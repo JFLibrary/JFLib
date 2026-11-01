@@ -769,7 +769,7 @@ impl Test {
                     let (up, base, px) = self.since_mark(ui);
                     let o = ui.gpu_output(0);
                     self.ok(up == 0 && base == 0 && px == 0, &format!("closed: {up} bytes uploaded, {px} pixels of the base drawn"));
-                    self.ok(o.layer_textures == 0 && o.layer_store == 0, &format!("closed: {} textures, {} bytes kept", o.layer_textures, o.layer_store));
+                    self.ok(o.layer_textures == 0, &format!("closed: {} textures in use", o.layer_textures));
                     self.same_so_far(ui, "closed");
                     self.mode += 1;
                     self.pc = if self.mode < COMBOS { 10 } else { 20 };
@@ -909,6 +909,14 @@ impl Test {
                 if self.after(60) {
                     self.ok(ui.gpu_output(0).layer_textures == 0, "closed");
                     self.screen_check(ui, "the end");
+                    self.next();
+                }
+            }
+            35 => {
+                // the memory follows a moment later, without a frame
+                if self.after(1400) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.layer_bytes == 0 && o.layer_store == 0, &format!("a moment later: {} bytes of textures, {} kept", o.layer_bytes, o.layer_store));
                     self.finish(ui);
                 }
             }
@@ -1701,6 +1709,12 @@ impl App for LayerBench {
             ui.timer(1, 8);
             return;
         }
+        // (a settle pass of the same frame: the scene stays)
+        if now.render == self.last.render {
+            self.t.frame(ui);
+            ui.timer(1, 8);
+            return;
+        }
         if self.stage < self.stages.len() {
             let (st_frames, st_settle, st_pick, st_set, st_name) = {
                 let st = &self.stages[self.stage];
@@ -1724,7 +1738,7 @@ impl App for LayerBench {
                 self.stage += 1;
                 self.frame = 0;
                 self.t.sc = Scene { page_on: true, ..Scene::default() };
-                if self.stage == 5 || self.stage == 6 || self.stage == 7 || self.stage == 8 {
+                if (6..=9).contains(&self.stage) {
                     if let Some(b) = &self.big {
                         self.t.sc.imgs.push((b.clone(), 1, [20, 60, 1200, 900]));
                     }
@@ -1785,7 +1799,11 @@ fn layer_bench(n: usize) -> i32 {
             s.dx = (k as i32 * 7) % 700;
             s.dy = (k as i32 * 3) % 300;
         } },
-        Stage { name: "tooltip", frames: n, settle: 0, pick: every, set: |s, k| {
+        Stage { name: "tooltip open", frames: n, settle: 0, pick: even, set: |s, k| {
+            s.panel = [200, 72];
+            s.mask = if k % 2 == 0 { 4 } else { 0 };
+        } },
+        Stage { name: "tooltip close", frames: n, settle: 0, pick: odd, set: |s, k| {
             s.panel = [200, 72];
             s.mask = if k % 2 == 0 { 4 } else { 0 };
         } },

@@ -86,6 +86,34 @@ fn rects(t: &mut T, g: &Gpu) -> Option<()> {
     t.ok(matches!(e1, Err(GpuError::Invalid(_))), "write_texture_rects: data smaller than the texture: Invalid");
     let e2 = q.write_texture_rects(&tex, &[[0, 0, 5, 5]], &a, 4, Layout::Sampled, Layout::Sampled);
     t.ok(matches!(e2, Err(GpuError::Invalid(_))), "write_texture_rects: stride smaller than a row: Invalid");
+    // from a larger image: a texture that holds a part of it
+    let (sw, sh, ox, oy) = (40u32, 30u32, 100i32, 50i32);
+    let small = t.res(dev.create_texture(&TextureDesc::d2(sw, sh, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::COPY_SRC | TextureUsage::SAMPLED)),
+                      "create_texture")?;
+    t.res(q.write_texture_rects_at(&small, &[[ox, oy, sw as i32, sh as i32]], (ox, oy), &a, stride, Layout::Undefined, Layout::Sampled), "the whole part")?;
+    // inside, across the texture's corner, across the image's edge, outside the texture
+    let rs = [[110, 60, 20, 10], [90, 40, 15, 15], [135, 75, 400, 400], [0, 0, 30, 30]];
+    t.res(q.write_texture_rects_at(&small, &rs, (ox, oy), &b, stride, Layout::Sampled, Layout::Sampled), "the rectangles")?;
+    let px = read_tex(t, dev, &small, Layout::Sampled)?;
+    let mut bad = 0;
+    for y in 0..sh as i32 {
+        for x in 0..sw as i32 {
+            let (ix, iy) = (x + ox, y + oy);
+            let src = if rs.iter().any(|r| inside(r, ix, iy)) { &b } else { &a };
+            let want = &src[(iy as u32 * stride + ix as u32 * 4) as usize..][..4];
+            let got = &px[((y as u32 * sw + x as u32) * 4) as usize..][..4];
+            if want != got {
+                bad += 1;
+            }
+        }
+    }
+    t.ok(bad == 0, &format!("write_texture_rects_at: rectangles of a larger image at the origin, clipped ({bad} texels differ)"));
+    let e3 = q.write_texture_rects_at(&small, &[[0, 0, 5, 5]], (0, 0), &a, 0, Layout::Sampled, Layout::Sampled);
+    t.ok(matches!(e3, Err(GpuError::Invalid(_))), "write_texture_rects_at: stride 0: Invalid");
+    // a rectangle reaching past the image's rows is cut to them: the bytes after them are not read
+    let mut one = alloc::vec![0u8; stride as usize * 2];
+    one[..4].copy_from_slice(&[9, 8, 7, 255]);
+    t.res(q.write_texture_rects_at(&small, &[[0, 0, 5, 100]], (0, 0), &one, stride, Layout::Sampled, Layout::Sampled), "a short image")?;
     Some(())
 }
 

@@ -19,6 +19,7 @@
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
 //   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
+//   queue.write_texture_rects_at(&tex, &rects, origin, &[u8], stride, before, after)   of a larger image
 //   queue.read_buffer(&buf, off, &mut [T])          copies, submits and waits (slow path)
 //   queue.flush() -> Result<SubmitId>               submit the pending uploads now
 //   device.wait(id, timeout_ns) -> Result<bool>     false: timed out
@@ -100,6 +101,7 @@ struct Ring {
     busy: Vec<(u64, Chunk)>, // retired: free once the GPU reached the value
     free: Vec<Chunk>,
     big_at: u64,        // plat::time_us of the last upload above half a chunk
+    big_size: u64,      // its bytes
 }
 
 pub(crate) struct State {
@@ -114,6 +116,8 @@ pub(crate) struct State {
 
 /// a chunk of the staging ring
 const CHUNK: u64 = 256 << 10;
+/// a large chunk stays while large uploads need at least this part of it
+const BIG_KEEP_RATIO: u64 = 8;
 /// free chunks kept beyond the one being filled
 const CHUNKS_FREE: usize = 2;
 /// an upload above half a chunk keeps its buffer this long after the last one (us)
@@ -635,7 +639,9 @@ impl Shared {
     }
 
     /// the free chunks beyond what the ring keeps go back: ordinary ones above CHUNKS_FREE,
-    /// large ones a second after the last large upload (all but the largest at once)
+    /// large ones a second after the last large upload (all but the largest at once; the largest
+    /// too when the last large upload was far smaller: one big image's buffer does not stay
+    /// around for the frames after it)
     fn ring_trim(&self, st: &mut State) {
         let now = plat::time_us();
         let keep_big = now.saturating_sub(st.ring.big_at) < BIG_KEEP_US;
@@ -645,7 +651,7 @@ impl Shared {
         while i < st.ring.free.len() {
             let size = st.ring.free[i].a.size;
             let keep = if size >= CHUNK * 2 {
-                keep_big && size == largest
+                keep_big && size == largest && size <= st.ring.big_size.saturating_mul(BIG_KEEP_RATIO).max(CHUNK * 2)
             } else {
                 small += 1;
                 small <= CHUNKS_FREE
@@ -705,6 +711,7 @@ impl Shared {
         if n > CHUNK / 2 {
             // a buffer of its own: free once the next submission is done
             st.ring.big_at = plat::time_us();
+            st.ring.big_size = n;
             let size = (n + 0xFFFF) & !0xFFFF;
             let mut c = self.ring_chunk(st, size.max(CHUNK * 2))?;
             c.used = n;

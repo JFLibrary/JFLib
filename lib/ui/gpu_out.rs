@@ -49,7 +49,8 @@
 // it is drawn again or uploaded; closing costs no upload at all.  dirty.rs tells per cell which
 // layer changed first (W::through): gp_split_draw restores below that layer, then draws and uploads
 // only from there on.  Something changing below an open layer draws what lies above it in those
-// cells, as ever.  Textures and stores exist while their layer has content.
+// cells, as ever.  Textures and stores exist while their layer has content and LINGER_US longer
+// (a menu closed and another opened need no new memory).
 //
 // Images (G3b).  A big opaque Cmd::Image of the base layer that has cost as much in redraws as its
 // upload would (rent or buy: a static image never takes GPU memory) becomes a texture, cached by
@@ -154,6 +155,8 @@ const LAYER_STEP: i32 = 256;
 const LAYER_SPARE: i32 = 128;
 /// a layer's texture this many times larger than needed goes
 const LAYER_SHRINK: i64 = 4;
+/// a layer's texture and store stay this long after its last content (us)
+const LINGER_US: u64 = 1_000_000;
 /// the bytes image textures may take (jfgui_GPU_IMAGE_MB)
 const IMAGE_BUDGET: u64 = 256 << 20;
 /// images whose redraws are counted
@@ -206,10 +209,24 @@ impl Store {
         &self.px[self.idx[i] as usize * CELL_BYTES..][..CELL_BYTES]
     }
 
+    /// nothing kept, the memory stays
+    fn empty(&mut self) {
+        self.idx.clear();
+        self.px.clear();
+        self.free.clear();
+        self.used = 0;
+    }
+
+    /// room for n cells more without moving what is kept
+    fn reserve(&mut self, n: usize) {
+        self.px.reserve_exact((n + self.used as usize).saturating_mul(CELL_BYTES).saturating_sub(self.px.len()));
+    }
+
     /// the cell's block, a new one when it has none (cells: the window's)
     fn put(&mut self, i: usize, cells: usize) -> &mut [u8] {
         if self.idx.len() != cells {
-            *self = Store { idx: vec![NO_BLOCK; cells], ..Store::default() };
+            self.empty();
+            self.idx.resize(cells, NO_BLOCK);
         }
         let mut b = self.idx[i];
         if b == NO_BLOCK {
@@ -244,7 +261,8 @@ struct LayerTex {
     fresh: bool, // nothing uploaded yet (Layout::Undefined)
 }
 
-/// a layer above the base: its texture, the rectangles of its cells, the pixels below it
+/// a layer above the base: its texture, the rectangles of its cells (none: it has no content, the
+/// texture and the store linger), the pixels below it
 #[derive(Default)]
 struct Upper {
     tex: Option<LayerTex>,
@@ -290,6 +308,8 @@ struct Split {
     upper: [Upper; UPPER],
     /// a layer above the base has cells apart
     active: bool,
+    /// when the memory of layers without content goes (0: none lingers)
+    linger_at: u64,
     /// the base texture holds no pixels of a layer above it
     clean: bool,
     /// this frame's uploads are done
@@ -657,7 +677,7 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
         e.set_render_pipeline(&core.pipe);
     }
     // the layers above, opaque: each cell holds what is there up to its layer
-    for u in &w.sp.upper {
+    for u in w.sp.upper.iter().filter(|u| !u.rects.is_empty()) {
         if let Some(t) = &u.tex {
             e.set_bind_group(0, &t.group);
             e.push_constants(0, &[t.ox, t.oy, 0, 0]);
@@ -1136,6 +1156,17 @@ impl Ui {
         }
         self.gp_poll();
         let n = self.m.gout.wins.len();
+        let now = plat::time_us();
+        for w in self.m.gout.wins.iter_mut().flatten() {
+            if w.sp.linger_at != 0 && now >= w.sp.linger_at {
+                w.sp.linger_at = 0;
+                for u in w.sp.upper.iter_mut().filter(|u| u.rects.is_empty()) {
+                    u.tex = None;
+                    u.store = Store::default();
+                }
+                self.m.gout.trim_at = now + TRIM_US; // (destroyed when the GPU has finished)
+            }
+        }
         for i in 0..n {
             let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
             match w.stage {
@@ -1285,6 +1316,9 @@ impl Ui {
         let ready = matches!(s.dev, Dev::Ready(_));
         let moving = plat::win_in_sizemove();
         for w in s.wins.iter().flatten() {
+            if w.sp.linger_at != 0 {
+                d = d.min(w.sp.linger_at);
+            }
             let minimised = plat::win_state(w.pw) & plat::WST_MINIMIZED != 0;
             match w.stage {
                 Stage::Switch if !minimised => d = d.min(now + RETRY_US),
@@ -1362,7 +1396,7 @@ impl Ui {
             o.pending = w.pending;
             for u in &w.sp.upper {
                 if let Some(t) = &u.tex {
-                    o.layer_textures += 1;
+                    o.layer_textures += !u.rects.is_empty() as u32;
                     o.layer_bytes += t.w as u64 * t.h as u64 * 4;
                 }
                 o.layer_store += u.store.px.capacity() as u64;
@@ -1554,11 +1588,13 @@ impl Ui {
                                 if let Dev::Ready(core) = &s.dev {
                                     // (a device gone or no memory: the CPU draws it, a failure of the
                                     // device shows with the next present)
+                                    let t0 = plat::time_us();
                                     if let Ok(tex) = image_texture(core, sf) {
                                         s.images[at].tex = Some(Rc::new(tex));
                                         s.image_bytes += need;
                                         s.image_uploads += 1;
                                         s.trim_at = plat::time_us() + TRIM_US;
+                                        s.note(&format!("image {} x {} as a texture: {:.2} ms", sf.w, sf.h, ms(t0, plat::time_us())));
                                         if let Some(Some(w)) = s.wins.get_mut(i) {
                                             w.out.upload_bytes += need;
                                         }
@@ -1623,6 +1659,9 @@ impl Ui {
             if kept {
                 self.gp_flatten(i);
             }
+            if let Some(w) = self.m.gout.win(i).filter(|_| upper_now) {
+                w.sp.clean = false; // the layers go into the base texture with this frame
+            }
             self.wp.dirty.busy = false;
             return false;
         }
@@ -1668,7 +1707,7 @@ impl Ui {
             sp.owed = vec![false; total];
             sp.stale = vec![false; total];
         }
-        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, .. } = sp;
+        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, linger_at, .. } = sp;
         // ---- per cell: what changed, which layers touch it
         lowest.clear();
         lowest.resize(total, L_COUNT as u8);
@@ -1719,8 +1758,8 @@ impl Ui {
                 bb = [bb[0].min(b[0]), bb[1].min(b[1]), bb[2].max(b[2]), bb[3].max(b[3])];
             }
             if bb[0] >= bb[2] {
-                if u.tex.take().is_some() {
-                    *trim_at = plat::time_us() + TRIM_US; // (destroyed when the GPU has finished: a look then)
+                if u.tex.is_some() && !u.rects.is_empty() {
+                    *linger_at = plat::time_us() + LINGER_US;
                 }
                 continue;
             }
@@ -1760,6 +1799,12 @@ impl Ui {
                         }
                     }
                     if nr[k] & bit != 0 {
+                        let st = &upper[l - 1].store;
+                        if !st.has(k) && st.free.is_empty() && st.px.len() + CELL_BYTES > st.px.capacity() {
+                            // (the layer's other new cells too: no reallocation for each of them)
+                            let n = (k..total).filter(|&c| nr[c] & bit != 0 && !st.has(c)).count();
+                            upper[l - 1].store.reserve(n);
+                        }
                         if owed[k] && hole[k] != 0 {
                             if let Some(q) = quads.get(hole[k] as usize - 1) {
                                 quad_blit(fb, q, b);
@@ -1812,7 +1857,7 @@ impl Ui {
                     }
                 }
                 if u.store.used == 0 {
-                    u.store = Store::default();
+                    u.store.empty();
                 }
                 cell_rects(&mut u.rects, cols, rows, fw, fh, |k| nr[k] & bit != 0);
             }
@@ -1823,7 +1868,7 @@ impl Ui {
         }
         sp.any_owed = sp.owed.iter().any(|&v| v);
         sp.any_stale = sp.stale.iter().any(|&v| v);
-        sp.active = sp.upper.iter().any(|u| u.tex.is_some());
+        sp.active = sp.upper.iter().any(|u| !u.rects.is_empty());
         sp.clean = true;
         sp.drawn = true;
         sp.err = err;
