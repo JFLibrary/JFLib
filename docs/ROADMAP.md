@@ -1398,6 +1398,11 @@ Fensterrand hinaus.
   Breiten und Höhen, Floats, Flexbox, Grid, Positionierung) und JavaScript. Offen: Schriftgrößen
   und -familien aus CSS in der Ansicht, Hintergründe einzelner Tabellenzellen, zusammenfallende
   Ränder, `@media`; im dunklen Thema bleiben Textfarben der Seite, wie sie sind.
+  Benutzt seit B1 und B2 (2026-11-01) vom Webbrowser des App-README: `doc_view` mit `MI_APP`,
+  `MdEv::link`, `MdEv::submit`, `MdDoc::by_id`/`select_first`/`parent` für Fragmente und Titel.
+  Dabei behoben: Der Name eines Links am Anfang eines Listeneintrags enthielt für Screenreader
+  die Listenmarke („- Text“). Neu in `lib/netpkt` dazu: `uri` (URI-Referenzen nach RFC 3986,
+  Auflösen, Prozent- und Formular-Kodierung) und `http::mime_of`.
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,

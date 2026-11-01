@@ -2279,7 +2279,12 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   options `OPT_*` (`ECHO`, `SGA`, ...), `escape` and `to_nvt` for a data stream, a `Reader`
   that turns bytes arriving in pieces into `Item`s (data, a command, a negotiation, a
   subnegotiation), `parse` for one buffer, and `Options` (the loop-free Q method of RFC 1143:
-  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `radius`
+  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `uri` reads
+  addresses as RFC 3986 does: `Uri::parse(s)` takes every text as a reference (scheme, authority,
+  path, query, fragment; `host()`, `port()`), `base.join(r)` resolves a relative one (the examples
+  of 5.4 are tests), `remove_dot_segments`, `u.encoded()` escapes what a URI cannot hold,
+  `percent_encode` / `percent_decode`, and `form_encode` / `form_decode` are HTML's
+  `application/x-www-form-urlencoded`; `http::mime_of(path)` gives a file's Content-Type.  `radius`
   has the RADIUS packets of RFC 2865 / 2866 -- `RadiusView` and `Packet` with every attribute
   by number and name (`A_*`, `attr_name`, `value_name`; vendor-specific ones kept as bytes),
   `hide_password` / `reveal_password` (the User-Password hiding of 5.2), the Request and

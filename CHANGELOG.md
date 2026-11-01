@@ -84,6 +84,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **shader:** lib/shader: a SPIR-V module builder (SPIR-V 1.3 to 1.6), a disassembler, a structural validator, std140 / std430 layouts, specialization constants (also for the workgroup size), shader::reflect (entry points, specialization constants and their values), the shaders of the GPU benchmark scene and texture sample shaders with CPU references (docs/SHADER.md)
 - **plat:** plat::win_native: the HWND and HINSTANCE of a plat window, for GPU surfaces
 - **wgsl:** lib/wgsl, JFLib's WGSL compiler: lexer, parser and checker after the W3C WGSL specification (every type, constant evaluation, overrides, the built-in functions, layouts, entry points), German diagnostics with line and column, a fully typed IR and a back end to SPIR-V 1.3 and 1.6 (wgsl::compile: one module per entry point, WGSL's runtime rules, bounds-clamped indices and texture coordinates, overrides as specialization constants with their values computed by name or @id, WebGPU's pipeline checks); the benchmark shaders in WGSL (docs/WGSL.md)
+- **netpkt:** URI references as RFC 3986 reads them (netpkt::uri: parsing, resolving a relative reference, remove_dot_segments, percent encoding, HTML's form encoding) and the Content-Type of a file by its extension (netpkt::http::mime_of)
 
 ### Changed
 
@@ -141,6 +142,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Wayland: windows come to the front through xdg-activation -- the launcher's $XDG_ACTIVATION_TOKEN (Plasma's menu, KRunner, Dolphin, GNOME's shell; KWin 6 gives a new window the keyboard only with it) is used for the first window and removed from the environment; win_activate / ui.bring_to_front raise and restore a minimized window (before nothing happened: the tray's 'show window' and a click on a notification left it minimized) with the token KDE's tray (ProvideXdgActivationToken) or the notification server (ActivationToken) gave, else one asked for with the last input; a later start of an AF_SINGLE_INSTANCE app hands its token to the running instance
 - **plat:** The library builds with Rust 1.99 too: Atomic*::fetch_update, deprecated there (renamed), is try_update (already in 1.98)
 - **plat:** plat::instance builds for the web and Android again (the stand-in casts of encode / decode)
+- **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
 
 ### Security
 
