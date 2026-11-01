@@ -1670,8 +1670,18 @@ Fensterrand hinaus.
   187 KB größer, auch mit abgeschaltetem Weg. Es fehlen Messungen auf anderen GPUs und Laptops, mit
   60 Hz, ein echter Treiber-Reset, Sperrbildschirm und Remote Desktop im laufenden Betrieb, der Stift
   auf echter Hardware.
-- **P2** · *fehlt* · G3b: Ebenen (Basis, Dialog, Popup, Tooltip) als eigene Texturen und
-  `Cmd::Image` als GPU-Textur.
+- **P2** · *erledigt* (2026-11-01) · G3b: Ebenen (Dialog, Popup, Tooltip) und große Bilder als
+  eigene GPU-Texturen ([GPU.md](GPU.md#ebenen-und-bilder)), `jfgui_GPU_LAYERS=0` schaltet ab. Die
+  GPU blendet nichts: Überblenden wich in rund einem Achtel der durchscheinenden Pixel um 1–2
+  Stufen ab, und Subpixel-Text braucht einen undurchsichtigen Grund. Die CPU rechnet deshalb jede
+  Ebene über das, was wirklich darunter liegt, und die GPU legt fertige Zellen von 32 × 32 Pixeln
+  übereinander. Ein Popup schließt ohne Upload (vorher 737 KB) in 0,3 statt 1,1 ms. Öffnen und
+  Verschieben laden so viel hoch wie zuvor und sparen 20–30 % CPU. Ein großes Bild wird erst zur
+  Textur, wenn seine Neuzeichnungen das Hochladen aufgewogen haben (Budget 256 MiB), dann sinkt
+  eine Seitenänderung darüber von 13,5 auf 5,8 ms. Stehende Bilder gewinnen nichts, und `image_view`
+  und Leinwände nutzen den Weg erst mit G3c. `Ui::fb()` kann dabei Pixel solcher Bilder auslassen,
+  `Ui::gpu_settle()` holt sie nach. Nicht getestet: ein echter Treiber-Reset, andere GPUs, ein
+  Bildcache über zwei Fenster, ein echtes Bild in RTL.
 - **P2** · *fehlt* · G3c: Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel,
   JFNetworker, Bildbetrachter und Diagramm.
 - **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne

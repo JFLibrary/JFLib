@@ -1815,6 +1815,15 @@ fn layer_bench(n: usize) -> i32 {
             s.dx = (k as i32 * 3) % 900;
             s.dy = (k as i32 * 2) % 500;
         } },
+        // the whole page changes, alone and under an open dialog
+        Stage { name: "page", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.page = k as u32;
+        } },
+        Stage { name: "page, dialog", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.panel = [560, 380];
+            s.mask = 1;
+            s.page = k as u32;
+        } },
         // a big image: something beside it changes; it stands still under a popup; it moves
         Stage { name: "image, beside", frames: n, settle: 2, pick: every, set: |s, k| {
             s.tick = k as u32;

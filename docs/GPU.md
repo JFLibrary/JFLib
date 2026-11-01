@@ -470,6 +470,10 @@ Beim Öffnen und Verschieben bleibt die Menge gleich und der größte Teil der Z
 Fläche) und Inhalt der Ebene selbst. Was wegfällt, ist alles darunter; je teurer der Grund (eigene Zeichnungen, Leinwände),
 desto mehr bringt das. Am meisten gewinnen Schließen und Bilder. Ein stillstehendes Bild kostet und bringt nichts.
 
+Ändert sich die ganze Seite unter einem offenen Dialog, zeichnet dieser Weg auf einem Thread statt in Bändern. Mit derselben
+Arbeit auf der CPU (`jfgui_GPU_IMAGES=0`) sind das 13–15 ms statt 12 ms, dafür 0,5 statt 1,2 ms beim Darstellen, bei 14 % mehr
+Upload (zwei Läufe gegen einen, der Rechner unter Last).
+
 Echte Galerie (1900 × 1000, ein Skript, ganze Zahlen aus den Zählern, je 1 Lauf; hochgeladen, in Klammern davon in die Grundtextur, und Grund-Pixel):
 
 | Vorgang | vorher | nachher |

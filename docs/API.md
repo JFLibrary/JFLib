@@ -370,8 +370,7 @@ event carries its window (Event::win).
 **`impl Ui`**
 
 - **`fn fb(&self) -> &Surface`**
-  ui_fb: the live window's framebuffer
-  the live window's framebuffer.  While its frames go through the GPU a big image may be
+  ui_fb: the live window's framebuffer.  While its frames go through the GPU a big image may be
   drawn only there: Ui::gpu_settle() first when the pixels matter
 - **`fn client_size(&self) -> (i32, i32)`**
   ui_client_size: client area in DIP
