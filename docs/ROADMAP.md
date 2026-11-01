@@ -731,8 +731,7 @@ Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
   echte Schriften gegen `fonttest --outlines`): Konturen höchstens 0,0005 Einheiten neben
   HarfBuzz, Vorschübe gleich; FreeType liest FDSelect 4 nicht (die Collection prüft nur
   HarfBuzz). Es fehlen: Hinting von CFF2 (wie bei CFF: Stems werden gezählt und übersprungen),
-  eine Probe mit einer echten CFF2-Schrift (auf diesem Rechner gibt es keine; Fedora-Test
-  ausstehend), `blend` in Private-DICT-Werten wirkt nicht (Hinting-Werte werden nicht
+  die Probe unter GNOME (mit der echten Schrift auf Fedora KDE geprüft, LINUX_TESTPLAN 1a), `blend` in Private-DICT-Werten wirkt nicht (Hinting-Werte werden nicht
   gebraucht), VVAR / vertikale CJK-Metriken; Schnitte einer Collection teilen ihre Daten nicht
   (jeder geladene Schnitt liest die ganze Datei).
 
