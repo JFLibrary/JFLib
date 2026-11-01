@@ -354,6 +354,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
 | `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
+| `dot1x_panel.uis` | 802.1X im Fenster auf `fixtures/dot1x_lab.jfnet`: die Kabel der geschlossenen Ports heißen „nicht autorisiert“, das Feld „Anmeldung am Netz (802.1X)“ der IP-Konfiguration auf PC1 (ohne Identität ein Hinweis; EAP-MD5, der Port geht auf), PC2 mit falschem Passwort und EAP-PWD (bleibt zu), der RADIUS-Server im Inspektor eines Enterprise-Netzes, der Laptop im Unternehmens-WLAN |
+| `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
+| `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
+| `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -374,7 +378,9 @@ für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`, 
 Skriptsprache die Gruppe `script`.
 Für Mail: `mail_domains.jfnet` (a.lab und b.lab mit je einem Mailserver und einem PC hinter R1,
 DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskripte
-`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte).
+`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte), 802.1X,
+WPA-Enterprise und IMAP (die selftest-Gruppen `dot1x` und `imap`, `scen_dot1x_imap.uis`, die
+coretest-Gruppe `eap` mit den Vektoren von EAP-PWD und dem Codec von IMAP).
 Für Gruppen und Hintergrundbild: `groups.jfnet` (zwei PCs und zwei Server an SW1, die Server mit
 einem Kabel unter sich, dessen Masken nicht passen) und `bg_plan.png` (ein Grundriss,
 160 × 120); die Rahmen des Diagramm-Widgets prüft `apps/diagramtest/tests/frames.uis`.
@@ -449,6 +455,8 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
+| 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
+| IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
 
 ### Gerätekatalog
 
@@ -2341,7 +2349,8 @@ läuft, blass, wenn die Station außer Reichweite ist).
   oder mehrere Netze mit SSID, Band und Kanal (2,4 GHz Kanal 1 bis 13, 5 GHz 36 bis 64 und 100
   bis 140, 6 GHz 1 bis 93; der JF-AP6E sendet auf allen drei Bändern über je einen Funkport, der
   Heimrouter 2,4 und 5 GHz über `wlan0`), Sicherheit (offen, WPA2-Personal oder WPA3-Personal
-  mit einer Passphrase von 8 bis 63 Zeichen; 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
+  mit einer Passphrase von 8 bis 63 Zeichen, WPA2- oder WPA3-Enterprise mit einem RADIUS-Server,
+  siehe [802.1X und WPA-Enterprise](#8021x-und-wpa-enterprise); 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
   Funkports und die Kabelports in der Grundeinstellung werden dafür Trunks mit VLAN 1 ungetaggt;
   der Heimrouter behält seine Stationen in seinem LAN), Gastnetz und Client-Isolation. Eine Station hat das
   Netz, das sie sucht (SSID und Passphrase), oder keins. Jede Änderung ist ein Rückgängig-Schritt,
@@ -2418,8 +2427,8 @@ ein HKDF-SHA256 über Passwort, beide MAC-Adressen und je einen Zufallswert beid
 auf beiden Seiten bei gleichem Passwort, neu bei jeder Zuordnung), alles danach ist echt. Die
 Daten werden nicht mit CCMP verschlüsselt (die Schlüssel entstehen, die Frames bleiben lesbar).
 
-Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, WPA-Enterprise (802.1X mit
-RADIUS), Band Steering und 802.11r, Netze über die IOS-artige Befehlszeile einrichten.
+Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, Band Steering und 802.11r, Netze
+über die IOS-artige Befehlszeile einrichten.
 
 Für Programme: `Action::Move { dev, x, y }`, `Action::Wlan { dev, wlan }`, `Action::Scale {
 dip_per_m }`, `Engine::wlan_assocs()`, `wlan_station(dev)`, `wlan_stations_of(ap)`,
@@ -2795,8 +2804,8 @@ Vorbild).
 
 Der **vty-Telnet-Server** (eine Sitzung je vty-Leitung, `transport input`, die Anmeldung der
 Leitung über dieses Gate und AAA, Sitzungslimit, Leerlaufzeit) kam mit X1e, siehe
-[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server). Offen: 802.1X und WPA-Enterprise
-(spätere Meilensteine).
+[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server); 802.1X und WPA-Enterprise mit X1g,
+siehe [802.1X und WPA-Enterprise](#8021x-und-wpa-enterprise).
 
 Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
 `CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
@@ -2978,6 +2987,21 @@ gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontras
   UIDL (der eindeutige Name der Datei), RETR und TOP nach der Lesezeit der Disk, DELE, RSET,
   NOOP, CAPA und QUIT, das erst dann die markierten Nachrichten löscht (ein Rückgängig-Schritt
   des Projekts); ein Postfach hält nur eine Sitzung (`[IN-USE]`).
+- **IMAP-Server** ([`imapd.rs`](crates/jfn_sim/imapd.rs), Dienst `imap-server`, Port 143; der Codec:
+  [`netpkt::imap`](../../lib/netpkt/imap.rs)): dieselben Maildirs wie POP3, mit Ordnern (`.Sent`,
+  `.Trash`, weitere als `.Name`), Flags im Dateinamen (`:2,FRST`, ein Flag schiebt die Nachricht von
+  `new/` nach `cur/`) und UIDs in der Datei `.uidlist` des Ordners. CAPABILITY, LOGIN, AUTHENTICATE
+  PLAIN, LOGOUT, NOOP; LIST, LSUB, SELECT, EXAMINE, STATUS, CREATE, DELETE, RENAME; FETCH (FLAGS,
+  UID, RFC822.SIZE, INTERNALDATE, ENVELOPE, BODY[], BODY[HEADER], BODY[TEXT],
+  BODY[HEADER.FIELDS (…)], .PEEK, RFC822, ALL, FAST, FULL), STORE, EXPUNGE, CLOSE, UNSELECT, COPY,
+  MOVE, APPEND, SEARCH (ALL, UNSEEN, FROM, SUBJECT, TEXT, NOT, OR und mehr), die UID-Formen und IDLE
+  (eine neue Nachricht meldet sich nach höchstens 2 s). Mehrere Sitzungen und POP3 dürfen dasselbe
+  Postfach halten; was eine andere entfernt, kommt beim nächsten NOOP als EXPUNGE. Die erste
+  Anmeldung legt Sent und Trash an. Die Begrüßung nennt unseren eigenen Server.
+
+  ```json
+  {"kind": "imap-server", "name": "imap", "config": {"users": [{"name": "anna", "password": "geheim"}]}}
+  ```
 - **E-Mail im Desktop** ([`devwin/email.rs`](src/workspace/devwin/email.rs)): das Konto (Name,
   Adresse, SMTP-Server und Port, POP3-Server und Port, Benutzer, Passwort, Nachrichten auf dem
   Server lassen) liegt als `/root/Mail/account` auf dem Gerät; Posteingang (`/root/Mail/inbox`)
@@ -2986,9 +3010,15 @@ gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontras
   zitiert), Löschen, Senden und Abrufen. Senden und Abrufen gehen als `Action::MailSend` /
   `MailFetch` an den Simulator (so spielt das Zurückspulen sie nach), der ein Programm des
   Geräts damit beauftragt; abgerufen wird, was die UIDL noch nicht kannte (`/root/Mail/.uidl`).
-  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab.
+  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab. Mit dem Kontotyp IMAP bleibt die Mail
+  auf dem Server: die Ordner des Servers stehen zur Wahl, die Spalte Status zeigt seine Flags (Neu,
+  ★), Abrufen gleicht den gezeigten Ordner ab (`/root/Mail/imap/ORDNER/UID.eml` ist nur die Kopie
+  fürs Fenster), Lesen setzt \Seen, Markieren \Flagged, Löschen verschiebt nach Trash (dort endgültig),
+  Gesendetes landet per APPEND in Sent, Ordner werden angelegt und gelöscht; je eine Sitzung über
+  `Action::MailImap`.
 - **Shell:** `curl smtp://SERVER[:PORT][/HELO] --mail-from A --mail-rcpt B -T DATEI [-u
   BENUTZER:PASSWORT] [-v]` und `curl pop3://SERVER[/N] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
+  DATEI] [-v]` und `curl imap://SERVER[/ORDNER[;UID=N][?SUCHE]] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
   DATEI] [-v]` mit den Schritten, Meldungen und Exit-Codes von curl; `mail` einmalig: `echo
   TEXT | mail -s BETREFF [-c ADRESSE] [-r ABSENDER] EMPFÄNGER` übergibt eine Nachricht an den
   SMTP-Server des Kontos (oder an einen auf dem Gerät selbst), `mail -H` listet den
@@ -3018,19 +3048,24 @@ Ein Mailserver in der Projektdatei:
 Entscheidungen: Maildir statt mbox, weil jede Nachricht eine Datei im Reiter Dateien ist, UIDL
 ihr Name und DELE das Entfernen einer Datei. Die Antworten der Server, ihre Begrüßung, die
 Unzustellbarkeitsnachricht und die Log-Zeilen sind eigene Worte auf Englisch wie bei den
-anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Weder
-STARTTLS noch IMAP.
+anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Kein STARTTLS.
+Bei IMAP gilt eine Nachricht als \Recent, solange sie in `new/` liegt: das Postfach bleibt, wie der
+Server es vorfand, bis jemand etwas ändert. Keine BODYSTRUCTURE und keine Teilabrufe, Schlüsselwörter
+werden nicht gespeichert.
 
-Noch offen: IMAP, STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
+Noch offen: STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
 Warteschlange auf der Disk, die einen Neustart übersteht, Anhänge im Programm E-Mail, SPF und
 DKIM.
 
 Für Programme: `Action::MailSend { dev, draft: MailDraft }`, `Action::MailFetch { dev }`,
+`Action::MailImap { dev, op: ImapOp }`, `mailc::{imap_dir, imap_folders, imap_marks, uid_of_path}`,
 `Engine::mail_client(dev)`, `jfn_sim::mailc` (`Account`, `folder`, `read_mail`, `INBOX`,
 `SENT`, `ACCOUNT`), `Note::Mail(MNote)`, `ProblemKind::MailMxNowhere`, `MailOpenRelay` und
 `MailNoMailbox`. Geprüft wird in der Selbsttest-Gruppe `mail` ([`src/mailtest.rs`](src/mailtest.rs)),
 in der coretest-Gruppe `mail` (die Codecs Byte für Byte), mit `scen_mail_domains.uis` und den
-Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`.
+Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`; IMAP in der
+Selbsttest-Gruppe `imap` ([`src/imaptest.rs`](src/imaptest.rs)), der coretest-Gruppe `eap`, mit
+`scen_dot1x_imap.uis` und `mail_imap.uis`.
 
 ### Gruppen und Hintergrundbild
 
@@ -3351,6 +3386,89 @@ Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `Ses
 Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu das Szenario
 `sessions.scn` und die Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und
 `sessions_shots.uis`.
+
+### 802.1X und WPA-Enterprise
+
+Ein Port eines IOS-artigen Switches kann die Anmeldung verlangen, bevor er Daten durchlässt, und
+ein Access Point kann sein Netz über denselben Weg schützen (IEEE 802.1X-2004, RFC 3748, 3579,
+5931). Auch hier fließen echte Bytes: EAPOL auf dem Kabel oder der Funkstrecke, EAP in RADIUS,
+echte Prüfsummen und Schlüssel; der Paket-Tab zeigt alles Feld für Feld, der Simulationsmodus hat
+für EAPOL die Kategorie „802.1X“ in einem gedämpften Rostrot.
+
+- **Am Switch** ([`dot1x.rs`](crates/jfn_sim/dot1x.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs)):
+  `aaa new-model`, `aaa authentication dot1x default group radius` (auch `group NAME`, `local`),
+  `dot1x system-auth-control`, am Port `authentication port-control
+  auto|force-authorized|force-unauthorized`, `dot1x pae authenticator`, `dot1x timeout
+  tx-period|quiet-period|reauth-period|supp-timeout N`, `dot1x max-req N`, `authentication
+  periodic`, `authentication timer reauthenticate N`. Ein Port unter `auto` ist geschlossen, bis der
+  Server zustimmt: nur EAPOL kommt durch, nichts wird gelernt, seine LED leuchtet gelb und das
+  Kabel heißt „nicht autorisiert“. Ablauf: EAP-Request/Identity an die Gruppenadresse, sobald der
+  Link steht, dann alle `tx-period`; die Antworten des Supplicants gehen in Access-Requests mit
+  State und Message-Authenticator zum Server, jede Access-Challenge kommt als nächste Anfrage
+  zurück (wiederholt nach `supp-timeout`, bis `max-req`). Nach Access-Accept ist der Port offen
+  (`show dot1x`, `show authentication sessions` in eigenem Aufbau, `debug dot1x`, `%DOT1X-…` auf
+  der Konsole), mit `authentication periodic` wird nach `reauth-period` oder dem Session-Timeout des
+  Servers neu gefragt, der Port bleibt dabei offen. Nach Access-Reject bleibt er für `quiet-period`
+  zu. `dot1x re-authenticate interface IF` und `clear authentication sessions` fragen sofort neu.
+- **VLAN vom Server:** Tunnel-Type, Tunnel-Medium-Type und Tunnel-Private-Group-ID (RFC 3580) legen
+  den Port für die Dauer der Sitzung in dieses VLAN, seine Einstellung bleibt; ein VLAN, das der
+  Switch nicht kennt, lässt den Port zu.
+- **RADIUS-Server** ([`radiusd.rs`](crates/jfn_sim/radiusd.rs)): antwortet EAP mit seinen Benutzern,
+  `eap_methods` (ohne Angabe MD5, dann PWD), `eap_id`, je Benutzer `vlan` und `session_timeout`:
+
+  ```json
+  {"kind": "radius-server", "name": "radius", "config": {"clients": [{"address": "10.0.0.0/24",
+   "secret": "testing123"}], "users": [{"name": "anna", "password": "geheim", "vlan": 20}]}}
+  ```
+- **Methoden** ([`lib/eapm`](../../lib/eapm/lib.rs), [`crypto::eappwd`](../../lib/crypto/eappwd.rs)):
+  EAP-MD5 für Kabelports, ohne Schlüssel; EAP-PWD (RFC 5931 auf P-256 mit SHA-256): nur ein
+  Passwort, keine Zertifikate, und es ergibt MSK und EMSK. Bei NAS-Port-Type Wireless-802.11 bietet
+  der Server nur Methoden mit Schlüsseln an.
+- **Supplicant** ([`supp.rs`](crates/jfn_sim/supp.rs)): `/etc/wpa_supplicant/wpa_supplicant.conf` mit
+  `network={ … }`-Blöcken (`key_mgmt=IEEE8021X` am Kabel, `key_mgmt=WPA-EAP` und `ssid` im WLAN,
+  `eap=MD5|PWD`, `identity`, `password`). Die Datei ist ein Schritt des Projekts; wie beim echten
+  Programm zählt eine Änderung erst beim Start oder nach `wpa_cli reconfigure`, Rückgängig beendet
+  also keine laufende Anmeldung. Liegt die Datei auf dem Gerät, läuft er von selbst;
+  `wpa_supplicant [-B] -i IF -c DATEI`, `wpa_cli status|list_networks|reconfigure|logon|logoff|
+  reauthenticate`. Antwortet niemand auf drei EAPOL-Start (alle 30 s), läuft der Port ohne 802.1X;
+  nach einer Ablehnung wartet er 60 s. Nach dem Erfolg startet ein DHCP-Client des Ports ohne Lease
+  sofort. Im Desktop schreibt das Feld „Anmeldung am Netz (802.1X)“ der **IP-Konfiguration** diese
+  Datei (Methode, Identität, Passwort, am Kabel und fürs WLAN) und zeigt den Zustand. Alle
+  Endgeräte haben die Shell und damit den Supplicant; das IP-Telefon hat nur Brückenports und
+  meldet sich nicht an.
+- **WPA-Enterprise** ([`wlan.rs`](crates/jfn_sim/wlan.rs)): Sicherheit `wpa2-enterprise` (AKM 1) und
+  `wpa3-enterprise` (AKM 5, mit AES-128-CMAC und KDF-SHA256, auch auf 6 GHz); ein Netz nennt
+  `radius`, `radius_key`, `radius_port`, im Inspektor RADIUS-Server und Schlüssel. Eine Station hat
+  `identity` und `eap` neben der Passphrase als Passwort, oder einen Block der Datei. Nach der
+  Assoziation läuft EAP über die Funkstrecke (die Anfrage kommt nach 3 s wieder), der Access Point
+  fragt seinen Server über sein BVI; das MSK kommt in MS-MPPE-Recv-Key und -Send-Key (RFC 2548) zu
+  ihm und aus der Methode zur Station, die ersten 32 Bytes sind das PMK, und der echte 4-Wege-Handshake
+  folgt. Eine Ablehnung oder ein Erfolg ohne Schlüssel beendet die Zuordnung (Grund 23) und zählt
+  wie eine falsche Passphrase. Beim Roaming läuft EAP neu, es gibt kein PMK-Caching.
+- **Probleme:** `Dot1xNoServer` (auto ohne Methodenliste oder Server: der Port bleibt zu, Fehler),
+  `Dot1xOff` (auto ohne `dot1x system-auth-control`: der Port bleibt offen, Warnung).
+
+Entscheidungen: PEAP-MSCHAPv2 und EAP-TLS gibt es nicht: TLS liegt in `lib/netio` und nennt `plat`
+(ein Kern ohne I/O wäre ein Umbau der Library), MSCHAPv2 bräuchte auch MD4 und DES. EAP-PWD ist die
+schlüsselerzeugende Methode, weil es ohne Zertifikate auskommt. Beide Rollen sind verborgene Dienste
+(`dot1x-auth`, `wpa_supplicant`) mit Dienst-Timern, es gibt keinen festen Timer-Slot. Eine
+Port-Zeile `authentication port-control auto` genügt, `dot1x pae authenticator` steht nur auf
+Wunsch in der Konfiguration, `no dot1x pae authenticator` schaltet den Port aus. „local“ in der
+Methodenliste heißt: der Switch prüft EAP-MD5 selbst gegen `username NAME password …` (ein Hash
+kann keine Challenge beantworten); ohne Server und ohne „local“ bleibt der Port zu. Ein Port ist
+„multi-host“: wer dahinter hängt, kommt mit durch.
+
+Noch offen: Host-Modi (single-host, multi-domain für IP-Telefone), MAB, Guest- und Auth-Fail-VLAN,
+Accounting für 802.1X, TLS-Methoden, PMK-Caching und 802.11r.
+
+Für Programme: `Action::Supplicant { dev, conf }`, `Engine::dot1x_sessions(dev)`,
+`dot1x_port_closed(dev, port)`, `supp_views(dev)`, `supp_conf(dev)`, `wlan_creds(dev, ssid)`,
+`Led::Unauth`, `Note::Dot1x(DNote)`, `jfn_sim::supp` (`NetBlock`, `parse_conf`, `conf_text`),
+`netpkt::eap`, `netpkt::eapol::{start, logoff, eap_pdu, PAE_GROUP}`, `netpkt::radius` (`push_eap`,
+`push_vlan`, `push_msk`, `mppe_seal`, …), `crypto::p256` (die Gruppe), `eapm::{Peer, Server}`. Geprüft
+wird in der Selbsttest-Gruppe `dot1x` ([`src/dot1xtest.rs`](src/dot1xtest.rs)), in der coretest-Gruppe
+`eap` (Codecs und die Vektoren einer unabhängigen Python-Referenz von EAP-PWD), mit
+`scen_dot1x_imap.uis` und den Fensterskripten `dot1x_panel.uis` und `dot1x_shots.uis`.
 
 ## Performance
 
