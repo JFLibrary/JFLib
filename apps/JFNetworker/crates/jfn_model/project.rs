@@ -5,7 +5,7 @@
 //   rename / move_device / remove_device -> (Device, links) / insert_device (undo, paste)
 //   connect(a, b, cable) -> link id               ports by any spelling; the right cable when
 //                                                 `cable` is None, else checked with cable_fits
-//   disconnect(id) -> Link / insert_link (undo)    add_note / remove_note
+//   disconnect(id) -> Link / insert_link (undo)    add_note / add_label / remove_note
 //   suggest_ports(a, b)                           the free port pair a quick connect would take
 //   suggest_ports_for(a, b, kind)                 the same for a cable the user chose: only pairs
 //                                                 it fits, the fastest first
@@ -73,6 +73,10 @@
 // place, scale, opacity and lock; null without).  Both are view data the simulator never sees;
 // a group's id comes from the same counter as devices, links and notes.  Older files have
 // neither and look as before.
+//
+// A note's "style" (H3): "sticker", a card that wraps its text inside its box, or "label", a slim
+// text without a card, its box measured by the app when the text is set.  A file without it (and
+// an unknown value) means the sticker.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -188,6 +192,14 @@ record! {
     }
 }
 
+wire_enum! {
+    /// how a note looks on the canvas
+    pub enum NoteStyle {
+        Sticker = "sticker",
+        Label = "label",
+    }
+}
+
 record! {
     /// a text note on the canvas
     pub struct Note {
@@ -197,6 +209,8 @@ record! {
         pub w: i32,
         pub h: i32,
         pub text: String,
+        /// a card or a slim text
+        pub style: NoteStyle,
     }
 }
 
@@ -644,9 +658,16 @@ impl Project {
 
     pub fn add_note(&mut self, x: i32, y: i32, text: &str) -> u32 {
         let id = self.alloc_id();
-        self.notes.push(Note { id, x, y, w: 200, h: 80, text: String::from(text) });
+        self.notes.push(Note { id, x, y, w: 200, h: 80, text: String::from(text), style: NoteStyle::Sticker });
         id
     }
+    /// a label: its text and its box w x h (measured by the app, world units) -> its id
+    pub fn add_label(&mut self, x: i32, y: i32, w: i32, h: i32, text: &str) -> u32 {
+        let id = self.alloc_id();
+        self.notes.push(Note { id, x, y, w, h, text: String::from(text), style: NoteStyle::Label });
+        id
+    }
+
     pub fn remove_note(&mut self, id: u32) -> Option<Note> {
         let i = self.notes.iter().position(|n| n.id == id)?;
         Some(self.notes.remove(i))

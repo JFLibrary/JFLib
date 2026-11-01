@@ -48,6 +48,12 @@
 // and show their count; the LEDs of a line's ends are the worst of its cables' -- and a cable
 // with both ends in one cluster is not drawn (line_of: None).  The picture lies under the grid
 // (DgPaint::paint_under; with the grid hidden, right after the cover).
+//
+// A note is a card (a sticker) or text only (a label, canvas/labels.rs: its box is its text with a
+// hair around it, DN_HITMIN keeps it selectable at low zoom).  Labels lie over the cables and
+// under the devices, on the plate a device's name has (the canvas' colour: no card, the grid and
+// cables only stay behind the text, which high contrast needs); too small to read (below 5 px) or
+// while a gesture moves many things they are a thin bar per line.
 
 use alloc::collections::BTreeMap;
 use alloc::rc::Weak;
@@ -59,7 +65,7 @@ use gfx::dash::{DASH_DASH, DASH_DASHDOT, DASH_DASHDOTDOT, DASH_DOT, DASH_SOLID, 
 use jfn_model::catalog::PortSpec;
 use jfn_model::group::Groups;
 use jfn_model::project::Route;
-use jfn_model::{catalog, ifname, CableColor, CableKind, Project};
+use jfn_model::{catalog, ifname, CableColor, CableKind, NoteStyle, Project};
 use jfn_sim::Led;
 use ui::*;
 
@@ -80,6 +86,9 @@ const LABEL_GAP: f32 = 3.0;
 const PARALLEL: f32 = 7.0;
 /// the inner padding of a note (world units)
 const NOTE_PAD: f32 = 8.0;
+/// a label's text: its style and the hair around it in its box (world units)
+pub(crate) const LABEL_TS: u32 = TS_BODY;
+pub(crate) const LABEL_PAD: f32 = 1.0;
 /// where a cable's LED sits: this far from its end along the cable, and its radius
 const LED_AT: f32 = 12.0;
 const LED_R: f32 = 3.0;
@@ -115,8 +124,11 @@ pub(crate) struct SDev {
 
 /// a note to paint
 pub(crate) struct SNote {
+    pub id: u32,
     pub rect: [f32; 4],
     pub text: String,
+    /// text only (else a card)
+    pub label: bool,
 }
 
 /// a link to paint (along the widget's route of the edge with the same index)
@@ -174,6 +186,8 @@ pub(crate) struct Scene {
     edge_at: BTreeMap<u64, usize>,
     /// the background picture's world box (a node of its own while it is not locked)
     pub bg: Option<[f32; 4]>,
+    /// the label being typed (labels.rs): not drawn, the input stands in its place
+    pub editing: Option<u32>,
 }
 
 /// a model's ports, expanded once per build, and the index of each exact name
@@ -289,10 +303,11 @@ impl Scene {
             if self.hidden.contains_key(&n.id) {
                 continue;
             }
-            let rect = [n.x as f32, n.y as f32, n.w.max(40) as f32, n.h.max(24) as f32];
+            let rect = super::groups::note_rect(n);
+            let label = n.style == NoteStyle::Label;
             self.at.insert(n.id as u64, self.nodes.len());
-            self.nodes.push(DNode { key: n.id as u64, rect, ports: 0..0, flags: 0 });
-            self.notes.push(SNote { rect, text: n.text.clone() });
+            self.nodes.push(DNode { key: n.id as u64, rect, ports: 0..0, flags: if label { DN_HITMIN } else { 0 } });
+            self.notes.push(SNote { id: n.id, rect, text: n.text.clone(), label });
         }
         // the devices by id with their models (looked up once, not per cable end)
         let by_id: BTreeMap<u32, (&jfn_model::Device, Option<&'static catalog::Model>)> = p.devices.iter().map(|d| (d.id, (d, catalog::model(&d.model)))).collect();
@@ -495,8 +510,8 @@ impl Scene {
         Some(self.nodes.get(*self.at.get(&key)?)?.rect)
     }
 
-    /// the name of a node: a device's host name, "Notiz: " and the first line of a note, a
-    /// group's ("Gruppe Serverraum, 5 Geräte"), the picture's
+    /// the name of a node: a device's host name, "Notiz: " and the first line of a note
+    /// ("Beschriftung: " of a label), a group's ("Gruppe Serverraum, 5 Geräte"), the picture's
     pub(crate) fn label(&self, key: u64) -> String {
         let Some(&i) = self.at.get(&key) else { return String::from("–") };
         if key == BG_KEY {
@@ -507,6 +522,9 @@ impl Scene {
         }
         if let Some(n) = i.checked_sub(self.n0).and_then(|k| self.notes.get(k)) {
             let first = n.text.lines().next().unwrap_or("").trim();
+            if n.label {
+                return if first.is_empty() { String::from(t("Beschriftung")) } else { tf("Beschriftung: {}", &[first]) };
+            }
             return if first.is_empty() { String::from(t("Notiz")) } else { tf("Notiz: {}", &[first]) };
         }
         i.checked_sub(self.d0).and_then(|k| self.devs.get(k)).map_or_else(|| String::from("–"), |d| d.name.clone())
@@ -857,6 +875,7 @@ impl DgPaint for Painter {
         super::groups::paint_frames(g, f, sc, &nodes, lod);
         paint_notes(g, f, sc, &nodes, lod);
         paint_links(g, f, sc, &edges, lod);
+        paint_labels(g, f, sc, &nodes, lod);
         super::wlan::paint_assocs(g, f, &n);
         paint_devices(g, f, sc, &n.syms, &n.canvas.lab, &nodes, lod);
         super::groups::paint_clusters(g, f, sc, &n.syms, &n.canvas.lab, &n.canvas.grp, &nodes, lod);
@@ -898,8 +917,8 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
     let fill = color_mix(fill, 0xFFF2_D46B, if f.dark { 18 } else { 40 });
     let stroke = f.color(T_CTRL_STROKE);
     let (font, size) = f.font(TS_BODY);
-    // the notes start at node n0
-    for n in nodes.iter().filter_map(|&i| (i as usize).checked_sub(sc.n0).and_then(|k| sc.notes.get(k))) {
+    // the notes start at node n0 (labels: paint_labels)
+    for n in nodes.iter().filter_map(|&i| (i as usize).checked_sub(sc.n0).and_then(|k| sc.notes.get(k))).filter(|n| !n.label) {
         let q = px_rect(f, n.rect);
         if !touches(g, [q[0], q[1], q[0] + q[2], q[1] + q[3]]) {
             continue;
@@ -921,7 +940,7 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
             continue;
         }
         g.text.set_font(font, size);
-        let line_h = (g.text.ascent() + g.text.descent()) * 6 / 5;
+        let step = line_h(g.text.ascent(), g.text.descent());
         let (text, color) = if n.text.trim().is_empty() { (t("Notiz"), f.color(T_TEXT3)) } else { (n.text.as_str(), f.color(T_TEXT)) };
         g.dc.clip_push(q[0] + pad, q[1] + pad, iw, ih);
         g.dc.set_color(color);
@@ -931,9 +950,58 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
                 break;
             }
             g.text.draw(g.dc, g.sf, q[0] + pad, y, line.as_bytes());
-            y += line_h;
+            y += step;
         }
         g.dc.clip_pop();
+    }
+}
+
+/// the line step of a note's text from the font's ascent and descent (px)
+pub(crate) fn line_h(asc: i32, desc: i32) -> i32 {
+    (asc + desc) * 6 / 5
+}
+
+// the labels: text in the theme's text colour on a plate of the canvas' colour, a thin bar per
+// line when it cannot be read
+fn paint_labels(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
+    let (font, size) = f.font(LABEL_TS);
+    g.text.set_font(font, size);
+    let (asc, desc) = (g.text.ascent(), g.text.descent());
+    let step = line_h(asc, desc).max(1);
+    let pad = fl(LABEL_PAD * f.vp.scale() as f32 + 0.5);
+    let hair = ((f.vp.dpi + 24) / 96).max(1);
+    let text_c = f.color(T_TEXT);
+    let bar = color_mix(f.bg, text_c | 0xFF00_0000, 150);
+    let plate = (f.bg & 0x00FF_FFFF) | 0xD800_0000;
+    for n in nodes.iter().filter_map(|&i| (i as usize).checked_sub(sc.n0).and_then(|k| sc.notes.get(k))).filter(|n| n.label && sc.editing != Some(n.id)) {
+        let q = px_rect(f, n.rect);
+        // (glyphs may reach a little beyond the box)
+        let ext = size >> 8;
+        if !touches(g, [q[0] - ext, q[1] - ext, q[0] + q[2] + ext, q[1] + q[3] + ext]) {
+            continue;
+        }
+        if size < 5 << 8 || lod {
+            let lines = n.text.split('\n').count().max(1) as i32;
+            g.dc.set_color(bar);
+            for k in 0..lines {
+                g.dc.fill(g.sf, q[0], q[1] + (q[3] * (2 * k + 1) / (2 * lines)), q[2], hair);
+            }
+            continue;
+        }
+        let (text, color) = if n.text.trim().is_empty() { (t("Beschriftung"), f.color(T_TEXT3)) } else { (n.text.as_str(), text_c) };
+        let mut y = q[1] + pad + asc;
+        for line in text.split('\n') {
+            let tw = g.text.width(line);
+            if tw > 0 {
+                let mut sh = g.shapes();
+                sh.dc.set_color(plate);
+                sh.fill_rrect(q[0], y - asc, tw + pad * 2, step, pad * 2);
+            }
+            g.text.set_font(font, size);
+            g.dc.set_color(color);
+            g.text.draw(g.dc, g.sf, q[0] + pad, y, line.as_bytes());
+            y += step;
+        }
     }
 }
 

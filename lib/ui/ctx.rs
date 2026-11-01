@@ -347,6 +347,14 @@ impl Ui {
         self.repass = true;
     }
 
+    /// the keyboard focus to a widget of this window without the focus ring: the keyboard goes
+    /// back to it after a pointer gesture (a ring only follows keyboard navigation)
+    pub fn focus_quiet(&mut self, id: u32) {
+        self.wp.ctx.focus = id;
+        self.wp.ctx.focus_visible = false;
+        self.repass = true;
+    }
+
     /// ui_focus_req_expire: after the passes, a focus id no window emitted is dropped
     pub(crate) fn focus_req_expire(&mut self) {
         if self.focus_req_frame < self.frame {

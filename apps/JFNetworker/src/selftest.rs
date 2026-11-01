@@ -73,6 +73,8 @@
 // the bridge, the access point).
 // cablestest.rs: the choice of cables (group cables: jfn_model::cable, phys::reach_graded, the
 // engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
+// labelstest.rs: the slim labels of the canvas (group labels: a note's style in the file, the steps
+// of doc/edits.rs, the scene of canvas/paint.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -172,13 +174,15 @@ mod pagescripttest;
 mod dot1xtest;
 #[path = "imaptest.rs"]
 mod imaptest;
+#[path = "labelstest.rs"]
+mod labelstest;
 #[path = "webdevtest.rs"]
 mod webdevtest;
 #[path = "modelstest.rs"]
 mod modelstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 56] = [
+    let groups: [(&'static str, fn(&mut T)); 57] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -235,6 +239,7 @@ pub fn run() -> i32 {
         ("imap", imaptest::run),
         ("models", modelstest::run),
         ("cables", cablestest::run),
+        ("labels", labelstest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

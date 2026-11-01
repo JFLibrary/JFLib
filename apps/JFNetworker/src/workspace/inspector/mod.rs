@@ -8,7 +8,7 @@
 // settings of the chosen one, cables), cable.rs a cable (ends, kind, category, colour, speed,
 // delay, loss, plug, route), faults.rs the lab's fault injection on each of them (a device, a cable, the
 // partition of several devices) and the active faults (also on the project's page).  Here:
-// notes edit their text, several things show what is selected and switch all
+// notes and labels edit their text, several things show what is selected and switch all
 // their devices on or off, the project edits its title, shows file, state and counts (with
 // the cables that are up) and has "Auto-MDI-X aus" (Project::strict_mdix).  Every change is one undo
 // step; the simulator follows each.  Edit buffers
@@ -139,7 +139,8 @@ pub(crate) fn field_begin(ui: &mut Ui, key: &str) {
 
 fn note(n: &mut Net, ui: &mut Ui, id: u32) {
     let Some(o) = n.doc.proj.note(id).cloned() else { return };
-    ui.text(TS_SUBTITLE, t("Notiz"));
+    let label = o.style == jfn_model::NoteStyle::Label;
+    ui.text(TS_SUBTITLE, t(if label { "Beschriftung" } else { "Notiz" }));
     let ins = &mut n.inspector;
     if ins.note_for != id || ins.note_src != o.text {
         ins.note = o.text.clone();
@@ -147,12 +148,15 @@ fn note(n: &mut Net, ui: &mut Ui, id: u32) {
         ins.note_for = id;
     }
     ui.next_size(-1, 120);
-    ui.textbox(ID_INS_NOTE, Some(t("Text der Notiz")), &mut ins.note, 2000 | TB_MULTI | TB_WRAP);
+    ui.textbox(ID_INS_NOTE, Some(t(if label { "Text der Beschriftung" } else { "Text der Notiz" })), &mut ins.note, 2000 | TB_MULTI | TB_WRAP);
     ui.box_begin(0, BOX_H | BOX_END, 8);
-    ui.next_flags(if ins.note == o.text { ST_DISABLED } else { 0 });
+    // (a label is never empty, its box follows its text)
+    ui.next_flags(if ins.note == o.text || (label && ins.note.trim().is_empty()) { ST_DISABLED } else { 0 });
     if ui.button(ID_INS_NOTE_APPLY, t("Übernehmen")) & EV_ACT != 0 {
         let text = String::from(ins.note.trim_end());
-        if let Some(e) = edits::note_text(&n.doc.proj, id, &text) {
+        if label {
+            canvas::labels::set_text(n, ui, id, &text);
+        } else if let Some(e) = edits::note_text(&n.doc.proj, id, &text) {
             n.doc.apply(e);
         }
         ui.repass();

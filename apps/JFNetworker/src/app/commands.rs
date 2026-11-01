@@ -11,7 +11,8 @@
 // Simulation: Echtzeit / Simulationsmodus, Abspielen (F6), Schritt vor (F7) und zurück
 // (Shift+F7), Zurück zu live, Von hier fortsetzen (K1: after its question), Tempo, PDUs, Nur
 // Auswahl, Zurücksetzen (workspace/sim);
-// Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
+// Werkzeuge: the tools with their single keys (V, H, C, N, P), Beschriftung einfügen (T, at the
+// middle of the view: canvas/labels.rs) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
 // a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, IDE of a host,
@@ -46,7 +47,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 116] = [
+pub(crate) static CMDS: [Command; 117] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -163,6 +164,7 @@ pub(crate) static CMDS: [Command; 116] = [
     Command::new(CMD_CABLE_MORE + 3, "Koa&xialkabel", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_CABLE_MORE + 4, "&Direktkabel (DAC)", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_CABLE_MORE + 5, "Akti&ves Glasfaserkabel (AOC)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_LABEL, "Beschriftung einfügen", IC_FONT, 0, b'T' as u32, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -302,11 +304,12 @@ static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0 + 5),
 ];
 /// the tools (their single keys) and the settings
-static M_TOOLS: [Mi; 9] = [
+static M_TOOLS: [Mi; 10] = [
     Mi::Cmd(CMD_TOOL_SELECT),
     Mi::Cmd(CMD_TOOL_HAND),
     Mi::Cmd(CMD_TOOL_CONNECT),
     Mi::Cmd(CMD_TOOL_NOTE),
+    Mi::Cmd(CMD_LABEL),
     Mi::Cmd(CMD_TOOL_PDU),
     Mi::Sep,
     Mi::Cmd(CMD_SETTINGS),
@@ -399,6 +402,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_TOOL_HAND, flag(t == Tool::Hand, CF_CHECKED));
     ui.cmd_state(CMD_TOOL_CONNECT, flag(matches!(t, Tool::Connect(_)), CF_CHECKED));
     ui.cmd_state(CMD_TOOL_NOTE, flag(t == Tool::Note, CF_CHECKED));
+    ui.cmd_state(CMD_LABEL, flag(n.phys.on, CF_DISABLED));
     crate::workspace::sim::states(n, ui);
     cables::states(n, ui);
     terminal::states(n, ui);
@@ -434,6 +438,10 @@ fn focus_panel(n: &mut Net, ui: &mut Ui, p: u32) {
 
 /// App::command
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
+    // what is being typed into a label counts before a command acts (Ctrl+S, closing the window)
+    if id <= UIC_CLOSE {
+        canvas::labels::flush(n, ui);
+    }
     // the physical view's commands, and while it is shown zoom, Löschen, Umbenennen ...
     if let Some(r) = crate::workspace::phys::command(n, ui, id, arg) {
         return r;
@@ -540,6 +548,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             tools::set(n, Tool::Connect(kind));
         }
         CMD_TOOL_NOTE => tools::set(n, Tool::Note),
+        CMD_LABEL => canvas::labels::open_centre(n, ui),
         CMD_ABOUT => n.shell.about.set(1),
         CMD_FOCUS_CANVAS => ui.focus(ID_CANVAS),
         CMD_SETTINGS => n.settings_open.set(1),

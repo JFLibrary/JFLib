@@ -664,3 +664,8 @@ pub(crate) const ID_CABLE_TILE: u32 = 0x0001_F010;
 pub(crate) const ID_INS_GRADE: u32 = 0x0001_F040;
 pub(crate) const ID_INS_CABLE_COLOR: u32 = 0x0001_F041;
 pub(crate) const ID_PROJ_MDIX: u32 = 0x0001_F042;
+// ---- H3: labels on the canvas (commands 990 .. 999, widgets 0x0001_F400 .. 0x0001_F4FF; no timers)
+/// Beschriftung einfügen: the input at the middle of the view (T)
+pub(crate) const CMD_LABEL: u32 = 990;
+/// the input of a label on the canvas (canvas/labels.rs)
+pub(crate) const ID_LABEL_BOX: u32 = 0x0001_F400;

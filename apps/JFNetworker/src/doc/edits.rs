@@ -2,6 +2,7 @@
 //
 //   add_device(p, model, x, y) -> (id, edit)   a new device (free name: PC1, SW2, ...), applied
 //   add_note(p, x, y) -> (id, edit)            a new empty note, applied
+//   add_label(p, x, y, w, h, text) -> (id, edit)   a new label with its text in one step, applied
 //   moves(p, &[(id, x, y)], to) -> edit        devices and notes to new positions (a drag)
 //   delete(p, ids) -> edit                     devices with their links, links, notes; undo
 //                                              puts everything back where it was in the lists
@@ -9,6 +10,7 @@
 //                                              applied when it is allowed
 //   note_text(p, id, text) / title(p, text)    the text of a note, the project's title
 //   strict_mdix(p, on) -> edit                 "Auto-MDI-X aus" of the project (not applied yet)
+//   label_edit(p, id, text, w, h) -> edit      the text and the box of a label (not applied yet)
 //   connect(p, a, b, cable) -> Result<(id, edit)>   a new link (jfn_model's cable rules: None
 //                                              takes the right cable), applied
 //   link_edit(p, id, label, f) -> edit         any change of one link: kind, category, colour,
@@ -28,7 +30,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use jfn_model::{CableKind, Device, Link, Note, PortRef, ProjErr, Project};
+use jfn_model::{CableKind, Device, Link, Note, NoteStyle, PortRef, ProjErr, Project};
 use ui::Edit;
 
 /// something on the canvas
@@ -59,6 +61,11 @@ pub(crate) fn pos(p: &Project, id: u32) -> Option<[i32; 2]> {
         Item::Note(_) => p.note(id).map(|n| [n.x, n.y]),
         Item::Link(_) => None,
     }
+}
+
+/// the id names a label
+pub(crate) fn is_label(p: &Project, id: u32) -> bool {
+    p.note(id).is_some_and(|n| n.style == NoteStyle::Label)
 }
 
 /// put a device or note at x, y (no undo step: live moves, edits)
@@ -113,13 +120,20 @@ impl Edit<Project> for AddNote {
         p.remove_note(self.note.id);
     }
     fn label(&self) -> &str {
-        "Notiz hinzufügen"
+        if self.note.style == NoteStyle::Label { "Beschriftung hinzufügen" } else { "Notiz hinzufügen" }
     }
 }
 
 /// a new empty note with its top left corner at x, y (applied)
 pub(crate) fn add_note(p: &mut Project, x: i32, y: i32) -> (u32, Box<dyn Edit<Project>>) {
     let id = p.add_note(x, y, "");
+    let note = p.note(id).cloned().unwrap_or_default();
+    (id, Box::new(AddNote { note }))
+}
+
+/// a new label with its text and box (applied): creating and typing are one step
+pub(crate) fn add_label(p: &mut Project, x: i32, y: i32, w: i32, h: i32, text: &str) -> (u32, Box<dyn Edit<Project>>) {
+    let id = p.add_label(x, y, w, h, text);
     let note = p.note(id).cloned().unwrap_or_default();
     (id, Box::new(AddNote { note }))
 }
@@ -159,7 +173,8 @@ pub(crate) fn moves(p: &Project, from: &[(u32, [i32; 2])]) -> Option<Box<dyn Edi
         return None;
     }
     let label = if moves.len() == 1 {
-        let name = p.device(moves[0].0).map_or_else(|| String::from("Notiz"), |d| d.name.clone());
+        let note = if is_label(p, moves[0].0) { "Beschriftung" } else { "Notiz" };
+        let name = p.device(moves[0].0).map_or_else(|| String::from(note), |d| d.name.clone());
         format!("{} verschieben", name)
     } else {
         format!("{} Objekte verschieben", moves.len())
@@ -225,6 +240,7 @@ pub(crate) fn delete(p: &Project, ids: &[u32]) -> Option<Box<dyn Edit<Project>>>
     }
     let label = match (devs.len(), notes.len()) {
         (1, 0) => format!("{} löschen", devs[0].1.name),
+        (0, 1) if links.is_empty() && notes[0].1.style == NoteStyle::Label => String::from("Beschriftung löschen"),
         (0, 1) if links.is_empty() => String::from("Notiz löschen"),
         (0, 0) if links.len() == 1 => String::from("Kabel trennen"),
         (0, 0) => format!("{} Kabel trennen", links.len()),
@@ -300,6 +316,41 @@ pub(crate) fn note_text(p: &Project, id: u32, text: &str) -> Option<Box<dyn Edit
         return None;
     }
     Some(Box::new(NoteText { id, from, to: String::from(text) }))
+}
+
+/// a label before and after a change of its text (its box follows the text)
+struct LabelEdit {
+    from: Note,
+    to: Note,
+}
+
+fn put_note(p: &mut Project, n: &Note) {
+    if let Some(x) = p.notes.iter_mut().find(|x| x.id == n.id) {
+        *x = n.clone();
+    }
+}
+
+impl Edit<Project> for LabelEdit {
+    fn apply(&mut self, p: &mut Project) {
+        put_note(p, &self.to);
+    }
+    fn revert(&mut self, p: &mut Project) {
+        put_note(p, &self.from);
+    }
+    fn label(&self) -> &str {
+        "Beschriftung bearbeiten"
+    }
+}
+
+/// the new text of a label and its box -> the undo step (not applied yet), None when both are
+/// the same
+pub(crate) fn label_edit(p: &Project, id: u32, text: &str, w: i32, h: i32) -> Option<Box<dyn Edit<Project>>> {
+    let from = p.note(id)?.clone();
+    let to = Note { w, h, text: String::from(text), ..from.clone() };
+    if to == from {
+        return None;
+    }
+    Some(Box::new(LabelEdit { from, to }))
 }
 
 struct Title {

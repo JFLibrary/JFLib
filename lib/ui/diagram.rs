@@ -39,7 +39,9 @@
 // DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
 // frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
 // its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
-// DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
+// DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).  A DN_HITMIN node
+// (a line of text) is hit in a box of at least 16 x 16 DIP around it, so it stays selectable at
+// low zoom.
 //
 // Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 // ports at a position relative to their node's top left corner, edges from key a to key b
@@ -56,7 +58,9 @@
 // (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 // port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 // (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
-// (Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
+// (Shift: sideways), Ctrl + wheel zooms at the pointer.  A double click on the background with
+// DG_SELECT (no Shift, no Ctrl) reports DEv::DoubleClick at the second press; a press that became
+// a drag (a marquee) or a key between the clicks makes none.  Keys while the canvas has the focus:
 // arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
 // a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
 // the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
@@ -107,6 +111,7 @@ pub const DN_TOGGLE: u32 = 8; // a collapse button (DEv::Toggle), see dg_toggle_
 pub const DN_STEP: u32 = 16; // moves by whole grid steps (its corner keeps its offset to the grid)
 pub const DN_RESIZE: u32 = 32; // selected: a handle at the bottom right corner resizes it
 pub const DN_OUTLINE: u32 = 64; // an outline in the overview (DN_FRAME nodes are always)
+pub const DN_HITMIN: u32 = 128; // hit in a box of at least 16 x 16 DIP around it (a small text)
 /// port flags (DPort::flags)
 pub const DPT_HIDDEN: u32 = 1; // neither shown nor hit
 pub const DPT_USED: u32 = 2; // shown filled (connected)
@@ -115,6 +120,7 @@ const CELL: f32 = 256.0; // bucket size (world units)
 const CELLS_MAX: i64 = 4096; // a query over more buckets looks at everything
 const SPAN_MAX: i64 = 64; // an item over more buckets goes to the always-checked list
 const DRAG_DIP: i32 = 4;
+const HITMIN_DIP: i32 = 16;
 const STUB: f32 = 16.0; // orthogonal routes leave a port straight for this many units
 const EPS: f32 = 0.01;
 /// a view gesture of wheel turns (or the minimap) lasts this long after the last one (ms)
@@ -342,6 +348,9 @@ pub enum DEv {
     Delete,
     /// a click on the background, or anywhere with DG_PLACE (snapped then); world units
     Click { at: [f32; 2] },
+    /// a double click on the background with DG_SELECT (no Shift, no Ctrl): the world point of
+    /// the second press, not snapped; neither a Click nor a marquee follows it
+    DoubleClick { at: [f32; 2] },
     /// zoom or centre changed
     ViewChanged,
     /// a click on the collapse button of a DN_TOGGLE node
@@ -503,7 +512,9 @@ pub struct DiagramState {
     pending_sel: bool,
     g: Gesture,
     ix: Index,
-    last_hit: DHit,
+    // what the last press that can start a double click hit (None: no such press; DHit::None
+    // alone is the background)
+    last_hit: Option<DHit>,
     last_ms: u32,
     last_px: [i32; 2],
     visible: Vec<u32>,
@@ -541,7 +552,7 @@ impl DiagramState {
             pending_sel: false,
             g: Gesture::Idle,
             ix: Index::default(),
-            last_hit: DHit::None,
+            last_hit: None,
             last_ms: 0,
             last_px: [0; 2],
             visible: Vec::new(),
@@ -699,6 +710,13 @@ impl DiagramState {
                 if !on_bar && !(within(b) && !inner) {
                     continue;
                 }
+            } else if n.flags & DN_HITMIN != 0 {
+                // up to the reach of the query above
+                let min = w(HITMIN_DIP);
+                let (gx, gy) = (((min - r[2]) * 0.5).clamp(0.0, pr), ((min - r[3]) * 0.5).clamp(0.0, pr));
+                if !(p[0] >= r[0] - gx && p[1] >= r[1] - gy && p[0] < r[0] + r[2] + gx && p[1] < r[1] + r[3] + gy) {
+                    continue;
+                }
             } else if !within(0.0) {
                 continue;
             }
@@ -783,7 +801,7 @@ impl DiagramState {
                 if i.btn & (1 << BTN_LEFT) == 0 {
                     self.click(m, i.tool, hit, at, mods, was, out)
                 } else if far {
-                    self.last_hit = DHit::None; // a drag is no first click
+                    self.last_hit = None; // a drag is no first click
                     self.drag(m, i.tool, hit, at, mods)
                 } else {
                     Gesture::Press { hit, px, at, mods, was }
@@ -811,11 +829,15 @@ impl DiagramState {
         // (behave's EV_DOUBLE also counts a press after a drag)
         let hit = self.hover;
         let near = (i.px[0] - self.last_px[0]).abs() <= i.lim * 2 && (i.px[1] - self.last_px[1]).abs() <= i.lim * 2;
-        if same(hit, self.last_hit) && near && i.now.wrapping_sub(self.last_ms) <= i.dbl {
-            self.last_hit = DHit::None;
+        if self.last_hit.is_some_and(|l| same(hit, l)) && near && i.now.wrapping_sub(self.last_ms) <= i.dbl {
+            self.last_hit = None;
             match hit {
                 DHit::Waypoint(e, k) => {
                     out.push(DEv::WaypointDelete { edge: e, idx: k });
+                    return Gesture::Hold;
+                }
+                DHit::None if i.tool == DG_SELECT && i.mods & (MOD_SHIFT | MOD_CTRL) == 0 => {
+                    out.push(DEv::DoubleClick { at: i.p });
                     return Gesture::Hold;
                 }
                 // buttons and handles take every click as one of their own
@@ -826,7 +848,7 @@ impl DiagramState {
                 }
             }
         } else {
-            self.last_hit = hit;
+            self.last_hit = Some(hit);
             self.last_ms = i.now;
             self.last_px = i.px;
         }
@@ -2155,6 +2177,10 @@ impl Ui {
 
     // the keys of a focused diagram
     fn dg_keys(&mut self, st: &mut DiagramState, m: &DModel, enter: bool, out: &mut Vec<DEv>) {
+        // a key after a click on the background: the next click is a click of its own
+        if st.last_hit == Some(DHit::None) && !self.wp.ctx.keyq.is_empty() {
+            st.last_hit = None;
+        }
         let r = st.vp.rect;
         let idle = matches!(st.g, Gesture::Idle);
         // Esc: the gesture, else the selection
