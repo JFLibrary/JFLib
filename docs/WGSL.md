@@ -789,6 +789,12 @@ sonstige zweiteilige Regeln still durch (wie Tint).
   Stufen-Variablen über die Location-Grenze hinaus, wenn Built-ins mitzählen.
 - **Subgroups**: die GPU-Tests sind nicht mit Chrome verglichen. `subgroupBroadcast` mit
   einer inaktiven Lane ist laut Spezifikation ein dynamischer Fehler, das Back-End prüft nichts.
+  `Device::create_compute_pipeline_sized` setzt die Subgroup-Größe, aber nicht
+  `VK_PIPELINE_SHADER_STAGE_REQUIRE_FULL_SUBGROUPS_BIT` und prüft `maxComputeWorkgroupSubgroups`
+  nicht: Ein Treiber darf also auch mit `@subgroup_size` Subgroups nur teilweise füllen.
+  `Limits::WEBGPU` lässt Subgroup-Größen von 4 bis 128 zu; wer `check_pipeline` für ein Gerät
+  aufruft, übergibt dessen Grenzen, sonst gilt ein `@subgroup_size` als gültig, das das Gerät
+  nicht kann.
 - **Uniformitätsanalyse**: die erste Fehlerstelle kann von Tints abweichen, wo eine Funktion mehrere
   Fehlschläge hat und Tints Mengen anders iterieren (hier: die neueste Anforderung);
   `potential-trigger-set` meldet nur die Regel des gefundenen Wegs.

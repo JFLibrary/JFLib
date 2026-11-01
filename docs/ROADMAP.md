@@ -1616,8 +1616,22 @@ Fensterrand hinaus.
   Funktionen, die Prüfung der Puffergröße beim Binden, `layout: 'auto'`, std140-Zerlegung für
   `matCx2` (braucht `uniformBufferStandardLayout`), Dual-Source-Blending in den Pipelines von
   `lib/gpu`, mehrere Ebenen bei `texture_external`.
-- **P2** · *fehlt* · G2d: Uniformitätsanalyse, Rest der Abweichungen zu Tint, Fehlermeldungen
-  feilen.
+- **P2** · *erledigt* (2026-11-01) · G2d: Abschluss des Compilers. Uniformitätsanalyse nach
+  Kapitel 15.2 (`lib/wgsl/uniformity.rs`): Barrieren immer ein Fehler, Ableitungen über
+  `derivative_uniformity` mit Filtern, Meldung am Aufruf mit Hinweisen zurück zur Ursache; 10 ms
+  beim Shader mit 27 000 Zeilen (4,4 % von Parsen und Prüfen). Subgroups: `enable subgroups`,
+  `subgroup_size_control`, alle Built-ins und 25 Funktionen, `lib/gpu` meldet und schaltet sie
+  frei (`Features::subgroups_webgpu`, `create_compute_pipeline_sized`); auf der GPU 31 068
+  Ergebnisse je Stufe gleich der CPU-Referenz. Grenzen der Spezifikation, Chromes eigene
+  strengere Grenzen und Override-Fehler in Funktionsrümpfen. `Diagnostic::render` zeigt die
+  Quellzeile, Vorschläge bei Tippfehlern, einheitliche Meldungen. Die Sammlung wuchs auf 932
+  Dateien: 918 stimmen mit Tint überein, keine nimmt JFLib an und Tint lehnt ab; die 14 übrigen
+  lehnen wir bewusst ab (`01f`, 13 × Mindestgrenzen, die Chrome überschreitet). Warnungen und
+  Hinweise gleichen Tint auf allen 297 Dateien in `unif` und `diag`; die erste Fehlerstelle
+  trifft in 435 von 490 Fehlerdateien dieselbe Stelle (vorher 373). 1,5 Mio. Mutationen ohne
+  Absturz. Es fehlen: `buffer_view`, `layout: 'auto'`, die Anzahl der Bindungen je Stufe,
+  volle Subgroups bei `@subgroup_size` (`REQUIRE_FULL_SUBGROUPS`), Tests auf anderen GPUs und
+  unter Linux.
 - **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
   Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
   und Diagramm.
