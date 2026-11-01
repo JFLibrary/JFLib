@@ -376,6 +376,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
 | `model.uis`, Gruppe `units` | Einheiten und Bereitstellen (siehe [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)): Unit-Dateien und ihre Fehler, jedes Wort von `systemctl` mit seinem Exit-Code, erzeugte Einheiten, Einschalten über einen Stromausfall und Speichern und Laden, die Neustart-Regeln mit Startgrenze, `Requires` und `After`, `journalctl` mit `-u`, `-n`, `-f` und Strg+C (auch in einer anderen Sitzung und im Hintergrund), eine Bereitstellung, deren Prüfung auf dem zweiten Host scheitert, eine, die durchgeht, Zurückrollen, Ablehnungen, Abbrechen, Determinismus (zwei Läufe, ein Klon mitten im Lauf, ein Nachspielen aus Keyframes), das Labor `05-microservices` ungelöst, gelöst und mit allen Hosts zugleich verdorben |
 | `scen_deploy.uis` | das Golden-Szenario (`scen/deploy.scn`): `systemctl` und `journalctl` auf DEV1, eine Einheit, die scheitert und neu startet, eine Bereitstellung, die an WEB2 scheitert, eine, die durchgeht, ein Stromausfall, ein Zurückrollen |
+| `ide_unit.uis` | F5 auf einer Datei, die als Einheit läuft: `systemctl start web` macht die Einheit zum Ziel der IDE, F5 speichert und startet sie neu (PC1 bekommt die neue Fassung, kein zweiter Dienst), Stoppen und Neu starten gehen über die Einheit |
 | `deploy_ide.uis` | Bereitstellen aus der IDE auf die Gruppe Webserver: die Vorschläge des Bereichs, der Fortschritt je Host, das Scheitern auf WEB2 mit seinem Grund, der Lauf, der durchgeht, eine Liste von Hosts, eine fehlende Einheit, Einheit anlegen, Abbrechen |
 | `load_ide.uis` | der Lasttest aus der IDE: ein Ziel ohne URL, offene Last mit Kacheln und Diagrammen, die Zusammenfassung, geschlossene Last, Stoppen, der Lauf im Panel Metriken |
 | `deploy_shots.uis` | die Bilder von Bereitstellen und Lasttest hell und dunkel mit 100 und 150 %, klein und in hohem Kontrast (`build/jfnetworker/deploy_shots_*.png`) |
@@ -1783,9 +1784,13 @@ wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
   Fenster der IDE). „Als Dienst
   ausführen“ (F5) startet den Skript-Dienst, der auf die Datei verweist, neu – gibt es keinen,
   legt es einen als Rückgängig-Schritt an (`{"file": PFAD}`, nach der Datei benannt) –, bei einem
-  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt.
+  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt. Läuft
+  die Datei schon als [Einheit](#einheiten-bereitstellen-und-lasttest), startet F5 diese Einheit
+  neu und legt keinen zweiten Dienst an, der am Port scheiterte; ebenso eine gescheiterte Einheit,
+  solange kein Dienst auf die Datei verweist. Eine Einheit, die nie lief, bleibt außen vor.
   Stoppen (Umschalt+F5) und Neu starten (Strg+Umschalt+F5) wirken im Simulator wie
-  `script stop|restart`. Läuft der Dienst einer gespeicherten Datei noch mit der Fassung davor,
+  `script stop|restart`, bei einer Einheit wie `systemctl stop|restart`. Läuft der Dienst einer
+  gespeicherten Datei noch mit der Fassung davor,
   sagt die Statuszeile das mit einem Knopf „Neu starten“.
 - **Debugger:** ein Klick links neben eine Zeilennummer oder F9 setzt einen Haltepunkt,
   Strg+Umschalt+F9 einen mit Bedingung (ein Flyout, die Bedingung ist ein Ausdruck in jfs).
