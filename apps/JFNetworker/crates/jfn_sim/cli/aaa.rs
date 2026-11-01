@@ -207,6 +207,13 @@ pub(crate) fn build_aaa(t: &mut Tree<K>, m: [ModeId; 4]) {
     t.add(conf, "radius-server host A.B.C.D=addr auth-port <0-65535>=ap acct-port <0-65535>=cp key LINE=key", "The shared secret", Some(K::RadiusHost), 0);
     t.add_no(conf, "radius-server host A.B.C.D=addr", K::RadiusHost);
 
+    // the submodes: without their own exit it would be the device configuration's, which leaves
+    for m in [sg, rs] {
+        t.add(m, "do", "Run an EXEC command from here", None, 0);
+        t.add(m, "do LINE=cmd", "The command", Some(K::Do), 0);
+        t.add(m, "exit", "Back to the device configuration", Some(K::Exit), 0);
+        t.add(m, "end", "Finish configuring", Some(K::End), F_HIDDEN);
+    }
     // the group's submode
     t.add(sg, "server", "A server of this group", None, F_NO);
     t.add(sg, "server name WORD=name", "A server by its name", Some(K::SgServer), 0);
@@ -282,6 +289,14 @@ impl Engine {
         if on { Secret::type7(plain) } else { Secret::plain(plain) }
     }
 
+    /// the methods of a command; a wrong one: its error on the console
+    fn methods_of(&mut self, ni: usize, p: &Parsed<K>) -> Result<Vec<Method>, String> {
+        match parse_methods(p.text("methods").unwrap_or("")) {
+            Ok(ms) => Ok(ms),
+            Err(e) => self.ios_err(ni, &e).map(|_| Vec::new()),
+        }
+    }
+
     // ---------------------------------------------------------------- the dispatcher
 
     pub(crate) fn ios_aaa(&mut self, ni: usize, p: &Parsed<K>, _line: &str) -> Result<(), String> {
@@ -303,14 +318,14 @@ impl Engine {
             }
             K::AaaAuthLogin => self.cmd_auth_login(ni, p),
             K::AaaAuthEnable => {
-                let ms = if p.no { Vec::new() } else { parse_methods(p.text("methods").unwrap_or(""))? };
+                let ms = if p.no { Vec::new() } else { self.methods_of(ni, p)? };
                 if let Some(cfg) = self.cfg_mut(ni) {
                     cfg.aaa.set_enable_list(ms);
                 }
                 Ok(())
             }
             K::AaaAuthorExec => {
-                let ms = if p.no { Vec::new() } else { parse_methods(p.text("methods").unwrap_or(""))? };
+                let ms = if p.no { Vec::new() } else { self.methods_of(ni, p)? };
                 if let Some(cfg) = self.cfg_mut(ni) {
                     cfg.aaa.author_exec = if ms.is_empty() { None } else { Some(MethodList { name: String::new(), methods: ms }) };
                 }
@@ -438,7 +453,7 @@ impl Engine {
 
     fn cmd_auth_login(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let name = String::from(p.text("list").unwrap_or(""));
-        let ms = if p.no { Vec::new() } else { parse_methods(p.text("methods").unwrap_or(""))? };
+        let ms = if p.no { Vec::new() } else { self.methods_of(ni, p)? };
         if let Some(cfg) = self.cfg_mut(ni) {
             cfg.aaa.set_login(&name, ms);
         }
@@ -453,7 +468,7 @@ impl Engine {
             return Ok(());
         }
         let action = String::from(p.text("act").unwrap_or("start-stop"));
-        let ms = parse_methods(p.text("methods").unwrap_or(""))?;
+        let ms = self.methods_of(ni, p)?;
         if let Some(cfg) = self.cfg_mut(ni) {
             cfg.aaa.acct_exec = Some(crate::aaa::AcctExec { name: String::new(), action, methods: ms });
         }

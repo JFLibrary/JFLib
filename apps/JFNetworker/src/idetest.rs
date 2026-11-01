@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use agent_core::jmap::Value;
 use jfn_model::files::File;
 use jfn_model::project::{Project, ServiceDef};
-use jfn_sim::{Action, Engine, Report, ScriptService, ScriptState, Service, MS, SEC};
+use jfn_sim::{Action, Cmd, Engine, Report, ScriptService, ScriptState, Service, UnitOp, UnitState, MS, SEC};
 
 use crate::doc::ide as dide;
 use crate::doc::Doc;
@@ -116,6 +116,7 @@ pub(crate) fn run(t: &mut T) {
     restart(t);
     convert(t);
     steps(t);
+    unit_file(t);
     replace(t);
     tests(t);
     determinism(t);
@@ -284,6 +285,68 @@ fn steps(t: &mut T) {
     let st = dide::store_of(&doc.proj, h).unwrap_or_else(|| jfn_model::files::Store::new(false, 0, None));
     t.eq("bound", dide::bound(&d, &st, "/root/app/a.jfs"), alloc::vec![s("a")]);
     t.eq("bind again: another name", dide::bind(&mut doc, h, "/root/app/a.jfs"), Ok(s("a2")));
+}
+
+const SERVER: &str = "http.serve(80, fn(req, res) {\n  res.send(200, \"eins\\n\")\n})\nprint(\"bereit\")\n";
+const UNIT: &str = "[Service]\nExecStart=jfs /root/app/server.jfs\nRestart=on-failure\n";
+
+// a file that runs as a unit: the unit holds it (F5 starts the unit anew, debug.rs), a second
+// service of the file would fail at the port; which unit holds it in which state
+fn unit_file(t: &mut T) {
+    let path = "/root/app/server.jfs";
+    let bad = "/root/app/bad.jfs";
+    let (p, h) = project(&[(path, SERVER), (bad, "fehlt_hier()\n"), ("/etc/systemd/system/web.service", UNIT), ("/etc/systemd/system/bad.service", "[Service]\nExecStart=jfs /root/app/bad.jfs\n")], Vec::new());
+    let mut doc = doc_of(p);
+    go(&mut doc, 50);
+    let holder = |doc: &Doc, path: &str, last: Option<&str>| {
+        let d = doc.proj.device(h).cloned().unwrap_or_default();
+        let st = dide::store_of(&doc.proj, h).unwrap_or_else(|| jfn_model::files::Store::new(false, 0, None));
+        dide::unit_of(doc.sim.engine(), &d, &st, path, last)
+    };
+    let op = |doc: &mut Doc, name: &str, op: UnitOp| doc.sim.send(Cmd::Apply(Action::Unit { dev: h, name: s(name), op })).is_ok();
+    let state = |doc: &Doc, name: &str| doc.sim.engine().unit(h, name).map(|u| u.state);
+    t.eq("unit: it never ran: nothing holds the file", holder(&doc, path, None), None);
+    t.check("unit: start", op(&mut doc, "web", UnitOp::Start));
+    go(&mut doc, 50);
+    t.eq("unit: it runs", state(&doc, "web"), Some(UnitState::Active));
+    t.eq("unit: it holds the file", holder(&doc, path, None), Some(s("web")));
+    t.eq("unit: not another one", holder(&doc, "/root/app/andere.jfs", None), None);
+    t.eq("unit: the list", doc.sim.engine().units_of_file(h, path), alloc::vec![(s("web"), UnitState::Active)]);
+    // F5: the file saved, the unit starts anew, with the new text, and the project stays as it was
+    t.eq("unit: saved", dide::save(&mut doc, h, path, &SERVER.replace("eins", "zwei")), Ok(true));
+    let steps = doc.hist.len();
+    t.check("unit: restart", op(&mut doc, "web", UnitOp::Restart));
+    go(&mut doc, 50);
+    t.eq("unit: a second run", sv(doc.sim.engine(), h, "web").map(|x| x.view(0).runs), Some(2));
+    t.check("unit: the saved text runs", sv(doc.sim.engine(), h, "web").is_some_and(|x| x.state() == ScriptState::Running && x.source().contains("zwei")));
+    t.eq("unit: no new service, no step", (doc.proj.device(h).map(|d| d.services.len()), doc.hist.len()), (Some(0), steps));
+    // stopped: the IDE's own target only
+    t.check("unit: stop", op(&mut doc, "web", UnitOp::Stop));
+    go(&mut doc, 50);
+    t.eq("unit: stopped: not for a stranger", holder(&doc, path, None), None);
+    t.eq("unit: stopped: the IDE's target", holder(&doc, path, Some("web")), Some(s("web")));
+    t.check("unit: a restart starts a stopped one", op(&mut doc, "web", UnitOp::Restart));
+    go(&mut doc, 50);
+    t.eq("unit: it runs again", state(&doc, "web"), Some(UnitState::Active));
+    // failed: it holds the file, so the fix goes on with F5
+    t.check("unit: the other one", op(&mut doc, "bad", UnitOp::Start));
+    go(&mut doc, 50);
+    t.eq("unit: it failed", state(&doc, "bad"), Some(UnitState::Failed));
+    t.eq("unit: a failed one holds the file", holder(&doc, bad, None), Some(s("bad")));
+    t.eq("unit: fixed", dide::save(&mut doc, h, bad, "timer.after(100000, fn() { })\n"), Ok(true));
+    t.check("unit: a restart starts a failed one", op(&mut doc, "bad", UnitOp::Restart));
+    go(&mut doc, 50);
+    t.eq("unit: it runs now", state(&doc, "bad"), Some(UnitState::Active));
+    // why: a service of the file next to the unit fails at the port; the running unit still comes first
+    t.eq("unit: a second service", dide::bind(&mut doc, h, path), Ok(s("server")));
+    go(&mut doc, 50);
+    let second = sv(doc.sim.engine(), h, "server").map(|x| (x.state(), x.errors().first().map(|e| e.msg.clone())));
+    t.eq("unit: a second service fails at the port", second, Some((ScriptState::Failed, Some(s("http.serve: Port 80 ist schon belegt.")))));
+    t.eq("unit: the running one comes first", holder(&doc, path, None), Some(s("web")));
+    // a bound service comes before a unit that does not run
+    t.check("unit: stop again", op(&mut doc, "web", UnitOp::Stop));
+    go(&mut doc, 50);
+    t.eq("unit: stopped, a service bound", holder(&doc, path, Some("web")), None);
 }
 
 // replace in files: one undo step for every file
