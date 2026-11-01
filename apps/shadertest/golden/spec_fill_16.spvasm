@@ -1,0 +1,140 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos; 0
+; Bound: 89
+; Schema: 0
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %out %pc %tile %gl_GlobalInvocationID %gl_LocalInvocationID
+               OpExecutionModeId %main LocalSizeId %WG %uint_1 %uint_1
+               OpName %WG "WG"
+               OpName %MUL "MUL"
+               OpName %ADD "ADD"
+               OpName %SCALE "SCALE"
+               OpName %FLIP "FLIP"
+               OpName %Out "Out"
+               OpMemberName %Out 0 "v"
+               OpName %out "out"
+               OpName %Push "Push"
+               OpMemberName %Push 0 "n"
+               OpName %pc "pc"
+               OpName %tile "tile"
+               OpName %main "main"
+               OpDecorate %WG SpecId 0
+               OpDecorate %MUL SpecId 1
+               OpDecorate %ADD SpecId 2
+               OpDecorate %SCALE SpecId 3
+               OpDecorate %FLIP SpecId 4
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpMemberDecorate %Out 0 Offset 0
+               OpDecorate %Out Block
+               OpDecorate %out DescriptorSet 0
+               OpDecorate %out Binding 0
+               OpMemberDecorate %Push 0 Offset 0
+               OpDecorate %Push Block
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+       %bool = OpTypeBool
+     %v3uint = OpTypeVector %uint 3
+         %WG = OpSpecConstant %uint 64
+        %MUL = OpSpecConstant %uint 3
+        %ADD = OpSpecConstant %int -5
+      %SCALE = OpSpecConstant %float 0.5
+       %FLIP = OpSpecConstantFalse %bool
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+     %uint_8 = OpConstant %uint 8
+    %uint_20 = OpConstant %uint 20
+    %uint_32 = OpConstant %uint 32
+         %18 = OpSpecConstantComposite %v3uint %WG %uint_1 %uint_1
+         %19 = OpSpecConstantOp %uint CompositeExtract %18 0
+         %20 = OpSpecConstantOp %uint IMul %WG %uint_2
+         %21 = OpSpecConstantOp %uint ShiftLeftLogical %20 %uint_8
+         %22 = OpSpecConstantOp %uint ShiftLeftLogical %19 %uint_20
+         %23 = OpSpecConstantOp %bool ULessThan %uint_32 %WG
+         %24 = OpSpecConstantOp %bool LogicalNot %FLIP
+         %25 = OpSpecConstantOp %uint Select %24 %uint_0 %uint_1
+         %26 = OpSpecConstantOp %uint BitwiseOr %21 %22
+         %27 = OpSpecConstantOp %uint BitwiseOr %26 %25
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+        %Out = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer_Out = OpTypePointer StorageBuffer %Out
+        %out = OpVariable %_ptr_StorageBuffer_Out StorageBuffer
+       %Push = OpTypeStruct %uint
+%_ptr_PushConstant_Push = OpTypePointer PushConstant %Push
+         %pc = OpVariable %_ptr_PushConstant_Push PushConstant
+%_arr_uint_WG = OpTypeArray %uint %WG
+%_ptr_Workgroup__arr_uint_WG = OpTypePointer Workgroup %_arr_uint_WG
+       %tile = OpVariable %_ptr_Workgroup__arr_uint_WG Workgroup
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+%gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %42 = OpTypeFunction %void
+%_ptr_Workgroup_uint = OpTypePointer Workgroup %uint
+   %uint_264 = OpConstant %uint 264
+%_ptr_PushConstant_uint = OpTypePointer PushConstant %uint
+%_ptr_Function_uint = OpTypePointer Function %uint
+     %uint_4 = OpConstant %uint 4
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+     %uint_3 = OpConstant %uint 3
+       %main = OpFunction %void None %42
+         %43 = OpLabel
+         %63 = OpVariable %_ptr_Function_uint Function
+         %44 = OpLoad %v3uint %gl_GlobalInvocationID
+         %45 = OpCompositeExtract %uint %44 0
+         %46 = OpLoad %v3uint %gl_LocalInvocationID
+         %47 = OpCompositeExtract %uint %46 0
+         %49 = OpAccessChain %_ptr_Workgroup_uint %tile %47
+         %50 = OpIMul %uint %45 %MUL
+               OpStore %49 %50
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+         %53 = OpAccessChain %_ptr_PushConstant_uint %pc %uint_0
+         %54 = OpLoad %uint %53
+         %55 = OpULessThan %bool %45 %54
+               OpSelectionMerge %57 None
+               OpBranchConditional %55 %56 %57
+         %56 = OpLabel
+         %58 = OpIAdd %uint %47 %uint_1
+         %59 = OpUMod %uint %58 %WG
+         %60 = OpAccessChain %_ptr_Workgroup_uint %tile %59
+         %61 = OpLoad %uint %60
+               OpStore %63 %61
+               OpSelectionMerge %65 None
+               OpBranchConditional %FLIP %64 %65
+         %64 = OpLabel
+         %66 = OpLoad %uint %63
+         %67 = OpNot %uint %66
+               OpStore %63 %67
+               OpBranch %65
+         %65 = OpLabel
+         %68 = OpLoad %uint %63
+         %69 = OpBitcast %int %45
+         %70 = OpIAdd %int %69 %ADD
+         %71 = OpBitcast %uint %70
+         %72 = OpConvertUToF %float %45
+         %73 = OpFMul %float %72 %SCALE
+         %74 = OpBitcast %uint %73
+         %75 = OpSelect %uint %23 %uint_2 %uint_0
+         %76 = OpBitwiseOr %uint %27 %75
+         %78 = OpIMul %uint %45 %uint_4
+         %79 = OpIAdd %uint %78 %uint_0
+         %81 = OpAccessChain %_ptr_StorageBuffer_uint %out %uint_0 %79
+               OpStore %81 %68
+         %82 = OpIAdd %uint %78 %uint_1
+         %83 = OpAccessChain %_ptr_StorageBuffer_uint %out %uint_0 %82
+               OpStore %83 %71
+         %84 = OpIAdd %uint %78 %uint_2
+         %85 = OpAccessChain %_ptr_StorageBuffer_uint %out %uint_0 %84
+               OpStore %85 %74
+         %87 = OpIAdd %uint %78 %uint_3
+         %88 = OpAccessChain %_ptr_StorageBuffer_uint %out %uint_0 %87
+               OpStore %88 %76
+               OpBranch %57
+         %57 = OpLabel
+               OpReturn
+               OpFunctionEnd

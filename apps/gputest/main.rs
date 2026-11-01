@@ -24,6 +24,15 @@
 //                    and a new device after it
 //        syncval     (--validate only) two copies into one buffer without a barrier: the
 //                    validation layer must report the hazard (synchronization validation on)
+//        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3
+//                    (WorkgroupSize built-in) and 1.6 (LocalSizeId) with its defaults and with
+//                    constants for every override (workgroup sizes 1 .. the limit) = its CPU
+//                    reference; invalid constants and workgroup sizes are Err(Invalid)
+//        textures    textures in shaders (t_texture.rs) against CPU references: OpImageFetch,
+//                    sampling a 2D array / cube / cube array, storage textures (write, read,
+//                    read-write, 8 formats), a texture + sampler in a fragment shader (nearest
+//                    explicit and implicit LOD, bilinear, trilinear), depth comparison (also
+//                    PCF), size / level queries, (Voll) Bindless textures and samplers
 //        scene       the benchmark scene (t_scene.rs): move = move_all bit for bit, cull =
 //                    cull_ref, an image of known cubes (orientation, lit colour, depth order,
 //                    back faces culled) in both modes, indirect and single pictures compared
@@ -66,6 +75,8 @@ mod shaders;
 mod t_compute;
 mod t_render;
 mod t_scene;
+mod t_spec;
+mod t_texture;
 mod t_window;
 
 rt::main!(run());
@@ -438,7 +449,7 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 12] = [
+    let tests: [(&str, fn(&mut T)); 14] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -446,6 +457,8 @@ fn run() -> i32 {
         ("indirect", t_render::indirect),
         ("timestamps", t_compute::timestamps),
         ("bindless", t_compute::bindless),
+        ("spec", t_spec::spec),
+        ("textures", t_texture::textures),
         ("window", t_window::window),
         ("errors", errors),
         ("syncval", syncval),

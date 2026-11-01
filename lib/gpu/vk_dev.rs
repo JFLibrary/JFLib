@@ -9,7 +9,8 @@
 //        the Vulkan memory model only together with its device scope (else Device-scope
 //        atomics, as in the benchmark's cull, would be invalid); on Voll also descriptor
 //        indexing (update after bind, partially bound, non-uniform indexing) and
-//        draw-indirect-count.  Not enabled: robust buffer access (speed).
+//        draw-indirect-count; maintenance4 on Vulkan 1.3 (LocalSizeId).  Not enabled: robust
+//        buffer access (speed).
 //   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
@@ -104,6 +105,8 @@ pub(crate) struct Shared {
     pub ts_base: AtomicU64,
     /// vkResetQueryPool from the host (hostQueryReset enabled)
     pub host_query_reset: bool,
+    /// maintenance4 enabled (Vulkan 1.3): shaders may set their workgroup size with LocalSizeId
+    pub maintenance4: bool,
     lost: AtomicBool,
     submitted: AtomicU64,
     completed: AtomicU64,
@@ -350,6 +353,7 @@ impl Adapter {
             swapchain,
             ts_base: AtomicU64::new(0),
             host_query_reset: v12 && e12[vk::F12_HOST_QUERY_RESET] != 0,
+            maintenance4: v13 && e13[vk::F13_MAINTENANCE4] != 0,
             lost: AtomicBool::new(false),
             submitted: AtomicU64::new(0),
             completed: AtomicU64::new(0),

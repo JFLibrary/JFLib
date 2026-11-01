@@ -7,6 +7,10 @@
 //                 struct_/struct_layout/ptr/func/image/sampler/sampled_image; deduplicated except
 //                 structs and strided arrays (their decorations differ)
 //   constants     const_u32/i32/f32/bool/scalar/composite/null (deduplicated)
+//   spec consts   spec_u32/i32/f32/bool/scalar (SpecId), spec_composite, spec_op
+//                 (OpSpecConstantOp); workgroup sizes from them: local_size_id (LocalSizeId),
+//                 workgroup_size_builtin (the WorkgroupSize built-in), workgroup_size (the one
+//                 the level allows); ty_array_id (override-sized arrays)
 //   globals       global, input, output, builtin, buffer, push_constant, workgroup, resource;
 //                 local (Function storage, placed in the entry block)
 //   functions     begin_function -> (id, params), end_function, label, begin_block
@@ -106,6 +110,7 @@ pub struct Module {
     funcs: Vec<u32>,
     info: Vec<Info>,
     consts: BTreeMap<u32, u32>,
+    spec: BTreeSet<u32>,
     keys: BTreeMap<Vec<u32>, Id>,
     f: Option<Func>,
 }
@@ -160,6 +165,7 @@ impl Module {
             funcs: Vec::new(),
             info: alloc::vec![Info::Free],
             consts: BTreeMap::new(),
+            spec: BTreeSet::new(),
             keys: BTreeMap::new(),
             f: None,
         };
@@ -340,6 +346,12 @@ impl Module {
         self.ty_plain(Ty::Array { elem, len: l }, op::TypeArray, &[elem.0, l.0])
     }
 
+    /// an array whose length is the id of an integer constant or specialization constant (WGSL:
+    /// a workgroup array sized by an override expression)
+    pub fn ty_array_id(&mut self, elem: Id, len: Id) -> Id {
+        self.ty_plain(Ty::Array { elem, len }, op::TypeArray, &[elem.0, len.0])
+    }
+
     /// an array decorated with ArrayStride (buffers); deduplicated by element, length, stride
     pub fn ty_array_stride(&mut self, elem: Id, len: u32, stride: u32) -> Id {
         let l = self.const_u32(len);
@@ -517,6 +529,76 @@ impl Module {
         self.constant(op::ConstantNull, ty, &[])
     }
 
+    // ---- specialization constants (WGSL override)
+
+    /// whether v is a specialization constant (OpSpecConstant*, composites of them, results of
+    /// OpSpecConstantOp)
+    pub fn is_spec(&self, v: Id) -> bool {
+        self.spec.contains(&v.0)
+    }
+
+    fn spec_value(&mut self, opc: u16, ty: Id, args: &[u32]) -> Id {
+        let id = self.alloc(Info::Value { ty });
+        let mut a = alloc::vec![ty.0, id.0];
+        a.extend_from_slice(args);
+        enc(&mut self.globals, opc, &a);
+        self.spec.insert(id.0);
+        id
+    }
+
+    /// OpSpecConstant of an int or float type with its default value words (low word first),
+    /// decorated SpecId spec_id (the pipeline constant's id); never deduplicated
+    pub fn spec_scalar(&mut self, ty: Id, spec_id: u32, words: &[u32]) -> Id {
+        let id = self.spec_value(op::SpecConstant, ty, words);
+        self.decorate(id, Dec::SpecId, &[spec_id]);
+        id
+    }
+
+    pub fn spec_u32(&mut self, spec_id: u32, default: u32) -> Id {
+        let t = self.ty_u32();
+        self.spec_scalar(t, spec_id, &[default])
+    }
+
+    pub fn spec_i32(&mut self, spec_id: u32, default: i32) -> Id {
+        let t = self.ty_i32();
+        self.spec_scalar(t, spec_id, &[default as u32])
+    }
+
+    pub fn spec_f32(&mut self, spec_id: u32, default: f32) -> Id {
+        let t = self.ty_f32();
+        self.spec_scalar(t, spec_id, &[default.to_bits()])
+    }
+
+    /// OpSpecConstantTrue / OpSpecConstantFalse decorated SpecId spec_id
+    pub fn spec_bool(&mut self, spec_id: u32, default: bool) -> Id {
+        let t = self.ty_bool();
+        let id = self.spec_value(if default { op::SpecConstantTrue } else { op::SpecConstantFalse }, t, &[]);
+        self.decorate(id, Dec::SpecId, &[spec_id]);
+        id
+    }
+
+    /// OpSpecConstantComposite of constants and specialization constants (deduplicated)
+    pub fn spec_composite(&mut self, ty: Id, parts: &[Id]) -> Id {
+        let a: Vec<u32> = parts.iter().map(|p| p.0).collect();
+        let id = self.constant(op::SpecConstantComposite, ty, &a);
+        self.spec.insert(id.0);
+        id
+    }
+
+    /// OpSpecConstantOp: the operation opc on constant ids, then its literals (the indices of
+    /// CompositeExtract / CompositeInsert, the components of VectorShuffle).  SPIR-V allows
+    /// for Shader: SConvert, UConvert (1.4+), FConvert, QuantizeToF16, SNegate, Not, IAdd,
+    /// ISub, IMul, UDiv, SDiv, UMod, SRem, SMod, the shifts, BitwiseOr / Xor / And,
+    /// VectorShuffle, CompositeExtract / Insert, LogicalOr / And / Not / Equal / NotEqual,
+    /// Select, IEqual, INotEqual and the integer comparisons (val checks it); no float
+    /// arithmetic.
+    pub fn spec_op(&mut self, ty: Id, opc: u16, ids: &[Id], literals: &[u32]) -> Id {
+        let mut a = alloc::vec![opc as u32];
+        a.extend(ids.iter().map(|i| i.0));
+        a.extend_from_slice(literals);
+        self.spec_value(op::SpecConstantOp, ty, &a)
+    }
+
     // ---- global variables
 
     /// a global OpVariable of `pointee` in storage class sc
@@ -575,8 +657,16 @@ impl Module {
         self.global(Sc::Workgroup, ty, None)
     }
 
-    /// an image, sampler or sampled image (UniformConstant) at set / binding
+    /// an image, sampler or sampled image (UniformConstant) at set / binding; a runtime array
+    /// of them (a Bindless table) adds RuntimeDescriptorArray (before 1.5 with
+    /// SPV_EXT_descriptor_indexing)
     pub fn resource(&mut self, ty: Id, set: u32, binding: u32) -> Id {
+        if let Ty::RuntimeArray { .. } = self.ty(ty) {
+            self.capability(Cap::RuntimeDescriptorArray);
+            if self.minor < 5 {
+                self.extension("SPV_EXT_descriptor_indexing");
+            }
+        }
         let v = self.global(Sc::UniformConstant, ty, None);
         self.decorate(v, Dec::DescriptorSet, &[set]);
         self.decorate(v, Dec::Binding, &[binding]);
@@ -594,6 +684,42 @@ impl Module {
         let mut a = alloc::vec![func.0, mode as u32];
         a.extend_from_slice(args);
         enc(&mut self.modes, op::ExecutionMode, &a);
+    }
+
+    /// OpExecutionModeId (SPIR-V 1.2+): a mode whose operands are constant ids (LocalSizeId)
+    pub fn exec_mode_id(&mut self, func: Id, mode: Mode, ids: &[Id]) {
+        let mut a = alloc::vec![func.0, mode as u32];
+        a.extend(ids.iter().map(|i| i.0));
+        enc(&mut self.modes, op::ExecutionModeId, &a);
+    }
+
+    /// LocalSizeId x y z: the workgroup size of a GLCompute entry point from 32-bit integer
+    /// constants or specialization constants.  Vulkan needs maintenance4 for it (core and
+    /// required in Vulkan 1.3, so always there at the level Voll).
+    pub fn local_size_id(&mut self, func: Id, size: [Id; 3]) {
+        self.exec_mode_id(func, Mode::LocalSizeId, &size);
+    }
+
+    /// the WorkgroupSize built-in: a uvec3 composite of size (OpSpecConstantComposite when a
+    /// part is a specialization constant) decorated BuiltIn WorkgroupSize.  It sets the
+    /// workgroup size of every GLCompute entry point of the module and wins over LocalSize.
+    pub fn workgroup_size_builtin(&mut self, size: [Id; 3]) -> Id {
+        let u = self.ty_u32();
+        let uv3 = self.ty_vec(u, 3);
+        let c = if size.iter().any(|&p| self.is_spec(p)) { self.spec_composite(uv3, &size) } else { self.const_composite(uv3, &size) };
+        self.decorate(c, Dec::BuiltIn, &[Bi::WorkgroupSize as u32]);
+        c
+    }
+
+    /// a workgroup size of (specialization) constants the way the level allows: LocalSizeId
+    /// from SPIR-V 1.6 (Voll, Vulkan 1.3), else the WorkgroupSize built-in (then for every
+    /// compute entry point of the module: one module per entry point, as Basis needs it)
+    pub fn workgroup_size(&mut self, func: Id, size: [Id; 3]) {
+        if self.minor >= 6 {
+            self.local_size_id(func, size);
+        } else {
+            self.workgroup_size_builtin(size);
+        }
     }
 
     // ---- functions and blocks
@@ -1264,6 +1390,34 @@ impl Module {
     pub fn image_size_lod(&mut self, ty: Id, image: Id, lod: Id) -> Id {
         self.capability(Cap::ImageQuery);
         self.emit_ids(op::ImageQuerySizeLod, ty, &[image, lod])
+    }
+
+    /// OpImageQueryLevels (textureNumLevels of a sampled image) with result type ty
+    pub fn image_levels(&mut self, ty: Id, image: Id) -> Id {
+        self.capability(Cap::ImageQuery);
+        self.emit_ids(op::ImageQueryLevels, ty, &[image])
+    }
+
+    /// textureSampleCompare: OpImageSampleDrefImplicitLod (fragment shaders) -> the float result
+    pub fn sample_dref(&mut self, si: Id, coord: Id, dref: Id) -> Id {
+        let Ty::Image { sampled, .. } = self.image_of(si) else { panic!("shader: not an image") };
+        self.emit_ids(op::ImageSampleDrefImplicitLod, sampled, &[si, coord, dref])
+    }
+
+    /// textureSampleCompareLevel: OpImageSampleDrefExplicitLod with Lod lod
+    pub fn sample_dref_lod(&mut self, si: Id, coord: Id, dref: Id, lod: Id) -> Id {
+        let Ty::Image { sampled, .. } = self.image_of(si) else { panic!("shader: not an image") };
+        self.emit(op::ImageSampleDrefExplicitLod, Some(sampled), &[si.0, coord.0, dref.0, spv::img::Lod, lod.0])
+    }
+
+    /// decorate v NonUniform (a resource index or the image / sampler loaded with it) and
+    /// declare ShaderNonUniform (before 1.5 with SPV_EXT_descriptor_indexing)
+    pub fn nonuniform(&mut self, v: Id) {
+        self.capability(Cap::ShaderNonUniform);
+        if self.minor < 5 {
+            self.extension("SPV_EXT_descriptor_indexing");
+        }
+        self.decorate(v, Dec::NonUniform, &[]);
     }
 
     // ---- derivatives (fragment shaders)

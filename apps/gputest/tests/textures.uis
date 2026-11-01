@@ -1,0 +1,5 @@
+#!args --test textures
+# textures in shaders built with lib/shader, against CPU references: OpImageFetch, sampling of 2D
+# arrays, cubes and cube arrays, storage textures (write / read / read-write), a texture and a
+# sampler in a fragment shader (nearest, bilinear, trilinear, mip selection), depth comparison,
+# size and level queries, Bindless textures and samplers (level Voll)

@@ -167,7 +167,7 @@ LIBS = {
     "update": ("lib/update/lib.rs", ["rt", "plat", "crypto", "agent_core", "netio"]),
     "script": ("lib/script/lib.rs", ["rt", "agent_core"]),  # JFNetworker's .jfs scripts (SK3: json via agent_core)
     # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
-    "gpu": ("lib/gpu/lib.rs", ["rt", "plat"]),
+    "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
 }
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 

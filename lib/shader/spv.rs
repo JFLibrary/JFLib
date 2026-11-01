@@ -16,6 +16,7 @@
 //   f function control   e selection control   l loop control (+ args)
 //   m memory access (+ args)   I image operands (+ id args)   x extended instruction number
 //   w switch targets: (literal, id) pairs
+//   o an opcode (OpSpecConstantOp) followed by the operands of that opcode's grammar
 #![allow(non_upper_case_globals)]
 
 pub const MAGIC: u32 = 0x0723_0203;
@@ -85,6 +86,7 @@ ops! {
     SpecConstantFalse = 49, R_TY, "";
     SpecConstant = 50, R_TY, "v";
     SpecConstantComposite = 51, R_TY, "i*";
+    SpecConstantOp = 52, R_TY, "o";
     Function = 54, R_TY, "fi";
     FunctionParameter = 55, R_TY, "";
     FunctionEnd = 56, R_NONE, "";

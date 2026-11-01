@@ -6,8 +6,9 @@
 //
 // Names follow spirv-dis' FriendlyNameMapper: OpName first, then generated names for types
 // (void, uint, v4float, mat4v4float, _arr_float_uint_4, _runtimearr_X, _ptr_Uniform_X,
-// _struct_N) and constants (uint_4, int_n1, float_0_5, true); a taken name gets _0, _1 ...;
-// everything else is its number.  Opcodes shader does not know print as OpUnknown(N) with
+// _struct_N), constants (uint_4, int_n1, float_0_5, true) and built-ins (gl_Position,
+// gl_GlobalInvocationID ...); a taken name gets _0, _1 ...; everything else (specialization
+// constants too) is its number.  OpSpecConstantOp prints its operation without "Op".  Opcodes shader does not know print as OpUnknown(N) with
 // their words.
 
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -159,6 +160,48 @@ fn quote(s: &str) -> String {
     o
 }
 
+/// the name spirv-dis gives a variable or constant decorated BuiltIn b (FriendlyNameMapper)
+fn builtin_name(b: u32) -> Option<&'static str> {
+    Some(match b {
+        0 => "gl_Position",
+        1 => "gl_PointSize",
+        3 => "gl_ClipDistance",
+        4 => "gl_CullDistance",
+        5 => "gl_VertexID",
+        6 => "gl_InstanceID",
+        7 => "gl_PrimitiveID",
+        8 => "gl_InvocationID",
+        9 => "gl_Layer",
+        10 => "gl_ViewportIndex",
+        11 => "gl_TessLevelOuter",
+        12 => "gl_TessLevelInner",
+        13 => "gl_TessCoord",
+        14 => "gl_PatchVertices",
+        15 => "gl_FragCoord",
+        16 => "gl_PointCoord",
+        17 => "gl_FrontFacing",
+        18 => "gl_SampleID",
+        19 => "gl_SamplePosition",
+        20 => "gl_SampleMask",
+        22 => "gl_FragDepth",
+        23 => "gl_HelperInvocation",
+        24 => "gl_NumWorkGroups",
+        25 => "gl_WorkGroupSize",
+        26 => "gl_WorkGroupID",
+        27 => "gl_LocalInvocationID",
+        28 => "gl_GlobalInvocationID",
+        29 => "gl_LocalInvocationIndex",
+        36 => "SubgroupSize",
+        38 => "NumSubgroups",
+        40 => "SubgroupId",
+        41 => "SubgroupLocalInvocationId",
+        42 => "gl_VertexIndex",
+        43 => "gl_InstanceIndex",
+        4425 => "gl_BaseInstance",
+        _ => return None,
+    })
+}
+
 /// the names of the ids, the number kinds of the scalar types, the extended instruction sets
 fn scan(insts: &[Inst]) -> (Names, BTreeMap<u32, Num>, BTreeMap<u32, String>) {
     let mut n = Names { map: BTreeMap::new(), used: BTreeSet::new() };
@@ -170,6 +213,11 @@ fn scan(insts: &[Inst]) -> (Names, BTreeMap<u32, Num>, BTreeMap<u32, String>) {
             op::Name if !o.is_empty() => n.save(o[0], &parse::string(&o[1..]).0),
             op::ExtInstImport => {
                 sets.insert(i.res, parse::string(o).0);
+            }
+            op::Decorate if o.len() >= 3 && o[1] == spv::Dec::BuiltIn as u32 => {
+                if let Some(b) = builtin_name(o[2]) {
+                    n.save(o[0], b);
+                }
             }
             op::TypeVoid => n.save(i.res, "void"),
             op::TypeBool => n.save(i.res, "bool"),
@@ -266,6 +314,7 @@ pub fn disassemble(words: &[u32]) -> Result<String, String> {
                     }
                     _ => w[0].to_string(),
                 },
+                'o' => spv::op_info(w[0] as u16).map_or_else(|| w[0].to_string(), |o| String::from(o.name)),
                 'C' => enum_name(spv::CAPS, w[0]),
                 'A' => enum_name(spv::ADDRESSING, w[0]),
                 'Y' => enum_name(spv::MEMORY_MODELS, w[0]),

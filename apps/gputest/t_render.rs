@@ -49,8 +49,8 @@ impl Scene {
         let pl = t.res(dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 0 }), "pipeline layout")?;
         let pipe = t.res(dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &pl,
-            vertex: ShaderStage { module: &vs, entry: "main" },
-            fragment: Some(ShaderStage { module: &fs, entry: "main" }),
+            vertex: ShaderStage::new(&vs, "main"),
+            fragment: Some(ShaderStage::new(&fs, "main")),
             buffers: &[],
             topology: Topology::Triangles,
             cull: Cull::Back,
@@ -171,8 +171,7 @@ pub fn indirect(t: &mut T) {
                                                                     stages: Stages::COMPUTE }]), "layout") else { return };
     let Some(apl) = t.res(dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&abgl], push_constants: 64 }), "layout")
     else { return };
-    let Some(apipe) = t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &apl, shader: ShaderStage { module: &m,
-        entry: "main" } }), "args pipeline") else { return };
+    let Some(apipe) = t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &apl, shader: ShaderStage::new(&m, "main") }), "args pipeline") else { return };
     let Some(args) = storage(t, dev, 64, BufferUsage::INDIRECT) else { return };
     let Some(abg) = t.res(dev.create_bind_group(&BindGroupDesc { layout: &abgl, entries: &[BindEntry { binding: 0,
         resource: Resource::Buffer { buffer: &args, offset: 0, size: 0 } }] }), "bind group") else { return };

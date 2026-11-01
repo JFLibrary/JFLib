@@ -35,7 +35,7 @@ let bgl = dev.create_bind_group_layout(&[gpu::Binding {
     binding: 0, kind: gpu::BindingKind::StorageBuffer, stages: gpu::Stages::COMPUTE }])?;
 let layout = dev.create_pipeline_layout(&gpu::PipelineLayoutDesc { groups: &[&bgl], push_constants: 12 })?;
 let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
-    layout: &layout, shader: gpu::ShaderStage { module: &shader, entry: "main" } })?;
+    layout: &layout, shader: gpu::ShaderStage::new(&shader, "main") })?;
 let buf = dev.create_buffer(&gpu::BufferDesc { size: 4 << 20, usage: gpu::BufferUsage::STORAGE,
                                                memory: gpu::MemoryKind::Device })?;
 let rb = dev.create_buffer(&gpu::BufferDesc { size: 4 << 20, usage: gpu::BufferUsage::NONE,

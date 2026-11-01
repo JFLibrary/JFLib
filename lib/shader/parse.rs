@@ -83,8 +83,9 @@ pub fn string_words(s: &str) -> Vec<u32> {
 
 /// walk the operands: f(kind, words).  Kinds as in the spv module comment; the arguments of
 /// masks (l, m, I), execution modes (E: n, G: i), decorations (B for BuiltIn, else n) and
-/// switch targets (n, i) are reported one by one after their mask / enum.  Unknown opcodes:
-/// every word as 'n'.  Returns false when the words do not fit the grammar.
+/// switch targets (n, i) are reported one by one after their mask / enum; OpSpecConstantOp's
+/// opcode as 'o', then its operation's operands.  Unknown opcodes: every word as 'n'.  Returns
+/// false when the words do not fit the grammar.
 pub fn operands(inst: &Inst, f: &mut dyn FnMut(char, &[u32])) -> bool {
     let Some(info) = inst.info else {
         for k in 0..inst.ops.len() {
@@ -152,6 +153,22 @@ pub fn operands(inst: &Inst, f: &mut dyn FnMut(char, &[u32])) -> bool {
                     }
                 }
                 k - i
+            }
+            'o' => {
+                // OpSpecConstantOp: the opcode, then the operands of its grammar
+                f('o', &w[i..i + 1]);
+                let op = w[i] as u16;
+                let inner = Inst { op, ty: 0, res: 0, ops: &w[i + 1..], at: inst.at, info: spv::op_info(op) };
+                if inner.info.is_some_and(|x| x.res == spv::R_TY) {
+                    if !operands(&inner, f) {
+                        return false;
+                    }
+                } else {
+                    for k in i + 1..w.len() {
+                        f('n', &w[k..k + 1]);
+                    }
+                }
+                w.len() - i
             }
             'w' => {
                 let mut k = i;

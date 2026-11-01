@@ -1,9 +1,12 @@
-// interp -- a small SPIR-V interpreter (one invocation at a time, the instructions the
-// benchmark shaders use) and the checks that run move, cull_reset, cull, vs_instanced,
-// vs_single and fs_lambert through it: move and cull must equal move_ref / cull_ref bit for
-// bit (IEEE add / sub / mul as Vulkan requires them), the vertex and fragment shaders the f64
-// maths within a tolerance.  Buffers are the byte images lib/gpu uploads, laid out by the
-// modules' own Offset / ArrayStride / MatrixStride decorations.
+// interp -- a small SPIR-V interpreter (one invocation at a time, or a workgroup whose
+// invocations take turns between OpControlBarriers; the instructions the benchmark and sample
+// shaders use; specialization constants set as a pipeline sets them, through
+// shader::reflect) and the checks that run move, cull_reset, cull, vs_instanced, vs_single,
+// fs_lambert and samples::spec_fill through it: move and cull must equal move_ref / cull_ref
+// bit for bit (IEEE add / sub / mul as Vulkan requires them), the vertex and fragment shaders
+// the f64 maths within a tolerance, spec_fill spec_fill_ref with its defaults and with other
+// pipeline constants.  Buffers are the byte images lib/gpu uploads, laid out by the modules'
+// own Offset / ArrayStride / MatrixStride decorations.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -11,7 +14,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use shader::bench::{self, Camera, DrawCmd, Object, Push, Shader};
-use shader::{op, parse, spv, Bi, Dec, Ty};
+use shader::samples::{self, SpecParams};
+use shader::{op, parse, reflect, spv, Bi, Dec, Ty};
 
 use crate::T;
 
@@ -49,8 +53,17 @@ fn b(x: bool) -> u32 {
     x as u32
 }
 
+/// where an invocation is: instruction, previous block, current block
+type At = (usize, u32, u32);
+
 impl<'a> Vm<'a> {
     pub fn new(words: &'a [u32]) -> Vm<'a> {
+        Vm::with_spec(words, &[])
+    }
+
+    /// the module specialized with set: (SpecId, value bits) pairs, the rest keep their defaults
+    pub fn with_spec(words: &'a [u32], set: &[(u32, u64)]) -> Vm<'a> {
+        let spec = reflect::constant_values(words, set).expect("interp: specialization");
         let ins = parse::parse(words).expect("interp: parse");
         let mut vm = Vm { ins, tys: BTreeMap::new(), consts: BTreeMap::new(), offs: BTreeMap::new(),
                           mstride: BTreeMap::new(), stride: BTreeMap::new(), builtin: BTreeMap::new(),
@@ -135,6 +148,10 @@ impl<'a> Vm<'a> {
                 op::ConstantNull => {
                     let n = vm.flat(i.ty);
                     vm.consts.insert(i.res, alloc::vec![0; n as usize]);
+                }
+                op::SpecConstant | op::SpecConstantTrue | op::SpecConstantFalse | op::SpecConstantComposite
+                | op::SpecConstantOp => {
+                    vm.consts.insert(i.res, spec[&i.res].clone());
                 }
                 op::Variable if !in_fn => {
                     let Some(Ty::Pointer { pointee, .. }) = vm.tys.get(&i.ty).cloned() else { panic!("interp: variable") };
@@ -353,9 +370,84 @@ impl<'a> Vm<'a> {
         self.vals[id as usize] = Some(Val::W(v));
     }
 
-    /// run the entry point once
+    /// run the entry point once (OpControlBarrier does nothing for a single invocation)
     pub fn run(&mut self) -> Result<(), String> {
-        let (mut pc, mut prev, mut cur) = (self.main + 1, 0u32, 0u32);
+        let mut at = (self.main + 1, 0, 0);
+        self.resume(&mut at, false).map(|_| ())
+    }
+
+    /// whether variable v is an invocation's own (Input, Output, Private, Function)
+    fn private(&self, v: u32) -> bool {
+        self.vars.get(&v).is_some_and(|x| matches!(x.0, 1 | 3 | 6 | 7))
+    }
+
+    /// run one workgroup of `size` invocations; set(vm, k) sets the built-ins of invocation k.
+    /// The invocations take turns: each runs to its next OpControlBarrier (or OpReturn), then the
+    /// next one; workgroup and buffer memory are shared, the rest is each invocation's own.
+    pub fn run_group(&mut self, size: u32, set: &mut dyn FnMut(&mut Vm<'a>, u32)) -> Result<(), String> {
+        struct Inv {
+            at: At,
+            vals: Vec<Option<Val>>,
+            mem: BTreeMap<u32, Vec<u8>>,
+            done: bool,
+        }
+        let base_mem: BTreeMap<u32, Vec<u8>> =
+            self.mem.iter().filter(|(v, _)| self.private(**v)).map(|(k, m)| (*k, m.clone())).collect();
+        let mut invs: Vec<Inv> = (0..size)
+            .map(|_| Inv { at: (self.main + 1, 0, 0), vals: self.vals.clone(), mem: base_mem.clone(), done: false })
+            .collect();
+        let mut started = alloc::vec![false; size as usize];
+        let result = loop {
+            let mut err = None;
+            for (k, inv) in invs.iter_mut().enumerate() {
+                if inv.done {
+                    continue;
+                }
+                core::mem::swap(&mut self.vals, &mut inv.vals);
+                for (v, m) in core::mem::take(&mut inv.mem) {
+                    self.mem.insert(v, m);
+                }
+                if !started[k] {
+                    set(self, k as u32);
+                    started[k] = true;
+                }
+                let mut at = inv.at;
+                match self.resume(&mut at, true) {
+                    Ok(done) => inv.done = done,
+                    Err(e) => err = Some(e),
+                }
+                inv.at = at;
+                core::mem::swap(&mut self.vals, &mut inv.vals);
+                let own: Vec<u32> = self.mem.keys().copied().filter(|&v| self.private(v)).collect();
+                for v in own {
+                    if let Some(m) = self.mem.remove(&v) {
+                        inv.mem.insert(v, m);
+                    }
+                }
+                if err.is_some() {
+                    break;
+                }
+            }
+            if let Some(e) = err {
+                break Err(e);
+            }
+            if invs.iter().all(|i| i.done) {
+                break Ok(());
+            }
+            if invs.iter().any(|i| i.done) {
+                break Err(String::from("an invocation returned while others wait at a barrier"));
+            }
+        };
+        for (v, m) in base_mem {
+            self.mem.insert(v, m);
+        }
+        result
+    }
+
+    /// run from `at` to OpReturn (true) or, with stop_at_barrier, past the next
+    /// OpControlBarrier (false)
+    fn resume(&mut self, at: &mut At, stop_at_barrier: bool) -> Result<bool, String> {
+        let (mut pc, mut prev, mut cur) = *at;
         loop {
             self.steps += 1;
             let i = self.ins[pc];
@@ -373,7 +465,14 @@ impl<'a> Vm<'a> {
                     pc = self.labels[&if self.w(o[0])?[0] != 0 { o[1] } else { o[2] }];
                     continue;
                 }
-                op::Return => return Ok(()),
+                op::Return => {
+                    *at = (pc, prev, cur);
+                    return Ok(true);
+                }
+                op::ControlBarrier if stop_at_barrier => {
+                    *at = (pc + 1, prev, cur);
+                    return Ok(false);
+                }
                 op::SelectionMerge | op::LoopMerge | op::Line | op::Nop => {}
                 op::Phi => {
                     let v = o.chunks(2).find(|p| p[1] == prev).map(|p| p[0]).ok_or("phi without its predecessor")?;
@@ -508,6 +607,7 @@ impl<'a> Vm<'a> {
                 }).collect()
             }
             op::Not => self.w(o[0])?.iter().map(|x| !x).collect(),
+            op::SNegate => self.w(o[0])?.iter().map(|&x| (x as i32).wrapping_neg() as u32).collect(),
             op::IEqual | op::INotEqual | op::ULessThan | op::ULessThanEqual | op::UGreaterThan | op::UGreaterThanEqual
             | op::SLessThan | op::SGreaterThanEqual => {
                 let (a, bb) = (self.w(o[0])?, self.w(o[1])?);
@@ -645,7 +745,50 @@ fn dispatch(vm: &mut Vm, count: u32, wg: u32) -> Result<(), String> {
     Ok(())
 }
 
+/// spec_fill with the pipeline constants of p (None: the module's defaults) over n invocations
+fn spec_check(t: &mut T, minor: u32, p: Option<SpecParams>, n: u32) {
+    let w = samples::spec_fill(minor);
+    let set = p.map_or(Vec::new(), |p| p.bits());
+    let want_p = p.unwrap_or(SpecParams::DEFAULT);
+    let what = format!("spec_fill 1.{} {}", minor, if p.is_none() { String::from("(defaults)") } else { format!("{:?}", want_p) });
+    let Ok(Some(size)) = reflect::workgroup_size(&w, "main", &set) else {
+        t.check(&format!("{}: workgroup size", what), false);
+        return;
+    };
+    t.eq(&format!("{}: workgroup size", what), size, [want_p.wg, 1, 1]);
+    let mut vm = Vm::with_spec(&w, &set);
+    vm.buffer(0, alloc::vec![0xEEu8; (n as usize + 4) * 16]);
+    vm.push(n.to_le_bytes().to_vec());
+    let wg = size[0];
+    for g in 0..n.div_ceil(wg) {
+        let r = vm.run_group(wg, &mut |vm, k| {
+            vm.set_builtin(Bi::GlobalInvocationId, &[g * wg + k, 0, 0]);
+            vm.set_builtin(Bi::LocalInvocationId, &[k, 0, 0]);
+        });
+        if let Err(e) = r {
+            t.check(&format!("{}: group {}: {}", what, g, e), false);
+            return;
+        }
+    }
+    let got: Vec<u32> = vm.buffer_bytes(0).chunks_exact(4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+    let want = samples::spec_fill_ref(&want_p, n);
+    let bad = (0..want.len()).find(|&k| got[k] != want[k]);
+    if let Some(k) = bad {
+        crate::out(&format!("   {} word {}: got {:#x}, want {:#x}\n", what, k, got[k], want[k]));
+    }
+    t.check(&format!("{} = spec_fill_ref ({} invocations)", what, n), bad.is_none());
+    t.check(&format!("{}: nothing written past n", what), got[want.len()..].iter().all(|&x| x == 0xEEEE_EEEE));
+}
+
 pub fn run(t: &mut T) {
+    for minor in [3u32, 6] {
+        spec_check(t, minor, None, 300);
+        for p in [SpecParams { wg: 32, mul: 7, add: 1000, scale: -1.25, flip: true },
+                  SpecParams { wg: 256, mul: 0xFFFF_FFFF, add: i32::MIN, scale: 3.0e-3, flip: false },
+                  SpecParams { wg: 1, mul: 2, add: -1, scale: 1.0, flip: true }] {
+            spec_check(t, minor, Some(p), 300);
+        }
+    }
     let p = crate::refs::sample_push(COUNT);
     let objs = bench::move_all(&p);
     let cam = crate::refs::sample_camera(p.extent);

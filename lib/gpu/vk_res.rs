@@ -8,7 +8,8 @@
 //        texture.create_view(&ViewDesc) -> TextureView a range of mips and layers
 //   device.create_sampler(&SamplerDesc) -> Sampler
 //   ShaderModule::from_spirv(&device, &[u32])          SPIR-V up to 1.3 (Vulkan 1.1), 1.5
-//        (1.2), 1.6 (1.3); the header is checked, the code is the driver's
+//        (1.2), 1.6 (1.3); the header and the instruction lengths are checked, the code is the
+//        driver's; entry points and specialization constants are read (shader::reflect)
 //   device.create_bind_group_layout(&[Binding])        descriptor set layout (one descriptor
 //        per binding)
 //   device.create_pipeline_layout(&PipelineLayoutDesc) set g = groups[g]; push constants as one
@@ -19,7 +20,11 @@
 //        partially bound set: binding 0 sampled textures, 1 samplers, 2 storage buffers,
 //        3 storage textures; table.group() binds it, table.layout() goes into pipeline layouts
 //   device.create_compute_pipeline / create_render_pipeline   (dynamic rendering: the target
-//        formats are part of the pipeline; viewport and scissor are dynamic)
+//        formats are part of the pipeline; viewport and scissor are dynamic); per stage: the
+//        entry point must exist with the stage's model, its pipeline constants become a
+//        VkSpecializationInfo (types and ids checked against the module), a compute workgroup
+//        size (LocalSize, LocalSizeId or the WorkgroupSize built-in, after specialization)
+//        must fit the limits, LocalSizeId needs maintenance4
 //   device.create_timestamps(n) -> Timestamps          read_ticks(first, n) / read_ms(first, n)
 //        (Err(NotReady) until every one was written and finished)
 //
@@ -639,6 +644,11 @@ impl Device {
 pub(crate) struct ShaderInner {
     sh: Arc<Shared>,
     pub h: vk::Handle,
+    /// the words (for the workgroup size once the pipeline constants are known)
+    words: Vec<u32>,
+    entries: Vec<shader::reflect::Entry>,
+    spec: Vec<shader::reflect::SpecConst>,
+    local_size_id: bool,
 }
 
 impl Drop for ShaderInner {
@@ -669,6 +679,11 @@ impl ShaderModule {
         if code[1] > max || code[1] < 0x0001_0000 {
             return Err(GpuError::Unsupported("this SPIR-V version"));
         }
+        let entries = shader::reflect::entry_points(code).map_err(|_| GpuError::Invalid("SPIR-V instructions do not fit the words"))?;
+        let spec = shader::reflect::spec_constants(code).map_err(|_| GpuError::Invalid("SpecId on something else than a scalar specialization constant"))?;
+        if spec.iter().enumerate().any(|(i, a)| spec[..i].iter().any(|b| b.spec_id == a.spec_id)) {
+            return Err(GpuError::Invalid("a SpecId twice in the module"));
+        }
         let ci = vk::ShaderModuleCreateInfo {
             s_type: vk::STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             code_size: code.len() * 4,
@@ -678,8 +693,120 @@ impl ShaderModule {
         let mut h = 0;
         // SAFETY: code is a SPIR-V word array of code_size bytes.
         sh.vk(unsafe { (sh.f.create_shader_module)(sh.dev, &ci, core::ptr::null(), &mut h) })?;
-        Ok(ShaderModule(Arc::new(ShaderInner { sh: sh.clone(), h })))
+        let local_size_id = shader::reflect::uses_local_size_id(code);
+        Ok(ShaderModule(Arc::new(ShaderInner { sh: sh.clone(), h, words: code.to_vec(), entries, spec, local_size_id })))
     }
+
+    /// the entry points: (model as SPIR-V numbers it: 0 vertex, 4 fragment, 5 compute, name)
+    pub fn entry_points(&self) -> Vec<(u32, &str)> {
+        self.0.entries.iter().map(|e| (e.model, e.name.as_str())).collect()
+    }
+
+    /// the pipeline-overridable constants the module declares: (id, kind, default value)
+    pub fn constants(&self) -> Vec<(u32, shader::reflect::Kind, f64)> {
+        self.0.spec.iter().map(|c| (c.spec_id, c.kind, kind_value(c.kind, c.default))).collect()
+    }
+}
+
+/// the bits of a constant of kind k as f64
+fn kind_value(k: shader::reflect::Kind, v: u64) -> f64 {
+    use shader::reflect::Kind;
+    match k {
+        Kind::Bool => (v != 0) as u32 as f64,
+        Kind::Int { width, signed: true } => {
+            let s = 64 - width.min(64);
+            (((v << s) as i64) >> s) as f64
+        }
+        Kind::Int { .. } => v as f64,
+        Kind::Float { width: 16 } => shader::reflect::f16_to_f32(v as u16) as f64,
+        Kind::Float { width: 32 } => f32::from_bits(v as u32) as f64,
+        Kind::Float { .. } => f64::from_bits(v),
+    }
+}
+
+/// a pipeline constant's value as the bits of kind k (WebGPU's conversions, lib.rs Constant)
+fn constant_bits(k: shader::reflect::Kind, x: f64) -> Result<u64> {
+    use shader::reflect::Kind;
+    let bad = GpuError::Invalid("pipeline constant: the value does not fit the override's type");
+    match k {
+        Kind::Bool => Ok((x != 0.0 && !x.is_nan()) as u64),
+        Kind::Int { width, signed } => {
+            if !x.is_finite() {
+                return Err(bad);
+            }
+            let t = x as i128; // toward 0 (saturating: out of range anyway)
+            let w = width.clamp(1, 64);
+            let (lo, hi) = if signed { (-(1i128 << (w - 1)), (1i128 << (w - 1)) - 1) } else { (0, (1i128 << w) - 1) };
+            if t < lo || t > hi {
+                return Err(bad);
+            }
+            let m = if w >= 64 { u64::MAX } else { (1u64 << w) - 1 };
+            Ok(t as u64 & m)
+        }
+        Kind::Float { width } => {
+            if !x.is_finite() {
+                return Err(bad);
+            }
+            match width {
+                16 => {
+                    let h = shader::reflect::f16_from_f32(x as f32);
+                    if h & 0x7c00 == 0x7c00 || !(x as f32).is_finite() {
+                        return Err(bad);
+                    }
+                    Ok(h as u64)
+                }
+                32 => {
+                    let f = x as f32;
+                    if !f.is_finite() {
+                        return Err(bad);
+                    }
+                    Ok(f.to_bits() as u64)
+                }
+                _ => Ok(x.to_bits()),
+            }
+        }
+    }
+}
+
+/// a stage's pipeline constants checked against its module -> (map entries, data,
+/// (SpecId, bits) for shader::reflect)
+fn specialize(m: &ShaderInner, constants: &[Constant]) -> Result<(Vec<vk::SpecializationMapEntry>, Vec<u8>, Vec<(u32, u64)>)> {
+    let mut map = Vec::with_capacity(constants.len());
+    let mut data = Vec::new();
+    let mut set = Vec::with_capacity(constants.len());
+    for (i, c) in constants.iter().enumerate() {
+        if constants[..i].iter().any(|d| d.id == c.id) {
+            return Err(GpuError::Invalid("pipeline constant: an id twice"));
+        }
+        let Some(decl) = m.spec.iter().find(|s| s.spec_id == c.id) else {
+            return Err(GpuError::Invalid("pipeline constant: the module has no override with this id"));
+        };
+        let bits = constant_bits(decl.kind, c.value)?;
+        let size = match decl.kind {
+            shader::reflect::Kind::Bool => 4, // VkBool32
+            shader::reflect::Kind::Int { width, .. } | shader::reflect::Kind::Float { width } => (width as usize).div_ceil(8),
+        };
+        map.push(vk::SpecializationMapEntry { constant_id: c.id, offset: data.len() as u32, size });
+        data.extend_from_slice(&bits.to_le_bytes()[..size]);
+        while data.len() % 4 != 0 {
+            data.push(0);
+        }
+        set.push((c.id, bits));
+    }
+    Ok((map, data, set))
+}
+
+/// the checks of a stage (its entry point exists with model; the constants) -> what
+/// VkPipelineShaderStageCreateInfo needs
+fn stage_info(sh: &Shared, st: &ShaderStage, model: shader::Model) -> Result<(Vec<vk::SpecializationMapEntry>, Vec<u8>, Vec<(u32, u64)>)> {
+    let m = &st.module.0;
+    if !m.entries.iter().any(|e| e.name == st.entry && e.model == model as u32) {
+        return Err(GpuError::Invalid("the module has no entry point of this name for the stage"));
+    }
+    if m.local_size_id && !sh.maintenance4 {
+        return Err(GpuError::Unsupported("LocalSizeId (maintenance4, Vulkan 1.3)"));
+    }
+    specialize(m, st.constants)
 }
 
 // ---------------------------------------------------------------- bindings
@@ -1127,6 +1254,22 @@ impl Device {
     pub fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline> {
         let sh = &self.sh;
         sh.check()?;
+        let (map, data, set) = stage_info(sh, &desc.shader, shader::Model::GLCompute)?;
+        // the workgroup size once specialized: at least 1, within the limits (WebGPU checks it here too)
+        let wg = shader::reflect::workgroup_size(&desc.shader.module.0.words, desc.shader.entry, &set)
+            .map_err(|_| GpuError::Invalid("pipeline constants: a specialization constant is undefined (division by 0, shift)"))?;
+        let Some(wg) = wg else { return Err(GpuError::Invalid("compute entry point without a workgroup size")) };
+        let lim = &sh.limits;
+        let count = wg.iter().map(|&x| x as u64).product::<u64>();
+        if wg.contains(&0) || (0..3).any(|i| wg[i] > lim.max_compute_workgroup_size[i]) || count > lim.max_compute_invocations as u64 {
+            return Err(GpuError::Invalid("workgroup size 0 or beyond Limits::max_compute_workgroup_size / max_compute_invocations"));
+        }
+        let si = vk::SpecializationInfo {
+            map_entry_count: map.len() as u32,
+            p_map_entries: map.as_ptr(),
+            data_size: data.len(),
+            p_data: data.as_ptr() as *const c_void,
+        };
         let name = nul_name(desc.shader.entry);
         let ci = vk::ComputePipelineCreateInfo {
             s_type: vk::STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -1135,6 +1278,7 @@ impl Device {
                 stage: vk::SHADER_STAGE_COMPUTE_BIT,
                 module: desc.shader.module.0.h,
                 p_name: name.as_ptr(),
+                p_specialization_info: if map.is_empty() { core::ptr::null() } else { &si as *const _ as *const c_void },
                 ..vk::Zero::zero()
             },
             layout: desc.layout.0.h,
@@ -1166,6 +1310,21 @@ impl Device {
         if desc.depth.is_some_and(|d| !d.format.is_depth()) {
             return Err(GpuError::Invalid("depth state with a colour format"));
         }
+        let (vmap, vdata, _) = stage_info(sh, &desc.vertex, shader::Model::Vertex)?;
+        let (fmap, fdata, _) = match &desc.fragment {
+            Some(fs) => stage_info(sh, fs, shader::Model::Fragment)?,
+            None => (Vec::new(), Vec::new(), Vec::new()),
+        };
+        let spec = |map: &Vec<vk::SpecializationMapEntry>, data: &Vec<u8>| vk::SpecializationInfo {
+            map_entry_count: map.len() as u32,
+            p_map_entries: map.as_ptr(),
+            data_size: data.len(),
+            p_data: data.as_ptr() as *const c_void,
+        };
+        let (vsi, fsi) = (spec(&vmap, &vdata), spec(&fmap, &fdata));
+        let ptr = |map: &Vec<vk::SpecializationMapEntry>, si: &vk::SpecializationInfo| {
+            if map.is_empty() { core::ptr::null() } else { si as *const _ as *const c_void }
+        };
         let vname = nul_name(desc.vertex.entry);
         let fname = nul_name(desc.fragment.map_or("", |f| f.entry));
         let mut stages = vec![vk::PipelineShaderStageCreateInfo {
@@ -1173,6 +1332,7 @@ impl Device {
             stage: vk::SHADER_STAGE_VERTEX_BIT,
             module: desc.vertex.module.0.h,
             p_name: vname.as_ptr(),
+            p_specialization_info: ptr(&vmap, &vsi),
             ..vk::Zero::zero()
         }];
         if let Some(fs) = desc.fragment {
@@ -1181,6 +1341,7 @@ impl Device {
                 stage: vk::SHADER_STAGE_FRAGMENT_BIT,
                 module: fs.module.0.h,
                 p_name: fname.as_ptr(),
+                p_specialization_info: ptr(&fmap, &fsi),
                 ..vk::Zero::zero()
             });
         }
