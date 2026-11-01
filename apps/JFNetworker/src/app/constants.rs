@@ -636,3 +636,9 @@ pub(crate) const ID_ENT_NET0: u32 = 0x0001_DC00;
 /// the inspector's station: identity, method
 pub(crate) const ID_ENT_IDENTITY: u32 = 0x0001_DC80;
 pub(crate) const ID_ENT_METHOD: u32 = 0x0001_DC81;
+// ---- B3: the Webbrowser's page scripts (commands 930 .. 949, widgets 0x0001_E000 .. 0x0001_E7FF,
+// timers 0x1C8 .. 0x1CB; the commands are not used)
+/// the console in device window k: ID_PAGE0 + 0x80 k (devwin/browser.rs)
+pub(crate) const ID_PAGE0: u32 = 0x0001_E000;
+/// a frame for a page's next timer: TIMER_PAGE + k % 4
+pub(crate) const TIMER_PAGE: u32 = 0x1C8;

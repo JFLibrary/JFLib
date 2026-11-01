@@ -95,6 +95,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** netpkt::eap (RFC 3748 packets, EAP-MD5 data, EAP-PWD exchanges), EAPOL Start, Logoff and EAP PDUs, netpkt::radius with EAP-Message pieces, VLAN attributes and MS-MPPE keys, netpkt::imap (IMAP without I/O: lines with literals, commands, responses, sequence sets, FETCH items, SEARCH keys, ENVELOPE)
 - **crypto:** crypto::eappwd (the sums of EAP-PWD, RFC 5931) and the group of crypto::p256 (y_for_x, on_curve, mul_point, add_points, neg_point, scalar_add, scalar_ok)
 - **eapm:** lib/eapm: EAP-MD5 and EAP-PWD as peer and server state machines without I/O
+- **ui:** The document view reports the element a click hit (`MdEv::click`, `MdDoc::element_at`), and `MdDoc::dom_size` the size of its tree
+- **script:** Several scripts in one VM with one scope of top-level names (`Vm::add_script`), as the <script> elements of a page
 
 ### Changed
 
