@@ -125,7 +125,8 @@ CRATES = [
      "full"),
     ("netio", "HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS", "full"),
     ("netpkt", "network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, "
-     "syslog, SNMP, SSH without I/O, a dissector, pcapng", "full"),
+     "syslog, SNMP, SSH, EAP and IMAP without I/O, URI references, a dissector, pcapng", "full"),
+    ("eapm", "EAP-MD5 and EAP-PWD as peer and server state machines without I/O", "full"),
     ("cas", "content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC",
      "full"),
     ("update", "signed app updates: check, download, apply at the next start, health marker, rollback",
