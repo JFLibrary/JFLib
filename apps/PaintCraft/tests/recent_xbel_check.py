@@ -28,6 +28,7 @@ click menuitem:"Liste leeren"
 
 def main():
     exe = sys.argv[1] if len(sys.argv) > 1 else "build/" + ("win/PaintCraft.exe" if os.name == "nt" else "linux/PaintCraft")
+    exe = str(Path(exe).resolve())
     fails = 0
 
     def check(ok, what):
