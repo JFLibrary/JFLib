@@ -26,6 +26,9 @@
 //   plattest --test pen                    (PN1, t_pen.rs) the pen paths without a pen: Win32
 //                                          WM_POINTER* to an own hidden window with a fake
 //                                          pointer API (Linux: not ported yet)
+//   plattest --test touch                  (t_touch.rs) the fingers without a touch screen: Win32
+//                                          WM_POINTER* to own hidden windows with a fake pointer
+//                                          API; Linux: wl_touch and XI 2.2 events fed in
 //   plattest --test cursor                 (t_cursor.rs) custom cursors: cursor_create from ARGB
 //                                          pixels, set on window 0, destroy, slot reuse, size
 //                                          limits, cursor_dpi

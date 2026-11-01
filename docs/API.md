@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -3887,6 +3887,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   finger [N] down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
                   down across other commands; N: the finger's id (default 0), for a second one;
                   cancel: the system took it
+  pinch S D0 D1 [MS]   two fingers around S, D0 DIP apart, go to D1 DIP apart in MS ms (default 300),
+                  then they lift
+  pan2 S DX DY [MS]   two fingers around S (80 DIP apart) move by DX, DY (DIP) in MS ms (default 300),
+                  then they lift
   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
@@ -4834,9 +4838,11 @@ HB_GRAB_V: u32 = 0x80000
 // finger moving along this axis is the widget's (not the scroll view's around it); with both the
 // press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
 // resting for the long-press time: a panel that starts to move then, until then the finger goes
-// to what is around it); TF_TWO a second finger is the widget's: no press, no click, it reads
-// ui.touch_fingers (pan and zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing
-// special (the finger rolls what is around it, with nothing to roll it drags the widget).
+// to what is around it); TF_HOLD_LONG the same after 800 ms (a panel's title bar; ui.touch_hold_part
+// shows it); TF_REST a finger that rests presses like one that moved, no context menu (a canvas); TF_TWO
+// a second finger is the widget's: no press, no click, it reads ui.touch_two or ui.touch_fingers (pan and
+// zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing special (the finger rolls what is
+// around it, with nothing to roll it drags the widget).
 TF_V: u32 = 1
 TF_H: u32 = 2
 TF_BOTH: u32 = 3
@@ -4844,6 +4850,8 @@ TF_HOLD: u32 = 4
 TF_TWO: u32 = 8
 TF_SLOP: u32 = 16
 TF_DECLINE: u32 = 32
+TF_REST: u32 = 64
+TF_HOLD_LONG: u32 = 128
 ```
 
 *semantic kinds and states*
@@ -9280,6 +9288,8 @@ touch -- the finger: one gesture recogniser for every host
                                   text views, the console)
   touch_mode() -> the pointer is a finger (no scroll bars)   touch_drag()
   touch_take(TF_*) a widget takes the finger or declines it   touch_fingers() -> what is down
+  touch_two() -> two fingers on the last widget (TF_TWO): their midpoint and scale (pinch, pan)
+  touch_hold_part(id) -> how far the press and hold on a title bar is (TF_HOLD_LONG)
 
 A host only forwards raw fingers: plat::finger(win, phase, id, x, y, age_ms), or jfgui_finger where
 the windows live in one surface (the Android host: GalleryActivity.java, bridge.c; the browser's
@@ -9290,8 +9300,17 @@ the virtual clock.
 Every finger is in a table (touch_fingers).  The first one down drives the gesture.  A second one
 takes nothing from it: while nothing is decided it is no tap any more (no click, no long press);
 when the first one lifts, a pan goes on with the other one, a press ends, the rest waits for the
-last finger to lift.  A widget with TF_TWO gets the second finger for itself: no press, and a pass
-whenever a finger moves, for its own pan and zoom.
+last finger to lift.  A widget with TF_TWO gets the second finger for itself: no press (one younger
+than 200 ms is taken back: touch_two says so), and a pass whenever a finger moves, for its own pan and
+zoom.
+
+A pen comes first: while it is down, hovers or left less than 500 ms ago a finger is a palm and does
+not exist (no finger mode either); a pen that comes down ends the fingers already on the screen.
+
+A finger is wider than what it means: on the background (a title bar, an empty bar, no hit box at
+all) the nearest small widget wins whose rectangle, grown to 44 DIP each way around its middle, holds
+the point (touch_aim).  An exact hit stays what it is; a mouse sees none of this and nothing is drawn
+differently.  A tap is a click wherever the finger lifts within the slop.
 
 The first decision waits until the finger left the slop (ViewConfiguration: 8 DIP) or lifted:
   - lifted: a tap, press and release at once (no flash when a scroll starts instead);
@@ -9311,8 +9330,9 @@ with speed (least squares over the last 100 ms, as Android's VelocityTracker; 50
 the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
 and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
 tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
-host give feedback; TF_HOLD: the left button, the drag starts); if it moves after that, the same
-decision.  After the finger left, the hover goes.
+host give feedback; TF_HOLD: the left button, the drag starts, TF_HOLD_LONG after 800 ms; TF_REST:
+the left button, no context menu: a canvas); if it moves after that, the same decision.  After the
+finger left, the hover goes.
 
 With a finger (and at the start on Android, and in a phone's browser) there are no scroll bars:
 no pixels and no hit box in sbar_core, the room they would have stays, so nothing jumps; a mouse
@@ -9330,6 +9350,17 @@ cursor, touch_grab).
   - `down_y: i32`
   - `time_ms: u32` -- its last sample (ms, as Ui::now)
 
+- **`struct TwoFingers`**
+  two fingers on a widget that said TF_TWO (ui.touch_two): px of the window, logical in a mirrored one
+  - `x: i32` -- the point between them
+  - `y: i32`
+  - `start_x: i32` -- where it was when this pair came down
+  - `start_y: i32`
+  - `scale: f64` -- their distance against the one at the start (1.0 = the same)
+  - `began: bool` -- the first read of this pair: take the anchor now
+  - `taken_back: bool` -- the first finger's press went out less than 200 ms ago and was taken back for this pair: its
+    release comes through as usual, undo what the press began
+
 **`impl Ui`**
 
 - **`fn touch_mode(&self) -> bool`**
@@ -9346,6 +9377,14 @@ cursor, touch_grab).
 - **`fn touch_fingers(&self) -> Vec<Finger>`**
   ui_touch_fingers: the fingers down on the live window, the first one first (a widget with
   TF_TWO gets a pass whenever one moves)
+- **`fn touch_two(&mut self) -> Option<TwoFingers>`**
+  ui_touch_two: two fingers on the last widget (it said TF_TWO; call it after the widget, every
+  frame): where they are and how far apart.  None while the first finger drags the widget: a
+  stroke older than 200 ms goes on, the second finger waits
+- **`fn touch_hold_part(&self, id: u32) -> Option<u32>`**
+  ui_touch_hold_part(id) -> how far a finger's press and hold on widget id of this window is, in
+  1/1000 (TF_HOLD_LONG): None without one, 1000 once the drag runs.  Show it: a second is long
+  without a sign
 
 #### `ui/theme_app.rs`
 
@@ -21876,7 +21915,13 @@ Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_
 
 - **`fn touch_primary() -> bool`**
   (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
-  `pointer: coarse`): no scroll bars from the first frame on; the next pointer event decides again
+  `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
+  next pointer event decides again
+
+- **`fn touch_keyboard(w: i32, show: bool)`**
+  (ui touch.rs) a text field got the focus through a finger (show) or lost it: the on-screen keyboard
+  of window w.  Windows: InputPane; Wayland: text-input follows the focus by itself (the compositor's
+  keyboard); elsewhere the host's job (Android, the browser) or nothing there is to ask (X11)
 
 - **`fn touch_reached(reached: bool)`**
   (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):
@@ -26325,7 +26370,7 @@ Source: [`lib/plat/win_api.rs`](../lib/plat/win_api.rs)
 win_api -- the window-indexed platform API on Windows: windows (records), input, the event
 wait, presentation, cursors                                     [src/plat/win/win_window.s]
 (popups: win_popup.rs; clipboard, IME, drops: win_clip.rs; file dialog: win_filedlg.rs;
- pens: win_pen.rs; shell, theme, home, drives, spawn_self: win_shell.rs)
+ pens: win_pen.rs; fingers: win_touch.rs; shell, theme, home, drives, spawn_self: win_shell.rs)
 
   win_create(title, w_dip, h_dip, flags, owner, x, y) -> index / -1
        owner PW_NOOWNER: a top-level window (WS_OVERLAPPEDWINDOW, preferably index 0); else
@@ -26586,10 +26631,10 @@ win_pen -- (PN1) pen input on Windows: WM_POINTER* of pen pointers (Windows 8+)
   pen_api_set(Some(api))   (test aid) the pointer API through the given functions instead
        of user32's (plattest's fakes); None = back to user32 (loaded again on first use)
 
-Only pointers of type PT_PEN are handled.  EnableMouseInPointer is never called, so the
-mouse keeps sending WM_MOUSEMOVE / WM_*BUTTON*; touch and every pointer the API cannot
-describe go on to DefWindowProc, which turns them into mouse messages as before.  A handled
-pen message produces no mouse message.  With pen input off (pen_enable(false)) nothing is
+Pointers of type PT_PEN are handled here, fingers (PT_TOUCH) in win_touch.rs.  EnableMouseInPointer
+is never called, so the mouse keeps sending WM_MOUSEMOVE / WM_*BUTTON*; every pointer the API cannot
+describe goes on to DefWindowProc, which turns it into mouse messages as before.  A handled
+pen message produces no mouse message.  With pen input off (pen_enable(false)) no pen is
 handled: pens arrive as the system's mouse emulation.
   WM_POINTERUPDATE   every coalesced sample since the last message (GetPointerPenInfoHistory,
                      oldest first, at most PEN_HIST) -> E_MOVE with pen data
@@ -26631,6 +26676,70 @@ PEN_HIST: usize = 16  // samples per WM_POINTERUPDATE
 
 - **`fn pen_devices() -> i32`**
   pens / pen tablets attached, -1 = no pointer API  [plat_pen_devices]
+
+### `plat/win_touch.rs` (Windows)
+
+Source: [`lib/plat/win_touch.rs`](../lib/plat/win_touch.rs)
+
+```text
+win_touch -- fingers on Windows: WM_POINTER* / WM_NCPOINTER* of touch pointers (Windows 8+)
+
+  pointer(hwnd, msg, id, w) -> handled    (win_pen.rs, for a pointer of type PT_TOUCH): a finger
+  nc_pointer(hwnd, msg, wp, w) -> handled (window procedure) a finger over the non-client area
+  activate(hwnd, wp, w) -> the answer to WM_POINTERACTIVATE, None: the system's
+  begin_drag(w, edges) -> true: a finger is down on window w and the window follows it from now on
+       (win_begin_move / win_begin_resize: the system's move loop follows only a mouse)
+  mouse_is_stale() -> true: this WM_MOUSEMOVE is no mouse (window procedure)
+  feedback_off(hwnd)      no system visuals for a touch of this window
+  touch_api_set(Some(api))   (test aid) the touch calls through the given functions (plattest's
+       fakes, like pen_api_set); None = user32's again
+  win_touch_primary() -> a tablet in slate posture    win_touch_keyboard(w, show) the on-screen keyboard
+
+Every finger goes to plat::finger: no gesture is decided here (ui/touch.rs).  A handled pointer
+message never reaches DefWindowProc, and that is the point: DefWindowProc turns a finger into mouse
+messages, a pinch into Ctrl + wheel (preset steps), a two-finger pan into nothing at all and a
+press and hold into a right click.  EnableMouseInPointer stays off: the mouse keeps its messages.
+
+Which window a finger belongs to: a contact is wide and the system gives it to a window frame it
+touches (measured with InjectTouchInput, a contact 60 px wide): a finger on PaintCraft's zoom slider
+arrived as WM_NCPOINTERDOWN HTBOTTOM on the tool window above it, whose invisible resize border ends
+at the status bar, and resized that window.  So a finger over a border belongs to the window whose
+client area is under its centre (z-order, from the window that got it), with none the system's resize
+goes on.  HTCAPTION: a tool window's title bar is the UI's (press and hold, then begin_drag); the main
+window's goes to the system (moves, snaps, double tap) unless a small widget is close (a finger that
+misses the gear by a hair).
+
+Coordinates come from the pointer's screen position, so the window that was moved under a finger or a
+popup window (win_popup.rs: its input belongs to the owner, in the owner's client coordinates) need
+nothing else.  The API's results are not trusted: counts are clamped, a finger without a free slot is
+nobody's.  A palm is the recogniser's business (ui/touch.rs: the pen comes first); what the system
+itself cancels comes through as FingerPhase::Cancel.
+```
+
+- **`struct TouchInfo`**
+  one sample of the pointer API: the POINTER_TOUCH_INFO fields the finger path reads
+  - `flags: u32` -- POINTER_INFO.pointerFlags
+  - `x: i32` -- ptPixelLocation (screen px)
+  - `y: i32`
+  - `time: u32` -- dwTime (ms, 0: none)
+
+- **`struct TouchApi`**
+  the touch part of the pointer API (functions that are missing are None)
+  - `info: Option<fn(u32) -> Option<TouchInfo>>` -- GetPointerTouchInfo(id) -> the newest sample
+  - `hist: Option<fn(u32, &mut u32, &mut [TouchInfo]) -> bool>` -- GetPointerTouchInfoHistory(id, &count, out): newest first, at most \*count records; \*count =
+    the samples available -> false: failed
+  - `now: Option<fn() -> u32>` -- the clock of TouchInfo::time (GetTickCount)
+
+- **`fn touch_api_set(api: Option<TouchApi>)`**
+  (test aid) the touch calls through `api` (None: user32's again, loaded on first use)
+
+- **`fn win_touch_primary() -> bool`**
+  the main pointer of this machine is a finger right now: a tablet in slate posture
+
+- **`fn win_touch_keyboard(w: i32, show: bool)`**
+  the on-screen keyboard for a text field that got a finger (show), or gone again.  InputPane through
+  its interop interface, which takes a desktop window (Windows 10 1809 and later; older ones and a
+  machine without one: nothing happens)
 
 ### `plat/win_popup.rs` (Windows)
 

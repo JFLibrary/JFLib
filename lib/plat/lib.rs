@@ -169,7 +169,8 @@ pub fn back_trap(on: bool) {
 }
 
 /// (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
-/// `pointer: coarse`): no scroll bars from the first frame on; the next pointer event decides again
+/// `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
+/// next pointer event decides again
 pub fn touch_primary() -> bool {
     #[cfg(target_arch = "wasm32")]
     return web::touch_primary();

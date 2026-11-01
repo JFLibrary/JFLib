@@ -297,6 +297,14 @@ def run(exe, work):
         check(sum(1 for e in ev if e[0] == 1 and is_finger(e)) > 10, "two-finger pan: the moves arrive as fingers")
         strays = [e for e in ev if e[0] in (1, 2, 3) and not is_finger(e) and e[1] == 0 and e[5] == 0 and near(e, cx - 100, cy, 40)]
         check(not strays, "two-finger pan: no mouse messages at the fingers", strays[:3])
+
+        # ---- a text field: the on-screen keyboard is asked for (what it looks like only a tablet shows),
+        # another widget takes it away; the program lives through both calls
+        a.tap(ox + 360, oy + 108)
+        time.sleep(0.5)
+        a.tap(ox + 417, oy + 108)
+        time.sleep(0.5)
+        check(a.p.poll() is None, "text field: InputPane asked to show and to hide, the program runs on")
     finally:
         a.close()
 
