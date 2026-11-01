@@ -138,7 +138,23 @@ pub fn run(t: &mut T) {
     t.check("origin in the centre", o[0].abs() < 1e-5 && o[1].abs() < 1e-5 && (o[3] - 10.0).abs() < 1e-4);
     t.check("depth in 0..1", o[2] / o[3] > 0.0 && o[2] / o[3] < 1.0);
     let up = clip(&cam, [0.0, 1.0, 0.0]);
-    t.check("up is up on screen (Vulkan y down)", up[1] / up[3] < 0.0);
+    t.check("up is up on screen (NDC y up, lib/gpu flips the viewport)", up[1] / up[3] > 0.0);
+    let right = clip(&cam, [1.0, 0.0, 0.0]);
+    t.check("right is right on screen", right[0] / right[3] > 0.0 && (right[1] / right[3]).abs() < 1e-6);
+    // winding in NDC: the cube face towards the camera (+z) counter-clockwise, the one away from
+    // it (-z) clockwise -- front faces with front_cw false, culled as back faces otherwise
+    let area = |face: usize| {
+        let p: Vec<[f64; 2]> = is[face * 6..face * 6 + 3].iter().map(|&i| {
+            let v = vs[i as usize].pos;
+            let c = clip(&cam, [v[0], v[1], v[2]]);
+            [c[0] / c[3], c[1] / c[3]]
+        }).collect();
+        (p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[2][0] - p[0][0]) * (p[1][1] - p[0][1])
+    };
+    let (front, back) = (vs.iter().position(|v| v.normal[2] == 1.0), vs.iter().position(|v| v.normal[2] == -1.0));
+    let (front, back) = (front.unwrap_or(0) / 4, back.unwrap_or(0) / 4);
+    t.check("face towards the camera counter-clockwise in NDC", area(front) > 0.0);
+    t.check("face away from the camera clockwise in NDC", area(back) < 0.0);
     let near = clip(&cam, [0.0, 0.0, 9.9]);
     t.check("near plane at depth 0", (near[2] / near[3]).abs() < 1e-4);
     t.check("planes have unit normals", cam.planes.iter().all(|p| ((p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) - 1.0).abs() < 1e-5));

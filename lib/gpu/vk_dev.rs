@@ -5,9 +5,11 @@
 //        one queue (the first family with graphics + compute, presentation checked per
 //        surface); level Voll when the adapter has it and desc.max_level allows it.  Enabled:
 //        timeline semaphores, dynamic rendering (core 1.3 or the KHR extensions on 1.1 / 1.2),
-//        VK_KHR_swapchain when the instance has surfaces, the optional features of Features;
-//        on Voll also descriptor indexing (update after bind, partially bound, non-uniform
-//        indexing) and draw-indirect-count.  Not enabled: robust buffer access (speed).
+//        VK_KHR_swapchain when the instance has surfaces, the optional features of Features,
+//        the Vulkan memory model only together with its device scope (else Device-scope
+//        atomics, as in the benchmark's cull, would be invalid); on Voll also descriptor
+//        indexing (update after bind, partially bound, non-uniform indexing) and
+//        draw-indirect-count.  Not enabled: robust buffer access (speed).
 //   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
@@ -154,6 +156,7 @@ const E12: &[usize] = &[
     vk::F12_TIMELINE_SEMAPHORE,
     vk::F12_BUFFER_DEVICE_ADDRESS,
     vk::F12_VULKAN_MEMORY_MODEL,
+    vk::F12_VULKAN_MEMORY_MODEL_DEVICE_SCOPE,
 ];
 const E12_VOLL: &[usize] = &[
     vk::F12_DRAW_INDIRECT_COUNT,
@@ -195,6 +198,11 @@ impl Adapter {
         }
         let e11 = pick(&self.f11, E11);
         let mut e12 = pick(&self.f12, E12);
+        // with the Vulkan memory model on, Device-scope atomics (any shader's, also under the
+        // GLSL450 model) need its device scope (VUID-RuntimeSpirv-vulkanMemoryModel-06265)
+        if e12[vk::F12_VULKAN_MEMORY_MODEL_DEVICE_SCOPE] == 0 {
+            e12[vk::F12_VULKAN_MEMORY_MODEL] = 0;
+        }
         if voll {
             for &i in E12_VOLL {
                 e12[i] = self.f12[i];

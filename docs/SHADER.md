@@ -207,6 +207,12 @@ Vertex-Shader lesen ihre Storage-Buffer nur (`NonWritable`), `vertexPipelineStor
 wird nicht gebraucht; auch `multiDrawIndirect`, `drawIndirectFirstInstance` und
 `shaderDrawParameters` nicht.
 
+`apps/gputest` nimmt statt des einen Layouts zwei mit denselben Nummern: eines für die
+Rechen-Pipelines (Bindungen 0 bis 3, 1 bis 3 beschreibbar) und eines für die Render-Pipelines
+(0, 1, 2, 4, die Speicherpuffer nur lesend). So braucht kein Vertex-Shader eine beschreibbare
+Bindung (`Features::vertex_stores`), wie unter WebGPU, wo ein Speicherpuffer im Vertex-Shader
+nur lesend gebunden werden darf.
+
 ### Datensätze (Rust-Structs mit `bytes()` / `from_bytes()`)
 
 `Object` – std430, 48 Byte, `OBJECT_OFF`:
@@ -262,10 +268,16 @@ Vergleichspfad: `vs_single` + `fs_lambert`, je Objekt `vkCmdPushConstants(object
 `vkCmdDrawIndexed(36, 1, 0, 0, 0)` – entweder für alle Objekte oder CPU-getrieben für die von
 `cull_ref` über `move_all` ermittelten.
 
-Rasterizer: `Camera::look_at` / `from_view_proj` erzeugen Vulkan-Clip-Space (y gespiegelt, so
-dass Welt-oben auf dem Bildschirm oben ist; Tiefe 0 = near bis 1 = far). Würfeldreiecke sind von
-außen gesehen gegen den Uhrzeigersinn: `frontFace = COUNTER_CLOCKWISE`, `cullMode = BACK`,
-Tiefentest `LESS`, Depth-Clear 1.0. Farbausgang Location 0 (vec4, Alpha 1).
+Rasterizer: `Camera::look_at` / `from_view_proj` erzeugen den Clip-Space von `lib/gpu` (wie
+WebGPU und Metal): NDC mit y nach oben, Tiefe 0 = near bis 1 = far. Die Matrix kippt nichts;
+das Vulkan-Backend von `lib/gpu` kippt den Viewport, so dass Welt-oben auf dem Bildschirm oben
+ist. Wer den Vertrag ohne `lib/gpu` direkt auf Vulkan benutzt, braucht denselben gekippten
+Viewport (negative Höhe). Die sechs Ebenen sind links, rechts, unten, oben, near, far.
+Würfeldreiecke sind von außen gesehen gegen den Uhrzeigersinn und bleiben es in NDC (y oben):
+Vorderseiten wie die Voreinstellung von `lib/gpu` (`front_cw: false`, unter Vulkan mit dem
+gekippten Viewport `frontFace = COUNTER_CLOCKWISE`), `cull: Cull::Back`, Tiefentest `LESS`,
+Depth-Clear 1.0. Farbausgang Location 0 (vec4, Alpha 1). `apps/gputest` prüft Lage und Windung
+auf der GPU an einem gerenderten Bild (`gputest --test scene`, docs/GPU.md „Messszene“).
 
 ### Bewegung, Culling und die CPU-Referenzen
 
@@ -303,7 +315,8 @@ Der Vertex- und der Fragment-Shader sind nicht exakt (Matrixprodukte, `Normalize
 - `validate`: alle Benchmark-Shader beider Stufen gültig; 34 kaputte Module, mindestens eines je
   Regel, jedes von genau der erwarteten Regel abgelehnt.
 - `refs`: Hash-Werte, `floor`, `sincos_turns` gegen f64, Eigenschaften von `move_ref`,
-  Datensätze, Würfel-Windung, Kamera, `visible` gegen einen Clip-Space-Test, `cull_ref`.
+  Datensätze, Würfel-Windung, Kamera (NDC y oben, rechts / oben, Windung der Würfelseiten in NDC),
+  `visible` gegen einen Clip-Space-Test, `cull_ref`.
 - `interp`: ein kleiner SPIR-V-Interpreter (nur in der Test-App) führt die Benchmark-Shader auf
   der CPU aus: `move` und `cull` gleich `move_ref` / `cull_ref` Bit für Bit (3000 Objekte),
   `cull_reset`, Vertex-Shader (Position, Normale, Farbe) und `fs_lambert` gegen f64-Rechnung.

@@ -422,6 +422,7 @@ pub const F12_HOST_QUERY_RESET: usize = 36;
 pub const F12_TIMELINE_SEMAPHORE: usize = 37;
 pub const F12_BUFFER_DEVICE_ADDRESS: usize = 38;
 pub const F12_VULKAN_MEMORY_MODEL: usize = 41;
+pub const F12_VULKAN_MEMORY_MODEL_DEVICE_SCOPE: usize = 42;
 pub const F12_COUNT: usize = 47;
 pub const F13_SYNCHRONIZATION2: usize = 9;
 pub const F13_DYNAMIC_RENDERING: usize = 12;

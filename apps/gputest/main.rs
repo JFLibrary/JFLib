@@ -24,6 +24,10 @@
 //                    and a new device after it
 //        syncval     (--validate only) two copies into one buffer without a barrier: the
 //                    validation layer must report the hazard (synchronization validation on)
+//        scene       the benchmark scene (t_scene.rs): move = move_all bit for bit, cull =
+//                    cull_ref, an image of known cubes (orientation, lit colour, depth order,
+//                    back faces culled) in both modes, indirect and single pictures compared
+//        bench_smoke short runs of the scene's frame loop (offscreen, a window) with --verify
 //        all         every test above
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
 //                   validation); a validation error fails the test.  Without the layer: a note,
@@ -31,6 +35,12 @@
 //   gputest --bench                 instance / device / swapchain creation, FIFO / MAILBOX /
 //                                   IMMEDIATE frame times of a clear-and-present loop, the 1M
 //                                   compute round trip
+//   gputest --bench N [--res 1080p|4k|WxH] [--mode indirect|single] [--window | --fullscreen]
+//                     [--present immediate|fifo|mailbox] [--frames F] [--warmup W] [--inflight K]
+//                     [--verify] [--shot FILE.png] [--validate]
+//                                   the benchmark scene with N cubes (measure.rs, scene.rs;
+//                                   docs/GPU.md "Messszene"): CPU, GPU per pass and frame times,
+//                                   median and p99, a RESULT line for scripts
 //
 // Without Vulkan or a usable GPU every test prints "SKIP" and passes (the error paths are
 // tested with jfgui_GPU_DLL).  Exit code 1 when a check failed.  build_rs.py test gputest runs
@@ -50,9 +60,12 @@ use alloc::vec::Vec;
 use gpu::*;
 
 mod bench;
+mod measure;
+mod scene;
 mod shaders;
 mod t_compute;
 mod t_render;
+mod t_scene;
 mod t_window;
 
 rt::main!(run());
@@ -413,16 +426,19 @@ fn run() -> i32 {
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));
     }
     if args.iter().any(|a| a == "--bench") {
+        if let Some(n) = plat::arg_value("--bench").and_then(|v| v.parse::<u32>().ok()).filter(|&n| n > 0) {
+            return measure::bench_scene(n, validate);
+        }
         bench::bench();
         return 0;
     }
     let test = if args.iter().any(|a| a == "--info") { Some(String::from("info")) } else { plat::arg_value("--test") };
     let Some(test) = test else {
-        plat::write_stderr(b"gputest: --info, --test NAME [--validate] or --bench (see apps/gputest/main.rs)\n");
+        plat::write_stderr(b"gputest: --info, --test NAME [--validate], --bench or --bench N (see apps/gputest/main.rs)\n");
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 10] = [
+    let tests: [(&str, fn(&mut T)); 12] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -433,6 +449,8 @@ fn run() -> i32 {
         ("window", t_window::window),
         ("errors", errors),
         ("syncval", syncval),
+        ("scene", t_scene::scene),
+        ("bench_smoke", t_scene::bench_smoke),
     ];
     let mut ran = false;
     for (name, f) in tests {
