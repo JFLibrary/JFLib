@@ -65,6 +65,8 @@ pub(crate) mod editor;
 pub(crate) mod filemgr;
 pub(crate) mod sysmon;
 pub(crate) mod browser;
+// page scripts of the Webbrowser (B3): the VM's host on a document, the console
+pub(crate) mod pagescript;
 
 use alloc::collections::BTreeMap;
 use alloc::format;

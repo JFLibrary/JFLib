@@ -7,6 +7,8 @@
 //   Engine::unit_op(dev, name, op) / Action::Unit   start, stop, restart, enable, disable a unit
 //   Engine::units_reload(ni)       daemon-reload: every unit file read again
 //   Engine::units(dev) / unit(dev, name)   the units as UnitView (what systemctl shows)
+//   Engine::units_of_file(dev, path)   the units that were read and run script `path`, by the
+//                                  names of their services, with their states (the IDE's F5)
 //   Engine::units_boot(ni)         the device starts (add_node, power on): every unit file is
 //                                  read, the enabled ones start, in the order of After=
 //   Engine::units_power_off(ni), units_halted(ni, id, code), unit_timer(ni, id),
@@ -899,6 +901,15 @@ impl Engine {
     pub fn unit(&self, dev: u32, name: &str) -> Option<UnitView> {
         let ni = self.node_index(dev)?;
         self.unit_view_of(ni, &unit::unit_name(name))
+    }
+
+    /// the units that were read and run script `path` (canonical): the names of their services,
+    /// their states
+    pub fn units_of_file(&self, dev: u32, path: &str) -> Vec<(String, UnitState)> {
+        let Some(ni) = self.node_index(dev) else { return Vec::new() };
+        let Some(os) = self.os(ni) else { return Vec::new() };
+        let runs = |u: &Unit| matches!(&u.exec, Exec::Jfs { file, .. } if os.files.norm(file).ok().as_deref() == Some(path));
+        os.units.map.iter().filter(|(_, rt)| runs(&rt.unit)).filter_map(|(n, _)| self.unit_view_of(ni, n)).map(|v| (String::from(unit::stem(&v.name)), v.state)).collect()
     }
 
     /// the service id of a unit (a unit file's service, or the project's)

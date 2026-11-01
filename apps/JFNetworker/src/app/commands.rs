@@ -16,7 +16,7 @@
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
 // a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, IDE of a host,
 // Umbenennen, Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
-// the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
+// the simulation mode's animation, TIMER_PAGE brings a frame for a page script's timer.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
 // windows, the log) are workspace/terminal.rs's.  The labs (U6b, workspace/task.rs): Datei ›
 // Labor öffnen …, Ansicht › Bereiche › Aufgabe (Ctrl+Shift+A), Simulation › Ziele prüfen (F9)
 // and Nächster Hinweis.  Assessments (A1): Werkzeuge › Aufgabe erstellen … (the author's panel,
@@ -436,6 +436,12 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         }
         UIC_TIMER if arg == TIMER_ANIM => {
             crate::workspace::sim::tick(n, ui);
+            return true;
+        }
+        // a page's timer falls due: the clock to now, a frame for it (devwin/browser.rs)
+        UIC_TIMER if (TIMER_PAGE..TIMER_PAGE + 4).contains(&arg) => {
+            n.doc.sim.tick();
+            ui.repass();
             return true;
         }
         UIC_TIMER if arg == TIMER_AUTOSAVE => {

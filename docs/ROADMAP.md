@@ -1452,9 +1452,11 @@ Fensterrand hinaus.
   eines Felds, vor dem Felder kommen oder gehen; `MdBlock`/`MdField`/`MdForm::node`,
   `field_of`. Getestet mit `mdviewtest --test unit` (Gruppen `dom`, `dom changes` mit 300
   zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
-  Linux). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten das ganze Dokument neu ab
-  statt nur den betroffenen Container; Element unter einer Textposition (Klick-Ereignisse) gibt
-  es nur blockweise (`MdBlock::node`).
+  Linux). Seit B3 (2026-11-01) nennt `MdEv::click` das Element unter einem Klick, auch inline
+  (`MdDoc::element_at`, `mdviewtest --test unit`, `doc_clicks.uis`), `MdDoc::dom_size` die Größe des
+  Baums, und `Vm::add_script` in `lib/script` gibt die Skripte einer Seite in eine VM mit gemeinsamen
+  obersten Namen (coretest `scriptmod`). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten
+  das ganze Dokument neu ab statt nur den betroffenen Container.
   (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
   (media screen/all) und `style=`; Selektoren wie in (3) (Tag, `*`, `#id`, `.klasse`,
   Attribute, Nachfahre, Kind, Listen); Kaskade nach Spezifität und Reihenfolge, dann

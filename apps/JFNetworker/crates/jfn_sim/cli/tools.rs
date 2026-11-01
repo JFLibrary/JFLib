@@ -39,6 +39,7 @@ use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{ConsoleEv, Metric, Owner, OsApi, Service, SvcEvent, ANY, ANY4};
 use crate::resolver::Family;
 use crate::tcp::{SockOpts, TcpEnd, TcpRow, TcpState, TcpTimer};
+use crate::webc::redirected;
 
 /// "addr:port" with an IPv6 address in brackets (curl's "Trying", nc, the TCP client)
 fn ep(a: IpAddr, p: u16) -> String {
@@ -508,6 +509,8 @@ struct Transfer {
     /// what the agent said about the connection after the answer
     after: Option<String>,
     redirects: u32,
+    /// this request carries the data of -d (a redirect can end that)
+    posting: bool,
 }
 
 /// curl on the console
@@ -541,7 +544,7 @@ impl Curl {
         while let Some(u) = self.queue.pop_front() {
             match Url::parse(&u) {
                 Ok(url) => {
-                    self.begin(os, url, u, 0);
+                    self.begin(os, url, u, 0, true);
                     return;
                 }
                 Err(e) => {
@@ -560,13 +563,14 @@ impl Curl {
         }
         os.exit(self.exit);
     }
-    fn begin(&mut self, os: &mut OsApi, url: Url, given: String, redirects: u32) {
+    fn begin(&mut self, os: &mut OsApi, url: Url, given: String, redirects: u32, posting: bool) {
         let o = &self.o;
+        let data = o.data.as_ref().filter(|_| posting);
         let method = if o.head {
             String::from("HEAD")
         } else if let Some(m) = &o.method {
             m.clone()
-        } else if o.data.is_some() {
+        } else if data.is_some() {
             String::from("POST")
         } else {
             String::from("GET")
@@ -580,14 +584,14 @@ impl Curl {
                 None => h.add(k, &v),
             }
         }
-        let body = o.data.clone().unwrap_or_default();
+        let body = data.cloned().unwrap_or_default();
         for (n, v) in &o.headers {
             if v.is_empty() || ["host", "user-agent", "accept", "content-type"].iter().any(|x| n.eq_ignore_ascii_case(x)) {
                 continue;
             }
             h.add(n, v);
         }
-        if o.data.is_some() {
+        if data.is_some() {
             h.add("Content-Length", &format!("{}", body.len()));
             match o.headers.iter().find(|(n, _)| n.eq_ignore_ascii_case("content-type")) {
                 Some((n, v)) if !v.is_empty() => h.add(n, v),
@@ -617,7 +621,7 @@ impl Curl {
         }
         self.conns_before = self.agent.stats.connects;
         let id = self.agent.submit(os, req);
-        self.cur = Some(Transfer { id, url, given, start: now, meter, body: 0, expect: None, head: None, skip_body: false, after: None, redirects });
+        self.cur = Some(Transfer { id, url, given, start: now, meter, body: 0, expect: None, head: None, skip_body: false, after: None, redirects, posting });
         self.show(os);
     }
     fn v(&self, os: &mut OsApi, s: &str) {
@@ -785,8 +789,14 @@ impl Curl {
                 return;
             }
             self.v(os, &format!("* Issue another request to this URL: '{}'\n", next.text()));
+            // the browser's rule (webc.rs): 301, 302 and 303 end the POST of -d, 307 and 308 keep it;
+            // the word of -X stays on every request, as with curl itself
+            let posting = t.posting && redirected(r.head.status, String::from("POST"), Vec::new()).0 == "POST";
+            if t.posting && !posting && self.o.data.is_some() {
+                self.v(os, "* The redirect drops the data of -d\n");
+            }
             let given = next.text();
-            self.begin(os, next, given, t.redirects + 1);
+            self.begin(os, next, given, t.redirects + 1, posting);
             return;
         }
         self.next(os);

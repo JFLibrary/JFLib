@@ -1361,10 +1361,11 @@ impl Engine {
         } else if ty == "Vlan" {
             match num.parse::<u16>() {
                 Ok(v) if (1..=4094).contains(&v) => {
-                    // switches make a new VLAN interface up (Vlan1 alone ships shut down)
+                    // switches make a new VLAN interface up (Vlan1 alone ships shut down); one named
+                    // in a configuration that boots is up unless the block says "shutdown", as a port
                     let new = !self.stack(ni).is_some_and(|s| s.iface_by_name(&name).is_some());
                     let r = self.apply(Action::Svi { dev, vlan: v, add: true });
-                    if new && r.is_ok() {
+                    if (new || self.booting(ni)) && r.is_ok() {
                         let _ = self.apply(Action::IfUp { dev, iface: name.clone(), up: true });
                     }
                     r.map(|_| Mode::If)
