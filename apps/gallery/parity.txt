@@ -9,3 +9,6 @@ rsonly inspect.uis # The live inspector (ROADMAP §12) has no assembly counterpa
 rsonly inspect_rtl.uis # The live inspector (ROADMAP §12) has no assembly counterpart.
 rsonly csd_titlebar.uis # The system title bar settings, `system env` and `expect wm` have no assembly counterpart.
 rsonly csd_titlebar_rtl.uis # The system title bar settings, `system env` and `expect wm` have no assembly counterpart.
+rsonly gpu_output.uis # The GPU output and the script command `gpu` have no assembly counterpart.
+rsonly gpu_layers.uis # The GPU output and the script command `gpu` have no assembly counterpart.
+rsonly gpu_layers_rtl.uis # The GPU output and the script command `gpu` have no assembly counterpart.

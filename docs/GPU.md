@@ -10,7 +10,8 @@ Stand (G1a): Vulkan unter Windows. `vulkan-1.dll` wird zur Laufzeit geladen, das
 startet also auch auf Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
 Vulkan unter Linux und Android, WebGPU im Browser, später Metal -- mit denselben Typen und
 Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows zeigt die GPU das Ergebnis
-(G3a, [Ausgabe der UI](#ausgabe-der-ui), `jfgui_GPU=0` schaltet das ab).
+(G3a, [Ausgabe der UI](#ausgabe-der-ui), `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
+und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
 | Teil | Wo |
 | --- | --- |
@@ -24,7 +25,7 @@ Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows zeigt die GP
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
-| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis) |
+| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis) |
 
 ## Ein Beispiel
 
@@ -97,8 +98,9 @@ rb.read(0, &mut out)?;
   `draw_indexed_indirect`; auf Voll `draw_indexed_indirect_multi` und
   `draw_indexed_indirect_count`), Zeitstempel (`reset_timestamps`, `timestamp`); `finish()`.
 - **Warteschlange**: `submit([cmd, ..])` gibt eine `SubmitId` (Zeitleisten-Semaphor);
-  `write_buffer`, `write_texture` und `write_texture_rects` (Rechtecke eines Bildes mit eigener
-  Zeilenlänge, ein Übergang für alle) werden über den Staging-Ring vor der nächsten Übergabe
+  `write_buffer`, `write_texture`, `write_texture_rects` (Rechtecke eines Bildes mit eigener
+  Zeilenlänge, ein Übergang für alle) und `write_texture_rects_at` (dasselbe aus einem größeren
+  Bild: die Textur hält einen Teil davon) werden über den Staging-Ring vor der nächsten Übergabe
   ausgeführt; `read_buffer` (kopiert, übergibt und wartet: der langsame Weg für Werkzeuge und
   Tests); `flush()`.
 - **Zeitstempel**: `create_timestamps(n)`, `read_ticks`, `read_ms` (Millisekunden seit dem
@@ -327,18 +329,80 @@ Schatten und runde Ecken macht DWM am Hauptfenster, sie gelten auch für das Kin
 geprüft).
 
 **Shader.** WGSL in [`lib/ui/gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), vorübersetzt in
-[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 250 Wörter): UI-Programme linken `lib/wgsl`
+[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 373 + 513 Wörter): UI-Programme linken `lib/wgsl`
 nicht. `uigputest --test shaders` vergleicht die Wörter mit `wgsl::compile`, `uigputest --gen-shaders
 lib/ui/gpu_out_spv.rs` schreibt sie neu.
 
 **Tests.** `apps/gallery/tests/gpu_output.uis` (das Skriptkommando `gpu`, GUIDE §12) und
 `apps/uigputest` (nur Windows; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
 `switch`, `resize`, `minimize`, `dpi`, `windows`, `off`, `noloader`, `lose`, `idle`, `csd`, `monitors`, `shaders`,
-`adapter`, `hwnd`. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
+`adapter`, `hwnd`, `layers`, `images`, `imgplain`; dazu `apps/gallery/tests/gpu_layers.uis` und
+`gpu_layers_rtl.uis`. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
 zurückgelesen; ohne GPU `SKIP`; liegt ein anderes Fenster über dem Testfenster, ist die Prüfung des
 Bildschirms ein Hinweis statt eines Fehlers. Maximieren und Vollbild aktivieren das Fenster, deshalb tut das
-kein Test mehr; eine frühere Fassung von `csd` hat beides einmal geprüft. `gputest --test upload` prüft Ring, `write_texture_rects` und
+kein Test mehr; eine frühere Fassung von `csd` hat beides einmal geprüft. `gputest --test upload` prüft Ring, `write_texture_rects`, `write_texture_rects_at` und
 `try_acquire`.
+
+### Ebenen und Bilder
+
+Der Framebuffer bleibt die Wahrheit: er hält das ganze Bild, Byte für Byte wie auf dem CPU-Pfad. Nur
+was die GPU davon bekommt, ist getrennt ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3b).
+
+**Warum die GPU nicht mischt.** Der naheliegende Weg, eine Ebene als vormultiplizierte Textur mit
+durchsichtigem Grund über den Rest zu blenden, ist nicht pixelgleich. Versuch auf der Galerie (Wegwerf-Code,
+1000 × 1500, Menü und Untermenü): die Ebene einzeln gezeichnet, mit dem **genauen** ganzzahligen „über“
+aufs darunter gelegt, wie es die beste GPU könnte, gegen direkt gezeichnet. Pixel mit Alpha 0 und 255 stimmen immer (1 431 680 und
+61 820, 0 anders). Von den durchscheinenden (Schatten, Ecken; 6 500 und 8 282) weichen 808 und 1 090 ab,
+um 1 bis 2 Stufen: ein Schatten sind zwölf Mischungen nacheinander, gerundet wird jedes Mal. Dazu
+Subpixel-Text: der geht nur auf einem deckenden Ziel (`Text`: FMT_XRGB), auf einer durchsichtigen
+Ebene wird er grau. Also mischt die GPU nichts.
+
+**Ebenen.** Die Textur des Fensters hält nur noch die Grundebene. Jede Ebene darüber (Dialog, Popup,
+Tooltip) mit Befehlen hat eine eigene Textur; sie hält in den 32 × 32-Zellen, die die Ebene berührt,
+die Pixel **bis einschließlich dieser Ebene**, auf der CPU über das gezeichnet, was wirklich darunter
+liegt: dieselben Kerne auf denselben Pixeln, also nichts, was abweichen könnte, ob Schatten,
+durchscheinende Widgets, Subpixel-Text, Klipp oder RTL (die Befehle sind schon gespiegelt). Der
+Render-Durchgang zeichnet den Grund, dann diese Zellen deckend in Ebenenfolge (Scissor je Rechteck, kein Blending).
+Neben jeder Textur bleiben die Pixel unter der Ebene zellenweise im Speicher (`Store`).
+Der Hash der Schmutz-Zellen wird dafür nach jeder Ebene festgehalten (`dirty::W::through`, nur wenn es Ebenen gibt), so ist je Zelle bekannt,
+welche Ebene sich als unterste geändert hat und welche Ebenen sie berühren. Für jede
+Ebene von unten nach oben (`gp_split_draw`): die Zellen, in denen sie die unterste geänderte ist, bekommen ihre
+Pixel von darunter zurück in den Framebuffer; die Zellen, die sie berührt, werden gemerkt, sie wird dort
+gezeichnet und in ihre Textur geladen.
+
+| Vorgang | CPU | hochgeladen |
+| --- | --- | --- |
+| Popup öffnen | nur das Popup (Pixel darunter gemerkt) | seine Zellen |
+| Popup schließen | die gemerkten Pixel zurück in den Framebuffer | nichts |
+| Popup verschieben | nur das Popup an der neuen Stelle, die alte Stelle aus dem Speicher | seine neuen Zellen |
+| Hover in einem Menü | nur die Zellen dieser Ebene | nur diese Zellen |
+| Unter einer offenen Ebene ändert sich etwas | wie immer: Grund und alles darüber in diesen Zellen | diese Zellen in jede betroffene Textur |
+
+Texturen und Speicher gibt es nur, solange die Ebene Inhalt hat, und eine Sekunde länger (ein Menü zu, das
+nächste auf: kein neuer Speicher); frei werden sie ohne Bild, die Fensterschleife schaut dafür
+einmal nach. Eine Textur ist so groß wie das, was die Ebene umschließt, auf 256 px gerundet, mit Platz zum Verschieben.
+Solange Ebenen getrennt sind, gibt es keine Scroll-Kopien: sie verschieben Pixel des Framebuffers.
+
+**Wann alles zurück in eine Textur geht** (`gp_flatten`, je Fenster): neue Größe, minimiert, der Inspektor,
+eine Reparatur von `--verify-dirty`, jeder Fehler. Dann steht der ganze Framebuffer in der Grundtextur, das Bild stimmt.
+Hat eine Ebene dabei noch Inhalt, zeichnet die nächste Änderung einmal alles und trennt wieder. Gerät verloren:
+Texturen und Speicher weg, CPU-Pfad, nach dem neuen Gerät kommen Ebenen und Bilder mit der nächsten Änderung zurück.
+
+**Bilder.** `Cmd::Image` der Grundebene ab 256 × 256 sichtbaren Pixeln werden zu Texturen, wenn sie deckend sind (FMT_XRGB, oder Alpha überall 255: einmal geprüft).
+Schlüssel: Identität der Fläche (`Rc`; ein `Weak` hält die Adresse fest, keine andere Fläche kommt dorthin) und `ver`.
+Hochgeladen wird erst, wenn die Neuzeichnungen des Bildes so viel gekostet haben wie das Hochladen (Mieten oder Kaufen):
+ein Bild, das still steht, belegt nie GPU-Speicher, eines mit neuer `ver` in jedem Bild ebenso nie. Es geht in Teilen von 4 MiB hoch, je Bild, das es zeichnet; bis dahin zeichnet die CPU weiter (in einem Stück kostete ein Bild von 4000 × 3000 einmal 61 ms). Budget 256 MiB (`jfgui_GPU_IMAGE_MB`), verdrängt wird, was am längsten nicht gezeichnet wurde;
+30 s nicht gezeichnet: weg mit dem nächsten Bild. Größer als das Budget, durchscheinend, in einer höheren Ebene oder unter der Mindestgröße: die CPU zeichnet es wie bisher.
+
+Die GPU zeichnet ein Bild nur in den Zellen, die es ganz füllt und in denen es der letzte Befehl der Grundebene ist; dort zeichnet und lädt die
+CPU nichts. Der Shader rechnet die Abbildung von `Dc::blit_scaled` in ganzen Zahlen nach
+(`(d * step + step / 2) >> 16`, `textureLoad`, kein Filter), 1:1 ist derselbe Fall mit Schritt 65536.
+Randzellen und Zellen mit etwas darüber laufen wie immer. Dem Framebuffer fehlen in diesen Zellen dann die
+Pixel des Bildes (`owed`); `gp_settle` zeichnet sie nach, bevor ihn jemand liest: Rückweg zum CPU-Pfad, jede
+Ebene darüber, `jfgui_GPU_VERIFY`, `--verify-dirty`, `shot`, `expect pixel`, `expect same`, der Agent; ein Programm, das selbst `Ui::fb()` liest,
+ruft vorher `Ui::gpu_settle()`. Mit Bildern auf der GPU gibt es ebenfalls keine Scroll-Kopien.
+
+Was nicht `Cmd::Image` ist, geht nicht diesen Weg: die Bildansicht `image_view` und die Leinwände zeichnen über `Cmd::Custom` (G3c).
 
 ### Messungen
 
@@ -382,12 +446,63 @@ Größenänderung sind so gut wie auf dem CPU-Pfad,
 der Leerlauf nicht: die Treiberthreads kosten 1,6–5 ms CPU je Sekunde und wecken den Rechner, der CPU-Pfad nichts. Von uns läuft dabei nichts, abstellen ließe es sich nur, indem das Gerät im Leerlauf wegginge (ein neues dauert eine halbe Sekunde). Dazu kommen 47 MiB Working Set, 58 MiB privater und 42 MiB GPU-Speicher je Programm sowie 100 ms beim Prozessende. Sichtbar bringt der Weg erst mit Ebenen und Bildern als GPU-Texturen (G3b)
 und Leinwänden (G3c) etwas. Die Größe der Programme wächst in jedem Fall.
 
-### Was fehlt, und was G3b und G3c hieraus nehmen
+**G3b, vorher und nachher.** `uigputest --bench layers`: ein Fenster 1920 × 1000, eine volle Seite (rund
+2 200 Felder aus abgerundetem Rechteck und Text), 200 Bilder je Szene im selben Prozess, Release; „vorher“ ist
+`jfgui_GPU_LAYERS=0` (der Weg von G3a), „nachher“ der Standard, je 3 Läufe im Wechsel, parallel bauten andere Sitzungen.
+Median der drei Mediane; Render ist `render_live`, Present `gp_present` (nach dem Hochladen in Render bzw. mit ihm).
+Das Hochladen steht in Byte je Bild.
 
-- Nur eine Ebene: `show` zeichnet ein Dreieck aus einer Textur. G3b zeichnet stattdessen mehrere
-  Texturen (Grund, Dialog, Popup, Tooltip) und `Cmd::Image` hierher; die Bind-Group-Struktur und der
-  Render-Durchgang bleiben. G3c hängt Leinwände mit eigener Transformation in denselben Durchgang.
-  Beides kann auf denselben Wegen zurück auf den CPU-Pfad.
+| Szene | Render vorher | nachher | Present vorher | nachher | hochgeladen vorher | nachher | Grund-Pixel vorher | nachher |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Popup 320 × 420 öffnen | 2 306 µs | 1 775 µs | 668 µs | 563 µs | 737 KB | 737 KB | 184 320 | 0 |
+| Popup schließen | 1 141 µs | 292 µs | 681 µs | 534 µs | 737 KB | 0 | 184 320 | 0 |
+| Popup verschieben | 2 226 µs | 1 638 µs | 639 µs | 568 µs | 737 KB | 737 KB | 184 320 | 0 |
+| Tooltip 200 × 72 öffnen (vorher 2 Läufe) | 602–607 µs | 531 µs | 638–677 µs | 561 µs | 164 KB | 164 KB | 40 960 | 0 |
+| Tooltip schließen (vorher 2 Läufe) | 358–378 µs | 178 µs | 594–652 µs | 592 µs | 164 KB | 0 | 40 960 | 0 |
+| Dialog 560 × 380 ziehen | 2 980 µs | 2 148 µs | 700 µs | 527 µs | 1 090 KB | 1 090 KB | 272 384 | 0 |
+| Dialog mit Dunst ziehen | 3 059 µs | 2 257 µs | 711 µs | 529 µs | 1 090 KB | 1 090 KB | 272 384 | 0 |
+| Bild 4000 × 3000 auf 1200 × 900, daneben ändert sich wenig | 193 µs | 200 µs | 612 µs | 616 µs | 33 KB | 33 KB | 8 192 | 8 192 |
+| dasselbe, die ganze Seite ändert sich | 13 482 µs | 5 785 µs | 1 336 µs | 526 µs | 7 680 KB | 3 437 KB | 1 920 000 | 859 136 |
+| dasselbe, das Bild wird verschoben | 9 238 µs | 1 566 µs | 1 120 µs | 525 µs | 4 633 KB | 389 KB | 1 158 144 | 97 280 |
+| Popup über dem Bild, auf und zu | 2 072 µs | 1 233 µs | 639 µs | 538 µs | 737 KB | 737 / 0 KB | 184 320 | 0 |
+
+Beim Öffnen und Verschieben bleibt die Menge gleich und der größte Teil der Zeit: Schatten (zwölf Runden über die ganze
+Fläche) und Inhalt der Ebene selbst. Was wegfällt, ist alles darunter; je teurer der Grund (eigene Zeichnungen, Leinwände),
+desto mehr bringt das. Am meisten gewinnen Schließen und Bilder. Ein stillstehendes Bild kostet und bringt nichts.
+
+Ändert sich die ganze Seite unter einem offenen Dialog, zeichnet dieser Weg auf einem Thread statt in Bändern. Mit derselben
+Arbeit auf der CPU (`jfgui_GPU_IMAGES=0`) sind das 13–15 ms statt 12 ms, dafür 0,5 statt 1,2 ms beim Darstellen, bei 14 % mehr
+Upload (zwei Läufe gegen einen, der Rechner unter Last).
+
+Echte Galerie (1900 × 1000, ein Skript, ganze Zahlen aus den Zählern, je 1 Lauf; hochgeladen, in Klammern davon in die Grundtextur, und Grund-Pixel):
+
+| Vorgang | vorher | nachher |
+| --- | ---: | ---: |
+| Menü „Datei“ öffnen | 360 KB (360 KB), 90 112 | 360 KB (16 KB), 4 096 |
+| Hover im Menü | 221 KB (221 KB), 55 296 | 221 KB (0), 0 |
+| Menü schließen | 352 KB (352 KB), 88 064 | 16 KB (16 KB), 4 096 |
+| Inhaltsdialog mit Dunst öffnen | 7 723 KB (7 723 KB), 1 930 720 | 7 776 KB (176 KB), 44 032 |
+| Inhaltsdialog schließen | 7 600 KB (7 600 KB), 1 900 000 | 49 KB (49 KB), 12 288 |
+
+Das Bild geht in Teilen hoch: der teuerste Rahmen während des Mietens und Ladens 23 ms (`--n 40`, 1 Lauf; das Bild ganz auf der CPU 15 ms je Rahmen),
+vorher in einem Stück einmal 61 ms. Eine vierte Runde nachher lag unter fremder Last (schlechtester Rahmen 117 ms in Szenen ohne Bild) und zählt in der Tabelle nicht.
+
+Größe, Release: gallery Windows 4 076 544 → 4 126 720 Byte (+50 176), Linux 4 412 248 → 4 413 848 (+1 600), Browser
+3 518 288 → 3 521 061 Byte (simd, threads je −1 728), dort keine Vulkan-Zeichenkette.
+
+Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 10–13 MiB mit Popups, nachher 16–20 MiB; davon eine Popup-Textur 1,5 MiB
+plus 0,7 MiB CPU-Speicher für die Pixel darunter, ein Dialog 2,3 + 1,1 MiB, Dunst über dem ganzen Fenster 7,5 + 7,7 MiB. Das Bild: 45,8 MiB Textur,
+`memory_reserved` 67–78 MiB (vorher 13–28 MiB), kurz dazu 48 MiB Staging, der eine Sekunde später zurückgeht. Ohne Ebenen und ohne geänderte Bilder: kein Unterschied zu vorher.
+
+### Was fehlt, und was G3c hieraus nimmt
+
+- `show` zeichnet Grund, Bilder, Ebenen in einem Durchgang. G3c hängt Leinwände mit eigener Transformation an die Stelle der Bilder
+  (`Quad`: eine Fläche in Zellen, die die GPU füllt und die CPU auslässt); beides kann auf denselben Wegen zurück auf den CPU-Pfad.
+- Eine verschobene Ebene wird neu gezeichnet und ganz hochgeladen. Ihr deckendes Inneres könnte in der Textur bleiben, nur der
+  durchscheinende Rand müsste neu. Das setzt voraus, dass Pixel beim Verschieben gleich bleiben: der Rasterer rechnet in
+  absoluten f32-Koordinaten, abgerundete Ecken, Kreise und Linien ändern sich (siehe `scrollcopy.rs`). Nicht gebaut.
+- Durchscheinende Bilder, Bilder in höheren Ebenen und unter 256 × 256 bleiben auf der CPU. Die Bildränder (eine Zelle breit) laufen weiter über den Grund.
+- `Cmd::Custom` (Bildansicht, Leinwände) gar nicht: das ist G3c.
 - Kein teilweises Zeichnen in die Swapchain (`VK_KHR_incremental_present`): jedes Bild zeichnet das
   ganze Fenster, auch für ein Blinken. Billig, aber nicht nichts auf einer schwachen GPU.
 - Scroll-Kopien laufen im Framebuffer; die Textur bekommt die verschobenen Zellen neu (die GPU könnte sie
@@ -410,6 +525,9 @@ und Leinwänden (G3c) etwas. Die Größe der Programme wächst in jedem Fall.
 | nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)) |
 | `jfgui_GPU_VERIFY=1` | die UI-Ausgabe liest jedes dargestellte Bild zurück und vergleicht es mit dem Framebuffer (langsam, zum Testen) |
 | `jfgui_GPU_TRACE=1` | die UI-Ausgabe schreibt ihre Schritte und Zeiten auf stderr |
+| `jfgui_GPU_LAYERS=0` | die UI-Ausgabe hält eine Textur je Fenster: keine Ebenen, keine Bilder ([Ebenen und Bilder](#ebenen-und-bilder)) |
+| `jfgui_GPU_IMAGES=0` | keine Bilder als Texturen, Ebenen bleiben |
+| `jfgui_GPU_IMAGE_MB=n` | Budget der Bildtexturen (Vorgabe 256) |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
@@ -453,7 +571,7 @@ für Messungen den Configurator ausschalten.
 | `info.uis` | Adapter, Treiber, API-Version, Stufe, Features, Limits; ein auf Basis begrenztes Gerät |
 | `compute.uis` | Rechen-Shader schreibt f(i) in einen Speicherpuffer, 1000 und 1M Elemente, die Elemente dahinter unberührt; `write_buffer` / `read_buffer` |
 | `copies.uis` | Puffer → Textur → Puffer mit aufgefüllten Zeilen; `write_texture` in jede Mip-Stufe und Schicht eines Arrays, Rücklesen pro Mip |
-| `upload.uis` | der Staging-Ring: 2000 kleine Uploads bleiben im Ring, ein ganzes Bild nimmt einen eigenen Puffer, der eine Sekunde später weg ist; Blöcke wachsen; `write_texture_rects` (Zeilenlänge, Klippen, Fehler); `write_buffer` über Stückgrenzen; `try_acquire` wartet nicht auf die Anzeige, `Stale` nach neuer Größe, `rebuild`, alles auf einem Kindfenster |
+| `upload.uis` | der Staging-Ring: 2000 kleine Uploads bleiben im Ring, ein ganzes Bild nimmt einen eigenen Puffer, der eine Sekunde später weg ist; Blöcke wachsen; `write_texture_rects` und `write_texture_rects_at` (Zeilenlänge, Klippen, Fehler); `write_buffer` über Stückgrenzen; `try_acquire` wartet nicht auf die Anzeige, `Stale` nach neuer Größe, `rebuild`, alles auf einem Kindfenster |
 | `graphics.uis` | zwei Dreiecke (Vertex-Pulling, Indexpuffer, Rückseiten-Culling, Tiefentest) in eine Textur; Pixel geprüft |
 | `indirect.uis` | Argumente von einem Rechen-Shader: `dispatch_indirect`, `draw_indexed_indirect`, auf Voll `_multi` und `_count` |
 | `timestamps.uis` | monoton über zwei Übergaben, plausibel gegen die CPU-Uhr |

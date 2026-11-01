@@ -420,7 +420,8 @@ impl Ui {
 
     // ------------------------------------------------------------------ queries
 
-    /// ui_fb: the live window's framebuffer
+    /// ui_fb: the live window's framebuffer.  While its frames go through the GPU a big image may be
+    /// drawn only there: Ui::gpu_settle() first when the pixels matter
     pub fn fb(&self) -> &Surface {
         &self.wp.rt.fb
     }
@@ -936,7 +937,9 @@ impl Ui {
         if self.wp.rt.fb.px.is_empty() {
             return; // no framebuffer (allocation failed)
         }
+        let t0 = plat::time_us();
         let (w, h) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        self.wp.dirty.split = self.gp_split_wanted(); // (the GPU output keeps layers apart: gpu_out.rs)
         self.cmd_mirror(); // right-to-left: the recorded commands across the window
         let mut n = self.dirty_compute(w, h);
         let ins = self.m.ins.on;
@@ -947,14 +950,20 @@ impl Ui {
         if self.ui_debug {
             plat::write_stderr(alloc::format!("render: {} dirty rects (-1 = full)\n", n).as_bytes());
         }
+        let split = self.gp_split_begin(n);
         if self.wp.rt.present_n == 0 {
+            self.gp_frame_done(t0, 0, false);
             return; // nothing changed
         }
+        let dirty_n = n;
         self.dc.begin(&self.wp.rt.fb);
         // the text font the passes left set stays set (the replay sets each text's font,
         // custom draws their own; what stays must not depend on the dirty part or on threads)
         let font = self.text.get_font();
-        if self.render_par(n) {
+        if split {
+            self.gp_split_draw(n); // layer by layer, what lies below stays (gpu_out.rs)
+            n = 0;
+        } else if self.render_par(n) {
             n = 0; // drawn on several threads (render_par.rs)
         }
         if n < 0 {
@@ -980,6 +989,7 @@ impl Ui {
             self.verify_dirty();
         }
         self.text.set_font(font.0, font.1);
+        self.gp_frame_done(t0, dirty_n, split);
     }
 
     /// ui_present: show what render changed in the live window
@@ -996,6 +1006,7 @@ impl Ui {
     // (--verify-dirty): any difference means a command's box was too small (auto.rs' bench
     // calls it after the timed render)
     pub(crate) fn verify_dirty(&mut self) {
+        self.gp_settle_all(); // (the GPU output's images: the framebuffer's pixels are compared)
         let (w, h) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
         if self.wp.rt.shadow.w != w || self.wp.rt.shadow.h != h {
             self.wp.rt.shadow = Surface::new(w, h, FMT_XRGB);
@@ -1038,6 +1049,7 @@ impl Ui {
         if self.m.ins.on {
             self.ins_verify(false);
         }
+        self.gp_repaired(); // (the GPU output: the framebuffer goes up as a whole)
         self.wp.rt.present_n = -1;
     }
 

@@ -1,0 +1,4 @@
+#!args --test layers
+# the layers above the base as textures of their own: every combination opened, moved and closed,
+# the presented image equal to the framebuffer, nothing of the base drawn or uploaded; a change
+# below them; a layer over the whole window; a new size; a lost device

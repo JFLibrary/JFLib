@@ -1,0 +1,3 @@
+#!args --test imgplain
+# a big image without reading back: the framebuffer lacks its pixels until asked (Ui::gpu_settle),
+# the way back to the CPU path shows them

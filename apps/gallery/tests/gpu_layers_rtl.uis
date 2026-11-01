@@ -1,0 +1,52 @@
+#!args --rtl --verify-dirty
+# gpu_layers.uis in a mirrored window: the commands are mirrored before the cells are hashed, the
+# layers' textures and stores hold what the mirrored window shows
+system env jfgui_GPU_VALIDATE 1
+size 1000 900
+theme dark
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect screen
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+click "Datei"
+expect "Datei" open
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+move menuitem:"Speichern"
+gpu expect same
+gpu expect base 0
+gpu expect raster 0
+key esc
+expect menuitem:"Neu" missing
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+wheel 100,300 -600
+wait 400
+click "Dialog"
+wait 300
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+click "Dialog öffnen"
+expect "Änderungen speichern?" open
+wait 400
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+key esc
+wait 400
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu off

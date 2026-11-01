@@ -1517,7 +1517,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=0`
   (nothing of the GPU anywhere; on Windows the windows show their frames through a swapchain by default;
   GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
-  `jfgui_GPU_TRACE=1` prints its stages), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
+  `jfgui_GPU_TRACE=1` prints its stages, `jfgui_GPU_LAYERS=0` keeps one texture per window,
+  `jfgui_GPU_IMAGES=0` keeps images on the CPU, `jfgui_GPU_IMAGE_MB=n` their budget), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
   taking the keyboard and without DWM's fade-in),
   `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_RENDER_PAR=0`
   (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
@@ -1578,7 +1579,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
-| `gpu on\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer, a render after every input edge. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `same`: every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check |
+| `gpu on\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer, a render after every input edge. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `budget`: what image textures may take. `same`: every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
@@ -1656,7 +1657,10 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 * **Presenting through the GPU** (Windows, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
   UI"): the first frames, every frame of a resize and every window after a failure go the way below;
   otherwise the rectangles go into a texture and a swapchain on a child window shows it, without
-  ever waiting for the display. Popups outside the window stay below's way.
+  ever waiting for the display. The layers above the base have textures of their own: a popup that
+  closes or moves costs nothing of what lies below it. Big opaque `draw_image`s that keep being
+  redrawn become textures; `Ui::fb()` may lack their pixels then, `Ui::gpu_settle()` draws them (GPU.md "Ebenen und
+  Bilder"). Popups outside the window stay below's way.
 * **Presenting** (`plat::win_present(w, frame, rects)`, `bench` leaves it out): the frame's
   dirty rectangles are copied once toward the screen, straight from the framebuffer. Windows:
   into the window's kept copy, a DIB section, then BitBlt (batched, `GdiFlush`); WM_PAINT

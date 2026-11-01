@@ -145,7 +145,7 @@ mod gpu_out;
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
 #[cfg(windows)]
-pub use gpu_out::{GPU_OUT_FS, GPU_OUT_VS, GPU_OUT_WGSL};
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_VS, GPU_OUT_WGSL};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
 // ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
@@ -477,8 +477,29 @@ pub struct GpuOutput {
     /// frames presented through the swapchain / the CPU path
     pub frames: u64,
     pub cpu_frames: u64,
-    /// bytes uploaded to the window's texture
+    /// bytes uploaded to the window's textures, those of them to the base texture
     pub upload_bytes: u64,
+    pub upload_base: u64,
+    /// pixels of the base layer drawn again (what a layer above it no longer costs)
+    pub base_px: u64,
+    /// frames drawn layer by layer
+    pub split_frames: u64,
+    /// the layers above the base with a texture now, its bytes, and the bytes kept of the pixels
+    /// below them
+    pub layer_textures: u32,
+    pub layer_bytes: u64,
+    pub layer_store: u64,
+    /// images drawn as textures in the window's last frame; of all windows: textures, their
+    /// bytes, uploads, frames that drew one, textures evicted
+    pub image_quads: u32,
+    pub image_textures: u32,
+    pub image_bytes: u64,
+    pub image_uploads: u64,
+    pub image_hits: u64,
+    pub image_evicted: u64,
+    /// time in the window's renders and presents (us)
+    pub render_us: u64,
+    pub present_us: u64,
     /// switches to the swapchain, and back to the CPU path
     pub switches: u32,
     pub leaves: u32,

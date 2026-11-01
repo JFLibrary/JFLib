@@ -1,0 +1,183 @@
+#!args --verify-dirty
+# the layers above the base as textures of their own (lib/ui/gpu_out.rs, docs/GPU.md "Ebenen") on
+# real gallery pages: a menu, a submenu, a tooltip, a content dialog with its smoke, a second
+# window, a new size, a theme, a lost device.  Every presented image is read back and compared
+# with the framebuffer, --verify-dirty compares the framebuffer with a full redraw; `gpu expect
+# base` and `raster` count what reaches the base: what a button's hover changes, not what lies
+# below a layer.  Without a GPU `gpu` prints a SKIP once and does nothing.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 1000 900
+theme dark
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect screen
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+gpu expect layers 0
+# ---- a menu: its button's hover in the base, the rest in the layer
+click "Datei"
+expect "Datei" open
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+gpu expect upload 2000000
+gpu print
+# hovering inside it: only the popup's cells
+move menuitem:"Speichern"
+move menuitem:"Neu"
+gpu expect same
+gpu expect base 0
+gpu expect raster 0
+gpu expect upload 400000
+# closed: nothing of the popup goes up, what lay below comes back
+key esc
+expect menuitem:"Neu" missing
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+gpu expect upload 200000
+gpu print
+# ---- a submenu: the layer's cells grow, also the empty corner stays the base's
+click "Ansicht"
+move menuitem:"Zoom"
+expect menuitem:"Zoom" open
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+key esc
+key esc
+expect menuitem:"Zoom" missing
+gpu expect layers 0
+gpu expect same
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+# ---- a tooltip above the base, then another one at once; the pointer leaves
+move #9003
+wait 700
+expect text:"Speichern (Strg+S)" exists
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+move #103
+wait 16
+expect text:"Speichern" exists
+gpu expect same
+gpu expect base 100000
+gpu expect raster 25000
+move 500,890
+wait 100
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu expect base 100000
+# ---- a popup over a menu: two layers, closed one after the other
+click "Bearbeiten"
+expect menuitem:"Ausschneiden" enabled
+gpu expect same
+theme light
+gpu expect same
+gpu expect screen
+theme dark
+gpu expect same
+gpu expect screen
+gpu expect layers 1
+key esc
+gpu expect layers 0
+gpu expect same
+# ---- the content dialog: smoke over the whole window, the base stays
+wheel 900,300 -600
+wait 400
+click "Dialog"
+wait 300
+gpu expect upload 100000000
+gpu expect base 100000000
+gpu expect raster 100000000
+click "Dialog öffnen"
+expect "Änderungen speichern?" open
+wait 400
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+gpu print
+# keys inside the dialog: the dialog's cells
+key tab
+key tab
+gpu expect same
+gpu expect base 0
+gpu expect raster 0
+key esc
+expect "Änderungen speichern?" missing
+wait 400
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+gpu expect raster 50000
+gpu print
+# ---- a popup and a new size: the frame through the CPU path, then the layers again
+click "Datei"
+gpu expect layers 1
+size 900 850
+gpu expect cpu
+gpu expect window
+gpu wait
+gpu expect same
+gpu expect screen
+key esc
+gpu expect same
+click "Datei"
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+# ---- a popup and a lost device: the CPU path, a new device, the layers again
+gpu lose
+move menuitem:"Speichern"
+wait 100
+gpu expect cpu
+gpu expect window
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect screen
+move menuitem:"Neu"
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+key esc
+gpu expect layers 0
+gpu expect same
+# ---- scrolled below a tooltip's place: scroll copies again when nothing is apart
+wheel 800,700 -120
+wait 300
+expect_nowarn
+gpu expect same
+gpu expect screen
+# ---- popups of a second window beside the main window's page
+cmd 9104
+expect window 7760 open
+gpu wait
+gpu expect same
+click #7761
+expect #7761 open
+gpu expect same
+key esc
+gpu expect same
+close window 7760
+gpu expect same
+gpu print
+gpu off
