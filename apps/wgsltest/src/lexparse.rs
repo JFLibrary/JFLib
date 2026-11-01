@@ -244,19 +244,19 @@ pub fn parse(t: &mut T) {
     let bin = expr_of("a >= b").map(|e| matches!(e.kind, ExprKind::Binary(BinOp::Ge, ..)));
     t.eq(">=", bin, Some(true));
     // the operator mixes the grammar forbids
-    t.parse_fail("& and |", "const x = a & b $| c;", "`&` und `|` dürfen nicht ohne Klammern");
+    t.parse_fail("& and |", "const x = a $& b | c;", "`&` und `|` dürfen nicht ohne Klammern");
     t.parse_fail("+ and <<", "const x = a + b $<< c;", "`+` und `<<`");
-    t.parse_fail("<< and +", "const x = a << b $+ c;", "`<<` und `+`");
-    t.parse_fail("chained comparison", "const x = a < b $< c;", "Vergleiche lassen sich nicht verketten");
-    t.parse_fail("&& and ||", "const x = a && b $|| c;", "`&&` und `||`");
-    t.parse_fail("& and ==", "const x = a & b $== c;", "`&` und `==`");
-    t.parse_fail("&& and &", "const x = a && b $& c;", "`&&` und `&`");
+    t.parse_fail("<< and +", "const x = a $<< b + c;", "`<<` und `+`");
+    t.parse_fail("chained comparison", "const x = a $< b < c;", "Vergleiche lassen sich nicht verketten");
+    t.parse_fail("&& and ||", "const x = a $&& b || c;", "`&&` und `||`");
+    t.parse_fail("& and ==", "const x = a $& b == c;", "`&` und `==`");
+    t.parse_fail("&& and &", "const x = a $&& b & c;", "`&&` und `&`");
     // statements
     t.parse_fail("missing semicolon", "fn f() { var a = 1\n    $a = 2; }", "erwartet `;` nach der Anweisung");
     t.parse_fail("expression statement", "fn f() { var a = 1; $1 + a; }", "erwartet eine Anweisung");
     t.parse_fail("bare expression", "fn f() { var a = 1; a $+ 1; }", "ein Ausdruck allein ist keine Anweisung");
     t.parse_fail("break if outside continuing", "fn f() { loop { $break if true; } }", "`break if` ist nur als letzte Anweisung");
-    t.parse_fail("break if not last", "fn f() { var i = 0; loop { continuing { break if true; $i++; } } }", "letzte Anweisung von `continuing`");
+    t.parse_fail("break if not last", "fn f() { var i = 0; loop { continuing { $break if true; i++; } } }", "letzte Anweisung von `continuing`");
     t.parse_fail("continuing not last", "fn f() { loop { continuing { } $let a = 1; } }", "`continuing` muss die letzte Anweisung");
     t.parse_fail("empty switch", "fn f() { switch 1 ${ } }", "mindestens einen `case`");
     t.parse_fail("attribute on assignment", "fn f() { var a = 1; $@diagnostic(off, derivative_uniformity) a = 2; }", "Attribute sind nur vor Blöcken");

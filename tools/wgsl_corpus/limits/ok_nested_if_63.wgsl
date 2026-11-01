@@ -1,0 +1,3 @@
+// WGSL "Limits": statements nest less than 127 deep: an if and its block count 2 (Chrome)
+// expect: valid
+fn f(c: bool, x: u32) { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }

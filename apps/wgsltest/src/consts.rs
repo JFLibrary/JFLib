@@ -288,7 +288,7 @@ pub fn run(t: &mut T) {
     t.eq("short-circuit value", eval("false && (1 / 0 == 0)"), Ok(Value::Bool(false)));
     t.eq("zero value", eval("vec3<f32>()"), Ok(Value::Zero));
     t.eq("zero element", eval("array<vec2f, 4>()[3].y"), Ok(Value::F32(0.0)));
-    t.eq("big zero array element", eval("array<f32, 100000>()[99999]"), Ok(Value::F32(0.0)));
+    t.eq("big zero array element", eval("array<f32, 65535>()[65534]"), Ok(Value::F32(0.0)));
     // f16
     t.eq("f16 sum rounds", eval("1.0h + 0.0001h"), Ok(Value::F16(1.0)));
     t.eq("f16 product", eval("1.5h * 3.0h"), Ok(Value::F16(4.5)));

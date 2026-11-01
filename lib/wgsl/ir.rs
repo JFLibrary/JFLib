@@ -4,7 +4,7 @@
 //   Module            types (interned: equal types have equal TypeIds), structs with their
 //                     layout, globals, overrides, functions (callees before callers), entry
 //                     points with their interface, the module-scope expression arena, enabled
-//                     extensions, diagnostic filters (kept for the uniformity analysis, G2d)
+//                     extensions, diagnostic filters (read by the uniformity analysis)
 //   Type              Scalar / Vector / Matrix / Atomic / Array (count, stride) / Struct /
 //                     Pointer / Reference / SwizzleView / Sampler / Texture
 //   Expr / ExprKind   one arena per function (Function::exprs) and one for module scope
@@ -480,7 +480,7 @@ pub enum UnaryOp {
     BitNot,
 }
 
-/// the built-in functions (spec section 17; no subgroup and quad functions, no buffer views)
+/// the built-in functions (spec section 17; no buffer views)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum Builtin {
     // logical, array
@@ -508,6 +508,13 @@ pub enum Builtin {
     Unpack2x16snorm, Unpack2x16unorm, Unpack2x16float,
     // synchronization
     StorageBarrier, TextureBarrier, WorkgroupBarrier, WorkgroupUniformLoad,
+    // subgroups
+    SubgroupAdd, SubgroupExclusiveAdd, SubgroupInclusiveAdd, SubgroupAll, SubgroupAnd, SubgroupAny,
+    SubgroupBallot, SubgroupBroadcast, SubgroupBroadcastFirst, SubgroupElect, SubgroupMax, SubgroupMin,
+    SubgroupMul, SubgroupExclusiveMul, SubgroupInclusiveMul, SubgroupOr, SubgroupShuffle,
+    SubgroupShuffleDown, SubgroupShuffleUp, SubgroupShuffleXor, SubgroupXor,
+    // quad operations
+    QuadBroadcast, QuadSwapDiagonal, QuadSwapX, QuadSwapY,
 }
 
 /// expression nodes (see the module comment for the conventions)
@@ -730,6 +737,8 @@ pub struct EntryPoint {
     pub stage: Stage,
     /// compute only
     pub workgroup_size: Option<[WgSize; 3]>,
+    /// @subgroup_size (compute only, subgroup_size_control)
+    pub subgroup_size: Option<WgSize>,
     pub inputs: Vec<IoVar>,
     pub outputs: Vec<IoVar>,
     /// every module-scope variable statically accessed (ascending)

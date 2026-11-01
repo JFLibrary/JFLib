@@ -19,6 +19,8 @@
 //                                               error / warning, German message, notes
 //   bench                                       the six benchmark shaders of docs/SHADER.md
 //                                               as WGSL text
+//   Diagnostic::render(&src)                    with the source line and a caret span
+//   analyze_uniformity(&module, src, &Options)  the uniformity analysis alone (uniformity.rs)
 //   compile(src, &CompileOptions) -> Result<Output, Vec<Diagnostic>>   check + lower to
 //                                               SPIR-V, one module per entry point (spirv.rs)
 //   Output::constants / workgroup_size / check_pipeline, check_interface, Limits
@@ -53,6 +55,7 @@ pub mod spirv;
 mod spirv_builtin;
 mod spirv_func;
 mod types;
+mod uniformity;
 pub mod xid;
 
 pub use ast::{Ast, Span};
@@ -71,14 +74,17 @@ pub struct Note {
 }
 
 /// a message for the editor: position (1-based; columns count characters, end_col is
-/// exclusive and on the same line), error or warning, German text; start / end: the byte
-/// range in the source; notes point at related places ("hier deklariert")
+/// exclusive and on the same line), error, warning or info (`error` and `info` both false: a
+/// warning), German text; start / end: the byte range in the source; notes point at related
+/// places ("hier deklariert")
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Diagnostic {
     pub line: u32,
     pub col: u32,
     pub end_col: u32,
     pub error: bool,
+    /// a message of severity info (diagnostic(info, ...)); it is neither error nor warning
+    pub info: bool,
     pub msg: String,
     pub start: u32,
     pub end: u32,
@@ -88,11 +94,44 @@ pub struct Diagnostic {
 impl core::fmt::Display for Diagnostic {
     /// "3:5: Fehler: erwartet `;` nach der Anweisung" plus one line per note
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{}:{}: {}: {}", self.line, self.col, if self.error { "Fehler" } else { "Warnung" }, self.msg)?;
+        let what = if self.error {
+            "Fehler"
+        } else if self.info {
+            "Info"
+        } else {
+            "Warnung"
+        };
+        write!(f, "{}:{}: {}: {}", self.line, self.col, what, self.msg)?;
         for n in &self.notes {
             write!(f, "\n  {}:{}: Hinweis: {}", n.line, n.col, n.msg)?;
         }
         Ok(())
+    }
+}
+
+impl Diagnostic {
+    /// the message with its source line and a caret span under the place, and each note the
+    /// same way, for a terminal:
+    ///
+    ///     4:29: Fehler: `workgroupBarrier` darf nur in uniformem Kontrollfluss aufgerufen werden
+    ///        4 | fn g(c: u32) { if c == 0u { workgroupBarrier(); } }
+    ///          |                             ^^^^^^^^^^^^^^^^
+    pub fn render(&self, src: &str) -> String {
+        let map = LineMap::new(src);
+        let what = if self.error {
+            "Fehler"
+        } else if self.info {
+            "Info"
+        } else {
+            "Warnung"
+        };
+        let mut out = alloc::format!("{}:{}: {}: {}\n", self.line, self.col, what, self.msg);
+        map.render_at(src, self.line, self.col, self.end_col, "", &mut out);
+        for n in &self.notes {
+            out.push_str(&alloc::format!("  {}:{}: Hinweis: {}\n", n.line, n.col, n.msg));
+            map.render_at(src, n.line, n.col, n.end_col, "  ", &mut out);
+        }
+        out
     }
 }
 
@@ -121,6 +160,10 @@ pub mod feature {
     pub const FRAGMENT_DEPTH: u32 = 1 << 9;
     /// v.xy = ... (swizzle views)
     pub const SWIZZLE_ASSIGNMENT: u32 = 1 << 10;
+    /// a uniformity scope of its own for the subgroup and quad functions
+    pub const SUBGROUP_UNIFORMITY: u32 = 1 << 11;
+    /// @builtin(subgroup_id) and @builtin(num_subgroups)
+    pub const SUBGROUP_ID: u32 = 1 << 12;
     /// enable-extensions the device may offer (the WebGPU features)
     pub const F16: u32 = 1 << 16;
     /// enable clip_distances: @builtin(clip_distances)
@@ -131,11 +174,30 @@ pub mod feature {
     pub const PRIMITIVE_INDEX: u32 = 1 << 19;
     /// enable atomic_vec2u_min_max: atomicStoreMin / Max on atomic<vec2<u32>>
     pub const ATOMIC_VEC2U_MIN_MAX: u32 = 1 << 20;
+    /// enable subgroups: the subgroup and quad built-in functions and values
+    pub const SUBGROUPS: u32 = 1 << 21;
+    /// enable subgroup_size_control: @subgroup_size (turns subgroups on too)
+    pub const SUBGROUP_SIZE_CONTROL: u32 = 1 << 22;
     /// what a browser offers and this front end implements: the language features of Chrome
-    /// 156 except buffer_view, subgroup_id and subgroup_uniformity (and without
-    /// fragment_depth, which Chrome offers only with --enable-unsafe-webgpu: implemented,
-    /// opt-in), the enable-extensions except subgroups and subgroup_size_control
-    pub const ALL: u32 = (0x7ff & !FRAGMENT_DEPTH) | 0x1f << 16;
+    /// 156 except buffer_view (and without fragment_depth, which Chrome offers only with
+    /// --enable-unsafe-webgpu: implemented, opt-in), the enable-extensions
+    pub const ALL: u32 = (0x1fff & !FRAGMENT_DEPTH) | 0x7f << 16;
+    /// ALL for a device: the enable-extensions it lacks are off, as WebGPU gates them on the
+    /// features of the device (lib/gpu: Features::shader_f16, subgroups_webgpu,
+    /// subgroup_size_control)
+    pub const fn for_device(f16: bool, subgroups: bool, subgroup_size_control: bool) -> u32 {
+        let mut bits = ALL;
+        if !f16 {
+            bits &= !F16;
+        }
+        if !subgroups {
+            bits &= !(SUBGROUPS | SUBGROUP_SIZE_CONTROL);
+        }
+        if !subgroup_size_control {
+            bits &= !SUBGROUP_SIZE_CONTROL;
+        }
+        bits
+    }
     /// (name, bit, is a language extension) for every extension name WGSL defines; bit 0:
     /// known but not implemented here
     pub const NAMES: &[(&str, u32, bool)] = &[
@@ -151,15 +213,15 @@ pub mod feature {
         ("fragment_depth", FRAGMENT_DEPTH, true),
         ("swizzle_assignment", SWIZZLE_ASSIGNMENT, true),
         ("buffer_view", 0, true),
-        ("subgroup_id", 0, true),
-        ("subgroup_uniformity", 0, true),
+        ("subgroup_id", SUBGROUP_ID, true),
+        ("subgroup_uniformity", SUBGROUP_UNIFORMITY, true),
         ("f16", F16, false),
         ("clip_distances", CLIP_DISTANCES, false),
         ("dual_source_blending", DUAL_SOURCE_BLENDING, false),
         ("primitive_index", PRIMITIVE_INDEX, false),
         ("atomic_vec2u_min_max", ATOMIC_VEC2U_MIN_MAX, false),
-        ("subgroups", 0, false),
-        ("subgroup_size_control", 0, false),
+        ("subgroups", SUBGROUPS, false),
+        ("subgroup_size_control", SUBGROUP_SIZE_CONTROL, false),
     ];
 }
 
@@ -196,6 +258,12 @@ pub fn check_with(src: &str, opt: &Options) -> Result<Module, Vec<Diagnostic>> {
         return Err(diags);
     }
     check::check(src, &ast, opt)
+}
+
+/// the uniformity analysis of a checked module alone (check runs it already; for tools and
+/// measurements): the diagnostics it gives
+pub fn analyze_uniformity(m: &Module, src: &str, opt: &Options) -> Vec<Diagnostic> {
+    uniformity::analyze(m, src, &LineMap::new(src), opt.features)
 }
 
 /// the start of every line (byte offsets); line breaks as WGSL defines them: LF, VT, FF, CR
@@ -249,8 +317,35 @@ impl LineMap {
         let line_end = self.starts.get(line as usize).map(|&s| s as usize).unwrap_or(src.len());
         let e = (end as usize).min(line_end).max(start as usize);
         let w = src.get(start as usize..e).map(|s| s.trim_end_matches(['\n', '\r']).chars().count()).unwrap_or(1) as u32;
-        Diagnostic { line, col, end_col: col + w.max(1), error, msg, start, end, notes: Vec::new() }
+        Diagnostic { line, col, end_col: col + w.max(1), error, info: false, msg, start, end, notes: Vec::new() }
     }
+    /// the text of a 1-based line without its line break
+    pub fn line_text<'s>(&self, src: &'s str, line: u32) -> &'s str {
+        let Some(&s) = self.starts.get(line.wrapping_sub(1) as usize) else { return "" };
+        let e = self.starts.get(line as usize).map_or(src.len(), |&x| x as usize);
+        src.get(s as usize..e).unwrap_or("").trim_end_matches(['\n', '\r', '\u{b}', '\u{c}', '\u{85}', '\u{2028}', '\u{2029}'])
+    }
+
+    /// a source line and carets under col..end_col; a long line is cut around the place
+    fn render_at(&self, src: &str, line: u32, col: u32, end_col: u32, indent: &str, out: &mut String) {
+        const WIDTH: usize = 100;
+        let chars: Vec<char> = self.line_text(src, line).chars().map(|c| if c == '\t' { ' ' } else { c }).collect();
+        let (c0, c1) = ((col.max(1) - 1) as usize, (end_col.max(col + 1) - 1) as usize);
+        let c1 = c1.clamp(c0 + 1, chars.len().max(c0 + 1));
+        let (mut from, mut to) = (0, chars.len());
+        if to > WIDTH {
+            from = c0.saturating_sub(WIDTH / 3);
+            to = (from + WIDTH).min(chars.len());
+        }
+        let text: String = chars.get(from..to).unwrap_or(&[]).iter().collect();
+        let (pre, post) = (if from > 0 { "…" } else { "" }, if to < chars.len() { "…" } else { "" });
+        let number = alloc::format!("{}", line);
+        out.push_str(&alloc::format!("{}{:>4} | {}{}{}\n", indent, number, pre, text, post));
+        let pad = c0.saturating_sub(from) + (from > 0) as usize;
+        let carets = c1.min(to).saturating_sub(c0).max(1);
+        out.push_str(&alloc::format!("{}     | {}{}\n", indent, " ".repeat(pad), "^".repeat(carets)));
+    }
+
     /// a note for the byte range start..end
     pub fn note(&self, src: &str, start: u32, end: u32, msg: String) -> Note {
         let d = self.diag(src, start, end, false, msg);

@@ -23,6 +23,17 @@ use crate::{feature, Diagnostic, LineMap, Options};
 
 pub const MAX_ERRORS: usize = 60;
 
+// the limits of spec 2.4 (Chrome allows more, except where the comment says otherwise; the
+// spec's value is the rule here, docs/WGSL.md "Abweichungen")
+pub const MAX_STRUCT_MEMBERS: usize = 1023;
+pub const MAX_NEST_DEPTH: u32 = 15;
+/// (Chrome: the same)
+pub const MAX_PARAMS: usize = 255;
+pub const MAX_CASE_SELECTORS: usize = 1023;
+pub const MAX_PRIVATE_BYTES: u64 = 8192;
+pub const MAX_FUNCTION_BYTES: u64 = 8192;
+pub const MAX_ARRAY_CONSTRUCTOR: usize = 2047;
+
 /// an error that is already reported
 #[derive(Debug, Clone, Copy)]
 pub struct E;
@@ -80,9 +91,13 @@ pub struct FnInfo {
     pub globals: BTreeSet<u32>,
     pub overrides: BTreeSet<u32>,
     pub uses_discard: bool,
+    /// the first discard reachable and the first use of each module-scope variable
+    pub discard_use: Option<Span>,
+    pub global_use: BTreeMap<u32, Span>,
     /// the first fragment-only / compute-only built-in reachable (place, name)
     pub frag_use: Option<(Span, String)>,
     pub compute_use: Option<(Span, String)>,
+    pub not_vertex_use: Option<(Span, String)>,
     /// alias analysis: pointer parameters read / written, module-scope variables read /
     /// written (callees included)
     pub ptr_read: Vec<bool>,
@@ -143,6 +158,9 @@ pub struct FnCtx {
     pub in_continuing: u32,
     /// the uids used while checking a continuing block (the innermost one)
     pub cont_uses: Vec<BTreeMap<u32, Span>>,
+    /// statement nesting as Chrome counts it (check_stmt.rs), and whether that was reported
+    pub depth: u32,
+    pub depth_reported: bool,
     pub info: FnInfo,
     pub calls: BTreeSet<u32>,
     pub reads: BTreeSet<Root>,
@@ -185,6 +203,10 @@ const ATTRS: [&str; 18] = [
     "must_use", "size", "workgroup_size", "subgroup_size", "vertex", "fragment", "compute",
 ];
 
+/// the warning about code after return / break / continue and its rule (Chrome's name)
+pub const UNREACHABLE: &str = "unerreichbarer Code";
+pub const UNREACHABLE_RULE: &str = "chromium.unreachable_code";
+
 /// the predeclared type names (no template list)
 const PREDECL_TYPES: [&str; 13] = [
     "bool", "i32", "u32", "f32", "f16", "sampler", "sampler_comparison", "texture_depth_2d", "texture_depth_2d_array",
@@ -198,6 +220,55 @@ const GENERATORS: [&str; 26] = [
 ];
 
 const ENUMERANTS: [&str; 9] = ["read", "write", "read_write", "function", "private", "workgroup", "uniform", "storage", "immediate"];
+
+/// the edit distance of two names, at most `max` (larger: max + 1), case-insensitive steps count
+fn distance(a: &str, b: &str, max: usize) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    if a.len().abs_diff(b.len()) > max {
+        return max + 1;
+    }
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, &ca) in a.iter().enumerate() {
+        let mut prev = row[0];
+        row[0] = i + 1;
+        let mut best = row[0];
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = if ca == cb { 0 } else { 1 };
+            let v = (prev + cost).min(row[j] + 1).min(row[j + 1] + 1);
+            prev = row[j + 1];
+            row[j + 1] = v;
+            best = best.min(v);
+        }
+        if best > max {
+            return max + 1;
+        }
+    }
+    row[b.len()]
+}
+
+/// " – meintest du `x`?" when a candidate is close to the name, else nothing (only when an
+/// error is reported, so a walk over the names costs nothing else)
+pub fn suggestion<'n>(name: &str, candidates: impl Iterator<Item = &'n str>) -> String {
+    let len = name.chars().count();
+    if len < 3 {
+        return String::new();
+    }
+    let max = (len.div_ceil(3)).clamp(1, 3);
+    let mut best: Option<(usize, &str)> = None;
+    for c in candidates {
+        if c == name {
+            continue;
+        }
+        let d = distance(name, c, max);
+        if d <= max && best.is_none_or(|b| d < b.0) {
+            best = Some((d, c));
+        }
+    }
+    match best {
+        Some((_, c)) => format!(" – meintest du `{}`?", c),
+        None => String::new(),
+    }
+}
 
 /// a predeclared type alias (vec3f, mat4x4h): (generator, scalar)
 pub fn alias_parts(name: &str) -> Option<(&str, Scalar)> {
@@ -234,6 +305,45 @@ pub fn predeclared_kind(name: &str) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+/// the severity the nearest enclosing filter of a rule gives at this place (None: no filter)
+pub fn filter_at(filters: &[DiagnosticFilter], rule: &str, at: u32) -> Option<Severity> {
+    let mut best: Option<(u32, Severity)> = None;
+    for f in filters.iter().filter(|f| f.rule == rule) {
+        if f.range.start <= at && at < f.range.end.max(f.range.start + 1) {
+            let w = f.range.end - f.range.start;
+            if best.is_none_or(|b| w < b.0) {
+                best = Some((w, f.severity));
+            }
+        }
+    }
+    best.map(|b| b.1)
+}
+
+/// the warnings with a rule of their own go through the diagnostic filters
+fn apply_rule_filters(diags: &mut Vec<Diagnostic>, filters: &[DiagnosticFilter], errors: &mut usize) {
+    if filters.is_empty() {
+        return;
+    }
+    diags.retain_mut(|d| {
+        if d.error || d.msg != UNREACHABLE {
+            return true;
+        }
+        match filter_at(filters, UNREACHABLE_RULE, d.start) {
+            Some(Severity::Off) => false,
+            Some(Severity::Info) => {
+                d.info = true;
+                true
+            }
+            Some(Severity::Error) => {
+                d.error = true;
+                *errors += 1;
+                true
+            }
+            _ => true,
+        }
+    });
 }
 
 pub fn check(src: &str, ast: &ast::Ast, opt: &Options) -> Result<Module, Vec<Diagnostic>> {
@@ -279,6 +389,7 @@ pub fn check(src: &str, ast: &ast::Ast, opt: &Options) -> Result<Module, Vec<Dia
         c.entry_points();
     }
     let mut diags = core::mem::take(&mut c.diags);
+    apply_rule_filters(&mut diags, &c.m.diagnostic_filters, &mut c.errors);
     diags.sort_by_key(|d| (d.start, !d.error));
     if c.errors > 0 {
         return Err(diags);
@@ -286,6 +397,14 @@ pub fn check(src: &str, ast: &ast::Ast, opt: &Options) -> Result<Module, Vec<Dia
     let mut m = c.m;
     m.types = c.t.list;
     m.structs = c.t.structs;
+    // the uniformity analysis works on the finished IR
+    let found = crate::uniformity::analyze(&m, src, &c.lm, opt.features);
+    let failed = found.iter().any(|d| d.error);
+    diags.extend(found);
+    diags.sort_by_key(|d| (d.start, !d.error));
+    if failed {
+        return Err(diags);
+    }
     m.warnings = diags;
     Ok(m)
 }
@@ -342,7 +461,8 @@ impl<'a> Checker<'a> {
                         match entry {
                             None => {
                                 let what = if enable { "Erweiterung" } else { "Spracherweiterung" };
-                                let _ = self.err(n.span, format!("unbekannte {} `{}`", what, n.name));
+                                let hint = suggestion(&n.name, feature::NAMES.iter().filter(|e| e.2 != enable).map(|e| e.0));
+                                let _ = self.err(n.span, format!("unbekannte {} `{}`{}", what, n.name, hint));
                             }
                             Some(&(_, _, lang)) if lang == enable => {
                                 let msg = if enable {
@@ -359,8 +479,10 @@ impl<'a> Checker<'a> {
                                 if self.opt.features & bit == 0 {
                                     let _ = self.err(n.span, format!("`{}` ist auf diesem Gerät nicht verfügbar", n.name));
                                 } else if enable {
-                                    self.enabled |= bit;
-                                    self.m.enables |= bit;
+                                    // (subgroup_size_control turns subgroups on)
+                                    let bits = if bit == feature::SUBGROUP_SIZE_CONTROL { bit | feature::SUBGROUPS } else { bit };
+                                    self.enabled |= bits;
+                                    self.m.enables |= bits;
                                 } else {
                                     self.m.requires |= bit;
                                 }
@@ -370,11 +492,12 @@ impl<'a> Checker<'a> {
                 }
                 ast::DirectiveKind::Diagnostic(c) => {
                     if let Ok((sev, rule)) = self.diag_control(c) {
+                        let rsp = c.rule_span();
                         if let Some(prev) = seen_filters.iter().find(|p| p.0 == rule && p.1 != sev) {
                             let psp = prev.2;
-                            let _ = self.err_note(d.span, format!("widersprüchliche Diagnose-Filter für `{}`", rule), psp, String::from("der andere Filter"));
+                            let _ = self.err_note(rsp, format!("widersprüchliche Diagnose-Filter für `{}`", rule), psp, String::from("der andere Filter"));
                         }
-                        seen_filters.push((rule.clone(), sev, d.span));
+                        seen_filters.push((rule.clone(), sev, rsp));
                         self.m.diagnostic_filters.push(DiagnosticFilter { severity: sev, rule, range: Span::new(0, self.src.len() as u32), global: true });
                     }
                 }
@@ -396,11 +519,16 @@ impl<'a> Checker<'a> {
             Some(r2) => format!("{}.{}", c.rule.name, r2.name),
             None => {
                 if !matches!(c.rule.name.as_str(), "derivative_uniformity" | "subgroup_uniformity") {
-                    self.warn(c.rule.span, format!("unbekannte Diagnose-Regel `{}`", c.rule.name));
+                    let hint = suggestion(&c.rule.name, ["derivative_uniformity", "subgroup_uniformity"].into_iter());
+                    self.warn(c.rule.span, format!("unbekannte Diagnose-Regel `{}`{}", c.rule.name, hint));
                 }
                 c.rule.name.clone()
             }
         };
+        // (rules with two names are the implementation's: only the chromium ones are known)
+        if c.rule.name == "chromium" && !matches!(rule.as_str(), UNREACHABLE_RULE | "chromium.subgroup_matrix_uniformity") {
+            self.warn(c.rule_span(), format!("unbekannte Diagnose-Regel `{}`", rule));
+        }
         Ok((sev, rule))
     }
 
@@ -410,11 +538,12 @@ impl<'a> Checker<'a> {
         for a in attrs {
             if let AttrKind::Diagnostic(c) = &a.kind {
                 if let Ok((sev, rule)) = self.diag_control(c) {
+                    let rsp = c.rule_span();
                     if let Some(p) = rules.iter().find(|r| r.0 == rule) {
                         let psp = p.1;
-                        let _ = self.err_note(a.span, format!("zwei @diagnostic-Attribute für dieselbe Regel `{}`", rule), psp, String::from("das erste"));
+                        let _ = self.err_note(rsp, format!("zwei `@diagnostic`-Attribute für dieselbe Regel `{}`", rule), psp, String::from("das erste"));
                     }
-                    rules.push((rule.clone(), a.span));
+                    rules.push((rule.clone(), rsp));
                     self.m.diagnostic_filters.push(DiagnosticFilter { severity: sev, rule, range, global: false });
                 }
             }
@@ -425,7 +554,7 @@ impl<'a> Checker<'a> {
     pub fn only_diag(&mut self, attrs: &[Attr], range: Span) {
         for a in attrs {
             if !matches!(a.kind, AttrKind::Diagnostic(_)) {
-                let _ = self.err(a.span, format!("`@{}` ist hier nicht erlaubt (vor Anweisungen nur @diagnostic)", a.name.name));
+                let _ = self.err(a.name.span, format!("`@{}` ist hier nicht erlaubt (vor Anweisungen nur `@diagnostic`)", a.name.name));
             }
         }
         self.diag_attrs(attrs, range);
@@ -437,18 +566,19 @@ impl<'a> Checker<'a> {
         for (i, a) in attrs.iter().enumerate() {
             let n = a.name.name.as_str();
             if !ATTRS.contains(&n) {
-                let _ = self.err(a.span, format!("unbekanntes Attribut `@{}`", n));
+                let hint = suggestion(n, ATTRS.iter().copied()).replace("du `", "du `@");
+                let _ = self.err(a.name.span, format!("unbekanntes Attribut `@{}`{}", n, hint));
                 ok = false;
                 continue;
             }
             if !allowed.contains(&n) {
-                let _ = self.err(a.span, format!("`@{}` ist an {} nicht erlaubt", n, what));
+                let _ = self.err(a.name.span, format!("`@{}` ist an {} nicht erlaubt", n, what));
                 ok = false;
                 continue;
             }
             if n != "diagnostic" {
                 if let Some(p) = attrs[..i].iter().find(|p| p.name.name == n) {
-                    let _ = self.err_note(a.span, format!("`@{}` steht zweimal", n), p.span, String::from("das erste"));
+                    let _ = self.err_note(a.name.span, format!("`@{}` steht zweimal", n), p.name.span, String::from("das erste"));
                     ok = false;
                 }
             }
@@ -462,7 +592,7 @@ impl<'a> Checker<'a> {
                 _ => argc != 1,
             };
             if bad {
-                let _ = self.err(a.span, format!("falsche Anzahl von Argumenten für `@{}`", n));
+                let _ = self.err(a.name.span, format!("falsche Anzahl von Argumenten für `@{}`", n));
                 ok = false;
             }
         }
@@ -486,7 +616,7 @@ impl<'a> Checker<'a> {
             Some(Value::I32(x)) => Ok(x as i64),
             Some(Value::U32(x)) => Ok(x as i64),
             _ if te.ty == I32 || te.ty == U32 => Ok(0),
-            _ => Err(self.err(e.span, format!("das Argument von `@{}` muss vom Typ i32 oder u32 sein, nicht `{}`", a.name.name, self.tn(te.ty)))),
+            _ => Err(self.err(e.span, format!("das Argument von `@{}` muss vom Typ `i32` oder `u32` sein, nicht `{}`", a.name.name, self.tn(te.ty)))),
         }
     }
 
@@ -516,30 +646,37 @@ impl<'a> Checker<'a> {
             let n = self.attr_name(a0, "den Namen eines eingebauten Werts")?;
             let b = match BUILTIN_VALUES.iter().find(|b| b.0 == n) {
                 Some(b) => b.1,
-                None => return Err(self.err(a0.span, format!("`{}` ist kein eingebauter Wert", n))),
+                None => {
+                    let hint = suggestion(&n, BUILTIN_VALUES.iter().map(|b| b.0));
+                    return Err(self.err(a0.span, format!("`{}` ist kein eingebauter Wert{}", n, hint)));
+                }
             };
             let need = match b {
-                BuiltinValue::ClipDistances => Some((feature::CLIP_DISTANCES, "enable clip_distances;")),
-                BuiltinValue::PrimitiveIndex => Some((feature::PRIMITIVE_INDEX, "enable primitive_index;")),
-                BuiltinValue::GlobalInvocationIndex | BuiltinValue::WorkgroupIndex => Some((feature::LINEAR_INDEXING, "die Spracherweiterung linear_indexing")),
-                BuiltinValue::SubgroupInvocationId | BuiltinValue::SubgroupSize | BuiltinValue::SubgroupId | BuiltinValue::NumSubgroups => {
-                    return Err(self.err(a0.span, format!("`{}` gehört zu subgroups, das dieser Compiler noch nicht unterstützt", n)));
+                BuiltinValue::ClipDistances => Some((feature::CLIP_DISTANCES, "`enable clip_distances;`")),
+                BuiltinValue::PrimitiveIndex => Some((feature::PRIMITIVE_INDEX, "`enable primitive_index;`")),
+                BuiltinValue::GlobalInvocationIndex | BuiltinValue::WorkgroupIndex => Some((feature::LINEAR_INDEXING, "die Spracherweiterung `linear_indexing`")),
+                BuiltinValue::SubgroupInvocationId | BuiltinValue::SubgroupSize => Some((feature::SUBGROUPS, "`enable subgroups;`")),
+                BuiltinValue::SubgroupId | BuiltinValue::NumSubgroups => {
+                    if !self.has(feature::SUBGROUPS) {
+                        return Err(self.err(a.name.span, format!("`@builtin({})` braucht `enable subgroups;`", n)));
+                    }
+                    Some((feature::SUBGROUP_ID, "die Spracherweiterung `subgroup_id`"))
                 }
                 _ => None,
             };
             if let Some((bit, how)) = need {
                 if !self.has(bit) {
-                    return Err(self.err(a0.span, format!("`{}` braucht {}", n, how)));
+                    return Err(self.err(a.name.span, format!("`@builtin({})` braucht {}", n, how)));
                 }
             }
             io.builtin = Some(b);
             if let Some(m) = a.args().get(1) {
                 let mn = self.attr_name(m, "less oder greater")?;
                 if b != BuiltinValue::FragDepth {
-                    return Err(self.err(m.span, String::from("ein Tiefenmodus ist nur bei frag_depth erlaubt")));
+                    return Err(self.err(m.span, String::from("ein Tiefenmodus ist nur bei `frag_depth` erlaubt")));
                 }
                 if !self.has(feature::FRAGMENT_DEPTH) {
-                    return Err(self.err(m.span, String::from("der Tiefenmodus braucht die Spracherweiterung fragment_depth")));
+                    return Err(self.err(m.span, String::from("der Tiefenmodus braucht die Spracherweiterung `fragment_depth`")));
                 }
                 io.depth_mode = Some(match mn.as_str() {
                     "less" => DepthMode::Less,
@@ -553,7 +690,7 @@ impl<'a> Checker<'a> {
         }
         if let Some(a) = self.attr(attrs, "blend_src") {
             if !self.has(feature::DUAL_SOURCE_BLENDING) {
-                return Err(self.err(a.span, String::from("`@blend_src` braucht `enable dual_source_blending;`")));
+                return Err(self.err(a.name.span, String::from("`@blend_src` braucht `enable dual_source_blending;`")));
             }
             let v = self.attr_nonneg(a)?;
             if v > 1 {
@@ -561,7 +698,7 @@ impl<'a> Checker<'a> {
                 return Err(self.err(sp, format!("`@blend_src` muss 0 oder 1 sein, nicht {}", v)));
             }
             if io.location.is_none() {
-                return Err(self.err(a.span, String::from("`@blend_src` braucht auch `@location`")));
+                return Err(self.err(a.name.span, String::from("`@blend_src` braucht auch `@location`")));
             }
             io.blend_src = Some(v);
         }
@@ -597,13 +734,13 @@ impl<'a> Checker<'a> {
                 samp = Some(sv);
             }
             if io.location.is_none() {
-                return Err(self.err(a.span, String::from("`@interpolate` ist nur zusammen mit `@location` erlaubt")));
+                return Err(self.err(a.name.span, String::from("`@interpolate` ist nur zusammen mit `@location` erlaubt")));
             }
             io.interpolate = Some((ty, samp));
         }
         if let Some(a) = self.attr(attrs, "invariant") {
             if io.builtin != Some(BuiltinValue::Position) {
-                return Err(self.err(a.span, String::from("`@invariant` ist nur an `@builtin(position)` erlaubt")));
+                return Err(self.err(a.name.span, String::from("`@invariant` ist nur an `@builtin(position)` erlaubt")));
             }
             io.invariant = true;
         }
@@ -876,7 +1013,7 @@ impl<'a> Checker<'a> {
             let (c, r) = (name.as_bytes()[3] - b'0', name.as_bytes()[5] - b'0');
             return match self.t.get(t) {
                 Type::Scalar(s @ (Scalar::F32 | Scalar::F16)) => Ok(self.t.mat(c, r, s)),
-                _ => Err(self.err(args[0].span, format!("die Komponenten einer Matrix müssen f32 oder f16 sein, nicht `{}`", self.tn(t)))),
+                _ => Err(self.err(args[0].span, format!("die Komponenten einer Matrix müssen `f32` oder `f16` sein, nicht `{}`", self.tn(t)))),
             };
         }
         match name {
@@ -885,7 +1022,7 @@ impl<'a> Checker<'a> {
                 let t = self.scalar_arg(args, sp, name)?;
                 let ok = t == I32 || t == U32 || (t == self.t.vec(2, Scalar::U32) && self.has(feature::ATOMIC_VEC2U_MIN_MAX));
                 if !ok {
-                    return Err(self.err(args[0].span, format!("atomic<{}> ist nicht erlaubt (nur i32 oder u32)", self.tn(t))));
+                    return Err(self.err(args[0].span, format!("`atomic<{}>` ist nicht erlaubt (nur `i32` oder `u32`)", self.tn(t))));
                 }
                 Ok(self.t.intern(Type::Atomic(t)))
             }
@@ -897,7 +1034,11 @@ impl<'a> Checker<'a> {
     fn unknown_type(&mut self, name: &str, sp: Span) -> E {
         match predeclared_kind(name) {
             Some(k) if k != "ein Typ" && k != "ein Typ-Generator" => self.err(sp, format!("`{}` ist {}, kein Typ", name, k)),
-            _ => self.err(sp, format!("unbekannter Typ `{}`", name)),
+            _ => {
+                let names: Vec<&str> = self.names.keys().copied().collect();
+                let hint = suggestion(name, names.iter().copied().chain(PREDECL_TYPES.iter().copied()).chain(GENERATORS.iter().copied()));
+                self.err(sp, format!("unbekannter Typ `{}`{}", name, hint))
+            }
         }
     }
 
@@ -917,6 +1058,10 @@ impl<'a> Checker<'a> {
             None => ArrayCount::Runtime,
             Some(ce) => self.array_count(ce)?,
         };
+        let depth = 1 + self.t.nest_depth(elem);
+        if depth > MAX_NEST_DEPTH {
+            return Err(self.err(sp, format!("der Typ ist zu tief verschachtelt (Tiefe {}, erlaubt sind {})", depth, MAX_NEST_DEPTH)));
+        }
         let t = self.t.array(elem, count);
         if let (ArrayCount::Fixed(n), Type::Array { stride, .. }) = (count, self.t.get(t)) {
             if n as u64 * stride as u64 > u32::MAX as u64 {
@@ -939,7 +1084,7 @@ impl<'a> Checker<'a> {
                 return Err(self.err(ce.span, String::from("die Anzahl der Elemente muss ein const- oder override-Ausdruck sein")));
             }
             if te.ty != I32 && te.ty != U32 && te.ty != AINT {
-                return Err(self.err(ce.span, format!("die Anzahl der Elemente muss i32 oder u32 sein, nicht `{}`", self.tn(te.ty))));
+                return Err(self.err(ce.span, format!("die Anzahl der Elemente muss `i32` oder `u32` sein, nicht `{}`", self.tn(te.ty))));
             }
             let te = if te.ty == AINT { self.convert(te, I32)? } else { te };
             if te.stage == Phase::Const {
@@ -984,7 +1129,10 @@ impl<'a> Checker<'a> {
             "uniform" => AddressSpace::Uniform,
             "storage" => AddressSpace::Storage,
             "immediate" if self.has(feature::IMMEDIATE_ADDRESS_SPACE) => AddressSpace::Immediate,
-            _ => return Err(self.err(e.span, format!("`{}` ist kein Adressraum (function, private, workgroup, uniform, storage)", n))),
+            _ => {
+                let hint = suggestion(&n, ENUMERANTS[3..].iter().copied());
+                return Err(self.err(e.span, format!("`{}` ist kein Adressraum (function, private, workgroup, uniform, storage){}", n, hint)));
+            }
         })
     }
 
@@ -994,7 +1142,10 @@ impl<'a> Checker<'a> {
             "read" => Access::Read,
             "write" => Access::Write,
             "read_write" => Access::ReadWrite,
-            _ => return Err(self.err(e.span, format!("`{}` ist kein Zugriffsmodus (read, write, read_write)", n))),
+            _ => {
+                let hint = suggestion(&n, ENUMERANTS[..3].iter().copied());
+                return Err(self.err(e.span, format!("`{}` ist kein Zugriffsmodus (read, write, read_write){}", n, hint)));
+            }
         })
     }
 
@@ -1011,7 +1162,7 @@ impl<'a> Checker<'a> {
                 }
                 let m = self.access_mode(a)?;
                 if m == Access::Write {
-                    return Err(self.err(a.span, String::from("Speicherpuffer erlauben nur read oder read_write")));
+                    return Err(self.err(a.span, String::from("Speicherpuffer erlauben nur `read` oder `read_write`")));
                 }
                 m
             }
@@ -1065,10 +1216,10 @@ impl<'a> Checker<'a> {
             AddressSpace::Handle => {}
         }
         if space != AddressSpace::Storage && space != AddressSpace::Workgroup && self.t.contains_atomic(t) {
-            return Err(self.err(sp, format!("Atomics gibt es nur in storage (read_write) und workgroup, nicht in `{}`", space.name())));
+            return Err(self.err(sp, format!("Atomics gibt es nur in `storage` (`read_write`) und `workgroup`, nicht in `{}`", space.name())));
         }
         if self.t.contains_runtime_array(t) && space != AddressSpace::Storage {
-            return Err(self.err(sp, format!("Laufzeit-Arrays gibt es nur im Adressraum storage, nicht in `{}`", space.name())));
+            return Err(self.err(sp, format!("Laufzeit-Arrays gibt es nur im Adressraum `storage`, nicht in `{}`", space.name())));
         }
         Ok(())
     }
@@ -1087,21 +1238,22 @@ impl<'a> Checker<'a> {
             }
             let fname = self.enumerant(&args[0], "ein Texelformat")?;
             let Some(&(_, fmt, tier1)) = TEXEL_FORMATS.iter().find(|f| f.0 == fname) else {
-                return Err(self.err(args[0].span, format!("`{}` ist kein Texelformat für Speichertexturen", fname)));
+                let hint = suggestion(&fname, TEXEL_FORMATS.iter().map(|f| f.0));
+                return Err(self.err(args[0].span, format!("`{}` ist kein Texelformat für Speichertexturen{}", fname, hint)));
             };
             if tier1 && !self.has(feature::TEXTURE_FORMATS_TIER1) {
-                return Err(self.err(args[0].span, format!("das Format `{}` braucht die Spracherweiterung texture_formats_tier1", fname)));
+                return Err(self.err(args[0].span, format!("das Format `{}` braucht die Spracherweiterung `texture_formats_tier1`", fname)));
             }
             let acc = self.access_mode(&args[1])?;
             if acc != Access::Write && !self.has(feature::READONLY_AND_READWRITE_STORAGE_TEXTURES) {
-                return Err(self.err(args[1].span, String::from("Speichertexturen mit read oder read_write brauchen readonly_and_readwrite_storage_textures")));
+                return Err(self.err(args[1].span, String::from("Speichertexturen mit `read` oder `read_write` brauchen die Spracherweiterung `readonly_and_readwrite_storage_textures`")));
             }
             return Ok(self.t.intern(Type::Texture(dim, TexKind::Storage(fmt, acc))));
         }
         let t = self.scalar_arg(args, sp, name)?;
         let s = match self.t.get(t) {
             Type::Scalar(s @ (Scalar::F32 | Scalar::I32 | Scalar::U32)) => s,
-            _ => return Err(self.err(args[0].span, format!("der Abtasttyp einer Textur muss f32, i32 oder u32 sein, nicht `{}`", self.tn(t)))),
+            _ => return Err(self.err(args[0].span, format!("der Abtasttyp einer Textur muss `f32`, `i32` oder `u32` sein, nicht `{}`", self.tn(t)))),
         };
         let (dim, kind) = match rest {
             "1d" => (TexDim::D1, TexKind::Sampled(s)),
@@ -1134,13 +1286,13 @@ impl<'a> Checker<'a> {
             },
             DeclKind::Fn(f) => self.function(f, d.span).map(DeclInfo::Fn),
             DeclKind::ConstAssert(e) => {
-                self.const_assert(e)?;
+                self.const_assert(e, d.span)?;
                 Ok(DeclInfo::Assert)
             }
         }
     }
 
-    pub fn const_assert(&mut self, e: &Expr) -> R<()> {
+    pub fn const_assert(&mut self, e: &Expr, at: Span) -> R<()> {
         let te = self.expr(e)?;
         let te = self.rvalue(te)?;
         if te.stage != Phase::Const {
@@ -1150,7 +1302,7 @@ impl<'a> Checker<'a> {
             return Err(self.err(e.span, format!("`const_assert` braucht einen bool-Ausdruck, nicht `{}`", self.tn(te.ty))));
         }
         if te.val == Some(Value::Bool(false)) {
-            return Err(self.err(e.span, String::from("const_assert schlägt fehl: der Ausdruck ist false")));
+            return Err(self.err(at, String::from("`const_assert` schlägt fehl: der Ausdruck ist `false`")));
         }
         Ok(())
     }
@@ -1158,6 +1310,9 @@ impl<'a> Checker<'a> {
     fn struct_decl(&mut self, name: &ast::Ident, members: &[ast::Member], span: Span) -> R<TypeId> {
         if members.is_empty() {
             return Err(self.err(name.span, format!("die Struktur `{}` braucht mindestens ein Member", name.name)));
+        }
+        if members.len() > MAX_STRUCT_MEMBERS {
+            return Err(self.err(Span::new(span.start, name.span.end), format!("die Struktur `{}` hat {} Member, erlaubt sind {}", name.name, members.len(), MAX_STRUCT_MEMBERS)));
         }
         let mut ms: Vec<StructMember> = Vec::new();
         let mut ok = true;
@@ -1179,13 +1334,19 @@ impl<'a> Checker<'a> {
                 ok = false;
                 continue;
             };
+            let depth = 1 + self.t.nest_depth(t);
+            if depth > MAX_NEST_DEPTH {
+                let _ = self.err(Span::new(span.start, name.span.end), format!("die Struktur `{}` ist zu tief verschachtelt (Tiefe {}, erlaubt sind {})", name.name, depth, MAX_NEST_DEPTH));
+                ok = false;
+                continue;
+            }
             let tname = self.tn(t);
             let last = k + 1 == members.len();
             let valid = match self.t.get(t) {
                 Type::Scalar(_) | Type::Vector(..) | Type::Matrix(..) | Type::Atomic(_) => true,
                 Type::Array { count: ArrayCount::Runtime, .. } => {
                     if !last {
-                        let _ = self.err(m.ty.span, String::from("ein Array ohne feste Größe darf nur das letzte Member sein"));
+                        let _ = self.err(m.name.span, String::from("ein Array ohne feste Größe darf nur das letzte Member sein"));
                         ok = false;
                         continue;
                     }
@@ -1200,7 +1361,7 @@ impl<'a> Checker<'a> {
                 }
                 Type::Struct(_) => {
                     if !self.t.creation_fixed(t) {
-                        let _ = self.err(m.ty.span, format!("die Struktur `{}` hat ein Laufzeit-Array und kann kein Member sein", tname));
+                        let _ = self.err(m.name.span, format!("die Struktur `{}` hat ein Laufzeit-Array und kann kein Member sein", tname));
                         ok = false;
                         continue;
                     }
@@ -1209,7 +1370,7 @@ impl<'a> Checker<'a> {
                 _ => false,
             };
             if !valid {
-                let _ = self.err(m.ty.span, format!("`{}` kann kein Struct-Member sein", tname));
+                let _ = self.err(m.name.span, format!("`{}` kann kein Struct-Member sein", tname));
                 ok = false;
                 continue;
             }
@@ -1224,14 +1385,14 @@ impl<'a> Checker<'a> {
                     ok = false;
                     continue;
                 };
-                let asp = a.args()[0].span;
+                let aname = a.name.span;
                 if v <= 0 || (v & (v - 1)) != 0 {
-                    let _ = self.err(asp, format!("`@align` muss eine positive Zweierpotenz sein, nicht {}", v));
+                    let _ = self.err(aname, format!("`@align` muss eine positive Zweierpotenz sein, nicht {}", v));
                     ok = false;
                     continue;
                 }
                 if v as u32 % talign != 0 {
-                    let _ = self.err(asp, format!("`@align({})` ist kein Vielfaches der Ausrichtung {} von `{}`", v, talign, tname));
+                    let _ = self.err(aname, format!("`@align({})` ist kein Vielfaches der Ausrichtung {} von `{}`", v, talign, tname));
                     ok = false;
                     continue;
                 }
@@ -1243,19 +1404,19 @@ impl<'a> Checker<'a> {
                     ok = false;
                     continue;
                 };
-                let asp = a.args()[0].span;
+                let aname = a.name.span;
                 if runtime && last {
-                    let _ = self.err(asp, String::from("`@size` ist an einem Laufzeit-Array nicht erlaubt"));
+                    let _ = self.err(aname, String::from("`@size` ist an einem Laufzeit-Array nicht erlaubt"));
                     ok = false;
                     continue;
                 }
                 if v < tsize as i64 {
-                    let _ = self.err(asp, format!("`@size({})` ist kleiner als die Größe {} von `{}`", v, tsize, tname));
+                    let _ = self.err(aname, format!("`@size({})` ist kleiner als die Größe {} von `{}`", v, tsize, tname));
                     ok = false;
                     continue;
                 }
                 if v > i32::MAX as i64 {
-                    let _ = self.err(asp, String::from("`@size` ist zu groß"));
+                    let _ = self.err(aname, String::from("`@size` ist zu groß"));
                     ok = false;
                     continue;
                 }
@@ -1307,7 +1468,7 @@ impl<'a> Checker<'a> {
                 }
                 let m = self.access_mode(a)?;
                 if m == Access::Write {
-                    return Err(self.err(a.span, String::from("Speicherpuffer erlauben nur read oder read_write")));
+                    return Err(self.err(a.span, String::from("Speicherpuffer erlauben nur `read` oder `read_write`")));
                 }
                 access = Some(m);
             }
@@ -1379,10 +1540,15 @@ impl<'a> Checker<'a> {
             }
         } else {
             if let Some(a) = group.or(binding) {
-                return Err(self.err(a.span, format!("`@{}` ist nur an Ressourcen (uniform, storage, Texturen, Sampler) erlaubt", a.name.name)));
+                return Err(self.err(a.name.span, format!("`@{}` ist nur an Ressourcen (uniform, storage, Texturen, Sampler) erlaubt", a.name.name)));
             }
             None
         };
+        if space != AddressSpace::Storage {
+            if let Some(n) = self.t.big_array(ty) {
+                return Err(self.err(tsp, format!("ein Array mit {} Elementen: außerhalb von Speicherpuffern sind höchstens 65535 erlaubt", n)));
+            }
+        }
         let std140 = space != AddressSpace::Uniform || self.t.layout_error(ty, true).is_none();
         let gi = self.m.globals.len() as u32;
         // overrides in the initializer and in override-sized array counts
@@ -1404,7 +1570,7 @@ impl<'a> Checker<'a> {
         }
         if let Type::Array { count: ArrayCount::Override(_) | ArrayCount::Expr(_), .. } = self.t.get(ty) {
             if space != AddressSpace::Workgroup {
-                return Err(self.err(tsp, String::from("Arrays mit override-Größe gibt es nur im Adressraum workgroup")));
+                return Err(self.err(tsp, String::from("Arrays mit override-Größe gibt es nur im Adressraum `workgroup`")));
             }
         }
         self.m.globals.push(Global { name: v.name.name.clone(), space, access, ty, binding: bind, init, std140, span: v.span });
@@ -1454,7 +1620,7 @@ impl<'a> Checker<'a> {
                 let te = self.expr(ie)?;
                 let te = self.rvalue(te)?;
                 if te.stage == Phase::Runtime {
-                    return Err(self.err(ie.span, String::from("der Initialisierer eines override muss ein const- oder override-Ausdruck sein")));
+                    return Err(self.err(ie.span, String::from("der Initialisierer eines `override` muss ein const- oder override-Ausdruck sein")));
                 }
                 let t = match ty {
                     Some(t) => t,
@@ -1469,7 +1635,7 @@ impl<'a> Checker<'a> {
             };
             if !matches!(self.t.get(ty), Type::Scalar(s) if !s.is_abstract()) {
                 let sp = v.ty.as_ref().map(|t| t.span).unwrap_or(v.name.span);
-                return Err(self.err(sp, format!("ein override muss einen konkreten Skalartyp haben, nicht `{}`", self.tn(ty))));
+                return Err(self.err(sp, format!("ein `override` muss einen konkreten Skalartyp haben, nicht `{}`", self.tn(ty))));
             }
             Ok((ty, init))
         })();
@@ -1479,13 +1645,13 @@ impl<'a> Checker<'a> {
         if let Some(a) = self.attr(&v.attrs, "id") {
             let n = self.attr_nonneg(a)?;
             if n > 65535 {
-                return Err(self.err(a.args()[0].span, format!("`@id` muss zwischen 0 und 65535 liegen, nicht {}", n)));
+                return Err(self.err(a.name.span, format!("`@id` muss zwischen 0 und 65535 liegen, nicht {}", n)));
             }
             if let Some(&(_, psp)) = self.override_ids.get(&(n as u16)) {
-                return Err(self.err_note(a.span, format!("`@id({})` ist schon vergeben", n), psp, String::from("hier")));
+                return Err(self.err_note(a.name.span, format!("`@id({})` ist schon vergeben", n), psp, String::from("hier")));
             }
             let oi = self.m.overrides.len() as u32;
-            self.override_ids.insert(n as u16, (oi, a.span));
+            self.override_ids.insert(n as u16, (oi, a.name.span));
             id = Some(n as u16);
         }
         let oi = self.m.overrides.len() as u32;
@@ -1508,25 +1674,31 @@ impl<'a> Checker<'a> {
                 "fragment" => ir::Stage::Fragment,
                 "compute" => ir::Stage::Compute,
                 "const" => {
-                    let _ = self.err(a.span, String::from("`@const` ist eigenen Funktionen nicht erlaubt"));
+                    let _ = self.err(a.name.span, String::from("`@const` ist eigenen Funktionen nicht erlaubt"));
                     bad = true;
                     continue;
                 }
                 "subgroup_size" => {
-                    let _ = self.err(a.span, String::from("`@subgroup_size` (subgroup_size_control) wird noch nicht unterstützt"));
-                    bad = true;
+                    if !self.has(feature::SUBGROUP_SIZE_CONTROL) {
+                        let _ = self.err(a.name.span, String::from("`@subgroup_size` braucht `enable subgroup_size_control;`"));
+                        bad = true;
+                    }
                     continue;
                 }
                 _ => continue,
             };
             if stage.is_some() {
-                let _ = self.err(a.span, String::from("eine Funktion kann nur für eine Shader-Stufe Einstiegspunkt sein"));
+                let _ = self.err(a.name.span, String::from("eine Funktion kann nur für eine Shader-Stufe Einstiegspunkt sein"));
                 bad = true;
             }
             stage = Some(s);
         }
         self.diag_attrs(&f.attrs, span);
         let entry = stage.is_some();
+        if f.params.len() > MAX_PARAMS {
+            let _ = self.err(f.name.span, format!("die Funktion `{}` hat {} Parameter, erlaubt sind {}", f.name.name, f.params.len(), MAX_PARAMS));
+            bad = true;
+        }
         // parameters
         let mut params = Vec::new();
         for p in &f.params {
@@ -1552,6 +1724,10 @@ impl<'a> Checker<'a> {
             if self.param_type_ok(t, p.ty.span).is_err() {
                 bad = true;
             }
+            if let Some(n) = self.t.big_array(t) {
+                let _ = self.err(p.ty.span, format!("ein Array mit {} Elementen: außerhalb von Speicherpuffern sind höchstens 65535 erlaubt", n));
+                bad = true;
+            }
             params.push(ir::Param { name: p.name.name.clone(), ty: t, io, span: p.span });
         }
         let mut ret = None;
@@ -1567,6 +1743,10 @@ impl<'a> Checker<'a> {
                         let _ = self.err(rty.span, format!("der Rückgabetyp `{}` ist nicht konstruierbar", self.tn(t)));
                         bad = true;
                     }
+                    if let Some(n) = self.t.big_array(t) {
+                        let _ = self.err(rty.span, format!("ein Array mit {} Elementen: außerhalb von Speicherpuffern sind höchstens 65535 erlaubt", n));
+                        bad = true;
+                    }
                     ret = Some(t);
                 }
                 Err(_) => bad = true,
@@ -1580,7 +1760,7 @@ impl<'a> Checker<'a> {
         }
         let must_use = self.attr(&f.attrs, "must_use").is_some();
         if must_use && ret.is_none() {
-            let sp = self.attr(&f.attrs, "must_use").map(|a| a.span).unwrap_or(span);
+            let sp = self.attr(&f.attrs, "must_use").map(|a| a.name.span).unwrap_or(span);
             let _ = self.err(sp, String::from("`@must_use` braucht eine Funktion mit Rückgabetyp"));
             bad = true;
         }
@@ -1611,6 +1791,8 @@ impl<'a> Checker<'a> {
             ctl: Vec::new(),
             in_continuing: 0,
             cont_uses: Vec::new(),
+            depth: 0,
+            depth_reported: false,
             info,
             calls: BTreeSet::new(),
             reads: BTreeSet::new(),
@@ -1626,6 +1808,11 @@ impl<'a> Checker<'a> {
         self.f = Some(ctx);
         let body = self.fn_body(&f.body, f.name.span);
         let ctx = self.f.take().unwrap_or_else(|| unreachable_ctx());
+        // the limit of function-scope variables
+        let bytes: u64 = ctx.locals.iter().filter(|l| l.kind == LocalKind::Var).map(|l| self.t.layout(l.ty).map_or(0, |x| x.1 as u64)).sum();
+        if bytes > MAX_FUNCTION_BYTES {
+            let _ = self.err(f.name.span, format!("die Variablen der Funktion `{}` belegen {} Byte, erlaubt sind {}", f.name.name, bytes, MAX_FUNCTION_BYTES));
+        }
         let mut info = ctx.info;
         info.ptr_read = (0..params.len()).map(|k| ctx.reads.contains(&Root::Param(k as u32))).collect();
         info.ptr_write = (0..params.len()).map(|k| ctx.writes.contains(&Root::Param(k as u32))).collect();
@@ -1647,10 +1834,15 @@ impl<'a> Checker<'a> {
         // workgroup_size
         if let Some(a) = self.attr(&f.attrs, "workgroup_size") {
             if stage != Some(ir::Stage::Compute) {
-                let _ = self.err(a.span, String::from("`@workgroup_size` ist nur an `@compute`-Funktionen erlaubt"));
+                let _ = self.err(a.name.span, String::from("`@workgroup_size` ist nur an `@compute`-Funktionen erlaubt"));
             }
         } else if stage == Some(ir::Stage::Compute) {
             let _ = self.err(f.name.span, format!("der Compute-Einstiegspunkt `{}` braucht `@workgroup_size(…)`", f.name.name));
+        }
+        if let Some(a) = self.attr(&f.attrs, "subgroup_size") {
+            if stage != Some(ir::Stage::Compute) && self.has(feature::SUBGROUP_SIZE_CONTROL) {
+                let _ = self.err(a.name.span, String::from("`@subgroup_size` ist nur an `@compute`-Funktionen erlaubt"));
+            }
         }
         self.m.functions.push(ir::Function {
             name: f.name.name.clone(),
@@ -1680,7 +1872,7 @@ impl<'a> Checker<'a> {
             Type::Pointer { space, .. } => {
                 let ok = matches!(space, AddressSpace::Function | AddressSpace::Private) || self.has(feature::UNRESTRICTED_POINTER_PARAMETERS) && !matches!(space, AddressSpace::Handle);
                 if !ok {
-                    return Err(self.err(sp, format!("Zeiger-Parameter sind nur in den Adressräumen function und private erlaubt, nicht `{}`", space.name())));
+                    return Err(self.err(sp, format!("Zeiger-Parameter sind nur in den Adressräumen `function` und `private` erlaubt, nicht `{}`", space.name())));
                 }
                 Ok(())
             }
@@ -1703,6 +1895,8 @@ fn unreachable_ctx() -> FnCtx {
         ctl: Vec::new(),
         in_continuing: 0,
         cont_uses: Vec::new(),
+        depth: 0,
+        depth_reported: false,
         info: FnInfo::default(),
         calls: BTreeSet::new(),
         reads: BTreeSet::new(),

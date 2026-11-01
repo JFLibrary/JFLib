@@ -1,7 +1,8 @@
 # lib/wgsl – der WGSL-Übersetzer
 
 `lib/wgsl` übersetzt WGSL-Text in ein geprüftes, vollständig typisiertes Modul: Lexer, Parser,
-semantische Prüfung, Konstantenauswertung und ein IR (Schritt G2a), und dieses IR mit dem
+semantische Prüfung, Konstantenauswertung und ein IR (Schritt G2a), die
+[Uniformitätsanalyse](#uniformitätsanalyse) und [Subgroups](#subgroups) (G2d), und dieses IR mit dem
 [Back-End](#back-end-spir-v-g2c) nach SPIR-V (mit [`lib/shader`](SHADER.md), Schritt G2c), samt
 Pipeline-Konstanten und den Prüfungen, die WebGPU beim Anlegen einer Pipeline macht. Im Browser
 (G4) bekommt WebGPU denselben Text direkt; deshalb soll das Front-End genau das annehmen, was
@@ -24,6 +25,7 @@ Konstanten sind in der Größe begrenzt.
 | [`check_expr.rs`](../lib/wgsl/check_expr.rs) | Ausdrücke, Überladungen, Konstruktoren, Aufrufe, Alias-Analyse |
 | [`check_stmt.rs`](../lib/wgsl/check_stmt.rs) | Anweisungen, Verhalten (Behaviors), Schleifen-Regeln |
 | [`entry.rs`](../lib/wgsl/entry.rs) | Einstiegspunkte: Schnittstelle, Stufen-Regeln, Ressourcen |
+| [`uniformity.rs`](../lib/wgsl/uniformity.rs) | die Uniformitätsanalyse über dem fertigen IR |
 | [`types.rs`](../lib/wgsl/types.rs) | Typtabelle, Typeigenschaften, Layout, ConversionRank |
 | [`consteval.rs`](../lib/wgsl/consteval.rs), [`builtins.rs`](../lib/wgsl/builtins.rs), [`math.rs`](../lib/wgsl/math.rs) | Konstanten, eingebaute Funktionen, f64-Mathematik |
 | [`ir.rs`](../lib/wgsl/ir.rs) | das IR (siehe [Das IR](#das-ir)) |
@@ -45,12 +47,14 @@ let (toks, lex_diags) = wgsl::lex::tokens(src); // Tokens (Template-Listen schon
 let out = wgsl::compile(src, &wgsl::CompileOptions::new(shader::VOLL))?;   // SPIR-V, siehe Back-End
 ```
 
-`Diagnostic { line, col, end_col, error, msg, start, end, notes }`: Zeile und Spalte 1-basiert,
-Spalten zählen Zeichen (wie `lib/script`), `end_col` exklusiv auf derselben Zeile, `start`/`end`
-der Bytebereich, `notes` zeigen auf zugehörige Stellen („hier deklariert“, „das erste“). Zeilen
-trennt WGSL mit LF, VT, FF, CR, CRLF, NEL, LS und PS; `LineMap` zählt genauso. Die Texte sind
-deutsch: „erwartet `;` nach der Anweisung, gefunden `}`“, „`x` ist hier nicht bekannt“, „Typ
-`vec3<f32>` passt nicht zu `f32`“, „`&` und `|` dürfen nicht ohne Klammern gemischt werden“.
+`Diagnostic { line, col, end_col, error, info, msg, start, end, notes }`: Zeile und Spalte
+1-basiert, Spalten zählen Zeichen (wie `lib/script`), `end_col` exklusiv auf derselben Zeile,
+`start`/`end` der Bytebereich, `notes` zeigen auf zugehörige Stellen („hier deklariert“, „das
+erste“). `error` und `info` beide falsch: eine Warnung. Zeilen trennt WGSL mit LF, VT, FF, CR, CRLF,
+NEL, LS und PS; `LineMap` zählt genauso. Die Texte sind deutsch: „erwartet `;` nach der Anweisung,
+gefunden `}`“, „`x` ist hier nicht bekannt“, „Typ `vec3<f32>` passt nicht zu `f32`“, „`&` und `|`
+dürfen nicht ohne Klammern gemischt werden“. `render` und die Vorschläge: siehe
+[Diagnosen](#diagnosen).
 
 `Options::features` (`feature::*`): welche Spracherweiterungen die Implementierung unterstützt
 (sie gelten wie im Browser auch ohne `requires`) und welche Enable-Erweiterungen das Gerät anbietet
@@ -61,12 +65,14 @@ deutsch: „erwartet `;` nach der Anweisung, gefunden `}`“, „`x` ist hier ni
 | `readonly_and_readwrite_storage_textures`, `packed_4x8_integer_dot_product`, `unrestricted_pointer_parameters`, `pointer_composite_access` | Sprache | unterstützt |
 | `uniform_buffer_standard_layout`, `texture_and_sampler_let`, `texture_formats_tier1`, `linear_indexing`, `immediate_address_space`, `swizzle_assignment` | Sprache | unterstützt |
 | `fragment_depth` | Sprache | unterstützt, aber nicht in `feature::ALL` (Chrome 156 bietet es nur mit `--enable-unsafe-webgpu`) |
-| `buffer_view`, `subgroup_id`, `subgroup_uniformity` | Sprache | Fehler „noch nicht unterstützt“ |
-| `f16`, `clip_distances`, `dual_source_blending`, `primitive_index`, `atomic_vec2u_min_max` | enable | unterstützt |
-| `subgroups`, `subgroup_size_control` | enable | Fehler „noch nicht unterstützt“ |
+| `subgroup_id`, `subgroup_uniformity` | Sprache | unterstützt ([Subgroups](#subgroups)) |
+| `buffer_view` | Sprache | Fehler „noch nicht unterstützt“ |
+| `f16`, `clip_distances`, `dual_source_blending`, `primitive_index`, `atomic_vec2u_min_max`, `subgroups`, `subgroup_size_control` | enable | unterstützt |
 
 Chrome 156 meldet in `wgslLanguageFeatures` dieselben Spracherweiterungen (ohne `fragment_depth`)
-plus die drei nicht unterstützten.
+plus `buffer_view`. `feature::for_device(f16, subgroups, size_control)` ist `ALL` ohne die
+enable-Erweiterungen, die ein Gerät nicht hat (wie WebGPU sie an die Features des Geräts bindet):
+`enable subgroups` ist dann ein Fehler („auf diesem Gerät nicht verfügbar“).
 
 ## Lexer
 
@@ -105,9 +111,11 @@ Grenzen (`parse.rs`): Verschachtelung (Klammern, Template-Listen, unäre Operato
 höchstens `MAX_DEPTH` = 128 Ebenen, Blöcke in einer Funktion höchstens `MAX_BRACES` = 127
 (die Mindestgrenze der Spezifikation; wie Tint), die Höhe eines Ausdrucksbaums höchstens
 `MAX_EXPR_DEPTH` = 256 (Operatorketten, Member-Ketten, Aufrufe zählen mit; jeder spätere Durchgang
-rekursiert so tief). Gemessen (Linux, Entwicklungs-Build, opt-level 1): der tiefste gültige
-Quelltext braucht unter 400 KB Stapel (`wgsltest --stack worst 96 KB`); das Front-End braucht
-also einen Thread mit mindestens 512 KB, der Hauptthread (1 MB unter Windows) genügt.
+rekursiert so tief). Die Anweisungen nesten zusätzlich so, wie Chrome zählt
+([Grenzen](#grenzen)). Gemessen (Linux, Entwicklungs-Build, opt-level 1): der tiefste gültige
+Quelltext braucht unter 400 KB Stapel (`wgsltest --stack worst 61 KB`, auch durch die
+Uniformitätsanalyse); das Front-End braucht also einen Thread mit mindestens 512 KB, der
+Hauptthread (1 MB unter Windows) genügt.
 
 `print(&ast)` schreibt den Baum mit vier Leerzeichen Einzug zurück; Klammern genau da, wo der Baum
 `Paren`-Knoten hat, Literale wie geschrieben, Kommentare entfallen. `parse(print(ast))` ergibt
@@ -146,8 +154,8 @@ denselben Baum (die Tests vergleichen das zweimalige Ausgeben und das Prüfergeb
   Spezifikation sind ausgewertet; die transzendenten Funktionen (`math.rs`, eigene f64-Routinen)
   sind auf wenige ulp genau, für f32/f16 nach dem Runden in der Regel exakt.
 - **Override-Ausdrücke** bleiben symbolisch (Override-Knoten im IR); Fehler, die erst ihr Wert
-  zeigt (Division durch null, Array-Größe ≤ 0, workgroup_size ≤ 0), sind Pipeline-Fehler und
-  hier nicht geprüft.
+  zeigt (Division durch null, Array-Größe ≤ 0, workgroup_size ≤ 0), sind Pipeline-Fehler
+  (`check_pipeline`, auch in Funktionsrümpfen, siehe [Pipeline-Prüfungen](#pipeline-prüfungen)).
 - **Attribute**: unbekannte und doppelte Attribute, Attribute am falschen Ort; Werte von
   `@group @binding @location @id @align @size @blend_src @workgroup_size` als const-Ausdrücke vom
   Typ i32/u32 (Bereiche, Zweierpotenzen, Vielfache der Ausrichtung); `@builtin` mit Namen und
@@ -158,7 +166,8 @@ denselben Baum (die Tests vergleichen das zweimalige Ausgeben und das Prüfergeb
   override-Ausdruck bei private), workgroup (feste Größe, override-Größe nur hier), uniform
   (konstruierbar und host-teilbar), storage (host-teilbar, Atomics nur read_write), immediate
   (ohne Arrays), handle (Texturen und Sampler ohne Adressraum); Zugriffsmodus nur bei storage;
-  Ressourcen brauchen `@group` und `@binding`, andere dürfen sie nicht haben.
+  Ressourcen brauchen `@group` und `@binding`, andere dürfen sie nicht haben. Die
+  [Grenzen](#grenzen) der Spezifikation gelten.
 - **Layout** (14.4): Ausrichtung und Größe aller Typen, Offsets mit `@align`/`@size`,
   Array-Stride; die Regeln des Adressraums (storage: Offsets und Strides Vielfache der
   Ausrichtung; uniform ohne `uniform_buffer_standard_layout` zusätzlich 16-Byte-Strides und
@@ -264,8 +273,178 @@ denselben Baum (die Tests vergleichen das zweimalige Ausgeben und das Prüfergeb
   `overrides` auch über Initialisierer, Array-Größen und die Workgroup-Größe, `immediate` die eine
   immediate-Variable.
 - **Sonst**: `enables` / `requires` (feature-Bits), `diagnostic_filters` (Schweregrad, Regel,
-  betroffener Bereich als Bytespanne; global = ganzes Modul) für die Uniformitätsanalyse (G2d),
-  `consts` (die Modul-Konstanten, nur zur Information), `warnings`.
+  betroffener Bereich als Bytespanne; global = ganzes Modul) für die Uniformitätsanalyse,
+  `consts` (die Modul-Konstanten, nur zur Information), `warnings` (auch die Infos, `info` gesetzt).
+
+## Uniformitätsanalyse
+
+[`uniformity.rs`](../lib/wgsl/uniformity.rs) ist das Kapitel 15.2 der Spezifikation über dem fertigen
+IR. `check` und `compile` führen sie aus: ein Fehler macht das Modul ungültig, Warnungen und Infos
+stehen in `Module::warnings` bzw. `Output::warnings`. Allein: `wgsl::analyze_uniformity(&m, src,
+&opt)` (für Messungen).
+
+- **Der Graph** je Funktion, Aufgerufene zuerst: Knoten `RequiredToBeUniform.S` (S = error,
+  warning, info), `MayBeNonUniform`, `CF_start`, `Value_return`, je Parameter Wert, Inhalt (Zeiger
+  in `function`) und Inhalt am Ende; eine Kante a → b heißt „muss a uniform sein, dann auch b“.
+  Ein Weg von `RequiredToBeUniform.S` nach `MayBeNonUniform` ist ein Fehlschlag mit Schweregrad S;
+  was `CF_start` oder einen Parameter erreicht, wird zum Tag für die Aufrufer
+  (`CallSiteRequiredToBeUniform.S`, `ParameterRequiredToBeUniform.S`,
+  `ParameterContentsRequiredToBeUniform.S`), ebenso, was `Value_return`
+  (`ReturnValueMayBeNonUniform`, `ParameterReturnContentsRequiredToBeUniform`) und der Inhalt am
+  Ende erreichen (`PointerParameterMayBeNonUniform`, die Quell-Parameter). Danach ist der Graph
+  weg; nur eine Erklärung baut ihn neu.
+- **Anweisungen und Werte** nach 15.2.5 bis 15.2.8: `for` und `while` sind im IR schon
+  `loop` mit `if`, kurzschließende Operatoren machen die rechte Seite vom Wert der linken abhängig,
+  `let`-Zeiger behalten Wurzel und die Werte ihrer Indizes von der Deklaration, eine Zuweisung
+  an eine ganze Variable (auch über einen vollen Zeiger) vergisst den alten Wert, eine
+  Teil-Zuweisung nicht. Variablen tragen ihren aktuellen Knoten
+  (Undo-Log an Verzweigungen), Schleifen eine Eingangs-Variante mit Rückkante, `break` und
+  `continue` ihren Zustand.
+- **Eingebaute Funktionen:** Barrieren und `workgroupUniformLoad` verlangen immer uniformen
+  Kontrollfluss (`workgroupUniformLoad` auch einen uniformen Zeiger), Filter ändern daran nichts.
+  Ableitungen, `textureSample`, `textureSampleBias`, `textureSampleCompare`: Regel
+  `derivative_uniformity`, Ergebnis nie uniform. `textureLoad` einer `read_write`-Speichertextur:
+  Ergebnis nicht uniform. Alles andere: Ergebnis so uniform wie die Argumente (`arrayLength` hängt
+  nur am Zeiger).
+- **Quellen:** veränderbarer Speicher (`storage` `read_write`, `workgroup`, `private`), Atomics, alle
+  Eingaben eines Einstiegspunkts außer den uniformen Built-ins (`workgroup_id`, `num_workgroups`,
+  `num_subgroups`, `subgroup_size` im Compute-Shader); ein Struct als Eingabe zählt als Ganzes.
+- **Filter** nach 2.3: `diagnostic(…)` und `@diagnostic(…)`, der kleinste Bereich um die Stelle des
+  Aufrufs gewinnt. Der Schweregrad steht beim Aufruf der eingebauten Funktion fest und geht mit
+  dem Tag durch die Aufrufer; ein Filter um einen Aufruf einer Hilfsfunktion hilft also nicht.
+- **Was gemeldet wird** (wie Tint): je Funktion und Schweregrad ein Fehlschlag, die neueste
+  Anforderung gewinnt (die Tiefensuche geht zuerst die neueste Kante entlang); nach einer Warnung
+  sieht die Funktion nicht mehr nach Infos, nach einem Fehler endet die Analyse (Warnungen aus
+  Funktionen davor bleiben). Der Text steht beim Aufruf der eingebauten Funktion (auch tief in
+  einer Hilfsfunktion), bei `delta` / `mask` / `p` beim Argument. Die Hinweise gehen zur Quelle:
+  die Verzweigung nächst der Quelle, der Parameter und das übergebene Argument je Funktion der
+  Kette, der Aufruf (eine Kette von Aufrufen als ein „indirekt über den Aufruf von `g` in
+  `fs`“), die Quelle selbst. Höchstens 24 Hinweise (lange Ketten verlieren die Mitte), höchstens
+  32 Warnungen je Lauf.
+
+```wgsl
+fn a(c: bool) { if c { workgroupBarrier(); } }
+fn b(c: bool) { a(c); }
+@compute @workgroup_size(1) fn main(@builtin(local_invocation_index) i: u32) { b(i == 0u); }
+```
+
+```text
+1:24: Fehler: `workgroupBarrier` darf nur in uniformem Kontrollfluss aufgerufen werden
+  1:20: Hinweis: der Kontrollfluss hängt hier von einem möglicherweise nicht uniformen Wert ab
+  1:6: Hinweis: der Parameter `c` von `a` ist möglicherweise nicht uniform
+  2:19: Hinweis: hier wird ein möglicherweise nicht uniformer Wert übergeben
+  2:6: Hinweis: der Parameter `c` von `b` ist möglicherweise nicht uniform
+  3:82: Hinweis: hier wird ein möglicherweise nicht uniformer Wert übergeben
+  3:82: Hinweis: der eingebaute Wert `i` von `main` ist möglicherweise nicht uniform
+```
+
+Wo die Spezifikation nicht ausreicht oder Chrome strenger ist, nimmt die Analyse die strengere
+Lesart (nie annehmen, was Chrome ablehnt; alle Punkte gegen Chrome 156 geprüft):
+
+| Fall | Spezifikation (Wortlaut) | Tint, und so auch hier |
+|---|---|---|
+| Atomics | nicht erwähnt: der Zeiger wäre uniform, also auch das Ergebnis | Ergebnis nie uniform |
+| `*p` mit `p: ptr<storage, T, read>`, auch `uniform` | `CF` | hängt vom Zeiger ab: `g(&buf[i])` mit nicht uniformem `i` ist ein Fehler |
+| Inhalt eines `function`-Zeigers wird verlangt | nur der Inhalt von `x` in `g(&x)` | auch die Indizes des Arguments |
+| Inhalt nach dem Aufruf `f(&x)` | nur das, was `Value_return_i_contents` erreicht | hängt immer auch vom Kontrollfluss des Aufrufs ab, eine Teil-Sicht `f(&a[0])` behält den alten Wert |
+
+## Subgroups
+
+`enable subgroups` schaltet die Subgroup- und Quad-Funktionen (17.12, 17.13) und die Built-ins
+`subgroup_invocation_id`, `subgroup_size` (Compute und Fragment), `subgroup_id`, `num_subgroups`
+(nur Compute, mit der Spracherweiterung `subgroup_id`) frei, `enable subgroup_size_control` auch
+`@subgroup_size(n)` und schaltet subgroups mit ein; beide brauchen das Feature
+([`feature::for_device`](#api)). `f16` geht mit `enable f16`.
+
+- **Prüfung** wie in Chrome 156: nur Compute und Fragment, auch durch Hilfsfunktionen;
+  `subgroupBroadcast` und `quadBroadcast` mit const-`id` (0 … 127 bzw. 0 … 3), const-Werte von
+  `subgroupShuffle` (`id`), `subgroupShuffleUp` / `Down` (`delta`), `subgroupShuffleXor` (`mask`)
+  unter 128, als Override erst bei der Pipeline; alle Funktionen sind `@must_use`; `@subgroup_size`
+  nur am Compute-Einstiegspunkt, const ≥ 1 und Zweierpotenz, bei der Pipeline (auch ein Override)
+  Zweierpotenz, in `Limits::subgroup_min_size` … `subgroup_max_size`, die Workgroup-Größe in x ein
+  Vielfaches.
+- **Uniformität:** mit `subgroup_uniformity` (`feature::SUBGROUP_UNIFORMITY`, in `ALL`) gibt es zwei
+  Läufe, wie die Spezifikation sagt: Workgroup-/Draw-Bereich (Barrieren, Ableitungen; das Ergebnis
+  jeder Subgroup-Funktion ist nicht uniform, ihre Aufrufe stellen keine Anforderung) und, nur
+  wenn das Modul eine Subgroup- oder Quad-Funktion ruft, der Subgroup-Bereich (Regel
+  `subgroup_uniformity` an jedem Aufruf, auch an `delta` und `mask`; `subgroup_id` ist uniform;
+  `subgroupAdd`, `All`, `And`, `Any`, `Ballot`, `Broadcast`, `BroadcastFirst`, `Max`, `Min`, `Mul`,
+  `Or`, `Xor` sind so uniform wie ihr Argument, die anderen nicht). Ohne die Spracherweiterung ein
+  Lauf: Anforderung an jedem Aufruf, kein Ergebnis uniform.
+- **Back-End:** `OpGroupNonUniform*` mit Scope `Subgroup` (SPIR-V 1.3, also auf beiden Stufen),
+  Capabilities `GroupNonUniform`, `…Vote`, `…Arithmetic`, `…Ballot`, `…Shuffle`,
+  `…ShuffleRelative`, `…Quad` nach Gebrauch; die `id` von Broadcast und Quad-Broadcast als
+  vorzeichenlose Konstante, `subgroupShuffle` mit i32 über einen Bitcast. Die Built-ins
+  `SubgroupLocalInvocationId`, `SubgroupSize` (im Fragment-Shader `Flat`), `SubgroupId`,
+  `NumSubgroups`. `Needs::subgroup_ops` nennt die benutzten Operationen,
+  `Needs::subgroup_extended_types` f16. `EntryOut::subgroup_size` und
+  `Output::subgroup_size(entry, &given)` liefern den Wert für
+  `Device::create_compute_pipeline_sized` ([GPU.md](GPU.md)).
+- **Auf der GPU** (`gputest --test wgsl`, [`t_wgsl3.rs`](../apps/gputest/t_wgsl3.rs)): 42 Fälle auf
+  u32, i32, f32, Vektoren gegen eine CPU-Referenz, die die Subgroups aus `subgroup_id` und
+  `subgroup_invocation_id` kennt, in Workgroups von 1 bis 256 Aufrufen (Teil-Subgroups), in
+  uniformem Kontrollfluss und in einem Zweig auf dem Aufruf (fehlende Lanes, auch bei Ballots):
+  31 068 Ergebnisse je Stufe, SPIR-V 1.6 und 1.3 auf der RTX 2070 SUPER (Subgroup-Größe 32) 0
+  Abweichungen; f16; `@subgroup_size` als Konstante und als Override; Quad-Swaps gegen die
+  Pixelkoordinaten im Fragment-Shader. Der Vergleich mit Chrome über `tools/wgsl_run.mjs` steht aus.
+
+## Diagnosen
+
+`Diagnostic::render(&src)` gibt die Meldung mit der Quellzeile und einer Span aus Carets aus, die
+Hinweise ebenso; `wgsltest --file` benutzt es. Lange Zeilen werden um die Stelle herum
+abgeschnitten (`…`).
+
+```text
+2:13: Fehler: `cuont` ist hier nicht bekannt – meintest du `count`?
+   2 |     let c = cuont;
+     |             ^^^^^
+```
+
+Vorschläge („meintest du …“, Bearbeitungsdistanz bis ⌈Länge / 3⌉, höchstens 3, ab drei Zeichen): für
+unbekannte Namen (lokal, Modul, bei Aufrufen die eingebauten Funktionen), Typen, Struct-Member,
+Attribute, eingebaute Werte, Erweiterungen, Spracherweiterungen, Diagnose-Regeln, Adressräume,
+Zugriffsmodi und Texelformate. Sie kosten nichts, solange kein Fehler auftritt.
+
+Texte: Code steht in Backticks, auch Typnamen und Schlüsselwörter in Regeln („`i32` oder `u32`“).
+Fehler stehen am Aufruf, nicht am Einstiegspunkt: `` `dpdx` gibt es nur in Fragment-Shadern `` beim
+Aufruf, der Hinweis nennt den Einstiegspunkt; `discard` und workgroup-Variablen ebenso.
+
+Die erste Fehlerstelle stimmt bei 435 von 490 Korpus-Dateien mit Tints überein (zu Beginn von G2d
+160 von 256 der damaligen Dateien, von denen heute 217 von 267 stimmen; die Gruppe `corpus` zählt mit
+und lässt die Zahl nicht sinken, `--verbose` listet die anderen). Die übrigen 55 zeigen bewusst auf
+eine andere Stelle derselben Sache: auf den Namen statt auf den Anfang der Deklaration (Zyklen,
+Neudeklarationen, `var a: i32;`), auf den falschen Zugriffsmodus, Typ oder Initialisierer statt auf
+die ganze Variable (`var<uniform, read>`, `var<workgroup> a: i32 = 1`), auf das falsche Argument
+statt auf den ganzen Aufruf (`atomicAdd(a, 1u)`, `arrayLength(&a)`), auf das Attribut statt auf seinen
+Wert oder die Deklaration (`@align(8)`, `@location(0)` an einem `bool`).
+
+## Grenzen
+
+Die Grenzen aus 2.4 der Spezifikation sind Mindestwerte, die Implementierungen überschreiten dürfen;
+`lib/wgsl` nimmt die Mindestwerte als Regel (auch wo Chrome mehr erlaubt, siehe
+[Abweichungen](#abweichungen-zwischen-spezifikation-und-chrome)), damit ein angenommener Shader
+überall läuft:
+
+| Grenze | hier | Chrome 156 |
+|---|---|---|
+| Member einer Struktur | 1023 | 16383 |
+| Schachtelungstiefe eines Composite-Typs (`NestDepth`: Vektor 1, Matrix 2, Array und Struct + 1) | 15 | 255 |
+| Parameter einer Funktion | 255 | 255 |
+| case-Werte eines `switch` (alle Werte, auch `default`) | 1023 | 16383 Klauseln, die Werte einer Klausel zählen nicht |
+| Elemente eines Array-Konstruktors | 2047 | 65535 |
+| Bytes der `private`-Variablen, die ein Einstiegspunkt benutzt | 8192 | keine Grenze |
+| Bytes der `var`s einer Funktion | 8192 | keine Grenze |
+| Bytes der `workgroup`-Variablen, die ein Einstiegspunkt benutzt | Pipeline: `Limits::max_workgroup_storage` (16384) | ebenso |
+| Bytes der `immediate`-Variable | Pipeline: `Limits::max_immediate_size` (64) | ebenso |
+| geschweifte Klammern in einer Funktion | 127 | 127 |
+
+Zwei Grenzen hat nur Chrome, also auch `lib/wgsl`: **Tiefe der Anweisungen** unter 127, wobei der
+Funktionsrumpf 0 zählt, jede Anweisung eins mehr als ihr Block, der Block eines `if`, `loop`, `for`,
+`while` eins mehr als die Anweisung, ein `else if` eins mehr als sein Vorgänger, der Block eines
+`case` zwei mehr als sein `switch`, ein `continuing` zwei mehr als seine Schleife (63 `if`
+ineinander, 42 `switch`, 124 `else if` hintereinander). **Arrays** mit 65536 oder mehr Elementen
+sind außerhalb von Speicherpuffern ein Fehler, sobald der Typ benutzt wird (Variable, Wert,
+Parameter, Ergebnis, Zeiger); `alias` und `struct` allein nicht.
 
 ## Die Benchmark-Shader in WGSL
 
@@ -293,10 +472,11 @@ Jede Datei ist ein vollständiges Modul mit dem Einstiegspunkt `main`.
 ## Tests: `apps/wgsltest`
 
 `python -u build_rs.py test wgsltest` (Windows und Linux) bzw. `build/win/wgsltest.exe [--only
-GRUPPE] [--verbose]`, `--file F.wgsl` prüft eine Datei, `--spv F.wgsl [--out DIR]` übersetzt sie
+GRUPPE] [--verbose]`, `--file F.wgsl` prüft eine Datei, `--verdict F.wgsl` das Urteil der Gruppe
+`corpus` über eine Datei (valid, error, pipeline-error), `--spv F.wgsl [--out DIR]` übersetzt sie
 auf beiden Stufen und schreibt die `.spv`-Dateien, `--stack ART N KB` misst den Stapel einer
 Verschachtelung in einem Thread (genau nur unter Linux), `--only robust --mutations N --seed S`
-ist ein Dauertest (bei der Entwicklung 560 000 Mutationen ohne Panik). 3453 Prüfungen unter
+ist ein Dauertest (zuletzt 1,5 Millionen Mutationen durch alle Durchgänge ohne Panik). 5768 Prüfungen unter
 Windows mit Vulkan SDK (ohne SDK fehlen die `spirv-val`-Prüfungen der Gruppe `spirv`):
 
 | Gruppe | Prüfungen | Inhalt |
@@ -304,21 +484,24 @@ Windows mit Vulkan SDK (ohne SDK fehlen die `spirv-val`-Prüfungen der Gruppe `s
 | `lex` | 64 | Token-Klassen, Literalwerte und Bereiche, Template-Listen (alle Beispiele aus 3.9), Kommentare, Leerraum, Bezeichner, Positionen in Zeichen |
 | `parse` | 58 | jede Anweisungsform, Vorrang, verbotene Mischungen, Token-Teilung, Fehlerbehandlung (mehrere Fehler je Lauf), Tiefengrenzen |
 | `print` | 40 | parse → print → parse für die Benchmark-Shader und ein Beispiel mit allen Formen |
-| `check` | 370 | 82 gültige und 262 ungültige Module (jeder Fehler mit Position und Textteil), Warnungen, Hinweise, 14 Fälle mit abgeschalteten Features |
+| `check` | 370 | 82 gültige und 261 ungültige Module (jeder Fehler mit Position und Textteil), Warnungen, Hinweise, 14 Fälle mit abgeschalteten Features |
+| `unif` | 343 | die Uniformitätsanalyse von beiden Seiten (Kontrollfluss, Schleifen, `continuing`, `break if`, `switch`, Kurzschluss, `discard`, Funktionsketten, Zeiger, `let` / `var`, Quellen, Filter, jeder Fehler mit Position und Textteil), Warnungen und Infos, Hinweise, Ketten von 3000 Funktionen, die Subgroup-Prüfung, die Grenzen, die Override-Fehler in Funktionsrümpfen, `render`, Vorschläge |
 | `consts` | 164 | je 300 Zufallsfälle AbstractInt gegen i64, AbstractFloat gegen f64, f32 gegen Rusts f32; Umwandlungen; alle const-Funktionen |
 | `ir` | 65 | keine abstrakten Typen, Faltung, Load-Regel, Splats, Matrixspalten, Schleifen, Layout-Beispiele der Spezifikation, Overrides, Schnittstellen |
 | `bench` | 73 | die sechs Shader: Stufe, Workgroup, Bindungen, immediate, Ein-/Ausgaben, Layouts (Object 48, Camera 176, DrawCmd 20, CubeVertex 32, Push 20) |
-| `robust` | 32 | 2400 zufällige Mutationen der gültigen Testshader, Verschachtelung an und über allen Grenzen, der tiefste gültige Fall in 512 KB (auch durch das Back-End auf beiden Stufen), lange Ketten, Zyklen, riesige Konstanten |
-| `perf` | 5 | ein erzeugter Shader mit 27 010 Zeilen (883 KB, 1501 Funktionen), auch nach SPIR-V 1.6 abgesenkt (Entwicklungs-Build 57 ms, 705 431 Wörter) |
-| `spirv` | 1988 | 322 Quellen auf beiden Stufen: die Benchmark-Shader, 13 Abdeckungs-Module ([`coverage.rs`](../apps/wgsltest/src/coverage.rs): jede Texturüberladung, Stufen-Built-ins und Interpolationen, f16 in jedem Adressraum und an der Schnittstelle, Zeiger in jeden Adressraum als Parameter, Kontrollfluss, Overrides überall, Atomics, `discard`, Werte und Umwandlungen), die gültigen Fälle der Gruppe `check` (ohne Einstiegspunkt als Bibliothek) und jede Korpus-Datei, die Tint annimmt: 672 Module, alle von `shader::val` und `spirv-val --target-env vulkan1.1` / `vulkan1.3` angenommen, jedes zweimal übersetzt wortgleich |
-| `corpus` | 512 | das Urteil über die 494 Korpus-Dateien gegen Tints (siehe [Korpus-Vergleich](#korpus-vergleich)) |
+| `robust` | 34 | 2400 zufällige Mutationen der gültigen Testshader, Verschachtelung an und über allen Grenzen, der tiefste gültige Fall in 512 KB (auch durch das Back-End auf beiden Stufen), lange Ketten, Zyklen, riesige Konstanten |
+| `perf` | 6 | ein erzeugter Shader mit 27 010 Zeilen (883 KB, 1501 Funktionen), auch nach SPIR-V 1.6 abgesenkt (Entwicklungs-Build 57 ms, 705 431 Wörter), die Uniformitätsanalyse allein |
+| `spirv` | 3224 | 528 Quellen auf beiden Stufen: die Benchmark-Shader, 13 Abdeckungs-Module ([`coverage.rs`](../apps/wgsltest/src/coverage.rs): jede Texturüberladung, Stufen-Built-ins und Interpolationen, f16 in jedem Adressraum und an der Schnittstelle, Zeiger in jeden Adressraum als Parameter, Kontrollfluss, Overrides überall, Atomics, `discard`, Werte und Umwandlungen), die gültigen Fälle der Gruppe `check` (ohne Einstiegspunkt als Bibliothek) und jede Korpus-Datei, die Tint annimmt: 1084 Module, alle von `shader::val` und `spirv-val --target-env vulkan1.1` / `vulkan1.3` angenommen, jedes zweimal übersetzt wortgleich |
+| `corpus` | 1246 | das Urteil über die 932 Korpus-Dateien gegen Tints, die Warnungen und Infos und die erste Fehlerstelle (siehe [Korpus-Vergleich](#korpus-vergleich)) |
 | `backend` | 79 | die API: was Einstiegspunkte melden (Ressourcen mit Art und Mindestgröße, immediate, Workgroup, Stufen-Variablen, `Needs`), `robust` (kein `OpArrayLength` ohne), `exact` (`NoContraction` an jeder Gleitkomma-Operation), die Interface-Listen je Stufe, Overrides (SpecIds, `constants` mit abgeleiteten und versteckten Werten, eingesetzte Werte ohne Spezialisierungskonstante, sieben Fehlerfälle), Pipeline-Grenzen, Schnittstellen, Bibliothek, Fehler |
 | `perf_backend` | 2 | die Übersetzungszeit der sechs Benchmark-Shader je Stufe |
 
 Übersetzungszeit (Windows, Release-Build): Parsen 58 ms, Parsen + Prüfen 135 ms für die
 27 010 Zeilen (≈ 200 000 Zeilen/s, 144 014 IR-Ausdrücke); die sechs Benchmark-Shader zusammen
 0,8 ms (mit dem Absenken nach SPIR-V 1,2–1,3 ms, siehe Back-End). Entwicklungs-Build: 74 / 169 ms
-(Windows), 104 / 239 ms (Linux in WSL).
+(Windows), 104 / 239 ms (Linux in WSL). Die Uniformitätsanalyse kostet davon rund 4 %: im
+Release-Build unter Last (Median aus 15 Läufen, hohe Priorität) 10,2 ms von 233 ms für die
+27 010 Zeilen, 45 µs von 1255 µs für die sechs Benchmark-Shader.
 
 Auf der GPU prüft `gputest --test wgsl` (docs/GPU.md „Tests“) das Back-End: jeder Operator und
 jede numerische eingebaute Funktion auf Laufzeitwerten gegen den Konstantenauswerter des
@@ -513,7 +696,8 @@ das `WorkgroupSize`-Built-in). `OpSpecConstantOp` kommt nicht vor:
 
 Override-Ausdrücke in Funktionsrümpfen (`x * a` mit einem Override `a`) rechnet der Shader zur
 Laufzeit mit der Spezialisierungskonstante; Pipeline-Fehler, die erst ihr Wert zeigt, findet
-`constants` nur für Overrides, Workgroup-Größen und Array-Längen.
+`constants` nur für Overrides, Workgroup-Größen und Array-Längen, `check_pipeline` auch in den
+Funktionsrümpfen.
 
 ### Pipeline-Prüfungen
 
@@ -521,11 +705,19 @@ Laufzeit mit der Spezialisierungskonstante; Pipeline-Fehler, die erst ihr Wert z
 prüft: die Overrides (wie `constants`), Workgroup-Größe je Achse und Aufrufe gesamt,
 Workgroup-Speicher (je Variable auf 16 Byte aufgerundet, Override-Arrays mit ihrem Wert),
 Fragment-Ausgaben `@location` < maxColorAttachments, Vertex-Ausgaben und Fragment-Eingaben <
-maxInterStageShaderVariables, die immediate-Bytes, und die Speichertextur-Formate des Kerns
+maxInterStageShaderVariables, die immediate-Bytes, die Speichertextur-Formate des Kerns
 (bgra8unorm nur mit bgra8unorm-storage, `read_write` nur r32float / r32sint / r32uint, mit
-`texture_formats_tier2` mehr). `Limits::WEBGPU` sind WebGPUs Standardgrenzen (256 Aufrufe,
-256 × 256 × 64, 16 KiB, 8, 16, 64 Byte). `check_interface(&module, &vertex, &fragment)` prüft
-WebGPUs Stufen-Regeln: zu jeder Fragment-Eingabe eine Vertex-Ausgabe an derselben Location mit
+`texture_formats_tier2` mehr), `@subgroup_size` und jeden Funktionsrumpf, den der Einstiegspunkt
+erreicht: mit den Werten der Overrides wird ein Ausdruck zur Konstante, die ein Fehler sein kann
+(wie Tint, das die Werte einsetzt und neu prüft): `1 / a`, `1 % a`, `x / a` und `x % a` mit einer
+Laufzeit-Variable `x` und `a` = 0, `x << a` mit `a` ≥ 32, `sqrt(a)`, `ldexp`, `clamp(x, a, b)` mit
+`a` > `b`, `v[a]` außerhalb der Grenzen von Array, Vektor oder Matrix, Überlauf von f32 und f16,
+`subgroupShuffle(x, a)` mit `a` ≥ 128 … Auch in einem Zweig, der nie läuft, und in Argumenten; nicht
+in der rechten Seite eines Kurzschlusses, den die Werte schon entscheiden, und nicht in Funktionen,
+die der Einstiegspunkt nicht ruft. `Limits::WEBGPU` sind WebGPUs Standardgrenzen (256 Aufrufe,
+256 × 256 × 64, 16 KiB, 8, 16, 64 Byte, Subgroup-Größen 4 bis 128; Chrome prüft `@subgroup_size`
+gegen den Adapter, auf der RTX 2070 SUPER nur 32). `check_interface(&module, &vertex, &fragment)`
+prüft WebGPUs Stufen-Regeln: zu jeder Fragment-Eingabe eine Vertex-Ausgabe an derselben Location mit
 demselben Komponententyp, mindestens so vielen Komponenten und derselben Interpolation.
 `lib/gpu` prüft dagegen nur die Gerätegrenzen.
 
@@ -534,27 +726,24 @@ demselben Komponententyp, mindestens so vielen Komponenten und derselben Interpo
 Die Gruppe `corpus` vergleicht das Urteil von `lib/wgsl` (prüfen, übersetzen, dann je
 Einstiegspunkt `check_pipeline` mit `Limits::WEBGPU` und der `// constants:`-Zeile, und
 `check_interface` zwischen dem ersten Vertex- und jedem Fragment-Einstiegspunkt) mit Tints
-Urteil in `expected.json`, ohne Chrome: **478 der 494 Dateien stimmen überein**, alle 16
-Pipeline-Fehler eingeschlossen (Workgroup-Grenzen 2, Fragment-Location 8, Location 16,
-Workgroup-Speicher, Override-Fehler 6, immediate 80 Byte, Speichertextur-Formate 2,
-Schnittstellen 2). Die Gruppe schlägt fehl bei jeder neuen Abweichung außerhalb der beiden
-Listen in [`backend.rs`](../apps/wgsltest/src/backend.rs):
+Urteil in `expected.json`, ohne Chrome: **918 der 932 Dateien stimmen überein**, alle 53
+Pipeline-Fehler eingeschlossen. Dazu auf den 297 Dateien in `unif` und `diag`: unsere Warnungen und
+Infos gleichen Tints in Art und Zeile (alle 297). Die Gruppe schlägt fehl bei jeder neuen Abweichung
+außerhalb der beiden Listen in [`backend.rs`](../apps/wgsltest/src/backend.rs):
 
-- **Wir nehmen an, Tint lehnt ab** (`ALLOW_ACCEPT`, 11, alle wegen der fehlenden
-  Uniformitätsanalyse, G2d): `diag/err_default_error`, `diag/err_error_directive`,
-  `unif/err_sample_after_nonuniform_loop_break`, `unif/err_sample_after_nonuniform_return`,
-  `unif/err_short_circuit_nonuniform` (Ableitungen / `textureSample` in nicht uniformem
-  Kontrollfluss), `unif/err_barrier_nonuniform_if`, `unif/err_barrier_read_write_storage`,
-  `unif/err_parameter_nonuniform_call`, `unif/err_pointer_param_nonuniform`,
-  `unif/err_storage_barrier_nonuniform`, `unif/err_workgroup_plain_load` (Barrieren und
-  `workgroupUniformLoad` in nicht uniformem Kontrollfluss).
-- **Wir lehnen ab, Tint nimmt an** (`KNOWN_REJECT`, 5): `lex/err_float_leading_zero_suffix`
+- **Wir nehmen an, Tint lehnt ab** (`ALLOW_ACCEPT`): leer.
+- **Wir lehnen ab, Tint nimmt an** (`KNOWN_REJECT`, 14): `lex/err_float_leading_zero_suffix`
   (`01f`: die Grammatik der Spezifikation erlaubt keine führende Null vor einem Suffix; Tint
-  nimmt es an), `enable/ok_subgroups`, `enable/ok_subgroups_f16`,
-  `diag/ok_subgroup_uniformity_rule`, `requires/ok_subgroup_id` (Subgroups fehlen).
+  nimmt es an) und 13 Dateien aus `limits/`, die über den Mindestgrenzen der Spezifikation liegen,
+  die Chrome überschreitet (siehe [Grenzen](#grenzen)): `err_array_constructor_2048`,
+  `err_array_constructor_typed_2048`, `err_case_selectors_1024`,
+  `err_case_selectors_in_one_clause_1024`, `err_function_8196`, `err_function_two_blocks`,
+  `err_nesting_array_16`, `err_nesting_matrix_counts_two`, `err_nesting_struct_16`,
+  `err_private_8196`, `err_private_through_helper`, `err_private_two_variables`,
+  `err_struct_members_1024`.
 
-`requires/err_unsafe_only_feature` stimmt jetzt: `fragment_depth` ist umgesetzt, aber nicht mehr
-in `feature::ALL`, weil Chrome 156 es nur mit `--enable-unsafe-webgpu` anbietet (einschalten
+`requires/err_unsafe_only_feature` stimmt: `fragment_depth` ist umgesetzt, aber nicht in
+`feature::ALL`, weil Chrome 156 es nur mit `--enable-unsafe-webgpu` anbietet (einschalten
 mit `Options { features: feature::ALL | feature::FRAGMENT_DEPTH }`). Beide Listen werden selbst
 geprüft: ein Eintrag, der nicht mehr abweicht, lässt die Gruppe ebenfalls fehlschlagen.
 
@@ -576,27 +765,33 @@ Wo beide sich widersprechen, folgt `lib/wgsl` der Spezifikation:
 | `array<i32, select(1, 2, 1 <= 3)>` | der Algorithmus aus 3.9 nimmt das `=` nach einem `<`, vor dem kein Name steht, als Zuweisung und verwirft die offenen Listen → Syntaxfehler | angenommen (Tint erkennt Templates über Tokens) |
 | `-(-9223372036854775807 - 1)` | AbstractInt darf nicht überlaufen → Fehler | angenommen |
 | Ketten mit 256 bis 511 Gliedern | `MAX_EXPR_DEPTH` = 256 (Stapelbudget) → Fehler | bis 512 angenommen |
+| `01f` | die Grammatik erlaubt keine führende Null vor dem Suffix → Fehler | angenommen |
+| Struct mit über 1023 Membern, Typen tiefer als 15, `switch` mit über 1023 case-Werten, Array-Konstruktor mit über 2047 Elementen, über 8192 Byte `private` je Einstiegspunkt oder `var`s je Funktion | die Mindestgrenzen aus 2.4 → Fehler ([Grenzen](#grenzen)) | angenommen bis 16383, 255, 16383 Klauseln, 65535, ohne Grenze |
 
-Weitere Unterschiede, die keine Widersprüche sind: Chrome lehnt nicht uniforme Aufrufe von
-Ableitungen und `textureSample` ab (Uniformitätsanalyse, kommt mit G2d); Chrome nimmt
+Umgekehrt ist Chrome an einigen Stellen strenger als der Wortlaut der Spezifikation, dort folgt
+`lib/wgsl` Chrome: die Tabelle unter [Uniformitätsanalyse](#uniformitätsanalyse), die Tiefe der
+Anweisungen und die Arrays ab 65536 Elementen unter [Grenzen](#grenzen).
+
+Weitere Unterschiede, die keine Widersprüche sind: Chrome nimmt
 `ptr<uniform, array<T>>` und `ptr<workgroup, array<T>>` an (erlaubt durch buffer_view, das hier
-fehlt); `&&p` lehnen beide ab, Chrome als Syntaxfehler, `lib/wgsl` weil `&` keinen Zeiger nimmt.
+fehlt); `&&p` lehnen beide ab, Chrome als Syntaxfehler, `lib/wgsl` weil `&` keinen Zeiger nimmt;
+in Tint heißt die Warnung vor unerreichbarem Code `chromium.unreachable_code`, `lib/wgsl` nimmt
+denselben Regelnamen für Filter, kennt andere `chromium.`-Regeln nicht (Warnung wie Tint) und lässt
+sonstige zweiteilige Regeln still durch (wie Tint).
 
 ## Was fehlt
 
-- **Uniformitätsanalyse** (G2d): `derivative_uniformity` und `subgroup_uniformity` werden nicht
-  geprüft; die Diagnose-Filter stehen im IR bereit. Bis dahin nimmt das Front-End Shader an, die
-  Chrome wegen nicht uniformer Ableitungen ablehnt.
-- **Subgroups**: `enable subgroups` / `subgroup_size_control`, `requires subgroup_id` /
-  `subgroup_uniformity`, die Subgroup- und Quad-Funktionen und -Built-ins, `@subgroup_size` – alle
-  mit der Meldung „noch nicht unterstützt“.
 - **buffer_view**: `buffer<N>` / `buffer`, `bufferView`, `bufferArrayView`, `bufferLength` und die
   Zeigerregeln, die davon abhängen.
-- **Pipeline-Fehler**: `check_pipeline` und `check_interface` finden Override-Fehler,
-  Grenzen, Speichertextur-Formate und Schnittstellen (alle 16 des Korpus). Nicht geprüft:
-  Fehler von Override-Ausdrücken in Funktionsrümpfen (`1 / a` mit `a` = 0 rechnet der Shader mit
-  WGSLs Laufzeitregel), Bind-Group-Kompatibilität mit `layout: 'auto'`, die Anzahl der Bindungen
-  je Art und Stufe, Stufen-Variablen über die Location-Grenze hinaus, wenn Built-ins mitzählen.
+- **Pipeline-Fehler**: `check_pipeline` und `check_interface` finden Override-Fehler (auch in
+  Funktionsrümpfen), Grenzen, Speichertextur-Formate und Schnittstellen (alle 53 des Korpus). Nicht
+  geprüft: Bind-Group-Kompatibilität mit `layout: 'auto'`, die Anzahl der Bindungen je Art und Stufe,
+  Stufen-Variablen über die Location-Grenze hinaus, wenn Built-ins mitzählen.
+- **Subgroups**: die GPU-Tests sind nicht mit Chrome verglichen. `subgroupBroadcast` mit
+  einer inaktiven Lane ist laut Spezifikation ein dynamischer Fehler, das Back-End prüft nichts.
+- **Uniformitätsanalyse**: die erste Fehlerstelle kann von Tints abweichen, wo eine Funktion mehrere
+  Fehlschläge hat und Tints Mengen anders iterieren (hier: die neueste Anforderung);
+  `potential-trigger-set` meldet nur die Regel des gefundenen Wegs.
 - **Back-End**: Uniform-Puffer mit Matrizen `matCx2` (Spaltenabstand 8) und andere nicht
   std140-taugliche Layouts brauchen uniformBufferStandardLayout (Tint zerlegt solche Matrizen in
   Spalten); Bindungen kleiner als `Resource::min_size` prüft weder das Back-End noch `lib/gpu`;
@@ -607,10 +802,6 @@ fehlt); `&&p` lehnen beide ab, Chrome als Syntaxfehler, `lib/wgsl` weil `&` kein
   GPU); `texture_external` ist eine gewöhnliche 2D-Textur (eine Ebene, keine Farbumwandlung).
   Mit Chrome verglichen sind nur die numerischen Fälle von `gputest --test wgsl`, nicht die
   Overrides-, Robustheits-, `discard`- und Texturteile.
-- **Grenzen der Spezifikation** (Mindestwerte, die eine Implementierung prüfen sollte): mehr als
-  1023 Struct-Member, Typ-Schachtelung über 15, mehr als 255 Parameter, mehr als 1023
-  case-Werte, Byte-Grenzen von private (8192), function (8192), workgroup (16384) und immediate
-  (64) werden nicht gemeldet.
 - **Genauigkeit**: sin/cos/tan reduzieren das Argument mit einem dreiteiligen π/2 (genau bis etwa
   2²⁰ · π/2; darüber verlieren sie Stellen); die anderen transzendenten Funktionen sind auf wenige
   ulp genau. Warnungen vor Homoglyphen in Bezeichnern (eine „should“-Empfehlung) fehlen.

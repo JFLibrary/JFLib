@@ -1,0 +1,3 @@
+// WGSL "Limits": 64 nested ifs
+// expect: error
+fn f(c: bool, x: u32) { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }

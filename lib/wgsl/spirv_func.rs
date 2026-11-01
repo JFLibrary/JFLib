@@ -1096,6 +1096,7 @@ pub(crate) fn lower_library(m: &Module, opt: &CompileOptions, values: Vec<Option
         func: 0,
         stage: Stage::Compute,
         workgroup_size: Some([WgSize::Const(1); 3]),
+        subgroup_size: None,
         inputs: Vec::new(),
         outputs: Vec::new(),
         globals: Vec::new(),
@@ -1143,6 +1144,7 @@ pub(crate) fn lower_library(m: &Module, opt: &CompileOptions, values: Vec<Option
         stage: Stage::Compute,
         words,
         workgroup_size: Some([1, 1, 1]),
+        subgroup_size: None,
         resources: Vec::new(),
         immediate_size: 0,
         inputs: Vec::new(),
@@ -1218,7 +1220,22 @@ fn io_var(g: &mut Gen, io: &IoVar, input: bool) -> IoV {
                 BuiltinValue::GlobalInvocationIndex | BuiltinValue::WorkgroupIndex => {
                     return IoV { var: Id(0), f16, array1, computed: Some(b) };
                 }
-                _ => Bi::SubgroupSize,
+                BuiltinValue::SubgroupInvocationId => {
+                    g.b.capability(shader::Cap::GroupNonUniform);
+                    Bi::SubgroupLocalInvocationId
+                }
+                BuiltinValue::SubgroupSize => {
+                    g.b.capability(shader::Cap::GroupNonUniform);
+                    Bi::SubgroupSize
+                }
+                BuiltinValue::SubgroupId => {
+                    g.b.capability(shader::Cap::GroupNonUniform);
+                    Bi::SubgroupId
+                }
+                BuiltinValue::NumSubgroups => {
+                    g.b.capability(shader::Cap::GroupNonUniform);
+                    Bi::NumSubgroups
+                }
             };
             let t = if array1 {
                 let u = g.b.ty_u32();
@@ -1230,8 +1247,8 @@ fn io_var(g: &mut Gen, io: &IoVar, input: bool) -> IoV {
             if io.invariant {
                 g.b.decorate(v, Dec::Invariant, &[]);
             }
-            if b == BuiltinValue::FrontFacing || b == BuiltinValue::SampleIndex || b == BuiltinValue::PrimitiveIndex {
-                if input && g.stage == Stage::Fragment && b != BuiltinValue::FrontFacing {
+            if matches!(b, BuiltinValue::SampleIndex | BuiltinValue::PrimitiveIndex | BuiltinValue::SubgroupInvocationId | BuiltinValue::SubgroupSize) {
+                if input && g.stage == Stage::Fragment {
                     g.b.decorate(v, Dec::Flat, &[]);
                 }
             }
@@ -1493,6 +1510,11 @@ pub(crate) fn lower_entry(m: &Module, ep: &EntryPoint, opt: &CompileOptions, val
         stage: ep.stage,
         words,
         workgroup_size: if ep.stage == Stage::Compute { wg_default } else { None },
+        subgroup_size: match ep.subgroup_size {
+            Some(WgSize::Const(n)) => Some(n),
+            Some(WgSize::Override(e)) => crate::pipeline::eval_u32_default(m, e),
+            None => None,
+        },
         resources,
         immediate_size,
         inputs: io(&ep.inputs),

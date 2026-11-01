@@ -41,6 +41,7 @@
 //        wgsl        lib/wgsl's back end on the GPU (t_wgsl.rs): every operator and numeric
 //                    built-in on runtime values = lib/wgsl's constant evaluator (the spec's
 //                    float accuracy), the runtime rules (division by 0, shifts), NaN reported;
+//                    the subgroup and quad functions against a CPU reference (t_wgsl3.rs);
 //                    SPIR-V 1.6 and 1.3 (a Basis device)
 //        bench_smoke short runs of the scene's frame loop (offscreen, a window) with --verify
 //        all         every test above
@@ -86,6 +87,7 @@ mod t_spec;
 mod t_texture;
 mod t_wgsl;
 mod t_wgsl2;
+mod t_wgsl3;
 mod t_window;
 
 rt::main!(run());
@@ -227,13 +229,16 @@ fn info(t: &mut T) {
     out(&format!("device: {:.1} ms, {} at level {:?}", ms_since(t1), dev.info().name, dev.level()));
     t.ok(dev.level() == a.level(), "device level = the adapter's highest");
     let f = dev.features();
-    let flags: [(&str, bool); 32] = [
+    let flags: [(&str, bool); 35] = [
         ("timestamps", f.timestamps),
         ("multi_draw_indirect", f.multi_draw_indirect),
         ("draw_indirect_first_instance", f.draw_indirect_first_instance),
         ("draw_indirect_count", f.draw_indirect_count),
         ("bindless", f.bindless),
         ("subgroups", f.subgroups),
+        ("subgroups_webgpu", f.subgroups_webgpu),
+        ("subgroup_size_control", f.subgroup_size_control),
+        ("subgroup_extended_types", f.subgroup_extended_types),
         ("draw_parameters", f.draw_parameters),
         ("shader_f16", f.shader_f16),
         ("shader_f64", f.shader_f64),

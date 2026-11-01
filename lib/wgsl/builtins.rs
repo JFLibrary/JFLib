@@ -3,8 +3,8 @@
 // built-in
 //
 //   lookup(name) -> Option<(Builtin, flags)>   flags: CONST, MUST_USE, FRAG (fragment stage
-//                                     only), COMPUTE (compute stage only) and the feature bit
-//                                     the function needs (feature())
+//                                     only), COMPUTE (compute stage only), NOT_VERTEX and the
+//                                     feature bit the function needs (feature())
 //   candidates(b, types, f16) -> Vec<Sig>   the fully elaborated overloads of the numeric,
 //                                     logical, packing, derivative and barrier functions;
 //                                     overload resolution (check_expr.rs) ranks them
@@ -27,8 +27,11 @@ pub const CONST: u8 = 1;
 pub const MUST_USE: u8 = 2;
 pub const FRAG: u8 = 4;
 pub const COMPUTE: u8 = 8;
+/// fragment and compute stage (the subgroup and quad functions)
+pub const NOT_VERTEX: u8 = 16;
 
 const CM: u8 = CONST | MUST_USE;
+const SG: u8 = MUST_USE | NOT_VERTEX;
 
 pub const TABLE: &[(&str, Builtin, u8)] = {
     use Builtin::*;
@@ -74,17 +77,19 @@ pub const TABLE: &[(&str, Builtin, u8)] = {
         ("unpack2x16float", Unpack2x16float, CM),
         ("storageBarrier", StorageBarrier, COMPUTE), ("textureBarrier", TextureBarrier, COMPUTE),
         ("workgroupBarrier", WorkgroupBarrier, COMPUTE), ("workgroupUniformLoad", WorkgroupUniformLoad, MUST_USE | COMPUTE),
+        ("subgroupAdd", SubgroupAdd, SG), ("subgroupExclusiveAdd", SubgroupExclusiveAdd, SG), ("subgroupInclusiveAdd", SubgroupInclusiveAdd, SG),
+        ("subgroupAll", SubgroupAll, SG), ("subgroupAnd", SubgroupAnd, SG), ("subgroupAny", SubgroupAny, SG), ("subgroupBallot", SubgroupBallot, SG),
+        ("subgroupBroadcast", SubgroupBroadcast, SG), ("subgroupBroadcastFirst", SubgroupBroadcastFirst, SG), ("subgroupElect", SubgroupElect, SG),
+        ("subgroupMax", SubgroupMax, SG), ("subgroupMin", SubgroupMin, SG), ("subgroupMul", SubgroupMul, SG),
+        ("subgroupExclusiveMul", SubgroupExclusiveMul, SG), ("subgroupInclusiveMul", SubgroupInclusiveMul, SG), ("subgroupOr", SubgroupOr, SG),
+        ("subgroupShuffle", SubgroupShuffle, SG), ("subgroupShuffleDown", SubgroupShuffleDown, SG), ("subgroupShuffleUp", SubgroupShuffleUp, SG),
+        ("subgroupShuffleXor", SubgroupShuffleXor, SG), ("subgroupXor", SubgroupXor, SG),
+        ("quadBroadcast", QuadBroadcast, SG), ("quadSwapDiagonal", QuadSwapDiagonal, SG), ("quadSwapX", QuadSwapX, SG), ("quadSwapY", QuadSwapY, SG),
     ]
 };
 
-/// the names of the subgroup and quad built-ins (not implemented: subgroups is a gap)
-pub const SUBGROUP_NAMES: &[&str] = &[
-    "subgroupAdd", "subgroupExclusiveAdd", "subgroupInclusiveAdd", "subgroupAll", "subgroupAnd", "subgroupAny",
-    "subgroupBallot", "subgroupBroadcast", "subgroupBroadcastFirst", "subgroupElect", "subgroupMax", "subgroupMin",
-    "subgroupMul", "subgroupExclusiveMul", "subgroupInclusiveMul", "subgroupOr", "subgroupShuffle",
-    "subgroupShuffleDown", "subgroupShuffleUp", "subgroupShuffleXor", "subgroupXor", "quadBroadcast",
-    "quadSwapDiagonal", "quadSwapX", "quadSwapY", "bufferView", "bufferArrayView", "bufferLength",
-];
+/// the names of the buffer view built-ins (not implemented: buffer_view is a gap)
+pub const BUFFER_VIEW_NAMES: &[&str] = &["bufferView", "bufferArrayView", "bufferLength"];
 
 pub fn lookup(name: &str) -> Option<(Builtin, u8)> {
     TABLE.iter().find(|e| e.0 == name).map(|e| (e.1, e.2))
@@ -103,6 +108,10 @@ pub fn feature(b: Builtin) -> u32 {
         }
         TextureBarrier => feature::READONLY_AND_READWRITE_STORAGE_TEXTURES,
         AtomicStoreMin | AtomicStoreMax => feature::ATOMIC_VEC2U_MIN_MAX,
+        SubgroupAdd | SubgroupExclusiveAdd | SubgroupInclusiveAdd | SubgroupAll | SubgroupAnd | SubgroupAny | SubgroupBallot | SubgroupBroadcast
+        | SubgroupBroadcastFirst | SubgroupElect | SubgroupMax | SubgroupMin | SubgroupMul | SubgroupExclusiveMul | SubgroupInclusiveMul
+        | SubgroupOr | SubgroupShuffle | SubgroupShuffleDown | SubgroupShuffleUp | SubgroupShuffleXor | SubgroupXor | QuadBroadcast
+        | QuadSwapDiagonal | QuadSwapX | QuadSwapY => feature::SUBGROUPS,
         _ => 0,
     }
 }
@@ -134,6 +143,7 @@ const FLOATS: [Scalar; 3] = [Scalar::AbstractFloat, Scalar::F32, Scalar::F16];
 const NUMS: [Scalar; 6] = [Scalar::AbstractInt, Scalar::AbstractFloat, Scalar::I32, Scalar::U32, Scalar::F32, Scalar::F16];
 const SIGNED: [Scalar; 5] = [Scalar::AbstractInt, Scalar::AbstractFloat, Scalar::I32, Scalar::F32, Scalar::F16];
 const INTS: [Scalar; 2] = [Scalar::I32, Scalar::U32];
+const CONCRETE: [Scalar; 4] = [Scalar::I32, Scalar::U32, Scalar::F32, Scalar::F16];
 
 fn sets(f16: bool, s: &[Scalar]) -> impl Iterator<Item = Scalar> + '_ {
     s.iter().copied().filter(move |&x| f16 || x != Scalar::F16)
@@ -293,9 +303,104 @@ pub fn candidates(b: Builtin, t: &mut Types, f16: bool) -> Vec<Sig> {
             cw(&mut v, t, f16, &[Scalar::F32], 1, false, false)
         }
         StorageBarrier | TextureBarrier | WorkgroupBarrier => v.push(Sig::new(&[], NONE)),
+        SubgroupAdd | SubgroupExclusiveAdd | SubgroupInclusiveAdd | SubgroupMul | SubgroupExclusiveMul | SubgroupInclusiveMul | SubgroupMax
+        | SubgroupMin | SubgroupBroadcastFirst | QuadSwapDiagonal | QuadSwapX | QuadSwapY => cw(&mut v, t, f16, &CONCRETE, 1, false, false),
+        SubgroupAnd | SubgroupOr | SubgroupXor => cw(&mut v, t, f16, &INTS, 1, false, false),
+        SubgroupAll | SubgroupAny => v.push(Sig::new(&[BOOL], BOOL)),
+        SubgroupBallot => v.push(Sig::new(&[BOOL], t.vec(4, Scalar::U32))),
+        SubgroupElect => v.push(Sig::new(&[], BOOL)),
+        SubgroupBroadcast | SubgroupShuffle | QuadBroadcast => {
+            for s in sets(f16, &CONCRETE) {
+                for n in 1..=4u8 {
+                    let ty = t.vec_or_scalar(n, s);
+                    v.push(Sig::new(&[ty, I32], ty));
+                    v.push(Sig::new(&[ty, U32], ty));
+                }
+            }
+        }
+        SubgroupShuffleDown | SubgroupShuffleUp | SubgroupShuffleXor => {
+            for s in sets(f16, &CONCRETE) {
+                for n in 1..=4u8 {
+                    let ty = t.vec_or_scalar(n, s);
+                    v.push(Sig::new(&[ty, U32], ty));
+                }
+            }
+        }
         _ => {}
     }
     v
+}
+
+/// the errors a built-in has when some of its arguments are constant (None: not constant):
+/// Err((first argument, last argument, message)); the same for const-expressions and for
+/// override-expressions at pipeline creation
+pub fn arg_checks(t: &Types, b: Builtin, a: &[(Option<Value>, TypeId)]) -> Result<(), (usize, usize, String)> {
+    let c = |i: usize| a.get(i).and_then(|x| x.0.as_ref());
+    let ints = |v: &Value| -> Vec<i128> {
+        match v {
+            Value::Comp(cs) => cs.iter().filter_map(as_int).collect(),
+            _ => as_int(v).into_iter().collect(),
+        }
+    };
+    match b {
+        Builtin::SubgroupBroadcast | Builtin::SubgroupShuffle | Builtin::SubgroupShuffleUp | Builtin::SubgroupShuffleDown | Builtin::SubgroupShuffleXor | Builtin::QuadBroadcast => {
+            if let Some(v) = c(1).and_then(as_int) {
+                let limit = if b == Builtin::QuadBroadcast { 4 } else { 128 };
+                let arg = match b {
+                    Builtin::SubgroupShuffleUp | Builtin::SubgroupShuffleDown => "delta",
+                    Builtin::SubgroupShuffleXor => "mask",
+                    _ => "id",
+                };
+                if v < 0 {
+                    return Err((1, 1, format!("das Argument `{}` von `{}` darf nicht negativ sein ({})", arg, name(b), v)));
+                }
+                if v >= limit {
+                    return Err((1, 1, format!("das Argument `{}` von `{}` muss kleiner als {} sein, nicht {}", arg, name(b), limit, v)));
+                }
+            }
+        }
+        Builtin::ExtractBits | Builtin::InsertBits => {
+            let (oi, ci) = if b == Builtin::ExtractBits { (1, 2) } else { (2, 3) };
+            if let (Some(o), Some(n)) = (c(oi), c(ci)) {
+                let (o, n) = (as_int(o).unwrap_or(0), as_int(n).unwrap_or(0));
+                if o + n > 32 {
+                    return Err((oi, ci, format!("`offset` + `count` = {} ist größer als 32", o + n)));
+                }
+            }
+        }
+        Builtin::Clamp => {
+            if let (Some(lo), Some(hi)) = (c(1), c(2)) {
+                let (lv, hv) = (comps(t, lo, a[1].1), comps(t, hi, a[2].1));
+                let bad = if t.is_scalar(a[1].1) { as_f64(lo) > as_f64(hi) } else { lv.iter().zip(&hv).any(|(x, y)| as_f64(x) > as_f64(y)) };
+                if bad {
+                    return Err((1, 2, String::from("`clamp`: die Untergrenze ist größer als die Obergrenze")));
+                }
+            }
+        }
+        Builtin::Smoothstep => {
+            if let (Some(e0), Some(e1)) = (c(0), c(1)) {
+                let eq = if t.is_scalar(a[0].1) { as_f64(e0) == as_f64(e1) } else { comps(t, e0, a[0].1).iter().zip(comps(t, e1, a[1].1)).any(|(x, y)| as_f64(x) == as_f64(&y)) };
+                if eq {
+                    return Err((0, 1, String::from("`smoothstep`: `low` und `high` dürfen nicht gleich sein")));
+                }
+            }
+        }
+        Builtin::Ldexp => {
+            if let Some(e) = c(1) {
+                let bias = match t.scalar_of(a[0].1) {
+                    Some(Scalar::F32) => 127,
+                    Some(Scalar::F16) => 15,
+                    _ => 1023,
+                };
+                let exps = if t.is_scalar(a[1].1) { ints(e) } else { comps(t, e, a[1].1).iter().filter_map(as_int).collect() };
+                if exps.iter().any(|&x| x > bias + 1) {
+                    return Err((1, 1, format!("`ldexp`: der Exponent ist größer als {}", bias + 1)));
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 // ---- texture overloads
@@ -595,7 +700,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         Atanh => map1(t, a0, t0, &mut |v| {
             let x = as_f64(v);
             if x.abs() >= 1.0 {
-                return Err(format!("atanh ist für {} nicht definiert (|x| < 1)", consteval::fmt(v)));
+                return Err(format!("`atanh` ist für {} nicht definiert (|x| < 1)", consteval::fmt(v)));
             }
             fl(math::atanh, v)
         }),
@@ -613,7 +718,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         Clamp => mapn(t, &vals, &tys, &mut |c| {
             let lt = |a: &Value, b: &Value| matches!(consteval::binary_scalar(crate::ast::BinOp::Lt, a, b), Ok(Value::Bool(true)));
             if lt(&c[2], &c[1]) {
-                return Err(format!("clamp: die Untergrenze {} ist größer als die Obergrenze {}", consteval::fmt(&c[1]), consteval::fmt(&c[2])));
+                return Err(format!("`clamp`: die Untergrenze {} ist größer als die Obergrenze {}", consteval::fmt(&c[1]), consteval::fmt(&c[2])));
             }
             let m = if lt(&c[0], &c[1]) { c[1].clone() } else { c[0].clone() };
             Ok(if lt(&c[2], &m) { c[2].clone() } else { m })
@@ -632,25 +737,25 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         Exp2 => map1(t, a0, t0, &mut unf(math::exp2)),
         Log => map1(t, a0, t0, &mut |v| {
             if as_f64(v) <= 0.0 {
-                return Err(format!("log ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
+                return Err(format!("`log` ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
             }
             fl(math::log, v)
         }),
         Log2 => map1(t, a0, t0, &mut |v| {
             if as_f64(v) <= 0.0 {
-                return Err(format!("log2 ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
+                return Err(format!("`log2` ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
             }
             fl(math::log2, v)
         }),
         Sqrt => map1(t, a0, t0, &mut |v| {
             if as_f64(v) < 0.0 {
-                return Err(format!("sqrt ist für {} nicht definiert (x >= 0)", consteval::fmt(v)));
+                return Err(format!("`sqrt` ist für {} nicht definiert (x >= 0)", consteval::fmt(v)));
             }
             fl(math::sqrt, v)
         }),
         InverseSqrt => map1(t, a0, t0, &mut |v| {
             if as_f64(v) <= 0.0 {
-                return Err(format!("inverseSqrt ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
+                return Err(format!("`inverseSqrt` ist für {} nicht definiert (x > 0)", consteval::fmt(v)));
             }
             float_result(1.0 / math::sqrt(as_f64(v)), v)
         }),
@@ -672,7 +777,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         Smoothstep => mapn(t, &vals, &tys, &mut |c| {
             let (e0, e1, x) = (as_f64(&c[0]), as_f64(&c[1]), as_f64(&c[2]));
             if e0 == e1 {
-                return Err(String::from("smoothstep: edge0 und edge1 dürfen nicht gleich sein"));
+                return Err(String::from("`smoothstep`: `low` und `high` dürfen nicht gleich sein"));
             }
             let tt = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
             float_result(tt * tt * (3.0 - 2.0 * tt), &c[0])
@@ -700,7 +805,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
             let cs = comps(t, a0, t0);
             let l = math::sqrt(cs.iter().map(|c| as_f64(c) * as_f64(c)).sum());
             if l == 0.0 {
-                return Err(String::from("normalize eines Nullvektors"));
+                return Err(String::from("`normalize` eines Nullvektors"));
             }
             let mut out = Vec::new();
             for c in &cs {
@@ -763,7 +868,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
                 _ => 1023,
             };
             if e > bias + 1 {
-                return Err(format!("ldexp: der Exponent {} ist größer als {}", e, bias + 1));
+                return Err(format!("`ldexp`: der Exponent {} ist größer als {}", e, bias + 1));
             }
             float_result(math::ldexp(as_f64(&c[0]), e as i64), &c[0])
         }),
@@ -789,7 +894,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         QuantizeToF16 => map1(t, a0, t0, &mut |v| {
             let x = as_f64(v);
             if !f16_ok(x) {
-                return Err(format!("quantizeToF16: {} liegt außerhalb des Bereichs von f16", consteval::fmt(v)));
+                return Err(format!("`quantizeToF16`: {} liegt außerhalb des Bereichs von `f16`", consteval::fmt(v)));
             }
             Ok(Value::F32(crate::lex::round_f64(x, crate::lex::Fmt::F16).unwrap_or(0.0) as f32))
         }),
@@ -821,7 +926,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
         ExtractBits | InsertBits => {
             let (o, c) = if b == ExtractBits { (bits32(&vals[1]), bits32(&vals[2])) } else { (bits32(&vals[2]), bits32(&vals[3])) };
             if o as u64 + c as u64 > 32 {
-                return Err(format!("{}: offset + count = {} ist größer als 32", name(b), o as u64 + c as u64));
+                return Err(format!("`{}`: `offset` + `count` = {} ist größer als 32", name(b), o as u64 + c as u64));
             }
             let mask: u32 = if c == 0 { 0 } else { (((1u64 << c) - 1) << o) as u32 };
             if b == ExtractBits {
@@ -896,7 +1001,7 @@ pub fn eval(t: &mut Types, b: Builtin, args: &[(Value, TypeId)]) -> CR<Value> {
             for (k, c) in cs.iter().enumerate() {
                 let x = as_f64(c);
                 if !f16_ok(x) {
-                    return Err(format!("pack2x16float: {} liegt außerhalb des Bereichs von f16", consteval::fmt(c)));
+                    return Err(format!("`pack2x16float`: {} liegt außerhalb des Bereichs von `f16`", consteval::fmt(c)));
                 }
                 let h = crate::lex::round_f64(x, crate::lex::Fmt::F16).unwrap_or(0.0) as f32;
                 r |= (f16_bits(h) as u32) << (16 * k);
