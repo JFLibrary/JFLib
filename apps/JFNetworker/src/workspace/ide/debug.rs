@@ -100,29 +100,33 @@ fn show(n: &mut Net, k: usize, dev: u32, low: i32) {
         w.ide.lower = low;
         w.ide.lower_on = true;
     }
-    if low == LOW_TERMINAL {
-        n.cons.focus = Some(dev);
+    if low == LOW_TERMINAL
+        && let Some(s) = super::term_session(n, k, dev)
+    {
+        n.cons.focus_ses = Some((dev, s));
     }
 }
 
-/// Als Prozess ausführen: `jfs FILE` in the device's console
+/// Als Prozess ausführen: `jfs FILE` in the IDE's terminal (its own session)
 pub(crate) fn run_process(n: &mut Net, k: usize, cx: &Cx) -> Result<(), String> {
     let Some(Key::File(path)) = cx.cur.clone() else {
         return Err(String::from(t("Als Prozess läuft eine Datei: ein eingebettetes Skript erst in eine Datei umwandeln.")));
     };
     editor::save(n, k, cx, true)?;
     show(n, k, cx.dev, LOW_TERMINAL);
-    console::typed(n, cx.dev, &format!("jfs {}", word(&path)));
+    let s = super::term_session(n, k, cx.dev).ok_or_else(|| String::from(t("Das Gerät ist ausgeschaltet.")))?;
+    console::typed_session(n, cx.dev, s, &format!("jfs {}", word(&path)));
     Ok(())
 }
 
-/// Tests ausführen: `jfs --test FILE` in the device's console, the Tests pane shows the run
+/// Tests ausführen: `jfs --test FILE` in the IDE's terminal, the Tests pane shows the run
 pub(crate) fn tests(n: &mut Net, k: usize, cx: &Cx) -> Result<(), String> {
     let Some(Key::File(path)) = cx.cur.clone() else {
         return Err(String::from(t("Tests laufen aus einer Datei: ein eingebettetes Skript erst in eine Datei umwandeln.")));
     };
     editor::save(n, k, cx, true)?;
-    console::typed(n, cx.dev, &format!("jfs --test {}", word(&path)));
+    let s = super::term_session(n, k, cx.dev).ok_or_else(|| String::from(t("Das Gerät ist ausgeschaltet.")))?;
+    console::typed_session(n, cx.dev, s, &format!("jfs --test {}", word(&path)));
     show(n, k, cx.dev, LOW_TESTS);
     Ok(())
 }
@@ -167,11 +171,11 @@ fn finish_run(n: &mut Net, k: usize, dev: u32, name: &str) {
     show(n, k, dev, LOW_OUTPUT);
 }
 
-/// Stoppen: the target stops (a process in the console gets Ctrl+C)
+/// Stoppen: the target stops (a process in the IDE's terminal gets Ctrl+C)
 pub(crate) fn stop(n: &mut Net, cx: &Cx) -> Result<(), String> {
-    match &cx.target {
-        Some(name) if cx.running() => scripts::run(&mut n.doc, cx.dev, name, false),
-        _ if cx.busy => n.doc.sim.send(Cmd::Interrupt { dev: cx.dev }).map(|_| ()).map_err(|e| crate::app::tr::msg(&e.msg())),
+    match (&cx.target, cx.term) {
+        (Some(name), _) if cx.running() => scripts::run(&mut n.doc, cx.dev, name, false),
+        (_, Some(ses)) if cx.busy => n.doc.sim.send(Cmd::SesInterrupt { dev: cx.dev, ses }).map(|_| ()).map_err(|e| crate::app::tr::msg(&e.msg())),
         _ => Ok(()),
     }
 }

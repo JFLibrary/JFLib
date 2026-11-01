@@ -10,7 +10,7 @@
 //   shows(n, dev)           the window that draws this device's console now (its CLI tab, the
 //                           desktop's Terminal or MIB-Browser window): the Terminal panel shows
 //                           a note instead
-//   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: the IDE)
+//   open_on(n, ui, dev, tab)   the device's window on one of its tabs
 //   get(k) / peek(k)       device window k (for the tabs' modules and the IDE)
 //   fullscreen(n, ui)       F11 (CMD_DESK_FULL): the active device window into full screen and
 //                           back (ui.window_fullscreen), without one the main window
@@ -29,8 +29,9 @@
 //   editor.rs    the desktop's Texteditor: the notes (notizen.txt) and the device's files
 //   filemgr.rs   the desktop's Dateimanager: folders and files, copy, move, import, export
 //   sysmon.rs    the desktop's Systemmonitor: processes (ps), services, CPU and memory
-//   scripts.rs   IDE of hosts (once Skripte): a thin wrapper around the IDE (workspace/ide:
-//                Explorer, tabs, language services, run, debug, tests; ids ID_IDE0 + 0x1000 k ..)
+//   scripts.rs   CMD_SCRIPTS ("IDE …": the desktop's IDE window, desktop::open_ide), the IDE's
+//                check while typing, helpers of its runtime marks (the IDE: workspace/ide, in
+//                the desktop's IDE window; ids ID_IDE0 + 0x1000 k ..)
 //   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
 //                delete, import, export (ids ID_FILES0 + 0x180 k ..)
 //   email.rs     the E-Mail program of the Desktop: account, inbox, sent, write, answer, send,
@@ -90,7 +91,6 @@ pub(crate) enum Tab {
     Services,
     Cli,
     Desktop,
-    Scripts,
     Files,
 }
 
@@ -104,7 +104,6 @@ impl Tab {
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
-            Tab::Scripts => "IDE",
             Tab::Files => "Dateien",
         })
     }
@@ -125,9 +124,6 @@ fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
     if m.is_some_and(|m| m.has(F_HOST) && m.cli == CliStyle::Linux) {
         v.push(Tab::Desktop);
     }
-    if scripts::has_tab(&n.doc.proj, dev) {
-        v.push(Tab::Scripts);
-    }
     if files::has_tab(&n.doc.proj, dev) {
         v.push(Tab::Files);
     }
@@ -145,7 +141,7 @@ pub(crate) struct DevWin {
     pub desk: desktop::Desk,
     /// opened at (the oldest gives its place up)
     age: u32,
-    /// the IDE tab (workspace/ide)
+    /// the IDE's state in this window (workspace/ide; drawn in the desktop's IDE window)
     pub ide: crate::workspace::ide::Pane,
     /// the Dateien tab's grid
     pub files: GridState,
@@ -263,9 +259,9 @@ pub(crate) fn open_on(n: &mut Net, ui: &mut Ui, dev: u32, tab: Tab) {
 pub(crate) fn shows(n: &Net, dev: u32) -> Option<u32> {
     n.devwin.wins.iter().enumerate().find_map(|(k, x)| {
         let x = x.as_ref()?;
-        // the desktop's Terminal and MIB-Browser (mib.rs) windows draw the console too, and the
-        // IDE's Terminal
-        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && x.desk.console_at.is_some()) || (x.tab == Tab::Scripts && crate::workspace::ide::shows_console(n, k, dev));
+        // the desktop's Terminal and MIB-Browser (mib.rs) windows draw the console too (the
+        // IDE's Terminal pane is a session of its own)
+        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && x.desk.console_at.is_some());
         (x.dev == dev && x.open.get() != 0 && console).then(|| base(k))
     })
 }
@@ -335,7 +331,6 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             desktop::tab(n, ui, k, id + 0x80, dev);
             ui.box_end();
         }
-        Tab::Scripts => scripts::tab(n, ui, k, dev),
         Tab::Files => files::tab(n, ui, k, dev),
     }
     ui.box_end();

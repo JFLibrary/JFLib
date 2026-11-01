@@ -350,7 +350,7 @@ pub(crate) fn make(n: &mut Net, ui: &mut Ui, k: usize, cx: &Cx, what: AskFor, na
             ui.popup_close();
             if let Some(p) = file {
                 // (the new file is in the project now; the frame's store is older)
-                let mut cx2 = Cx { dev: cx.dev, d: cx.d.clone(), st: cx.st.clone(), cur: cx.cur.clone(), target: cx.target.clone(), view: None, paused: None, busy: cx.busy };
+                let mut cx2 = Cx { dev: cx.dev, d: cx.d.clone(), st: cx.st.clone(), cur: cx.cur.clone(), target: cx.target.clone(), view: None, paused: None, busy: cx.busy, term: cx.term };
                 if let Some(st) = dide::store_of(&n.doc.proj, cx.dev) {
                     cx2.st = st;
                 }
@@ -388,7 +388,7 @@ pub(crate) fn from_template(n: &mut Net, ui: &mut Ui, k: usize, cx: &Cx, dir: &s
         w.ide.tree.expanded.insert(key_of(dir));
         w.ide.tree.cur = Some(key_of(&p));
     }
-    let mut cx2 = Cx { dev: cx.dev, d: cx.d.clone(), st: cx.st.clone(), cur: cx.cur.clone(), target: cx.target.clone(), view: None, paused: None, busy: cx.busy };
+    let mut cx2 = Cx { dev: cx.dev, d: cx.d.clone(), st: cx.st.clone(), cur: cx.cur.clone(), target: cx.target.clone(), view: None, paused: None, busy: cx.busy, term: cx.term };
     if let Some(st) = dide::store_of(&n.doc.proj, cx.dev) {
         cx2.st = st;
     }

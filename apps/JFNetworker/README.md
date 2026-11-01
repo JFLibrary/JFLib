@@ -45,8 +45,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Einleitung, Ziele als Checkliste, die der Simulator laufend prüft, Hinweise und Fortschritt;
   die Einstellungen der Dienste lassen sich im Gerätefenster als JSON bearbeiten (siehe
   [Labore und Aufgaben](#labore-und-aufgaben)).
-- **IDE (IDE1, vormals Skript-Editor U7):** der Reiter IDE im Gerätefenster eines Hosts: ein
-  Explorer über die Dateien des Geräts und die noch eingebetteten Skripte, Tabs mit Entwürfen,
+- **IDE (IDE1, vormals Skript-Editor U7):** ein Programm des Desktops eines Hosts, maximiert
+  in seinem Fenster: ein Explorer über die Dateien des Geräts und die noch eingebetteten Skripte, Tabs mit Entwürfen,
   die Sprachdienste von SK6 auch über Importe hinweg, Suchen und Ersetzen in Dateien, darunter
   Ausgabe, Terminal, Probleme, Debugger und Tests; eine Datei läuft als Prozess (`jfs DATEI`) oder
   als Dienst, der auf die Datei verweist (`"file"`), mit Haltepunkten, Schritten, Aufrufliste,
@@ -258,7 +258,7 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `task.uis` | das Panel „Aufgabe“ am Labor des Loadbalancers: leer ohne Labor, die Liste der Labore, Titel und Ziele der Reihe nach, die Einleitung zum Einklappen, „Prüfen“ mit den Befunden, Hinweise nacheinander, der Fortschritt; gelöst im Fenster: das Kabel zu WEB3, das dritte Backend in den Einstellungen von LB1 (Text ohne JSON mit Zeile und Spalte abgelehnt, eine Einstellung, die der Simulator ablehnt), alle Ziele erreicht; Rückgängig lässt sie erreicht, „Simulation zurücksetzen“ fängt neu an |
 | `labs.uis` | die Labore auf Englisch (`--lang en`): die Liste, das Panel mit den Texten der Labordatei, F9 mit den Befunden, ein Hinweis, Strg+Umschalt+A; das Cache-Labor über die Einstellungen von CACHE1 gelöst, dann (nach „Änderungen speichern?“ mit Verwerfen) das Campus-Labor in den Konsolen von MLS1, R1, PC3 und PC4 |
 | `task_shots.uis` | Bilder der Liste der Labore, des Panels (das Labor der Shards nach „Prüfen“ mit einem Hinweis) und der Einstellungen eines KV-Knotens, hell und dunkel mit 100 und 150 % (`build/jfnetworker/task_*.png`) |
-| `script_editor.uis` | die eingebetteten Skripte in der IDE (siehe [IDE](#ide)) auf `fixtures/scripts.jfnet`: der Reiter IDE aus dem Kontextmenü, die Skripte im Explorer, der Laufzeitfehler in Zeile 13 als Marke und in Probleme (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und speichert, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, eine Vorlage als neue Datei (als Dienst ausgeführt ihr Fehler: Port 7 ist belegt), Löschen und Rückgängig, der Reiter Dienste |
+| `script_editor.uis` | die eingebetteten Skripte in der IDE (siehe [IDE](#ide)) auf `fixtures/scripts.jfnet`: das maximierte Fenster der IDE auf dem Desktop aus dem Kontextmenü, die Skripte im Explorer, der Laufzeitfehler in Zeile 13 als Marke und in Probleme (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und speichert, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, eine Vorlage als neue Datei (als Dienst ausgeführt ihr Fehler: Port 7 ist belegt), Löschen und Rückgängig, der Reiter Dienste |
 | `script_editor_en.uis` | die IDE auf Englisch: Kontextmenü, Reiter, Explorer, Statuszeile, Meldungen in Problems, Output, die Namen der Werkzeugleiste, eine Vorlage als neue Datei auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
 | `script_shots.uis` | die Bilder eines eingebetteten Skripts in der IDE hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
 | `script_ls.uis` | die Sprachdienste in der IDE (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung der Seitenleiste (ein neues `fn`, ein Klick setzt die Schreibmarke) |
@@ -335,6 +335,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `desk_files.uis` | Texteditor und Dateimanager: die Notizen, ein Text mit „Speichern unter …“ als Datei, die die Shell mit `cat` liest; Neuer Ordner, Umbenennen, Kopieren und Einfügen in den neuen Ordner, Löschen mit Rückgängig und Wiederholen, die Kopie per Doppelklick im Texteditor, Eigenschaften |
 | `desk_monitor.uis` | Systemmonitor und Einstellungen: ein Job aus dem Terminal (`sleep 100 &`) unter den Prozessen, mit „Beenden“ (`kill` im Terminal) beendet, `init` nicht; die Dienste von SRV1 mit dem laufenden Webserver, CPU-Last und Speicher; Hintergrund, Symbolgröße und Uhr, dieselben Werte unter Werkzeuge › Einstellungen |
 | `desk_terminals.uis` | weitere Terminal-Fenster (V2 mit den Sitzungen von X1e): „Weiteres Terminal“ im Startmenü öffnet „Terminal (2)“ mit eigener Sitzung (eigener Prompt und Verzeichnis, `tty` `/dev/pts/0`, `ps` mit `tty1` und `pts/0`), die Konsole behält ihr Verzeichnis, `who` zählt beide; Schließen des Fensters beendet die Sitzung |
+| `desk_ide.uis` | die IDE auf dem Desktop (IDE1 in V2s Fenster, ihr Terminal eine Sitzung von X1e): eine `.jfs`-Datei aus dem Dateimanager öffnet sich in der maximierten IDE, Strg+F5 führt sie im Terminal der IDE aus (`tty` `/dev/pts/0`), `who` an der Konsole zählt beide, Schließen des IDE-Fensters beendet ihre Sitzung |
 | `desk_rtl.uis` | der Desktop in einem gespiegelten Fenster: Symbole rechts, Taskleiste und Titelleisten gespiegelt, wie gezeichnet bedienbar; Bilder hell und dunkel mit 150 % |
 | `desk_shots.uis` | die Bilder des Desktops (drei Fenster, das Startmenü) hell und dunkel mit 100 und 150 %, Hochkontrast, die Hintergründe Netz und Sand mit großen Symbolen (`build/jfnetworker/desk_*.png`) |
 | `model.uis`, Gruppe `desk` | worauf der Desktop baut: die Prozesse von `jfn_sim/procs.rs` gegen `ps` (ein Job mit PID und Befehl, `kill`, ein Dienst, der kein Job ist), die CPU-Zeit je Sekunde gegen die Zahlen des Webservers, freie Namen, Kopien eines Ordnerbaums und Verschieben im Dateimanager, welches Fenster die Konsole zeigt, der Kontrast der Beschriftungen auf jedem Hintergrund in beiden Themes |
@@ -1673,10 +1674,12 @@ zweimal und mit einem Klon im Halt).
 
 ### IDE
 
-Die Programme eines Hosts schreibt, startet, prüft und debuggt der Reiter **IDE** seines
-Gerätefensters (Kontextmenü eines Hosts › „IDE …“; [`src/workspace/ide/`](src/workspace/ide/mod.rs),
-der Reiter ist nur ein Aufruf von `ide::view` in [`devwin/scripts.rs`](src/workspace/devwin/scripts.rs),
-so kann ihn später ein Fenster des Desktops aufnehmen). Oben stehen die Menüs Datei,
+Die Programme eines Hosts schreibt, startet, prüft und debuggt die **IDE**, ein Programm seines
+[Desktops](#desktop-der-hosts), das maximiert in seinem Fenster startet (Kontextmenü eines
+Hosts › „IDE …“ öffnet das Gerätefenster auf dem Desktop mit der IDE vorn, ebenso das Symbol
+und das Startmenü; [`src/workspace/ide/`](src/workspace/ide/mod.rs), im Fenster ein Aufruf von
+`ide::view` in `desktop::ide_window`). Eine `.jfs`-Datei, die der Dateimanager öffnet, kommt
+als Tab der IDE. Oben stehen die Menüs Datei,
 Bearbeiten, Ausführen, Debuggen und Ansicht (jede Zeile nennt ihre Tasten) und die
 Werkzeugleiste; links die Seitenleiste mit Explorer, Suchen und Gliederung, rechts der Editor
 mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger und Tests. Die Teiler behalten
@@ -1721,8 +1724,11 @@ wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
   einem Rückgängig-Schritt und lehnt ab, solange eine Datei mit Treffern ungespeicherte
   Änderungen hat.
 - **Ausführen** ([`debug.rs`](src/workspace/ide/debug.rs); zuvor speichert es alles):
-  „Als Prozess ausführen“ (Strg+F5) tippt `jfs DATEI` ins **Terminal** (die Konsole des Geräts;
-  eine eigene Sitzung kann später an ihre Stelle treten, `ide::terminal`). „Als Dienst
+  „Als Prozess ausführen“ (Strg+F5) tippt `jfs DATEI` ins **Terminal** der IDE: eine eigene
+  Befehlszeilen-Sitzung neben der Konsole des Geräts (siehe
+  [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server); `pts/N`, geöffnet, wenn sie zum
+  ersten Mal gebraucht wird, nach dem Ausschalten des Geräts eine neue; sie endet mit dem
+  Fenster der IDE). „Als Dienst
   ausführen“ (F5) startet den Skript-Dienst, der auf die Datei verweist, neu – gibt es keinen,
   legt es einen als Rückgängig-Schritt an (`{"file": PFAD}`, nach der Datei benannt) –, bei einem
   eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt.
@@ -3249,7 +3255,7 @@ Dialog mit seinem Titel.
 - **Dateimanager** ([`filemgr.rs`](src/workspace/devwin/filemgr.rs)): die Ordner als Baum, die
   Einträge des Ordners mit Größe, Art und Zeit; Neuer Ordner, Umbenennen, Löschen, Kopieren,
   Ausschneiden, Einfügen (ein vergebener Name bekommt „(Kopie)“), Öffnen (ein Ordner, eine Datei
-  in ihrem Programm, Skripte über `desktop::open_jfs`, bis zur IDE im Texteditor), Eigenschaften,
+  in ihrem Programm, `.jfs`-Skripte in der IDE, alles andere im Texteditor), Eigenschaften,
   Importieren … und Exportieren … über die Dateidialoge des Reiters Dateien – so kommt ein
   `.jfs`-Skript herein und hinaus. In der Liste: Entf, F2, Strg+C / X / V, Eingabe. Jede
   Änderung ist ein Rückgängig-Schritt des Projekts, dem der Simulator sofort folgt.
@@ -3272,8 +3278,8 @@ Dialog mit seinem Titel.
   Hochkontrast die Fläche des Fensters ohne Muster), die Größe der Symbole und die Form der Uhr.
   Sie sind Einstellungen des Benutzers für alle Desktops (`config://settings.ini`, auch unter
   Werkzeuge › Einstellungen › Desktop), keine Konfiguration der simulierten Geräte.
-- **IDE:** startet maximiert und zeigt bis zu Meilenstein IDE1 einen Hinweis mit dem Weg zum
-  Reiter Skripte (`desktop::ide_window`).
+- **IDE:** startet maximiert, siehe [IDE](#ide); ihr Terminal ist eine eigene Sitzung, die mit
+  dem Fenster endet. Das Gerätefenster hat keinen eigenen Reiter für Skripte mehr.
 - **Wo der Zustand liegt:** Fenster, offene Programme und was sie zeigen gehören zur Sitzung,
   nicht ins Projekt und nicht ins Rückgängig: je Gerät, solange die App läuft. Ein geschlossenes
   und wieder geöffnetes Gerätefenster zeigt den Desktop wie zuvor; ein neues oder geladenes
@@ -3415,7 +3421,7 @@ Geste).
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
-| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
+| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

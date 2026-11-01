@@ -1,5 +1,5 @@
 #!args --verify-dirty --lang en --open apps/JFNetworker/tests/fixtures/scripts.jfnet
-# the IDE in English (U7, IDE1): the context menu, the IDE tab, the Explorer's inline scripts, the
+# the IDE in English (U7, IDE1): the context menu, the desktop's IDE window, the Explorer's inline scripts, the
 # status line, the messages of a run in Problems, Output, the tool bar's names, a template (its
 # comments and texts in English) as a new file on PC1, which has no script yet, and the keys in
 # the overview of the shortcuts.  The messages of lib/script and of the running program stay
@@ -12,7 +12,7 @@ rclick listitem:"SRV1"
 move 700,300
 click menuitem:"IDE …"
 expect window 26624 open
-expect tab:"IDE" selected
+expect dialog:"IDE (maximized)" selected
 resizewin 26624 1100 760
 wait 300
 expect listitem:"Embedded scripts" exists

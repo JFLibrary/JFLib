@@ -662,8 +662,6 @@ Worum es geht	What it is about
 # the script editor (U7): the Skripte tab of a host's device window (devwin/scripts.rs), the
 # scripts of a device in the project and the templates of "Neu" (doc/scripts.rs; the texts of
 # a template's code lines must stay free of quotes and backslashes), its keys in the overview
-&Skripte …	&Scripts …
-Skripte	Scripts
 Ein Skript braucht einen Namen.	A script needs a name.
 „{}“ geht nicht als Name: Buchstaben, Ziffern, - _ und . (am Anfang ein Buchstabe oder eine Ziffer, höchstens 32 Zeichen).	“{}” cannot be a name: letters, digits, - _ and . (a letter or digit first, at most 32 characters).
 Auf {} gibt es schon einen Dienst „{}“.	{} has a service “{}” already.
@@ -687,59 +685,32 @@ des Geräts und überstehen Neustarts und Stromausfälle.	of the device and surv
 kein Wert	no value
 Speicher bereit auf Port ${port}	Store ready on port ${port}
 Ein Skript reagiert auf Ereignisse: net.udp, net.listen, http.serve, timer.every …	A script reacts to events: net.udp, net.listen, http.serve, timer.every …
-Strg+S übernimmt es ins Projekt und in den laufenden Simulator.	Ctrl+S applies it to the project and the running simulator.
 Skript gestartet	Script started
-übersetzt nicht	does not compile
-nicht im Simulator	not in the simulator
 Gerät aus	device off
 rechnet	computing
 mit Fehler beendet	ended by an error
-Der Simulator führt dieses Skript nicht aus.	The simulator does not run this script.
-Der Simulator führt es nicht aus: {}	The simulator does not run it: {}
-CPU {} · Warteschlange {} (höchstens {}) · Rückrufe {} · Fehler {} · Speicher {}	CPU {} · queue {} (at most {}) · callbacks {} · errors {} · memory {}
-offen: {}	open: {}
 Fehler im Lauf ({}, bei {}): {}	Error while running ({}, at {}): {}
-Noch keine Skripte	No scripts yet
-Ein Skript ist ein eigenes Programm in der Sprache .jfs, das auf diesem Gerät als Dienst läuft: UDP, TCP, HTTP, Timer, die Disk. „Neu“ legt eines aus einer Vorlage an.	A script is a program of your own in the .jfs language that runs on this device as a service: UDP, TCP, HTTP, timers, the disk. “New” makes one from a template.
-Neu	New
-Ein neues Skript aus einer Vorlage	A new script from a template
-{} hat noch kein Skript.	{} has no script yet.
 1 Fehler	1 error
 {} Fehler	{} errors
-Löscht das Skript und was es auf der Disk abgelegt hat (Rückgängig bringt das Skript zurück, die Disk beginnt leer)	Deletes the script and what it stored on the disk (undo brings the script back, its disk starts empty)
-Neuer Name des Skripts	New name of the script
 Ausführen	Run
 Neu starten	Restart
-Neu starten: Speicher und Timer beginnen leer, die Disk und die Zahlen bleiben	Restart: memory and timers start empty, the disk and the numbers stay
-Holt die Fassung des Projekts zurück (Strg+Z im Editor nimmt das zurück)	Brings back the project's version (Ctrl+Z in the editor takes that back)
-Ins Projekt (ein Rückgängig-Schritt) und in das laufende Skript, das damit neu startet und seine Disk und Zahlen behält (Strg+S)	Into the project (one undo step) and into the running script, which restarts with it and keeps its disk and numbers (Ctrl+S)
 Zeile {}, Spalte {}	Line {}, column {}
 keine Meldungen	no messages
 1 Warnung	1 warning
 {} Warnungen	{} warnings
-geändert – Strg+S übernimmt, F8 springt zur nächsten Meldung	changed – Ctrl+S applies, F8 goes to the next message
 wie im Projekt	as in the project
-Fehler ({})	Errors ({})
 Ausgabe	Output
-Noch keine Ausgabe in diesem Lauf: print(…) schreibt hierher.	No output in this run yet: print(…) writes here.
-Keine Fehler in diesem Lauf (davor {}; die Konsole zeigt sie mit „script errors“).	No errors in this run ({} before; the console shows them with “script errors”).
-Keine Fehler in diesem Lauf.	No errors in this run.
-{} · Zeile {}, Spalte {} ({}): {}	{} · line {}, column {} ({}): {}
-Skript-Editor	Script editor
 Strg+S	Ctrl+S
-das Skript übernehmen: ins Projekt und in das laufende Skript	apply the script: to the project and to the running script
 F8 / Umschalt+F8	F8 / Shift+F8
 zur nächsten / vorigen Meldung (Fehler, Warnung, Fehler im Lauf)	to the next / previous message (error, warning, error while running)
 Strg+Z / Strg+Y	Ctrl+Z / Ctrl+Y
 im Editor rückgängig / wiederholen (außerhalb des Editors: das Projekt)	undo / redo in the editor (outside the editor: the project)
 Strg+F / Strg+H	Ctrl+F / Ctrl+H
-suchen / ersetzen	find / replace
 Strg+/	Ctrl+/
 Zeilen aus- und wieder einkommentieren	comment lines out and in again
 die gewählten Zeilen ein- und ausrücken	indent and outdent the chosen lines
 Alt+Pfeil auf / ab	Alt+Up / Down arrow
 die Zeilen verschieben	move the lines
-Fehler|Liste	Errors
 Löschen	Delete
 # the lab in the window (U6a): the Metriken panel (workspace/metrics.rs), the pills on the canvas (canvas/lab.rs), faults in the inspector (inspector/faults.rs)
 Metriken	Metrics
@@ -1311,12 +1282,9 @@ Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten.	A
 Formatieren	Format
 Gliederung	Outline
 Noch keine Funktionen und globalen Variablen.	No functions and global variables yet.
-Hier steht kein Name, der in diesem Skript deklariert ist.	There is no name here that this script declares.
 Formatieren geht erst ohne Syntaxfehler ({})	Formatting needs a script without syntax errors ({})
 Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile – ein Rückgängig-Schritt	Format (Shift+Alt+F): indentation, spaces, one statement per line – one undo step
 Name umbenennen	Rename name
-Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
-Neuer Name (jede Stelle im Skript)	New name (every place in the script)
 # ---- V2: the desktop of hosts (workspace/devwin/desktop.rs, progs.rs, editor.rs, filemgr.rs,
 # sysmon.rs; app/prefs.rs's section Desktop; the shortcuts' section Desktop)
 &Vollbild	&Full screen
@@ -1337,9 +1305,7 @@ System	System
 Entwicklung	Development
 Die Konsole des Geräts ist im Fenster „{}“ offen.	The device's console is open in the window “{}”.
 Zeigen	Show
-Die Skripte des Geräts	The device's scripts
-Die Skripte bearbeitet, prüft und startet bis auf Weiteres der Reiter Skripte dieses Fensters.	For now the Scripts tab of this window edits, checks and starts the scripts.
-Reiter Skripte öffnen	Open the Scripts tab
+Das Gerät ist ausgeschaltet: das Terminal der IDE öffnet, sobald es wieder läuft.	The device is off: the IDE's terminal opens once it runs again.
 Hintergrund	Background
 Der Hintergrund der Desktops aller Hosts; im Hochkontrast eine ruhige Fläche.	The background of every host's desktop; a plain area in high contrast.
 Schiefer	Slate
@@ -1424,13 +1390,10 @@ TTY	TTY
 Telnet-Server	Telnet server
 # IDE1: the IDE of a host (workspace/ide, doc/ide.rs; the IDE tab of the device window)
 &IDE …	&IDE …
-IDE	IDE
 den Namen gibt es dort schon	the name exists there already
 das Verzeichnis ist nicht leer	the folder is not empty
 das gehört zum System des Geräts	it belongs to the device's system
 Dieses Gerät hat keine Dateien.	This device has no files.
-„{}“ wurde nicht gespeichert: {}.	“{}” was not saved: {}.
-„{}“ geht nicht: {}.	“{}” does not work: {}.
 „{}“ gibt es schon.	“{}” exists already.
 „{}“ lässt sich nicht löschen: {}.	“{}” cannot be deleted: {}.
 „{}“ läuft schon aus einer Datei.	“{}” runs from a file already.

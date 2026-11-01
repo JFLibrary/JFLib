@@ -1,10 +1,10 @@
-// scripts -- the IDE tab of a host's device window (once the Skripte tab): a thin wrapper around
-// the IDE (workspace/ide), which another window can host with the same one call
+// scripts -- what is left of the Skripte tab around the IDE (workspace/ide), which lives in the
+// desktop's IDE window (devwin/desktop.rs ide_window, started maximised)
 //
-//   has_tab(project, dev)         a host with a Linux shell gets the tab
-//   tab(n, ui, k, dev)            the tab of device window k: ide::view(n, ui, k, dev)
+//   has_tab(project, dev)         a host with a Linux shell has the IDE (and a desktop)
 //   states(n, ui) / command(n, ui, id) -> handled   CMD_SCRIPTS: the selected host's window on
-//                                 this tab (the context menu of a device, "IDE …")
+//                                 its desktop with the IDE in front (the context menu of a
+//                                 device, "IDE …")
 //   check_due(n, ui)              TIMER_SCRIPT_CHECK: the IDE's check of the changed drafts
 //   map_line(run, now, line) / word_at(text, col)   where a line of the program that runs is
 //                                 in the edited text, the word of a column (the IDE's marks of
@@ -18,17 +18,12 @@ use ui::*;
 
 use crate::app::constants::*;
 use crate::app::Net;
-use crate::workspace::devwin::{self, Tab};
+use crate::workspace::devwin;
 
-/// device `dev` gets the tab: a host with a Linux shell (the devices whose OS runs scripts and
+/// device `dev` has the IDE: a host with a Linux shell (the devices whose OS runs scripts and
 /// that have a desktop)
 pub(crate) fn has_tab(p: &Project, dev: u32) -> bool {
     p.model_of(dev).is_some_and(|m| m.has(F_HOST) && m.cli == CliStyle::Linux)
-}
-
-/// the tab of device window k: the IDE
-pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
-    crate::workspace::ide::view(n, ui, k, dev);
 }
 
 /// TIMER_SCRIPT_CHECK: the IDE's check while typing
@@ -80,7 +75,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
         return false;
     }
     if let Some(d) = selected_host(n) {
-        devwin::open_on(n, ui, d, Tab::Scripts);
+        devwin::desktop::open_ide(n, ui, d);
     }
     ui.repass();
     true

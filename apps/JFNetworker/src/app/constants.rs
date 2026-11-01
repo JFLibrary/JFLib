@@ -327,7 +327,8 @@ pub(crate) const ID_SVC_EDIT_APPLY: u32 = 0xC910;
 pub(crate) const ID_SVC_EDIT_CANCEL: u32 = 0xC911;
 // ---- the script editor (U7: commands 340 .. 379, widgets 0xD000 .. 0xDFFF, timers 0x160 ..
 // 0x16F; no dock panel: P_SCRIPT = 11 stays free)
-/// the selected host's device window on its Skripte tab (the context menu of a device)
+/// the selected host's device window on its desktop with the IDE in front (the context menu of a
+/// device, "IDE …"; devwin/desktop.rs open_ide)
 pub(crate) const CMD_SCRIPTS: u32 = 340;
 /// the check of the edited scripts while typing (at most every devwin::scripts::CHECK_MS)
 pub(crate) const TIMER_SCRIPT_CHECK: u32 = 0x160;

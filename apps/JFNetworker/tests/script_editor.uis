@@ -1,6 +1,6 @@
 #!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
 # the script editor in the IDE (U7, IDE1: workspace/ide, doc/scripts.rs) on SRV1 of the fixture:
-# its device window from the context menu on the IDE tab, the inline scripts in the Explorer;
+# its device window from the context menu in the desktop's maximised IDE window, the inline scripts in the Explorer;
 # zaehler's runtime error in line 13 (a mark in the editor, the Probleme list, a click puts the
 # caret there) and its output in Ausgabe, following live; typing with the check while typing (at
 # most every 250 ms) and F8 from one message to the next; Ctrl+S refuses a source that does not
@@ -20,7 +20,7 @@ rclick listitem:"SRV1"
 move 700,300
 click menuitem:"IDE …"
 expect window 26624 open
-expect tab:"IDE" selected
+expect dialog:"IDE (maximiert)" selected
 resizewin 26624 1100 760
 wait 300
 expect listitem:"zaehler" exists

@@ -7,8 +7,8 @@
 # (Shift+Alt+F; one undo step; a refusal with syntax errors), the outline in the side bar's
 # Gliederung (a click puts the caret on a name).  Ids: 26624 the device window, 98816 the
 # editor, 98512 Name umbenennen (its name 98513, Abbrechen 98515), 98691 Formatieren, 98567
-# Gliederung, 98565 Explorer.  The editor's lines are 20 px from y 137 of the window, its text
-# starts at x 373 (cells of 8 px)
+# Gliederung, 98565 Explorer.  The editor's lines are 20 px from y 171 of the window, its text
+# starts at x 377 (cells of 8 px)
 size 1280 900
 theme light
 wait 3500
@@ -28,7 +28,7 @@ expect listitem:"let n" exists
 click #98816
 key ctrl+home
 window 26624
-move 377,307
+move 381,341
 wait 600
 expect text:"timer\nName des Hosts\nZeitgeber: after, every, cancel." exists
 move 700,600
@@ -62,7 +62,7 @@ key f12
 expect text:"Zeile 2, Spalte 5" exists
 key ctrl+home
 window 26624
-drag 569,347 569,347 1 ctrl
+drag 573,381 573,381 1 ctrl
 window any
 expect text:"Zeile 2, Spalte 5" exists
 # ---- rename n: the flyout with the name, Enter renames every place (one undo step)
@@ -76,7 +76,7 @@ expect listitem:"let zahl" exists
 expect listitem:"let n" missing
 expect #98816 focused
 window 26624
-move 393,327
+move 397,361
 wait 600
 expect text:"let zahl\nglobale Variable" exists
 move 700,600
@@ -86,7 +86,7 @@ shot build/jfnetworker/script_ls_renamed.png window 26624
 key ctrl+z
 expect listitem:"let n" exists
 window 26624
-move 393,327
+move 397,361
 wait 600
 expect text:"let n\nglobale Variable" exists
 move 700,600

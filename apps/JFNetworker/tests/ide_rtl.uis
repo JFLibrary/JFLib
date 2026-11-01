@@ -20,7 +20,7 @@ wait 300
 expect tab:"server.jfs" selected
 expect #98816 focused
 # the side bar is on the right of the editor
-expect tab:"Explorer" rect 1014 105 75 30
+expect tab:"Explorer" rect 1010 139 75 30
 key ctrl+end
 type "lib.gr"
 expect listitem:"greet – fn greet(path)" exists

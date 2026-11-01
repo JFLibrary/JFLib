@@ -9,13 +9,15 @@
 //   Pane::new(dev)               the IDE's state in one device window: the open tabs, the side
 //                                bar, the lower area, the debugger's choices
 //   view(n, ui, k, dev)          the IDE of device window k, filling the box it is given; ids
-//                                ID_IDE0 + 0x1000 k .. + 0xFFF (below).  The Skripte tab
-//                                (devwin/scripts.rs) is a wrapper around this one call, so
-//                                another window (the desktop's, V2) can host it the same way
+//                                ID_IDE0 + 0x1000 k .. + 0xFFF (below).  The desktop's IDE
+//                                window hosts it (devwin/desktop.rs ide_window, maximised)
+//   open_later(n, k, path)       a file of the device as the shown tab, at the IDE's next frame
+//                                (the Dateimanager's Öffnen)
 //   check_due(n, ui)             TIMER_SCRIPT_CHECK: the check of every changed draft
-//   shows_console(n, k, dev)     window k's IDE draws the device's console now (Terminal)
-//   terminal(n, ui, dev)         the Terminal pane: the device's console (doc/console.rs view);
-//                                one function, so a session of its own can take its place (X1e)
+//   term_session(n, k, dev)      the IDE's command-line session (Desk::ide_term; opened when
+//                                first wanted, a new one after the device was off)
+//   terminal(n, ui, k, dev)      the Terminal pane: that session (console::view_session); a
+//                                process the IDE runs and its tests run there
 //   Key                          what a tab holds: a file of the device (canonical path) or the
 //                                inline source of a script service
 //
@@ -220,6 +222,8 @@ pub(crate) struct Pane {
     pub(crate) ren_msg: Option<String>,
     /// the focused widget of the last frame
     pub(crate) last_focus: u32,
+    /// a file to show as a tab at the next frame (open_later)
+    pub(crate) open_req: Option<String>,
     /// the frames the flyouts were open (the name, the rename, the condition): a text box's
     /// commit in the first one is an old one's (its edit state went to the editor)
     pub(crate) fly: [u32; 3],
@@ -256,6 +260,7 @@ impl Pane {
             ren_at: TextPos::default(),
             ren_msg: None,
             last_focus: 0,
+            open_req: None,
             fly: [0; 3],
         }
     }
@@ -275,8 +280,10 @@ pub(crate) struct Cx {
     pub(crate) target: Option<String>,
     pub(crate) view: Option<ScriptView>,
     pub(crate) paused: Option<Pause>,
-    /// the device's console runs a command (a process holds it)
+    /// the IDE's terminal runs a command (a process holds it)
     pub(crate) busy: bool,
+    /// the IDE's terminal session (Desk::ide_term) once it was opened
+    pub(crate) term: Option<u32>,
 }
 
 impl Cx {
@@ -299,8 +306,10 @@ impl Cx {
         let svc = target.as_ref().and_then(|t| e.service::<ScriptService>(d.id, t));
         let view = svc.map(|s| s.view(e.now()));
         let paused = svc.and_then(|s| s.paused());
-        let busy = e.cli_busy(d.id);
-        Some(Cx { dev: d.id, d: d.clone(), st: st.clone(), cur, target, view, paused, busy })
+        // (the IDE's own terminal: a process it runs holds it)
+        let term = n.devwin.peek(k).and_then(|w| w.desk.ide_term);
+        let busy = term.is_some_and(|s| e.cli_sessions(d.id).iter().any(|x| x.id == s) && e.cli_ses_busy(d.id, s));
+        Some(Cx { dev: d.id, d: d.clone(), st: st.clone(), cur, target, view, paused, busy, term })
     }
     pub(crate) fn running(&self) -> bool {
         self.view.as_ref().is_some_and(|v| v.state == ScriptState::Running)
@@ -357,7 +366,10 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     // typed
     let f = ui.focused();
     let win = ID_DEVWIN0 + 0x200 * k as u32;
-    let term = n.cons.id(&n.doc.proj, dev);
+    let term = match n.devwin.peek(k).and_then(|w| w.desk.ide_term) {
+        Some(s) => n.cons.ses_id(&n.doc.proj, dev, s),
+        None => 0,
+    };
     let texty = f == term || [0xC1, 0xC9, 0xD1, 0x120, 0x121, 0x130, 0x200].iter().any(|o| f == id + o);
     if let Some(w) = n.devwin.get(k) {
         if texty && f != w.ide.last_focus && ui.window_state(win) & UWS_ACTIVE == 0 {
@@ -366,7 +378,17 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         w.ide.last_focus = f;
     }
     editor::follow(n, ui, k, &d, &st);
-    let Some(cx) = Cx::of(n, k, &d, &st) else { return };
+    let Some(mut cx) = Cx::of(n, k, &d, &st) else { return };
+    // a file the desktop asked for (the Dateimanager's Öffnen)
+    if let Some(path) = n.devwin.get(k).and_then(|w| w.ide.open_req.take()) {
+        if let Err(e) = editor::open(n, ui, k, &cx, Key::File(path), None)
+            && let Some(w) = n.devwin.get(k)
+        {
+            w.ide.msg = Some(e);
+        }
+        let Some(c) = Cx::of(n, k, &d, &st) else { return };
+        cx = c;
+    }
     let mut acts: Vec<Act> = Vec::new();
     keys(n, ui, k, id, &cx, &mut acts);
     ui.next_size(-1, -1);
@@ -649,17 +671,47 @@ fn sidebar(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, acts: &mut Vec<
     ui.box_end();
 }
 
-/// the Terminal pane: the device's console (a session of its own can take its place here)
-pub(crate) fn terminal(n: &mut Net, ui: &mut Ui, dev: u32) {
-    ui.next_size(-1, -1);
-    ui.box_begin(0, BOX_V, 0);
-    crate::doc::console::view(n, ui, dev);
-    ui.box_end();
+/// a file of the device (its path) as the shown tab of window k's IDE at its next frame
+pub(crate) fn open_later(n: &mut Net, k: usize, path: &str) {
+    if let Some(w) = n.devwin.get(k) {
+        w.ide.open_req = Some(String::from(path));
+    }
 }
 
-/// window k's IDE draws device `dev`'s console now (its Terminal pane is shown)
-pub(crate) fn shows_console(n: &Net, k: usize, dev: u32) -> bool {
-    n.devwin.peek(k).is_some_and(|w| w.ide.dev == dev && w.ide.lower_on && w.ide.lower == LOW_TERMINAL)
+/// the IDE's command-line session in window k (Desk::ide_term): the one it has while the engine
+/// knows it, else a new one while the device is on (None: off, or no command line)
+pub(crate) fn term_session(n: &mut Net, k: usize, dev: u32) -> Option<u32> {
+    let cur = n.devwin.peek(k).and_then(|w| w.desk.ide_term);
+    if let Some(s) = cur
+        && n.doc.sim.engine().cli_sessions(dev).iter().any(|x| x.id == s)
+    {
+        return Some(s);
+    }
+    // ended (the device was off): its console goes once a new session can take its place
+    let s = crate::doc::console::open_session(n, dev)?;
+    if let Some(old) = cur {
+        crate::doc::console::close_session(n, dev, old);
+    }
+    if let Some(w) = n.devwin.get(k) {
+        w.desk.ide_term = Some(s);
+    }
+    Some(s)
+}
+
+/// the Terminal pane: the IDE's own command-line session (term_session; after it ended, while
+/// the device is off, its console says so)
+pub(crate) fn terminal(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
+    let s = term_session(n, k, dev).or_else(|| n.devwin.peek(k).and_then(|w| w.desk.ide_term));
+    ui.next_size(-1, -1);
+    ui.box_begin(0, BOX_V, 0);
+    match s {
+        Some(s) => crate::doc::console::view_session(n, ui, dev, s),
+        None => {
+            ui.next_size(-1, 0);
+            ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Das Gerät ist ausgeschaltet: das Terminal der IDE öffnet, sobald es wieder läuft."));
+        }
+    }
+    ui.box_end();
 }
 
 /// TIMER_SCRIPT_CHECK: the check of every changed draft

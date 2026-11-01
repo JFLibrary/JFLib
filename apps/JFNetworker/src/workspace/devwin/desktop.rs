@@ -18,9 +18,13 @@
 //   terminal_window(n, ui, k, dev, s) a Terminal window's content: the device's console (None,
 //                                     the program Terminal) or a further session of its own
 //                                     (Some, "Weiteres Terminal": console::view_session)
-//   ide_window(n, ui, k, dev)         the IDE's content (IDE1 replaces the body with the IDE)
-//   open_with(n, k, dev, path)        a file of the device in its program: open_jfs for .jfs
-//                                     (the Texteditor now, the IDE after IDE1), else the editor
+//   ide_window(n, ui, k, dev)         the IDE's window: the IDE of workspace/ide (ide::view) with
+//                                     the window's box; its Terminal pane is a command-line
+//                                     session of its own (Desk::ide_term, ended with the window)
+//   open_ide(n, ui, dev)              the device's window on its desktop with the IDE in front
+//                                     (CMD_SCRIPTS, the context menu's "IDE …")
+//   open_with(n, k, dev, path)        a file of the device in its program: .jfs files in the
+//                                     IDE (open_jfs(n, k, path)), the others in the Texteditor
 //   bg_colors(bg, dark) / BG_LABEL    the backgrounds and their labels' colours (selftest desk)
 //
 // The programs (Prog): Terminal, Dateimanager (filemgr.rs), Texteditor (editor.rs),
@@ -166,6 +170,9 @@ pub(crate) struct Desk {
     /// the sessions of the further Terminal windows (cli/ses.rs), in the taskbar's order after
     /// the programs
     pub terms: Vec<u32>,
+    /// the session of the IDE's Terminal pane (opened when it is first wanted, ended with the
+    /// IDE's window)
+    pub ide_term: Option<u32>,
     // the programs
     pub ip: super::progs::IpState,
     pub web: super::progs::WebState,
@@ -189,6 +196,7 @@ impl Desk {
             raise: None,
             console_at: None,
             terms: Vec::new(),
+            ide_term: None,
             ip: super::progs::IpState::new(),
             web: super::progs::WebState::new(),
             edit: super::editor::Editor::new(),
@@ -543,7 +551,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     // the sessions that end: of the windows closed this frame, of a desktop given up
     let mut ended: Vec<(u32, u32)> = Vec::new();
     if d.dev != dev {
-        ended.extend(d.terms.iter().map(|&s| (d.dev, s)));
+        ended.extend(d.terms.iter().chain(&d.ide_term).map(|&s| (d.dev, s)));
         *d = Desk::new(dev);
     }
     let mut titles: Vec<String> = d.open.iter().map(|p| String::from(p.name())).collect();
@@ -603,6 +611,12 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         if let DeskEv::Close(key) = ev {
             if let Some(p) = Prog::of_key(key) {
                 d.open.retain(|&o| o != p);
+                // the IDE's terminal ends with it
+                if p == Prog::Ide
+                    && let Some(s) = d.ide_term.take()
+                {
+                    ended.push((dev, s));
+                }
             } else if let Some(s) = key.checked_sub(TERM_KEY0) {
                 d.terms.retain(|&o| o != s);
                 ended.push((dev, s));
@@ -698,7 +712,7 @@ fn start_menu(ui: &mut Ui, base: u32, on: bool) -> (Option<Prog>, bool) {
 fn content(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32, p: Prog) {
     let base = desk_base(k);
     ui.next_size(-1, -1);
-    ui.box_begin(0, BOX_V | if p == Prog::Terminal { 0 } else { pad(8) }, 8);
+    ui.box_begin(0, BOX_V | if matches!(p, Prog::Terminal | Prog::Ide) { 0 } else { pad(8) }, 8);
     match p {
         Prog::Terminal => terminal_window(n, ui, k, dev, None),
         Prog::Files => super::filemgr::program(n, ui, k, base + 0x200, dev),
@@ -755,34 +769,39 @@ pub(crate) fn terminal_window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, s: O
     ui.box_end();
 }
 
-/// the IDE's window (it starts maximised): until IDE1 a note and the way to the Skripte tab --
-/// IDE1 replaces this body with the IDE (src/workspace/ide/)
+/// the IDE's window (it starts maximised): the IDE of workspace/ide in the window's box
 pub(crate) fn ide_window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
-    let id = desk_base(k) + 0x700;
     ui.next_size(-1, -1);
-    ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 10);
-    ui.empty_state(JN_APP_IDE, t("Die Skripte des Geräts"), t("Die Skripte bearbeitet, prüft und startet bis auf Weiteres der Reiter Skripte dieses Fensters."));
-    ui.next_icon(IC_DEV_TOOLS);
-    if ui.accent_button(id + 1, t("Reiter Skripte öffnen")) & EV_ACT != 0 {
-        super::open_on(n, ui, dev, super::Tab::Scripts);
-        ui.repass();
-    }
+    ui.box_begin(0, BOX_V | pad(4), 0);
+    crate::workspace::ide::view(n, ui, k, dev);
     ui.box_end();
+}
+
+/// the device's window on its desktop with the IDE's window in front (CMD_SCRIPTS)
+pub(crate) fn open_ide(n: &mut Net, ui: &mut Ui, dev: u32) {
+    super::open_on(n, ui, dev, super::Tab::Desktop);
+    if let Some(w) = n.devwin.wins.iter_mut().flatten().find(|w| w.dev == dev && w.open.get() != 0) {
+        w.desk.open_prog(Prog::Ide);
+    }
+    ui.repass();
 }
 
 /// a file of the device in the program for it (the Dateimanager's Öffnen): a script in
 /// open_jfs, every other file in the Texteditor
 pub(crate) fn open_with(n: &mut Net, k: usize, dev: u32, path: &str) {
     if path.ends_with(".jfs") {
-        open_jfs(n, k, dev, path);
+        open_jfs(n, k, path);
     } else {
         super::editor::open_file(n, k, dev, Some(path));
     }
 }
 
-/// a .jfs script of the device: in the Texteditor for now (IDE1: the IDE)
-pub(crate) fn open_jfs(n: &mut Net, k: usize, dev: u32, path: &str) {
-    super::editor::open_file(n, k, dev, Some(path));
+/// a .jfs script of the device: a tab of the IDE, whose window comes to the front
+pub(crate) fn open_jfs(n: &mut Net, k: usize, path: &str) {
+    crate::workspace::ide::open_later(n, k, path);
+    if let Some(w) = n.devwin.get(k) {
+        w.desk.open_prog(Prog::Ide);
+    }
 }
 
 // ---------------------------------------------------------------- Einstellungen

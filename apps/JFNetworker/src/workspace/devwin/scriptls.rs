@@ -1,4 +1,4 @@
-// scriptls -- the language services of the Skripte tab: lib/script's services (script::ls,
+// scriptls -- the language services of the IDE's editor: lib/script's services (script::ls,
 // script::fmt) for the code editor of a draft, with the names the simulator's ScriptService
 // gives scripts
 //

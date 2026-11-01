@@ -31,6 +31,8 @@
 //                                    view); after the session ended its console says so and
 //                                    takes no input
 //   close_session(n, dev, s)         the session ends and its console goes
+//   typed_session(n, dev, s, line)   a line as if typed in session s, as typed does it for the
+//                                    console (the IDE runs files in its terminal's session)
 //   new_tab(n, ui, dev)              "Neue Sitzung": a further session as a tab of the Terminal
 //                                    panel, titled "PC1 (2)"; closing the tab ends it
 //
@@ -812,6 +814,19 @@ pub(crate) fn close_session(n: &mut Net, dev: u32, s: u32) {
     if n.cons.focus_ses == Some((dev, s)) {
         n.cons.focus_ses = None;
     }
+}
+
+/// a line as if typed in session `s` of `dev` (0: typed): its echo after the prompt, the engine
+/// runs it, its output follows
+pub(crate) fn typed_session(n: &mut Net, dev: u32, s: u32, line: &str) {
+    if s == 0 {
+        typed(n, dev, line);
+        return;
+    }
+    pump(n);
+    let prompt = n.doc.sim.engine().cli_ses_prompt(dev, s);
+    n.cons.get_ses(&n.doc.proj, dev, s).term.write_str(&format!("{}{}\n", prompt, line));
+    ses_submit(n, dev, s, line);
 }
 
 /// "Neue Sitzung": a further session of `dev` as a tab of the Terminal panel ("PC1 (2)"), shown

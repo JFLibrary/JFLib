@@ -83,7 +83,7 @@ pub(crate) fn area(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, acts: &
     }
     let _ = errs;
     match sel {
-        LOW_TERMINAL => super::terminal(n, ui, cx.dev),
+        LOW_TERMINAL => super::terminal(n, ui, k, cx.dev),
         LOW_PROBLEMS => problems_pane(n, ui, k, id, &probs, acts),
         LOW_DEBUG => super::debug::view(n, ui, k, id, cx, acts),
         LOW_TESTS => tests_pane(n, ui, k, id, cx, tests.as_ref(), acts),

@@ -18,7 +18,7 @@ rclick listitem:"SRV1"
 move 700,300
 click menuitem:"IDE …"
 expect window 26624 open
-expect tab:"IDE" selected
+expect dialog:"IDE (maximiert)" selected
 resizewin 26624 1100 760
 wait 300
 # the tree: /root is open, app is not; the inline script
