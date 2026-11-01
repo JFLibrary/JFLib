@@ -1478,9 +1478,27 @@ Fensterrand hinaus.
   da ist, `spirv-val` (nimmt alle Module an, lehnt 33 von 34 kaputten ab; die Ausnahme ist die
   Gerätegrenze für Push-Konstanten). Es fehlen: Mesh- und Task-Shader, Subgroups,
   Spezialisierungskonstanten, MSL, die WGSL-Seite (G2).
-- **P2** · *fehlt* · G1c: Messszene in `gputest` mit `lib/gpu` und den Shadern aus
-  `lib/shader` (100 000 bis 1 000 000 Objekte, Sichtbarkeit per Compute-Shader, ein indirekter
-  Zeichenbefehl gegen einen je Objekt, CPU- und GPU-Zeit je Bild in 1080p und 4K).
+- **P2** · *erledigt* (2026-11-01) · G1c: Messszene in `gputest` mit `lib/gpu` und den
+  Shadern aus `lib/shader` (`gputest --bench N`, [GPU.md](GPU.md) „Messszene“): bis 1 000 000
+  bewegte Würfel, Bewegen und Sichtbarkeit per Compute-Shader, ein indirekter Zeichenbefehl
+  gegen einen je Objekt, drei Bilder in Arbeit; je Bild wandert nur die Kamera (176 Byte) zur
+  GPU. `gputest`: zwölf Skripte, alle auch unter Validierung ohne Meldung; `move` bitgleich zu
+  `move_all`, `cull` gleich `cull_ref`, ein Bild bekannter Würfel (oben, rechts, Farbe,
+  Tiefenfolge, Rückseiten weg), indirekt und einzeln pixelgleich. Dabei behoben: die Kamera
+  aus `lib/shader` rechnet jetzt in der Bildschirmausrichtung von `lib/gpu` (NDC y oben, sonst
+  stand das Bild kopf), und `lib/gpu` schaltet das Vulkan-Speichermodell nur mit seinem
+  Geräte-Scope ein (sonst lehnt die Validierung jedes Atomic im Geräte-Scope ab). Gemessen
+  (Release-Build, RTX 2070 SUPER, Median aus drei Läufen, etwa 53 % der Würfel sichtbar):
+  indirekt 1 Mio. Würfel 1,71 ms je Bild in 1080p (545 fps) und 2,54 ms in 4K (380 fps),
+  100 000 Würfel 0,30 ms in 1080p; Vollbild 1080p ohne Vsync 1,87 ms bei 1 Mio.; die CPU
+  braucht je Bild 0,06–0,14 ms. Ein Zeichenbefehl je Objekt: 1 Mio. 90 ms (11 fps), 100 000
+  8,5 ms, CPU-gebunden mit etwa 90 ns je Objekt bei 10–15 % GPU-Last. Engpass indirekt:
+  Geometriedurchsatz (6,35 Mio. Dreiecke je Bild bei 1 Mio., 3,5 Mrd. Dreiecke/s in 1080p),
+  in 4K zusätzlich Rasterung und Pixel; `cull` liest mit etwa 360 GB/s. Für G5 folgt daraus:
+  Verdeckung (Hi-Z in zwei Durchgängen), Detailstufen, kompakte Objektdaten für die
+  Sichtbarkeit, eine zweite Queue für Compute neben dem Zeichnen, Instanzlisten je Mesh statt
+  Befehlen je Objekt. Es fehlen in `lib/gpu`: eine zweite Queue, Abfragen der
+  Pipeline-Statistik.
 - **P2** · *fehlt* · G2: Shader-Compiler WGSL → SPIR-V mit Fehlermeldungen mit Zeile.
 - **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
   Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
