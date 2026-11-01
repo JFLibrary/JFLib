@@ -100,6 +100,9 @@ impl Lists {
         let (first, end) = ui.list_begin(ID_RLIST, &mut self.rl_sel, RL_N as i32, 48 | LF_REORDER);
         for row in first..end {
             ui.list_item_begin(row);
+            // the handle: a vertical move here drags the row, elsewhere it rolls the list
+            ui.icon(IC_MENU, 20);
+            ui.touch_drag();
             let it = self.rl_order[row as usize] as usize;
             ui.next_size(28, 28);
             ui.next_flags(ST_NOFOCUS); // a picture: no Tab stop

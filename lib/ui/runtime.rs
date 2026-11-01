@@ -781,6 +781,7 @@ impl Ui {
                 self.uiw_pass_begin(w, h);
                 let csd = self.csd_begin();
                 let t0 = if self.m.ins.on { plat::time_us() } else { 0 };
+                plat::touch_drag_clear();
                 app.frame(self);
                 if t0 != 0 {
                     *build_us += plat::time_us().saturating_sub(t0);

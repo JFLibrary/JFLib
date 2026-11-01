@@ -105,6 +105,7 @@ impl Basic {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         ui.next_size(60, 140);
         ui.slider(ID_VSLIDER, &mut self.vslider, &RANGE_VERT);
+        ui.touch_drag();
         ui.text(TS_BODY, &format!("Senkrecht: {}", self.vslider));
         ui.box_end();
 

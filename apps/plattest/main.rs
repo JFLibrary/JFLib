@@ -133,6 +133,7 @@
 //   plattest --test audio                  (t_audio.rs) plat::audio without a device: WAV files
 //                                          (formats, damaged ones), the ring, the resampler,
 //                                          tones, Ogg Vorbis, the PulseAudio wire format (Linux)
+//   plattest --test sensors / sensors-policy / sensors-ask   (t_sensors.rs) plat::sensors without hardware
 //   plattest --test screen / screen-wl / screen-bus / screen-policy   (t_screen.rs) plat::screen
 //                                          and plat::hotkey: chords, the dry run; Windows the
 //                                          monitors against GetSystemMetrics, a pattern window
@@ -213,6 +214,7 @@ mod t_audio;
 mod t_recent;
 // the monitors, pictures of the screen, the colour pick, global shortcuts
 mod t_screen;
+mod t_sensors;
 
 use plat::{
     CPU_AVX2, CPU_BMI2, CPU_FMA, CPU_POPCNT, CPU_SSE41, Cancelled, E_WAKE, FO_READ, FO_RW, FO_WRITE, File, Job,
@@ -389,6 +391,9 @@ fn plattest() -> i32 {
         Some("screen-wl") => t_screen::t_screen_wl,    // Linux: the Wayland outputs as monitors
         Some("screen-bus") => t_screen::t_screen_bus,  // Linux: the portals (tools/platshared/screen_bus.py)
         Some("screen-policy") => t_screen::t_screen_policy, // without input.global / screen.capture (not in "all")
+        Some("sensors") => t_sensors::t_sensors,       // plat::sensors without hardware
+        Some("sensors-policy") => t_sensors::t_sensors_policy, // without location / sensors (not in "all")
+        Some("sensors-ask") => t_sensors::t_sensors_ask, // behind ask lines (not in "all")
         Some("hotkey-hold") => t_screen::t_hotkey_hold, // its other process: holds a shortcut
         Some("async") => t_async::t_async,             // plat::task / plat::aio: executors, pool, timers, files
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,

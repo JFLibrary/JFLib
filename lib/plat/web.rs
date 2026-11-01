@@ -52,6 +52,8 @@ pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 #[path = "web_system.rs"]
 pub(crate) mod system_host;
 pub use system_host::{jfgui_note, jfgui_system};
+#[cfg(target_os = "android")]
+pub use system_host::jfgui_touch_drag;
 pub(crate) use system_host::sys_settings_host;
 // sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
 #[path = "web_sensors.rs"]

@@ -34,6 +34,8 @@
 //   dark() -> Option<bool>       (web.rs theme())
 //   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
 //   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
+//   jfgui_touch_drag(x, y) -> 0|1   (Android) a touch starting here drags in every direction
+//                                instead of scrolling with a vertical swipe (ui.touch_drag)
 //
 // The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
 // the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
@@ -198,6 +200,30 @@ const CALL_BACK: u32 = 55;
 #[cfg(target_os = "android")]
 pub(crate) fn back_trap(on: bool) {
     let _ = crate::web::android_host::call(CALL_BACK, &[on as u8]);
+}
+
+// (Android) the rectangles of ui.touch_drag of the last frame, px
+#[cfg(target_os = "android")]
+static TOUCH_DRAG: SpinLock<alloc::vec::Vec<[i32; 4]>> = SpinLock::new(alloc::vec::Vec::new());
+
+#[cfg(target_os = "android")]
+pub(crate) fn touch_drag_clear() {
+    TOUCH_DRAG.lock().clear();
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn touch_drag_add(r: [i32; 4]) {
+    let mut v = TOUCH_DRAG.lock();
+    if v.len() < 64 {
+        v.push(r);
+    }
+}
+
+/// (Android) a touch starting at this point (px) drags in every direction -> 1
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_touch_drag(x: i32, y: i32) -> u32 {
+    TOUCH_DRAG.lock().iter().any(|r| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]) as u32
 }
 
 /// the host's scheme: Some(true) dark, Some(false) light, None no preference

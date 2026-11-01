@@ -38,6 +38,8 @@ public final class GalleryActivity extends Activity {
     static native void nativeEvent(int type, int button, int mods, int x, int y, int data);
     private static native void nativeText(byte[] text);
     private static native boolean nativeIme();
+    // the widget under a new touch takes drags in every direction (ui.touch_drag)
+    private static native boolean nativeTouchDrag(int x, int y);
     // the accessibility tree (GalleryAccessibility): mirror on / off, its updates, an action
     static native void nativeA11y(boolean on);
     static native byte[] nativeA11yTake();
@@ -177,7 +179,7 @@ public final class GalleryActivity extends Activity {
         private final int slop;
         private int dpi, mode, pointerId = -1;
         private float renderScale = 1, downX, downY, lastY, wheelRemainder;
-        private boolean resumed, newSurface;
+        private boolean resumed, newSurface, grabs;
         private GalleryInputConnection connection;
         private String failure;
         private final GalleryAccessibility a11y;
@@ -277,6 +279,7 @@ public final class GalleryActivity extends Activity {
                 pointerId = event.getPointerId(0);
                 downX = event.getX(); downY = lastY = event.getY();
                 mode = 1; wheelRemainder = 0;
+                grabs = nativeTouchDrag(Math.round(downX * renderScale), Math.round(downY * renderScale));
                 postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
                 return true;
             }
@@ -289,7 +292,7 @@ public final class GalleryActivity extends Activity {
             if (action == MotionEvent.ACTION_MOVE) {
                 if (mode == 1 && Math.hypot(x - downX, y - downY) > slop) {
                     removeCallbacks(longPress);
-                    mode = Math.abs(y - downY) > Math.abs(x - downX) ? 3 : 2;
+                    mode = !grabs && Math.abs(y - downY) > Math.abs(x - downX) ? 3 : 2;
                     if (mode == 2) pointer(2, downX, downY);
                 }
                 if (mode == 2) pointer(1, x, y);

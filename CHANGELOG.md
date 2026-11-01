@@ -15,6 +15,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Added
 
+- **plat:** The device's motion sensors and location (`plat::sensors`: `watch`, `state`, `read`, `attitude`, `location_watch`, `location_state`, `location_fix`): Android through `SensorManager` and `LocationManager` (no Google Play services, the runtime permission from a user action), browsers through `devicemotion`, `deviceorientation` and `geolocation`; Windows and Linux report "not available"; stopped in the background; the rights `location` and `sensors` (also `ask`, `PERMDENY`); `plat::back_trap` (Android's back key as Esc)
+- **ui:** `UIC_SENSOR`, `UIC_LOCATION`, `ui.touch_drag` (a widget takes a finger's vertical drags on Android), a long press as the right button on Android, the script commands `sensor` and `location`
+- **build:** `tools/android.py` refuses an APK whose PERMISSIONS has `location` while its AndroidManifest.xml lists neither location permission; the packages note `location` and `sensors`
 - **crypto:** MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5 (`hmac_md5`), for protocols defined with MD5 (RADIUS); documented as broken for collisions, as `sha1` is
 - **netpkt:** The Telnet protocol (`telnet`: the NVT commands and option negotiation of RFC 854 / 855 / 857 / 858, IAC escaping, a `Reader` for bytes in pieces, the loop-free `Options` of RFC 1143) and RADIUS (`radius`: authentication and accounting of RFC 2865 / 2866 with every attribute, the User-Password hiding, the Request / Response Authenticators and the Message-Authenticator of RFC 3579); `decode` dissects both (`P_TELNET`, `P_RADIUS`)
 - **ui:** Full keyboard operation: focus groups (the arrows inside toolbars, radio sets, swatches and button grids), F6 / Ctrl+F6 through panes, docked panels and tool windows, F8 for splitters, the menu key / Shift+F10 everywhere, Enter, Space and Ctrl+arrows in lists, grids and trees

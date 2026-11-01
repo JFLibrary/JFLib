@@ -225,6 +225,15 @@ def main():
             return any(f"|{PKG}|{note_id}|jfgui-note|" in line for line in listed.splitlines())
         return f"Benachrichtigung Nummer {note_id}" in d.sh("dumpsys", "notification", "--noredact")
 
+    # the system lists a note a moment after the app's call returned (seen: up to 0.4 s on an emulator)
+    def listed(note_id, timeout=5):
+        end = time.time() + timeout
+        while time.time() < end:
+            if posted(note_id):
+                return True
+            time.sleep(0.2)
+        return False
+
     def focused():
         return ACTIVITY.replace("/.", "/" + PKG + ".") in "".join(
             line for line in d.sh("dumpsys", "window").splitlines() if "mCurrentFocus" in line or "mFocusedApp" in line)
@@ -345,11 +354,11 @@ def main():
             n += 1
             ok(dialog("permission_allow_button", "the permission dialog"), "the system asks again: \"Allow\"")
             s = wait(lambda s: num(s, "shown") == n, "shown after allowing")
-            ok(s is not None and posted(n), f"allowed: notification {n} posted (cmd notification list)")
+            ok(s is not None and listed(n), f"allowed: notification {n} posted (cmd notification list)")
         else:
             ok(tap_label("Benachrichtigung"), "tap \"Benachrichtigung\"")
             n += 1
-            ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and posted(n), f"notification {n} posted")
+            ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and listed(n), f"notification {n} posted")
         # tap it in the shade: UIC_NOTE, the activity in front
         d.sh("cmd", "statusbar", "expand-notifications")
         note = find(label(f"Benachrichtigung Nummer {n}"), "the notification in the shade")
@@ -363,7 +372,7 @@ def main():
         awake()
         ok(tap_label("Benachrichtigung"), "tap \"Benachrichtigung\" (granted)")
         n += 1
-        ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and posted(n), f"granted: notification {n} posted")
+        ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and listed(n), f"granted: notification {n} posted")
         d.sh("cmd", "statusbar", "expand-notifications")
         note = find(label(f"Benachrichtigung Nummer {n}"), "the notification in the shade")
         if note is not None:

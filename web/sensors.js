@@ -138,7 +138,8 @@ export class SensorHost {
   }
   permissionChanged() {
     if(!this.wanted || !this.perm) return;
-    if(this.perm.state==="denied") {this.stopWatch();this.state(LOC_DENIED,"denied");}
+    // ("prompt": the user reset it; asked again from the next user action)
+    if(this.perm.state!=="granted") {this.stopWatch();this.state(LOC_DENIED,"denied");}
     else if(this.perm.state==="granted" && this.watch===null) {this.state(SEARCHING,"searching");this.startWatch();}
   }
   async location(op) {

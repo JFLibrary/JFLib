@@ -76,7 +76,7 @@ impl Gallery {
             self.home_restore = 2; // the scroll view may have to learn its extent again first
         }
         self.page = to;
-        self.sensors.enter(to);
+        self.sensors.enter(ui, to);
         plat::back_trap(to != Page::Home);
     }
 
@@ -112,8 +112,10 @@ impl Gallery {
             ui.box_end();
             ui.scroll_end();
         }
-        if self.page == Page::Windows {
-            self.windows.windows(ui);
+        match self.page {
+            Page::Windows => self.windows.windows(ui),
+            Page::Boxes => ui.toast_host(),
+            _ => {}
         }
     }
 }

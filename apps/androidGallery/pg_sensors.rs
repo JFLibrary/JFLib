@@ -416,11 +416,12 @@ impl Default for Sensors {
 
 impl Sensors {
     /// a page opens: its sensors start, the others stop (what both need runs on)
-    pub fn enter(&mut self, page: Page) {
+    pub fn enter(&mut self, ui: &Ui, page: Page) {
         self.page = page;
         let mask = mask_of(page);
         self.watch = (mask != 0).then(|| ps::watch(mask));
         self.location = if page == Page::Gps && self.loc_on != 0 { Some(ps::location_watch()) } else { None };
+        self.save(ui);
     }
 
     /// the library's commands: count them, a frame -> handled
@@ -437,7 +438,7 @@ impl Sensors {
             UIC_PERMISSION => {
                 // the answer to an `ask` line of a manifest: try again
                 if arg == 1 && self.page != Page::Home {
-                    self.enter(self.page);
+                    self.enter(ui, self.page);
                 }
                 return false;
             }

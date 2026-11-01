@@ -116,6 +116,24 @@ def sdk_tools():
     return sdk, ndk, llvm, build, platform, java, suffix
 
 
+def manifest_gaps(perms, manifest):
+    """what apps/NAME/PERMISSIONS allows but android/AndroidManifest.xml does not declare (Android
+    would refuse it without a word) -> the message, or None.  Only the location needs a line:
+    motion sensors have no permission, and the other rules have no Android permission behind them
+    or ask for theirs elsewhere"""
+    if perms is None:
+        return None
+    keys = set()
+    for line in perms.splitlines():
+        words = line.split('#')[0].split()
+        if words:
+            keys.add(words[1] if words[0] == 'ask' and len(words) > 1 else words[0])
+    if 'location' in keys and 'ACCESS_FINE_LOCATION' not in manifest and 'ACCESS_COARSE_LOCATION' not in manifest:
+        return ('PERMISSIONS has `location`: android/AndroidManifest.xml needs <uses-permission> for '
+                'android.permission.ACCESS_FINE_LOCATION and / or ACCESS_COARSE_LOCATION.')
+    return None
+
+
 def build_apk(builder, name, style, variant, root, crates, run, notices):
     """notices: {relative Path: source} (build_rs.app_notices), packed below assets/"""
     # Import the same error type as the active build entry point, including __main__.
@@ -142,6 +160,9 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     deps = crates + [f'style_{style}']
     # Packaging and tool versions participate in freshness, including the host sources.
     perms, assets, boot = builder.boot_inputs(name)   # the manifest and app:// as on the desktop
+    missing = manifest_gaps(perms, manifest.read_text(encoding='utf-8'))
+    if missing:
+        raise error(f'{name}: {missing}')
     digest = hashlib.sha256(builder.src_hash(root, deps, extra=style + boot).encode())
     sources = [Path(__file__), ROOT / 'build_rs.py']
     sources += sorted(p for p in (ROOT / 'android').rglob('*') if p.is_file())

@@ -1819,7 +1819,7 @@ impl Ui {
         let (w, h) = st.dropdown_size(self, &mut sp);
         let (w, h) = self.ctrl_size(w, h, flags, false); // (theme) control height
         self.place(w, h);
-        let mut hb = HB_FOCUS;
+        let mut hb = if flags & ST_NOFOCUS != 0 { 0 } else { HB_FOCUS };
         if flags & ST_DISABLED != 0 {
             hb |= HB_DISABLED;
         }

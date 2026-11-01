@@ -1,0 +1,3 @@
+#!args --test sensors
+# (Rust only) plattest --test sensors: plat::sensors without hardware (lib/plat/sensors.rs): the
+# attitude from gravity, a field, a rotation; guards, the background, a test feed like the host's.

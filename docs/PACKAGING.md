@@ -382,6 +382,7 @@ own repositories and bundles.
 | `audio.output` | `--socket=pulseaudio` (`plat::audio` speaks the PulseAudio protocol, also to pipewire-pulse; the socket allows recording too, so only apps that play sound list the right; noted) |
 | `recent` | `--filesystem=xdg-data/recently-used.xbel` (the host's list of recent files for `plat::recent_add` / `ui.recent_add`; it lists every program's recent files; noted) |
 | `fs.user`, `url`, `print`, `autostart` | none: the file dialog, OpenURI, Print and Background portals; files of "Open with" come through the document portal |
+| `location`, `sensors` | none yet, noted: `plat` has no Linux version (later the location portal, no hole; `--system-talk-name=net.hadess.SensorProxy` for iio-sensor-proxy) |
 | `process` | none: programs outside the sandbox are not reachable (`flatpak-spawn --host` would need `--talk-name=org.freedesktop.Flatpak`, a full escape: not granted; noted) |
 | no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
@@ -425,7 +426,11 @@ or URL as its command-line argument; a `desktop:StartupTask` (`Enabled="false"`)
 allows `autostart` (or there is no PERMISSIONS); capabilities: `internetClient` for `net.connect`,
 `internetClientServer` and `privateNetworkClientServer` for `net.listen` (a full-trust app is not
 confined by them; they are shown in the Store, PERMISSIONS stays what plat enforces); `audio.output`
-needs none (playing sound is no MSIX capability, only recording is: `microphone`).  The
+needs none (playing sound is no MSIX capability, only recording is: `microphone`); `location`
+and `sensors` declare nothing while `plat` has no Windows version (noted; the former will be the
+device capability `location`).  An APK's `android/AndroidManifest.xml` stays the app's own file:
+with `location` in PERMISSIONS the build refuses a manifest without `ACCESS_FINE_LOCATION` or
+`ACCESS_COARSE_LOCATION` (`tools/android.py`).  The
 package folder holds `<App>.exe` (signed like the setup's, when a certificate is set), modules,
 further programs and notices; `MakeAppx pack` checks the manifest against the schema.
 

@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -156,7 +156,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 **`Ui` methods by area** (signatures and descriptions in the sections below):
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
-- [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
+- [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `touch_drag`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
@@ -446,6 +446,11 @@ natural size.
   ui_take_icon: the pending icon (cleared; for widgets)
 - **`fn last_rect(&self) -> [i32; 4]`**
   ui_last_rect: [x, y, w, h] of the last placed widget (px)
+- **`fn touch_drag(&mut self)`**
+  ui_touch_drag: a finger that starts on the last widget drags it in every direction instead
+  of scrolling the page with a vertical swipe (Android: a colour wheel, a vertical slider, the
+  handle of a row; a horizontal drag always reaches the widget).  Call it after the widget,
+  every frame; the main window only.  Elsewhere nothing happens
 - **`fn box_id(&self) -> u32`**
   ui_box_id: id of the current box (the root box's id at the top level; 0 outside a pass)
 - **`fn box_rect(&self) -> [i32; 4]`**
@@ -3899,6 +3904,16 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
                       overrides of the system settings (follow with `system settings ...`),
                       jfgui_CSD (the library title bar and its resize band, next pass)
+  sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
+                      the sensor exists from now on; a stopped sensor delivers nothing
+  sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
+  sensor none NAME|all   this sensor does not exist (the start: none does)
+  sensor expect NAME off|waiting|running|paused|denied|unavailable
+  location LAT LON [ACC ALT SPEED BEARING]   a fix of plat::sensors ('-': the provider does not
+                      say); location age MS: how old it is now
+  location searching|denied|off|none   the host's answer (off: the system's switch; none: no
+                      location service, as at the start)
+  location expect off|searching|fix|paused|denied|disabled|unavailable
   expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
                       bar or the resize band asked the window manager for since the last check
                       (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
@@ -4957,6 +4972,8 @@ UIC_HOTKEY_LOST: u32 = 0x7FFF_0016  // arg = id: the desktop dropped the shortcu
 UIC_PICK: u32 = 0x7FFF_0017  // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
 UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
 UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
+UIC_SENSOR: u32 = 0x7FFF_001B  // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
+UIC_LOCATION: u32 = 0x7FFF_001C  // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -21414,6 +21431,17 @@ Re-exports: `rt::{VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
 Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_PANIC, CK_STACK, CrashHook, CrashInfo}`
 
+- **`fn back_trap(on: bool)`**
+  Android: while `on`, the back key reaches the app as Esc (a page of the app goes back, a popup
+  closes; `UIC_ESCAPE` when nothing took it) instead of ending the activity.  Elsewhere nothing:
+  there Esc is a key of its own
+
+- **`fn touch_drag_clear()`**
+  (ui, every pass) no widget takes touch drags yet (ui.touch_drag; Android, jfgui_touch_drag)
+
+- **`fn touch_drag_add(r: [i32; 4])`**
+  (ui) a touch that starts in this rectangle (px) drags instead of scrolling (Android)
+
 - **`struct Event`**
   one platform event (the EV_\* record): type, button, modifiers, window index (0 = the
   main window), position (px; E_RESIZE: size), data
@@ -22240,7 +22268,7 @@ start-up, then checked by the public file, process, shell, plugin and print func
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
   audio_allowed()                        -> bool
-  input_global_allowed() / screen_capture_allowed()
+  input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed()
                                          -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
@@ -22307,6 +22335,8 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         another program has the keyboard)
   screen.capture        plat::screen::capture_start (pictures of the screen; picking one
                         pixel's colour needs nothing: the user chooses it)
+  location              plat::sensors::location_watch (where the device is)
+  sensors               plat::sensors::watch (accelerometer, gyroscope, magnetometer, rotation)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -22360,9 +22390,10 @@ STORE: &str = "config://permission-decisions.txt"
 - **`struct Denial`**
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    "audio.output", "net.connect", "net.listen", "agent", "input.global" or "screen.capture"
+    "audio.output", "net.connect", "net.listen", "agent", "input.global", "screen.capture",
+    "location" or "sensors"
   - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action, the
-    chord of a shortcut or "" (print, autostart, audio.output, screen.capture)
+    chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -22466,6 +22497,12 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn screen_capture_allowed() -> bool`**
   whether plat::screen::capture_start may take pictures of the screen (`screen.capture`)
+
+- **`fn location_allowed() -> bool`**
+  whether plat::sensors::location_watch may ask where the device is (`location`)
+
+- **`fn sensors_allowed() -> bool`**
+  whether plat::sensors::watch may read the motion sensors (`sensors`)
 
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
@@ -23427,6 +23464,192 @@ INHIBIT_IDLE: u32 = 2
 
 - **`fn inhibited() -> u32`**
   the INHIBIT_\* bits the live guards of this process hold
+
+### `plat/sensors.rs`
+
+Source: [`lib/plat/sensors.rs`](../lib/plat/sensors.rs)
+
+```text
+sensors -- the device's motion sensors and its location for the app
+
+  watch(SENSOR_*) -> SensorWatch   these sensors run while the guard lives (counted per sensor:
+                                   the last guard stops them); nothing runs without a guard.
+                                   Needs `sensors` in the manifest (else state() is Denied,
+                                   "PERMDENY sensors")
+  state(SENSOR_X) -> SensorState   Off, Waiting (started, no reading yet), Running, Paused (the
+                                   app is in the background), Unavailable (this device has no
+                                   such sensor, or the platform none at all), Denied
+  read(SENSOR_X) -> Option<Reading>   the last reading (kept while Paused, gone when stopped)
+  attitude() -> Option<Attitude>   pitch, roll and heading from what runs: gravity (the
+                                   gravity sensor, the rotation estimate, the accelerometer, in
+                                   this order), heading from the rotation estimate, otherwise
+                                   computed from gravity and the magnetic field
+  attitude_of(gravity, rotation, magnet) -> Option<Attitude>   the same from given values
+  location_watch() -> LocationWatch   the location runs while the guard lives; the first start
+                                   may ask the user (call it from a user action: Android's
+                                   runtime permission, the browser's prompt).  Needs `location`
+                                   in the manifest (else Denied, "PERMDENY location")
+  location_state() -> LocationState   Off, Searching, Fix, Paused, Denied (the user or the
+                                   manifest refused), Disabled (the system's location switch
+                                   is off), Unavailable (no location service here)
+  location_fix() -> Option<Fix>    the last fix: latitude, longitude, and what the provider
+                                   gave of accuracy, altitude, speed, bearing; age_ms()
+  take() -> (bits, location)       (ui) what is new since the last call
+  suspend(on)                      (ui) the app went to the background / came back: everything
+                                   stops, Paused, and starts again without asking
+
+New readings reach the UI thread like the host's other events: plat::wake(), then E_WAKE, and
+the UI turns them into App::command(UIC_SENSOR, bits) and App::command(UIC_LOCATION, state);
+nothing polls.  A sensor's axes are the device's: x to the right of the screen, y to its top, z
+out of it; accelerometer and gravity in m/s^2 (lying flat, screen up: z = +9.81), gyroscope in
+rad/s, magnetic field in microtesla, the rotation estimate a unit quaternion (x, y, z, w) from
+the device's axes to east, north, up (Reading::absolute: its zero is north; false: wherever the
+device pointed when it started).
+
+Android (android/GallerySensors.java, web_sensors.rs): SensorManager and LocationManager (GPS
+and network providers, no Google Play services), ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
+asked when location_watch starts.  Browser (web/sensors.js, web_sensors.rs): DeviceMotionEvent,
+DeviceOrientationEvent (Safari's requestPermission from the click), navigator.geolocation; no
+magnetic field.  Windows and Linux: everything is Unavailable (docs/ROADMAP.md names what a
+native version would use).  Scripts feed readings (`sensor ...`, `location ...`; lib/ui/auto.rs):
+test_sensor, test_sensor_none, test_location.
+```
+
+```rust
+/// acceleration including gravity, m/s^2
+SENSOR_ACCEL: u32 = 1
+/// gravity alone, m/s^2 (a virtual sensor of the system)
+SENSOR_GRAVITY: u32 = 2
+/// angular speed around x, y, z, rad/s
+SENSOR_GYRO: u32 = 4
+/// magnetic field, microtesla
+SENSOR_MAGNET: u32 = 8
+/// the rotation estimate: a unit quaternion from the device's axes to east, north, up
+SENSOR_ROTATION: u32 = 16
+/// every sensor
+SENSOR_ALL: u32 = 31
+```
+
+- **`enum SensorState`**
+  what a sensor does now
+  - `Off = 0` -- nobody asks for it
+  - `Waiting = 1` -- started, no reading yet
+  - `Running = 2` -- readings arrive
+  - `Paused = 3` -- the app is in the background (or the system sleeps): stopped until it is back
+  - `Denied = 4` -- the manifest refuses it (`sensors`) or the user did (Safari's question)
+  - `Unavailable = 6` -- this device has no such sensor, or the platform has none
+
+- **`enum LocationState`**
+  what the location does now
+  - `Off = 0` -- nobody asks for it
+  - `Searching = 1` -- started (or asking the user), no fix yet
+  - `Fix = 2` -- a fix arrived: location_fix
+  - `Paused = 3` -- the app is in the background: stopped until it is back
+  - `Denied = 4` -- the manifest (`location`) or the user refuses it, or the user took it back
+  - `Disabled = 5` -- the system's location switch is off
+  - `Unavailable = 6` -- no location service on this device or platform
+
+- **`struct Reading`**
+  one reading of a sensor
+  - `v: [f32; 4]` -- x, y, z (the rotation estimate: x, y, z, w of the quaternion; else 0)
+  - `accuracy: u8` -- how far to trust it: 0 unreliable (a magnetometer asking for the figure eight), 1 low,
+    2 medium, 3 high
+  - `absolute: bool` -- (rotation) its zero is north; false: only relative to where it started
+
+- **`struct Attitude`**
+  the device's position in the room, degrees
+  - `pitch: f32` -- -90 .. 90: the top edge above the bottom edge (upright: 90)
+  - `roll: f32` -- -180 .. 180: the right edge below the left edge
+  - `side: f32` -- -90 .. 90: the right edge above the left edge (a level's other axis beside pitch)
+  - `heading: Option<f32>` -- 0 .. 360 clockwise from north: where the device's top points, or its back when it is held
+    upright; None: no rotation estimate and no magnetic field
+  - `absolute: bool` -- heading's zero is north (false: where the estimate started)
+  - `up: [f32; 3]` -- the direction away from the earth in the device's axes (a unit vector)
+
+- **`enum FixSource`**
+  where a fix comes from
+  - `Other = 0` -- the host did not say
+  - `Gps = 1` -- satellites
+  - `Network = 2` -- mobile cells and wireless networks
+
+- **`struct Fix`**
+  one location fix
+  - `latitude: f64` -- degrees, north positive
+  - `longitude: f64` -- degrees, east positive
+  - `accuracy: Option<f32>` -- metres (68 % of the fixes lie this close), when the provider says
+  - `altitude: Option<f64>` -- metres above the WGS 84 ellipsoid, when the provider says
+  - `speed: Option<f32>` -- metres per second, when the provider says
+  - `bearing: Option<f32>` -- degrees clockwise from north, when the provider says
+  - `source: FixSource`
+
+**`impl Fix`**
+
+- **`fn age_ms(&self) -> u64`**
+  how old it is, ms (a fix of a script stays as old as the script says)
+
+- **`struct SensorWatch`**
+  these sensors run while the guard lives; dropping it stops them
+
+**`impl SensorWatch`**
+
+- **`fn mask(&self) -> u32`**
+  the SENSOR_\* bits this guard keeps running (0: refused by the manifest)
+
+- **`fn watch(mask: u32) -> SensorWatch`**
+  start these sensors (SENSOR_\* bits) until the guard is dropped; a sensor this device lacks is
+  not an error: its state() says Unavailable.  Without `sensors` in the manifest: nothing runs,
+  state() says Denied
+
+- **`fn state(bit: u32) -> SensorState`**
+  what this sensor (one SENSOR_\* bit) does now
+
+- **`fn read(bit: u32) -> Option<Reading>`**
+  the last reading of this sensor (one SENSOR_\* bit)
+
+- **`fn attitude() -> Option<Attitude>`**
+  pitch, roll and heading from what runs now (see the module header)
+
+- **`fn attitude_of(gravity: Option<[f32; 3]>, rotation: Option<Reading>, magnet: Option<[f32; 3]>) -> Option<Attitude>`**
+  the attitude from a gravity vector (the accelerometer at rest: what points away from the
+  earth), a rotation quaternion and a magnetic field, each in the device's axes; pitch and roll
+  follow gravity when it is given, the rotation otherwise; heading follows the rotation, else
+  gravity and the field.  None: neither gravity nor rotation (or useless values)
+
+- **`struct LocationWatch`**
+  the location runs while the guard lives; dropping it stops it
+
+- **`fn location_watch() -> LocationWatch`**
+  start the location until the guard is dropped; the first start may ask the user, so call it
+  from a user action.  Without `location` in the manifest: nothing runs, location_state() says
+  Denied (an `ask location` line: the UI's question, UIC_PERMISSION, then call it again)
+
+- **`fn location_state() -> LocationState`**
+  what the location does now
+
+- **`fn location_fix() -> Option<Fix>`**
+  the last fix (kept while Paused or Searching again; gone when stopped)
+
+- **`fn take() -> (u32, bool)`**
+  (ui) what is new since the last call: the sensors with news (a reading or another state),
+  whether the location has news
+
+- **`fn suspend(on: bool)`**
+  (ui) the app went to the background or the system to sleep (true): everything stops, Paused;
+  back (false): it starts again, nobody is asked
+
+- **`fn test_sensor(bit: u32, v: [f32; 4], accuracy: u8, absolute: bool) -> bool`**
+  (scripts: `sensor NAME ...`) this sensor exists now; its reading arrives if it runs (a stopped
+  sensor delivers nothing) -> it was taken
+
+- **`fn test_sensor_none(mask: u32)`**
+  (scripts: `sensor none NAME`) these sensors do not exist (any more)
+
+- **`fn test_location(state: LocationState, fix: Option<(f64, f64, [f64; 4], u64)>)`**
+  (scripts: `location ...`) the host's answer: a state (LocationState: Searching, Denied,
+  Disabled, Unavailable), or Fix with `fix` (a fix of a script keeps its age)
+
+- **`fn test_location_age(age_ms: u64)`**
+  (scripts: `location age MS`) how old the script's fix is
 
 ### `plat/autostart.rs`
 
@@ -27817,6 +28040,9 @@ Wire (little endian): u32 numbers, i64 times, strings and byte blocks as u32 len
   CALL_GRANTS    -> u32 count, (uri, u32 read, u32 write)..
   CALL_RELEASE   uri -> u32 ok
   CALL_SECRET_*  the secret store (android_secret.rs, android/GallerySecrets.java)
+  50 .. 59       android/GallerySystem.java: notifications (web_notify.rs), the screen kept on
+                 (web_power.rs), sensors and location (web_sensors.rs), the back key
+                 (web_system.rs)
   DocInfo: uri, display name, u32 dir, u64 size (u64::MAX unknown), i64 mtime ms, u32 DOC_*
 
 The clipboard: text (and HTML) go to the system; the library's richer forms (RTF, DOCX)
@@ -28035,6 +28261,9 @@ web_system -- what the browser / Android host says about the system: the user's 
   sys_settings_host(&mut s)    (settings.rs) the host's values; the jfgui_* overrides follow
   dark() -> Option<bool>       (web.rs theme())
   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
+  back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
+  jfgui_touch_drag(x, y) -> 0|1   (Android) a touch starting here drags in every direction
+                               instead of scrolling with a vertical swipe (ui.touch_drag)
 
 The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
 the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
@@ -28048,6 +28277,44 @@ into UIC_SUSPEND.
 - **`extern "C" fn jfgui_note(id: u32, clicked: u32) -> u32`**
   A notification of tray::notify was clicked (clicked 1) or went away without a click (0)
   -> 1 taken (0: the app has not started).
+
+- **`extern "C" fn jfgui_touch_drag(x: i32, y: i32) -> u32`**
+  (Android) a touch starting at this point (px) drags in every direction -> 1
+
+### `plat/web_sensors.rs`
+
+Source: [`lib/plat/web_sensors.rs`](../lib/plat/web_sensors.rs)
+
+```text
+web_sensors -- (sensors.rs) the sensors and the location in the browser and on Android
+
+Browser (web/sensors.js): REQUEST_SENSORS, u32 SENSOR_* union (0: stop) and REQUEST_LOCATION,
+u32 LOC_STOP / LOC_START / LOC_RESUME; no completion.  The page answers with jfgui_sensor,
+jfgui_sensor_state and jfgui_location; while it has not, a sensor is Waiting and the location
+Searching.  Android (android/GallerySensors.java): CALL_SENSORS, u32 union -> u32 the bits this
+device has; CALL_LOCATION, u32 op -> u32 LocationState; it asks ACCESS_FINE_LOCATION /
+ACCESS_COARSE_LOCATION on LOC_START and answers later through the same exports:
+
+  jfgui_sensor(bit, x, y, z, w, flags) -> 1   a reading (flags: accuracy 0..3, 4 absolute)
+  jfgui_sensor_state(mask, state) -> 1        Waiting 1, Denied 4, Unavailable 6
+  jfgui_location(state, lat, lon, accuracy, altitude, speed, bearing, age_ms, source) -> 1
+                                              a state (LocationState as a number) or with
+                                              state 2 a fix; NaN: the provider does not say;
+                                              source 1 GPS, 2 network
+
+A reading is stored, plat::wake() brings E_WAKE at the next jfgui_input / jfgui_tick (Android:
+the host's nativeEvent(E_WAKE)), the UI's UIC_SENSOR / UIC_LOCATION follow.
+```
+
+- **`extern "C" fn jfgui_sensor(bit: u32, x: f32, y: f32, z: f32, w: f32, flags: u32) -> u32`**
+  A reading of the host: bit SENSOR_\*, the values, flags: accuracy 0..3, 4 absolute -> 1 taken
+
+- **`extern "C" fn jfgui_sensor_state(mask: u32, state: u32) -> u32`**
+  What the host says of these sensors: 1 Waiting, 4 Denied, 6 Unavailable -> 1
+
+- **`extern "C" fn jfgui_location(state: u32, lat: f64, lon: f64, accuracy: f64, altitude: f64, speed: f64, bearing: f64, age_ms: f64, source: u32) -> u32`**
+  The host's location: a state (LocationState as a number) or with state 2 a fix; NaN: the
+  provider does not say; age_ms: how old the fix is now; source: 1 GPS, 2 network -> 1
 
 ### `plat/android_ime.rs`
 

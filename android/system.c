@@ -10,6 +10,7 @@
 extern uintptr_t jfgui_buffer(uint32_t length);
 extern uint32_t jfgui_system(uint32_t length);
 extern uint32_t jfgui_note(uint32_t id, uint32_t clicked);
+extern uint32_t jfgui_touch_drag(int32_t x, int32_t y);
 extern uint32_t jfgui_sensor(uint32_t bit, float x, float y, float z, float w, uint32_t flags);
 extern uint32_t jfgui_location(uint32_t state, double lat, double lon, double accuracy, double altitude,
                                double speed, double bearing, double age_ms, uint32_t source);
@@ -29,6 +30,11 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GallerySystem_nativeSettings(JNIEn
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryNotify_nativeNote(JNIEnv *env, jclass cls, jint id, jboolean clicked) {
     (void)env; (void)cls;
     (void)jfgui_note((uint32_t)id, clicked ? 1u : 0u);
+}
+
+JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeTouchDrag(JNIEnv *env, jclass cls, jint x, jint y) {
+    (void)env; (void)cls;
+    return jfgui_touch_drag(x, y) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GallerySensors_nativeSensor(JNIEnv *env, jclass cls, jint bit, jfloat x, jfloat y,

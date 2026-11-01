@@ -163,7 +163,7 @@ wait 50
 shot build/shots/androidGallery/lists.png
 click #4351
 expect #4351 unchecked
-drag #4301 #4303
+drag 36,441 36,537
 expect text:"Reihenfolge: 2 3 1 4 5 6 7 8 9 10 11 12" exists
 expect text:"Auswahl: 2   Verschoben: 1" exists
 expect text:"Knoten: –" exists
@@ -172,7 +172,6 @@ expect text:"Knoten: Fotos" exists
 expect listitem:"Urlaub" exists
 expect listitem:"Strand.jpg" missing
 key right
-key down
 key right
 expect listitem:"Strand.jpg" exists
 shot build/shots/androidGallery/tree.png
