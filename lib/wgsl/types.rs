@@ -71,6 +71,25 @@ impl Types {
         t
     }
 
+    /// the table of a checked module again (the back end's constant evaluation: the ids are
+    /// the module's, since the checker interned in the same order)
+    pub fn from_module(types: &[Type], structs: &[Struct]) -> Types {
+        let mut t = Types::new();
+        t.structs = structs.to_vec();
+        for (i, ty) in types.iter().enumerate() {
+            if i >= t.list.len() {
+                t.list.push(*ty);
+                t.map.insert(*ty, i as TypeId);
+            }
+        }
+        for (i, s) in structs.iter().enumerate() {
+            if let (Some(b), Some(&id)) = (s.builtin, t.map.get(&Type::Struct(i as u32))) {
+                t.builtin_structs.insert(b, id);
+            }
+        }
+        t
+    }
+
     pub fn intern(&mut self, ty: Type) -> TypeId {
         if let Some(&id) = self.map.get(&ty) {
             return id;

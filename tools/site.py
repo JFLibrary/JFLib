@@ -94,7 +94,7 @@ DOCS = [
     ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de"),
     ("docs/GPU.md", "GPU layer", "Reference", "de"),
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de"),
-    ("docs/WGSL.md", "WGSL front end", "Reference", "de"),
+    ("docs/WGSL.md", "WGSL compiler", "Reference", "de"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en"),
     ("apps/PaintCraft/README.md", "PaintCraft", "Apps", "en"),
     ("plugins/README.md", "PaintCraft plugins", "Apps", "en"),

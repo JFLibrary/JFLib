@@ -140,9 +140,12 @@ let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
 
 - **Schlüssel ist die Nummer** (`SpecId`). WebGPU nimmt `constants: Record<string, number>`
   mit der Nummer als Text (`"0"`) oder, bei Overrides ohne `@id`, ihrem Namen. Der
-  WGSL-Übersetzer vergibt deshalb auch Overrides ohne `@id` eine Nummer (außerhalb von 0 …
-  65535, die WGSL für `@id` erlaubt) und liefert die Zuordnung Name → Nummer; ein späteres
-  WebGPU-Backend setzt damit den Schlüssel.
+  WGSL-Übersetzer (`lib/wgsl`) vergibt deshalb auch Overrides ohne `@id` eine Nummer
+  (0x10000 + Index, außerhalb von 0 … 65535, die WGSL für `@id` erlaubt), und
+  `wgsl::Output::constants` macht aus WebGPU-artigen Schlüsseln (Name oder Zahl) die Liste
+  `(Nummer, Wert)` für jede Spezialisierungskonstante des Moduls, abgeleitete Overrides fertig
+  ausgerechnet (docs/WGSL.md „Overrides“); ein späteres WebGPU-Backend setzt den Schlüssel
+  selbst.
 - **Der Wert ist ein `f64`** wie in WebGPU und wird so umgewandelt wie dort: `bool` ist wahr außer
   bei 0 und NaN; `i32` / `u32` (und die anderen Ganzzahlen) werden zur Null hin abgeschnitten und
   müssen endlich und im Bereich liegen; `f32` / `f16` / `f64` werden gerundet und müssen endlich
@@ -152,7 +155,7 @@ let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
   `Invalid` (Vulkan würde sie übergehen, WebGPU nicht); ein Modul mit einer `SpecId` zweimal
   ebenso. Overrides, die die Pipeline nicht setzt, behalten den Standardwert im Modul. Ob ein
   WGSL-Override ohne Initialisierer gesetzt ist, weiß nur der Übersetzer (SPIR-V hat immer einen
-  Standardwert).
+  Standardwert): das prüft `wgsl::Output::constants`.
 - **Workgroup-Größe**: nach dem Einsetzen der Konstanten (`WorkgroupSize`-Built-in vor
   `LocalSizeId` vor `LocalSize`) muss jede Achse ≥ 1 und innerhalb von
   `Limits::max_compute_workgroup_size`, das Produkt innerhalb von `max_compute_invocations` sein,
@@ -266,11 +269,12 @@ für Messungen den Configurator ausschalten.
 | `bindless.uis` | (Voll) Puffer und Texturen über eine Tabelle; ein Platz ersetzt |
 | `window.uis` | Fenster mit Swapchain: FIFO-Bilder, dargestelltes Bild zurückgelesen, Größe geändert, minimiert / wiederhergestellt, IMMEDIATE und MAILBOX |
 | `errors.uis` | `jfgui_GPU=0`, fehlender Loader, `jfgui_GPU_ADAPTER` ohne Treffer, ungültige Aufrufe (Fehler, kein Absturz), verlorenes Gerät und ein neues danach |
-| `scene.uis` | die Messszene (unten): `move` = `move_all` Bit für Bit, `cull` = `cull_ref`, ein Bild bekannter Würfel (Lage, Farbe, Tiefe, Rückseiten), indirekter und Einzel-Pfad gleich |
-| `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE |
+| `scene.uis` | die Messszene (unten) mit den handgeschriebenen SPIR-V-Shadern und mit den von `lib/wgsl` übersetzten WGSL-Shadern: `move` = `move_all` Bit für Bit, `cull` = `cull_ref`, ein Bild bekannter Würfel (Lage, Farbe, Tiefe, Rückseiten), indirekter und Einzel-Pfad gleich, die WGSL-Bilder = die SPIR-V-Bilder Pixel für Pixel; WGSL-`move` ohne Robustheit bitgleich, mit erlaubter Kontraktion gemeldet (der Treiber fusioniert: 1,33 Mio. Wörter weichen ab) |
+| `wgsl.uis` | das WGSL-Back-End auf der GPU, auf SPIR-V 1.6 und auf einem Basis-Gerät mit 1.3 ([`t_wgsl.rs`](../apps/gputest/t_wgsl.rs), [`t_wgsl2.rs`](../apps/gputest/t_wgsl2.rs)): jeder Operator und jede numerische eingebaute Funktion auf Laufzeitwerten (150 Fälle, 13 469 Ergebnisse, neun davon mit f16) gegen den Konstantenauswerter von `lib/wgsl` mit den Genauigkeiten der Spezifikation und WGSLs Laufzeitregeln (Division durch 0, `MIN / -1`, Shifts ab der Bitbreite); NaN bei `min` / `max` / `clamp` / Vergleichen (gemeldet: 7 von 7 wie WGSL); Overrides als Spezialisierungskonstanten und eingesetzt, mit Standardwerten, Fehlerfällen; Robustheit (Schreiben hinter ein Laufzeit-Array und ein festes Array, Lesen weit außerhalb); Workgroup-Speicher genullt, Atomics dort, `workgroupUniformLoad`; `discard` (Farbe, Atomic danach, `dpdx` danach); `textureStore` außerhalb übersprungen, `textureLoad` außerhalb geklemmt. `--dump DATEI` schreibt die Fälle für [`tools/wgsl_run.mjs`](../tools/wgsl_run.mjs) (Chrome rechnet dieselben Shader), `--chrome ERGEBNIS` vergleicht dessen Ergebnisse mit denselben Referenzen |
+| `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE; indirekt und einzeln mit den WGSL-Shadern |
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
-| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec` und `textures` |
+| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung) |
 
 Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
 `gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
@@ -317,8 +321,14 @@ die Tests in [`t_scene.rs`](../apps/gputest/t_scene.rs)):
 ```text
 gputest --bench N [--res 1080p|4k|720p|BxH] [--mode indirect|single] [--window | --fullscreen]
                   [--present immediate|fifo|mailbox] [--frames F] [--warmup W] [--inflight K]
-                  [--verify] [--shot DATEI.png] [--validate]
+                  [--verify] [--shot DATEI.png] [--validate] [--shaders spirv|wgsl] [--robust 0]
+                  [--fused]
 ```
+
+`--shaders wgsl` nimmt statt der handgeschriebenen SPIR-V-Shader aus `lib/shader/bench.rs` die
+WGSL-Shader aus `lib/wgsl/bench`, beim Anlegen der Szene von `lib/wgsl` für die Stufe des Geräts
+übersetzt (robust, `move` und `cull` mit `exact`); `--robust 0` ohne Robustheit, `--fused` ohne
+`NoContraction` (dann ist `move` nicht mehr bitgleich).
 
 Voreinstellung: 1080p, `indirect`, ohne Fenster, 300 gemessene Bilder nach 60 zum Aufwärmen,
 3 Bilder in Flug. Ohne Fenster zeichnet die Szene in eine Rgba8Unorm- und eine
@@ -500,6 +510,27 @@ Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fen
   0 = near; die Kamera hier (near 0,1, far 900) reicht nur, weil die Würfel weit auseinander
   liegen.
 
+**WGSL gegen SPIR-V** (G2c: die sechs Shader aus `lib/wgsl/bench`, von `lib/wgsl` übersetzt,
+gegen die handgeschriebenen; dieselben Messbedingungen, gleichzeitig ein Release-Build in einem
+anderen Prozess; Median aus drei Läufen je Konfiguration, abwechselnd, Spanne der GPU-Gesamtzeit
+in Klammern; ms):
+
+| N, Ziel, Modus | Shader | GPU move / cull / draw | GPU gesamt (Spanne) | Bildzeit Mittel |
+| --- | --- | ---: | ---: | ---: |
+| 1M, 1080p, indirekt | SPIR-V | 0,257 / 0,133 / 1,242 | 1,633 (1,623–1,635) | 1,670 |
+| | WGSL | 0,251 / 0,133 / 1,234 | 1,617 (1,614–1,628) | 1,647 |
+| | WGSL ohne Robustheit | 0,244 / 0,133 / 1,236 | 1,613 (1,609–1,617) | 1,649 |
+| 1M, 4K, indirekt | SPIR-V | 0,256 / 0,133 / 1,937 | 2,326 (2,318–2,331) | 2,370 |
+| | WGSL | 0,251 / 0,133 / 1,927 | 2,313 (2,309–2,319) | 2,355 |
+| | WGSL ohne Robustheit | 0,245 / 0,133 / 1,929 | 2,309 (2,304–2,314) | 2,345 |
+| 100k, 1080p, einzeln | SPIR-V | 0,036 / – / 0,660 | 0,695 (0,693–0,798) | 6,390 |
+| | WGSL | 0,041 / – / 0,670 | 0,711 (0,710–0,712) | 6,434 |
+| | WGSL ohne Robustheit | 0,041 / – / 0,661 | 0,701 (0,701–0,703) | 7,508 |
+
+Die übersetzten Shader sind so schnell wie die handgeschriebenen (`move` sogar 2 % schneller);
+die Robustheit kostet in `move` 0,007 ms (+2,8 %), sonst nichts Messbares. Der Einzel-Pfad ist
+CPU-gebunden (100 000 Draws je Bild); seine Bildzeiten schwanken mit der Last des Rechners.
+
 ## Bekannte Lücken
 
 - Nur Windows. Linux und Android brauchen einen Weg zu `libvulkan.so` (JFLib lädt unter Linux
@@ -539,9 +570,16 @@ Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fen
 - Overrides: skalare Spezialisierungskonstanten, `SpecId` = Nummer der Pipeline-Konstante (auch
   für Overrides ohne `@id`, siehe „Pipeline-Konstanten“). Abgeleitete Overrides mit
   Gleitkomma-Arithmetik oder eingebauten Funktionen kann SPIR-V nicht ausdrücken
-  (`OpSpecConstantOp` nur ganzzahlig): die rechnet der Übersetzer beim Anlegen der Pipeline aus.
-  `@workgroup_size` mit Overrides: auf Basis das `WorkgroupSize`-Built-in (ein Modul je
-  Entry Point), auf Voll `LocalSizeId`.
+  (`OpSpecConstantOp` nur ganzzahlig): `lib/wgsl` rechnet beim Anlegen der Pipeline jedes
+  Override auf der CPU aus und gibt jeder Spezialisierungskonstante ihren fertigen Wert
+  (`wgsl::Output::constants`, docs/WGSL.md „Overrides“). `@workgroup_size` mit Overrides: auf
+  Basis das `WorkgroupSize`-Built-in (ein Modul je Entry Point), auf Voll `LocalSizeId`.
+- Umgesetzt in [`lib/wgsl`](WGSL.md) (G2c); `lib/gpu` schaltet dafür zusätzlich ein, wo das Gerät
+  es hat: 16-Bit-Werte in Uniform-Puffern und Push-Konstanten, uniformBufferStandardLayout,
+  shaderDemoteToHelperInvocation, shaderClipDistance, geometryShader (primitive_index),
+  sampleRateShading, dualSrcBlend, shaderStorageImageExtendedFormats,
+  shaderStorageImageReadWithoutFormat (`Features::uniform_16bit`, `push_constant_16bit`,
+  `uniform_standard_layout`, `demote`, `clip_distances`, `primitive_index`, `sample_shading`).
 - Bindless-Tabelle: in der Gruppe, in die das Programm sie setzt; Bindung 0 Laufzeit-Array von
   Texturen, 1 Sampler, 2 Speicherpuffer (Laufzeit-Array von `Block`-Strukturen, ohne
   `ArrayStride` am äußeren Array), 3 Speichertexturen. `RuntimeDescriptorArray` (unter 1.5 mit

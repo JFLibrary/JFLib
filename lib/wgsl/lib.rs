@@ -1,5 +1,5 @@
-// wgsl -- JFLib's WGSL front end: source text -> a checked, fully typed module (step G2a of
-// the GPU plan; docs/WGSL.md).  The back end (G2c) lowers the IR to SPIR-V with lib/shader;
+// wgsl -- JFLib's WGSL compiler: source text -> a checked, fully typed module (the front end,
+// step G2a of the GPU plan) -> SPIR-V through lib/shader (the back end, G2c; docs/WGSL.md);
 // the browser path (G4) hands the same text to WebGPU.  The reference is the W3C WGSL
 // Candidate Recommendation (2026-10-26); where Chrome's Tint differs, the docs say so.
 //
@@ -19,6 +19,11 @@
 //                                               error / warning, German message, notes
 //   bench                                       the six benchmark shaders of docs/SHADER.md
 //                                               as WGSL text
+//   compile(src, &CompileOptions) -> Result<Output, Vec<Diagnostic>>   check + lower to
+//                                               SPIR-V, one module per entry point (spirv.rs)
+//   Output::constants / workgroup_size / check_pipeline, check_interface, Limits
+//                                               pipeline constants and WebGPU's pipeline
+//                                               checks (pipeline.rs)
 //
 // Never panics on any input: nesting deeper than parse::MAX_DEPTH is an error, constant
 // values are capped in size (consteval::MAX_ELEMS), every count is checked.
@@ -42,13 +47,19 @@ pub mod ir;
 pub mod lex;
 mod math;
 pub mod parse;
+pub mod pipeline;
 mod print;
+pub mod spirv;
+mod spirv_builtin;
+mod spirv_func;
 mod types;
 pub mod xid;
 
 pub use ast::{Ast, Span};
 pub use ir::Module;
+pub use pipeline::{check_interface, Limits};
 pub use print::print;
+pub use spirv::{compile, compile_module, CompileOptions, EntryOut, Output};
 
 /// a note attached to a diagnostic: where the related declaration is
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -120,10 +131,11 @@ pub mod feature {
     pub const PRIMITIVE_INDEX: u32 = 1 << 19;
     /// enable atomic_vec2u_min_max: atomicStoreMin / Max on atomic<vec2<u32>>
     pub const ATOMIC_VEC2U_MIN_MAX: u32 = 1 << 20;
-    /// everything this front end implements (the language features of Chrome 156 except
-    /// buffer_view, subgroup_id and subgroup_uniformity; the enable-extensions except
-    /// subgroups and subgroup_size_control)
-    pub const ALL: u32 = 0x7ff | 0x1f << 16;
+    /// what a browser offers and this front end implements: the language features of Chrome
+    /// 156 except buffer_view, subgroup_id and subgroup_uniformity (and without
+    /// fragment_depth, which Chrome offers only with --enable-unsafe-webgpu: implemented,
+    /// opt-in), the enable-extensions except subgroups and subgroup_size_control
+    pub const ALL: u32 = (0x7ff & !FRAGMENT_DEPTH) | 0x1f << 16;
     /// (name, bit, is a language extension) for every extension name WGSL defines; bit 0:
     /// known but not implemented here
     pub const NAMES: &[(&str, u32, bool)] = &[

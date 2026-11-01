@@ -244,6 +244,19 @@ pub struct Features {
     pub shader_i8: bool,
     /// 16 / 8 bit values in storage buffers
     pub storage_16bit: bool,
+    /// 16-bit values in uniform buffers and push constants too (WGSL f16 there)
+    pub uniform_16bit: bool,
+    pub push_constant_16bit: bool,
+    /// uniform buffers in the storage layout (uniformBufferStandardLayout: a WGSL uniform
+    /// buffer whose layout is not std140, e.g. mat2x2f)
+    pub uniform_standard_layout: bool,
+    /// OpDemoteToHelperInvocation (lib/wgsl's discard at the level Voll)
+    pub demote: bool,
+    /// WGSL @builtin(clip_distances), @builtin(primitive_index) (geometryShader),
+    /// @interpolate(.., sample) / @builtin(sample_index) (sampleRateShading)
+    pub clip_distances: bool,
+    pub primitive_index: bool,
+    pub sample_shading: bool,
     pub storage_8bit: bool,
     /// BC1 .. BC7 compressed textures
     pub texture_bc: bool,

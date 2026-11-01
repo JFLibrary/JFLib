@@ -33,9 +33,15 @@
 //                    read-write, 8 formats), a texture + sampler in a fragment shader (nearest
 //                    explicit and implicit LOD, bilinear, trilinear), depth comparison (also
 //                    PCF), size / level queries, (Voll) Bindless textures and samplers
-//        scene       the benchmark scene (t_scene.rs): move = move_all bit for bit, cull =
+//        scene       the benchmark scene (t_scene.rs) with the hand-written SPIR-V and with the
+//                    WGSL shaders compiled by lib/wgsl: move = move_all bit for bit, cull =
 //                    cull_ref, an image of known cubes (orientation, lit colour, depth order,
-//                    back faces culled) in both modes, indirect and single pictures compared
+//                    back faces culled) in both modes, indirect and single pictures compared,
+//                    the WGSL pictures = the SPIR-V pictures
+//        wgsl        lib/wgsl's back end on the GPU (t_wgsl.rs): every operator and numeric
+//                    built-in on runtime values = lib/wgsl's constant evaluator (the spec's
+//                    float accuracy), the runtime rules (division by 0, shifts), NaN reported;
+//                    SPIR-V 1.6 and 1.3 (a Basis device)
 //        bench_smoke short runs of the scene's frame loop (offscreen, a window) with --verify
 //        all         every test above
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
@@ -46,7 +52,8 @@
 //                                   compute round trip
 //   gputest --bench N [--res 1080p|4k|WxH] [--mode indirect|single] [--window | --fullscreen]
 //                     [--present immediate|fifo|mailbox] [--frames F] [--warmup W] [--inflight K]
-//                     [--verify] [--shot FILE.png] [--validate]
+//                     [--verify] [--shot FILE.png] [--validate] [--shaders spirv|wgsl] [--robust 0]
+//                     [--fused]
 //                                   the benchmark scene with N cubes (measure.rs, scene.rs;
 //                                   docs/GPU.md "Messszene"): CPU, GPU per pass and frame times,
 //                                   median and p99, a RESULT line for scripts
@@ -77,6 +84,8 @@ mod t_render;
 mod t_scene;
 mod t_spec;
 mod t_texture;
+mod t_wgsl;
+mod t_wgsl2;
 mod t_window;
 
 rt::main!(run());
@@ -218,7 +227,7 @@ fn info(t: &mut T) {
     out(&format!("device: {:.1} ms, {} at level {:?}", ms_since(t1), dev.info().name, dev.level()));
     t.ok(dev.level() == a.level(), "device level = the adapter's highest");
     let f = dev.features();
-    let flags: [(&str, bool); 25] = [
+    let flags: [(&str, bool); 32] = [
         ("timestamps", f.timestamps),
         ("multi_draw_indirect", f.multi_draw_indirect),
         ("draw_indirect_first_instance", f.draw_indirect_first_instance),
@@ -232,6 +241,13 @@ fn info(t: &mut T) {
         ("shader_i64", f.shader_i64),
         ("shader_i8", f.shader_i8),
         ("storage_16bit", f.storage_16bit),
+        ("uniform_16bit", f.uniform_16bit),
+        ("push_constant_16bit", f.push_constant_16bit),
+        ("uniform_standard_layout", f.uniform_standard_layout),
+        ("demote", f.demote),
+        ("clip_distances", f.clip_distances),
+        ("primitive_index", f.primitive_index),
+        ("sample_shading", f.sample_shading),
         ("storage_8bit", f.storage_8bit),
         ("texture_bc", f.texture_bc),
         ("anisotropy", f.anisotropy),
@@ -449,7 +465,7 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 14] = [
+    let tests: [(&str, fn(&mut T)); 15] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -463,6 +479,7 @@ fn run() -> i32 {
         ("errors", errors),
         ("syncval", syncval),
         ("scene", t_scene::scene),
+        ("wgsl", t_wgsl::wgsl),
         ("bench_smoke", t_scene::bench_smoke),
     ];
     let mut ran = false;
