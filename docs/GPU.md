@@ -35,7 +35,7 @@ let bgl = dev.create_bind_group_layout(&[gpu::Binding {
     binding: 0, kind: gpu::BindingKind::StorageBuffer, stages: gpu::Stages::COMPUTE }])?;
 let layout = dev.create_pipeline_layout(&gpu::PipelineLayoutDesc { groups: &[&bgl], push_constants: 12 })?;
 let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
-    layout: &layout, shader: gpu::ShaderStage { module: &shader, entry: "main" } })?;
+    layout: &layout, shader: gpu::ShaderStage::new(&shader, "main") })?;
 let buf = dev.create_buffer(&gpu::BufferDesc { size: 4 << 20, usage: gpu::BufferUsage::STORAGE,
                                                memory: gpu::MemoryKind::Device })?;
 let rb = dev.create_buffer(&gpu::BufferDesc { size: 4 << 20, usage: gpu::BufferUsage::NONE,
@@ -77,7 +77,10 @@ rb.read(0, &mut out)?;
   `group()`, `layout()`).
 - **Pipelines**: `create_compute_pipeline`, `create_render_pipeline` (Vertex + Fragment,
   dynamisches Rendern, Tiefentest, Mischen, Culling; Vertex-Eingaben sind optional,
-  Vertex-Pulling aus Speicherpuffern geht ohne sie).
+  Vertex-Pulling aus Speicherpuffern geht ohne sie). Jede Stufe ist ein `ShaderStage { module,
+  entry, constants }` (`ShaderStage::new(module, entry)` ohne Konstanten) mit ihren
+  Pipeline-Konstanten (unten). `ShaderModule::entry_points()` und `constants()` sagen, was ein
+  Modul enthält.
 - **Befehle**: `device.encoder()`; Kopien (`copy_buffer`, `fill_buffer`,
   `copy_buffer_to_texture`, `copy_texture_to_buffer`), Barrieren (`barrier`,
   `texture_barrier`, `texture_barrier_range`), Rechnen (`set_compute_pipeline`,
@@ -122,6 +125,43 @@ Sie gelten für jedes Backend und für den WGSL-Übersetzer:
 - **Gruppen und Push-Konstanten** gehen an die zuletzt gesetzte Pipeline: außerhalb von
   Render-Durchgängen an die Rechen-Pipeline, innerhalb an die Render-Pipeline (Pipeline zuerst
   setzen).
+
+## Pipeline-Konstanten (WGSL `override`)
+
+Ein Override eines Shaders (WGSL `@id(n) override x: u32 = 64;`, SPIR-V eine
+Spezialisierungskonstante mit `SpecId n`, docs/SHADER.md) bekommt seinen Wert beim Anlegen der
+Pipeline, je Stufe:
+
+```rust
+let c = [gpu::Constant { id: 0, value: 128.0 }, gpu::Constant { id: 3, value: -1.25 }];
+let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
+    layout: &layout, shader: gpu::ShaderStage { module: &m, entry: "main", constants: &c } })?;
+```
+
+- **Schlüssel ist die Nummer** (`SpecId`). WebGPU nimmt `constants: Record<string, number>`
+  mit der Nummer als Text (`"0"`) oder, bei Overrides ohne `@id`, ihrem Namen. Der
+  WGSL-Übersetzer vergibt deshalb auch Overrides ohne `@id` eine Nummer (außerhalb von 0 …
+  65535, die WGSL für `@id` erlaubt) und liefert die Zuordnung Name → Nummer; ein späteres
+  WebGPU-Backend setzt damit den Schlüssel.
+- **Der Wert ist ein `f64`** wie in WebGPU und wird so umgewandelt wie dort: `bool` ist wahr außer
+  bei 0 und NaN; `i32` / `u32` (und die anderen Ganzzahlen) werden zur Null hin abgeschnitten und
+  müssen endlich und im Bereich liegen; `f32` / `f16` / `f64` werden gerundet und müssen endlich
+  bleiben. Sonst `Invalid`.
+- **Geprüft gegen das Modul** (`ShaderModule::from_spirv` liest die Spezialisierungskonstanten
+  mit `shader::reflect`): eine Nummer, die das Modul nicht hat, oder eine Nummer zweimal ist
+  `Invalid` (Vulkan würde sie übergehen, WebGPU nicht); ein Modul mit einer `SpecId` zweimal
+  ebenso. Overrides, die die Pipeline nicht setzt, behalten den Standardwert im Modul. Ob ein
+  WGSL-Override ohne Initialisierer gesetzt ist, weiß nur der Übersetzer (SPIR-V hat immer einen
+  Standardwert).
+- **Workgroup-Größe**: nach dem Einsetzen der Konstanten (`WorkgroupSize`-Built-in vor
+  `LocalSizeId` vor `LocalSize`) muss jede Achse ≥ 1 und innerhalb von
+  `Limits::max_compute_workgroup_size`, das Produkt innerhalb von `max_compute_invocations` sein,
+  sonst `Invalid` (WebGPU prüft das ebenfalls bei der Pipeline). Ein Modul mit `LocalSizeId`
+  braucht `maintenance4` (Vulkan 1.3; sonst `Unsupported`).
+- Auch der Entry Point wird geprüft: das Modul muss ihn für die Stufe haben, sonst `Invalid`.
+
+Vulkan bekommt ein `VkSpecializationInfo` je Stufe (bool als `VkBool32`, sonst die Breite des
+Typs). Getestet von `gputest --test spec` (unten).
 
 ## Feature-Stufen
 
@@ -228,10 +268,28 @@ für Messungen den Configurator ausschalten.
 | `errors.uis` | `jfgui_GPU=0`, fehlender Loader, `jfgui_GPU_ADAPTER` ohne Treffer, ungültige Aufrufe (Fehler, kein Absturz), verlorenes Gerät und ein neues danach |
 | `scene.uis` | die Messszene (unten): `move` = `move_all` Bit für Bit, `cull` = `cull_ref`, ein Bild bekannter Würfel (Lage, Farbe, Tiefe, Rückseiten), indirekter und Einzel-Pfad gleich |
 | `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE |
-| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene` und `bench_smoke` |
+| `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
+| `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
+| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec` und `textures` |
 
 Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
 `gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
+
+**Texturen in Shadern** (`gputest --test textures`, [`t_texture.rs`](../apps/gputest/t_texture.rs);
+die Shader sind `shader::samples`, vor dem Hochladen von `shader::val` geprüft). Exakt heißt:
+gleich der CPU-Referenz Bit für Bit (unorm-Texel als `k / 255` in f32).
+
+| Teil | was | Ergebnis auf der RTX 2070 SUPER |
+| --- | --- | --- |
+| fetch | `OpImageFetch` jedes Texels jeder Mip-Stufe und Schicht im Rechen-Shader: rgba8unorm (5 Mips), r32float (4 Mips), r32float-2D-Array (3 Schichten, 2 Mips), r32uint, r32sint, rgba32uint, depth32float (die Tiefe in x) | exakt; fehlende Kanäle 0, 0, 1 |
+| sample | `OpImageSampleExplicitLod` (nearest) im Rechen-Shader: 2D-Array (Schicht = RNE(z) begrenzt auf 0 … 3, auch die Halbfälle 0,5 / 1,5 / 2,5), Würfel 4 × 4 (jedes Texel jeder Seite über seine Richtung, Länge 1, 2,5 und 0,125; die CPU-Seitenwahl nach Vulkans Tabelle), Würfel-Array (2 Würfel) | exakt |
+| storage | `OpImageWrite`, dann `OpImageRead` und `OpImageQuerySize` von rgba8unorm, rgba16float, r32float, rgba32float, r32uint, rgba32uint, r32sint (16 × 12); die Bytes der Textur zurückgelesen; lesen-ändern-schreiben in einem Shader für r32float / r32uint / r32sint | exakt (rgba8unorm: die Bytes und `k / 255`) |
+| fragment | Textur + Sampler im Fragment-Shader (Rgba32Float-Ziel): nearest mit expliziter LOD 0 … 4 und mit impliziter LOD (Mip-Auswahl aus den Ableitungen, Ziel in Mip-Größe); bilinear bei LOD 0 und trilinear bei LOD 1,5 an Viertel-Texel-Positionen | nearest exakt; linear max. Fehler 5,8·10⁻⁶ / 7,6·10⁻⁶ bei einer Toleranz von 1/256 (8 Bit Unterteilung der Filtergewichte; an Viertel-Texeln sind die Gewichte exakt) |
+| compare | Tiefentextur + Vergleichssampler (`less`, `greater-equal`), `OpImageSampleDrefExplicitLod` und `…ImplicitLod`, fünf Referenzwerte einschließlich eines Texelwerts; PCF (linearer Vergleich) | exakt; PCF Fehler 0 (Toleranz 1/256) |
+| queries | `OpImageQuerySizeLod` bei Mip 0 und 1 und `OpImageQueryLevels` von 2D, 2D-Array, Würfel, Würfel-Array (Anzahl Würfel), Tiefe und einer Ansicht der Mips 1 … 3; `OpImageQuerySize` einer Speichertextur | exakt |
+| bindless | (Voll) Texturen und Sampler einer Bindless-Tabelle, je Aufruf ein anderer Index (`NonUniform`), nearest und linear abgetastet | max. Fehler 3·10⁻⁸ |
+
+Alles läuft auch mit `--validate` ohne Meldung der Validierungsschicht.
 
 ## Messwerte
 
@@ -450,8 +508,10 @@ Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fen
 - Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
   `move` und `cull` neben dem Zeichnen laufen lassen).
 - Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.
-- Keine Spezialisierungskonstanten, kein Pipeline-Cache, kein MSAA, keine Stencil-Operationen,
-  keine Textur-zu-Textur-Kopien und kein Blit (Mip-Erzeugung).
+- Kein Pipeline-Cache, kein MSAA, keine Stencil-Operationen, keine Textur-zu-Textur-Kopien und
+  kein Blit (Mip-Erzeugung).
+- `Format` hat kein `Rgba32Sint` (und keine anderen vierkanaligen 8-/16-Bit-Ganzzahlformate);
+  gputest überspringt diese Speichertextur.
 - Bindungen ohne Arrays (`count` 1); Arrays gibt es über die Bindless-Tabelle auf Stufe Voll.
 - Uploads legen pro Übergabe mindestens einen 4-MiB-Staging-Bereich an; ein Ringpuffer für
   viele kleine Schreibvorgänge pro Bild fehlt.
@@ -476,6 +536,12 @@ Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fen
   `OpSampledImage` selbst.
 - Push-Konstanten: ein `Block` in `PushConstant` mit `Offset`-Dekorationen ab 0, höchstens
   128 Byte.
+- Overrides: skalare Spezialisierungskonstanten, `SpecId` = Nummer der Pipeline-Konstante (auch
+  für Overrides ohne `@id`, siehe „Pipeline-Konstanten“). Abgeleitete Overrides mit
+  Gleitkomma-Arithmetik oder eingebauten Funktionen kann SPIR-V nicht ausdrücken
+  (`OpSpecConstantOp` nur ganzzahlig): die rechnet der Übersetzer beim Anlegen der Pipeline aus.
+  `@workgroup_size` mit Overrides: auf Basis das `WorkgroupSize`-Built-in (ein Modul je
+  Entry Point), auf Voll `LocalSizeId`.
 - Bindless-Tabelle: in der Gruppe, in die das Programm sie setzt; Bindung 0 Laufzeit-Array von
   Texturen, 1 Sampler, 2 Speicherpuffer (Laufzeit-Array von `Block`-Strukturen, ohne
   `ArrayStride` am äußeren Array), 3 Speichertexturen. `RuntimeDescriptorArray` (unter 1.5 mit

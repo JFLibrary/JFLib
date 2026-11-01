@@ -97,7 +97,7 @@ impl Scene {
         let rpl = t.res(dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&rl], push_constants: bench::PUSH_SIZE }),
                         "render pipeline layout")?;
         let compute = |t: &mut T, m: &ShaderModule, what: &str| {
-            t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cpl, shader: ShaderStage { module: m, entry: "main" } }),
+            t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cpl, shader: ShaderStage::new(m, "main") }),
                   what)
         };
         let mv = compute(t, &ms, "move pipeline")?;
@@ -105,8 +105,8 @@ impl Scene {
         let render = |t: &mut T, vs: &ShaderModule, what: &str| {
             t.res(dev.create_render_pipeline(&RenderPipelineDesc {
                 layout: &rpl,
-                vertex: ShaderStage { module: vs, entry: "main" },
-                fragment: Some(ShaderStage { module: &fs, entry: "main" }),
+                vertex: ShaderStage::new(vs, "main"),
+                fragment: Some(ShaderStage::new(&fs, "main")),
                 buffers: &[],
                 topology: Topology::Triangles,
                 cull: Cull::Back,

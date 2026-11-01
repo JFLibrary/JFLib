@@ -687,6 +687,11 @@ vk_structs! {
         pub p_image_info: *const DescriptorImageInfo, pub p_buffer_info: *const DescriptorBufferInfo,
         pub p_texel_buffer_view: *const Handle,
     }
+    pub struct SpecializationMapEntry { pub constant_id: u32, pub offset: u32, pub size: usize }
+    pub struct SpecializationInfo {
+        pub map_entry_count: u32, pub p_map_entries: *const SpecializationMapEntry, pub data_size: usize,
+        pub p_data: *const c_void,
+    }
     pub struct PipelineShaderStageCreateInfo {
         pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub stage: u32, pub module: Handle,
         pub p_name: *const u8, pub p_specialization_info: *const c_void,
@@ -1123,6 +1128,8 @@ mod layout {
     check!(DescriptorImageInfo, 24, sampler = 0, image_view = 8, image_layout = 16);
     check!(DescriptorBufferInfo, 24, buffer = 0, offset = 8, range = 16);
     check!(WriteDescriptorSet, 64, s_type = 0, p_next = 8, dst_set = 16, dst_binding = 24, dst_array_element = 28, descriptor_count = 32, descriptor_type = 36, p_image_info = 40, p_buffer_info = 48, p_texel_buffer_view = 56);
+    check!(SpecializationMapEntry, 16, constant_id = 0, offset = 4, size = 8);
+    check!(SpecializationInfo, 32, map_entry_count = 0, p_map_entries = 8, data_size = 16, p_data = 24);
     check!(PipelineShaderStageCreateInfo, 48, s_type = 0, p_next = 8, flags = 16, stage = 20, module = 24, p_name = 32, p_specialization_info = 40);
     check!(ComputePipelineCreateInfo, 96, s_type = 0, p_next = 8, flags = 16, stage = 24, layout = 72, base_pipeline_handle = 80, base_pipeline_index = 88);
     check!(VertexInputBindingDescription, 12, binding = 0, stride = 4, input_rate = 8);
