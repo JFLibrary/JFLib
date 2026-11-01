@@ -110,6 +110,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFNetworker:** More devices in the catalog, all manufacturer-neutral with fixed ports: JF-S8 (unmanaged, no command line), JF-S8P, JF-S24, JF-S48P, JF-S24M (2.5G, PoE++), the leaf and spine L3 switches JF-S48Y and JF-S32C, the branch router JF-R2, the firewalls JF-FW2 and JF-FW8, the access point JF-AP7 (802.11be), a repeater and a bridge without a command line, symbols for the small boxes
 - **JFNetworker:** Choosing a cable first: a Kabel part in the palette (Automatisch and a tile per kind) sets the Verbinden tool with that kind, the port choice offers only pairs it fits and what cannot fit is refused with its reason at the target. New kinds appended (serial with a chosen DCE or DTE end, telephone, coax, DAC, AOC), Media::Rj11 and Media::Coax with a cable modem and a DSL modem, a category (Cat5e .. Cat8, OM3, OM4, OS2) and a colour on the link, the project setting Auto-MDI-X aus; old files load unchanged, the golden reports stay as they are
 - **ui:** A double click on the background of ui.diagram (DEv::DoubleClick with the world point of the second press), DN_HITMIN for small nodes that stay selectable at low zoom, ui.focus_quiet (the keyboard focus without the ring after a pointer gesture)
+- **ui:** A card or list row that does one thing when it is chosen: ui.action_card with CardDesc (title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area), for start pages and the like
 
 ### Changed
 

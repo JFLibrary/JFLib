@@ -15,7 +15,8 @@
 // handing in); author.rs: the panel that makes one from the project (A1).  phys/: the physical
 // view beside the canvas (P1): places, floor plans, racks, cable lengths.  ide/: the IDE of a
 // host (IDE1): Explorer, tabs, language services, find in files, run as a process or a
-// service, the debugger, tests; its device window's IDE tab hosts it.
+// service, the debugger, tests; its device window's IDE tab hosts it.  startpage.rs: the page the
+// window opens on (new projects and templates, recent projects, labs), the project's info.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -33,6 +34,7 @@ pub(crate) mod assess;
 pub(crate) mod author;
 pub(crate) mod phys;
 pub(crate) mod ide;
+pub(crate) mod startpage;
 
 use alloc::string::String;
 use alloc::vec::Vec;

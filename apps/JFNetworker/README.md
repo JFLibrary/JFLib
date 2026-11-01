@@ -190,6 +190,17 @@ Queues, Lastgeneratoren, eigene Skripte).
 
 ## Bedienung
 
+- **Startseite:** das Fenster öffnet ohne Projekt auf der Startseite: **Neu** (ein leeres Projekt und
+  fünf Vorlagen als Karten: Heimnetz, Büro mit VLANs, Campus, Rechenzentrum mit Leaf-Spine, Webdienst
+  hinter Loadbalancer; jede ein laufendes Netz ohne Datei, Speichern fragt nach einem Namen),
+  **Zuletzt** (die letzten Projekte mit Ordner und Änderungszeit, Öffnen …; eine fehlende Datei ist
+  markiert und lässt sich aus der Liste nehmen, eine Datei außerhalb dessen, was das Programm lesen
+  darf, öffnet den Dateidialog an ihrer Stelle) und **Lernen** (die Labore und Aufgaben mit
+  Bewertung). Tab läuft durch die Karten, Eingabe öffnet; die Leiste einer automatischen Sicherung
+  steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
+  ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
+- **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
+  Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
   dann auf die Fläche klicken (Umschalt: mehrere), oder per Tastatur: Strg+1 springt in die
   Gerätesuche, Tab zu den Kacheln einer Kategorie, die Pfeiltasten wählen, Eingabe setzt das
@@ -221,7 +232,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Hauptfenster) in den Vollbildmodus und zurück.
 - **Einstellungen** (Werkzeuge › Einstellungen, Strg+,): Raster und Rasterweite, Einrasten,
   Minimap, Tempo beim Start, Bewegung (wie das System, reduziert, voll), Sprache (wie das
-  System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus). Sie liegen in
+  System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus), Startseite beim Start
+  anzeigen. Sie liegen in
   `config://settings.ini`.
 - **Automatische Sicherung:** ungespeicherte Änderungen landen alle 120 s (einstellbar) und
   sofort beim Ruhezustand oder Abmelden in `data://autosave/`; nach einem Absturz bietet die
@@ -245,6 +257,7 @@ python build_rs.py app JFNetworker
 build/win/JFNetworker.exe                                   # der Editor
 build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/campus.jfnet
 build/win/JFNetworker.exe --lang en                         # auf Englisch
+build/win/JFNetworker.exe --script apps/JFNetworker/tests/start_page.uis --start-page  # Skripte sehen die Startseite nur so
 build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell, Simulator, Oberfläche
 build/win/JFNetworker.exe --selftest --pcap-out DIR         # dazu die Mitschnitte der Prüfungen
 build/win/JFNetworker.exe --script apps/JFNetworker/tests/place.uis --verify-dirty
@@ -287,6 +300,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `settings.uis` | den Einstellungsdialog: Raster, Einrasten, Minimap, Tempo, Sprache (das Fenster auf Englisch und zurück), Bewegung, Sicherungsintervall |
 | `autosave.uis`, `autosave_recover.uis`, `autosave_reopen.uis` | eine Kopie nach dem Intervall und beim Ruhezustand, die Kopie überlebt das Sitzungsende; die nächste Sitzung stellt sie wieder her und hält sie, bis sie eine eigene hat (ein zweiter Absturz verliert nichts); Beenden mit „Verwerfen“ nimmt die Kopien mit (die drei laufen in dieser Reihenfolge) |
 | `english.uis` | das Fenster mit `--lang en`: Menüs, Bereiche, Eigenschaften, Simulationsmodus, Dialoge |
+| `start_page.uis` | die Startseite (`--start-page`; `--recent=` gibt dem Lauf seine zuletzt geöffneten Dateien, ein Pfad allein ist erlaubt, mit `\|` verbundene sind es nicht): erster Fokus und Eingabe, was ohne Projekt abgeschaltet ist, das leere Projekt, eine Vorlage, Speichern fragt nach ihrem Namen, Datei › Startseite mit der Rückfrage, die Zeilen von Zuletzt (öffnen, fehlend und entfernen, nicht lesbar: der Dateidialog), eine Fehlermeldung auf der Seite, Labor und Aufgabe, Tab und Umschalt+Tab durch die Karten, Projektinfo mit Rückgängig, die Einstellung |
+| `start_page_crash.uis`, `start_page_later.uis`, `start_page_recover.uis` | die Wiederherstellung auf der Startseite (in dieser Reihenfolge): eine Sitzung endet mit ungespeicherten Änderungen, die nächste zeigt die Leiste über der Seite mit der Tastatur auf „Wiederherstellen“, „Später“ lässt die Seite stehen und die Kopie liegen, die dritte stellt sie wieder her; danach wieder die Seite ohne Angebot |
+| `start_page_en.uis`, `start_page_shots.uis` | die Seite auf Englisch mit einer geöffneten Vorlage; die Bilder hell und dunkel mit 100 und 150 %, im kleinsten Fenster (auch gescrollt), breit, mit Fokus und Hover, die Vorlage Campus und der Dialog Projektinfo (`build/jfnetworker/start_page_*.png`) |
+| `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
 | `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
 | `campus.uis`, `scen_campus.uis` | die Abnahme von Phase 1 (unten) |
@@ -543,6 +560,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 
 ### Gerätekatalog
 
@@ -761,6 +779,8 @@ und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher. Ein 
 eine Datei nicht sagt, bleibt, wie es war.
 Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild))
 stehen in `groups` (`[]` ohne) und `background` (`null` ohne); auch sie fehlen älteren Dateien.
+`description` sagt, worum es geht, `author`, wer es gemacht hat (Datei › Projektinfo); älteren
+Dateien fehlt `author`, dann bleibt er leer.
 
 ```json
 {

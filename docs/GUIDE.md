@@ -1770,6 +1770,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `command_bar(id, &[CmdItem]) -> Option<u32>` | primary and secondary commands; what does not fit goes into an overflow menu |
 | `split_begin(id, pos, vertical)`, `split_next`, `split_end(&mut pos)` | two panes with a draggable splitter (master / detail) |
 | `page_header`, `breadcrumb`, `key_value`, `empty_state`, `link` | page titles, paths, label / value rows, empty pages with a call to action, text links |
+| `action_card(id, name, &CardDesc)` | a card or list row that does one thing when chosen (a template on a start page, a recent file): title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area with the app's drawing; `next_size` its width, `ST_SUBTLE` a list row, `ST_CHECKED`, `ST_DISABLED`; one Tab stop, a button record named `name`; in a row of cards all take the row's height ([`ui/action_card.rs`](../lib/ui/action_card.rs)) |
 | `segmented(id, &mut sel, items)` | segmented control (filters, schedule kinds) |
 | `wizard_steps(id, steps, current, states)` | the step list of a full-page wizard |
 | `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last |

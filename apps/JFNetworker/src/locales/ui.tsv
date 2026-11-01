@@ -1779,3 +1779,37 @@ Beschriftung: {}	Label: {}
 Text der Beschriftung	Text of the label
 Doppelklick auf freie Fläche	Double click on free space
 Beschriftung dort schreiben (Eingabe übernimmt, Umschalt+Eingabe: neue Zeile, Esc verwirft)	Write a label there (Enter takes it, Shift+Enter: new line, Esc discards)
+# the start page and the project's info (workspace/startpage.rs, ST1)
+S&tartseite	S&tart page
+Projekt&info …	Project &info …
+Beim Start anzeigen	Show at startup
+Ohne diese Seite beginnt das Programm mit einem leeren Projekt.	Without this page the program begins with an empty project.
+Startseite	Start page
+Heimnetz	Home network
+Heimrouter mit WLAN und DHCP, dazu PC, Drucker, Laptop und Smartphone.	A home router with Wi-Fi and DHCP, with a PC, a printer, a laptop and a smartphone.
+Büro mit VLANs	Office with VLANs
+VLANs für Büro, Technik und Server, ein Router am Trunk, DHCP und DNS.	VLANs for office, engineering and servers, a router on the trunk, DHCP and DNS.
+Campus	Campus
+Zwei Gebäude mit L3-Switches, OSPF zum Router, DHCP über Relays, DNS.	Two buildings with L3 switches, OSPF to the router, DHCP through relays, DNS.
+Rechenzentrum (Leaf-Spine)	Data centre (leaf-spine)
+Zwei Spines, vier Leafs, acht Server; geroutet mit OSPF über gleich gute Wege.	Two spines, four leaves, eight servers; routed with OSPF over equally good paths.
+Webdienst hinter Loadbalancer	Web service behind a load balancer
+Ein Loadbalancer verteilt die Anfragen auf drei Webserver und prüft sie.	A load balancer shares the requests among three web servers and checks them.
+Heute {}	Today {}
+Gestern {}	Yesterday {}
+Netzwerke entwerfen, simulieren und verstehen.	Design, simulate and understand networks.
+Leeres Projekt	Empty project
+Eine leere Zeichenfläche: Geräte aus der Palette ziehen und verbinden.	An empty canvas: drag devices from the palette and connect them.
+Vorlage: {}	Template: {}
+Zuletzt	Recent
+Hier erscheinen die Projekte, die Sie öffnen und speichern.	The projects you open and save appear here.
+{}, nicht gefunden	{}, not found
+Nicht gefunden	Not found
+Aus der Liste entfernen	Remove from the list
+Lernen	Learn
+Labore: ein Netz, Ziele, die der Simulator prüft, und Hinweise.	Labs: a network, goals the simulator checks, and hints.
+Aufgaben mit Bewertung: das Netz aufbauen und Punkte bekommen.	Graded assessments: build the network and earn points.
+Projektinfo	Project info
+Worum es in diesem Projekt geht	What this project is about
+Autor	Author
+Ihr Name	Your name

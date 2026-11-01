@@ -403,6 +403,35 @@ pub(crate) fn strict_mdix(p: &Project, on: bool) -> Option<Box<dyn Edit<Project>
     Some(Box::new(StrictMdix { to: on }))
 }
 
+struct Info {
+    from: (String, String),
+    to: (String, String),
+}
+
+impl Edit<Project> for Info {
+    fn apply(&mut self, p: &mut Project) {
+        p.description = self.to.0.clone();
+        p.author = self.to.1.clone();
+    }
+    fn revert(&mut self, p: &mut Project) {
+        p.description = self.from.0.clone();
+        p.author = self.from.1.clone();
+    }
+    fn label(&self) -> &str {
+        "Projektinfo ändern"
+    }
+}
+
+/// the project's new description and author -> the undo step (not applied yet), None when they
+/// are the same
+pub(crate) fn info(p: &Project, description: &str, author: &str) -> Option<Box<dyn Edit<Project>>> {
+    let to = (String::from(description.trim_end()), String::from(author.trim()));
+    if p.description == to.0 && p.author == to.1 {
+        return None;
+    }
+    Some(Box::new(Info { from: (p.description.clone(), p.author.clone()), to }))
+}
+
 // ---------------------------------------------------------------- links
 
 struct AddLink {

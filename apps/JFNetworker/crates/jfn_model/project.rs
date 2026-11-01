@@ -77,6 +77,8 @@
 // A note's "style" (H3): "sticker", a card that wraps its text inside its box, or "label", a slim
 // text without a card, its box measured by the app when the text is set.  A file without it (and
 // an unknown value) means the sticker.
+// The project's info (ST1): "description" says what it is about, "author" who made it ("" without);
+// older files have no author.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -261,6 +263,8 @@ record! {
         pub groups: Vec<crate::group::Group>,
         /// the picture under the logical canvas (background.rs; None: none)
         pub background: Option<crate::background::Background>,
+        /// who made it (Datei › Projektinfo; "": nobody named)
+        pub author: String,
     }
 }
 

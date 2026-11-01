@@ -377,7 +377,8 @@ fn preview_device(n: &Net, ui: &mut Ui, model: usize, x: i32, y: i32, click: boo
     ui.clip_pop();
 }
 
-fn infobar(n: &mut Net, ui: &mut Ui) {
+/// the info bar of the files' messages (above the canvas, on the start page)
+pub(crate) fn infobar(n: &mut Net, ui: &mut Ui) {
     let Some((sev, title, msg)) = n.file.msg.clone() else { return };
     ui.box_begin(0, BOX_V | pad(8), 0);
     if ui.infobar(ID_INFOBAR, sev, &title, &msg) & EV_ACT != 0 {

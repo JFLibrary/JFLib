@@ -75,6 +75,8 @@
 // engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
 // labelstest.rs: the slim labels of the canvas (group labels: a note's style in the file, the steps
 // of doc/edits.rs, the scene of canvas/paint.rs).
+// startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
+// setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
 
 use alloc::format;
 use alloc::string::String;
@@ -180,9 +182,11 @@ mod labelstest;
 mod webdevtest;
 #[path = "modelstest.rs"]
 mod modelstest;
+#[path = "startpagetest.rs"]
+mod startpagetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 57] = [
+    let groups: [(&'static str, fn(&mut T)); 58] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -240,6 +244,7 @@ pub fn run() -> i32 {
         ("models", modelstest::run),
         ("cables", cablestest::run),
         ("labels", labelstest::run),
+        ("startpage", startpagetest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {
