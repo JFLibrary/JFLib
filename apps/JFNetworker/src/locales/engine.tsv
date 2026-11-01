@@ -1423,7 +1423,6 @@ zurückgerollt	rolled back
 „root“ muss ein absoluter Pfad sein: {}	“root” must be an absolute path: {}
 Webbrowser: Weiterleitung {} nach {}.	Web browser: redirect {} to {}.
 Nach {} Weiterleitungen kam noch eine: es bleibt dabei.	After {} redirects came another one: it stops here.
-Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.	Encrypted pages (https) come with a later stage.
 Das Gerät oder der Dienst hat angehalten.	The device or the service stopped.
 {} Anfragen, {} Antworten, {} gescheitert	{} requests, {} answers, {} failed
 # X1f: SSH (sshd.rs, sshtrace.rs, svcact.rs)
@@ -1522,3 +1521,25 @@ IMAP: Nachricht mit {} Bytes in {} abgelegt.	IMAP: a message of {} bytes put int
 IMAP: {} {}.	IMAP: {} {}.
 IMAP: {} abgelehnt.	IMAP: {} refused.
 E-Mail: {} von {} geholt, {} Nachrichten.	E-Mail: {} fetched from {}, {} messages.
+TLS: Alert {} gesendet	TLS: sent alert {}
+TLS: Alert {} vom Server	TLS: alert {} from the server
+Port {} (TLS): {} Anfragen, {} Antworten, {} in Arbeit, {} wartend	Port {} (TLS): {} requests, {} responses, {} in progress, {} waiting
+„tls“ muss ein Objekt sein.	“tls” must be an object.
+Den Aussteller „{}“ gibt es nicht: lab oder self.	There is no issuer “{}”: lab or self.
+„{}“ ist kein Name für ein Zertifikat.	“{}” is no name for a certificate.
+TLS: Zertifikat für {}, ausgestellt von {}.	TLS: certificate for {}, issued by {}.
+TLS: ClientHello von {}.	TLS: ClientHello from {}.
+TLS: ClientHello von {} für {}.	TLS: ClientHello from {} for {}.
+TLS: Handshake mit {} fertig ({}), die Verbindung ist verschlüsselt.	TLS: handshake with {} done ({}), the connection is encrypted.
+TLS: Zertifikat von {} abgelehnt ({}).	TLS: certificate of {} refused ({}).
+TLS: Zertifikat von {} trotz Fehler angenommen ({}).	TLS: certificate of {} accepted in spite of a fault ({}).
+TLS: Verbindung mit {} beendet, Alert {} gesendet.	TLS: connection with {} ended, sent alert {}.
+TLS: {} beendet die Verbindung mit Alert {}.	TLS: {} ends the connection with alert {}.
+„{}“: nur http und https gehen.	“{}”: only http and https work.
+Signatur falsch	wrong signature
+abgelaufen	expired
+noch nicht gültig	not valid yet
+selbst signiert	self-signed
+unbekannter Aussteller	unknown issuer
+falscher Name	wrong name
+ohne Fehler	no fault

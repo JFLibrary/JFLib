@@ -1017,6 +1017,12 @@ Fensterrand hinaus.
     und `@media`, Animation. Ungleichmäßig skalierte Konturen werden mit der mittleren Breite
     gezeichnet. Eingebettete Bilder brauchen die Decoder der Bildformate (die Laufzeit
     registriert PNG, JPEG, BMP, GIF).
+- **P3** · *erledigt* · Stylesheets von außen und was ein Element bekam (2026-11-01,
+  [`ui/md_doc.rs`](../lib/ui/md_doc.rs), [`ui/rich_html.rs`](../lib/ui/rich_html.rs)):
+  `doc.sheet_links()` nennt die `<link rel="stylesheet">` eines Dokuments, `doc.set_sheet(href, text)`
+  gibt den Text von der App (der Viewer liest nichts selbst) und er zählt, wo der Link zwischen den
+  `<style>`-Elementen steht; `doc.style_of(node)` sagt, was die Kaskade einem Element gibt. Im Einsatz
+  im Webbrowser von JFNetworker (B4), getestet in `mdviewtest` (Gruppe `css`).
 - **P3** · *erledigt* · Markdown- / HTML-Viewer, Listen mit variabler Zeilenhöhe (2026-10-21,
   [`ui/md_doc.rs`](../lib/ui/md_doc.rs), [`ui/md_view.rs`](../lib/ui/md_view.rs),
   [`ui/vlist.rs`](../lib/ui/vlist.rs)): `ui.markdown_view(id, &mut MdViewState, text, MV_*)` /
@@ -1235,6 +1241,10 @@ Fensterrand hinaus.
   IPv4 (Fragmentierung, Reassembly), IPv6-Kopf, ICMP, UDP, TCP mit Optionen, ein Dissektor
   mit Feldern und Bytebereichen für Paket-Inspektoren (auch für IP-Pakete ohne Ethernet, etwa
   auf seriellen Leitungen) sowie pcapng schreiben und lesen.
+  Seit B4 von JFNetworker auch Cookies nach RFC 6265 ([`netpkt/cookie.rs`](../lib/netpkt/cookie.rs),
+  Gruppe `cookie`) und TLS 1.3 ohne I/O mit einem X.509 für eigene Zertifikate
+  ([`netpkt/tls.rs`](../lib/netpkt/tls.rs), [`netpkt/x509.rs`](../lib/netpkt/x509.rs), Gruppe `tlscore`:
+  RFC-8448-Werte, in beide Richtungen gegen `netio::tls`; `tools/tls_interop.py --core` gegen OpenSSL).
   Getestet mit `coretest` (Gruppen `netpkt`, `rng`; RFC-Vektoren, unabhängig berechnete
   Prüfsummen). Seit E6 auch DHCP (RFC 2131/2132 mit typisierten Optionen, Relay-Information
   RFC 3046, lange Optionen RFC 3396), DNS-Nachrichten (RFC 1035 mit Namenskompression in beide

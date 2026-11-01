@@ -81,7 +81,9 @@
 //   addresses are IPv4 or IPv6 text ("2001:db8::1", also in brackets); net.listen, net.udp
 //                        and http.serve take both families (os.rs: ANY), a peer over IPv6 is
 //                        its IPv6 address
-//   http.serve(port, fn(req, res))      once per script: req {method, path, target, query,
+//   http.serve(port, fn(req, res), {tls: {names, issuer, org, days, age_days, starts_in_days}})
+//                        once per script (the options may be left out; tls: it speaks TLS, tlssim.rs;
+//                        a list as a header's value in res.send: several headers): req {method, path, target, query,
 //                        headers, body, peer, peer_port, form}: query the fields of the URL, form
 //                        those of a body sent as application/x-www-form-urlencoded (only then:
 //                        req.form ?? {} for a handler that also gets others), both decoded (a
@@ -1142,7 +1144,7 @@ impl Api<'_, '_> {
         Ok(Value::Nil)
     }
 
-    fn serve(&mut self, cx: &mut Cx, port: Value, f: Value) -> Result<Value, Fail> {
+    fn serve(&mut self, cx: &mut Cx, port: Value, f: Value, opts: Value) -> Result<Value, Fail> {
         let Some(port) = port_of(port).filter(|&p| p > 0) else {
             return Err(cx.error("http.serve: der Port muss eine ganze Zahl von 1 bis 65535 sein"));
         };
@@ -1154,6 +1156,23 @@ impl Api<'_, '_> {
             return Err(cx.error(&m));
         }
         let mut s = Serve::new(ServeCfg { port, server: String::from("jfn-script/1.0"), ..ServeCfg::default() }, K_SERVE);
+        // http.serve(443, f, {tls: {names: ["web.lab"], issuer: "self", days: 30}}): as a web server's "tls"
+        if let Some(t) = cx.map_get_str(opts, "tls") {
+            let names: Vec<String> = match cx.map_get_str(t, "names").and_then(|l| cx.list(l).map(|x| x.to_vec())) {
+                Some(items) => items.into_iter().map(|x| cx.display(x)).collect(),
+                None => Vec::new(),
+            };
+            let secs = |cx: &Cx, k: &str| match cx.map_get_str(t, k) {
+                Some(Value::Int(d)) if d >= 0 => Some(d as u64 * 86_400),
+                _ => None,
+            };
+            let (days, age, starts) = (secs(cx, "days"), secs(cx, "age_days"), secs(cx, "starts_in_days"));
+            let issuer = cx.map_get_str(t, "issuer").and_then(|v| cx.str(v)).map(String::from);
+            let org = cx.map_get_str(t, "org").and_then(|v| cx.str(v)).map(String::from);
+            let spec = crate::tlssim::TlsSpec::make(names, issuer.as_deref(), org.as_deref(), days, age, starts).map_err(|m| cx.error(&format!("http.serve: {}", m.text())))?;
+            let who = self.book.name.clone();
+            s.cfg.tls = Some(alloc::sync::Arc::new(spec.identity(self.os, &who)));
+        }
         if !s.start(self.os, &self.book.name) {
             return Err(cx.error(&format!("http.serve: Port {} ist schon belegt.", port)));
         }
@@ -1372,8 +1391,18 @@ impl Api<'_, '_> {
                 };
                 if let Value::Map(_) = a(3) {
                     for (k, v) in cx.map_entries(a(3)) {
-                        let (k, v) = (cx.display(k), cx.display(v));
-                        rep.headers.set(&k, &v);
+                        let name = cx.display(k);
+                        // a list: several headers of that name (Set-Cookie)
+                        if let Some(items) = cx.list(v).map(|l| l.to_vec()) {
+                            rep.headers.remove(&name);
+                            for x in items {
+                                let x = cx.display(x);
+                                rep.headers.add(&name, &x);
+                            }
+                            continue;
+                        }
+                        let v = cx.display(v);
+                        rep.headers.set(&name, &v);
                     }
                 }
                 cx.charge(rep.body.len() as u64 / 64);
@@ -1405,7 +1434,7 @@ impl script::Host for Api<'_, '_> {
             "net.connect" => self.connect(cx, a(0), a(1), a(2)),
             "net.udp" => self.udp(cx, a(0), a(1), a(2)),
             "dns.resolve" => self.resolve(cx, a(0), a(1)),
-            "http.serve" => self.serve(cx, a(0), a(1)),
+            "http.serve" => self.serve(cx, a(0), a(1), a(2)),
             "http.request" => self.request(cx, a(0), a(1)),
             "disk.get" | "disk.put" | "disk.delete" | "disk.scan" => self.disk(cx, name, args),
             "metrics.inc" | "metrics.gauge" | "metrics.observe" => self.metric(cx, name, a(0), a(1)),
@@ -2701,7 +2730,8 @@ impl Service for ScriptService {
         let breaks: usize = self.book.breaks.iter().map(|b| 48 + b.0.len() + b.2.as_ref().map_or(0, |c| c.len())).sum();
         // (a service from a file: the text it read, its path)
         let file = self.def.file.as_ref().map_or(0, |f| f.len() + self.def.source.len());
-        4096 + vm + breaks + file + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
+        let tls = self.run.as_ref().and_then(|r| r.serve.as_ref()).map_or(0, |s| s.tls_bytes());
+        4096 + vm + breaks + file + tls + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
