@@ -229,14 +229,15 @@ uniformBufferStandardLayout; `lib/wgsl` braucht das für WGSLs `mat2x2f` in Unif
 | `Cfg` | Blöcke beginnen mit `OpLabel` und enden mit genau einem Terminator; Merge-Instruktionen direkt vor ihrem Branch (`OpSelectionMerge` vor `OpBranchConditional` / `OpSwitch`, `OpLoopMerge` vor `OpBranch` / `OpBranchConditional`); Merge- und Continue-Ziele sind Blöcke der Funktion, ein Merge-Block gehört zu höchstens einem Header und steht nach ihm; bedingte Sprünge ohne Merge nur als break / continue; Rückwärtskanten nur zu Loop-Headern, jede Schleife hat eine; der Eintrittsblock ist kein Sprungziel; Phis am Blockanfang mit Vorgängern als Eltern |
 | `Interface` | Entry Point ist eine void-Funktion ohne Parameter; Interface nur aus globalen Variablen, vor 1.4 nur Input / Output, ab 1.4 jede höchstens einmal; es enthält jede globale Variable des Aufrufbaums (ab 1.4) bzw. jede Input- / Output-Variable (vor 1.4); keine zwei Entry Points gleichen Namens und Modells |
 | `ExecMode` | `LocalSize` (oder `LocalSizeId` mit drei 32-Bit-Ganzzahlkonstanten, gewöhnliche ≥ 1, oder das WorkgroupSize-Built-in) für GLCompute, Id-Modes nur in `OpExecutionModeId` und umgekehrt, `OriginUpperLeft` und kein `OriginLowerLeft` für Fragment, Modes nur für passende Modelle, `LocalSize` ≥ 1, `DepthReplacing` wenn `FragDepth` geschrieben wird, fragmentexklusive Instruktionen (discard, demote, Ableitungen, Sampling mit impliziter LOD) nur unter Fragment-Entry-Points, Workgroup-Variablen nur unter Compute |
-| `Capability` | Capabilities, die Typen (Int8/16/64, Float16/64), Instruktionen (DerivativeControl, ImageQuery, DemoteToHelperInvocation, Int64Atomics, *WithoutFormat), Built-ins (ClipDistance, CullDistance, DrawParameters, SampleRateShading, MultiView), Bildtypen, Modelle, Laufzeit-Arrays von Ressourcen (RuntimeDescriptorArray) und `NonUniform` (ShaderNonUniform) brauchen (`Shader` impliziert `Matrix`) |
-| `Version` | `OpTerminateInvocation` / `OpDemoteToHelperInvocation` vor 1.6 nur mit ihrer Extension, `OpCopyLogical`, `OpSelect` auf Composites und `UConvert` in `OpSpecConstantOp` erst ab 1.4, `OpExecutionModeId` ab 1.2, Laufzeit-Arrays von Ressourcen und `NonUniform` vor 1.5 nur mit `SPV_EXT_descriptor_indexing`, StorageBuffer vor 1.3 nur mit Extension |
+| `Capability` | Capabilities, die Typen (Int8/16/64, Float16/64), Instruktionen (DerivativeControl, ImageQuery, DemoteToHelperInvocation, Int64Atomics, *WithoutFormat, GroupNonUniform und seine Vote, Arithmetic, Ballot, Shuffle, ShuffleRelative, Quad), Built-ins (ClipDistance, CullDistance, DrawParameters, SampleRateShading, MultiView, die Subgroup-Built-ins), Bildtypen, Modelle, Laufzeit-Arrays von Ressourcen (RuntimeDescriptorArray) und `NonUniform` (ShaderNonUniform) brauchen (`Shader` impliziert `Matrix`) |
+| `Version` | `OpTerminateInvocation` / `OpDemoteToHelperInvocation` vor 1.6 nur mit ihrer Extension, `OpCopyLogical`, `OpSelect` auf Composites und `UConvert` in `OpSpecConstantOp` erst ab 1.4, `OpExecutionModeId` ab 1.2, `OpGroupNonUniform*` ab 1.3, Laufzeit-Arrays von Ressourcen und `NonUniform` vor 1.5 nur mit `SPV_EXT_descriptor_indexing`, StorageBuffer vor 1.3 nur mit Extension |
 
 Nicht geprüft (dafür ist `spirv-val` zuständig): Dominanz im eigentlichen Sinn (nur „vorher
 definiert“ in Instruktionsreihenfolge), die vollständigen Regeln strukturierter Konstrukte
 (Verschachtelung, Ausgänge außer break / continue, Switch-Fallthrough, Header-Dominanz), Anzahl
 der Phi-Eltern gleich Anzahl der Vorgänger, Typregeln der Opcodes, die der Builder nicht schreibt
-(Gruppen-/Subgroup-Operationen, Bitfelder, Kernel), Typ und Speicherklasse der Built-ins
+(Bitfelder, Kernel; bei `OpGroupNonUniform*` nur Scope als Konstante und Ergebnistyp gleich
+Wert), Typ und Speicherklasse der Built-ins
 (`Position` als vec4-Output …), überlappende Locations / Components und das Zusammenpassen der
 Stufen, Vulkan-Memory-Model, relaxed / scalar Block Layout (der Validator verlangt die strenge
 Ausrichtung), Gerätegrenzen außer den 128 Byte Push-Konstanten, die Werte von
@@ -388,9 +389,10 @@ Der Vertex- und der Fragment-Shader sind nicht exakt (Matrixprodukte, `Normalize
   `.spvasm`-Dateien nach `golden/` kopieren).
 - `layout`: Offsets, Strides und Größen typischer Structs, die Benchmark-Datensätze, was
   `ty_struct_layout` dekoriert.
-- `validate`: alle Benchmark-Shader beider Stufen gültig; 53 kaputte Module, mindestens eines je
+- `validate`: alle Benchmark-Shader beider Stufen gültig; 62 kaputte Module, mindestens eines je
   Regel (darunter Spezialisierungskonstanten, `LocalSizeId`, Id-Modes, Bild-Abfragen, Dref,
-  Koordinaten, Descriptor-Indexing), jedes von genau der erwarteten Regel abgelehnt.
+  Koordinaten, Descriptor-Indexing, Gruppen-Operationen, Subgroup-Built-ins), jedes von genau der
+  erwarteten Regel abgelehnt.
 - `refs`: Hash-Werte, `floor`, `sincos_turns` gegen f64, Eigenschaften von `move_ref`,
   Datensätze, Würfel-Windung, Kamera (NDC y oben, rechts / oben, Windung der Würfelseiten in NDC),
   `visible` gegen einen Clip-Space-Test, `cull_ref`.
@@ -410,7 +412,7 @@ Der Vertex- und der Fragment-Shader sind nicht exakt (Matrixprodukte, `Normalize
 - `determinism`: jeder Shader zweimal und in anderer Reihenfolge gebaut, gleiche Wörter.
 - `sdk`: wenn das Vulkan SDK da ist (`--sdk DIR`, `%VULKAN_SDK%\Bin`, das neueste
   `C:\VulkanSDK\*\Bin`, `PATH`): `spirv-val --target-env vulkan1.1` (1.3-Module) bzw.
-  `vulkan1.3` (1.6-Module) akzeptiert jedes gebaute Modul samt den Beispielen und lehnt 50 der 53
+  `vulkan1.3` (1.6-Module) akzeptiert jedes gebaute Modul samt den Beispielen und lehnt 59 der 62
   kaputten ab (nicht geprüft von `spirv-val`: die 128-Byte-Grenze für Push-Konstanten, eine
   `SpecId` zweimal, ein Float in `LocalSizeId`); `spirv-dis` und `dis::disassemble` werden für
   die Benchmark- und die Beispiel-Module verglichen (Unterschiede werden gemeldet, nicht als
@@ -424,7 +426,7 @@ Der WGSL-Übersetzer muss annehmen, was Chromes Tint annimmt (der Browser bekomm
 direkt). [`tools/wgsl_ref.mjs`](../tools/wgsl_ref.mjs) lässt das installierte Chrome (headless,
 ohne Flags, über Playwright) jede gegebene `.wgsl`-Datei übersetzen und je Entry Point eine
 Pipeline anlegen und schreibt Urteil, Meldungen (Zeile, Spalte, Offset, Länge, Text) und
-Pipeline-Fehler als JSON. [`tools/wgsl_corpus`](../tools/wgsl_corpus/README.md) sind 494 selbst
+Pipeline-Fehler als JSON. [`tools/wgsl_corpus`](../tools/wgsl_corpus/README.md) sind 932 selbst
 geschriebene Fälle zu den Regeln der Spezifikation, `expected.json` ist Tints Urteil darüber
 (Chrome 156): Tests vergleichen damit ohne Chrome. Das README des Korpus nennt die Fälle, in
 denen Tint anders urteilte als erwartet (etwa: konkretes `i32` läuft auch in
@@ -432,7 +434,8 @@ Konstantenausdrücken modulo 2³² über, `01f` ist für Tint ein gültiges Lite
 
 ## Was fehlt
 
-Mesh- und Task-Shader (`MeshEXT` / `TaskEXT` sind nur als Modelle bekannt), Subgroup-Operationen,
+Mesh- und Task-Shader (`MeshEXT` / `TaskEXT` sind nur als Modelle bekannt), geclusterte
+Subgroup-Operationen (die anderen schreibt `lib/wgsl` über `Module::emit`),
 `OpTypeForwardPointer` / Physical Storage Buffer, Row-Major-Layouts
 im Layout-Helfer, Switch-Literale breiter als 32 Bit, MSL-Ausgabe; der Validator deckt die oben
 genannten Lücken nicht ab. Der WGSL-Übersetzer, der diese Crate als Back-End benutzt, ist

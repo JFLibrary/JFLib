@@ -2,13 +2,15 @@
 // feature modules, and rejects deliberately broken modules, at least one per rule (cases(),
 // also written by --write and run through spirv-val by the sdk group): among them the rules of
 // specialization constants (OpSpecConstantOp operations, SpecId, LocalSizeId, the
-// WorkgroupSize built-in) and of image instructions (queries, Dref, coordinates, fetch)
+// WorkgroupSize built-in), of image instructions (queries, Dref, coordinates, fetch) and of the
+// group operations and subgroup built-ins
 
 use alloc::format;
 use alloc::vec::Vec;
 
 use shader::bench::{self, Shader};
 use shader::val::{validate, Rule};
+use shader::spv::{group_op, scope};
 use shader::{op, parse, Bi, Cap, Dec, Dim, Fmt, Id, Mode, Model, Module, Sc};
 
 use crate::T;
@@ -475,6 +477,62 @@ pub fn cases() -> Vec<Case> {
     }), |x| {
         let k = x.find(op::Capability, |o| o[0] == Cap::ShaderNonUniform as u32);
         x.ins.remove(k);
+    }), true));
+
+    // group operations
+    v.push(c("capability_group_vote", Rule::Capability, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        let (b, t, s) = (m.ty_bool(), m.const_bool(true), m.const_u32(scope::Subgroup));
+        m.emit(op::GroupNonUniformAll, Some(b), &[s.0, t.0]);
+    }), true));
+    v.push(c("capability_group_arithmetic", Rule::Capability, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        let (u, one, s) = (m.ty_u32(), m.const_u32(1), m.const_u32(scope::Subgroup));
+        m.emit(op::GroupNonUniformIAdd, Some(u), &[s.0, group_op::Reduce, one.0]);
+    }), true));
+    v.push(c("capability_group_shuffle_relative", Rule::Capability, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        m.capability(Cap::GroupNonUniformShuffle);
+        let (u, one, s) = (m.ty_u32(), m.const_u32(1), m.const_u32(scope::Subgroup));
+        m.emit(op::GroupNonUniformShuffleUp, Some(u), &[s.0, one.0, one.0]);
+    }), true));
+    v.push(c("capability_group_quad", Rule::Capability, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        let (u, one, s) = (m.ty_u32(), m.const_u32(1), m.const_u32(scope::Subgroup));
+        m.emit(op::GroupNonUniformQuadSwap, Some(u), &[s.0, one.0, one.0]);
+    }), true));
+    v.push(c("capability_subgroup_builtin", Rule::Capability, compute(3, |m| {
+        let u = m.ty_u32();
+        let g = m.builtin(Sc::Input, u, Bi::SubgroupSize);
+        m.load(g);
+    }), true));
+    v.push(c("version_group_operation", Rule::Version, {
+        let mut w = compute(3, |m| {
+            m.capability(Cap::GroupNonUniform);
+            let (b, s) = (m.ty_bool(), m.const_u32(scope::Subgroup));
+            m.emit(op::GroupNonUniformElect, Some(b), &[s.0]);
+        });
+        w[1] = 0x0001_0200;
+        w
+    }, true));
+    v.push(c("type_group_scope_not_constant", Rule::Type, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        let (u, b, k) = (m.ty_u32(), m.ty_bool(), m.const_u32(scope::Subgroup));
+        let l = m.local(u, Some(k));
+        let s = m.load(l);
+        m.emit(op::GroupNonUniformElect, Some(b), &[s.0]);
+    }), true));
+    v.push(c("type_group_result", Rule::Type, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        m.capability(Cap::GroupNonUniformArithmetic);
+        let (u, one, s) = (m.ty_u32(), m.const_i32(1), m.const_u32(scope::Subgroup));
+        m.emit(op::GroupNonUniformIAdd, Some(u), &[s.0, group_op::Reduce, one.0]);
+    }), true));
+    v.push(c("type_group_broadcast", Rule::Type, compute(3, |m| {
+        m.capability(Cap::GroupNonUniform);
+        m.capability(Cap::GroupNonUniformBallot);
+        let (u, f, s, z) = (m.ty_u32(), m.const_f32(1.0), m.const_u32(scope::Subgroup), m.const_u32(0));
+        m.emit(op::GroupNonUniformBroadcast, Some(u), &[s.0, f.0, z.0]);
     }), true));
     v
 }

@@ -122,6 +122,8 @@ pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES: u32 = 10000
 pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2: u32 = 1000059000;
 pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2: u32 = 1000059001;
 pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES: u32 = 1000094000;
+pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES: u32 = 1000225000;
+pub const STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO: u32 = 1000225001;
 pub const STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT: u32 = 1000128003;
 pub const STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT: u32 = 1000128004;
 pub const STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO: u32 = 1000161000;
@@ -367,6 +369,8 @@ pub const SUBGROUP_FEATURE_VOTE_BIT: u32 = 2;
 pub const SUBGROUP_FEATURE_ARITHMETIC_BIT: u32 = 4;
 pub const SUBGROUP_FEATURE_BALLOT_BIT: u32 = 8;
 pub const SUBGROUP_FEATURE_SHUFFLE_BIT: u32 = 0x10;
+pub const SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT: u32 = 0x20;
+pub const SUBGROUP_FEATURE_QUAD_BIT: u32 = 0x80;
 
 pub const DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: u32 = 1;
 pub const DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: u32 = 0x10;
@@ -427,6 +431,7 @@ pub const F12_DESCRIPTOR_BINDING_PARTIALLY_BOUND: usize = 27;
 pub const F12_RUNTIME_DESCRIPTOR_ARRAY: usize = 29;
 pub const F12_SCALAR_BLOCK_LAYOUT: usize = 31;
 pub const F12_UNIFORM_BUFFER_STANDARD_LAYOUT: usize = 33;
+pub const F12_SHADER_SUBGROUP_EXTENDED_TYPES: usize = 34;
 pub const F12_HOST_QUERY_RESET: usize = 36;
 pub const F12_TIMELINE_SEMAPHORE: usize = 37;
 pub const F12_BUFFER_DEVICE_ADDRESS: usize = 38;
@@ -434,6 +439,7 @@ pub const F12_VULKAN_MEMORY_MODEL: usize = 41;
 pub const F12_VULKAN_MEMORY_MODEL_DEVICE_SCOPE: usize = 42;
 pub const F12_COUNT: usize = 47;
 pub const F13_SHADER_DEMOTE_TO_HELPER_INVOCATION: usize = 5;
+pub const F13_SUBGROUP_SIZE_CONTROL: usize = 7;
 pub const F13_SYNCHRONIZATION2: usize = 9;
 pub const F13_DYNAMIC_RENDERING: usize = 12;
 pub const F13_MAINTENANCE4: usize = 14;
@@ -580,6 +586,13 @@ vk_structs! {
     pub struct PhysicalDeviceSubgroupProperties {
         pub s_type: u32, pub p_next: *mut c_void, pub subgroup_size: u32, pub supported_stages: u32,
         pub supported_operations: u32, pub quad_operations_in_all_stages: Bool32,
+    }
+    pub struct PhysicalDeviceSubgroupSizeControlProperties {
+        pub s_type: u32, pub p_next: *mut c_void, pub min_subgroup_size: u32, pub max_subgroup_size: u32,
+        pub max_compute_workgroup_subgroups: u32, pub required_subgroup_size_stages: u32,
+    }
+    pub struct PipelineShaderStageRequiredSubgroupSizeCreateInfo {
+        pub s_type: u32, pub p_next: *mut c_void, pub required_subgroup_size: u32,
     }
     /// VkPhysicalDeviceDescriptorIndexingProperties (its 23 uint32_t / VkBool32 fields: DIP_*)
     pub struct PhysicalDeviceDescriptorIndexingProperties {
@@ -1099,6 +1112,8 @@ mod layout {
     check!(PhysicalDeviceProperties2, 840, s_type = 0, p_next = 8, properties = 16);
     check!(PhysicalDeviceDriverProperties, 536, s_type = 0, p_next = 8, driver_id = 16, driver_name = 20, driver_info = 276, conformance_version = 532);
     check!(PhysicalDeviceSubgroupProperties, 32, s_type = 0, p_next = 8, subgroup_size = 16, supported_stages = 20, supported_operations = 24, quad_operations_in_all_stages = 28);
+    check!(PhysicalDeviceSubgroupSizeControlProperties, 32, s_type = 0, p_next = 8, min_subgroup_size = 16, max_subgroup_size = 20, max_compute_workgroup_subgroups = 24, required_subgroup_size_stages = 28);
+    check!(PipelineShaderStageRequiredSubgroupSizeCreateInfo, 24, s_type = 0, p_next = 8, required_subgroup_size = 16);
     check!(PhysicalDeviceDescriptorIndexingProperties, 112);
     check!(PhysicalDeviceFeatures2, 240);
     check!(PhysicalDeviceVulkan11Features, 64);

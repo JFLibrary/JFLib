@@ -1,6 +1,6 @@
 # WGSL-Korpus: Tints Urteil als Referenz
 
-494 kleine WGSL-Module, selbst geschrieben, die die Regeln der WGSL-Spezifikation von beiden
+932 kleine WGSL-Module, selbst geschrieben, die die Regeln der WGSL-Spezifikation von beiden
 Seiten prüfen: was gültig sein muss und was abgelehnt werden muss. `expected.json` ist das
 Urteil von Chromes WGSL-Übersetzer (Tint) über jede Datei, erzeugt von
 [`tools/wgsl_ref.mjs`](../wgsl_ref.mjs). Damit können die Tests von JFLibs eigenem
@@ -20,7 +20,7 @@ Pipeline lässt sich nicht anlegen: Overrides, Grenzwerte, Schnittstellen zwisch
 | `types` | 45 | Vektoren, Matrizen, Arrays (Anzahl, Laufzeit-Arrays, Override-Größen), Atomics, konstruierbare Typen, Konstruktoren, Zeiger, Operatoren (Mischen von Bit-Operatoren, Ketten, Vergleiche) |
 | `abstract` | 22 | abstrakte Zahlen und ihre Umwandlung: Darstellbarkeit, Konkretisierung durch `let`, f64-Genauigkeit, Shifts |
 | `consteval` | 39 | `const_assert`, Überlauf und Division durch 0 in Konstantenausdrücken, Sättigung bei Float→Int, eingebaute Funktionen in Konstantenausdrücken (Definitionsbereiche), Kurzschluss, Indizes |
-| `override` | 22 | Overrides: Typen, `@id`, Ableitungen, Pipeline-Konstanten nach Name und Zahl, Fehler erst bei der Pipeline, Workgroup-Größen |
+| `override` | 58 | Overrides: Typen, `@id`, Ableitungen, Pipeline-Konstanten nach Name und Zahl, Fehler erst bei der Pipeline, Workgroup-Größen, Override-Ausdrücke in Funktionsrümpfen, die mit dem Wert zum Fehler werden |
 | `attr` | 32 | Attribute: `@align`, `@size`, Doppelte, unbekannte, `@workgroup_size` (Typen, Grenzen), `@interpolate`, `@invariant`, `@must_use` |
 | `addr` | 23 | Adressräume und Zugriffsarten, Initialisierer, Speichern in Werte, Adressen, Zeigerparameter, `var<immediate>` |
 | `layout` | 13 | Speicherlayout: Uniform-Regeln (mit `uniform_buffer_standard_layout`), Ausrichtung, Größen, Laufzeit-Arrays, f16, Grenzwerte für Uniform- und Workgroup-Speicher |
@@ -30,9 +30,10 @@ Pipeline lässt sich nicht anlegen: Overrides, Grenzwerte, Schnittstellen zwisch
 | `tex` | 39 | Texturen und Sampler: Sample-, Load-, Store-, Compare-, Gather- und Abfragefunktionen, Speichertexturen und ihre Formate, Offsets, Bindungen |
 | `atomic` | 12 | Atomics: Operationen, Adressräume, Zugriffsarten, Benutzung als Wert |
 | `requires` | 18 | die WGSL-Sprachfeatures, die Chrome 156 anbietet, und Fehlerfälle |
-| `enable` | 16 | `enable f16`, `subgroups`, `clip_distances`, `dual_source_blending`, `primitive_index`, unbekannte und experimentelle Erweiterungen |
-| `diag` | 12 | `diagnostic`-Direktiven und -Attribute: Schweregrade, Regelnamen, Konflikte |
-| `unif` | 18 | Einheitlichkeitsanalyse: Barrieren, `textureSample`, Speicher- und Workgroup-Werte, Parameter, Kurzschluss, `discard` |
+| `enable` | 89 | `enable f16`, `subgroups`, `clip_distances`, `dual_source_blending`, `primitive_index`, unbekannte und experimentelle Erweiterungen; die Subgroup- und Quad-Funktionen, ihre Built-ins und `@subgroup_size` |
+| `diag` | 68 | `diagnostic`-Direktiven und -Attribute: Schweregrade, Regelnamen, Konflikte, jede Stelle eines Filters, Filter durch Funktionsketten, `chromium.unreachable_code` |
+| `unif` | 229 | Einheitlichkeitsanalyse: Barrieren, `textureSample`, Speicher- und Workgroup-Werte, Parameter, Kurzschluss, `discard`, Schleifen, `continuing`, `break if`, `switch`, Funktionsketten, Zeiger, `let` / `var`, Quellen, der Subgroup-Bereich |
+| `limits` | 62 | die Grenzen aus Kapitel 2.4 und die von Chrome: Struct-Member, Schachtelung, Parameter, case-Werte, Klammern, Tiefe der Anweisungen, Bytes je Adressraum, Array-Konstruktoren, Arrays ab 65536 Elementen |
 
 Jede Datei beginnt mit Kommentarzeilen:
 
@@ -45,7 +46,8 @@ Jede Datei beginnt mit Kommentarzeilen:
 ```
 
 Die erste Zeile nennt den Abschnitt der Spezifikation (seine Überschrift) und die Regel,
-`expect` unsere Erwartung. 26 Fälle sind als Einheitlichkeitsfälle markiert (`unif`, `diag`).
+`expect` unsere Erwartung. Die Dateien in `unif` und die meisten in `diag` sind als
+Einheitlichkeitsfälle markiert.
 Alle Fälle sind selbst geschrieben; nichts ist aus der WebGPU-CTS, aus Tint oder aus der
 Spezifikation kopiert. Neue Fälle bitte genauso.
 
@@ -74,23 +76,26 @@ set PLAYWRIGHT_MODULE=<Pfad zum Playwright-Paket>      (oder Playwright über np
 node tools/wgsl_ref.mjs --corpus
 ```
 
-Das schreibt `tools/wgsl_corpus/expected.json` neu (rund 5 Sekunden). Chrome muss installiert
+Das schreibt `tools/wgsl_corpus/expected.json` neu (rund 15 Sekunden). Chrome muss installiert
 sein (oder `CHROME_PATH`), headless genügt, keine Flags. Ein neues Chrome kann Urteile ändern:
 dann die Unterschiede in `expected.json` ansehen, bevor sie eingecheckt werden. Einzelne
 Dateien: `node tools/wgsl_ref.mjs DATEI.wgsl ...` (JSON auf stdout).
 
 Stand der eingecheckten Datei: Chrome 156.0.8078.76, Windows 11, GeForce RTX 2070 SUPER
-(Adapter `nvidia` / `turing`), 211 gültig, 267 Fehler, 16 Pipeline-Fehler.
+(Adapter `nvidia` / `turing`), 389 gültig, 490 Fehler, 53 Pipeline-Fehler. Fälle, deren Urteil
+vom Gerät abhängt (`@subgroup_size` außerhalb des Adapter-Bereichs), stehen nicht im Korpus.
 
 ## Wo Tint anders urteilte als erwartet
 
 Beim ersten Lauf wichen 13 Fälle von unserer Erwartung ab. In 12 lag die Erwartung falsch oder
 die Regel gehört zur WebGPU-API statt zu WGSL; diese Fälle tragen jetzt Tints Urteil als
-Erwartung (die Regelzeile erklärt es). Einer bleibt als Abweichung stehen.
+Erwartung (die Regelzeile erklärt es). Einer bleibt als Abweichung stehen, dazu seit G2d 13 Dateien
+aus `limits`: JFLib nimmt die Mindestgrenzen der Spezifikation als Regel, die Chrome überschreitet
+(`docs/WGSL.md`, „Grenzen“); sie heißen `err_` und stehen in `summary.mismatches`.
 
 | Fall | erwartet | Tint | Bemerkung |
 | --- | --- | --- | --- |
-| `lex/err_float_leading_zero_suffix` | Fehler | gültig | `01f` passt auf keine Form der Grammatik für dezimale Gleitkommaliterale (`0f` und `[1-9][0-9]*f` ohne Punkt oder Exponent); Tint nimmt es an. **Bleibt als Abweichung** – JFLib muss es trotzdem annehmen, weil der Browser es tut. |
+| `lex/err_float_leading_zero_suffix` | Fehler | gültig | `01f` passt auf keine Form der Grammatik für dezimale Gleitkommaliterale (`0f` und `[1-9][0-9]*f` ohne Punkt oder Exponent); Tint nimmt es an. **Bleibt als Abweichung**: JFLib folgt der Spezifikation und lehnt es ab. |
 | `consteval/ok_i32_add_wraps`, `ok_i32_mul_wraps`, `ok_i32_neg_wraps`, `ok_u32_sub_wraps` | Fehler | gültig | Tint rechnet konkretes `i32` / `u32` auch in Konstantenausdrücken modulo 2³² (`const_assert 2147483647i + 1i < 0i` gilt). Fehler gibt es nur für abstrakte Ganzzahlen, beim Umwandeln, bei Division durch 0, `i32 min / -1` und bei Shifts, die das Vorzeichen ändern. |
 | `override/ok_overflow_at_pipeline` | Pipeline-Fehler | gültig | dasselbe für Override-Ausdrücke bei der Pipeline-Erzeugung |
 | `addr/err_address_of_component` | gültig | Fehler | `&v.x` ist verboten: von einer Vektorkomponente gibt es keinen Zeiger |

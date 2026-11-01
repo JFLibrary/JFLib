@@ -649,6 +649,9 @@ impl<'a> V<'a> {
                 }
                 x if x == Bi::SampleId as u32 || x == Bi::SamplePosition as u32 => self.need_cap(Cap::SampleRateShading, k),
                 x if x == Bi::ViewIndex as u32 => self.need_cap(Cap::MultiView, k),
+                x if [Bi::SubgroupSize, Bi::NumSubgroups, Bi::SubgroupId, Bi::SubgroupLocalInvocationId].iter().any(|b| *b as u32 == x) => {
+                    self.need_cap(Cap::GroupNonUniform, k)
+                }
                 _ => {}
             }
         }
@@ -1420,6 +1423,34 @@ impl<'a> V<'a> {
                 }
             }
             op::CopyLogical if self.minor < 4 => self.err(Rule::Version, k, String::from("OpCopyLogical needs SPIR-V 1.4")),
+            o2 if (op::GroupNonUniformElect..=op::GroupNonUniformQuadSwap).contains(&o2) => {
+                // the group operations: SPIR-V 1.3, their capability, the scope is a constant,
+                // the result has the value's type (except elect and ballot)
+                if self.minor < 3 {
+                    let n = self.name(k);
+                    self.err(Rule::Version, k, format!("Op{} needs SPIR-V 1.3", n));
+                }
+                let cap = match o2 {
+                    op::GroupNonUniformElect => Cap::GroupNonUniform,
+                    op::GroupNonUniformAll | op::GroupNonUniformAny => Cap::GroupNonUniformVote,
+                    op::GroupNonUniformBroadcast | op::GroupNonUniformBroadcastFirst | op::GroupNonUniformBallot => Cap::GroupNonUniformBallot,
+                    op::GroupNonUniformShuffle | op::GroupNonUniformShuffleXor => Cap::GroupNonUniformShuffle,
+                    op::GroupNonUniformShuffleUp | op::GroupNonUniformShuffleDown => Cap::GroupNonUniformShuffleRelative,
+                    op::GroupNonUniformQuadBroadcast | op::GroupNonUniformQuadSwap => Cap::GroupNonUniformQuad,
+                    _ => Cap::GroupNonUniformArithmetic,
+                };
+                self.need_cap(cap, k);
+                let scope = g(0);
+                self.want(k, self.kind(scope) == Some(K::Const), "the scope must be a constant");
+                let arith = (op::GroupNonUniformIAdd..=op::GroupNonUniformBitwiseXor).contains(&o2);
+                if arith {
+                    let a = self.val(k, g(2));
+                    self.want(k, a == ty, "the value must have the result type");
+                } else if matches!(o2, op::GroupNonUniformBroadcast | op::GroupNonUniformBroadcastFirst | op::GroupNonUniformShuffle | op::GroupNonUniformShuffleXor | op::GroupNonUniformShuffleUp | op::GroupNonUniformShuffleDown | op::GroupNonUniformQuadBroadcast | op::GroupNonUniformQuadSwap) {
+                    let a = self.val(k, g(1));
+                    self.want(k, a == ty, "the value must have the result type");
+                }
+            }
             op::FunctionCall => {
                 let callee = g(0);
                 if self.kind(callee) != Some(K::Func) {

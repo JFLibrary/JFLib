@@ -248,6 +248,31 @@ ops! {
     Unreachable = 255, R_NONE, "";
     ModuleProcessed = 330, R_NONE, "s";
     ExecutionModeId = 331, R_NONE, "iG";
+    GroupNonUniformElect = 333, R_TY, "i";
+    GroupNonUniformAll = 334, R_TY, "ii";
+    GroupNonUniformAny = 335, R_TY, "ii";
+    GroupNonUniformBroadcast = 337, R_TY, "iii";
+    GroupNonUniformBroadcastFirst = 338, R_TY, "ii";
+    GroupNonUniformBallot = 339, R_TY, "ii";
+    GroupNonUniformShuffle = 345, R_TY, "iii";
+    GroupNonUniformShuffleXor = 346, R_TY, "iii";
+    GroupNonUniformShuffleUp = 347, R_TY, "iii";
+    GroupNonUniformShuffleDown = 348, R_TY, "iii";
+    GroupNonUniformIAdd = 349, R_TY, "ini?";
+    GroupNonUniformFAdd = 350, R_TY, "ini?";
+    GroupNonUniformIMul = 351, R_TY, "ini?";
+    GroupNonUniformFMul = 352, R_TY, "ini?";
+    GroupNonUniformSMin = 353, R_TY, "ini?";
+    GroupNonUniformUMin = 354, R_TY, "ini?";
+    GroupNonUniformFMin = 355, R_TY, "ini?";
+    GroupNonUniformSMax = 356, R_TY, "ini?";
+    GroupNonUniformUMax = 357, R_TY, "ini?";
+    GroupNonUniformFMax = 358, R_TY, "ini?";
+    GroupNonUniformBitwiseAnd = 359, R_TY, "ini?";
+    GroupNonUniformBitwiseOr = 360, R_TY, "ini?";
+    GroupNonUniformBitwiseXor = 361, R_TY, "ini?";
+    GroupNonUniformQuadBroadcast = 365, R_TY, "iii";
+    GroupNonUniformQuadSwap = 366, R_TY, "iii";
     CopyLogical = 400, R_TY, "i";
     TerminateInvocation = 4416, R_NONE, "";
     DemoteToHelperInvocation = 5380, R_NONE, "";
@@ -289,7 +314,8 @@ Cap, CAPS {
     ImageQuery = 50, DerivativeControl = 51, InterpolationFunction = 52, TransformFeedback = 53,
     GeometryStreams = 54, StorageImageReadWithoutFormat = 55, StorageImageWriteWithoutFormat = 56,
     MultiViewport = 57, GroupNonUniform = 61, GroupNonUniformVote = 62, GroupNonUniformArithmetic = 63,
-    GroupNonUniformBallot = 64, GroupNonUniformShuffle = 65, ShaderLayer = 69, ShaderViewportIndex = 70,
+    GroupNonUniformBallot = 64, GroupNonUniformShuffle = 65, GroupNonUniformShuffleRelative = 66,
+    GroupNonUniformQuad = 68, ShaderLayer = 69, ShaderViewportIndex = 70,
     DrawParameters = 4427, StorageBuffer16BitAccess = 4433, UniformAndStorageBuffer16BitAccess = 4434,
     StoragePushConstant16 = 4435, StorageInputOutput16 = 4436, MultiView = 4439,
     StorageBuffer8BitAccess = 4448, ShaderNonUniform = 5301, RuntimeDescriptorArray = 5302,
@@ -386,6 +412,13 @@ pub mod scope {
     pub const Subgroup: u32 = 3;
     pub const Invocation: u32 = 4;
     pub const QueueFamily: u32 = 5;
+}
+
+/// the group operation literal of OpGroupNonUniform{IAdd, FAdd ...}
+pub mod group_op {
+    pub const Reduce: u32 = 0;
+    pub const InclusiveScan: u32 = 1;
+    pub const ExclusiveScan: u32 = 2;
 }
 
 /// memory semantics bits (the value of a constant id operand)
