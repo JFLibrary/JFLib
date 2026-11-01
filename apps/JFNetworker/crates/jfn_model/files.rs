@@ -178,6 +178,7 @@ pub fn capacity_of(m: &Model) -> u64 {
     match m.kind {
         Router | Firewall => 256 * MIB,
         L3Switch => 512 * MIB,
+        Switch if m.cli == CliStyle::None => 0,
         Switch => 128 * MIB,
         AccessPoint => 64 * MIB,
         Pc => 512 * GIB,
