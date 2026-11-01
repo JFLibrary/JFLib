@@ -17963,9 +17963,11 @@ buffer slots, staged uploads, submission
        one queue (the first family with graphics + compute, presentation checked per
        surface); level Voll when the adapter has it and desc.max_level allows it.  Enabled:
        timeline semaphores, dynamic rendering (core 1.3 or the KHR extensions on 1.1 / 1.2),
-       VK_KHR_swapchain when the instance has surfaces, the optional features of Features;
-       on Voll also descriptor indexing (update after bind, partially bound, non-uniform
-       indexing) and draw-indirect-count.  Not enabled: robust buffer access (speed).
+       VK_KHR_swapchain when the instance has surfaces, the optional features of Features,
+       the Vulkan memory model only together with its device scope (else Device-scope
+       atomics, as in the benchmark's cull, would be invalid); on Voll also descriptor
+       indexing (update after bind, partially bound, non-uniform indexing) and
+       draw-indirect-count.  Not enabled: robust buffer access (speed).
   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
@@ -18398,7 +18400,7 @@ SPIR-V 1.3 (Basis) or 1.6 (Voll), their data contract and CPU references.
   Object (48 bytes), Camera (176), DrawCmd (20), CubeVertex (32), Push (20): the buffer
   records with bytes() / from_bytes(); offsets in the *_OFF constants
   cube_vertices() (24) / cube_indices() (36, u16, counter-clockwise from outside)
-  Camera::look_at / from_view_proj: Vulkan clip space (y down, depth 0..1), planes
+  Camera::look_at / from_view_proj: lib/gpu's clip space (NDC y up, depth 0..1), planes
   hash, unit, floor, sincos_turns, move_ref, move_all, visible, cull_ref: the CPU references
 
 Descriptor set 0 (one layout for every pipeline, stages COMPUTE | VERTEX | FRAGMENT):
@@ -18516,11 +18518,13 @@ PUSH_OFF: [u32; 5] = [0, 4, 8, 12, 16]
 
 - **`fn look_at(eye: [f32; 3], target: [f32; 3], fovy: f32, aspect: f32, near: f32, far: f32) -> Camera`**
   a right-handed camera at eye looking at target (+y up), vertical field of view fovy
-  (radians), Vulkan clip space: y flipped (world up is up on screen), depth 0 (near) to
-  1 (far).  Front faces are counter-clockwise (VK_FRONT_FACE_COUNTER_CLOCKWISE).
+  (radians), in lib/gpu's clip space (as WebGPU and Metal): NDC y up (world up is up on
+  screen; the Vulkan backend flips the viewport, the matrix flips nothing), depth 0 (near)
+  to 1 (far).  Faces counter-clockwise from outside stay counter-clockwise in NDC: front
+  faces with lib/gpu's default (front_cw false), cull Back.
 - **`fn from_view_proj(vp: [f32; 16]) -> Camera`**
-  planes of a view-projection matrix (Vulkan: -w &lt;= x, y &lt;= w, 0 &lt;= z &lt;= w), normalised;
-  the light comes from above (0.3, 0.8, 0.5), ambient 0.25
+  planes of a view-projection matrix (-w &lt;= x, y &lt;= w, 0 &lt;= z &lt;= w: left, right, bottom,
+  top, near, far), normalised; the light comes from above (0.3, 0.8, 0.5), ambient 0.25
 - **`fn bytes(&self) -> Vec<u8>`**
   the 176 bytes of the uniform buffer (std140)
 

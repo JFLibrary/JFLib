@@ -7,7 +7,7 @@
 //   Object (48 bytes), Camera (176), DrawCmd (20), CubeVertex (32), Push (20): the buffer
 //   records with bytes() / from_bytes(); offsets in the *_OFF constants
 //   cube_vertices() (24) / cube_indices() (36, u16, counter-clockwise from outside)
-//   Camera::look_at / from_view_proj: Vulkan clip space (y down, depth 0..1), planes
+//   Camera::look_at / from_view_proj: lib/gpu's clip space (NDC y up, depth 0..1), planes
 //   hash, unit, floor, sincos_turns, move_ref, move_all, visible, cull_ref: the CPU references
 //
 // Descriptor set 0 (one layout for every pipeline, stages COMPUTE | VERTEX | FRAGMENT):
@@ -271,8 +271,10 @@ fn norm(a: V3) -> V3 {
 
 impl Camera {
     /// a right-handed camera at eye looking at target (+y up), vertical field of view fovy
-    /// (radians), Vulkan clip space: y flipped (world up is up on screen), depth 0 (near) to
-    /// 1 (far).  Front faces are counter-clockwise (VK_FRONT_FACE_COUNTER_CLOCKWISE).
+    /// (radians), in lib/gpu's clip space (as WebGPU and Metal): NDC y up (world up is up on
+    /// screen; the Vulkan backend flips the viewport, the matrix flips nothing), depth 0 (near)
+    /// to 1 (far).  Faces counter-clockwise from outside stay counter-clockwise in NDC: front
+    /// faces with lib/gpu's default (front_cw false), cull Back.
     pub fn look_at(eye: [f32; 3], target: [f32; 3], fovy: f32, aspect: f32, near: f32, far: f32) -> Camera {
         let e: V3 = [eye[0] as f64, eye[1] as f64, eye[2] as f64];
         let t: V3 = [target[0] as f64, target[1] as f64, target[2] as f64];
@@ -284,7 +286,7 @@ impl Camera {
                     [-f[0], -f[1], -f[2], dot3(f, e)], [0.0, 0.0, 0.0, 1.0]];
         let fy = 1.0 / tan64(fovy as f64 * 0.5);
         let (n, fa) = (near as f64, far as f64);
-        let proj = [[fy / aspect as f64, 0.0, 0.0, 0.0], [0.0, -fy, 0.0, 0.0],
+        let proj = [[fy / aspect as f64, 0.0, 0.0, 0.0], [0.0, fy, 0.0, 0.0],
                     [0.0, 0.0, fa / (n - fa), n * fa / (n - fa)], [0.0, 0.0, -1.0, 0.0]];
         let mut vp = [0.0f32; 16];
         for r in 0..4 {
@@ -299,8 +301,8 @@ impl Camera {
         Camera::from_view_proj(vp)
     }
 
-    /// planes of a view-projection matrix (Vulkan: -w <= x, y <= w, 0 <= z <= w), normalised;
-    /// the light comes from above (0.3, 0.8, 0.5), ambient 0.25
+    /// planes of a view-projection matrix (-w <= x, y <= w, 0 <= z <= w: left, right, bottom,
+    /// top, near, far), normalised; the light comes from above (0.3, 0.8, 0.5), ambient 0.25
     pub fn from_view_proj(vp: [f32; 16]) -> Camera {
         let row = |r: usize| [vp[r] as f64, vp[4 + r] as f64, vp[8 + r] as f64, vp[12 + r] as f64];
         let (r0, r1, r2, r3) = (row(0), row(1), row(2), row(3));

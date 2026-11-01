@@ -226,10 +226,12 @@ für Messungen den Configurator ausschalten.
 | `bindless.uis` | (Voll) Puffer und Texturen über eine Tabelle; ein Platz ersetzt |
 | `window.uis` | Fenster mit Swapchain: FIFO-Bilder, dargestelltes Bild zurückgelesen, Größe geändert, minimiert / wiederhergestellt, IMMEDIATE und MAILBOX |
 | `errors.uis` | `jfgui_GPU=0`, fehlender Loader, `jfgui_GPU_ADAPTER` ohne Treffer, ungültige Aufrufe (Fehler, kein Absturz), verlorenes Gerät und ein neues danach |
-| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben) |
+| `scene.uis` | die Messszene (unten): `move` = `move_all` Bit für Bit, `cull` = `cull_ref`, ein Bild bekannter Würfel (Lage, Farbe, Tiefe, Rückseiten), indirekter und Einzel-Pfad gleich |
+| `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE |
+| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene` und `bench_smoke` |
 
 Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
-`gputest --bench` misst die Zahlen unten.
+`gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
 
 ## Messwerte
 
@@ -247,12 +249,207 @@ GeForce RTX 2070 SUPER, Treiber 610.88 (Vulkan 1.4.341), Ryzen 5 3600, Windows 1
 | Löschen und Darstellen, IMMEDIATE | 0,49 .. 0,57 ms pro Bild (1750 .. 2050 Bilder/s), Median 0,39 ms |
 | 1M-Rechen-Rundreise (aufzeichnen, übergeben, warten, 4 MiB lesen) | 1,0 .. 1,5 ms (Median), davon GPU: Füllen 0,017 ms, Kopie 0,32 ms; Lesen auf der CPU 0,5 ms |
 
+## Messszene
+
+`gputest --bench N` lässt die Benchmark-Szene aus `lib/shader` ([SHADER.md](SHADER.md),
+„Benchmark-Vertrag“) auf `lib/gpu` laufen und misst sie
+([`apps/gputest/scene.rs`](../apps/gputest/scene.rs), [`measure.rs`](../apps/gputest/measure.rs);
+die Tests in [`t_scene.rs`](../apps/gputest/t_scene.rs)):
+
+```text
+gputest --bench N [--res 1080p|4k|720p|BxH] [--mode indirect|single] [--window | --fullscreen]
+                  [--present immediate|fifo|mailbox] [--frames F] [--warmup W] [--inflight K]
+                  [--verify] [--shot DATEI.png] [--validate]
+```
+
+Voreinstellung: 1080p, `indirect`, ohne Fenster, 300 gemessene Bilder nach 60 zum Aufwärmen,
+3 Bilder in Flug. Ohne Fenster zeichnet die Szene in eine Rgba8Unorm- und eine
+Depth32Float-Textur der Größe, ohne Darstellung. `--window` öffnet ein plat-Fenster dieser
+Client-Größe (höchstens der Arbeitsbereich des Monitors) mit Swapchain, IMMEDIATE zum Messen,
+`--present fifo` zum Anschauen (Esc oder Schließen beendet); `--fullscreen` legt das Fenster
+rahmenlos über den ganzen Monitor (`WCMD_FULLSCREEN`). Die Animationszeit läuft 1/60 s je Bild
+weiter, nicht mit der Uhr: jeder Lauf zeichnet dieselben Bilder. `--verify` vergleicht danach
+die Objekte und die sichtbare Liste des letzten Bildes Bit für Bit mit `move_all` /
+`cull_ref`, `--shot` speichert das letzte Bild als PNG. Die letzte Zeile (`RESULT n=… res=…`)
+ist für Skripte.
+
+**Szene.** N Würfel bewegt `move` auf Bahnen in einer flachen Scheibe (Radius `extent_for(N)`
+= 3 · ∛N, Höhe ± extent/8). Die Kamera fährt in der Scheibe auf einem Kreis mit halbem Radius
+knapp über der Mitte (0,08 · extent) einmal in 50 s herum und blickt 30° neben die Mitte;
+vertikales Sichtfeld 60°, near 0,1, far 3 · extent. So sind bei 16:9 rund 53 % der Würfel im
+Sichtkegel (Bounding-Spheres gegen sechs Ebenen), bei jedem N und über die ganze Fahrt.
+Die Objekte entstehen einmal auf der GPU (`move` zur Zeit 0) und werden nie hochgeladen; je
+Bild gehen nur 176 Byte Kamera über den Bus.
+
+**Ablauf je Bild** (`indirect`): Zeitstempel 0; eine Barriere gegen alle Zugriffe des Bildes
+davor; Kamera aus dem Staging-Puffer des Bild-Slots in den Uniform-Puffer kopieren; `move`
+(⌈N/256⌉ Gruppen); Zeitstempel 1; `instance_count` = 0 (`fill_buffer`), Barriere, `cull`;
+Zeitstempel 2; Barriere zu Indirect-, Vertex- und Kopier-Lesen; den `DrawCmd` in den
+Rückleseplatz des Slots kopieren (sichtbare Anzahl); Render-Durchgang mit einem
+`draw_indexed_indirect` (`vs_instanced` + `fs_lambert`, Rückseiten-Culling, Tiefentest);
+Zeitstempel 3. `single`: kein `cull`; im Durchgang je Objekt `push_constants(16, [i])` und
+`draw_indexed(36, 1, 0, 0, 0)` mit `vs_single`. Zwei Bindungs-Layouts mit den Nummern des
+Vertrags: eines für die Rechen-Pipelines (beschreibbar), eines für die Render-Pipelines (nur
+lesend), damit kein Vertex-Shader eine beschreibbare Bindung braucht.
+
+**Bilder in Flug.** Die Szene hat K Slots (Kamera-Staging, Rücklesen des `DrawCmd`, vier
+Zeitstempel). Bevor Bild f in Slot f mod K aufgezeichnet wird, wartet die Schleife auf die
+Übergabe von Bild f − K (ohne Fenster `device.wait`, im Fenster `swapchain.acquire` mit
+`frames_in_flight` K), liest dessen Zeitstempel und sichtbare Anzahl und zeichnet dann auf. Die
+CPU läuft also bis zu K Bilder voraus und wartet nur, wenn die GPU zurückliegt. Objekte,
+sichtbare Liste und `DrawCmd` gibt es nur einmal: die GPU arbeitet die Bilder nacheinander ab
+(die Barriere am Bildanfang), nur die Aufzeichnung überlappt.
+
+**Messgrößen.** CPU: Kamera schreiben + aufzeichnen + `finish` („Aufz.“) und dazu `submit`
+bzw. `present` („CPU“), ohne Warten. GPU aus den Zeitstempeln: `move` = 1 − 0, `cull` = 2 − 1,
+`draw` = 3 − 2, gesamt = 3 − 0; GPU-Bildabstand = Abstand der Zeitstempel 3 zweier Bilder,
+Belegung = Summe der Gesamtzeiten durch Summe dieser Abstände. Bildzeit = Abstand zweier
+`submit` / `present` auf der CPU-Uhr. Je Lauf Median und 99. Perzentil über die gemessenen
+Bilder.
+
+**Messbedingungen.** GeForce RTX 2070 SUPER (448 GB/s), Treiber 610.88, Ryzen 5 3600, Windows
+11, Monitor 1920 × 1080 mit 165 Hz; Release-Build (`python build_rs.py app gputest --release`),
+ohne Validierung, die impliziten Schichten des Systems an (OBS-Hook, NV-Optimus/Present). Parallel
+liefen in anderen Worktrees die volle Testsuite und Builds (CPU-Last 97–100 %); jede Messung lief
+deshalb mit Prozesspriorität „hoch“. Mit normaler Priorität verlor der Prozess Zeitscheiben von
+30–100 ms, die GPU stand bis zu 87 % der Zeit still (Bildzeit-p99 bis 115 ms); solche Läufe sind
+verworfen. Je Konfiguration drei Läufe, abwechselnd (alle Konfigurationen nacheinander, die zweite
+Runde rückwärts); die Tabellen zeigen den Median der drei Läufe, in Klammern die Spanne der drei
+Läufe (bei „Spanne“ die der Mediane). Alle Zeiten in ms, 300 Bilder nach 60 zum Aufwärmen, 3
+Bilder in Flug; Bilder/s aus der mittleren Bildzeit.
+
+`indirect` (sichtbar: 53,4 % bei 100k, 52,9 % bei 1M; Belegung = Anteil der Zeit, in der die GPU
+an der Szene arbeitet):
+
+| N | Ziel | CPU Med. (p99) | GPU move / cull / draw | GPU gesamt Med. (p99), Spanne | Bildzeit Med. (p99) | Bilder/s (Spanne) | GPU belegt | Engpass |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 100k | 1080p | 0,064 (0,16) | 0,033 / 0,016 / 0,235 | 0,284 (0,81), 0,283–0,305 | 0,300 (0,90) | 3055 (2825–3081) | 95 % | Rasterung + Geometrie |
+| 250k | 1080p | 0,068 (0,19) | 0,071 / 0,041 / 0,406 | 0,518 (1,07), 0,518–0,530 | 0,535 (1,17) | 1695 (1544–1704) | 97 % | Geometrie |
+| 500k | 1080p | 0,089 (0,17) | 0,133 / 0,072 / 0,682 | 0,888 (1,59), 0,873–0,892 | 0,912 (1,66) | 1003 (993–1019) | 98 % | Geometrie |
+| 1M | 1080p | 0,139 (0,19) | 0,259 / 0,133 / 1,256 | 1,650 (2,38), 1,640–1,675 | 1,710 (2,50) | 545 (531–557) | 99 % | Geometrie |
+| 100k | 4K | 0,078 (0,23) | 0,033 / 0,016 / 0,643 | 0,693 (1,26), 0,689–0,698 | 0,721 (1,29) | 1289 (1166–1320) | 97 % | Rasterung / Fragmente |
+| 250k | 4K | 0,080 (0,18) | 0,071 / 0,041 / 0,928 | 1,040 (1,63), 1,038–1,054 | 1,064 (1,73) | 878 (874–882) | 98 % | Rasterung / Fragmente |
+| 500k | 4K | 0,124 (0,22) | 0,134 / 0,072 / 1,327 | 1,538 (2,26), 1,531–1,563 | 1,574 (2,31) | 594 (591–597) | 99 % | Geometrie + Rasterung |
+| 1M | 4K | 0,141 (0,22) | 0,259 / 0,133 / 2,012 | 2,568 (3,77), 2,397–2,603 | 2,543 (3,68) | 380 (369–386) | 99 % | Geometrie + Rasterung |
+| 100k | Vollbild 1080p | 0,294 (0,97) | 0,033 / 0,016 / 0,281 | 0,331 (0,74), 0,320–0,331 | 0,352 (1,17) | 2192 (2111–2508) | 77 % | `present`, Bildwechsel |
+| 250k | Vollbild 1080p | 0,288 (1,20) | 0,071 / 0,042 / 0,452 | 0,564 (1,02), 0,559–0,565 | 0,588 (1,77) | 1482 (1405–1558) | 92 % | Geometrie |
+| 500k | Vollbild 1080p | 0,321 (1,20) | 0,139 / 0,072 / 0,727 | 0,939 (1,37), 0,932–0,940 | 1,002 (1,85) | 921 (902–946) | 95 % | Geometrie |
+| 1M | Vollbild 1080p | 0,386 (0,80) | 0,264 / 0,134 / 1,290 | 1,700 (2,43), 1,690–1,704 | 1,866 (2,61) | 526 (523–526) | 99 % | Geometrie |
+
+`single` (kein Culling, alle N Würfel, je ein Draw):
+
+| N | Ziel | CPU Med. (p99), Spanne | GPU move / draw | GPU gesamt Med. (p99) | Bildzeit Med. (p99) | Bilder/s (Spanne) | GPU belegt | Engpass |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 100k | 1080p | 8,48 (10,9), 8,40–8,67 | 0,042 / 0,761 | 0,803 (1,64) | 8,49 (10,9) | 117 (115–118) | 11 % | CPU-Aufzeichnung |
+| 250k | 1080p | 22,1 (26,2), 20,5–22,6 | 0,113 / 2,421 | 2,534 (3,90) | 22,1 (26,2) | 45 (43–49) | 13 % | CPU-Aufzeichnung |
+| 500k | 1080p | 44,0 (52,0), 43,6–44,4 | 0,211 / 5,621 | 5,832 (8,28) | 44,0 (52,0) | 23 (22–23) | 14 % | CPU-Aufzeichnung |
+| 1M | 1080p | 89,9 (104), 80,3–90,1 | 0,407 / 10,71 | 11,25 (12,6) | 89,9 (104) | 11 (11–12) | 12 % | CPU-Aufzeichnung |
+| 100k | 4K | 9,14 (10,5), 7,42–9,17 | 0,042 / 0,960 | 1,002 (2,13) | 9,15 (10,5) | 109 (107–130) | 13 % | CPU-Aufzeichnung |
+| 250k | 4K | 21,8 (26,3), 18,1–22,7 | 0,113 / 2,631 | 2,745 (4,04) | 21,8 (26,4) | 46 (44–54) | 14 % | CPU-Aufzeichnung |
+| 500k | 4K | 40,8 (48,3), 39,7–45,3 | 0,210 / 5,848 | 6,059 (6,88) | 40,8 (48,3) | 25 (22–25) | 15 % | CPU-Aufzeichnung |
+| 1M | 4K | 90,1 (102), 81,7–90,5 | 0,407 / 11,16 | 11,60 (13,0) | 90,2 (102) | 11 (11–12) | 13 % | CPU-Aufzeichnung |
+| 100k | Vollbild 1080p | 8,99 (10,1), 7,26–9,27 | 0,042 / 0,786 | 0,828 (1,66) | 9,00 (10,1) | 109 (107–134) | 10 % | CPU-Aufzeichnung |
+| 250k | Vollbild 1080p | 21,7 (24,1), 18,6–22,0 | 0,113 / 2,441 | 2,554 (3,18) | 21,7 (24,1) | 46 (45–53) | 12 % | CPU-Aufzeichnung |
+| 500k | Vollbild 1080p | 41,0 (45,7), 35,5–43,5 | 0,210 / 4,812 | 5,023 (5,95) | 41,0 (45,7) | 25 (23–28) | 13 % | CPU-Aufzeichnung |
+| 1M | Vollbild 1080p | 87,0 (125), 86,9–90,8 | 0,406 / 10,10 | 10,50 (11,0) | 87,0 (125) | 11 (11–12) | 12 % | CPU-Aufzeichnung |
+
+Die Spannen der GPU-Zeiten liegen meist unter 3 %. Verzerrt hat die Last vor allem die
+CPU-gebundenen `single`-Läufe: die dritte Runde lief bei geringerer Last bis zu 20 % schneller
+(etwa 1M bei 1080p 80,3 statt 89,7–90,1 ms); bei 4K 1M streut auch die GPU-Gesamtzeit (2,40–2,60).
+
+**Dreiecke je Sekunde, größter Fall** (1M, `indirect`, 529 000 Würfel × 12 = 6,35 M Dreiecke je
+Bild, die Hälfte davon Rückseiten): 1080p 545 Bilder/s = 3,5 G Dreiecke/s, im Zeichendurchgang
+selbst 6,35 M / 1,256 ms = 5,1 G/s (12,7 M Vertex-Aufrufe = 10 G Vertices/s); 4K 380 Bilder/s =
+2,4 G/s, im Durchgang 3,2 G/s. Zum Vergleich `single` 1M: 12 M Dreiecke × 11 Bilder/s =
+0,13 G/s (die GPU allein schaffte 1,1 G/s).
+
+**Weitere Reihen** (je drei Läufe, Median):
+
+| Reihe | Werte |
+| --- | --- |
+| Bildgröße, 1M `indirect`: draw | 320 × 180: 1,185 · 1280 × 720: 1,193 · 1080p: 1,257 · 2560 × 1440: 1,401 · 4K: 1,987 |
+| Bildgröße, 100k `indirect`: draw | 320 × 180: 0,127 · 1280 × 720: 0,137 · 1080p: 0,234 · 2560 × 1440: 0,342 · 4K: 0,641 |
+| Bilder in Flug K, 100k 1080p | K = 1: Bildzeit 0,427, GPU belegt 62 % · K = 2: 0,301, 94 % · K = 3: 0,302, 95 % |
+| Bilder in Flug K, 1M 1080p | K = 1: 1,870, 89 % · K = 2: 1,703, 99 % · K = 3: 1,729, 99 % |
+| Fenster 1904 × 984 (größte Client-Fläche des Monitors), IMMEDIATE, 1M | Bildzeit 2,07 (Mittel 2,11 = 473 Bilder/s), draw 1,62: der Desktop-Compositor setzt jedes Bild zusammen und teilt sich die GPU |
+| Vollbild FIFO, 1M | Mittel 6,22 ms = 161 Bilder/s (165 Hz), GPU 1,88 ms je Bild, belegt 32 % |
+| `--verify`, 1M nach 70 Bildern | 12 M Gleitkommazahlen = `move_all` Bit für Bit, keine Denormalen gekappt; sichtbare Liste = `cull_ref` (528 797) |
+
+Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fenster gemessen.
+
+**Wo der Engpass liegt.**
+
+- `indirect`, CPU: kein Engpass. Aufzeichnen 0,03–0,08 ms, `vkQueueSubmit` 0,03–0,06 ms, im
+  Vollbild `present` weitere ~0,25 ms (`vkQueuePresentKHR`), unabhängig von N bis auf Rauschen.
+  Die CPU wartet 80–95 % der Bildzeit auf die GPU. Nur bei sehr kurzen Bildern (100k im Vollbild,
+  0,35 ms) begrenzen `present` und der Bildwechsel: die GPU ist dort nur zu 77 % belegt.
+- `move`: Schreibbandbreite. 48 Byte je Objekt in fünf Speicherbefehlen (vec3, float, vec4, vec3,
+  float) mit 48 Byte Abstand: 1M = 48 MB in 0,26 ms ≈ 185 GB/s, 41 % der Spitze von 448 GB/s;
+  die Rechnung (261 Befehle je Objekt laut Interpreter) allein wäre mehrfach schneller. Linear in
+  N: 0,26 ms je Million.
+- `cull`: Lesebandbreite. Es braucht nur Position und Radius (16 Byte), liest wegen der
+  32-Byte-Sektoren aber jeden Datensatz ganz: 48 MB in 0,133 ms ≈ 360 GB/s, 80 % der Spitze.
+- `draw` bis 1440p bei großem N: Geometrie-Durchsatz, also Vertex-Aufrufe und die
+  Primitiv-Verarbeitung der festen Funktion. Die Zeichenzeit für 1M ist bei 320 × 180 und bei
+  1080p fast gleich (1,19 bzw. 1,26 ms); Speicher ist es nicht (25 MB Objektdaten je Bild
+  ≈ 20 GB/s), Rechenleistung auch nicht (der Vertex-Shader ist kurz). Je Würfel im Sichtkegel
+  ~2,25 ns: 24 Vertex-Aufrufe und 12 Dreiecke, die Hälfte davon nach dem Vertex-Shader als
+  Rückseite verworfen ≈ 10 G Vertices/s und 5 G Dreiecke/s.
+- `draw` bei 4K und bei kleinem N: Rasterung, früher Tiefentest, Fragment-Shader und Schreiben
+  von Farbe und Tiefe. Über der Geometrie-Grundlast kommen bei 1M in 4K ~0,8 ms hinzu, bei 100k
+  wächst die Zeit oberhalb von 720p fast mit der Pixelzahl (0,23 → 0,64 ms von 1080p zu 4K;
+  bei kleinem N sind die Würfel nah und groß).
+- `single`: die CPU-Aufzeichnung. ~87–90 ns je Objekt, getrennt gemessen ~37 ns für
+  `vkCmdPushConstants` und ~55 ns für `vkCmdDrawIndexed`; `lib/gpu` legt je Aufruf nur ein paar
+  Vergleiche darüber. Die GPU verarbeitet einen Einzel-Draw in ~8–11 ns (≈ 100 M Draws/s) und ist
+  zu 10–15 % belegt. Auch mit freier CPU wäre der Pfad auf der GPU langsamer als `indirect` mit
+  Culling (1M: 10,7 statt 1,26 ms draw), weil er alle N und jeden Würfel als eigenen Draw zeichnet.
+- Bilder in Flug: mit K = 1 wartet die GPU auf jede Aufzeichnung (100k: 62 % belegt, Bildzeit
+  0,43 statt 0,30 ms); ab K = 2 ist sie zu 94–99 % belegt, K = 3 bringt hier nichts mehr, puffert
+  aber Aussetzer der CPU besser ab.
+
+**Was weitere Gewinne begrenzt, und was G5 daraus mitnimmt.**
+
+- Die Zeichenzeit ist Geometrie: jeder sichtbare Würfel kostet 24 Vertex-Aufrufe und 12 Dreiecke,
+  von denen die Hälfte erst nach dem Vertex-Shader als Rückseite wegfällt, und der Vertex-Shader
+  rechnet die Drehmatrix aus dem Quaternion 24-mal je Würfel. Viele der ~530 000 Würfel im
+  Sichtkegel verdecken sich gegenseitig (das Bild ist eine dichte Wand aus Würfeln), und die
+  fernen sind nur wenige Pixel groß. Größter Hebel ist deshalb Verdeckungs-Culling (Hi-Z-Pyramide
+  aus dem Tiefenpuffer des Vorbilds, zweistufig), dann Detailstufen (ferne Würfel als wenige
+  Dreiecke oder Punkte) und auf Stufe Voll Mesh-Shader, die Rückseiten je Objekt vor der
+  Rasterung verwerfen (3 statt 6 Seiten). Die Transformation gehört einmal je Instanz in den
+  Rechen-Shader (kompakte Instanzdaten mit fertiger Matrix), nicht in jeden Vertex.
+- Rechnen ist reine Bandbreite: Bewegung und Culling sollten auf kompakten Daten laufen (Struktur
+  aus Arrays: 16-Byte-Bounding-Spheres fürs Culling, Transformationen getrennt, wo sinnvoll
+  halbe Genauigkeit), nur Geändertes schreiben und das Culling nicht 48 Byte je Objekt lesen
+  lassen.
+- Eine Warteschlange: `move` und `cull` des nächsten Bildes können nicht neben dem Zeichnen des
+  laufenden laufen (die Objekte gibt es einmal, die Barriere am Bildanfang serialisiert). Eine
+  eigene Rechen-Warteschlange in `lib/gpu` und doppelt gepufferte Objektdaten würden bei 1M
+  ~0,4 ms je Bild verstecken.
+- Die CPU ist mit dem GPU-getriebenen Pfad aus dem Spiel (0,1 ms je Bild für 1M Objekte, auch
+  `vkQueueSubmit` und `present` kosten mehr als das Aufzeichnen). Ein Draw je Objekt dagegen
+  begrenzt auf ~10 000 Objekte je Millisekunde CPU, und auch die GPU schafft nur ~100 M Draws/s.
+  G5 soll Objekte nie einzeln zeichnen: Instanzlisten je Mesh, gefüllt vom Culling,
+  `draw_indexed_indirect_count` / `_multi` (Stufe Voll) für mehrere Meshes und Materialien in
+  einem Aufruf, Basis mit einem indirekten Draw je Mesh.
+- Bilder in Flug: 2–3 genügen. Bei sehr kurzen Bildern (0,3 ms) puffern drei Bilder aber nur
+  ~1 ms, und Aussetzer der CPU (Zeitscheiben von Windows unter Last) lassen die GPU leerlaufen.
+  Je Bild in Flug eigene Kamera- und Uniform-Daten (hier ein Staging-Slot und eine Kopie am
+  Bildanfang), Zeitstempel je Durchgang zum Profilieren behalten; für die Analyse fehlen in
+  `lib/gpu` noch Pipeline-Statistiken (Vertex-, Primitiv- und Fragment-Zähler).
+- Für große Szenen Reverse-Z (Tiefe 1 → 0 mit Float-Tiefenpuffer) statt des Vertrags mit Tiefe
+  0 = near; die Kamera hier (near 0,1, far 900) reicht nur, weil die Würfel weit auseinander
+  liegen.
+
 ## Bekannte Lücken
 
 - Nur Windows. Linux und Android brauchen einen Weg zu `libvulkan.so` (JFLib lädt unter Linux
   ohne libc) und ihre Fensterflächen; das Backend übersetzt dort, `Instance::new` gibt
   `NoLoader`.
-- Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange.
+- Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
+  `move` und `cull` neben dem Zeichnen laufen lassen).
+- Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.
 - Keine Spezialisierungskonstanten, kein Pipeline-Cache, kein MSAA, keine Stencil-Operationen,
   keine Textur-zu-Textur-Kopien und kein Blit (Mip-Erzeugung).
 - Bindungen ohne Arrays (`count` 1); Arrays gibt es über die Bindless-Tabelle auf Stufe Voll.
