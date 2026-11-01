@@ -1,0 +1,3 @@
+#!args --test graphics
+# two triangles (vertex pulling, index buffer, back-face culling, depth test) into an offscreen
+# texture; pixels checked

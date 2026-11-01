@@ -65,7 +65,7 @@ its sources, its dependencies or the flags changed (hash stamps in <out>/<target
 
 Rules checked before every build (`check`):
   * every crate root starts with #![no_std]; only alloc / core are `extern crate`d
-  * `unsafe` is allowed only in rt, simd, plat, plugin: every other library and style
+  * `unsafe` is allowed only in rt, simd, plat, plugin, gpu: every other library and style
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
   * own crates use --extern; text_shape's pinned Cargo dependencies are the exception
@@ -104,7 +104,7 @@ RS = ROOT
 LLVM = Path(r"C:\Program Files\LLVM\bin")
 TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", "web": "wasm32-unknown-unknown", "android": "aarch64-linux-android"}
 RUSTC_VERSION = "1.98"          # the toolchain this code is written for (checked, minor ignored)
-UNSAFE_OK = {"rt", "simd", "plat", "plugin"}
+UNSAFE_OK = {"rt", "simd", "plat", "plugin", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
 # library crates: name -> (root file, dependencies); order = a valid build order
 LIBS = {
@@ -156,6 +156,9 @@ LIBS = {
     "datetime": ("lib/datetime/lib.rs", []),
     "crypto": ("lib/crypto/lib.rs", []),
     "compress": ("lib/compress/lib.rs", []),
+    # G1b: SPIR-V module builder, disassembler, validator, std140 / std430 layouts, the GPU
+    # benchmark shaders (docs/SHADER.md)
+    "shader": ("lib/shader/lib.rs", []),
     "netpkt": ("lib/netpkt/lib.rs", []),  # JFNetworker: addresses, checksums, header codecs, pcapng
     "datastore": ("lib/datastore/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
     "netio": ("lib/netio/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
@@ -163,6 +166,8 @@ LIBS = {
     # signed app updates with rollback (docs/UPDATES.md)
     "update": ("lib/update/lib.rs", ["rt", "plat", "crypto", "agent_core", "netio"]),
     "script": ("lib/script/lib.rs", ["rt", "agent_core"]),  # JFNetworker's .jfs scripts (SK3: json via agent_core)
+    # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
+    "gpu": ("lib/gpu/lib.rs", ["rt", "plat"]),
 }
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 

@@ -1,0 +1,5 @@
+#!args --check
+# shadertest is a console program: it runs every self-check of lib/shader (golden bytes and
+# disassembly, builder, validator rules, layouts, CPU references, the interpreter runs of the
+# benchmark shaders, spirv-val / spirv-dis when the Vulkan SDK is installed) and ignores the
+# script (build_rs.py test passes --script); a failing check exits with code 1

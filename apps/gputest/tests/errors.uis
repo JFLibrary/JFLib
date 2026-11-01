@@ -1,0 +1,3 @@
+#!args --test errors
+# jfgui_GPU=0, a missing loader (jfgui_GPU_DLL), jfgui_GPU_ADAPTER without a match, invalid calls
+# (errors, no crash), a lost device (Device::test_lose) and a new device after it

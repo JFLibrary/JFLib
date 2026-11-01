@@ -1,0 +1,212 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos; 0
+; Bound: 130
+; Schema: 0
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %objects %camera %cube %visible %gl_VertexIndex %gl_InstanceIndex %gl_Position %out_normal %out_color
+               OpName %Object "Object"
+               OpMemberName %Object 0 "pos"
+               OpMemberName %Object 1 "scale"
+               OpMemberName %Object 2 "rot"
+               OpMemberName %Object 3 "color"
+               OpMemberName %Object 4 "radius"
+               OpName %Objects "Objects"
+               OpMemberName %Objects 0 "items"
+               OpName %objects "objects"
+               OpName %Camera "Camera"
+               OpMemberName %Camera 0 "view_proj"
+               OpMemberName %Camera 1 "planes"
+               OpMemberName %Camera 2 "light_dir"
+               OpMemberName %Camera 3 "ambient"
+               OpName %camera "camera"
+               OpName %CubeVertex "CubeVertex"
+               OpMemberName %CubeVertex 0 "pos"
+               OpMemberName %CubeVertex 1 "normal"
+               OpName %Cube "Cube"
+               OpMemberName %Cube 0 "vertices"
+               OpName %cube "cube"
+               OpName %Visible "Visible"
+               OpMemberName %Visible 0 "index"
+               OpName %visible "visible"
+               OpName %gl_VertexIndex "gl_VertexIndex"
+               OpName %gl_InstanceIndex "gl_InstanceIndex"
+               OpName %gl_Position "gl_Position"
+               OpName %out_normal "out_normal"
+               OpName %out_color "out_color"
+               OpName %main "main"
+               OpMemberDecorate %Object 0 Offset 0
+               OpMemberDecorate %Object 1 Offset 12
+               OpMemberDecorate %Object 2 Offset 16
+               OpMemberDecorate %Object 3 Offset 32
+               OpMemberDecorate %Object 4 Offset 44
+               OpDecorate %_runtimearr_Object ArrayStride 48
+               OpMemberDecorate %Objects 0 Offset 0
+               OpDecorate %Objects Block
+               OpDecorate %objects DescriptorSet 0
+               OpDecorate %objects Binding 1
+               OpDecorate %objects NonWritable
+               OpDecorate %_arr_v4float_uint_6 ArrayStride 16
+               OpMemberDecorate %Camera 0 Offset 0
+               OpMemberDecorate %Camera 0 ColMajor
+               OpMemberDecorate %Camera 0 MatrixStride 16
+               OpMemberDecorate %Camera 1 Offset 64
+               OpMemberDecorate %Camera 2 Offset 160
+               OpMemberDecorate %Camera 3 Offset 172
+               OpDecorate %Camera Block
+               OpDecorate %camera DescriptorSet 0
+               OpDecorate %camera Binding 0
+               OpMemberDecorate %CubeVertex 0 Offset 0
+               OpMemberDecorate %CubeVertex 1 Offset 16
+               OpDecorate %_runtimearr_CubeVertex ArrayStride 32
+               OpMemberDecorate %Cube 0 Offset 0
+               OpDecorate %Cube Block
+               OpDecorate %cube DescriptorSet 0
+               OpDecorate %cube Binding 4
+               OpDecorate %cube NonWritable
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpMemberDecorate %Visible 0 Offset 0
+               OpDecorate %Visible Block
+               OpDecorate %visible DescriptorSet 0
+               OpDecorate %visible Binding 2
+               OpDecorate %visible NonWritable
+               OpDecorate %gl_VertexIndex BuiltIn VertexIndex
+               OpDecorate %gl_InstanceIndex BuiltIn InstanceIndex
+               OpDecorate %gl_Position BuiltIn Position
+               OpDecorate %out_normal Location 0
+               OpDecorate %out_color Location 1
+       %void = OpTypeVoid
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+    %v3float = OpTypeVector %float 3
+    %v4float = OpTypeVector %float 4
+     %v3uint = OpTypeVector %uint 3
+     %Object = OpTypeStruct %v3float %float %v4float %v3float %float
+%_runtimearr_Object = OpTypeRuntimeArray %Object
+    %Objects = OpTypeStruct %_runtimearr_Object
+%_ptr_StorageBuffer_Objects = OpTypePointer StorageBuffer %Objects
+    %objects = OpVariable %_ptr_StorageBuffer_Objects StorageBuffer
+%mat4v4float = OpTypeMatrix %v4float 4
+     %uint_6 = OpConstant %uint 6
+%_arr_v4float_uint_6 = OpTypeArray %v4float %uint_6
+     %Camera = OpTypeStruct %mat4v4float %_arr_v4float_uint_6 %v3float %float
+%_ptr_Uniform_Camera = OpTypePointer Uniform %Camera
+     %camera = OpVariable %_ptr_Uniform_Camera Uniform
+ %CubeVertex = OpTypeStruct %v4float %v4float
+%_runtimearr_CubeVertex = OpTypeRuntimeArray %CubeVertex
+       %Cube = OpTypeStruct %_runtimearr_CubeVertex
+%_ptr_StorageBuffer_Cube = OpTypePointer StorageBuffer %Cube
+       %cube = OpVariable %_ptr_StorageBuffer_Cube StorageBuffer
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+    %Visible = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer_Visible = OpTypePointer StorageBuffer %Visible
+    %visible = OpVariable %_ptr_StorageBuffer_Visible StorageBuffer
+%_ptr_Input_uint = OpTypePointer Input %uint
+%gl_VertexIndex = OpVariable %_ptr_Input_uint Input
+%gl_InstanceIndex = OpVariable %_ptr_Input_uint Input
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%gl_Position = OpVariable %_ptr_Output_v4float Output
+%_ptr_Output_v3float = OpTypePointer Output %v3float
+ %out_normal = OpVariable %_ptr_Output_v3float Output
+  %out_color = OpVariable %_ptr_Output_v3float Output
+         %37 = OpTypeFunction %void
+     %uint_0 = OpConstant %uint 0
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+%_ptr_StorageBuffer_v3float = OpTypePointer StorageBuffer %v3float
+     %uint_1 = OpConstant %uint 1
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+     %uint_2 = OpConstant %uint 2
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+     %uint_3 = OpConstant %uint 3
+    %float_1 = OpConstant %float 1
+    %float_0 = OpConstant %float 0
+%_ptr_Uniform_mat4v4float = OpTypePointer Uniform %mat4v4float
+%mat3v3float = OpTypeMatrix %v3float 3
+       %main = OpFunction %void None %37
+         %38 = OpLabel
+         %39 = OpLoad %uint %gl_VertexIndex
+         %40 = OpLoad %uint %gl_InstanceIndex
+         %43 = OpAccessChain %_ptr_StorageBuffer_uint %visible %uint_0 %40
+         %44 = OpLoad %uint %43
+         %46 = OpAccessChain %_ptr_StorageBuffer_v3float %objects %uint_0 %44 %uint_0
+         %47 = OpLoad %v3float %46
+         %50 = OpAccessChain %_ptr_StorageBuffer_float %objects %uint_0 %44 %uint_1
+         %51 = OpLoad %float %50
+         %54 = OpAccessChain %_ptr_StorageBuffer_v4float %objects %uint_0 %44 %uint_2
+         %55 = OpLoad %v4float %54
+         %57 = OpAccessChain %_ptr_StorageBuffer_v3float %objects %uint_0 %44 %uint_3
+         %58 = OpLoad %v3float %57
+         %59 = OpAccessChain %_ptr_StorageBuffer_v4float %cube %uint_0 %39 %uint_0
+         %60 = OpLoad %v4float %59
+         %61 = OpAccessChain %_ptr_StorageBuffer_v4float %cube %uint_0 %39 %uint_1
+         %62 = OpLoad %v4float %61
+         %63 = OpVectorShuffle %v3float %60 %60 0 1 2
+         %64 = OpVectorShuffle %v3float %62 %62 0 1 2
+         %65 = OpCompositeExtract %float %55 0
+         %66 = OpCompositeExtract %float %55 1
+         %67 = OpCompositeExtract %float %55 2
+         %68 = OpCompositeExtract %float %55 3
+         %69 = OpFMul %float %66 %66
+         %70 = OpFMul %float %67 %67
+         %71 = OpFAdd %float %69 %70
+         %72 = OpFAdd %float %71 %71
+         %74 = OpFSub %float %float_1 %72
+         %75 = OpFMul %float %65 %66
+         %76 = OpFMul %float %68 %67
+         %77 = OpFAdd %float %75 %76
+         %78 = OpFAdd %float %77 %77
+         %79 = OpFMul %float %65 %67
+         %80 = OpFMul %float %68 %66
+         %81 = OpFSub %float %79 %80
+         %82 = OpFAdd %float %81 %81
+         %83 = OpFMul %float %65 %66
+         %84 = OpFMul %float %68 %67
+         %85 = OpFSub %float %83 %84
+         %86 = OpFAdd %float %85 %85
+         %87 = OpFMul %float %65 %65
+         %88 = OpFMul %float %67 %67
+         %89 = OpFAdd %float %87 %88
+         %90 = OpFAdd %float %89 %89
+         %91 = OpFSub %float %float_1 %90
+         %92 = OpFMul %float %66 %67
+         %93 = OpFMul %float %68 %65
+         %94 = OpFAdd %float %92 %93
+         %95 = OpFAdd %float %94 %94
+         %96 = OpFMul %float %65 %67
+         %97 = OpFMul %float %68 %66
+         %98 = OpFAdd %float %96 %97
+         %99 = OpFAdd %float %98 %98
+        %100 = OpFMul %float %66 %67
+        %101 = OpFMul %float %68 %65
+        %102 = OpFSub %float %100 %101
+        %103 = OpFAdd %float %102 %102
+        %104 = OpFMul %float %65 %65
+        %105 = OpFMul %float %66 %66
+        %106 = OpFAdd %float %104 %105
+        %107 = OpFAdd %float %106 %106
+        %108 = OpFSub %float %float_1 %107
+        %109 = OpCompositeConstruct %v3float %74 %78 %82
+        %110 = OpCompositeConstruct %v3float %86 %91 %95
+        %111 = OpCompositeConstruct %v3float %99 %103 %108
+        %113 = OpVectorTimesScalar %v3float %109 %51
+        %114 = OpCompositeConstruct %v4float %113 %float_0
+        %115 = OpVectorTimesScalar %v3float %110 %51
+        %116 = OpCompositeConstruct %v4float %115 %float_0
+        %117 = OpVectorTimesScalar %v3float %111 %51
+        %118 = OpCompositeConstruct %v4float %117 %float_0
+        %119 = OpCompositeConstruct %v4float %47 %float_1
+        %120 = OpCompositeConstruct %mat4v4float %114 %116 %118 %119
+        %121 = OpCompositeConstruct %v4float %63 %float_1
+        %122 = OpMatrixTimesVector %v4float %120 %121
+        %124 = OpAccessChain %_ptr_Uniform_mat4v4float %camera %uint_0
+        %125 = OpLoad %mat4v4float %124
+        %126 = OpMatrixTimesVector %v4float %125 %122
+               OpStore %gl_Position %126
+        %128 = OpCompositeConstruct %mat3v3float %109 %110 %111
+        %129 = OpMatrixTimesVector %v3float %128 %64
+               OpStore %out_normal %129
+               OpStore %out_color %58
+               OpReturn
+               OpFunctionEnd

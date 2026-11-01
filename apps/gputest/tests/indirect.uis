@@ -1,0 +1,3 @@
+#!args --test indirect
+# arguments written by a compute shader: dispatch_indirect, draw_indexed_indirect, on level Voll
+# draw_indexed_indirect_multi and draw_indexed_indirect_count

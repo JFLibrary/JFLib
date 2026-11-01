@@ -1,6 +1,8 @@
 # Linux-Testplan: was auf echten Desktops noch zu prüfen ist
 
-Stand 2026-10-30, Branch `linux-wayland-fixes` (Commits `1069f11`, `e0f2cd4`). Die
+Stand 2026-10-30, Branch `linux-wayland-fixes` (Commits `1069f11`, `e0f2cd4`); ergänzt am
+2026-10-31 um das, was seitdem auf `main` kam (Abschnitt 7), und um die Übergabe an eine
+Sitzung auf dem Linux-Rechner (Abschnitt 8). Die
 Linux-Überarbeitung lief zuerst nur in einer Cloud-Umgebung (headless GNOME 46, sway, Weston,
 Xvfb mit openbox), dann auf dem KDE-Rechner (Plasma 6.6.6, Wayland, ein Monitor eDP-1 mit
 125 %, Layout de, keine Eingabemethode). Dieser Plan hält fest, was dort geprüft ist und was
@@ -70,7 +72,10 @@ dann, ohne dass die Library schuld ist.
 - `sudo dnf install git python3 lld openssh-server`, dann `sudo systemctl enable --now sshd`.
 - rustup, dann `rustup toolchain install 1.98`.
 - In der Claude-App als SSH-Verbindung eintragen (oder Hostname und Benutzer nennen).
-- Das Repo kommt als Git-Bundle vom KDE-Rechner (`git bundle create`), ohne Push.
+- Das Repo ist öffentlich: `git clone https://github.com/JFLibrary/JFLib.git` (in einem
+  vorhandenen Klon `git pull --ff-only`). Ein Git-Bundle vom KDE-Rechner geht weiterhin.
+- Für Abschnitt 7: `sudo dnf install rpm-build rpm-sign` (RPM bauen und signieren); Flatpak
+  und Orca bringt Fedora Workstation mit.
 
 **Prüfen**
 
@@ -146,3 +151,79 @@ for a in BackupCraft JFNetworker Kritzel PaintCraft jfWord buildManager gallery 
   echo "$a: $(( (c1 - c0) * 10 / 3 )) ms CPU per s idle"
 done
 ```
+
+---
+
+## 7. Neu seit dem 2026-10-30: auf jedem echten Desktop prüfen
+
+Was seit Abschnitt 1 bis 6 auf `main` kam und bisher nur in WSL (WSLg: Weston, rootloses
+Xwayland, PulseAudio-Server von WSLg) oder gegen Fake-Busse lief.
+
+1. **Vollbild** (`apps/desktest`, GUIDE §35): Haupt- und Werkzeugfenster ins Vollbild und
+   zurück, auch aus maximiert; danach dieselbe Lage und Größe. Verlässt man das Vollbild über
+   den Desktop (KDE: Fenstermenü, GNOME: Super+↑/↓ bzw. Doppelklick), muss die App folgen
+   (`UIC_FULLSCREEN`). Mehrere Monitore nur mit externem Monitor.
+2. **Fenster in einem Bereich und Taskleiste** (`apps/desktest`, `lib/ui/desk.rs`): Ziehen,
+   Größe, Einrasten, Minimieren in die Taskleiste, bei 100 %, 125 % und 150 %.
+3. **Zuletzt verwendet** (`plat::recent_add`, `~/.local/share/recently-used.xbel`): eine Datei
+   in PaintCraft öffnen und speichern; sie erscheint in Dolphin bzw. Nautilus unter „Zuletzt
+   verwendet“ und in den „Zuletzt“-Listen der Dateidialoge, mit PaintCraft als Programm. Aus der
+   Liste der App entfernt oder geleert, verschwindet nur der Eintrag von PaintCraft; Einträge
+   anderer Programme bleiben. `build/linux/plattest --test recent` läuft auf einer Testdatei.
+4. **Hot-Reload und Inspektor** nativ (nicht WSL):
+   `python3 build_rs.py watch gallery --target linux -- --inspect`. Eine Quelldatei der Galerie
+   speichern: Die App baut neu und startet mit demselben Fenster, derselben Seite und dem
+   Inspektor samt Auswahl. Im Inspektor zeigt „Quelle“ Datei und Zeile des Widgets; „Im Editor
+   öffnen“ öffnet den installierten Editor an dieser Zeile (`jfgui_EDITOR`, sonst
+   `$VISUAL`/`$EDITOR`, sonst CLion oder VS Code). Der Editor bleibt offen, wenn die App endet.
+5. **Variable Schriften** (`build/linux/fontpicktest`, Schriftdialog): die variablen
+   Systemschriften (GNOME: Cantarell bzw. Adwaita Sans, Noto als VF) zeigen ihre Achsen und
+   benannten Instanzen, Text in einer Instanz sieht aus wie im Dialog. **CFF2**
+   (Noto CJK VF) erst mit dem Stand, der CFF2 liest (siehe 3): danach CJK-Text in der Galerie
+   ohne Kästchen.
+6. **Pakete** (PACKAGING.md „Other formats“; Fedora: `rpm-build`, `rpm-sign`):
+   `python3 tools/package.py updatetest --formats rpm,flatpak,appimage` mit Signatur
+   (`--sign`, Testschlüssel). Das RPM mit `sudo dnf install ./build/dist/…rpm` installieren,
+   aus dem Startmenü starten, Dateizuordnung prüfen, mit `dnf remove` entfernen. Das Flatpak
+   für den Nutzer installieren, starten, Dateidialog über das Portal, Update auf die nächste
+   Version. Das AppImage per Doppelklick und im Terminal starten (ohne FUSE), danach das
+   Update der App selbst (`updatetest`). Danach alles wieder entfernen.
+7. **Klang über echtes PipeWire** (`audiotest`, spielt hörbar ab): Wiedergabe, der Name des
+   Streams in der Lautstärkeregelung des Desktops, Ausgabegerät während der Wiedergabe wechseln.
+8. **Screenreader und Lupe**: Orca mit der Galerie (Tab-Fokus, Knöpfe, Häkchen, Slider-Werte,
+   Textfeld mit Schreibmarke und Auswahl, Überschriften im Markdown-Betrachter); die GNOME-Lupe
+   bzw. KWin-Lupe folgt der Schreibmarke. Bisher nur gegen at-spi2-core ohne echten
+   Screenreader geprüft.
+9. **Papierkorb** (`plat::trash`, `plattest --test trash`): eine Datei in den Papierkorb
+   legen; sie erscheint in Dolphin bzw. Nautilus mit Herkunftsordner und lässt sich
+   wiederherstellen. Bekannt: Das Löschdatum steht in UTC (ROADMAP §2) und kann um die
+   Zeitzone verschoben angezeigt werden.
+10. **Autostart** (`plat::autostart_set`, `updatetest` bzw. `plattest --test autostart`):
+    einschalten, ab- und wieder anmelden, die App startet; ausschalten entfernt die Datei.
+11. **Standby verhindern** (`plattest --test power`): Während die App sperrt, zeigt der Desktop
+    das an (KDE: Energieverwaltung; GNOME: kein Bereitschaftsmodus), danach wieder frei.
+
+---
+
+## 8. Übergabe an eine Sitzung auf dem Linux-Rechner
+
+Für eine Claude-Sitzung, die auf dem Linux-Rechner selbst läuft (oder per SSH dorthin).
+
+- **Stand holen**: `git clone https://github.com/JFLibrary/JFLib.git` bzw. im vorhandenen Klon
+  `git pull --ff-only`. Nie `git init`; nie die alte Geschichte (`archive/main`, Wurzel
+  `2e0b359`) mergen oder pushen.
+- **Arbeitszweig**: `git switch -c linux-tests-<rechner>-<datum>`. Ergebnisse und Fixes dort
+  committen, nie auf `main`. Den Zweig nur mit Jakobs Zustimmung pushen, sonst als Bundle
+  (`git bundle create ../linux-tests.bundle origin/main..HEAD`).
+- **Reihenfolge**: Einrichtung (Abschnitt 3 bzw. 6) prüfen und nur nachfragen, was fehlt
+  (Installationen mit `sudo dnf`/`apt` nur nach Jakobs Ja); `python3 build_rs.py test --quick
+  --target linux`; dann der Abschnitt des Desktops (2 KDE, 3 GNOME, 4 Xfce/X11) und
+  Abschnitt 7. Fenster dürfen hier sichtbar aufgehen; danach schließen.
+- **Einstellungen**: Was für einen Test geändert wird (Skalierung, Theme, Akzentfarbe,
+  Eingabemethode, Autostart), danach zurückstellen.
+- **Ergebnisse**: in dieser Datei. Erledigtes nach Abschnitt 1 („Erledigt auf …“, mit Desktop
+  und Version), Offenes in die Liste des Desktops, Fehler mit Befehl, Erwartung und Befund.
+  Ein klarer, kleiner Fehler darf gleich behoben werden, mit Test (`.uis`-Skript oder
+  plattest), sonst nur beschreiben.
+- **Bericht** an Jakob auf Deutsch, kurz: was geprüft ist, was scheiterte, was behoben ist,
+  welcher Zweig oder welches Bundle es enthält.
