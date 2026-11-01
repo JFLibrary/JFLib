@@ -63,6 +63,7 @@ pub(crate) const TOP_BLOCKED: u8 = 255;
 /// a big image of the base layer in this frame: its record, the part of it the clips leave
 /// (x0, y0, x1, y1)
 #[derive(Clone, Copy)]
+#[cfg_attr(not(windows), allow(dead_code))] // (read by gpu_out.rs)
 pub(crate) struct ImgSeen {
     pub(crate) index: u32,
     pub(crate) vis: [i32; 4],
@@ -106,6 +107,7 @@ pub(crate) struct W {
 impl W {
     /// (after dirty_compute, whose swap made cells_prev this frame's) the hashes through layer l
     /// of this frame or of the last one
+    #[cfg_attr(not(windows), allow(dead_code))] // (read by gpu_out.rs)
     pub(crate) fn through(&self, now: bool, l: usize) -> &[u64] {
         let (pre, all) = if now { (&self.pre_prev, &self.cells_prev) } else { (&self.pre, &self.cells) };
         match pre[l.min(L_COUNT - 1)..].iter().find(|k| !k.is_empty()) {
@@ -338,7 +340,7 @@ impl Ui {
         {
             let Ui { wp, .. } = self;
             let d = &mut wp.dirty;
-            let split = d.split;
+            let split = cfg!(windows) && d.split; // (only there: nothing of it in other targets)
             let cells = d.cells.as_mut().unwrap();
             cells.fill(0);
             let grids = sc.on();
@@ -427,7 +429,7 @@ impl Ui {
         let pending = self.dmg.iter().any(|d| d.win == self.uiw_cur);
         // the GPU output's images of this frame; scroll copies move pixels of the framebuffer, which
         // keeps no separate layers and may lack an image's pixels
-        let split = self.wp.dirty.split;
+        let split = cfg!(windows) && self.wp.dirty.split;
         let apart = split && {
             let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy) && self.gp_plan_images();
             quads || self.wp.dirty.busy || self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty())

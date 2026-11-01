@@ -990,7 +990,7 @@ impl Test {
                     // 500 x 400 moved: only the cells at its edges (without the texture 800 000 bytes)
                     let o = ui.gpu_output(0);
                     self.ok(per <= 300_000, &format!("moved: {per} bytes per frame"));
-                    self.ok(o.image_quads == 1 && o.image_uploads == 1, &format!("drawn by the GPU, {} upload(s)", o.image_uploads));
+                    self.ok(o.image_quads == 1 && o.image_uploads == 1 && o.image_hits >= 5, &format!("drawn by the GPU: {} frames, {} upload(s)", o.image_hits, o.image_uploads));
                     self.same_so_far(ui, "moved");
                     self.sc.over = true;
                     self.mode = 0;
@@ -1661,6 +1661,7 @@ fn odd(k: usize) -> bool {
     k % 2 == 1
 }
 
+/// a frame's costs since the last one
 #[derive(Clone, Copy)]
 struct Sample {
     render: u64,
@@ -1775,10 +1776,11 @@ fn report(name: &str, v: &mut [Sample]) {
         (x[x.len() / 2], x[x.len() * 95 / 100])
     }
     let (rm, rp) = stat(v, |s| s.render);
+    let worst = v.iter().map(|s| s.render + s.present).max().unwrap_or(0);
     let (pm, pp) = stat(v, |s| s.present);
     let (um, up) = stat(v, |s| s.up);
     let (bm, bp) = stat(v, |s| s.base);
-    out(&format!("RESULT {name:<16} n={:<4} render {rm:>6} us (p95 {rp:>6})  present {pm:>6} us (p95 {pp:>6})  upload {um:>9} B (p95 {up:>9})  base px {bm:>8} (p95 {bp:>8})", v.len()));
+    out(&format!("RESULT {name:<16} n={:<4} render {rm:>6} us (p95 {rp:>6})  present {pm:>6} us (p95 {pp:>6})  upload {um:>9} B (p95 {up:>9})  base px {bm:>8} (p95 {bp:>8})  worst frame {worst} us", v.len()));
 }
 
 fn layer_bench(n: usize) -> i32 {

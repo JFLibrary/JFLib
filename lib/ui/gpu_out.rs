@@ -54,7 +54,8 @@
 //
 // Images (G3b).  A big opaque Cmd::Image of the base layer that has cost as much in redraws as its
 // upload would (rent or buy: a static image never takes GPU memory) becomes a texture, cached by
-// surface identity and version, under a budget with LRU eviction.  In the cells it fills, as the
+// surface identity and version, under a budget with LRU eviction; it goes up in parts over the
+// frames that draw it (IMAGE_STEP_BYTES, the CPU draws it meanwhile).  In the cells it fills, as the
 // last command there, its pixels are drawn by the GPU with Dc::blit_scaled's integer mapping: the
 // CPU neither draws nor uploads them (Split::owed: the framebuffer lacks them; gp_settle draws them
 // before anybody reads it).  Everything else, also the cells at the image's edge or with something
@@ -159,6 +160,8 @@ const LAYER_SHRINK: i64 = 4;
 const LINGER_US: u64 = 1_000_000;
 /// the bytes image textures may take (jfgui_GPU_IMAGE_MB)
 const IMAGE_BUDGET: u64 = 256 << 20;
+/// an image goes up with this many bytes per frame: no frame waits for a whole big one
+const IMAGE_STEP_BYTES: u64 = 4 << 20;
 /// images whose redraws are counted
 const IMAGES_KEPT: usize = 64;
 /// an image texture not drawn for this long goes with the next frame (us)
@@ -276,6 +279,13 @@ struct ImageTex {
     group: BindGroup,
 }
 
+/// an image's texture on the way up: the rows that went up so far
+struct ImageLoad {
+    t: Texture,
+    group: BindGroup,
+    row: i32,
+}
+
 /// an image the output has seen: what its redraws cost so far, its texture
 struct Image {
     key: usize,
@@ -285,6 +295,7 @@ struct Image {
     acc: u64,
     opaque: Option<bool>,
     tex: Option<Rc<ImageTex>>,
+    load: Option<ImageLoad>,
     tick: u64,
     used_us: u64,
 }
@@ -491,7 +502,7 @@ impl S {
     /// an image's texture goes (a window's last frame may keep drawing it)
     fn evict(&mut self, k: usize) {
         let e = &mut self.images[k];
-        if e.tex.take().is_some() {
+        if e.tex.take().is_some() | e.load.take().is_some() {
             self.image_bytes -= e.bytes;
             self.image_evicted += 1;
             self.trim_at = plat::time_us() + TRIM_US;
@@ -502,6 +513,7 @@ impl S {
     fn images_gone(&mut self) {
         for e in self.images.iter_mut() {
             e.tex = None;
+            e.load = None;
         }
         self.image_bytes = 0;
     }
@@ -807,15 +819,14 @@ fn surface_opaque(sf: &Surface) -> bool {
     sf.fmt != FMT_A8 && sf.px.chunks(stride).take(sf.h as usize).all(|r| r[..row].chunks_exact(4).all(|p| p[3] == 255))
 }
 
-// the texture of an image, its whole pixels uploaded
-fn image_texture(core: &Core, sf: &Surface) -> gpu::Result<ImageTex> {
+// the texture of an image, nothing uploaded yet
+fn image_texture(core: &Core, sf: &Surface) -> gpu::Result<ImageLoad> {
     let t = core.dev.create_texture(&TextureDesc::d2(sf.w as u32, sf.h as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED))?;
-    core.dev.queue().write_texture_rects(&t, &[[0, 0, sf.w, sf.h]], &sf.px, sf.stride as u32, Layout::Undefined, Layout::Sampled)?;
     let group = core.dev.create_bind_group(&BindGroupDesc {
         layout: &core.bgl,
         entries: &[BindEntry { binding: 0, resource: Resource::Texture(t.view()) }],
     })?;
-    Ok(ImageTex { _t: t, group })
+    Ok(ImageLoad { t, group, row: 0 })
 }
 
 // a texture for what a layer holds now: bb (x0, y0, x1, y1) with spare room, inside the window
@@ -1562,6 +1573,7 @@ impl Ui {
                             acc: 0,
                             opaque: None,
                             tex: None,
+                            load: None,
                             tick,
                             used_us: now,
                         });
@@ -1572,7 +1584,7 @@ impl Ui {
                 s.images[at].used_us = now;
                 // rent or buy: the redraws have cost what the upload costs
                 let e = &s.images[at];
-                if e.tex.is_none() && e.acc >= e.bytes && e.bytes <= s.image_budget {
+                if e.tex.is_none() && e.load.is_none() && e.acc >= e.bytes && e.bytes <= s.image_budget {
                     if let Dev::Ready(core) = &s.dev {
                         let lim = core.dev.limits().max_texture_2d as i32;
                         let opaque = e.opaque.unwrap_or_else(|| surface_opaque(sf));
@@ -1580,7 +1592,7 @@ impl Ui {
                         if opaque && sf.w <= lim && sf.h <= lim {
                             let need = s.images[at].bytes;
                             while s.image_bytes + need > s.image_budget {
-                                let old = (0..s.images.len()).filter(|&k| s.images[k].tex.is_some() && s.images[k].tick != tick).min_by_key(|&k| s.images[k].tick);
+                                let old = (0..s.images.len()).filter(|&k| (s.images[k].tex.is_some() || s.images[k].load.is_some()) && s.images[k].tick != tick).min_by_key(|&k| s.images[k].tick);
                                 let Some(old) = old else { break };
                                 s.evict(old);
                             }
@@ -1588,21 +1600,43 @@ impl Ui {
                                 if let Dev::Ready(core) = &s.dev {
                                     // (a device gone or no memory: the CPU draws it, a failure of the
                                     // device shows with the next present)
-                                    let t0 = plat::time_us();
-                                    if let Ok(tex) = image_texture(core, sf) {
-                                        s.images[at].tex = Some(Rc::new(tex));
-                                        s.image_bytes += need;
-                                        s.image_uploads += 1;
-                                        s.trim_at = plat::time_us() + TRIM_US;
-                                        s.note(&format!("image {} x {} as a texture: {:.2} ms", sf.w, sf.h, ms(t0, plat::time_us())));
-                                        if let Some(Some(w)) = s.wins.get_mut(i) {
-                                            w.out.upload_bytes += need;
+                                    match image_texture(core, sf) {
+                                        Ok(load) => {
+                                            s.images[at].load = Some(load);
+                                            s.image_bytes += need;
                                         }
-                                    } else {
-                                        s.images[at].opaque = Some(false);
+                                        Err(_) => s.images[at].opaque = Some(false),
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                // the next rows of a texture on the way up; the last ones make it usable
+                if let (Dev::Ready(core), Some(load)) = (&s.dev, s.images[at].load.as_mut()) {
+                    let t0 = plat::time_us();
+                    let rows = ((IMAGE_STEP_BYTES / (sf.w as u64 * 4)).max(1) as i32).min(sf.h - load.row);
+                    let before = if load.row == 0 { Layout::Undefined } else { Layout::Sampled };
+                    match core.dev.queue().write_texture_rects(&load.t, &[[0, load.row, sf.w, rows]], &sf.px, sf.stride as u32, before, Layout::Sampled) {
+                        Ok(()) => {
+                            load.row += rows;
+                            let done = load.row >= sf.h;
+                            let bytes = sf.w as u64 * rows as u64 * 4;
+                            s.trim_at = plat::time_us() + TRIM_US;
+                            if let Some(Some(w)) = s.wins.get_mut(i) {
+                                w.out.upload_bytes += bytes;
+                            }
+                            if done {
+                                if let Some(load) = s.images[at].load.take() {
+                                    s.images[at].tex = Some(Rc::new(ImageTex { _t: load.t, group: load.group }));
+                                    s.image_uploads += 1;
+                                }
+                                s.note(&format!("image {} x {} as a texture, the last part {:.2} ms", sf.w, sf.h, ms(t0, plat::time_us())));
+                            }
+                        }
+                        Err(_) => {
+                            s.evict(at);
+                            s.images[at].opaque = Some(false);
                         }
                     }
                 }

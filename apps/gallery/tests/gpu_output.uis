@@ -47,7 +47,7 @@ gpu expect upload 12000000
 # ---- a menu goes up as a texture of its own, closing it uploads nothing of what lies below it
 # (gpu_layers.uis: all of that), and scroll copies come back afterwards
 gpu expect upload 100000000
-gpu expect base 100000000
+gpu expect base 2000000000
 click "Datei"
 gpu expect layers 1
 gpu expect same
