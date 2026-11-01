@@ -107,6 +107,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Cookies as RFC 6265 reads them, without I/O and a clock (`netpkt::cookie`: `SetCookie::parse`, `parse_date`, `Jar`, SameSite from RFC 6265bis as far as a small browser needs it)
 - **netpkt:** TLS 1.3 without I/O and a clock (`netpkt::tls`: a `Core` for both sides, TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519, a seed gives the same bytes) and certificates of a private PKI (`netpkt::x509`); `decode` dissects TLS records
 - **ui:** Style sheets from outside for the document view: `MdDoc::sheet_links`, `MdDoc::set_sheet` (a text counts where its `<link>` stands), `MdDoc::style_of` (what the cascade gives an element)
+- **JFNetworker:** Choosing a cable first: a Kabel part in the palette (Automatisch and a tile per kind) sets the Verbinden tool with that kind, the port choice offers only pairs it fits and what cannot fit is refused with its reason at the target. New kinds appended (serial with a chosen DCE or DTE end, telephone, coax, DAC, AOC), Media::Rj11 and Media::Coax with a cable modem and a DSL modem, a category (Cat5e .. Cat8, OM3, OM4, OS2) and a colour on the link, the project setting Auto-MDI-X aus; old files load unchanged, the golden reports stay as they are
 
 ### Changed
 
