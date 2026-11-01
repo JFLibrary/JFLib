@@ -368,12 +368,22 @@ impl Engine {
         if lw.starts_with("nvram:") {
             let start = self.cdev(ni).map(|c| c.cfg.startup.len() as u64).unwrap_or(0);
             let mut s = String::from("Directory of nvram:/\n\n");
+            let mut n = 0;
+            let mut used = start;
             if start > 0 {
-                s.push_str(&format!("    1  -rw- {:>11}  {:<30}  startup-config\n", start, "<no date>"));
-            } else {
+                n += 1;
+                s.push_str(&format!("    {}  -rw- {:>11}  {:<30}  startup-config\n", n, start, "<no date>"));
+            }
+            // the host keys of SSH (cli/ssh.rs) are its only files besides that
+            for (name, st) in st.list("nvram:/").unwrap_or_default() {
+                n += 1;
+                used += st.size;
+                s.push_str(&format!("    {}  -rw- {:>11}  {:<30}  {}\n", n, st.size, "<no date>", name));
+            }
+            if n == 0 {
                 s.push_str("No files in directory\n");
             }
-            s.push_str(&format!("\n{} bytes total ({} bytes free)\n", NVRAM_BYTES, NVRAM_BYTES.saturating_sub(start)));
+            s.push_str(&format!("\n{} bytes total ({} bytes free)\n", NVRAM_BYTES, NVRAM_BYTES.saturating_sub(used)));
             return s;
         }
         if !lw.starts_with("flash:") && lw.contains(':') {

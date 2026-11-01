@@ -1,0 +1,62 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ssh_snmpv3.jfnet
+# the MIB-Browser with a user of SNMPv3 (X1f, devwin/mib.rs) on fixtures/ssh_snmpv3.jfnet: version 3
+# swaps the community for user, level, signature and passwords; Get at authPriv against SW1, the level
+# authNoPriv with its own user, a wrong password gets its answer in the console, version 2c brings
+# the community back.
+# Ids: the window 26624; the MIB-Browser 69632: agent 69633, community 69634, version 69635, Get
+# 69638, user 69644, level 69645, signature 69646, its password 69647, the privacy password 69648.
+size 1280 900
+theme light
+dblclick listitem:"ADMIN" shift
+expect window 26624 open
+expect tab:"Desktop" selected
+dblclick listitem:"MIB-Browser"
+click #69633
+type "10.0.0.3"
+expect #69644 missing
+expect #69634 exists
+click #69635
+key down
+key enter
+wait 100
+expect #69634 missing
+expect #69644 exists
+expect #69645 exists
+click listitem:"sysName"
+expect #69638 disabled
+expect text:"Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen." exists
+click #69644
+type "monitor"
+click #69647
+type "monitorauth"
+click #69648
+type "monitorpriv"
+expect #69638 enabled
+click #69638
+wait 1000
+expect text:"SNMPv2-MIB::sysName.0 = STRING: SW1" exists
+shot build/jfnetworker/snmpv3_mib.png window 26624
+# another user at authNoPriv: the privacy password goes away
+click #69644
+key ctrl+a
+type "leser"
+click #69645
+key up
+key enter
+wait 100
+expect #69648 missing
+click #69647
+key ctrl+a
+type "leserauth"
+click listitem:"sysServices"
+click #69638
+wait 1000
+expect text:"SNMPv2-MIB::sysServices.0 = INTEGER: 2" exists
+# a wrong password
+click #69647
+key ctrl+a
+type "falschfalsch"
+click #69638
+wait 1000
+expect text:"snmpget: the agent refused the signature (wrong password or way to sign)" exists
+expect_nowarn

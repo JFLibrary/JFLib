@@ -512,10 +512,14 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
     b += size_of::<crate::cli::CliDev>() + 256 + cfg.startup.len() + (cfg.methods.len() + cfg.descr.len()) * 64 + n.cli.queue.iter().map(|l| l.len() + 24).sum::<usize>();
     // the login, AAA and RADIUS configuration, the banner, a pending login gate (X1d)
     b += cfg.auth.footprint() + cfg.aaa.footprint() + cfg.motd.len() + n.cli.gate.as_ref().map_or(0, |g| g.user.len() + g.methods.len() * 16 + 48);
+    // the ports' 802.1X settings (X1g; the sessions are in their service's footprint)
+    b += cfg.dot1x.footprint();
     // the shell's session: its directory, variables, history, line and background jobs (V1)
     b += n.cli.sh.footprint();
     // the further sessions: their infos, telnet buffers and waiting command lines (X1e)
     b += n.cli.ses_footprint();
+    // the SSH settings (X1f; a session's core counts with the session, a server's with services)
+    b += cfg.ssh.footprint();
     if let Some(br) = &n.bridge {
         b += size_of::<crate::bridge::Bridge>() + br.ports.len() * size_of::<BridgePort>() + br.fdb.len() * (size_of::<FdbEntry>() + 40) + br.vlans.len() * 64 + 512;
     }
@@ -533,6 +537,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         f.tcp += os.tcp.footprint();
         // the resolver's cache and lookups, its latency window, the disk
         b += os.resolver.cache.len() * 128 + os.resolver.lookups.len() * 256 + os.resolver.latency.bytes() + 1024;
+        // its units and deployments (units.rs, deploy.rs)
+        b += os.units.footprint();
         // the files on the device (each copy holds their bytes; the system image has none)
         b += os.files.len() * 96 + (os.files.used() - os.files.image.as_ref().map_or(0, |i| i.1)) as usize;
     }

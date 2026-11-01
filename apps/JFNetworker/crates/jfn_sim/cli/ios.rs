@@ -34,6 +34,8 @@
 // The vty lines and sessions (telnetd.rs): "transport input", "access-class" in line mode,
 // terminal [no] monitor, show line, clear line; exit / logout in a vty or local session ends
 // it, "%SYS-5-CONFIG_I" names the session the configuration came from.
+// SSH (cli/ssh.rs, sshd.rs): ip domain-name, crypto key generate|zeroize, ip ssh ..., show ip ssh,
+// show ssh, show crypto key, debug ip ssh and the client ssh -l USER HOST.
 
 use alloc::format;
 use alloc::string::String;
@@ -268,6 +270,29 @@ pub enum K {
     TermMonitor,
     ShowLine,
     ClearLine,
+    // SSH (cli/ssh.rs, sshd.rs)
+    Ssh,
+    IpDomainName,
+    CryptoKeyGen,
+    CryptoKeyZero,
+    IpSsh,
+    ShowIpSsh,
+    ShowSsh,
+    ShowCryptoKey,
+    DebugSsh,
+    // SNMPv3 (cli/snmp.rs)
+    SnmpEngine,
+    SnmpView,
+    SnmpGroup,
+    SnmpUser,
+    ShowSnmpV3,
+    // 802.1X (cli/dot1x.rs)
+    Dot1xSystem,
+    AaaAuthDot1x,
+    Dot1xIf,
+    ShowDot1x,
+    ShowAuthSes,
+    Dot1xNow,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -635,6 +660,12 @@ fn build(caps: u32) -> Tree<K> {
     // ---- the vty lines and the sessions: transport input, access-class, terminal monitor,
     // show line, clear line (telnetd.rs)
     crate::telnetd::build_vty(&mut t, [user, prv, line]);
+    // SSH (cli/ssh.rs)
+    super::ssh::build_ssh(&mut t, [user, prv, conf]);
+    // ---- 802.1X on switches (cli/dot1x.rs)
+    if bridge && caps & CAP_AP == 0 {
+        super::dot1x::build_dot1x(&mut t, [user, prv, conf, ifm]);
+    }
     t
 }
 
@@ -758,7 +789,7 @@ impl Engine {
             }
         }
     }
-    fn booting(&self, ni: usize) -> bool {
+    pub(crate) fn booting(&self, ni: usize) -> bool {
         self.cdev(ni).is_some_and(|c| c.booting)
     }
     /// an error message on the console; Err with its first line
@@ -943,7 +974,9 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS | super::D_SSH | super::D_DOT1X
+                } else if line.split_whitespace().nth(1) == Some("dot1x") {
+                    super::D_DOT1X
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -971,6 +1004,7 @@ impl Engine {
                     (true, true, _) => String::from("Debug output: all off\n"),
                     (false, true, _) => String::from("Debug output: all on (a busy network prints a lot)\n"),
                     (o, _, D_ICMP) => format!("Debug output for ICMP: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_DOT1X) => format!("Debug output for 802.1X: {}\n", if o { "off" } else { "on" }),
                     (o, _, D_RIP) => format!("Debug output for RIP: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_NAT) => format!("Debug output for NAT: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_AAA) => format!("Debug output for AAA authentication: {}\n", if o { "off" } else { "on" }),
@@ -1220,6 +1254,19 @@ impl Engine {
             | K::TestAaa => self.ios_aaa(ni, p, line),
             K::Telnet => self.ios_telnet(ni, p),
             K::TransportInput | K::AccessClass | K::TermMonitor | K::ShowLine | K::ClearLine => self.ios_vty(ni, p),
+            K::SnmpEngine | K::SnmpView | K::SnmpGroup | K::SnmpUser | K::ShowSnmpV3 => self.ios_snmp_v3(ni, p),
+            K::Ssh | K::IpDomainName | K::CryptoKeyGen | K::CryptoKeyZero | K::IpSsh | K::ShowIpSsh | K::ShowSsh | K::ShowCryptoKey | K::DebugSsh => self.ios_ssh(ni, p),
+            K::Dot1xSystem | K::AaaAuthDot1x | K::ShowDot1x | K::ShowAuthSes | K::Dot1xNow => self.ios_dot1x(ni, p),
+            K::Dot1xIf => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_dot1x_if(ni, &f, p, line) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
         }
     }
 

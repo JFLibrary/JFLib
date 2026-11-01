@@ -1,0 +1,185 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "IMAP im Fenster",
+  "description": "Das Postfach von anna hat zwei Nachrichten, der PC noch kein Konto.",
+  "seed": 7,
+  "next_id": 13,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "radius-server",
+          "name": "radius",
+          "config": {
+            "clients": [
+              {
+                "address": "10.0.0.0/24",
+                "secret": "testing123"
+              }
+            ],
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              },
+              {
+                "name": "bob",
+                "password": "bobpw",
+                "vlan": 20
+              },
+              {
+                "name": "carla",
+                "password": "carlapw"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "smtp-server",
+          "name": "smtp",
+          "config": {
+            "hostname": "mail.a.lab",
+            "domains": [
+              "a.lab"
+            ],
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              },
+              {
+                "name": "bob",
+                "password": "bobpw"
+              }
+            ],
+            "networks": [
+              "10.0.0.0/24"
+            ]
+          }
+        },
+        {
+          "kind": "pop3-server",
+          "name": "pop3",
+          "config": {
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              },
+              {
+                "name": "bob",
+                "password": "bobpw"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "imap-server",
+          "name": "imap",
+          "config": {
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              },
+              {
+                "name": "bob",
+                "password": "bobpw"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/var/mail",
+          "mtime": 1767225600,
+          "dir": true
+        },
+        {
+          "path": "/var/mail/anna",
+          "mtime": 1767225600,
+          "dir": true
+        },
+        {
+          "path": "/var/mail/anna/new",
+          "mtime": 1767225600,
+          "dir": true
+        },
+        {
+          "path": "/var/mail/anna/new/1767225601.M1Q1.mail",
+          "mtime": 1767225600,
+          "text": "Return-Path: <bob@a.lab>\nFrom: bob@a.lab\nTo: anna@a.lab\nSubject: Hallo Anna\nDate: Thu, 01 Jan 2026 00:00:01 +0000\nMessage-ID: <1767225601.M1Q1.mail@a.lab>\n\nDer erste Text\n"
+        },
+        {
+          "path": "/var/mail/anna/new/1767225602.M2Q2.mail",
+          "mtime": 1767225600,
+          "text": "Return-Path: <carl@b.lab>\nFrom: carl@b.lab\nTo: anna@a.lab\nSubject: Rechnung\nDate: Thu, 01 Jan 2026 00:00:01 +0000\nMessage-ID: <1767225602.M2Q2.mail@a.lab>\n\nZweiter Text\n"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "PC1",
+      "model": "pc",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.21/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "straight"
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "straight"
+    }
+  ]
+}

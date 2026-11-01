@@ -27,6 +27,9 @@
 // gives a cable a length by hand (0, "auto": automatic again); either way every cable whose
 // length (or the delay that follows from it, phys::delay_ns) changed goes to the engine
 // (Action::CableLen, Action::Impair), and the line names the cables with their new lengths.
+// "deploy ..." starts a rolling deployment (A2, deploy.rs): the hosts are a group of the
+// project or names with commas, its log lines follow in the report with their times
+// ("deploy N: ...") after the run they fell into.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -165,6 +168,8 @@ fn drain(d: &mut Inline, r: &mut Rep) {
             }
             // a scenario types at the consoles only (telnet sessions print on the client's)
             Report::SesOut { .. } | Report::SesPrompt { .. } | Report::SesClosed { .. } => {}
+            // the Webbrowser is a window's (a scenario fetches with curl)
+            Report::Web { .. } => {}
         }
     }
 }
@@ -217,6 +222,25 @@ fn heal_lines(e: &Engine, r: &mut Rep, shown: &mut BTreeSet<u32>) {
     }
 }
 
+/// the lines of the deployments since the last call; `shown`: per (device, run) how many
+fn deploy_lines(e: &Engine, r: &mut Rep, shown: &mut BTreeMap<(u32, u32), usize>) {
+    for run in e.deployments_all() {
+        let n = shown.entry((run.src, run.id)).or_insert(0);
+        for l in run.log.iter().skip(n.saturating_sub(run.dropped)) {
+            r.line(l.at, "--", &format!("deploy {}: {}", run.id, l.msg.text()));
+        }
+        *n = run.dropped + run.log.len();
+    }
+}
+
+/// the hosts of a deployment: a group of the project, else names with commas
+fn deploy_hosts(p: &Project, e: &Engine, hosts: &str) -> Result<Vec<u32>, String> {
+    if let Some(g) = p.groups.iter().find(|g| g.name.eq_ignore_ascii_case(hosts)) {
+        return Ok(jfn_model::group::Groups::of(p).devices(p, g.id));
+    }
+    hosts.split(',').map(|h| resolve(p, e, h).ok_or_else(|| format!("das Gerät oder die Gruppe {} gibt es nicht", h))).collect()
+}
+
 /// runs a scenario against a project (`pcap`: capture also without a "pcap" step)
 pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outcome {
     let force_pcap = pcap;
@@ -244,6 +268,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
     let mut pcap: Option<String> = None;
     let mut series: Option<String> = None;
     let mut healed: BTreeSet<u32> = BTreeSet::new();
+    let mut deployed: BTreeMap<(u32, u32), usize> = BTreeMap::new();
     for step in &sc.steps {
         if let Some(t) = step.at {
             let now = d.eng.now();
@@ -251,6 +276,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                 let _ = d.send(Cmd::RunFor(t - now), 0);
                 drain(&mut d, &mut r);
                 heal_lines(&d.eng, &mut r, &mut healed);
+                deploy_lines(&d.eng, &mut r, &mut deployed);
             }
         }
         let now = d.eng.now();
@@ -350,6 +376,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
             },
             StepKind::Expect(x) => {
                 drain(&mut d, &mut r);
+                deploy_lines(&d.eng, &mut r, &mut deployed);
                 expects += 1;
                 let (held, text) = expect(&proj, &d.eng, &r, x);
                 let t = d.eng.now();
@@ -420,6 +447,19 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                     }
                 }
             }
+            // a rolling deployment (deploy.rs)
+            StepKind::Deploy(x) => {
+                let spec = dev_of(&x.src, &d).ok_or_else(|| format!("das Gerät {} gibt es nicht", x.src)).and_then(|src| {
+                    Ok(jfn_model::unit::DeploySpec { src, hosts: deploy_hosts(&proj, &d.eng, &x.hosts)?, files: x.files.clone(), unit: x.unit.clone(), health: x.health.clone(), wait: x.wait, timeout: x.timeout, on_fail: x.on_fail })
+                });
+                match spec.map(|spec| d.send(Cmd::Apply(Action::Deploy { spec }), 0).map_err(|e| format!("{}", e))) {
+                    Ok(Ok(_)) => r.line(now, "--", &format!("deploy {} {} unit {}", x.src, x.hosts, x.unit)),
+                    Ok(Err(e)) | Err(e) => {
+                        r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e));
+                        ok = false;
+                    }
+                }
+            }
             StepKind::Fault { fault, dur } => match fault_of(&proj, &d.eng, fault) {
                 Ok(f) => {
                     let id = d.eng.next_fault_id();
@@ -472,6 +512,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
         }
         drain(&mut d, &mut r);
         heal_lines(&d.eng, &mut r, &mut healed);
+        deploy_lines(&d.eng, &mut r, &mut deployed);
     }
     let end = d.eng.now();
     r.flush(end);

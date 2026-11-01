@@ -1,0 +1,82 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/units.jfnet
+# der Lasttest aus der IDE (A2: workspace/ide/load.rs) auf PC1 gegen den Dienst web auf DEV1:
+# Ausführen › Lasttest öffnet den Bereich, offene Last mit 50 Anfragen pro Sekunde über 10 s: die
+# Kacheln und Diagramme laufen mit, am Ende steht die Zusammenfassung; Stoppen im Lauf; geschlossene
+# Last mit Nutzern und Denkzeit; ein Ziel ohne URL wird abgelehnt.  Der Dienst des Laufs steht auch
+# im Panel Metriken.
+# Ids: 26624 the device window; the IDE from 98304: Ausführen 98307, its row Lasttest 98406; from
+# 111104 the pane: + 1 the URL, + 3 the rate, + 4 the users, + 5 the think time, + 6 the duration,
+# + 7 Starten, + 8 Stoppen, + 0x10 the load; 111136 the first chart.
+size 1280 900
+theme light
+wait 1500
+# web läuft auf DEV1
+rclick listitem:"DEV1"
+move 700,300
+click menuitem:"Konsole öffnen"
+wait 200
+type "systemctl start web\n"
+wait 300
+# die IDE von PC1
+rclick listitem:"PC1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+resizewin 26624 1180 820
+wait 300
+click #98307
+click #98406
+wait 200
+expect tab:"Lasttest" selected
+expect text:"Hier stehen Anfragen pro Sekunde, Latenzen und Fehler des Lasttests, sobald er läuft." exists
+# ein Ziel ohne URL
+click #111105
+key ctrl+a
+type "gar keine"
+click #111111
+wait 100
+expect text:"Das Ziel ist eine URL wie http://10.0.1.1/." exists
+click #111105
+key ctrl+a
+type "http://10.0.0.10/"
+click #111107
+key ctrl+a
+type "50\n"
+click #111110
+key ctrl+a
+type "10\n"
+click #111111
+wait 3000
+expect text:"läuft: 150 Anfragen gesendet, 150 Antworten" exists
+expect #111112 enabled
+expect #111111 disabled
+expect text:"Fehlerquote" exists
+expect text:"Durchsatz" exists
+expect text:"Latenz" exists
+expect #111136 exists
+shot build/jfnetworker/load_ide_running.png window 26624
+wait 9000
+expect text:"Fertig: 500 Anfragen, 500 Antworten (50/s), 0 Fehler; p50 6,63 µs, p95 6,63 µs, p99 6,63 µs" exists
+expect #111112 disabled
+expect #111111 enabled
+shot build/jfnetworker/load_ide_done.png window 26624
+# geschlossene Last, gestoppt im Lauf
+click tab:"Geschlossen"
+wait 100
+expect #111108 exists
+click #111108
+key ctrl+a
+type "5\n"
+click #111109
+key ctrl+a
+type "100\n"
+click #111111
+wait 2000
+expect #111112 enabled
+click #111112
+wait 200
+expect #111112 disabled
+# im Panel Metriken
+cmd 260
+wait 200
+expect listitem:"Lastgenerator lasttest" exists

@@ -78,6 +78,12 @@
 //            session in place (the console, outside the engine's work for another one)
 //   jfstest  jfs --test FILE ...: the test functions of jfs files as one process, the record
 //            of the last run per device (Engine::jfs_tests, the IDE's Tests pane)
+//   units    systemctl and journalctl: the units of a Linux host (units.rs) and its log
+//   ssh      SSH: ip domain-name, crypto key generate|zeroize, ip ssh ..., show ip ssh, show ssh,
+//            show crypto key mypubkey, debug ip ssh, ssh on IOS; ssh, scp and ssh-keygen on the shell
+//   dot1x    802.1X: "dot1x system-auth-control", "authentication port-control", "dot1x pae|
+//            timeout|max-req", show dot1x, show authentication sessions, debug dot1x on IOS-like
+//            switches; wpa_supplicant and wpa_cli on the shell
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -132,6 +138,9 @@ pub mod coreutils;
 pub mod man;
 pub mod ses;
 pub mod jfstest;
+pub mod units;
+pub mod ssh;
+pub mod dot1x;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -154,6 +163,10 @@ pub const D_SNMP: u32 = 0x40000;
 /// "debug aaa authentication", "debug radius" (cli/aaa.rs)
 pub const D_AAA: u32 = 0x100000;
 pub const D_RADIUS: u32 = 0x200000;
+/// "debug ip ssh" (cli/ssh.rs)
+pub const D_SSH: u32 = 0x800000;
+/// "debug dot1x" (cli/dot1x.rs)
+pub const D_DOT1X: u32 = 0x1000000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,6 +252,10 @@ pub struct DevCfg {
     pub aaa: crate::aaa::Aaa,
     /// "banner motd": the text shown before a login (empty: none)
     pub motd: String,
+    /// "ip domain-name", "ip ssh ..." (sshd.rs, cli/ssh.rs)
+    pub ssh: crate::sshd::SshCfg,
+    /// 802.1X of the ports (cli/dot1x.rs, dot1x.rs)
+    pub dot1x: crate::dot1x::Dot1xCfg,
 }
 
 impl Default for DevCfg {
@@ -255,6 +272,8 @@ impl Default for DevCfg {
             auth: crate::auth::LocalAuth::default(),
             aaa: crate::aaa::Aaa::default(),
             motd: String::new(),
+            ssh: crate::sshd::SshCfg::default(),
+            dot1x: crate::dot1x::Dot1xCfg::default(),
         }
     }
 }
@@ -417,6 +436,8 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         n if n.is_ospf() => c.debug > 0,
         Note::Bgp(_) => c.debug > 0,
         Note::Snmp(_) => c.debug > 0,
+        Note::Ssh(_) => c.debug > 0,
+        Note::Dot1x(_) => c.debug > 0,
         _ => false,
     }
 }
@@ -507,7 +528,10 @@ impl Engine {
                 Mode::Out => String::new(),
                 m => format!("{}{}", host, ios::prompt_suffix(m)),
             },
-            CliStyle::Linux => format!("root@{}:{}# ", host, self.sh_prompt_dir(ni)),
+            CliStyle::Linux => match c.ses(c.cur).map(|i| i.user_name()) {
+                Some(u) if u != "root" => format!("{}@{}:{}$ ", u, host, self.sh_prompt_dir(ni)),
+                _ => format!("root@{}:{}# ", host, self.sh_prompt_dir(ni)),
+            },
             CliStyle::None => String::new(),
         }
     }
@@ -600,6 +624,10 @@ impl Engine {
 
     /// Ctrl+C at the session in place of node `ni`
     pub(crate) fn cli_interrupt_at(&mut self, ni: usize) {
+        // an SSH session in the foreground: Ctrl+C travels to the far end (sshd.rs)
+        if self.ssh_interrupt(ni) {
+            return;
+        }
         let style = self.cdev(ni).map(|c| c.style).unwrap_or(CliStyle::None);
         let job = self.cdev_mut(ni).and_then(|c| {
             c.queue.clear();

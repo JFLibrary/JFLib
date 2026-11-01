@@ -1,0 +1,195 @@
+# JFNetworker-Szenario ssh_snmpv3.scn: „SSH und SNMPv3“, 5 Geräte, 4 Verbindungen, Seed 31
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan1 is up
+   0.000000000  --      run 1s
+   0.000000000  --      SRV1: Verzeichnis /etc/ssh angelegt
+   0.000000000  --      SRV1: /etc/ssh/ssh_host_ed25519_key gespeichert (399 Bytes)
+   0.000000000  --      SRV1: /etc/ssh/ssh_host_ed25519_key.pub gespeichert (91 Bytes)
+   1.000000000  ADMIN   root@ADMIN:~# telnet 10.0.0.1
+   1.000000000  --      run 1s
+   1.000000000  ADMIN   Trying 10.0.0.1 ...
+   1.000005776  ADMIN   % Connection refused by remote host
+   2.000000000  ok      expect ADMIN output contains "% Connection refused by remote host"
+   2.000000000  ADMIN   root@ADMIN:~# ssh -o StrictHostKeyChecking=accept-new admin@10.0.0.1
+   2.000000000  --      run 1s
+   2.000018232  --      ADMIN: Verzeichnis /root/.ssh angelegt
+   2.000018232  --      ADMIN: /root/.ssh/known_hosts gespeichert (90 Bytes)
+   2.000018232  ADMIN   Remembered 10.0.0.1 in /root/.ssh/known_hosts.
+   3.000000000  ok      expect ADMIN output contains "Password for admin at 10.0.0.1: "
+   3.000000000  ADMIN   Password for admin at 10.0.0.1: adminpw
+   3.000000000  --      run 200ms
+   3.200000000  ok      expect ADMIN output contains "R1#"
+   3.200000000  ADMIN   R1#show users
+   3.200000000  --      run 200ms
+   3.200006792  ADMIN       Line       User       Privilege  Idle      Location
+   3.200006792  ADMIN       con 0      -          1          00:00:03
+   3.200006792  ADMIN   *   vty 0      admin      15         00:00:00  10.0.0.100 (ssh)
+   3.400000000  ok      expect ADMIN output contains "10.0.0.100 (ssh)"
+   3.400000000  ADMIN   R1#show ssh
+   3.400000000  --      run 200ms
+   3.400006280  ADMIN   Line       Cipher                         Host key      Phase    User
+   3.400006280  ADMIN   vty 0      chacha20-poly1305@openssh.com  ssh-ed25519   session  admin
+   3.600000000  ADMIN   R1#show ip ssh
+   3.600000000  --      run 200ms
+   3.600008072  ADMIN   SSH server: on, version 2.0
+   3.600008072  ADMIN   Time for a login: 120 s, tries: 3
+   3.600008072  ADMIN   Key exchange: curve25519-sha256
+   3.600008072  ADMIN   Ciphers: chacha20-poly1305@openssh.com, aes128-ctr, aes256-ctr
+   3.600008072  ADMIN   Host keys:
+   3.600008072  ADMIN     ssh-ed25519, 256 bits, SHA256:MZdWrvARXGMejsa4Aj6ZbpEevwMjsKKA+XTc+wlsiA4
+   3.800000000  ADMIN   R1#configure terminal
+   3.800000000  --      run 200ms
+   3.800005384  ADMIN   Configuration mode: one command per line; end or Ctrl+Z leaves it.
+   4.000000000  ADMIN   R1(config)#interface Loopback0
+   4.000000000  --      run 200ms
+   4.000002308  R1      *Mar  1 00:00:04.000: %LINK-3-UPDOWN: Loopback0 is up
+   4.000002308  R1      *Mar  1 00:00:04.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   4.200000000  ADMIN   R1(config-if)#ip address 192.168.1.1 255.255.255.255
+   4.200000000  --      run 200ms
+   4.400000000  ADMIN   R1(config-if)#end
+   4.400000000  --      run 200ms
+   4.400002052  R1      *Mar  1 00:00:04.400: %SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)
+   4.600000000  ok      expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)"
+   4.600000000  ADMIN   R1#exit
+   4.600000000  --      run 1s
+   4.600005384  ADMIN   Session with 10.0.0.1 ended.
+   5.600000000  ok      expect ADMIN output contains "Session with 10.0.0.1 ended."
+   5.600000000  R1      R1>show users
+   5.600000000  R1          Line       User       Privilege  Idle      Location
+   5.600000000  R1      *   con 0      -          1          00:00:00
+   5.600000000  ADMIN   root@ADMIN:~# echo $?
+   5.600000000  ADMIN   0
+   5.600000000  --      run 100ms
+   5.700000000  ADMIN   root@ADMIN:~# ssh -o StrictHostKeyChecking=accept-new admin@10.0.0.2 show ip ssh
+   5.700000000  --      run 1s
+   5.700023808  --      ADMIN: /root/.ssh/known_hosts gespeichert (312 Bytes)
+   5.700023808  ADMIN   Remembered 10.0.0.2 in /root/.ssh/known_hosts.
+   6.700000000  ADMIN   Password for admin at 10.0.0.2: adminpw
+   6.700000000  --      run 1s
+   6.700018168  ADMIN   SSH server: on, version 2.0
+   6.700018168  ADMIN   Time for a login: 120 s, tries: 3
+   6.700018168  ADMIN   Key exchange: curve25519-sha256
+   6.700018168  ADMIN   Ciphers: chacha20-poly1305@openssh.com, aes128-ctr, aes256-ctr
+   6.700018168  ADMIN   Host keys:
+   6.700018168  ADMIN     rsa-sha2-256, 1024 bits, SHA256:QdgeJ/T1nJc6ztzPpo09drvyN5asWFM7i6dsF7/PSdg
+   7.700000000  ok      expect ADMIN output contains "rsa-sha2-256, 1024 bits"
+   7.700000000  ADMIN   root@ADMIN:~# cat ~/.ssh/known_hosts
+   7.700000000  ADMIN   10.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL+1R/w9FCPhRSZxCV39Spl1GJwiD+0TXHFBx5AfC+4
+   7.700000000  ADMIN   10.0.0.2 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC+05Jc+n6jwF80Qhds0EgaoxwaFv5mxeMgVCOU1IlfsXU2V1AHm8zJVxj5dyDQ1iprIDgnjqve/i+vjeAYzJB4dIRILaOyN210GX0UW17KmwPB/nio6+/5v990CSw4JDUpB24G01WdxF++GikMG6S52x17VPWN5kovL23VfE3fBQ==
+   7.700000000  --      run 100ms
+   7.800000000  ADMIN   root@ADMIN:~# ssh-keygen -q -t ed25519
+   7.800000000  --      ADMIN: /root/.ssh/id_ed25519 gespeichert (399 Bytes)
+   7.800000000  --      ADMIN: /root/.ssh/id_ed25519.pub gespeichert (92 Bytes)
+   7.800000000  --      run 100ms
+   7.900000000  ADMIN   root@ADMIN:~# scp -o StrictHostKeyChecking=accept-new ~/.ssh/id_ed25519.pub root@10.0.0.10:/tmp/admin.pub
+   7.900000000  --      run 1s
+   7.900021200  --      ADMIN: /root/.ssh/known_hosts gespeichert (403 Bytes)
+   7.900021200  ADMIN   Remembered 10.0.0.10 in /root/.ssh/known_hosts.
+   8.900000000  ADMIN   Password for root at 10.0.0.10: geheim
+   8.900000000  --      run 1s
+   8.900021892  --      SRV1: /tmp/admin.pub gespeichert (92 Bytes)
+   8.900023816  ADMIN   id_ed25519.pub: 92 bytes copied
+   9.900000000  ok      expect ADMIN output contains "id_ed25519.pub"
+   9.900000000  SRV1    root@SRV1:~# mkdir -p /root/.ssh
+   9.900000000  --      SRV1: Verzeichnis /root/.ssh angelegt
+   9.900000000  SRV1    root@SRV1:~# cat /tmp/admin.pub >> /root/.ssh/authorized_keys
+   9.900000000  --      SRV1: /root/.ssh/authorized_keys gespeichert (92 Bytes)
+   9.900000000  ADMIN   root@ADMIN:~# ssh root@10.0.0.10
+   9.900000000  --      run 1s
+  10.900000000  ok      expect ADMIN output contains "root@SRV1:~# "
+  10.900000000  ADMIN   root@SRV1:~# who
+  10.900000000  --      run 200ms
+  10.900005512  ADMIN   root     tty1         2025-12-31 23:59
+  10.900005512  ADMIN   root     pts/0        2026-01-01 00:00 (10.0.0.100)
+  11.100000000  ok      expect ADMIN output contains "pts/0"
+  11.100000000  ADMIN   root@SRV1:~# exit 7
+  11.100000000  --      run 1s
+  11.100004104  ADMIN   logout
+  11.100006360  ADMIN   Session with 10.0.0.10 ended.
+  12.100000000  ADMIN   root@ADMIN:~# echo $?
+  12.100000000  ADMIN   7
+  12.100000000  --      run 100ms
+  12.200000000  ok      expect ADMIN output contains "7"
+  12.200000000  ADMIN   root@ADMIN:~# ssh root@10.0.0.10 hostname
+  12.200000000  --      run 1s
+  12.200049528  ADMIN   SRV1
+  13.200000000  ok      expect ADMIN output contains "SRV1"
+  13.200000000  ADMIN   root@ADMIN:~# snmpget -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.3 sysName.0
+  13.200000000  --      run 1s
+  13.200007188  ADMIN   SNMPv2-MIB::sysName.0 = STRING: SW1
+  14.200000000  ok      expect ADMIN output contains "SNMPv2-MIB::sysName.0 = STRING: SW1"
+  14.200000000  ADMIN   root@ADMIN:~# snmpset -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.3 sysLocation.0 s Halle
+  14.200000000  --      run 1s
+  14.200005808  ADMIN   SNMPv2-MIB::sysLocation.0 = STRING: Halle
+  15.200000000  ok      expect ADMIN output contains "SNMPv2-MIB::sysLocation.0 = STRING: Halle"
+  15.200000000  ADMIN   root@ADMIN:~# snmpget -v3 -u leser -l authNoPriv -a SHA -A leserauth 10.0.0.3 sysLocation.0 ifNumber.0
+  15.200000000  --      run 1s
+  15.200005800  ADMIN   SNMPv2-MIB::sysLocation.0 = STRING: Halle
+  15.200005800  ADMIN   IF-MIB::ifNumber.0 = No Such Object (the agent has no object of this name)
+  16.200000000  ok      expect ADMIN output contains "IF-MIB::ifNumber.0 = No Such Object"
+  16.200000000  ADMIN   root@ADMIN:~# snmpget -v3 -u leser -l authNoPriv -a SHA -A falschfalsch 10.0.0.3 sysName.0
+  16.200000000  --      run 1s
+  16.200004006  SW1     *Mar  1 00:00:16.200: %SNMP-3-AUTHFAIL: refused a request from 10.0.0.100: wrong digest for user leser
+  16.200005448  ADMIN   snmpget: the agent refused the signature (wrong password or way to sign)
+  17.200000000  ok      expect ADMIN output contains "the agent refused the signature"
+  17.200000000  ADMIN   root@ADMIN:~# snmpget -v3 -u niemand 10.0.0.3 sysName.0
+  17.200000000  --      run 1s
+  17.200005384  ADMIN   snmpget: the agent knows no user 'niemand'
+  18.200000000  ok      expect ADMIN output contains "the agent knows no user 'niemand'"
+  18.200000000  ADMIN   root@ADMIN:~# snmpget -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.1 sysName.0
+  18.200000000  --      run 2s
+  18.200011472  ADMIN   SNMPv2-MIB::sysName.0 = STRING: R1
+  20.200000000  ok      expect ADMIN output contains "STRING: R1"
+  20.200000000  ADMIN   root@ADMIN:~# snmpwalk -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.10 system
+  20.200000000  --      run 2s
+  20.200013232  ADMIN   SNMPv2-MIB::sysDescr.0 = STRING: JFNetworker host system 1.0 (Linux-like) for the Rack-Server 1U (Rack-Server 1U (2× 10GBASE-T, 1G Management))
+  20.200019848  ADMIN   SNMPv2-MIB::sysObjectID.0 = OID: SNMPv2-SMI::enterprises.32473.1.21
+  20.200026336  ADMIN   SNMPv2-MIB::sysUpTime.0 = Timeticks: (2020) 0:00:20.20
+  20.200032776  ADMIN   SNMPv2-MIB::sysContact.0 = STRING: 
+  20.200039296  ADMIN   SNMPv2-MIB::sysName.0 = STRING: SRV1
+  20.200045736  ADMIN   SNMPv2-MIB::sysLocation.0 = STRING: 
+  20.200052208  ADMIN   SNMPv2-MIB::sysServices.0 = INTEGER: 72
+  22.200000000  ok      expect ADMIN output contains "STRING: SRV1"
+  22.200000000  SW1     SW1>show snmp engineID
+  22.200000000  SW1     Engine ID of this agent: 80007ed903024a00000300
+  22.200000000  SW1     Starts so far: 1
+  22.200000000  SW1     SW1>show snmp user
+  22.200000000  SW1     User              Group             Signed by  Encrypted by
+  22.200000000  SW1     leser             LESER             SHA        -
+  22.200000000  SW1     monitor           ADMINS            SHA        AES
+  22.200000000  SW1     SW1>show snmp group
+  22.200000000  SW1     Group             Level          Read view         Write view
+  22.200000000  SW1     LESER             authNoPriv     NURSYS            -
+  22.200000000  SW1     ADMINS            authPriv       (all)             NURSYS
+  22.200000000  SRV1    root@SRV1:~# rm /etc/ssh/ssh_host_ed25519_key
+  22.200000000  --      SRV1: /etc/ssh/ssh_host_ed25519_key gelöscht
+  22.200000000  --      fault 1: Dienst sshd auf SRV1 gestoppt
+  22.200000000  --      run 100ms
+  22.300000000  --      heal 1: Dienst sshd auf SRV1 gestoppt
+  22.300000000  --      run 1s
+  22.300000000  --      SRV1: /etc/ssh/ssh_host_ed25519_key gespeichert (399 Bytes)
+  22.300000000  --      SRV1: /etc/ssh/ssh_host_ed25519_key.pub gespeichert (91 Bytes)
+  23.300000000  ADMIN   root@ADMIN:~# ssh root@10.0.0.10 hostname
+  23.300000000  --      run 1s
+  23.300018312  ADMIN   The key of 10.0.0.10 is not the one remembered in /root/.ssh/known_hosts (line 3).
+  23.300018312  ADMIN   The host may have a new key, or someone may be listening in. Its key now: SHA256:PaPpWAOHecFubQ/CyiWlHPsK0n8yJfivW8EhFl1C5iQ.
+  23.300018312  ADMIN   After checking, ssh-keygen -R 10.0.0.10 forgets the old one.
+  23.300018312  ADMIN   Refused: the host key changed.
+  24.300000000  ok      expect ADMIN output contains "Refused: the host key changed."
+  24.300000000  ADMIN   root@ADMIN:~# echo $?
+  24.300000000  ADMIN   255
+  24.300000000  --      run 100ms
+  24.400000000  ok      expect ADMIN output contains "255"
+# 21 von 21 Erwartungen erfüllt

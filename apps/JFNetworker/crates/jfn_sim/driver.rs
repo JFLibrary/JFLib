@@ -277,6 +277,9 @@ pub enum Report {
     SesPrompt { dev: u32, ses: u32, prompt: alloc::string::String, busy: bool },
     /// a local session ended (exit, Engine::cli_close, the power went off)
     SesClosed { dev: u32, ses: u32 },
+    /// the outcome of a request of the Webbrowser (Action::WebFetch, webc.rs) at virtual time
+    /// `at`: `id` is the window's number for it
+    Web { dev: u32, id: u64, at: Ns, result: Result<crate::webc::WebResp, crate::webc::WebFail> },
 }
 
 impl Inline {

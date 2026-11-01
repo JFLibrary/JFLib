@@ -1,0 +1,220 @@
+# JFNetworker-Szenario deploy.scn: „Einheiten und Bereitstellung“, 6 Geräte, 5 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+   0.000000000  --      run 500ms
+   0.500000000  DEV1    root@DEV1:~# systemctl list-units --all
+   0.500000000  DEV1    Einheit           Quelle  Aktiv     Im Detail  Beschreibung
+   0.500000000  DEV1    braucht.service   Datei   inactive  dead       Braucht web
+   0.500000000  DEV1    crash.service     Datei   inactive  dead       Stürzt ab
+   0.500000000  DEV1    kaputt.service    Fehler  inactive  dead       Ohne Programm
+   0.500000000  DEV1    once.service      Datei   inactive  dead
+   0.500000000  DEV1    statisch.service  Datei   inactive  dead       Fertiger Webserver
+   0.500000000  DEV1    web.service       Datei   inactive  dead       Der Webdienst
+   0.500000000  DEV1    6 Einheiten
+   0.500000000  DEV1    root@DEV1:~# systemctl is-active web
+   0.500000000  DEV1    inactive
+   0.500000000  DEV1    root@DEV1:~# echo $?
+   0.500000000  DEV1    3
+   0.500000000  DEV1    root@DEV1:~# systemctl start web
+   0.500000000  --      run 100ms
+   0.600000000  ok      expect DEV1 unit web active
+   0.600000000  DEV1    root@DEV1:~# systemctl status web
+   0.600000000  DEV1    web.service: Der Webdienst
+   0.600000000  DEV1      Zustand:   läuft (active/running) seit 500,000 ms
+   0.600000000  DEV1      Quelle:    /etc/systemd/system/web.service (beim Start: disabled)
+   0.600000000  DEV1      Programm:  jfs /root/app/server.jfs
+   0.600000000  DEV1      Neustart:  on-failure nach 2 s, bisher 0
+   0.600000000  DEV1      PID:       101
+   0.600000000  DEV1    
+   0.600000000  DEV1    Dec 31 23:59:58 DEV1 systemd: web.service: gestartet: jfs /root/app/server.jfs
+   0.600000000  DEV1    Dec 31 23:59:58 DEV1 web: bereit, Version 2
+   0.600000000  PC1     root@PC1:~# curl -s http://10.0.0.10/
+   0.600000000  --      run 100ms
+   0.600013656  PC1     Version 2 von web
+   0.700000000  ok      expect PC1 output contains "Version 2 von web"
+   0.700000000  DEV1    root@DEV1:~# journalctl -u web
+   0.700000000  DEV1    Dec 31 23:59:58 DEV1 systemd: web.service: gestartet: jfs /root/app/server.jfs
+   0.700000000  DEV1    Dec 31 23:59:58 DEV1 web: bereit, Version 2
+   0.700000000  ok      expect DEV1 output contains "web: bereit, Version 2"
+   0.700000000  DEV1    root@DEV1:~# systemctl start crash
+   0.700000000  --      run 2s
+   2.700000000  DEV1    root@DEV1:~# systemctl status crash
+   2.700000000  DEV1    crash.service: Stürzt ab
+   2.700000000  DEV1      Zustand:   läuft (active/running) seit 2,200 s
+   2.700000000  DEV1      Quelle:    /etc/systemd/system/crash.service (beim Start: static)
+   2.700000000  DEV1      Programm:  jfs /root/app/crash.jfs
+   2.700000000  DEV1      Neustart:  on-failure nach 1 s, bisher 1
+   2.700000000  DEV1      PID:       102
+   2.700000000  DEV1    
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 systemd: crash.service: gestartet: jfs /root/app/crash.jfs
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 crash: gestartet
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 crash: Fehler in /root/app/crash.jfs, Zeile 3, Spalte 3 (timer): kaputt
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 systemd: crash.service: beendet mit Status 1
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 systemd: crash.service: Neustart in 1,000 s
+   2.700000000  DEV1    Jan  1 00:00:00 DEV1 systemd: crash.service: gestartet: jfs /root/app/crash.jfs
+   2.700000000  DEV1    Jan  1 00:00:00 DEV1 crash: gestartet
+   2.700000000  ok      expect DEV1 output contains "on-failure nach 1 s, bisher 1"
+   2.700000000  DEV1    root@DEV1:~# journalctl -u crash -n 3
+   2.700000000  DEV1    Dec 31 23:59:59 DEV1 systemd: crash.service: Neustart in 1,000 s
+   2.700000000  DEV1    Jan  1 00:00:00 DEV1 systemd: crash.service: gestartet: jfs /root/app/crash.jfs
+   2.700000000  DEV1    Jan  1 00:00:00 DEV1 crash: gestartet
+   2.700000000  ok      expect DEV1 output contains "Neustart in"
+   2.700000000  DEV1    root@DEV1:~# systemctl stop crash
+   2.700000000  --      run 2s
+   4.700000000  ok      expect DEV1 unit crash inactive
+   4.700000000  DEV1    root@DEV1:~# systemctl start nix
+   4.700000000  DEV1    systemctl start: Die Einheit nix.service gibt es nicht.
+   4.700000000  DEV1    root@DEV1:~# echo $?
+   4.700000000  DEV1    5
+   4.700000000  ok      expect DEV1 output contains "5"
+   4.700000000  DEV1    root@DEV1:~# systemctl start kaputt
+   4.700000000  DEV1    systemctl start: [Service] braucht ExecStart. (systemctl status kaputt.service, journalctl -u kaputt.service)
+   4.700000000  DEV1    root@DEV1:~# echo $?
+   4.700000000  DEV1    1
+   4.700000000  ok      expect DEV1 output contains "1"
+   4.700000000  ok      expect DEV1 unit kaputt failed
+   4.700000000  DEV1    root@DEV1:~# systemctl status kaputt
+   4.700000000  DEV1    kaputt.service: Ohne Programm
+   4.700000000  DEV1      Zustand:   Fehler (failed/failed) seit 4,700 s
+   4.700000000  DEV1      Quelle:    /etc/systemd/system/kaputt.service (beim Start: static)
+   4.700000000  DEV1      Programm:  
+   4.700000000  DEV1      Neustart:  no
+   4.700000000  DEV1      Grund:     [Service] braucht ExecStart.
+   4.700000000  DEV1      Warnung: Zeile 3: Quatsch gibt es hier nicht, die Zeile zählt nicht.
+   4.700000000  DEV1      Warnung: Zeile 6: Restart=manchmal gibt es hier nicht (no, on-failure, always).
+   4.700000000  DEV1      Fehler: [Service] braucht ExecStart.
+   4.700000000  DEV1    
+   4.700000000  DEV1    Dec 31 23:59:58 DEV1 systemd: kaputt.service: Zeile 3: Quatsch gibt es hier nicht, die Zeile zählt nicht.
+   4.700000000  DEV1    Dec 31 23:59:58 DEV1 systemd: kaputt.service: Zeile 6: Restart=manchmal gibt es hier nicht (no, on-failure, always).
+   4.700000000  DEV1    Dec 31 23:59:58 DEV1 systemd: kaputt.service: [Service] braucht ExecStart.
+   4.700000000  DEV1    Jan  1 00:00:03 DEV1 systemd: kaputt.service: Start gescheitert: [Service] braucht ExecStart.
+   4.700000000  DEV1    root@DEV1:~# systemctl stop web
+   4.700000000  --      deploy DEV1 Webserver unit web
+   4.700000000  --      run 10s
+   4.750050800  --      WEB1: /etc/systemd/system/web.service gespeichert (170 Bytes)
+   4.750050800  --      WEB1: Verzeichnis /etc/systemd/system/multi-user.target.wants angelegt
+   4.750050800  --      WEB1: /etc/systemd/system/multi-user.target.wants/web.service gespeichert (32 Bytes)
+   5.500115176  --      WEB2: /etc/systemd/system/web.service gespeichert (170 Bytes)
+   5.500115176  --      WEB2: Verzeichnis /etc/systemd/system/multi-user.target.wants angelegt
+   5.500115176  --      WEB2: /etc/systemd/system/multi-user.target.wants/web.service gespeichert (32 Bytes)
+   4.700000000  --      deploy 1: Bereitstellung von web.service auf WEB1, WEB2, WEB3
+   4.700000000  --      deploy 1: WEB1: kopiert 5 Dateien
+   4.750050800  --      deploy 1: WEB1: web.service neu gestartet
+   4.950064376  --      deploy 1: WEB1: Prüfung hielt
+   5.450064376  --      deploy 1: WEB1: fertig
+   5.450064376  --      deploy 1: WEB2: kopiert 5 Dateien
+   5.500115176  --      deploy 1: WEB2: web.service neu gestartet
+   7.700161712  --      deploy 1: WEB2: gescheitert: die Prüfung hielt nicht: Status 404 statt 200
+   7.700161712  --      deploy 1: Bereitstellung von web.service gescheitert
+  14.700000000  ok      expect DEV1 deploy failed
+  14.700000000  ok      expect WEB1 unit web active
+  14.700000000  ok      expect WEB1 unit web enabled
+  14.700000000  WEB2    root@WEB2:~# systemctl is-active web
+  14.700000000  WEB2    activating
+  14.700000000  ok      expect WEB2 output contains "activating"
+  14.700000000  WEB2    root@WEB2:~# journalctl -u web -n 4
+  14.700000000  WEB2    Jan  1 00:00:14 WEB2 systemd: web.service: gestartet: jfs /root/app/server.jfs
+  14.700000000  WEB2    Jan  1 00:00:14 WEB2 web: Fehler in /root/app/server.jfs, Zeile 4, Spalte 6 (start): http.serve: Port 80 ist schon belegt.
+  14.700000000  WEB2    Jan  1 00:00:14 WEB2 systemd: web.service: beendet mit Status 1
+  14.700000000  WEB2    Jan  1 00:00:14 WEB2 systemd: web.service: Neustart in 2,000 s
+  14.700000000  WEB2    root@WEB2:~# systemctl stop alt
+  14.700000000  WEB2    root@WEB2:~# systemctl status alt
+  14.700000000  WEB2    alt.service: http-server
+  14.700000000  WEB2      Zustand:   gestoppt (inactive/dead)
+  14.700000000  WEB2      Quelle:    aus dem Projekt (beim Start: generated)
+  14.700000000  WEB2      Art:       http-server
+  14.700000000  --      run 1s
+  15.700000000  --      deploy DEV1 Webserver unit web
+  15.700000000  --      run 10s
+  15.750050800  --      WEB1: /etc/systemd/system/web.service gespeichert (170 Bytes)
+  16.500112288  --      WEB2: /etc/systemd/system/web.service gespeichert (170 Bytes)
+  17.250173776  --      WEB3: /etc/systemd/system/web.service gespeichert (170 Bytes)
+  17.250173776  --      WEB3: Verzeichnis /etc/systemd/system/multi-user.target.wants angelegt
+  17.250173776  --      WEB3: /etc/systemd/system/multi-user.target.wants/web.service gespeichert (32 Bytes)
+  15.700000000  --      deploy 2: Bereitstellung von web.service auf WEB1, WEB2, WEB3
+  15.700000000  --      deploy 2: WEB1: kopiert 5 Dateien
+  15.750050800  --      deploy 2: WEB1: web.service neu gestartet
+  15.950061488  --      deploy 2: WEB1: Prüfung hielt
+  16.450061488  --      deploy 2: WEB1: fertig
+  16.450061488  --      deploy 2: WEB2: kopiert 5 Dateien
+  16.500112288  --      deploy 2: WEB2: web.service neu gestartet
+  16.700122976  --      deploy 2: WEB2: Prüfung hielt
+  17.200122976  --      deploy 2: WEB2: fertig
+  17.200122976  --      deploy 2: WEB3: kopiert 5 Dateien
+  17.250173776  --      deploy 2: WEB3: web.service neu gestartet
+  17.450187352  --      deploy 2: WEB3: Prüfung hielt
+  17.950187352  --      deploy 2: WEB3: fertig
+  17.950187352  --      deploy 2: web.service ist auf allen Hosts bereitgestellt
+  25.700000000  ok      expect DEV1 deploy done
+  25.700000000  ok      expect WEB1 svc web metric version == 2 (2)
+  25.700000000  ok      expect WEB2 svc web metric version == 2 (2)
+  25.700000000  ok      expect WEB3 svc web metric version == 2 (2)
+  25.700000000  ok      expect WEB3 unit web enabled
+  25.700000000  PC1     root@PC1:~# curl -s http://10.0.0.13/
+  25.700000000  --      run 100ms
+  25.700013656  PC1     Version 2 von web
+  25.800000000  ok      expect PC1 output contains "Version 2 von web"
+  25.800000000  --      power off WEB3
+  25.800000000  SW1     *Mar  1 00:00:25.800: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is down
+  25.800000000  SW1     *Mar  1 00:00:25.800: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is down
+  25.800000000  --      run 1s
+  26.800000000  --      power on WEB3
+  26.800000000  SW1     *Mar  1 00:00:26.800: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+  26.800000000  SW1     *Mar  1 00:00:26.800: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+  26.800000000  --      run 1s
+  27.800000000  ok      expect WEB3 unit web active
+  27.800000000  WEB3    root@WEB3:~# systemctl status web
+  27.800000000  WEB3    web.service: Der Webdienst
+  27.800000000  WEB3      Zustand:   läuft (active/running) seit 26,800 s
+  27.800000000  WEB3      Quelle:    /etc/systemd/system/web.service (beim Start: enabled)
+  27.800000000  WEB3      Programm:  jfs /root/app/server.jfs
+  27.800000000  WEB3      Neustart:  on-failure nach 2 s, bisher 0
+  27.800000000  WEB3      PID:       101
+  27.800000000  WEB3    
+  27.800000000  WEB3    Jan  1 00:00:17 WEB3 systemd: web.service: gestartet: jfs /root/app/server.jfs
+  27.800000000  WEB3    Jan  1 00:00:17 WEB3 web: bereit, Version 2
+  27.800000000  WEB3    Jan  1 00:00:27 WEB3 systemd: web.service: gestartet: jfs /root/app/server.jfs
+  27.800000000  WEB3    Jan  1 00:00:27 WEB3 web: bereit, Version 2
+  27.800000000  DEV1    root@DEV1:~# echo 'print("Version 3")' >> /root/app/server.jfs
+  27.800000000  --      DEV1: /root/app/server.jfs gespeichert (278 Bytes)
+  27.800000000  --      power off WEB3
+  27.800000000  SW1     *Mar  1 00:00:27.800: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is down
+  27.800000000  SW1     *Mar  1 00:00:27.800: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is down
+  27.800000000  --      deploy DEV1 Webserver unit web
+  27.800000000  --      run 10s
+  27.850052320  --      WEB1: /etc/systemd/system/web.service gespeichert (170 Bytes)
+  28.600104640  --      WEB2: /etc/systemd/system/web.service gespeichert (170 Bytes)
+  29.450156960  --      WEB2: /root/app/crash.jfs gespeichert (101 Bytes)
+  29.550156960  --      WEB1: /root/app/crash.jfs gespeichert (101 Bytes)
+  27.800000000  --      deploy 3: Bereitstellung von web.service auf WEB1, WEB2, WEB3
+  27.800000000  --      deploy 3: WEB1: kopiert 5 Dateien
+  27.850052320  --      deploy 3: WEB1: web.service neu gestartet
+  28.050052320  --      deploy 3: WEB1: Prüfung hielt
+  28.550052320  --      deploy 3: WEB1: fertig
+  28.550052320  --      deploy 3: WEB2: kopiert 5 Dateien
+  28.600104640  --      deploy 3: WEB2: web.service neu gestartet
+  28.800104640  --      deploy 3: WEB2: Prüfung hielt
+  29.300104640  --      deploy 3: WEB2: fertig
+  29.300104640  --      deploy 3: WEB3: kopiert 5 Dateien
+  29.350156960  --      deploy 3: WEB3: gescheitert: das Gerät ist ausgeschaltet
+  29.450156960  --      deploy 3: WEB2: zurückgerollt
+  29.550156960  --      deploy 3: WEB1: zurückgerollt
+  29.650156960  --      deploy 3: Bereitstellung von web.service gescheitert, alle Hosts zurückgerollt
+  37.800000000  ok      expect DEV1 deploy rolledback
+  37.800000000  ok      expect WEB1 unit web active
+  37.800000000  WEB1    root@WEB1:~# journalctl -u web -n 2
+  37.800000000  WEB1    Jan  1 00:00:29 WEB1 systemd: web.service: gestartet: jfs /root/app/server.jfs
+  37.800000000  WEB1    Jan  1 00:00:29 WEB1 web: bereit, Version 2
+  37.800000000  WEB1    root@WEB1:~# grep -c "Version 3" /root/app/server.jfs
+  37.800000000  WEB1    0
+  37.800000000  ok      expect WEB1 output contains "0"
+  37.800000000  --      Eine Einheit steht in Dateien des Geräts; eine Bereitstellung kopiert sie Host für Host, startet neu und prüft
+# 23 von 23 Erwartungen erfüllt

@@ -16,6 +16,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Added
 
 - **crypto:** MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5 (`hmac_md5`), for protocols defined with MD5 (RADIUS); documented as broken for collisions, as `sha1` is
+- **netpkt:** SSH version 2 without I/O (`ssh`: a `Core` for both sides of a connection with curve25519-sha256, ssh-ed25519, rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr, aes256-ctr with hmac-sha2-256, logins by none, password and publickey, session channels with windows; `KeyPair` with OpenSSH key files; checked against OpenSSH's client by `tools/ssh_interop.py --core`) and SNMPv3 (`snmpv3`: messages, the USM with key localisation, HMAC-MD5-96, HMAC-SHA-96 and the SHA-2 tags of RFC 7860, AES-128-CFB of RFC 3826, engine IDs, report PDUs); `decode` dissects both; `netpkt` now depends on `crypto`
+- **crypto:** RSA key generation and PKCS #1 v1.5 signing (`rsa::PrivateKey`), `aes::Aes` is `Clone`
 - **netpkt:** The Telnet protocol (`telnet`: the NVT commands and option negotiation of RFC 854 / 855 / 857 / 858, IAC escaping, a `Reader` for bytes in pieces, the loop-free `Options` of RFC 1143) and RADIUS (`radius`: authentication and accounting of RFC 2865 / 2866 with every attribute, the User-Password hiding, the Request / Response Authenticators and the Message-Authenticator of RFC 3579); `decode` dissects both (`P_TELNET`, `P_RADIUS`)
 - **ui:** Full keyboard operation: focus groups (the arrows inside toolbars, radio sets, swatches and button grids), F6 / Ctrl+F6 through panes, docked panels and tool windows, F8 for splitters, the menu key / Shift+F10 everywhere, Enter, Space and Ctrl+arrows in lists, grids and trees
 - **ui:** A rich-text editor (`ui.richtext`, a toolbar, HTML in and out) and a code editor (`ui.code_editor`) with syntax highlighting for Rust, JSON, INI, TOML and Markdown, find and replace, and files of 100 000 lines
@@ -89,6 +91,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **shader:** lib/shader: a SPIR-V module builder (SPIR-V 1.3 to 1.6), a disassembler, a structural validator, std140 / std430 layouts, specialization constants (also for the workgroup size), shader::reflect (entry points, specialization constants and their values), the shaders of the GPU benchmark scene and texture sample shaders with CPU references (docs/SHADER.md)
 - **plat:** plat::win_native: the HWND and HINSTANCE of a plat window, for GPU surfaces
 - **wgsl:** lib/wgsl, JFLib's WGSL compiler: lexer, parser and checker after the W3C WGSL specification (every type, constant evaluation, overrides, the built-in functions, layouts, entry points), German diagnostics with line and column, the uniformity analysis with diagnostic filters, subgroups, the spec's implementation limits, a fully typed IR and a back end to SPIR-V 1.3 and 1.6 (wgsl::compile: one module per entry point, WGSL's runtime rules, bounds-clamped indices and texture coordinates, overrides as specialization constants with their values computed by name or @id, WebGPU's pipeline checks); Diagnostic::render shows the source line, with suggestions for misspelled names; the benchmark shaders in WGSL (docs/WGSL.md)
+- **netpkt:** URI references as RFC 3986 reads them (netpkt::uri: parsing, resolving a relative reference, remove_dot_segments, percent encoding, HTML's form encoding) and the Content-Type of a file by its extension (netpkt::http::mime_of)
+- **netpkt:** netpkt::eap (RFC 3748 packets, EAP-MD5 data, EAP-PWD exchanges), EAPOL Start, Logoff and EAP PDUs, netpkt::radius with EAP-Message pieces, VLAN attributes and MS-MPPE keys, netpkt::imap (IMAP without I/O: lines with literals, commands, responses, sequence sets, FETCH items, SEARCH keys, ENVELOPE)
+- **crypto:** crypto::eappwd (the sums of EAP-PWD, RFC 5931) and the group of crypto::p256 (y_for_x, on_curve, mul_point, add_points, neg_point, scalar_add, scalar_ok)
+- **eapm:** lib/eapm: EAP-MD5 and EAP-PWD as peer and server state machines without I/O
 
 ### Changed
 
@@ -148,6 +154,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::instance builds for the web and Android again (the stand-in casts of encode / decode)
 - **ui:** Linux: the caption buttons of a frameless window win over the resize band (their top row and the close button's corner started a resize before); no band on the tiled edges of a tiled window; jfgui_CSD=1 also asks for no system frame (X11, Wayland's xdg-decoration)
 - **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
+- **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
 
 ### Security
 

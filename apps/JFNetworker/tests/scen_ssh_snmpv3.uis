@@ -1,0 +1,9 @@
+#!args apps/JFNetworker/tests/fixtures/ssh_snmpv3.jfnet --scenario apps/JFNetworker/tests/scen/ssh_snmpv3.scn --golden apps/JFNetworker/tests/scen/ssh_snmpv3.report
+# golden scenario: SSH and SNMPv3 (X1f). The admin PC logs in to R1 over SSH (telnet is off on its
+# lines, the host key is remembered), sees its session in show users and show ssh, configures a
+# loopback there, runs a command on R2 in exec mode (an RSA host key), puts its key on SRV1 with
+# scp and comes back without a password, exits with a status; then it asks SW1, R1 and SRV1 over
+# SNMPv3 (authPriv, authNoPriv, a view, a wrong password, an unknown user); SRV1 gets a new key and
+# ssh refuses it. The GUI program runs tests/scen/ssh_snmpv3.scn on tests/fixtures/ssh_snmpv3.jfnet
+# without a window and ends with the report, which must equal tests/scen/ssh_snmpv3.report byte
+# for byte on every target (CR LF there counts as LF; the script itself is not run).

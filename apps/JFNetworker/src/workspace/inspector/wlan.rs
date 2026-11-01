@@ -2,7 +2,9 @@
 // with a masked passphrase, VLAN, guest network, client isolation; add and remove) with its
 // ranges and stations; a station's network (SSID and passphrase; join, leave) with its state in
 // the simulator (the access point it is on, signal, rate, the networks in reach); the project's
-// scale
+// scale.  An enterprise network shows its RADIUS server and key in place of the passphrase; a
+// station whose network is one (or that has an identity) its identity and EAP method too, and
+// its passphrase counts as the password
 //
 //   Bufs                       the edit buffers: SSID, passphrase and VLAN of each network, the
 //                              station's fields, the scale; they start over when the value
@@ -43,6 +45,8 @@ pub(crate) struct Bufs {
     ssid: Vec<String>,
     pass: Vec<String>,
     vlan: Vec<String>,
+    radius: Vec<String>,
+    rkey: Vec<String>,
     show: Vec<bool>,
     /// why the last change of network k was refused
     err: (usize, String),
@@ -50,6 +54,8 @@ pub(crate) struct Bufs {
     join_src: (u32, Option<WlanJoin>),
     j_ssid: String,
     j_pass: String,
+    j_identity: String,
+    j_eap: String,
     j_show: bool,
     j_err: String,
     scale: String,
@@ -84,6 +90,8 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
         b.ssid = nets.iter().map(|x| x.ssid.clone()).collect();
         b.pass = nets.iter().map(|x| x.passphrase.clone()).collect();
         b.vlan = nets.iter().map(|x| if x.vlan == 0 { String::new() } else { x.vlan.to_string() }).collect();
+        b.radius = nets.iter().map(|x| x.radius.clone()).collect();
+        b.rkey = nets.iter().map(|x| x.radius_key.clone()).collect();
         b.show.resize(nets.len(), false);
         b.src = (id, nets.clone());
     }
@@ -123,7 +131,7 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
             x.band = nb;
             x.channel = 0;
             // 6 GHz takes WPA3 only
-            if nb == Band::G6 && x.security != Security::Wpa3 {
+            if nb == Band::G6 && !x.security.wpa3() {
                 x.security = Security::Wpa3;
             }
             change = Some((k, x, "Band"));
@@ -144,7 +152,7 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
         }
         ui.box_end();
         // security and passphrase
-        let secs: &[Security] = if net.band == Band::G6 { &[Security::Wpa3] } else { Security::ALL };
+        let secs: &[Security] = if net.band == Band::G6 { &[Security::Wpa3, Security::Wpa3Ent] } else { Security::ALL };
         let snames: Vec<&str> = secs.iter().map(|s| t(s.title())).collect();
         let mut ssel = secs.iter().position(|&s| s == net.security).map_or(0, |i| i as i32);
         field_begin(ui, t("Sicherheit"));
@@ -158,7 +166,34 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
         }
         ui.box_end();
         let b = &mut n.inspector.wl;
-        if net.security.secured() {
+        if net.security.enterprise() {
+            let eid = ID_ENT_NET0 + 4 * k as u32;
+            field_begin(ui, t("RADIUS-Server"));
+            if ui.focused() == eid && ui.capture_shortcut(VK_ESCAPE, 0) {
+                b.radius[k] = net.radius.clone();
+            }
+            ui.next_size(-1, 0);
+            if ui.textbox(eid, Some(t("Adresse, z. B. 10.0.0.10")), &mut b.radius[k], 40) & EV_COMMIT != 0 && ui.focused() == eid {
+                apply = true;
+            }
+            ui.box_end();
+            field_begin(ui, t("RADIUS-Schlüssel"));
+            if ui.focused() == eid + 1 && ui.capture_shortcut(VK_ESCAPE, 0) {
+                b.rkey[k] = net.radius_key.clone();
+            }
+            ui.next_size(-1, 0);
+            let mask = if b.show[k] { 0 } else { TB_PASSWORD };
+            if ui.textbox(eid + 1, Some(t("das gemeinsame Geheimnis")), &mut b.rkey[k], 63 | mask) & EV_COMMIT != 0 && ui.focused() == eid + 1 {
+                apply = true;
+            }
+            ui.box_end();
+            let mut sh = b.show[k] as i32;
+            if ui.checkbox(base + WL_SHOW, t("Schlüssel zeigen"), &mut sh) & EV_ACT != 0 {
+                b.show[k] = sh != 0;
+                ui.repass();
+            }
+        }
+        if net.security.personal() {
             field_begin(ui, t("Passphrase"));
             if ui.focused() == base + WL_PASS && ui.capture_shortcut(VK_ESCAPE, 0) {
                 b.pass[k] = net.passphrase.clone();
@@ -201,7 +236,7 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
         }
         ui.box_begin(0, BOX_H | BOX_END, 8);
         let b = &n.inspector.wl;
-        let typed = b.ssid[k] != net.ssid || b.pass[k] != net.passphrase || b.vlan[k] != if net.vlan == 0 { String::new() } else { net.vlan.to_string() };
+        let typed = b.ssid[k] != net.ssid || b.pass[k] != net.passphrase || b.radius[k] != net.radius || b.rkey[k] != net.radius_key || b.vlan[k] != if net.vlan == 0 { String::new() } else { net.vlan.to_string() };
         ui.next_flags(if typed { 0 } else { ST_DISABLED });
         if ui.button(base + WL_APPLY, t("Übernehmen")) & EV_ACT != 0 {
             apply = true;
@@ -216,6 +251,8 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
             let mut x = net.clone();
             x.ssid = String::from(b.ssid[k].trim());
             x.passphrase = b.pass[k].clone();
+            x.radius = String::from(b.radius[k].trim());
+            x.radius_key = b.rkey[k].clone();
             x.vlan = vlan;
             change = Some((k, x, "Netz"));
         }
@@ -309,6 +346,8 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
         }
         b.j_ssid = join.as_ref().map(|j| j.ssid.clone()).unwrap_or_default();
         b.j_pass = join.as_ref().map(|j| j.passphrase.clone()).unwrap_or_default();
+        b.j_identity = join.as_ref().map(|j| j.identity.clone()).unwrap_or_default();
+        b.j_eap = join.as_ref().map(|j| j.eap.clone()).unwrap_or_default();
         b.join_src = (id, join.clone());
     }
     ui.text(TS_BODY_STRONG, t("WLAN"));
@@ -346,7 +385,26 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
         apply = true;
     }
     ui.box_end();
-    field_begin(ui, t("Passphrase"));
+    // an enterprise network: who logs in, with which method
+    let ssid_now = String::from(n.inspector.wl.j_ssid.trim());
+    let ent = !n.inspector.wl.j_identity.is_empty() || n.doc.sim.state().wlan_survey(id, Some(&ssid_now)).iter().any(|x| x.security.enterprise());
+    let b = &mut n.inspector.wl;
+    if ent {
+        field_begin(ui, t("Identität"));
+        ui.next_size(-1, 0);
+        if ui.textbox(ID_ENT_IDENTITY, Some(t("der Benutzer beim RADIUS-Server")), &mut b.j_identity, 64) & EV_COMMIT != 0 && ui.focused() == ID_ENT_IDENTITY {
+            apply = true;
+        }
+        ui.box_end();
+        let mut sel = if eapm::Method::parse(&b.j_eap) == Some(eapm::Method::Md5) { 1 } else { 0 };
+        field_begin(ui, t("EAP-Methode"));
+        ui.next_size(-1, 0);
+        if ui.combobox(ID_ENT_METHOD, &mut sel, &["EAP-PWD", "EAP-MD5"]) & EV_ACT != 0 {
+            b.j_eap = String::from(if sel == 1 { "MD5" } else { "PWD" });
+        }
+        ui.box_end();
+    }
+    field_begin(ui, if ent { t("Passwort") } else { t("Passphrase") });
     if ui.focused() == ID_WL_JOIN_PASS && ui.capture_shortcut(VK_ESCAPE, 0) {
         b.j_pass = join.as_ref().map(|j| j.passphrase.clone()).unwrap_or_default();
     }
@@ -357,7 +415,7 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     ui.box_end();
     let mut sh = b.j_show as i32;
-    if ui.checkbox(ID_WL_JOIN_SHOW, t("Passphrase zeigen"), &mut sh) & EV_ACT != 0 {
+    if ui.checkbox(ID_WL_JOIN_SHOW, if ent { t("Passwort zeigen") } else { t("Passphrase zeigen") }, &mut sh) & EV_ACT != 0 {
         b.j_show = sh != 0;
         ui.repass();
     }
@@ -375,7 +433,7 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
     ui.box_end();
     if apply {
         let b = &n.inspector.wl;
-        let j = WlanJoin { ssid: String::from(b.j_ssid.trim()), passphrase: b.j_pass.clone() };
+        let j = WlanJoin { ssid: String::from(b.j_ssid.trim()), passphrase: b.j_pass.clone(), identity: String::from(b.j_identity.trim()), eap: b.j_eap.clone() };
         match wlan::check_join(&j) {
             Some(why) => n.inspector.wl.j_err = crate::app::tr::msg(&why),
             None => {

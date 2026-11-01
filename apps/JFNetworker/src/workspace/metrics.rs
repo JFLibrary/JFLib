@@ -80,7 +80,7 @@ pub(crate) enum Show {
 }
 
 impl Show {
-    fn unit(self) -> LcUnit<'static> {
+    pub(crate) fn unit(self) -> LcUnit<'static> {
         match self {
             Show::Num => LcUnit::Num(""),
             Show::Lat => LcUnit::Secs,
@@ -188,6 +188,12 @@ static G_POP3: [Group; 3] = [
     Group { title: "In Arbeit", show: Show::Num, names: &["active"] },
 ];
 
+static G_IMAP: [Group; 3] = [
+    Group { title: "Durchsatz", show: Show::Num, names: &["fetched", "stored", "expunged", "appended", "logins"] },
+    Group { title: "Fehler|Diagramm", show: Show::Num, names: &["failed_logins"] },
+    Group { title: "In Arbeit", show: Show::Num, names: &["active"] },
+];
+
 /// the charts of a kind of service
 pub(crate) fn groups(kind: &str) -> &'static [Group] {
     match kind {
@@ -203,6 +209,7 @@ pub(crate) fn groups(kind: &str) -> &'static [Group] {
         "script" => &G_SCRIPT,
         "smtp-server" => &G_SMTP,
         "pop3-server" => &G_POP3,
+        "imap-server" => &G_IMAP,
         _ => &G_OTHER,
     }
 }
@@ -325,8 +332,10 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "ftp-server" => t("FTP-Server"),
         "smtp-server" => t("Mailserver (SMTP)"),
         "pop3-server" => t("Postfach (POP3)"),
+        "imap-server" => t("Postfach (IMAP)"),
         "radius-server" => t("RADIUS-Server"),
         "telnetd" => t("Telnet-Server"),
+        "sshd" => t("SSH-Server"),
         _ => kind,
     }
 }

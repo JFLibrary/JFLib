@@ -30,6 +30,10 @@
 // too (to the other stations), and what goes out of a radio port goes through wlan_ap_send,
 // which knows the sender (client isolation, guest networks); such a port counts as live while
 // a station of it has finished its handshake.
+//
+// 802.1X (dot1x.rs): a closed port (BridgePort::closed) lets only EAPOL through, which goes to the
+// authenticator: nothing else comes in, learns or goes out there.  assign_vlan puts a port in the
+// VLAN RADIUS named while its session lasts, its settings stay as they are.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -181,11 +185,13 @@ pub struct BridgePort {
     pub access_vlan: u16,
     pub native_vlan: u16,
     pub allowed: VlanSet,
+    /// 802.1X: not authorized, only EAPOL passes (dot1x.rs)
+    pub closed: bool,
 }
 
 impl BridgePort {
     fn new(member: bool) -> BridgePort {
-        BridgePort { mode: PortMode::Access(1), member, admin: SwMode::Dynamic, access_vlan: 1, native_vlan: 1, allowed: VlanSet::all() }
+        BridgePort { mode: PortMode::Access(1), member, admin: SwMode::Dynamic, access_vlan: 1, native_vlan: 1, allowed: VlanSet::all(), closed: false }
     }
     /// the mode that follows from the settings
     fn settle(&mut self) {
@@ -323,12 +329,28 @@ impl Bridge {
             }
         }
     }
-    /// the port carries VLAN `vlan`
+    /// the port carries VLAN `vlan` (a port 802.1X keeps closed carries none)
     pub fn carries(&self, port: u16, vlan: u16) -> bool {
         match self.ports.get(port as usize) {
+            Some(BridgePort { closed: true, .. }) => false,
             Some(BridgePort { member: true, mode: PortMode::Access(v), .. }) => *v == vlan,
             Some(BridgePort { member: true, mode: PortMode::Trunk { native, allowed }, .. }) => *native == vlan || allowed.contains(vlan),
             _ => false,
+        }
+    }
+    /// the VLAN of an authenticated port as RADIUS says (None: its own again); what the port
+    /// learned goes when the VLAN changes
+    pub fn assign_vlan(&mut self, port: u16, vlan: Option<u16>) {
+        let Some(p) = self.ports.get_mut(port as usize) else {
+            return;
+        };
+        let before = p.mode.clone();
+        match vlan {
+            Some(v) if matches!(p.mode, PortMode::Access(_)) => p.mode = PortMode::Access(v),
+            _ => p.settle(),
+        }
+        if p.mode != before {
+            self.flush_port(port);
         }
     }
     /// frames of `vlan` leave this port with a tag
@@ -446,11 +468,22 @@ impl Engine {
             }
         };
         if link_local(l2.dst) {
+            // EAPOL goes to the authenticator (dot1x.rs)
+            if l2.ethertype == eth::ET_EAPOL && self.dot1x_rx(ni, pi, &frame, hop) {
+                return;
+            }
             // BPDUs go to spanning tree or BPDU guard (stp.rs); the rest stays here
             if self.stp_bpdu(ni, pi, &frame, hop) {
                 return;
             }
             self.note(dev, Some(hop), Note::Consumed { port: pi });
+            return;
+        }
+        if br.ports[pi as usize].closed {
+            // 802.1X: this port is not authorized
+            node.ports[pi as usize].counters.drops += 1;
+            let port = jfn_model::ifname::short(node.port_name(pi));
+            self.note(dev, Some(hop), Note::Dot1x(crate::dot1xtrace::DNote::Blocked { port }));
             return;
         }
         if !br.stp.forwards(pi) {
@@ -479,7 +512,7 @@ impl Engine {
             }
             return;
         }
-        let target = if l2.dst.is_unicast() { br.lookup(vlan, l2.dst, now) } else { None };
+        let target = if l2.dst.is_unicast() { br.lookup(vlan, l2.dst, now).filter(|&p| !br.ports[p as usize].closed) } else { None };
         if let Some(p) = target
             && p != pi
             && !br.stp.forwards(p)

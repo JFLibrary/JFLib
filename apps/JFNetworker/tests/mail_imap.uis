@@ -1,0 +1,91 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/imap_mail.jfnet
+# the E-Mail program with an IMAP account on fixtures/imap_mail.jfnet (devwin/email.rs): the account's
+# form with its type, the first session brings the server's folders and the inbox with its two
+# messages (both Neu), showing one marks it read on the server, Markieren flags it, Löschen moves it
+# to the folder Papierkorb, a new folder and deleting it, a message sent lands in Gesendet.
+# Ids (window 0): Abrufen 73729, Verfassen 73730, Löschen 73732, Konto 73733, Markieren 73812; the
+# account's name 73744, address 73745, SMTP server 73746, server 73748, port 73749, user 73750,
+# password 73751, Speichern 73754, Kontotyp 73808; the new message's To 73760, Subject 73762, text
+# 73763, Senden 73764; the message shown 73776; the new folder's name 73809, Anlegen 73810, Ordner löschen 73811.
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 900 680
+expect tab:"Desktop" selected
+dblclick listitem:"E-Mail"
+expect dialog:"E-Mail (maximiert)" exists
+expect text:"Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern." exists
+expect text:"POP3-Server" exists
+click #73808
+click listitem:"IMAP"
+expect text:"IMAP-Server" exists
+click #73744
+type "Anna"
+click #73745
+type "anna@a.lab"
+click #73746
+type "10.0.0.10"
+click #73748
+type "10.0.0.10"
+click #73749
+key ctrl+a
+type "143"
+click #73750
+type "anna"
+click #73751
+type "geheim"
+click #73754
+expect text:"Abrufen: noch nicht" exists
+expect text:"Keine Nachrichten" exists
+# the first session: the server's folders and the inbox (the first packet waits for ARP)
+click #73729
+wait 2000
+expect text:"Abrufen: INBOX auf 10.0.0.10 abgeglichen, 2 neue Nachrichten." exists
+expect tab:"Posteingang (2)" exists
+expect tab:"Gesendet (0)" exists
+expect tab:"Papierkorb (0)" exists
+expect text:"Hallo Anna" exists
+# showing a message sets \Seen on the server
+click text:"Hallo Anna"
+wait 1500
+expect #73776 text "Der erste Text\n"
+expect text:"Abrufen: INBOX auf 10.0.0.10 abgeglichen, nichts Neues." exists
+# flagged
+click #73812
+wait 1500
+expect text:"★" exists
+# to the folder Papierkorb
+click text:"Rechnung"
+wait 1500
+click #73732
+wait 1500
+expect tab:"Posteingang (1)" exists
+click tab:"Papierkorb (0)"
+wait 1500
+expect tab:"Papierkorb (1)" exists
+expect text:"Rechnung" exists
+# a new folder and away with it
+click #73809
+type "Projekte"
+click #73810
+wait 1500
+expect tab:"Projekte (0)" exists
+click tab:"Projekte (0)"
+wait 1500
+click #73811
+wait 1500
+expect tab:"Posteingang (1)" exists
+# a message sent lands in the server's folder
+click #73730
+click #73760
+type "bob@a.lab"
+click #73762
+type "Hallo Bob"
+click #73763
+type "Viele Grüße"
+click #73764
+wait 2500
+expect text:"Senden: Gesendet an bob@a.lab über 10.0.0.10." exists
+expect tab:"Gesendet (1)" exists
+close window 26624

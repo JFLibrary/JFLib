@@ -162,7 +162,7 @@ LIBS = {
     # G2a: the WGSL front end -- lexer, parser, semantic checker, the typed IR (docs/WGSL.md);
     # G2c: its back end lowers the IR to SPIR-V with shader
     "wgsl": ("lib/wgsl/lib.rs", ["shader"]),
-    "netpkt": ("lib/netpkt/lib.rs", []),  # JFNetworker: addresses, checksums, header codecs, pcapng
+    "netpkt": ("lib/netpkt/lib.rs", ["crypto"]),  # JFNetworker: addresses, checksums, header codecs, pcapng; ssh needs crypto
     "datastore": ("lib/datastore/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
     "netio": ("lib/netio/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
     "cas": ("lib/cas/lib.rs", ["rt", "plat", "crypto", "compress", "agent_core"]),
@@ -171,6 +171,8 @@ LIBS = {
     "script": ("lib/script/lib.rs", ["rt", "agent_core"]),  # JFNetworker's .jfs scripts (SK3: json via agent_core)
     # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
     "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
+    # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
+    "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 

@@ -40,6 +40,9 @@
 //   SnmpOpenRw          a community that may write and that every sender may use (warning)
 //   ScriptFile          a script service from a file whose file is missing or does not compile
 //                       (scriptsvc.rs, IDE1)
+//   Dot1xNoServer       a port under "authentication port-control auto" with no method list or no
+//                       server behind it: it stays closed (error; dot1x.rs)
+//   Dot1xOff            such a port without "dot1x system-auth-control": it stays open (warning)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -129,6 +132,10 @@ pub enum ProblemKind {
     SnmpOpenRw,
     /// a script service's file is missing or does not compile (scriptsvc.rs)
     ScriptFile,
+    /// a port asks for 802.1X and nobody can answer (dot1x.rs)
+    Dot1xNoServer,
+    /// a port asks for 802.1X but the device has it switched off
+    Dot1xOff,
 }
 
 /// a problem of the set-up
@@ -285,6 +292,7 @@ impl Engine {
         self.mail_problems(&mut out);
         self.snmp_problems(&mut out);
         self.script_problems(&mut out);
+        self.dot1x_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

@@ -2335,11 +2335,56 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   w.begin(ber::T_SEQUENCE); w.int(5); w.octets(b"public"); w.end();
   ```
 
+  Port access control: `eap` has the packets of RFC 3748 -- `Packet` (Request, Response, Success,
+  Failure; `identity_request`, `identity_response`, `nak`, `identity()`, `nak_types()`), the data of
+  EAP-MD5 (`Md5Data`, `md5_value` with lent MD5) and of EAP-PWD (`Pwd`: `Id`, `Commit`, `Confirm`),
+  `info` for one line about a packet. `eapol` writes `start`, `logoff` and `eap_pdu`, `PAE_GROUP` is
+  their address on a wire, `AKM_8021X` and `AKM_8021X_SHA256` are the suites of enterprise networks.
+  `radius` carries EAP: `Packet::push_eap` / `eap` (pieces of 253 bytes, RFC 3579 3.1), `push_vlan` /
+  `vlan` (RFC 3580), `push_msk` / `msk` with `mppe_seal` / `mppe_open` (RFC 2548). The sums of EAP-PWD
+  are `crypto::eappwd` on the group functions of `crypto::p256` (`y_for_x`, `mul_point`, `add_points`,
+  `neg_point`, `scalar_add`), and `eapm` holds the methods as state machines without I/O: `Peer` and
+  `Server` take packets and give the next one, the caller carries the bytes, keeps timers and hands in
+  randomness, so a run is the same byte for byte. `decode::layers` shows EAP as a layer under EAPOL
+  and as a line in a RADIUS EAP-Message.
+
+  ```rust
+  let mut peer = eapm::Peer::new("anna", "secret", eapm::Method::Pwd);
+  let mut server = eapm::Server::new("radius", &[eapm::Method::Pwd]);
+  let lookup = |user: &str| (user == "anna").then(|| String::from("secret"));
+  let mut request = eap::Packet::identity_request(1, "").to_bytes();
+  loop {
+      let eapm::PeerOut::Send(response) = peer.on_packet(&request, &mut rnd) else { break };
+      match server.on_packet(&response, &lookup, &mut rnd) {
+          eapm::ServerOut::Send(next) => request = next,
+          eapm::ServerOut::Success { eap, msk, .. } => {
+              peer.on_packet(&eap, &mut rnd); // now peer.msk() == msk.as_ref()
+              break;
+          }
+          _ => break,
+      }
+  }
+  ```
+
+  Mail on a server: `imap` is IMAP without I/O (a subset of RFC 9051 and 3501) -- `LineReader` turns
+  bytes in pieces into logical lines with their literals (`Read::NeedLiteral` tells a server to answer
+  "+"), `Command::parse` and `Response::parse` read them, `tokens` gives the values (`Item`: atom,
+  quoted, literal, list, NIL), `ok` / `no` / `bad` / `untagged` / `cont` write server lines, `astring`
+  and `quoted` strings; `SeqSet`, `parse_fetch` (`FetchItem`, `Section`), `parse_search` (`SearchKey`)
+  read what clients ask, `envelope`, `internal_date`, `header_of`, `text_of` and `header_fields` make
+  the answers. `decode::layers` shows each line with its tag, command or status and response code
+  (port 143, `P_MAIL`).
+
   Remote access: `telnet` has the NVT protocol of RFC 854 -- the commands after `IAC`, the
   options `OPT_*` (`ECHO`, `SGA`, ...), `escape` and `to_nvt` for a data stream, a `Reader`
   that turns bytes arriving in pieces into `Item`s (data, a command, a negotiation, a
   subnegotiation), `parse` for one buffer, and `Options` (the loop-free Q method of RFC 1143:
-  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `radius`
+  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `uri` reads
+  addresses as RFC 3986 does: `Uri::parse(s)` takes every text as a reference (scheme, authority,
+  path, query, fragment; `host()`, `port()`), `base.join(r)` resolves a relative one (the examples
+  of 5.4 are tests), `remove_dot_segments`, `u.encoded()` escapes what a URI cannot hold,
+  `percent_encode` / `percent_decode`, and `form_encode` / `form_decode` are HTML's
+  `application/x-www-form-urlencoded`; `http::mime_of(path)` gives a file's Content-Type.  `radius`
   has the RADIUS packets of RFC 2865 / 2866 -- `RadiusView` and `Packet` with every attribute
   by number and name (`A_*`, `attr_name`, `value_name`; vendor-specific ones kept as bytes),
   `hide_password` / `reveal_password` (the User-Password hiding of 5.2), the Request and
@@ -2354,6 +2399,49 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let hidden = radius::hide_password(b"secret", key, &auth, crypto::md5_parts);
   let mut p = radius::Packet::new(radius::ACCESS_REQUEST, id, auth);
   p.push(radius::Attr::text(radius::A_USER_NAME, "admin"));
+  ```
+
+  SSH: `ssh` is SSH version 2 without I/O, for simulators and tests (`netio::ssh::Client` is the
+  blocking client on real sockets).  `ssh::Core::client(cfg, &seed)` and `Core::server(cfg, keys, &seed)`
+  are one side of a connection: `push` what the connection brought, `take_out` what to send,
+  `take_events` what happened; random bytes come from the seed, so the same seed gives the same
+  bytes.  It speaks curve25519-sha256, ssh-ed25519 and rsa-sha2-256, chacha20-poly1305@openssh.com,
+  aes128-ctr and aes256-ctr with hmac-sha2-256, logins by none, password and publickey and session
+  channels with windows.  The embedder decides what the protocol leaves open: `host_key_verdict`
+  answers `Event::HostKey`, `auth_accept` / `auth_reject` / `auth_pk_ok` answer `Event::AuthRequest`
+  (later if a server must be asked), `accept_channel`, `reply`.  `KeyPair` makes keys from the
+  caller's random bytes, signs, and reads and writes OpenSSH's unencrypted key files; `fingerprint`,
+  `parse_public`, `verify`, `dissect` (for inspectors; `decode::layers` shows the identification line,
+  packets in the clear and "verschlüsselt" after them).  `crypto::rsa::PrivateKey` generates and signs.
+
+  ```rust
+  let mut client = ssh::Core::client(ssh::Config::default(), &seed_a);
+  let mut server = ssh::Core::server(ssh::Config::default(), vec![ssh::KeyPair::ed25519(&key)], &seed_b);
+  loop {
+      server.push(&client.take_out());
+      client.push(&server.take_out());
+      for e in client.take_events() {
+          match e {
+              ssh::Event::HostKey { blob, .. } => client.host_key_verdict(ssh::fingerprint(&blob) == pinned),
+              ssh::Event::AuthReady => client.auth_password("admin", "secret"),
+              ssh::Event::AuthSuccess => { client.open_session(); }
+              _ => {}
+          }
+      }
+      // ... the server's events the same way, until both are quiet
+  }
+  ```
+
+  SNMPv3: `snmpv3` has the message of RFC 3412 (`V3`, `Usm`, `ScopedPdu`) around the PDUs of `snmp`,
+  and the USM: `password_to_key` and `localize` (RFC 3414 A.2), `sign` and `check` (HMAC-MD5-96,
+  HMAC-SHA-96, the SHA-2 tags of RFC 7860), `encrypt` and `decrypt` (AES-128-CFB of RFC 3826),
+  `engine_id_mac`, the counters of report PDUs (`USM_STATS_*`, `report_pdu`, `report_name`).  `decode`
+  shows msgFlags, the user and the scoped PDU, or "verschlüsselt".
+
+  ```rust
+  let kul = snmpv3::localize(AuthProto::Sha1, &snmpv3::password_to_key(AuthProto::Sha1, b"maplesyrup"), &engine);
+  let mut bytes = message.to_bytes();         // msgAuthenticationParameters: zeros of tag_len()
+  snmpv3::sign(&mut bytes, AuthProto::Sha1, &kul);
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and

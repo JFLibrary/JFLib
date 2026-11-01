@@ -164,12 +164,26 @@ Queues, Lastgeneratoren, eigene Skripte).
   Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
   MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
   F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
+- **Webbrowser (B1, B2):** echte kleine Websites aus dem simulierten Netz im Desktop eines Hosts:
+  HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und Skripten mit
+  `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene Fehlerseiten (siehe
+  [Webbrowser](#webbrowser)).
 - **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
   Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
   vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
   Benutzer oder RADIUS, Sitzungslimit, Leerlaufzeit, `show users`, `clear line`, `terminal
   monitor`) und `telnetd` auf Linux-Hosts (`who`, `w`, `tty`, `ps` mit TTY) (siehe
   [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)).
+- **Software-Architektur (A2):** Dienste als Einheiten auf Linux-Hosts (Unit-Dateien,
+  `systemctl`, `journalctl -u`, Neustart-Regeln in virtueller Zeit), aus der IDE auf eine Gruppe
+  von Hosts bereitstellen, einer nach dem anderen mit Gesundheitsprüfung und Abbruch beim ersten
+  Fehler, ein Lasttest mit den Metriken daneben und das Labor `05-microservices` (siehe
+  [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)).
+- **SSH und SNMPv3 (X1f):** SSH Version 2 mit echtem Schlüsselaustausch und echter Verschlüsselung:
+  `crypto key generate`, `ip ssh`, `transport input ssh` und `ssh -l` auf den IOS-artigen Geräten, der
+  Dienst `sshd`, `ssh`, `scp` und `ssh-keygen` auf den Hosts mit `known_hosts` und `authorized_keys`;
+  SNMPv3 mit Benutzern, Gruppen und Sichten, HMAC und AES, den Report-PDUs und `-v 3` in den Werkzeugen und
+  im MIB-Browser (siehe [SSH](#ssh) und [SNMP](#snmp)).
 
 ## Bedienung
 
@@ -343,6 +357,12 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_sessions.uis` | Golden-Szenario `sessions.scn`: der Admin-PC per Telnet an R1 (Loopback eingerichtet, `show users`, R1s Konsole nennt die vty-Leitung) und an R2 (`login local`), die vergessene Sitzung endet nach der Leerlaufzeit |
 | `sessions_terminal.uis` | eine zweite Sitzung von ADMIN im Terminal-Panel („Neue Sitzung“, der Tab „ADMIN (2)“) mit eigenem Prompt und Verzeichnis, `tty`, `who` von der Konsole, Schließen des Tabs beendet sie |
 | `telnet_vty.uis` | Telnet von ADMINs Konsole zu R1 und zurück: das Passwort verdeckt, R1s Prompt in der Konsole, `show users`, `exit`, der Prompt der Shell wieder |
+| `model.uis`, Gruppe `ssh` | SSH (siehe [SSH](#ssh)): ein PC per SSH an einem Router mit lokalem Benutzer und mit RADIUS samt Rückfall, `transport input` lehnt Telnet oder SSH ab, `show ip ssh`, `show ssh`, `show users`, falsche Passwörter und ihre Grenze, die Zeit für eine Anmeldung, die Leerlaufzeit, exec-Modus mit Status, der IOS-artige Client, RSA- und Ed25519-Schlüssel, `debug ip ssh`, die Running-Config, ein Schlüssel über einen Neustart; `sshd` mit Passwort und mit Schlüssel aus `ssh-keygen` und `authorized_keys`, `known_hosts` (Frage, gemerkt, geänderter Schlüssel abgelehnt, `-R`), ein weiterer Benutzer, `who` und `w`, Strg+C und `~.`, `scp` hin und her; die Pakete im Klaren und verschlüsselt, Zurückspulen und Determinismus |
+| `model.uis`, Gruppe `snmpv3` | SNMPv3 (siehe [SNMP](#snmp)): Get, Walk, Bulk und Set auf jeder Stufe, die Discovery, jeder Report, das Zeitfenster und die Boots nach einem Neustart, Sichten und Gruppen, die IOS-artigen Befehle mit Running-Config und einem Start daraus, `snmpd` auf Linux, was auf der Leitung steht, Determinismus |
+| `scen_ssh_snmpv3.uis` | Golden-Szenario `ssh_snmpv3.scn`: der Admin-PC per SSH an R1 (Telnet aus, Host-Schlüssel gemerkt, Loopback eingerichtet), exec-Modus an R2 mit RSA-Schlüssel, sein Schlüssel per `scp` auf SRV1 und danach ohne Passwort, `snmpget` und `snmpset` mit Version 3 an SW1, R1 und SRV1 mit Sicht und Reports, zuletzt ein abgelehnter neuer Schlüssel |
+| `ssh_session.uis` | SSH von ADMINs Konsole zu R1 und zurück: die Frage nach dem Schlüssel, das Passwort verdeckt, R1s Prompt, `show users`, `exit`, beim zweiten Mal keine Frage, `~.` |
+| `snmpv3_mib.uis` | der MIB-Browser mit einem Benutzer der Version 3: Benutzer, Stufe, Signatur und Passwörter statt der Community, Get auf authPriv und authNoPriv, ein falsches Passwort |
+| `ssh_shots.uis` | die Bilder von SSH (Konsole mit Sitzung an R1) und SNMPv3 (MIB-Browser) hell und dunkel mit 100 und 150 % (`build/jfnetworker/ssh_*.png`, `snmpv3_*.png`) |
 | `sessions_shots.uis` | die Bilder der Sitzungen (ADMIN mit einer zweiten Sitzung, darin per Telnet an R1 mit `show users`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/sessions_*.png`) |
 | `model.uis`, Gruppe `ide` | worauf die IDE baut (siehe [IDE](#ide)): ein Dienst aus einer Datei mit Importen neben ihr und `config.file`, `source` und `file` zugleich abgelehnt, eine fehlende Datei und eine, die sich nicht übersetzen lässt (Fehler, Status, `script errors`, Log, das Problem `ScriptFile`), Speichern ändert den laufenden Dienst nicht, ein Neustart liest die Datei, das Umwandeln eines eingebetteten Skripts als ein Schritt mit Rückgängig und Wiederholen (die Disk zählt weiter), Speichern, neue Datei und Ordner, Umbenennen, Löschen, ein Dienst zu einer Datei, Ersetzen in zwei Dateien als ein Schritt, `jfs --test` (Bericht, Ergebnisse, Exit-Code, eine Datei mit Fehler, die Zeitgrenze, ein Port für den nächsten Test), Determinismus, ein altes Projekt mit `source` unverändert, Suchen und Ersetzen mit ganzen Wörtern |
 | `ide_explorer.uis` | der Explorer der IDE auf `fixtures/ide.jfnet`: der Baum mit `/root` offen und dem eingebetteten Skript, eine neue Datei über das Flyout, ihr Tab und ihre Zeile mit „●“, Strg+S, F2 benennt um (der Tab geht mit), Entf löscht, Rückgängig des Projekts, ein neuer Ordner, ein Entwurf übersteht seinen geschlossenen Tab, Alle speichern, ein rückgängig gemachtes Speichern im Entwurf, das eingebettete Skript im Tab, „In Datei umwandeln“ (Tab und Dienst gehen mit, die Disk zählt weiter) und sein Rückgängig |
@@ -354,8 +374,24 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
 | `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
+| `model.uis`, Gruppe `units` | Einheiten und Bereitstellen (siehe [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)): Unit-Dateien und ihre Fehler, jedes Wort von `systemctl` mit seinem Exit-Code, erzeugte Einheiten, Einschalten über einen Stromausfall und Speichern und Laden, die Neustart-Regeln mit Startgrenze, `Requires` und `After`, `journalctl` mit `-u`, `-n`, `-f` und Strg+C (auch in einer anderen Sitzung und im Hintergrund), eine Bereitstellung, deren Prüfung auf dem zweiten Host scheitert, eine, die durchgeht, Zurückrollen, Ablehnungen, Abbrechen, Determinismus (zwei Läufe, ein Klon mitten im Lauf, ein Nachspielen aus Keyframes), das Labor `05-microservices` ungelöst, gelöst und mit allen Hosts zugleich verdorben |
+| `scen_deploy.uis` | das Golden-Szenario (`scen/deploy.scn`): `systemctl` und `journalctl` auf DEV1, eine Einheit, die scheitert und neu startet, eine Bereitstellung, die an WEB2 scheitert, eine, die durchgeht, ein Stromausfall, ein Zurückrollen |
+| `deploy_ide.uis` | Bereitstellen aus der IDE auf die Gruppe Webserver: die Vorschläge des Bereichs, der Fortschritt je Host, das Scheitern auf WEB2 mit seinem Grund, der Lauf, der durchgeht, eine Liste von Hosts, eine fehlende Einheit, Einheit anlegen, Abbrechen |
+| `load_ide.uis` | der Lasttest aus der IDE: ein Ziel ohne URL, offene Last mit Kacheln und Diagrammen, die Zusammenfassung, geschlossene Last, Stoppen, der Lauf im Panel Metriken |
+| `deploy_shots.uis` | die Bilder von Bereitstellen und Lasttest hell und dunkel mit 100 und 150 %, klein und in hohem Kontrast (`build/jfnetworker/deploy_shots_*.png`) |
+| `model.uis`, Gruppe `browser` | der Webbrowser (siehe [Webbrowser](#webbrowser)): URLs mit allen Beispielen aus RFC 3986 5.4, Prozent- und Formular-Kodierung, die Adresszeile, jede Fehlerart, die Regeln der Weiterleitungen und ihre Grenze, Typen, Formulare mit GET und POST gegen ein Skript (`req.query`, `req.form`), Dateien mit `"root"`, Verlauf, Fragmente, Anhalten, Strom aus unter einer Anfrage, Wiederholung beim Zurückspulen, Determinismus |
+| `browser_pages.uis` | der Webbrowser auf dem Desktop von PC1 (`fixtures/web_site.jfnet`): Adresse tippen (Name über DNS), Seite mit Bild und Titel, Link und zurück (Knöpfe und Tasten), relative Links, Text, Markdown, Fragmente, ein Bild allein, Strg+L; eigene Seiten für einen unbekannten Namen, einen abgelehnten Port, keinen Weg, 404, 500, 503, zu viele Weiterleitungen und `https:`; Schließen verwirft den Zustand |
+| `browser_forms.uis` | Formulare gegen das `jfs`-Skript `laden.jfs`: GET mit Query in der Adresse, Zurück bringt das Formular mit dem Eingegebenen, POST mit dem Knopf, Neu laden fragt vor dem zweiten Senden, ein Link mit Weiterleitung, Anhalten und Esc, die angehaltene Simulation, Tab in die Felder |
+| `browser_requests.uis` | was der Webbrowser ins Netz schickt, an den Zahlen des Webservers im Reiter Dienste: Seite und Bild sind zwei Anfragen, Zurück und Vor keine, Neu laden fragt wieder (auch nach dem Bild); der Desktop kommt nach dem Schließen des Gerätefensters so zurück, wie er war |
+| `browser_shots.uis` | die Bilder des Webbrowsers (Seite mit Bild, Text, Formular, die Frage vor dem erneuten Senden, Fehlerseite) hell und dunkel mit 100 und 150 % (`build/jfnetworker/browser_*.png`) |
+| `scen_web_site.uis` | das Golden-Szenario einer kleinen Website (`scen/web_site.scn`): `curl` holt, was der Browser holt: Seiten über den Namen, die Weiterleitung eines Ordners, Typen, eine fehlende Seite, ein Pfad aus dem Ordner hinaus, Formulare mit GET und POST, Weiterleitungen und ihre Grenze, eine gespeicherte Seite |
+| `dot1x_panel.uis` | 802.1X im Fenster auf `fixtures/dot1x_lab.jfnet`: die Kabel der geschlossenen Ports heißen „nicht autorisiert“, das Feld „Anmeldung am Netz (802.1X)“ der IP-Konfiguration auf PC1 (ohne Identität ein Hinweis; EAP-MD5, der Port geht auf), PC2 mit falschem Passwort und EAP-PWD (bleibt zu), der RADIUS-Server im Inspektor eines Enterprise-Netzes, der Laptop im Unternehmens-WLAN |
+| `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
+| `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
+| `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 
-Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
+Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
+Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
 `campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
@@ -374,7 +410,9 @@ für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`, 
 Skriptsprache die Gruppe `script`.
 Für Mail: `mail_domains.jfnet` (a.lab und b.lab mit je einem Mailserver und einem PC hinter R1,
 DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskripte
-`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte).
+`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte), 802.1X,
+WPA-Enterprise und IMAP (die selftest-Gruppen `dot1x` und `imap`, `scen_dot1x_imap.uis`, die
+coretest-Gruppe `eap` mit den Vektoren von EAP-PWD und dem Codec von IMAP).
 Für Gruppen und Hintergrundbild: `groups.jfnet` (zwei PCs und zwei Server an SW1, die Server mit
 einem Kabel unter sich, dessen Masken nicht passen) und `bg_plan.png` (ein Grundriss,
 160 × 120); die Rahmen des Diagramm-Widgets prüft `apps/diagramtest/tests/frames.uis`.
@@ -383,12 +421,20 @@ von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login
 Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 `telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
+Für den Webbrowser: `web_site.jfnet` (WEB1 mit den Dateien aus `/var/www` und dem Laden als
+Skript, DNS1 mit `web.lab`, PC1 mit dem Browser; das Szenario `web_site.scn` und die Fensterskripte
+`browser_*.uis`).
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
 Für die Sitzungen: `sessions.jfnet` (R1 mit Leitungspasswort, R2 mit `login local` und einer
 Minute Leerlaufzeit, ADMIN, SRV1 mit `telnetd` an SW1; das Szenario `sessions.scn` und die
 Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und `sessions_shots.uis`).
+Für SSH und SNMPv3: `ssh_snmpv3.jfnet` (R1 mit Ed25519-Schlüssel, nur SSH, R2 mit RSA-Schlüssel, SW1 mit
+Benutzern der Version 3 und einer Sicht, ADMIN, SRV1 mit `sshd` und `snmpd`; das Szenario `ssh_snmpv3.scn`
+und die Fensterskripte `ssh_session.uis`, `snmpv3_mib.uis` und `ssh_shots.uis`), die coretest-Gruppe
+`sshcore` (`netpkt::ssh` und `netpkt::snmpv3` gegen Vektoren von außen und gegen `netio::ssh` über TCP) und
+`python tools/ssh_interop.py --core` (der OpenSSH-Client gegen den Kern, mit jeder Chiffre).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -448,7 +494,13 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
+| Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
+| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
+| SSH | [`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs), [`crates/jfn_sim/sshd.rs`](crates/jfn_sim/sshd.rs), [`sshtrace.rs`](crates/jfn_sim/sshtrace.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs), [`src/sshtest.rs`](src/sshtest.rs) | das Protokoll ohne I/O, Client und Server auf den Geräten, Schlüssel als Dateien, `known_hosts`, `authorized_keys`, `scp` |
+| SNMPv3 | [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs), [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmpv3test.rs`](src/snmpv3test.rs) | die Nachricht, USM, VACM, die Reports, die Werkzeuge, der MIB-Browser |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
+| 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
+| IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
 
 ### Gerätekatalog
 
@@ -542,9 +594,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
   Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
-  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)); sein
-  Webbrowser löst bisher nur Adressen und Ports auf, Seiten über HTTP laden und zeigen ist
-  Meilenstein B1 (siehe [Fahrplan](#fahrplan)). F11 zeigt ein Gerätefenster mit jedem Reiter
+  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)), darunter der
+  [Webbrowser](#webbrowser). F11 zeigt ein Gerätefenster mit jedem Reiter
   im Vollbild. Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
   Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
@@ -1014,7 +1065,8 @@ von [`lib/netio/http.rs`](../../lib/netio/http.rs). Der Dissektor zeigt Anfragen
   Kopfzeilen und Chunks; Rechenzeit mit Streuung, Worker mit Warteschlange (voll: sofort 503
   mit `Retry-After`), Fehlerrate pro Server oder Route; Keep-Alive mit Leerlauf-Timeout (75 s)
   und höchstens 1000 Anfragen pro Verbindung, Timeout für den Kopf, 100-continue, 400, 404,
-  405 mit `Allow`, 413, 414, 431 und 505.
+  405 mit `Allow`, 413, 414, 431 und 505. Mit `"root": "/var/www"` antwortet er zusätzlich aus
+  den Dateien des Geräts (siehe [Webbrowser](#webbrowser)).
 - **Client** (`http-client`): N Anfragen an eine URL in Abständen. Der Agent dahinter
   (auch für `curl` und den Lastgenerator) löst Namen auf, hält Verbindungen pro Host offen,
   pipelinet auf Wunsch, kennt Timeouts für Verbindung und Anfrage und wiederholt eine Anfrage
@@ -1587,7 +1639,7 @@ Konfiguration sieht das Skript als `config` (`config.port`):
 | `net.connect(adresse, port, {connect, data, close, binary})` | TCP-Client (Namen löst `dns.resolve` auf) |
 | `net.udp(port, fn(sock, msg), {binary})` | UDP-Socket mit `send(adresse, port, daten)` und `close()`; `msg` ist `{data, from, port}`, Port 0 ein flüchtiger |
 | `dns.resolve(name, fn(err, adressen))` | der Resolver des Geräts (Suchdomänen, Cache) |
-| `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}`, `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
+| `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}` (`query`: die Felder der URL, dekodiert), bei einem Inhalt vom Typ `application/x-www-form-urlencoded` dazu `form` mit dessen Feldern (sonst fehlt es: `req.form ?? {}`), `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
 | `http.request(url, fn(err, resp))`, `http.request({url, method, headers, body, timeout_ms}, ..)` | HTTP-Client mit gehaltenen Verbindungen, Namen über den Resolver, ohne Angabe 30 s Timeout; `resp` ist `{status, headers, body}` |
 | `disk.get(key, fn(err, wert))`, `disk.put(key, wert, fn(err))`, `disk.delete(key, fn(err, war_da))`, `disk.scan(präfix, fn(err, einträge))` | JSON-Werte auf der Disk des Geräts mit ihren Zugriffszeiten und ihrer Kapazität (`"disk": {...}` wie beim KV-Knoten) |
 | `metrics.inc(name, n)`, `metrics.gauge(name, wert)`, `metrics.observe(name, wert)` | Zahlen des Dienstes für `expect … svc NAME metric X`; `observe` ergibt `NAME_count`, `NAME_p50`, `NAME_p95`, `NAME_p99` und `NAME_max` über fünf Minuten |
@@ -1682,7 +1734,7 @@ und das Startmenü; [`src/workspace/ide/`](src/workspace/ide/mod.rs), im Fenster
 als Tab der IDE. Oben stehen die Menüs Datei,
 Bearbeiten, Ausführen, Debuggen und Ansicht (jede Zeile nennt ihre Tasten) und die
 Werkzeugleiste; links die Seitenleiste mit Explorer, Suchen und Gliederung, rechts der Editor
-mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger und Tests. Die Teiler behalten
+mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger, Tests, Bereitstellen und Lasttest. Die Teiler behalten
 ihre Lage, Seitenleiste (Strg+B) und untere Leiste (Strg+J) lassen sich ausblenden und weichen,
 wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
 
@@ -1744,6 +1796,9 @@ wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
   (lokal, erfasst, global; Listen und Maps klappen auf) und Ausdrücke, die im Aufruf gelesen
   werden. F5 setzt fort, Strg+F9 hält an, F10 geht über, F7 hinein, Umschalt+F7 heraus (F11
   bleibt dem Fenster). Angehalten wird in virtueller Zeit, die Simulation läuft weiter.
+- **Bereitstellen und Lasttest:** Ausführen › Bereitstellen und › Lasttest öffnen die
+  gleichnamigen Bereiche unten (siehe
+  [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)).
 - **Tests:** „Tests ausführen“ (Strg+Umschalt+T) tippt `jfs --test DATEI` ins Terminal; der
   Bereich **Tests** zeigt den Lauf (`Engine::jfs_tests`): bestanden und gescheitert mit Datei,
   Zeile, Spalte und Meldung, ein Klick geht zur Stelle des Fehlers.
@@ -1765,6 +1820,116 @@ Oberfläche schickt diese Actions über `Sim::keep` ([`src/doc/sim.rs`](src/doc/
 `keep_steps`; die Dateien eines Schritts vor seinen Diensten), so laufen Bearbeiten,
 Rückgängig und Wiederholen ohne Neustart des Geräts.
 
+### Einheiten, Bereitstellen und Lasttest
+
+Hier läuft der ganze Weg eines Dienstes: als Dateien schreiben, debuggen, als Einheit auf mehrere
+Hosts bringen, unter Last testen und messen.
+
+**Einheiten** ([`jfn_model/unit.rs`](crates/jfn_model/unit.rs),
+[`jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs)): Auf
+Linux-Hosts beschreibt eine Datei `/etc/systemd/system/NAME.service` einen Dienst (`mkdir -p
+/etc/systemd/system` legt den Ordner an, die IDE tut es selbst):
+
+```ini
+[Unit]
+Description=Die Bestell-API
+After=network.target kv.service
+Requires=kv.service
+
+[Service]
+ExecStart=jfs /root/app/server.jfs --port 8080
+Environment=MODE=test "NAME=a b"
+Restart=on-failure
+RestartSec=2
+Settings={"ns_per_op": 5}
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- `ExecStart` startet zwei Programme: `jfs DATEI ARGUMENTE` ein Skript des Geräts (`config.args`,
+  `config.env` aus `Environment`, `config.unit`, `config.file`; das Übrige aus `Settings`) und
+  `jfn-service ART [DATEI]` einen fertigen Dienst des Simulators (`http-server`, `lb`, `kv`,
+  `cache` …: die Arten aus [Dienste und virtuelles Betriebssystem](#dienste-und-virtuelles-betriebssystem))
+  mit seinen JSON-Einstellungen aus der Datei und `Settings`. Pfade sind absolut.
+- Eine Einheit läuft als ein Dienst unter ihrem Namen: er steht wie jeder andere unter Metriken,
+  `top`, `ss -p`, Systemmonitor und Dienste; Stoppen und Starten behalten seine Zahlen, seine Disk
+  und seine Zeitreihen. Was die Datei falsch macht, sagen `systemctl status` und das Log: unbekannte
+  Abschnitte und Schlüssel sind Warnungen, ein fehlendes oder unbrauchbares `ExecStart` hält sie vom
+  Start ab. Eine geladene Einheit behält ihren Text bis `systemctl daemon-reload`, und `status`
+  sagt, wenn die Datei neuer ist. Nur die `.service`-Dateien selbst zählen; `Requires=` startet
+  vorher, was fehlt, und stoppt mit ihm, `After=` ordnet den Start beim Hochfahren.
+- **Dienste aus dem Projekt** erscheinen als erzeugte, nur lesbare Einheiten (`is-enabled` sagt
+  `generated`): `start`, `stop`, `restart` und `status` wirken auf sie, `enable` und `disable` lehnen
+  ab, denn ob sie starten, steht im Projekt. Ein `stop` gilt bis zum nächsten Einschalten. Heißt eine
+  Datei wie ein Dienst des Projekts, gewinnt die Datei: er läuft dann nur als diese Einheit, und nur
+  wenn sie eingeschaltet ist. Projekte ohne Einheiten laufen wie bisher, ohne jede Änderung.
+- **Einschalten** ist eine Datei: `systemctl enable` legt
+  `/etc/systemd/system/multi-user.target.wants/NAME.service` an (je `WantedBy`-Ziel eine, mit dem Pfad
+  der Einheit als Inhalt, weil der Dateispeicher keine symbolischen Links kennt). Deshalb übersteht
+  es Stromausfälle und das Speichern des Projekts; wer die Datei löscht, hat sie ausgeschaltet.
+  Beim Hochfahren starten alle Einheiten aller `*.wants`-Ordner.
+- **Neustart-Regeln** in virtueller Zeit: ein Skript als Einheit endet, wenn nichts mehr zu tun ist
+  (Status 0: kein Timer, Socket, Server, keine offene Anfrage), oder nach einem Fehler, der es beendet
+  (Status 1: im Hauptprogramm, beim Laden seiner Datei, mit `"stop_on_error": true` jeder). `no` lässt
+  es dabei, `on-failure` startet nach `RestartSec` (Vorgabe 100 ms) neu, wenn der Status nicht 0 war,
+  `always` in beiden Fällen. Ein `stop` startet nie neu. Wie beim Vorbild gibt die Einheit nach
+  `StartLimitBurst` Starten (5) in `StartLimitIntervalSec` (10 s) auf und bleibt `failed`.
+
+| Befehl | was es tut, Exit-Code |
+|---|---|
+| `systemctl start\|stop\|restart EINHEIT …` | 0; 5, wenn es sie nicht gibt; 1, wenn der Start scheitert (fehlende Datei, Fehler in Einheit oder Skript) |
+| `systemctl status [EINHEIT …]` | eigene Darstellung: Zustand, Quelle, Programm, Neustarts, PID, Status, Grund, die letzten Log-Zeilen (`-n N`); 0 läuft, 3 läuft nicht, 4 gibt es nicht |
+| `systemctl enable\|disable [--now] EINHEIT …` | die Dateien oben; 1 ohne Datei, und für eine erzeugte Einheit |
+| `systemctl is-active\|is-failed\|is-enabled EINHEIT …` | ein Wort je Einheit (`-q`: keins); is-active 0 oder 3, die anderen 0 oder 1 |
+| `systemctl list-units [--all] [--failed]`, `list-unit-files` | Tabellen in eigener Form |
+| `systemctl daemon-reload`, `reset-failed [EINHEIT]`, `cat EINHEIT` | neu lesen, Fehler vergessen, die Datei zeigen |
+| `journalctl [-u EINHEIT] [-n N] [-f] [-r]` | das Log des Geräts (die letzten 1000 Zeilen, `Monat Tag Zeit HOST TAG: TEXT`), mit `-u` die Zeilen einer Einheit: was ihr Dienst schrieb, bei Skripten auch `print`, und ihr Starten und Enden; `-f` folgt, bis Strg+C (130), in jeder Sitzung und im Hintergrund |
+
+`man systemctl`, `man journalctl` und `--help` antworten in eigenen Worten; `Engine::units(dev)`,
+`Engine::unit(dev, name)` und `Action::Unit { dev, name, op }` bedienen die Oberfläche. Die
+Szenarien prüfen mit `expect WEB1 unit web active|inactive|failed|enabled|disabled`.
+
+**Bereitstellen** ([`jfn_sim/deploy.rs`](crates/jfn_sim/deploy.rs),
+[`ide/deploy.rs`](src/workspace/ide/deploy.rs)): In der IDE öffnet Ausführen › Bereitstellen den
+gleichnamigen Bereich unten. Die Hosts sind eine Gruppe der Zeichenfläche, die Auswahl oder eine
+Liste von Namen; dazu die Dateien und Ordner (zuerst der Ordner der gezeigten Datei), die Einheit
+(zuerst die, die diese Datei ausführt; „Einheit anlegen“ schreibt ihre Datei und öffnet sie), die
+Prüfung (Einheit aktiv, TCP-Port oder HTTP-Anfrage mit Pfad und Status), die Zeit dafür und die
+Wartezeit danach. Bereitstellen speichert alle Dateien und schickt `Action::Deploy`: die Engine führt
+die Bereitstellung selbst aus, als versteckter Dienst des Geräts (in `ps` als `deploy-N`), also auch
+in der Aufzeichnung von K1. Host für Host, nacheinander: Dateien kopieren (auf der Ebene der Engine,
+ein Ereignis je Host: 50 ms und die Bytes bei 100 Mbit/s; das Ziel muss eingeschaltet sein, ein Netz
+braucht es dafür nicht), Einheit lesen, einschalten und neu starten, prüfen (alle 500 ms, bis es hält
+oder die Zeit um ist, TCP und HTTP vom Quellgerät über das simulierte Netz), warten, nächster Host.
+Der Fortschritt steht je Host daneben. Hält eine Prüfung nicht, endet der Lauf: die folgenden Hosts
+bleiben unberührt, die fertigen behalten die neue Fassung; mit „Beim ersten Fehler zurückrollen“
+bekommen der gescheiterte und dann die fertigen Hosts (der letzte zuerst) ihre alten Dateien zurück,
+eine neue Datei verschwindet wieder, und die Einheit läuft wie zuvor. Abbrechen und ein Quellgerät,
+das ausgeht, beenden den Lauf, wo er ist. `Engine::deployments(dev)` gibt die Läufe mit Hosts und
+Log. Über das Netz kopiert die Bereitstellung noch nicht: sie schreibt die Dateien im Simulator direkt auf
+den Host, `scp` (siehe [SSH](#ssh)) nutzt sie nicht.
+
+Im Szenario, mit einer Gruppe oder einer Liste, und den Zeilen des Laufs im Bericht:
+
+```
+deploy DEV1 Webserver unit web files /root/app health http 80 /health 200 wait 500ms timeout 2s
+deploy DEV1 WEB1,WEB2 unit api files /root/api health tcp 8080 rollback
+expect DEV1 deploy done
+```
+
+**Lasttest** ([`ide/load.rs`](src/workspace/ide/load.rs)): Ausführen › Lasttest startet den
+Lastgenerator (`http-load`, siehe [HTTP](#http)) auf dem Host der IDE: das Ziel (vorgeschlagen: der
+Loadbalancer des Projekts, sonst der erste Host der letzten Bereitstellung), offene Last mit einer
+Rate oder geschlossene mit Nutzern und Denkzeit, die Dauer. Daneben laufen die Kacheln (Antworten pro
+Sekunde, p50, p95, p99, Fehlerquote, in Arbeit) und die Diagramme aus den Zeitreihen, wie im Panel
+Metriken, und am Ende steht die Zusammenfassung. Der Lauf ist ein Dienst `lasttest` nur der Engine
+und kein Teil des Projekts: er geht mit einem Neustart des Geräts und ersetzt den vorigen.
+
+Geprüft wird das in der Selbsttest-Gruppe `units` ([`src/unitstest.rs`](src/unitstest.rs)), im
+Golden-Szenario `deploy`, in `deploy_ide.uis` und `load_ide.uis` und am Labor
+`05-microservices` (siehe [Labore und Aufgaben](#labore-und-aufgaben)).
+
 ### Labore und Aufgaben
 
 Ein Labor ist ein Projekt mit einer Aufgabe: das Netz, wie es anfängt, eine Einleitung, Ziele,
@@ -1780,6 +1945,7 @@ Speichern legt eine Kopie an, die ihr Labor behält).
 | `02-lastverteilung.jfnet` | Verteilte Systeme | 360 Anfragen pro Sekunde auf zwei Webserver am Limit (p99 um 340 ms, 503er): WEB3 verkabeln und in die Backends von LB1 aufnehmen, dann p99 um 45 ms ohne Fehler |
 | `03-shards.jfnet` | Verteilte Systeme | drei KV-Knoten mit Replikationsfaktor 1 und strong: erst Replikate, dann KV2 ausschalten, ohne dass eine Anfrage scheitert (zwei Replikate mit strong reichen nicht, drei schon, oder eventual), dann holt KV2 über Read Repair auf |
 | `04-cache.jfnet` | Verteilte Systeme | ein Cache mit 20 Einträgen und 200 ms vor einem Server, der kaum 100 Anfragen pro Sekunde schafft: größer und länger einstellen, bis vier von fünf Anfragen aus dem Cache kommen und der Server Luft hat |
+| `05-microservices.jfnet` | Verteilte Systeme | zwei `jfs`-Dienste als Einheiten auf fünf Hosts hinter einem Loadbalancer, mit KV-Speicher und Cache, unter Last: Version 2 von DEV1 aus nacheinander ausrollen (IDE, Ausführen › Bereitstellen), ohne dass eine Anfrage scheitert; alle Hosts auf einmal neu zu starten lässt Anfragen scheitern |
 
 In den drei Laboren der verteilten Systeme zählen die Ziele der Reihe nach: ein Ergebnis wie „p99
 unter 100 ms“ oder „keine Fehler“ zählt erst nach dem Umbau, nicht schon in den ersten Sekunden,
@@ -2341,7 +2507,8 @@ läuft, blass, wenn die Station außer Reichweite ist).
   oder mehrere Netze mit SSID, Band und Kanal (2,4 GHz Kanal 1 bis 13, 5 GHz 36 bis 64 und 100
   bis 140, 6 GHz 1 bis 93; der JF-AP6E sendet auf allen drei Bändern über je einen Funkport, der
   Heimrouter 2,4 und 5 GHz über `wlan0`), Sicherheit (offen, WPA2-Personal oder WPA3-Personal
-  mit einer Passphrase von 8 bis 63 Zeichen; 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
+  mit einer Passphrase von 8 bis 63 Zeichen, WPA2- oder WPA3-Enterprise mit einem RADIUS-Server,
+  siehe [802.1X und WPA-Enterprise](#8021x-und-wpa-enterprise); 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
   Funkports und die Kabelports in der Grundeinstellung werden dafür Trunks mit VLAN 1 ungetaggt;
   der Heimrouter behält seine Stationen in seinem LAN), Gastnetz und Client-Isolation. Eine Station hat das
   Netz, das sie sucht (SSID und Passphrase), oder keins. Jede Änderung ist ein Rückgängig-Schritt,
@@ -2418,8 +2585,8 @@ ein HKDF-SHA256 über Passwort, beide MAC-Adressen und je einen Zufallswert beid
 auf beiden Seiten bei gleichem Passwort, neu bei jeder Zuordnung), alles danach ist echt. Die
 Daten werden nicht mit CCMP verschlüsselt (die Schlüssel entstehen, die Frames bleiben lesbar).
 
-Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, WPA-Enterprise (802.1X mit
-RADIUS), Band Steering und 802.11r, Netze über die IOS-artige Befehlszeile einrichten.
+Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, Band Steering und 802.11r, Netze
+über die IOS-artige Befehlszeile einrichten.
 
 Für Programme: `Action::Move { dev, x, y }`, `Action::Wlan { dev, wlan }`, `Action::Scale {
 dip_per_m }`, `Engine::wlan_assocs()`, `wlan_station(dev)`, `wlan_stations_of(ap)`,
@@ -2795,8 +2962,8 @@ Vorbild).
 
 Der **vty-Telnet-Server** (eine Sitzung je vty-Leitung, `transport input`, die Anmeldung der
 Leitung über dieses Gate und AAA, Sitzungslimit, Leerlaufzeit) kam mit X1e, siehe
-[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server). Offen: 802.1X und WPA-Enterprise
-(spätere Meilensteine).
+[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server); 802.1X und WPA-Enterprise mit X1g,
+siehe [802.1X und WPA-Enterprise](#8021x-und-wpa-enterprise).
 
 Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
 `CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
@@ -2978,6 +3145,21 @@ gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontras
   UIDL (der eindeutige Name der Datei), RETR und TOP nach der Lesezeit der Disk, DELE, RSET,
   NOOP, CAPA und QUIT, das erst dann die markierten Nachrichten löscht (ein Rückgängig-Schritt
   des Projekts); ein Postfach hält nur eine Sitzung (`[IN-USE]`).
+- **IMAP-Server** ([`imapd.rs`](crates/jfn_sim/imapd.rs), Dienst `imap-server`, Port 143; der Codec:
+  [`netpkt::imap`](../../lib/netpkt/imap.rs)): dieselben Maildirs wie POP3, mit Ordnern (`.Sent`,
+  `.Trash`, weitere als `.Name`), Flags im Dateinamen (`:2,FRST`, ein Flag schiebt die Nachricht von
+  `new/` nach `cur/`) und UIDs in der Datei `.uidlist` des Ordners. CAPABILITY, LOGIN, AUTHENTICATE
+  PLAIN, LOGOUT, NOOP; LIST, LSUB, SELECT, EXAMINE, STATUS, CREATE, DELETE, RENAME; FETCH (FLAGS,
+  UID, RFC822.SIZE, INTERNALDATE, ENVELOPE, BODY[], BODY[HEADER], BODY[TEXT],
+  BODY[HEADER.FIELDS (…)], .PEEK, RFC822, ALL, FAST, FULL), STORE, EXPUNGE, CLOSE, UNSELECT, COPY,
+  MOVE, APPEND, SEARCH (ALL, UNSEEN, FROM, SUBJECT, TEXT, NOT, OR und mehr), die UID-Formen und IDLE
+  (eine neue Nachricht meldet sich nach höchstens 2 s). Mehrere Sitzungen und POP3 dürfen dasselbe
+  Postfach halten; was eine andere entfernt, kommt beim nächsten NOOP als EXPUNGE. Die erste
+  Anmeldung legt Sent und Trash an. Die Begrüßung nennt unseren eigenen Server.
+
+  ```json
+  {"kind": "imap-server", "name": "imap", "config": {"users": [{"name": "anna", "password": "geheim"}]}}
+  ```
 - **E-Mail im Desktop** ([`devwin/email.rs`](src/workspace/devwin/email.rs)): das Konto (Name,
   Adresse, SMTP-Server und Port, POP3-Server und Port, Benutzer, Passwort, Nachrichten auf dem
   Server lassen) liegt als `/root/Mail/account` auf dem Gerät; Posteingang (`/root/Mail/inbox`)
@@ -2986,9 +3168,15 @@ gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontras
   zitiert), Löschen, Senden und Abrufen. Senden und Abrufen gehen als `Action::MailSend` /
   `MailFetch` an den Simulator (so spielt das Zurückspulen sie nach), der ein Programm des
   Geräts damit beauftragt; abgerufen wird, was die UIDL noch nicht kannte (`/root/Mail/.uidl`).
-  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab.
+  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab. Mit dem Kontotyp IMAP bleibt die Mail
+  auf dem Server: die Ordner des Servers stehen zur Wahl, die Spalte Status zeigt seine Flags (Neu,
+  ★), Abrufen gleicht den gezeigten Ordner ab (`/root/Mail/imap/ORDNER/UID.eml` ist nur die Kopie
+  fürs Fenster), Lesen setzt \Seen, Markieren \Flagged, Löschen verschiebt nach Trash (dort endgültig),
+  Gesendetes landet per APPEND in Sent, Ordner werden angelegt und gelöscht; je eine Sitzung über
+  `Action::MailImap`.
 - **Shell:** `curl smtp://SERVER[:PORT][/HELO] --mail-from A --mail-rcpt B -T DATEI [-u
   BENUTZER:PASSWORT] [-v]` und `curl pop3://SERVER[/N] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
+  DATEI] [-v]` und `curl imap://SERVER[/ORDNER[;UID=N][?SUCHE]] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
   DATEI] [-v]` mit den Schritten, Meldungen und Exit-Codes von curl; `mail` einmalig: `echo
   TEXT | mail -s BETREFF [-c ADRESSE] [-r ABSENDER] EMPFÄNGER` übergibt eine Nachricht an den
   SMTP-Server des Kontos (oder an einen auf dem Gerät selbst), `mail -H` listet den
@@ -3018,19 +3206,24 @@ Ein Mailserver in der Projektdatei:
 Entscheidungen: Maildir statt mbox, weil jede Nachricht eine Datei im Reiter Dateien ist, UIDL
 ihr Name und DELE das Entfernen einer Datei. Die Antworten der Server, ihre Begrüßung, die
 Unzustellbarkeitsnachricht und die Log-Zeilen sind eigene Worte auf Englisch wie bei den
-anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Weder
-STARTTLS noch IMAP.
+anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Kein STARTTLS.
+Bei IMAP gilt eine Nachricht als \Recent, solange sie in `new/` liegt: das Postfach bleibt, wie der
+Server es vorfand, bis jemand etwas ändert. Keine BODYSTRUCTURE und keine Teilabrufe, Schlüsselwörter
+werden nicht gespeichert.
 
-Noch offen: IMAP, STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
+Noch offen: STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
 Warteschlange auf der Disk, die einen Neustart übersteht, Anhänge im Programm E-Mail, SPF und
 DKIM.
 
 Für Programme: `Action::MailSend { dev, draft: MailDraft }`, `Action::MailFetch { dev }`,
+`Action::MailImap { dev, op: ImapOp }`, `mailc::{imap_dir, imap_folders, imap_marks, uid_of_path}`,
 `Engine::mail_client(dev)`, `jfn_sim::mailc` (`Account`, `folder`, `read_mail`, `INBOX`,
 `SENT`, `ACCOUNT`), `Note::Mail(MNote)`, `ProblemKind::MailMxNowhere`, `MailOpenRelay` und
 `MailNoMailbox`. Geprüft wird in der Selbsttest-Gruppe `mail` ([`src/mailtest.rs`](src/mailtest.rs)),
 in der coretest-Gruppe `mail` (die Codecs Byte für Byte), mit `scen_mail_domains.uis` und den
-Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`.
+Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`; IMAP in der
+Selbsttest-Gruppe `imap` ([`src/imaptest.rs`](src/imaptest.rs)), der coretest-Gruppe `eap`, mit
+`scen_dot1x_imap.uis` und `mail_imap.uis`.
 
 ### Gruppen und Hintergrundbild
 
@@ -3211,7 +3404,7 @@ coldStart sagt es schon). Ein Absender, den die Zugriffsliste abweist, zählt wi
 Community. Unter Linux gilt ein Set, solange der Dienst läuft; die Einstellungen ändert es nicht.
 sysObjectID nennt nie die Nummer eines Herstellers.
 
-Noch offen: SNMPv3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
+Noch offen: Traps der Version 3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
 IPv6, Tabellen über die Ressourcen der Hosts, ein Agent für den MIB-Browser ohne die Konsole.
 
 Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(dev)`,
@@ -3222,6 +3415,51 @@ Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(d
 ([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
 `snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
 `snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
+**SNMPv3** (RFC 3411–3415, 3826, 7860; [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs)): dieselben
+Agenten sprechen auch Version 3 mit dem User-based Security Model und VACM; ohne Benutzer antworten sie
+nur auf die Discovery.
+
+- **Sicherheitsstufen:** noAuthNoPriv, authNoPriv (HMAC-MD5-96, HMAC-SHA-96, die SHA-2-Varianten
+  SHA-256, SHA-384 und SHA-512 von RFC 7860), authPriv (dazu AES-128-CFB). DES gibt es nicht, weil
+  `lib/crypto` keines hat. Die Schlüssel werden aus dem Passwort abgeleitet und für die Engine
+  lokalisiert (RFC 3414 A.2).
+- **IOS-artig:** `snmp-server engineID local HEX`, `snmp-server view NAME OID included|excluded`,
+  `snmp-server group NAME v3 noauth|auth|priv [read SICHT] [write SICHT]` (ohne `read`: alles unter
+  1.3.6.1, ohne `write`: nichts), `snmp-server user NAME GRUPPE v3 [auth md5|sha|sha256|sha384|sha512
+  PASSWORT [priv aes 128 PASSWORT]]` (Passwörter mit mindestens 8 Zeichen), die `no`-Formen, `show snmp
+  user`, `show snmp group`, `show snmp view`, `show snmp engineID`. In der Running-Config steht ein
+  Benutzer mit `encrypted` und den lokalisierten Schlüsseln, nie mit dem Passwort; eine gespeicherte
+  Konfiguration bootet so. Ändert sich die Engine-ID, passen die Schlüssel nicht mehr, wie beim
+  Vorbild: der Benutzer muss neu eingegeben werden.
+- **Linux:** in den Einstellungen von `snmpd` `"engine_id": "80007ed9…"` und `"users": [{"name": "admin",
+  "level": "authPriv", "auth": "SHA", "auth_password": "…", "priv": "AES", "priv_password": "…", "access":
+  "rw", "subtree": "1.3.6.1.2.1.1"}]`.
+- **Werkzeuge:** `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset` nehmen `-v 3 -u BENUTZER
+  [-l noAuthNoPriv|authNoPriv|authPriv] [-a MD5|SHA|SHA-256|SHA-384|SHA-512] [-A PASSWORT] [-x AES] [-X
+  PASSWORT] [-e ENGINE] [-Z BOOTS,ZEIT] [-n KONTEXT]`. Ohne `-e` kommt erst die Discovery; ein signierter
+  Report über die Zeit setzt ihre Uhr, die Anfrage geht noch einmal; jeder andere Report endet mit einem
+  eigenen Satz.
+- **Reports:** ein Agent prüft in der Reihenfolge des RFC und antwortet mit einem Report-PDU:
+  usmStatsUnknownEngineIDs (das ist die Discovery), usmStatsUnknownUserNames, usmStatsUnsupportedSecLevels,
+  usmStatsWrongDigests (dazu `%SNMP-3-AUTHFAIL` und authenticationFailure, wo das an ist),
+  usmStatsNotInTimeWindows (Boots oder mehr als 150 s Unterschied, signiert), usmStatsDecryptionErrors,
+  snmpUnknownContexts; ohne das Report-Flag bleibt es bei der Zählung. Boots zählt jeden Start des Agenten
+  (es bleibt, solange das Projekt offen ist), die Zeit läuft seit diesem Start.
+- **Sichten:** außerhalb der Sicht antwortet Get mit noSuchObject, GetNext und GetBulk gehen darüber hinweg,
+  Set bekommt noAccess; ein Benutzer ohne passende Gruppe bekommt authorizationError.
+- **Im Fenster:** der MIB-Browser hat die Version 3 mit Benutzer, Stufe, Signatur und den Passwörtern
+  (verdeckt getippt). Der Paket-Tab zeigt msgID, msgMaxSize, msgFlags, das Modell, Engine-ID, Boots, Zeit,
+  Benutzer und die Parameter, und das scopedPDU oder „verschlüsselt“.
+
+Entscheidungen: Die Engine-ID ist ohne Einstellung Format 3 mit der MAC des ersten Interfaces unter der
+Enterprise-Nummer für Dokumentation. Eine Nachricht der Version 3, die sich nicht lesen lässt, zählt wie
+eine Version, die der Agent nicht spricht. Traps und Informs bleiben bei den Versionen 1 und 2c.
+Die usmStats-Zähler stehen nur im Report, nicht in der MIB des Agenten (ein Walk über 1.3.6.1.6.3 fände
+sie nicht).
+
+Geprüft wird in der Selbsttest-Gruppe `snmpv3` ([`src/snmpv3test.rs`](src/snmpv3test.rs)), Byte für Byte
+(RFC 3414 A.3, RFC 3826) in der coretest-Gruppe `sshcore`.
 
 ### Desktop der Hosts
 
@@ -3270,7 +3508,9 @@ Dialog mit seinem Titel.
   Hintergrund-Jobs der Konsole (Jobs eines weiteren Terminals beendet dessen eigenes `kill`); die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
   letzten Minute (`Engine::cpu_secs`, die vier CPUs von `top`) und der Speicher der Skripte (die
   Zeitreihe `heap_kb`) als kleine Diagramme.
-- **IP-Konfiguration** und **Webbrowser** ([`progs.rs`](src/workspace/devwin/progs.rs)),
+- **Webbrowser** ([`browser.rs`](src/workspace/devwin/browser.rs)): Seiten aus dem simulierten
+  Netz, siehe [Webbrowser](#webbrowser).
+- **IP-Konfiguration** ([`progs.rs`](src/workspace/devwin/progs.rs)),
   **E-Mail** ([`email.rs`](src/workspace/devwin/email.rs)), **MIB-Browser**
   ([`mib.rs`](src/workspace/devwin/mib.rs)) wie zuvor, jetzt in Fenstern; der MIB-Browser zeigt
   die Konsole unter dem Baum, solange das Terminal-Fenster nicht über ihm liegt.
@@ -3320,7 +3560,8 @@ Sitzung mit `terminal monitor`.
 - **vty-Leitungen** ([`crates/jfn_sim/telnetd.rs`](crates/jfn_sim/telnetd.rs)): jeder Block
   `line vty A B` gibt die Leitungen A bis B (Vorgabe `vty 0 4`: fünf); eine Verbindung auf TCP 23
   nimmt die niedrigste freie Leitung, deren `transport input` Telnet erlaubt (Vorgabe `all`,
-  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen ab) und deren
+  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen Telnet ab; siehe
+  [SSH](#ssh)) und deren
   `access-class LISTE in` die Quelle zulässt; sonst eine kurze Absage und Schluss. Angemeldet
   wird wie an der Konsole: `password` mit `login`, `login local`, `login authentication LISTE`
   über AAA und RADIUS, ohne `login` gar nicht; drei Fehlversuche schließen die Verbindung.
@@ -3343,7 +3584,7 @@ Entscheidungen: Eine weitere Sitzung eines IOS-artigen Geräts aus der Oberfläc
 Leitung `tty N` mit den Anmelderegeln von `line con 0` (wie ein zweites Terminal am
 Konsolenanschluss); die Nummern der Sitzungen werden nicht wieder vergeben. Weitere Sitzungen
 sprechen immer mit der Gegenwart (beim Zurückspulen antwortet nur die Konsole aus der
-Vergangenheit). Nicht nachgebildet: SSH, `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
+Vergangenheit). Nicht nachgebildet: `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
 von Telnet (unser Client schickt ganze Zeilen).
 
 Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `SesKind`), die
@@ -3351,6 +3592,224 @@ Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `Ses
 Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu das Szenario
 `sessions.scn` und die Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und
 `sessions_shots.uis`.
+
+### Webbrowser
+
+Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 und B2) ist
+ein Programm des Desktops: Er zeigt echte kleine Websites aus dem simulierten Netz mit dem
+`ui.html_view` der Library, nicht mit einer eigenen HTML/CSS-Engine. Ein echtes Internet gibt es
+nicht. Seiten liefern `http-server`-Routen, Dateien des Geräts und Skripte mit `http.serve`, wie
+PHP oder Node. Beispiel: [`tests/fixtures/web_site.jfnet`](tests/fixtures/web_site.jfnet) mit einer
+statischen Website und einem Laden als Skript.
+
+- **Bedienung:** Adresszeile (Eingabe öffnet, Strg+L springt hinein; ohne Schema gilt `http://`),
+  Zurück und Vor (auch Alt+Links, Alt+Rechts), Neu laden (F5; während des Ladens Anhalten, auch
+  Esc). Die Statuszeile nennt beim Laden das Ziel, danach Status, Typ, Größe, Dauer und
+  Weiterleitungen und unter dem Zeiger das Ziel eines Links; der Seitentitel steht im Fenstertitel
+  und in der Taskleiste. Steht die Simulation, sagt die Statuszeile, dass die Antwort mit ihr
+  kommt; im Simulationsmodus gehen die Pakete mit den Schritten.
+- **Inhalte:** `text/html` im Dokument der Library (mit deren CSS-Teilmenge und Formularen),
+  `text/markdown`, `text/plain` und anderer Text als vorformatierter Text, Bilder allein auf einer
+  kleinen Seite, alles andere als Hinweis mit Typ und Größe. Der Titel kommt aus `<title>`, sonst
+  aus der ersten Überschrift, sonst aus dem Dateinamen.
+- **Links und Bilder:** relative Adressen löst [`netpkt::uri`](../../lib/netpkt/uri.rs) nach
+  RFC 3986 auf. Ein Link auf ein Fragment springt innerhalb der Seite (das Element mit der `id`
+  oder `<a name>`, in Markdown die Überschrift mit diesem Kürzel) und ist ein eigener Schritt im
+  Verlauf. Bilder holt der Browser mit eigenen GET-Anfragen (`data:` entschlüsselt er selbst) und
+  merkt sie sich je Fenster, bis Neu laden sie verwirft; die Seite liest keine Datei des echten
+  Rechners (`MI_APP`).
+- **Verlauf:** je Fenster 30 Einträge mit ihrem Dokument: Zurück und Vor zeigen die Seite sofort
+  ohne Anfrage, an derselben Stelle und mit den eingegebenen Feldwerten, auch wenn die Simulation
+  steht. Neu laden fragt den Server wieder. Das Schließen des Fensters verwirft alles.
+- **Formulare (B2):** Senden geht als GET mit der Query oder als POST mit
+  `application/x-www-form-urlencoded` an die `action`, aufgelöst gegen die Seite; die Antwort ist
+  ein neuer Eintrag. Neu laden einer POST-Antwort fragt erst („Erneut senden“), denn die Anfrage
+  kann etwas auslösen (die zweite Bestellung). Ein Skript liest die Felder aus `req.query` und
+  `req.form` (das es nur bei einem Formular-Inhalt gibt, daher `req.form ?? {}`, wo auch anderes
+  ankommt).
+- **Fehlerseiten:** eigene Seiten mit Grund, Adresse und Hinweis: Verbindung abgelehnt,
+  Zeitüberschreitung, Name unbekannt, kein Weg, abgebrochene Verbindung, zu viele Weiterleitungen,
+  4xx und 5xx ohne eigene Seite des Servers (eine HTML-Seite des Servers zeigt der Browser, wie
+  sie ist). `https:` sagt, dass verschlüsselte Seiten mit einer späteren Ausbaustufe kommen (B4).
+
+**Im Simulator** ([`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs)): Das Programm ist ein
+versteckter Dienst „webbrowser“ des Hosts über demselben HTTP-Client wie `curl`, also mit DNS,
+TCP, Trace und Simulationsmodus. `Cmd::Apply(Action::WebFetch { dev, req })` schickt eine Anfrage
+(`WebReq`: id, Methode, URL, Kopfzeilen, Inhalt), `Action::WebCancel { dev, id }` gibt sie auf.
+Die Antwort kommt als `Report::Web { dev, id, at, result }`: `WebResp` (endgültige URL, Status,
+Kopfzeilen, Inhalt, Weiterleitungen, Dauer) oder `WebFail` (`WebErr`, URL, Grund). Weil die
+Anfragen Aktionen sind, spielt das Zurückspulen sie mit. Weiterleitungen (301, 302, 303, 307, 308,
+höchstens 10) folgt der Dienst selbst: 301 und 302 machen aus POST ein GET (wie Browser), 303 aus
+allem außer GET und HEAD, 307 und 308 behalten Methode und Inhalt; jede ist eine Notiz im Trace.
+Eine Anfrage hat 30 s virtuelle Zeit je Sprung. Im Reiter Dienste erscheint der Dienst nicht.
+
+**Dateien als Website:** `http-server` mit `"root": "/var/www"` beantwortet GET und HEAD, die keine
+Route nimmt, aus diesem Ordner des Geräts: `index.html` im Ordner, 301 auf den Ordner mit `/`, der
+Typ aus der Endung (`netpkt::http::mime_of`), andere Methoden 405. Der Pfad bleibt im Ordner (auch
+`%2e%2e`), das Lesen kostet die Zeit der Platte, eine gespeicherte Seite gilt sofort. Ohne `root`
+und ohne Routen antwortet der Server wie bisher mit „Hallo von {host}“.
+
+Entscheidungen: Zurück und Vor zeigen die gemerkte Seite statt neu zu fragen (so geht es auch bei
+stehender Simulation, und das Netz sieht nur, was ein Browser mit Cache auch schickte). Bilder
+kommen über `MI_APP` statt `MI_ASK`, damit relative Pfade einer Seite nicht als Dateien des echten
+Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>`, Seitenskripte und HTTPS
+(B3, B4), Datei-Felder und Mehrfachauswahl in Formularen.
+
+Geprüft wird in der Selbsttest-Gruppe `browser` ([`src/browsertest.rs`](src/browsertest.rs)), dazu
+das Szenario `web_site.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
+`browser_requests.uis` und `browser_shots.uis`.
+### SSH
+
+SSH Version 2 läuft auf den Geräten wie alles andere Byte für Byte: echte Schlüssel, echter
+Schlüsselaustausch, echte Verschlüsselung, im Mitschnitt echte SSH-Pakete. Das Protokoll steht ohne
+I/O in der Library ([`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs)): curve25519-sha256, Host- und
+Benutzerschlüssel ssh-ed25519 und rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr und
+aes256-ctr mit hmac-sha2-256, Anmeldung mit none, password und publickey, Sitzungskanäle mit
+pty-req, shell, exec, Fenstern und exit-status. Geprüft ist es auch gegen den OpenSSH-Client
+(`python tools/ssh_interop.py --core`). Der Kennungstext ist `SSH-2.0-JFNetworker_1`. Ohne
+Schlüssel lauscht niemand; ältere Projekte laufen wie bisher.
+
+- **IOS-artiger Server** ([`sshd.rs`](crates/jfn_sim/sshd.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs)):
+  `ip domain-name NAME` (auch `ip domain name`), `crypto key generate rsa [general-keys] [modulus
+  N]` (1024 bis 4096, ohne: 2048), `crypto key generate ed25519`, `crypto key zeroize [rsa|ed25519]`,
+  `ip ssh version 2`, `ip ssh time-out SEK` (120), `ip ssh authentication-retries N` (3), die
+  `no`-Formen; auf den Leitungen `transport input ssh|telnet|all|none` (ohne: all, wie bei Telnet).
+  Der Server lauscht auf TCP 22, solange ein Host-Schlüssel da ist und eine Leitung SSH nimmt und
+  jemanden anmelden kann. Eine Verbindung ist eine Sitzung wie bei Telnet, auf der niedrigsten
+  freien vty-Leitung; angemeldet wird über dasselbe Gate: `password` mit `login`, `login local`,
+  `login authentication LISTE` über AAA und RADIUS. `access-class` und `exec-timeout` gelten
+  genauso. `show ip ssh`, `show ssh`, `show crypto key mypubkey [rsa|ed25519]`, `show users`
+  (Herkunft mit `(ssh)`), `debug ip ssh`.
+- **IOS-artiger Client:** `ssh [-v 2] [-c CHIFFRE] -l BENUTZER [-p PORT] HOST`; er nimmt jeden
+  Host-Schlüssel, wie die Vorgabe der Geräte.
+- **Linux-Server** (Dienst `sshd`): `{"port": 22, "password": "…", "users": [{"name": "deploy",
+  "password": "…"}], "password_auth": true, "key_auth": true}`. Ohne Passwort kommt root nur mit
+  Schlüssel hinein; `~/.ssh/authorized_keys` (`/root`, sonst `/home/NAME`) nennt die Schlüssel. Seinen
+  Host-Schlüssel legt er beim ersten Start in `/etc/ssh/ssh_host_ed25519_key(.pub)` an, als Datei des
+  Geräts (ein Rückgängig-Schritt wie jede geschriebene Datei); ohne die Datei gibt der nächste Start
+  einen neuen. Die Sitzung ist eine Shell auf `pts/N`; `who`, `w`, `tty` und `ps` zeigen sie, ein
+  weiterer Benutzer hat seinen Namen, sein Heimatverzeichnis und den Prompt `NAME@HOST:~$ `.
+- **Linux-Client:** `ssh [-p PORT] [-l BENUTZER] [-i DATEI] [-c CHIFFRE] [-o OPTION=WERT] [-q]
+  [BENUTZER@]HOST [BEFEHL …]`. Das erste Mal fragt er in eigenen Worten, ob er den Host-Schlüssel
+  merken soll (`~/.ssh/known_hosts` im Format von OpenSSH, `[host]:port` bei anderem Port); ein
+  geänderter Schlüssel wird abgelehnt, ohne Frage. `-o StrictHostKeyChecking=yes|no|accept-new|ask`,
+  `-o BatchMode=yes`, `-o UserKnownHostsFile=DATEI`. Er meldet sich mit `~/.ssh/id_ed25519` oder
+  `~/.ssh/id_rsa` an, wenn es sie gibt, sonst mit einem Passwort (verdeckt getippt, drei Versuche).
+  Sein Status ist der der Gegenseite (`exit N`, der Befehl), 255 bei einem Fehler. Strg+C wirkt auf
+  der Gegenseite, die Zeile `~.` beendet die Verbindung.
+- **`ssh-keygen`:** `[-t ed25519|rsa] [-b BITS] [-f DATEI] [-N ""] [-C KOMMENTAR] [-q]`, `-l -f DATEI`,
+  `-y -f DATEI`, `-R HOST`; die Dateien haben das Format von OpenSSH (ohne Passwort).
+- **`scp`:** `[-P PORT] [-i DATEI] [-q] [-o OPTION=WERT] QUELLE ZIEL`, eine Seite `[BENUTZER@]HOST:PFAD`:
+  eine Datei hin oder her über das alte rcp-Protokoll (`scp -t`, `scp -f`), das der Linux-Server selbst
+  spricht.
+- **Paket-Tab:** Kennungstext, Paketlänge, Padding und Name der Nachricht, solange die Verbindung
+  im Klaren läuft (die Listen eines KEXINIT, die Werte des Austauschs), danach „verschlüsselt“.
+  Die Kategorie bleibt TCP/HTTP. **Notizen:** `Note::Ssh(SshNote)` für alles, was Server und Client
+  entscheiden; die Probleme-Liste bleibt dafür offen.
+
+Entscheidungen: Eine Verbindung ohne Anmeldung belegt die vty-Leitung schon, wie beim Vorbild. Eine
+Leitung ohne `login` lässt jeden hinein, eine mit `login` und Leitungspasswort nimmt das Passwort bei
+jedem Benutzernamen. Ein Schlüssel ist eine Datei in `nvram:` (`dir nvram:` zeigt ihn), keine Zeile der
+Running-Config: er bleibt über einen Neustart und liegt im Projekt; eine Zeile `crypto key generate`
+in einer Startkonfiguration erzeugt nur, solange keiner da ist, und meldet beim Start nichts ans
+Projekt (derselbe Seed ergibt denselben Schlüssel). Ein neuer Schlüssel ersetzt den alten ohne
+Frage. Der Schlüssel braucht einen eigenen Gerätenamen und `ip domain-name`, wie in den klassischen
+Übungen. Unser Client schickt ganze Zeilen und zeigt, was kommt (wie bei Telnet): Terminalsteuerung
+wird nicht ausgewertet, eine Zeile, die auf „assword: “ endet, verdeckt die nächste Eingabe. Virtuelle
+CPU-Zeit kostet der Schlüsselaustausch nicht. Zufall kommt aus dem Strom des Geräts: 32 Bytes je
+Verbindung als Seed des Kerns, daraus Schlüssel, Nonces und Padding.
+
+Nicht nachgebildet: Port-Weiterleitung, Agent, Kompression, Schlüsseldateien mit Passwort, DSA und
+ECDSA, `ip ssh pubkey-chain` (IOS-artig nur Passwörter), die strikte Schlüsselaushandlung von OpenSSH,
+Host-Schlüssel je Adresse.
+
+Für Programme: `SshServer`, `SshCfg`, `SshNote`, `Conn::ssh`, `SesInfo::account`; in der Library
+`netpkt::ssh` (`Core`, `Event`, `KeyPair`, `Cipher`, `dissect`) und `crypto::rsa::PrivateKey`. Geprüft wird
+in der Selbsttest-Gruppe `ssh` ([`src/sshtest.rs`](src/sshtest.rs)) und der coretest-Gruppe `sshcore`,
+dazu das Szenario `ssh_snmpv3.scn` und die Fensterskripte `ssh_session.uis`, `snmpv3_mib.uis` und
+`ssh_shots.uis`.
+### 802.1X und WPA-Enterprise
+
+Ein Port eines IOS-artigen Switches kann die Anmeldung verlangen, bevor er Daten durchlässt, und
+ein Access Point kann sein Netz über denselben Weg schützen (IEEE 802.1X-2004, RFC 3748, 3579,
+5931). Auch hier fließen echte Bytes: EAPOL auf dem Kabel oder der Funkstrecke, EAP in RADIUS,
+echte Prüfsummen und Schlüssel; der Paket-Tab zeigt alles Feld für Feld, der Simulationsmodus hat
+für EAPOL die Kategorie „802.1X“ in einem gedämpften Rostrot.
+
+- **Am Switch** ([`dot1x.rs`](crates/jfn_sim/dot1x.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs)):
+  `aaa new-model`, `aaa authentication dot1x default group radius` (auch `group NAME`, `local`),
+  `dot1x system-auth-control`, am Port `authentication port-control
+  auto|force-authorized|force-unauthorized`, `dot1x pae authenticator`, `dot1x timeout
+  tx-period|quiet-period|reauth-period|supp-timeout N`, `dot1x max-req N`, `authentication
+  periodic`, `authentication timer reauthenticate N`. Ein Port unter `auto` ist geschlossen, bis der
+  Server zustimmt: nur EAPOL kommt durch, nichts wird gelernt, seine LED leuchtet gelb und das
+  Kabel heißt „nicht autorisiert“. Ablauf: EAP-Request/Identity an die Gruppenadresse, sobald der
+  Link steht, dann alle `tx-period`; die Antworten des Supplicants gehen in Access-Requests mit
+  State und Message-Authenticator zum Server, jede Access-Challenge kommt als nächste Anfrage
+  zurück (wiederholt nach `supp-timeout`, bis `max-req`). Nach Access-Accept ist der Port offen
+  (`show dot1x`, `show authentication sessions` in eigenem Aufbau, `debug dot1x`, `%DOT1X-…` auf
+  der Konsole), mit `authentication periodic` wird nach `reauth-period` oder dem Session-Timeout des
+  Servers neu gefragt, der Port bleibt dabei offen. Nach Access-Reject bleibt er für `quiet-period`
+  zu. `dot1x re-authenticate interface IF` und `clear authentication sessions` fragen sofort neu.
+- **VLAN vom Server:** Tunnel-Type, Tunnel-Medium-Type und Tunnel-Private-Group-ID (RFC 3580) legen
+  den Port für die Dauer der Sitzung in dieses VLAN, seine Einstellung bleibt; ein VLAN, das der
+  Switch nicht kennt, lässt den Port zu.
+- **RADIUS-Server** ([`radiusd.rs`](crates/jfn_sim/radiusd.rs)): antwortet EAP mit seinen Benutzern,
+  `eap_methods` (ohne Angabe MD5, dann PWD), `eap_id`, je Benutzer `vlan` und `session_timeout`:
+
+  ```json
+  {"kind": "radius-server", "name": "radius", "config": {"clients": [{"address": "10.0.0.0/24",
+   "secret": "testing123"}], "users": [{"name": "anna", "password": "geheim", "vlan": 20}]}}
+  ```
+- **Methoden** ([`lib/eapm`](../../lib/eapm/lib.rs), [`crypto::eappwd`](../../lib/crypto/eappwd.rs)):
+  EAP-MD5 für Kabelports, ohne Schlüssel; EAP-PWD (RFC 5931 auf P-256 mit SHA-256): nur ein
+  Passwort, keine Zertifikate, und es ergibt MSK und EMSK. Bei NAS-Port-Type Wireless-802.11 bietet
+  der Server nur Methoden mit Schlüsseln an.
+- **Supplicant** ([`supp.rs`](crates/jfn_sim/supp.rs)): `/etc/wpa_supplicant/wpa_supplicant.conf` mit
+  `network={ … }`-Blöcken (`key_mgmt=IEEE8021X` am Kabel, `key_mgmt=WPA-EAP` und `ssid` im WLAN,
+  `eap=MD5|PWD`, `identity`, `password`). Die Datei ist ein Schritt des Projekts; wie beim echten
+  Programm zählt eine Änderung erst beim Start oder nach `wpa_cli reconfigure`, Rückgängig beendet
+  also keine laufende Anmeldung. Liegt die Datei auf dem Gerät, läuft er von selbst;
+  `wpa_supplicant [-B] -i IF -c DATEI`, `wpa_cli status|list_networks|reconfigure|logon|logoff|
+  reauthenticate`. Antwortet niemand auf drei EAPOL-Start (alle 30 s), läuft der Port ohne 802.1X;
+  nach einer Ablehnung wartet er 60 s. Nach dem Erfolg startet ein DHCP-Client des Ports ohne Lease
+  sofort. Im Desktop schreibt das Feld „Anmeldung am Netz (802.1X)“ der **IP-Konfiguration** diese
+  Datei (Methode, Identität, Passwort, am Kabel und fürs WLAN) und zeigt den Zustand. Alle
+  Endgeräte haben die Shell und damit den Supplicant; das IP-Telefon hat nur Brückenports und
+  meldet sich nicht an.
+- **WPA-Enterprise** ([`wlan.rs`](crates/jfn_sim/wlan.rs)): Sicherheit `wpa2-enterprise` (AKM 1) und
+  `wpa3-enterprise` (AKM 5, mit AES-128-CMAC und KDF-SHA256, auch auf 6 GHz); ein Netz nennt
+  `radius`, `radius_key`, `radius_port`, im Inspektor RADIUS-Server und Schlüssel. Eine Station hat
+  `identity` und `eap` neben der Passphrase als Passwort, oder einen Block der Datei. Nach der
+  Assoziation läuft EAP über die Funkstrecke (die Anfrage kommt nach 3 s wieder), der Access Point
+  fragt seinen Server über sein BVI; das MSK kommt in MS-MPPE-Recv-Key und -Send-Key (RFC 2548) zu
+  ihm und aus der Methode zur Station, die ersten 32 Bytes sind das PMK, und der echte 4-Wege-Handshake
+  folgt. Eine Ablehnung oder ein Erfolg ohne Schlüssel beendet die Zuordnung (Grund 23) und zählt
+  wie eine falsche Passphrase. Beim Roaming läuft EAP neu, es gibt kein PMK-Caching.
+- **Probleme:** `Dot1xNoServer` (auto ohne Methodenliste oder Server: der Port bleibt zu, Fehler),
+  `Dot1xOff` (auto ohne `dot1x system-auth-control`: der Port bleibt offen, Warnung).
+
+Entscheidungen: PEAP-MSCHAPv2 und EAP-TLS gibt es nicht: TLS liegt in `lib/netio` und nennt `plat`
+(ein Kern ohne I/O wäre ein Umbau der Library), MSCHAPv2 bräuchte auch MD4 und DES. EAP-PWD ist die
+schlüsselerzeugende Methode, weil es ohne Zertifikate auskommt. Beide Rollen sind verborgene Dienste
+(`dot1x-auth`, `wpa_supplicant`) mit Dienst-Timern, es gibt keinen festen Timer-Slot. Eine
+Port-Zeile `authentication port-control auto` genügt, `dot1x pae authenticator` steht nur auf
+Wunsch in der Konfiguration, `no dot1x pae authenticator` schaltet den Port aus. „local“ in der
+Methodenliste heißt: der Switch prüft EAP-MD5 selbst gegen `username NAME password …` (ein Hash
+kann keine Challenge beantworten); ohne Server und ohne „local“ bleibt der Port zu. Ein Port ist
+„multi-host“: wer dahinter hängt, kommt mit durch.
+
+Noch offen: Host-Modi (single-host, multi-domain für IP-Telefone), MAB, Guest- und Auth-Fail-VLAN,
+Accounting für 802.1X, TLS-Methoden, PMK-Caching und 802.11r.
+
+Für Programme: `Action::Supplicant { dev, conf }`, `Engine::dot1x_sessions(dev)`,
+`dot1x_port_closed(dev, port)`, `supp_views(dev)`, `supp_conf(dev)`, `wlan_creds(dev, ssid)`,
+`Led::Unauth`, `Note::Dot1x(DNote)`, `jfn_sim::supp` (`NetBlock`, `parse_conf`, `conf_text`),
+`netpkt::eap`, `netpkt::eapol::{start, logoff, eap_pdu, PAE_GROUP}`, `netpkt::radius` (`push_eap`,
+`push_vlan`, `push_msk`, `mppe_seal`, …), `crypto::p256` (die Gruppe), `eapm::{Peer, Server}`. Geprüft
+wird in der Selbsttest-Gruppe `dot1x` ([`src/dot1xtest.rs`](src/dot1xtest.rs)), in der coretest-Gruppe
+`eap` (Codecs und die Vektoren einer unabhängigen Python-Referenz von EAP-PWD), mit
+`scen_dot1x_imap.uis` und den Fensterskripten `dot1x_panel.uis` und `dot1x_shots.uis`.
 
 ## Performance
 
@@ -3419,9 +3878,9 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6) |
-| 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
-| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
+| 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
+| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

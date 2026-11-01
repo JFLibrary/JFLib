@@ -1,0 +1,52 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ssh_snmpv3.jfnet
+# shots of SSH and SNMPv3 (X1f): ADMIN's console logged in to R1 over SSH with show users and show
+# ip ssh, the MIB-Browser with a user of SNMPv3 in ADMIN's desktop; light and dark at 100 and 150 %.
+# Ids: ADMIN's console 25088 (input 25089); the window 26624; the MIB-Browser 69632.
+size 1280 900
+theme light
+wait 600
+drag 630,671 630,380 8
+dblclick listitem:"ADMIN"
+expect #25089 focused
+type "ssh -o StrictHostKeyChecking=accept-new admin@10.0.0.1\n"
+wait 600
+type "adminpw\n"
+wait 600
+type "show users\n"
+wait 600
+type "show ip ssh\n"
+wait 600
+expect text:"SSH server: on, version 2.0" exists
+shot build/jfnetworker/ssh_light.png
+theme dark
+shot build/jfnetworker/ssh_dark.png
+scale 150
+shot build/jfnetworker/ssh_dark_150.png
+theme light
+shot build/jfnetworker/ssh_light_150.png
+scale 100
+dblclick listitem:"ADMIN" shift
+expect window 26624 open
+dblclick listitem:"MIB-Browser"
+click #69633
+type "10.0.0.3"
+click #69635
+key down
+key enter
+wait 100
+click listitem:"sysName"
+click #69644
+type "monitor"
+click #69647
+type "monitorauth"
+click #69648
+type "monitorpriv"
+wait 100
+shot build/jfnetworker/snmpv3_light.png window 26624
+theme dark
+shot build/jfnetworker/snmpv3_dark.png window 26624
+scale 150
+shot build/jfnetworker/snmpv3_dark_150.png window 26624
+theme light
+shot build/jfnetworker/snmpv3_light_150.png window 26624
+expect_nowarn

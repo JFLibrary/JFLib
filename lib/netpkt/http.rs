@@ -25,6 +25,7 @@
 //                        while it is incomplete; start_kind(bytes) tells a request from a
 //                        response from anything else
 //   reason(status), http_date(unix seconds) ("Tue, 20 Oct 2026 12:00:00 GMT")
+//   mime_of(path)        the Content-Type a web server gives a file by its extension
 //
 // Limits: a head of at most 16 KiB (start line and header lines with their line ends) and 100
 // header lines (431), a request target of at most 8 KiB (414), chunk-size lines of at most 1024
@@ -831,4 +832,29 @@ pub fn http_date(unix: i64) -> String {
     let (y, mo, d, h, mi, s) = crate::ntp::civil(unix);
     let wd = DAYS[unix.div_euclid(86_400).rem_euclid(7) as usize];
     format!("{}, {:02} {} {:04} {:02}:{:02}:{:02} GMT", wd, d, MONTHS[(mo as usize).clamp(1, 12) - 1], y, h, mi, s)
+}
+
+/// the Content-Type of a file by its extension, in any case (text in UTF-8); what it does not
+/// know is application/octet-stream
+pub fn mime_of(path: &str) -> &'static str {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    let ext = name.rsplit_once('.').map_or("", |x| x.1).to_ascii_lowercase();
+    match ext.as_str() {
+        "html" | "htm" => "text/html; charset=utf-8",
+        "md" | "markdown" => "text/markdown; charset=utf-8",
+        "txt" | "log" | "conf" | "cfg" | "jfs" | "csv" => "text/plain; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "js" => "text/javascript; charset=utf-8",
+        "json" => "application/json",
+        "xml" => "application/xml",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        "webp" => "image/webp",
+        "ico" => "image/x-icon",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    }
 }

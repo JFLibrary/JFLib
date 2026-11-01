@@ -64,6 +64,7 @@ pub(crate) mod progs;
 pub(crate) mod editor;
 pub(crate) mod filemgr;
 pub(crate) mod sysmon;
+pub(crate) mod browser;
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -175,6 +176,17 @@ impl DevWins {
     /// device window k (for the tabs' modules)
     pub(crate) fn get(&mut self, k: usize) -> Option<&mut DevWin> {
         self.wins.get_mut(k).and_then(|w| w.as_mut())
+    }
+
+    /// the desktop of a device, whether its window is open or not (Report::Web finds its
+    /// browser here)
+    pub(crate) fn desk_of(&mut self, dev: u32) -> Option<&mut desktop::Desk> {
+        // (an open window first: a closed one may still hold an older desktop of the device)
+        let open = self.wins.iter().position(|w| w.as_ref().is_some_and(|w| w.dev == dev && w.open.get() != 0));
+        match open.or_else(|| self.wins.iter().position(|w| w.as_ref().is_some_and(|w| w.dev == dev))) {
+            Some(k) => self.wins[k].as_mut().map(|w| &mut w.desk),
+            None => self.kept.get_mut(&dev),
+        }
     }
 
     /// device window k to look at

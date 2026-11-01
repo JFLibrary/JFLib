@@ -75,15 +75,17 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [script](#script) -- the JFNetworker scripting language (.jfs): lexer, parser, editor diagnostics, compiler, a VM with fuel and a garbage collector, the standard library (str, list, map, bytes, math, json), float arithmetic and math in software
   <br>[lib.rs](#script-crate-root) · [ast.rs](#scriptastrs) · [check.rs](#scriptcheckrs) · [lex.rs](#scriptlexrs) · [parse.rs](#scriptparsers) · [code.rs](#scriptcoders) · [heap.rs](#scriptheaprs) · [num.rs](#scriptnumrs) · [math.rs](#scriptmathrs) · [vm.rs](#scriptvmrs) · [ls.rs](#scriptlsrs) · [fmt.rs](#scriptfmtrs) · [module.rs](#scriptmodulers) · [debug.rs](#scriptdebugrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
-  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs)
+  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
 - [compress](#compress) -- LZ4 block and frame, xxHash32, codec ids
   <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
-- [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs)
+- [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, EAP and IMAP without I/O, URI references, a dissector, pcapng
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs)
+- [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
+  <br>[lib.rs](#eapm-crate-root)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -32098,6 +32100,8 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
+  rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
+  eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
 
 No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
@@ -32590,6 +32594,19 @@ p256 -- Diffie-Hellman on NIST P-256 (SEC 1, RFC 8446 4.2.8.2) in constant time
                                            None for a point that is not on the curve
   secret_from(random) -> Option<[u8; 32]>  a scalar in [1, n - 1] from 32 random bytes
 
+The curve as a group, for protocols that compute on points themselves (EAP-PWD: eappwd.rs):
+points are x || y (64 bytes, both big endian), scalars 32 bytes big endian
+
+  below_p(x)                               x is a coordinate: smaller than p
+  y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
+                                           point; variable time, only for public or hashed x)
+  on_curve(point)                          both coordinates in range and the curve equation
+  mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
+  add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
+  neg_point(point)                         -point
+  scalar_add(a, b)                         a + b mod n
+  scalar_ok(k)                             k lies in [1, n - 1]
+
 Field elements in Montgomery form with four 64-bit limbs; multiplication, addition and
 subtraction without branches on the values (masked final corrections).  Points in projective
 coordinates with the complete addition formulas of Renes, Costello and Batina (2016,
@@ -32605,6 +32622,31 @@ multiplication by four-bit windows with a table read in full for every window.
 
 - **`fn shared(secret: &[u8; 32], peer: &[u8]) -> Option<[u8; 32]>`**
   the shared secret (x coordinate) with a peer's public point
+
+- **`fn below_p(x: &[u8; 32]) -> bool`**
+  x is smaller than p
+
+- **`fn y_for_x(x: &[u8; 32], odd: bool) -> Option<[u8; 32]>`**
+  the y of the point with this x and whose lowest bit is `odd`; None when x is out of range or
+  x^3 - 3x + b has no square root (p = 3 mod 4: the root is a^((p + 1) / 4))
+
+- **`fn on_curve(p: &[u8; 64]) -> bool`**
+  both coordinates are in range and the point is on the curve
+
+- **`fn mul_point(k: &[u8; 32], p: &[u8; 64]) -> Option<[u8; 64]>`**
+  k \* point (k below n)
+
+- **`fn add_points(a: &[u8; 64], b: &[u8; 64]) -> Option<[u8; 64]>`**
+  a + b
+
+- **`fn neg_point(p: &[u8; 64]) -> [u8; 64]`**
+  -point (y becomes p - y)
+
+- **`fn scalar_add(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32]`**
+  a + b mod n (both below n)
+
+- **`fn scalar_ok(k: &[u8; 32]) -> bool`**
+  k lies in [1, n - 1]
 
 ### `crypto/poly1305.rs`
 
@@ -32633,13 +32675,21 @@ poly1305 -- the Poly1305 one-time authenticator (RFC 8439), 44/44/42-bit limbs
 Source: [`lib/crypto/rsa.rs`](../lib/crypto/rsa.rs)
 
 ```text
-rsa -- RSA signature verification (RFC 8017): PKCS #1 v1.5 and PSS with MGF1
+rsa -- RSA signatures (RFC 8017): PKCS #1 v1.5 and PSS verification with MGF1, PKCS #1 v1.5
+signing, key generation
 
   PublicKey::new(n, e)                      big-endian modulus (1024..8192 bits) and exponent
   key.verify_pkcs1(hash, digest, sig)       the encoding is rebuilt and compared whole
   key.verify_pss(hash, digest, sig, salt)   salt length given, or None: any
+  PrivateKey::generate(bits, rand)          exponent 65537, two primes of bits / 2 from the
+                                            caller's random bytes (the same bytes give the
+                                            same key)
+  PrivateKey::from_parts(n, e, d, p, q)     big-endian numbers, checked against each other
+  key.sign_pkcs1(hash, digest)              RSASSA-PKCS1-v1_5; the exponent in constant time
+  key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
 
-Public operations only (variable time is fine).
+Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
+variable time and meant for simulators and tests, where the random bytes are no secret either.
 ```
 
 - **`struct PublicKey`**
@@ -32655,6 +32705,33 @@ Public operations only (variable time is fine).
 
 - **`fn mgf1(hash: HashAlg, seed: &[u8], len: usize) -> Vec<u8>`**
   MGF1 (RFC 8017 B.2.1)
+
+- **`struct PrivateKey`**
+  an RSA private key
+
+**`impl PrivateKey`**
+
+- **`fn generate(bits: usize, rand: &mut dyn FnMut(&mut [u8])) -> Option<PrivateKey>`**
+  a new key of `bits` bits (1024 to 8192, a multiple of 16): exponent 65537, primes made
+  from `rand`
+- **`fn from_parts(n: &[u8], e: &[u8], d: &[u8], p: &[u8], q: &[u8]) -> Option<PrivateKey>`**
+  a key from its numbers (big-endian); None when p q is not n, or d does not undo e for a
+  test value
+- **`fn bits(&self) -> usize`**
+  the modulus's bits
+- **`fn n(&self) -> Vec<u8>`**
+  the modulus, big-endian
+- **`fn e(&self) -> &[u8]`**
+- **`fn d(&self) -> &[u8]`**
+- **`fn p(&self) -> &[u8]`**
+- **`fn q(&self) -> &[u8]`**
+- **`fn iqmp(&self) -> Vec<u8>`**
+  q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+- **`fn public(&self) -> Option<PublicKey>`**
+  the public half
+- **`fn sign_pkcs1(&self, hash: HashAlg, digest: &[u8]) -> Option<Vec<u8>>`**
+  RSASSA-PKCS1-v1_5 of a digest: k bytes (None: the digest has the wrong length or the
+  modulus is too short for it)
 
 ### `crypto/sealbox.rs`
 
@@ -32837,6 +32914,66 @@ Message-Authenticator of RFC 3579); it is broken for collisions, so new designs 
 
 - **`fn md5_parts(parts: &[&[u8]]) -> [u8; 16]`**
   MD5 of the concatenation of `parts`
+
+### `crypto/eappwd.rs`
+
+Source: [`lib/crypto/eappwd.rs`](../lib/crypto/eappwd.rs)
+
+```text
+eappwd -- the sums of EAP-PWD (RFC 5931) on group 19 (P-256) with HMAC-SHA-256 as the random
+function and the PRF: a password-only EAP method that needs no certificates and derives an
+MSK and an EMSK.  Nothing of its packets here (netpkt::eap) and no state (eapm)
+
+  GROUP, RAND_FUNC, PRF                       the ciphersuite this knows; ciphersuite() its bytes
+  kdf(key, label, n)                          n bytes of the KDF of RFC 5931 2.5
+  pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3)
+  commit(pwe, rand, mask)                     (Scalar, Element) of one side, from its two random
+                                              scalars (2.8.5.1); None to draw again
+  shared(pwe, rand, peer_scalar, peer_element)   ss, the x coordinate of k (2.8.5.2); None for
+                                              what a peer must not send
+  confirm(ss, element_a, scalar_a, element_b, scalar_b)   H(ss | own | other's | ciphersuite)
+                                              (2.8.5.3)
+  keys(ss, confirm_p, confirm_s, scalar_p, scalar_s)   (MSK, EMSK) (2.9)
+
+H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  This looks for PWE the plain way, which
+shows by its time how many rounds a password needs; RFC 8146 and later hostapd run a fixed
+number of them.  The simulator has no such observer.
+```
+
+```rust
+/// the group's number in IANA's registry: P-256
+GROUP: u16 = 19
+/// the random function: HMAC-SHA-256
+RAND_FUNC: u8 = 1
+/// the PRF: HMAC-SHA-256
+PRF: u8 = 1
+```
+
+- **`fn ciphersuite() -> [u8; 4]`**
+  group | random function | PRF
+
+- **`fn kdf(key: &[u8], label: &[u8], n: usize) -> Vec<u8>`**
+  K(i) = HMAC(key, K(i-1) | i | label | L) with i and L (in bits) as 16-bit numbers, as many of
+  them as `n` bytes take
+
+- **`fn pwe(token: &[u8; 4], peer_id: &[u8], server_id: &[u8], password: &[u8]) -> [u8; 64]`**
+  the password element: a point both sides find from the password and their names; the counter
+  starts at 1, the lowest bit of pwd-seed picks y
+
+- **`fn commit(pwe: &[u8; 64], rand: &[u8; 32], mask: &[u8; 32]) -> Option<([u8; 32], [u8; 64])>`**
+  Scalar = rand + mask mod n, Element = -(mask \* PWE); None when a random value is no scalar or
+  Scalar comes to 0 or 1
+
+- **`fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]>`**
+  the x coordinate of k = rand \* (peer_scalar \* PWE + peer_element); None for a scalar out of
+  range, an element off the curve, or k at the identity
+
+- **`fn confirm(ss: &[u8; 32], element_a: &[u8; 64], scalar_a: &[u8; 32], element_b: &[u8; 64], scalar_b: &[u8; 32]) -> [u8; 32]`**
+  Confirm of a side: H(ss | its element | its scalar | the other's element | scalar | ciphersuite)
+
+- **`fn keys(ss: &[u8; 32], confirm_p: &[u8; 32], confirm_s: &[u8; 32], scalar_p: &[u8; 32], scalar_s: &[u8; 32]) -> ([u8; 64], [u8; 64])`**
+  MK = H(ss | Confirm_P | Confirm_S), stretched with the session id (the type byte 52 and
+  H(ciphersuite | Scalar_P | Scalar_S)) to 128 bytes: the MSK, then the EMSK
 
 ## compress
 
@@ -34233,7 +34370,7 @@ KU_CRL_SIGN: u8 = 0x02
 
 ## netpkt
 
-*network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
+*network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, EAP and IMAP without I/O, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
 
 ```text
 netpkt -- network packets byte for byte: addresses, checksums, header codecs, a dissector
@@ -34312,6 +34449,22 @@ on every target (simulators, packet tools, tests).
             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
             User-Password, Request / Response Authenticators, the Message-Authenticator; the
             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
+  uri       Uri: references with scheme, authority, path, query and fragment, resolving a
+            relative one against a base, remove_dot_segments, percent encoding, the form
+            encoding of HTML                                                 (RFC 3986)
+  snmpv3    SNMPv3 messages (V3, Usm, ScopedPdu), the USM: Level, AuthProto (HMAC-MD5-96, HMAC-SHA-96,
+            the SHA-2 tags of RFC 7860), password_to_key, localize, sign, check, AES-128-CFB, engine
+            IDs, report PDUs; uses crate crypto                    (RFC 3411-3414, 3826, 7860)
+  ssh       SSH-2 without I/O: Core for a client or a server (push bytes, take_out bytes,
+            take_events): identification, binary packets, KEXINIT, curve25519-sha256, ssh-ed25519
+            and rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr and aes256-ctr with
+            hmac-sha2-256, logins (none, password, publickey), session channels with windows;
+            KeyPair, OpenSSH key files, dissect; uses crate crypto  (RFC 4250-4254, 8731, 8332, 8709)
+  eap       Packet: EAP Request, Response, Success and Failure with Identity, Notification and
+            Nak, the data of EAP-MD5 (Md5Data, md5_value) and of EAP-PWD (Pwd, PwdId), info
+            for one line about a packet                            (RFC 3748, 1994, 5931)
+  imap      Line and LineReader (tags, literals), Command, Response, Item, SeqSet, FetchItem,
+            SearchKey, envelope, internal_date, the parts of a message  (RFC 9051, 3501)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -34655,6 +34808,13 @@ every option), DNS (header, questions and records, also over TCP), NTP and syslo
 dissectors; the payload of the others shows as one field.
 BPDUs of STP and RSTP (LLC SAP 0x42) show every field and flag (stp.rs).
 Field names and values follow the usual capture-tool wording (English protocol terms).
+SNMPv3 (RFC 3412, 3414) shows msgID, msgMaxSize, msgFlags with their names, the security model,
+the engine ID, boots and time, the user, the authentication and privacy parameters, and the scoped
+PDU as in 2c, or the field "Encrypted scopedPDU" with the value "verschlüsselt" (snmpv3.rs).
+SSH (TCP port 22) shows the identification line and, while the connection is in the clear, each
+packet with its length, padding and message name, the lists of a KEXINIT and the values of the
+key exchange; everything after NEWKEYS is one field with the value "verschlüsselt" (a German
+word on purpose: it is what the inspector's reader needs to see, no protocol term) (ssh.rs).
 HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 shows the start line, the header lines and the body bytes of every message the segment
 holds; a segment in the middle of a message is a "Continuation".
@@ -34698,6 +34858,12 @@ Vendor-Specific attribute's vendor, a hidden User-Password as hidden), with what
 discards: a Length that does not fit, attributes that do not end at it (radius.rs).  Telnet
 (TCP port 23) shows each command and negotiation ("Will Echo", "Interrupt Process") and the
 data as text; a command cut off at the end of a segment is a problem (telnet.rs).
+EAP in an EAPOL frame is a layer of its own: code, identifier, length, type and the data of
+Identity, Nak, EAP-MD5 and EAP-PWD field by field (eap.rs); as an EAP-Message of RADIUS one
+line with the same words.
+IMAP (TCP port 143) shows each line: a command with its tag, verb and arguments, a response with
+its tag or "*", status, response code and text; the bytes of a literal as a line of data. It
+shares the bit P_MAIL (imap.rs).
 ```
 
 ```rust
@@ -34776,6 +34942,8 @@ P_TELNET: u32 = 1 << 29
   - `Pop3` -- POP3 (port 110)
   - `Radius` -- RADIUS authentication and accounting
   - `Telnet` -- Telnet (port 23)
+  - `Eap` -- EAP inside EAPOL
+  - `Imap` -- IMAP (port 143)
 
 **`impl Proto`**
 
@@ -36197,6 +36365,7 @@ and chunks (RFC 9110, 9112), with the wire rules of lib/netio/http.rs
                        while it is incomplete; start_kind(bytes) tells a request from a
                        response from anything else
   reason(status), http_date(unix seconds) ("Tue, 20 Oct 2026 12:00:00 GMT")
+  mime_of(path)        the Content-Type a web server gives a file by its extension
 
 Limits: a head of at most 16 KiB (start line and header lines with their line ends) and 100
 header lines (431), a request target of at most 8 KiB (414), chunk-size lines of at most 1024
@@ -36379,6 +36548,10 @@ LAST_CHUNK: &[u8] = b"0\r\n\r\n"
 
 - **`fn http_date(unix: i64) -> String`**
   the date of a Date header (IMF-fixdate) for seconds since 1970
+
+- **`fn mime_of(path: &str) -> &'static str`**
+  the Content-Type of a file by its extension, in any case (text in UTF-8); what it does not
+  know is application/octet-stream
 
 ### `netpkt/stp.rs`
 
@@ -37428,6 +37601,10 @@ descriptor version) and wraps the key data (the AES key wrap of RFC 3394)
                                  data (with the padding of 12.7.2 j: 0xdd 0x00 ...)
   pad_key_data(data)             the padding for the key wrap (a multiple of 8, at least 16)
   KI_* (Key Information), AKM_* and CIPHER_CCMP (the suites of 00-0F-AC)
+  pdu(version, kind, body)       any other EAPOL PDU; start(version), logoff(version) and
+                                 eap_pdu(version, eap) are the ones of port access control
+  PAE_GROUP                      the group address of the port access entities (802.1X-2004
+                                 7.8): bridges never forward it
 
 The fields are big endian; the key replay counter is a 64-bit number.  Lengths are checked
 once by parse; a body shorter than the 95 fixed bytes is no Key.
@@ -37471,6 +37648,11 @@ CIPHER_CCMP: u8 = 4
 AKM_PSK: u8 = 2
 AKM_PSK_SHA256: u8 = 6
 AKM_SAE: u8 = 8
+/// AKM suites of 802.1X: WPA2-Enterprise and, with SHA-256, WPA3-Enterprise
+AKM_8021X: u8 = 1
+AKM_8021X_SHA256: u8 = 5
+/// the group address EAPOL goes to on a wired port (802.1X-2004 7.8)
+PAE_GROUP: [u8; 6] = [0x01, 0x80, 0xC2, 0x00, 0x00, 0x03]
 /// RSN capabilities: management frame protection capable / required
 RSN_MFPR: u16 = 0x0040
 RSN_MFPC: u16 = 0x0080
@@ -37496,6 +37678,18 @@ KDE_IGTK: u8 = 9
 - **`fn body(&self) -> &'a [u8]`**
 - **`fn pdu(&self) -> &'a [u8]`**
   header and body without what follows (Ethernet padding)
+
+- **`fn pdu(version: u8, kind: u8, body: &[u8]) -> Vec<u8>`**
+  an EAPOL PDU: the header with `version` and `kind`, the body
+
+- **`fn start(version: u8) -> Vec<u8>`**
+  EAPOL-Start
+
+- **`fn logoff(version: u8) -> Vec<u8>`**
+  EAPOL-Logoff
+
+- **`fn eap_pdu(version: u8, eap: &[u8]) -> Vec<u8>`**
+  an EAP packet in an EAPOL PDU
 
 - **`fn kind_name(t: u8) -> &'static str`**
   the name of a packet type ("EAPOL-Key")
@@ -38876,7 +39070,7 @@ community, the PDUs GetRequest, GetNextRequest, GetBulkRequest, SetRequest, Resp
 Trap of version 1, SNMPv2-Trap, InformRequest and Report with their variable bindings; the
 error statuses and their mapping to version 1 (RFC 3584); the objects every notification names
 
-  Version                 V1 (0) | V2c (1); other numbers (SNMPv3's 3) are no message here
+  Version                 V1 (0) | V2c (1); other numbers are no message here (SNMPv3: snmpv3.rs)
   Kind                    Get | GetNext | Response | Set | TrapV1 | GetBulk | Inform | TrapV2 |
                           Report: tag() (0xA0 ..), of_tag(), name(), in_v1()
   VarBind { oid, value }  VarBind::null(oid): a name to ask for
@@ -39423,6 +39617,15 @@ crypto::md5_parts and crypto::hmac_md5 are
                                   counted as zero, `auth` in the authenticator field: the
                                   packet's own for a request, the request's for an answer);
                                   set_message_auth / check_message_auth (None: there is none)
+  Packet::push_eap(eap) / eap()   an EAP packet in EAP-Message attributes of 253 bytes and back
+                                  (RFC 3579 3.1); a packet with one needs a Message-Authenticator
+  Packet::push_vlan(vlan) / vlan()   VLAN assignment: Tunnel-Type VLAN, Tunnel-Medium-Type 802,
+                                  Tunnel-Private-Group-ID (RFC 2868, 3580 3.31)
+  mppe_seal(key, secret, auth, salt, md5) / mppe_open(value, secret, auth, md5)   the keys of
+                                  MS-MPPE-Send-Key and -Recv-Key (RFC 2548 2.4.2): salted and
+                                  hidden with the shared secret and the Request Authenticator
+  Packet::push_msk(msk, secret, auth, salts, md5) / msk(secret, auth, md5)   an EAP method's MSK
+                                  in both of them (Recv first: RFC 3079, hostapd's order)
 
 RFC 2865 3: a packet is 20 to 4096 bytes; octets beyond its Length field are padding, a
 packet shorter than its Length is discarded, and so is one whose attributes do not end
@@ -39529,6 +39732,17 @@ A_LOGIN_LAT_PORT: u8 = 63
 // RFC 3579
 A_EAP_MESSAGE: u8 = 79
 A_MESSAGE_AUTHENTICATOR: u8 = 80
+// RFC 2868: tunnels, which also assign VLANs (RFC 3580 3.31)
+A_TUNNEL_TYPE: u8 = 64
+A_TUNNEL_MEDIUM_TYPE: u8 = 65
+A_TUNNEL_PRIVATE_GROUP_ID: u8 = 81
+/// Tunnel-Type VLAN, Tunnel-Medium-Type IEEE-802
+TUNNEL_VLAN: u32 = 13
+TUNNEL_MEDIUM_802: u32 = 6
+/// the vendor of MS-MPPE-Send-Key and MS-MPPE-Recv-Key (RFC 2548)
+VENDOR_MICROSOFT: u32 = 311
+MS_MPPE_SEND_KEY: u8 = 16
+MS_MPPE_RECV_KEY: u8 = 17
 /// Service-Type (RFC 2865 5.6)
 SERVICE_LOGIN: u32 = 1
 SERVICE_FRAMED: u32 = 2
@@ -39542,6 +39756,7 @@ SERVICE_AUTHENTICATE_ONLY: u32 = 8
 PORT_TYPE_ASYNC: u32 = 0
 PORT_TYPE_VIRTUAL: u32 = 5
 PORT_TYPE_ETHERNET: u32 = 15
+PORT_TYPE_WIRELESS: u32 = 19
 /// Acct-Status-Type (RFC 2866 5.1)
 ACCT_START: u32 = 1
 ACCT_STOP: u32 = 2
@@ -39691,8 +39906,1186 @@ TERM_NAS_REBOOT: u32 = 11
 - **`fn check_message_auth(b: &[u8], auth: Option<&[u8; 16]>, secret: &[u8], hmac: HmacMd5Fn) -> Option<bool>`**
   the Message-Authenticator of a packet fits the secret (None: the packet has none)
 
+**`impl Packet`**
+
+- **`fn push_eap(&mut self, eap: &[u8]) -> &mut Packet`**
+  an EAP packet in EAP-Message attributes (RFC 3579 3.1: pieces of at most 253 bytes)
+- **`fn eap(&self) -> Option<Vec<u8>>`**
+  the EAP packet of the EAP-Message attributes; None without one
+- **`fn push_vlan(&mut self, vlan: u16) -> &mut Packet`**
+  the attributes of a VLAN assignment (tag 0: no tunnel group)
+- **`fn vlan(&self) -> Option<u16>`**
+  the VLAN these attributes assign: all three are there, Tunnel-Type VLAN, the medium 802,
+  a number (a tag byte before the number is skipped); a name of a VLAN is no number here
+- **`fn push_msk(&mut self, msk: &[u8; 64], secret: &[u8], auth: &[u8; 16], salts: [u16; 2], md5: Md5Fn) -> &mut Packet`**
+  an MSK of 64 bytes as MS-MPPE-Recv-Key (its first half) and MS-MPPE-Send-Key
+- **`fn msk(&self, secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Option<[u8; 64]>`**
+  the MSK out of both MS-MPPE attributes (None: one is missing or does not open)
+
+- **`fn mppe_seal(key: &[u8], secret: &[u8], auth: &[u8; 16], salt: u16, md5: Md5Fn) -> Vec<u8>`**
+  the value of an MS-MPPE key attribute (RFC 2548 2.4.2): the salt (its high bit set), then a
+  length byte, the key and padding, each 16 bytes XORed with MD5(secret + the previous block; the
+  Request Authenticator and the salt first)
+
+- **`fn mppe_open(value: &[u8], secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Option<Vec<u8>>`**
+  the key of an MS-MPPE key attribute; None when its length byte does not fit
+
 - **`fn value_text(t: u8, v: &[u8]) -> String`**
   the value of an attribute as a dissector shows it (a hidden password stays hidden)
+
+### `netpkt/uri.rs`
+
+Source: [`lib/netpkt/uri.rs`](../lib/netpkt/uri.rs)
+
+```text
+uri -- URI references as RFC 3986 reads them: the generic parts of an address and the
+resolution of a relative reference, percent encoding, HTML's form encoding.  No scheme's own
+rules (http's default port, say) and no I/O; netio::url is the socket side's absolute URL
+(that crate needs plat), jfn_sim::http::Url the simulator's.
+
+  Uri::parse(s)                  every text is a reference (RFC 3986 appendix B): scheme (lower
+                                 case; only when it has the syntax of one), authority, path,
+                                 query, fragment, all as written
+  u.host() / port() / userinfo() the parts of the authority (an IPv6 address without its
+                                 brackets)
+  base.resolve(&r) / base.join(s)   the target of a reference against a base (5.2.2, strict)
+  remove_dot_segments(path)      "." and ".." out of a path (5.2.4)
+  u.text()                       the reference written again (5.3)
+  u.target()                     path and query as a request line wants them ("/" for no path)
+  u.encoded()                    the same reference with what a URI cannot hold as %XX (spaces,
+                                 umlauts, a lone %); what is escaped already stays
+  percent_encode(bytes, keep) / percent_decode(s) / percent_text(s)   %XX; keep: the bytes that
+                                 stay besides the unreserved ones; percent_decode leaves a bad
+                                 escape as it is, percent_text is UTF-8 with U+FFFD
+  form_encode(pairs) / form_decode(text)   application/x-www-form-urlencoded (HTML, WHATWG URL):
+                                 a space is "+", only * - . _ and alphanumerics stay
+```
+
+- **`struct Uri`**
+  a URI reference (see the module header)
+  - `scheme: Option<String>`
+  - `authority: Option<String>` -- what follows "//": [userinfo@]host[:port]
+  - `path: String`
+  - `query: Option<String>`
+  - `fragment: Option<String>`
+
+**`impl Uri`**
+
+- **`fn parse(s: &str) -> Uri`**
+  a reference: never fails, a text without any of the delimiters is a relative path
+- **`fn userinfo(&self) -> Option<&str>`**
+  the user information of the authority
+- **`fn host(&self) -> Option<&str>`**
+  the host as written (an IPv6 address without its brackets; "" when the authority has none)
+- **`fn port(&self) -> Option<u16>`**
+  the port (None: not given, or no number up to 65535)
+- **`fn resolve(&self, r: &Uri) -> Uri`**
+  the target of reference `r` against this base (RFC 3986 5.2.2, strict: a scheme equal to
+  the base's still makes the reference absolute)
+- **`fn join(&self, r: &str) -> Uri`**
+  resolve() of a reference given as text
+- **`fn text(&self) -> String`**
+  the reference written again (5.3)
+- **`fn target(&self) -> String`**
+  the path and query of a request line ("/" for an empty path, no fragment)
+- **`fn encoded(&self) -> Uri`**
+  the reference with every character a URI cannot hold as %XX: the path's, the query's and
+  the fragment's; what is escaped already stays, a % without two hex digits becomes %25
+
+- **`fn remove_dot_segments(path: &str) -> String`**
+  "." and ".." out of a path (RFC 3986 5.2.4); ".." never climbs above the root
+
+- **`fn percent_encode(b: &[u8], keep: &[u8]) -> String`**
+  %XX for every byte but the unreserved ones (RFC 3986 2.3) and those of `keep`
+
+- **`fn percent_decode(s: &str) -> Vec<u8>`**
+  the bytes behind %XX; an escape without two hex digits stays as it is
+
+- **`fn percent_text(s: &str) -> String`**
+  percent_decode as text: UTF-8, what is none becomes U+FFFD
+
+- **`fn form_encode(pairs: &[(String, String)]) -> String`**
+  name / value pairs as a form sends them (application/x-www-form-urlencoded)
+
+- **`fn form_decode(text: &str) -> Vec<(String, String)>`**
+  the name / value pairs of a query or a form's body, decoded in their order ("+" is a space)
+
+### `netpkt/ssh.rs`
+
+Source: [`lib/netpkt/ssh.rs`](../lib/netpkt/ssh.rs)
+
+```text
+ssh -- SSH version 2 without I/O (RFC 4250 to 4254, RFC 8731, RFC 8332, RFC 8709): the codec and
+a core for both sides of a connection: feed it the bytes that came, take the bytes to send and
+the events; no sockets, no clock.  Random bytes come from a seed the caller passes in, so a
+connection is the same byte for byte for the same seed
+
+  PORT                     22
+  MSG_*, msg_name(code)    the message numbers and their names
+  DISC_*, reason_name(c)   the reason codes of SSH_MSG_DISCONNECT
+  W, R                     writing and reading the wire types (byte, boolean, uint32, string,
+                           mpint, name-list)
+  KeyPair                  Ed25519 or RSA: generate from the caller's random bytes, blob(),
+                           key_type() ("ssh-ed25519", "ssh-rsa"), alg() ("ssh-ed25519",
+                           "rsa-sha2-256"), sign(data), bits(), public_line(comment),
+                           private_file(comment) and parse_private(text) (OpenSSH's unencrypted
+                           "OPENSSH PRIVATE KEY" format)
+  verify(alg, blob, data, sig), fingerprint(blob) ("SHA256:..."), blob_type(blob), blob_bits(blob),
+  parse_public(line) -> PublicLine { key_type, blob, comment }  (authorized_keys, known_hosts)
+  KexInit                  parse / to_payload; negotiate(client, server) -> Algos
+  exchange_hash(...), derive_key(k, h, letter, session_id, len)   RFC 4253 7.2, RFC 5656 4
+  Cipher                   one direction's protection: make(name, key, iv, mac), key_len(name),
+                           padding(n), seal(seq, payload, pad), open(seq, rx, head)
+  Config                   ident ("SSH-2.0-..."), ciphers, host key algorithms, the methods a
+                           failed login names
+  Core::client(cfg, seed) / Core::server(cfg, keys, seed)
+    push(bytes)            what the connection brought; take_out() the bytes to send;
+    take_events()          what happened (Event); dead(): nothing more will come or go
+    host_key_verdict(ok)   the client's answer to Event::HostKey (the exchange waits for it)
+    auth_none / auth_password / auth_key(user, ..)   the client's logins (after Event::AuthReady)
+    auth_accept / auth_reject / auth_pk_ok(alg, blob) / banner(text)   the server's answers to
+                           Event::AuthRequest (they may come later: a RADIUS server may be asked)
+    open_session() -> id, accept_channel(id) / refuse_channel(id, reason, text),
+    request(id, Request, want_reply), reply(id, ok), send(id, bytes), send_ext(id, 1, bytes),
+    eof(id), close(id)     channels, with windows both ways (what the window does not take waits)
+    rekey()                a new key exchange, as either side may start one
+    disconnect(reason, text)
+    algos() / session_id() / peer_ident() / authenticated() / encrypted() / footprint()
+  Event                    PeerIdent, Algos, HostKey, Encrypted, AuthReady, Banner, AuthSuccess,
+                           AuthFailure, AuthRequest, ChannelOpen, ChannelOpened, ChannelRefused,
+                           ChannelRequest, ChannelReply, Data, Eof, Closed, Debug, Unimplemented,
+                           Rekeyed, Disconnected, Failed
+  Part, dissect(segment)   what a dissector sees in a TCP segment: the identification line,
+                           packets in the clear with their fields, or bytes that are no packet
+                           in the clear (encrypted, or the rest of one)
+
+Algorithms: curve25519-sha256 (also under the name @libssh.org), host and user keys ssh-ed25519
+and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
+and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
+ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
+the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
+OpenSSH's strict key exchange (ignored when offered).
+
+The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
+channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
+ends in Event::Failed.  netio::ssh is the other SSH of the library, a blocking client on real
+sockets.
+```
+
+```rust
+/// the well-known port
+PORT: u16 = 22
+MSG_DISCONNECT: u8 = 1
+MSG_IGNORE: u8 = 2
+MSG_UNIMPLEMENTED: u8 = 3
+MSG_DEBUG: u8 = 4
+MSG_SERVICE_REQUEST: u8 = 5
+MSG_SERVICE_ACCEPT: u8 = 6
+MSG_EXT_INFO: u8 = 7
+MSG_KEXINIT: u8 = 20
+MSG_NEWKEYS: u8 = 21
+MSG_KEX_ECDH_INIT: u8 = 30
+MSG_KEX_ECDH_REPLY: u8 = 31
+MSG_USERAUTH_REQUEST: u8 = 50
+MSG_USERAUTH_FAILURE: u8 = 51
+MSG_USERAUTH_SUCCESS: u8 = 52
+MSG_USERAUTH_BANNER: u8 = 53
+MSG_USERAUTH_PK_OK: u8 = 60
+MSG_GLOBAL_REQUEST: u8 = 80
+MSG_REQUEST_SUCCESS: u8 = 81
+MSG_REQUEST_FAILURE: u8 = 82
+MSG_CHANNEL_OPEN: u8 = 90
+MSG_CHANNEL_OPEN_CONFIRMATION: u8 = 91
+MSG_CHANNEL_OPEN_FAILURE: u8 = 92
+MSG_CHANNEL_WINDOW_ADJUST: u8 = 93
+MSG_CHANNEL_DATA: u8 = 94
+MSG_CHANNEL_EXTENDED_DATA: u8 = 95
+MSG_CHANNEL_EOF: u8 = 96
+MSG_CHANNEL_CLOSE: u8 = 97
+MSG_CHANNEL_REQUEST: u8 = 98
+MSG_CHANNEL_SUCCESS: u8 = 99
+MSG_CHANNEL_FAILURE: u8 = 100
+```
+
+- **`fn msg_name(code: u8) -> &'static str`**
+  the name of a message number (RFC 4250 4.1)
+
+```rust
+DISC_HOST_NOT_ALLOWED: u32 = 1
+DISC_PROTOCOL_ERROR: u32 = 2
+DISC_KEY_EXCHANGE_FAILED: u32 = 3
+DISC_MAC_ERROR: u32 = 5
+DISC_SERVICE_NOT_AVAILABLE: u32 = 7
+DISC_VERSION_NOT_SUPPORTED: u32 = 8
+DISC_HOST_KEY_NOT_VERIFIABLE: u32 = 9
+DISC_CONNECTION_LOST: u32 = 10
+DISC_BY_APPLICATION: u32 = 11
+DISC_TOO_MANY_CONNECTIONS: u32 = 12
+DISC_AUTH_CANCELLED: u32 = 13
+DISC_NO_MORE_AUTH_METHODS: u32 = 14
+```
+
+- **`fn reason_name(c: u32) -> &'static str`**
+  the name of a disconnect reason (RFC 4250 4.2.2)
+
+- **`struct W(pub Vec<u8>)`**
+  a message under construction
+
+**`impl W`**
+
+- **`fn msg(t: u8) -> W`**
+- **`fn u8(mut self, v: u8) -> W`**
+- **`fn u32(mut self, v: u32) -> W`**
+- **`fn bool(self, v: bool) -> W`**
+- **`fn bytes(mut self, v: &[u8]) -> W`**
+- **`fn str(self, v: &str) -> W`**
+- **`fn mpint(self, v: &[u8]) -> W`**
+  an unsigned big-endian number as mpint (no leading zeros but the one a set top bit asks for)
+- **`fn raw(mut self, v: &[u8]) -> W`**
+
+- **`struct R<'a>`**
+  reading a message
+
+**`impl<'a> R<'a>`**
+
+- **`fn new(b: &'a [u8]) -> R<'a>`**
+- **`fn u8(&mut self) -> Option<u8>`**
+- **`fn u32(&mut self) -> Option<u32>`**
+- **`fn bool(&mut self) -> Option<bool>`**
+- **`fn bytes(&mut self) -> Option<&'a [u8]>`**
+- **`fn str(&mut self) -> Option<&'a str>`**
+- **`fn names(&mut self) -> Option<Vec<String>>`**
+  a name-list
+- **`fn skip(&mut self, n: usize) -> Option<&'a [u8]>`**
+- **`fn rest(&self) -> &'a [u8]`**
+- **`fn pos(&self) -> usize`**
+  how many bytes were read
+
+- **`enum KeyPair`**
+  a key pair of a host or a user
+  - `Ed25519(ed25519::Keypair)`
+  - `Rsa(Box<rsa::PrivateKey>)`
+
+**`impl KeyPair`**
+
+- **`fn ed25519(seed: &[u8; 32]) -> KeyPair`**
+  a new Ed25519 key from 32 random bytes
+- **`fn rsa(bits: usize, rand: &mut dyn FnMut(&mut [u8])) -> Option<KeyPair>`**
+  a new RSA key of `bits` bits (see rsa::PrivateKey::generate)
+- **`fn key_type(&self) -> &'static str`**
+  the type of the key in blobs and files
+- **`fn alg(&self) -> &'static str`**
+  the algorithm it signs with
+- **`fn blob(&self) -> Vec<u8>`**
+  the public key as the protocol carries it
+- **`fn bits(&self) -> u32`**
+- **`fn sign(&self, data: &[u8]) -> Vec<u8>`**
+  a signature as the protocol carries it
+- **`fn public_line(&self, comment: &str) -> String`**
+  "ssh-ed25519 AAAA... comment"
+- **`fn private_file(&self, comment: &str) -> String`**
+  the key file in OpenSSH's format, unencrypted
+- **`fn parse_private(text: &str) -> Option<(KeyPair, String)>`**
+  a key from a file in OpenSSH's format, unencrypted -> the key and its comment
+
+- **`fn fingerprint(blob: &[u8]) -> String`**
+  "SHA256:&lt;base64 without padding>" of a public key blob
+
+- **`fn blob_type(blob: &[u8]) -> &str`**
+  the first string of a public key blob ("ssh-ed25519", "ssh-rsa")
+
+- **`fn blob_bits(blob: &[u8]) -> u32`**
+  the bits of a public key blob
+
+- **`fn public_line(key_type: &str, blob: &[u8], comment: &str) -> String`**
+  a public key line: "TYPE BASE64 [COMMENT]"
+
+- **`struct PublicLine`**
+  a line of a public key file, authorized_keys or (after the host names) known_hosts
+  - `key_type: String`
+  - `blob: Vec<u8>`
+  - `comment: String`
+
+- **`fn parse_public(line: &str) -> Option<PublicLine>`**
+  reads "TYPE BASE64 [COMMENT]"
+
+- **`fn verify(alg: &str, blob: &[u8], data: &[u8], sig: &[u8]) -> bool`**
+  a signature blob over `data` is good for the public key blob, by the algorithm `alg`
+
+- **`struct KexInit`**
+  what a side offers in SSH_MSG_KEXINIT
+  - `cookie: [u8; 16]`
+  - `kex: Vec<String>`
+  - `host_key: Vec<String>`
+  - `enc_cs: Vec<String>`
+  - `enc_sc: Vec<String>`
+  - `mac_cs: Vec<String>`
+  - `mac_sc: Vec<String>`
+  - `comp_cs: Vec<String>`
+  - `comp_sc: Vec<String>`
+  - `lang_cs: Vec<String>`
+  - `lang_sc: Vec<String>`
+  - `follows: bool`
+
+**`impl KexInit`**
+
+- **`fn parse(p: &[u8]) -> Option<KexInit>`**
+  reads the message (with its number)
+- **`fn to_payload(&self) -> Vec<u8>`**
+  the message
+
+- **`struct Algos`**
+  what two KEXINITs agree on
+  - `kex: String`
+  - `host_key: String`
+  - `enc_cs: String`
+  - `enc_sc: String`
+  - `mac_cs: String` -- "" where the cipher authenticates by itself
+  - `mac_sc: String`
+  - `comp_cs: String`
+  - `comp_sc: String`
+
+- **`fn negotiate(c: &KexInit, s: &KexInit) -> Option<Algos>`**
+  RFC 4253 7.1: the client's preference decides -> None when a list has nothing in common
+
+- **`fn exchange_hash(v_c: &str, v_s: &str, i_c: &[u8], i_s: &[u8], k_s: &[u8], q_c: &[u8], q_s: &[u8], k: &[u8]) -> [u8; 32]`**
+  the exchange hash of curve25519-sha256 (RFC 8731, RFC 5656 4): `k` the shared secret as a
+  big-endian number
+
+- **`fn derive_key(k: &[u8], h: &[u8], letter: u8, sid: &[u8], len: usize) -> Vec<u8>`**
+  HASH(K || H || letter || session_id), extended as RFC 4253 7.2 says to `len` bytes
+
+- **`enum Cipher`**
+  the protection of one direction of a connection: nothing before the first NEWKEYS, then a
+  cipher with its keys
+  - `None`
+  - `ChaCha { main: [u8; 32], header: [u8; 32] }` -- chacha20-poly1305@openssh.com: the packet's key and the length's key
+  - `AesCtr { aes: Box<Aes>, ctr: [u8; 16], mac: [u8; 32] }` -- aes128-ctr or aes256-ctr with hmac-sha2-256
+
+**`impl Cipher`**
+
+- **`fn make(enc: &str, key: &[u8], iv: &[u8], mac: &[u8]) -> Cipher`**
+  from a cipher's name and the keys derive_key gave (key_len(enc), 16 and 32 bytes)
+- **`fn padding(&self, payload: usize) -> usize`**
+  how many padding bytes a payload takes (RFC 4253 6: at least 4, whole blocks)
+- **`fn seal(&mut self, seq: u32, payload: &[u8], pad: &[u8]) -> Vec<u8>`**
+  one binary packet: `pad` the padding bytes (self.padding(payload.len()) of them)
+- **`fn open(&mut self, seq: u32, rx: &mut Vec<u8>, head: &mut Option<[u8; 16]>) -> Result<Option<Vec<u8>>, (u32, &'static str)>`**
+  the next packet of `rx`: its payload when it is here whole and good (the bytes go), None
+  when more must come; Err: a reason code and a text.  `head` keeps a first block
+  decrypted already (AES-CTR) between two calls
+
+- **`fn key_len(enc: &str) -> usize`**
+  the length of the key of a cipher
+
+- **`enum AuthMethod`**
+  how a login attempt came
+  - `None` -- "none": a client asks which methods there are
+  - `Password(String)`
+  - `PublicKey { alg: String, blob: Vec<u8>, signed: bool, valid: bool }` -- "publickey": `signed` false is a question (auth_pk_ok answers it); else `valid` says the
+    signature is good for this key
+
+- **`enum Request`**
+  a channel request
+  - `Pty { term: String, cols: u32, rows: u32 }`
+  - `Shell`
+  - `Exec(String)`
+  - `Env { name: String, value: String }`
+  - `WindowChange { cols: u32, rows: u32 }`
+  - `ExitStatus(u32)`
+  - `ExitSignal(String)`
+  - `Other(String)` -- any other request by its name
+
+- **`enum Event`**
+  what happened on a connection
+  - `PeerIdent(String)` -- the peer's identification line came
+  - `Algos(Algos)` -- the algorithms are agreed
+  - `HostKey { alg: String, blob: Vec<u8> }` -- client: the server's key signed the exchange; host_key_verdict goes on (or does not)
+  - `Encrypted` -- new keys are in force both ways
+  - `AuthReady` -- client: the service ssh-userauth is there, a login may start
+  - `Banner(String)` -- client: a text from the server to show before the login
+  - `AuthSuccess` -- client: logged in
+  - `AuthFailure { methods: Vec<String>, partial: bool }` -- client: that failed; the methods that can go on
+  - `AuthRequest { user: String, method: AuthMethod }` -- server: a login attempt; auth_accept, auth_reject or (for a question) auth_pk_ok answer
+  - `ChannelOpen { channel: u32, kind: String }` -- a peer asks for a channel: accept_channel or refuse_channel
+  - `ChannelOpened { channel: u32 }` -- the peer took the channel of open_session
+  - `ChannelRefused { channel: u32, reason: u32, text: String }`
+  - `ChannelRequest { channel: u32, request: Request, want_reply: bool }`
+  - `ChannelReply { channel: u32, ok: bool }` -- the answer to a request with want_reply
+  - `Data { channel: u32, ext: Option<u32>, data: Vec<u8> }` -- data on a channel (ext: Some(1) is stderr)
+  - `Eof { channel: u32 }`
+  - `Closed { channel: u32 }` -- both sides closed the channel
+  - `Debug(String)` -- SSH_MSG_DEBUG with display set
+  - `Unimplemented(u32)` -- the peer does not know our packet of that number
+  - `Rekeyed` -- a later key exchange is done (the keys changed, the session goes on)
+  - `Disconnected { reason: u32, text: String }` -- the peer ended the connection
+  - `Failed { reason: u32, text: String }` -- the peer broke the protocol, the MAC was wrong or no algorithms are common: we told it so
+
+- **`enum Role`**
+  what a connection is about
+  - `Client`
+  - `Server`
+
+- **`struct Config`**
+  the settings of a connection
+  - `ident: String` -- the identification line without its line end ("SSH-2.0-...")
+  - `ciphers: Vec<String>` -- in order of preference
+  - `host_key_algs: Vec<String>` -- client: the host key algorithms it takes
+  - `methods: String` -- server: what a failed login names ("publickey,password")
+
+- **`struct Core`**
+  one side of an SSH connection
+
+**`impl Core`**
+
+- **`fn client(cfg: Config, seed: &[u8; 32]) -> Core`**
+  a client: what it sends starts with its identification line
+- **`fn server(cfg: Config, keys: Vec<KeyPair>, seed: &[u8; 32]) -> Core`**
+  a server with its host keys
+- **`fn take_out(&mut self) -> Vec<u8>`**
+  the bytes to send
+- **`fn take_events(&mut self) -> Vec<Event>`**
+  what happened since the last call
+- **`fn dead(&self) -> bool`**
+  nothing more will come or go (after the last take_out)
+- **`fn encrypted(&self) -> bool`**
+  keys are in force both ways
+- **`fn authenticated(&self) -> bool`**
+  a login succeeded
+- **`fn algos(&self) -> &Algos`**
+  the algorithms of the last exchange
+- **`fn session_id(&self) -> &[u8]`**
+  the session's identifier: H of the first exchange
+- **`fn peer_ident(&self) -> &str`**
+  the peer's identification line
+- **`fn footprint(&self) -> usize`**
+  the bytes it holds (a simulator's memory budget)
+- **`fn disconnect(&mut self, reason: u32, text: &str)`**
+  ends the connection from our side
+- **`fn push(&mut self, bytes: &[u8])`**
+  what the connection brought
+- **`fn rekey(&mut self)`**
+  starts a new key exchange (either side may)
+- **`fn host_key_verdict(&mut self, ok: bool)`**
+  the client's answer to Event::HostKey: the exchange goes on, or the connection ends
+- **`fn auth_accept(&mut self)`**
+  server: the login is good: channels may open
+- **`fn auth_reject(&mut self)`**
+  server: the login failed; the client may try another
+- **`fn auth_pk_ok(&mut self, alg: &str, blob: &[u8])`**
+  server: the answer to a question about a key: it would be taken
+- **`fn banner(&mut self, text: &str)`**
+  server: a text for the client before a login
+- **`fn set_methods(&mut self, methods: &str)`**
+  server: the methods a failed login names from now on
+- **`fn auth_none(&mut self, user: &str)`**
+  client: a login without credentials (it asks which methods there are)
+- **`fn auth_password(&mut self, user: &str, password: &str)`**
+  client: a login with a password
+- **`fn auth_key(&mut self, user: &str, key: &KeyPair)`**
+  client: a login with a key: first the question, the signature when the server would
+  take it
+- **`fn open_session(&mut self) -> u32`**
+  client: asks for a session channel -> its id (Event::ChannelOpened or ChannelRefused)
+- **`fn accept_channel(&mut self, id: u32)`**
+  takes a channel the peer asked for
+- **`fn refuse_channel(&mut self, id: u32, reason: u32, text: &str)`**
+  refuses a channel the peer asked for (reason 1: administratively prohibited, 3: unknown
+  channel type)
+- **`fn request(&mut self, id: u32, req: &Request, want_reply: bool)`**
+  sends a channel request
+- **`fn reply(&mut self, id: u32, ok: bool)`**
+  answers a request with want_reply
+- **`fn send(&mut self, id: u32, data: &[u8])`**
+  data on a channel (what its window does not take waits)
+- **`fn send_ext(&mut self, id: u32, code: u32, data: &[u8])`**
+  stderr data on a channel; it goes when nothing waits
+- **`fn eof(&mut self, id: u32)`**
+  no more data from us on this channel
+- **`fn close(&mut self, id: u32)`**
+  closes the channel when what waits went out
+- **`fn channel_open(&self, id: u32) -> bool`**
+  the channel is still there
+- **`fn channel_pending(&self, id: u32) -> usize`**
+  bytes that wait for a channel's window
+
+- **`enum Part`**
+  what is in a TCP segment of an SSH connection
+  - `Ident { at: usize, len: usize, line: String }` -- an identification line (without its line end)
+  - `Packet { at: usize, len: usize, packet_length: u32, padding: u8, code: u8 }` -- a packet in the clear; `len` its bytes here (fewer than 4 + packet_length when it goes on
+    in the next segment)
+  - `Opaque { at: usize, len: usize }` -- bytes that are no packet in the clear: encrypted, or the rest of a packet
+
+- **`fn dissect(b: &[u8]) -> Vec<Part>`**
+  a segment's parts.  A packet in the clear has a length that fits, a padding of at least 4
+  and a known message number; what does not look like one is opaque (an encrypted length
+  looks like one only by rare chance)
+
+### `netpkt/snmpv3.rs`
+
+Source: [`lib/netpkt/snmpv3.rs`](../lib/netpkt/snmpv3.rs)
+
+```text
+snmpv3 -- SNMPv3 messages with the User-based Security Model (RFC 3412, RFC 3414), AES-128 for
+privacy (RFC 3826), HMAC-SHA-2 for authentication (RFC 7860) and engine IDs (RFC 3411 5); the PDUs
+are those of netpkt::snmp
+
+  F_AUTH, F_PRIV, F_REPORTABLE     the bits of msgFlags; MODEL_USM (3)
+  Level                            NoAuthNoPriv | AuthNoPriv | AuthPriv: parse, word(), flags(),
+                                   of_flags(flags) (None: privacy without authentication)
+  AuthProto                        Md5 | Sha1 | Sha256 | Sha384 | Sha512: parse ("MD5", "SHA",
+                                   "SHA-256" ...), name(), tag_len() (12, 12, 24, 32, 48)
+  PrivProto                        Aes128: parse ("AES", "AES128"), name()
+  password_to_key(auth, password)  RFC 3414 A.2: a megabyte of the repeated password hashed
+  localize(auth, ku, engine_id)    the key of one engine (RFC 3414 A.2.2), hash length
+  priv_key(kul)                    the first 16 bytes (RFC 3826 3.1.2.1)
+  tag(auth, key, msg)              the truncated HMAC
+  Usm { engine_id, boots, time, user, auth, privacy }   msgSecurityParameters
+  ScopedPdu { context_engine, context_name, pdu }
+  Scoped                           Plain(ScopedPdu) | Encrypted(bytes)
+  V3 { id, max_size, flags, model, usm, scoped }: parse(b), to_bytes(), level(), reportable()
+  sign(bytes, auth, key)           puts the tag into a message written with zeros in msgAuthParameters;
+  check(bytes, auth, key)          compares it (false also when it is no message or has
+                                   another length)
+  encrypt(key, boots, time, salt, plain) / decrypt(...) AES-128-CFB with the IV of RFC 3826 3.1.2.1
+  open(enc) -> ScopedPdu           the plain bytes as a scoped PDU
+  engine_id_mac(mac)               format 3 (MAC) under the enterprise number 32473 for
+                                   documentation (RFC 5612), parse_engine_id(hex) (5 to 32 bytes),
+                                   engine_id_text(bytes) (hex)
+  USM_STATS_* , UNKNOWN_CONTEXTS   the counters of report PDUs; report_name(oid)
+
+DES (the other privacy protocol of RFC 3414) has no place in crypto and is not here.
+```
+
+```rust
+F_AUTH: u8 = 1
+F_PRIV: u8 = 2
+F_REPORTABLE: u8 = 4
+/// the User-based Security Model
+MODEL_USM: i64 = 3
+/// the message size we say we take
+MAX_SIZE: i64 = 65507
+```
+
+- **`enum Level`**
+  a security level
+  - `NoAuthNoPriv`
+  - `AuthNoPriv`
+  - `AuthPriv`
+
+**`impl Level`**
+
+- **`fn parse(s: &str) -> Option<Level>`**
+  "noAuthNoPriv", "authNoPriv", "authPriv" (also shorter: as net-snmp's tools take them)
+- **`fn word(self) -> &'static str`**
+- **`fn flags(self) -> u8`**
+  its bits of msgFlags
+- **`fn of_flags(f: u8) -> Option<Level>`**
+  the level of msgFlags (None: privacy without authentication, which RFC 3412 7.2 refuses)
+
+- **`enum AuthProto`**
+  an authentication protocol
+  - `Md5`
+  - `Sha1`
+  - `Sha256`
+  - `Sha384`
+  - `Sha512`
+
+**`impl AuthProto`**
+
+- **`fn parse(s: &str) -> Option<AuthProto>`**
+- **`fn name(self) -> &'static str`**
+- **`fn tag_len(self) -> usize`**
+  the bytes of msgAuthenticationParameters
+
+- **`enum PrivProto`**
+  a privacy protocol
+  - `Aes128`
+
+**`impl PrivProto`**
+
+- **`fn parse(s: &str) -> Option<PrivProto>`**
+- **`fn name(self) -> &'static str`**
+
+- **`fn password_to_key(auth: AuthProto, password: &[u8]) -> Vec<u8>`**
+  RFC 3414 A.2: a password as a key for any engine (an empty password gives no key)
+
+- **`fn localize(auth: AuthProto, ku: &[u8], engine_id: &[u8]) -> Vec<u8>`**
+  RFC 3414 A.2.2: the key of one engine
+
+- **`fn priv_key(kul: &[u8]) -> Vec<u8>`**
+  the privacy key of RFC 3826 3.1.2.1
+
+- **`fn tag(auth: AuthProto, key: &[u8], msg: &[u8]) -> Vec<u8>`**
+  the truncated HMAC of a whole message
+
+- **`struct Usm`**
+  msgSecurityParameters of the USM
+  - `engine_id: Vec<u8>`
+  - `boots: i32`
+  - `time: i32`
+  - `user: Vec<u8>`
+  - `auth: Vec<u8>` -- msgAuthenticationParameters
+  - `privacy: Vec<u8>` -- msgPrivacyParameters: the salt
+
+- **`struct ScopedPdu`**
+  a PDU with its context
+  - `context_engine: Vec<u8>`
+  - `context_name: Vec<u8>`
+  - `pdu: Pdu`
+
+- **`enum Scoped`**
+  the scoped PDU of a message
+  - `Plain(ScopedPdu)`
+  - `Encrypted(Vec<u8>)`
+
+- **`struct V3`**
+  an SNMPv3 message
+  - `id: i32`
+  - `max_size: i32`
+  - `flags: u8`
+  - `model: i32`
+  - `usm: Usm`
+  - `scoped: Scoped`
+
+**`impl ScopedPdu`**
+
+- **`fn to_bytes(&self) -> Vec<u8>`**
+- **`fn parse(b: &[u8]) -> Result<ScopedPdu, Bad>`**
+  plain bytes as a scoped PDU
+
+**`impl V3`**
+
+- **`fn parse(b: &[u8]) -> Result<V3, Bad>`**
+  bytes as a message (Bad::Version: another version)
+- **`fn to_bytes(&self) -> Vec<u8>`**
+- **`fn level(&self) -> Option<Level>`**
+  the security level of its flags
+- **`fn reportable(&self) -> bool`**
+- **`fn plain(&self) -> Option<&ScopedPdu>`**
+  the plain scoped PDU, if it is plain
+
+- **`fn sign(bytes: &mut [u8], auth: AuthProto, key: &[u8]) -> bool`**
+  puts the tag into a message written with zeros in msgAuthenticationParameters
+
+- **`fn check(bytes: &[u8], auth: AuthProto, key: &[u8]) -> bool`**
+  the tag of a message is right
+
+- **`fn encrypt(key: &[u8], boots: i32, time: i32, salt: &[u8], plain: &[u8]) -> Option<Vec<u8>>`**
+  AES-128-CFB of RFC 3826 (None: a key or salt of another length)
+
+- **`fn decrypt(key: &[u8], boots: i32, time: i32, salt: &[u8], cipher: &[u8]) -> Option<Vec<u8>>`**
+  the other way
+
+- **`fn engine_id_mac(mac: Mac) -> Vec<u8>`**
+  format 3 (a MAC address) under the enterprise number for documentation (RFC 5612), so no
+  real vendor is named
+
+- **`fn parse_engine_id(s: &str) -> Option<Vec<u8>>`**
+  hexadecimal text, 5 to 32 bytes
+
+- **`fn engine_id_text(b: &[u8]) -> String`**
+
+*report PDUs*
+
+```rust
+USM_STATS_UNSUPPORTED_SEC_LEVELS: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 1, 0]
+USM_STATS_NOT_IN_TIME_WINDOWS: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 2, 0]
+USM_STATS_UNKNOWN_USER_NAMES: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 3, 0]
+USM_STATS_UNKNOWN_ENGINE_IDS: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 4, 0]
+USM_STATS_WRONG_DIGESTS: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 5, 0]
+USM_STATS_DECRYPTION_ERRORS: [u32; 11] = [1, 3, 6, 1, 6, 3, 15, 1, 1, 6, 0]
+/// snmpUnknownContexts of RFC 3413 (a context name the engine does not have)
+UNKNOWN_CONTEXTS: [u32; 10] = [1, 3, 6, 1, 6, 3, 12, 1, 5, 0]
+```
+
+- **`fn report_name(oid: &[u32]) -> &'static str`**
+  the name of a report's counter
+
+- **`fn report_pdu(request_id: i32, counter: &[u32], value: u32) -> Pdu`**
+  a Report PDU with one counter
+
+### `netpkt/eap.rs`
+
+Source: [`lib/netpkt/eap.rs`](../lib/netpkt/eap.rs)
+
+```text
+eap -- EAP packets (RFC 3748): Request, Response, Success and Failure with the types Identity,
+Notification and Nak, the data of EAP-MD5 (RFC 3748 5.4 with the value of RFC 1994 4.1) and
+the exchanges of EAP-PWD (RFC 5931 3.2).  No cryptography here: EAP-MD5's digest is lent by the
+caller (crypto::md5_parts); the sums of EAP-PWD are crypto::eappwd, and the state machines of
+a peer and a server are the crate eapm.  EAP travels in EAPOL frames (eapol.rs) on a port and
+in the EAP-Message attributes of RADIUS (radius.rs) behind the authenticator
+
+  REQUEST, RESPONSE, SUCCESS, FAILURE              the codes; code_name
+  T_IDENTITY, T_NOTIFICATION, T_NAK, T_MD5, T_PWD  the types; type_name (these and the types a
+                                                   dissector meets: TLS, TTLS, PEAP, MS-CHAPv2)
+  Packet { code, id, typ, data }                   parse(b) / to_bytes; the constructors
+                                                   request / response / success / failure /
+                                                   identity_request / identity_response / nak
+  Packet::identity() / nak_types()                 what such a packet says
+  Md5Data { value, name }                          the Type-Data of EAP-MD5: parse / to_bytes
+  md5_value(id, secret, challenge, md5)            MD5(Identifier || secret || Challenge)
+  Pwd                                              the Type-Data of EAP-PWD: Id, Commit, Confirm;
+                                                   parse / to_bytes; exch_name
+  PwdId { group, rand_func, prf, token, prep, identity }
+  info(b)                                          one line about a packet for the packet tab
+
+A packet is its 4-byte header and, for a Request or a Response, a type byte; bytes after its
+Length field are padding (Ethernet) and go.  EAP-PWD's L and M bits (fragments) are read and
+refused: all three exchanges fit a frame, and a peer that fragments them is no peer of ours.
+```
+
+```rust
+REQUEST: u8 = 1
+RESPONSE: u8 = 2
+SUCCESS: u8 = 3
+FAILURE: u8 = 4
+T_IDENTITY: u8 = 1
+T_NOTIFICATION: u8 = 2
+T_NAK: u8 = 3
+T_MD5: u8 = 4
+T_TLS: u8 = 13
+T_TTLS: u8 = 21
+T_PEAP: u8 = 25
+T_MSCHAPV2: u8 = 26
+T_PWD: u8 = 52
+/// what Nak says when the peer takes no other method (RFC 3748 5.3.1)
+NAK_NONE: u8 = 0
+/// the exchanges of EAP-PWD
+PWD_ID: u8 = 1
+PWD_COMMIT: u8 = 2
+PWD_CONFIRM: u8 = 3
+/// EAP-PWD with group 19 (P-256) and SHA-256: an element and a scalar
+PWD_ELEMENT: usize = 64
+PWD_SCALAR: usize = 32
+```
+
+- **`type Md5Fn = fn(&[&[u8]]) -> [u8; 16]`**
+  MD5 of the concatenation of the parts (what the caller lends: crypto::md5_parts)
+
+- **`fn code_name(c: u8) -> &'static str`**
+  the name of a code
+
+- **`fn type_name(t: u8) -> String`**
+  the name of a type
+
+- **`struct Packet`**
+  an EAP packet
+  - `code: u8`
+  - `id: u8`
+  - `typ: u8` -- the type of a Request or a Response (0: Success and Failure have none)
+  - `data: Vec<u8>` -- the Type-Data
+
+**`impl Packet`**
+
+- **`fn parse(b: &[u8]) -> Option<Packet>`**
+  the packet at the start of `b`; None when its Length does not fit (shorter than its header
+  or longer than `b`, a Request or a Response without a type)
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the bytes
+- **`fn request(id: u8, typ: u8, data: &[u8]) -> Packet`**
+- **`fn response(id: u8, typ: u8, data: &[u8]) -> Packet`**
+- **`fn success(id: u8) -> Packet`**
+- **`fn failure(id: u8) -> Packet`**
+- **`fn identity_request(id: u8, prompt: &str) -> Packet`**
+  Request/Identity, an optional text for a person in the data
+- **`fn identity_response(id: u8, name: &str) -> Packet`**
+  Response/Identity
+- **`fn nak(id: u8, types: &[u8]) -> Packet`**
+  Response/Nak: the methods the peer takes instead (none: NAK_NONE)
+- **`fn is(&self, code: u8, typ: u8) -> bool`**
+  a Request or a Response of a type
+- **`fn identity(&self) -> String`**
+  the text of an Identity (bytes that are no UTF-8 are replaced)
+- **`fn nak_types(&self) -> Vec<u8>`**
+  the methods a Nak wants (NAK_NONE left out)
+
+- **`struct Md5Data`**
+  the Type-Data of EAP-MD5: Value-Size, the value (a challenge or a digest), a name
+  - `value: Vec<u8>`
+  - `name: Vec<u8>`
+
+**`impl Md5Data`**
+
+- **`fn parse(d: &[u8]) -> Option<Md5Data>`**
+- **`fn to_bytes(&self) -> Vec<u8>`**
+
+- **`fn md5_value(id: u8, secret: &[u8], challenge: &[u8], md5: Md5Fn) -> [u8; 16]`**
+  the value of a CHAP-style answer (RFC 1994 4.1): MD5(Identifier || secret || Challenge)
+
+- **`struct PwdId`**
+  EAP-pwd-ID: what the server offers and the peer takes (RFC 5931 3.2.1)
+  - `group: u16` -- the group's number in IANA's registry (19: P-256)
+  - `rand_func: u8` -- the random function (1: HMAC-SHA-256)
+  - `prf: u8` -- the PRF (1: HMAC-SHA-256)
+  - `token: [u8; 4]`
+  - `prep: u8` -- how the password is prepared (0: none)
+  - `identity: Vec<u8>`
+
+- **`enum Pwd`**
+  the Type-Data of EAP-PWD
+  - `Id(PwdId)`
+  - `Commit { element: [u8; PWD_ELEMENT], scalar: [u8; PWD_SCALAR] }`
+  - `Confirm([u8; 32])`
+
+**`impl Pwd`**
+
+- **`fn parse(d: &[u8]) -> Option<Pwd>`**
+  the data of a packet; None for other sizes (only group 19 is read), a fragment or an
+  unknown exchange
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the data bytes (L and M clear)
+
+- **`fn exch_name(x: u8) -> &'static str`**
+  the name of an EAP-PWD exchange
+
+- **`fn info(b: &[u8]) -> String`**
+  one line about a packet: "Request, Identity", "Response, Identity (anna)", "Success",
+  "Request, PWD-Commit", "Response, Nak (PWD)"
+
+### `netpkt/imap.rs`
+
+Source: [`lib/netpkt/imap.rs`](../lib/netpkt/imap.rs)
+
+```text
+imap -- IMAP without I/O (a subset of RFC 9051 and RFC 3501): command and response lines with
+tags, quoted strings, literals and parenthesized lists, the readers of both directions, sequence
+sets, flags, FETCH items, SEARCH keys and the ENVELOPE of a message
+
+  PORT_IMAP (143), verb_known
+  Item                      Atom | Quoted | Literal | List | Nil: one value of a line; text()
+  Line { text, lits }       a whole logical line: the bytes with its literals apart
+  LineReader                bytes in any pieces: push(b) then next() -> Some(Read::Line(line)) or
+                            Some(Read::NeedLiteral(n)), a client that waits for "+" (a server
+                            answers it)
+  tokens(&Line) -> Vec<Item>   the values of a line
+  Command { tag, verb, args }  Command::parse(&line) (the verb in capitals); line(tag, verb,
+                            args) the bytes of a simple command
+  Status, Kind, Response    Response::parse(&line): a tagged status, an untagged one, untagged
+                            data, a continuation; response code, text, the values
+  ok / no / bad / untagged / cont   server lines ("a1 OK done\r\n")
+  astring(s) / quoted(s)    an atom when it can be, else quoted, a literal for other bytes
+  SeqSet                    "1:3,5,*": parse, contains(n, max), to_text
+  FetchItem, Section        parse_fetch(item): what FETCH asks (ALL, FAST, FULL too)
+  SearchKey                 parse_search(args), matches through a closure of facts
+  envelope(&Message)        the ENVELOPE of RFC 9051 7.5.2 as text
+  internal_date(unix)       "01-Jan-2026 00:00:00 +0000"
+  header_of(data) / text_of(data) / header_fields(data, names, not)   the parts FETCH names
+  SEEN, ANSWERED, FLAGGED, DELETED, DRAFT, RECENT    the flags
+
+A line ends with CRLF.  A literal {n} (or {n+}) at its end means n bytes follow the CRLF and the
+line goes on after them; Line keeps those bytes in `lits` and marks their place in `text` with a
+NUL, which IMAP text never has.  Words are not checked here beyond their shape: what a verb takes
+is the server's business.  Strings a server sends in the body of its messages are literals.
+```
+
+```rust
+PORT_IMAP: u16 = 143
+SEEN: &str = "\\Seen"
+ANSWERED: &str = "\\Answered"
+FLAGGED: &str = "\\Flagged"
+DELETED: &str = "\\Deleted"
+DRAFT: &str = "\\Draft"
+RECENT: &str = "\\Recent"
+```
+
+- **`fn verb_known(v: &str) -> bool`**
+  the commands of RFC 9051 and 3501 and of the extensions a dissector meets
+
+- **`enum Item`**
+  one value of a line
+  - `Atom(String)`
+  - `Quoted(String)`
+  - `Literal(Vec<u8>)`
+  - `List(Vec<Item>)`
+  - `Nil`
+
+**`impl Item`**
+
+- **`fn text(&self) -> Option<String>`**
+  the value as text (an atom, a string, a literal; a list or NIL has none)
+- **`fn atom(s: &str) -> Item`**
+
+- **`struct Line`**
+  a whole logical line: its bytes (CRLF gone, NUL where a literal stands) and its literals
+  - `text: Vec<u8>`
+  - `lits: Vec<Vec<u8>>`
+
+**`impl Line`**
+
+- **`fn plain(s: &str) -> Line`**
+  a line without literals (tests, tools)
+
+- **`enum Read`**
+  what a reader found
+  - `Line(Line)`
+  - `NeedLiteral(usize)` -- a literal of n bytes without "+" in its braces was announced: a server says "+ ..." now
+
+- **`struct LineReader`**
+  splits bytes into logical lines
+
+**`impl LineReader`**
+
+- **`fn new() -> LineReader`**
+- **`fn push(&mut self, b: &[u8])`**
+- **`fn pending(&self) -> usize`**
+  bytes it holds that make up no line yet
+- **`fn next(&mut self) -> Option<Read>`**
+  the next thing that is complete
+
+- **`fn tokens_from(l: &Line, from: usize) -> Vec<Item>`**
+  the values of a line, from `from` on
+
+- **`fn tokens(l: &Line) -> Vec<Item>`**
+  the values of a whole line
+
+- **`struct Command`**
+  a command: its tag, the verb in capitals, its values
+  - `tag: String`
+  - `verb: String`
+  - `args: Vec<Item>`
+
+**`impl Command`**
+
+- **`fn parse(l: &Line) -> Option<Command>`**
+  a command line; None without a tag and a verb
+- **`fn arg(&self, k: usize) -> Option<String>`**
+  the text of argument k
+
+- **`fn line(tag: &str, verb: &str, args: &str) -> Vec<u8>`**
+  a simple command line of a client
+
+- **`enum Status`**
+  the status of a response
+  - `Ok`
+  - `No`
+  - `Bad`
+  - `Bye`
+  - `PreAuth`
+
+**`impl Status`**
+
+- **`fn word(self) -> &'static str`**
+
+- **`enum Kind`**
+  what sort of line a response is
+  - `Tagged(String)` -- "a1 OK ...": the end of a command
+  - `Untagged` -- "\* ..."
+  - `Cont` -- "+ ...": the server waits for more
+
+- **`struct Response`**
+  a response line
+  - `kind: Kind`
+  - `status: Option<Status>`
+  - `code: Option<String>` -- the response code of a status line, without its brackets ("UIDNEXT 7")
+  - `text: String` -- the text of a status line or a continuation
+  - `items: Vec<Item>` -- the values of untagged data ("1", "FETCH", (...))
+
+**`impl Response`**
+
+- **`fn parse(l: &Line) -> Option<Response>`**
+- **`fn name(&self) -> Option<&str>`**
+  the data's name: the first atom after an optional number ("FETCH", "LIST", "EXISTS")
+- **`fn number(&self) -> Option<u32>`**
+  the number before the name
+
+- **`fn ok(tag: &str, code: Option<&str>, text: &str) -> Vec<u8>`**
+  a status line OK / NO / BAD of a command
+
+- **`fn no(tag: &str, code: Option<&str>, text: &str) -> Vec<u8>`**
+
+- **`fn bad(tag: &str, text: &str) -> Vec<u8>`**
+
+- **`fn untagged(text: &str) -> Vec<u8>`**
+  "\* text"
+
+- **`fn cont(text: &str) -> Vec<u8>`**
+  "+ text"
+
+- **`fn quoted(s: &str) -> String`**
+  a string in quotes
+
+- **`fn astring(s: &str) -> String`**
+  an atom when it can be one, else a quoted string, else a literal (for other bytes)
+
+- **`struct SeqSet`**
+  a set of message numbers or UIDs: "1:3,5,\*"
+
+**`impl SeqSet`**
+
+- **`fn parse(s: &str) -> Option<SeqSet>`**
+- **`fn contains(&self, n: u32, max: u32) -> bool`**
+  n is in the set; `max` is what "\*" stands for
+- **`fn to_text(&self) -> String`**
+
+- **`enum Section`**
+  the part of a message BODY[...] names
+  - `Full`
+  - `Header`
+  - `Fields(Vec<String>, bool)` -- HEADER.FIELDS (or .NOT, `not`)
+  - `Text`
+
+- **`enum FetchItem`**
+  what FETCH asks for
+  - `Flags`
+  - `Uid`
+  - `Rfc822Size`
+  - `InternalDate`
+  - `Envelope`
+  - `Body { peek: bool, section: Section, name: String }` -- BODY[...] or BODY.PEEK[...] (peek: \\Seen stays as it is); the text shows it in the answer
+  - `Rfc822`
+  - `Rfc822Header`
+  - `Rfc822Text`
+
+- **`fn parse_fetch(arg: &Item) -> Option<Vec<FetchItem>>`**
+  the items of FETCH's argument: one atom or a list; None for one this does not know
+
+- **`enum SearchKey`**
+  a SEARCH key
+  - `All`
+  - `Seen`
+  - `Unseen`
+  - `Answered`
+  - `Unanswered`
+  - `Flagged`
+  - `Unflagged`
+  - `Deleted`
+  - `Undeleted`
+  - `Recent`
+  - `From(String)`
+  - `To(String)`
+  - `Subject(String)`
+  - `Body(String)`
+  - `Text(String)`
+  - `Larger(u64)`
+  - `Smaller(u64)`
+  - `Uid(SeqSet)`
+  - `Seq(SeqSet)`
+  - `Not(alloc::boxed::Box<SearchKey>)`
+  - `Or(alloc::boxed::Box<SearchKey>, alloc::boxed::Box<SearchKey>)`
+  - `And(Vec<SearchKey>)`
+
+- **`fn parse_search(args: &[Item]) -> Option<Vec<SearchKey>>`**
+  the keys of SEARCH (all must hold); None for what this does not know
+
+- **`fn envelope(m: &Message) -> String`**
+  the ENVELOPE of a message as its text (RFC 9051 7.5.2): date, subject, from, sender, reply-to,
+  to, cc, bcc, in-reply-to, message-id
+
+- **`fn internal_date(unix: i64) -> String`**
+  "01-Jan-2026 00:00:00 +0000" of seconds since 1970 (UTC)
+
+- **`fn header_of(data: &[u8]) -> &[u8]`**
+  the header of a message with its empty line
+
+- **`fn text_of(data: &[u8]) -> &[u8]`**
+  the text after the header
+
+- **`fn header_fields(data: &[u8], names: &[String], not: bool) -> Vec<u8>`**
+  the fields of the header with these names (not: all others), each with its continuation lines,
+  and the empty line
+
+## eapm
+
+*EAP-MD5 and EAP-PWD as peer and server state machines without I/O* -- crate root [`lib/eapm/lib.rs`](../lib/eapm/lib.rs)
+
+```text
+eapm -- EAP methods as state machines without I/O: the peer and the server of EAP-MD5 and
+EAP-PWD with the framing of netpkt::eap and the sums of crypto (RFC 3748, 5931).  They take the
+packets they get and give the packets to send; whoever holds them carries the bytes (EAPOL,
+RADIUS), keeps the timers and repeats a Request that got no answer.  Randomness comes from
+the caller, so a run is the same byte for byte
+
+  Method                         Md5 (wired ports, no keys) | Pwd (makes an MSK); word, parse,
+                                 of_type, typ, makes_keys
+  Peer::new(identity, password, method)
+  Peer::on_packet(&b, rnd) -> PeerOut   Send(bytes) | Success | Failure | Silent
+  Peer::msk() / emsk() / method_used()  after Success
+  Server::new(server_id, methods)       methods in the order to offer them
+  Server::on_packet(&b, lookup, rnd) -> ServerOut
+                                 Send(bytes) | Success { eap, msk, emsk } | Failure { eap } |
+                                 Silent; lookup: a user's password (None: no such user)
+  Server::user() / method()      who is logging in, with which method now
+  rand_scalar(rnd)               a scalar of P-256 from random bytes
+
+The peer answers a Request again with the same bytes when its identifier repeats (RFC 3748
+4.1) and takes a method it was not told to use with a Nak that names the one it knows.  A
+Success before the method is over is ignored, for EAP-PWD unless its Confirm checked out
+(RFC 3748 4.2 and 7.2); a Confirm that does not fit (another password) ends the method without
+an answer, as RFC 5931 2.8.5.3 says, so the authenticator's retries run out.
+
+The server starts when the first Response/Identity comes.  It offers its methods in order and
+goes on to the one a Nak names if it has it; with none left, it answers with Failure.
+```
+
+### `eapm` crate root
+
+- **`type Rnd<'a> = &'a mut dyn FnMut(&mut [u8])`**
+  where random bytes come from
+
+- **`enum Method`**
+  an EAP method
+  - `Md5`
+  - `Pwd`
+
+**`impl Method`**
+
+- **`fn word(self) -> &'static str`**
+  its word in a wpa_supplicant-style file ("MD5", "PWD")
+- **`fn parse(s: &str) -> Option<Method>`**
+  by its word, in any case
+- **`fn typ(self) -> u8`**
+  the EAP type
+- **`fn of_type(t: u8) -> Option<Method>`**
+- **`fn makes_keys(self) -> bool`**
+  it derives an MSK (WPA-Enterprise needs one)
+
+- **`fn rand_scalar(rnd: Rnd) -> [u8; 32]`**
+  a scalar in [1, n - 1] of P-256 from random bytes
+
+- **`enum PeerOut`**
+  what a peer does with a packet
+  - `Send(Vec<u8>)` -- send this packet
+  - `Success` -- EAP-Success after the method is over: msk() holds its keys
+  - `Failure` -- EAP-Failure, or a method that ended here
+  - `Silent` -- nothing to do
+
+- **`struct Peer`**
+  the peer's side of EAP
+  - `identity: String`
+
+**`impl Peer`**
+
+- **`fn new(identity: &str, password: &str, method: Method) -> Peer`**
+- **`fn msk(&self) -> Option<&[u8; 64]>`**
+- **`fn emsk(&self) -> Option<&[u8; 64]>`**
+- **`fn method_used(&self) -> Option<Method>`**
+  the method that ran
+- **`fn reset(&mut self)`**
+  back to the start (a new authentication on the same port)
+- **`fn on_packet(&mut self, b: &[u8], rnd: Rnd) -> PeerOut`**
+  a packet from the authenticator
+
+- **`enum ServerOut`**
+  what a server does with a packet
+  - `Send(Vec<u8>)` -- send this Request
+  - `Success { eap: Vec<u8>, msk: Option<[u8; 64]>, emsk: Option<[u8; 64]> }` -- the peer is in: the EAP-Success, the keys of a method that makes them
+  - `Failure { eap: Vec<u8> }` -- the peer is out: the EAP-Failure
+  - `Silent` -- nothing to do
+
+- **`struct Server`**
+  the server's side of EAP
+
+**`impl Server`**
+
+- **`fn new(server_id: &str, methods: &[Method]) -> Server`**
+- **`fn user(&self) -> &str`**
+  who is logging in (after the Response/Identity)
+- **`fn method(&self) -> Option<Method>`**
+  the method it runs now
+- **`fn on_packet(&mut self, b: &[u8], lookup: &dyn Fn(&str) -> Option<String>, rnd: Rnd) -> ServerOut`**
+  a Response; `lookup` gives a user's password, `rnd` the random bytes
 
 ## cas
 

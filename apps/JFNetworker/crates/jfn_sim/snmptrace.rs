@@ -8,6 +8,7 @@
 //   SNote::is_drop() / mask()   something refused, dropped or given up; the P_* bits (SNMP over
 //                               UDP)
 //
+// SNMPv3: a request past the USM, the Reports of an agent, a manager's discovery and what it hears.
 // Addresses are as the datagrams came; PDUs by their names in RFC 3416, notifications by the name
 // of their object (linkDown); error statuses by their names (notWritable).
 
@@ -17,6 +18,7 @@ use jfn_model::msg;
 use jfn_model::msg::Msg;
 use netpkt::decode::{P_IPV4, P_SNMP, P_UDP};
 use netpkt::snmp::{error_name, Kind, Version};
+use netpkt::snmpv3::Level;
 use netpkt::{IpAddr, Ipv4};
 
 /// a decision of SNMP
@@ -58,6 +60,14 @@ pub enum SNote {
     AskAgain { to: IpAddr, n: u8 },
     /// no answer after the last attempt
     NoAnswer { to: IpAddr },
+    /// an agent takes a request of SNMPv3 (the user got past the USM)
+    V3Request { from: IpAddr, kind: Kind, user: String, level: Level, id: i32, vars: u16 },
+    /// an agent refuses a message of SNMPv3 with a Report (what: the counter's name)
+    V3Report { to: IpAddr, what: String },
+    /// a manager learned the agent's engine ID (the discovery of RFC 3414 4)
+    V3Discovered { from: IpAddr, engine: String },
+    /// a manager heard a Report it cannot go on from
+    V3Refused { from: IpAddr, what: String },
 }
 
 impl SNote {
@@ -84,13 +94,17 @@ impl SNote {
             SNote::Ask { to, kind, id } => msg!("SNMP: {} an {} (Kennung {}).", kind.name(), to, id),
             SNote::AskAgain { to, n } => msg!("SNMP: keine Antwort von {}: noch einmal gefragt (Versuch {}).", to, n),
             SNote::NoAnswer { to } => msg!("SNMP: {} antwortet nicht: aufgegeben.", to),
+            SNote::V3Request { from, kind, user, level, id, vars } => msg!("SNMPv3: {} von {} (Benutzer {}, {}, Kennung {}, {} Variablen).", kind.name(), from, user, level.word(), id, vars),
+            SNote::V3Report { to, what } => msg!("SNMPv3: Report {} an {}.", what, to),
+            SNote::V3Discovered { from, engine } => msg!("SNMPv3: {} hat die Engine-ID {}.", from, engine),
+            SNote::V3Refused { from, what } => msg!("SNMPv3: {} lehnt ab: {}.", from, what),
         }
     }
     /// something was refused, dropped or given up
     pub fn is_drop(&self) -> bool {
         matches!(
             self,
-            SNote::BadCommunity { .. } | SNote::Denied { .. } | SNote::BadVersion { .. } | SNote::Malformed { .. } | SNote::ReadOnly { .. } | SNote::InformLost { .. } | SNote::NoRoute { .. } | SNote::TrapRefused { .. } | SNote::NoAnswer { .. }
+            SNote::BadCommunity { .. } | SNote::Denied { .. } | SNote::BadVersion { .. } | SNote::Malformed { .. } | SNote::ReadOnly { .. } | SNote::InformLost { .. } | SNote::NoRoute { .. } | SNote::TrapRefused { .. } | SNote::NoAnswer { .. } | SNote::V3Report { .. } | SNote::V3Refused { .. }
         )
     }
     /// the protocols of the note

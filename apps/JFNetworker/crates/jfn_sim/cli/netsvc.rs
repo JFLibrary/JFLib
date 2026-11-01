@@ -628,6 +628,8 @@ impl Engine {
         if self.cdev(ni).is_some_and(|c| matches!(c.job, Some(CliJob { out: JobOut::Dhclient { .. }, .. }))) {
             self.dhclient_progress(ni);
         }
+        // journalctl -f (cli/units.rs)
+        self.journal_follow(ni);
     }
 
     /// dhclient's lines since the last look; the end when the client is bound or gave up

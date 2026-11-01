@@ -1,8 +1,8 @@
 // mailtrace -- the decisions of mail as notes (Note::Mail) with their German sentences: the SMTP
 // server (sessions, logins, senders and recipients taken or refused, refused relays, messages
 // too big, the queue), its deliveries (local mailboxes, MX lookups, relays, deferrals with
-// their next attempt, bounces), the POP3 server (logins, retrievals, deletions) and the clients
-// (E-Mail, curl, mail)
+// their next attempt, bounces), the POP3 server (logins, retrievals, deletions), the IMAP server
+// (logins, folders, what is fetched, stored and expunged) and the clients (E-Mail, curl, mail)
 //
 //   MNote::message() -> Msg     the sentence
 //   MNote::is_drop() / mask()   something refused, bounced or given up; the P_* bits (mail
@@ -71,6 +71,26 @@ pub enum MNote {
     ClientFetched { n: u32, server: String },
     /// a client failed (the reason as the program words it)
     ClientFailed { what: Msg },
+    /// a client connects to the IMAP server
+    ImapSession { from: IpAddr },
+    /// LOGIN or AUTHENTICATE accepted or refused
+    ImapLogin { user: String },
+    ImapLoginFailed { user: String },
+    /// SELECT or EXAMINE of a folder with its messages
+    ImapSelect { user: String, folder: String, msgs: u32 },
+    /// FETCH sends messages
+    ImapFetch { folder: String, n: u32, bytes: u64 },
+    /// STORE changes flags, EXPUNGE removes, COPY and MOVE put messages elsewhere, APPEND adds one
+    ImapStore { folder: String, n: u32 },
+    ImapExpunge { folder: String, n: u32 },
+    ImapCopy { to: String, n: u32, moved: bool },
+    ImapAppend { folder: String, bytes: u64 },
+    /// CREATE, DELETE or RENAME of a folder
+    ImapFolder { what: String, folder: String },
+    /// a command refused (BAD or NO)
+    ImapRefused { cmd: String },
+    /// the E-Mail program's copy of a folder is up to date (n messages)
+    ClientSynced { folder: String, n: u32, server: String },
 }
 
 impl MNote {
@@ -106,6 +126,19 @@ impl MNote {
             MNote::ClientFetched { n: 1, server } => msg!("E-Mail: eine neue Nachricht von {} abgerufen.", server),
             MNote::ClientFetched { n, server } => msg!("E-Mail: {} neue Nachrichten von {} abgerufen.", n, server),
             MNote::ClientFailed { what } => msg!("E-Mail: {}", what),
+            MNote::ImapSession { from } => msg!("IMAP: {} verbindet sich.", from),
+            MNote::ImapLogin { user } => msg!("IMAP: {} ist angemeldet.", user),
+            MNote::ImapLoginFailed { user } => msg!("IMAP: Anmeldung von {} abgelehnt.", user),
+            MNote::ImapSelect { user, folder, msgs } => msg!("IMAP: {} wählt {} mit {} Nachrichten.", user, folder, msgs),
+            MNote::ImapFetch { folder, n, bytes } => msg!("IMAP: {} Nachrichten aus {} gesendet, {} Bytes.", n, folder, bytes),
+            MNote::ImapStore { folder, n } => msg!("IMAP: Markierungen von {} Nachrichten in {} geändert.", n, folder),
+            MNote::ImapExpunge { folder, n } => msg!("IMAP: {} Nachrichten aus {} entfernt.", n, folder),
+            MNote::ImapCopy { to, n, moved: true } => msg!("IMAP: {} Nachrichten nach {} verschoben.", n, to),
+            MNote::ImapCopy { to, n, moved: false } => msg!("IMAP: {} Nachrichten nach {} kopiert.", n, to),
+            MNote::ImapAppend { folder, bytes } => msg!("IMAP: Nachricht mit {} Bytes in {} abgelegt.", bytes, folder),
+            MNote::ImapFolder { what, folder } => msg!("IMAP: {} {}.", what, folder),
+            MNote::ImapRefused { cmd } => msg!("IMAP: {} abgelehnt.", cmd),
+            MNote::ClientSynced { folder, n, server } => msg!("E-Mail: {} von {} geholt, {} Nachrichten.", folder, server, n),
         }
     }
     /// something was refused, bounced or given up
@@ -121,6 +154,8 @@ impl MNote {
                 | MNote::Pop3LoginFailed { .. }
                 | MNote::Pop3Refused { .. }
                 | MNote::ClientFailed { .. }
+                | MNote::ImapLoginFailed { .. }
+                | MNote::ImapRefused { .. }
         )
     }
     /// the protocols of the note

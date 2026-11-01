@@ -15,6 +15,8 @@
 //   rename(doc, dev, from, to) -> Result<String, String>   a file or a folder with all in it
 //                                    gets another path (the new one)
 //   remove(doc, dev, path)           a file, or a folder with all in it
+//   new_unit(doc, dev, name, exec) -> Result<String, String>   the unit file NAME.service for
+//                                    the script `exec`, its folder made (A2) -> its path
 //   file_of(def) -> Option<&str>     the "file" of a script service's definition
 //   bound(d, store, path) -> Vec<String>   the script services of the device that run the file
 //   bind(doc, dev, path) -> Result<String, String>   a new script service {"file": path} named
@@ -138,6 +140,26 @@ pub(crate) fn new_file(doc: &mut Doc, dev: u32, path: &str, text: &str) -> Resul
     let t0 = now_s(doc, dev);
     st.write(&p, text.as_bytes(), t0).map_err(|e| tf("„{}“ geht nicht: {}.", &[&p, why(e)]))?;
     put(doc, dev, &st, &format!("Datei {} auf {} anlegen", p, d.name));
+    Ok(p)
+}
+
+/// the unit file of script `exec` (workspace/ide/deploy.rs) -> its path
+pub(crate) fn new_unit(doc: &mut Doc, dev: u32, name: &str, exec: &str) -> Result<String, String> {
+    use jfn_model::unit;
+    let d = device(doc, dev)?;
+    if !unit::name_ok(name) {
+        return Err(tf("„{}“ taugt nicht als Name einer Einheit.", &[name]));
+    }
+    let mut st = store(doc, dev)?;
+    let p = unit::path_of(name);
+    if st.exists(&p) {
+        return Err(tf("„{}“ gibt es schon.", &[&p]));
+    }
+    let t0 = now_s(doc, dev);
+    let text = format!("[Unit]\nDescription={}\n\n[Service]\nExecStart=jfs {}\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n", unit::stem(name), exec);
+    st.mkdir(unit::UNIT_DIR, t0, true).map_err(|e| tf("„{}“ geht nicht: {}.", &[&p, why(e)]))?;
+    st.write(&p, text.as_bytes(), t0).map_err(|e| tf("„{}“ geht nicht: {}.", &[&p, why(e)]))?;
+    put(doc, dev, &st, &format!("Einheit {} auf {} anlegen", name, d.name));
     Ok(p)
 }
 

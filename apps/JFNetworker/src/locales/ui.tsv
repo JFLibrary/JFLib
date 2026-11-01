@@ -364,7 +364,6 @@ Adresse, Maske und Gateway oder DHCP	Address, mask and gateway, or DHCP
 Die Shell des Geräts	The device's shell
 Texteditor	Text editor
 Webbrowser	Web browser
-Seiten als Text	Pages as text
 Dieses Gerät hat keine IPv4-Schnittstelle.	This device has no IPv4 interface.
 Adresse	Address
 Statisch	Static
@@ -383,16 +382,6 @@ Verwerfen	Discard
 Speichern	Save
 Notizen zu diesem Gerät: Aufgaben, Zugangsdaten des Labors, was noch fehlt …	Notes on this device: tasks, the lab's credentials, what is still missing …
 Öffnen	Open
-Eine Adresse eingeben und „Öffnen“.	Enter an address and “Open”.
-Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen.	This browser cannot open encrypted pages (https).
-„{}“ ist keine Portnummer.	“{}” is no port number.
-Die Adresse nennt keinen Rechner.	The address names no host.
-{}, Port {}, Pfad {}	{}, port {}, path {}
-{} ({}), Port {}, Pfad {}	{} ({}), port {}, path {}
-{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}	{} (the name is not known on this device), port {}, path {}
-Dieser Browser zeigt nur, wohin die Adresse führt.	This browser only shows where the address leads.
-Ziel: {}	Destination: {}
-Die Seite selbst holt „curl {}“ im Terminal über den Simulator.	The page itself: “curl {}” in the Terminal fetches it through the simulator.
 #
 # ---- the simulation mode (workspace/sim)
 Echtzeit	Real time
@@ -1535,3 +1524,138 @@ zur Definition / Name umbenennen / formatieren	go to definition / rename a name 
 in der Datei suchen / ersetzen	find / replace in the file
 Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
 Strg+B / Strg+J	Ctrl+B / Ctrl+J
+# the IDE's panes Bereitstellen and Lasttest (A2: workspace/ide/deploy.rs, load.rs)
+Auf der Leinwand ist nichts gewählt.	Nothing is selected on the canvas.
+Beim ersten Fehler zurückrollen	Roll back at the first failure
+Bereitstellen	Deploy
+Bereitstellen …	Deploy …
+Das Projekt hat keine Gruppe.	The project has no group.
+Das Projekt hat keine Gruppe: Geräte auf der Leinwand wählen und gruppieren (Strg+G) oder die Hosts als Liste nennen.	The project has no group: select devices on the canvas and group them (Ctrl+G), or name the hosts as a list.
+Einheit	Unit
+Einheit aktiv	Unit active
+Einheit anlegen	Create unit
+HTTP-Anfrage	HTTP request
+Hier steht der Fortschritt je Host: Dateien kopieren, Einheit neu starten, prüfen, dann der nächste.	The progress per host shows here: copy the files, restart the unit, check, then the next one.
+Hosts	Hosts
+Keine Hosts gewählt.	No hosts chosen.
+Lasttest	Load test
+Lasttest …	Load test …
+Pfad	Path
+Sonst behalten die fertigen Hosts die neuen Dateien, und die Bereitstellung hält an.	Otherwise the finished hosts keep the new files, and the deployment stops.
+TCP-Port	TCP port
+Welche Einheit? Ihr Name fehlt.	Which unit? Its name is missing.
+Zeige zuerst die .jfs-Datei, die als Einheit laufen soll.	First show the .jfs file that should run as a unit.
+Zeit für die Prüfung	Time for the check
+abgebrochen: {} von {} Hosts fertig	aborted: {} of {} hosts done
+fertig: {} von {} Hosts	done: {} of {} hosts
+gescheitert	failed
+gescheitert: alle Hosts zurückgerollt	failed: all hosts rolled back
+gescheitert: {} von {} Hosts fertig, der Rest bleibt, wie er war	failed: {} of {} hosts done, the rest stays as it was
+läuft: {} von {} Hosts fertig	running: {} of {} hosts done
+ms	ms
+s, danach warten	s, then wait
+wartet nach der Prüfung	waiting after the check
+z. B. /root/app	e.g. /root/app
+z. B. WEB1, WEB2	e.g. WEB1, WEB2
+z. B. web.service	e.g. web.service
+Das Ziel ist eine URL wie http://10.0.1.1/.	The target is a URL like http://10.0.1.1/.
+z. B. http://10.0.1.1/	e.g. http://10.0.1.1/
+Offen: Anfragen kommen in fester Rate, egal wie schnell die Antworten sind. Geschlossen: Nutzer warten auf ihre Antwort und denken, bevor sie wieder fragen.	Open: requests come at a fixed rate, however fast the answers are. Closed: users wait for their answer and think before they ask again.
+Hier stehen Anfragen pro Sekunde, Latenzen und Fehler des Lasttests, sobald er läuft.	Requests per second, latencies and errors of the load test show here as soon as it runs.
+Denkzeit (ms)	Think time (ms)
+Dauer (s)	Duration (s)
+Fertig: {} Anfragen, {} Antworten ({}/s), {} Fehler; p50 {}, p95 {}, p99 {}	Done: {} requests, {} answers ({}/s), {} errors; p50 {}, p95 {}, p99 {}
+läuft: {} Anfragen gesendet, {} Antworten	running: {} requests sent, {} answers
+Geschlossen	Closed
+Nutzer	Users
+Last	Load
+Starten	Start
+Liste	List
+Seiten aus dem simulierten Netz	Pages from the simulated network
+Seite nicht erreichbar	Page not reachable
+{} lehnt die Verbindung ab: auf Port {} lauscht kein Dienst.	{} refuses the connection: no service listens on port {}.
+Läuft der Webserver auf dem Gerät? Der Reiter Dienste und „ss -tln“ zeigen, was lauscht.	Is the web server running on the device? The Services tab and “ss -tln” show what listens.
+{} hat nicht rechtzeitig geantwortet.	{} did not answer in time.
+Kommt das Gerät per ping an? Der Simulationsmodus zeigt, wo die Pakete bleiben.	Does the device answer ping? The simulation mode shows where the packets end up.
+Den Namen {} kann dieses Gerät nicht auflösen.	This device cannot resolve the name {}.
+Stimmt der Name? Ein Name braucht einen Eintrag in /etc/hosts oder einen Namensserver in /etc/resolv.conf.	Is the name right? A name needs an entry in /etc/hosts or a name server in /etc/resolv.conf.
+Zu {} führt von hier kein Weg.	No path leads from here to {}.
+Hat das Gerät eine Adresse und ein Gateway, und sind die Kabel gesteckt?	Does the device have an address and a gateway, and are the cables plugged in?
+Die Verbindung zu {} brach mitten in der Antwort ab.	The connection to {} broke in the middle of the answer.
+Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat.	The request ended because the device or its service stopped.
+Zu viele Weiterleitungen	Too many redirects
+{} leitet immer weiter.	{} keeps redirecting.
+Oft zeigen zwei Seiten aufeinander; curl -L -v im Terminal zeigt die Kette.	Often two pages point at each other; curl -L -v in the terminal shows the chain.
+Verschlüsselte Seite	Encrypted page
+Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe.	This browser cannot open encrypted pages (https) yet: they come with a later stage.
+Dieselbe Seite über http:// geht, wenn der Server dort antwortet.	The same page over http:// works if the server answers there.
+Adresse kann nicht geöffnet werden	The address cannot be opened
+Dieser Browser öffnet http-Adressen im simulierten Netz.	This browser opens http addresses in the simulated network.
+Seite	Page
+{} Bytes	{} bytes
+eine Weiterleitung	one redirect
+{} Weiterleitungen	{} redirects
+gekürzt	cut short
+Der Server meldet einen Fehler	The server reports an error
+Die Seite gibt es so nicht	There is no such page
+Keine Seite	No page
+{} antwortet mit {} {}.	{} answers with {} {}.
+Die Antwort hat keinen Inhalt	The answer has no content
+Diese Datei zeigt der Browser nicht an	The browser does not show this file
+Typ {}, {} Bytes.	Type {}, {} bytes.
+Keine Antwort	No answer
+Zurück (Alt+Links)	Back (Alt+Left)
+Vor	Forward
+Vor (Alt+Rechts)	Forward (Alt+Right)
+Neu laden	Reload
+Neu laden (F5)	Reload (F5)
+Anhalten (Esc)	Stop (Esc)
+Adresse (Strg+L)	Address (Ctrl+L)
+Diese Seite ist die Antwort auf ein Formular. Neu laden sendet es noch einmal.	This page is the answer to a form. Reloading sends it again.
+Eine Adresse eingeben und „Öffnen“: Seiten kommen von den Webservern und Skripten im simulierten Netz.	Enter an address and “Open”: pages come from the web servers and scripts in the simulated network.
+Lädt von {} …	Loading from {} …
+Lädt von {} … Die Simulation ist angehalten: die Antwort kommt, wenn sie weiterläuft.	Loading from {} … The simulation is paused: the answer comes when it runs again.
+Lädt von {} … Im Simulationsmodus geht die Anfrage mit den Schritten voran.	Loading from {} … In simulation mode the request moves on with the steps.
+{} · ein Bild lädt noch …	{} · one picture still loading …
+{} · {} Bilder laden noch …	{} · {} pictures still loading …
+SSH-Server	SSH server
+Stufe	Level
+Signatur	Signature
+Verschlüsselung	Encryption
+Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen.	Give the agent and the user without spaces, passwords with at least 8 characters.
+# X1g: the 802.1X panel of IP-Konfiguration, the inspector of an enterprise network
+sucht einen Authenticator	looking for an authenticator
+niemand antwortet, läuft ohne 802.1X	nobody answers, running without 802.1X
+meldet {} an	logging {} in
+angemeldet als {} ({})	logged in as {} ({})
+{} abgelehnt, wartet	{} refused, waiting
+keine Zugangsdaten	no credentials
+Anmeldung am Netz (802.1X)	Login to the network (802.1X)
+802.1X an der Netzwerkbuchse	802.1X on the network socket
+der Benutzer beim RADIUS-Server	the user at the RADIUS server
+Unternehmens-WLAN (WPA-Enterprise)	Company Wi-Fi (WPA-Enterprise)
+Anmeldung übernehmen	Apply login
+Die Angaben liegen in {} auf dem Gerät; wpa_cli im Terminal zeigt den Zustand.	The settings are in {} on the device; wpa_cli in the Terminal shows the state.
+Eine Anmeldung braucht eine Identität, im WLAN auch die SSID.	A login needs an identity, on Wi-Fi the SSID too.
+Adresse, z. B. 10.0.0.10	Address, e.g. 10.0.0.10
+RADIUS-Schlüssel	RADIUS key
+das gemeinsame Geheimnis	the shared secret
+Schlüssel zeigen	Show key
+Identität	Identity
+EAP-Methode	EAP method
+Passwort zeigen	Show password
+nicht autorisiert	not authorized
+# X1g: the E-Mail program with an IMAP account, the category of 802.1X
+Papierkorb	Trash
+Den Ordner mit dem IMAP-Server abgleichen	Compare the folder with the IMAP server
+Markieren	Flag
+Abrufen gleicht diesen Ordner mit dem IMAP-Server ab.	Fetch compares this folder with the IMAP server.
+Neu	New
+Anlegen	Create
+Ordner löschen	Delete folder
+Kontotyp	Account type
+Das Konto braucht einen SMTP- und einen IMAP-Server.	The account needs an SMTP and an IMAP server.
+Postfach (IMAP)	Mailbox (IMAP)
+IMAP-Server	IMAP server
+IMAP-Port	IMAP port
+802.1X	802.1X

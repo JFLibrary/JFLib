@@ -15,7 +15,8 @@
 //   Agent         the client side: requests to hosts (names through the resolver), kept-alive
 //                 connections reused per host (a limit per host, optional pipelining),
 //                 connect and total timeouts, one retry when a reused connection turns out to
-//                 be closed before any byte came; the owner takes Done records with the times
+//                 be closed before any byte came, cancel(id) gives a request up (its connection
+//                 closes with it); the owner takes Done records with the times
 //                 of every step and, when it traces, each step as it happens (AgentEv, for
 //                 curl -v); names are looked up for the families of Agent::family (getaddrinfo
 //                 order: resolver.rs), and when they have addresses of both families a
@@ -1116,6 +1117,24 @@ impl Agent {
         used
     }
 
+    /// gives a request up: no Done comes for it, the connection it is on closes with it (what
+    /// else is on that connection goes again)
+    pub fn cancel(&mut self, os: &mut OsApi, id: u64) {
+        if !self.reqs.contains_key(&id) {
+            return;
+        }
+        self.detach(os, id);
+        let now = os.now();
+        let _ = self.finish(id, now, Err(Fail::Aborted));
+        self.pump(os);
+        self.wheel.arm(os);
+    }
+
+    /// the bytes its requests and answers on their way hold (a keyframe's footprint)
+    pub fn held_bytes(&self) -> usize {
+        self.reqs.values().map(|r| r.req.body.len() + r.body.len() + r.req.url.target.len()).sum::<usize>() + self.conns.values().map(|c| c.out.len()).sum::<usize>()
+    }
+
     /// closes the kept-alive connections that wait for nothing
     /// aborts every connection and forgets every request (ScriptService::release)
     pub fn abort_all(&mut self, os: &mut OsApi) {
@@ -1576,23 +1595,7 @@ impl Agent {
                     };
                     r.timer = None;
                     let (got, of) = (r.body_len, r.head.as_ref().and_then(|h| h.headers.content_length().ok().flatten()));
-                    let sock = r.sock;
-                    self.lookups.values_mut().for_each(|v| v.retain(|x| *x != id));
-                    self.waiting.retain(|x| *x != id);
-                    // the connection it is on closes with it; what else is on it goes again
-                    let on = sock.and_then(|s| {
-                        let c = self.conns.get_mut(&s)?;
-                        c.inflight.retain(|x| *x != id);
-                        c.queue.retain(|x| *x != id);
-                        Some((s, c.no, c.inflight.iter().chain(c.queue.iter()).copied().collect::<Vec<u64>>()))
-                    });
-                    if let Some((s, no, rest)) = on {
-                        self.ev(AgentEv::Closing { id, conn: no });
-                        self.drop_conn(os, s);
-                        for x in rest {
-                            self.retry(os, x);
-                        }
-                    }
+                    self.detach(os, id);
                     self.fail(os, id, Fail::Timeout { got, of });
                 }
                 ATimer::Connect(s) => {
@@ -1623,6 +1626,27 @@ impl Agent {
             }
         }
         self.pump(os);
+    }
+
+    /// a request leaves its lookup, its queue and its connection, which closes with it; what
+    /// else is on that connection goes again
+    fn detach(&mut self, os: &mut OsApi, id: u64) {
+        let sock = self.reqs.get(&id).and_then(|r| r.sock);
+        self.lookups.values_mut().for_each(|v| v.retain(|x| *x != id));
+        self.waiting.retain(|x| *x != id);
+        let on = sock.and_then(|s| {
+            let c = self.conns.get_mut(&s)?;
+            c.inflight.retain(|x| *x != id);
+            c.queue.retain(|x| *x != id);
+            Some((s, c.no, c.inflight.iter().chain(c.queue.iter()).copied().collect::<Vec<u64>>()))
+        });
+        if let Some((s, no, rest)) = on {
+            self.ev(AgentEv::Closing { id, conn: no });
+            self.drop_conn(os, s);
+            for x in rest {
+                self.retry(os, x);
+            }
+        }
     }
 
     fn drop_conn(&mut self, os: &mut OsApi, s: u32) {

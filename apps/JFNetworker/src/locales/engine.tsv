@@ -1350,3 +1350,175 @@ beendet nach einem Fehler: {}	ended after an error: {}
 Ein Skript hat „source“ oder „file“, nicht beides.	A script has “source” or “file”, not both.
 Skript {} auf {}: die Datei {} gibt es nicht.	Script {} on {}: the file {} does not exist.
 Skript {} auf {}: {}, Zeile {}, Spalte {}: {}	Script {} on {}: {}, line {}, column {}: {}
+# units and deployments (A2: jfn_model unit.rs, jfn_sim units.rs, deploy.rs)
+Auf {} läuft schon eine Bereitstellung.	A deployment is already running on {}.
+Bereitstellung von {} abgebrochen	Deployment of {} aborted
+Bereitstellung von {} auf {}	Deployment of {} to {}
+Bereitstellung von {} gescheitert	Deployment of {} failed
+Bereitstellung von {} gescheitert, alle Hosts zurückgerollt	Deployment of {} failed, all hosts rolled back
+Bereitstellung {}: {}	Deployment {}: {}
+Den Pfad {} gibt es auf {} nicht.	The path {} does not exist on {}.
+Die Datei von {} gibt es nicht.	The file of {} does not exist.
+Die Einheit {} fehlt oder startet nicht: {}	The unit {} is missing or does not start: {}
+Die Einheit {} gibt es auf {} nicht: weder in {} noch unter den Dateien.	The unit {} does not exist on {}: neither in {} nor among the files.
+Die Einheit {} gibt es nicht.	The unit {} does not exist.
+Die Einstellungen sind kein JSON-Objekt.	The settings are not a JSON object.
+Die Einstellungen sind kein gültiges JSON.	The settings are not valid JSON.
+Diese Bereitstellung läuft nicht.	This deployment is not running.
+Eine Bereitstellung braucht mindestens einen Host.	A deployment needs at least one host.
+Einheit {}: {}	Unit {}: {}
+Neustart in {}	restart in {}
+Start gescheitert: {}	start failed: {}
+Status {} statt {}	status {} instead of {}
+Zeile {}: ExecStart braucht einen absoluten Pfad, nicht {}.	Line {}: ExecStart needs an absolute path, not {}.
+Zeile {}: ExecStart startet hier nur jfs oder jfn-service, nicht {}.	Line {}: ExecStart starts only jfs or jfn-service here, not {}.
+Zeile {}: Restart={} gibt es hier nicht (no, on-failure, always).	Line {}: there is no Restart={} here (no, on-failure, always).
+Zeile {}: Type={} gibt es hier nicht, der Dienst läuft als simple.	Line {}: there is no Type={} here, the service runs as simple.
+Zeile {}: den Abschnitt [{}] kenne ich nicht, er zählt nicht.	Line {}: the section [{}] is unknown and does not count.
+Zeile {}: jfn-service braucht die Art des Dienstes, dahinter höchstens eine Datei mit seinen Einstellungen.	Line {}: jfn-service needs the kind of the service, then at most a file with its settings.
+Zeile {}: jfs braucht eine Datei.	Line {}: jfs needs a file.
+Zeile {}: ohne „=“ zählt die Zeile nicht.	Line {}: without “=” the line does not count.
+Zeile {}: {} gibt es hier nicht, die Zeile zählt nicht.	Line {}: there is no {} here, the line does not count.
+Zeile {}: {} ist kein Abschnitt.	Line {}: {} is not a section.
+Zeile {}: {} ist keine Zahl, es bleibt bei {}.	Line {}: {} is not a number, it stays at {}.
+Zeile {}: {} ist keine Zeit.	Line {}: {} is not a time.
+Zeile {}: {} ist nicht NAME=WERT.	Line {}: {} is not NAME=VALUE.
+Zeile {}: {} steht vor jedem Abschnitt und zählt nicht.	Line {}: {} stands before every section and does not count.
+[Service] braucht ExecStart.	[Service] needs ExecStart.
+beendet mit Status {}	ended with status {}
+beendet, Status 0	ended, status 0
+das Gerät gibt es nicht mehr	the device no longer exists
+das Gerät hat keine Adresse	the device has no address
+das Gerät hat keine Dateien	the device has no files
+das Ziel ist nicht erreichbar	the destination is unreachable
+das gibt es nicht	it does not exist
+die Datei {} gibt es nicht	the file {} does not exist
+die Datei {} ist kein Text	the file {} is no text
+die Dateien kamen nicht an: {}	the files did not arrive: {}
+die Einheit ist falsch: {}	the unit is wrong: {}
+die Einheit ist {}	the unit is {}
+die Prüfung hielt nicht: {}	the check did not hold: {}
+die Verbindung endete ohne Antwort	the connection ended without an answer
+gestartet: {}	started: {}
+kopiert	copying
+nicht begonnen	not started
+niemand lauscht auf dem Port	nobody listens on the port
+prüft	checking
+zu viele Starts in kurzer Zeit	too many starts in a short time
+zu viele Starts in kurzer Zeit: er bleibt gestoppt	too many starts in a short time: it stays stopped
+zurückgerollt	rolled back
+{} hat keine Linux-Shell und nimmt keine Einheit.	{} has no Linux shell and takes no unit.
+{} hat keine Linux-Shell: von dort lässt sich nichts bereitstellen.	{} has no Linux shell: nothing can be deployed from there.
+{} ist auf allen Hosts bereitgestellt	{} is deployed on all hosts
+{} kommt aus dem Projekt: ob der Dienst startet, steht dort (Gerätefenster, Dienste).	{} comes from the project: whether the service starts is said there (device window, Services).
+{} lässt sich nicht anlegen.	{} cannot be created.
+{}, Zeile {}, Spalte {}: {}	{}, line {}, column {}: {}
+{}: Prüfung hielt	{}: check held
+{}: fertig	{}: done
+{}: gescheitert: {}	{}: failed: {}
+{}: kopiert {} Dateien	{}: copying {} files
+{}: zurückgerollt	{}: rolled back
+{}: {} neu gestartet	{}: {} restarted
+„{}“ taugt nicht als Name einer Einheit.	“{}” is no name for a unit.
+„root“ muss ein absoluter Pfad sein: {}	“root” must be an absolute path: {}
+Webbrowser: Weiterleitung {} nach {}.	Web browser: redirect {} to {}.
+Nach {} Weiterleitungen kam noch eine: es bleibt dabei.	After {} redirects came another one: it stops here.
+Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.	Encrypted pages (https) come with a later stage.
+Das Gerät oder der Dienst hat angehalten.	The device or the service stopped.
+{} Anfragen, {} Antworten, {} gescheitert	{} requests, {} answers, {} failed
+# X1f: SSH (sshd.rs, sshtrace.rs, svcact.rs)
+„password_auth“ ist true oder false.	“password_auth” is true or false.
+„key_auth“ ist true oder false.	“key_auth” is true or false.
+„users“ ist eine Liste.	“users” is a list.
+Ein Benutzer in „users“ braucht „name“.	A user in “users” needs “name”.
+SSH: neuer Schlüssel {} ({} Bit, {}).	SSH: new {} key ({} bits, {}).
+SSH: Schlüssel {} gelöscht.	SSH: {} key deleted.
+SSH: Verbindung von {} auf vty {}.	SSH: connection from {} on vty {}.
+SSH: Verbindung von {}.	SSH: connection from {}.
+SSH: Verbindung von {} abgelehnt ({}).	SSH: connection from {} refused ({}).
+SSH: Schlüsselaustausch mit {} fertig ({}, Schlüssel {}), die Verbindung ist verschlüsselt.	SSH: key exchange with {} done ({}, key {}), the connection is encrypted.
+SSH: {} von {} angemeldet ({}).	SSH: {} from {} logged in ({}).
+SSH: Anmeldung von {} aus {} abgelehnt ({}).	SSH: login of {} from {} refused ({}).
+SSH: zu viele Versuche von {} aus {}: die Verbindung endet.	SSH: too many tries of {} from {}: the connection ends.
+SSH: Anmeldung von {} dauerte zu lange: die Verbindung endet.	SSH: the login from {} took too long: the connection ends.
+SSH: Sitzung von {}: {}.	SSH: session from {}: {}.
+SSH: Sitzung von {} nach Leerlauf geschlossen.	SSH: session from {} closed after being idle.
+SSH: Sitzung von {} geschlossen.	SSH: session from {} closed.
+SSH: Verbindung mit {} abgebrochen ({}).	SSH: connection with {} broken off ({}).
+SSH: verbunden mit {} Port {}.	SSH: connected to {} port {}.
+SSH: {} Port {} nicht erreicht ({}).	SSH: {} port {} not reached ({}).
+SSH: Schlüssel von {} neu gemerkt ({}).	SSH: remembered the new key of {} ({}).
+SSH: Schlüssel von {} hat sich geändert ({}): Verbindung verweigert.	SSH: the key of {} has changed ({}): connection refused.
+SSH: Schlüssel von {} nicht angenommen ({}).	SSH: the key of {} was not accepted ({}).
+SSH: als {} bei {} angemeldet ({}).	SSH: logged in as {} at {} ({}).
+SSH: Anmeldung als {} bei {} aufgegeben.	SSH: gave up logging in as {} at {}.
+SSH: Sitzung mit {} beendet (Status {}).	SSH: session with {} ended (status {}).
+SCP: {} ({} Byte) an {} geschickt.	SCP: sent {} ({} bytes) to {}.
+SCP: {} ({} Byte) von {} geholt.	SCP: fetched {} ({} bytes) from {}.
+IOS-artige Geräte nehmen SSH auf ihren vty-Leitungen an (crypto key generate, line vty).	IOS-like devices take SSH on their vty lines (crypto key generate, line vty).
+# X1f: SNMPv3 (snmpd.rs, snmptrace.rs)
+„{}“ ist keine Engine-ID (5 bis 32 Bytes hexadezimal).	“{}” is no engine ID (5 to 32 bytes in hexadecimal).
+Ein SNMPv3-Benutzer braucht „name“ ohne Leerzeichen.	An SNMPv3 user needs “name” without spaces.
+„{}“ ist keine Stufe (noAuthNoPriv, authNoPriv, authPriv).	“{}” is no level (noAuthNoPriv, authNoPriv, authPriv).
+„{}“ von {} braucht mindestens 8 Zeichen.	“{}” of {} needs at least 8 characters.
+„{}“ ist kein Verfahren (MD5, SHA, SHA-256, SHA-384, SHA-512).	“{}” is no protocol (MD5, SHA, SHA-256, SHA-384, SHA-512).
+„{}“ ist kein Verfahren (AES; DES gibt es hier nicht).	“{}” is no protocol (AES; there is no DES here).
+„{}“ ist kein Objekt.	“{}” is no object.
+SNMPv3: {} von {} (Benutzer {}, {}, Kennung {}, {} Variablen).	SNMPv3: {} from {} (user {}, {}, id {}, {} bindings).
+SNMPv3: Report {} an {}.	SNMPv3: report {} to {}.
+SNMPv3: {} hat die Engine-ID {}.	SNMPv3: {} has the engine ID {}.
+SNMPv3: {} lehnt ab: {}.	SNMPv3: {} refuses: {}.
+# X1g: 802.1X and WPA-Enterprise (jfn_model wlan.rs, jfn_sim dot1x.rs, dot1xtrace.rs, supp.rs, radiusd.rs)
+WPA2-Enterprise	WPA2-Enterprise
+WPA3-Enterprise	WPA3-Enterprise
+„{}“ braucht die Adresse seines RADIUS-Servers.	“{}” needs the address of its RADIUS server.
+„{}“ braucht den gemeinsamen Schlüssel seines RADIUS-Servers.	“{}” needs the key it shares with its RADIUS server.
+{} Sitzungen, {} angenommen, {} abgelehnt	{} sessions, {} accepted, {} refused
+{} {}: 802.1X verlangt, aber „dot1x system-auth-control“ fehlt: der Port bleibt offen.	{} {}: asks for 802.1X, but “dot1x system-auth-control” is missing: the port stays open.
+{} {}: 802.1X verlangt, aber kein RADIUS-Server eingetragen: der Port bleibt geschlossen.	{} {}: asks for 802.1X, but no RADIUS server is configured: the port stays closed.
+802.1X: EAP {} an {} gesendet.	802.1X: EAP {} sent to {}.
+802.1X: EAP {} von {}.	802.1X: EAP {} from {}.
+802.1X: EAPOL-Start an {}.	802.1X: EAPOL-Start on {}.
+802.1X: EAPOL-Logoff an {}.	802.1X: EAPOL-Logoff on {}.
+802.1X: {} ist für {} offen, VLAN {} von RADIUS.	802.1X: {} is open for {}, VLAN {} from RADIUS.
+802.1X: {} ist für {} offen.	802.1X: {} is open for {}.
+802.1X: {} abgelehnt, {} bleibt {} s geschlossen.	802.1X: {} refused, {} stays closed for {} s.
+802.1X: Wartezeit von {} vorbei, neue Anfrage.	802.1X: the wait of {} is over, it asks again.
+802.1X: keine Antwort an {}, Anfrage erneut (Versuch {}).	802.1X: no answer on {}, the request goes again (try {}).
+802.1X: {} antwortet nicht mehr.	802.1X: {} no longer answers.
+802.1X: kein RADIUS-Server für {} erreichbar, keine Methode übrig.	802.1X: no RADIUS server reachable for {}, no method left.
+802.1X: {} meldet sich neu an.	802.1X: {} authenticates again.
+802.1X: {} ist wieder geschlossen.	802.1X: {} is closed again.
+802.1X: VLAN {} von RADIUS gibt es hier nicht, {} bleibt geschlossen.	802.1X: VLAN {} from RADIUS does not exist here, {} stays closed.
+802.1X: EAP-Success für {} ohne Schlüssel, die Methode taugt nicht für WPA-Enterprise.	802.1X: EAP-Success for {} without keys, the method is no good for WPA-Enterprise.
+802.1X: {} ist nicht autorisiert, Frame verworfen.	802.1X: {} is not authorized, frame dropped.
+Supplicant: EAPOL-Start auf {}.	Supplicant: EAPOL-Start on {}.
+Supplicant: EAP {} auf {}.	Supplicant: EAP {} on {}.
+Supplicant: {} auf {} angemeldet ({}).	Supplicant: {} logged in on {} ({}).
+Supplicant: Anmeldung von {} auf {} abgelehnt.	Supplicant: the login of {} on {} was refused.
+Supplicant: niemand antwortet auf {}, der Port läuft ohne 802.1X.	Supplicant: nobody answers on {}, the port runs without 802.1X.
+Supplicant: keine Zugangsdaten für {}.	Supplicant: no credentials for {}.
+Supplicant: auf {} abgemeldet.	Supplicant: logged off on {}.
+EAP-Methode „{}“ gibt es hier nicht.	There is no EAP method “{}” here.
+{}: {} Anmeldungen, {} abgelehnt	{}: {} logins, {} refused
+# X1g: IMAP (jfn_sim imapd.rs, mailtrace.rs, mailc.rs)
+Port {}, {} Benutzer: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Nachrichten geholt, {} entfernt	Port {}, {} users: {} sessions, {} logins, {} refused, {} messages fetched, {} removed
+Nicht abgerufen: das Konto nennt keinen IMAP-Server oder keinen Benutzer.	Not fetched: the account names no IMAP server or no user.
+Nicht abgerufen: {} lehnt die Anmeldung ab ({}).	Not fetched: {} refuses the login ({}).
+Nicht abgerufen: {} lehnt {} ab ({}).	Not fetched: {} refuses {} ({}).
+{} auf {} abgeglichen, nichts Neues.	{} on {} compared, nothing new.
+{} auf {} abgeglichen, eine neue Nachricht.	{} on {} compared, one new message.
+{} auf {} abgeglichen, {} neue Nachrichten.	{} on {} compared, {} new messages.
+IMAP: {} verbindet sich.	IMAP: {} connects.
+IMAP: {} ist angemeldet.	IMAP: {} is logged in.
+IMAP: Anmeldung von {} abgelehnt.	IMAP: the login of {} was refused.
+IMAP: {} wählt {} mit {} Nachrichten.	IMAP: {} selects {} with {} messages.
+IMAP: {} Nachrichten aus {} gesendet, {} Bytes.	IMAP: {} messages from {} sent, {} bytes.
+IMAP: Markierungen von {} Nachrichten in {} geändert.	IMAP: flags of {} messages in {} changed.
+IMAP: {} Nachrichten aus {} entfernt.	IMAP: {} messages removed from {}.
+IMAP: {} Nachrichten nach {} verschoben.	IMAP: {} messages moved to {}.
+IMAP: {} Nachrichten nach {} kopiert.	IMAP: {} messages copied to {}.
+IMAP: Nachricht mit {} Bytes in {} abgelegt.	IMAP: a message of {} bytes put into {}.
+IMAP: {} {}.	IMAP: {} {}.
+IMAP: {} abgelehnt.	IMAP: {} refused.
+E-Mail: {} von {} geholt, {} Nachrichten.	E-Mail: {} fetched from {}, {} messages.

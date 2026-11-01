@@ -52,6 +52,13 @@
 //   cable SW1 Gi1/0/1 length 132 | length auto   a cable's length by hand (metres), automatic
 //   expect cable SW1 Gi1/0/1 length <= 100       the length of the cable at a port (no
 //   expect cable SW1 Gi1/0/1 up | down           comparison: ==), whether it carries
+//   deploy DEV1 GROUP|H1,H2 unit web             a rolling deployment (A2, jfn_sim deploy.rs)
+//     [files /root/app[,PATH]]                   from DEV1 to a group of the project or a
+//     [health active|tcp PORT|http PORT PATH [STATUS]]  list of hosts: the files, the unit,
+//     [wait 2s] [timeout 10s] [rollback]         its check, the wait before the next host,
+//                                                what a failure does (default: it stops)
+//   expect WEB1 unit web active|inactive|failed|enabled|disabled   a unit of a host (A2)
+//   expect DEV1 deploy done|running|failed|rolledback|aborted      its newest deployment
 //
 // Device and port names are resolved when the scenario runs; this module only checks syntax.
 
@@ -100,6 +107,23 @@ pub enum StepKind {
     Place { dev: String, place: String, unit: u16 },
     /// the length of the cable at a port set by hand ("cable DEV PORT length M|auto"; 0: auto)
     CableLen { dev: String, port: String, m: u32 },
+    /// a rolling deployment ("deploy ..."; the names are resolved when it runs)
+    Deploy(DeployStep),
+}
+
+/// a deployment of a scenario: the devices by name, a group or a list
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeployStep {
+    pub src: String,
+    /// a group's name, or device names separated by commas
+    pub hosts: String,
+    pub unit: String,
+    /// files and folders of the source (empty: the unit file alone)
+    pub files: Vec<String>,
+    pub health: crate::unit::Health,
+    pub wait: u64,
+    pub timeout: u64,
+    pub on_fail: crate::unit::OnFail,
 }
 
 /// a fault of a scenario (the names are resolved when it runs)
@@ -162,6 +186,10 @@ pub enum Expect {
     Reach { dev: String, host: String, negate: bool },
     /// the cable at a port: its length in metres compared, or whether it carries (P1)
     Cable { dev: String, port: String, check: CableCheck },
+    /// a unit of a host: active, inactive, failed, enabled, disabled (A2)
+    Unit { dev: String, unit: String, state: String },
+    /// the newest deployment of a device: done, running, failed, rolledback, aborted (A2)
+    Deploy { dev: String, state: String },
 }
 
 /// what "expect cable DEV PORT ..." looks at
@@ -178,6 +206,7 @@ impl Expect {
             Expect::Output { dev, .. } | Expect::Route { dev, .. } | Expect::NoRoute { dev, .. } | Expect::Metric { dev, .. } | Expect::Series { dev, .. } => Some(dev),
             Expect::Reach { dev, .. } => Some(dev),
             Expect::Cable { dev, .. } => Some(dev),
+            Expect::Unit { dev, .. } | Expect::Deploy { dev, .. } => Some(dev),
             Expect::Hops { .. } => None,
         }
     }
@@ -392,7 +421,7 @@ fn words(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move", "place", "cable"];
+const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move", "place", "cable", "deploy"];
 
 /// parses a scenario; all syntax errors are collected
 pub fn parse(text: &str) -> Result<Scenario, Vec<ScnErr>> {
@@ -482,6 +511,7 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
             StepKind::Place { dev: String::from(*dev), place: String::from(*place), unit: u }
         }
         ["cable", dev, port, "length", m] => StepKind::CableLen { dev: String::from(*dev), port: String::from(*port), m: metres(m)? },
+        ["deploy", src, hosts, rest @ ..] => StepKind::Deploy(parse_deploy(src, hosts, rest)?),
         [k, ..] => return Err(format!("Unbekannter Schritt \u{201e}{}\u{201c}.", k)),
         [] => return Ok(None),
     };
@@ -505,6 +535,61 @@ fn parse_impair(kv: &[&str]) -> Result<Impair, String> {
         }
     }
     Ok(imp)
+}
+
+/// the words of a deployment after its source and hosts
+fn parse_deploy(src: &str, hosts: &str, w: &[&str]) -> Result<DeployStep, String> {
+    use crate::unit::{Health, OnFail};
+    let mut d = DeployStep { src: String::from(src), hosts: String::from(hosts), unit: String::new(), files: Vec::new(), health: Health::Active, wait: 1_000_000_000, timeout: 10_000_000_000, on_fail: OnFail::Stop };
+    let dur = |s: &str| parse_duration(s).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zeitangabe (z. B. 250ms, 1.5s).", s));
+    let port = |s: &str| s.parse::<u16>().map_err(|_| format!("\u{201e}{}\u{201c} ist kein Port.", s));
+    let mut r = w;
+    loop {
+        r = match r {
+            [] => break,
+            ["unit", n, t @ ..] => {
+                d.unit = String::from(*n);
+                t
+            }
+            ["files", f, t @ ..] => {
+                d.files = f.split(',').map(String::from).collect();
+                t
+            }
+            ["health", "active", t @ ..] => {
+                d.health = Health::Active;
+                t
+            }
+            ["health", "tcp", p, t @ ..] => {
+                d.health = Health::Tcp { port: port(p)? };
+                t
+            }
+            ["health", "http", p, path, t @ ..] => {
+                let (status, t) = match t {
+                    [s, x @ ..] if s.bytes().all(|b| b.is_ascii_digit()) => (s.parse::<u16>().unwrap_or(200), x),
+                    x => (200, x),
+                };
+                d.health = Health::Http { port: port(p)?, path: String::from(*path), status };
+                t
+            }
+            ["wait", x, t @ ..] => {
+                d.wait = dur(x)?;
+                t
+            }
+            ["timeout", x, t @ ..] => {
+                d.timeout = dur(x)?;
+                t
+            }
+            ["rollback", t @ ..] => {
+                d.on_fail = OnFail::Rollback;
+                t
+            }
+            [k, ..] => return Err(format!("\u{201e}{}\u{201c} versteht deploy nicht.", k)),
+        };
+    }
+    if d.unit.is_empty() {
+        return Err(String::from("deploy braucht \u{201e}unit NAME\u{201c}."));
+    }
+    Ok(d)
 }
 
 /// the words after "fault" (without "for DURATION")
@@ -632,6 +717,8 @@ fn parse_expect(w: &[&str]) -> Result<Expect, String> {
         }
         [dev, "route", p, "dev", iface] => Expect::Route { dev: String::from(*dev), prefix: prefix(p)?, via: Via::Iface(String::from(*iface)) },
         [dev, "no", "route", p] => Expect::NoRoute { dev: String::from(*dev), prefix: prefix(p)? },
+        [dev, "unit", unit, st] if matches!(*st, "active" | "inactive" | "failed" | "enabled" | "disabled") => Expect::Unit { dev: String::from(*dev), unit: String::from(*unit), state: String::from(*st) },
+        [dev, "deploy", st] if matches!(*st, "done" | "running" | "failed" | "rolledback" | "aborted") => Expect::Deploy { dev: String::from(*dev), state: String::from(*st) },
         [dev, "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: false },
         [dev, "not", "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: true },
         ["cable", dev, port, "length", c, v] => Expect::Cable { dev: String::from(*dev), port: String::from(*port), check: CableCheck::Len(cmp(c)?, metres(v)?) },

@@ -1,0 +1,56 @@
+# Eine kleine Website. WEB1 zeigt die Dateien aus /var/www (http-server mit "root") und einen
+# Laden als Skript auf Port 8080, DNS1 kennt web.lab. PC1 holt mit curl, was der Webbrowser auch
+# holt: die Startseite über den Namen, einen Ordner ohne seinen Schrägstrich (301), Dateien mit
+# ihren Typen, eine fehlende Seite, einen Weg aus dem Ordner hinaus (bleibt drinnen), die Suche mit
+# GET, die Bestellung mit POST (das Skript liest req.query und req.form), eine Weiterleitung und
+# eine Schleife. Eine gespeicherte Seite gilt sofort.
+run 1s
+PC1: curl -s http://web.lab/
+run 100ms
+expect PC1 output contains "<title>Bäckerei Krume</title>"
+PC1: curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download}\n" http://web.lab/logo.svg
+run 100ms
+expect PC1 output contains "200 image/svg+xml"
+PC1: curl -s -i http://web.lab/brot
+run 100ms
+expect PC1 output contains "Location: /brot/"
+PC1: curl -s -L http://web.lab/brot
+run 100ms
+expect PC1 output contains "Roggenbrot"
+PC1: curl -s -i http://web.lab/notiz.txt
+run 100ms
+expect PC1 output contains "Content-Type: text/plain"
+PC1: curl -s -o /dev/null -w "%{http_code} %{content_type}\n" http://web.lab/hilfe.md
+run 100ms
+expect PC1 output contains "200 text/markdown"
+PC1: curl -s -o /dev/null -w "%{http_code}\n" http://web.lab/kaputt.html
+run 100ms
+expect PC1 output contains "404"
+PC1: curl -s -o /dev/null -w "%{http_code}\n" http://web.lab/%2e%2e/%2e%2e/root/app/laden.jfs
+run 100ms
+expect PC1 output contains "404"
+PC1: curl -s -X POST -o /dev/null -w "%{http_code}\n" http://web.lab/index.html
+run 100ms
+expect PC1 output contains "405"
+PC1: curl -s "http://web.lab:8080/suche?q=K%C3%A4se+%26+Brot"
+run 100ms
+expect PC1 output contains "Gesucht wurde: Käse &amp; Brot"
+PC1: curl -s -d "ware=Roggenbrot&menge=3" http://web.lab:8080/bestellen
+run 100ms
+expect PC1 output contains "Bestellung 1: 3 mal Roggenbrot"
+PC1: curl -s -i -d "x=1" http://web.lab:8080/see
+run 100ms
+expect PC1 output contains "HTTP/1.1 303 See Other"
+PC1: curl -s -L -d "x=1" http://web.lab:8080/temp
+run 100ms
+expect PC1 output contains "POST x=1"
+PC1: curl -L --max-redirs 3 http://web.lab:8080/schleife
+run 100ms
+expect PC1 output contains "Maximum (3) redirects followed"
+WEB1: echo "Neue Notiz" > /var/www/notiz.txt
+PC1: curl -s http://web.lab/notiz.txt
+run 100ms
+expect PC1 output contains "Neue Notiz"
+expect WEB1 svc www metric status_4xx == 3
+expect WEB1 svc laden metric errors == 0
+print "Seiten aus Dateien und aus einem Skript, Formulare mit GET und POST, Weiterleitungen"

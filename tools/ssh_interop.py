@@ -1,6 +1,10 @@
 """ssh_interop.py -- netio's SSH transport against OpenSSH's client.
 
-    python tools/ssh_interop.py [--distro Ubuntu-24.04]
+    python tools/ssh_interop.py [--distro Ubuntu-24.04] [--core] [--bin FILE] [--windows-only]
+
+--core: against netpkt::ssh instead (coretest --ssh-core-serve, the I/O-free core on a socket),
+each of its ciphers and without the strict key exchange, which that core does not take part in.
+--bin: the coretest to run on Windows (another output folder than build/win).
 
 coretest --ssh-serve runs a small server on netio::ssh (key exchange, encryption, logins and
 exec are the library's); OpenSSH's ssh logs in with a key made by ssh-keygen and with a password
@@ -80,6 +84,9 @@ class Side:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--distro", default="Ubuntu-24.04")
+    ap.add_argument("--core", action="store_true")
+    ap.add_argument("--bin")
+    ap.add_argument("--windows-only", action="store_true")
     a = ap.parse_args()
     passed = failed = 0
 
@@ -91,15 +98,17 @@ def main():
 
     tmp = Path(tempfile.mkdtemp(prefix="ssh-interop-"))
     try:
-        for name in ("windows", "linux"):
-            print(f"OpenSSH client ({name}) -> netio::ssh server")
+        for name in ("windows",) if a.windows_only else ("windows", "linux"):
+            print(f"OpenSSH client ({name}) -> {'netpkt::ssh core' if a.core else 'netio::ssh'} server")
             s = Side(name, a.distro, tmp)
+            if a.bin and not s.linux:
+                s.coretest = a.bin
             port = free_port()
             key = s.path("id")
             s.run([s.keygen, "-q", "-t", "ed25519", "-N", "", "-C", "", "-f", key], check=True)
             mine = s.run([s.coretest, "--ssh-key", key], text=True).stdout.split()
             check(mine[:2] == s.read("id.pub").split()[:2], "the library reads ssh-keygen's private key")
-            srv = subprocess.Popen(s.pre + [s.coretest, "--ssh-serve", str(port), "--authorized", s.path("id.pub"), "--hostkey-out", s.path("host.pub")],
+            srv = subprocess.Popen(s.pre + [s.coretest, "--ssh-core-serve" if a.core else "--ssh-serve", str(port), "--authorized", s.path("id.pub"), "--hostkey-out", s.path("host.pub")],
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
                 check(srv.stdout.readline().strip() == "ready", "test server up")
@@ -119,7 +128,15 @@ def main():
                 check(r.returncode == 3 and r.stderr.strip() == "boom", f"exit code and stderr ({r.returncode} {r.stderr.strip()!r})")
                 r = s.run(base + ["-vvv", "-o", "BatchMode=yes", "-i", key, "bc@127.0.0.1", "echo x"], text=True)
                 check(fp in r.stderr, f"ssh sees the fingerprint the library shows ({fp})")
-                check("will use strict KEX ordering" in r.stderr, "strict key exchange in use (Terrapin)")
+                if not a.core:
+                    check("will use strict KEX ordering" in r.stderr, "strict key exchange in use (Terrapin)")
+                else:
+                    for cipher in ("chacha20-poly1305@openssh.com", "aes128-ctr", "aes256-ctr"):
+                        opts = [o.replace("Ciphers=chacha20-poly1305@openssh.com", "Ciphers=" + cipher) for o in withkey] + ["-o", "MACs=hmac-sha2-256"]
+                        data = os.urandom(1 << 20)
+                        r = s.run(opts + ["sha256"], input=data)
+                        want = f"{hashlib.sha256(data).hexdigest()} {len(data)}\n".encode()
+                        check(r.returncode == 0 and r.stdout == want, f"{cipher}: 1 MiB through stdin ({r.returncode} {r.stderr[-200:]!r})")
                 # OpenSSH checks the library's host key signature: another known key is refused
                 s.write("known2", f"[127.0.0.1]:{port} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPrRGcKDw5kO91keC8u9HuXbIqD7TVyG+r6hPaF29HAv\n")
                 r = s.run([s.ssh] + SSH_OPTS + ["-o", f"UserKnownHostsFile={s.path('known2')}", "-o", "BatchMode=yes", "-p", str(port), "-i", key, "bc@127.0.0.1", "echo x"], text=True)
@@ -138,7 +155,7 @@ def main():
                 srv.kill()
                 srv.wait()
                 if s.linux:
-                    s.run(["pkill", "-f", f"ssh-serve {port}"])
+                    s.run(["pkill", "-f", f"-serve {port}"])
                 s.cleanup()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
