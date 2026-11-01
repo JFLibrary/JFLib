@@ -523,6 +523,14 @@ impl Ui {
             self.scr_bars(&e);
         }
         self.scr_wheel(&e);
+        if e.flags & SC_NOWHEEL == 0 {
+            // a finger may roll it (touch.rs)
+            let (mx, my) = self.scr_max(&e);
+            let s = *self.slot(e.id);
+            let axes = scr_axes(e.flags);
+            let ax = if axes & 1 != 0 { super::touch::AX_V } else { 0 } | if axes & 2 != 0 { super::touch::AX_H } else { 0 };
+            self.pan_push(e.id, e.hit0, e.layer as u8, false, ax, [s.scrollx, s.scrolly], [mx, my]);
+        }
         self.wp.ctx.last_rect = e.rect;
         if e.flags & SCR_F_LIST == 0 {
             // semantic record: value = position in DIP (vertical, or horizontal for SC_H views)
@@ -596,7 +604,8 @@ impl Ui {
         let range = content.wrapping_sub(view);
         if range <= 0 {
             pos = 0;
-        } else if view <= 0 {
+        } else if view <= 0 || self.m.touch.on {
+            // (a finger: no bar and no hit box; the room stays, so nothing jumps; touch.rs)
             pos = pos.max(0).min(range);
         } else {
             ev = self.behave(id, 0);

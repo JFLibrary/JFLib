@@ -525,7 +525,8 @@ impl Ui {
     /// origin moved lately
     pub(crate) fn sc_pass(&mut self, w: i32, h: i32) -> Pass {
         let icons_exact = self.icon_hook.is_none() && !ICON_PAINTED.load(Ordering::Relaxed);
-        let (ins, verify) = (self.m.ins.on, self.verify_dirty);
+        // (a finger scrolls every frame until the copies decide the frame rate: touch.rs)
+        let (ins, verify) = (self.m.ins.on, self.verify_dirty || self.m.touch.on);
         let s = &mut self.wp.scopy;
         s.shown.clear();
         s.tick = s.tick.wrapping_add(1);
@@ -592,6 +593,8 @@ impl Ui {
         }
         let (w, h) = (p.w, p.h);
         let rtl = self.rtl;
+        // (a finger: flat cells are copied too, every rectangle left to draw replays the commands)
+        let flat_too = self.m.touch.on;
         let grids = &self.wp.scopy.prev;
         // (grid, move, the part of the view whose pixels come from inside it)
         let mut cand: Vec<(&Grid, &Grid, i32, i32, [i32; 4])> = Vec::new();
@@ -655,7 +658,7 @@ impl Ui {
                         continue;
                     }
                     let ks = [j0 as usize * g.nx + i0 as usize, j0 as usize * g.nx + i1 as usize, j1 as usize * g.nx + i0 as usize, j1 as usize * g.nx + i1 as usize];
-                    if ks.iter().all(|&k| v[k]) && ks.iter().any(|&k| g.det[k]) {
+                    if ks.iter().all(|&k| v[k]) && (flat_too || ks.iter().any(|&k| g.det[k])) {
                         covered[(row * cols + c0 + n as i32) as usize] = tag;
                         any = true;
                     }
@@ -675,7 +678,7 @@ impl Ui {
     /// always do; else the view's measured costs decide (see the module header).  The frame
     /// counts as one that drew until sc_copy copies.
     pub(crate) fn sc_want(&mut self, plan: &Plan) -> bool {
-        let verify = self.verify_dirty;
+        let verify = self.verify_dirty || self.m.touch.on;
         let s = &mut self.wp.scopy;
         s.mode = 1;
         s.key = plan.moves.first().map_or(0, |m| m.0);

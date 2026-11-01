@@ -91,7 +91,7 @@ struct HostRuntime {
 impl plat::web::WebApplication for HostRuntime {
     fn frame_delay(&self) -> u32 {
         let ui = &self.runtime.ui;
-        if ui.need || ui.need_render || ui.animating || ui.tasks_ready() { return 0; }
+        if ui.need || ui.need_render || ui.animating || ui.touch_busy() || ui.tasks_ready() { return 0; }
         let task = ui.tasks_deadline().map(|t| (t.saturating_sub(plat::task::now_us()) / 1000).min(250) as i32);
         ui.timers.iter()
             .map(|(_, deadline)| deadline.wrapping_sub(ui.now_ms) as i32)
@@ -500,11 +500,18 @@ impl Ui {
     pub(crate) fn process_events_deferred(&mut self, app: &mut dyn App, render: bool) {
         let mut text_pending = false;
         let mut text_win: i32 = -1;
-        while let Some(mut ev) = plat::evq_pop() {
-            if self.hr_on() {
+        self.touch_tick(); // the resting finger, the hover after it (touch.rs)
+        self.uiw_use(0);
+        loop {
+            // what the gesture recogniser sends to the widgets goes first: it belongs to the raw
+            // finger event before the next one (and has the UI's window already)
+            let made = self.touch_next();
+            let synth = made.is_some();
+            let Some(mut ev) = made.or_else(plat::evq_pop) else { break };
+            if !synth && self.hr_on() {
                 self.hr_popped(&ev); // (hotreload.rs) replayed or recorded
             }
-            if !self.headless {
+            if !self.headless && !synth {
                 let w = self.uiw_from_pw(ev.win as i32);
                 if w < 0 {
                     ev_dropped(&ev);
@@ -620,6 +627,13 @@ impl Ui {
                 }
                 _ => {}
             }
+            if !synth {
+                self.touch_kind(&ev); // a finger or a mouse: the scroll bars follow
+                if self.touch_takes(&ev) {
+                    self.touch_input(&ev); // the finger goes through the recogniser (touch.rs)
+                    continue;
+                }
+            }
             // (inspect.rs) the inspector's hot keys and its pick take their events first
             if self.m.ins.armed {
                 let r = self.ins_event(&ev);
@@ -647,7 +661,7 @@ impl Ui {
                 self.need_render = true;
             }
             self.uiw_use(t as u32);
-            if self.hr_on() {
+            if !synth && self.hr_on() {
                 self.hr_input(&ev, t as u32); // (hotreload.rs) recorded or checked
             }
             match self.input_event(&ev) {
@@ -686,6 +700,11 @@ impl Ui {
         }
         if self.hr_on() {
             self.hr_batch_end(); // (hotreload.rs) the batch's records written
+        }
+        // the finger's way since the last frame: at most one frame for all its samples
+        if render && self.touch_moved() {
+            self.run_passes(app);
+            self.need_render = true;
         }
         if render && self.need_render {
             self.need_render = false;
@@ -750,11 +769,13 @@ impl Ui {
     /// other windows in the same pass.
     pub(crate) fn run_passes(&mut self, app: &mut dyn App) {
         let (mut passes, mut build_us) = (0u32, 0u64); // (inspect.rs) statistics
+        self.touch_apply(); // the way of the finger and of a fling, into the views (touch.rs)
         let mut tasks_ran = self.settle(app, &mut passes, &mut build_us);
         // typed text beyond a pass's queue (ctx.rs): part by part, each with passes of its own
         while self.text_refill() {
             tasks_ran = self.settle(app, &mut passes, &mut build_us);
         }
+        self.touch_after_passes();
         self.dnd_after_passes(); // a DS_START without drag_set is no drag
         self.focus_req_expire();
         self.need = tasks_ran; // tasks ran in the last round: the frame did not see it yet
@@ -781,7 +802,6 @@ impl Ui {
                 self.uiw_pass_begin(w, h);
                 let csd = self.csd_begin();
                 let t0 = if self.m.ins.on { plat::time_us() } else { 0 };
-                plat::touch_drag_clear();
                 app.frame(self);
                 if t0 != 0 {
                     *build_us += plat::time_us().saturating_sub(t0);
@@ -1290,7 +1310,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         }
         // deadline in ms since start: animations (16 ms), timers, auto close
         let mut dl = if ui.agent_enabled() { ui.now_ms.wrapping_add(30) } else { u32::MAX };
-        if ui.animating {
+        if ui.animating || ui.touch_busy() {
             dl = ui.now_ms.wrapping_add(16);
         }
         let t = ui.timer_due_peek();

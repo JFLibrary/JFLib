@@ -53,7 +53,7 @@ pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 pub(crate) mod system_host;
 pub use system_host::{jfgui_note, jfgui_system};
 #[cfg(target_os = "android")]
-pub use system_host::jfgui_touch_drag;
+pub use system_host::jfgui_touch_reached;
 pub(crate) use system_host::sys_settings_host;
 // sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
 #[path = "web_sensors.rs"]
@@ -189,6 +189,13 @@ static CALENDAR: SpinLock<Date> = SpinLock::new(Date {
 static STARTED: AtomicBool = AtomicBool::new(false);
 static WAKE_PENDING: AtomicBool = AtomicBool::new(false);
 static AGENT: AtomicBool = AtomicBool::new(false);
+/// the page's main pointer is a finger (`pointer: coarse`, a capability bit of the host)
+static TOUCH_PRIMARY: AtomicBool = AtomicBool::new(false);
+const HOST_COARSE: u32 = 262144;
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub(crate) fn touch_primary() -> bool {
+    TOUCH_PRIMARY.load(Ordering::Relaxed)
+}
 
 /// An owned app runtime registered once when the browser entrypoint returns.
 pub trait WebApplication {
@@ -851,11 +858,24 @@ pub extern "C" fn jfgui_input(time_ms: u32) {
     drain_wake();
     let _ = with_app(|app| app.input(time_ms));
 }
-/// Idle host scheduling hint. The host must still wake immediately for new input.
-#[cfg(target_os = "android")]
+/// Idle host scheduling hint (0: the next frame now). The host must still wake immediately for
+/// new input.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_frame_delay() -> u32 {
     with_app(|app| app.frame_delay()).unwrap_or(250)
+}
+/// The host's raw finger (crate::finger's job here, where the windows live in one surface): phase 0
+/// down, 1 move, 2 up, 3 cancel; id the host's small number of this finger; x, y px of the canvas;
+/// age_ms how old the sample is now.  The host calls jfgui_input after a batch.  -> 1 queued
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_finger(phase: u32, id: u32, x: i32, y: i32, age_ms: u32) -> u32 {
+    let phase = match phase {
+        0 => crate::FingerPhase::Down,
+        1 => crate::FingerPhase::Move,
+        2 => crate::FingerPhase::Up,
+        _ => crate::FingerPhase::Cancel,
+    };
+    windows::event(crate::finger_event(0, phase, id as u8, x, y, age_ms)) as u32
 }
 /// Enqueue a bounded platform event; pointer/resize events update virtual window routing.
 /// The lifecycle comes this way too: E_POWER with data 2 when the page was hidden / Android's
@@ -958,6 +978,7 @@ pub extern "C" fn jfgui_agent(enabled: u32) -> u32 {
 pub extern "C" fn jfgui_capabilities(bits: u32) {
     let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT;
     CAP_EXTRA.store(bits & allowed as u32, Ordering::Relaxed);
+    TOUCH_PRIMARY.store(bits & HOST_COARSE != 0, Ordering::Relaxed);
     HANDLES.store(bits & HOST_HANDLES != 0, Ordering::Relaxed);
     web_screen::set_eyedropper(bits & web_screen::HOST_EYEDROPPER != 0);
 }

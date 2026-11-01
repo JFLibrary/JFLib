@@ -684,6 +684,7 @@ impl Ui {
             hb |= HB_MOVES; // (the tooltip follows the pointer from one diagnostic or word to the next)
         }
         self.wp.ctx.last_rect = [inner[0], ty, inner[2], inner[1] + inner[3] - ty];
+        let hit0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
         let ev = self.behave(id, hb);
         let disabled = self.wp.ctx.last_state == SS_DISABLED as u32;
         let focused = !disabled && self.ed_focused(id);
@@ -952,6 +953,10 @@ impl Ui {
                 self.wp.ctx.wheel_x = 0;
             }
         }
+        // the finger's way (touch.rs)
+        let (px, py) = self.pan_take(id);
+        v.sy = (v.sy + py).clamp(0, (total_h - th).max(0));
+        v.sx = (v.sx + px).clamp(0, (content_w - tw_px).max(0));
         let caret = doc.clamp(doc.selection().caret);
         let ccol = v.long.col(doc, caret.line, caret.byte, tw) as i32;
         if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev || core::mem::take(&mut v.show_caret)) {
@@ -1310,6 +1315,8 @@ impl Ui {
                 v.sx = pos.clamp(0, (content_w - tw_px).max(0));
             }
         }
+        // a finger may roll it (touch.rs)
+        self.pan_view(id, hit0, super::touch::AX_ALL, [v.sx, v.sy], [(content_w - tw_px).max(0), (total_h - th).max(0)]);
         // ---- the find bar
         if v.find.open {
             self.ce_find_bar(id, doc, &mut v, [inner[0], inner[1], inner[2], bar_h], ro);

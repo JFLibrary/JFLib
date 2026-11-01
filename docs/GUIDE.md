@@ -1546,7 +1546,11 @@ in DIP):
 | `click S [l\|r]`, `rclick S`, `dblclick S`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer |
 | `drag S1 S2 [steps] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons |
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
-| `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events |
+| `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events (`touch`: they are a finger, §37) |
+| `tap S`, `longpress S [MS]` | a finger: down and up at S; resting MS ms (default 600) in between |
+| `swipe S1 S2 [MS] [hold]` | a finger from S1 to S2 at an even speed in MS ms (default 300, a sample every 8 ms), then it lifts with that speed (a fling starts, `wait` runs it); `hold`: it rests 100 ms first (no fling) |
+| `flick S DX DY [MS]` | a quick swipe from S by DX, DY (DIP) in MS ms (default 60) |
+| `finger down S`, `finger move S`, `finger up`, `finger cancel` | one raw finger event: it stays down across other commands; `cancel`: the system took it |
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
@@ -1559,8 +1563,8 @@ in DIP):
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
 | `expect token NAME #RRGGBB\|#AARRGGBB`, `expect pixel X Y #RRGGBB`, `expect same FILE.png [X Y W H]` | a colour token now (`bg`, `accent_text`, ...), the rendered colour at a point of the main window (DIP), the main window (with X Y W H: that part, DIP) rendered now has the pixels of an earlier `shot` (taken with the same crop) |
-| `expect S exists\|missing\|hover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed` | widget states |
-| `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP; `*` takes any value: `rect * * * 36`) |
+| `expect S exists\|missing\|hover\|nohover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed\|unpressed` | widget states |
+| `expect S value N`, `expect S value MIN..MAX`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP; `*` takes any value: `rect * * * 36`) |
 | `shot FILE.png [window ID\|desktop] [X Y W H]`, `dump [FILE]`, `print TEXT`, `bench N`, `quit` | output |
 | `bench N anim [MAX_US]`, `bench N drag S1 S2 [middle\|right\|shift\|ctrl\|alt]... [MAX_US]`, `bench N wheel S DY [shift\|ctrl\|alt]... [MAX_US]` | frame times while things move: N frames 16 ms apart on the virtual clock, the N moves of a drag (every other run drags back), N wheel events (DY and -DY by turns); each frame's passes and the render of its dirty cells are timed; prints mean, render, median and max; with `MAX_US` a run passes when its median is at most `MAX_US`, up to three runs, else FAIL |
 | `window ID\|main\|any` | selectors only look into that window |
@@ -4980,7 +4984,97 @@ Scripts feed readings (`sensor ...`, `location ...`, §12's table) so pages can 
 emulator or a real phone `android_sensors.py`; `plattest --test sensors` checks the arithmetic
 without hardware.
 
-Two more things for finger-first pages on Android: `plat::back_trap(on)` makes the back key an Esc
-for the app (a page goes back on `UIC_ESCAPE`), and `ui.touch_drag()` after a widget gives it
-vertical drags that would otherwise scroll the page (a colour wheel, a vertical slider, the handle
-of a row). A long press is a right click, so `ui.context_menu` works with the finger.
+On Android, `plat::back_trap(on)` makes the back key an Esc for the app (a page goes back on
+`UIC_ESCAPE`). The finger is §37.
+
+## 37. The finger
+
+One gesture recogniser for every host ([`lib/ui/touch.rs`](../lib/ui/touch.rs), no platform in it, the
+fling's physics included): hosts only forward raw fingers, so a script on the virtual clock tests the
+same code on any platform. On Android every tool but a mouse is a finger, in the browser `pointerType`
+touch. Windows and Linux report no fingers yet: there only scripts drive it.
+
+**A new host** calls one function for every finger, in the order they happen:
+
+```rust
+plat::finger(win, plat::FingerPhase::Down, id, x, y, age_ms);   // also Move, Up, Cancel
+```
+
+`win` as for every pointer event, `x`, `y` in px of that window, `id` the host's number of this finger
+while it is down (a second finger has another one), `age_ms` how old the sample is now (0 if unknown; the
+velocity needs it). A finger that goes away without an Up gets a `Cancel`. The system's mouse emulation of
+those fingers must be off: a mouse event ends the finger mode (no scroll bars). `plat::touch_primary()`
+says whether the main pointer is a finger at the start. Where the windows live in one surface (browser,
+Android) the host calls the export `jfgui_finger(phase, id, x, y, age_ms)` instead, then `jfgui_input`. The
+runtime's loop on Windows and Linux already keeps its clock running for a finger (`touch_busy`).
+
+What a finger does:
+
+| Gesture | Effect |
+| --- | --- |
+| Touch and lift within the slop (8 DIP) | a click at once: press and release in one frame, so a scroll that starts instead shows no press |
+| Moves along an axis, on a widget that takes that axis | the widget gets press and moves like a mouse's (below) |
+| Moves, a scroll view around the widget can roll along that axis | the pan: the positions move by the finger's pixels, unsmoothed. The direction is locked (a view that scrolls both ways stays free unless the finger starts along an axis: rails). From the innermost view each takes what it can, the rest goes to the next. The slop's way is not lost and causes no jump: it is caught up over the next 16 DIP |
+| Lifts with speed (50 to 8000 DIP/s; least squares over the last 100 ms, none if it rested 40 ms) | the fling: along `OverScroller`'s curve and friction, handing over along the same views, ends at the last one's limit |
+| Touches during a fling | stops it; no click, and if it moves on it rolls again |
+| Rests 100 ms | the widget hovers (a tooltip can follow); after 400 ms the right button (so `ui.context_menu` works), and on Android the system's long-press feedback; if it then moves, the same decision as above |
+| A second finger | takes nothing from the first: while nothing is decided it is no tap and no long press any more; when the first one lifts, a pan goes on with the other one, a press ends, the rest does nothing until the last one lifts |
+| The system takes it (`Cancel`) | a press is released outside everything, no click, no fling |
+
+On Android the slop, the velocities and the long-press time are the device's (`ViewConfiguration`).
+
+Who gets the finger: `Ui::hit` derives the axes from the hit box. `HB_GRAB_H` / `HB_GRAB_V` say it
+explicitly (sliders, `ui.canvas`, the image viewer, the diagram; a colour picker's parts); otherwise
+the cursor does: `CUR_SIZE_WE` horizontal (splitters, column grips), `CUR_SIZE_NS` vertical,
+`CUR_IBEAM` horizontal (a text field selects sideways, an upward swipe on it rolls), the diagonal
+ones, `CUR_MOVE` and `CUR_CROSS` both. A widget that takes both axes, and every `HB_DRAG` title bar,
+gets the press when the finger comes down, without a slop. A horizontal slider in a vertical page
+therefore drags sideways, and a vertical swipe starting on it rolls the page. `ui.touch_drag()` after
+a widget marks its rectangle for a part without a hit box of its own (the handle inside a list's row,
+`apps/androidGallery/pg_lists.rs`); apps otherwise call nothing.
+
+A widget can decide differently: `ui.touch_take(flags)` after it, every frame, replaces what its hit
+boxes say (the page "Container" of `apps/androidGallery` shows it):
+
+| Flag | The widget wants |
+| --- | --- |
+| `TF_H`, `TF_V`, `TF_BOTH` | a finger moving along this axis (both: the press comes with the touch) |
+| `TF_SLOP` | with `TF_BOTH`: the press only once the finger moved (a canvas waits for a second finger) |
+| `TF_HOLD` | only after resting for the long-press time, then the press comes and the drag starts (no right button); until then the finger rolls what is around it; a tap still clicks |
+| `TF_TWO` | a second finger is its own: no press, no click, a pass whenever a finger moves; `ui.touch_fingers()` has them (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for its own pan and zoom |
+| `TF_DECLINE` | no drag at all, a tap still clicks: the finger rolls what is around it or does nothing |
+| `0` | nothing special: the finger rolls what is around it, with nothing to roll it drags the widget |
+
+`WF_TOUCH_HOLD` asks the same of a window's title bar (`TF_HOLD`: a tool panel that only moves after a
+press and hold).
+
+What can be rolled: `ui.scroll_begin`, lists, data views, `ui.vlist_begin`, `ui.md_view`, the text
+views and editors, the console (row by row). `SC_NOWHEEL` views are not. A widget of your own with its
+position elsewhere keeps to `canvas` and its input (`UiInput::ptype` is `PTR_TOUCH`).
+
+**Scroll bars:** none while the pointer is a finger, of any kind (`ui.scrollbar` too): no pixels and
+no hit box, the room they would take stays, so nothing jumps. `ui.touch_mode()` tells whether it is
+one: the last pointer event came from a finger; on Android and in a browser with `pointer: coarse`
+from the first frame on. A real mouse (DeX, USB, also its wheel on Android) brings them back.
+
+**Windows:** the title bar of every window (`window_begin`, dialogs) moves it with the finger in all
+directions, from where the finger came down. `plat::reach_clamp` keeps the title bar on the screen and
+48 DIP of the window at each side. With a finger the resize band is wider at the sides and the bottom
+(14 DIP, 32 DIP corners; on top it stays thin, that is the title bar's).
+
+**Frames:** while a finger is down or a fling runs `frame_delay` is 0 (a frame on every vsync, on the
+browser's `requestAnimationFrame`); all samples of a frame make one pass. Idle it sleeps as before.
+While a finger scrolls, scroll copies (`scrollcopy.rs`) are taken whenever they are possible, flat cells
+too: the rest to draw stays small. On a Samsung SM-A566B (120 Hz) the start page went from 24 ms to
+11 ms a frame (`dumpsys gfxinfo`, the median), `nativeRender` from about 12 ms to about 6 ms:
+`apps/androidGallery/README.md` has the numbers. A debug APK started with the extra `jfgui_PERF` `1`
+logs `nativeRender` under the tag `jfgui-perf`.
+
+In the browser `#input` has `inputmode="none"` under `pointer: coarse` until a text field has the focus,
+so a touch does not open the system's keyboard; on Android the keyboard follows a tap or a drag, not a
+scroll.
+
+Test it: `apps/androidGallery/tests/touch.uis` and `touch_rtl.uis`, `apps/mdviewtest/tests/touch.uis`,
+`apps/editortest/tests/touch.uis`, `apps/termtest/tests/touch.uis` (scripts, Windows and Linux),
+`touch_web.mjs` (Chromium's touch emulation), `android_touch.py` (emulator or phone: `input motionevent`
+and `input swipe`, positions from `uiautomator dump`).

@@ -670,6 +670,7 @@ impl Ui {
             hb |= HB_DISABLED;
         }
         self.wp.ctx.last_rect = r;
+        let hit0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
         let ev = self.behave(id, hb);
         let disabled = self.wp.ctx.last_state == SS_DISABLED as u32;
         let focused = !disabled && self.ed_focused(id);
@@ -835,6 +836,9 @@ impl Ui {
                 self.wp.ctx.wheel_y = 0;
             }
         }
+        // the finger's way (touch.rs)
+        let (_, pan) = self.pan_take(id);
+        v.scroll = (v.scroll + pan).clamp(0, (total - th).max(0));
         let caret = doc.clamp(doc.selection().caret);
         let (crow_y, crow_h, cxp) = {
             let view = RView { doc: &*doc, lays: &lays, tops: &tops };
@@ -1035,6 +1039,8 @@ impl Ui {
                 v.scroll = pos.clamp(0, (total - th).max(0));
             }
         }
+        // a finger may roll it (touch.rs)
+        self.pan_view(id, hit0, super::touch::AX_V, [0, v.scroll], [0, (total - th).max(0)]);
         // ---- the record: the text, caret and anchor as offsets into it
         if v.label.0 != doc.uid() || v.label.1 != doc.revision() {
             v.label = (doc.uid(), doc.revision(), doc.text());

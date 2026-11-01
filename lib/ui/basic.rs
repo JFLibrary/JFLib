@@ -669,7 +669,7 @@ impl Ui {
         let (w, h) = st.slider_size(self, &mut sp);
         let thumb = sp.s[0];
         let r = self.place(w, h);
-        let mut hb = HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT;
+        let mut hb = HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT | if vert != 0 { HB_GRAB_V } else { HB_GRAB_H };
         if f & ST_DISABLED != 0 {
             hb |= HB_DISABLED;
         }
@@ -821,7 +821,7 @@ impl Ui {
         if cur == 0 {
             cur = CUR_CROSS << HB_CURSOR_SHIFT;
         }
-        let ev = self.behave(id, cur | HB_MOVES);
+        let ev = self.behave(id, cur | HB_MOVES | HB_GRAB_H | HB_GRAB_V); // (a finger is its input)
         // custom draw command
         self.cmd_custom(r[0], r[1], r[2], r[3], draw, user, version);
         let key = self.rtl_text_key(self.key_first()); // right-to-left: arrows as drawn

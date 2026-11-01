@@ -110,6 +110,8 @@ pub(crate) struct Hit {
     pub(crate) continuation: bool,
     /// HB_* (cursor in bits 12..15)
     pub(crate) flags: u16,
+    /// the axes along which a finger belongs to the widget (touch.rs, AX_*)
+    pub(crate) grab: u8,
     pub(crate) layer: u8,
     #[allow(dead_code)]
     pub(crate) kind: u8,
@@ -201,6 +203,10 @@ pub(crate) struct W {
     pub(crate) hits: [Vec<Hit>; 2],
     /// the drop targets of the same two passes (dnd.rs)
     pub(crate) zones: [Vec<super::dnd::Zone>; 2],
+    /// the views a finger can roll and the rectangles of ui.touch_drag (x0, y0, x1, y1) of the
+    /// same two passes (touch.rs)
+    pub(crate) pans: [Vec<super::touch::PanView>; 2],
+    pub(crate) grabs: [Vec<[i32; 4]>; 2],
     pub(crate) keyq: Vec<u32>,
     pub(crate) textq: Vec<u32>,
     pub(crate) hit_cur: usize,
@@ -244,6 +250,8 @@ impl W {
             uiclip_over: 0,
             hits: [Vec::new(), Vec::new()],
             zones: [Vec::new(), Vec::new()],
+            pans: [Vec::new(), Vec::new()],
+            grabs: [Vec::new(), Vec::new()],
             keyq: Vec::new(),
             textq: Vec::new(),
             hit_cur: 0,
@@ -620,6 +628,9 @@ impl Ui {
         self.mptype = (d >> plat::PD_TYPE_SHIFT) & 3;
         self.mtilt[0] = ((d << (32 - plat::PD_TILTY_SHIFT)) as i32) >> 25;
         self.mtilt[1] = (d as i32) >> plat::PD_TILTY_SHIFT;
+        if self.mptype == PTR_TOUCH {
+            self.mtilt = [0, 0]; // (those bits hold a finger's time)
+        }
     }
 
     // pts_add: remember the pointer position for stroke-like widgets (one window's points)
@@ -724,6 +735,7 @@ impl Ui {
             id,
             continuation: false,
             flags: (hbflags | notab) as u16,
+            grab: super::touch::hit_grab(hbflags),
             layer: c.cmd_layer_ui as u8,
             kind: 0,
             group,
@@ -1184,6 +1196,8 @@ impl Ui {
         self.wp.chrome.cap_n = 0; // the caption buttons' boxes of this pass (chrome.rs)
         let c = &mut self.wp.ctx;
         c.zones[cur].clear();
+        c.pans[cur].clear();
+        c.grabs[cur].clear();
         self.hot_update();
         self.dnd_pass_begin(); // the drop target under a drag (previous pass)
         // window background (style)

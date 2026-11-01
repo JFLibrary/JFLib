@@ -48,6 +48,12 @@ struct Display {
     composed: bool,     // it holds the last composition (the single-window path skips it)
     cursor: u32,
     pointer: (i32, i32),
+    /// where the pointer last went down
+    press: (i32, i32),
+    /// the fingers down (bit per id) and the one that came first: it alone moves windows; while one
+    /// is down they all go to the window the first one touched
+    fingers: u32,
+    lead: u8,
     drag: Option<(i32, i32, i32, [i32; 4], u32)>,
 }
 static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
@@ -64,6 +70,9 @@ static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
     composed: false,
     cursor: CUR_ARROW,
     pointer: (0, 0),
+    press: (0, 0),
+    fingers: 0,
+    lead: 0,
     drag: None,
 });
 
@@ -315,21 +324,22 @@ pub extern "C" fn jfgui_fullscreen(on: u32) -> u32 {
     1
 }
 
-/// Begin a pointer-driven move of a non-main library window.
+/// Begin a pointer-driven move of a non-main library window, from where the pointer went down
+/// (a finger may have moved on before the UI knew it is a drag).
 pub fn win_begin_move(id: i32) {
     let mut d = DISPLAY.lock();
     if id != 0 {
         if let Some(rect) = window(&d, id).map(|w| w.rect) {
-            d.drag = Some((id, d.pointer.0, d.pointer.1, rect, 0));
+            d.drag = Some((id, d.press.0, d.press.1, rect, 0));
         }
     }
 }
-/// Begin resizing a library surface inside the browser canvas.
+/// Begin resizing a library surface inside the browser canvas, from where the pointer went down.
 pub fn win_begin_resize(id: i32, edges: u32) {
     let mut d = DISPLAY.lock();
     if id != 0 {
         if let Some(rect) = window(&d, id).map(|w| w.rect) {
-            d.drag = Some((id, d.pointer.0, d.pointer.1, rect, edges));
+            d.drag = Some((id, d.press.0, d.press.1, rect, edges));
         }
     }
 }
@@ -667,14 +677,37 @@ pub(super) fn event(mut event: Event) -> bool {
             }
         }
         E_MOVE | E_DOWN | E_UP | E_WHEEL => {
-            d.pointer = (event.x, event.y);
-            if let Some((id, sx, sy, rect, edges)) = d.drag {
+            let finger = event.typ != E_WHEEL && (event.data >> PD_TYPE_SHIFT) & 3 == PTR_TOUCH;
+            let lead = if finger {
+                let bit = 1u32 << (event.btn & 31);
+                if event.typ == E_DOWN {
+                    if d.fingers == 0 {
+                        d.lead = event.btn;
+                    }
+                    d.fingers |= bit;
+                } else if event.typ == E_UP {
+                    d.fingers &= !bit;
+                }
+                d.lead == event.btn
+            } else {
+                true
+            };
+            if lead {
+                d.pointer = (event.x, event.y);
+            }
+            if lead && event.typ == E_DOWN {
+                d.press = d.pointer;
+            }
+            if let Some((id, sx, sy, rect, edges)) = d.drag.filter(|_| lead) {
                 if event.typ == E_MOVE {
+                    let area = [d.width, d.height];
                     if let Some(w) = window_mut(&mut d, id) {
                         let (dx, dy) = (event.x - sx, event.y - sy);
                         if edges == 0 {
-                            w.rect[0] = rect[0] + dx;
-                            w.rect[1] = rect[1] + dy;
+                            // the title bar stays in reach
+                            let p = crate::reach_clamp([rect[0] + dx, rect[1] + dy], w.rect[2], area, w.dpi);
+                            w.rect[0] = p[0];
+                            w.rect[1] = p[1];
                         } else {
                             // (clamp panics when min > max: a large min size must not reach it)
                             let minw = (w.min.0 as i64 * w.dpi as i64 / 96).clamp(1, 16384) as i32;
@@ -741,11 +774,11 @@ pub(super) fn event(mut event: Event) -> bool {
                     })
                     .map_or(d.active, |(i, _)| i as i32)
             });
-            if event.typ == E_DOWN {
+            if event.typ == E_DOWN && lead {
                 d.capture = Some(target);
                 d.active = target;
             }
-            if event.typ == E_UP {
+            if event.typ == E_UP && (!finger || d.fingers == 0) {
                 d.capture = None;
             }
             if let Some(w) = window(&d, target) {

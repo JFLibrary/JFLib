@@ -635,6 +635,7 @@ impl Ui {
         let mut keych = false;
         self.sld_place(rgf);
         let mut ev = self.sld_behave(id, stflags);
+        self.touch_grab(if rgf & RG_VERT != 0 { super::touch::AX_V } else { super::touch::AX_H });
         if ev & EV_HELD != 0 {
             let t = self.sld_ptr_t(rgf);
             *v = rf_from_t16(rf, t);
@@ -690,6 +691,7 @@ impl Ui {
         let mut keych = false;
         self.sld_place(rgf);
         let mut ev = self.sld_behave(id, stflags);
+        self.touch_grab(if rgf & RG_VERT != 0 { super::touch::AX_V } else { super::touch::AX_H });
         if ev & EV_HELD != 0 {
             let t = self.sld_ptr_t(rgf);
             // v = min + round(t * (max - min) / 65536), snapped to min + k * step
@@ -848,6 +850,7 @@ impl Ui {
         let (w, h) = st.angle_size(self, &mut sp);
         self.place(w, h);
         let mut ev = self.sld_behave(id, stflags);
+        self.touch_grab(super::touch::AX_ALL);
         // geometry: circle in the centre of the placed rectangle (right-to-left: angles stay)
         let r = self.wp.ctx.last_rect;
         self.ltr_begin(r[0], r[2]);
@@ -922,6 +925,7 @@ impl Ui {
         let (w, h) = st.pan_size(self, &mut sp);
         self.place(w, h);
         let mut ev = self.sld_behave(id, stflags);
+        self.touch_grab(super::touch::AX_ALL);
         let frac = |p: i32, len: i32| {
             let len = len.max(1);
             let mut f = p as f64 / len as f64;

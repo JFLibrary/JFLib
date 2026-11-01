@@ -94,12 +94,10 @@ impl Colors {
         ui.text(TS_BODY_STRONG, "Winkel und Verschieben");
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         ui.angle(ID_ANG, &mut self.ang, 0);
-        ui.touch_drag(); // the finger's vertical moves belong to these widgets, not to the page
         let t = ui.fmt_f64(self.ang, 2);
         ui.next_size(56, 0);
         ui.text(TS_BODY | TX_RIGHT, &t);
         ui.pan(ID_PAN, &mut self.pan_x, &mut self.pan_y, None, 0, 0);
-        ui.touch_drag();
         ui.box_end();
 
         ui.text(TS_BODY_STRONG, "Farbspuren");
@@ -109,18 +107,15 @@ impl Colors {
         ui.box_begin(0, BOX_H | BOX_XSTART, 16);
         self.tk_wv.stops[1] = hsv_to_rgb(self.whsv[0], self.whsv[1], 1000);
         ui.color_wheel(ID_WHEEL, &mut self.whsv, CW_HSV);
-        ui.touch_drag();
         ui.next_size(40, 160);
         let mut v = self.whsv[2] as i32;
         let tk = self.tk_wv.clone();
         ui.track_slider(ID_WHEEL_V, &mut v, &RANGE_WV, Some(&tk));
-        ui.touch_drag();
         self.whsv[2] = v as u32;
         ui.box_end();
 
         ui.text(TS_BODY_STRONG, "Farbwähler");
         ui.color_picker_ex(ID_PICKER, &mut self.pick, CP_ALPHA | CP_FIELDS);
-        ui.touch_drag();
     }
 
     fn tracks(&mut self, ui: &mut Ui) {
@@ -150,7 +145,6 @@ impl Colors {
         if ui.track_slider(ID_VT, &mut self.trk[2], &RANGE_PCT_V, Some(&tk)) & EV_ACT != 0 {
             self.hsv_changed();
         }
-        ui.touch_drag();
         ui.next_size(48, 48);
         if ui.swatch(ID_SW, self.argb, false) & EV_ACT != 0 {
             ui.menu_popup(&M_SWATCH);

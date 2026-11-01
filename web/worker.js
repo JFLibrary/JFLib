@@ -125,6 +125,8 @@ function dispatch(m) {
   switch(m.type) {
     case "tick": break;
     case "event": wasm.jfgui_event(...m.event); input(); break;
+    // a raw finger; how old the sample is by now (lib/plat/web.rs jfgui_finger, lib/ui/touch.rs)
+    case "finger": wasm.jfgui_finger(...m.finger,Math.max(0,Math.round(performance.timeOrigin+performance.now()-m.at)));input();break;
     case "text": {
       // Whole code points (never half a surrogate pair); jfgui_text answers the characters it
       // queued, the rest follows once input() handed them to the app (no rendering between).
@@ -281,5 +283,5 @@ self.onmessage = async ({data:m}) => {
     tick();
     if(m.type==="tick") postMessage({type:"tick-complete"});
   } catch(error) {if(computeWorker) failedWorker(error);else postMessage({type:"error",id:m.id,message:String(error?.message || error)});}
-  finally {if(m.type==="batch") postMessage({type:"batch-complete"});}
+  finally {if(m.type==="batch") postMessage({type:"batch-complete",busy:!!ready&&wasm.jfgui_frame_delay?.()===0});}
 };

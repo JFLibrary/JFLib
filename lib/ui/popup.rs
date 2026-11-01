@@ -2106,7 +2106,9 @@ impl Ui {
         if w.tip_block == id {
             return;
         }
-        if self.wp.ctx.pressed & BTN_MASK != 0 || self.key_first() != 0 {
+        // (a finger's long press is the right button: the tooltip of a resting finger stays)
+        let press = if self.m.touch.on { 1 << BTN_LEFT } else { BTN_MASK };
+        if self.wp.ctx.pressed & press != 0 || self.key_first() != 0 {
             let w = &mut self.wp.popup;
             w.tip_block = id;
             w.tip_id = 0;
@@ -2130,6 +2132,11 @@ impl Ui {
         w.tip_shown = id;
         w.tip_hid_ok = false;
         self.tip_draw(s);
+    }
+
+    /// a tooltip is up in the live window (touch.rs: it stays a while after the finger lifted)
+    pub(crate) fn tip_showing(&self) -> bool {
+        self.wp.popup.tip_shown != 0
     }
 
     // tip_reset: stop tracking the hovered widget (remember when a shown tooltip hid)

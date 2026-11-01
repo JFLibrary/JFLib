@@ -14,7 +14,17 @@
 //                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
 //                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
 //   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
-//                   following pointer events
+//                   following pointer events (touch: they are a finger, as in the next lines)
+//   tap S           a finger: down and up at S, no time between  (touch.rs: the recogniser sees
+//                   every finger on the virtual clock)
+//   longpress S [MS]   a finger rests MS ms (default 600) on S, then lifts
+//   swipe S1 S2 [MS] [hold]   a finger from S1 to S2 at an even speed in MS ms (default 300, a
+//                   sample every 8 ms), then it lifts: with its speed (a fling starts; `wait`
+//                   runs it), with hold after resting 100 ms (no fling)
+//   flick S DX DY [MS]   a quick swipe from S by DX, DY (DIP) in MS ms (default 60)
+//   finger [N] down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
+//                   down across other commands; N: the finger's id (default 0), for a second one;
+//                   cancel: the system took it
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
@@ -30,9 +40,10 @@
 //                   sleep()s of async tasks)
 //   shot FILE.png   render and save a screenshot
 //   dump [FILE]     print / save the widget tree
-//   expect S exists | missing | hover | focused | checked | unchecked | disabled |
-//            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
-//            (rect: '*' takes any value)
+//   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
+//            enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
+//            text "s" |
+//            rect X Y W H   (rect: '*' takes any value)
 //   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
 //                                 of the last `theme file` contains TEXT
 //   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -179,6 +190,8 @@ pub(crate) struct S {
     sc_x: i32,
     sc_y: i32,
     sc_pdata: u32,
+    /// the id of the next raw finger event (`finger N ...`)
+    finger_id: u32,
     warn_mark: u32,
     sc_scope: i32,
     /// the agent session of `agent call` (auto_perm.rs)
@@ -206,6 +219,7 @@ impl Default for S {
             sc_x: 0,
             sc_y: 0,
             sc_pdata: 0,
+            finger_id: 0,
             warn_mark: 0,
             sc_scope: -1, // `window` scope: window id, -1 = any
             agent: Default::default(),
@@ -436,7 +450,7 @@ fn json_escape(out: &mut Vec<u8>, src: &[u8], cap: usize) {
     }
 }
 
-const WFLAG_NAMES: [&str; 9] = ["tool", "dialog", "modal", "resizable", "noclose", "sysframe", "noactivate", "autoheight", "keys"];
+const WFLAG_NAMES: [&str; 10] = ["tool", "dialog", "modal", "resizable", "noclose", "sysframe", "noactivate", "autoheight", "keys", "touchhold"];
 
 // copy_px(dst, src, x, y): gfx_blit_copy -- src at (x, y) of dst, clipped, no blending
 fn blit_copy(dst: &mut Surface, src: &Surface, x: i32, y: i32) {
@@ -685,12 +699,12 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 46] = [
+        const CMDS: [&str; 51] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
-            "style", "sensor", "location",
+            "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -798,6 +812,11 @@ impl Ui {
             }
             "drag" => self.sc_drag(app, a),
             "wheel" => self.sc_wheel(app, a),
+            "tap" => self.sc_tap(app, a, 0),
+            "longpress" => self.sc_tap(app, a, 600),
+            "swipe" => self.sc_swipe(app, a),
+            "flick" => self.sc_flick(app, a),
+            "finger" => self.sc_finger(app, a),
             "key" => self.sc_key(app, a),
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
@@ -925,7 +944,7 @@ impl Ui {
             "dragleave" => self.sc_dragover(app, a, true),
             "dragout" => self.sc_dragout(app, a),
             "clip" => self.sc_clip(app, a),
-            "pointer" => self.sc_pointer(a),
+            "pointer" => self.sc_pointer(app, a),
             _ => {}
         }
         false
@@ -1286,6 +1305,9 @@ impl Ui {
 
     fn inject(&mut self, app: &mut dyn App, typ: u8, btn: u32, x: i32, y: i32, data: u32) {
         let w = if matches!(typ, plat::E_KEY_DOWN | plat::E_KEY_UP | plat::E_TEXT) { self.m.win.active } else { self.sc.sc_win };
+        // a finger: its id in the button (plat::finger_event), the sample is new
+        let finger = matches!(typ, plat::E_MOVE | plat::E_DOWN | plat::E_UP) && (data >> plat::PD_TYPE_SHIFT) & 3 == PTR_TOUCH;
+        let btn = if finger { self.sc.finger_id } else { btn };
         let ev = Event {
             typ,
             btn: btn as u8,
@@ -1426,6 +1448,133 @@ impl Ui {
         self.sc.sc_pdata = saved_pdata; // (PN1) the pointer's data as before
     }
 
+    // one raw finger event at (x, y) px of the window of the last selector
+    fn finger_at(&mut self, app: &mut dyn App, typ: u8, x: i32, y: i32) {
+        self.sc.sc_win = self.sc.sel_win;
+        self.sc.sc_x = x;
+        self.sc.sc_y = y;
+        let btn = if typ == plat::E_MOVE { 0 } else { BTN_LEFT };
+        self.inject(app, typ, btn, x, y, PTR_TOUCH << plat::PD_TYPE_SHIFT);
+    }
+
+    // tap S / longpress S [MS]: a finger down and up at S, MS ms apart
+    fn sc_tap(&mut self, app: &mut dyn App, a: &[u8], rest_ms: i32) {
+        let (s, r) = self.resolve(a);
+        if s.is_none() {
+            self.sel_fail();
+            return;
+        }
+        let (x, y) = (self.sc.sel_x, self.sc.sel_y);
+        let q = skip_ws(r);
+        let ms = if rest_ms > 0 && q.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(q).0 } else { rest_ms };
+        self.finger_at(app, plat::E_DOWN, x, y);
+        self.advance_time(app, ms);
+        self.finger_at(app, plat::E_UP, x, y);
+    }
+
+    // a finger from b to e at an even speed in ms ms (a sample every 8 ms), then it lifts
+    fn finger_path(&mut self, app: &mut dyn App, b: [i32; 2], e: [i32; 2], ms: i32, hold: bool) {
+        self.finger_at(app, plat::E_DOWN, b[0], b[1]);
+        let ms = ms.max(1);
+        let steps = (ms / 8).max(1);
+        for i in 1..=steps {
+            self.advance_time(app, ms * i / steps - ms * (i - 1) / steps);
+            let x = b[0] + (e[0] - b[0]).wrapping_mul(i) / steps;
+            let y = b[1] + (e[1] - b[1]).wrapping_mul(i) / steps;
+            self.finger_at(app, plat::E_MOVE, x, y);
+        }
+        if hold {
+            self.advance_time(app, 100);
+        }
+        self.finger_at(app, plat::E_UP, e[0], e[1]);
+    }
+
+    // swipe S1 S2 [MS] [hold]
+    fn sc_swipe(&mut self, app: &mut dyn App, a: &[u8]) {
+        let (s, r) = self.resolve(a);
+        if s.is_none() {
+            self.sel_fail();
+            return;
+        }
+        let b = [self.sc.sel_x, self.sc.sel_y];
+        let press_win = self.sc.sel_win;
+        let (s, r) = self.resolve(skip_ws(r));
+        if s.is_none() {
+            self.sel_fail();
+            return;
+        }
+        // the finger stays with the first window
+        self.point_to_window(self.sc.sel_win, press_win);
+        self.sc.sel_win = press_win;
+        let e = [self.sc.sel_x, self.sc.sel_y];
+        let mut q = skip_ws(r);
+        let mut ms = 300;
+        if q.first().is_some_and(|c| c.is_ascii_digit()) {
+            let (n, r) = parse_int(q);
+            ms = n;
+            q = skip_ws(r);
+        }
+        self.finger_path(app, b, e, ms, word_eq(q, "hold").is_some());
+    }
+
+    // flick S DX DY [MS]
+    fn sc_flick(&mut self, app: &mut dyn App, a: &[u8]) {
+        let (s, r) = self.resolve(a);
+        if s.is_none() {
+            self.sel_fail();
+            return;
+        }
+        let b = [self.sc.sel_x, self.sc.sel_y];
+        let (dx, r) = parse_int(r);
+        let (dy, r) = parse_int(r);
+        let q = skip_ws(r);
+        let ms = if q.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(q).0 } else { 60 };
+        let dpi = self.win_dpi(self.sc.sel_win);
+        let e = [b[0] + dp_at(dx, dpi), b[1] + dp_at(dy, dpi)];
+        self.finger_path(app, b, e, ms, false);
+    }
+
+    // finger down S | move S | up | cancel
+    fn sc_finger(&mut self, app: &mut dyn App, a: &[u8]) {
+        if a.first().is_some_and(|c| c.is_ascii_digit()) {
+            let (n, r) = parse_int(a);
+            self.sc.finger_id = n as u32;
+            self.sc_finger(app, skip_ws(r));
+            self.sc.finger_id = 0;
+            return;
+        }
+        if word_eq(a, "up").is_some() || word_eq(a, "cancel").is_some() {
+            let (x, y) = (self.sc.sc_x, self.sc.sc_y);
+            let cancel = word_eq(a, "cancel").is_some();
+            self.sc.sel_win = self.sc.sc_win;
+            if cancel {
+                self.inject(app, plat::E_UP, 0, x, y, PTR_TOUCH << plat::PD_TYPE_SHIFT | plat::PD_CANCEL);
+            } else {
+                self.finger_at(app, plat::E_UP, x, y);
+            }
+            return;
+        }
+        let (typ, s) = if let Some(r) = word_eq(a, "down") {
+            (plat::E_DOWN, r)
+        } else if let Some(r) = word_eq(a, "move") {
+            (plat::E_MOVE, r)
+        } else {
+            self.fail(b"finger: down S, move S, up or cancel");
+            return;
+        };
+        if self.resolve(skip_ws(s)).0.is_none() {
+            self.sel_fail();
+            return;
+        }
+        if typ == plat::E_MOVE {
+            // the finger stays with its window
+            self.point_to_window(self.sc.sel_win, self.sc.sc_win);
+            self.sc.sel_win = self.sc.sc_win;
+        }
+        let (x, y) = (self.sc.sel_x, self.sc.sel_y);
+        self.finger_at(app, typ, x, y);
+    }
+
     // wheel S DY [shift|ctrl|alt]...: the words hold those modifiers during the wheel event
     // (not during the move to S)
     fn sc_wheel(&mut self, app: &mut dyn App, a: &[u8]) {
@@ -1474,7 +1623,7 @@ impl Ui {
 
     // pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch -- (PN1) pen data of the
     // following pointer events
-    fn sc_pointer(&mut self, a: &[u8]) {
+    fn sc_pointer(&mut self, app: &mut dyn App, a: &[u8]) {
         let names = ["mouse", "pen", "eraser", "touch"];
         let Some(t) = names.iter().position(|n| word_eq(a, n).is_some()) else {
             let mut d = b"unknown pointer type ".to_vec();
@@ -1497,6 +1646,11 @@ impl Ui {
             }
         }
         self.sc.sc_pdata = plat::evq_pen_data(pressure, t as u32, tx, ty);
+        // (a finger or a mouse from now on: the scroll bars follow; touch.rs)
+        if self.m.touch.on != (t as u32 == PTR_TOUCH) {
+            self.touch_mode_set(t as u32 == PTR_TOUCH);
+            self.run_passes(app);
+        }
     }
 
     // key CHORD...
@@ -1603,6 +1757,9 @@ impl Ui {
             left -= step;
             let t = self.now_ms.wrapping_add(step as u32);
             self.set_time(t);
+            if self.touch_busy() {
+                self.process_events(app); // the resting finger, the hover after it (touch.rs)
+            }
             let mut fired = self.tasks_ready(); // a task's sleep() ended (tasks.rs)
             loop {
                 let (id, _) = self.timer_due();
@@ -1823,8 +1980,10 @@ impl Ui {
             return;
         };
         let rec = self.sel_rec(s);
-        const STATES: [(&str, u16, bool); 9] = [
+        const STATES: [(&str, u16, bool); 11] = [
             ("hover", SS_HOVER, true),
+            ("nohover", SS_HOVER, false),
+            ("unpressed", SS_PRESSED, false),
             ("focused", SS_FOCUSED, true),
             ("checked", SS_CHECKED, true),
             ("unchecked", SS_CHECKED, false),
@@ -1844,7 +2003,10 @@ impl Ui {
             }
         }
         if let Some(r) = word_eq(cond, "value") {
-            if parse_int(r).0 != rec.value {
+            let (lo, rest) = parse_int(r);
+            // value MIN..MAX
+            let hi = if rest.starts_with(b"..") { parse_int(&rest[2..]).0 } else { lo };
+            if rec.value < lo || rec.value > hi {
                 self.fail(alloc::format!("value is {}", rec.value).as_bytes());
             }
         } else if let Some(r) = word_eq(cond, "max") {
