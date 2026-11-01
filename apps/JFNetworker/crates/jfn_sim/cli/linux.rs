@@ -28,6 +28,7 @@
 //   which, type, help, man (coreutils.rs, man.rs); jobs, fg, wait, kill, ps, sleep, jfs FILE
 //   (shrun.rs: processes)
 //   who, w, tty, exit / logout in a further session (telnetd.rs, cli/ses.rs: the sessions)
+//   systemctl, journalctl (cli/units.rs: the units of the host, its log)
 //
 // A line goes through the shell's grammar first (sh.rs, shrun.rs: pipes, redirections, lists,
 // quoting, globs, $VAR, &); linux_cmd gets the words of one command and dispatches them.  Paths
@@ -236,6 +237,9 @@ impl Engine {
             "who" => self.sh_who(ni, &args),
             "w" => self.sh_w(ni, &args),
             "tty" => self.sh_tty(ni, &args),
+            // units and the log (cli/units.rs)
+            "systemctl" => self.sh_systemctl(ni, &args),
+            "journalctl" => self.sh_journalctl(ni, &args),
             _ => {
                 self.sh_set_code(ni, 127);
                 self.sh_err(ni, &format!("{}: command not found\n", cmd))
@@ -249,7 +253,12 @@ impl Engine {
             "cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
             "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
             "who", "w", "tty",
+            "systemctl", "journalctl",
         ];
+        // the verbs and units of systemctl (cli/units.rs)
+        if let Some(r) = self.systemctl_complete(ni, line) {
+            return r;
+        }
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {

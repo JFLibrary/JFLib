@@ -24,6 +24,8 @@
 //                                                 Note::Mail); SNMP's layer 7 (snmptrace.rs:
 //                                                 Note::Snmp)
 //   (aaatrace.rs: Note::Aaa holds logins, AAA, RADIUS and the vty telnet sessions, layer 7)
+//   Note::Unit, Note::Deploy         a unit's start, stop, end and restart (units.rs), the
+//                                    steps of a deployment (deploy.rs), layer 7
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -480,6 +482,10 @@ pub enum Note {
     /// logins, AAA, RADIUS and the vty telnet sessions (aaa.rs, radiusd.rs, telnetd.rs;
     /// aaatrace.rs: layer 7)
     Aaa(crate::aaatrace::ANote),
+    /// a unit of a Linux host started, stopped, ended or restarts (units.rs)
+    Unit { unit: String, what: Msg },
+    /// a step of a deployment (deploy.rs)
+    Deploy { id: u32, what: Msg },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -607,6 +613,7 @@ impl Note {
             Note::Mail(_) => 7,
             Note::Snmp(_) => 7,
             Note::Aaa(_) => 7,
+            Note::Unit { .. } | Note::Deploy { .. } => 7,
             _ => 2,
         }
     }
@@ -1187,6 +1194,8 @@ impl Note {
             Note::Xfer(n) => n.message(),
             Note::Phys(n) => n.message(port),
             Note::Mail(n) => n.message(),
+            Note::Unit { unit, what } => msg!("Einheit {}: {}", unit, what),
+            Note::Deploy { id, what } => msg!("Bereitstellung {}: {}", id, what),
             Note::Snmp(n) => n.message(),
             Note::Aaa(n) => n.message(),
         }

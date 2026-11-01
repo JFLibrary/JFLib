@@ -80,7 +80,7 @@ pub(crate) enum Show {
 }
 
 impl Show {
-    fn unit(self) -> LcUnit<'static> {
+    pub(crate) fn unit(self) -> LcUnit<'static> {
         match self {
             Show::Num => LcUnit::Num(""),
             Show::Lat => LcUnit::Secs,

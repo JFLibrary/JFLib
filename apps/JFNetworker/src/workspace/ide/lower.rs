@@ -2,9 +2,9 @@
 // run, following live), Terminal (the device's console), Probleme (the check's messages of the
 // open jfs files and the runtime errors of the service; a click goes there), Debugger
 // (debug.rs) and Tests (the device's last `jfs --test`, jfn_sim cli/jfstest.rs; a click on a
-// test goes to its place)
+// test goes to its place); Bereitstellen and Lasttest (A2: deploy.rs, load.rs)
 //
-//   names() -> [&str; 5]         the panes' titles (the Ansicht menu)
+//   names() -> [&str; 7]         the panes' titles (the Ansicht menu)
 //   area(n, ui, k, id, cx, acts) the tabs and the shown pane
 //   problems(n, cx) -> Vec<Problem>   what Probleme lists, errors first
 
@@ -16,13 +16,13 @@ use jfn_sim::ScriptService;
 use ui::*;
 
 use super::editor::{err_text, when};
-use super::{Act, Cx, Key, LOW_DEBUG, LOW_OUTPUT, LOW_PROBLEMS, LOW_TERMINAL, LOW_TESTS};
+use super::{Act, Cx, Key, LOW_DEBUG, LOW_DEPLOY, LOW_LOAD, LOW_OUTPUT, LOW_PROBLEMS, LOW_TERMINAL, LOW_TESTS};
 use crate::app::tr::{t, tf};
 use crate::app::Net;
 
 /// the panes' titles
-pub(crate) fn names() -> [&'static str; 5] {
-    [t("Ausgabe"), t("Terminal"), t("Probleme"), t("Debugger"), t("Tests")]
+pub(crate) fn names() -> [&'static str; 7] {
+    [t("Ausgabe"), t("Terminal"), t("Probleme"), t("Debugger"), t("Tests"), t("Bereitstellen"), t("Lasttest")]
 }
 
 /// a row of Probleme
@@ -78,7 +78,7 @@ pub(crate) fn area(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, acts: &
     let nm = names();
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 4);
-    if ui.tabs(id + 0x108, &mut sel, &[nm[0], nm[1], &ptitle, &dtitle, &ttitle]) & EV_ACT != 0 {
+    if ui.tabs(id + 0x108, &mut sel, &[nm[0], nm[1], &ptitle, &dtitle, &ttitle, nm[5], nm[6]]) & EV_ACT != 0 {
         acts.push(Act::Lower(sel));
     }
     let _ = errs;
@@ -87,6 +87,8 @@ pub(crate) fn area(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, acts: &
         LOW_PROBLEMS => problems_pane(n, ui, k, id, &probs, acts),
         LOW_DEBUG => super::debug::view(n, ui, k, id, cx, acts),
         LOW_TESTS => tests_pane(n, ui, k, id, cx, tests.as_ref(), acts),
+        LOW_DEPLOY => super::deploy::view(n, ui, k, cx, acts),
+        LOW_LOAD => super::load::view(n, ui, k, cx, acts),
         LOW_OUTPUT | _ => output(n, ui, k, id, cx),
     }
     ui.box_end();

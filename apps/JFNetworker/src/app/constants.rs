@@ -617,3 +617,8 @@ pub(crate) const SES_SLOTS: u32 = 192;
 /// parts)
 pub(crate) const ID_IDE0: u32 = 0x0001_8000;
 // (the IDE's check while typing keeps TIMER_SCRIPT_CHECK of the Skripte tab it replaces)
+// ---- A2: the IDE's panes Bereitstellen and Lasttest (commands 840 .. 869, widgets 0x0001_B000 ..
+// 0x0001_BFFF, timers 0x1B8 .. 0x1BB; the commands and timers are not used)
+/// the panes of device window k: ID_A20 + 0x800 k .. + 0x7FF (workspace/ide/deploy.rs: + 1 .. 0xFF,
+/// load.rs: + 0x200 ..)
+pub(crate) const ID_A20: u32 = 0x0001_B000;

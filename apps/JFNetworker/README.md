@@ -170,6 +170,11 @@ Queues, Lastgeneratoren, eigene Skripte).
   Benutzer oder RADIUS, Sitzungslimit, Leerlaufzeit, `show users`, `clear line`, `terminal
   monitor`) und `telnetd` auf Linux-Hosts (`who`, `w`, `tty`, `ps` mit TTY) (siehe
   [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)).
+- **Software-Architektur (A2):** Dienste als Einheiten auf Linux-Hosts (Unit-Dateien,
+  `systemctl`, `journalctl -u`, Neustart-Regeln in virtueller Zeit), aus der IDE auf eine Gruppe
+  von Hosts bereitstellen, einer nach dem anderen mit Gesundheitsprüfung und Abbruch beim ersten
+  Fehler, ein Lasttest mit den Metriken daneben und das Labor `05-microservices` (siehe
+  [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)).
 
 ## Bedienung
 
@@ -354,8 +359,14 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
 | `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
+| `model.uis`, Gruppe `units` | Einheiten und Bereitstellen (siehe [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)): Unit-Dateien und ihre Fehler, jedes Wort von `systemctl` mit seinem Exit-Code, erzeugte Einheiten, Einschalten über einen Stromausfall und Speichern und Laden, die Neustart-Regeln mit Startgrenze, `Requires` und `After`, `journalctl` mit `-u`, `-n`, `-f` und Strg+C (auch in einer anderen Sitzung und im Hintergrund), eine Bereitstellung, deren Prüfung auf dem zweiten Host scheitert, eine, die durchgeht, Zurückrollen, Ablehnungen, Abbrechen, Determinismus (zwei Läufe, ein Klon mitten im Lauf, ein Nachspielen aus Keyframes), das Labor `05-microservices` ungelöst, gelöst und mit allen Hosts zugleich verdorben |
+| `scen_deploy.uis` | das Golden-Szenario (`scen/deploy.scn`): `systemctl` und `journalctl` auf DEV1, eine Einheit, die scheitert und neu startet, eine Bereitstellung, die an WEB2 scheitert, eine, die durchgeht, ein Stromausfall, ein Zurückrollen |
+| `deploy_ide.uis` | Bereitstellen aus der IDE auf die Gruppe Webserver: die Vorschläge des Bereichs, der Fortschritt je Host, das Scheitern auf WEB2 mit seinem Grund, der Lauf, der durchgeht, eine Liste von Hosts, eine fehlende Einheit, Einheit anlegen, Abbrechen |
+| `load_ide.uis` | der Lasttest aus der IDE: ein Ziel ohne URL, offene Last mit Kacheln und Diagrammen, die Zusammenfassung, geschlossene Last, Stoppen, der Lauf im Panel Metriken |
+| `deploy_shots.uis` | die Bilder von Bereitstellen und Lasttest hell und dunkel mit 100 und 150 %, klein und in hohem Kontrast (`build/jfnetworker/deploy_shots_*.png`) |
 
-Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
+Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
+Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
 `campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
@@ -448,6 +459,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
+| Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 
 ### Gerätekatalog
@@ -1682,7 +1694,7 @@ und das Startmenü; [`src/workspace/ide/`](src/workspace/ide/mod.rs), im Fenster
 als Tab der IDE. Oben stehen die Menüs Datei,
 Bearbeiten, Ausführen, Debuggen und Ansicht (jede Zeile nennt ihre Tasten) und die
 Werkzeugleiste; links die Seitenleiste mit Explorer, Suchen und Gliederung, rechts der Editor
-mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger und Tests. Die Teiler behalten
+mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger, Tests, Bereitstellen und Lasttest. Die Teiler behalten
 ihre Lage, Seitenleiste (Strg+B) und untere Leiste (Strg+J) lassen sich ausblenden und weichen,
 wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
 
@@ -1744,6 +1756,9 @@ wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
   (lokal, erfasst, global; Listen und Maps klappen auf) und Ausdrücke, die im Aufruf gelesen
   werden. F5 setzt fort, Strg+F9 hält an, F10 geht über, F7 hinein, Umschalt+F7 heraus (F11
   bleibt dem Fenster). Angehalten wird in virtueller Zeit, die Simulation läuft weiter.
+- **Bereitstellen und Lasttest:** Ausführen › Bereitstellen und › Lasttest öffnen die
+  gleichnamigen Bereiche unten (siehe
+  [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)).
 - **Tests:** „Tests ausführen“ (Strg+Umschalt+T) tippt `jfs --test DATEI` ins Terminal; der
   Bereich **Tests** zeigt den Lauf (`Engine::jfs_tests`): bestanden und gescheitert mit Datei,
   Zeile, Spalte und Meldung, ein Klick geht zur Stelle des Fehlers.
@@ -1765,6 +1780,115 @@ Oberfläche schickt diese Actions über `Sim::keep` ([`src/doc/sim.rs`](src/doc/
 `keep_steps`; die Dateien eines Schritts vor seinen Diensten), so laufen Bearbeiten,
 Rückgängig und Wiederholen ohne Neustart des Geräts.
 
+### Einheiten, Bereitstellen und Lasttest
+
+Hier läuft der ganze Weg eines Dienstes: als Dateien schreiben, debuggen, als Einheit auf mehrere
+Hosts bringen, unter Last testen und messen.
+
+**Einheiten** ([`jfn_model/unit.rs`](crates/jfn_model/unit.rs),
+[`jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs)): Auf
+Linux-Hosts beschreibt eine Datei `/etc/systemd/system/NAME.service` einen Dienst (`mkdir -p
+/etc/systemd/system` legt den Ordner an, die IDE tut es selbst):
+
+```ini
+[Unit]
+Description=Die Bestell-API
+After=network.target kv.service
+Requires=kv.service
+
+[Service]
+ExecStart=jfs /root/app/server.jfs --port 8080
+Environment=MODE=test "NAME=a b"
+Restart=on-failure
+RestartSec=2
+Settings={"ns_per_op": 5}
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- `ExecStart` startet zwei Programme: `jfs DATEI ARGUMENTE` ein Skript des Geräts (`config.args`,
+  `config.env` aus `Environment`, `config.unit`, `config.file`; das Übrige aus `Settings`) und
+  `jfn-service ART [DATEI]` einen fertigen Dienst des Simulators (`http-server`, `lb`, `kv`,
+  `cache` …: die Arten aus [Dienste und virtuelles Betriebssystem](#dienste-und-virtuelles-betriebssystem))
+  mit seinen JSON-Einstellungen aus der Datei und `Settings`. Pfade sind absolut.
+- Eine Einheit läuft als ein Dienst unter ihrem Namen: er steht wie jeder andere unter Metriken,
+  `top`, `ss -p`, Systemmonitor und Dienste; Stoppen und Starten behalten seine Zahlen, seine Disk
+  und seine Zeitreihen. Was die Datei falsch macht, sagen `systemctl status` und das Log: unbekannte
+  Abschnitte und Schlüssel sind Warnungen, ein fehlendes oder unbrauchbares `ExecStart` hält sie vom
+  Start ab. Eine geladene Einheit behält ihren Text bis `systemctl daemon-reload`, und `status`
+  sagt, wenn die Datei neuer ist. Nur die `.service`-Dateien selbst zählen; `Requires=` startet
+  vorher, was fehlt, und stoppt mit ihm, `After=` ordnet den Start beim Hochfahren.
+- **Dienste aus dem Projekt** erscheinen als erzeugte, nur lesbare Einheiten (`is-enabled` sagt
+  `generated`): `start`, `stop`, `restart` und `status` wirken auf sie, `enable` und `disable` lehnen
+  ab, denn ob sie starten, steht im Projekt. Ein `stop` gilt bis zum nächsten Einschalten. Heißt eine
+  Datei wie ein Dienst des Projekts, gewinnt die Datei: er läuft dann nur als diese Einheit, und nur
+  wenn sie eingeschaltet ist. Projekte ohne Einheiten laufen wie bisher, ohne jede Änderung.
+- **Einschalten** ist eine Datei: `systemctl enable` legt
+  `/etc/systemd/system/multi-user.target.wants/NAME.service` an (je `WantedBy`-Ziel eine, mit dem Pfad
+  der Einheit als Inhalt, weil der Dateispeicher keine symbolischen Links kennt). Deshalb übersteht
+  es Stromausfälle und das Speichern des Projekts; wer die Datei löscht, hat sie ausgeschaltet.
+  Beim Hochfahren starten alle Einheiten aller `*.wants`-Ordner.
+- **Neustart-Regeln** in virtueller Zeit: ein Skript als Einheit endet, wenn nichts mehr zu tun ist
+  (Status 0: kein Timer, Socket, Server, keine offene Anfrage), oder nach einem Fehler, der es beendet
+  (Status 1: im Hauptprogramm, beim Laden seiner Datei, mit `"stop_on_error": true` jeder). `no` lässt
+  es dabei, `on-failure` startet nach `RestartSec` (Vorgabe 100 ms) neu, wenn der Status nicht 0 war,
+  `always` in beiden Fällen. Ein `stop` startet nie neu. Wie beim Vorbild gibt die Einheit nach
+  `StartLimitBurst` Starten (5) in `StartLimitIntervalSec` (10 s) auf und bleibt `failed`.
+
+| Befehl | was es tut, Exit-Code |
+|---|---|
+| `systemctl start\|stop\|restart EINHEIT …` | 0; 5, wenn es sie nicht gibt; 1, wenn der Start scheitert (fehlende Datei, Fehler in Einheit oder Skript) |
+| `systemctl status [EINHEIT …]` | eigene Darstellung: Zustand, Quelle, Programm, Neustarts, PID, Status, Grund, die letzten Log-Zeilen (`-n N`); 0 läuft, 3 läuft nicht, 4 gibt es nicht |
+| `systemctl enable\|disable [--now] EINHEIT …` | die Dateien oben; 1 ohne Datei, und für eine erzeugte Einheit |
+| `systemctl is-active\|is-failed\|is-enabled EINHEIT …` | ein Wort je Einheit (`-q`: keins); is-active 0 oder 3, die anderen 0 oder 1 |
+| `systemctl list-units [--all] [--failed]`, `list-unit-files` | Tabellen in eigener Form |
+| `systemctl daemon-reload`, `reset-failed [EINHEIT]`, `cat EINHEIT` | neu lesen, Fehler vergessen, die Datei zeigen |
+| `journalctl [-u EINHEIT] [-n N] [-f] [-r]` | das Log des Geräts (die letzten 1000 Zeilen, `Monat Tag Zeit HOST TAG: TEXT`), mit `-u` die Zeilen einer Einheit: was ihr Dienst schrieb, bei Skripten auch `print`, und ihr Starten und Enden; `-f` folgt, bis Strg+C (130), in jeder Sitzung und im Hintergrund |
+
+`man systemctl`, `man journalctl` und `--help` antworten in eigenen Worten; `Engine::units(dev)`,
+`Engine::unit(dev, name)` und `Action::Unit { dev, name, op }` bedienen die Oberfläche. Die
+Szenarien prüfen mit `expect WEB1 unit web active|inactive|failed|enabled|disabled`.
+
+**Bereitstellen** ([`jfn_sim/deploy.rs`](crates/jfn_sim/deploy.rs),
+[`ide/deploy.rs`](src/workspace/ide/deploy.rs)): In der IDE öffnet Ausführen › Bereitstellen den
+gleichnamigen Bereich unten. Die Hosts sind eine Gruppe der Zeichenfläche, die Auswahl oder eine
+Liste von Namen; dazu die Dateien und Ordner (zuerst der Ordner der gezeigten Datei), die Einheit
+(zuerst die, die diese Datei ausführt; „Einheit anlegen“ schreibt ihre Datei und öffnet sie), die
+Prüfung (Einheit aktiv, TCP-Port oder HTTP-Anfrage mit Pfad und Status), die Zeit dafür und die
+Wartezeit danach. Bereitstellen speichert alle Dateien und schickt `Action::Deploy`: die Engine führt
+die Bereitstellung selbst aus, als versteckter Dienst des Geräts (in `ps` als `deploy-N`), also auch
+in der Aufzeichnung von K1. Host für Host, nacheinander: Dateien kopieren (auf der Ebene der Engine,
+ein Ereignis je Host: 50 ms und die Bytes bei 100 Mbit/s; das Ziel muss eingeschaltet sein, ein Netz
+braucht es dafür nicht), Einheit lesen, einschalten und neu starten, prüfen (alle 500 ms, bis es hält
+oder die Zeit um ist, TCP und HTTP vom Quellgerät über das simulierte Netz), warten, nächster Host.
+Der Fortschritt steht je Host daneben. Hält eine Prüfung nicht, endet der Lauf: die folgenden Hosts
+bleiben unberührt, die fertigen behalten die neue Fassung; mit „Beim ersten Fehler zurückrollen“
+bekommen der gescheiterte und dann die fertigen Hosts (der letzte zuerst) ihre alten Dateien zurück,
+eine neue Datei verschwindet wieder, und die Einheit läuft wie zuvor. Abbrechen und ein Quellgerät,
+das ausgeht, beenden den Lauf, wo er ist. `Engine::deployments(dev)` gibt die Läufe mit Hosts und
+Log. Über das Netz kopiert die Bereitstellung noch nicht (offen, bis SSH da ist).
+
+Im Szenario, mit einer Gruppe oder einer Liste, und den Zeilen des Laufs im Bericht:
+
+```
+deploy DEV1 Webserver unit web files /root/app health http 80 /health 200 wait 500ms timeout 2s
+deploy DEV1 WEB1,WEB2 unit api files /root/api health tcp 8080 rollback
+expect DEV1 deploy done
+```
+
+**Lasttest** ([`ide/load.rs`](src/workspace/ide/load.rs)): Ausführen › Lasttest startet den
+Lastgenerator (`http-load`, siehe [HTTP](#http)) auf dem Host der IDE: das Ziel (vorgeschlagen: der
+Loadbalancer des Projekts, sonst der erste Host der letzten Bereitstellung), offene Last mit einer
+Rate oder geschlossene mit Nutzern und Denkzeit, die Dauer. Daneben laufen die Kacheln (Antworten pro
+Sekunde, p50, p95, p99, Fehlerquote, in Arbeit) und die Diagramme aus den Zeitreihen, wie im Panel
+Metriken, und am Ende steht die Zusammenfassung. Der Lauf ist ein Dienst `lasttest` nur der Engine
+und kein Teil des Projekts: er geht mit einem Neustart des Geräts und ersetzt den vorigen.
+
+Geprüft wird das in der Selbsttest-Gruppe `units` ([`src/unitstest.rs`](src/unitstest.rs)), im
+Golden-Szenario `deploy`, in `deploy_ide.uis` und `load_ide.uis` und am Labor
+`05-microservices` (siehe [Labore und Aufgaben](#labore-und-aufgaben)).
+
 ### Labore und Aufgaben
 
 Ein Labor ist ein Projekt mit einer Aufgabe: das Netz, wie es anfängt, eine Einleitung, Ziele,
@@ -1780,6 +1904,7 @@ Speichern legt eine Kopie an, die ihr Labor behält).
 | `02-lastverteilung.jfnet` | Verteilte Systeme | 360 Anfragen pro Sekunde auf zwei Webserver am Limit (p99 um 340 ms, 503er): WEB3 verkabeln und in die Backends von LB1 aufnehmen, dann p99 um 45 ms ohne Fehler |
 | `03-shards.jfnet` | Verteilte Systeme | drei KV-Knoten mit Replikationsfaktor 1 und strong: erst Replikate, dann KV2 ausschalten, ohne dass eine Anfrage scheitert (zwei Replikate mit strong reichen nicht, drei schon, oder eventual), dann holt KV2 über Read Repair auf |
 | `04-cache.jfnet` | Verteilte Systeme | ein Cache mit 20 Einträgen und 200 ms vor einem Server, der kaum 100 Anfragen pro Sekunde schafft: größer und länger einstellen, bis vier von fünf Anfragen aus dem Cache kommen und der Server Luft hat |
+| `05-microservices.jfnet` | Verteilte Systeme | zwei `jfs`-Dienste als Einheiten auf fünf Hosts hinter einem Loadbalancer, mit KV-Speicher und Cache, unter Last: Version 2 von DEV1 aus nacheinander ausrollen (IDE, Ausführen › Bereitstellen), ohne dass eine Anfrage scheitert; alle Hosts auf einmal neu zu starten lässt Anfragen scheitern |
 
 In den drei Laboren der verteilten Systeme zählen die Ziele der Reihe nach: ein Ergebnis wie „p99
 unter 100 ms“ oder „keine Fehler“ zählt erst nach dem Umbau, nicht schon in den ersten Sekunden,

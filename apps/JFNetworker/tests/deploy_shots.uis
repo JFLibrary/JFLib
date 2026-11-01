@@ -1,0 +1,57 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/units.jfnet
+# the shot matrix of A2 on fixtures/units.jfnet: Bereitstellen with a run that failed on WEB2, then
+# Lasttest with its tiles and charts; light and dark at 100 and 150 %, and a small window --
+# build/jfnetworker/deploy_shots_<pane>_<theme>_<scale>.png.
+# Ids: 26624 the device window, 98307 Ausführen, 98405 Bereitstellen, 98406 Lasttest; 110605 Starten
+# of the deployment; 111105 the load test's URL, 111111 Starten.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"DEV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+resizewin 26624 1180 820
+wait 300
+dblclick listitem:"app"
+wait 600
+dblclick listitem:"server.jfs"
+wait 300
+click #98307
+click #98405
+wait 200
+click #110605
+wait 15000
+expect text:"gescheitert: 1 von 3 Hosts fertig, der Rest bleibt, wie er war" exists
+shot build/jfnetworker/deploy_shots_deploy_light_100.png window 26624
+theme dark
+shot build/jfnetworker/deploy_shots_deploy_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/deploy_shots_deploy_dark_150.png window 26624
+theme light
+shot build/jfnetworker/deploy_shots_deploy_light_150.png window 26624
+scale 100 window 26624
+# Lasttest against WEB1, which runs the new version
+click #98307
+click #98406
+wait 200
+click #111105
+key ctrl+a
+type "http://10.0.0.11/"
+click #111111
+wait 12000
+expect text:"Durchsatz" exists
+shot build/jfnetworker/deploy_shots_load_light_100.png window 26624
+theme dark
+shot build/jfnetworker/deploy_shots_load_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/deploy_shots_load_dark_150.png window 26624
+theme light
+shot build/jfnetworker/deploy_shots_load_light_150.png window 26624
+scale 100 window 26624
+# small: the panes stay usable
+resizewin 26624 640 520
+wait 100
+shot build/jfnetworker/deploy_shots_small_light_100.png window 26624
+theme contrast
+shot build/jfnetworker/deploy_shots_small_contrast_100.png window 26624

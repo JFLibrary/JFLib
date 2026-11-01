@@ -84,6 +84,8 @@ pub enum Found {
     NoCable,
     /// the cable carries or not (expect cable ... up | down)
     Carries(bool),
+    /// what a unit or a deployment is instead ("inactive"; "": there is none)
+    State(String),
 }
 
 /// whether an expectation holds and what it found
@@ -202,6 +204,8 @@ pub fn expect_text(x: &Expect) -> String {
         Expect::Reach { dev, host, negate } => format!("expect {} {}reaches {}", dev, if *negate { "not " } else { "" }, host),
         Expect::Cable { dev, port, check: CableCheck::Len(c, m) } => format!("expect cable {} {} length {} {}", dev, port, c.as_str(), m),
         Expect::Cable { dev, port, check: CableCheck::Up(up) } => format!("expect cable {} {} {}", dev, port, if *up { "up" } else { "down" }),
+        Expect::Unit { dev, unit, state } => format!("expect {} unit {} {}", dev, unit, state),
+        Expect::Deploy { dev, state } => format!("expect {} deploy {}", dev, state),
     }
 }
 
@@ -301,6 +305,17 @@ fn judge_found(p: &Project, e: &Engine, x: &Expect, out: &dyn Fn(u32) -> String)
                     (now == *up, if now == *up { Found::Nothing } else { Found::Carries(now) })
                 }
             }
+        }
+        Expect::Unit { unit, state, .. } => {
+            let Some(u) = e.unit(id, unit) else {
+                return (false, Found::State(String::new()));
+            };
+            let now = if matches!(state.as_str(), "enabled" | "disabled") { u.enabled.word() } else { u.state.active_word() };
+            (now == state, if now == state { Found::Nothing } else { Found::State(String::from(now)) })
+        }
+        Expect::Deploy { state, .. } => {
+            let now = e.deployments(id).last().map_or("", |d| d.state.word());
+            (now == state, if now == state { Found::Nothing } else { Found::State(String::from(now)) })
         }
     }
 }
@@ -403,6 +418,8 @@ impl Verdict {
             Found::NoCable => format!("{} (an dem Port steckt kein Kabel)", t),
             Found::Carries(true) => format!("{} (die Leitung ist aktiv)", t),
             Found::Carries(false) => format!("{} (die Leitung ist unten)", t),
+            Found::State(s) if s.is_empty() => format!("{} (das gibt es nicht)", t),
+            Found::State(s) => format!("{} (gefunden: {})", t, s),
         }
     }
 
@@ -436,6 +453,8 @@ impl Verdict {
             Found::NoCable => msg!("an dem Port steckt kein Kabel"),
             Found::Carries(true) => msg!("die Leitung ist aktiv"),
             Found::Carries(false) => msg!("die Leitung ist unten"),
+            Found::State(s) if s.is_empty() => msg!("das gibt es nicht"),
+            Found::State(s) => msg!("gefunden: {}", s),
         }
     }
 }

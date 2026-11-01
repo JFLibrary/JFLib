@@ -1535,3 +1535,50 @@ zur Definition / Name umbenennen / formatieren	go to definition / rename a name 
 in der Datei suchen / ersetzen	find / replace in the file
 Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
 Strg+B / Strg+J	Ctrl+B / Ctrl+J
+# the IDE's panes Bereitstellen and Lasttest (A2: workspace/ide/deploy.rs, load.rs)
+Auf der Leinwand ist nichts gewählt.	Nothing is selected on the canvas.
+Beim ersten Fehler zurückrollen	Roll back at the first failure
+Bereitstellen	Deploy
+Bereitstellen …	Deploy …
+Das Projekt hat keine Gruppe.	The project has no group.
+Das Projekt hat keine Gruppe: Geräte auf der Leinwand wählen und gruppieren (Strg+G) oder die Hosts als Liste nennen.	The project has no group: select devices on the canvas and group them (Ctrl+G), or name the hosts as a list.
+Einheit	Unit
+Einheit aktiv	Unit active
+Einheit anlegen	Create unit
+HTTP-Anfrage	HTTP request
+Hier steht der Fortschritt je Host: Dateien kopieren, Einheit neu starten, prüfen, dann der nächste.	The progress per host shows here: copy the files, restart the unit, check, then the next one.
+Hosts	Hosts
+Keine Hosts gewählt.	No hosts chosen.
+Lasttest	Load test
+Lasttest …	Load test …
+Pfad	Path
+Sonst behalten die fertigen Hosts die neuen Dateien, und die Bereitstellung hält an.	Otherwise the finished hosts keep the new files, and the deployment stops.
+TCP-Port	TCP port
+Welche Einheit? Ihr Name fehlt.	Which unit? Its name is missing.
+Zeige zuerst die .jfs-Datei, die als Einheit laufen soll.	First show the .jfs file that should run as a unit.
+Zeit für die Prüfung	Time for the check
+abgebrochen: {} von {} Hosts fertig	aborted: {} of {} hosts done
+fertig: {} von {} Hosts	done: {} of {} hosts
+gescheitert	failed
+gescheitert: alle Hosts zurückgerollt	failed: all hosts rolled back
+gescheitert: {} von {} Hosts fertig, der Rest bleibt, wie er war	failed: {} of {} hosts done, the rest stays as it was
+läuft: {} von {} Hosts fertig	running: {} of {} hosts done
+ms	ms
+s, danach warten	s, then wait
+wartet nach der Prüfung	waiting after the check
+z. B. /root/app	e.g. /root/app
+z. B. WEB1, WEB2	e.g. WEB1, WEB2
+z. B. web.service	e.g. web.service
+Das Ziel ist eine URL wie http://10.0.1.1/.	The target is a URL like http://10.0.1.1/.
+z. B. http://10.0.1.1/	e.g. http://10.0.1.1/
+Offen: Anfragen kommen in fester Rate, egal wie schnell die Antworten sind. Geschlossen: Nutzer warten auf ihre Antwort und denken, bevor sie wieder fragen.	Open: requests come at a fixed rate, however fast the answers are. Closed: users wait for their answer and think before they ask again.
+Hier stehen Anfragen pro Sekunde, Latenzen und Fehler des Lasttests, sobald er läuft.	Requests per second, latencies and errors of the load test show here as soon as it runs.
+Denkzeit (ms)	Think time (ms)
+Dauer (s)	Duration (s)
+Fertig: {} Anfragen, {} Antworten ({}/s), {} Fehler; p50 {}, p95 {}, p99 {}	Done: {} requests, {} answers ({}/s), {} errors; p50 {}, p95 {}, p99 {}
+läuft: {} Anfragen gesendet, {} Antworten	running: {} requests sent, {} answers
+Geschlossen	Closed
+Nutzer	Users
+Last	Load
+Starten	Start
+Liste	List

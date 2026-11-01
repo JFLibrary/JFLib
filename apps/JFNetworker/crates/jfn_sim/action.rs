@@ -76,6 +76,10 @@
 //                                                      communities, location, contact,
 //                                                      receivers, notifications, "no snmp-server"
 //                                                      (snmpd.rs)
+//   Unit                                               start, stop, restart, enable, disable a
+//                                                      unit of a Linux host (units.rs)
+//   Deploy / DeployAbort                               a rolling deployment over a list of hosts
+//                                                      (deploy.rs)
 //   ScriptDebug                                        the debugger of a script service: stop,
 //                                                      go on, steps, breakpoints in virtual time
 //                                                      (scriptsvc.rs, DebugOp)
@@ -282,6 +286,12 @@ pub enum Action {
     Snmp { dev: u32, set: crate::snmpd::SnmpSet },
     /// the debugger of a script service: stop, go on, a step, breakpoints (scriptsvc.rs)
     ScriptDebug { dev: u32, svc: String, op: crate::scriptsvc::DebugOp },
+    /// start, stop, restart, enable, disable a unit of a Linux host (units.rs)
+    Unit { dev: u32, name: String, op: crate::units::UnitOp },
+    /// a rolling deployment over a list of hosts (deploy.rs)
+    Deploy { spec: jfn_model::unit::DeploySpec },
+    /// ends deployment `id` of device `dev` where it is (deploy.rs)
+    DeployAbort { dev: u32, id: u32 },
 }
 
 /// why an action was refused (German text through Display)
@@ -938,6 +948,8 @@ impl Engine {
         for s in &d.services {
             let _ = self.service_def(d.id, s);
         }
+        // the units it has enabled in its files (units.rs)
+        self.units_boot(ni);
         // its place on the canvas and its WLAN settings (wlan.rs)
         self.wlan_register(d, ni);
         Ok(ni)

@@ -1,0 +1,80 @@
+# Dienste als Einheiten und eine Bereitstellung nacheinander. DEV1 hält den Webdienst als Datei
+# und seine Einheiten: systemctl zeigt sie, startet web, journalctl -u zeigt seine Zeilen. crash
+# endet nach 500 ms mit einem Fehler und startet nach RestartSec wieder. Die erste Bereitstellung
+# auf die Gruppe Webserver bleibt an WEB2 hängen, weil dort der Dienst alt den Port 80 hält: WEB1
+# behält die neue Fassung, WEB3 bleibt unberührt. Ohne alt geht sie durch; WEB3 übersteht einen
+# Stromausfall als eingeschaltete Einheit. Die dritte Bereitstellung scheitert an einem
+# ausgeschalteten WEB3 und rollt WEB2 und WEB1 zurück.
+run 500ms
+DEV1: systemctl list-units --all
+DEV1: systemctl is-active web
+DEV1: echo $?
+DEV1: systemctl start web
+run 100ms
+expect DEV1 unit web active
+DEV1: systemctl status web
+PC1: curl -s http://10.0.0.10/
+run 100ms
+expect PC1 output contains "Version 2 von web"
+DEV1: journalctl -u web
+expect DEV1 output contains "web: bereit, Version 2"
+# die Neustart-Regel in virtueller Zeit
+DEV1: systemctl start crash
+run 2s
+DEV1: systemctl status crash
+expect DEV1 output contains "on-failure nach 1 s, bisher 1"
+DEV1: journalctl -u crash -n 3
+expect DEV1 output contains "Neustart in"
+DEV1: systemctl stop crash
+run 2s
+expect DEV1 unit crash inactive
+# Fehler und Exit-Codes
+DEV1: systemctl start nix
+DEV1: echo $?
+expect DEV1 output contains "5"
+DEV1: systemctl start kaputt
+DEV1: echo $?
+expect DEV1 output contains "1"
+expect DEV1 unit kaputt failed
+DEV1: systemctl status kaputt
+DEV1: systemctl stop web
+# scheitert an WEB2, dort hält alt den Port
+deploy DEV1 Webserver unit web files /root/app health http 80 /health 200 wait 500ms timeout 2s
+run 10s
+expect DEV1 deploy failed
+expect WEB1 unit web active
+expect WEB1 unit web enabled
+WEB2: systemctl is-active web
+expect WEB2 output contains "activating"
+WEB2: journalctl -u web -n 4
+WEB2: systemctl stop alt
+WEB2: systemctl status alt
+run 1s
+# nun geht sie durch
+deploy DEV1 Webserver unit web files /root/app health http 80 /health 200 wait 500ms timeout 2s
+run 10s
+expect DEV1 deploy done
+expect WEB1 svc web metric version == 2
+expect WEB2 svc web metric version == 2
+expect WEB3 svc web metric version == 2
+expect WEB3 unit web enabled
+PC1: curl -s http://10.0.0.13/
+run 100ms
+expect PC1 output contains "Version 2 von web"
+power off WEB3
+run 1s
+power on WEB3
+run 1s
+expect WEB3 unit web active
+WEB3: systemctl status web
+# zurückrollen: WEB3 ist aus
+DEV1: echo 'print("Version 3")' >> /root/app/server.jfs
+power off WEB3
+deploy DEV1 Webserver unit web files /root/app health active wait 500ms timeout 2s rollback
+run 10s
+expect DEV1 deploy rolledback
+expect WEB1 unit web active
+WEB1: journalctl -u web -n 2
+WEB1: grep -c "Version 3" /root/app/server.jfs
+expect WEB1 output contains "0"
+print "Eine Einheit steht in Dateien des Geräts; eine Bereitstellung kopiert sie Host für Host, startet neu und prüft"
