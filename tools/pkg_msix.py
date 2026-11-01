@@ -89,7 +89,8 @@ def capabilities(perms):
     """the capabilities of a PERMISSIONS manifest (None: no manifest) -> (names, notes).  A
     full-trust desktop app is not confined by them (they are shown in the Store); runFullTrust
     is always declared, PERMISSIONS stays what plat enforces.  audio.output needs none: playing
-    sound is no capability in MSIX (only recording would be: microphone)"""
+    sound is no capability in MSIX (only recording would be: microphone).  location: the device
+    capability, as a Store listing shows it; sensors need none (Windows.Devices.Sensors)"""
     if perms is None:
         return ["internetClient", "internetClientServer", "privateNetworkClientServer"], \
             ["kein PERMISSIONS: alle Netz-Fähigkeiten angegeben"]
@@ -101,6 +102,10 @@ def capabilities(perms):
         caps += ["internetClientServer", "privateNetworkClientServer"]
     if "audio.output" in keys:
         notes.append("audio.output: keine Fähigkeit nötig (Wiedergabe)")
+    if "location" in keys:
+        notes.append("location: DeviceCapability location (plat liefert unter Windows noch keinen Standort)")
+    if "sensors" in keys:
+        notes.append("sensors: keine Fähigkeit nötig (plat liest unter Windows noch keine Sensoren)")
     return caps, notes
 
 

@@ -25,6 +25,9 @@
 //   CALL_GRANTS    -> u32 count, (uri, u32 read, u32 write)..
 //   CALL_RELEASE   uri -> u32 ok
 //   CALL_SECRET_*  the secret store (android_secret.rs, android/GallerySecrets.java)
+//   50 .. 59       android/GallerySystem.java: notifications (web_notify.rs), the screen kept on
+//                  (web_power.rs), sensors and location (web_sensors.rs), the back key
+//                  (web_system.rs)
 //   DocInfo: uri, display name, u32 dir, u64 size (u64::MAX unknown), i64 mtime ms, u32 DOC_*
 //
 // The clipboard: text (and HTML) go to the system; the library's richer forms (RTF, DOCX)

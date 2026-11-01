@@ -33,6 +33,7 @@
 //   sys_settings_host(&mut s)    (settings.rs) the host's values; the jfgui_* overrides follow
 //   dark() -> Option<bool>       (web.rs theme())
 //   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
+//   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
 //
 // The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
 // the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
@@ -187,6 +188,16 @@ pub(crate) fn sys_settings_host(s: &mut SysSettings) {
     s.contrast_colors = if h.forced { h.colors } else { None };
     s.reduce_motion = h.motion;
     s.text_scale = h.scale.clamp(50, 300);
+}
+
+// (Android) the host call of GallerySystem (android_host.rs: CALL_*)
+#[cfg(target_os = "android")]
+const CALL_BACK: u32 = 55;
+
+/// (Android) while on, the back key reaches the app as Esc instead of ending the activity
+#[cfg(target_os = "android")]
+pub(crate) fn back_trap(on: bool) {
+    let _ = crate::web::android_host::call(CALL_BACK, &[on as u8]);
 }
 
 /// the host's scheme: Some(true) dark, Some(false) light, None no preference

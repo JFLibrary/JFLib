@@ -43,6 +43,11 @@ public final class GalleryActivity extends Activity {
     static native byte[] nativeA11yTake();
     static native void nativeA11yAct(int win, int keyLo, int keyHi, int act, int a, int b, double value, byte[] text);
     private GalleryView gallery;
+    private static GalleryActivity current;
+    /** A frame now: what a sensor or a fix changed (GallerySensors, GallerySystem.back). */
+    static void frameNow() {
+        if (current != null && current.gallery != null) current.gallery.requestFrame();
+    }
 
     private static native void nativeEnv(byte[] entry);
     // the displays (lib/plat/web_screen.rs jfgui_screens): one line each
@@ -72,8 +77,9 @@ public final class GalleryActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        current = this;
         GalleryHost.attach(this);
-        GallerySystem.attach(this); // the system's settings, the screen kept on, notifications
+        GallerySystem.attach(this); // the system's settings, the screen kept on, notifications, sensors
         // the displays now and after every change (a projection, a folding phone)
         screens();
         android.hardware.display.DisplayManager dm =
@@ -142,12 +148,18 @@ public final class GalleryActivity extends Activity {
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); GalleryNotify.intent(intent); }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
-        if (!GalleryNotify.permissions(code, results)) super.onRequestPermissionsResult(code, permissions, results);
+        if (!GalleryNotify.permissions(code, results) && !GallerySensors.permissions(code, results))
+            super.onRequestPermissionsResult(code, permissions, results);
+    }
+    // a page of the app goes back first (plat::back_trap); targetSdk 35: no OnBackInvokedCallback needed
+    @Override public void onBackPressed() {
+        if (!GallerySystem.back()) super.onBackPressed();
     }
     @Override public void onDestroy() {
         android.hardware.display.DisplayManager dm =
             (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null && displayListener != null) dm.unregisterDisplayListener(displayListener);
+        if (current == this) current = null;
         GalleryHost.detach(this);
         GallerySystem.detach(this);
         super.onDestroy();
@@ -242,9 +254,21 @@ public final class GalleryActivity extends Activity {
         }
         private void cancelGesture() {
             // Release outside every widget so cancellation cannot accidentally click a button.
+            removeCallbacks(longPress);
             if (mode == 2) pointer(3, -10000, -10000);
             mode = 0; pointerId = -1;
         }
+        // a finger that stays: the right button (a context menu), nothing more of this touch
+        private final Runnable longPress = () -> {
+            if (mode != 1) return;
+            mode = 4;
+            int x = Math.round(downX * renderScale), y = Math.round(downY * renderScale);
+            nativeEvent(1, 0, 0, x, y, 0);
+            nativeEvent(2, 2, 0, x, y, 0);
+            nativeEvent(3, 2, 0, x, y, 0);
+            performLongClick();
+            requestFrame();
+        };
         @Override public boolean onTouchEvent(MotionEvent event) {
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
@@ -253,6 +277,7 @@ public final class GalleryActivity extends Activity {
                 pointerId = event.getPointerId(0);
                 downX = event.getX(); downY = lastY = event.getY();
                 mode = 1; wheelRemainder = 0;
+                postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
                 return true;
             }
             int index = event.findPointerIndex(pointerId);
@@ -263,6 +288,7 @@ public final class GalleryActivity extends Activity {
             float x = event.getX(index), y = event.getY(index);
             if (action == MotionEvent.ACTION_MOVE) {
                 if (mode == 1 && Math.hypot(x - downX, y - downY) > slop) {
+                    removeCallbacks(longPress);
                     mode = Math.abs(y - downY) > Math.abs(x - downX) ? 3 : 2;
                     if (mode == 2) pointer(2, downX, downY);
                 }
@@ -279,6 +305,7 @@ public final class GalleryActivity extends Activity {
                 }
                 lastY = y;
             } else if (action == MotionEvent.ACTION_UP) {
+                removeCallbacks(longPress);
                 if (mode == 1) pointer(2, downX, downY);
                 if (mode == 1 || mode == 2) {
                     pointer(3, x, y);

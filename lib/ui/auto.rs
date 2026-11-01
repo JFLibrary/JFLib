@@ -63,6 +63,16 @@
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
 //                       overrides of the system settings (follow with `system settings ...`),
 //                       jfgui_CSD (the library title bar and its resize band, next pass)
+//   sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
+//                       the sensor exists from now on; a stopped sensor delivers nothing
+//   sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
+//   sensor none NAME|all   this sensor does not exist (the start: none does)
+//   sensor expect NAME off|waiting|running|paused|denied|unavailable
+//   location LAT LON [ACC ALT SPEED BEARING]   a fix of plat::sensors ('-': the provider does not
+//                       say); location age MS: how old it is now
+//   location searching|denied|off|none   the host's answer (off: the system's switch; none: no
+//                       location service, as at the start)
+//   location expect off|searching|fix|paused|denied|disabled|unavailable
 //   expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
 //                       bar or the resize band asked the window manager for since the last check
 //                       (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
@@ -675,12 +685,12 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 44] = [
+        const CMDS: [&str; 46] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
-            "style",
+            "style", "sensor", "location",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -694,6 +704,8 @@ impl Ui {
         match c {
             "quit" => return true,
             "system" => self.sc_system(app, a),
+            "sensor" => self.sc_sensor(app, a),
+            "location" => self.sc_location(app, a),
             "print" => {
                 let mut o = a.to_vec();
                 o.push(b'\n');

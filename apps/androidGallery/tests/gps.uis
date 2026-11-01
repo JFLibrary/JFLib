@@ -1,0 +1,99 @@
+#!args --size 390x780 --anim off --theme light
+# "GPS": nothing runs before the switch (Android's permission and the browser's prompt ask from it);
+# a computer has no location; fixes fed like the host's; refused, switched off, the background.
+click #900
+click menuitem:"GPS"
+location expect off
+expect text:"Standort: aus" exists
+expect text:"Breite: –" exists
+# no one listens yet: nothing arrives
+location 48.1 11.5
+location expect off
+expect text:"Breite: –" exists
+shot build/shots/androidGallery/gps_off.png
+
+click #10010
+expect #10010 checked
+location none
+location expect unavailable
+expect text:"Standort: nicht verfügbar" exists
+expect text:"Dieses Gerät hat keinen Standortdienst." exists
+shot build/shots/androidGallery/gps_none.png
+
+location searching
+location expect searching
+expect text:"Standort: sucht" exists
+
+# a whole fix
+location 48.137154 11.576124 5 519 3.2 45
+location expect fix
+expect text:"Standort: Position da" exists
+expect text:"Breite: 48,137154°" exists
+expect text:"Länge: 11,576124°" exists
+expect text:"Genauigkeit: 5 m" exists
+expect text:"Höhe: 519 m" exists
+expect text:"Tempo: 3,2 m/s (11,5 km/h)" exists
+expect text:"Richtung: 45°" exists
+expect text:"Alter: 0 s" exists
+location age 12000
+expect text:"Alter: 12 s" exists
+shot build/shots/androidGallery/gps_fix.png
+
+# south and west, only coordinates: the rest stays open
+location -33.8688 -151.2093
+expect text:"Breite: -33,868800°" exists
+expect text:"Länge: -151,209300°" exists
+expect text:"Genauigkeit: –" exists
+expect text:"Höhe: –" exists
+expect text:"Tempo: –" exists
+expect text:"Richtung: –" exists
+
+# what is given without what is missing
+location 1 2 - 100
+expect text:"Genauigkeit: –" exists
+expect text:"Höhe: 100 m" exists
+
+# the user refuses, or takes it back
+location denied
+location expect denied
+expect text:"Standort: nicht erlaubt" exists
+expect text:"Die App darf den Standort nicht abfragen: in den Einstellungen des Systems erlauben und den Schalter neu setzen." exists
+shot build/shots/androidGallery/gps_denied.png
+
+# the system's switch
+location off
+location expect disabled
+expect text:"Standort: Standort des Systems ist aus" exists
+location searching
+
+# the background: paused, nothing arrives; back again it looks anew
+location 10 20
+system background
+location expect paused
+expect text:"Standort: pausiert" exists
+location 30 40
+expect text:"Breite: 10,000000°" exists
+system foreground
+location expect searching
+expect text:"Breite: 10,000000°" exists
+location 30 40
+location expect fix
+
+# the switch off: stopped, the fix gone
+click #10010
+location expect off
+expect text:"Breite: –" exists
+# on again, leave the page, come back: it runs again from the switch's state
+click #10010
+location searching
+key esc
+expect #100 exists
+location expect off
+click #900
+click menuitem:"GPS"
+expect #10010 checked
+location searching
+location expect searching
+key esc
+location expect off
+expect_nowarn

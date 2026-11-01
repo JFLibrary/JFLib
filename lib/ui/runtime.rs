@@ -533,6 +533,8 @@ impl Ui {
                         _ => (1, "the system goes to sleep"),
                     };
                     plat::log_info("app", what);
+                    plat::sensors::suspend(arg != 0); // the sensors and the location stop with it
+                    self.sensors_poll();
                     self.call_cmd(app, UIC_SUSPEND, arg);
                     self.run_passes(app); // an edge: its own frame
                     self.need_render = true;
@@ -579,6 +581,7 @@ impl Ui {
                     self.open_poll();
                     self.tray_poll();
                     self.screen_poll(); // global shortcuts, picks, pictures (screen.rs)
+                    self.sensors_poll(); // sensor readings, location fixes (sensors.rs)
                     self.recent_poll(); // the browser's answer to a reopen (recent.rs)
                     self.a11y_poll(); // actions of screen readers (a11y.rs)
                     self.spell_poll(); // suggestions made on a worker (edit_spell.rs)

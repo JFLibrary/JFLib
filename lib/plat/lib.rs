@@ -155,6 +155,18 @@ pub mod tray;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
+
+pub mod sensors;
+
+/// Android: while `on`, the back key reaches the app as Esc (a page of the app goes back, a popup
+/// closes; `UIC_ESCAPE` when nothing took it) instead of ending the activity.  Elsewhere nothing:
+/// there Esc is a key of its own
+pub fn back_trap(on: bool) {
+    #[cfg(target_os = "android")]
+    web::system_host::back_trap(on);
+    #[cfg(not(target_os = "android"))]
+    let _ = on;
+}
 /// Starting the app when the user logs in (Run key, XDG autostart, Background portal, an MSIX
 /// package's StartupTask).
 pub mod autostart;

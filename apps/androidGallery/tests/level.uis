@@ -1,0 +1,79 @@
+#!args --size 390x780 --anim off --theme light
+# "Wasserwaage": without sensors (a computer) it says so; readings fed like the host's; only while
+# the page is open do its sensors run, the background pauses them.
+sensor expect gravity off
+click #900
+click menuitem:"Wasserwaage"
+expect text:"Keine Daten" exists
+expect text:"Schwerkraft: nicht verfügbar" exists
+expect #10100 exists
+sensor expect accel unavailable
+sensor expect gravity unavailable
+sensor expect rot unavailable
+sensor expect gyro off
+sensor expect magnet off
+shot build/shots/androidGallery/level_none.png
+
+# flat on the table
+sensor gravity 0 0 9.81
+sensor expect gravity running
+expect text:"Waagerecht" exists
+expect text:"Quer: 0,0°   Längs: 0,0°" exists
+expect text:"Schwerkraft: läuft" exists
+expect text:"0,00 0,00 9,81 m/s²" exists
+expect #10100 missing
+# the bubble in the middle, green
+expect pixel 195 246 #107C10
+shot build/shots/androidGallery/level_flat.png
+
+# the top edge up, the right edge up: the bubble goes to the upper right
+sensor gravity 1 2 9.5
+expect text:"Geneigt" exists
+expect text:"Quer: 5,9°   Längs: 11,8°" exists
+expect pixel 201 252 #E3EFC4
+expect pixel 224 188 #8FB339
+shot build/shots/androidGallery/level_tilted.png
+
+# upright: a tube along the width
+sensor gravity 0 9.81 0
+expect text:"Waagerecht" exists
+expect text:"Quer: 0,0°   Längs: 90,0°" exists
+shot build/shots/androidGallery/level_upright.png
+sensor gravity 1 9.7 0
+expect text:"Auf der Kante" exists
+# on its long edge: a tube along the height
+sensor gravity 9.81 0 0
+expect text:"Waagerecht" exists
+shot build/shots/androidGallery/level_side.png
+sensor gravity 9.7 1 0
+expect text:"Auf der Kante" exists
+
+# the rotation estimate alone gives the same (no gravity sensor)
+sensor none gravity
+sensor expect gravity unavailable
+expect text:"Schwerkraft: nicht verfügbar" exists
+
+# the background: everything pauses; a reading now does not arrive; back again it waits
+sensor gravity 0 0 9.81
+system background
+sensor expect gravity paused
+expect text:"Schwerkraft: pausiert" exists
+expect text:"Pausiert, solange die App im Hintergrund ist." exists
+sensor gravity 1 1 9
+expect text:"0,00 0,00 9,81 m/s²" exists
+system foreground
+sensor expect gravity waiting
+sensor gravity 0 0 9.81
+sensor expect gravity running
+
+# in the dark
+theme dark
+shot build/shots/androidGallery/level_dark.png
+theme light
+
+# leaving the page stops them
+key esc
+expect #100 exists
+sensor expect gravity off
+sensor expect accel off
+expect_nowarn

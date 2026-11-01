@@ -792,6 +792,8 @@ fs.user                              # the files the user picks (file dialog, dr
 # audio.output                       play sound (plat::audio, ui.beep; Flatpak: --socket=pulseaudio)
 # input.global                       global shortcuts: chords pressed in other programs
 # screen.capture                     pictures of the screen (picking one pixel needs nothing)
+# location                           where the device is (plat::sensors; Android: ACCESS_*_LOCATION in the manifest)
+# sensors                            motion sensors: accelerometer, gyroscope, compass (plat::sensors)
 # ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead
 # sandbox                            let the OS enforce this manifest too (Landlock+seccomp / mitigations)
 """

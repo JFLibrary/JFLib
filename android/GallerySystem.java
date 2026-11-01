@@ -11,7 +11,9 @@
  *   FLAG_KEEP_SCREEN_ON on the activity's window, a partial WakeLock "jfgui:<package>"
  *   (android.permission.WAKE_LOCK), both taken again by a new activity;
  * - the lifecycle: onStop / onStart (not the first) -> E_POWER 2 / 3 through nativeEvent ->
- *   UIC_SUSPEND 2 / 0 (onPause / onResume are E_FOCUS_OUT / IN already: UIC_ACTIVE).
+ *   UIC_SUSPEND 2 / 0 (onPause / onResume are E_FOCUS_OUT / IN already: UIC_ACTIVE);
+ * - the back key (call CALL_BACK, plat::back_trap): while the app wants it, Esc instead of the end
+ *   of the activity (a page of the app goes back, a popup closes).
  * All of it on the UI thread, like the library. */
 package org.jflib.gallery;
 
@@ -32,7 +34,7 @@ import java.nio.charset.StandardCharsets;
 
 final class GallerySystem {
     // android_host.rs: the calls of web_notify.rs (GalleryNotify) and web_power.rs
-    static final int CALL_FIRST = 50, CALL_LAST = 59, CALL_POWER = 52;
+    static final int CALL_FIRST = 50, CALL_LAST = 59, CALL_POWER = 52, CALL_BACK = 55;
     // plat::INHIBIT_*, plat::E_POWER, E_WAKE
     static final int INHIBIT_SUSPEND = 1, INHIBIT_IDLE = 2, E_POWER = 20, E_WAKE = 14;
     // Settings.Secure.ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED (hidden; readable on most systems)
@@ -45,7 +47,7 @@ final class GallerySystem {
     private static Context app;
     private static int power;
     private static PowerManager.WakeLock wake;
-    private static boolean observing, stopped;
+    private static boolean observing, stopped, backTrapped;
     private static String sent;
 
     static void attach(Activity a) {
@@ -55,10 +57,20 @@ final class GallerySystem {
         settings();
         keepScreen();
         GalleryNotify.attach(a);
+        GallerySensors.attach(a);
     }
     static void detach(Activity a) {
         if (activity == a) activity = null;
         GalleryNotify.detach(a);
+        GallerySensors.detach(a);
+    }
+    /** GalleryActivity.onBackPressed -> true: the app takes it (Esc). */
+    static boolean back() {
+        if (!backTrapped) return false;
+        GalleryActivity.nativeEvent(5, 0, 0, 0, 0, 27);
+        GalleryActivity.nativeEvent(6, 0, 0, 0, 0, 27);
+        GalleryActivity.frameNow();
+        return true;
     }
     /** GalleryActivity.onConfigurationChanged: night mode, font scale. */
     static void configuration(Activity a) { settings(); }
@@ -143,6 +155,11 @@ final class GallerySystem {
             int bits = in != null && in.length >= 4 ? (in[0] & 255) | (in[1] & 255) << 8 : 0;
             return new byte[] {(byte) (power(bits) ? 1 : 0)};
         }
+        if (kind == CALL_BACK) {
+            backTrapped = in != null && in.length >= 1 && in[0] == 1;
+            return new byte[] {1};
+        }
+        if (kind == GallerySensors.CALL_SENSORS || kind == GallerySensors.CALL_LOCATION) return GallerySensors.call(kind, in);
         return GalleryNotify.call(app, activity, kind, in);
     }
     private static boolean power(int bits) {

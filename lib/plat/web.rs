@@ -53,6 +53,10 @@ pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 pub(crate) mod system_host;
 pub use system_host::{jfgui_note, jfgui_system};
 pub(crate) use system_host::sys_settings_host;
+// sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
+#[path = "web_sensors.rs"]
+pub(crate) mod sensors_host;
+pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 #[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;

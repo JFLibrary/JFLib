@@ -1,3 +1,8 @@
 matrix off
 rsonly tests/basic.uis New Android gallery without an assembly reference.
 rsonly tests/folder.uis The folder mode of the file dialog has no assembly counterpart.
+rsonly tests/pages.uis The pages behind the start page have no assembly reference.
+rsonly tests/level.uis plat::sensors has no assembly counterpart.
+rsonly tests/attitude.uis plat::sensors has no assembly counterpart.
+rsonly tests/compass.uis plat::sensors has no assembly counterpart.
+rsonly tests/gps.uis plat::sensors has no assembly counterpart.

@@ -7,7 +7,7 @@
 //   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
 //   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
 //   audio_allowed()                        -> bool
-//   input_global_allowed() / screen_capture_allowed()
+//   input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed()
 //                                          -> bool
 //                                          a refusal is recorded (denials) and printed once
 //                                          per target to stderr: "PERMDENY kind target"
@@ -74,6 +74,8 @@
 //                         another program has the keyboard)
 //   screen.capture        plat::screen::capture_start (pictures of the screen; picking one
 //                         pixel's colour needs nothing: the user chooses it)
+//   location              plat::sensors::location_watch (where the device is)
+//   sensors               plat::sensors::watch (accelerometer, gyroscope, magnetometer, rotation)
 //   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
 //                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
 //                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -132,10 +134,11 @@ pub const STORE: &str = "config://permission-decisions.txt";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Denial {
     /// "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    /// "audio.output", "net.connect", "net.listen", "agent", "input.global" or "screen.capture"
+    /// "audio.output", "net.connect", "net.listen", "agent", "input.global", "screen.capture",
+    /// "location" or "sensors"
     pub kind: &'static str,
     /// the path, program, URL, address, the service of a secret, the agent's action, the
-    /// chord of a shortcut or "" (print, autostart, audio.output, screen.capture)
+    /// chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors)
     pub target: String,
     /// the plugin the call was made for ("" = the app itself)
     pub plugin: String,
@@ -231,9 +234,9 @@ pub enum AgentRule {
 }
 
 // the kinds of access (Denial::kind, Question::kind)
-const KINDS: [&str; 14] = [
+const KINDS: [&str; 16] = [
     "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect",
-    "net.listen", "agent", "input.global", "screen.capture",
+    "net.listen", "agent", "input.global", "screen.capture", "location", "sensors",
 ];
 
 fn kind_of(rule: &str) -> &'static str {
@@ -279,6 +282,8 @@ struct Policy {
     audio: Option<u16>,
     hotkeys: Option<u16>,
     capture: Option<u16>,
+    location: Option<u16>,
+    sensors: Option<u16>,
     connect: Vec<NetRule>,
     listen: Vec<NetRule>,
     resolved: Vec<Resolved>,
@@ -476,6 +481,16 @@ pub fn input_global_allowed() -> bool {
 /// whether plat::screen::capture_start may take pictures of the screen (`screen.capture`)
 pub fn screen_capture_allowed() -> bool {
     decide("screen.capture", "", &Req::Capture, false) == Verdict::Allow
+}
+
+/// whether plat::sensors::location_watch may ask where the device is (`location`)
+pub fn location_allowed() -> bool {
+    decide("location", "", &Req::Location, false) == Verdict::Allow
+}
+
+/// whether plat::sensors::watch may read the motion sensors (`sensors`)
+pub fn sensors_allowed() -> bool {
+    decide("sensors", "", &Req::Sensors, false) == Verdict::Allow
 }
 
 /// the last refusals, oldest first
@@ -799,6 +814,8 @@ enum Req<'a> {
     Audio,
     Hotkeys,
     Capture,
+    Location,
+    Sensors,
     #[cfg(any(windows, target_os = "linux"))]
     Connect([u8; 16], u16),
     #[cfg(any(windows, target_os = "linux"))]
@@ -863,6 +880,8 @@ impl Policy {
             Req::Audio => flag(self.audio),
             Req::Hotkeys => flag(self.hotkeys),
             Req::Capture => flag(self.capture),
+            Req::Location => flag(self.location),
+            Req::Sensors => flag(self.sensors),
             #[cfg(any(windows, target_os = "linux"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
@@ -1421,9 +1440,9 @@ fn scope_name() -> String {
 // ---------------------------------------------------------------- the manifest
 
 // the keys an ask line may carry
-const ASK_KEYS: [&str; 13] = [
+const ASK_KEYS: [&str; 15] = [
     "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect",
-    "net.listen", "input.global", "screen.capture",
+    "net.listen", "input.global", "screen.capture", "location", "sensors",
 ];
 
 // a line -> (rule text, reason): the reason is a "quoted text" at the end; '#' outside it
@@ -1535,7 +1554,8 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     p.explicit_read = true;
                 }
             }
-            "fs.user" | "print" | "secrets" | "autostart" | "audio.output" | "input.global" | "screen.capture" => {
+            "fs.user" | "print" | "secrets" | "autostart" | "audio.output" | "input.global" | "screen.capture" | "location"
+            | "sensors" => {
                 if !args.is_empty() {
                     return Err(at("takes no arguments"));
                 }
@@ -1548,6 +1568,8 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     "audio.output" => set(&mut p.audio),
                     "input.global" => set(&mut p.hotkeys),
                     "screen.capture" => set(&mut p.capture),
+                    "location" => set(&mut p.location),
+                    "sensors" => set(&mut p.sensors),
                     _ => p.user = true,
                 }
             }
@@ -1634,7 +1656,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             }
             _ => {
                 return Err(at(
-                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, audio.output, net.connect, net.listen, input.global, screen.capture, sandbox, ask, agent.confirm, agent.deny)",
+                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, audio.output, net.connect, net.listen, input.global, screen.capture, location, sensors, sandbox, ask, agent.confirm, agent.deny)",
                 ))
             }
         }
