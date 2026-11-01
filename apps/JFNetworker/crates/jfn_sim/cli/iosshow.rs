@@ -163,6 +163,9 @@ impl Engine {
                 if d & super::D_SSH != 0 {
                     s.push_str("Debug output for SSH: on\n");
                 }
+                if d & super::D_DOT1X != 0 {
+                    s.push_str("Debug output for 802.1X: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -191,6 +194,8 @@ impl Engine {
         s.push_str(&self.ios_files_config(ni));
         // logins, AAA and RADIUS (cli/aaa.rs)
         s.push_str(&self.ios_aaa_config(ni));
+        // 802.1X (cli/dot1x.rs)
+        s.push_str(&self.ios_dot1x_config(ni));
         if let Some(st) = &n.ip {
             let default = n.model.has(F_ROUTER) && (!n.model.has(F_BRIDGE) || n.model.has(F_HOST));
             if st.forwarding != default {
@@ -373,6 +378,7 @@ impl Engine {
         // spanning tree of a switch port (stp.rs)
         if let Some(p) = port {
             s.push_str(&self.ios_stp_if_config(ni, p));
+            s.push_str(&self.ios_dot1x_if_config(ni, p));
         }
         s.push_str("!\n");
         s

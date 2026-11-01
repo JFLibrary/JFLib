@@ -248,6 +248,9 @@ impl Engine {
             "ssh" => self.sh_ssh(ni, &args),
             "scp" => self.sh_scp(ni, &args),
             "ssh-keygen" => self.sh_ssh_keygen(ni, &args),
+            // the supplicant (cli/dot1x.rs)
+            "wpa_supplicant" => self.sh_wpa_supplicant(ni, &args),
+            "wpa_cli" => self.sh_wpa_cli(ni, &args),
             _ => {
                 self.sh_set_code(ni, 127);
                 self.sh_err(ni, &format!("{}: command not found\n", cmd))
@@ -262,6 +265,7 @@ impl Engine {
             "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
             "systemctl", "journalctl",
             "who", "w", "tty", "ssh", "scp", "ssh-keygen",
+            "wpa_cli", "wpa_supplicant",
         ];
         // the verbs and units of systemctl (cli/units.rs)
         if let Some(r) = self.systemctl_complete(ni, line) {

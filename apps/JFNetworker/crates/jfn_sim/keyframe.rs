@@ -512,6 +512,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
     b += size_of::<crate::cli::CliDev>() + 256 + cfg.startup.len() + (cfg.methods.len() + cfg.descr.len()) * 64 + n.cli.queue.iter().map(|l| l.len() + 24).sum::<usize>();
     // the login, AAA and RADIUS configuration, the banner, a pending login gate (X1d)
     b += cfg.auth.footprint() + cfg.aaa.footprint() + cfg.motd.len() + n.cli.gate.as_ref().map_or(0, |g| g.user.len() + g.methods.len() * 16 + 48);
+    // the ports' 802.1X settings (X1g; the sessions are in their service's footprint)
+    b += cfg.dot1x.footprint();
     // the shell's session: its directory, variables, history, line and background jobs (V1)
     b += n.cli.sh.footprint();
     // the further sessions: their infos, telnet buffers and waiting command lines (X1e)

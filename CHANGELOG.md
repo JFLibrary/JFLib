@@ -92,6 +92,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::win_native: the HWND and HINSTANCE of a plat window, for GPU surfaces
 - **wgsl:** lib/wgsl, JFLib's WGSL compiler: lexer, parser and checker after the W3C WGSL specification (every type, constant evaluation, overrides, the built-in functions, layouts, entry points), German diagnostics with line and column, a fully typed IR and a back end to SPIR-V 1.3 and 1.6 (wgsl::compile: one module per entry point, WGSL's runtime rules, bounds-clamped indices and texture coordinates, overrides as specialization constants with their values computed by name or @id, WebGPU's pipeline checks); the benchmark shaders in WGSL (docs/WGSL.md)
 - **netpkt:** URI references as RFC 3986 reads them (netpkt::uri: parsing, resolving a relative reference, remove_dot_segments, percent encoding, HTML's form encoding) and the Content-Type of a file by its extension (netpkt::http::mime_of)
+- **netpkt:** netpkt::eap (RFC 3748 packets, EAP-MD5 data, EAP-PWD exchanges), EAPOL Start, Logoff and EAP PDUs, netpkt::radius with EAP-Message pieces, VLAN attributes and MS-MPPE keys, netpkt::imap (IMAP without I/O: lines with literals, commands, responses, sequence sets, FETCH items, SEARCH keys, ENVELOPE)
+- **crypto:** crypto::eappwd (the sums of EAP-PWD, RFC 5931) and the group of crypto::p256 (y_for_x, on_curve, mul_point, add_points, neg_point, scalar_add, scalar_ok)
+- **eapm:** lib/eapm: EAP-MD5 and EAP-PWD as peer and server state machines without I/O
 
 ### Changed
 

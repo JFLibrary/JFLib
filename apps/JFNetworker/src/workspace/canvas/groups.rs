@@ -533,7 +533,7 @@ pub(crate) fn paint_clusters(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbol
 pub(crate) fn worst(leds: &[Led]) -> Led {
     let rank = |l: &Led| match l {
         Led::Down => 0,
-        Led::Blocking | Led::Learning => 1,
+        Led::Blocking | Led::Learning | Led::Unauth => 1,
         Led::NoPower => 2,
         Led::Up => 3,
     };

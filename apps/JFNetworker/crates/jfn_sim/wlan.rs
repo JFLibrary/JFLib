@@ -30,6 +30,10 @@
 //            the station gives up 1 s later
 //   assoc    two frames, 500 µs; the AP gives an AID, announces the station with a Layer 2
 //            Update frame (an 802.2 XID broadcast with the station's address, as hostapd does)
+//   802.1X   WPA-Enterprise: EAP over EAPOL on the radio link first, the AP asking its RADIUS
+//            server (dot1x.rs), the station answering with its identity and method (supp.rs).  The
+//            MSK that comes from both sides is the PMK; a refusal, or no keys, ends the association
+//            (reason 23) and counts as a failure like a wrong passphrase
 //   4-way    WPA2 / WPA3: real EAPOL-Key frames on the radio link (wlankey.rs); a MIC that does
 //            not fit (another passphrase) is dropped, message 1 comes again after 100 ms, then
 //            every second, four times in all, and then the AP ends it (reason 15)
@@ -830,6 +834,27 @@ impl Engine {
         self.sta_start(dev);
     }
 
+    /// a host's supplicant file changed: a station that waited for its credentials tries again,
+    /// one without a network takes the enterprise network of the file
+    pub(crate) fn wlan_creds_changed(&mut self, ni: usize) {
+        let dev = self.dev_of(ni);
+        let Some(s) = self.wlan.stas.get(&dev) else { return };
+        if s.join.is_none() {
+            let block = self.supp_conf(dev).into_iter().find(|b| b.key_mgmt == crate::supp::KeyMgmt::WpaEap && !b.ssid.is_empty());
+            if let Some(b) = block {
+                self.wlan_join(ni, Some(WlanJoin { ssid: b.ssid, ..WlanJoin::default() }));
+            }
+            return;
+        }
+        if matches!(s.phase, Phase::Waiting(Wait::NoPassphrase | Wait::GaveUp)) {
+            if let Some(x) = self.wlan.stas.get_mut(&dev) {
+                x.failures = 0;
+                x.phase = Phase::Idle;
+            }
+            self.sta_start(dev);
+        }
+    }
+
     /// the stations that wait for a network look again; connected ones see whether to roam
     fn wlan_wake(&mut self) {
         let stas: Vec<(u32, bool)> = self.wlan.stas.iter().map(|(&d, s)| (d, matches!(s.phase, Phase::Waiting(Wait::NoNetwork)))).collect();
@@ -1017,7 +1042,7 @@ impl Engine {
         };
         let ap = self.name(best.ap);
         self.wnote(dev, None, WNote::ScanFound { ssid: join.ssid.clone(), n: found.len() as u16, ap, band: best.band, ch: best.channel, dbm: best.dbm() });
-        if best.security.secured() && join.passphrase.is_empty() {
+        if best.security.personal() && join.passphrase.is_empty() || best.security.enterprise() && self.wlan_creds(dev, &join.ssid).is_none() {
             self.wnote(dev, None, WNote::NoPassphrase { ssid: join.ssid.clone() });
             self.sta_wait(dev, Wait::NoPassphrase);
             return;
@@ -1035,6 +1060,7 @@ impl Engine {
 
     /// authentication with the AP of a network (`old`: the association it roams from)
     fn sta_auth(&mut self, dev: u32, bss: Bss, old: Option<u32>) {
+        // (WPA3-Enterprise has no SAE: it opens with Open System and checks in 802.1X)
         let sae = bss.security == Security::Wpa3;
         let pass_sta = self.wlan.stas.get(&dev).and_then(|s| s.join.as_ref()).map(|j| j.passphrase.clone()).unwrap_or_default();
         let pass_ap = self.ap_nets(bss.ap).and_then(|n| n.get(bss.net)).map(|n| n.passphrase.clone()).unwrap_or_default();
@@ -1178,6 +1204,8 @@ impl Engine {
                 let s = wlankey::pmk_sae(&pass_sta, bss.bssid, sta_mac, &rands.0, &rands.1);
                 (a, s)
             }
+            // the MSK of 802.1X will give them (wlan_eap_done, wlan_sta_keys)
+            Security::Wpa2Ent | Security::Wpa3Ent => ([0; 32], [0; 32]),
         };
         let rt = LinkRt {
             id,
@@ -1256,11 +1284,49 @@ impl Engine {
         self.bridge_output(ani, vlan, f, None);
         if open {
             self.assoc_authorize(id);
+        } else if net.security.enterprise() {
+            self.dot1x_wlan_begin(ani, id);
         } else {
             self.hs_start(id);
         }
         self.wlan.bump();
         id
+    }
+
+    /// the AP's 802.1X of an association is over: Ok(MSK) starts the 4-way handshake, Err(reason)
+    /// ends the association
+    pub(crate) fn wlan_eap_done(&mut self, id: u32, r: Result<[u8; 64], u16>) {
+        match r {
+            Ok(msk) => {
+                if let Some(a) = self.wlan.assocs.get_mut(&id) {
+                    a.pmk_ap = wlankey::pmk_msk(&msk);
+                }
+                self.hs_start(id);
+            }
+            Err(_) => self.assoc_drop(id, Why::EapFailed),
+        }
+    }
+
+    /// the station's 802.1X of an association is over: its MSK (None: its method gives none)
+    pub(crate) fn wlan_sta_keys(&mut self, id: u32, msk: Option<[u8; 64]>) {
+        if let (Some(a), Some(m)) = (self.wlan.assocs.get_mut(&id), msk) {
+            a.pmk_sta = wlankey::pmk_msk(&m);
+        }
+    }
+
+    /// the RADIUS server of an association's network, for its AP's authenticator
+    pub(crate) fn wlan_radius_of(&self, id: u32) -> Option<crate::aaa::RadiusServer> {
+        let a = self.wlan.assocs.get(&id)?;
+        let net = self.ap_nets(a.ap)?.get(a.net)?;
+        let addr = netpkt::Ipv4(jfn_model::wlan::netpkt_addr_ok(&net.radius)?);
+        let mut s = crate::aaa::RadiusServer::new("", addr);
+        s.key = net.radius_key.clone();
+        if net.radius_port != 0 {
+            s.auth_port = net.radius_port;
+        }
+        s.timeout = crate::dot1x::WLAN_RADIUS_TIMEOUT;
+        s.retransmit = crate::dot1x::WLAN_RADIUS_RETRANSMIT;
+        Some(s)
     }
 
     /// the station may send: its link carries data now (the IP stack sees the link come up, a
@@ -1381,6 +1447,10 @@ impl Engine {
     /// both sides, the station's next step
     fn assoc_drop(&mut self, id: u32, why: Why) {
         let Some(a) = self.wlan.assocs.get(&id).cloned() else { return };
+        if a.security.enterprise() {
+            self.dot1x_wlan_end(a.ap_ni, id);
+            self.supp_assoc_gone(a.sta_ni, a.sta_port);
+        }
         if let Some(Some(l)) = self.links.get_mut(a.li) {
             l.down = true;
         }
@@ -1416,8 +1486,17 @@ impl Engine {
                     self.wnote(a.ap, None, WNote::StaLeft { sta: sname.clone(), reason: 4 });
                 }
             }
+            Why::EapFailed => {
+                self.wnote(a.sta, None, WNote::Deauthed { ap: aname, reason: 23 });
+                self.wnote(a.ap, None, WNote::StaLeft { sta: sname.clone(), reason: 23 });
+                let text = format!("{}: {} refused the 802.1X login on {}", self.port_name_of(a.sta), a.bssid, a.ssid);
+                self.wlan_log(a.sta_ni, "wpa_supplicant", "%DOT11-4-AUTH", &text);
+                let rport = self.nodes[a.ap_ni].as_ref().map(|n| String::from(n.port_name(a.ap_port))).unwrap_or_default();
+                let text = format!("{}: station {} ({}) failed 802.1X on {}, it is sent away", rport, a.sta_mac.cisco(), sname, a.ssid);
+                self.wlan_log(a.ap_ni, "hostapd", "%DOT11-4-AUTH", &text);
+            }
         }
-        if !matches!(why, Why::HsTimeout) && ap_on {
+        if !matches!(why, Why::HsTimeout | Why::EapFailed) && ap_on {
             let rport = self.nodes[a.ap_ni].as_ref().map(|n| String::from(n.port_name(a.ap_port))).unwrap_or_default();
             let text = format!("{}: station {} ({}) left {}", rport, a.sta_mac.cisco(), sname, a.ssid);
             self.wlan_log(a.ap_ni, "hostapd", "%DOT11-6-DISASSOC", &text);
@@ -1427,7 +1506,7 @@ impl Engine {
         let joined = self.wlan.stas.get(&a.sta).is_some_and(|s| s.phase == Phase::Joined { assoc: id });
         if joined {
             match why {
-                Why::HsTimeout => self.sta_failed(a.sta),
+                Why::HsTimeout | Why::EapFailed => self.sta_failed(a.sta),
                 Why::StaLeaving => {}
                 Why::ApLeaving | Why::BeaconLoss => {
                     if let Some(s) = self.wlan.stas.get_mut(&a.sta) {
@@ -1463,7 +1542,7 @@ impl Engine {
     fn hs_send_m1(&mut self, id: u32) {
         let Some(a) = self.wlan.assocs.get(&id) else { return };
         let Some(hs) = a.ap_hs.as_ref() else { return };
-        let sae = a.security == Security::Wpa3;
+        let sae = wlankey::Akm::of(a.security);
         let pdu = wlankey::seal(&wlankey::m1(sae, hs.replay, &hs.anonce), None, sae, 2);
         let f = wlankey::frame(a.sta_mac, a.bssid, &pdu);
         let (li, ap, sta) = (a.li, a.ap, self.name(a.sta));
@@ -1475,7 +1554,7 @@ impl Engine {
         let Some(a) = self.wlan.assocs.get(&id) else { return };
         let Some(hs) = a.ap_hs.as_ref() else { return };
         let Some(ptk) = hs.ptk.clone() else { return };
-        let sae = a.security == Security::Wpa3;
+        let sae = wlankey::Akm::of(a.security);
         let (ap, net, replay, anonce) = (a.ap, a.net, hs.replay, hs.anonce);
         let (gtk, igtk) = self.group_keys(ap, net);
         let Some(a) = self.wlan.assocs.get(&id) else { return };
@@ -1541,8 +1620,14 @@ impl Engine {
     fn eapol_at_ap(&mut self, id: u32, frame: &[u8], hop: HopId) {
         let Some(a) = self.wlan.assocs.get(&id) else { return };
         let Some(pdu) = frame.get(14..).and_then(EapolView::parse).map(|v| v.pdu().to_vec()) else { return };
+        // EAP, EAPOL-Start and Logoff go to the authenticator (dot1x.rs)
+        if a.security.enterprise() && EapolView::parse(&pdu).is_some_and(|v| v.kind() != netpkt::eapol::T_KEY) {
+            let (ani, src) = (a.ap_ni, a.sta_mac);
+            self.dot1x_wlan_rx(ani, id, src, &pdu, hop);
+            return;
+        }
         let Some(k) = EapolView::parse(&pdu).and_then(|v| Key::parse(v.body())) else { return };
-        let (ap, sta_name, sae) = (a.ap, self.name(a.sta), a.security == Security::Wpa3);
+        let (ap, sta_name, sae) = (a.ap, self.name(a.sta), wlankey::Akm::of(a.security));
         let msg = k.message().unwrap_or(0);
         self.wnote(ap, Some(hop), WNote::Eapol { msg, out: false, peer: sta_name.clone() });
         let Some(a) = self.wlan.assocs.get(&id) else { return };
@@ -1588,8 +1673,14 @@ impl Engine {
     fn eapol_at_sta(&mut self, id: u32, frame: &[u8], hop: HopId) {
         let Some(a) = self.wlan.assocs.get(&id) else { return };
         let Some(pdu) = frame.get(14..).and_then(EapolView::parse).map(|v| v.pdu().to_vec()) else { return };
+        // EAP goes to the supplicant (supp.rs)
+        if a.security.enterprise() && EapolView::parse(&pdu).is_some_and(|v| v.kind() != netpkt::eapol::T_KEY) {
+            let (sni, sport) = (a.sta_ni, a.sta_port);
+            self.supp_wlan_rx(sni, sport, id, &pdu, hop);
+            return;
+        }
         let Some(k) = EapolView::parse(&pdu).and_then(|v| Key::parse(v.body())) else { return };
-        let (sta, ap_name, sae) = (a.sta, self.name(a.ap), a.security == Security::Wpa3);
+        let (sta, ap_name, sae) = (a.sta, self.name(a.ap), wlankey::Akm::of(a.security));
         let had = a.sta_hs.clone();
         let msg = k.message().unwrap_or(0);
         self.wnote(sta, Some(hop), WNote::Eapol { msg, out: false, peer: ap_name.clone() });
@@ -1893,4 +1984,6 @@ enum Why {
     HsTimeout,
     /// the station missed the beacons
     BeaconLoss,
+    /// 802.1X refused it, or gave no keys (reason 23)
+    EapFailed,
 }

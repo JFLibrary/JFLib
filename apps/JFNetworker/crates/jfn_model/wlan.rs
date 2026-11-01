@@ -3,9 +3,11 @@
 // their frequencies, the fastest rate of a band, the scale between the canvas and metres
 //
 //   Wlan { nets, join }                  Device::wlan (None: no WLAN settings, as in older files)
-//   WlanNet { ssid, band, channel, security, passphrase, vlan, guest, isolate }
-//   WlanJoin { ssid, passphrase }        what a station joins
-//   Band (2.4 / 5 / 6 GHz), Security (open, WPA2-Personal, WPA3-Personal)
+//   WlanNet { ssid, band, channel, security, passphrase, vlan, guest, isolate, radius, radius_key,
+//             radius_port }
+//   WlanJoin { ssid, passphrase, identity, eap }   what a station joins
+//   Band (2.4 / 5 / 6 GHz), Security (open, WPA2-Personal, WPA3-Personal, WPA2-Enterprise,
+//   WPA3-Enterprise)
 //   role(model) -> Role                  Ap (F_AP with a radio), Station (a radio client), None
 //   ap_bands(model) / client_bands(model)   the bands of a model's radios (B_* bits)
 //   range_m(model, band)                 how far an access point of the model reaches
@@ -20,8 +22,10 @@
 //
 // There is no radio physics: a station reaches a network when the access point is within the
 // range of the network's band; the simulator turns the distance into a signal and a rate
-// (wlan.rs of jfn_sim).  6 GHz takes WPA3-Personal only (as the standard asks); networks on one band
-// share the radio of that band and its channel (the first network's channel counts).
+// (wlan.rs of jfn_sim).  6 GHz takes WPA3 only (as the standard asks); networks on one band
+// share the radio of that band and its channel (the first network's channel counts).  An enterprise
+// network names its RADIUS server and shared secret; a station names its identity and EAP method,
+// its passphrase is the password (or a network block of its supplicant's file holds all that).
 
 use alloc::format;
 use alloc::string::String;
@@ -49,6 +53,8 @@ wire_enum! {
         Open = "open",
         Wpa2 = "wpa2-personal",
         Wpa3 = "wpa3-personal",
+        Wpa2Ent = "wpa2-enterprise",
+        Wpa3Ent = "wpa3-enterprise",
     }
 }
 
@@ -70,6 +76,12 @@ record! {
         pub guest: bool,
         /// client isolation: its stations do not reach each other (nor other stations)
         pub isolate: bool,
+        /// WPA-Enterprise: the address of its RADIUS server
+        pub radius: String,
+        /// WPA-Enterprise: the secret it shares with that server
+        pub radius_key: String,
+        /// WPA-Enterprise: the server's port (0: 1812)
+        pub radius_port: u16,
     }
 }
 
@@ -77,8 +89,12 @@ record! {
     /// the network a station joins
     pub struct WlanJoin {
         pub ssid: String,
-        /// for WPA2 / WPA3 networks (an open network ignores it)
+        /// for WPA2 / WPA3 networks (an open network ignores it); WPA-Enterprise: the password
         pub passphrase: String,
+        /// WPA-Enterprise: who logs in
+        pub identity: String,
+        /// WPA-Enterprise: the EAP method ("PWD" if empty)
+        pub eap: String,
     }
 }
 
@@ -132,18 +148,32 @@ impl Band {
 }
 
 impl Security {
-    /// "Offen", "WPA2-Personal", "WPA3-Personal" (the app translates it)
+    /// "Offen", "WPA2-Personal", "WPA3-Personal", ... (the app translates it)
     pub fn title(self) -> &'static str {
         // i18n
         match self {
             Security::Open => "Offen",
             Security::Wpa2 => "WPA2-Personal",
             Security::Wpa3 => "WPA3-Personal",
+            Security::Wpa2Ent => "WPA2-Enterprise",
+            Security::Wpa3Ent => "WPA3-Enterprise",
         }
     }
-    /// it needs a passphrase
+    /// it is not open
     pub fn secured(self) -> bool {
         self != Security::Open
+    }
+    /// it logs in over 802.1X with a RADIUS server
+    pub fn enterprise(self) -> bool {
+        matches!(self, Security::Wpa2Ent | Security::Wpa3Ent)
+    }
+    /// it has a passphrase
+    pub fn personal(self) -> bool {
+        matches!(self, Security::Wpa2 | Security::Wpa3)
+    }
+    /// WPA3 of either kind (the only one 6 GHz takes)
+    pub fn wpa3(self) -> bool {
+        matches!(self, Security::Wpa3 | Security::Wpa3Ent)
     }
 }
 
@@ -292,11 +322,19 @@ pub fn check_net(n: &WlanNet) -> Option<Msg> {
     if n.channel != 0 && !channels(n.band).contains(&n.channel) {
         return Some(msg!("Kanal {} gibt es im Band {} nicht.", n.channel, crate::msg::phrase(n.band.title())));
     }
-    if n.band == Band::G6 && n.security != Security::Wpa3 {
+    if n.band == Band::G6 && !n.security.wpa3() {
         return Some(msg!("Im 6-GHz-Band gibt es nur WPA3-Personal."));
     }
-    if n.security.secured() && !passphrase_ok(&n.passphrase) {
+    if n.security.personal() && !passphrase_ok(&n.passphrase) {
         return Some(msg!("Die Passphrase von \u{201e}{}\u{201c} braucht 8 bis 63 Zeichen (ASCII).", n.ssid));
+    }
+    if n.security.enterprise() {
+        if netpkt_addr_ok(&n.radius).is_none() {
+            return Some(msg!("\u{201e}{}\u{201c} braucht die Adresse seines RADIUS-Servers.", n.ssid));
+        }
+        if n.radius_key.is_empty() {
+            return Some(msg!("\u{201e}{}\u{201c} braucht den gemeinsamen Schlüssel seines RADIUS-Servers.", n.ssid));
+        }
     }
     if n.vlan > 4094 {
         return Some(msg!("VLAN {} gibt es nicht (1 bis 4094).", n.vlan));
@@ -309,10 +347,20 @@ pub fn check_join(j: &WlanJoin) -> Option<Msg> {
     if j.ssid.is_empty() || j.ssid.len() > SSID_MAX {
         return Some(msg!("Eine SSID hat 1 bis 32 Bytes."));
     }
-    if !j.passphrase.is_empty() && !passphrase_ok(&j.passphrase) {
+    if j.identity.is_empty() && !j.passphrase.is_empty() && !passphrase_ok(&j.passphrase) {
         return Some(msg!("Die Passphrase von \u{201e}{}\u{201c} braucht 8 bis 63 Zeichen (ASCII).", j.ssid));
     }
     None
+}
+
+/// an IPv4 address in dotted form
+pub fn netpkt_addr_ok(s: &str) -> Option<[u8; 4]> {
+    let mut out = [0u8; 4];
+    let mut it = s.trim().split('.');
+    for b in out.iter_mut() {
+        *b = it.next()?.parse().ok()?;
+    }
+    if it.next().is_some() { None } else { Some(out) }
 }
 
 /// a new network for an access point that has `nets`: SSID "WLAN-N" with the lowest free N, the

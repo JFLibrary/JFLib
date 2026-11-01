@@ -8,6 +8,8 @@
 // trips, edge cases.
 // The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
 // The group sshcore checks netpkt::ssh and netpkt::snmpv3 (sshcoret.rs, snmpv3t.rs).
+// The group eap checks netpkt::eap, the EAP parts of netpkt::eapol and netpkt::radius, crypto::eappwd
+// and the crate eapm (eapt.rs), and netpkt::imap (imapt.rs).
 // The group scriptls checks script's language services and formatter (scriptlst.rs).
 // The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
 // The group scriptmod checks script's modules, debugger and test functions (scriptmodt.rs).
@@ -67,6 +69,8 @@ mod radiust;
 mod scriptlst;
 mod patternt;
 mod scriptmodt;
+mod eapt;
+mod imapt;
 
 /// the result collector of a check group
 pub struct T {
@@ -148,7 +152,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 39] = [
+    let groups: [(&'static str, fn(&mut T)); 40] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -188,6 +192,7 @@ fn run() -> i32 {
         ("pattern", patternt::run),
         ("scriptmod", scriptmodt::run),
         ("sshcore", sshcoret::run),
+        ("eap", eapt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

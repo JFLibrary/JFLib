@@ -1884,8 +1884,8 @@ impl Engine {
     }
 
     pub(crate) fn sh_curl(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
-        // smtp:// and pop3:// URLs (cli/mail.rs)
-        if args.iter().any(|a| a.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("smtp://") || p.eq_ignore_ascii_case("pop3://"))) {
+        // smtp://, pop3:// and imap:// URLs (cli/mail.rs)
+        if args.iter().any(|a| a.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("smtp://") || p.eq_ignore_ascii_case("pop3://") || p.eq_ignore_ascii_case("imap://"))) {
             return self.sh_curl_mail(ni, args);
         }
         // ftp:// URLs (ftpc.rs)

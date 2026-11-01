@@ -491,6 +491,8 @@ pub enum Note {
     WebRedirect { status: u16, to: String },
     /// a decision of SSH: sshtrace.rs
     Ssh(crate::sshtrace::SshNote),
+    /// a decision of 802.1X (dot1xtrace.rs)
+    Dot1x(crate::dot1xtrace::DNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -620,6 +622,7 @@ impl Note {
             Note::Aaa(_) => 7,
             Note::Unit { .. } | Note::Deploy { .. } => 7,
             Note::Ssh(_) => 7,
+            Note::Dot1x(_) => 2,
             _ => 2,
         }
     }
@@ -766,6 +769,7 @@ impl Note {
             || matches!(self, Note::Snmp(n) if n.is_drop())
             || matches!(self, Note::Aaa(n) if n.is_drop())
             || matches!(self, Note::Ssh(n) if n.is_drop())
+            || matches!(self, Note::Dot1x(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1208,6 +1212,7 @@ impl Note {
             Note::Aaa(n) => n.message(),
             Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
             Note::Ssh(n) => n.message(),
+            Note::Dot1x(n) => n.message(),
         }
     }
 }
@@ -1680,6 +1685,7 @@ impl Note {
             Note::Snmp(n) => n.mask(),
             Note::Aaa(n) => n.mask(),
             Note::Ssh(n) => n.mask(),
+            Note::Dot1x(n) => n.mask(),
             _ => 0,
         }
     }

@@ -5,6 +5,8 @@
 //                                    [--mail-rcpt ADDR].. -T FILE smtp://HOST[:PORT][/DOMAIN]
 //                                    curl [-v] [-s] [-S] [-u USER:PASS] [-X CMD] [-l] [-o FILE]
 //                                    pop3://[USER:PASS@]HOST[:PORT][/N]
+//                                    curl [-v] [-s] [-S] [-u USER:PASS] [-X CMD] [-o FILE]
+//                                    imap://[USER:PASS@]HOST[:PORT][/FOLDER[;UID=N][?SEARCH]]
 //   Engine::sh_mail(ni, args, text)  mail [-s SUBJECT] [-c ADDR] [-r FROM] ADDR..: the text a
 //                                    pipe gives (echo TEXT | mail ...; without one the message
 //                                    has no text); mail -H (or mail alone): the headers of the
@@ -18,7 +20,11 @@
 // reply, 9 EHLO refused, 67 a refused login, 55 a refused MAIL, RCPT or DATA.  curl pop3://:
 // the greeting, CAPA, USER and PASS, then LIST (no number in the URL, or -l), RETR N or the
 // command of -X (with the number), QUIT; the body of a multi-line answer goes to the console
-// or the file of -o; 67 a refused login, 8 a refused command.
+// or the file of -o; 67 a refused login, 8 a refused command.  curl imap://: the greeting,
+// CAPABILITY, LOGIN, then LIST "" "*" (no folder in the URL), SELECT and UID FETCH n BODY[] (a
+// ;UID=n), SELECT and SEARCH (a ?query), SELECT alone (the folder) or the command of -X; the
+// untagged lines or the message go to the console or the file of -o; LOGOUT; 67 a refused login, 78
+// no such folder, 8 a refused command.
 //
 // mail hands the message to the SMTP server of the E-Mail program's account (/root/Mail/account,
 // with its login on port 587), else to an smtp-server running on the device itself (127.0.0.1):
@@ -33,6 +39,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::any::Any;
 
+use netpkt::imap::{self, Item, Kind, LineReader, Read, Response};
 use netpkt::imf::{self, Draft, Mailbox};
 use netpkt::pop3;
 use netpkt::smtp;
@@ -228,6 +235,245 @@ impl Service for SmtpProgram {
     }
     fn status(&self) -> String {
         format!("smtp {}", self.dial.host)
+    }
+    fn clone_box(&self) -> Box<dyn Service> {
+        Box::new(self.clone())
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+// ---------------------------------------------------------------- curl imap://
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IStep {
+    Greet,
+    Capa,
+    Login,
+    Select,
+    Cmd,
+    Logout,
+}
+
+/// curl with an imap:// URL
+#[derive(Clone, Debug)]
+pub struct ImapProgram {
+    dial: Dial,
+    user: Option<(String, String)>,
+    /// the folder of the URL (empty: none)
+    folder: String,
+    /// the command after SELECT ("UID FETCH 1 BODY[]", "SEARCH ALL"); empty: nothing more
+    cmd: String,
+    out: Option<String>,
+    verbose: bool,
+    quiet: bool,
+    reader: LineReader,
+    tag: u32,
+    step: IStep,
+    /// what goes to the output
+    got: Vec<u8>,
+    fail: Option<(i32, String)>,
+    started: Ns,
+    exit: Option<i32>,
+}
+
+impl ImapProgram {
+    fn v(&self, os: &mut OsApi, s: &str) {
+        if self.verbose {
+            os.print(s);
+        }
+    }
+    fn send(&mut self, os: &mut OsApi, sock: u32, text: &str, step: IStep) {
+        self.tag += 1;
+        let line = format!("A{:03} {}", self.tag, text);
+        self.v(os, &format!("> {}\n", line));
+        os.tcp_send(sock, format!("{}\r\n", line).as_bytes());
+        self.step = step;
+    }
+    fn end(&mut self, os: &mut OsApi, code: i32, err: Option<String>) {
+        if let Some(e) = err
+            && !self.quiet
+        {
+            os.print(&format!("curl: ({}) {}\n", code, e));
+        }
+        self.dial.close(os);
+        self.exit = Some(code);
+        os.exit(code);
+    }
+    fn trace(&mut self, os: &mut OsApi) {
+        for l in core::mem::take(&mut self.dial.trace) {
+            self.v(os, &format!("{}\n", l));
+        }
+    }
+    fn dialed(&mut self, os: &mut OsApi, e: DialEv) {
+        self.trace(os);
+        match e {
+            DialEv::Up(_) => {
+                let (h, a, p) = (self.dial.host.clone(), self.dial.addr.map(|x| format!("{}", x)).unwrap_or_default(), self.dial.port);
+                self.v(os, &format!("* Connected to {} ({}) port {}\n", h, a, p));
+            }
+            DialEv::Fail(why) => {
+                let ms = (os.now() - self.started) / MS;
+                let (c, m) = dial_fail(&why, &self.dial.host, self.dial.port, ms);
+                self.end(os, c, Some(m));
+            }
+        }
+    }
+    fn after_login(&mut self, os: &mut OsApi, sock: u32) {
+        if self.folder.is_empty() {
+            let c = if self.cmd.is_empty() { String::from("LIST \"\" \"*\"") } else { self.cmd.clone() };
+            self.send(os, sock, &c, IStep::Cmd);
+        } else {
+            let f = imap::astring(&self.folder);
+            self.send(os, sock, &format!("SELECT {}", f), IStep::Select);
+        }
+    }
+    fn data(&mut self, os: &mut OsApi, sock: u32) {
+        let b = os.tcp_recv(sock, usize::MAX);
+        self.reader.push(&b);
+        while let Some(r) = self.reader.next() {
+            let Read::Line(l) = r else { continue };
+            let text = String::from_utf8_lossy(&l.text).into_owned();
+            if self.verbose {
+                os.print(&format!("< {}\n", text.replace('\0', "{literal}")));
+            }
+            let Some(resp) = Response::parse(&l) else { continue };
+            if resp.kind == Kind::Untagged {
+                if self.step == IStep::Greet {
+                    if resp.status == Some(imap::Status::Ok) {
+                        self.send(os, sock, "CAPABILITY", IStep::Capa);
+                    } else {
+                        self.fail = Some((8, String::from("Got unexpected imap-server response")));
+                        self.send(os, sock, "LOGOUT", IStep::Logout);
+                    }
+                } else if self.step == IStep::Cmd {
+                    // a message as a literal goes out as it is, other untagged lines as they came
+                    let body = match resp.items.get(2) {
+                        Some(Item::List(items)) => items.iter().find_map(|x| if let Item::Literal(b) = x { Some(b.clone()) } else { None }),
+                        _ => None,
+                    };
+                    match body {
+                        Some(b) => self.got.extend_from_slice(&b),
+                        None => {
+                            self.got.extend_from_slice(text.as_bytes());
+                            self.got.extend_from_slice(b"\r\n");
+                        }
+                    }
+                }
+                continue;
+            }
+            let ok = resp.status == Some(imap::Status::Ok);
+            match self.step {
+                IStep::Capa => match self.user.clone() {
+                    Some((u, p)) => {
+                        let line = format!("LOGIN {} {}", imap::astring(&u), imap::astring(&p));
+                        self.send(os, sock, &line, IStep::Login);
+                    }
+                    None => {
+                        self.fail = Some((67, String::from("Login denied")));
+                        self.send(os, sock, "LOGOUT", IStep::Logout);
+                    }
+                },
+                IStep::Login if ok => self.after_login(os, sock),
+                IStep::Login => {
+                    self.fail = Some((67, String::from("Login denied")));
+                    self.send(os, sock, "LOGOUT", IStep::Logout);
+                }
+                IStep::Select if ok => {
+                    if self.cmd.is_empty() {
+                        self.send(os, sock, "LOGOUT", IStep::Logout);
+                    } else {
+                        let c = self.cmd.clone();
+                        self.send(os, sock, &c, IStep::Cmd);
+                    }
+                }
+                IStep::Select => {
+                    self.fail = Some((78, String::from("Select failed")));
+                    self.send(os, sock, "LOGOUT", IStep::Logout);
+                }
+                IStep::Cmd => {
+                    if !ok {
+                        self.fail = Some((8, String::from("Weird server reply")));
+                    }
+                    self.send(os, sock, "LOGOUT", IStep::Logout);
+                }
+                IStep::Logout => return self.finish(os),
+                IStep::Greet => {}
+            }
+        }
+    }
+    fn finish(&mut self, os: &mut OsApi) {
+        if let Some((c, m)) = self.fail.clone() {
+            return self.end(os, c, Some(m));
+        }
+        let body = core::mem::take(&mut self.got);
+        if let Some(path) = self.out.clone() {
+            if os.file_write(&path, &imf::lf(&body)).is_err() {
+                let m = format!("Failure writing output to destination, passed {} returned 0", body.len());
+                return self.end(os, 23, Some(m));
+            }
+        } else if !body.is_empty() {
+            os.print(&String::from_utf8_lossy(&imf::lf(&body)));
+        }
+        let h = self.dial.host.clone();
+        self.v(os, &format!("* Closing connection to {}\n", h));
+        self.end(os, 0, None);
+    }
+}
+
+impl Service for ImapProgram {
+    fn kind(&self) -> &'static str {
+        "curl"
+    }
+    fn start(&mut self, os: &mut OsApi) {
+        self.started = os.now();
+        if let Some(e) = self.dial.start(os) {
+            self.dialed(os, e);
+        } else {
+            self.trace(os);
+        }
+    }
+    fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
+        if self.exit.is_some() {
+            return;
+        }
+        let up = self.dial.up;
+        match ev {
+            SvcEvent::Timer(K_DIAL) => {
+                if let Some(e) = self.dial.timer(os) {
+                    self.dialed(os, e);
+                } else {
+                    self.trace(os);
+                }
+            }
+            SvcEvent::TcpData { sock, .. } if up && Some(sock) == self.dial.sock => self.data(os, sock),
+            SvcEvent::TcpEof { sock, .. } | SvcEvent::TcpClosed { sock, .. } if up && Some(sock) == self.dial.sock => {
+                let rest = os.tcp_recv(sock, usize::MAX);
+                self.reader.push(&rest);
+                if self.step == IStep::Logout {
+                    return self.finish(os);
+                }
+                self.end(os, 56, Some(String::from("Recv failure: Connection reset by peer")));
+            }
+            SvcEvent::Console(_) => {}
+            ev => {
+                if let Some(e) = self.dial.on(&ev, os) {
+                    self.dialed(os, e);
+                } else {
+                    self.trace(os);
+                }
+            }
+        }
+    }
+    fn metrics(&self) -> Vec<Metric> {
+        alloc::vec![Metric::new("bytes", self.got.len() as i64)]
+    }
+    fn status(&self) -> String {
+        format!("imap {}", self.dial.host)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -606,8 +852,9 @@ impl Engine {
         let Some(u) = url else { return usage(self, "no URL specified") };
         let lower = u.to_ascii_lowercase();
         let smtp_url = lower.starts_with("smtp://");
-        let Some(rest) = u.get(7..).filter(|_| smtp_url || lower.starts_with("pop3://")) else { return usage(self, "no URL specified") };
-        let (creds, host, port, path) = match url_parts(rest, if smtp_url { smtp::PORT_SMTP } else { pop3::PORT_POP3 }) {
+        let imap_url = lower.starts_with("imap://");
+        let Some(rest) = u.get(7..).filter(|_| smtp_url || imap_url || lower.starts_with("pop3://")) else { return usage(self, "no URL specified") };
+        let (creds, host, port, path) = match url_parts(rest, if smtp_url { smtp::PORT_SMTP } else if imap_url { imap::PORT_IMAP } else { pop3::PORT_POP3 }) {
             Ok(x) => x,
             Err(m) => return refuse(self, ni, &m),
         };
@@ -632,6 +879,21 @@ impl Engine {
             let mut conv = SmtpConv::new(&helo, from.as_deref().unwrap_or(""), rcpts, imf::crlf(&data));
             conv.auth = login;
             let p = SmtpProgram { dial, conv, verbose, quiet, started: 0, exit: None };
+            return self.run_program(ni, "curl", Box::new(p), false);
+        }
+        if imap_url {
+            // /FOLDER, /FOLDER;UID=N, /FOLDER?QUERY (curl's forms)
+            let p = path.trim_matches('/');
+            let (p, query) = p.split_once('?').unwrap_or((p, ""));
+            let (folder, uid) = p.split_once(";UID=").or_else(|| p.split_once("/;UID=")).unwrap_or((p, ""));
+            let folder = folder.trim_end_matches('/');
+            let cmd = match (&custom, uid.is_empty(), query.is_empty()) {
+                (Some(c), ..) => c.clone(),
+                (None, false, _) => format!("UID FETCH {} BODY[]", uid),
+                (None, _, false) => format!("SEARCH {}", query),
+                _ => String::new(),
+            };
+            let p = ImapProgram { dial, user: login, folder: String::from(folder), cmd, out: output.filter(|o| o != "-").map(|o| self.sh_abs(ni, &o)), verbose, quiet, reader: LineReader::new(), tag: 0, step: IStep::Greet, got: Vec::new(), fail: None, started: 0, exit: None };
             return self.run_program(ni, "curl", Box::new(p), false);
         }
         let id = path.trim_matches('/');
@@ -728,7 +990,11 @@ impl Engine {
 
     /// mail -H: the inbox's messages as mailx lists them
     fn mail_headers(&mut self, ni: usize) -> Result<(), String> {
-        let list = self.store(ni).map(|s| mailc::folder(s, mailc::INBOX)).unwrap_or_default();
+        // (an IMAP account: the copy of its inbox)
+        let list = self.store(ni).map(|s| {
+            let dir = if mailc::Account::of(s).is_some_and(|a| a.is_imap()) { mailc::imap_dir("INBOX") } else { String::from(mailc::INBOX) };
+            mailc::folder(s, &dir)
+        }).unwrap_or_default();
         if list.is_empty() {
             let u = "root";
             return self.sh_err(ni, &format!("No mail for {}\n", u));

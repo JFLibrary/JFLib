@@ -302,8 +302,8 @@ pub(crate) fn leds_on_top(n: &Net, ui: &mut Ui) {
     let hair = ui.hair();
     let bg = ui.color(T_BG) | 0xFF00_0000;
     let ring = super::paint::led_ring(ui.color(T_TEXT), bg, ui.theme_dark());
-    let mut cols = [0u32; 5];
-    for (i, led) in [Led::Up, Led::Down, Led::Blocking, Led::Learning, Led::NoPower].into_iter().enumerate() {
+    let mut cols = [0u32; 6];
+    for (i, led) in [Led::Up, Led::Down, Led::Blocking, Led::Learning, Led::NoPower, Led::Unauth].into_iter().enumerate() {
         cols[i] = super::paint::led_color(led, &|t| ui.color(t), bg);
     }
     let col = |l: Led| cols[match l {
@@ -312,6 +312,7 @@ pub(crate) fn leds_on_top(n: &Net, ui: &mut Ui) {
         Led::Blocking => 2,
         Led::Learning => 3,
         Led::NoPower => 4,
+        Led::Unauth => 5,
     }];
     let r = st.vp.rect;
     ui.clip_push(r[0], r[1], r[2], r[3]);
@@ -374,6 +375,7 @@ pub(crate) fn state_text(down: bool, leds: Option<[Led; 2]>) -> &'static str {
         _ if down => "ausgesteckt",
         Some([Led::Up, Led::Up]) => "aktiv",
         Some(l) if l.contains(&Led::NoPower) => "ohne Strom",
+        Some(l) if l.contains(&Led::Unauth) => "nicht autorisiert",
         Some(l) if l.iter().any(|x| matches!(x, Led::Blocking | Led::Learning)) => "blockiert",
         _ => "unten",
     })

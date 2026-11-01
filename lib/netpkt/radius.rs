@@ -29,6 +29,15 @@
 //                                   counted as zero, `auth` in the authenticator field: the
 //                                   packet's own for a request, the request's for an answer);
 //                                   set_message_auth / check_message_auth (None: there is none)
+//   Packet::push_eap(eap) / eap()   an EAP packet in EAP-Message attributes of 253 bytes and back
+//                                   (RFC 3579 3.1); a packet with one needs a Message-Authenticator
+//   Packet::push_vlan(vlan) / vlan()   VLAN assignment: Tunnel-Type VLAN, Tunnel-Medium-Type 802,
+//                                   Tunnel-Private-Group-ID (RFC 2868, 3580 3.31)
+//   mppe_seal(key, secret, auth, salt, md5) / mppe_open(value, secret, auth, md5)   the keys of
+//                                   MS-MPPE-Send-Key and -Recv-Key (RFC 2548 2.4.2): salted and
+//                                   hidden with the shared secret and the Request Authenticator
+//   Packet::push_msk(msk, secret, auth, salts, md5) / msk(secret, auth, md5)   an EAP method's MSK
+//                                   in both of them (Recv first: RFC 3079, hostapd's order)
 //
 // RFC 2865 3: a packet is 20 to 4096 bytes; octets beyond its Length field are padding, a
 // packet shorter than its Length is discarded, and so is one whose attributes do not end
@@ -150,6 +159,17 @@ pub const A_LOGIN_LAT_PORT: u8 = 63;
 // RFC 3579
 pub const A_EAP_MESSAGE: u8 = 79;
 pub const A_MESSAGE_AUTHENTICATOR: u8 = 80;
+// RFC 2868: tunnels, which also assign VLANs (RFC 3580 3.31)
+pub const A_TUNNEL_TYPE: u8 = 64;
+pub const A_TUNNEL_MEDIUM_TYPE: u8 = 65;
+pub const A_TUNNEL_PRIVATE_GROUP_ID: u8 = 81;
+/// Tunnel-Type VLAN, Tunnel-Medium-Type IEEE-802
+pub const TUNNEL_VLAN: u32 = 13;
+pub const TUNNEL_MEDIUM_802: u32 = 6;
+/// the vendor of MS-MPPE-Send-Key and MS-MPPE-Recv-Key (RFC 2548)
+pub const VENDOR_MICROSOFT: u32 = 311;
+pub const MS_MPPE_SEND_KEY: u8 = 16;
+pub const MS_MPPE_RECV_KEY: u8 = 17;
 
 /// Service-Type (RFC 2865 5.6)
 pub const SERVICE_LOGIN: u32 = 1;
@@ -164,6 +184,7 @@ pub const SERVICE_AUTHENTICATE_ONLY: u32 = 8;
 pub const PORT_TYPE_ASYNC: u32 = 0;
 pub const PORT_TYPE_VIRTUAL: u32 = 5;
 pub const PORT_TYPE_ETHERNET: u32 = 15;
+pub const PORT_TYPE_WIRELESS: u32 = 19;
 /// Acct-Status-Type (RFC 2866 5.1)
 pub const ACCT_START: u32 = 1;
 pub const ACCT_STOP: u32 = 2;
@@ -244,6 +265,9 @@ pub fn attr_name(t: u8) -> String {
         A_LOGIN_LAT_PORT => "Login-LAT-Port",
         A_EAP_MESSAGE => "EAP-Message",
         A_MESSAGE_AUTHENTICATOR => "Message-Authenticator",
+        A_TUNNEL_TYPE => "Tunnel-Type",
+        A_TUNNEL_MEDIUM_TYPE => "Tunnel-Medium-Type",
+        A_TUNNEL_PRIVATE_GROUP_ID => "Tunnel-Private-Group-ID",
         _ => return format!("Attribute {}", t),
     })
 }
@@ -678,8 +702,134 @@ pub fn check_message_auth(b: &[u8], auth: Option<&[u8; 16]>, secret: &[u8], hmac
     Some(b[at..at + 16] == m)
 }
 
+// ---------------------------------------------------------------- EAP and what comes with it
+
+impl Packet {
+    /// an EAP packet in EAP-Message attributes (RFC 3579 3.1: pieces of at most 253 bytes)
+    pub fn push_eap(&mut self, eap: &[u8]) -> &mut Packet {
+        for c in eap.chunks(VALUE_MAX) {
+            self.attrs.push(Attr::bytes(A_EAP_MESSAGE, c));
+        }
+        self
+    }
+    /// the EAP packet of the EAP-Message attributes; None without one
+    pub fn eap(&self) -> Option<Vec<u8>> {
+        let parts = self.all(A_EAP_MESSAGE);
+        if parts.is_empty() {
+            return None;
+        }
+        let mut v = Vec::new();
+        for a in parts {
+            v.extend_from_slice(&a.value);
+        }
+        Some(v)
+    }
+    /// the attributes of a VLAN assignment (tag 0: no tunnel group)
+    pub fn push_vlan(&mut self, vlan: u16) -> &mut Packet {
+        self.attrs.push(Attr::int(A_TUNNEL_TYPE, TUNNEL_VLAN));
+        self.attrs.push(Attr::int(A_TUNNEL_MEDIUM_TYPE, TUNNEL_MEDIUM_802));
+        self.attrs.push(Attr::text(A_TUNNEL_PRIVATE_GROUP_ID, &format!("{}", vlan)));
+        self
+    }
+    /// the VLAN these attributes assign: all three are there, Tunnel-Type VLAN, the medium 802,
+    /// a number (a tag byte before the number is skipped); a name of a VLAN is no number here
+    pub fn vlan(&self) -> Option<u16> {
+        let tag_free = |a: &Attr| (a.value.len() == 4).then(|| u32::from_be_bytes([0, a.value[1], a.value[2], a.value[3]]));
+        if self.attr(A_TUNNEL_TYPE).and_then(tag_free) != Some(TUNNEL_VLAN) || self.attr(A_TUNNEL_MEDIUM_TYPE).and_then(tag_free) != Some(TUNNEL_MEDIUM_802) {
+            return None;
+        }
+        let g = &self.attr(A_TUNNEL_PRIVATE_GROUP_ID)?.value;
+        let text = if g.first().is_some_and(|&b| b < 0x20) { &g[1..] } else { &g[..] };
+        core::str::from_utf8(text).ok()?.parse().ok().filter(|v| (1..=4094).contains(v))
+    }
+    /// an MSK of 64 bytes as MS-MPPE-Recv-Key (its first half) and MS-MPPE-Send-Key
+    pub fn push_msk(&mut self, msk: &[u8; 64], secret: &[u8], auth: &[u8; 16], salts: [u16; 2], md5: Md5Fn) -> &mut Packet {
+        for (t, key, salt) in [(MS_MPPE_RECV_KEY, &msk[..32], salts[0]), (MS_MPPE_SEND_KEY, &msk[32..], salts[1])] {
+            let body = mppe_seal(key, secret, auth, salt, md5);
+            let mut sub = alloc::vec![t, (body.len() + 2) as u8];
+            sub.extend_from_slice(&body);
+            self.attrs.push(Attr::vsa(VENDOR_MICROSOFT, &sub));
+        }
+        self
+    }
+    /// the MSK out of both MS-MPPE attributes (None: one is missing or does not open)
+    pub fn msk(&self, secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Option<[u8; 64]> {
+        let key = |want: u8| -> Option<Vec<u8>> {
+            self.all(A_VENDOR_SPECIFIC).iter().find_map(|a| match a.vendor() {
+                Some((VENDOR_MICROSOFT, d)) if d.len() > 2 && d[0] == want && d[1] as usize == d.len() => mppe_open(&d[2..], secret, auth, md5),
+                _ => None,
+            })
+        };
+        let (r, s) = (key(MS_MPPE_RECV_KEY)?, key(MS_MPPE_SEND_KEY)?);
+        if r.len() != 32 || s.len() != 32 {
+            return None;
+        }
+        let mut m = [0u8; 64];
+        m[..32].copy_from_slice(&r);
+        m[32..].copy_from_slice(&s);
+        Some(m)
+    }
+}
+
+/// the value of an MS-MPPE key attribute (RFC 2548 2.4.2): the salt (its high bit set), then a
+/// length byte, the key and padding, each 16 bytes XORed with MD5(secret + the previous block; the
+/// Request Authenticator and the salt first)
+pub fn mppe_seal(key: &[u8], secret: &[u8], auth: &[u8; 16], salt: u16, md5: Md5Fn) -> Vec<u8> {
+    let salt = (salt | 0x8000).to_be_bytes();
+    let mut p = alloc::vec![key.len() as u8];
+    p.extend_from_slice(key);
+    while p.len() % 16 != 0 {
+        p.push(0);
+    }
+    let mut out = salt.to_vec();
+    let mut prev = md5(&[secret, auth, &salt]);
+    for c in p.chunks(16) {
+        let at = out.len();
+        out.extend(c.iter().zip(prev).map(|(x, y)| x ^ y));
+        prev = md5(&[secret, &out[at..]]);
+    }
+    out
+}
+
+/// the key of an MS-MPPE key attribute; None when its length byte does not fit
+pub fn mppe_open(value: &[u8], secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Option<Vec<u8>> {
+    if value.len() < 18 || (value.len() - 2) % 16 != 0 || value[0] & 0x80 == 0 {
+        return None;
+    }
+    let mut prev = md5(&[secret, auth, &value[..2]]);
+    let mut p = Vec::with_capacity(value.len() - 2);
+    for c in value[2..].chunks(16) {
+        p.extend(c.iter().zip(prev).map(|(x, y)| x ^ y));
+        prev = md5(&[secret, c]);
+    }
+    let n = p[0] as usize;
+    (n < p.len()).then(|| p[1..1 + n].to_vec())
+}
+
 /// the value of an attribute as a dissector shows it (a hidden password stays hidden)
 pub fn value_text(t: u8, v: &[u8]) -> String {
+    if t == A_EAP_MESSAGE {
+        return crate::eap::info(v);
+    }
+    if matches!(t, A_TUNNEL_TYPE | A_TUNNEL_MEDIUM_TYPE) && v.len() == 4 {
+        let n = u32::from_be_bytes([0, v[1], v[2], v[3]]);
+        return match (t, n) {
+            (A_TUNNEL_TYPE, TUNNEL_VLAN) => format!("VLAN ({})", n),
+            (A_TUNNEL_MEDIUM_TYPE, TUNNEL_MEDIUM_802) => format!("IEEE-802 ({})", n),
+            _ => format!("{}", n),
+        };
+    }
+    if t == A_TUNNEL_PRIVATE_GROUP_ID {
+        let text = if v.first().is_some_and(|&b| b < 0x20) { &v[1..] } else { v };
+        return format!("\"{}\"", String::from_utf8_lossy(text));
+    }
+    if t == A_VENDOR_SPECIFIC
+        && v.len() > 6
+        && be32(v, 0) == VENDOR_MICROSOFT
+        && matches!(v[4], MS_MPPE_SEND_KEY | MS_MPPE_RECV_KEY)
+    {
+        return format!("{} (hidden, {} bytes)", if v[4] == MS_MPPE_SEND_KEY { "MS-MPPE-Send-Key" } else { "MS-MPPE-Recv-Key" }, v.len() - 6);
+    }
     match attr_kind(t) {
         Kind::Text => format!("\"{}\"", String::from_utf8_lossy(v)),
         Kind::Hidden => format!("(hidden, {} bytes)", v.len()),

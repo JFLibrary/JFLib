@@ -12,6 +12,16 @@
 //   Engine::nas_begin         start a RADIUS login for a session (cli/aaa.rs hands it a user, a
 //                             password and the remaining methods)
 //
+// With an EAP-Message the server runs EAP (RFC 3579, the crate eapm): each round is an
+// Access-Challenge with the next EAP-Request and a State that names the session, the end an
+// Access-Accept or Access-Reject with EAP-Success or EAP-Failure.  It offers the methods of
+// "eap_methods" in order (default MD5, then PWD; NAS-Port-Type Wireless-802.11 leaves out methods
+// without keys) and goes on as a Nak says; the password is the user's.  An Accept carries the MSK
+// in MS-MPPE-Recv-Key and -Send-Key (RFC 2548), the user's "vlan" in the tunnel attributes of RFC
+// 3580, "session_timeout" as Session-Timeout.  An EAP-Message without a Message-Authenticator is
+// dropped (RFC 3579 3.2); sessions without a next round go after 60 s.  The authenticator side is
+// dot1x.rs.
+//
 // A server drops a request from an unknown client or with a wrong Message-Authenticator
 // silently and logs a line (RFC 2865 says so).  The NAS hides User-Password with the server's
 // shared secret and the Request Authenticator (RFC 2865 5.2), checks the Response
@@ -70,7 +80,21 @@ pub struct RadiusUser {
     pub privilege: u8,
     /// a Reply-Message attribute in the answer
     pub reply: Option<String>,
+    /// 802.1X: the VLAN of the Access-Accept
+    pub vlan: Option<u16>,
+    /// 802.1X: Session-Timeout of the Access-Accept (seconds, 0: none)
+    pub session_timeout: u32,
 }
+
+/// an EAP session between two rounds
+#[derive(Clone, Debug)]
+struct EapSes {
+    srv: eapm::Server,
+    at: Ns,
+}
+
+/// how long an EAP session waits for its next round
+const EAP_KEEP: Ns = 60 * SEC;
 
 /// the "radius-server" service
 #[derive(Clone, Debug)]
@@ -81,6 +105,11 @@ pub struct RadiusServerSvc {
     pub users: Vec<RadiusUser>,
     /// where accounting records are written (empty: no accounting file)
     pub acct_log: String,
+    /// the EAP methods it offers, in order
+    pub eap_methods: Vec<eapm::Method>,
+    /// the name it gives itself in EAP-MD5 and EAP-PWD
+    pub eap_id: String,
+    eap: BTreeMap<Vec<u8>, EapSes>,
     // metrics
     requests: u64,
     accepts: u64,
@@ -92,7 +121,7 @@ pub struct RadiusServerSvc {
 
 impl Default for RadiusServerSvc {
     fn default() -> RadiusServerSvc {
-        RadiusServerSvc { auth_port: radius::PORT_AUTH, acct_port: radius::PORT_ACCT, clients: Vec::new(), users: Vec::new(), acct_log: String::from("/var/log/radius/accounting"), requests: 0, accepts: 0, rejects: 0, acct: 0, dropped: 0, bad_auth: 0 }
+        RadiusServerSvc { auth_port: radius::PORT_AUTH, acct_port: radius::PORT_ACCT, clients: Vec::new(), users: Vec::new(), acct_log: String::from("/var/log/radius/accounting"), eap_methods: alloc::vec![eapm::Method::Md5, eapm::Method::Pwd], eap_id: String::from("radius"), eap: BTreeMap::new(), requests: 0, accepts: 0, rejects: 0, acct: 0, dropped: 0, bad_auth: 0 }
     }
 }
 
@@ -112,6 +141,16 @@ impl RadiusServerSvc {
         }
         if let Some(l) = c.get("acct_log").and_then(|v| v.as_str()) {
             s.acct_log = String::from(l.trim());
+        }
+        if let Some(m) = c.get("eap_methods").and_then(|v| v.as_array()) {
+            s.eap_methods = Vec::new();
+            for x in m {
+                let w = x.as_str().unwrap_or("");
+                s.eap_methods.push(eapm::Method::parse(w).ok_or_else(|| msg!("EAP-Methode \u{201e}{}\u{201c} gibt es hier nicht.", w))?);
+            }
+        }
+        if let Some(i) = c.get("eap_id").and_then(|v| v.as_str()) {
+            s.eap_id = String::from(i.trim());
         }
         for cl in c.get("clients").and_then(|v| v.as_array()).unwrap_or(&[]) {
             let a = cl.get("address").and_then(|v| v.as_str()).unwrap_or("").trim();
@@ -133,6 +172,8 @@ impl RadiusServerSvc {
                 password: String::from(u.get("password").and_then(|v| v.as_str()).unwrap_or("")),
                 privilege,
                 reply: u.get("reply").and_then(|v| v.as_str()).map(String::from),
+                vlan: u.get("vlan").and_then(|v| v.as_u64()).and_then(|v| u16::try_from(v).ok()).filter(|v| (1..=4094).contains(v)),
+                session_timeout: u.get("session_timeout").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             });
         }
         Ok(s)
@@ -215,13 +256,108 @@ impl Service for RadiusServerSvc {
         self
     }
     fn footprint(&self) -> usize {
-        self.clients.iter().map(|c| c.secret.len() + 24).sum::<usize>() + self.users.iter().map(|u| u.name.len() + u.password.len() + u.reply.as_ref().map_or(0, |r| r.len()) + 24).sum::<usize>() + 512
+        self.clients.iter().map(|c| c.secret.len() + 24).sum::<usize>() + self.users.iter().map(|u| u.name.len() + u.password.len() + u.reply.as_ref().map_or(0, |r| r.len()) + 24).sum::<usize>() + self.eap.len() * (core::mem::size_of::<EapSes>() + 64) + 512
     }
 }
 
 impl RadiusServerSvc {
+    /// an Access-Request with EAP: one round of a method (RFC 3579)
+    fn eap_access(&mut self, os: &mut OsApi, from: Ipv4, sport: u16, secret: &str, p: &Packet) {
+        self.requests += 1;
+        // RFC 3579 3.2: without a Message-Authenticator it is discarded
+        if p.attr(radius::A_MESSAGE_AUTHENTICATOR).is_none() {
+            self.dropped += 1;
+            os.note(Note::Aaa(ANote::RadiusDropped { from, why: String::from("falscher Message-Authenticator") }));
+            return;
+        }
+        let bytes = p.eap().unwrap_or_default();
+        let now = os.now();
+        self.eap.retain(|_, s| now.saturating_sub(s.at) < EAP_KEEP);
+        let methods: Vec<eapm::Method> = if p.int(radius::A_NAS_PORT_TYPE) == Some(radius::PORT_TYPE_WIRELESS) { self.eap_methods.iter().copied().filter(|m| m.makes_keys()).collect() } else { self.eap_methods.clone() };
+        let srv = match p.attr(radius::A_STATE) {
+            Some(st) => self.eap.remove(&st.value).map(|s| s.srv),
+            None => Some(eapm::Server::new(&self.eap_id, &methods)),
+        };
+        let user = p.text(radius::A_USER_NAME).unwrap_or_default();
+        let Some(mut srv) = srv else {
+            // a State it does not know: the session is gone
+            return self.eap_end(os, from, sport, secret, p, None, &user);
+        };
+        let users = self.users.clone();
+        let lookup = |name: &str| users.iter().find(|u| u.name == name).map(|u| u.password.clone());
+        let out = {
+            let mut rnd = |o: &mut [u8]| {
+                for c in o.chunks_mut(4) {
+                    let r = os.rand().to_be_bytes();
+                    let n = c.len();
+                    c.copy_from_slice(&r[..n]);
+                }
+            };
+            srv.on_packet(&bytes, &lookup, &mut rnd)
+        };
+        match out {
+            eapm::ServerOut::Send(req) => {
+                let mut state = [0u8; 16];
+                fill16(os, &mut state);
+                self.eap.insert(state.to_vec(), EapSes { srv, at: now });
+                let mut reply = Packet::new(radius::ACCESS_CHALLENGE, p.id, [0; 16]);
+                reply.push_eap(&req);
+                reply.push(Attr::bytes(radius::A_STATE, &state));
+                self.send_reply(os, from, sport, secret, &p.auth, reply, true);
+                os.note(Note::Aaa(ANote::RadiusChallenge { from, user }));
+            }
+            eapm::ServerOut::Success { eap, msk, .. } => {
+                self.accepts += 1;
+                let u = users.iter().find(|u| u.name == user).cloned();
+                let mut reply = Packet::new(radius::ACCESS_ACCEPT, p.id, [0; 16]);
+                reply.push(Attr::text(radius::A_USER_NAME, &user));
+                reply.push(Attr::int(radius::A_SERVICE_TYPE, radius::SERVICE_FRAMED));
+                reply.push_eap(&eap);
+                if let Some(v) = u.as_ref().and_then(|u| u.vlan) {
+                    reply.push_vlan(v);
+                }
+                if let Some(t) = u.as_ref().map(|u| u.session_timeout).filter(|&t| t > 0) {
+                    reply.push(Attr::int(radius::A_SESSION_TIMEOUT, t));
+                    reply.push(Attr::int(radius::A_TERMINATION_ACTION, 1));
+                }
+                if let Some(m) = msk {
+                    let salts = [(os.rand() & 0xFFFF) as u16, (os.rand() & 0xFFFF) as u16];
+                    reply.push_msk(&m, secret.as_bytes(), &p.auth, salts, md5);
+                }
+                if let Some(t) = u.as_ref().and_then(|u| u.reply.as_ref()) {
+                    reply.push(Attr::text(radius::A_REPLY_MESSAGE, t));
+                }
+                self.send_reply(os, from, sport, secret, &p.auth, reply, true);
+                os.note(Note::Aaa(ANote::RadiusAccept { from, user: user.clone(), level: None }));
+                os.log(SEV_INFO, "radiusd", &format!("{} accepted over EAP ({})", user, from));
+            }
+            eapm::ServerOut::Failure { eap } => self.eap_end(os, from, sport, secret, p, Some(eap), &user),
+            eapm::ServerOut::Silent => {
+                self.eap.insert(p.attr(radius::A_STATE).map(|a| a.value.clone()).unwrap_or_default(), EapSes { srv, at: now });
+            }
+        }
+    }
+
+    /// an Access-Reject of an EAP session
+    #[allow(clippy::too_many_arguments)]
+    fn eap_end(&mut self, os: &mut OsApi, from: Ipv4, sport: u16, secret: &str, p: &Packet, eap: Option<Vec<u8>>, user: &str) {
+        self.rejects += 1;
+        let mut reply = Packet::new(radius::ACCESS_REJECT, p.id, [0; 16]);
+        let failure = eap.unwrap_or_else(|| {
+            let id = p.eap().and_then(|b| netpkt::eap::Packet::parse(&b)).map_or(0, |e| e.id);
+            netpkt::eap::Packet::failure(id.wrapping_add(1)).to_bytes()
+        });
+        reply.push_eap(&failure);
+        self.send_reply(os, from, sport, secret, &p.auth, reply, true);
+        os.note(Note::Aaa(ANote::RadiusReject { from, user: String::from(user) }));
+        os.log(SEV_WARN, "radiusd", &format!("{} rejected over EAP ({})", user, from));
+    }
+
     /// an Access-Request: reveal the password, look the user up, answer Accept or Reject
     fn access(&mut self, os: &mut OsApi, from: Ipv4, sport: u16, secret: &str, p: &Packet) {
+        if p.attr(radius::A_EAP_MESSAGE).is_some() {
+            return self.eap_access(os, from, sport, secret, p);
+        }
         self.requests += 1;
         let user = String::from(p.text(radius::A_USER_NAME).unwrap_or_default());
         let hidden = p.attr(radius::A_USER_PASSWORD).map(|a| a.value.clone()).unwrap_or_default();

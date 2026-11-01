@@ -63,6 +63,12 @@
 // discards: a Length that does not fit, attributes that do not end at it (radius.rs).  Telnet
 // (TCP port 23) shows each command and negotiation ("Will Echo", "Interrupt Process") and the
 // data as text; a command cut off at the end of a segment is a problem (telnet.rs).
+// EAP in an EAPOL frame is a layer of its own: code, identifier, length, type and the data of
+// Identity, Nak, EAP-MD5 and EAP-PWD field by field (eap.rs); as an EAP-Message of RADIUS one
+// line with the same words.
+// IMAP (TCP port 143) shows each line: a command with its tag, verb and arguments, a response with
+// its tag or "*", status, response code and text; the bytes of a literal as a line of data. It
+// shares the bit P_MAIL (imap.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -178,6 +184,10 @@ pub enum Proto {
     Radius,
     /// Telnet (port 23)
     Telnet,
+    /// EAP inside EAPOL
+    Eap,
+    /// IMAP (port 143)
+    Imap,
 }
 
 impl Proto {
@@ -217,6 +227,8 @@ impl Proto {
             Proto::Pop3 => "POP3",
             Proto::Radius => "RADIUS",
             Proto::Telnet => "Telnet",
+            Proto::Eap => "EAP",
+            Proto::Imap => "IMAP",
         }
     }
     pub fn bit(self) -> u32 {
@@ -250,9 +262,10 @@ impl Proto {
             Proto::Eapol => P_EAPOL,
             Proto::Bgp => P_BGP,
             Proto::Ftp | Proto::FtpData => P_FTP,
-            Proto::Smtp | Proto::Pop3 => P_MAIL,
+            Proto::Smtp | Proto::Pop3 | Proto::Imap => P_MAIL,
             Proto::Radius => P_RADIUS,
             Proto::Telnet => P_TELNET,
+            Proto::Eap => P_EAPOL,
         }
     }
 }
@@ -318,6 +331,7 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             ftp::PORT_FTP_DATA => Proto::FtpData,
             smtp::PORT_SMTP | smtp::PORT_SUBMISSION => Proto::Smtp,
             pop3::PORT_POP3 => Proto::Pop3,
+            crate::imap::PORT_IMAP => Proto::Imap,
             telnet::PORT => Proto::Telnet,
             _ => return None,
         })
@@ -394,6 +408,9 @@ pub fn stack(frame: &[u8]) -> Stack {
             Some(v) => {
                 s.push(Proto::Eapol, off, v.pdu().len());
                 s.trailer = (rest.len() - v.pdu().len()) as u32;
+                if v.kind() == crate::eapol::T_EAP && v.body_len() > 0 {
+                    s.push(Proto::Eap, off + 4, v.body_len());
+                }
             }
             None => s.push(Proto::Data, off, rest.len()),
         },
@@ -626,6 +643,8 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Radius => Some(radius_layer(frame, off, len)),
             Proto::Telnet => Some(telnet_layer(frame, off, len)),
             Proto::Ssh => Some(ssh_layer(frame, off, len)),
+            Proto::Eap => Some(eap_layer(frame, off, len)),
+            Proto::Imap => Some(imap_layer(frame, off, len, mail_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1091,6 +1110,8 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Radius => Some(radius_info(b)),
         Proto::Telnet => Some(telnet_info(b)),
         Proto::Ssh => Some(ssh_info(b)),
+        Proto::Eap => Some(crate::eap::info(b)),
+        Proto::Imap => Some(imap_info(b)),
         _ => None,
     }
 }
@@ -2307,6 +2328,8 @@ fn akm_name(a: u8) -> String {
         crate::eapol::AKM_PSK => String::from("PSK (2)"),
         crate::eapol::AKM_PSK_SHA256 => String::from("PSK-SHA256 (6)"),
         crate::eapol::AKM_SAE => String::from("SAE (8)"),
+        crate::eapol::AKM_8021X => String::from("802.1X (1)"),
+        crate::eapol::AKM_8021X_SHA256 => String::from("802.1X-SHA256 (5)"),
         n => format!("{}", n),
     }
 }
@@ -2410,6 +2433,74 @@ fn eapol_info(b: &[u8]) -> String {
         },
         None => String::from("Key"),
     }
+}
+
+/// an EAP packet field by field
+fn eap_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::eap::{self, Md5Data, Packet, Pwd};
+    let b = &frame[off..off + len];
+    let Some(p) = Packet::parse(b) else {
+        let mut l = payload_layer(Proto::Eap, off, len);
+        l.l.title = String::from("Extensible Authentication Protocol");
+        l.bad(String::from("a Length that does not fit, or a Request or Response without a type"));
+        return l;
+    };
+    let title = format!("Extensible Authentication Protocol, {}", eap::info(b));
+    let mut l = B::new(Proto::Eap, off, len, title);
+    l.f("Code", off, 1, format!("{} ({})", eap::code_name(p.code), p.code));
+    l.f("Id", off + 1, 1, format!("{}", p.id));
+    l.f("Length", off + 2, 2, format!("{}", be16(b, 2)));
+    if !matches!(p.code, eap::REQUEST | eap::RESPONSE) {
+        return l;
+    }
+    l.f("Type", off + 4, 1, format!("{} ({})", eap::type_name(p.typ), p.typ));
+    let d = off + 5;
+    let n = p.data.len();
+    if n == 0 {
+        return l;
+    }
+    match p.typ {
+        eap::T_IDENTITY | eap::T_NOTIFICATION => l.f(if p.typ == eap::T_IDENTITY { "Identity" } else { "Notification" }, d, n, format!("\"{}\"", p.identity())),
+        eap::T_NAK => {
+            let names: Vec<String> = p.data.iter().map(|&t| if t == eap::NAK_NONE { String::from("none (0)") } else { format!("{} ({})", eap::type_name(t), t) }).collect();
+            l.f("Desired Auth Types", d, n, names.join(", "));
+        }
+        eap::T_MD5 => match Md5Data::parse(&p.data) {
+            Some(m) => {
+                l.f("Value-Size", d, 1, format!("{}", m.value.len()));
+                l.f("Value", d + 1, m.value.len(), hex_head(&m.value, 16));
+                if !m.name.is_empty() {
+                    l.f("Name", d + 1 + m.value.len(), m.name.len(), format!("\"{}\"", String::from_utf8_lossy(&m.name)));
+                }
+            }
+            None => l.bad(String::from("a Value-Size longer than the data")),
+        },
+        eap::T_PWD => {
+            let h = p.data[0];
+            l.f("Exchange", d, 1, format!("{} ({}), L {}, M {}", eap::exch_name(h & 0x3F), h & 0x3F, h >> 7, (h >> 6) & 1));
+            match Pwd::parse(&p.data) {
+                Some(Pwd::Id(i)) => {
+                    let group = if i.group == 19 { String::from("P-256 (19)") } else { format!("{}", i.group) };
+                    l.f("Group", d + 1, 2, group);
+                    l.f("Random Function", d + 3, 1, if i.rand_func == 1 { String::from("HMAC-SHA-256 (1)") } else { format!("{}", i.rand_func) });
+                    l.f("PRF", d + 4, 1, if i.prf == 1 { String::from("HMAC-SHA-256 (1)") } else { format!("{}", i.prf) });
+                    l.f("Token", d + 5, 4, hex_head(&i.token, 4));
+                    l.f("Prep", d + 9, 1, if i.prep == 0 { String::from("none (0)") } else { format!("{}", i.prep) });
+                    if !i.identity.is_empty() {
+                        l.f("Identity", d + 10, i.identity.len(), format!("\"{}\"", String::from_utf8_lossy(&i.identity)));
+                    }
+                }
+                Some(Pwd::Commit { element, scalar }) => {
+                    l.f("Element", d + 1, eap::PWD_ELEMENT, hex_head(&element, 16));
+                    l.f("Scalar", d + 1 + eap::PWD_ELEMENT, eap::PWD_SCALAR, hex_head(&scalar, 16));
+                }
+                Some(Pwd::Confirm(c)) => l.f("Confirm", d + 1, 32, hex_head(&c, 16)),
+                None => l.bad(String::from("a size that does not fit the exchange, or a fragment")),
+            }
+        }
+        _ => l.f("Type-Data", d, n, format!("{} bytes", n)),
+    }
+    l
 }
 
 // ---------------------------------------------------------------- BGP
@@ -2827,7 +2918,7 @@ fn ftp_info(b: &[u8], response: bool) -> String {
 /// the segment of an SMTP or POP3 connection comes from the server (its well-known port is the
 /// source and not the destination)
 fn mail_response(st: &Stack, frame: &[u8]) -> bool {
-    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3;
+    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3 || p == crate::imap::PORT_IMAP;
     match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
         Some(t) => server(t.src_port()) && !server(t.dst_port()),
         None => false,
@@ -2864,6 +2955,63 @@ fn mail_verb(line: &str, known: fn(&str) -> bool) -> Option<(String, usize, usiz
         return None;
     }
     Some((w.to_ascii_uppercase(), w.len(), lead + w.len() + 1))
+}
+
+/// IMAP lines
+fn imap_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    use crate::imap;
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Imap, off, len, String::from("Internet Message Access Protocol"));
+    for (s, e, end) in lines_of(b) {
+        if end == b.len() && e == end && !b.ends_with(b"\n") {
+            l.f("Continuation", off + s, end - s, format!("{} bytes", end - s));
+            break;
+        }
+        let line = String::from_utf8_lossy(&b[s..e]).into_owned();
+        let parsed = imap::Line::plain(&line);
+        if response {
+            l.f("Line", off + s, end - s, line.clone());
+            match imap::Response::parse(&parsed) {
+                Some(r) => match (&r.kind, r.status) {
+                    (imap::Kind::Cont, _) => l.f("Continuation request", off + s, end - s, r.text.clone()),
+                    (kind, Some(st)) => {
+                        let tag = if let imap::Kind::Tagged(t) = kind { t.as_str() } else { "*" };
+                        l.f("Tag", off + s, tag.len(), String::from(tag));
+                        l.f("Status", off + s + tag.len() + 1, st.word().len(), String::from(st.word()));
+                        if let Some(c) = &r.code {
+                            l.f("Response code", off + s + tag.len() + st.word().len() + 3, c.len(), c.clone());
+                        }
+                    }
+                    _ if line.starts_with("* ") => l.f("Untagged", off + s + 2, e - s - 2, String::from(&line[2..])),
+                    _ => l.f("Message data", off + s, end - s, line.clone()),
+                },
+                None => l.f("Message data", off + s, end - s, line.clone()),
+            }
+        } else if let Some(c) = imap::Command::parse(&parsed).filter(|c| imap::verb_known(&c.verb)) {
+            l.f("Line", off + s, end - s, line.clone());
+            l.f("Tag", off + s, c.tag.len(), c.tag.clone());
+            l.f("Command", off + s + c.tag.len() + 1, c.verb.len(), c.verb.clone());
+            let at = c.tag.len() + c.verb.len() + 2;
+            if line.len() > at {
+                l.f("Arguments", off + s + at, e - s - at, String::from(&line[at..]));
+            }
+        } else {
+            l.f("Message data", off + s, end - s, line.clone());
+        }
+    }
+    l
+}
+
+/// the first line of a segment
+fn imap_info(b: &[u8]) -> String {
+    let n = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let l = String::from_utf8_lossy(&b[..n]);
+    let t = l.trim_end();
+    let mut s: String = t.chars().take(120).collect();
+    if t.chars().count() > 120 {
+        s.push_str("...");
+    }
+    s
 }
 
 fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {

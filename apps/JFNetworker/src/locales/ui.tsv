@@ -1623,3 +1623,39 @@ Stufe	Level
 Signatur	Signature
 Verschlüsselung	Encryption
 Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen.	Give the agent and the user without spaces, passwords with at least 8 characters.
+# X1g: the 802.1X panel of IP-Konfiguration, the inspector of an enterprise network
+sucht einen Authenticator	looking for an authenticator
+niemand antwortet, läuft ohne 802.1X	nobody answers, running without 802.1X
+meldet {} an	logging {} in
+angemeldet als {} ({})	logged in as {} ({})
+{} abgelehnt, wartet	{} refused, waiting
+keine Zugangsdaten	no credentials
+Anmeldung am Netz (802.1X)	Login to the network (802.1X)
+802.1X an der Netzwerkbuchse	802.1X on the network socket
+der Benutzer beim RADIUS-Server	the user at the RADIUS server
+Unternehmens-WLAN (WPA-Enterprise)	Company Wi-Fi (WPA-Enterprise)
+Anmeldung übernehmen	Apply login
+Die Angaben liegen in {} auf dem Gerät; wpa_cli im Terminal zeigt den Zustand.	The settings are in {} on the device; wpa_cli in the Terminal shows the state.
+Eine Anmeldung braucht eine Identität, im WLAN auch die SSID.	A login needs an identity, on Wi-Fi the SSID too.
+Adresse, z. B. 10.0.0.10	Address, e.g. 10.0.0.10
+RADIUS-Schlüssel	RADIUS key
+das gemeinsame Geheimnis	the shared secret
+Schlüssel zeigen	Show key
+Identität	Identity
+EAP-Methode	EAP method
+Passwort zeigen	Show password
+nicht autorisiert	not authorized
+# X1g: the E-Mail program with an IMAP account, the category of 802.1X
+Papierkorb	Trash
+Den Ordner mit dem IMAP-Server abgleichen	Compare the folder with the IMAP server
+Markieren	Flag
+Abrufen gleicht diesen Ordner mit dem IMAP-Server ab.	Fetch compares this folder with the IMAP server.
+Neu	New
+Anlegen	Create
+Ordner löschen	Delete folder
+Kontotyp	Account type
+Das Konto braucht einen SMTP- und einen IMAP-Server.	The account needs an SMTP and an IMAP server.
+Postfach (IMAP)	Mailbox (IMAP)
+IMAP-Server	IMAP server
+IMAP-Port	IMAP port
+802.1X	802.1X

@@ -235,7 +235,7 @@ pub(crate) fn build_aaa(t: &mut Tree<K>, m: [ModeId; 4]) {
 // ---------------------------------------------------------------- method parsing
 
 /// the methods of a list from the rest of a line
-fn parse_methods(s: &str) -> Result<Vec<Method>, String> {
+pub(crate) fn parse_methods(s: &str) -> Result<Vec<Method>, String> {
     let words: Vec<&str> = s.split_whitespace().collect();
     let mut out = Vec::new();
     let mut i = 0;

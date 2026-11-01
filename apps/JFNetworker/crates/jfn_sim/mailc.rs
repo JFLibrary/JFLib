@@ -23,6 +23,18 @@
 //                   server): Action::MailSend { dev, draft } and Action::MailFetch { dev } queue
 //                   a job, which runs when the ones before it are done; Engine::mail_client(dev)
 //                   gives the last send and fetch with their outcome for the status line
+//   ImapConv        one IMAP session of the E-Mail program: LOGIN, what the job adds (CREATE,
+//                   DELETE, APPEND), LIST, SELECT, what it does in the folder (UID STORE, UID MOVE,
+//                   EXPUNGE), UID FETCH of the flags, BODY.PEEK[] of what is new, LOGOUT
+//   ImapOp          Action::MailImap { dev, op }: Sync, Flag, Delete, Append, CreateFolder,
+//                   DeleteFolder; each runs as a session and leaves the folder's copy up to date
+//   imap_dir(f) / imap_folders(st) / imap_marks(st, f) / uid_of_path(p)   the copy of an IMAP
+//                   account under /root/Mail/imap: <folder>/<uid>.eml, <folder>/.flags, .folders
+//
+// An account with "imap" set keeps its mail on the server: the files under /root/Mail/imap are a
+// copy for the window, the folders, read and flagged states are the server's.  Deleting moves to
+// Trash (in Trash: for good), a message sent is appended to Sent.  The program never reads a body
+// without BODY.PEEK; the window asks for \Seen when a message is shown.
 //
 // A sent message is kept as SENT/<unique>.eml, a fetched one as INBOX/<UIDL>.eml (line ends
 // "\n"), the UIDLs fetched in /root/Mail/.uidl (so with "keep" a message is fetched once); the
@@ -31,7 +43,7 @@
 // quoted-printable; its Date and Message-ID come from the device clock and random numbers.
 
 use alloc::boxed::Box;
-use alloc::collections::{BTreeSet, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -40,6 +52,7 @@ use core::any::Any;
 use jfn_model::files::Store;
 use jfn_model::msg;
 use jfn_model::msg::Msg;
+use netpkt::imap::{self, Item, Kind, LineReader, Read, Response};
 use netpkt::imf::{self, Draft, Mailbox, Message};
 use netpkt::pop3;
 use netpkt::smtp::{self, Command, Ehlo, Reply, ReplyReader};
@@ -652,7 +665,265 @@ impl Fetch {
     }
 }
 
+// ---------------------------------------------------------------- the E-Mail program's IMAP session
+
+/// what the E-Mail program does with its IMAP server
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ImapOp {
+    /// the folder's copy up to date
+    Sync { folder: String },
+    /// a flag of a message on or off
+    Flag { folder: String, uid: u32, flag: String, on: bool },
+    /// a message to Trash; in Trash for good
+    Delete { folder: String, uid: u32 },
+    /// a message into a folder (a sent one, seen)
+    Append { folder: String, data: Vec<u8> },
+    CreateFolder { name: String },
+    DeleteFolder { name: String },
+}
+
+impl ImapOp {
+    /// the folder it leaves up to date
+    fn folder(&self) -> &str {
+        match self {
+            ImapOp::Sync { folder } | ImapOp::Flag { folder, .. } | ImapOp::Delete { folder, .. } | ImapOp::Append { folder, .. } => folder,
+            ImapOp::CreateFolder { .. } | ImapOp::DeleteFolder { .. } => crate::mailbox::INBOX,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IStep {
+    Greet,
+    Login,
+    Global,
+    List,
+    Select,
+    Ops(usize),
+    Flags,
+    Bodies,
+    Logout,
+    Done,
+}
+
+/// one IMAP session of the E-Mail program
+#[derive(Clone, Debug)]
+pub(crate) struct ImapConv {
+    user: String,
+    pass: String,
+    folder: String,
+    /// a command before LIST: CREATE, DELETE, APPEND (its literal waits for "+")
+    global: Option<String>,
+    literal: Option<Vec<u8>>,
+    /// what is done in the folder, UID STORE and the like
+    ops: Vec<String>,
+    known: BTreeSet<u32>,
+    reader: LineReader,
+    tag: u32,
+    step: IStep,
+    pub folders: Vec<String>,
+    /// uid -> flag words, as FETCH said
+    pub flags: BTreeMap<u32, String>,
+    pub got: Vec<(u32, Vec<u8>)>,
+    /// what was refused: the command, the text
+    pub fail: Option<(&'static str, String)>,
+    pub done: bool,
+}
+
+impl ImapConv {
+    fn new(user: &str, pass: &str, op: &ImapOp, known: BTreeSet<u32>) -> ImapConv {
+        let mut c = ImapConv { user: String::from(user), pass: String::from(pass), folder: String::from(op.folder()), global: None, literal: None, ops: Vec::new(), known, reader: LineReader::new(), tag: 0, step: IStep::Greet, folders: Vec::new(), flags: BTreeMap::new(), got: Vec::new(), fail: None, done: false };
+        match op {
+            ImapOp::Sync { .. } => {}
+            ImapOp::Flag { uid, flag, on, .. } => c.ops.push(format!("UID STORE {} {}FLAGS.SILENT ({})", uid, if *on { "+" } else { "-" }, flag)),
+            ImapOp::Delete { folder, uid } if folder == crate::mailbox::TRASH => {
+                c.ops.push(format!("UID STORE {} +FLAGS.SILENT (\\Deleted)", uid));
+                c.ops.push(String::from("EXPUNGE"));
+            }
+            ImapOp::Delete { uid, .. } => c.ops.push(format!("UID MOVE {} {}", uid, crate::mailbox::TRASH)),
+            ImapOp::Append { folder, data } => {
+                let bytes = imf::crlf(data);
+                c.global = Some(format!("APPEND {} (\\Seen) {{{}}}", imap::astring(folder), bytes.len()));
+                c.literal = Some(bytes);
+            }
+            ImapOp::CreateFolder { name } => c.global = Some(format!("CREATE {}", imap::astring(name))),
+            ImapOp::DeleteFolder { name } => c.global = Some(format!("DELETE {}", imap::astring(name))),
+        }
+        c
+    }
+    /// a command with the next tag
+    fn cmd(&mut self, out: &mut Vec<Vec<u8>>, text: &str, step: IStep) {
+        self.tag += 1;
+        out.push(format!("e{} {}\r\n", self.tag, text).into_bytes());
+        self.step = step;
+    }
+    fn logout(&mut self, out: &mut Vec<Vec<u8>>) {
+        self.cmd(out, "LOGOUT", IStep::Logout);
+    }
+    /// bytes of the server: what to send
+    fn on_bytes(&mut self, b: &[u8]) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        self.reader.push(b);
+        while let Some(r) = self.reader.next() {
+            let Read::Line(l) = r else { continue };
+            let Some(resp) = Response::parse(&l) else { continue };
+            self.response(&resp, &mut out);
+        }
+        out
+    }
+    fn response(&mut self, r: &Response, out: &mut Vec<Vec<u8>>) {
+        match &r.kind {
+            Kind::Cont => {
+                if let Some(mut x) = self.literal.take() {
+                    x.extend_from_slice(b"\r\n");
+                    out.push(x);
+                }
+            }
+            Kind::Untagged => {
+                if self.step == IStep::Greet {
+                    if r.status == Some(imap::Status::Ok) {
+                        let line = format!("LOGIN {} {}", imap::astring(&self.user), imap::astring(&self.pass));
+                        self.cmd(out, &line, IStep::Login);
+                    } else {
+                        self.fail = Some(("greeting", r.text.clone()));
+                        self.step = IStep::Done;
+                        self.done = true;
+                    }
+                    return;
+                }
+                match r.name() {
+                    Some("LIST") => {
+                        if let Some(n) = r.items.last().and_then(Item::text) {
+                            self.folders.push(n);
+                        }
+                    }
+                    Some("FETCH") => self.fetch_data(r),
+                    _ => {}
+                }
+            }
+            Kind::Tagged(_) => {
+                let ok = r.status == Some(imap::Status::Ok);
+                match self.step {
+                    IStep::Login if ok => self.after_login(out),
+                    IStep::Login => {
+                        self.fail = Some(("LOGIN", r.text.clone()));
+                        self.logout(out);
+                    }
+                    IStep::Global if ok => self.cmd(out, "LIST \"\" \"*\"", IStep::List),
+                    IStep::Global => {
+                        self.fail = Some(("COMMAND", r.text.clone()));
+                        self.logout(out);
+                    }
+                    IStep::List => {
+                        let f = imap::astring(&self.folder);
+                        self.cmd(out, &format!("SELECT {}", f), IStep::Select);
+                    }
+                    IStep::Select if ok => self.next_op(out, 0),
+                    IStep::Select => {
+                        self.fail = Some(("SELECT", r.text.clone()));
+                        self.logout(out);
+                    }
+                    IStep::Ops(k) => {
+                        if !ok && self.fail.is_none() {
+                            self.fail = Some(("COMMAND", r.text.clone()));
+                        }
+                        self.next_op(out, k + 1);
+                    }
+                    IStep::Flags => {
+                        let want: Vec<String> = self.flags.keys().filter(|u| !self.known.contains(u)).map(|u| format!("{}", u)).collect();
+                        if want.is_empty() {
+                            self.logout(out);
+                        } else {
+                            self.cmd(out, &format!("UID FETCH {} (BODY.PEEK[])", want.join(",")), IStep::Bodies);
+                        }
+                    }
+                    IStep::Bodies => self.logout(out),
+                    IStep::Logout => {
+                        self.step = IStep::Done;
+                        self.done = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    fn after_login(&mut self, out: &mut Vec<Vec<u8>>) {
+        match self.global.clone() {
+            Some(g) => self.cmd(out, &g, IStep::Global),
+            None => self.cmd(out, "LIST \"\" \"*\"", IStep::List),
+        }
+    }
+    fn next_op(&mut self, out: &mut Vec<Vec<u8>>, k: usize) {
+        if let Some(c) = self.ops.get(k).cloned() {
+            self.cmd(out, &c, IStep::Ops(k));
+        } else {
+            self.cmd(out, "UID FETCH 1:* (UID FLAGS)", IStep::Flags);
+        }
+    }
+    /// "* n FETCH (UID u FLAGS (...) BODY[] {..})"
+    fn fetch_data(&mut self, r: &Response) {
+        let Some(Item::List(l)) = r.items.get(2) else { return };
+        let mut uid = None;
+        let mut flags = None;
+        let mut body = None;
+        let mut i = 0;
+        while i + 1 < l.len() {
+            let name = l[i].text().unwrap_or_default().to_ascii_uppercase();
+            match (name.as_str(), &l[i + 1]) {
+                ("UID", v) => uid = v.text().and_then(|x| x.parse::<u32>().ok()),
+                ("FLAGS", Item::List(f)) => flags = Some(f.iter().filter_map(Item::text).collect::<Vec<_>>().join(" ")),
+                ("BODY[]", Item::Literal(b)) => body = Some(b.clone()),
+                _ => {}
+            }
+            i += 2;
+        }
+        let Some(u) = uid else { return };
+        if let Some(f) = flags {
+            self.flags.insert(u, f);
+        }
+        if let Some(b) = body {
+            self.got.push((u, b));
+        }
+    }
+}
+
 // ---------------------------------------------------------------- the account and the folders
+
+/// the copy of an IMAP account's mail
+pub const IMAP_ROOT: &str = "/root/Mail/imap";
+/// the folders of the server, one per line
+pub const IMAP_FOLDERS: &str = "/root/Mail/imap/.folders";
+
+/// the directory of a folder's copy
+pub fn imap_dir(folder: &str) -> String {
+    let f: String = folder.chars().map(|c| if c == '/' { '_' } else { c }).collect();
+    format!("{}/{}", IMAP_ROOT, f)
+}
+
+/// the folders the program knows of the server (none before the first session)
+pub fn imap_folders(st: &Store) -> Vec<String> {
+    st.read(IMAP_FOLDERS).map(|b| String::from_utf8_lossy(b).lines().map(String::from).collect()).unwrap_or_default()
+}
+
+/// the UID of a message file of a folder's copy
+pub fn uid_of_path(path: &str) -> Option<u32> {
+    path.rsplit('/').next()?.strip_suffix(".eml")?.parse().ok()
+}
+
+/// the marks of a folder's copy: uid -> (read, flagged)
+pub fn imap_marks(st: &Store, folder: &str) -> BTreeMap<u32, (bool, bool)> {
+    let mut m = BTreeMap::new();
+    if let Ok(b) = st.read(&format!("{}/.flags", imap_dir(folder))) {
+        for l in String::from_utf8_lossy(b).lines() {
+            if let Some((u, f)) = l.split_once(' ')
+                && let Ok(u) = u.parse::<u32>()
+            {
+                m.insert(u, (f.contains("\\Seen"), f.contains("\\Flagged")));
+            }
+        }
+    }
+    m
+}
 
 /// the E-Mail program's settings
 pub const ACCOUNT: &str = "/root/Mail/account";
@@ -672,6 +943,9 @@ pub struct Account {
     pub smtp_port: u16,
     pub pop3: String,
     pub pop3_port: u16,
+    /// the IMAP server (set: the account's mail stays on it, the POP3 fields do not count)
+    pub imap: String,
+    pub imap_port: u16,
     pub user: String,
     pub password: String,
     /// messages stay on the server after they were fetched
@@ -681,7 +955,7 @@ pub struct Account {
 impl Account {
     /// "key = value" lines (# comments, unknown keys left out)
     pub fn parse(text: &str) -> Account {
-        let mut a = Account { smtp_port: smtp::PORT_SMTP, pop3_port: pop3::PORT_POP3, ..Account::default() };
+        let mut a = Account { smtp_port: smtp::PORT_SMTP, pop3_port: pop3::PORT_POP3, imap_port: imap::PORT_IMAP, ..Account::default() };
         for line in text.lines() {
             let l = line.trim();
             if l.starts_with('#') {
@@ -696,6 +970,8 @@ impl Account {
                 "smtp_port" => a.smtp_port = v.parse().unwrap_or(smtp::PORT_SMTP),
                 "pop3" => a.pop3 = v,
                 "pop3_port" => a.pop3_port = v.parse().unwrap_or(pop3::PORT_POP3),
+                "imap" => a.imap = v,
+                "imap_port" => a.imap_port = v.parse().unwrap_or(imap::PORT_IMAP),
                 "user" => a.user = v,
                 "password" => a.password = v,
                 "keep" => a.keep = matches!(v.as_str(), "yes" | "true" | "1"),
@@ -704,9 +980,13 @@ impl Account {
         }
         a
     }
+    /// the account keeps its mail on an IMAP server
+    pub fn is_imap(&self) -> bool {
+        !self.imap.trim().is_empty()
+    }
     /// the file's text
     pub fn to_text(&self) -> String {
-        format!(
+        let mut s = format!(
             "# E-Mail: the account of the program on the desktop\nname = {}\naddress = {}\nsmtp = {}\nsmtp_port = {}\npop3 = {}\npop3_port = {}\nuser = {}\npassword = {}\nkeep = {}\n",
             self.name.trim(),
             self.address.trim(),
@@ -717,7 +997,11 @@ impl Account {
             self.user.trim(),
             self.password,
             if self.keep { "yes" } else { "no" }
-        )
+        );
+        if self.is_imap() {
+            s.push_str(&format!("imap = {}\nimap_port = {}\n", self.imap.trim(), self.imap_port));
+        }
+        s
     }
     /// the account of a device's files (None: there is none)
     pub fn of(st: &Store) -> Option<Account> {
@@ -800,6 +1084,7 @@ pub struct MailDraft {
 pub enum MailJob {
     Send(MailDraft),
     Fetch,
+    Imap(ImapOp),
 }
 
 /// the outcome of a send or fetch
@@ -830,6 +1115,7 @@ pub struct MailClientView {
 enum Run {
     Send { dial: Dial, conv: SmtpConv, to: String, raw: Vec<u8> },
     Fetch { dial: Dial, fetch: Fetch },
+    Imap { dial: Dial, conv: ImapConv, op: ImapOp },
 }
 
 const K_DIAL: u32 = 0;
@@ -863,7 +1149,7 @@ impl MailClient {
         MailClientView {
             busy: self.run.as_ref().map(|r| match r {
                 Run::Send { .. } => "send",
-                Run::Fetch { .. } => "fetch",
+                Run::Fetch { .. } | Run::Imap { .. } => "fetch",
             }),
             waiting: self.queue.len(),
             last_send: self.last_send.clone(),
@@ -892,6 +1178,7 @@ impl MailClient {
             match job {
                 MailJob::Send(d) => self.begin_send(os, d),
                 MailJob::Fetch => self.begin_fetch(os),
+                MailJob::Imap(op) => self.begin_imap(os, op),
             }
         }
     }
@@ -949,7 +1236,28 @@ impl MailClient {
         }
     }
 
+    /// an IMAP session of the account
+    fn begin_imap(&mut self, os: &mut OsApi, op: ImapOp) {
+        let Some(a) = Self::account(os).filter(|a| a.is_imap() && !a.user.trim().is_empty()) else {
+            return self.outcome(os, false, false, msg!("Nicht abgerufen: das Konto nennt keinen IMAP-Server oder keinen Benutzer."), 0);
+        };
+        let dir = imap_dir(op.folder());
+        let known: BTreeSet<u32> = os.file_list(&dir).unwrap_or_default().iter().filter_map(|(n, _)| uid_of_path(n)).collect();
+        let conv = ImapConv::new(a.user.trim(), &a.password, &op, known);
+        let mut dial = Dial::new(a.imap.trim(), a.imap_port, K_DIAL, DIAL_TIMEOUT);
+        let ev = dial.start(os);
+        self.run = Some(Run::Imap { dial, conv, op });
+        os.timer(K_IDLE, os.now() + IDLE_TIMEOUT);
+        if let Some(e) = ev {
+            self.dialed(os, e);
+        }
+    }
+
     fn begin_fetch(&mut self, os: &mut OsApi) {
+        // an IMAP account: the inbox's copy up to date
+        if Self::account(os).is_some_and(|a| a.is_imap()) {
+            return self.begin_imap(os, ImapOp::Sync { folder: String::from(crate::mailbox::INBOX) });
+        }
         let Some(a) = Self::account(os).filter(|a| !a.pop3.trim().is_empty() && !a.user.trim().is_empty()) else {
             return self.outcome(os, false, false, msg!("Nicht abgerufen: das Konto nennt keinen POP3-Server oder keinen Benutzer."), 0);
         };
@@ -971,7 +1279,7 @@ impl MailClient {
             DialEv::Fail(why) => {
                 let (send, host) = match &self.run {
                     Some(Run::Send { dial, .. }) => (true, dial.host.clone()),
-                    Some(Run::Fetch { dial, .. }) => (false, dial.host.clone()),
+                    Some(Run::Fetch { dial, .. }) | Some(Run::Imap { dial, .. }) => (false, dial.host.clone()),
                     None => return,
                 };
                 self.run = None;
@@ -1006,10 +1314,85 @@ impl MailClient {
                 }
                 end = fetch.done;
             }
+            Some(Run::Imap { conv, .. }) => {
+                for l in conv.on_bytes(&b) {
+                    os.tcp_send(sock, &l);
+                }
+                end = conv.done;
+            }
             None => {}
         }
         if end {
             self.finish(os);
+        }
+    }
+
+    /// an IMAP session is over: the folder's copy, its marks, the folder list
+    fn imap_done(&mut self, os: &mut OsApi, mut dial: Dial, conv: ImapConv, op: ImapOp) {
+        dial.close(os);
+        let host = dial.host.clone();
+        let folder = String::from(op.folder());
+        let dir = imap_dir(&folder);
+        let mut last = String::new();
+        if conv.done || !conv.got.is_empty() {
+            if !conv.folders.is_empty() {
+                let mut text = conv.folders.join("\n");
+                text.push('\n');
+                let _ = os.store_put(IMAP_FOLDERS, text.as_bytes());
+                last = String::from(IMAP_FOLDERS);
+            }
+            // what the server no longer has goes, what is new comes
+            if conv.done && conv.fail.is_none() {
+                let old: Vec<String> = os.file_list(&dir).unwrap_or_default().into_iter().filter(|(n, _)| uid_of_path(n).is_some_and(|u| !conv.flags.contains_key(&u))).map(|(n, _)| n).collect();
+                for n in old {
+                    let p = format!("{}/{}", dir, n);
+                    let _ = os.store_remove(&p);
+                    last = p;
+                }
+            }
+            for (uid, body) in &conv.got {
+                let p = format!("{}/{}.eml", dir, uid);
+                let _ = os.store_put(&p, &imf::lf(body));
+                last = p;
+            }
+            if conv.done && conv.fail.is_none() {
+                let mut t = String::new();
+                for (u, f) in &conv.flags {
+                    t.push_str(&format!("{} {}\n", u, f));
+                }
+                let p = format!("{}/.flags", dir);
+                let _ = os.store_put(&p, t.as_bytes());
+                last = p;
+            }
+            if !last.is_empty() {
+                os.store_report(&last);
+            }
+        }
+        let n = conv.got.len() as u32;
+        self.fetched += n as u64;
+        match &conv.fail {
+            Some(("LOGIN", t)) => {
+                let m = msg!("Nicht abgerufen: {} lehnt die Anmeldung ab ({}).", host, t);
+                self.outcome(os, false, false, m, n);
+            }
+            Some((what, t)) => {
+                let m = msg!("Nicht abgerufen: {} lehnt {} ab ({}).", host, what, t);
+                self.outcome(os, false, false, m, n);
+            }
+            None if !conv.done => {
+                let m = msg!("Abruf von {} abgebrochen: die Verbindung brach ab ({} Nachrichten geholt).", host, n);
+                self.outcome(os, false, false, m, n);
+            }
+            None => {
+                os.note(Note::Mail(MNote::ClientSynced { folder: folder.clone(), n, server: host.clone() }));
+                os.log(6, "e-mail", &format!("{}: {} new messages from {}", folder, n, host));
+                let m = match n {
+                    0 => msg!("{} auf {} abgeglichen, nichts Neues.", folder, host),
+                    1 => msg!("{} auf {} abgeglichen, eine neue Nachricht.", folder, host),
+                    _ => msg!("{} auf {} abgeglichen, {} neue Nachrichten.", folder, host, n),
+                };
+                self.outcome(os, false, true, m, n);
+            }
         }
     }
 
@@ -1023,12 +1406,17 @@ impl MailClient {
                 let host = dial.host.clone();
                 if conv.ok() {
                     self.sent += 1;
-                    // the copy in SENT
-                    let clock = os.clock();
-                    let name = crate::mailbox::unique(clock.div_euclid(1_000_000_000), (clock.rem_euclid(1_000_000_000) / 1000) as u32, self.seq, &os.hostname());
-                    let path = format!("{}/{}.eml", SENT, name);
-                    let _ = os.store_put(&path, &imf::lf(&raw));
-                    os.store_report(&path);
+                    if Self::account(os).is_some_and(|a| a.is_imap()) {
+                        // the copy goes to the server's folder Sent
+                        self.queue.push_front(MailJob::Imap(ImapOp::Append { folder: String::from(crate::mailbox::SENT), data: imf::lf(&raw) }));
+                    } else {
+                        // the copy in SENT
+                        let clock = os.clock();
+                        let name = crate::mailbox::unique(clock.div_euclid(1_000_000_000), (clock.rem_euclid(1_000_000_000) / 1000) as u32, self.seq, &os.hostname());
+                        let path = format!("{}/{}.eml", SENT, name);
+                        let _ = os.store_put(&path, &imf::lf(&raw));
+                        os.store_report(&path);
+                    }
                     let reply = conv.final_reply.as_ref().map(|r| r.line()).unwrap_or_default();
                     let refused: Vec<String> = conv.rcpts.iter().zip(conv.refused.iter()).filter(|(_, r)| r.is_some()).map(|(a, _)| a.clone()).collect();
                     os.note(Note::Mail(MNote::ClientSent { to: to.clone(), server: host.clone() }));
@@ -1088,13 +1476,14 @@ impl MailClient {
                     }
                 }
             }
+            Run::Imap { dial, conv, op } => self.imap_done(os, dial, conv, op),
         }
         self.kick(os);
     }
 
     fn dial_of(&mut self) -> Option<&mut Dial> {
         match self.run.as_mut()? {
-            Run::Send { dial, .. } | Run::Fetch { dial, .. } => Some(dial),
+            Run::Send { dial, .. } | Run::Fetch { dial, .. } | Run::Imap { dial, .. } => Some(dial),
         }
     }
 }
@@ -1132,6 +1521,9 @@ impl Service for MailClient {
                         }
                         Some(Run::Fetch { fetch, .. }) => {
                             let _ = fetch.on_bytes(&rest);
+                        }
+                        Some(Run::Imap { conv, .. }) => {
+                            let _ = conv.on_bytes(&rest);
                         }
                         None => {}
                     }
@@ -1171,6 +1563,7 @@ impl Service for MailClient {
         let run = match &self.run {
             Some(Run::Send { conv, raw, .. }) => conv.data.len() + conv.data8.as_ref().map_or(0, Vec::len) + raw.len(),
             Some(Run::Fetch { fetch, .. }) => fetch.got.iter().map(|g| g.1.len() + g.0.len()).sum(),
+            Some(Run::Imap { conv, .. }) => conv.got.iter().map(|g| g.1.len() + 8).sum::<usize>() + conv.flags.len() * 32,
             None => 0,
         };
         512 + run + self.queue.iter().map(|j| if let MailJob::Send(d) = j { d.text.len() + d.subject.len() + d.to.len() + 64 } else { 16 }).sum::<usize>()

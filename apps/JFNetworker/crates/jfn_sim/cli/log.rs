@@ -254,6 +254,8 @@ impl Engine {
             // debug snmp packets (cli/snmp.rs)
             n @ Note::Snmp(_) if d & super::D_SNMP != 0 => text = self.snmp_debug(n),
             n @ Note::Ssh(_) if d & super::D_SSH != 0 => text = self.ssh_debug(n),
+            // debug dot1x (cli/dot1x.rs)
+            n @ Note::Dot1x(_) if d & super::D_DOT1X != 0 => text = self.dot1x_debug(n),
             _ => {}
         }
         if text.is_empty() {

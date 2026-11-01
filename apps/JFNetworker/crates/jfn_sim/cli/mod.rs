@@ -81,6 +81,9 @@
 //   units    systemctl and journalctl: the units of a Linux host (units.rs) and its log
 //   ssh      SSH: ip domain-name, crypto key generate|zeroize, ip ssh ..., show ip ssh, show ssh,
 //            show crypto key mypubkey, debug ip ssh, ssh on IOS; ssh, scp and ssh-keygen on the shell
+//   dot1x    802.1X: "dot1x system-auth-control", "authentication port-control", "dot1x pae|
+//            timeout|max-req", show dot1x, show authentication sessions, debug dot1x on IOS-like
+//            switches; wpa_supplicant and wpa_cli on the shell
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -137,6 +140,7 @@ pub mod ses;
 pub mod jfstest;
 pub mod units;
 pub mod ssh;
+pub mod dot1x;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -161,6 +165,8 @@ pub const D_AAA: u32 = 0x100000;
 pub const D_RADIUS: u32 = 0x200000;
 /// "debug ip ssh" (cli/ssh.rs)
 pub const D_SSH: u32 = 0x800000;
+/// "debug dot1x" (cli/dot1x.rs)
+pub const D_DOT1X: u32 = 0x1000000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -248,6 +254,8 @@ pub struct DevCfg {
     pub motd: String,
     /// "ip domain-name", "ip ssh ..." (sshd.rs, cli/ssh.rs)
     pub ssh: crate::sshd::SshCfg,
+    /// 802.1X of the ports (cli/dot1x.rs, dot1x.rs)
+    pub dot1x: crate::dot1x::Dot1xCfg,
 }
 
 impl Default for DevCfg {
@@ -265,6 +273,7 @@ impl Default for DevCfg {
             aaa: crate::aaa::Aaa::default(),
             motd: String::new(),
             ssh: crate::sshd::SshCfg::default(),
+            dot1x: crate::dot1x::Dot1xCfg::default(),
         }
     }
 }
@@ -428,6 +437,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         Note::Bgp(_) => c.debug > 0,
         Note::Snmp(_) => c.debug > 0,
         Note::Ssh(_) => c.debug > 0,
+        Note::Dot1x(_) => c.debug > 0,
         _ => false,
     }
 }

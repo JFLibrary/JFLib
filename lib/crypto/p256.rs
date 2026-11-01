@@ -5,6 +5,19 @@
 //                                            None for a point that is not on the curve
 //   secret_from(random) -> Option<[u8; 32]>  a scalar in [1, n - 1] from 32 random bytes
 //
+// The curve as a group, for protocols that compute on points themselves (EAP-PWD: eappwd.rs):
+// points are x || y (64 bytes, both big endian), scalars 32 bytes big endian
+//
+//   below_p(x)                               x is a coordinate: smaller than p
+//   y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
+//                                            point; variable time, only for public or hashed x)
+//   on_curve(point)                          both coordinates in range and the curve equation
+//   mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
+//   add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
+//   neg_point(point)                         -point
+//   scalar_add(a, b)                         a + b mod n
+//   scalar_ok(k)                             k lies in [1, n - 1]
+//
 // Field elements in Montgomery form with four 64-bit limbs; multiplication, addition and
 // subtraction without branches on the values (masked final corrections).  Points in projective
 // coordinates with the complete addition formulas of Renes, Costello and Batina (2016,
@@ -298,4 +311,119 @@ pub fn shared(secret: &[u8; 32], peer: &[u8]) -> Option<[u8; 32]> {
     let q = Pt { x: mx, y: my, z: to_mont(&[1, 0, 0, 0]) };
     let (sx, _) = affine(&scalar_mul(secret, &q, &b))?;
     Some(to_be(&sx))
+}
+
+// ---------------------------------------------------------------- the group, for protocols on points
+
+/// x is smaller than p
+pub fn below_p(x: &[u8; 32]) -> bool {
+    less(&from_be(x), &P)
+}
+
+/// a^e (variable time in e, which is public here)
+fn pow(a: &Fe, e: &Fe) -> Fe {
+    let mut r = to_mont(&[1, 0, 0, 0]);
+    for i in (0..256).rev() {
+        r = mul(&r, &r);
+        if (e[i / 64] >> (i % 64)) & 1 == 1 {
+            r = mul(&r, a);
+        }
+    }
+    r
+}
+
+/// x^3 - 3x + b in Montgomery form (x too)
+fn curve_rhs(mx: &Fe) -> Fe {
+    let x3 = mul(&mul(mx, mx), mx);
+    add(&sub(&x3, &add(&add(mx, mx), mx)), &to_mont(&B))
+}
+
+/// the y of the point with this x and whose lowest bit is `odd`; None when x is out of range or
+/// x^3 - 3x + b has no square root (p = 3 mod 4: the root is a^((p + 1) / 4))
+pub fn y_for_x(x: &[u8; 32], odd: bool) -> Option<[u8; 32]> {
+    if !below_p(x) {
+        return None;
+    }
+    let mx = to_mont(&from_be(x));
+    let rhs = curve_rhs(&mx);
+    // (p + 1) / 4 = 2^254 - 2^222 + 2^190 + 2^94
+    let e: Fe = [0, 0x0000_0000_4000_0000, 0x4000_0000_0000_0000, 0x3FFF_FFFF_C000_0000];
+    let root = pow(&rhs, &e);
+    if mul(&root, &root) != rhs {
+        return None;
+    }
+    let y = from_mont(&root);
+    let y = if (y[0] & 1 == 1) == odd { y } else { sub(&[0; 4], &y) };
+    Some(to_be(&y))
+}
+
+/// x || y as a point, checked: in range and on the curve
+fn point_of(p: &[u8; 64]) -> Option<Pt> {
+    let (x, y) = (from_be(&p[..32]), from_be(&p[32..]));
+    if !less(&x, &P) || !less(&y, &P) {
+        return None;
+    }
+    let (mx, my) = (to_mont(&x), to_mont(&y));
+    if mul(&my, &my) != curve_rhs(&mx) {
+        return None;
+    }
+    Some(Pt { x: mx, y: my, z: to_mont(&[1, 0, 0, 0]) })
+}
+
+/// x || y of a point (None: the identity)
+fn bytes_of(p: &Pt) -> Option<[u8; 64]> {
+    let (x, y) = affine(p)?;
+    let mut out = [0u8; 64];
+    out[..32].copy_from_slice(&to_be(&x));
+    out[32..].copy_from_slice(&to_be(&y));
+    Some(out)
+}
+
+/// both coordinates are in range and the point is on the curve
+pub fn on_curve(p: &[u8; 64]) -> bool {
+    point_of(p).is_some()
+}
+
+/// k * point (k below n)
+pub fn mul_point(k: &[u8; 32], p: &[u8; 64]) -> Option<[u8; 64]> {
+    let q = point_of(p)?;
+    bytes_of(&scalar_mul(k, &q, &to_mont(&B)))
+}
+
+/// a + b
+pub fn add_points(a: &[u8; 64], b: &[u8; 64]) -> Option<[u8; 64]> {
+    let (p, q) = (point_of(a)?, point_of(b)?);
+    bytes_of(&padd(&p, &q, &to_mont(&B)))
+}
+
+/// -point (y becomes p - y)
+pub fn neg_point(p: &[u8; 64]) -> [u8; 64] {
+    let mut out = *p;
+    let mut y = [0u8; 32];
+    y.copy_from_slice(&p[32..]);
+    let ny = sub(&[0; 4], &from_be(&y));
+    out[32..].copy_from_slice(&to_be(&ny));
+    out
+}
+
+/// a + b mod n (both below n)
+pub fn scalar_add(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
+    let (x, y) = (from_be(a), from_be(b));
+    let mut r = [0u64; 4];
+    let mut c = 0;
+    for i in 0..4 {
+        (r[i], c) = adc(x[i], y[i], c);
+    }
+    let mut s = [0u64; 4];
+    let mut br = 0;
+    for i in 0..4 {
+        (s[i], br) = sbb(r[i], N[i], br);
+    }
+    let (_, br) = sbb(c, 0, br);
+    to_be(&if br == 1 { r } else { s })
+}
+
+/// k lies in [1, n - 1]
+pub fn scalar_ok(k: &[u8; 32]) -> bool {
+    secret_from(k).is_some()
 }

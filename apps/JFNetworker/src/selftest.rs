@@ -62,6 +62,10 @@
 // jfn_sim::units, deploy, cli/units.rs, the lab 05-microservices).
 // browsertest.rs: the Webbrowser (group browser: netpkt::uri, jfn_sim::webc, the static files of
 // http-server, req.form of scripts, what devwin/browser.rs decides).
+// dot1xtest.rs: 802.1X and WPA-Enterprise (group dot1x: jfn_sim::dot1x, supp, dot1xtrace, the EAP
+// part of radiusd and wlan, cli/dot1x.rs).
+// imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
+// mailc.rs and cli/mail.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -153,9 +157,13 @@ mod idetest;
 mod unitstest;
 #[path = "browsertest.rs"]
 mod browsertest;
+#[path = "dot1xtest.rs"]
+mod dot1xtest;
+#[path = "imaptest.rs"]
+mod imaptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 50] = [
+    let groups: [(&'static str, fn(&mut T)); 52] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -206,6 +214,8 @@ pub fn run() -> i32 {
         ("browser", browsertest::run),
         ("ssh", sshtest::run),
         ("snmpv3", snmpv3test::run),
+        ("dot1x", dot1xtest::run),
+        ("imap", imaptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -1468,3 +1468,57 @@ SNMPv3: {} von {} (Benutzer {}, {}, Kennung {}, {} Variablen).	SNMPv3: {} from {
 SNMPv3: Report {} an {}.	SNMPv3: report {} to {}.
 SNMPv3: {} hat die Engine-ID {}.	SNMPv3: {} has the engine ID {}.
 SNMPv3: {} lehnt ab: {}.	SNMPv3: {} refuses: {}.
+# X1g: 802.1X and WPA-Enterprise (jfn_model wlan.rs, jfn_sim dot1x.rs, dot1xtrace.rs, supp.rs, radiusd.rs)
+WPA2-Enterprise	WPA2-Enterprise
+WPA3-Enterprise	WPA3-Enterprise
+„{}“ braucht die Adresse seines RADIUS-Servers.	“{}” needs the address of its RADIUS server.
+„{}“ braucht den gemeinsamen Schlüssel seines RADIUS-Servers.	“{}” needs the key it shares with its RADIUS server.
+{} Sitzungen, {} angenommen, {} abgelehnt	{} sessions, {} accepted, {} refused
+{} {}: 802.1X verlangt, aber „dot1x system-auth-control“ fehlt: der Port bleibt offen.	{} {}: asks for 802.1X, but “dot1x system-auth-control” is missing: the port stays open.
+{} {}: 802.1X verlangt, aber kein RADIUS-Server eingetragen: der Port bleibt geschlossen.	{} {}: asks for 802.1X, but no RADIUS server is configured: the port stays closed.
+802.1X: EAP {} an {} gesendet.	802.1X: EAP {} sent to {}.
+802.1X: EAP {} von {}.	802.1X: EAP {} from {}.
+802.1X: EAPOL-Start an {}.	802.1X: EAPOL-Start on {}.
+802.1X: EAPOL-Logoff an {}.	802.1X: EAPOL-Logoff on {}.
+802.1X: {} ist für {} offen, VLAN {} von RADIUS.	802.1X: {} is open for {}, VLAN {} from RADIUS.
+802.1X: {} ist für {} offen.	802.1X: {} is open for {}.
+802.1X: {} abgelehnt, {} bleibt {} s geschlossen.	802.1X: {} refused, {} stays closed for {} s.
+802.1X: Wartezeit von {} vorbei, neue Anfrage.	802.1X: the wait of {} is over, it asks again.
+802.1X: keine Antwort an {}, Anfrage erneut (Versuch {}).	802.1X: no answer on {}, the request goes again (try {}).
+802.1X: {} antwortet nicht mehr.	802.1X: {} no longer answers.
+802.1X: kein RADIUS-Server für {} erreichbar, keine Methode übrig.	802.1X: no RADIUS server reachable for {}, no method left.
+802.1X: {} meldet sich neu an.	802.1X: {} authenticates again.
+802.1X: {} ist wieder geschlossen.	802.1X: {} is closed again.
+802.1X: VLAN {} von RADIUS gibt es hier nicht, {} bleibt geschlossen.	802.1X: VLAN {} from RADIUS does not exist here, {} stays closed.
+802.1X: EAP-Success für {} ohne Schlüssel, die Methode taugt nicht für WPA-Enterprise.	802.1X: EAP-Success for {} without keys, the method is no good for WPA-Enterprise.
+802.1X: {} ist nicht autorisiert, Frame verworfen.	802.1X: {} is not authorized, frame dropped.
+Supplicant: EAPOL-Start auf {}.	Supplicant: EAPOL-Start on {}.
+Supplicant: EAP {} auf {}.	Supplicant: EAP {} on {}.
+Supplicant: {} auf {} angemeldet ({}).	Supplicant: {} logged in on {} ({}).
+Supplicant: Anmeldung von {} auf {} abgelehnt.	Supplicant: the login of {} on {} was refused.
+Supplicant: niemand antwortet auf {}, der Port läuft ohne 802.1X.	Supplicant: nobody answers on {}, the port runs without 802.1X.
+Supplicant: keine Zugangsdaten für {}.	Supplicant: no credentials for {}.
+Supplicant: auf {} abgemeldet.	Supplicant: logged off on {}.
+EAP-Methode „{}“ gibt es hier nicht.	There is no EAP method “{}” here.
+{}: {} Anmeldungen, {} abgelehnt	{}: {} logins, {} refused
+# X1g: IMAP (jfn_sim imapd.rs, mailtrace.rs, mailc.rs)
+Port {}, {} Benutzer: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Nachrichten geholt, {} entfernt	Port {}, {} users: {} sessions, {} logins, {} refused, {} messages fetched, {} removed
+Nicht abgerufen: das Konto nennt keinen IMAP-Server oder keinen Benutzer.	Not fetched: the account names no IMAP server or no user.
+Nicht abgerufen: {} lehnt die Anmeldung ab ({}).	Not fetched: {} refuses the login ({}).
+Nicht abgerufen: {} lehnt {} ab ({}).	Not fetched: {} refuses {} ({}).
+{} auf {} abgeglichen, nichts Neues.	{} on {} compared, nothing new.
+{} auf {} abgeglichen, eine neue Nachricht.	{} on {} compared, one new message.
+{} auf {} abgeglichen, {} neue Nachrichten.	{} on {} compared, {} new messages.
+IMAP: {} verbindet sich.	IMAP: {} connects.
+IMAP: {} ist angemeldet.	IMAP: {} is logged in.
+IMAP: Anmeldung von {} abgelehnt.	IMAP: the login of {} was refused.
+IMAP: {} wählt {} mit {} Nachrichten.	IMAP: {} selects {} with {} messages.
+IMAP: {} Nachrichten aus {} gesendet, {} Bytes.	IMAP: {} messages from {} sent, {} bytes.
+IMAP: Markierungen von {} Nachrichten in {} geändert.	IMAP: flags of {} messages in {} changed.
+IMAP: {} Nachrichten aus {} entfernt.	IMAP: {} messages removed from {}.
+IMAP: {} Nachrichten nach {} verschoben.	IMAP: {} messages moved to {}.
+IMAP: {} Nachrichten nach {} kopiert.	IMAP: {} messages copied to {}.
+IMAP: Nachricht mit {} Bytes in {} abgelegt.	IMAP: a message of {} bytes put into {}.
+IMAP: {} {}.	IMAP: {} {}.
+IMAP: {} abgelehnt.	IMAP: {} refused.
+E-Mail: {} von {} geholt, {} Nachrichten.	E-Mail: {} fetched from {}, {} messages.

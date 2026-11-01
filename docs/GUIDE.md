@@ -2335,6 +2335,46 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   w.begin(ber::T_SEQUENCE); w.int(5); w.octets(b"public"); w.end();
   ```
 
+  Port access control: `eap` has the packets of RFC 3748 -- `Packet` (Request, Response, Success,
+  Failure; `identity_request`, `identity_response`, `nak`, `identity()`, `nak_types()`), the data of
+  EAP-MD5 (`Md5Data`, `md5_value` with lent MD5) and of EAP-PWD (`Pwd`: `Id`, `Commit`, `Confirm`),
+  `info` for one line about a packet. `eapol` writes `start`, `logoff` and `eap_pdu`, `PAE_GROUP` is
+  their address on a wire, `AKM_8021X` and `AKM_8021X_SHA256` are the suites of enterprise networks.
+  `radius` carries EAP: `Packet::push_eap` / `eap` (pieces of 253 bytes, RFC 3579 3.1), `push_vlan` /
+  `vlan` (RFC 3580), `push_msk` / `msk` with `mppe_seal` / `mppe_open` (RFC 2548). The sums of EAP-PWD
+  are `crypto::eappwd` on the group functions of `crypto::p256` (`y_for_x`, `mul_point`, `add_points`,
+  `neg_point`, `scalar_add`), and `eapm` holds the methods as state machines without I/O: `Peer` and
+  `Server` take packets and give the next one, the caller carries the bytes, keeps timers and hands in
+  randomness, so a run is the same byte for byte. `decode::layers` shows EAP as a layer under EAPOL
+  and as a line in a RADIUS EAP-Message.
+
+  ```rust
+  let mut peer = eapm::Peer::new("anna", "secret", eapm::Method::Pwd);
+  let mut server = eapm::Server::new("radius", &[eapm::Method::Pwd]);
+  let lookup = |user: &str| (user == "anna").then(|| String::from("secret"));
+  let mut request = eap::Packet::identity_request(1, "").to_bytes();
+  loop {
+      let eapm::PeerOut::Send(response) = peer.on_packet(&request, &mut rnd) else { break };
+      match server.on_packet(&response, &lookup, &mut rnd) {
+          eapm::ServerOut::Send(next) => request = next,
+          eapm::ServerOut::Success { eap, msk, .. } => {
+              peer.on_packet(&eap, &mut rnd); // now peer.msk() == msk.as_ref()
+              break;
+          }
+          _ => break,
+      }
+  }
+  ```
+
+  Mail on a server: `imap` is IMAP without I/O (a subset of RFC 9051 and 3501) -- `LineReader` turns
+  bytes in pieces into logical lines with their literals (`Read::NeedLiteral` tells a server to answer
+  "+"), `Command::parse` and `Response::parse` read them, `tokens` gives the values (`Item`: atom,
+  quoted, literal, list, NIL), `ok` / `no` / `bad` / `untagged` / `cont` write server lines, `astring`
+  and `quoted` strings; `SeqSet`, `parse_fetch` (`FetchItem`, `Section`), `parse_search` (`SearchKey`)
+  read what clients ask, `envelope`, `internal_date`, `header_of`, `text_of` and `header_fields` make
+  the answers. `decode::layers` shows each line with its tag, command or status and response code
+  (port 143, `P_MAIL`).
+
   Remote access: `telnet` has the NVT protocol of RFC 854 -- the commands after `IAC`, the
   options `OPT_*` (`ECHO`, `SGA`, ...), `escape` and `to_nvt` for a data stream, a `Reader`
   that turns bytes arriving in pieces into `Item`s (data, a command, a negotiation, a

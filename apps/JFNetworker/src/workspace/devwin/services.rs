@@ -46,6 +46,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "ftp-server" => "FTP-Server",
         "smtp-server" => "Mailserver (SMTP)",
         "pop3-server" => "Postfach (POP3)",
+        "imap-server" => "Postfach (IMAP)",
         "snmpd" => "SNMP-Agent",
         "snmptrapd" => "SNMP-Trap-Empfänger",
         "radius-server" => "RADIUS-Server",

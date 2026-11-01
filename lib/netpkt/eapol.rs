@@ -17,6 +17,10 @@
 //                                  data (with the padding of 12.7.2 j: 0xdd 0x00 ...)
 //   pad_key_data(data)             the padding for the key wrap (a multiple of 8, at least 16)
 //   KI_* (Key Information), AKM_* and CIPHER_CCMP (the suites of 00-0F-AC)
+//   pdu(version, kind, body)       any other EAPOL PDU; start(version), logoff(version) and
+//                                  eap_pdu(version, eap) are the ones of port access control
+//   PAE_GROUP                      the group address of the port access entities (802.1X-2004
+//                                  7.8): bridges never forward it
 //
 // The fields are big endian; the key replay counter is a 64-bit number.  Lengths are checked
 // once by parse; a body shorter than the 95 fixed bytes is no Key.
@@ -68,6 +72,11 @@ pub const CIPHER_CCMP: u8 = 4;
 pub const AKM_PSK: u8 = 2;
 pub const AKM_PSK_SHA256: u8 = 6;
 pub const AKM_SAE: u8 = 8;
+/// AKM suites of 802.1X: WPA2-Enterprise and, with SHA-256, WPA3-Enterprise
+pub const AKM_8021X: u8 = 1;
+pub const AKM_8021X_SHA256: u8 = 5;
+/// the group address EAPOL goes to on a wired port (802.1X-2004 7.8)
+pub const PAE_GROUP: [u8; 6] = [0x01, 0x80, 0xC2, 0x00, 0x00, 0x03];
 /// RSN capabilities: management frame protection capable / required
 pub const RSN_MFPR: u16 = 0x0040;
 pub const RSN_MFPC: u16 = 0x0080;
@@ -110,6 +119,29 @@ impl<'a> EapolView<'a> {
     pub fn pdu(&self) -> &'a [u8] {
         &self.b[..4 + self.body_len()]
     }
+}
+
+/// an EAPOL PDU: the header with `version` and `kind`, the body
+pub fn pdu(version: u8, kind: u8, body: &[u8]) -> Vec<u8> {
+    let mut v = alloc::vec![version, kind, 0, 0];
+    put16(&mut v, 2, body.len() as u16);
+    v.extend_from_slice(body);
+    v
+}
+
+/// EAPOL-Start
+pub fn start(version: u8) -> Vec<u8> {
+    pdu(version, T_START, &[])
+}
+
+/// EAPOL-Logoff
+pub fn logoff(version: u8) -> Vec<u8> {
+    pdu(version, T_LOGOFF, &[])
+}
+
+/// an EAP packet in an EAPOL PDU
+pub fn eap_pdu(version: u8, eap: &[u8]) -> Vec<u8> {
+    pdu(version, T_EAP, eap)
 }
 
 /// the name of a packet type ("EAPOL-Key")
