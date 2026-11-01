@@ -939,6 +939,7 @@ fn recovered_origin(p: &mut Pn, ini_path: &str) {
 // recent_add(path) -- to the top of the list (an existing entry moves up), at most RECENT_MAX
 fn recent_add(p: &mut Pn, _ui: &mut Ui, path: &str) {
     recent_add_p(p, path);
+    plat::recent_add(path); // Dolphin's / Nautilus's and the file dialogs' "recent"
 }
 
 fn recent_add_p(p: &mut Pn, path: &str) {
@@ -1668,7 +1669,10 @@ pub(crate) fn fio_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
                 fio_close_doc(p, ui, d);
             }
         }
-        CMD_RECENT_CLEAR => p.fio.recent.clear(),
+        CMD_RECENT_CLEAR => {
+            p.fio.recent.clear();
+            plat::recent_clear();
+        }
         _ => {
             let k = id.wrapping_sub(CMD_RECENT0);
             if k >= RECENT_MAX as u32 {
