@@ -809,6 +809,14 @@ impl Ft {
         let n = c.parse("<fontconfig><match><test name=\"lang\"><string>ko</string></test><edit name=\"family\" mode=\"append_last\"><string>KR</string></edit></match><alias><family>serif</family><prefer><family>S</family>", "");
         let l = c.candidates("serif", "ko");
         self.st_check(n == 2 && l == ["S", "serif", "KR"], &format!("selftest: fontconf parse {n} {l:?}\n"));
+        // Fedora's files in their order: a family's default goes behind the whole list
+        let mut c = FontConf::new();
+        c.parse("<fontconfig><match><test name=\"family\"><string>monospace</string></test><edit name=\"family\" mode=\"prepend\"><string>Script</string></edit></match>\
+            <alias><family>Script</family><default><family>sans-serif</family></default></alias>\
+            <match><test name=\"family\"><string>monospace</string></test><edit name=\"family\" mode=\"prepend\"><string>Mono</string></edit></match>\
+            <alias><family>sans-serif</family><prefer><family>Sans</family></prefer></alias></fontconfig>", "");
+        let l = c.candidates("monospace", "");
+        self.st_check(l == ["Script", "Mono", "monospace", "Sans", "sans-serif"], &format!("selftest: fontconf default at the end {l:?}\n"));
         // Fedora's rules put a font of another script first in monospace and sans-serif
         let mut db = FontDb::new();
         db.scan_dirs(&["lib/doc_view/assets", "apps/fonttest/tests/fixtures"], FDB_RESCAN);

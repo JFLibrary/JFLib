@@ -11699,7 +11699,8 @@ right after F (a later list before an earlier one), its <default> families at th
 (eq) and they hold; its family edits prepend (before F), prepend_first, append (after F),
 append_last or assign (in place of F).  Other matches (charset, spacing, prgname, target
 font: hinting) are skipped.  The families in the list that have rules of their own are
-expanded in place (4 levels).  Layers: the files' rules first, the built-in ones after them;
+expanded in place (4 levels), only their <default> and append_last families go to the end
+of the whole list.  Layers: the files' rules first, the built-in ones after them;
 names compare ASCII-case-insensitively, each once.  Languages: "ja" matches ja and ja-JP;
 zh-Hans / zh-CN / zh-SG / plain zh also match zh-cn, zh-Hant / zh-TW zh-tw, zh-HK / zh-MO
 zh-hk and zh-tw.  <include> follows files and folders (*.conf in name order) relative to
