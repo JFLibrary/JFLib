@@ -192,6 +192,8 @@ mod symbol;
 mod taskbar;
 mod tasks;
 mod term;
+mod touch;
+pub use touch::Finger;
 pub use term::{TermEv, TermState, TF_CTRL_SHIFT6, TF_NO_FRAME, TF_NO_INPUT, TF_QHELP, TK_KEY, TM_BUSY, TM_LINE, TM_RAW, TM_SECRET};
 pub mod theme;
 mod timeline;
@@ -445,6 +447,8 @@ pub(crate) struct Mods {
     pub(crate) rpar: render_par::S,
     /// (L7) the window areas (desk.rs)
     pub(crate) desk: desk::S,
+    /// the finger: the gesture recogniser (touch.rs)
+    pub(crate) touch: touch::S,
     /// (G3a) the output through a swapchain (gpu_out.rs)
     pub(crate) gout: gpu_out::S,
 }

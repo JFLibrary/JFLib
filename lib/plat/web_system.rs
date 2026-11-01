@@ -34,8 +34,8 @@
 //   dark() -> Option<bool>       (web.rs theme())
 //   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
 //   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
-//   jfgui_touch_drag(x, y) -> 0|1   (Android) a touch starting here drags in every direction
-//                                instead of scrolling with a vertical swipe (ui.touch_drag)
+//   jfgui_touch_reached() -> 0|1  (Android) the last finger's gesture reached a widget (a tap, a
+//                                drag), not only a scroll: the keyboard may follow it
 //
 // The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
 // the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
@@ -195,6 +195,8 @@ pub(crate) fn sys_settings_host(s: &mut SysSettings) {
 // (Android) the host call of GallerySystem (android_host.rs: CALL_*)
 #[cfg(target_os = "android")]
 const CALL_BACK: u32 = 55;
+#[cfg(target_os = "android")]
+const CALL_LONG_PRESS: u32 = 56;
 
 /// (Android) while on, the back key reaches the app as Esc instead of ending the activity
 #[cfg(target_os = "android")]
@@ -202,28 +204,26 @@ pub(crate) fn back_trap(on: bool) {
     let _ = crate::web::android_host::call(CALL_BACK, &[on as u8]);
 }
 
-// (Android) the rectangles of ui.touch_drag of the last frame, px
+// (Android) the finger's gesture reached a widget: plat::touch_reached, jfgui_touch_reached
 #[cfg(target_os = "android")]
-static TOUCH_DRAG: SpinLock<alloc::vec::Vec<[i32; 4]>> = SpinLock::new(alloc::vec::Vec::new());
+static TOUCH_REACHED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 #[cfg(target_os = "android")]
-pub(crate) fn touch_drag_clear() {
-    TOUCH_DRAG.lock().clear();
+pub(crate) fn touch_reached(reached: bool) {
+    TOUCH_REACHED.store(reached, Ordering::Relaxed);
 }
 
-#[cfg(target_os = "android")]
-pub(crate) fn touch_drag_add(r: [i32; 4]) {
-    let mut v = TOUCH_DRAG.lock();
-    if v.len() < 64 {
-        v.push(r);
-    }
-}
-
-/// (Android) a touch starting at this point (px) drags in every direction -> 1
+/// (Android) the last finger's gesture reached a widget -> 1
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
-pub extern "C" fn jfgui_touch_drag(x: i32, y: i32) -> u32 {
-    TOUCH_DRAG.lock().iter().any(|r| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]) as u32
+pub extern "C" fn jfgui_touch_reached() -> u32 {
+    TOUCH_REACHED.load(Ordering::Relaxed) as u32
+}
+
+/// (Android) a finger rested long enough: GalleryActivity gives the system's feedback
+#[cfg(target_os = "android")]
+pub(crate) fn touch_long_press() {
+    let _ = crate::web::android_host::call(CALL_LONG_PRESS, &[]);
 }
 
 /// the host's scheme: Some(true) dark, Some(false) light, None no preference

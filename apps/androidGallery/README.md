@@ -7,8 +7,10 @@ Unicode-Textfeld und einer Karte „Dateien & Zwischenablage“ (Öffnen, Speich
 Einfügen über die System-Zwischenablage; [`files.rs`](files.rs)) sowie „Sicherer Speicher“
 (ein Wert im Android Keystore bzw. im Browser-Speicher von `plat::secret`; [`secrets.rs`](secrets.rs))
 und „System“ (Einstellungen des Systems live, eine Benachrichtigung, Bildschirm anlassen,
-Lebenszyklus; [`system.rs`](system.rs)). Vertikal wischen scrollt die
-Seite; horizontal ziehen bewegt den Slider; langes Drücken ist die rechte Taste.
+Lebenszyklus; [`system.rs`](system.rs)). Der Finger rollt die Seite 1:1 und sie rollt nach dem
+Loslassen weiter; horizontal ziehen bewegt den Slider; langes Drücken ist die rechte Taste; Fenster
+folgen dem Finger an der Titelleiste; Rollleisten gibt es nur mit einer Maus
+([GUIDE §37](../../docs/GUIDE.md), [`lib/ui/touch.rs`](../../lib/ui/touch.rs)).
 
 Hinter der Startseite (die Karte „07 Weitere Seiten“ am Ende, das Menü oben rechts; die Zurück-Taste
 führt zurück) liegt der technische Umfang der großen Galerie [`apps/gallery`](../gallery/main.rs),
@@ -20,7 +22,7 @@ für den Finger angeordnet (eine Spalte, 44 DIP):
 | Menüs & Auswahl | Menüleiste mit Untermenüs und zuletzt geöffneten Dateien, Auswahlliste, Kalender, Aufklapp-, Teil- und Befehlsknöpfe, Kontextmenü, Hinweise | [`pg_menus.rs`](pg_menus.rs) |
 | Texteingabe | Textfelder, Kennwort, Zahlenfelder, mehrzeilig, Formular im Raster, Umbruch und Kürzung | [`pg_text.rs`](pg_text.rs) |
 | Listen & Bäume | 200 Einträge virtualisiert, Zeilen zum Ziehen mit Griff, Baum mit Checkboxen, Zeichenfläche mit `canvas_damage` | [`pg_lists.rs`](pg_lists.rs) |
-| Container | Tabs, Expander, Hinweisleisten, kurze Meldungen, waagerechtes Rollen, Rollleiste | [`pg_boxes.rs`](pg_boxes.rs) |
+| Container | Tabs, Expander, Hinweisleisten, kurze Meldungen, waagerechtes Rollen, Rollleiste (nur mit der Maus), Regler mit `ui.touch_take` (nur mit dem Finger) | [`pg_boxes.rs`](pg_boxes.rs) |
 | Werte & Farben | Dezimalregler, Eigenschaftszeilen, Winkel, Verschieben, Farbspuren, Farbrad, Farbwähler | [`pg_colors.rs`](pg_colors.rs) |
 | Fenster & Dialoge | Werkzeugfenster, verschachtelte modale Dialogfenster, Seitendialog, Popups aus einem Fenster, Statusleiste | [`pg_windows.rs`](pg_windows.rs) |
 | Randfälle | Bedienelemente in den Ecken: ihre Menüs, Listen und der Kalender bleiben auf dem Bildschirm | [`pg_edge.rs`](pg_edge.rs) |
@@ -368,10 +370,44 @@ in Chromium und Firefox. Auf einem Samsung SM-A566B mit Android 16: `android_sen
 Lage und Kompass einer Bewegung folgen und ein Fix vom GPS sind dort noch nicht geprüft (das Skript
 meldet beides am Ende).
 
-Offen: Im Browser auf dem Telefon rollt der Finger die Seite noch nicht und langes Drücken ist keine
-rechte Taste (der Android-Host macht beides selbst); Hinweise (Tooltips) gibt es nur mit Maus oder
-Stift; die Zeilen der Menüleiste sind Desktop-hoch; iOS (das Vorzeichen seiner Beschleunigung, die
+Offen: Die Zeilen der Menüleiste sind Desktop-hoch; iOS (das Vorzeichen seiner Beschleunigung, die
 Geste für `requestPermission`) ist nicht auf einem Gerät gelaufen.
+
+## Der Finger
+
+Rollen, Weiterrollen, Tippen und was den Finger selbst nimmt, stehen in
+[GUIDE §37](../../docs/GUIDE.md). Getestet mit:
+
+```powershell
+python build_rs.py app androidGallery --target win
+python build_rs.py test androidGallery --target win        # tests/touch.uis, touch_rtl.uis
+node apps/androidGallery/tests/touch_web.mjs build --engines=chromium
+python build_rs.py app androidGallery --target android --android-abi arm64-v8a
+python apps/androidGallery/tests/android_touch.py --serial SERIAL
+```
+
+`tests/android_touch.py` arbeitet mit `input motionevent` und `input swipe` und liest die Lage aus
+`uiautomator dump`; es ändert nur den Zustand der App (35 Prüfungen auf dem Emulator und auf dem
+SM-A566B am 01.11.2026). Eine Debug-APK mit dem Extra `jfgui_PERF` (`am start ... --es jfgui_PERF 1`)
+schreibt alle 120 geänderten Bilder die Zeiten von `nativeRender` ins Logcat (Tag `jfgui-perf`).
+
+Gemessen auf dem SM-A566B (Android 16, 120 Hz, 768 x 1496 Bitmap-Pixel), 12 Züge mit `input swipe` je
+500 ms auf der Startseite, ohne Spiegelung durch Android Studio; vorher ein Release-Bau, nachher ein
+Entwicklungsbau (ein Release-Bau ist kaum schneller, die Zeit liegt in `gfx` und `text`):
+
+| | vorher | nachher |
+| --- | --- | --- |
+| Bilder | 499 | 1274 |
+| ruckelnd (`dumpsys gfxinfo`) | 58 % | 6 % |
+| Bildzeit Median / 95 % | 24 / 36 ms | 11 / 14 ms |
+| verpasste Vsyncs | 159 | 0 bis 1 |
+| `nativeRender` Median / 95 % | 12 / 16 ms | 5,7 / 8 ms |
+| Abstand der Bilder (Median) | 16,6 ms | 8,3 ms |
+
+`nativeRender` nachher: etwa 1,9 ms bringen die Bilder durch den Speicher (`jfgui_present_us`), der
+Rest ist Aufbau und Zeichnen ohne SIMD (auf ARM rechnet `lib/simd` skalar). Die Seite „Werte &
+Farben“ mit ihren Verläufen bleibt bei 7 ms und verfehlt manchmal einen Vsync (23 % ruckelnd, 12 ms im
+Median).
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

@@ -816,7 +816,8 @@ impl Ui {
             0
         } else {
             let st = self.style;
-            st.metric(if flags & WF_TOOL != 0 { SM_WIN_TBH_TOOL } else { SM_WIN_TBH_DIALOG })
+            let h = st.metric(if flags & WF_TOOL != 0 { SM_WIN_TBH_TOOL } else { SM_WIN_TBH_DIALOG });
+            if self.m.touch.on { h.max(super::touch::TITLE_DIP) } else { h } // (a finger moves it there)
         };
         {
             let r = &mut self.m.win.recs[iu];

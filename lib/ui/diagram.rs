@@ -2073,7 +2073,7 @@ impl Ui {
         let enter = self.wp.ctx.focus == id && self.key_peek(VK_RETURN);
         let lim = self.dp(DRAG_DIP);
         let notch = self.dp(48);
-        let ev = self.behave(id, HB_FOCUS | HB_MOVES | cur << HB_CURSOR_SHIFT);
+        let ev = self.behave(id, HB_FOCUS | HB_MOVES | HB_GRAB_H | HB_GRAB_V | cur << HB_CURSOR_SHIFT);
         let state = self.wp.ctx.last_state;
         let c = &self.wp.ctx;
         let (now, dbl) = (self.now_ms, self.dbl_ms);

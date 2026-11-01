@@ -1,0 +1,14 @@
+#!args --verify-dirty
+# The finger (lib/ui/touch.rs) on the console: it rolls row by row, the way below a row waits; no
+# scroll bar
+size 760 520
+pointer touch
+tap tab:"Shell"
+tap 300,300
+type "seq 200\n"
+wait 100
+expect text:"200" exists
+swipe 300,100 300,400 300 hold
+expect text:"200" missing
+swipe 300,400 300,100 300 hold
+expect text:"200" exists

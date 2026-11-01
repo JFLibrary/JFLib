@@ -693,7 +693,7 @@ impl Ui {
         if matches!(st.g, Gesture::Rect { .. }) || self.mods & MOD_CTRL != 0 {
             cur = CUR_CROSS;
         }
-        let ev = self.behave(id, HB_FOCUS | HB_MOVES | cur << HB_CURSOR_SHIFT);
+        let ev = self.behave(id, HB_FOCUS | HB_MOVES | HB_GRAB_H | HB_GRAB_V | cur << HB_CURSOR_SHIFT);
         let state = self.wp.ctx.last_state;
         let (mx, my) = (self.rtl_map(self.wp.ctx.mx, r[0], r[2]), self.wp.ctx.my);
         let (cxv, cyv) = (r[0] as f64 + vw * 0.5, r[1] as f64 + vh * 0.5);

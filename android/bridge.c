@@ -205,6 +205,12 @@ JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeRender(
     return result != 0 ? -1 : presented;
 }
 
+/* (jfgui_PERF) microseconds spent presenting so far (lib/plat/web.rs) */
+extern double jfgui_present_us(void);
+JNIEXPORT jlong JNICALL Java_org_jflib_gallery_GalleryActivity_nativePresentUs(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    return (jlong)jfgui_present_us();
+}
 JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFrameDelay(JNIEnv *env, jclass cls) {
     (void)env; (void)cls;
     return started ? (jint)jfgui_frame_delay() : 250;
@@ -237,6 +243,23 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEvent(
     if (!started) return;
     jfgui_event((uint32_t)type, (uint32_t)button, (uint32_t)mods, 0, x, y, (uint32_t)data);
     jfgui_input(time_ms());
+}
+/* A raw finger (GalleryActivity.onTouchEvent -> lib/ui/touch.rs): phase 0 down, 1 move, 2 up, 3 cancel,
+ * the pointer's id, px of the bitmap, time as SystemClock.uptimeMillis (CLOCK_MONOTONIC, as
+ * jfgui_host_time_us).  The samples of one MotionEvent are handed over together (last). */
+extern uint32_t jfgui_finger(uint32_t phase, uint32_t id, int32_t x, int32_t y, uint32_t age_ms);
+extern uint32_t jfgui_touch_reached(void);
+JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFinger(
+        JNIEnv *env, jclass cls, jint phase, jint id, jint x, jint y, jlong time, jboolean last) {
+    (void)env; (void)cls;
+    if (!started) return;
+    int64_t age = (int64_t)(jfgui_host_time_us() / 1000.0) - (int64_t)time;
+    (void)jfgui_finger((uint32_t)phase, (uint32_t)id, x, y, age > 0 ? (uint32_t)age : 0);
+    if (last) jfgui_input(time_ms());
+}
+JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFingerReached(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    return started && jfgui_touch_reached();
 }
 /* "NAME=value" into the app's environment before it starts (LANGUAGE: the system's locales). */
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEnv(

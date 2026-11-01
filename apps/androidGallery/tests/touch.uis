@@ -1,0 +1,434 @@
+#!args --size 390x780 --anim off --theme light --verify-dirty
+# The finger (lib/ui/touch.rs): the pan 1:1 with its direction locked, nested views, sideways, the
+# fling and what stops it, a tap, the long press, widgets that take the finger, no scroll bars, a
+# window moved by finger.  The start page's scroll view is #10, a page's #20 + its number.
+
+# ---- a tap still clicks; the press only comes with the tap
+expect text:"Klicks: 0" exists
+finger down #100
+expect #100 unpressed
+expect #100 nohover
+finger up
+expect text:"Klicks: 1" exists
+tap #101
+expect text:"Klicks: 0" exists
+# the hover of a tap goes
+tap #100
+expect #100 hover
+wait 200
+expect #100 nohover
+tap #101
+
+# ---- the pan: no jump at the slop, then every pixel of the way
+expect #10 value 0
+finger down 195,600
+finger move 195,595
+expect #10 value 0
+# out of the slop: what lies beyond it moves ...
+finger move 195,590
+expect #10 value 2
+# ... and the slop's way is caught up within the next moves
+finger move 195,580
+expect #10 value 17
+finger move 195,570
+expect #10 value 30
+finger move 195,470
+expect #10 value 130
+finger move 195,300
+expect #10 value 300
+# back and over the start: it stops there, nothing rolls past it
+finger move 195,500
+expect #10 value 100
+finger move 195,700
+expect #10 value 0
+finger move 195,600
+expect #10 value 100
+finger up
+expect #10 value 100
+wait 100
+expect #10 value 100
+
+# ---- a swipe: exactly its way when the finger rests before it lifts; the button under it is no click
+swipe 195,700 195,400 400 hold
+expect #10 value 400
+swipe 195,400 195,700 400 hold
+expect #10 value 100
+swipe #100 195,600 300 hold
+expect text:"Klicks: 0" exists
+swipe 195,100 195,700 400 hold
+expect #10 value 0
+
+# ---- direction locked: a vertical start stays vertical, nothing sideways here anyway ...
+finger down 195,500
+finger move 195,450
+expect #10 value 42
+finger move 300,400
+expect #10 value 100
+finger move 100,300
+expect #10 value 200
+finger up
+swipe 195,100 195,700 400 hold
+expect #10 value 0
+# ... and a sideways start on a page that only rolls up and down is no scroll
+swipe 50,500 350,510 300 hold
+expect #10 value 0
+
+# ---- a second finger takes nothing from the first: two fingers are no tap ...
+finger down #100
+finger 1 down 195,650
+finger 1 up
+finger up
+expect text:"Klicks: 0" exists
+wait 200
+# ... the pan goes on with the first; when it lifts, with the other one
+finger down 195,600
+finger move 195,550
+finger move 195,500
+expect #10 value 100
+finger 1 down 300,650
+finger 1 move 300,300
+expect #10 value 100
+finger move 195,480
+expect #10 value 120
+finger up
+expect #10 value 120
+finger 1 move 300,250
+expect #10 value 170
+finger 1 up
+wait 16
+expect #10 value 170
+swipe 195,100 195,700 300 hold
+expect #10 value 0
+# a cancelled finger does not click
+finger down #100
+finger cancel
+expect text:"Klicks: 0" exists
+wait 200
+
+# ---- the fling: on after the finger lifted, slowing down, at last at rest
+flick 195,700 0 -200 80
+expect #10 value 150..210
+wait 100
+expect #10 value 350..800
+wait 3000
+expect #10 value 800..4000
+# ... back: at the start it ends
+flick 195,100 0 500 80
+wait 4000
+flick 195,100 0 500 80
+wait 4000
+expect #10 value 0
+# a finger that rested before it lifted has no speed; a slow one is no fling
+swipe 195,700 195,600 4000
+expect #10 value 100
+wait 500
+expect #10 value 100
+swipe 195,600 195,700 300 hold
+expect #10 value 0
+
+# ---- a touch stops the fling and is no click; held it rolls on
+flick 195,700 0 -300 80
+wait 100
+finger down 195,400
+finger up
+wait 16
+expect #10 value 300..2000
+swipe 195,100 195,700 300 hold
+swipe 195,100 195,700 300 hold
+swipe 195,100 195,700 300 hold
+swipe 195,100 195,700 300 hold
+swipe 195,100 195,700 300 hold
+expect #10 value 0
+flick 195,300 0 -100 80
+wait 16
+# (the first button under the finger now: the touch only stops)
+finger down #100
+finger up
+expect text:"Klicks: 0" exists
+tap #100
+expect text:"Klicks: 1" exists
+tap #101
+swipe 195,100 195,700 300 hold
+expect #10 value 0
+
+# ---- sliders take their own axis, the other one rolls the page
+expect #130 value 40
+flick #130 60 0 300
+expect #130 value 50..70
+flick #130 0 -100 400
+expect #130 value 50..70
+wait 2000
+expect #10 value 100..1000
+swipe 195,100 195,700 300 hold
+swipe 195,100 195,700 300 hold
+expect #10 value 0
+wait 1000
+
+# ---- a press ends when the first finger lifts, the rest does nothing
+expect #10 value 0
+finger down 100,483
+finger move 200,483
+expect #130 value 30..80
+finger 1 down 195,650
+finger up
+expect #130 unpressed
+finger 1 move 195,300
+expect #10 value 0
+finger 1 up
+wait 200
+
+# ---- no scroll bars while the pointer is a finger; a mouse brings them back
+pointer mouse
+move 195,300
+wait 400
+expect pixel 384 100 #868686
+pointer touch
+expect pixel 384 100 #F3F3F3
+# (the bar's place is the page under a finger)
+swipe 384,400 384,300 300 hold
+expect #10 value 100
+swipe 195,100 195,700 300 hold
+
+# ---- nested views: the inner one first, at its end the rest goes to the page
+pointer mouse
+click #900
+click menuitem:"Listen & Bäume"
+pointer touch
+# the virtual list has room: the page stays
+expect #24 value 0
+flick #4000 0 -100 300
+expect #24 value 0
+wait 3000
+expect text:"Eintrag 1" missing
+# a tap selects; in a fling a touch only stops
+flick #4000 0 -100 60
+wait 50
+expect text:"Auswahl: 2   Doppelt getippt: 0" exists
+tap #4000
+expect text:"Auswahl: 2   Doppelt getippt: 0" exists
+wait 2000
+tap #4000
+expect text:"Auswahl: 2   Doppelt getippt: 0" missing
+# a swipe on a row's text rolls the list, the order stays; at its end the rest rolls the page
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+swipe 250,620 250,420 400 hold
+expect #24 value 0
+swipe 250,620 250,420 400 hold
+expect #24 value 64
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+# back: the inner one first again
+swipe 250,400 250,500 400 hold
+expect #24 value 64
+swipe 250,400 250,600 400 hold
+expect #24 value 64
+swipe 250,420 250,700 400 hold
+expect #24 value 0
+# the handle of a row (ui.touch_drag): the finger moves the row, also straight away
+expect text:"Ebene 1" rect 96 430 * *
+swipe 34,440 34,510 500 hold
+expect text:"Reihenfolge: 2 1 3 4 5 6 7 8 9 10 11 12" exists
+expect #24 value 0
+pointer mouse
+key esc
+pointer touch
+
+# ---- sideways: the horizontal view takes it, a vertical swipe on it rolls the page
+pointer mouse
+click #900
+click menuitem:"Container"
+click tab:"Rollen"
+pointer touch
+size 390 240
+expect #25 value 0
+expect #5040 value 0
+expect #5041 missing
+swipe 300,186 100,186 300 hold
+expect #5040 value 200
+expect #25 value 0
+expect text:"Zuletzt: Knopf 0" exists
+# the direction stays locked
+finger down 300,186
+finger move 280,186
+finger move 260,186
+expect #5040 value 240
+finger move 200,120
+expect #5040 value 300
+expect #25 value 0
+finger up
+wait 16
+swipe 200,186 200,100 400 hold
+expect #25 value 1..200
+expect #5040 value 300
+swipe 200,60 200,230 400 hold
+expect #25 value 0
+# a tap on a button of the row clicks
+size 390 400
+swipe 100,186 300,186 300 hold
+swipe 100,186 300,186 300 hold
+expect #5040 value 0
+tap #5052
+expect text:"Zuletzt: Knopf 3" exists
+# a sideways fling; to the end it runs and rests there
+flick 300,186 -200 0 80
+expect #5040 value 150..200
+wait 100
+expect #5040 value 300..800
+wait 3000
+expect #5040 value 800..1800
+# what a widget may ask of a finger (ui.touch_take): only after resting ...
+size 390 500
+expect #5042 value 0
+expect #25 value 0
+flick #5042 80 0 300
+expect #5042 value 0
+expect #25 value 0
+finger down #5042
+wait 500
+finger move 300,0
+finger up
+expect #5042 value 50..100
+# ... a vertical swipe on it rolls what is around it
+# ... a second finger is its own: no press, it can read them
+expect text:"Finger darauf: 0" exists
+finger down #5042
+finger 1 down 195,450
+wait 16
+expect text:"Finger darauf: 2" exists
+finger 1 move 195,440
+finger 1 up
+finger up
+wait 16
+expect text:"Finger darauf: 0" exists
+# only a tap
+expect #5043 value 0
+flick #5043 80 0 300
+expect #5043 value 0
+tap #5043
+expect #5043 value 45..55
+size 390 780
+pointer mouse
+key esc
+pointer touch
+
+# ---- a long press: the context menu, no click
+pointer mouse
+click #900
+click menuitem:"Menüs & Auswahl"
+pointer touch
+longpress #2020
+expect menuitem:"Eigenschaften" exists
+tap menuitem:"Eigenschaften"
+expect menuitem:"Eigenschaften" missing
+expect text:"Letzter Befehl: Eigenschaften" missing
+pointer mouse
+key esc
+pointer touch
+
+# ---- text: a vertical swipe on a field rolls the page, a horizontal one is the field's
+pointer mouse
+click #900
+click menuitem:"Texteingabe"
+pointer touch
+expect #23 value 0
+swipe 383,700 383,500 300 hold
+expect #23 value 200
+expect #3004 exists
+flick #3004 0 -100 300
+expect #23 value 300
+expect #3004 enabled
+flick #3004 60 0 300
+expect #23 value 300
+expect #3004 focused
+pointer mouse
+key esc
+key esc
+pointer touch
+
+# ---- what takes the finger in every direction: on it the page does not roll
+pointer mouse
+click #900
+click menuitem:"Werte & Farben"
+pointer touch
+expect #26 value 0
+swipe 195,700 195,250 300 hold
+expect #26 value 450
+expect #6020 exists
+flick #6020 0 60 300
+expect #26 value 450
+flick #6021 0 -40 300
+expect #26 value 450
+swipe 383,700 383,100 300 hold
+expect #26 value 500..1050
+expect #6030 exists
+pointer mouse
+key esc
+pointer touch
+
+# ---- a window moved by finger in every direction, not out of reach
+pointer mouse
+click #900
+click menuitem:"Fenster & Dialoge"
+click #7000
+expect window 7100 open
+pointer touch
+expect window 7100 rect 24 48 260 272
+window 7100
+swipe 100,14 130,54 300 hold
+window any
+expect window 7100 rect 54 88 260 272
+window 7100
+flick 100,14 -900 -900 300
+window any
+expect window 7100 rect -214 0 260 272
+window 7100
+flick 210,14 900 2000 300
+window any
+expect window 7100 rect 342 732 260 272
+# back; a tap on a title bar does not move it, its widgets work, the close button by finger
+window 7100
+flick 100,14 -300 -700 300
+window any
+expect window 7100 rect 42 32 260 272
+window 7100
+tap 100,14
+tap #7101
+window any
+expect window 7100 rect 42 32 260 272
+expect #7101 value 51
+window 7100
+flick #7101 30 0 300
+window any
+expect #7101 value 60..80
+expect window 7100 rect 42 32 260 272
+window 7100
+tap 245,14
+window any
+expect window 7100 closed
+# a tooltip comes to a resting finger and stays a moment after it lifted
+pointer mouse
+click #7003
+expect window 7500 open
+pointer touch
+window 7500
+finger down #7503
+wait 800
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" exists
+finger up
+wait 500
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" exists
+wait 1500
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" missing
+window any
+close window 7500
+# a modal dialog window too
+pointer mouse
+click #7001
+expect window 7200 modal
+pointer touch
+window 7200
+swipe 100,14 100,64 300 hold
+window any
+expect window 7200 rect 25 286 340 276
+pointer mouse
+window any
+print done

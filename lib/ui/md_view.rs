@@ -1965,6 +1965,7 @@ impl Ui {
         if stflags & ST_DISABLED != 0 {
             hb |= HB_DISABLED;
         }
+        let hit0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
         let ev = self.behave(id, hb);
         let disabled = self.wp.ctx.last_state == SS_DISABLED as u32;
         let focused = !disabled && self.wp.ctx.focus == id;
@@ -1994,6 +1995,15 @@ impl Ui {
             if st.pending != 0 {
                 self.animating = true;
             }
+        }
+        // ---- the finger's way (touch.rs)
+        let (_, pan) = self.pan_take(id);
+        if pan != 0 {
+            st.pending = 0;
+            st.reveal = None;
+            st.follow = false;
+            let p = st.rows.pos() + pan as i64;
+            st.rows.set_pos(p);
         }
         // ---- the visible blocks (laid out; the anchor settles at the end, a range to reveal)
         let mut vis = self.md_walk(st, view_h, cw, drtl, &fc);
@@ -2193,6 +2203,10 @@ impl Ui {
                 }
             }
         }
+        // a finger may roll it (touch.rs)
+        let max = (st.rows.total() - view_h as i64).clamp(0, i32::MAX as i64) as i32;
+        let pos = st.rows.pos().clamp(0, i32::MAX as i64) as i32;
+        self.pan_view(id, hit0, super::touch::AX_V, [0, pos], [0, max]);
         // ---- the focus visual and the record
         self.wp.ctx.last_rect = r;
         if self.focus_ring(ev) && st.link.is_none() {

@@ -188,7 +188,7 @@ export class Shadow {
     }
     for(const n of changed) this.node(this.mirror.wins.get(n.win),n);
     for(const win of structure) if(this.mirror.wins.has(win)) this.arrange(this.mirror.wins.get(win));
-    if(structure.size || changed.length) this.place();
+    this.place(); // (also when only a window moved)
     this.focus(had && !this.root.contains(document.activeElement));
   }
   // the window's element

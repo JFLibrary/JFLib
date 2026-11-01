@@ -410,7 +410,7 @@ impl Ui {
         let (w, h) = (self.dp(256), self.dp(16));
         let r = self.place(w, h);
         self.ltr_begin(r[0], r[2]);
-        let e = self.behave(id.wrapping_add(PART_HUE), HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT);
+        let e = self.behave(id.wrapping_add(PART_HUE), HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT | HB_GRAB_H | HB_GRAB_V);
         ev |= e;
         // keyboard: arrows 1 degree (Shift 10), Home / End the ends
         let (dx, _) = self.cp_keys(e, 10, false);
@@ -443,7 +443,7 @@ impl Ui {
             let (w, h) = (self.dp(256), self.dp(16));
             let r = self.place(w, h);
             self.ltr_begin(r[0], r[2]);
-            let e = self.behave(id.wrapping_add(PART_ALPHA), HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT);
+            let e = self.behave(id.wrapping_add(PART_ALPHA), HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT | HB_GRAB_H | HB_GRAB_V);
             ev |= e;
             // keyboard: arrows 1 of 255 (Shift 16), Home / End the ends
             let (dx, _) = self.cp_keys(e, 1, false);

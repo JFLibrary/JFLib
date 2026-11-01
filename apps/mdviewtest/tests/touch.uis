@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# The finger (lib/ui/touch.rs) on the views with a position of their own: the document (ui.md_view)
+# and ui.vlist roll 1:1 from the slop on, roll on after a quick swipe, have no scroll bars; a
+# touch stops them; a tap on a row selects
+size 1000 720
+theme light
+pointer touch
+# ---- the document
+expect heading:"Listen" rect 29 204 930 39
+swipe 500,600 500,500 300 hold
+expect heading:"Listen" rect 29 104 930 39
+flick 500,600 0 -200 80
+wait 3000
+expect heading:"Listen" missing
+tap 500,100
+# ---- the list
+tap "Liste"
+expect #16777217 rect 12 100 964 52
+expect #16777220 rect 12 256 964 72
+finger down 400,500
+finger move 400,490
+finger move 400,480
+finger move 400,470
+finger move 400,300
+finger up
+expect #16777220 rect 12 56 964 72
+# a tap selects
+tap 400,230
+expect #16777216 value 5..8
+# the fling: on after the finger lifted, far into the list; a touch stops it
+flick 400,600 0 -300 80
+wait 100
+wait 400
+expect #16777217 missing
+expect #16777216 value 5..8
+finger down 400,600
+finger up
+expect #16777216 value 5..8
+wait 500
+expect #16777217 missing

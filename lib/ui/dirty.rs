@@ -437,7 +437,8 @@ impl Ui {
         let allowed = !self.wp.dirty.full && !pending && !apart;
         let mut plan = self.sc_plan(sc, cols, rows, allowed);
         let want = plan.as_ref().is_some_and(|p| self.sc_want(p));
-        let force = self.verify_dirty; // (checked frames copy whenever they can)
+        // (checked frames copy whenever they can, and so does a finger's scroll: touch.rs)
+        let force = self.verify_dirty || self.m.touch.on;
         let (built, copy) = {
             let Ui { wp, drects, .. } = &mut *self;
             let d = &wp.dirty;

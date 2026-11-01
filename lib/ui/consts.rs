@@ -38,6 +38,26 @@ pub const HB_CURSOR_SHIFT: u32 = 12; // cursor shape: flags | CUR_* << HB_CURSOR
 // own (lists, grids, trees: behave gives no EV_ACT for them)
 pub const HB_SPACE: u32 = 0x10000;
 pub const HB_OWNKEYS: u32 = 0x20000;
+// behave only: a finger moving along this axis belongs to the widget, not to the scroll view
+// around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
+pub const HB_GRAB_H: u32 = 0x40000;
+pub const HB_GRAB_V: u32 = 0x80000;
+
+// ------------------------------------------------------------------ the finger (touch.rs)
+// ui.touch_take(flags) after a widget, instead of what its hit box says by itself: TF_V / TF_H a
+// finger moving along this axis is the widget's (not the scroll view's around it); with both the
+// press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
+// resting for the long-press time: a panel that starts to move then, until then the finger goes
+// to what is around it); TF_TWO a second finger is the widget's: no press, no click, it reads
+// ui.touch_fingers (pan and zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing
+// special (the finger rolls what is around it, with nothing to roll it drags the widget).
+pub const TF_V: u32 = 1;
+pub const TF_H: u32 = 2;
+pub const TF_BOTH: u32 = 3;
+pub const TF_HOLD: u32 = 4;
+pub const TF_TWO: u32 = 8;
+pub const TF_SLOP: u32 = 16;
+pub const TF_DECLINE: u32 = 32;
 
 // ------------------------------------------------------------------ semantic kinds and states
 pub const K_BOX: u16 = 0;
@@ -409,6 +429,7 @@ pub const WF_SYSFRAME: u32 = 32;
 pub const WF_NOACTIVATE: u32 = 64;
 pub const WF_AUTOHEIGHT: u32 = 128;
 pub const WF_KEYS: u32 = 256;
+pub const WF_TOUCH_HOLD: u32 = 512; // a finger moves it by the title bar only after resting there (TF_HOLD)
 pub const UWS_OPEN: u32 = 1;
 pub const UWS_VISIBLE: u32 = 2;
 pub const UWS_ACTIVE: u32 = 4;

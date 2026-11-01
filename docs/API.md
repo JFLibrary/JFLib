@@ -158,7 +158,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 **`Ui` methods by area** (signatures and descriptions in the sections below):
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
-- [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `touch_drag`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
+- [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
@@ -489,11 +489,6 @@ natural size.
   ui_take_icon: the pending icon (cleared; for widgets)
 - **`fn last_rect(&self) -> [i32; 4]`**
   ui_last_rect: [x, y, w, h] of the last placed widget (px)
-- **`fn touch_drag(&mut self)`**
-  ui_touch_drag: a finger that starts on the last widget drags it in every direction instead
-  of scrolling the page with a vertical swipe (Android: a colour wheel, a vertical slider, the
-  handle of a row; a horizontal drag always reaches the widget).  Call it after the widget,
-  every frame; the main window only.  Elsewhere nothing happens
 - **`fn box_id(&self) -> u32`**
   ui_box_id: id of the current box (the root box's id at the top level; 0 outside a pass)
 - **`fn box_rect(&self) -> [i32; 4]`**
@@ -3899,7 +3894,17 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
-                  following pointer events
+                  following pointer events (touch: they are a finger, as in the next lines)
+  tap S           a finger: down and up at S, no time between  (touch.rs: the recogniser sees
+                  every finger on the virtual clock)
+  longpress S [MS]   a finger rests MS ms (default 600) on S, then lifts
+  swipe S1 S2 [MS] [hold]   a finger from S1 to S2 at an even speed in MS ms (default 300, a
+                  sample every 8 ms), then it lifts: with its speed (a fling starts; `wait`
+                  runs it), with hold after resting 100 ms (no fling)
+  flick S DX DY [MS]   a quick swipe from S by DX, DY (DIP) in MS ms (default 60)
+  finger [N] down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
+                  down across other commands; N: the finger's id (default 0), for a second one;
+                  cancel: the system took it
   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
@@ -3915,9 +3920,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   sleep()s of async tasks)
   shot FILE.png   render and save a screenshot
   dump [FILE]     print / save the widget tree
-  expect S exists | missing | hover | focused | checked | unchecked | disabled |
-           enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
-           (rect: '*' takes any value)
+  expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
+           enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
+           text "s" |
+           rect X Y W H   (rect: '*' takes any value)
   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
                                 of the last `theme file` contains TEXT
   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -4837,6 +4843,29 @@ HB_CURSOR_SHIFT: u32 = 12  // cursor shape: flags | CUR_* << HB_CURSOR_SHIFT
 // own (lists, grids, trees: behave gives no EV_ACT for them)
 HB_SPACE: u32 = 0x10000
 HB_OWNKEYS: u32 = 0x20000
+// behave only: a finger moving along this axis belongs to the widget, not to the scroll view
+// around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
+HB_GRAB_H: u32 = 0x40000
+HB_GRAB_V: u32 = 0x80000
+```
+
+*the finger (touch.rs)*
+
+```rust
+// ui.touch_take(flags) after a widget, instead of what its hit box says by itself: TF_V / TF_H a
+// finger moving along this axis is the widget's (not the scroll view's around it); with both the
+// press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
+// resting for the long-press time: a panel that starts to move then, until then the finger goes
+// to what is around it); TF_TWO a second finger is the widget's: no press, no click, it reads
+// ui.touch_fingers (pan and zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing
+// special (the finger rolls what is around it, with nothing to roll it drags the widget).
+TF_V: u32 = 1
+TF_H: u32 = 2
+TF_BOTH: u32 = 3
+TF_HOLD: u32 = 4
+TF_TWO: u32 = 8
+TF_SLOP: u32 = 16
+TF_DECLINE: u32 = 32
 ```
 
 *semantic kinds and states*
@@ -5237,6 +5266,7 @@ WF_SYSFRAME: u32 = 32
 WF_NOACTIVATE: u32 = 64
 WF_AUTOHEIGHT: u32 = 128
 WF_KEYS: u32 = 256
+WF_TOUCH_HOLD: u32 = 512  // a finger moves it by the title bar only after resting there (TF_HOLD)
 UWS_OPEN: u32 = 1
 UWS_VISIBLE: u32 = 2
 UWS_ACTIVE: u32 = 4
@@ -9307,6 +9337,88 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
   mono_font_set, else the system's "monospace", else FONT_REG (drawn cell by cell)
 - **`fn terminal(&mut self, id: u32, st: &mut TermState, flags: u32) -> Vec<TermEv>`**
   ui_terminal(id, st, flags) -> events: the console (see the module header)
+
+#### `ui/touch.rs`
+
+Source: [`lib/ui/touch.rs`](../lib/ui/touch.rs)
+
+```text
+touch -- the finger: one gesture recogniser for every host
+
+  touch_takes(ev) -> a raw finger event (pointer data PTR_TOUCH, process_events)
+  touch_input(ev)                 the raw finger: the recogniser's state, events for the widgets
+  touch_tick()                    the clock: the long press, the hover of a resting finger
+  touch_apply()                   run_passes: what the finger and the fling moved, into the views
+  pan_view(...) / pan_take(id)    a view with its own position rolls by finger (vlist, md_view,
+                                  text views, the console)
+  touch_mode() -> the pointer is a finger (no scroll bars)   touch_drag()
+  touch_take(TF_*) a widget takes the finger or declines it   touch_fingers() -> what is down
+
+A host only forwards raw fingers: plat::finger(win, phase, id, x, y, age_ms), or jfgui_finger where
+the windows live in one surface (the Android host: GalleryActivity.java, bridge.c; the browser's
+pointer events: web/loader.js); scripts: swipe, flick, tap, finger, `pointer touch` (auto.rs).  Only
+this file sees them raw.  It knows no platform: all of them behave the same and scripts test it on
+the virtual clock.
+
+Every finger is in a table (touch_fingers).  The first one down drives the gesture.  A second one
+takes nothing from it: while nothing is decided it is no tap any more (no click, no long press);
+when the first one lifts, a pan goes on with the other one, a press ends, the rest waits for the
+last finger to lift.  A widget with TF_TWO gets the second finger for itself: no press, and a pass
+whenever a finger moves, for its own pan and zoom.
+
+The first decision waits until the finger left the slop (ViewConfiguration: 8 DIP) or lifted:
+  - lifted: a tap, press and release at once (no flash when a scroll starts instead);
+  - the widget under the down point takes this direction (grabs: a slider its axis, a colour
+    wheel, the handle of a row, a window's title bar every direction -- those get the press at
+    the touch itself, no slop, unless TF_SLOP or TF_HOLD): press and moves go to the widget like
+    a mouse's;
+  - a scroll view around the down point can move along the dominant axis: the pan.  The chain
+    of views is fixed there (from the hit boxes of the last pass), innermost first: each moves
+    as far as it can, the rest goes to the next.  The axis is locked (a view that scrolls both
+    ways stays free unless the finger starts along an axis: rails);
+  - nothing to roll: press and moves go to the widget after all (TF_DECLINE, TF_HOLD: nothing).
+The pan moves the positions with no smoothing, by the finger's pixels; the slop's travel is
+caught up on the next 16 DIP (half a pixel per finger pixel) or when it lifts: no jump, nothing
+lost.  Lifted
+with speed (least squares over the last 100 ms, as Android's VelocityTracker; 50..8000 DIP/s)
+the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
+and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
+tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
+host give feedback; TF_HOLD: the left button, the drag starts); if it moves after that, the same
+decision.  After the finger left, the hover goes.
+
+With a finger (and at the start on Android, and in a phone's browser) there are no scroll bars:
+no pixels and no hit box in sbar_core, the room they would have stays, so nothing jumps; a mouse
+brings them back.  ui.touch_drag() marks a rectangle whose hit box is someone else's (the handle
+inside a list row); widgets that need the finger say so themselves (HB_GRAB_*, the shape of their
+cursor, touch_grab).
+```
+
+- **`struct Finger`**
+  a finger that is down (ui.touch_fingers): px of the window, logical in a mirrored one
+  - `id: u8` -- the host's number for it, while it is down
+  - `x: i32`
+  - `y: i32`
+  - `down_x: i32` -- where it came down
+  - `down_y: i32`
+  - `time_ms: u32` -- its last sample (ms, as Ui::now)
+
+**`impl Ui`**
+
+- **`fn touch_mode(&self) -> bool`**
+  ui_touch_mode: the pointer is a finger (the last pointer event came from one; on Android and
+  in a phone's browser from the start): the library shows no scroll bars.  A mouse ends it
+- **`fn touch_drag(&mut self)`**
+  ui_touch_drag: a finger that starts on the last widget's rectangle drags in every direction
+  instead of rolling what is around it: for a part of a widget that has no hit box of its own
+  (the handle of a list's row).  Sliders, colour wheels, splitters and the like take the finger
+  by themselves.  Call it after the widget, every frame
+- **`fn touch_take(&mut self, flags: u32)`**
+  ui_touch_take(flags): what the last widget (all hit boxes in its rectangle) wants of a finger,
+  TF_\*, instead of what its hit boxes say by themselves.  Call it after the widget, every frame
+- **`fn touch_fingers(&self) -> Vec<Finger>`**
+  ui_touch_fingers: the fingers down on the live window, the first one first (a widget with
+  TF_TWO gets a pass whenever one moves)
 
 #### `ui/theme_app.rs`
 
@@ -21843,11 +21955,20 @@ Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_
   closes; `UIC_ESCAPE` when nothing took it) instead of ending the activity.  Elsewhere nothing:
   there Esc is a key of its own
 
-- **`fn touch_drag_clear()`**
-  (ui, every pass) no widget takes touch drags yet (ui.touch_drag; Android, jfgui_touch_drag)
+- **`fn touch_primary() -> bool`**
+  (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
+  `pointer: coarse`): no scroll bars from the first frame on; the next pointer event decides again
 
-- **`fn touch_drag_add(r: [i32; 4])`**
-  (ui) a touch that starts in this rectangle (px) drags instead of scrolling (Android)
+- **`fn touch_reached(reached: bool)`**
+  (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):
+  Android asks after the finger lifted whether the keyboard has to follow
+
+- **`fn touch_long_press()`**
+  (ui touch.rs) a finger rested long enough: the host's feedback (Android: performLongClick)
+
+- **`fn reach_clamp(p: [i32; 2], w: i32, screen: [i32; 2], dpi: i32) -> [i32; 2]`**
+  where a window the user moves may be (x, y; w its width; screen the area's size; dpi for the
+  margin): the title bar stays on the screen, at least 48 DIP of the window at each side
 
 - **`struct Event`**
   one platform event (the EV_\* record): type, button, modifiers, window index (0 = the
@@ -28411,7 +28532,13 @@ REQUEST_UNSAVED: u32 = 22
   Drain input in order, deferring expensive rasterization until the batch's next tick.
 
 - **`extern "C" fn jfgui_frame_delay() -> u32`**
-  Idle host scheduling hint. The host must still wake immediately for new input.
+  Idle host scheduling hint (0: the next frame now). The host must still wake immediately for
+  new input.
+
+- **`extern "C" fn jfgui_finger(phase: u32, id: u32, x: i32, y: i32, age_ms: u32) -> u32`**
+  The host's raw finger (crate::finger's job here, where the windows live in one surface): phase 0
+  down, 1 move, 2 up, 3 cancel; id the host's small number of this finger; x, y px of the canvas;
+  age_ms how old the sample is now.  The host calls jfgui_input after a batch.  -> 1 queued
 
 - **`extern "C" fn jfgui_event( typ: u32, button: u32, mods: u32, window: u32, x: i32, y: i32, data: u32, ) -> u32`**
   Enqueue a bounded platform event; pointer/resize events update virtual window routing.
@@ -28622,10 +28749,11 @@ REQUEST_FULLSCREEN: u32 = 23
   own)
 
 - **`fn win_begin_move(id: i32)`**
-  Begin a pointer-driven move of a non-main library window.
+  Begin a pointer-driven move of a non-main library window, from where the pointer went down
+  (a finger may have moved on before the UI knew it is a drag).
 
 - **`fn win_begin_resize(id: i32, edges: u32)`**
-  Begin resizing a library surface inside the browser canvas.
+  Begin resizing a library surface inside the browser canvas, from where the pointer went down.
 
 - **`fn win_size(id: i32) -> (i32, i32)`**
   Physical client dimensions.
@@ -28751,8 +28879,8 @@ web_system -- what the browser / Android host says about the system: the user's 
   dark() -> Option<bool>       (web.rs theme())
   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
-  jfgui_touch_drag(x, y) -> 0|1   (Android) a touch starting here drags in every direction
-                               instead of scrolling with a vertical swipe (ui.touch_drag)
+  jfgui_touch_reached() -> 0|1  (Android) the last finger's gesture reached a widget (a tap, a
+                               drag), not only a scroll: the keyboard may follow it
 
 The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
 the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
@@ -28767,8 +28895,8 @@ into UIC_SUSPEND.
   A notification of tray::notify was clicked (clicked 1) or went away without a click (0)
   -> 1 taken (0: the app has not started).
 
-- **`extern "C" fn jfgui_touch_drag(x: i32, y: i32) -> u32`**
-  (Android) a touch starting at this point (px) drags in every direction -> 1
+- **`extern "C" fn jfgui_touch_reached() -> u32`**
+  (Android) the last finger's gesture reached a widget -> 1
 
 ### `plat/web_sensors.rs`
 
@@ -29295,6 +29423,8 @@ evq -- the platform event ring (shared by every platform and the script runner)
        event: pressure -1 = the device has none (-> 0), else clamped to 1..PRESSURE_ONE;
        type PTR_*; tilts in degrees, clamped to -63..63.  0 for PTR_MOUSE and while pen
        input is off.
+  finger(win, phase, id, x, y, age_ms) -> false when it was dropped: a host's raw finger, any
+       platform (the UI's gesture recogniser takes it: ui/touch.rs); finger_event: its Event
   pen_enable(on)    pen input on (default) / off: off = pens report plain mouse events
   pen_enabled() -> bool
 
@@ -29314,6 +29444,11 @@ PD_PRESSURE: u32 = 0xFFFF  // bits 0..15 pressure 1..PRESSURE_ONE, 0 = none (ful
 PD_TYPE_SHIFT: u32 = 16  // bits 16..17 PTR_*
 PD_TILTX_SHIFT: u32 = 18  // bits 18..24 i7 tilt x in degrees (-63..63, + = right)
 PD_TILTY_SHIFT: u32 = 25  // bits 25..31 i7 tilt y in degrees (+ = towards the user)
+// a finger (finger_event, PTR_TOUCH) has no tilt: bits 18..30 how old the sample was when it was
+// pushed (ms), bit 31 it was cancelled; Event::btn is the finger's id
+PD_AGE_SHIFT: u32 = 18
+PD_AGE_MASK: u32 = 0x1FFF
+PD_CANCEL: u32 = 1 << 31
 PRESSURE_ONE: i32 = 65535
 ```
 
@@ -29334,6 +29469,25 @@ PRESSURE_ONE: i32 = 65535
 
 - **`fn evq_pen_data(pressure: i32, typ: u32, tilt_x: i32, tilt_y: i32) -> u32`**
   Event::data of a pen pointer event (0 for a mouse or while pen input is off)
+
+- **`enum FingerPhase`**
+  what happens to a finger (finger)
+  - `Down`
+  - `Move`
+  - `Up`
+  - `Cancel` -- the system took it: no click, no fling
+
+- **`fn finger_event(win: u8, phase: FingerPhase, id: u8, x: i32, y: i32, age_ms: u32) -> Event`**
+  the Event of a raw finger: E_DOWN / E_MOVE / E_UP with PTR_TOUCH in its data.  id: the host's
+  number of this finger while it is down (a second one has another); age_ms: how old the sample
+  is now (the velocity needs it; 0 when the host does not know)
+
+- **`fn finger(win: u8, phase: FingerPhase, id: u8, x: i32, y: i32, age_ms: u32) -> bool`**
+  A host's raw finger, in px of its window (Event::win as for every pointer event): this is all a
+  platform does for touch; pan, fling, tap, long press and what takes the finger are decided in
+  ui/touch.rs.  Every finger goes through here, in the order they happen; a finger that goes away
+  without an Up gets a Cancel.  The browser and Android, whose windows live in one surface, come
+  through jfgui_finger instead.  -> false when the event was dropped
 
 - **`fn pen_enable(on: bool)`**
   pen input on (default) / off (pens become plain mouse events)

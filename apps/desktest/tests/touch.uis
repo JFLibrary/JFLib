@@ -1,0 +1,54 @@
+# A finger on a resizable tool window (lib/ui/touch.rs, chrome.rs edge_grips): the band at the sides and
+# the bottom is wider than for a pointer, the corners at the bottom too; the title bar (higher for a
+# finger) moves the window; the close button is wide enough
+theme light
+click "Werkzeug"
+expect window 601 open
+system env jfgui_CSD 1
+pointer touch
+wait 16
+expect wm none
+window 601
+# 10 DIP inside the bottom edge: a vertical move there resizes
+flick 131,140 0 30 300
+expect wm resize s
+# 10 DIP inside the right and the left edge: a horizontal move
+flick 252,90 30 0 300
+expect wm resize e
+flick 10,90 -30 0 300
+expect wm resize w
+# the corner at the bottom: at once
+finger down 256,146
+expect wm resize se
+finger up
+wait 200
+# on top the title bar moves the window, all along
+flick 100,6 30 30 300
+window any
+expect wm none
+expect window 601 rect 54 78 260 120
+window 601
+flick 100,34 -30 -30 300
+window any
+expect window 601 rect 24 48 260 120
+# WF_TOUCH_HOLD: the title bar only moves it after the finger rested there; a quick swipe does nothing
+system env jfgui_DESKTEST_HOLD 1
+wait 16
+window 601
+tap 100,20
+window any
+window 601
+flick 100,20 30 30 300
+window any
+expect window 601 rect 24 48 260 120
+window 601
+finger down 100,20
+wait 500
+finger move 130,50
+finger up
+window any
+expect window 601 rect 54 78 260 120
+window 601
+tap 240,20
+window any
+expect window 601 closed
