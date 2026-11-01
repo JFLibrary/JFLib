@@ -30,7 +30,8 @@
 //   win_native(w) -> NativeWindow     (gpu) HWND + HINSTANCE for a GPU surface (lib/gpu); such
 //                                     a window is never given to win_present: without a kept
 //                                     copy WM_PAINT paints nothing and the swapchain's images
-//                                     stay on screen
+//                                     stay on screen.  The UI's windows draw on both: their
+//                                     swapchain lives on a child (win_gpuout.rs)
 //   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
 //   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
 //                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -91,6 +92,9 @@ pub use pen::*;
 #[path = "win_popup.rs"]
 mod popup;
 pub use popup::*;
+#[path = "win_gpuout.rs"]
+mod gpuout;
+pub use gpuout::*;
 #[path = "win_shell.rs"]
 mod shell;
 pub use shell::*;
@@ -519,6 +523,7 @@ struct Ww {
     fs: Cell<bool>,          // (L7) in full screen: the style and placement to go back to
     fs_style: Cell<isize>,
     fs_place: Cell<Placement>,
+    gchild: Cell<isize>,     // (gpu) the child window of the swapchain (win_gpuout.rs; 0 = none)
 }
 
 impl Ww {
@@ -553,6 +558,7 @@ impl Ww {
             fs: Cell::new(false),
             fs_style: Cell::new(0),
             fs_place: Cell::new(PLACEMENT0),
+            gchild: Cell::new(0),
         }
     }
 
@@ -578,6 +584,7 @@ impl Ww {
         self.req.set([0; 4]);
         self.movepend.set(false);
         self.fs.set(false);
+        self.gchild.set(0); // (destroyed with its parent)
         self.kept_free();
     }
 }
@@ -1318,7 +1325,9 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
                 r.min.set(true);
                 return 0;
             }
-            r.min.set(false);
+            if r.min.replace(false) {
+                win_push(E_PAINT, 0, 0, 0, 0); // restored: a window on the GPU shows what it missed
+            }
             let (cw, ch) = ((lp & 0xFFFF) as i32, ((lp >> 16) & 0xFFFF) as i32);
             if cw == r.w.get() && ch == r.h.get() {
                 return 0;
@@ -1619,6 +1628,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
                 r.movepend.set(false);
                 win_push(E_WINPOS, 0, r.px.get(), r.py.get(), 0);
             }
+            win_push(E_PAINT, 0, 0, 0, 0); // wakes the program's loop: a GPU output may continue
             def()
         }
         super::thread::WM_APP_WAKE => {

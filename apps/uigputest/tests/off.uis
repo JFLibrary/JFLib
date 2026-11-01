@@ -1,0 +1,2 @@
+#!args --test off
+# jfgui_GPU=0: the CPU path, nothing of the GPU

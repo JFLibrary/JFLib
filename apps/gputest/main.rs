@@ -16,6 +16,10 @@
 //                    NotReady before they are written
 //        bindless    (Voll) storage buffers and textures indexed from one table; a slot changed
 //                    after the GPU finished
+//        upload      the staging ring (t_upload.rs): small uploads stay in a few chunks, a large
+//                    one's buffer goes back after a second; write_texture_rects (stride, clipping,
+//                    errors), write_buffer across chunks; try_acquire and rebuild on a window (a
+//                    child window too: Surface::native), memory blocks that grow
 //        window      a plat window with a swapchain: FIFO frames (cleared colour + triangles,
 //                    the presented image read back), resize, minimise / restore, IMMEDIATE and
 //                    MAILBOX frame times
@@ -85,6 +89,7 @@ mod t_render;
 mod t_scene;
 mod t_spec;
 mod t_texture;
+mod t_upload;
 mod t_wgsl;
 mod t_wgsl2;
 mod t_wgsl3;
@@ -470,10 +475,11 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 15] = [
+    let tests: [(&str, fn(&mut T)); 16] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
+        ("upload", t_upload::upload),
         ("graphics", t_render::graphics),
         ("indirect", t_render::indirect),
         ("timestamps", t_compute::timestamps),

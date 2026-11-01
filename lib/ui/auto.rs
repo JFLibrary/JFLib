@@ -90,6 +90,9 @@
 //                                 notify; headless runs play none)
 //   expect scrollcopy [N]|none    at least N (default 1) frames / no frame moved pixels by a
 //                                 scroll copy since the last check (scrollcopy.rs)
+//   gpu on|off|wait [MS]|lose|print   gpu expect gpu|cpu|same|window|screen|upload N
+//                                 (Windows, else a SKIP) real windows through the swapchain, every
+//                                 presented image read back and compared (gpu_out.rs)
 //   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
 //                                 script also warns about a widget id used twice in a pass)
 // (K1) Files and clipboard, drag and drop:
@@ -675,12 +678,12 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 44] = [
+        const CMDS: [&str; 45] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
-            "style",
+            "style", "gpu",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -879,6 +882,7 @@ impl Ui {
                     self.fail(b"no such style");
                 }
             }
+            "gpu" => self.sc_gpu(app, a),     // gpu_out.rs
             "perm" => self.sc_perm(app, a),   // auto_perm.rs
             "agent" => self.sc_agent(app, a), // auto_perm.rs
             "inspect" => self.sc_inspect(app, a), // inspect.rs

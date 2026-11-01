@@ -172,6 +172,9 @@ LIBS = {
     # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
     "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
 }
+# what a library crate needs on one target only: G3a, the UI's output through the GPU (the other
+# targets do not link Vulkan code: lib/ui/gpu_out_off.rs)
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -411,8 +414,9 @@ def style_crates():
                            source_crates(entrypoint(RS / "styles" / s, "lib"))) for s in STYLES}
 
 
-def all_libs():
-    d = {name: (resolve_root(RS / root).relative_to(RS).as_posix(), deps)
+def all_libs(target=None):
+    """every library crate -> (root, deps); with a target also what it needs there (TARGET_DEPS)"""
+    d = {name: (resolve_root(RS / root).relative_to(RS).as_posix(), deps + TARGET_DEPS.get((name, target), []))
          for name, (root, deps) in LIBS.items()}
     d.update(local_crates())
     d.update(style_crates())
@@ -951,7 +955,7 @@ class Builder:
         independent ones in parallel (once per run: the app builds that run in parallel find
         them ready)"""
         with self.lib_lock:
-            libs = all_libs()
+            libs = all_libs(self.target)
             need = set()
 
             def add(n):
@@ -1522,7 +1526,7 @@ def dev_command(a):
 def write_ide():
     """rust-project.json: rust-analyzer without Cargo (Windows target)"""
     sysroot = subprocess.run(["rustc", "--print", "sysroot"], capture_output=True, text=True).stdout.strip()
-    libs = all_libs()
+    libs = all_libs("win")
     bins = {f"bin:{a}/{b}": (a, root, kind) for a in apps() for b, root, kind in app_bins(a)}     # app-bins
     names = list(libs) + [f"app:{a}" for a in apps()] + list(bins)
     idx = {n: i for i, n in enumerate(names)}

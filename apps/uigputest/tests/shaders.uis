@@ -1,0 +1,2 @@
+#!args --test shaders
+# the embedded SPIR-V of the output = wgsl::compile of lib/ui/gpu_out.wgsl, word for word

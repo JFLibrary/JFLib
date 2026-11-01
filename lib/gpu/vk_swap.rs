@@ -5,12 +5,19 @@
 //   device.create_swapchain(&surface, &SwapchainDesc) -> Result<Swapchain>
 //        B8G8R8A8 (or R8G8B8A8) UNORM / SRGB, sRGB non-linear colour space; the present mode of
 //        the desc or jfgui_GPU_PRESENT=fifo|mailbox|immediate, FIFO when the surface lacks it;
-//        image count: the surface's minimum + 1; copy_src adds TRANSFER_SRC (read-back)
+//        image count: the surface's minimum + 1 (or SwapchainDesc::min_images); copy_src adds
+//        TRANSFER_SRC (read-back)
 //   sc.acquire() -> Result<Option<Frame>>    None while the window is minimised or has no area;
 //        rebuilds the swapchain first when the window's size changed, the last present said
 //        out-of-date / suboptimal, resize() or set_present_mode() asked for it, or the last frame
 //        was never presented; waits until the frame slot's previous submission is done
 //        (frames_in_flight)
+//   sc.try_acquire() -> Result<TryAcquire>   never waits, never rebuilds: Frame, NotReady (no
+//        image free yet, or the frame slot's previous submission runs), Stale (the window's size
+//        changed, the last present said out-of-date / suboptimal, resize() asked: rebuild() first),
+//        NoArea (minimised)
+//   sc.rebuild()                             what acquire() does when stale (any thread, once
+//        the swapchain has moved there; waits for the queue to be idle)
 //   sc.view(&frame) / texture(&frame)        the image: Layout::Undefined at the start of the
 //        frame's commands, Layout::Present at their end
 //   sc.present(frame, [cmd, ..]) -> Result<SubmitId>   submit (waiting for the image at the
@@ -60,13 +67,27 @@ pub struct Surface(pub(crate) Arc<SurfShared>);
 impl Surface {
     /// the surface of plat window `window` (an index of plat::win_create)
     pub fn new(instance: &Instance, window: i32) -> Result<Surface> {
+        #[cfg(windows)]
+        {
+            let nw = plat::win_native(window).ok_or(GpuError::Invalid("no such window"))?;
+            Surface::native(instance, nw, window)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (instance, window);
+            Err(GpuError::Unsupported("window surfaces on this target"))
+        }
+    }
+
+    /// the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
+    /// whose size and state are those of plat window `window`
+    #[cfg(windows)]
+    pub fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface> {
         let sh = &instance.sh;
         if !sh.surface {
             return Err(GpuError::Unsupported("window surfaces"));
         }
-        #[cfg(windows)]
         {
-            let nw = plat::win_native(window).ok_or(GpuError::Invalid("no such window"))?;
             let create = sh.f.create_win32_surface_khr.ok_or(GpuError::Unsupported("VK_KHR_win32_surface"))?;
             let ci = vk::Win32SurfaceCreateInfoKHR {
                 s_type: vk::STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -82,11 +103,6 @@ impl Surface {
             }
             Ok(Surface(Arc::new(SurfShared { inst: sh.clone(), h, window })))
         }
-        #[cfg(not(windows))]
-        {
-            let _ = window;
-            Err(GpuError::Unsupported("window surfaces on this target"))
-        }
     }
 }
 
@@ -97,6 +113,18 @@ pub struct Frame {
     slot: u32,
     generation: u32,
     size: (u32, u32),
+}
+
+/// what Swapchain::try_acquire found
+#[must_use]
+pub enum TryAcquire {
+    Frame(Frame),
+    /// no image is free yet, or the frame slot's previous submission still runs: try again later
+    NotReady,
+    /// the swapchain does not fit the window any more: Swapchain::rebuild first
+    Stale,
+    /// the window is minimised or has no area
+    NoArea,
 }
 
 impl Frame {
@@ -244,9 +272,9 @@ impl Swapchain {
         // SAFETY: plain query.
         let r = unsafe { caps_fn(sh.pd, surf, &mut caps) };
         sh.vk(r)?;
-        let (ww, wh) = window_size(self.surf.0.window);
         let mut ext = caps.current_extent;
         if ext.width == u32::MAX {
+            let (ww, wh) = window_size(self.surf.0.window);
             ext = vk::Extent2D {
                 width: ww.clamp(caps.min_image_extent.width, caps.max_image_extent.width),
                 height: wh.clamp(caps.min_image_extent.height, caps.max_image_extent.height),
@@ -277,7 +305,7 @@ impl Swapchain {
         }
         modes.truncate(n as usize);
         self.mode = if modes.contains(&present_mode_vk(self.desc.present)) { self.desc.present } else { PresentMode::Fifo };
-        let mut count = caps.min_image_count + 1;
+        let mut count = if self.desc.min_images != 0 { self.desc.min_images.max(caps.min_image_count) } else { caps.min_image_count + 1 };
         if caps.max_image_count != 0 {
             count = count.min(caps.max_image_count);
         }
@@ -357,10 +385,53 @@ impl Swapchain {
         Ok(())
     }
 
-    fn rebuild(&mut self) -> Result<()> {
-        // the old images may still be in use: wait (resizes are rare)
+    /// (re)create the swapchain for the window's size now; the old images may still be in use:
+    /// waits for the queue to be idle (resizes are rare)
+    pub fn rebuild(&mut self) -> Result<()> {
         self.sh.queue_idle()?;
         self.build()
+    }
+
+    /// the next image to draw into, without waiting and without rebuilding (see TryAcquire)
+    pub fn try_acquire(&mut self) -> Result<TryAcquire> {
+        self.sh.check()?;
+        let Some(acq) = self.sh.f.acquire_next_image_khr else {
+            return Err(GpuError::Unsupported("VK_KHR_swapchain"));
+        };
+        if window_minimised(self.surf.0.window) {
+            return Ok(TryAcquire::NoArea);
+        }
+        if self.stale.get() || self.outstanding.get() || self.h == 0 || window_size(self.surf.0.window) != self.extent {
+            self.stale.set(true);
+            return Ok(TryAcquire::Stale);
+        }
+        let k = self.slot.get();
+        let prev = self.slot_value[k as usize].get();
+        if prev != 0 && prev > self.sh.refresh() {
+            self.sh.check()?;
+            return Ok(TryAcquire::NotReady);
+        }
+        let mut image = 0u32;
+        // SAFETY: the slot's semaphore is unsignalled (its last wait completed); no fence.
+        let r = unsafe { acq(self.sh.dev, self.h, 0, self.acquire[k as usize], 0, &mut image) };
+        match r {
+            vk::SUCCESS | vk::SUBOPTIMAL_KHR => {
+                if r == vk::SUBOPTIMAL_KHR {
+                    self.stale.set(true);
+                }
+                self.outstanding.set(true);
+                Ok(TryAcquire::Frame(Frame { image, slot: k, generation: self.generation, size: self.extent }))
+            }
+            vk::ERROR_OUT_OF_DATE_KHR => {
+                self.stale.set(true);
+                Ok(TryAcquire::Stale)
+            }
+            vk::TIMEOUT | vk::NOT_READY => Ok(TryAcquire::NotReady),
+            _ => {
+                self.sh.vk(r)?;
+                Ok(TryAcquire::NotReady)
+            }
+        }
     }
 
     /// the next image to draw into; None while the window is minimised or has no area

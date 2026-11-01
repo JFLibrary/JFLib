@@ -138,6 +138,14 @@ mod hotreload;
 mod hyph;
 pub mod i18n;
 mod ids;
+// the output through a swapchain: Windows, its windows only (docs/GPU.md "Ausgabe der UI")
+#[cfg(windows)]
+mod gpu_out;
+#[cfg(not(windows))]
+#[path = "gpu_out_off.rs"]
+mod gpu_out;
+#[cfg(windows)]
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_VS, GPU_OUT_WGSL};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
 // ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
@@ -224,7 +232,7 @@ pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData};
 pub use popup::{Command, Mi}; // ui-popup: the command table and menu records
 pub use ribbon::{RibbonGroup, RibbonGroupMode, RibbonLayout, RibbonMetrics, RibbonSample};
-pub use runtime::{Runtime, launch, run};
+pub use runtime::{Runtime, launch, run, run_window};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};
 pub use chart::{BarSeries, DonutSlice};
@@ -436,6 +444,42 @@ pub(crate) struct Mods {
     pub(crate) rpar: render_par::S,
     /// (L7) the window areas (desk.rs)
     pub(crate) desk: desk::S,
+    /// (G3a) the output through a swapchain (gpu_out.rs)
+    pub(crate) gout: gpu_out::S,
+}
+
+/// what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
+/// tests and measurements
+#[derive(Clone, Debug, Default)]
+pub struct GpuOutput {
+    /// the output is switched on for this run (jfgui_GPU, the `gpu on` of a script)
+    pub wanted: bool,
+    /// the window's frames go through its swapchain now
+    pub on: bool,
+    /// its swapchain is being built
+    pub building: bool,
+    /// a frame waits for a free image, or for the window to come back
+    pub pending: bool,
+    /// no output in this run: no Vulkan, no usable adapter or surface, this target
+    pub never: bool,
+    /// the adapter (empty: none yet) and the present mode in use
+    pub adapter: alloc::string::String,
+    pub present_mode: &'static str,
+    /// what the last failure said (None: the last switch went well)
+    pub error: Option<alloc::string::String>,
+    /// bytes of GPU and staging memory the device holds in blocks
+    pub reserved: u64,
+    /// frames presented through the swapchain / the CPU path
+    pub frames: u64,
+    pub cpu_frames: u64,
+    /// bytes uploaded to the window's texture
+    pub upload_bytes: u64,
+    /// switches to the swapchain, and back to the CPU path
+    pub switches: u32,
+    pub leaves: u32,
+    /// jfgui_GPU_VERIFY: images read back and compared, those that differed
+    pub verified: u64,
+    pub verify_bad: u64,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

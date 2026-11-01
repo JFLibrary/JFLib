@@ -9,7 +9,8 @@ Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird p
 Stand (G1a): Vulkan unter Windows. `vulkan-1.dll` wird zur Laufzeit geladen, das Programm
 startet also auch auf Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
 Vulkan unter Linux und Android, WebGPU im Browser, später Metal -- mit denselben Typen und
-Methoden. Die Oberfläche rastert weiter auf der CPU; ihre Darstellung über die GPU folgt mit G3.
+Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows kann die GPU das Ergebnis zeigen
+(G3a, [Ausgabe der UI](#ausgabe-der-ui), noch mit `jfgui_GPU=1` einzuschalten).
 
 | Teil | Wo |
 | --- | --- |
@@ -21,8 +22,9 @@ Methoden. Die Oberfläche rastert weiter auf der CPU; ihre Darstellung über die
 | Befehle aufzeichnen | [`lib/gpu/vk_cmd.rs`](../lib/gpu/vk_cmd.rs) |
 | Fensterflächen und Swapchains | [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
-| Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)) |
-| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs) |
+| Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
+| Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
+| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis) |
 
 ## Ein Beispiel
 
@@ -60,11 +62,13 @@ rb.read(0, &mut out)?;
 ## API-Überblick
 
 - **Instanz und Adapter**: `Instance::new()` / `with(&InstanceDesc)`, `adapters()` (alle GPUs,
-  diskrete zuerst; `AdapterInfo::missing` nennt, warum eine unbrauchbar ist), `adapter()`.
+  diskrete zuerst; `AdapterInfo::missing` nennt, warum eine unbrauchbar ist), `adapter()`,
+  `adapters_low_power(display)` (für die Ausgabe der UI; `low_power_rank`).
   `AdapterInfo`: Name, Hersteller, Gerätekennung, Art, Treibername und -version, API-Version.
-  `adapter.features()`, `limits()`, `level()`, `create_device(&DeviceDesc)`.
+  `adapter.features()`, `limits()`, `level()`, `can_present(&surface)`,
+  `create_device(&DeviceDesc)`.
 - **Gerät**: `queue()`, `features()`, `limits()`, `level()`, `wait(id, timeout_ns)`,
-  `wait_idle()`, `poll()`, `completed()`, `is_lost()`, `memory_reserved()`, `test_lose()`
+  `wait_idle()`, `poll()`, `completed()`, `is_done(id)`, `is_lost()`, `memory_reserved()`, `test_lose()`
   (Testhilfe).
 - **Ressourcen**: `create_buffer` (`MemoryKind::Device` / `Upload` / `Readback`; die beiden
   letzten sind dauerhaft abgebildet: `write`, `read`), `create_texture` (2D, 2D-Array, Würfel,
@@ -93,15 +97,18 @@ rb.read(0, &mut out)?;
   `draw_indexed_indirect`; auf Voll `draw_indexed_indirect_multi` und
   `draw_indexed_indirect_count`), Zeitstempel (`reset_timestamps`, `timestamp`); `finish()`.
 - **Warteschlange**: `submit([cmd, ..])` gibt eine `SubmitId` (Zeitleisten-Semaphor);
-  `write_buffer` und `write_texture` werden über Staging-Speicher vor der nächsten Übergabe
+  `write_buffer`, `write_texture` und `write_texture_rects` (Rechtecke eines Bildes mit eigener
+  Zeilenlänge, ein Übergang für alle) werden über den Staging-Ring vor der nächsten Übergabe
   ausgeführt; `read_buffer` (kopiert, übergibt und wartet: der langsame Weg für Werkzeuge und
   Tests); `flush()`.
 - **Zeitstempel**: `create_timestamps(n)`, `read_ticks`, `read_ms` (Millisekunden seit dem
   ersten gelesenen Zeitstempel des Geräts, damit `f64` jeden Takt behält); `Err(NotReady)`,
   solange nicht alle geschrieben und fertig sind.
-- **Fenster**: `Surface::new(&instance, plat_fenster)`, `create_swapchain(&surface,
-  &SwapchainDesc)`, `acquire()` (`None`, solange das Fenster minimiert ist oder keine Fläche
-  hat), `view(&frame)`, `texture(&frame)`, `present(frame, [cmd, ..])`, `resize()`,
+- **Fenster**: `Surface::new(&instance, plat_fenster)`, `Surface::native(&instance, griffe,
+  plat_fenster)` (ein Kindfenster), `create_swapchain(&surface, &SwapchainDesc)`, `acquire()`
+  (`None`, solange das Fenster minimiert ist oder keine Fläche hat), `try_acquire()` (wartet nie,
+  baut nie neu: `Frame`, `NotReady`, `Stale`, `NoArea`), `rebuild()` (auch auf einem anderen
+  Thread), `view(&frame)`, `texture(&frame)`, `present(frame, [cmd, ..])`, `resize()`,
   `set_present_mode(m)`, `size()`, `format()`, `present_mode()`.
 
 ## Konventionen
@@ -200,8 +207,14 @@ späteren Aufruf `DeviceLost`; dann das `Device` fallen lassen und vom Adapter e
 ## Speicher und Lebensdauer
 
 Ein einfacher Unterverteiler: pro Speichertyp und Belegungsart (Puffer / optimale Texturen)
-Blöcke von 64 MiB Gerätespeicher oder 16 MiB Host-Speicher, Anforderungen über einem halben
-Block bekommen einen eigenen Block; freie Bereiche werden zusammengelegt. Ressourcen sind
+Blöcke, die wachsen (Gerätespeicher 4 MiB, dann das Doppelte bis 64 MiB; Host-Speicher 1 MiB bis
+16 MiB), Anforderungen über einem Achtel des größten Blocks bekommen einen eigenen Block, der mit
+ihnen wieder geht; freie Bereiche werden zusammengelegt. Ein Programm mit einem kleinen Fenster
+reserviert so wenige MiB statt 80. Uploads laufen über einen Staging-Ring: Stücke von 256 KiB,
+von vorn nach hinten gefüllt, über Übergaben hinweg; ein volles Stück ist wieder frei, sobald die
+GPU die letzte Übergabe erledigt hat, die daraus liest (zwei bleiben frei liegen). Ein Upload über
+einem halben Stück bekommt einen eigenen Puffer, den der nächste passende wieder nimmt und der eine
+Sekunde nach dem letzten zurückgeht (`Device::poll`). Ressourcen sind
 referenzgezählte Griffe. Ein Befehlskodierer leiht, was er aufzeichnet; eine fallen gelassene
 Ressource wird zerstört, sobald die GPU alle Übergaben vor dem Fallenlassen erledigt hat (die
 Zeitleiste des Geräts). Die CPU wartet nur, wenn man es verlangt (`wait`, `read_buffer`,
@@ -214,8 +227,8 @@ mit eigener Ereignisschleife (`plat::wait`, `plat::evq_pop`) führt und **nie an
 `plat::win_present` gibt**. So malt die CPU-Darstellung nichts darüber: ohne eine behaltene Kopie
 malt `WM_PAINT` nichts, `WM_ERASEBKGND` löscht nichts, die Fensterklasse hat keinen Pinsel.
 Dafür war nur ein Zugriff auf die Fenster-Handles nötig: `plat::win_native(w)` liefert HWND und
-HINSTANCE für `VK_KHR_win32_surface`. Die UI-Fenster von `lib/ui` stellen weiter über die CPU
-dar; das ändert G3.
+HINSTANCE für `VK_KHR_win32_surface`. Die UI-Fenster von `lib/ui` stellen über beide Wege dar: ihre
+Swapchain liegt auf einem Kindfenster ([Ausgabe der UI](#ausgabe-der-ui)).
 
 Darstellungsmodi: `Fifo` (V-Sync, immer vorhanden, Standard), `Mailbox`, `Immediate` (für
 Messungen); fehlt einer, wird `Fifo` genommen. Die Swapchain wird beim nächsten `acquire()` neu
@@ -225,11 +238,179 @@ dargestellt wurde; vorher wartet sie, bis die Warteschlange leer ist. Minimiert 
 `acquire()` `None`. Mit `SwapchainDesc::copy_src` lassen sich die dargestellten Bilder
 zurücklesen.
 
+## Ausgabe der UI
+
+Die UI rastert weiter auf der CPU und bleibt pixelgleich; der Framebuffer ist die Wahrheit. Unter
+Windows kann die GPU ihn zeigen ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a): die
+Änderungsrechtecke, die die Laufzeit ohnehin berechnet, gehen in eine Textur je Fenster, ein
+Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
+Gerät. **Standardmäßig ist das aus; `jfgui_GPU=1` schaltet es ein** (unten: warum). `jfgui_GPU=0`
+schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
+Skript verlangt mit `gpu on` anderes. Andere Ziele linken nichts davon
+(`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
+
+**Der Weg eines Fensters.**
+
+| Stufe | Was geschieht |
+| --- | --- |
+| CPU | `plat::win_present` wie ohne GPU. Das erste Bild jedes Programms geht so |
+| Job | Instanz, Gerät, Pipeline und Swapchain entstehen auf einem Hilfsthread, der erst nach dem ersten Bild startet und danach endet. Die CPU zeichnet weiter |
+| Wechsel | der ganze Framebuffer in die Textur, ein `present` auf dem verborgenen Kindfenster, dann das Kindfenster zeigen und die Kopie für `WM_PAINT` freigeben |
+| GPU | je Bild: Rechtecke hochladen, `try_acquire`, zeichnen, `present` |
+| zurück | bei neuer Größe oder einem Fehler erst das Bild über den CPU-Pfad zeigen, dann das Kindfenster verbergen; keine Lücke, kein falsches Bild |
+
+**Das Kindfenster.** Hat eine Swapchain auf einem Fenster dargestellt, bleibt GDI dort unsichtbar,
+auch nachdem Swapchain und Fläche zerstört sind, nach `WM_PAINT`, neuer Größe und Aus- und
+Einblenden: DWM zeigt weiter das letzte Bild (hier gemessen, `uigputest --test hwnd` druckt es).
+Von der GPU zurück auf denselben HWND geht also nicht. Deshalb lebt die Swapchain auf einem
+Kindfenster, das den Client-Bereich bedeckt (`plat::win_gpu_child`, `lib/plat/win_gpuout.rs`:
+`WS_CHILD | WS_DISABLED`, `HTTRANSPARENT`, zeichnet nie selbst, nimmt keine Eingaben; der
+Hit-Test mit dem Größenrand des Fensters läuft weiter im Elternfenster). Das Hauptfenster bleibt
+sein Leben lang der CPU-Pfad: Kindfenster verborgen = sofort, was GDI zuletzt gezeichnet hat.
+Ein Kindfenster, das gezeigt wird, bevor sein `present` den Bildschirm erreicht, zeigt das
+Elternfenster durch: dieselben Pixel, kein Blitzen. `gpu expect screen` und die Prüfungen von
+`uigputest` lesen dafür den zusammengesetzten Bildschirm.
+
+**Größe ändern.** Jedes Bild einer Größenänderung ist ein CPU-Bild, auch in der modalen Schleife:
+GDI zeichnet, bevor `SetWindowPos` zurückkehrt, also hinkt nichts dem Rahmen hinterher (eine
+Swapchain käme ein bis zwei Bilder später: gestreckte Bilder oder Lücken). Sobald die Größe 100 ms
+steht und die modale Schleife zu Ende ist, baut der Hilfsthread die Swapchain neu (etwa 10 ms, das Fenster bleibt so lange auf dem CPU-Pfad) und
+das Fenster wechselt zurück. Dasselbe bei Maximieren, Einrasten, Vollbild und DPI-Wechsel. Beim
+Verschieben, auch auf einen anderen Monitor, geschieht nichts: das Kindfenster fährt mit.
+
+**Warten.** Ein `present` wartet nie: `Swapchain::try_acquire` gibt `NotReady`, wenn kein Bild frei
+ist; das Bild bleibt in der Textur und kommt mit `gp_tick` (die Fensterschleife schaut nach 2 ms)
+oder dem nächsten Bild. Bilder im Abstand unter 4 ms warten ebenso (zu sehen ist davon nichts, die
+GPU muss es nicht zeichnen). Darstellungsmodus: MAILBOX (fehlt er: FIFO), zwei Bilder.
+
+**Leerlauf.** Kein Thread von uns, kein Timer, kein Bild. Minimierte Fenster laden nichts hoch und
+bekommen beim Wiederherstellen das ganze Bild. Ein blinkender Cursor kostet ein kleines Hochladen
+(4 KiB je Blinken) und einmal den Fensterinhalt zeichnen.
+
+**Hochladen.** Der Staging-Ring von `lib/gpu` (Kapitel „Speicher und Lebensdauer“): ein Bild kleiner
+Rechtecke kostet, was sie enthalten, und keinen neuen Puffer; ein ganzes Bild bekommt einen
+eigenen, der eine Sekunde nach dem letzten zurückgeht.
+
+**Pixelgleichheit.** UNORM-Format, `COMPOSITE_ALPHA_OPAQUE`, keine sRGB-Umwandlung, der
+Fragment-Shader holt das Texel mit `textureLoad` (kein Filter) und setzt Alpha auf 1 (das vierte Byte
+des XRGB-Framebuffers bedeutet nichts). `jfgui_GPU_VERIFY=1` liest jedes dargestellte Bild zurück
+(`SwapchainDesc::copy_src`) und vergleicht es Byte für Byte; `apps/gallery/tests/gpu_output.uis` tut
+das auf Galerie-Seiten nach Teil-Updates, Scroll-Kopien, neuen Größen, DPI- und Themenwechsel, mit
+einem zweiten Fenster und nach einem verlorenen Gerät, und vergleicht den zusammengesetzten
+Bildschirm mit dem Framebuffer (gleich bis auf die vom System gerundeten Fensterecken). Maximiert
+sind Bildschirm mit CPU- und GPU-Pfad gleich bis auf die Uhr der Taskleiste.
+
+**Adapter.** `instance.adapters_low_power(display)`: nur integrierte und diskrete GPUs (eine
+CPU- oder virtuelle ist kein Gewinn gegenüber dem CPU-Pfad), der Adapter, der den Monitor des Fensters
+betreibt, zuerst (`plat::win_display_adapter`: `EnumDisplayDevices`, PCI-Kennung; er ist ohnehin wach und
+braucht keine Kopie zwischen GPUs), integrierte vor diskreten. `jfgui_GPU_ADAPTER` gilt auch hier.
+Programme, die eine GPU für sich wollen, nehmen weiter `instance.adapter()` (diskrete zuerst). Hier
+gibt es nur eine GPU; die Rangfolge prüft `uigputest --test adapter` als Tabelle. Ob schon das Aufzählen
+der Adapter eine schlafende diskrete GPU weckt (der Treiber wird geladen), ist auf einem Laptop noch zu messen.
+
+**Fehler.** Kein Vulkan, kein brauchbarer Adapter oder keine Fläche, ein Start in einer
+Remote-Desktop-Sitzung: CPU-Pfad für den ganzen Lauf, ohne Meldung. Gerät verloren oder ein anderer
+Fehler: alle Fenster mit dem Framebuffer zurück auf den CPU-Pfad, ein neues Gerät nach 2 s, 4 s, ...
+5 min (ist die Sitzung inzwischen eine Remote-Desktop-Sitzung, wird alle 10 s wieder geprüft).
+
+**Fensterarten.**
+
+| Fenster | Weg |
+| --- | --- |
+| Hauptfenster, auch mit eigener Titelleiste (`AF_CUSTOM_TITLEBAR`), maximiert, Vollbild | Swapchain |
+| Zweitfenster (`window_begin`), Dialoge, Werkzeugfenster | Swapchain, gleiches Gerät |
+| Popups und Tooltips außerhalb des Fensters (`plat::popup`: `WS_POPUP`, Fensterregion, `CS_DROPSHADOW`, oft nur für Augenblicke) | bleiben CPU: eine Swapchain dauert länger als viele von ihnen leben; sie liegen über dem Elternfenster und seinem Kind |
+| Popups und Menüs im Fenster | Teil des Framebuffers |
+| Überlagerung des Farbwählers, der Bildschirmaufnahme | bleiben CPU |
+
+Schatten und runde Ecken macht DWM am Hauptfenster, sie gelten auch für das Kind (auf dem Bildschirm
+geprüft).
+
+**Shader.** WGSL in [`lib/ui/gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), vorübersetzt in
+[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 250 Wörter): UI-Programme linken `lib/wgsl`
+nicht. `uigputest --test shaders` vergleicht die Wörter mit `wgsl::compile`, `uigputest --gen-shaders
+lib/ui/gpu_out_spv.rs` schreibt sie neu.
+
+**Tests.** `apps/gallery/tests/gpu_output.uis` (das Skriptkommando `gpu`, GUIDE §12) und
+`apps/uigputest` (nur Windows; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
+`switch`, `resize`, `minimize`, `dpi`, `windows`, `off`, `noloader`, `lose`, `idle`, `csd`, `monitors`, `shaders`,
+`adapter`, `hwnd`. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
+zurückgelesen; ohne GPU `SKIP`; liegt ein anderes Fenster über dem Testfenster, ist die Prüfung des
+Bildschirms ein Hinweis statt eines Fehlers. Maximieren und Vollbild aktivieren das Fenster, deshalb tut das
+kein Test mehr; eine frühere Fassung von `csd` hat beides einmal geprüft. `gputest --test upload` prüft Ring, `write_texture_rects` und
+`try_acquire`.
+
+### Messungen
+
+GeForce RTX 2070 SUPER, Treiber 610.88, Ryzen 5 3600, zwei 1080p-Monitore mit 165 Hz, Windows 11,
+Release-Builds, Konfigurationen abwechselnd, Mediane der Läufe. Parallel bauten andere Sitzungen. „Vorher“ ist der Stand vor G3a, „aus“ dieser Stand mit `jfgui_GPU=0`, „an“ mit
+`jfgui_GPU=1`. Die Werkzeuge waren Python-Skripte (`ctypes`, kein Teil des Repos), die echte Fenster starten und den
+Bildschirm mit `BitBlt` lesen; `uigputest --bench latency|idle|caret` ist der Teil im Repo.
+
+| Messung | vorher / CPU-Pfad | GPU-Pfad | wie |
+| --- | ---: | ---: | --- |
+| Prozessstart → das Bild steht auf dem Bildschirm (gallery 1200 × 800, mit DWMs Einblenden) | vorher 170 ms (153–304), aus 165 ms (144–400) | 170 ms (149–434) | 15 Läufe je Variante, Bildschirm gelesen; kein Unterschied |
+| Erstes Bild → Swapchain zeigt | – | 510–580 ms; Instanz 360–430, Adapter 3–5, Gerät 78–90, Swapchain + Textur 38–42, Pipeline 2 (Hilfsthread); der Wechsel auf dem UI-Thread 5–7 ms | 3 Läufe, `jfgui_GPU_TRACE=1` |
+| Blitzen beim Wechsel | – | 0 falsche von 127–154 Bildschirmstreifen | `uigputest --test switch` |
+| `WM_CLOSE` → Fenster weg / Prozess weg | vorher 1,9 / 12 ms, aus 1,9 / 14 ms | 0,4 / 114 ms (der Treiber beim Prozessende; das Fenster geht vorher) | 7 Läufe |
+| Ereignis → `present` zurück, kleiner Fleck (200 × 40), Median (p95) | 0,29 ms (1,06) | MAILBOX 0,74 ms (1,50), FIFO 0,44 ms (0,98) | 3 Läufe zu je 120 Tastendrücken, 15–30 ms Abstand |
+| Ereignis → `present` zurück, ganzes Bild (1280 × 800) | 1,88 ms (2,99) | MAILBOX 1,67 ms (2,56), FIFO 1,37 ms (1,87) | ebenso |
+| Ereignis → Bildschirm, kleiner Fleck | 6,5 ms (12,2) | MAILBOX 9,7 ms (12,7), FIFO 7,0 ms (11,9) | ebenso; ein Thread liest den Bildschirm |
+| Ereignis → Bildschirm, ganzes Bild | 9,8 ms (16,1) | MAILBOX 7,7 ms (12,9), FIFO 10,2 ms (17,5) | ebenso |
+| Dauerfeuer: Alter des gezeigten Bildes, Median (p95) | 4,5 ms (6,1) | MAILBOX 3,2 ms (5,6), IMMEDIATE 3,2 ms (5,3), **FIFO 33,5 ms (34,3)** | 3 Läufe zu je 6000 Tastendrücken ohne Pause; die Farbe des Flecks ist seine Nummer |
+| Dauerfeuer: Ereignis → `present` zurück | 0,14 ms | 0,08 ms (die meisten Bilder warten auf das nächste) | ebenso |
+| Größenänderung, modale Schleife | keine schwarzen Flächen | keine schwarzen Flächen; die Bilder der Schleife sind CPU-Bilder. Der einmalige Wechsel zurück 2,5–3,7 ms | je 1 Lauf mit `SC_SIZE` und Pfeiltasten, 39 und 48 Bildschirmaufnahmen, angesehen |
+| Maximiert, fertiges Bild | | gleich dem CPU-Pfad bis auf 131 Pixel der Taskleistenuhr | Bildschirmaufnahmen verglichen |
+| Leerlauf, CPU-Zeit | 0 ms in 30 s, 5 Threads | 47 ms in 30 s (1,6 ms/s), 19 Threads, alles in `nvoglv64.dll`; ein zweiter Lauf 5 ms/s. Ein Treiberthread wacht rund 150-mal je Sekunde auf | je 1 Lauf; `GetThreadTimes` zählt in Schritten von 15,6 ms |
+| Leerlauf, GPU-Zeit und Bilder | – | 0 ms, kein Bild | Leistungszähler `GPU Engine`, `Ui::gpu_output` |
+| Blinkender Cursor (1280 × 800) | – | 4 KiB je Blinken; GPU 159 ms in 15 s bei 28 Bildern (Zähler von Windows, grob); ein Bild für jedes Blinken, nichts dazwischen | je 1 Lauf |
+| Speicher, gallery 1200 × 800: Working Set / privat | vorher 20,5 / 10,5 MiB, aus 20,6 / 10,5 MiB | 67,7 / 68,1 MiB | 3 Läufe; der Anteil des Treibers: +47 / +58 MiB |
+| GPU-Speicher | 0 | 27,0 MiB dediziert + 14,9 MiB geteilt; davon 3 × 3,7 MiB die Bilder (zwei der Swapchain, die Textur), `memory_reserved()` 5–6 MiB | 3 Läufe, Zähler `GPU Process Memory` |
+| Größe der Programme, Release | gallery 3 877 376, Kritzel 4 038 144, PaintCraft 8 348 160 Byte | +186 880, +186 880, +186 368 Byte (`jfgui_GPU` ändert daran nichts) | |
+| Andere Ziele | gallery Linux 4 398 528 Byte, Browser (threads) 3 464 579 Byte | +240 und +465 Byte (das Skriptkommando), keine Vulkan-Zeichenkette im Programm | |
+
+Die Läufe zu Start, Ende, Latenz und Dauerfeuer liefen vor der Regel „höchstens drei Runden“ und mit
+Prozesspriorität hoch; sie sind nicht wiederholt worden. Beim Ereignis → Bildschirm streuen die
+Mediane zwischen zwei Messreihen um 1–3 ms bei 6 ms Bildabstand, und andere Sitzungen belasteten den
+Rechner. Das Ergebnis lautet deshalb: **kein erkennbarer Unterschied** zwischen CPU-Pfad und MAILBOX, weder
+beim Fleck (dort CPU vorn) noch beim ganzen Bild (dort GPU vorn). Das Lesen des Bildschirms wartet selbst
+auf DWM und misst nicht bis zum Licht. Unter Dauerfeuer entscheidet die Messung: FIFO läuft fünf
+Bildwechsel hinterher, deshalb MAILBOX. Ein 60-Hz-Monitor war nicht zur Hand.
+
+**Warum es aus bleibt.** Startzeit, Latenz und Größenänderung sind so gut wie auf dem CPU-Pfad,
+der Leerlauf nicht: die Treiberthreads kosten 1,6–5 ms CPU je Sekunde und wecken den Rechner, der CPU-Pfad nichts. Von uns läuft dabei nichts, abstellen ließe es sich nur, indem das Gerät im Leerlauf wegginge (ein neues dauert eine halbe Sekunde). Dazu kommen 47 MiB Working Set, 58 MiB privater und 42 MiB GPU-Speicher je Programm sowie 100 ms beim Prozessende ; dem steht bis G3b kein Gewinn gegenüber, den man
+sehen könnte. Sobald Ebenen und Bilder als GPU-Texturen (G3b) und Leinwände (G3c) etwas einbringen, ist neu zu
+entscheiden. Die Größe der Programme wächst in jedem Fall.
+
+### Was fehlt, und was G3b und G3c hieraus nehmen
+
+- Nur eine Ebene: `show` zeichnet ein Dreieck aus einer Textur. G3b zeichnet stattdessen mehrere
+  Texturen (Grund, Dialog, Popup, Tooltip) und `Cmd::Image` hierher; die Bind-Group-Struktur und der
+  Render-Durchgang bleiben. G3c hängt Leinwände mit eigener Transformation in denselben Durchgang.
+  Beides kann auf denselben Wegen zurück auf den CPU-Pfad.
+- Kein teilweises Zeichnen in die Swapchain (`VK_KHR_incremental_present`): jedes Bild zeichnet das
+  ganze Fenster, auch für ein Blinken. Billig, aber nicht nichts auf einer schwachen GPU.
+- Scroll-Kopien laufen im Framebuffer; die Textur bekommt die verschobenen Zellen neu (die GPU könnte sie
+  selbst verschieben).
+- Der Framebuffer wird einmal in den Staging-Puffer kopiert (der Weg ohne Kopie:
+  `VK_EXT_external_memory_host`, verlangt Warten auf die GPU).
+- Nicht getestet: ein Laptop mit zwei GPUs, AMD und Intel, Monitore an verschiedenen GPUs (die Swapchain
+  bleibt auf ihrem Adapter, DWM kopiert), ein echter Treiber-Reset (`test_lose` spielt ihn nur vor),
+  Bildschirmsperre und Remote Desktop im laufenden Betrieb, HDR, Bildschirmleser mit Treffertest auf dem Kindfenster.
+- Was das Fenster-DC liest (`plat::win_test_image`, Werkzeuge wie `tools/wincap.py`), sieht im GPU-Betrieb
+  das letzte CPU-Bild; Aufnahmen über den Bildschirm oder Windows Graphics Capture sehen das richtige.
+- `VK_KHR_present_wait` fehlt in `lib/gpu`; „bis auf dem Bildschirm“ ist deshalb mit dem Lesen des
+  Bildschirms gemessen, das selbst auf DWM wartet.
+
 ## Umgebungsvariablen
 
 | Variable | Wirkung |
 | --- | --- |
-| `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)` |
+| `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
+| `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)) |
+| `jfgui_GPU_VERIFY=1` | die UI-Ausgabe liest jedes dargestellte Bild zurück und vergleicht es mit dem Framebuffer (langsam, zum Testen) |
+| `jfgui_GPU_TRACE=1` | die UI-Ausgabe schreibt ihre Schritte und Zeiten auf stderr |
+| `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
 | `jfgui_GPU_PRESENT=fifo\|mailbox\|immediate` | Darstellungsmodus jeder neuen Swapchain |
@@ -272,6 +453,7 @@ für Messungen den Configurator ausschalten.
 | `info.uis` | Adapter, Treiber, API-Version, Stufe, Features, Limits; ein auf Basis begrenztes Gerät |
 | `compute.uis` | Rechen-Shader schreibt f(i) in einen Speicherpuffer, 1000 und 1M Elemente, die Elemente dahinter unberührt; `write_buffer` / `read_buffer` |
 | `copies.uis` | Puffer → Textur → Puffer mit aufgefüllten Zeilen; `write_texture` in jede Mip-Stufe und Schicht eines Arrays, Rücklesen pro Mip |
+| `upload.uis` | der Staging-Ring: 2000 kleine Uploads bleiben im Ring, ein ganzes Bild nimmt einen eigenen Puffer, der eine Sekunde später weg ist; Blöcke wachsen; `write_texture_rects` (Zeilenlänge, Klippen, Fehler); `write_buffer` über Stückgrenzen; `try_acquire` wartet nicht auf die Anzeige, `Stale` nach neuer Größe, `rebuild`, alles auf einem Kindfenster |
 | `graphics.uis` | zwei Dreiecke (Vertex-Pulling, Indexpuffer, Rückseiten-Culling, Tiefentest) in eine Textur; Pixel geprüft |
 | `indirect.uis` | Argumente von einem Rechen-Shader: `dispatch_indirect`, `draw_indexed_indirect`, auf Voll `_multi` und `_count` |
 | `timestamps.uis` | monoton über zwei Übergaben, plausibel gegen die CPU-Uhr |
@@ -553,8 +735,6 @@ CPU-gebunden (100 000 Draws je Bild); seine Bildzeiten schwanken mit der Last de
 - `Format` hat kein `Rgba32Sint` (und keine anderen vierkanaligen 8-/16-Bit-Ganzzahlformate);
   gputest überspringt diese Speichertextur.
 - Bindungen ohne Arrays (`count` 1); Arrays gibt es über die Bindless-Tabelle auf Stufe Voll.
-- Uploads legen pro Übergabe mindestens einen 4-MiB-Staging-Bereich an; ein Ringpuffer für
-  viele kleine Schreibvorgänge pro Bild fehlt.
 - Kopien von Tiefen-Stencil-Formaten werden abgelehnt.
 - Zeilenlängen für Kopien im Kodierer prüft Vulkan nicht auf 256 Byte; WebGPU verlangt das --
   für Portabilität `bytes_per_row` als Vielfaches von 256 wählen.

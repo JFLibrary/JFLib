@@ -18,6 +18,7 @@
 //   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
+//   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
 //   queue.read_buffer(&buf, off, &mut [T])          copies, submits and waits (slow path)
 //   queue.flush() -> Result<SubmitId>               submit the pending uploads now
 //   device.wait(id, timeout_ns) -> Result<bool>     false: timed out
@@ -29,10 +30,14 @@
 // submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 // latest submit and is destroyed once that value is reached -- earlier if no submit is
 // pending.  Command buffers come from slots (a transient command pool with one buffer each),
-// reused once their submission completed.  Uploads: staging chunks of at least 4 MiB of
-// Upload memory, filled front to back; their copies are recorded into one upload command
-// buffer that ends with a global barrier (copy writes -> every later access) and is put
-// before the caller's command buffers in the next vkQueueSubmit.
+// reused once their submission completed.  Uploads: the data goes into the staging ring, the
+// copies into one upload command buffer that ends with a global barrier (copy writes -> every
+// later access) and is put before the caller's command buffers in the next vkQueueSubmit.
+// The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
+// a full chunk is reused once the GPU has passed the last submission that reads from it (two
+// are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
+// by the next one that fits and released when none came for a second (Device::poll): a frame of
+// small rectangles costs what they hold, not a full frame or a new allocation.
 // Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 // call returns GpuError::DeviceLost (objects are still destroyed normally).
 
@@ -72,11 +77,29 @@ pub(crate) struct Slot {
     pub cb: vk::CommandBuffer,
 }
 
-/// the pending staged uploads
+/// a buffer of the staging ring
+struct Chunk {
+    buf: vk::Handle,
+    a: Alloc,
+    used: u64, // bytes used, front to back
+}
+
+/// the pending staged uploads: the command buffer, the chunks full since the last submission
+/// that it reads from
 struct Upload {
     slot: Slot,
-    chunks: Vec<(vk::Handle, Alloc)>,
-    used: u64, // bytes used of the last chunk
+    retired: Vec<Chunk>,
+}
+
+/// the staging ring
+#[derive(Default)]
+struct Ring {
+    cur: Option<Chunk>, // the chunk being filled (what is behind `used` stays free across submissions)
+    cur_value: u64,     // the last submission that reads from it (0: none)
+    cur_open: bool,     // the open upload command buffer reads from it
+    busy: Vec<(u64, Chunk)>, // retired: free once the GPU reached the value
+    free: Vec<Chunk>,
+    big_at: u64,        // plat::time_us of the last upload above half a chunk
 }
 
 pub(crate) struct State {
@@ -86,9 +109,15 @@ pub(crate) struct State {
     busy: Vec<(u64, Slot)>,
     pools: Vec<vk::Handle>, // descriptor pools of the bind groups (the last one is filled)
     upload: Option<Upload>,
+    ring: Ring,
 }
 
-const CHUNK: u64 = 4 << 20;
+/// a chunk of the staging ring
+const CHUNK: u64 = 256 << 10;
+/// free chunks kept beyond the one being filled
+const CHUNKS_FREE: usize = 2;
+/// an upload above half a chunk keeps its buffer this long after the last one (us)
+const BIG_KEEP_US: u64 = 1_000_000;
 
 pub(crate) struct Shared {
     pub inst: Arc<InstShared>,
@@ -388,6 +417,7 @@ impl Adapter {
                 busy: Vec::new(),
                 pools: Vec::new(),
                 upload: None,
+                ring: Ring::default(),
             }),
         });
         Ok(Device { queue: Queue { sh: sh.clone() }, sh })
@@ -504,10 +534,21 @@ impl Shared {
 
     /// free the garbage and the command slots whose submissions completed
     fn collect(&self, st: &mut State) {
-        if st.garbage.is_empty() && st.busy.is_empty() {
+        if st.garbage.is_empty() && st.busy.is_empty() && st.ring.busy.is_empty() && st.ring.free.is_empty() {
             return;
         }
         let done = if self.lost.load(Ordering::Relaxed) { u64::MAX } else { self.refresh() };
+        let mut i = 0;
+        while i < st.ring.busy.len() {
+            if st.ring.busy[i].0 <= done {
+                let (_, mut c) = st.ring.busy.swap_remove(i);
+                c.used = 0;
+                st.ring.free.push(c);
+            } else {
+                i += 1;
+            }
+        }
+        self.ring_trim(st);
         let mut i = 0;
         while i < st.busy.len() {
             if st.busy[i].0 <= done {
@@ -593,6 +634,43 @@ impl Shared {
         self.st.lock().free.push(s);
     }
 
+    /// the free chunks beyond what the ring keeps go back: ordinary ones above CHUNKS_FREE,
+    /// large ones a second after the last large upload (all but the largest at once)
+    fn ring_trim(&self, st: &mut State) {
+        let now = plat::time_us();
+        let keep_big = now.saturating_sub(st.ring.big_at) < BIG_KEEP_US;
+        let largest = st.ring.free.iter().map(|c| c.a.size).max().unwrap_or(0);
+        let mut small = 0;
+        let mut i = 0;
+        while i < st.ring.free.len() {
+            let size = st.ring.free[i].a.size;
+            let keep = if size >= CHUNK * 2 {
+                keep_big && size == largest
+            } else {
+                small += 1;
+                small <= CHUNKS_FREE
+            };
+            if keep {
+                i += 1;
+            } else {
+                let c = st.ring.free.swap_remove(i);
+                self.destroy(st, Garbage::Buffer(c.buf, c.a));
+            }
+        }
+    }
+
+    /// a chunk of at least size bytes, reused or new (its `used` is 0); the ring's own chunks
+    /// (size = CHUNK) are never large ones, those would stay around
+    fn ring_chunk(&self, st: &mut State, size: u64) -> Result<Chunk> {
+        let top = if size == CHUNK { CHUNK * 2 } else { u64::MAX };
+        let best = st.ring.free.iter().enumerate().filter(|(_, c)| c.a.size >= size && c.a.size < top).min_by_key(|(_, c)| c.a.size).map(|(i, _)| i);
+        if let Some(i) = best {
+            return Ok(st.ring.free.swap_remove(i));
+        }
+        let (buf, a) = self.raw_buffer(st, size, vk::BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryKind::Upload)?;
+        Ok(Chunk { buf, a, used: 0 })
+    }
+
     /// the upload command buffer (begun when there is none): it runs first in the next submit
     pub fn upload_cb(&self, st: &mut State) -> Result<vk::CommandBuffer> {
         self.stage(st, 0)?;
@@ -619,27 +697,40 @@ impl Shared {
                 st.free.push(slot);
                 return Err(e);
             }
-            st.upload = Some(Upload { slot, chunks: Vec::new(), used: CHUNK });
+            st.upload = Some(Upload { slot, retired: Vec::new() });
         }
         if n == 0 {
             return Ok((0, 0, 0));
         }
-        let room = {
-            let up = st.upload.as_ref().unwrap_or_else(|| unreachable!());
-            up.chunks.last().map_or(0, |(_, a)| a.size.saturating_sub(up.used))
-        };
-        if room < n {
-            let size = n.max(CHUNK);
-            let (buf, a) = self.raw_buffer(st, size, vk::BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryKind::Upload)?;
-            let up = st.upload.as_mut().unwrap_or_else(|| unreachable!());
-            up.chunks.push((buf, a));
-            up.used = 0;
+        if n > CHUNK / 2 {
+            // a buffer of its own: free once the next submission is done
+            st.ring.big_at = plat::time_us();
+            let size = (n + 0xFFFF) & !0xFFFF;
+            let mut c = self.ring_chunk(st, size.max(CHUNK * 2))?;
+            c.used = n;
+            let (buf, ptr) = (c.buf, c.a.ptr);
+            st.upload.as_mut().unwrap_or_else(|| unreachable!()).retired.push(c);
+            return Ok((buf, 0, ptr));
         }
-        let up = st.upload.as_mut().unwrap_or_else(|| unreachable!());
-        let (buf, a) = *up.chunks.last().unwrap_or_else(|| unreachable!());
-        let off = up.used;
-        up.used = (off + n + 15) & !15;
-        Ok((buf, off, a.ptr + off as usize))
+        let room = st.ring.cur.as_ref().is_some_and(|c| c.used + n <= c.a.size);
+        if !room {
+            if let Some(c) = st.ring.cur.take() {
+                if st.ring.cur_open {
+                    st.upload.as_mut().unwrap_or_else(|| unreachable!()).retired.push(c);
+                } else {
+                    let v = st.ring.cur_value;
+                    st.ring.busy.push((v, c));
+                }
+            }
+            let c = self.ring_chunk(st, CHUNK)?;
+            st.ring.cur = Some(c);
+            st.ring.cur_open = false;
+        }
+        st.ring.cur_open = true;
+        let c = st.ring.cur.as_mut().unwrap_or_else(|| unreachable!());
+        let off = c.used;
+        c.used = (off + n + 15) & !15;
+        Ok((c.buf, off, c.a.ptr + off as usize))
     }
 
     /// a VkBuffer with memory of kind (bound) -> (buffer, allocation)
@@ -689,7 +780,8 @@ impl Shared {
         }
         let up = self.st.lock().upload.take();
         let mut all: Vec<vk::CommandBuffer> = Vec::with_capacity(cbs.len() + 1);
-        let mut chunks = Vec::new();
+        let mut chunks: Vec<Chunk> = Vec::new();
+        let uploads = up.is_some();
         if let Some(u) = up {
             let mb = vk::MemoryBarrier {
                 s_type: vk::STRUCTURE_TYPE_MEMORY_BARRIER,
@@ -706,7 +798,7 @@ impl Shared {
             let r = unsafe { (self.f.end_command_buffer)(u.slot.cb) };
             all.push(u.slot.cb);
             slots.push(u.slot);
-            chunks = u.chunks;
+            chunks = u.retired;
             if let Err(e) = self.vk(r) {
                 self.fail_submit(slots, chunks);
                 return Err(e);
@@ -750,20 +842,25 @@ impl Shared {
         for s in slots {
             st.busy.push((value, s));
         }
-        for (b, a) in chunks {
-            st.garbage.push((value, Garbage::Buffer(b, a)));
+        for c in chunks {
+            st.ring.busy.push((value, c));
+        }
+        if uploads && st.ring.cur_open {
+            st.ring.cur_value = value;
+            st.ring.cur_open = false;
         }
         self.collect(&mut st);
         Ok(value)
     }
 
-    fn fail_submit(&self, slots: Vec<Slot>, chunks: Vec<(vk::Handle, Alloc)>) {
+    fn fail_submit(&self, slots: Vec<Slot>, chunks: Vec<Chunk>) {
         for s in slots {
             self.give_slot(s);
         }
         let mut st = self.st.lock();
-        for (b, a) in chunks {
-            self.destroy(&mut st, Garbage::Buffer(b, a));
+        st.ring.cur_open = false; // its copies never ran
+        for c in chunks {
+            self.destroy(&mut st, Garbage::Buffer(c.buf, c.a));
         }
     }
 
@@ -862,10 +959,14 @@ impl Drop for Shared {
             (f.device_wait_idle)(d);
             let mut st = self.st.lock();
             if let Some(u) = st.upload.take() {
-                for (b, a) in u.chunks {
-                    st.garbage.push((0, Garbage::Buffer(b, a)));
+                for c in u.retired {
+                    st.garbage.push((0, Garbage::Buffer(c.buf, c.a)));
                 }
                 st.free.push(u.slot);
+            }
+            let ring = core::mem::take(&mut st.ring);
+            for c in ring.cur.into_iter().chain(ring.free).chain(ring.busy.into_iter().map(|(_, c)| c)) {
+                st.garbage.push((0, Garbage::Buffer(c.buf, c.a)));
             }
             let garbage = core::mem::take(&mut st.garbage);
             for (_, g) in garbage {
@@ -938,6 +1039,10 @@ impl Device {
     pub fn completed(&self) -> SubmitId {
         SubmitId(self.sh.refresh())
     }
+    /// the submission id is done on the GPU (asks the driver; never waits)
+    pub fn is_done(&self, id: SubmitId) -> bool {
+        self.sh.refresh() >= id.0
+    }
     /// bytes of device and host memory the device holds in blocks
     pub fn memory_reserved(&self) -> u64 {
         self.sh.st.lock().mem.reserved
@@ -1009,6 +1114,73 @@ impl Queue {
             crate::vk_cmd::image_barrier(&sh.f, cb, t.image(), range, before, Layout::CopyDst);
             (sh.f.cmd_copy_buffer_to_image)(cb, sbuf, t.image(), vk::IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
             crate::vk_cmd::image_barrier(&sh.f, cb, t.image(), range, Layout::CopyDst, after);
+        }
+        Ok(())
+    }
+
+    /// write rectangles (x, y, w, h; clipped to the texture, empty ones skipped) of mip 0, layer 0
+    /// of a 2D texture from `data`, an image of the texture's size in rows of `stride` bytes (a
+    /// framebuffer), before the next submission; the staged bytes are those of the rectangles.
+    /// The whole level goes from `before` to CopyDst and then to `after`, once for all of them
+    pub fn write_texture_rects(&self, t: &crate::Texture, rects: &[[i32; 4]], data: &[u8], stride: u32, before: Layout,
+                               after: Layout) -> Result<()> {
+        let f = t.format();
+        let bb = f.block_bytes() as u64;
+        if f.is_compressed() || f.is_depth() || t.depth() != 1 {
+            return Err(GpuError::Invalid("write_texture_rects: an uncompressed 2D colour texture"));
+        }
+        let (tw, th) = (t.width() as i32, t.height() as i32);
+        if (stride as u64) < tw as u64 * bb || (data.len() as u64) < stride as u64 * th as u64 {
+            return Err(GpuError::Invalid("write_texture_rects: data smaller than the texture"));
+        }
+        let mut regions: Vec<vk::BufferImageCopy> = Vec::with_capacity(rects.len());
+        let mut total = 0u64;
+        let sub = crate::vk_res::subresources(t, 0, 1, 0, 1);
+        for r in rects {
+            let (x0, y0) = (r[0].max(0), r[1].max(0));
+            let (x1, y1) = (r[0].saturating_add(r[2]).min(tw), r[1].saturating_add(r[3]).min(th));
+            if x1 <= x0 || y1 <= y0 {
+                continue;
+            }
+            let (w, h) = ((x1 - x0) as u32, (y1 - y0) as u32);
+            regions.push(vk::BufferImageCopy {
+                buffer_offset: total,
+                buffer_row_length: w,
+                buffer_image_height: h,
+                image_subresource: vk::ImageSubresourceLayers { aspect_mask: sub.aspect_mask, mip_level: 0, base_array_layer: 0, layer_count: 1 },
+                image_offset: vk::Offset3D { x: x0, y: y0, z: 0 },
+                image_extent: vk::Extent3D { width: w, height: h, depth: 1 },
+            });
+            total += w as u64 * h as u64 * bb;
+        }
+        if regions.is_empty() {
+            return Ok(());
+        }
+        let sh = &self.sh;
+        sh.check()?;
+        let mut st = sh.st.lock();
+        let (sbuf, soff, ptr) = sh.stage(&mut st, total)?;
+        let cb = st.upload.as_ref().map_or(0, |u| u.slot.cb);
+        for g in regions.iter_mut() {
+            let (x, y) = (g.image_offset.x as usize, g.image_offset.y as usize);
+            let (w, h) = (g.image_extent.width as usize, g.image_extent.height as usize);
+            let row = w * bb as usize;
+            let mut dst = ptr + g.buffer_offset as usize;
+            for yy in y..y + h {
+                let from = yy * stride as usize + x * bb as usize;
+                // SAFETY: the row lies in data (checked against the texture's size) and in the
+                // staged range of `total` bytes, whose rectangles follow each other.
+                unsafe { core::ptr::copy_nonoverlapping(data.as_ptr().add(from), dst as *mut u8, row) };
+                dst += row;
+            }
+            g.buffer_offset += soff;
+        }
+        // SAFETY: the upload buffer is recording (guarded by the lock); the regions lie in the
+        // texture (clipped above) and the staged range.
+        unsafe {
+            crate::vk_cmd::image_barrier(&sh.f, cb, t.image(), sub, before, Layout::CopyDst);
+            (sh.f.cmd_copy_buffer_to_image)(cb, sbuf, t.image(), vk::IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, regions.len() as u32, regions.as_ptr());
+            crate::vk_cmd::image_barrier(&sh.f, cb, t.image(), sub, Layout::CopyDst, after);
         }
         Ok(())
     }

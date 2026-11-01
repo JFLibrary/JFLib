@@ -1,0 +1,99 @@
+#!args --verify-dirty
+# the UI's output through the GPU (lib/ui/gpu_out.rs, docs/GPU.md "Ausgabe der UI") on real gallery
+# pages: real windows (shown without activation, the script's events stay virtual), every
+# presented image read back and compared byte for byte with the framebuffer; under the validation
+# layer when it is installed.  Without a GPU (and on other targets) `gpu` prints a SKIP once and
+# does nothing, the script still passes.  Partial updates, scroll copies, resizes, DPI, themes, a
+# second window, a lost device.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 1000 800
+theme dark
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect screen
+# ---- partial updates: a press and a release of a button; little goes up
+gpu expect upload 100000000
+move 500,200
+move 510,200
+gpu expect upload 100000
+gpu expect same
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+move 900,310
+expect #7000 value 144
+gpu expect same
+expect scrollcopy 1
+gpu expect screen
+# scroll copies frame by frame, the scroll bar's thumb
+wheel 900,300 360
+bench 12 anim
+gpu expect same
+drag 995,60 995,300
+drag 995,300 995,60
+gpu expect same
+expect #7000 value 0
+# ---- the virtualized list scrolls under the keyboard: a small part of the window goes up
+gpu expect upload 100000000
+focus #7100
+key down down down down down down down down
+gpu expect same
+gpu expect upload 12000000
+# ---- a new size: that frame through the CPU path (the window's DC shows it), then the swapchain
+size 900 700
+gpu expect cpu
+gpu expect window
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect screen
+size 1100 760
+gpu expect cpu
+gpu wait
+gpu expect same
+# ---- DPI: everything drawn again, a new size
+scale 150
+gpu wait
+gpu expect same
+wheel 900,300 -120
+wait 300
+gpu expect same
+scale 100
+gpu wait
+gpu expect same
+# ---- themes: whole frames
+theme light
+gpu expect same
+gpu expect screen
+theme dark
+gpu expect same
+# ---- a lost device: the next frame through the CPU path, a new device, the swapchain again
+gpu lose
+wheel 900,300 120
+wait 300
+gpu expect cpu
+gpu expect window
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect screen
+# ---- a second window: its own swapchain on the same device
+wheel 900,300 -1200
+wait 500
+click "Werkzeugfenster"
+expect window 7600 open
+gpu wait
+gpu expect same
+click #7601
+expect #7601 value 51
+gpu expect same
+close window 7600
+gpu expect same
+# ---- jfgui_GPU_VERIFY found nothing on the way
+gpu print
+gpu off
