@@ -803,7 +803,7 @@ fn stage_info(sh: &Shared, st: &ShaderStage, model: shader::Model) -> Result<(Ve
     if !m.entries.iter().any(|e| e.name == st.entry && e.model == model as u32) {
         return Err(GpuError::Invalid("the module has no entry point of this name for the stage"));
     }
-    if m.local_size_id && !sh.maintenance4 {
+    if model == shader::Model::GLCompute && m.local_size_id && !sh.maintenance4 {
         return Err(GpuError::Unsupported("LocalSizeId (maintenance4, Vulkan 1.3)"));
     }
     specialize(m, st.constants)

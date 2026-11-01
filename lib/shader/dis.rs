@@ -8,8 +8,8 @@
 // (void, uint, v4float, mat4v4float, _arr_float_uint_4, _runtimearr_X, _ptr_Uniform_X,
 // _struct_N), constants (uint_4, int_n1, float_0_5, true) and built-ins (gl_Position,
 // gl_GlobalInvocationID ...); a taken name gets _0, _1 ...; everything else (specialization
-// constants too) is its number.  OpSpecConstantOp prints its operation without "Op".  Opcodes shader does not know print as OpUnknown(N) with
-// their words.
+// constants too) is its number.  OpSpecConstantOp prints its operation without "Op".
+// Opcodes shader does not know print as OpUnknown(N) with their words.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;

@@ -2,9 +2,11 @@
 
 `lib/shader` ist das Back-End des späteren WGSL-Compilers (Schritt G2) und schon jetzt direkt aus
 Rust benutzbar: ein Modul-Builder, der SPIR-V-Wörter schreibt, ein Disassembler im Stil von
-`spirv-dis`, ein struktureller Validator, ein Layout-Helfer für std140 / std430 und die Shader der
-GPU-Benchmark-Szene mit ihrem Datenvertrag und CPU-Referenzen. Die Crate ist `no_std` + `alloc`,
-ohne Abhängigkeiten und ohne GPU testbar (`apps/shadertest`).
+`spirv-dis`, ein struktureller Validator, ein Layout-Helfer für std140 / std430, `reflect`
+(Entry Points, Spezialisierungskonstanten und ihre Werte, Workgroup-Größen), die Shader der
+GPU-Benchmark-Szene mit ihrem Datenvertrag und CPU-Referenzen und kleine Beispiel-Shader für die
+Tests (`samples`). Die Crate ist `no_std` + `alloc`, ohne Abhängigkeiten und ohne GPU testbar
+(`apps/shadertest`).
 
 Zwei Feature-Stufen:
 
@@ -63,6 +65,12 @@ Kompakt:
 - **Konstanten** (dedupliziert; `-0.0` und `0.0` sind verschieden): `const_u32`, `const_i32`,
   `const_f32`, `const_bool`, `const_scalar(ty, words)` (auch 64 Bit), `const_composite`,
   `const_vec_f32`, `const_null`.
+- **Spezialisierungskonstanten** (WGSL `override`, unten mehr): `spec_u32`, `spec_i32`,
+  `spec_f32`, `spec_bool`, `spec_scalar(ty, spec_id, words)` (`OpSpecConstant*` mit `SpecId`, nie
+  dedupliziert), `spec_composite`, `spec_op(ty, opcode, ids, literals)`
+  (`OpSpecConstantOp`), `is_spec`; Workgroup-Größe: `local_size_id(func, [x, y, z])`,
+  `workgroup_size_builtin([x, y, z])`, `workgroup_size(func, [x, y, z])`; Arrays mit
+  Override-Länge: `ty_array_id(elem, len)`.
 - **Globale Variablen**: `global(sc, ty, init)`, `input(ty, location)`, `output(ty, location)`,
   `builtin(sc, ty, Bi)` (setzt `ClipDistance`, `DrawParameters`, `SampleRateShading` …),
   `buffer(Sc::Uniform | Sc::StorageBuffer, block, set, binding)` (`Block` am Struct,
@@ -71,8 +79,9 @@ Kompakt:
 - **Namen und Dekorationen**: `name`, `member_name`, `decorate`, `member_decorate` (gleiche
   Dekorationen werden einmal geschrieben); `no_contraction = true` dekoriert jedes
   Gleitkomma-Add/Sub/Mul/Div/Rem und jedes Produkt mit `NoContraction` (kein FMA).
-- **Entry Points**: `entry_point(Model, func, name)`, `exec_mode(func, Mode, args)`; das
-  Interface berechnet `finish()` aus den Funktionen.
+- **Entry Points**: `entry_point(Model, func, name)`, `exec_mode(func, Mode, args)`,
+  `exec_mode_id(func, Mode, ids)` (`OpExecutionModeId`); das Interface berechnet `finish()` aus
+  den Funktionen.
 - **Funktionen und Blöcke**: `begin_function(ret, params) -> (id, params)` (öffnet den
   Eintrittsblock), `begin_function_id` (für vorab vergebene Ids), `end_function`, `label`,
   `begin_block`, `block_open`, `local(ty, init)` (Function-Variable, landet am Anfang des
@@ -89,8 +98,11 @@ Kompakt:
   `extract_dynamic`, GLSL.std.450 über `ext(ty, inst, args)` / `glsl(inst, args)` / `length`,
   Atomics `atomic(op, ptr, scope, semantics, value)`, `atomic_load`, `atomic_store`,
   `atomic_cas`, Barrieren `control_barrier`, `memory_barrier`, Bilder `sampled_image`, `sample`,
-  `sample_lod`, `fetch`, `image_read`, `image_write` (setzen die *WithoutFormat-Capabilities bei
-  `Fmt::Unknown`), `image_size`, `image_size_lod` (`ImageQuery`), Ableitungen `deriv(op, a)`,
+  `sample_lod`, `sample_dref` / `sample_dref_lod` (Tiefenvergleich), `fetch`, `image_read`,
+  `image_write` (setzen die *WithoutFormat-Capabilities bei `Fmt::Unknown`), `image_size`,
+  `image_size_lod`, `image_levels` (`ImageQuery`), `nonuniform` (`NonUniform` und
+  `ShaderNonUniform`; `resource` mit Laufzeit-Array setzt `RuntimeDescriptorArray`, vor 1.5 mit
+  `SPV_EXT_descriptor_indexing`), Ableitungen `deriv(op, a)`,
   `dpdx`, `dpdy`, `fwidth` (Fine / Coarse setzen `DerivativeControl`), `call`; für alles andere
   `emit(opcode, ty, operands)`.
 
@@ -103,6 +115,61 @@ andere findet der Validator.
 `Dim`, `Fmt`, `Lang` mit Namenstabellen, `scope::*`, `sem::*`, `glsl::*` und die
 Operanden-Grammatik (`OPS`), die Disassembler und Validator teilen; `parse` zerlegt Wörter in
 Instruktionen und Operanden.
+
+## Spezialisierungskonstanten (WGSL `override`)
+
+Ein Override wird eine skalare Spezialisierungskonstante mit `SpecId` = der Konstantennummer der
+Pipeline (`lib/gpu`: `Constant { id, value }`, docs/GPU.md „Pipeline-Konstanten“); ihr Wert im
+Modul ist der Standardwert. Abgeleitete Overrides werden `OpSpecConstantOp`, aber SPIR-V erlaubt
+unter `Shader` nur ganzzahlige Arithmetik, Shifts, Bit- und Logik-Operationen, ganzzahlige
+Vergleiche, `Select`, `SConvert` / `UConvert` (ab 1.4) / `FConvert`, `QuantizeToF16`,
+`VectorShuffle`, `CompositeExtract` / `CompositeInsert` -- **keine Gleitkomma-Arithmetik und
+keine eingebauten Funktionen**. Für solche Override-Ausdrücke muss der WGSL-Übersetzer (G2c) den
+Wert beim Anlegen der Pipeline selbst ausrechnen, wie Tint es tut.
+
+Workgroup-Größe aus Overrides (`@workgroup_size(n)` mit einem Override `n`):
+
+| Stufe | Weg | Bedingung |
+| --- | --- | --- |
+| Basis (SPIR-V 1.3) | `WorkgroupSize`-Built-in an einem `OpSpecConstantComposite` uvec3 (`workgroup_size_builtin`) | gilt für **jeden** GLCompute-Entry-Point des Moduls und hat Vorrang vor `LocalSize`: ein Modul je Entry Point |
+| Voll (SPIR-V 1.6) | `OpExecutionModeId … LocalSizeId %x %y %z` (`local_size_id`), je Entry Point | Vulkan verlangt `maintenance4` (Kern und Pflicht in Vulkan 1.3); `lib/gpu` meldet `Unsupported` ohne |
+
+`workgroup_size(func, size)` nimmt den Weg der Stufe. Die Teile dürfen gewöhnliche Konstanten
+und Spezialisierungskonstanten mischen. Ein Array mit Override-Länge (nur im Workgroup-Speicher)
+ist `ty_array_id(elem, spec_konstante)`.
+
+`reflect` liest das alles aus fertigen Wörtern:
+
+- `entry_points(words)`: Modell, Name, Funktions-Id je `OpEntryPoint`.
+- `spec_constants(words)`: je `SpecId` die Konstante, ihre Art (`Kind::Bool`, `Int { width,
+  signed }`, `Float { width }`) und die Bits des Standardwerts.
+- `constant_values(words, set)`: die Wörter jeder Konstanten auf Modulebene, wenn die Pipeline
+  die Spezialisierungskonstanten in `set` (`(SpecId, Bits)`) setzt; Komposita und jede erlaubte
+  `OpSpecConstantOp`-Operation werden ausgewertet. `Err` für das, was SPIR-V undefiniert lässt
+  (Division durch 0, Shift um die Bitbreite oder mehr) und für Operationen, die unter `Shader`
+  nicht erlaubt sind.
+- `workgroup_size(words, entry, set)`: Built-in vor `LocalSizeId` vor `LocalSize`.
+- `uses_local_size_id(words)`, `f16_from_f32` / `f16_to_f32` (round to nearest even).
+
+`lib/gpu` prüft damit die Konstanten einer Pipeline gegen das Modul und die spezialisierte
+Workgroup-Größe gegen die Grenzen; der Interpreter von shadertest führt spezialisierte Module aus.
+
+## Beispiel-Shader (`samples`)
+
+Kleine Module mit CPU-Referenzen, die shadertest prüft (Validator, `spirv-val`, `spirv-dis`,
+Interpreter) und gputest auf der GPU laufen lässt (docs/GPU.md „Tests“):
+
+| Funktion | Modell | prüft |
+| --- | --- | --- |
+| `spec_fill(minor)` | GLCompute | fünf Overrides (u32, u32, i32, f32, bool) mit `SpecId` 0 … 4, die Workgroup-Größe aus `SPEC_WG` (Basis: Built-in, Voll: `LocalSizeId`), ein Workgroup-Array dieser Länge mit Barriere, sieben `OpSpecConstantOp`-Arten; Referenz `spec_fill_ref(&SpecParams, n)` |
+| `vs_fullscreen` | Vertex | ein Dreieck über das ganze Ziel, ohne Eingaben |
+| `fs_sample` | Fragment | Textur + Sampler, explizite LOD oder implizite (Mip-Auswahl über Ableitungen) |
+| `fs_compare` | Fragment | Tiefentextur + Vergleichssampler, `OpImageSampleDrefExplicitLod` / `…ImplicitLod` |
+| `cs_fetch(minor, Texel, arrayed, depth)` | GLCompute | `OpImageFetch` jedes Texels einer Mip-Stufe (float / uint / sint, 2D-Array, Tiefe) |
+| `cs_sample(minor, SampleDim)` | GLCompute | `OpImageSampleExplicitLod` an Koordinaten aus einem Puffer (2D, 2D-Array, Würfel, Würfel-Array) |
+| `cs_storage_write` / `cs_storage_read` / `cs_storage_rw(minor, Fmt)` | GLCompute | Speichertexturen; `storage_texel`, `storage_read`, `storage_rw_ref` sind die Referenzen |
+| `cs_query(minor)` | GLCompute | `OpImageQuerySizeLod` (Mip 0 und 1), `OpImageQueryLevels`, `OpImageQuerySize` |
+| `cs_bindless_sample()` | GLCompute (1.6) | Texturen und Sampler einer Bindless-Tabelle, nicht einheitlich indiziert (`NonUniform`) |
 
 ## Layout-Helfer (`layout`)
 
@@ -128,9 +195,12 @@ Laufzeit-Arrays haben keine Größe (letztes Member eines Blocks), `bool` hat ke
 (`; SPIR-V`, Version, Generator, Bound, Schema), Ergebnis-Ids rechtsbündig vor Spalte 15,
 Friendly Names wie im FriendlyNameMapper von SPIRV-Tools (OpName zuerst, dann `void`, `uint`,
 `v4float`, `mat4v4float`, `_arr_float_uint_4`, `_runtimearr_X`, `_ptr_StorageBuffer_X`,
-`_struct_N`, Konstanten `uint_4`, `int_n1`, `float_0_5`, `true`; doppelte Namen bekommen `_0`,
-`_1` …), Enums und Masken mit Namen, Gleitkommazahlen wie `%.9g` (`dis::fmt_float`; inf / NaN
-hexadezimal). Für alle zwölf Benchmark-Module ist die Ausgabe Zeile für Zeile gleich der von
+`_struct_N`, Konstanten `uint_4`, `int_n1`, `float_0_5`, `true`, Built-ins ohne OpName wie
+`gl_GlobalInvocationID`, `gl_WorkGroupSize`; doppelte Namen bekommen `_0`, `_1` …;
+Spezialisierungskonstanten behalten ihre Nummer), Enums und Masken mit Namen,
+`OpSpecConstantOp` mit seiner Operation ohne „Op“ (`OpSpecConstantOp %uint IMul %WG %uint_2`),
+Gleitkommazahlen wie `%.9g` (`dis::fmt_float`; inf / NaN hexadezimal). Für alle zwölf
+Benchmark-Module und alle 35 Beispiel-Module ist die Ausgabe Zeile für Zeile gleich der von
 `spirv-dis` aus SPIRV-Tools v2026.4 (Vulkan SDK 1.4.363.0). Unbekannte Opcodes erscheinen als
 `OpUnknown(N)` mit ihren Wörtern.
 
@@ -148,15 +218,15 @@ für `spirv-val`.
 | `IdUnique` | jede Ergebnis-Id einmal definiert |
 | `IdDefined` | jede benutzte Id definiert, vor ihrer Benutzung (außer Namen, Dekorationen, Entry Points, Execution Modes, Labels, Phis, aufgerufene Funktionen); funktionslokale Ids nur in ihrer Funktion |
 | `IdKind` | Ergebnistypen sind Typen, Sprungziele Labels, Operanden Werte, Callees Funktionen, `OpExtInst`-Sets Importe |
-| `Type` | Typen wohlgeformt (Vektor 2–4, Matrix aus Float-Vektoren, Array-Längen konstant ≥ 1, Laufzeit-Arrays zuletzt) und Typ-Übereinstimmung für Arithmetik, Bit-Operationen, Shifts, Produkte, Vergleiche, Logik, Select, Konvertierungen, Access Chains, Load / Store, Composites, Shuffles, GLSL.std.450, Atomics, Barrieren, Bilder, Ableitungen, Aufrufe, Phis, Returns, Konstanten, Variablen-Initialisierer, Funktionsparameter |
-| `Decoration` | Ziel passt zur Dekoration (`Block` an Structs, `ArrayStride` an Arrays, `Offset` / `MatrixStride` nur an Membern, `Location` / `Flat` an Input / Output, `Binding` / `DescriptorSet` an Ressourcen, `NoContraction` an Ergebnissen), Member-Indizes |
+| `Type` | Typen wohlgeformt (Vektor 2–4, Matrix aus Float-Vektoren, Array-Längen: Konstante ≥ 1 oder ganzzahlige Spezialisierungskonstante, Laufzeit-Arrays zuletzt) und Typ-Übereinstimmung für Arithmetik, Bit-Operationen, Shifts, Produkte, Vergleiche, Logik, Select, Konvertierungen, Access Chains, Load / Store, Composites, Shuffles, GLSL.std.450, Atomics, Barrieren, Bilder (Koordinatenlänge, Dref als f32-Skalar, Ergebnis der Dref-Instruktionen, kein Fetch aus Würfeln; die Abfragen: `QuerySizeLod` / `QueryLevels` nur an gesampelten 1D/2D/3D/Würfel-Bildern ohne MS, `QuerySize` an Speicher-, MS-, Rect- und Buffer-Bildern, Komponentenzahl des Ergebnisses), Ableitungen, Aufrufe, Phis, Returns, Konstanten, Spezialisierungskonstanten (`OpSpecConstantOp`: nur die unter `Shader` erlaubten Operationen, nur konstante Operanden, die Typregeln der Operation), Variablen-Initialisierer, Funktionsparameter |
+| `Decoration` | Ziel passt zur Dekoration (`Block` an Structs, `ArrayStride` an Arrays, `Offset` / `MatrixStride` nur an Membern, `Location` / `Flat` an Input / Output, `Binding` / `DescriptorSet` an Ressourcen, `NoContraction` an Ergebnissen, `SpecId` an skalaren Spezialisierungskonstanten und jeder Wert einmal, `BuiltIn` an einer Konstanten nur als uvec3-`WorkgroupSize`, `NonUniform` an Werten), Member-Indizes |
 | `Storage` | Speicherklasse der Variable = die ihres Pointers, Function-Variablen zuerst im Eintrittsblock, Vulkans Regeln: Block-Structs in Uniform / StorageBuffer / PushConstant, `DescriptorSet` + `Binding` an Ressourcen, keine an Push-Konstanten, `Location` oder `BuiltIn` an Input / Output, nur Bilder / Sampler in UniformConstant, kein Store in Input / Uniform / PushConstant / UniformConstant, Atomics nur auf Buffer-, Workgroup- und Image-Speicher, höchstens eine Push-Konstanten-Variable je Entry Point |
 | `BlockLayout` | `Offset` an jedem Block-Member, ausgerichtet nach std140 (Uniform) bzw. std430 (StorageBuffer, PushConstant), keine Überlappung; `ArrayStride` / `MatrixStride` vorhanden, Vielfache der Ausrichtung und nicht kleiner als das Element; `ColMajor` / `RowMajor` an Matrizen; Laufzeit-Arrays nur zuletzt im äußeren Block; Push-Konstanten höchstens 128 Byte |
 | `Cfg` | Blöcke beginnen mit `OpLabel` und enden mit genau einem Terminator; Merge-Instruktionen direkt vor ihrem Branch (`OpSelectionMerge` vor `OpBranchConditional` / `OpSwitch`, `OpLoopMerge` vor `OpBranch` / `OpBranchConditional`); Merge- und Continue-Ziele sind Blöcke der Funktion, ein Merge-Block gehört zu höchstens einem Header und steht nach ihm; bedingte Sprünge ohne Merge nur als break / continue; Rückwärtskanten nur zu Loop-Headern, jede Schleife hat eine; der Eintrittsblock ist kein Sprungziel; Phis am Blockanfang mit Vorgängern als Eltern |
 | `Interface` | Entry Point ist eine void-Funktion ohne Parameter; Interface nur aus globalen Variablen, vor 1.4 nur Input / Output, ab 1.4 jede höchstens einmal; es enthält jede globale Variable des Aufrufbaums (ab 1.4) bzw. jede Input- / Output-Variable (vor 1.4); keine zwei Entry Points gleichen Namens und Modells |
-| `ExecMode` | `LocalSize` (oder `LocalSizeId` / WorkgroupSize-Built-in) für GLCompute, `OriginUpperLeft` und kein `OriginLowerLeft` für Fragment, Modes nur für passende Modelle, `LocalSize` ≥ 1, `DepthReplacing` wenn `FragDepth` geschrieben wird, fragmentexklusive Instruktionen (discard, demote, Ableitungen, Sampling mit impliziter LOD) nur unter Fragment-Entry-Points, Workgroup-Variablen nur unter Compute |
-| `Capability` | Capabilities, die Typen (Int8/16/64, Float16/64), Instruktionen (DerivativeControl, ImageQuery, DemoteToHelperInvocation, Int64Atomics, *WithoutFormat), Built-ins (ClipDistance, CullDistance, DrawParameters, SampleRateShading, MultiView), Bildtypen und Modelle brauchen (`Shader` impliziert `Matrix`) |
-| `Version` | `OpTerminateInvocation` / `OpDemoteToHelperInvocation` vor 1.6 nur mit ihrer Extension, `OpCopyLogical` und `OpSelect` auf Composites erst ab 1.4, StorageBuffer vor 1.3 nur mit Extension |
+| `ExecMode` | `LocalSize` (oder `LocalSizeId` mit drei 32-Bit-Ganzzahlkonstanten, gewöhnliche ≥ 1, oder das WorkgroupSize-Built-in) für GLCompute, Id-Modes nur in `OpExecutionModeId` und umgekehrt, `OriginUpperLeft` und kein `OriginLowerLeft` für Fragment, Modes nur für passende Modelle, `LocalSize` ≥ 1, `DepthReplacing` wenn `FragDepth` geschrieben wird, fragmentexklusive Instruktionen (discard, demote, Ableitungen, Sampling mit impliziter LOD) nur unter Fragment-Entry-Points, Workgroup-Variablen nur unter Compute |
+| `Capability` | Capabilities, die Typen (Int8/16/64, Float16/64), Instruktionen (DerivativeControl, ImageQuery, DemoteToHelperInvocation, Int64Atomics, *WithoutFormat), Built-ins (ClipDistance, CullDistance, DrawParameters, SampleRateShading, MultiView), Bildtypen, Modelle, Laufzeit-Arrays von Ressourcen (RuntimeDescriptorArray) und `NonUniform` (ShaderNonUniform) brauchen (`Shader` impliziert `Matrix`) |
+| `Version` | `OpTerminateInvocation` / `OpDemoteToHelperInvocation` vor 1.6 nur mit ihrer Extension, `OpCopyLogical`, `OpSelect` auf Composites und `UConvert` in `OpSpecConstantOp` erst ab 1.4, `OpExecutionModeId` ab 1.2, Laufzeit-Arrays von Ressourcen und `NonUniform` vor 1.5 nur mit `SPV_EXT_descriptor_indexing`, StorageBuffer vor 1.3 nur mit Extension |
 
 Nicht geprüft (dafür ist `spirv-val` zuständig): Dominanz im eigentlichen Sinn (nur „vorher
 definiert“ in Instruktionsreihenfolge), die vollständigen Regeln strukturierter Konstrukte
@@ -165,8 +235,10 @@ der Phi-Eltern gleich Anzahl der Vorgänger, Typregeln der Opcodes, die der Buil
 (Gruppen-/Subgroup-Operationen, Bitfelder, Kernel), Typ und Speicherklasse der Built-ins
 (`Position` als vec4-Output …), überlappende Locations / Components und das Zusammenpassen der
 Stufen, Vulkan-Memory-Model, relaxed / scalar Block Layout (der Validator verlangt die strenge
-Ausrichtung), Gerätegrenzen außer den 128 Byte Push-Konstanten, Spezialisierungskonstanten,
-Regeln einzelner Extensions.
+Ausrichtung), Gerätegrenzen außer den 128 Byte Push-Konstanten, die Werte von
+Spezialisierungskonstanten (ob eine Workgroup-Größe nach der Spezialisierung ≥ 1 ist, prüft
+`lib/gpu`), ob `LocalSizeId` auf dem Gerät erlaubt ist (`maintenance4`), Regeln einzelner
+Extensions.
 
 ## Benchmark-Vertrag (`bench`)
 
@@ -312,26 +384,51 @@ Der Vertex- und der Fragment-Shader sind nicht exakt (Matrixprodukte, `Normalize
   `.spvasm`-Dateien nach `golden/` kopieren).
 - `layout`: Offsets, Strides und Größen typischer Structs, die Benchmark-Datensätze, was
   `ty_struct_layout` dekoriert.
-- `validate`: alle Benchmark-Shader beider Stufen gültig; 34 kaputte Module, mindestens eines je
-  Regel, jedes von genau der erwarteten Regel abgelehnt.
+- `validate`: alle Benchmark-Shader beider Stufen gültig; 53 kaputte Module, mindestens eines je
+  Regel (darunter Spezialisierungskonstanten, `LocalSizeId`, Id-Modes, Bild-Abfragen, Dref,
+  Koordinaten, Descriptor-Indexing), jedes von genau der erwarteten Regel abgelehnt.
 - `refs`: Hash-Werte, `floor`, `sincos_turns` gegen f64, Eigenschaften von `move_ref`,
   Datensätze, Würfel-Windung, Kamera (NDC y oben, rechts / oben, Windung der Würfelseiten in NDC),
   `visible` gegen einen Clip-Space-Test, `cull_ref`.
+- `spec`: was der Builder je Stufe schreibt (Built-in auf 1.3, `LocalSizeId` auf 1.6),
+  `reflect` (Spezialisierungskonstanten von `spec_fill`, Workgroup-Größen mit und ohne
+  Pipeline-Konstanten, jede der 39 erlaubten `OpSpecConstantOp`-Operationen gegen Rust-Rechnung,
+  die undefinierten Fälle als `Err`), die Halbgenauigkeits-Umrechnung (Grenzfälle, alle 63 490
+  Halbwerte außer NaN hin und zurück), der Validator auf allen 35
+  Beispiel-Modulen, die Disassembly von `spec_fill` gegen `golden/spec_fill*.spvasm`,
+  Determinismus der Beispiele.
 - `interp`: ein kleiner SPIR-V-Interpreter (nur in der Test-App) führt die Benchmark-Shader auf
   der CPU aus: `move` und `cull` gleich `move_ref` / `cull_ref` Bit für Bit (3000 Objekte),
-  `cull_reset`, Vertex-Shader (Position, Normale, Farbe) und `fs_lambert` gegen f64-Rechnung.
+  `cull_reset`, Vertex-Shader (Position, Normale, Farbe) und `fs_lambert` gegen f64-Rechnung;
+  `spec_fill` beider Stufen mit Standardwerten und drei Sätzen Pipeline-Konstanten
+  (Workgroup-Größen 1, 32, 256) gleich `spec_fill_ref` -- eine Workgroup läuft dabei
+  abwechselnd bis zur nächsten Barriere, Workgroup-Speicher geteilt.
 - `determinism`: jeder Shader zweimal und in anderer Reihenfolge gebaut, gleiche Wörter.
 - `sdk`: wenn das Vulkan SDK da ist (`--sdk DIR`, `%VULKAN_SDK%\Bin`, das neueste
   `C:\VulkanSDK\*\Bin`, `PATH`): `spirv-val --target-env vulkan1.1` (1.3-Module) bzw.
-  `vulkan1.3` (1.6-Module) akzeptiert jedes gebaute Modul und lehnt 33 der 34 kaputten ab (die
-  128-Byte-Grenze für Push-Konstanten prüft `spirv-val` nicht); `spirv-dis` und
-  `dis::disassemble` werden verglichen (Unterschiede werden gemeldet, nicht als Fehler gezählt).
+  `vulkan1.3` (1.6-Module) akzeptiert jedes gebaute Modul samt den Beispielen und lehnt 50 der 53
+  kaputten ab (nicht geprüft von `spirv-val`: die 128-Byte-Grenze für Push-Konstanten, eine
+  `SpecId` zweimal, ein Float in `LocalSizeId`); `spirv-dis` und `dis::disassemble` werden für
+  die Benchmark- und die Beispiel-Module verglichen (Unterschiede werden gemeldet, nicht als
+  Fehler gezählt).
   Ohne SDK meldet die Gruppe, dass sie übersprungen wurde. Das SDK ist nur Testwerkzeug; die
   Crate braucht es nicht.
+
+## WGSL-Referenz: Tint
+
+Der WGSL-Übersetzer muss annehmen, was Chromes Tint annimmt (der Browser bekommt das WGSL
+direkt). [`tools/wgsl_ref.mjs`](../tools/wgsl_ref.mjs) lässt das installierte Chrome (headless,
+ohne Flags, über Playwright) jede gegebene `.wgsl`-Datei übersetzen und je Entry Point eine
+Pipeline anlegen und schreibt Urteil, Meldungen (Zeile, Spalte, Offset, Länge, Text) und
+Pipeline-Fehler als JSON. [`tools/wgsl_corpus`](../tools/wgsl_corpus/README.md) sind 494 selbst
+geschriebene Fälle zu den Regeln der Spezifikation, `expected.json` ist Tints Urteil darüber
+(Chrome 156): Tests vergleichen damit ohne Chrome. Das README des Korpus nennt die Fälle, in
+denen Tint anders urteilte als erwartet (etwa: konkretes `i32` läuft auch in
+Konstantenausdrücken modulo 2³² über, `01f` ist für Tint ein gültiges Literal).
 
 ## Was fehlt
 
 Mesh- und Task-Shader (`MeshEXT` / `TaskEXT` sind nur als Modelle bekannt), Subgroup-Operationen,
-Spezialisierungskonstanten, `OpTypeForwardPointer` / Physical Storage Buffer, Row-Major-Layouts
+`OpTypeForwardPointer` / Physical Storage Buffer, Row-Major-Layouts
 im Layout-Helfer, Switch-Literale breiter als 32 Bit, MSL-Ausgabe, der WGSL-Compiler selbst (G2);
 der Validator deckt die oben genannten Lücken nicht ab.
