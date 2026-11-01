@@ -10,7 +10,8 @@
 // Last, WLAN stations with a network to join start their scan (wlan.rs), on the project's
 // positions and scale.  Every cable starts with the length the project gives it (by hand or
 // from its places, jfn_model::phys::length) and the delay that follows from that
-// (phys::delay_ns: an older project keeps its delays); too long, it stays down (phys.rs).
+// (phys::delay_ns: an older project keeps its delays); too long, it stays down (phys.rs).  A host
+// with a supplicant's file runs it (supp.rs).
 
 use jfn_model::Project;
 
@@ -36,6 +37,11 @@ impl Engine {
             e.cli_boot(d.id, &d.startup_config);
         }
         e.wlan_boot();
+        for d in &p.devices {
+            if let Some(ni) = e.node_index(d.id) {
+                e.supp_boot(ni);
+            }
+        }
         Ok(e)
     }
 }

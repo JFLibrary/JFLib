@@ -64,6 +64,8 @@ mod radiust;
 mod scriptlst;
 mod patternt;
 mod scriptmodt;
+mod eapt;
+mod imapt;
 
 /// the result collector of a check group
 pub struct T {
@@ -142,7 +144,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 38] = [
+    let groups: [(&'static str, fn(&mut T)); 39] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -181,6 +183,7 @@ fn run() -> i32 {
         ("scriptls", scriptlst::run),
         ("pattern", patternt::run),
         ("scriptmod", scriptmodt::run),
+        ("eap", eapt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

@@ -74,6 +74,9 @@
 //             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
 //             User-Password, Request / Response Authenticators, the Message-Authenticator; the
 //             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
+//   eap       Packet: EAP Request, Response, Success and Failure with Identity, Notification and
+//             Nak, the data of EAP-MD5 (Md5Data, md5_value) and of EAP-PWD (Pwd, PwdId), info
+//             for one line about a packet                            (RFC 3748, 1994, 5931)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -118,6 +121,7 @@ pub mod snmp;
 pub mod mib;
 pub mod telnet;
 pub mod radius;
+pub mod eap;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

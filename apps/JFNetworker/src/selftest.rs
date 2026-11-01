@@ -56,6 +56,8 @@
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
 // idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
+// dot1xtest.rs: 802.1X and WPA-Enterprise (group dot1x: jfn_sim::dot1x, supp, dot1xtrace, the EAP
+// part of radiusd and wlan, cli/dot1x.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -139,9 +141,11 @@ mod desktoptest;
 mod sessiontest;
 #[path = "idetest.rs"]
 mod idetest;
+#[path = "dot1xtest.rs"]
+mod dot1xtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 46] = [
+    let groups: [(&'static str, fn(&mut T)); 47] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -188,6 +192,7 @@ pub fn run() -> i32 {
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
+        ("dot1x", dot1xtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

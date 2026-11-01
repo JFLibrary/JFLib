@@ -236,6 +236,9 @@ impl Engine {
             "who" => self.sh_who(ni, &args),
             "w" => self.sh_w(ni, &args),
             "tty" => self.sh_tty(ni, &args),
+            // the supplicant (cli/dot1x.rs)
+            "wpa_supplicant" => self.sh_wpa_supplicant(ni, &args),
+            "wpa_cli" => self.sh_wpa_cli(ni, &args),
             _ => {
                 self.sh_set_code(ni, 127);
                 self.sh_err(ni, &format!("{}: command not found\n", cmd))
@@ -249,6 +252,7 @@ impl Engine {
             "cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
             "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
             "who", "w", "tty",
+            "wpa_cli", "wpa_supplicant",
         ];
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);

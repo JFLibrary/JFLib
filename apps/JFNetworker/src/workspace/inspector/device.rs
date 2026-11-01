@@ -114,6 +114,7 @@ fn port_status(power: bool, p: &PortView) -> (&'static str, u32) {
             (None, _) => ("frei", BADGE_NEUTRAL),
             (Some(_), Led::Up) => ("aktiv", BADGE_OK),
             (Some(_), Led::Blocking | Led::Learning) => ("blockiert", BADGE_WARN),
+            (Some(_), Led::Unauth) => ("nicht autorisiert", BADGE_WARN),
             (Some(_), Led::NoPower) => ("ohne Strom", BADGE_NEUTRAL),
             (Some(_), Led::Down) => ("unten", BADGE_CRIT),
         }

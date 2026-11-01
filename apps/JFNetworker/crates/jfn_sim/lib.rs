@@ -173,6 +173,11 @@
 //            ps's TTY column; Report::SesOut / SesPrompt / SesClosed, Cmd::Ses* (X1e)
 //   procs    the processes of a device as ps sees them (Engine::processes) and its programs'
 //            CPU time second by second (Engine::cpu_secs): the desktop's Systemmonitor (V2)
+//   dot1x    port access control (802.1X): the authenticator of IOS-like switches and of access
+//            points with WPA-Enterprise as the hidden service "dot1x-auth", RADIUS with EAP (X1g)
+//   supp     the supplicant of hosts: its wpa_supplicant-like file, the hidden service
+//            "wpa_supplicant", what wpa_cli asks of it (X1g)
+//   dot1xtrace DNote: the decisions of 802.1X as notes (Note::Dot1x)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -271,6 +276,9 @@ pub mod aaatrace;
 pub mod radiusd;
 pub mod telnetd;
 pub mod procs;
+pub mod dot1xtrace;
+pub mod dot1x;
+pub mod supp;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};

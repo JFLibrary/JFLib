@@ -22,7 +22,8 @@
 // with strict MDI-X), up (green); with spanning tree a bridge port that does not forward is
 // blocking (amber: Blocking, Listening, Discarding) or learning (amber: Learning).  The radio of
 // an access point without a cable is up while it sends a network (wlan.rs); WLAN associations
-// are links of the view too (ids from wlan::ASSOC_ID0), the views of wlan.rs tell more.
+// are links of the view too (ids from wlan::ASSOC_ID0), the views of wlan.rs tell more.  A port
+// 802.1X keeps closed shows Led::Unauth (amber too; dot1x.rs).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -44,6 +45,8 @@ pub enum Led {
     Up,
     Blocking,
     Learning,
+    /// up, but 802.1X lets only EAPOL through
+    Unauth,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -138,6 +141,10 @@ impl Engine {
             return Led::Down;
         };
         match port.link {
+            Some(li) if port.admin_up && self.link_up(li) && n.bridge.as_ref().is_some_and(|b| b.ports.get(pi as usize).is_some_and(|bp| bp.closed)) => {
+                let _ = li;
+                Led::Unauth
+            }
             Some(li) if port.admin_up && self.link_up(li) => match n.bridge.as_ref().filter(|b| b.stp.on() && b.ports.get(pi as usize).is_some_and(|bp| bp.member)).map(|b| b.stp.state(pi)) {
                 Some(crate::stp::PortState::Learning) => Led::Learning,
                 Some(crate::stp::PortState::Blocking | crate::stp::PortState::Listening | crate::stp::PortState::Discarding) => Led::Blocking,

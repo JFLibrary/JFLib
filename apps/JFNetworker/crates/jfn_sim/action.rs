@@ -282,6 +282,8 @@ pub enum Action {
     Snmp { dev: u32, set: crate::snmpd::SnmpSet },
     /// the debugger of a script service: stop, go on, a step, breakpoints (scriptsvc.rs)
     ScriptDebug { dev: u32, svc: String, op: crate::scriptsvc::DebugOp },
+    /// the file of the supplicant now (a window's form): written, read again (supp.rs)
+    Supplicant { dev: u32, conf: String },
 }
 
 /// why an action was refused (German text through Display)
@@ -419,6 +421,10 @@ impl Engine {
                     self.stp_power(ni, true);
                 }
                 self.wlan_power(ni, on);
+                if !on {
+                    // the bridge's ports close again with the authenticator gone (dot1x.rs)
+                    self.dot1x_power_off(ni);
+                }
                 Ok(())
             }
             Action::PortAdmin { dev, port, up } => {
@@ -664,6 +670,13 @@ impl Engine {
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
+            Action::Supplicant { dev, conf } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                let _ = self.file_mkdir(ni, "/etc/wpa_supplicant", true);
+                self.file_put(ni, crate::supp::CONF, conf.as_bytes(), false).map_err(|e| ActErr::Refused(msg!("{}", e.errno_text())))?;
+                self.supp_reconfigure(ni, None);
+                Ok(())
+            }
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),

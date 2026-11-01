@@ -4,11 +4,15 @@
 //
 //   pmk_psk(passphrase, ssid)          WPA2: PBKDF2-HMAC-SHA1, 4096 rounds, 32 bytes (J.4)
 //   pmk_sae(password, a, b, ra, rb)    WPA3: a stand-in for the PMK of SAE (see below)
+//   pmk_msk(msk)                       WPA-Enterprise: the first 32 bytes of EAP's MSK (12.7.1.3)
+//   Akm                                the key management of a network: Psk, Sae, Eap (AKM 1),
+//                                      EapSha256 (AKM 5); of(Security), and every function here
+//                                      takes it or a bool ("sae", as before)
 //   Ptk::derive(sae, pmk, aa, spa, anonce, snonce)   KCK, KEK and TK: WPA2 the PRF-384 of
-//                                      12.7.1.2 over HMAC-SHA1, WPA3 (AKM 8) KDF-SHA256-384
+//                                      12.7.1.2 over HMAC-SHA1, WPA3 (AKM 8, 5) KDF-SHA256-384
 //   m1 / m2 / m3 / m4                  the four messages as netpkt::eapol::Key
 //   seal(key, ptk, sae, version)       the EAPOL PDU with its MIC (HMAC-SHA1-128 for WPA2, AES-128-
-//                                      CMAC for AKM 8); mic_ok(pdu, ptk, sae) checks one
+//                                      CMAC for AKM 8 and 5); mic_ok(pdu, ptk, sae) checks one
 //   key_data(sae, gtk, igtk) / wrap / unwrap_gtk   message 3's key data: the RSN element, the
 //                                      GTK (and for WPA3 the IGTK) KDE, padded, AES-wrapped
 //   frame(dst, src, pdu)               the Ethernet II frame (ethertype 0x888E)
@@ -28,6 +32,46 @@ use netpkt::Mac;
 
 /// the label of the pairwise key expansion
 const LABEL: &[u8] = b"Pairwise key expansion";
+
+/// the key management of a network
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Akm {
+    Psk,
+    Sae,
+    /// WPA2-Enterprise
+    Eap,
+    /// WPA3-Enterprise
+    EapSha256,
+}
+
+impl From<bool> for Akm {
+    fn from(sae: bool) -> Akm {
+        if sae { Akm::Sae } else { Akm::Psk }
+    }
+}
+
+impl Akm {
+    pub fn of(s: jfn_model::wlan::Security) -> Akm {
+        use jfn_model::wlan::Security;
+        match s {
+            Security::Wpa3 => Akm::Sae,
+            Security::Wpa2Ent => Akm::Eap,
+            Security::Wpa3Ent => Akm::EapSha256,
+            _ => Akm::Psk,
+        }
+    }
+    /// KDF-SHA256 and AES-128-CMAC (else the PRF and HMAC-SHA1)
+    fn sha256(self) -> bool {
+        matches!(self, Akm::Sae | Akm::EapSha256)
+    }
+}
+
+/// the PMK of WPA-Enterprise: the first 256 bits of the MSK
+pub fn pmk_msk(msk: &[u8; 64]) -> [u8; 32] {
+    let mut p = [0u8; 32];
+    p.copy_from_slice(&msk[..32]);
+    p
+}
 
 /// the PMK of WPA2-Personal: PBKDF2-HMAC-SHA1(passphrase, SSID, 4096, 256 bits)
 pub fn pmk_psk(passphrase: &str, ssid: &str) -> [u8; 32] {
@@ -115,9 +159,9 @@ pub fn kdf_sha256(key: &[u8], label: &[u8], context: &[u8], bits: usize) -> Vec<
 
 impl Ptk {
     /// the keys of a handshake: WPA2 (AKM 2) the PRF-384, WPA3 (AKM 8) KDF-SHA256-384
-    pub fn derive(sae: bool, pmk: &[u8; 32], aa: Mac, spa: Mac, anonce: &[u8; 32], snonce: &[u8; 32]) -> Ptk {
+    pub fn derive(akm: impl Into<Akm>, pmk: &[u8; 32], aa: Mac, spa: Mac, anonce: &[u8; 32], snonce: &[u8; 32]) -> Ptk {
         let ctx = context(aa, spa, anonce, snonce);
-        let b = if sae { kdf_sha256(pmk, LABEL, &ctx, 384) } else { prf_sha1(pmk, LABEL, &ctx, 384) };
+        let b = if akm.into().sha256() { kdf_sha256(pmk, LABEL, &ctx, 384) } else { prf_sha1(pmk, LABEL, &ctx, 384) };
         let mut p = Ptk { kck: [0; 16], kek: [0; 16], tk: [0; 16] };
         p.kck.copy_from_slice(&b[..16]);
         p.kek.copy_from_slice(&b[16..32]);
@@ -126,40 +170,51 @@ impl Ptk {
     }
 }
 
-/// the key descriptor version: 2 (HMAC-SHA1-128, AES key wrap) for WPA2, 0 (defined by AKM 8)
-/// for WPA3
-fn kdv(sae: bool) -> u16 {
-    if sae { eapol::KDV_AKM } else { eapol::KDV_SHA1 }
+/// the key descriptor version: 2 (HMAC-SHA1-128, AES key wrap) for AKM 2 and 1, 0 (defined by
+/// the AKM) for 8, 3 (AES-128-CMAC) for 5
+fn kdv(a: Akm) -> u16 {
+    match a {
+        Akm::Sae => eapol::KDV_AKM,
+        Akm::EapSha256 => eapol::KDV_CMAC,
+        Akm::Psk | Akm::Eap => eapol::KDV_SHA1,
+    }
 }
 
-/// the RSN element of a network (CCMP, PSK or SAE; WPA3 requires management frame protection)
-pub fn rsne(sae: bool) -> Rsne {
-    if sae { Rsne { akm: eapol::AKM_SAE, caps: eapol::RSN_MFPR | eapol::RSN_MFPC } } else { Rsne { akm: eapol::AKM_PSK, caps: 0 } }
+/// the RSN element of a network (CCMP, its AKM; WPA3 requires management frame protection)
+pub fn rsne(akm: impl Into<Akm>) -> Rsne {
+    let mfp = eapol::RSN_MFPR | eapol::RSN_MFPC;
+    match akm.into() {
+        Akm::Psk => Rsne { akm: eapol::AKM_PSK, caps: 0 },
+        Akm::Sae => Rsne { akm: eapol::AKM_SAE, caps: mfp },
+        Akm::Eap => Rsne { akm: eapol::AKM_8021X, caps: 0 },
+        Akm::EapSha256 => Rsne { akm: eapol::AKM_8021X_SHA256, caps: mfp },
+    }
 }
 
 /// message 1: the AP's nonce
-pub fn m1(sae: bool, replay: u64, anonce: &[u8; 32]) -> Key {
-    Key { info: kdv(sae) | KI_PAIRWISE | KI_ACK, key_len: 16, replay, nonce: *anonce, ..Key::default() }
+pub fn m1(akm: impl Into<Akm>, replay: u64, anonce: &[u8; 32]) -> Key {
+    Key { info: kdv(akm.into()) | KI_PAIRWISE | KI_ACK, key_len: 16, replay, nonce: *anonce, ..Key::default() }
 }
 
 /// message 2: the station's nonce and its RSN element, with a MIC
-pub fn m2(sae: bool, replay: u64, snonce: &[u8; 32]) -> Key {
-    Key { info: kdv(sae) | KI_PAIRWISE | KI_MIC, key_len: 0, replay, nonce: *snonce, data: rsne(sae).to_bytes(), ..Key::default() }
+pub fn m2(akm: impl Into<Akm>, replay: u64, snonce: &[u8; 32]) -> Key {
+    let a = akm.into();
+    Key { info: kdv(a) | KI_PAIRWISE | KI_MIC, key_len: 0, replay, nonce: *snonce, data: rsne(a).to_bytes(), ..Key::default() }
 }
 
 /// message 3: install, the AP's nonce again, the wrapped key data
-pub fn m3(sae: bool, replay: u64, anonce: &[u8; 32], wrapped: Vec<u8>) -> Key {
-    Key { info: kdv(sae) | KI_PAIRWISE | KI_INSTALL | KI_ACK | KI_MIC | KI_SECURE | KI_ENCRYPTED, key_len: 16, replay, nonce: *anonce, data: wrapped, ..Key::default() }
+pub fn m3(akm: impl Into<Akm>, replay: u64, anonce: &[u8; 32], wrapped: Vec<u8>) -> Key {
+    Key { info: kdv(akm.into()) | KI_PAIRWISE | KI_INSTALL | KI_ACK | KI_MIC | KI_SECURE | KI_ENCRYPTED, key_len: 16, replay, nonce: *anonce, data: wrapped, ..Key::default() }
 }
 
 /// message 4: the acknowledgement
-pub fn m4(sae: bool, replay: u64) -> Key {
-    Key { info: kdv(sae) | KI_PAIRWISE | KI_MIC | KI_SECURE, key_len: 0, replay, ..Key::default() }
+pub fn m4(akm: impl Into<Akm>, replay: u64) -> Key {
+    Key { info: kdv(akm.into()) | KI_PAIRWISE | KI_MIC | KI_SECURE, key_len: 0, replay, ..Key::default() }
 }
 
 /// the MIC of a PDU with its MIC field zero
-fn mic(sae: bool, kck: &[u8; 16], zeroed: &[u8]) -> [u8; 16] {
-    if sae {
+fn mic(a: Akm, kck: &[u8; 16], zeroed: &[u8]) -> [u8; 16] {
+    if a.sha256() {
         crypto::cmac_aes(kck, zeroed).unwrap_or([0; 16])
     } else {
         let h = crypto::hmac_sha1(kck, zeroed);
@@ -170,31 +225,32 @@ fn mic(sae: bool, kck: &[u8; 16], zeroed: &[u8]) -> [u8; 16] {
 }
 
 /// the EAPOL PDU of a key message; with the MIC bit, its MIC under the KCK
-pub fn seal(k: &Key, ptk: Option<&Ptk>, sae: bool, version: u8) -> Vec<u8> {
+pub fn seal(k: &Key, ptk: Option<&Ptk>, akm: impl Into<Akm>, version: u8) -> Vec<u8> {
     let mut pdu = k.pdu(version);
     if k.has(KI_MIC)
         && let Some(p) = ptk
         && let Some(z) = eapol::mic_input(&pdu)
     {
-        let m = mic(sae, &p.kck, &z);
+        let m = mic(akm.into(), &p.kck, &z);
         eapol::set_mic(&mut pdu, &m);
     }
     pdu
 }
 
 /// the MIC of a received PDU is right under these keys
-pub fn mic_ok(pdu: &[u8], ptk: &Ptk, sae: bool) -> bool {
+pub fn mic_ok(pdu: &[u8], ptk: &Ptk, akm: impl Into<Akm>) -> bool {
     let Some(z) = eapol::mic_input(pdu) else { return false };
     let Some(k) = eapol::EapolView::parse(pdu).and_then(|v| Key::parse(v.body())) else { return false };
-    crypto::ct_eq(&mic(sae, &ptk.kck, &z), &k.mic)
+    crypto::ct_eq(&mic(akm.into(), &ptk.kck, &z), &k.mic)
 }
 
 /// message 3's key data before the wrap: the AP's RSN element, the GTK (key 1) and, with
 /// management frame protection (WPA3), the IGTK (key 4), padded
-pub fn key_data(sae: bool, gtk: &[u8; 16], igtk: &[u8; 16]) -> Vec<u8> {
-    let mut d = rsne(sae).to_bytes();
+pub fn key_data(akm: impl Into<Akm>, gtk: &[u8; 16], igtk: &[u8; 16]) -> Vec<u8> {
+    let a = akm.into();
+    let mut d = rsne(a).to_bytes();
     d.extend_from_slice(&eapol::kde_gtk(1, gtk));
-    if sae {
+    if a.sha256() {
         d.extend_from_slice(&eapol::kde_igtk(4, 0, igtk));
     }
     eapol::pad_key_data(&d)

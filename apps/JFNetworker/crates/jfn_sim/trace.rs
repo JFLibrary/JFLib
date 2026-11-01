@@ -480,6 +480,8 @@ pub enum Note {
     /// logins, AAA, RADIUS and the vty telnet sessions (aaa.rs, radiusd.rs, telnetd.rs;
     /// aaatrace.rs: layer 7)
     Aaa(crate::aaatrace::ANote),
+    /// a decision of 802.1X (dot1xtrace.rs)
+    Dot1x(crate::dot1xtrace::DNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -607,6 +609,7 @@ impl Note {
             Note::Mail(_) => 7,
             Note::Snmp(_) => 7,
             Note::Aaa(_) => 7,
+            Note::Dot1x(_) => 2,
             _ => 2,
         }
     }
@@ -751,6 +754,7 @@ impl Note {
             || matches!(self, Note::Mail(n) if n.is_drop())
             || matches!(self, Note::Snmp(n) if n.is_drop())
             || matches!(self, Note::Aaa(n) if n.is_drop())
+            || matches!(self, Note::Dot1x(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1189,6 +1193,7 @@ impl Note {
             Note::Mail(n) => n.message(),
             Note::Snmp(n) => n.message(),
             Note::Aaa(n) => n.message(),
+            Note::Dot1x(n) => n.message(),
         }
     }
 }
@@ -1660,6 +1665,7 @@ impl Note {
             Note::Mail(n) => n.mask(),
             Note::Snmp(n) => n.mask(),
             Note::Aaa(n) => n.mask(),
+            Note::Dot1x(n) => n.mask(),
             _ => 0,
         }
     }
