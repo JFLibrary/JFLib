@@ -1,0 +1,4 @@
+#!args --test bench_smoke
+# short runs of the benchmark's frame loop with --verify (small N, 30 frames): indirect and
+# single offscreen, a window with FIFO and IMMEDIATE; the long measurements are run by hand
+# (gputest --bench N, docs/GPU.md "Messszene")

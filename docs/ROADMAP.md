@@ -1503,8 +1503,90 @@ Fensterrand hinaus.
 
 ## 8. Rendering
 
-- **P2** · *fehlt* · GPU-Rendering (D3D11 / Vulkan / OpenGL / WebGPU); heute rechnet alles
-  die CPU.
+- **P2** · *entschieden* (2026-10-31) · Allgemeiner GPU-Support in der Library für die UI,
+  2D-CAD und 3D-Spiele (Entscheidungsvorlage „GPU-Rendering in JFLib“, Fassung vom
+  31.10.2026, alle acht Empfehlungen freigegeben).
+  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal später für
+    einen nativen Apple-Port; D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
+    VMs, WARP). D3D11, WebGL2 und GLES entfallen.
+  - Shader in WGSL mit eigenem Compiler nach SPIR-V (später MSL); der Browser nimmt WGSL direkt.
+  - Linux: GUI- und Spielprogramme werden dynamisch gegen glibc gelinkt (sonst nichts),
+    `libvulkan.so.1` per `dlopen`, Threads über `pthread_create` (der rohe `clone` in
+    `linux_thread.rs` hat keinen TLS, den Treiber voraussetzen), das Bild als dmabuf über den
+    eigenen Wayland- und X11-Code (`zwp_linux_dmabuf_v1`, DRI3/Present). Kommandozeilen- und
+    Serverprogramme bleiben statisch ohne libc.
+  - Zwei Funktionsstufen der GPU-Schicht: Basis (was WebGPU und Vulkan 1.1 können: Compute,
+    Speicherpuffer, einzelnes indirektes Zeichnen) und Voll (Vulkan 1.3: Bindless, indirektes
+    Zeichnen mit Anzahl aus der GPU, Subgroups; Mesh-Shader und Raytracing, wo vorhanden).
+  - Die UI rastert weiter auf der CPU und bleibt pixelgleich; die GPU übernimmt Ausgabe,
+    Ebenen, Bilder und Leinwände. Ohne GPU zeichnet die UI wie heute.
+  - Reihenfolge: G1 GPU-Schicht und Messszene (Windows), G2 Shader-Compiler, G3 UI über die
+    GPU, G4 Linux / Android / Browser, G5 3D-Engine-Kern, G6 2D-Renderer für CAD, G7
+    Spiel-Bausteine. Über G5 wird nach der Messung aus G1 entschieden.
+- **P2** · *erledigt* (2026-10-31) · G1a: GPU-Schicht `lib/gpu` mit Vulkan unter Windows
+  ([GPU.md](GPU.md)). `vulkan-1.dll` wird nur aus System32 geladen (das Programm startet ohne
+  Vulkan), die handgeschriebene FFI ist gegen `vulkan_core.h` geprüft (Konstanten, 91
+  Strukturgrößen und -offsets). Adapter (diskrete zuerst, `jfgui_GPU_ADAPTER`), Funktionsstufen
+  Basis / Voll, Puffer (Device / Upload / Readback), Texturen (2D, Arrays, Cube, 3D, Mips,
+  Tiefe, BC), Sampler, Bind-Groups und auf Voll eine Bindless-Tabelle, Compute- und
+  Render-Pipelines (Dynamic Rendering, Vertex-Pulling), Befehlslisten mit indirektem Zeichnen
+  (auf Voll auch mit Anzahl aus der GPU), Timeline-Semaphoren, GPU-Zeitstempel, Swapchain auf
+  einem plat-Fenster (`plat::win_native`; FIFO, MAILBOX, IMMEDIATE, Größe, minimiert),
+  Gerät-verloren mit neuem Gerät danach; `jfgui_GPU=0` schaltet ab, `jfgui_GPU_VALIDATE=1`
+  nimmt die Khronos-Validierung samt Synchronisationsprüfung dazu (nur zum Testen, Vulkan SDK).
+  `gputest`: zehn Skripte, alle auch unter Validierung ohne Meldung; die Validierung fand zwei
+  echte Fehler (Swapchain vor dem Ende eines Presents zerstört, Zeitstempel ungelöscht
+  gelesen). Gemessen (RTX 2070 SUPER, Treiber 610.88, Ryzen 5 3600, 165-Hz-Bildschirm,
+  Dev-Build): Instanz beim ersten Mal 440–880 ms, danach 23–32 ms; Gerät 65–110 ms;
+  Swapchain 58–700 ms; Löschen und Zeigen FIFO 6,06 ms je Bild, MAILBOX 3,1 ms, IMMEDIATE
+  0,39 ms (Median); 1 Mio. Elemente Compute samt Zurücklesen 1,0–1,5 ms. Es fehlen: Linux,
+  Android und Browser (G4), eine zweite Queue, Spezialisierungskonstanten, Pipeline-Cache,
+  MSAA, Stencil, Textur-zu-Textur-Kopien, ein Ring für Uploads (jeder Submit mit Uploads nimmt
+  mindestens 4 MiB Staging); die Wege für Vulkan 1.1 / 1.2 sind ungetestet.
+- **P2** · *erledigt* (2026-10-31) · G1b: SPIR-V-Schreiber `lib/shader` ([SHADER.md](SHADER.md)):
+  Modul-Builder für SPIR-V 1.3 bis 1.6 (Typen und Konstanten ohne Doppelte, Fähigkeiten
+  automatisch, strukturierter Kontrollfluss, Schnittstellenlisten je Version), Disassembler
+  (gleiche Ausgabe wie `spirv-dis` für alle zwölf Module der Messszene), eigene Prüfung mit 15
+  Regeln (kein vollständiges spirv-val; die Lücken stehen in SHADER.md), std140- / std430-Layouts,
+  die sechs Shader der Messszene (`move`, `cull_reset`, `cull`, `vs_instanced`, `vs_single`,
+  `fs_lambert`) samt CPU-Fassungen von `move` und `cull`. `shadertest`: 300 Prüfungen, darunter
+  ein SPIR-V-Interpreter (Bewegen und Sichtbarkeit bitgleich zur CPU-Fassung) und, wenn das SDK
+  da ist, `spirv-val` (nimmt alle Module an, lehnt 33 von 34 kaputten ab; die Ausnahme ist die
+  Gerätegrenze für Push-Konstanten). Es fehlen: Mesh- und Task-Shader, Subgroups,
+  Spezialisierungskonstanten, MSL, die WGSL-Seite (G2).
+- **P2** · *erledigt* (2026-11-01) · G1c: Messszene in `gputest` mit `lib/gpu` und den
+  Shadern aus `lib/shader` (`gputest --bench N`, [GPU.md](GPU.md) „Messszene“): bis 1 000 000
+  bewegte Würfel, Bewegen und Sichtbarkeit per Compute-Shader, ein indirekter Zeichenbefehl
+  gegen einen je Objekt, drei Bilder in Arbeit; je Bild wandert nur die Kamera (176 Byte) zur
+  GPU. `gputest`: zwölf Skripte, alle auch unter Validierung ohne Meldung; `move` bitgleich zu
+  `move_all`, `cull` gleich `cull_ref`, ein Bild bekannter Würfel (oben, rechts, Farbe,
+  Tiefenfolge, Rückseiten weg), indirekt und einzeln pixelgleich. Dabei behoben: die Kamera
+  aus `lib/shader` rechnet jetzt in der Bildschirmausrichtung von `lib/gpu` (NDC y oben, sonst
+  stand das Bild kopf), und `lib/gpu` schaltet das Vulkan-Speichermodell nur mit seinem
+  Geräte-Scope ein (sonst lehnt die Validierung jedes Atomic im Geräte-Scope ab). Gemessen
+  (Release-Build, RTX 2070 SUPER, Median aus drei Läufen, etwa 53 % der Würfel sichtbar):
+  indirekt 1 Mio. Würfel 1,71 ms je Bild in 1080p (545 fps) und 2,54 ms in 4K (380 fps),
+  100 000 Würfel 0,30 ms in 1080p; Vollbild 1080p ohne Vsync 1,87 ms bei 1 Mio.; die CPU
+  braucht je Bild 0,06–0,14 ms. Ein Zeichenbefehl je Objekt: 1 Mio. 90 ms (11 fps), 100 000
+  8,5 ms, CPU-gebunden mit etwa 90 ns je Objekt bei 10–15 % GPU-Last. Engpass indirekt:
+  Geometriedurchsatz (6,35 Mio. Dreiecke je Bild bei 1 Mio., 3,5 Mrd. Dreiecke/s in 1080p),
+  in 4K zusätzlich Rasterung und Pixel; `cull` liest mit etwa 360 GB/s. Für G5 folgt daraus:
+  Verdeckung (Hi-Z in zwei Durchgängen), Detailstufen, kompakte Objektdaten für die
+  Sichtbarkeit, eine zweite Queue für Compute neben dem Zeichnen, Instanzlisten je Mesh statt
+  Befehlen je Objekt. Es fehlen in `lib/gpu`: eine zweite Queue, Abfragen der
+  Pipeline-Statistik.
+- **P2** · *fehlt* · G2: Shader-Compiler WGSL → SPIR-V mit Fehlermeldungen mit Zeile.
+- **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
+  Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
+  und Diagramm.
+- **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
+  Auflösungsgrenze), Browser (WebGPU).
+- **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
+  Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
+- **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
+  Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). G7: Spiel-Bausteine
+  (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall,
+  GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
   die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge

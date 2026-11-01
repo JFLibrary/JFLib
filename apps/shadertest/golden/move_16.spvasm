@@ -1,0 +1,513 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos; 0
+; Bound: 323
+; Schema: 0
+               OpCapability Shader
+        %159 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %objects %pc %gl_GlobalInvocationID
+               OpExecutionMode %main LocalSize 256 1 1
+               OpName %Object "Object"
+               OpMemberName %Object 0 "pos"
+               OpMemberName %Object 1 "scale"
+               OpMemberName %Object 2 "rot"
+               OpMemberName %Object 3 "color"
+               OpMemberName %Object 4 "radius"
+               OpName %Objects "Objects"
+               OpMemberName %Objects 0 "items"
+               OpName %objects "objects"
+               OpName %Push "Push"
+               OpMemberName %Push 0 "time"
+               OpMemberName %Push 1 "count"
+               OpMemberName %Push 2 "seed"
+               OpMemberName %Push 3 "extent"
+               OpMemberName %Push 4 "object_index"
+               OpName %pc "pc"
+               OpName %main "main"
+               OpName %gl_GlobalInvocationID "gl_GlobalInvocationID"
+               OpMemberDecorate %Object 0 Offset 0
+               OpMemberDecorate %Object 1 Offset 12
+               OpMemberDecorate %Object 2 Offset 16
+               OpMemberDecorate %Object 3 Offset 32
+               OpMemberDecorate %Object 4 Offset 44
+               OpDecorate %_runtimearr_Object ArrayStride 48
+               OpMemberDecorate %Objects 0 Offset 0
+               OpDecorate %Objects Block
+               OpDecorate %objects DescriptorSet 0
+               OpDecorate %objects Binding 1
+               OpMemberDecorate %Push 0 Offset 0
+               OpMemberDecorate %Push 1 Offset 4
+               OpMemberDecorate %Push 2 Offset 8
+               OpMemberDecorate %Push 3 Offset 12
+               OpMemberDecorate %Push 4 Offset 16
+               OpDecorate %Push Block
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %124 NoContraction
+               OpDecorate %127 NoContraction
+               OpDecorate %130 NoContraction
+               OpDecorate %133 NoContraction
+               OpDecorate %136 NoContraction
+               OpDecorate %139 NoContraction
+               OpDecorate %142 NoContraction
+               OpDecorate %146 NoContraction
+               OpDecorate %147 NoContraction
+               OpDecorate %148 NoContraction
+               OpDecorate %150 NoContraction
+               OpDecorate %151 NoContraction
+               OpDecorate %152 NoContraction
+               OpDecorate %153 NoContraction
+               OpDecorate %155 NoContraction
+               OpDecorate %156 NoContraction
+               OpDecorate %157 NoContraction
+               OpDecorate %158 NoContraction
+               OpDecorate %161 NoContraction
+               OpDecorate %163 NoContraction
+               OpDecorate %164 NoContraction
+               OpDecorate %166 NoContraction
+               OpDecorate %168 NoContraction
+               OpDecorate %169 NoContraction
+               OpDecorate %171 NoContraction
+               OpDecorate %172 NoContraction
+               OpDecorate %174 NoContraction
+               OpDecorate %175 NoContraction
+               OpDecorate %177 NoContraction
+               OpDecorate %178 NoContraction
+               OpDecorate %180 NoContraction
+               OpDecorate %181 NoContraction
+               OpDecorate %183 NoContraction
+               OpDecorate %185 NoContraction
+               OpDecorate %186 NoContraction
+               OpDecorate %188 NoContraction
+               OpDecorate %189 NoContraction
+               OpDecorate %191 NoContraction
+               OpDecorate %192 NoContraction
+               OpDecorate %194 NoContraction
+               OpDecorate %195 NoContraction
+               OpDecorate %197 NoContraction
+               OpDecorate %198 NoContraction
+               OpDecorate %199 NoContraction
+               OpDecorate %200 NoContraction
+               OpDecorate %202 NoContraction
+               OpDecorate %203 NoContraction
+               OpDecorate %204 NoContraction
+               OpDecorate %205 NoContraction
+               OpDecorate %206 NoContraction
+               OpDecorate %207 NoContraction
+               OpDecorate %208 NoContraction
+               OpDecorate %209 NoContraction
+               OpDecorate %210 NoContraction
+               OpDecorate %211 NoContraction
+               OpDecorate %212 NoContraction
+               OpDecorate %213 NoContraction
+               OpDecorate %214 NoContraction
+               OpDecorate %216 NoContraction
+               OpDecorate %217 NoContraction
+               OpDecorate %218 NoContraction
+               OpDecorate %219 NoContraction
+               OpDecorate %220 NoContraction
+               OpDecorate %221 NoContraction
+               OpDecorate %222 NoContraction
+               OpDecorate %223 NoContraction
+               OpDecorate %224 NoContraction
+               OpDecorate %225 NoContraction
+               OpDecorate %226 NoContraction
+               OpDecorate %227 NoContraction
+               OpDecorate %228 NoContraction
+               OpDecorate %229 NoContraction
+               OpDecorate %230 NoContraction
+               OpDecorate %231 NoContraction
+               OpDecorate %232 NoContraction
+               OpDecorate %233 NoContraction
+               OpDecorate %234 NoContraction
+               OpDecorate %235 NoContraction
+               OpDecorate %236 NoContraction
+               OpDecorate %237 NoContraction
+               OpDecorate %238 NoContraction
+               OpDecorate %239 NoContraction
+               OpDecorate %240 NoContraction
+               OpDecorate %241 NoContraction
+               OpDecorate %242 NoContraction
+               OpDecorate %243 NoContraction
+               OpDecorate %244 NoContraction
+               OpDecorate %245 NoContraction
+               OpDecorate %246 NoContraction
+               OpDecorate %247 NoContraction
+               OpDecorate %249 NoContraction
+               OpDecorate %250 NoContraction
+               OpDecorate %251 NoContraction
+               OpDecorate %252 NoContraction
+               OpDecorate %253 NoContraction
+               OpDecorate %254 NoContraction
+               OpDecorate %255 NoContraction
+               OpDecorate %256 NoContraction
+               OpDecorate %257 NoContraction
+               OpDecorate %258 NoContraction
+               OpDecorate %259 NoContraction
+               OpDecorate %260 NoContraction
+               OpDecorate %261 NoContraction
+               OpDecorate %262 NoContraction
+               OpDecorate %263 NoContraction
+               OpDecorate %264 NoContraction
+               OpDecorate %265 NoContraction
+               OpDecorate %266 NoContraction
+               OpDecorate %267 NoContraction
+               OpDecorate %268 NoContraction
+               OpDecorate %269 NoContraction
+               OpDecorate %270 NoContraction
+               OpDecorate %271 NoContraction
+               OpDecorate %272 NoContraction
+               OpDecorate %273 NoContraction
+               OpDecorate %274 NoContraction
+               OpDecorate %275 NoContraction
+               OpDecorate %276 NoContraction
+               OpDecorate %277 NoContraction
+               OpDecorate %278 NoContraction
+               OpDecorate %279 NoContraction
+               OpDecorate %280 NoContraction
+               OpDecorate %281 NoContraction
+               OpDecorate %283 NoContraction
+               OpDecorate %284 NoContraction
+               OpDecorate %285 NoContraction
+               OpDecorate %287 NoContraction
+               OpDecorate %294 NoContraction
+               OpDecorate %297 NoContraction
+               OpDecorate %298 NoContraction
+               OpDecorate %302 NoContraction
+               OpDecorate %303 NoContraction
+               OpDecorate %304 NoContraction
+               OpDecorate %309 NoContraction
+               OpDecorate %310 NoContraction
+               OpDecorate %311 NoContraction
+               OpDecorate %314 NoContraction
+       %void = OpTypeVoid
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+    %v3float = OpTypeVector %float 3
+    %v4float = OpTypeVector %float 4
+     %v3uint = OpTypeVector %uint 3
+     %Object = OpTypeStruct %v3float %float %v4float %v3float %float
+%_runtimearr_Object = OpTypeRuntimeArray %Object
+    %Objects = OpTypeStruct %_runtimearr_Object
+%_ptr_StorageBuffer_Objects = OpTypePointer StorageBuffer %Objects
+    %objects = OpVariable %_ptr_StorageBuffer_Objects StorageBuffer
+       %Push = OpTypeStruct %float %uint %uint %float %uint
+%_ptr_PushConstant_Push = OpTypePointer PushConstant %Push
+         %pc = OpVariable %_ptr_PushConstant_Push PushConstant
+         %17 = OpTypeFunction %void
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+     %uint_1 = OpConstant %uint 1
+%_ptr_PushConstant_uint = OpTypePointer PushConstant %uint
+       %bool = OpTypeBool
+     %uint_0 = OpConstant %uint 0
+%_ptr_PushConstant_float = OpTypePointer PushConstant %float
+     %uint_2 = OpConstant %uint 2
+     %uint_3 = OpConstant %uint 3
+%uint_747796405 = OpConstant %uint 747796405
+%uint_2891336453 = OpConstant %uint 2891336453
+%uint_277803737 = OpConstant %uint 277803737
+    %uint_28 = OpConstant %uint 28
+     %uint_4 = OpConstant %uint 4
+    %uint_22 = OpConstant %uint 22
+     %uint_8 = OpConstant %uint 8
+%float_5_96046448en08 = OpConstant %float 5.96046448e-08
+  %float_0_5 = OpConstant %float 0.5
+%float_0_100000001 = OpConstant %float 0.100000001
+%float_0_899999976 = OpConstant %float 0.899999976
+ %float_0_25 = OpConstant %float 0.25
+%float_0_200000003 = OpConstant %float 0.200000003
+%float_3_14159274 = OpConstant %float 3.14159274
+%float_n2_50521079en08 = OpConstant %float -2.50521079e-08
+%float_2_75573188en06 = OpConstant %float 2.75573188e-06
+%float_n0_000198412701 = OpConstant %float -0.000198412701
+%float_0_00833333377 = OpConstant %float 0.00833333377
+%float_n0_166666672 = OpConstant %float -0.166666672
+    %float_1 = OpConstant %float 1
+%float_2_08767559en09 = OpConstant %float 2.08767559e-09
+%float_n2_755732en07 = OpConstant %float -2.755732e-07
+%float_2_48015876en05 = OpConstant %float 2.48015876e-05
+%float_n0_00138888892 = OpConstant %float -0.00138888892
+%float_0_0416666679 = OpConstant %float 0.0416666679
+ %float_n0_5 = OpConstant %float -0.5
+    %float_2 = OpConstant %float 2
+   %uint_255 = OpConstant %uint 255
+%float_0_00392156886 = OpConstant %float 0.00392156886
+%float_0_349999994 = OpConstant %float 0.349999994
+%float_0_649999976 = OpConstant %float 0.649999976
+    %uint_16 = OpConstant %uint 16
+%float_1_73205078 = OpConstant %float 1.73205078
+%_ptr_StorageBuffer_v3float = OpTypePointer StorageBuffer %v3float
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+       %main = OpFunction %void None %17
+         %18 = OpLabel
+         %21 = OpLoad %v3uint %gl_GlobalInvocationID
+         %22 = OpCompositeExtract %uint %21 0
+         %25 = OpAccessChain %_ptr_PushConstant_uint %pc %uint_1
+         %26 = OpLoad %uint %25
+         %28 = OpULessThan %bool %22 %26
+               OpSelectionMerge %30 None
+               OpBranchConditional %28 %29 %30
+         %29 = OpLabel
+         %33 = OpAccessChain %_ptr_PushConstant_float %pc %uint_0
+         %34 = OpLoad %float %33
+         %36 = OpAccessChain %_ptr_PushConstant_uint %pc %uint_2
+         %37 = OpLoad %uint %36
+         %39 = OpAccessChain %_ptr_PushConstant_float %pc %uint_3
+         %40 = OpLoad %float %39
+         %41 = OpBitwiseXor %uint %22 %37
+         %48 = OpIMul %uint %41 %uint_747796405
+         %49 = OpIAdd %uint %48 %uint_2891336453
+         %50 = OpShiftRightLogical %uint %49 %uint_28
+         %51 = OpIAdd %uint %50 %uint_4
+         %52 = OpShiftRightLogical %uint %49 %51
+         %53 = OpBitwiseXor %uint %52 %49
+         %54 = OpIMul %uint %53 %uint_277803737
+         %55 = OpShiftRightLogical %uint %54 %uint_22
+         %56 = OpBitwiseXor %uint %55 %54
+         %57 = OpIMul %uint %56 %uint_747796405
+         %58 = OpIAdd %uint %57 %uint_2891336453
+         %59 = OpShiftRightLogical %uint %58 %uint_28
+         %60 = OpIAdd %uint %59 %uint_4
+         %61 = OpShiftRightLogical %uint %58 %60
+         %62 = OpBitwiseXor %uint %61 %58
+         %63 = OpIMul %uint %62 %uint_277803737
+         %64 = OpShiftRightLogical %uint %63 %uint_22
+         %65 = OpBitwiseXor %uint %64 %63
+         %66 = OpIMul %uint %65 %uint_747796405
+         %67 = OpIAdd %uint %66 %uint_2891336453
+         %68 = OpShiftRightLogical %uint %67 %uint_28
+         %69 = OpIAdd %uint %68 %uint_4
+         %70 = OpShiftRightLogical %uint %67 %69
+         %71 = OpBitwiseXor %uint %70 %67
+         %72 = OpIMul %uint %71 %uint_277803737
+         %73 = OpShiftRightLogical %uint %72 %uint_22
+         %74 = OpBitwiseXor %uint %73 %72
+         %75 = OpIMul %uint %74 %uint_747796405
+         %76 = OpIAdd %uint %75 %uint_2891336453
+         %77 = OpShiftRightLogical %uint %76 %uint_28
+         %78 = OpIAdd %uint %77 %uint_4
+         %79 = OpShiftRightLogical %uint %76 %78
+         %80 = OpBitwiseXor %uint %79 %76
+         %81 = OpIMul %uint %80 %uint_277803737
+         %82 = OpShiftRightLogical %uint %81 %uint_22
+         %83 = OpBitwiseXor %uint %82 %81
+         %84 = OpIMul %uint %83 %uint_747796405
+         %85 = OpIAdd %uint %84 %uint_2891336453
+         %86 = OpShiftRightLogical %uint %85 %uint_28
+         %87 = OpIAdd %uint %86 %uint_4
+         %88 = OpShiftRightLogical %uint %85 %87
+         %89 = OpBitwiseXor %uint %88 %85
+         %90 = OpIMul %uint %89 %uint_277803737
+         %91 = OpShiftRightLogical %uint %90 %uint_22
+         %92 = OpBitwiseXor %uint %91 %90
+         %93 = OpIMul %uint %92 %uint_747796405
+         %94 = OpIAdd %uint %93 %uint_2891336453
+         %95 = OpShiftRightLogical %uint %94 %uint_28
+         %96 = OpIAdd %uint %95 %uint_4
+         %97 = OpShiftRightLogical %uint %94 %96
+         %98 = OpBitwiseXor %uint %97 %94
+         %99 = OpIMul %uint %98 %uint_277803737
+        %100 = OpShiftRightLogical %uint %99 %uint_22
+        %101 = OpBitwiseXor %uint %100 %99
+        %102 = OpIMul %uint %101 %uint_747796405
+        %103 = OpIAdd %uint %102 %uint_2891336453
+        %104 = OpShiftRightLogical %uint %103 %uint_28
+        %105 = OpIAdd %uint %104 %uint_4
+        %106 = OpShiftRightLogical %uint %103 %105
+        %107 = OpBitwiseXor %uint %106 %103
+        %108 = OpIMul %uint %107 %uint_277803737
+        %109 = OpShiftRightLogical %uint %108 %uint_22
+        %110 = OpBitwiseXor %uint %109 %108
+        %111 = OpIMul %uint %110 %uint_747796405
+        %112 = OpIAdd %uint %111 %uint_2891336453
+        %113 = OpShiftRightLogical %uint %112 %uint_28
+        %114 = OpIAdd %uint %113 %uint_4
+        %115 = OpShiftRightLogical %uint %112 %114
+        %116 = OpBitwiseXor %uint %115 %112
+        %117 = OpIMul %uint %116 %uint_277803737
+        %118 = OpShiftRightLogical %uint %117 %uint_22
+        %119 = OpBitwiseXor %uint %118 %117
+        %121 = OpShiftRightLogical %uint %56 %uint_8
+        %122 = OpConvertUToF %float %121
+        %124 = OpFMul %float %122 %float_5_96046448en08
+        %125 = OpShiftRightLogical %uint %65 %uint_8
+        %126 = OpConvertUToF %float %125
+        %127 = OpFMul %float %126 %float_5_96046448en08
+        %128 = OpShiftRightLogical %uint %74 %uint_8
+        %129 = OpConvertUToF %float %128
+        %130 = OpFMul %float %129 %float_5_96046448en08
+        %131 = OpShiftRightLogical %uint %83 %uint_8
+        %132 = OpConvertUToF %float %131
+        %133 = OpFMul %float %132 %float_5_96046448en08
+        %134 = OpShiftRightLogical %uint %92 %uint_8
+        %135 = OpConvertUToF %float %134
+        %136 = OpFMul %float %135 %float_5_96046448en08
+        %137 = OpShiftRightLogical %uint %101 %uint_8
+        %138 = OpConvertUToF %float %137
+        %139 = OpFMul %float %138 %float_5_96046448en08
+        %140 = OpShiftRightLogical %uint %110 %uint_8
+        %141 = OpConvertUToF %float %140
+        %142 = OpFMul %float %141 %float_5_96046448en08
+        %146 = OpFMul %float %float_0_899999976 %124
+        %147 = OpFAdd %float %float_0_100000001 %146
+        %148 = OpFMul %float %40 %147
+        %150 = OpFMul %float %40 %float_0_25
+        %151 = OpFSub %float %127 %float_0_5
+        %152 = OpFMul %float %150 %151
+        %153 = OpFSub %float %130 %float_0_5
+        %155 = OpFMul %float %153 %float_0_200000003
+        %156 = OpFMul %float %155 %34
+        %157 = OpFAdd %float %133 %156
+        %158 = OpFAdd %float %157 %float_0_5
+        %160 = OpExtInst %float %159 Floor %158
+        %161 = OpFSub %float %157 %160
+        %163 = OpFMul %float %161 %float_3_14159274
+        %164 = OpFMul %float %163 %163
+        %166 = OpFMul %float %164 %float_n2_50521079en08
+        %168 = OpFAdd %float %float_2_75573188en06 %166
+        %169 = OpFMul %float %164 %168
+        %171 = OpFAdd %float %float_n0_000198412701 %169
+        %172 = OpFMul %float %164 %171
+        %174 = OpFAdd %float %float_0_00833333377 %172
+        %175 = OpFMul %float %164 %174
+        %177 = OpFAdd %float %float_n0_166666672 %175
+        %178 = OpFMul %float %164 %177
+        %180 = OpFAdd %float %float_1 %178
+        %181 = OpFMul %float %163 %180
+        %183 = OpFMul %float %164 %float_2_08767559en09
+        %185 = OpFAdd %float %float_n2_755732en07 %183
+        %186 = OpFMul %float %164 %185
+        %188 = OpFAdd %float %float_2_48015876en05 %186
+        %189 = OpFMul %float %164 %188
+        %191 = OpFAdd %float %float_n0_00138888892 %189
+        %192 = OpFMul %float %164 %191
+        %194 = OpFAdd %float %float_0_0416666679 %192
+        %195 = OpFMul %float %164 %194
+        %197 = OpFAdd %float %float_n0_5 %195
+        %198 = OpFMul %float %164 %197
+        %199 = OpFAdd %float %float_1 %198
+        %200 = OpFMul %float %181 %199
+        %202 = OpFMul %float %200 %float_2
+        %203 = OpFMul %float %199 %199
+        %204 = OpFMul %float %181 %181
+        %205 = OpFSub %float %203 %204
+        %206 = OpFMul %float %float_0_5 %136
+        %207 = OpFAdd %float %float_0_25 %206
+        %208 = OpFSub %float %139 %float_0_5
+        %209 = OpFMul %float %208 %34
+        %210 = OpFAdd %float %139 %209
+        %211 = OpFSub %float %142 %float_0_5
+        %212 = OpFMul %float %211 %34
+        %213 = OpFAdd %float %142 %212
+        %214 = OpFAdd %float %210 %float_0_5
+        %215 = OpExtInst %float %159 Floor %214
+        %216 = OpFSub %float %210 %215
+        %217 = OpFMul %float %216 %float_3_14159274
+        %218 = OpFMul %float %217 %217
+        %219 = OpFMul %float %218 %float_n2_50521079en08
+        %220 = OpFAdd %float %float_2_75573188en06 %219
+        %221 = OpFMul %float %218 %220
+        %222 = OpFAdd %float %float_n0_000198412701 %221
+        %223 = OpFMul %float %218 %222
+        %224 = OpFAdd %float %float_0_00833333377 %223
+        %225 = OpFMul %float %218 %224
+        %226 = OpFAdd %float %float_n0_166666672 %225
+        %227 = OpFMul %float %218 %226
+        %228 = OpFAdd %float %float_1 %227
+        %229 = OpFMul %float %217 %228
+        %230 = OpFMul %float %218 %float_2_08767559en09
+        %231 = OpFAdd %float %float_n2_755732en07 %230
+        %232 = OpFMul %float %218 %231
+        %233 = OpFAdd %float %float_2_48015876en05 %232
+        %234 = OpFMul %float %218 %233
+        %235 = OpFAdd %float %float_n0_00138888892 %234
+        %236 = OpFMul %float %218 %235
+        %237 = OpFAdd %float %float_0_0416666679 %236
+        %238 = OpFMul %float %218 %237
+        %239 = OpFAdd %float %float_n0_5 %238
+        %240 = OpFMul %float %218 %239
+        %241 = OpFAdd %float %float_1 %240
+        %242 = OpFMul %float %229 %241
+        %243 = OpFMul %float %242 %float_2
+        %244 = OpFMul %float %241 %241
+        %245 = OpFMul %float %229 %229
+        %246 = OpFSub %float %244 %245
+        %247 = OpFAdd %float %213 %float_0_5
+        %248 = OpExtInst %float %159 Floor %247
+        %249 = OpFSub %float %213 %248
+        %250 = OpFMul %float %249 %float_3_14159274
+        %251 = OpFMul %float %250 %250
+        %252 = OpFMul %float %251 %float_n2_50521079en08
+        %253 = OpFAdd %float %float_2_75573188en06 %252
+        %254 = OpFMul %float %251 %253
+        %255 = OpFAdd %float %float_n0_000198412701 %254
+        %256 = OpFMul %float %251 %255
+        %257 = OpFAdd %float %float_0_00833333377 %256
+        %258 = OpFMul %float %251 %257
+        %259 = OpFAdd %float %float_n0_166666672 %258
+        %260 = OpFMul %float %251 %259
+        %261 = OpFAdd %float %float_1 %260
+        %262 = OpFMul %float %250 %261
+        %263 = OpFMul %float %251 %float_2_08767559en09
+        %264 = OpFAdd %float %float_n2_755732en07 %263
+        %265 = OpFMul %float %251 %264
+        %266 = OpFAdd %float %float_2_48015876en05 %265
+        %267 = OpFMul %float %251 %266
+        %268 = OpFAdd %float %float_n0_00138888892 %267
+        %269 = OpFMul %float %251 %268
+        %270 = OpFAdd %float %float_0_0416666679 %269
+        %271 = OpFMul %float %251 %270
+        %272 = OpFAdd %float %float_n0_5 %271
+        %273 = OpFMul %float %251 %272
+        %274 = OpFAdd %float %float_1 %273
+        %275 = OpFMul %float %262 %274
+        %276 = OpFMul %float %275 %float_2
+        %277 = OpFMul %float %274 %274
+        %278 = OpFMul %float %262 %262
+        %279 = OpFSub %float %277 %278
+        %280 = OpFMul %float %148 %205
+        %281 = OpFMul %float %148 %202
+        %282 = OpCompositeConstruct %v3float %280 %152 %281
+        %283 = OpFMul %float %246 %276
+        %284 = OpFMul %float %243 %279
+        %285 = OpFMul %float %243 %276
+        %286 = OpFNegate %float %285
+        %287 = OpFMul %float %246 %279
+        %288 = OpCompositeConstruct %v4float %283 %284 %286 %287
+        %290 = OpShiftRightLogical %uint %119 %uint_0
+        %291 = OpBitwiseAnd %uint %290 %uint_255
+        %292 = OpConvertUToF %float %291
+        %294 = OpFMul %float %292 %float_0_00392156886
+        %297 = OpFMul %float %float_0_649999976 %294
+        %298 = OpFAdd %float %float_0_349999994 %297
+        %299 = OpShiftRightLogical %uint %119 %uint_8
+        %300 = OpBitwiseAnd %uint %299 %uint_255
+        %301 = OpConvertUToF %float %300
+        %302 = OpFMul %float %301 %float_0_00392156886
+        %303 = OpFMul %float %float_0_649999976 %302
+        %304 = OpFAdd %float %float_0_349999994 %303
+        %306 = OpShiftRightLogical %uint %119 %uint_16
+        %307 = OpBitwiseAnd %uint %306 %uint_255
+        %308 = OpConvertUToF %float %307
+        %309 = OpFMul %float %308 %float_0_00392156886
+        %310 = OpFMul %float %float_0_649999976 %309
+        %311 = OpFAdd %float %float_0_349999994 %310
+        %312 = OpCompositeConstruct %v3float %298 %304 %311
+        %314 = OpFMul %float %207 %float_1_73205078
+        %316 = OpAccessChain %_ptr_StorageBuffer_v3float %objects %uint_0 %22 %uint_0
+               OpStore %316 %282
+        %318 = OpAccessChain %_ptr_StorageBuffer_float %objects %uint_0 %22 %uint_1
+               OpStore %318 %207
+        %320 = OpAccessChain %_ptr_StorageBuffer_v4float %objects %uint_0 %22 %uint_2
+               OpStore %320 %288
+        %321 = OpAccessChain %_ptr_StorageBuffer_v3float %objects %uint_0 %22 %uint_3
+               OpStore %321 %312
+        %322 = OpAccessChain %_ptr_StorageBuffer_float %objects %uint_0 %22 %uint_4
+               OpStore %322 %314
+               OpBranch %30
+         %30 = OpLabel
+               OpReturn
+               OpFunctionEnd

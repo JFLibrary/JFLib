@@ -27,6 +27,10 @@
 //                                     of the presented pixels (a DIB section the rectangles
 //                                     are copied into and BitBlt from): WM_PAINT repaints from
 //                                     it.
+//   win_native(w) -> NativeWindow     (gpu) HWND + HINSTANCE for a GPU surface (lib/gpu); such
+//                                     a window is never given to win_present: without a kept
+//                                     copy WM_PAINT paints nothing and the swapchain's images
+//                                     stay on screen
 //   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
 //   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
 //                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -655,6 +659,21 @@ pub(crate) fn hwnd_main() -> isize {
 #[allow(dead_code)]
 pub(crate) fn hwnd_of(w: i32) -> isize {
     win_hwnd(w)
+}
+
+/// (gpu) the native handles of a platform window for a GPU surface (VK_KHR_win32_surface)
+#[derive(Clone, Copy, Debug)]
+pub struct NativeWindow {
+    pub hwnd: isize,
+    pub hinstance: isize,
+}
+
+/// (gpu) HWND and HINSTANCE of platform window w (None: no such window).  Its pixels then come
+/// from the GPU: do not call win_present for it -- until a frame is presented WM_PAINT has no
+/// kept copy to paint (WM_ERASEBKGND erases nothing, the class has no brush).
+pub fn win_native(w: i32) -> Option<NativeWindow> {
+    let hwnd = win_hwnd(w);
+    if hwnd == 0 { None } else { Some(NativeWindow { hwnd, hinstance: hinst() }) }
 }
 
 /// module instance (g_hinst)

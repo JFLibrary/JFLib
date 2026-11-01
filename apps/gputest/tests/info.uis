@@ -1,0 +1,3 @@
+#!args --test info
+# lib/gpu: instance, adapters (name, vendor, driver, Vulkan version, level), device creation,
+# features and limits; the script itself is ignored (gputest runs its checks and exits)

@@ -1,0 +1,206 @@
+; SPIR-V
+; Version: 1.3
+; Generator: Khronos; 0
+; Bound: 95
+; Schema: 0
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
+               OpExecutionMode %main LocalSize 256 1 1
+               OpName %Object "Object"
+               OpMemberName %Object 0 "pos"
+               OpMemberName %Object 1 "scale"
+               OpMemberName %Object 2 "rot"
+               OpMemberName %Object 3 "color"
+               OpMemberName %Object 4 "radius"
+               OpName %Objects "Objects"
+               OpMemberName %Objects 0 "items"
+               OpName %objects "objects"
+               OpName %Camera "Camera"
+               OpMemberName %Camera 0 "view_proj"
+               OpMemberName %Camera 1 "planes"
+               OpMemberName %Camera 2 "light_dir"
+               OpMemberName %Camera 3 "ambient"
+               OpName %camera "camera"
+               OpName %Visible "Visible"
+               OpMemberName %Visible 0 "index"
+               OpName %visible "visible"
+               OpName %DrawCmd "DrawCmd"
+               OpMemberName %DrawCmd 0 "index_count"
+               OpMemberName %DrawCmd 1 "instance_count"
+               OpMemberName %DrawCmd 2 "first_index"
+               OpMemberName %DrawCmd 3 "vertex_offset"
+               OpMemberName %DrawCmd 4 "first_instance"
+               OpName %draw "draw"
+               OpName %Push "Push"
+               OpMemberName %Push 0 "time"
+               OpMemberName %Push 1 "count"
+               OpMemberName %Push 2 "seed"
+               OpMemberName %Push 3 "extent"
+               OpMemberName %Push 4 "object_index"
+               OpName %pc "pc"
+               OpName %main "main"
+               OpName %inside "inside"
+               OpName %k "k"
+               OpName %gl_GlobalInvocationID "gl_GlobalInvocationID"
+               OpMemberDecorate %Object 0 Offset 0
+               OpMemberDecorate %Object 1 Offset 12
+               OpMemberDecorate %Object 2 Offset 16
+               OpMemberDecorate %Object 3 Offset 32
+               OpMemberDecorate %Object 4 Offset 44
+               OpDecorate %_runtimearr_Object ArrayStride 48
+               OpMemberDecorate %Objects 0 Offset 0
+               OpDecorate %Objects Block
+               OpDecorate %objects DescriptorSet 0
+               OpDecorate %objects Binding 1
+               OpDecorate %objects NonWritable
+               OpDecorate %_arr_v4float_uint_6 ArrayStride 16
+               OpMemberDecorate %Camera 0 Offset 0
+               OpMemberDecorate %Camera 0 ColMajor
+               OpMemberDecorate %Camera 0 MatrixStride 16
+               OpMemberDecorate %Camera 1 Offset 64
+               OpMemberDecorate %Camera 2 Offset 160
+               OpMemberDecorate %Camera 3 Offset 172
+               OpDecorate %Camera Block
+               OpDecorate %camera DescriptorSet 0
+               OpDecorate %camera Binding 0
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpMemberDecorate %Visible 0 Offset 0
+               OpDecorate %Visible Block
+               OpDecorate %visible DescriptorSet 0
+               OpDecorate %visible Binding 2
+               OpMemberDecorate %DrawCmd 0 Offset 0
+               OpMemberDecorate %DrawCmd 1 Offset 4
+               OpMemberDecorate %DrawCmd 2 Offset 8
+               OpMemberDecorate %DrawCmd 3 Offset 12
+               OpMemberDecorate %DrawCmd 4 Offset 16
+               OpDecorate %DrawCmd Block
+               OpDecorate %draw DescriptorSet 0
+               OpDecorate %draw Binding 3
+               OpMemberDecorate %Push 0 Offset 0
+               OpMemberDecorate %Push 1 Offset 4
+               OpMemberDecorate %Push 2 Offset 8
+               OpMemberDecorate %Push 3 Offset 12
+               OpMemberDecorate %Push 4 Offset 16
+               OpDecorate %Push Block
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %71 NoContraction
+               OpDecorate %74 NoContraction
+               OpDecorate %75 NoContraction
+               OpDecorate %78 NoContraction
+               OpDecorate %79 NoContraction
+               OpDecorate %81 NoContraction
+       %void = OpTypeVoid
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+    %v3float = OpTypeVector %float 3
+    %v4float = OpTypeVector %float 4
+     %v3uint = OpTypeVector %uint 3
+     %Object = OpTypeStruct %v3float %float %v4float %v3float %float
+%_runtimearr_Object = OpTypeRuntimeArray %Object
+    %Objects = OpTypeStruct %_runtimearr_Object
+%_ptr_StorageBuffer_Objects = OpTypePointer StorageBuffer %Objects
+    %objects = OpVariable %_ptr_StorageBuffer_Objects StorageBuffer
+%mat4v4float = OpTypeMatrix %v4float 4
+     %uint_6 = OpConstant %uint 6
+%_arr_v4float_uint_6 = OpTypeArray %v4float %uint_6
+     %Camera = OpTypeStruct %mat4v4float %_arr_v4float_uint_6 %v3float %float
+%_ptr_Uniform_Camera = OpTypePointer Uniform %Camera
+     %camera = OpVariable %_ptr_Uniform_Camera Uniform
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+    %Visible = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer_Visible = OpTypePointer StorageBuffer %Visible
+    %visible = OpVariable %_ptr_StorageBuffer_Visible StorageBuffer
+    %DrawCmd = OpTypeStruct %uint %uint %uint %int %uint
+%_ptr_StorageBuffer_DrawCmd = OpTypePointer StorageBuffer %DrawCmd
+       %draw = OpVariable %_ptr_StorageBuffer_DrawCmd StorageBuffer
+       %Push = OpTypeStruct %float %uint %uint %float %uint
+%_ptr_PushConstant_Push = OpTypePointer PushConstant %Push
+         %pc = OpVariable %_ptr_PushConstant_Push PushConstant
+       %bool = OpTypeBool
+         %31 = OpTypeFunction %void
+       %true = OpConstantTrue %bool
+     %uint_0 = OpConstant %uint 0
+%_ptr_Function_bool = OpTypePointer Function %bool
+%_ptr_Function_uint = OpTypePointer Function %uint
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+     %uint_1 = OpConstant %uint 1
+%_ptr_PushConstant_uint = OpTypePointer PushConstant %uint
+%_ptr_StorageBuffer_v3float = OpTypePointer StorageBuffer %v3float
+     %uint_4 = OpConstant %uint 4
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float
+      %false = OpConstantFalse %bool
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+       %main = OpFunction %void None %31
+         %32 = OpLabel
+     %inside = OpVariable %_ptr_Function_bool Function %true
+          %k = OpVariable %_ptr_Function_uint Function %uint_0
+         %41 = OpLoad %v3uint %gl_GlobalInvocationID
+         %42 = OpCompositeExtract %uint %41 0
+         %45 = OpAccessChain %_ptr_PushConstant_uint %pc %uint_1
+         %46 = OpLoad %uint %45
+         %47 = OpULessThan %bool %42 %46
+               OpSelectionMerge %49 None
+               OpBranchConditional %47 %48 %49
+         %48 = OpLabel
+         %51 = OpAccessChain %_ptr_StorageBuffer_v3float %objects %uint_0 %42 %uint_0
+         %52 = OpLoad %v3float %51
+         %55 = OpAccessChain %_ptr_StorageBuffer_float %objects %uint_0 %42 %uint_4
+         %56 = OpLoad %float %55
+         %57 = OpFNegate %float %56
+               OpBranch %58
+         %58 = OpLabel
+               OpLoopMerge %62 %61 None
+               OpBranch %59
+         %59 = OpLabel
+         %63 = OpLoad %uint %k
+         %64 = OpULessThan %bool %63 %uint_6
+               OpBranchConditional %64 %60 %62
+         %60 = OpLabel
+         %65 = OpLoad %uint %k
+         %67 = OpAccessChain %_ptr_Uniform_v4float %camera %uint_1 %65
+         %68 = OpLoad %v4float %67
+         %69 = OpCompositeExtract %float %68 0
+         %70 = OpCompositeExtract %float %52 0
+         %71 = OpFMul %float %69 %70
+         %72 = OpCompositeExtract %float %68 1
+         %73 = OpCompositeExtract %float %52 1
+         %74 = OpFMul %float %72 %73
+         %75 = OpFAdd %float %71 %74
+         %76 = OpCompositeExtract %float %68 2
+         %77 = OpCompositeExtract %float %52 2
+         %78 = OpFMul %float %76 %77
+         %79 = OpFAdd %float %75 %78
+         %80 = OpCompositeExtract %float %68 3
+         %81 = OpFAdd %float %79 %80
+         %82 = OpFOrdLessThan %bool %81 %57
+               OpSelectionMerge %84 None
+               OpBranchConditional %82 %83 %84
+         %83 = OpLabel
+               OpStore %inside %false
+               OpBranch %62
+         %84 = OpLabel
+               OpBranch %61
+         %61 = OpLabel
+         %86 = OpLoad %uint %k
+         %87 = OpIAdd %uint %86 %uint_1
+               OpStore %k %87
+               OpBranch %58
+         %62 = OpLabel
+         %88 = OpLoad %bool %inside
+               OpSelectionMerge %90 None
+               OpBranchConditional %88 %89 %90
+         %89 = OpLabel
+         %92 = OpAccessChain %_ptr_StorageBuffer_uint %draw %uint_1
+         %93 = OpAtomicIAdd %uint %92 %uint_1 %uint_0 %uint_1
+         %94 = OpAccessChain %_ptr_StorageBuffer_uint %visible %uint_0 %93
+               OpStore %94 %42
+               OpBranch %90
+         %90 = OpLabel
+               OpBranch %49
+         %49 = OpLabel
+               OpReturn
+               OpFunctionEnd

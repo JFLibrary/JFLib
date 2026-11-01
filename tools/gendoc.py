@@ -107,6 +107,10 @@ CRATES = [
     ("img_svg", "SVG images and icons: parsed once, drawn at any size through gfx's paths (the format IMGF_SVG)",
      "full"),                                                                              # svg
     ("fx", "effects and adjustments", "full"),
+    ("gpu", "the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, "
+     "swapchains (Vulkan on Windows)", "full"),
+    ("shader", "SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders",
+     "full"),
     ("plat", "the platform layer: process, files, threads, windows (Windows and Linux)", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),

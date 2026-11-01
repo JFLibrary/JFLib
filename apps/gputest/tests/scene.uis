@@ -1,0 +1,4 @@
+#!args --test scene
+# the benchmark scene (lib/shader's shaders on lib/gpu): move = move_all bit for bit, cull =
+# cull_ref, an image of known cubes (orientation, lit colour, depth order, back faces culled)
+# in both modes, the indirect and the single picture of the moving scene compared
