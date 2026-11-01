@@ -821,6 +821,16 @@ fn outline_update(p: &mut Pn, ui: &mut Ui) {
     }
 }
 
+/// the current tool paints an overlay with the image (the canvas's draw callback)
+pub(crate) fn tool_has_overlay(p: &Pn) -> bool {
+    cur_desc(&p.tool).is_some_and(|t| t.overlay.is_some())
+}
+
+/// the brush ring: its place (window px) and radius (24.8)
+pub(crate) fn tool_ring(p: &Pn) -> Option<(i32, i32, i32)> {
+    p.tool.ol_vis.then_some((p.tool.ol_x, p.tool.ol_y, p.tool.ol_r))
+}
+
 // tool_ovl(ctx, doc, &canvas_rect): view overlay: the tool's TD_OVERLAY, the brush outline
 fn tool_ovl(p: &mut Pn, g: &mut Gfx, _ctx: usize, doc: DocId, rect: [i32; 4]) {
     if let Some(f) = cur_desc(&p.tool).and_then(|t| t.overlay) {
