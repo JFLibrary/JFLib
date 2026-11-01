@@ -1,0 +1,5 @@
+#!args --check
+# wgsltest is a console program: it runs every self-check of lib/wgsl (lexer, parser, print
+# round trips, checker rules, constant evaluation, the IR, the benchmark shaders, robustness,
+# compile-time numbers) and ignores the script (build_rs.py test passes --script); a failing
+# check exits with code 1
