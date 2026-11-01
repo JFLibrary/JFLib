@@ -9,8 +9,8 @@ Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird p
 Stand (G1a): Vulkan unter Windows. `vulkan-1.dll` wird zur Laufzeit geladen, das Programm
 startet also auch auf Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
 Vulkan unter Linux und Android, WebGPU im Browser, später Metal -- mit denselben Typen und
-Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows kann die GPU das Ergebnis zeigen
-(G3a, [Ausgabe der UI](#ausgabe-der-ui), noch mit `jfgui_GPU=1` einzuschalten).
+Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows zeigt die GPU das Ergebnis
+(G3a, [Ausgabe der UI](#ausgabe-der-ui), `jfgui_GPU=0` schaltet das ab).
 
 | Teil | Wo |
 | --- | --- |
@@ -241,10 +241,10 @@ zurücklesen.
 ## Ausgabe der UI
 
 Die UI rastert weiter auf der CPU und bleibt pixelgleich; der Framebuffer ist die Wahrheit. Unter
-Windows kann die GPU ihn zeigen ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a): die
+Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a): die
 Änderungsrechtecke, die die Laufzeit ohnehin berechnet, gehen in eine Textur je Fenster, ein
 Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
-Gerät. **Standardmäßig ist das aus; `jfgui_GPU=1` schaltet es ein** (unten: warum). `jfgui_GPU=0`
+Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
 Skript verlangt mit `gpu on` anderes. Andere Ziele linken nichts davon
 (`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
@@ -377,10 +377,10 @@ beim Fleck (dort CPU vorn) noch beim ganzen Bild (dort GPU vorn). Das Lesen des 
 auf DWM und misst nicht bis zum Licht. Unter Dauerfeuer entscheidet die Messung: FIFO läuft fünf
 Bildwechsel hinterher, deshalb MAILBOX. Ein 60-Hz-Monitor war nicht zur Hand.
 
-**Warum es aus bleibt.** Startzeit, Latenz und Größenänderung sind so gut wie auf dem CPU-Pfad,
-der Leerlauf nicht: die Treiberthreads kosten 1,6–5 ms CPU je Sekunde und wecken den Rechner, der CPU-Pfad nichts. Von uns läuft dabei nichts, abstellen ließe es sich nur, indem das Gerät im Leerlauf wegginge (ein neues dauert eine halbe Sekunde). Dazu kommen 47 MiB Working Set, 58 MiB privater und 42 MiB GPU-Speicher je Programm sowie 100 ms beim Prozessende ; dem steht bis G3b kein Gewinn gegenüber, den man
-sehen könnte. Sobald Ebenen und Bilder als GPU-Texturen (G3b) und Leinwände (G3c) etwas einbringen, ist neu zu
-entscheiden. Die Größe der Programme wächst in jedem Fall.
+**Was der Standard kostet.** Seit dem 01.11.2026 ist der Weg standardmäßig an. Startzeit, Latenz und
+Größenänderung sind so gut wie auf dem CPU-Pfad,
+der Leerlauf nicht: die Treiberthreads kosten 1,6–5 ms CPU je Sekunde und wecken den Rechner, der CPU-Pfad nichts. Von uns läuft dabei nichts, abstellen ließe es sich nur, indem das Gerät im Leerlauf wegginge (ein neues dauert eine halbe Sekunde). Dazu kommen 47 MiB Working Set, 58 MiB privater und 42 MiB GPU-Speicher je Programm sowie 100 ms beim Prozessende. Sichtbar bringt der Weg erst mit Ebenen und Bildern als GPU-Texturen (G3b)
+und Leinwänden (G3c) etwas. Die Größe der Programme wächst in jedem Fall.
 
 ### Was fehlt, und was G3b und G3c hieraus nehmen
 
@@ -407,7 +407,7 @@ entscheiden. Die Größe der Programme wächst in jedem Fall.
 | Variable | Wirkung |
 | --- | --- |
 | `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
-| `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)) |
+| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)) |
 | `jfgui_GPU_VERIFY=1` | die UI-Ausgabe liest jedes dargestellte Bild zurück und vergleicht es mit dem Framebuffer (langsam, zum Testen) |
 | `jfgui_GPU_TRACE=1` | die UI-Ausgabe schreibt ihre Schritte und Zeiten auf stderr |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |

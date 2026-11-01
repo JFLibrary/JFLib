@@ -26664,7 +26664,8 @@ and poke our own windows only (no input is injected into the system)
                   (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
                   sending the pixels again) -> microseconds taken
     WT_NOANIM     no DWM transitions for window w (fade-in, minimise) -> 1
-    WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w is window w -> 1 / 0
+    WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w: window w -> 1, its GPU
+                  child -> 2, another window (of any program) -> 0
     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
                   keyboard and the other windows alone) -> 1
   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)

@@ -1646,18 +1646,18 @@ Fensterrand hinaus.
   volle Subgroups bei `@subgroup_size` (`REQUIRE_FULL_SUBGROUPS`), Tests auf anderen GPUs und
   unter Linux.
 - **P2** · *erledigt* (2026-11-01) · G3a: UI-Fenster unter Windows zeigen ihr Bild über eine
-  Swapchain, mit `jfgui_GPU=1` einzuschalten
+  Swapchain, standardmäßig an (`jfgui_GPU=0` schaltet ab)
   ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), [GPU.md](GPU.md#ausgabe-der-ui)). Die UI rechnet
   weiter auf der CPU; die ersten Bilder kommen über den CPU-Weg, Geräteaufbau auf einem
   Hintergrundthread, Rückfall bei Größenänderung, Fehler, Remote Desktop oder fehlendem Vulkan.
   Die Swapchain liegt auf einem Kindfenster, weil GDI auf einem Fenster unsichtbar bleibt, sobald
   dort eine Swapchain präsentiert hat. 70 zurückgelesene Bilder auf den Galerie-Seiten stimmen Byte
-  für Byte. Standard bleibt aus: Start, Größenänderung und Latenz sind wie beim CPU-Weg, aber der
-  Leerlauf kostet 1,6–5 ms CPU je Sekunde durch Treiberthreads, der Speicher wächst um 47 MiB
-  Arbeitsspeicher und 42 MiB GPU, das Beenden dauert 100 ms länger, und sichtbar gewonnen ist noch
-  nichts. Jede Windows-App wird 187 KB größer, auch mit abgeschaltetem Weg. Es fehlen Messungen auf
-  anderen GPUs und Laptops, mit 60 Hz, ein echter Treiber-Reset, Sperrbildschirm und Remote Desktop
-  im laufenden Betrieb.
+  für Byte. Start, Größenänderung und Latenz sind wie beim CPU-Weg. Der Standard kostet: im Leerlauf
+  1,6–5 ms CPU je Sekunde durch Treiberthreads, 47 MiB Arbeitsspeicher und 42 MiB GPU mehr, das
+  Beenden dauert 100 ms länger; sichtbar wird der Gewinn erst mit G3b und G3c. Jede Windows-App wird
+  187 KB größer, auch mit abgeschaltetem Weg. Es fehlen Messungen auf anderen GPUs und Laptops, mit
+  60 Hz, ein echter Treiber-Reset, Sperrbildschirm und Remote Desktop im laufenden Betrieb, der Stift
+  auf echter Hardware.
 - **P2** · *fehlt* · G3b: Ebenen (Basis, Dialog, Popup, Tooltip) als eigene Texturen und
   `Cmd::Image` als GPU-Textur.
 - **P2** · *fehlt* · G3c: Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel,

@@ -81,9 +81,9 @@ use super::auto::{next_word, skip_ws, word_eq};
 use super::{App, GpuOutput, Ui};
 use gfx::Surface;
 
-/// the output without jfgui_GPU in the environment: off for now, jfgui_GPU=1 turns it on (docs/GPU.md
-/// "Ausgabe der UI" says what stands against the default)
-const DEFAULT_ON: bool = false;
+/// the output without jfgui_GPU in the environment: on, jfgui_GPU=0 turns it off (docs/GPU.md
+/// "Ausgabe der UI" says what it costs)
+const DEFAULT_ON: bool = true;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md
 /// "Ausgabe der UI")

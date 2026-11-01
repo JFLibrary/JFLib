@@ -13,12 +13,17 @@ script: 0 if the window was captured and the app exited with 0.
 import argparse
 import ctypes
 import ctypes.wintypes as wt
+import os
 import struct
 import subprocess
 import testenv  # noqa: F401  (keeps PaintCraft away from the user's settings)
 import sys
 import time
 import zlib
+
+# PrintWindow reads the window's DC: on the GPU path it holds the last CPU frame (wincheck.py
+# imports this module too)
+os.environ.setdefault("jfgui_GPU", "0")
 
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
@@ -88,7 +93,6 @@ def main():
     ap.add_argument("--delay", type=float, default=1.0)
     ap.add_argument("--close-ms", type=int, default=3000)
     a = ap.parse_args(argv)
-    import os
     proc = subprocess.Popen([os.path.abspath(a.exe), "--auto-close", str(a.close_ms)] + extra)
     time.sleep(a.delay)
     hwnd = None

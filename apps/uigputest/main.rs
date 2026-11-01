@@ -123,6 +123,17 @@ impl Test {
         cond
     }
 
+    /// the main window, not its child, is found at a client point (a window of another program on
+    /// top of ours is a note, no result)
+    fn finds_window(&mut self, x: i32, y: i32, what: &str) {
+        match plat::win_test(plat::WT_FROM_POINT, 0, [x, y, 0, 0]) {
+            0 => out(&format!("note: {what}: another window lies on top of ours (no result)")),
+            at => {
+                self.ok(at == 1, what);
+            }
+        }
+    }
+
     fn next(&mut self) {
         self.pc += 1;
         self.since = plat::time_us();
@@ -279,7 +290,7 @@ impl Test {
             3 => {
                 if self.after(200) {
                     self.watch_result("the screen during the switch");
-                    self.ok(plat::win_test(plat::WT_FROM_POINT, 0, [320, 240, 0, 0]) == 1, "the pointer finds the window, not the child on it");
+                    self.finds_window(320, 240, "the pointer finds the window, not the child on it");
                     self.patch = 0xFF00_C0F0;
                     self.next();
                 }
@@ -641,7 +652,7 @@ impl Test {
                     let mid = plat::win_test_send(0, WM_NCHITTEST, 0, lp(r[0] + 200, r[1] + 200));
                     self.ok(top == 12, &format!("the resize band at the top: HTTOP ({top})"));
                     self.ok(mid == 1, &format!("the middle: HTCLIENT ({mid})"));
-                    self.ok(plat::win_test(plat::WT_FROM_POINT, 0, [200, 1, 0, 0]) == 1, "the band's point finds the window, not the child");
+                    self.finds_window(200, 1, "the band's point finds the window, not the child");
                     self.screen_check(ui, "the library's frame");
                     plat::win_test(plat::WT_MOVE, 0, [r[0], r[1], 700, 500]);
                     self.next();
@@ -873,7 +884,7 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
     while b.hwnd.load(Ordering::Relaxed) == 0 {
         plat::sleep_ms(5);
     }
-    plat::sleep_ms(if plat::env("jfgui_GPU").as_deref() == Some("1") { 2500 } else { 500 });
+    plat::sleep_ms(if plat::env("jfgui_GPU").as_deref() != Some("0") { 2500 } else { 500 });
     let hwnd = b.hwnd.load(Ordering::Relaxed) as isize;
     let (x, y) = (b.x.load(Ordering::Relaxed) as i32, b.y.load(Ordering::Relaxed) as i32);
     let (mut to_present, mut to_screen) = (Vec::new(), Vec::new());
@@ -1271,7 +1282,8 @@ fn run() -> i32 {
     }
     plat::setenv("jfgui_STATE", Some("0"));
     plat::setenv("jfgui_TEST_NOACTIVATE", Some("1"));
-    plat::setenv("jfgui_GPU", Some(if test == "off" { "0" } else { "1" }));
+    // `switch` without the variable: the swapchain is the default
+    plat::setenv("jfgui_GPU", if test == "off" { Some("0") } else if test == "switch" { None } else { Some("1") });
     if !plain {
         plat::setenv("jfgui_GPU_VERIFY", Some("1"));
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));

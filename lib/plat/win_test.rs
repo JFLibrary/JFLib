@@ -27,7 +27,8 @@
 //                   (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
 //                   sending the pixels again) -> microseconds taken
 //     WT_NOANIM     no DWM transitions for window w (fade-in, minimise) -> 1
-//     WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w is window w -> 1 / 0
+//     WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w: window w -> 1, its GPU
+//                   child -> 2, another window (of any program) -> 0
 //     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
 //                   keyboard and the other windows alone) -> 1
 //   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
@@ -204,7 +205,14 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                     WT_FROM_POINT => {
                         let mut p = Point { x: a[0], y: a[1] };
                         super::ClientToScreen(h, &mut p);
-                        (super::WindowFromPoint(p) == h) as i64
+                        let at = super::WindowFromPoint(p);
+                        if at == h {
+                            1
+                        } else if at != 0 && rec(w).is_some_and(|r| r.gchild.get() == at) {
+                            2
+                        } else {
+                            0
+                        }
                     }
                     WT_SHOW => {
                         super::ShowWindow(h, a[0]);

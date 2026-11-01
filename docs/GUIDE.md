@@ -1514,8 +1514,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   theme, §34), `--accent RRGGBB`, `--anim off`,
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
-  `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=1`
-  (Windows: the windows show their frames through a swapchain, `=0`: nothing of the GPU anywhere;
+  `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=0`
+  (nothing of the GPU anywhere; on Windows the windows show their frames through a swapchain by default;
   GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
   `jfgui_GPU_TRACE=1` prints its stages), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
   taking the keyboard and without DWM's fade-in),
@@ -1647,7 +1647,7 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
-* **Presenting through the GPU** (Windows, `jfgui_GPU=1`, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
+* **Presenting through the GPU** (Windows, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
   UI"): the first frames, every frame of a resize and every window after a failure go the way below;
   otherwise the rectangles go into a texture and a swapchain on a child window shows it, without
   ever waiting for the display. Popups outside the window stay below's way.
