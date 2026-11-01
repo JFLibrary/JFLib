@@ -28,7 +28,7 @@
 //   bg_colors(bg, dark) / BG_LABEL    the backgrounds and their labels' colours (selftest desk)
 //
 // The programs (Prog): Terminal, Dateimanager (filemgr.rs), Texteditor (editor.rs),
-// IP-Konfiguration and Webbrowser (progs.rs), E-Mail (email.rs), MIB-Browser (mib.rs),
+// IP-Konfiguration (progs.rs), Webbrowser (browser.rs), E-Mail (email.rs), MIB-Browser (mib.rs),
 // Systemmonitor (sysmon.rs), Einstellungen (here), IDE.  Each has one window (key: its index + 1)
 // with a first and a smallest size of its own.  The Terminal shows the device's console; "Weiteres
 // Terminal" in the start menu opens one more Terminal window with a command-line session of its
@@ -49,8 +49,8 @@
 // Ids: ID_DESK0 + 0x1000 k (app/constants.rs: + 0 the area, + 1 Start, + 2 its menu, + 3
 // Vollbild, + 0x10 + p the menu's rows, + 0x20 the icons' group, + 0x30 + p the icons, + 0x40 the
 // background, + 0x600 Einstellungen, + 0x700 IDE, + 0x710 Terminal, + 0x720 the MIB-Browser's
-// note); IP-Konfiguration id + 0x10, Webbrowser id + 0x30 (id: devwin base + 0x80), E-Mail
-// ID_MAIL0 + 0x400 k, MIB-Browser ID_MIB0 + 0x400 k.
+// note); IP-Konfiguration id + 0x10, Webbrowser id + 0x30 (id: devwin base + 0x80; its page
+// ID_BROWSER0 + 0x100 k), E-Mail ID_MAIL0 + 0x400 k, MIB-Browser ID_MIB0 + 0x400 k.
 
 use alloc::format;
 use alloc::string::String;
@@ -92,7 +92,7 @@ const PROGS: [(Prog, &str, &str, usize, [i32; 2], [i32; 2]); 10] = [
     (Prog::Files, "Dateimanager", "Ordner und Dateien des Geräts", 1, [640, 360], [420, 220]),
     (Prog::Editor, "Texteditor", "Notizen und Dateien des Geräts bearbeiten", 2, [540, 340], [320, 200]),
     (Prog::IpConfig, "IP-Konfiguration", "Adresse, Maske und Gateway oder DHCP", 0, [460, 380], [340, 220]),
-    (Prog::Browser, "Webbrowser", "Seiten als Text", 0, [560, 320], [320, 200]),
+    (Prog::Browser, "Webbrowser", "Seiten aus dem simulierten Netz", 0, [640, 420], [360, 240]),
     (Prog::Mail, "E-Mail", "Nachrichten senden und abrufen", 0, [680, 460], [420, 300]),
     (Prog::Mib, "MIB-Browser", "SNMP-Objekte eines Agenten lesen und setzen", 0, [720, 480], [460, 320]),
     (Prog::Monitor, "Systemmonitor", "Prozesse, Dienste, CPU und Speicher", 1, [580, 380], [380, 260]),
@@ -167,6 +167,8 @@ pub(crate) struct Desk {
     raise: Option<u32>,
     /// the window that draws the device's console (this frame)
     pub console_at: Option<Prog>,
+    /// the key of the active window (this frame): a program's shortcuts are its own then
+    pub front: u32,
     /// the sessions of the further Terminal windows (cli/ses.rs), in the taskbar's order after
     /// the programs
     pub terms: Vec<u32>,
@@ -175,7 +177,7 @@ pub(crate) struct Desk {
     pub ide_term: Option<u32>,
     // the programs
     pub ip: super::progs::IpState,
-    pub web: super::progs::WebState,
+    pub web: super::browser::Browser,
     pub edit: super::editor::Editor,
     pub fm: super::filemgr::Fm,
     pub mon: super::sysmon::Mon,
@@ -195,10 +197,11 @@ impl Desk {
             sel: None,
             raise: None,
             console_at: None,
+            front: 0,
             terms: Vec::new(),
             ide_term: None,
             ip: super::progs::IpState::new(),
-            web: super::progs::WebState::new(),
+            web: super::browser::Browser::new(),
             edit: super::editor::Editor::new(),
             fm: super::filemgr::Fm::new(),
             mon: super::sysmon::Mon::new(),
@@ -554,12 +557,13 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         ended.extend(d.terms.iter().chain(&d.ide_term).map(|&s| (d.dev, s)));
         *d = Desk::new(dev);
     }
-    let mut titles: Vec<String> = d.open.iter().map(|p| String::from(p.name())).collect();
+    let mut titles: Vec<String> = d.open.iter().map(|p| if *p == Prog::Browser { d.web.window_title(p.name()) } else { String::from(p.name()) }).collect();
     titles.extend(d.terms.iter().map(|s| format!("{} ({})", Prog::Terminal.name(), s + 1)));
     let names: Vec<&'static str> = Prog::ALL.iter().map(|p| p.name()).collect();
     let np = d.open.len();
     let wins: Vec<DeskWin> = d.open.iter().zip(&titles).map(|(p, t)| p.win(t)).chain(d.terms.iter().zip(&titles[np..]).map(|(&s, t)| term_win(s, t))).collect();
     d.console_at = d.console_owner();
+    d.front = d.desk.active();
     let sel = d.sel;
     let mut st = core::mem::take(&mut d.desk);
     let place = core::mem::take(&mut d.place);
@@ -607,10 +611,15 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let d = &mut w.desk;
     d.desk = st;
     d.place.extend(place);
+    let mut web_gone: Vec<u64> = Vec::new();
     for ev in evs {
         if let DeskEv::Close(key) = ev {
             if let Some(p) = Prog::of_key(key) {
                 d.open.retain(|&o| o != p);
+                // the browser's state goes with its window
+                if p == Prog::Browser {
+                    web_gone = d.web.close();
+                }
                 // the IDE's terminal ends with it
                 if p == Prog::Ide
                     && let Some(s) = d.ide_term.take()
@@ -653,6 +662,9 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     }
     for (dv, s) in ended {
         console::close_session(n, dv, s);
+    }
+    for req in web_gone {
+        let _ = n.doc.sim.send(jfn_sim::Cmd::Apply(jfn_sim::Action::WebCancel { dev, id: req }));
     }
     // "Weiteres Terminal": a session of its own in a window of its own
     if more {
@@ -718,7 +730,7 @@ fn content(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32, p: Prog) {
         Prog::Files => super::filemgr::program(n, ui, k, base + 0x200, dev),
         Prog::Editor => super::editor::program(n, ui, k, base + 0x100, dev),
         Prog::IpConfig => super::progs::ipconfig(n, ui, k, id + 0x10, dev),
-        Prog::Browser => super::progs::browser(n, ui, k, id + 0x30, dev),
+        Prog::Browser => super::browser::program(n, ui, k, id + 0x30, dev),
         Prog::Mail => super::email::program(n, ui, k, ID_MAIL0 + 0x400 * k as u32, dev),
         Prog::Mib => super::mib::browser(n, ui, k, dev),
         Prog::Monitor => super::sysmon::program(n, ui, k, base + 0x400, dev),

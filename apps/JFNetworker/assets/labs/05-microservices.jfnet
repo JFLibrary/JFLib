@@ -1,0 +1,837 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Microservices: Version 2 ausrollen",
+  "description": "Labor: zwei kleine Dienste als Einheiten hinter einem Loadbalancer, mit KV-Speicher und Cache; die neue Version geht nacheinander auf die Hosts.",
+  "seed": 5,
+  "next_id": 32,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "last",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.1/",
+              "http://10.0.1.1:81/"
+            ],
+            "mode": "open",
+            "rps": 80,
+            "arrival": "poisson",
+            "delay_ms": 4000,
+            "timeout_ms": 3000,
+            "mix": [
+              {
+                "path": "/"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "LB1",
+      "model": "load-balancer",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname LB1\nip addr add 10.0.1.1/24 dev eth0\nip addr add 10.0.2.1/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "lb",
+          "name": "katalog",
+          "disabled": false,
+          "config": {
+            "mode": "http",
+            "port": 80,
+            "algorithm": "round-robin",
+            "backends": [
+              {
+                "name": "api1",
+                "addr": "10.0.2.11",
+                "port": 8080
+              },
+              {
+                "name": "api2",
+                "addr": "10.0.2.12",
+                "port": 8080
+              },
+              {
+                "name": "api3",
+                "addr": "10.0.2.13",
+                "port": 8080
+              }
+            ],
+            "health": {
+              "type": "http",
+              "path": "/health",
+              "interval_ms": 1000,
+              "timeout_ms": 500,
+              "rise": 2,
+              "fall": 3
+            },
+            "retries": 2
+          }
+        },
+        {
+          "kind": "lb",
+          "name": "bestell",
+          "disabled": false,
+          "config": {
+            "mode": "http",
+            "port": 81,
+            "algorithm": "round-robin",
+            "backends": [
+              {
+                "name": "ord1",
+                "addr": "10.0.2.21",
+                "port": 8081
+              },
+              {
+                "name": "ord2",
+                "addr": "10.0.2.22",
+                "port": 8081
+              }
+            ],
+            "health": {
+              "type": "http",
+              "path": "/health",
+              "interval_ms": 1000,
+              "timeout_ms": 500,
+              "rise": 2,
+              "fall": 3
+            },
+            "retries": 2
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 480,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "API1",
+      "model": "server-1u",
+      "x": 640,
+      "y": -240,
+      "off": false,
+      "startup_config": "hostname API1\nip addr add 10.0.2.11/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/katalog",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/katalog/katalog.jfs",
+          "text": "// der Katalog: liest Artikel über den Cache aus dem KV-Speicher; Version 1\nlet version = 1\nmetrics.gauge(\"version\", version)\nlet cache = config.env.CACHE\n// Startzeit: der Dienst nimmt erst nach einer Weile Verbindungen an\ntimer.after(1500, fn() {\n  http.serve(8080, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    http.request({url: \"${cache}/kv/artikel${rand(40)}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Katalog: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Katalog v${version}: ${r.status}\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Katalog bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/katalog.service",
+          "text": "[Unit]\nDescription=Der Katalog\n\n[Service]\nExecStart=jfs /root/katalog/katalog.jfs\nEnvironment=CACHE=http://10.0.2.41:8000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants/katalog.service",
+          "text": "/etc/systemd/system/katalog.service\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "API2",
+      "model": "server-1u",
+      "x": 640,
+      "y": -160,
+      "off": false,
+      "startup_config": "hostname API2\nip addr add 10.0.2.12/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/katalog",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/katalog/katalog.jfs",
+          "text": "// der Katalog: liest Artikel über den Cache aus dem KV-Speicher; Version 1\nlet version = 1\nmetrics.gauge(\"version\", version)\nlet cache = config.env.CACHE\n// Startzeit: der Dienst nimmt erst nach einer Weile Verbindungen an\ntimer.after(1500, fn() {\n  http.serve(8080, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    http.request({url: \"${cache}/kv/artikel${rand(40)}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Katalog: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Katalog v${version}: ${r.status}\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Katalog bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/katalog.service",
+          "text": "[Unit]\nDescription=Der Katalog\n\n[Service]\nExecStart=jfs /root/katalog/katalog.jfs\nEnvironment=CACHE=http://10.0.2.41:8000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants/katalog.service",
+          "text": "/etc/systemd/system/katalog.service\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "API3",
+      "model": "server-1u",
+      "x": 640,
+      "y": -80,
+      "off": false,
+      "startup_config": "hostname API3\nip addr add 10.0.2.13/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/katalog",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/katalog/katalog.jfs",
+          "text": "// der Katalog: liest Artikel über den Cache aus dem KV-Speicher; Version 1\nlet version = 1\nmetrics.gauge(\"version\", version)\nlet cache = config.env.CACHE\n// Startzeit: der Dienst nimmt erst nach einer Weile Verbindungen an\ntimer.after(1500, fn() {\n  http.serve(8080, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    http.request({url: \"${cache}/kv/artikel${rand(40)}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Katalog: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Katalog v${version}: ${r.status}\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Katalog bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/katalog.service",
+          "text": "[Unit]\nDescription=Der Katalog\n\n[Service]\nExecStart=jfs /root/katalog/katalog.jfs\nEnvironment=CACHE=http://10.0.2.41:8000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants/katalog.service",
+          "text": "/etc/systemd/system/katalog.service\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "ORD1",
+      "model": "server-1u",
+      "x": 640,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname ORD1\nip addr add 10.0.2.21/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/bestell",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/bestell/bestell.jfs",
+          "text": "// die Bestellung: schreibt Aufträge in den KV-Speicher; Version 1\nlet version = 1\nmetrics.gauge(\"version\", version)\nlet kv = config.env.KV\nlet nr = 0\ntimer.after(1500, fn() {\n  http.serve(8081, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    nr = nr + 1\n    http.request({url: \"${kv}/kv/auftrag${rand(1000)}\", method: \"PUT\", body: \"Auftrag ${nr}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Bestellung: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Bestellung v${version}: angenommen\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Bestellung bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/bestell.service",
+          "text": "[Unit]\nDescription=Die Bestellung\n\n[Service]\nExecStart=jfs /root/bestell/bestell.jfs\nEnvironment=KV=http://10.0.2.31:7000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants/bestell.service",
+          "text": "/etc/systemd/system/bestell.service\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "ORD2",
+      "model": "server-1u",
+      "x": 640,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname ORD2\nip addr add 10.0.2.22/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/bestell",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/bestell/bestell.jfs",
+          "text": "// die Bestellung: schreibt Aufträge in den KV-Speicher; Version 1\nlet version = 1\nmetrics.gauge(\"version\", version)\nlet kv = config.env.KV\nlet nr = 0\ntimer.after(1500, fn() {\n  http.serve(8081, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    nr = nr + 1\n    http.request({url: \"${kv}/kv/auftrag${rand(1000)}\", method: \"PUT\", body: \"Auftrag ${nr}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Bestellung: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Bestellung v${version}: angenommen\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Bestellung bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/bestell.service",
+          "text": "[Unit]\nDescription=Die Bestellung\n\n[Service]\nExecStart=jfs /root/bestell/bestell.jfs\nEnvironment=KV=http://10.0.2.31:7000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/multi-user.target.wants/bestell.service",
+          "text": "/etc/systemd/system/bestell.service\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "KV1",
+      "model": "server-1u",
+      "x": 800,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname KV1\nip addr add 10.0.2.31/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.31"
+            ],
+            "rf": 1,
+            "consistency": "eventual"
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 11,
+      "name": "CACHE1",
+      "model": "server-1u",
+      "x": 800,
+      "y": -160,
+      "off": false,
+      "startup_config": "hostname CACHE1\nip addr add 10.0.2.41/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "cache",
+          "name": "cache",
+          "disabled": false,
+          "config": {
+            "port": 8000,
+            "backend": "http://10.0.2.31:7000/",
+            "entries": 200,
+            "ttl_ms": 2000
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 12,
+      "name": "DEV1",
+      "model": "pc",
+      "x": 320,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname DEV1\nip addr add 10.0.2.50/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/katalog",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/katalog/katalog.jfs",
+          "text": "// der Katalog: liest Artikel über den Cache aus dem KV-Speicher; Version 2\nlet version = 2\nmetrics.gauge(\"version\", version)\nlet cache = config.env.CACHE\n// Startzeit: der Dienst nimmt erst nach einer Weile Verbindungen an\ntimer.after(1500, fn() {\n  http.serve(8080, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    http.request({url: \"${cache}/kv/artikel${rand(40)}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Katalog: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Katalog v${version}: ${r.status}\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Katalog bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/bestell",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/bestell/bestell.jfs",
+          "text": "// die Bestellung: schreibt Aufträge in den KV-Speicher; Version 2\nlet version = 2\nmetrics.gauge(\"version\", version)\nlet kv = config.env.KV\nlet nr = 0\ntimer.after(1500, fn() {\n  http.serve(8081, fn(req, res) {\n    if (req.path == \"/health\") {\n      res.send(200, \"gesund\\n\")\n      return nil\n    }\n    nr = nr + 1\n    http.request({url: \"${kv}/kv/auftrag${rand(1000)}\", method: \"PUT\", body: \"Auftrag ${nr}\", timeout_ms: 1000}, fn(err, r) {\n      if (err != nil || r.status >= 500) {\n        res.send(502, \"Bestellung: der Speicher antwortet nicht\\n\")\n      } else {\n        res.send(200, \"Bestellung v${version}: angenommen\\n\")\n      }\n    })\n    return nil\n  })\n  print(\"Bestellung bereit, Version ${version}\")\n})\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/katalog.service",
+          "text": "[Unit]\nDescription=Der Katalog\n\n[Service]\nExecStart=jfs /root/katalog/katalog.jfs\nEnvironment=CACHE=http://10.0.2.41:8000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/bestell.service",
+          "text": "[Unit]\nDescription=Die Bestellung\n\n[Service]\nExecStart=jfs /root/bestell/bestell.jfs\nEnvironment=KV=http://10.0.2.31:7000\nRestart=on-failure\nRestartSec=1\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "id": 13,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 14,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 15,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 16,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 17,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 18,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 19,
+      "a": {
+        "dev": 8,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/5"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 20,
+      "a": {
+        "dev": 9,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/6"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 21,
+      "a": {
+        "dev": 10,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/7"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 22,
+      "a": {
+        "dev": 11,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/8"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 23,
+      "a": {
+        "dev": 12,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/9"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "groups": [
+    {
+      "id": 24,
+      "name": "Katalog",
+      "color": "blue",
+      "members": [
+        5,
+        6,
+        7
+      ],
+      "collapsed": false
+    },
+    {
+      "id": 25,
+      "name": "Bestellung",
+      "color": "green",
+      "members": [
+        8,
+        9
+      ],
+      "collapsed": false
+    }
+  ],
+  "lab": {
+    "title": [
+      "Microservices: Version 2 ausrollen",
+      "Microservices: rolling out version 2"
+    ],
+    "summary": [
+      "Zwei Dienste als Einheiten hinter einem Loadbalancer: die neue Version nacheinander ausrollen, ohne dass unter Last eine Anfrage scheitert.",
+      "Two services as units behind a load balancer: roll out the new version host by host without a single request failing under load."
+    ],
+    "topic": "ds",
+    "intro": [
+      [
+        "GEN schickt 80 Anfragen pro Sekunde an den Loadbalancer LB1, mit dem Katalog auf Port 80 und der Bestellung auf Port 81. Der Katalog läuft auf API1 bis API3 und liest über CACHE1 aus KV1, die Bestellung läuft auf ORD1 und ORD2 und schreibt nach KV1. Beide sind Skripte, die als Einheiten laufen: systemctl status katalog in der Konsole von API1 zeigt es. Ein Dienst braucht nach dem Start 1,5 s, bevor er Verbindungen annimmt.",
+        "GEN sends 80 requests per second to the load balancer LB1, with the catalogue on port 80 and the orders on port 81. The catalogue runs on API1 to API3 and reads through CACHE1 from KV1, the orders run on ORD1 and ORD2 and write to KV1. Both are scripts that run as units: systemctl status katalog in the console of API1 shows it. After its start a service takes 1.5 s before it accepts connections."
+      ],
+      [
+        "Auf DEV1 liegt Version 2 von beiden fertig: /root/katalog und /root/bestell. Öffne dort die IDE (Kontextmenü von DEV1, „IDE …“) und bringe beide mit Ausführen › Bereitstellen auf ihre Gruppe, nacheinander und mit einer Gesundheitsprüfung, die erst weitergeht, wenn der Host wieder antwortet. Wer alle Hosts auf einmal neu startet, lässt Anfragen scheitern.",
+        "On DEV1 version 2 of both is ready: /root/katalog and /root/bestell. Open the IDE there (DEV1's context menu, “IDE …”) and bring both to their group with Run › Deploy, one host after the other and with a health check that only moves on when the host answers again. Restart all hosts at once and requests fail."
+      ]
+    ],
+    "ordered": true,
+    "goals": [
+      {
+        "text": [
+          "Der Katalog läuft auf allen drei Hosts in Version 2",
+          "The catalogue runs in version 2 on all three hosts"
+        ],
+        "checks": [
+          "API1 svc katalog metric version == 2",
+          "API2 svc katalog metric version == 2",
+          "API3 svc katalog metric version == 2"
+        ],
+        "hints": [
+          [
+            "Die IDE von DEV1, Ausführen › Bereitstellen: Hosts die Gruppe Katalog, Dateien /root/katalog, Einheit katalog.",
+            "DEV1's IDE, Run › Deploy: the group Katalog as hosts, files /root/katalog, unit katalog."
+          ],
+          [
+            "Gesundheitsprüfung HTTP mit Port 8080, Pfad /health und Status 200: so wartet die Bereitstellung, bis der Dienst wieder annimmt.",
+            "Health check HTTP with port 8080, path /health and status 200: so the deployment waits until the service accepts again."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Die Bestellung läuft auf beiden Hosts in Version 2",
+          "The orders run in version 2 on both hosts"
+        ],
+        "checks": [
+          "ORD1 svc bestell metric version == 2",
+          "ORD2 svc bestell metric version == 2"
+        ],
+        "hints": [
+          [
+            "Wie beim Katalog: die Gruppe Bestellung, /root/bestell, Einheit bestell, Port 8081.",
+            "As for the catalogue: the group Bestellung, /root/bestell, unit bestell, port 8081."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Keine Anfrage ist gescheitert, und die Bereitstellung ist fertig",
+          "No request failed, and the deployment is done"
+        ],
+        "checks": [
+          "GEN svc last metric failed == 0",
+          "GEN svc last metric http_errors == 0",
+          "DEV1 deploy done"
+        ],
+        "hints": [
+          [
+            "Scheitern Anfragen, waren zu viele Hosts zugleich weg: mit einer Prüfung über HTTP geht der nächste Host erst, wenn der vorige wieder antwortet. „Simulation zurücksetzen“ beginnt von vorn.",
+            "If requests fail, too many hosts were gone at once: with a check over HTTP the next host only goes when the one before answers again. “Reset simulation” starts over."
+          ]
+        ]
+      }
+    ],
+    "hints": [
+      [
+        "Der Lasttest der IDE (Ausführen › Lasttest) zeigt Antworten, Latenzen und Fehler neben dem Editor; die Zahlen von GEN stehen im Panel Metriken.",
+        "The IDE's load test (Run › Load test) shows answers, latencies and errors beside the editor; GEN's numbers are in the Metrics panel."
+      ],
+      [
+        "journalctl -u katalog in der Konsole eines Hosts zeigt, was sein Dienst schrieb.",
+        "journalctl -u katalog in a host's console shows what its service wrote."
+      ]
+    ]
+  }
+}

@@ -109,12 +109,12 @@ fn offer(p: &mut Project, ap: u32, nets: Vec<WlanNet>) {
 
 fn join(p: &mut Project, sta: u32, ssid: &str, pass: &str) {
     if let Some(d) = p.device_mut(sta) {
-        d.wlan = Some(Wlan { nets: Vec::new(), join: Some(WlanJoin { ssid: s(ssid), passphrase: s(pass) }) });
+        d.wlan = Some(Wlan { nets: Vec::new(), join: Some(WlanJoin { ssid: s(ssid), passphrase: s(pass), ..WlanJoin::default() }) });
     }
 }
 
 fn joining(ssid: &str, pass: &str) -> Option<Wlan> {
-    Some(Wlan { nets: Vec::new(), join: Some(WlanJoin { ssid: s(ssid), passphrase: s(pass) }) })
+    Some(Wlan { nets: Vec::new(), join: Some(WlanJoin { ssid: s(ssid), passphrase: s(pass), ..WlanJoin::default() }) })
 }
 
 fn dhcp(p: &mut Project, dev: u32, iface: &str) {
@@ -286,8 +286,8 @@ fn radio(t: &mut T) {
     t.eq("no channel 14", text(mw::check_net(&WlanNet { channel: 14, ..net("X", Band::G24, Security::Open, "") })), Some(s("Kanal 14 gibt es im Band 2,4 GHz nicht.")));
     t.eq("no vlan 4095", text(mw::check_net(&WlanNet { vlan: 4095, ..net("X", Band::G24, Security::Open, "") })), Some(s("VLAN 4095 gibt es nicht (1 bis 4094).")));
     t.eq("a good network", (mw::check_net(&net("Buero", Band::G5, Security::Wpa2, PASS)), mw::check_net(&net("Labor", Band::G6, Security::Wpa3, PASS))), (None, None));
-    t.eq("a bad join", text(mw::check_join(&WlanJoin { ssid: s("Buero"), passphrase: s("x") })), Some(s("Die Passphrase von \u{201e}Buero\u{201c} braucht 8 bis 63 Zeichen (ASCII).")));
-    t.eq("an open join", mw::check_join(&WlanJoin { ssid: s("Cafe"), passphrase: String::new() }), None);
+    t.eq("a bad join", text(mw::check_join(&WlanJoin { ssid: s("Buero"), passphrase: s("x"), ..WlanJoin::default() })), Some(s("Die Passphrase von \u{201e}Buero\u{201c} braucht 8 bis 63 Zeichen (ASCII).")));
+    t.eq("an open join", mw::check_join(&WlanJoin { ssid: s("Cafe"), passphrase: String::new(), ..WlanJoin::default() }), None);
     t.eq("default scale", mw::dip_per_m(&Project::new("x", 1)), 10);
 }
 
@@ -378,7 +378,7 @@ fn open(t: &mut T) {
         ],
     );
     t.eq("no handshake", eapol_hops(&e), Vec::new());
-    t.eq("connected", e.wlan_station(nb).map(|v| (v.state, v.failures, v.join)), Some((StaState::Connected, 0, Some(WlanJoin { ssid: s("Cafe"), passphrase: String::new() }))));
+    t.eq("connected", e.wlan_station(nb).map(|v| (v.state, v.failures, v.join)), Some((StaState::Connected, 0, Some(WlanJoin { ssid: s("Cafe"), passphrase: String::new(), ..WlanJoin::default() }))));
     let a: Vec<_> = e.wlan_assocs().into_iter().map(|a| ((a.id, a.sta, a.sta_port, a.ap, a.ap_port, a.ssid), (a.channel, a.aid, a.vlan, a.dbm, a.kbps, a.authorized, a.lost, a.since))).collect();
     t.eq("the association", a, vec![((ASSOC_ID0, nb, 0, ap, 2, s("Cafe")), (36, 1, 1, -50, 2_400_000, true, false, JOINED))]);
     // a link of the engine: two thirds of the rate, 200 µs + 10 ns

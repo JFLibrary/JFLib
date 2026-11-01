@@ -692,7 +692,7 @@ pub(crate) fn led_color(led: Led, color: &dyn Fn(u32) -> u32, bg: u32) -> u32 {
     match led {
         Led::Up => color(T_OK),
         Led::Down => color(T_CRIT),
-        Led::Blocking | Led::Learning => color(T_WARN),
+        Led::Blocking | Led::Learning | Led::Unauth => color(T_WARN),
         Led::NoPower => color_mix(color(T_TEXT3) | 0xFF00_0000, bg | 0xFF00_0000, 96),
     }
 }

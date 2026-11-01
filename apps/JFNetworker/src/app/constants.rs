@@ -617,3 +617,22 @@ pub(crate) const SES_SLOTS: u32 = 192;
 /// parts)
 pub(crate) const ID_IDE0: u32 = 0x0001_8000;
 // (the IDE's check while typing keeps TIMER_SCRIPT_CHECK of the Skripte tab it replaces)
+// ---- A2: the IDE's panes Bereitstellen and Lasttest (commands 840 .. 869, widgets 0x0001_B000 ..
+// 0x0001_BFFF, timers 0x1B8 .. 0x1BB; the commands and timers are not used)
+/// the panes of device window k: ID_A20 + 0x800 k .. + 0x7FF (workspace/ide/deploy.rs: + 1 .. 0xFF,
+/// load.rs: + 0x200 ..)
+pub(crate) const ID_A20: u32 = 0x0001_B000;
+// ---- B1, B2: the Webbrowser (commands 870 .. 889, widgets 0x0001_C000 .. 0x0001_CFFF, timers
+// 0x1BC .. 0x1BF; the commands and timers are not used)
+/// the Webbrowser in device window k: ID_BROWSER0 + 0x100 k the page (its toolbar: the desktop's
+/// block + 0x30, devwin/browser.rs)
+pub(crate) const ID_BROWSER0: u32 = 0x0001_C000;
+// ---- X1g: 802.1X, WPA-Enterprise and IMAP (commands 910 .. 929, widgets 0x0001_D800 ..
+// 0x0001_DFFF, timers 0x1C4 .. 0x1C7; the commands and timers are not used)
+/// IP-Konfiguration's 802.1X panel in device window k: ID_WPA0 + 0x40 k (devwin/progs.rs)
+pub(crate) const ID_WPA0: u32 = 0x0001_D800;
+/// the inspector's enterprise network k: ID_ENT_NET0 + 4 k: + 0 the RADIUS server, + 1 its key
+pub(crate) const ID_ENT_NET0: u32 = 0x0001_DC00;
+/// the inspector's station: identity, method
+pub(crate) const ID_ENT_IDENTITY: u32 = 0x0001_DC80;
+pub(crate) const ID_ENT_METHOD: u32 = 0x0001_DC81;

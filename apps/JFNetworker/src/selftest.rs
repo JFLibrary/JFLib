@@ -54,8 +54,18 @@
 // CPU time per second, the Dateimanager's copies and moves, the console's window, contrast).
 // sessiontest.rs: command-line sessions and the telnet servers (group sessions: jfn_sim::cli::ses,
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
+// sshtest.rs: SSH (group ssh: jfn_sim::sshd, sshtrace, cli/ssh.rs).
+// snmpv3test.rs: SNMPv3 (group snmpv3: jfn_sim::snmpd's USM and VACM, cli/snmp.rs).
 // idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
+// unitstest.rs: services as units and rolling deployments (group units: jfn_model::unit,
+// jfn_sim::units, deploy, cli/units.rs, the lab 05-microservices).
+// browsertest.rs: the Webbrowser (group browser: netpkt::uri, jfn_sim::webc, the static files of
+// http-server, req.form of scripts, what devwin/browser.rs decides).
+// dot1xtest.rs: 802.1X and WPA-Enterprise (group dot1x: jfn_sim::dot1x, supp, dot1xtrace, the EAP
+// part of radiusd and wlan, cli/dot1x.rs).
+// imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
+// mailc.rs and cli/mail.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -137,11 +147,23 @@ mod scriptmodtest;
 mod desktoptest;
 #[path = "sessiontest.rs"]
 mod sessiontest;
+#[path = "sshtest.rs"]
+mod sshtest;
+#[path = "snmpv3test.rs"]
+mod snmpv3test;
 #[path = "idetest.rs"]
 mod idetest;
+#[path = "unitstest.rs"]
+mod unitstest;
+#[path = "browsertest.rs"]
+mod browsertest;
+#[path = "dot1xtest.rs"]
+mod dot1xtest;
+#[path = "imaptest.rs"]
+mod imaptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 46] = [
+    let groups: [(&'static str, fn(&mut T)); 52] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -188,6 +210,12 @@ pub fn run() -> i32 {
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
+        ("units", unitstest::run),
+        ("browser", browsertest::run),
+        ("ssh", sshtest::run),
+        ("snmpv3", snmpv3test::run),
+        ("dot1x", dot1xtest::run),
+        ("imap", imaptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

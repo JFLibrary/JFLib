@@ -55,6 +55,8 @@ fn suite(s: Security) -> &'static str {
         Security::Open => "",
         Security::Wpa2 => "PSK",
         Security::Wpa3 => "SAE",
+        Security::Wpa2Ent => "IEEE 802.1X",
+        Security::Wpa3Ent => "IEEE 802.1X/SHA-256",
     }
 }
 
@@ -140,7 +142,7 @@ impl Engine {
                 if !pass.is_empty() && !wlan::passphrase_ok(pass) {
                     return self.sh_err(ni, "iw: a passphrase has 8 to 63 printable characters\n");
                 }
-                self.wlan_join(ni, Some(WlanJoin { ssid: String::from(ssid), passphrase: String::from(pass) }));
+                self.wlan_join(ni, Some(WlanJoin { ssid: String::from(ssid), passphrase: String::from(pass), ..WlanJoin::default() }));
                 Ok(())
             }
             ["disconnect"] if station => {

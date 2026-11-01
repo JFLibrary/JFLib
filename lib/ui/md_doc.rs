@@ -2536,7 +2536,7 @@ impl MdDoc {
 
     // the text of block k from a to b with images as their alt texts, buttons as their captions
     // (other fields as nothing: their values are the view's)
-    fn block_text(&self, k: usize, a: usize, b: usize) -> String {
+    pub(crate) fn block_text(&self, k: usize, a: usize, b: usize) -> String {
         let bl = &self.blocks[k];
         let t = &bl.text;
         let (a, b) = (clamp_char(t, a), clamp_char(t, b.max(a)));

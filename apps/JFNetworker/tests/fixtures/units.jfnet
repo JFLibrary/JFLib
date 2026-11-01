@@ -1,0 +1,295 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Einheiten und Bereitstellung",
+  "description": "DEV1 hält den Webdienst als Dateien und seine Einheiten, WEB1 bis WEB3 sind die Gruppe Webserver; auf WEB2 belegt der Dienst alt den Port 80.",
+  "seed": 11,
+  "next_id": 13,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "DEV1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname DEV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/app",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/app/server.jfs",
+          "text": "// der Webdienst: Version 2\nlet version = 2\nmetrics.gauge(\"version\", version)\nhttp.serve(80, fn(req, res) {\n  if (req.path == \"/health\") {\n    return \"gesund\\n\"\n  }\n  return \"Version ${version} von ${config.env.NAME}\\n\"\n})\nprint(\"bereit, Version ${version}\")\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/app/crash.jfs",
+          "text": "// endet nach 500 ms mit einem Fehler\ntimer.after(500, fn() {\n  throw \"kaputt\"\n})\nprint(\"gestartet\")\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/app/once.jfs",
+          "text": "// tut etwas und endet\nprint(\"einmal\")\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/app/needs.jfs",
+          "text": "// läuft, solange ihn niemand stoppt\ntimer.every(1000, fn() { })\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/jfn",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/jfn/statisch.json",
+          "text": "{\"port\": 8090, \"routes\": [{\"path\": \"/\", \"body\": \"fertig\\n\"}]}\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/web.service",
+          "text": "[Unit]\nDescription=Der Webdienst\n\n[Service]\nExecStart=jfs /root/app/server.jfs\nEnvironment=NAME=web\nRestart=on-failure\nRestartSec=2\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/crash.service",
+          "text": "[Unit]\nDescription=Stürzt ab\n\n[Service]\nExecStart=jfs /root/app/crash.jfs\nSettings={\"stop_on_error\": true}\nRestart=on-failure\nRestartSec=1\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/once.service",
+          "text": "[Service]\nExecStart=jfs /root/app/once.jfs\nRestart=always\nRestartSec=2s\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/kaputt.service",
+          "text": "[Unit]\nDescription=Ohne Programm\nQuatsch=1\n\n[Service]\nRestart=manchmal\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/braucht.service",
+          "text": "[Unit]\nDescription=Braucht web\nRequires=web.service\nAfter=web.service\n\n[Service]\nExecStart=jfs /root/app/needs.jfs\n",
+          "mtime": 1767225600
+        },
+        {
+          "path": "/etc/systemd/system/statisch.service",
+          "text": "[Unit]\nDescription=Fertiger Webserver\n\n[Service]\nExecStart=jfn-service http-server /etc/jfn/statisch.json\n\n[Install]\nWantedBy=multi-user.target\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 400,
+      "y": -120,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.11/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "WEB2",
+      "model": "server-1u",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname WEB2\nip addr add 10.0.0.12/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "alt",
+          "disabled": false,
+          "config": {
+            "routes": [
+              {
+                "path": "/",
+                "body": "alt\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "WEB3",
+      "model": "server-1u",
+      "x": 400,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname WEB3\nip addr add 10.0.0.13/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.20/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/5"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "groups": [
+    {
+      "id": 12,
+      "name": "Webserver",
+      "color": "blue",
+      "members": [
+        3,
+        4,
+        5
+      ],
+      "collapsed": false
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 // Trap of version 1, SNMPv2-Trap, InformRequest and Report with their variable bindings; the
 // error statuses and their mapping to version 1 (RFC 3584); the objects every notification names
 //
-//   Version                 V1 (0) | V2c (1); other numbers (SNMPv3's 3) are no message here
+//   Version                 V1 (0) | V2c (1); other numbers are no message here (SNMPv3: snmpv3.rs)
 //   Kind                    Get | GetNext | Response | Set | TrapV1 | GetBulk | Inform | TrapV2 |
 //                           Report: tag() (0xA0 ..), of_tag(), name(), in_v1()
 //   VarBind { oid, value }  VarBind::null(oid): a name to ask for
@@ -248,7 +248,7 @@ impl Bad {
 }
 
 /// the variable bindings of a PDU
-fn read_varbinds(r: &mut Reader, version: Version) -> Result<Vec<VarBind>, Bad> {
+pub(crate) fn read_varbinds(r: &mut Reader, version: Version) -> Result<Vec<VarBind>, Bad> {
     let mut list = r.seq(T_SEQUENCE)?;
     let mut v = Vec::new();
     while !list.is_empty() {
@@ -265,7 +265,7 @@ fn read_varbinds(r: &mut Reader, version: Version) -> Result<Vec<VarBind>, Bad> 
     Ok(v)
 }
 
-fn write_varbinds(w: &mut Writer, vbs: &[VarBind]) {
+pub(crate) fn write_varbinds(w: &mut Writer, vbs: &[VarBind]) {
     w.begin(T_SEQUENCE);
     for vb in vbs {
         w.begin(T_SEQUENCE);

@@ -519,7 +519,7 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
             ui.text(TS_BODY, t("Keine Labore gefunden."));
         } else {
             let mut sel = n.task.lab_sel.clamp(0, count - 1);
-            ui.next_size(520, (count * 56 + 4).min(340));
+            ui.next_size(520, (count * 56 + 4).min(400));
             let (first, end) = ui.list_begin(ID_LABS_LIST, &mut sel, count, 56);
             for i in first..end {
                 let l = &n.task.labs[i as usize];

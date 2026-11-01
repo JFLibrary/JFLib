@@ -13,6 +13,13 @@
 // dissectors; the payload of the others shows as one field.
 // BPDUs of STP and RSTP (LLC SAP 0x42) show every field and flag (stp.rs).
 // Field names and values follow the usual capture-tool wording (English protocol terms).
+// SNMPv3 (RFC 3412, 3414) shows msgID, msgMaxSize, msgFlags with their names, the security model,
+// the engine ID, boots and time, the user, the authentication and privacy parameters, and the scoped
+// PDU as in 2c, or the field "Encrypted scopedPDU" with the value "verschlüsselt" (snmpv3.rs).
+// SSH (TCP port 22) shows the identification line and, while the connection is in the clear, each
+// packet with its length, padding and message name, the lists of a KEXINIT and the values of the
+// key exchange; everything after NEWKEYS is one field with the value "verschlüsselt" (a German
+// word on purpose: it is what the inspector's reader needs to see, no protocol term) (ssh.rs).
 // HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 // shows the start line, the header lines and the body bytes of every message the segment
 // holds; a segment in the middle of a message is a "Continuation".
@@ -56,6 +63,12 @@
 // discards: a Length that does not fit, attributes that do not end at it (radius.rs).  Telnet
 // (TCP port 23) shows each command and negotiation ("Will Echo", "Interrupt Process") and the
 // data as text; a command cut off at the end of a segment is a problem (telnet.rs).
+// EAP in an EAPOL frame is a layer of its own: code, identifier, length, type and the data of
+// Identity, Nak, EAP-MD5 and EAP-PWD field by field (eap.rs); as an EAP-Message of RADIUS one
+// line with the same words.
+// IMAP (TCP port 143) shows each line: a command with its tag, verb and arguments, a response with
+// its tag or "*", status, response code and text; the bytes of a literal as a line of data. It
+// shares the bit P_MAIL (imap.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -171,6 +184,10 @@ pub enum Proto {
     Radius,
     /// Telnet (port 23)
     Telnet,
+    /// EAP inside EAPOL
+    Eap,
+    /// IMAP (port 143)
+    Imap,
 }
 
 impl Proto {
@@ -210,6 +227,8 @@ impl Proto {
             Proto::Pop3 => "POP3",
             Proto::Radius => "RADIUS",
             Proto::Telnet => "Telnet",
+            Proto::Eap => "EAP",
+            Proto::Imap => "IMAP",
         }
     }
     pub fn bit(self) -> u32 {
@@ -243,9 +262,10 @@ impl Proto {
             Proto::Eapol => P_EAPOL,
             Proto::Bgp => P_BGP,
             Proto::Ftp | Proto::FtpData => P_FTP,
-            Proto::Smtp | Proto::Pop3 => P_MAIL,
+            Proto::Smtp | Proto::Pop3 | Proto::Imap => P_MAIL,
             Proto::Radius => P_RADIUS,
             Proto::Telnet => P_TELNET,
+            Proto::Eap => P_EAPOL,
         }
     }
 }
@@ -311,6 +331,7 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             ftp::PORT_FTP_DATA => Proto::FtpData,
             smtp::PORT_SMTP | smtp::PORT_SUBMISSION => Proto::Smtp,
             pop3::PORT_POP3 => Proto::Pop3,
+            crate::imap::PORT_IMAP => Proto::Imap,
             telnet::PORT => Proto::Telnet,
             _ => return None,
         })
@@ -387,6 +408,9 @@ pub fn stack(frame: &[u8]) -> Stack {
             Some(v) => {
                 s.push(Proto::Eapol, off, v.pdu().len());
                 s.trailer = (rest.len() - v.pdu().len()) as u32;
+                if v.kind() == crate::eapol::T_EAP && v.body_len() > 0 {
+                    s.push(Proto::Eap, off + 4, v.body_len());
+                }
             }
             None => s.push(Proto::Data, off, rest.len()),
         },
@@ -618,6 +642,9 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Snmp => Some(snmp_layer(frame, off, len)),
             Proto::Radius => Some(radius_layer(frame, off, len)),
             Proto::Telnet => Some(telnet_layer(frame, off, len)),
+            Proto::Ssh => Some(ssh_layer(frame, off, len)),
+            Proto::Eap => Some(eap_layer(frame, off, len)),
+            Proto::Imap => Some(imap_layer(frame, off, len, mail_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1082,6 +1109,9 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Snmp => Some(snmp_info(b)),
         Proto::Radius => Some(radius_info(b)),
         Proto::Telnet => Some(telnet_info(b)),
+        Proto::Ssh => Some(ssh_info(b)),
+        Proto::Eap => Some(crate::eap::info(b)),
+        Proto::Imap => Some(imap_info(b)),
         _ => None,
     }
 }
@@ -2298,6 +2328,8 @@ fn akm_name(a: u8) -> String {
         crate::eapol::AKM_PSK => String::from("PSK (2)"),
         crate::eapol::AKM_PSK_SHA256 => String::from("PSK-SHA256 (6)"),
         crate::eapol::AKM_SAE => String::from("SAE (8)"),
+        crate::eapol::AKM_8021X => String::from("802.1X (1)"),
+        crate::eapol::AKM_8021X_SHA256 => String::from("802.1X-SHA256 (5)"),
         n => format!("{}", n),
     }
 }
@@ -2401,6 +2433,74 @@ fn eapol_info(b: &[u8]) -> String {
         },
         None => String::from("Key"),
     }
+}
+
+/// an EAP packet field by field
+fn eap_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::eap::{self, Md5Data, Packet, Pwd};
+    let b = &frame[off..off + len];
+    let Some(p) = Packet::parse(b) else {
+        let mut l = payload_layer(Proto::Eap, off, len);
+        l.l.title = String::from("Extensible Authentication Protocol");
+        l.bad(String::from("a Length that does not fit, or a Request or Response without a type"));
+        return l;
+    };
+    let title = format!("Extensible Authentication Protocol, {}", eap::info(b));
+    let mut l = B::new(Proto::Eap, off, len, title);
+    l.f("Code", off, 1, format!("{} ({})", eap::code_name(p.code), p.code));
+    l.f("Id", off + 1, 1, format!("{}", p.id));
+    l.f("Length", off + 2, 2, format!("{}", be16(b, 2)));
+    if !matches!(p.code, eap::REQUEST | eap::RESPONSE) {
+        return l;
+    }
+    l.f("Type", off + 4, 1, format!("{} ({})", eap::type_name(p.typ), p.typ));
+    let d = off + 5;
+    let n = p.data.len();
+    if n == 0 {
+        return l;
+    }
+    match p.typ {
+        eap::T_IDENTITY | eap::T_NOTIFICATION => l.f(if p.typ == eap::T_IDENTITY { "Identity" } else { "Notification" }, d, n, format!("\"{}\"", p.identity())),
+        eap::T_NAK => {
+            let names: Vec<String> = p.data.iter().map(|&t| if t == eap::NAK_NONE { String::from("none (0)") } else { format!("{} ({})", eap::type_name(t), t) }).collect();
+            l.f("Desired Auth Types", d, n, names.join(", "));
+        }
+        eap::T_MD5 => match Md5Data::parse(&p.data) {
+            Some(m) => {
+                l.f("Value-Size", d, 1, format!("{}", m.value.len()));
+                l.f("Value", d + 1, m.value.len(), hex_head(&m.value, 16));
+                if !m.name.is_empty() {
+                    l.f("Name", d + 1 + m.value.len(), m.name.len(), format!("\"{}\"", String::from_utf8_lossy(&m.name)));
+                }
+            }
+            None => l.bad(String::from("a Value-Size longer than the data")),
+        },
+        eap::T_PWD => {
+            let h = p.data[0];
+            l.f("Exchange", d, 1, format!("{} ({}), L {}, M {}", eap::exch_name(h & 0x3F), h & 0x3F, h >> 7, (h >> 6) & 1));
+            match Pwd::parse(&p.data) {
+                Some(Pwd::Id(i)) => {
+                    let group = if i.group == 19 { String::from("P-256 (19)") } else { format!("{}", i.group) };
+                    l.f("Group", d + 1, 2, group);
+                    l.f("Random Function", d + 3, 1, if i.rand_func == 1 { String::from("HMAC-SHA-256 (1)") } else { format!("{}", i.rand_func) });
+                    l.f("PRF", d + 4, 1, if i.prf == 1 { String::from("HMAC-SHA-256 (1)") } else { format!("{}", i.prf) });
+                    l.f("Token", d + 5, 4, hex_head(&i.token, 4));
+                    l.f("Prep", d + 9, 1, if i.prep == 0 { String::from("none (0)") } else { format!("{}", i.prep) });
+                    if !i.identity.is_empty() {
+                        l.f("Identity", d + 10, i.identity.len(), format!("\"{}\"", String::from_utf8_lossy(&i.identity)));
+                    }
+                }
+                Some(Pwd::Commit { element, scalar }) => {
+                    l.f("Element", d + 1, eap::PWD_ELEMENT, hex_head(&element, 16));
+                    l.f("Scalar", d + 1 + eap::PWD_ELEMENT, eap::PWD_SCALAR, hex_head(&scalar, 16));
+                }
+                Some(Pwd::Confirm(c)) => l.f("Confirm", d + 1, 32, hex_head(&c, 16)),
+                None => l.bad(String::from("a size that does not fit the exchange, or a fragment")),
+            }
+        }
+        _ => l.f("Type-Data", d, n, format!("{} bytes", n)),
+    }
+    l
 }
 
 // ---------------------------------------------------------------- BGP
@@ -2818,7 +2918,7 @@ fn ftp_info(b: &[u8], response: bool) -> String {
 /// the segment of an SMTP or POP3 connection comes from the server (its well-known port is the
 /// source and not the destination)
 fn mail_response(st: &Stack, frame: &[u8]) -> bool {
-    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3;
+    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3 || p == crate::imap::PORT_IMAP;
     match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
         Some(t) => server(t.src_port()) && !server(t.dst_port()),
         None => false,
@@ -2855,6 +2955,63 @@ fn mail_verb(line: &str, known: fn(&str) -> bool) -> Option<(String, usize, usiz
         return None;
     }
     Some((w.to_ascii_uppercase(), w.len(), lead + w.len() + 1))
+}
+
+/// IMAP lines
+fn imap_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    use crate::imap;
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Imap, off, len, String::from("Internet Message Access Protocol"));
+    for (s, e, end) in lines_of(b) {
+        if end == b.len() && e == end && !b.ends_with(b"\n") {
+            l.f("Continuation", off + s, end - s, format!("{} bytes", end - s));
+            break;
+        }
+        let line = String::from_utf8_lossy(&b[s..e]).into_owned();
+        let parsed = imap::Line::plain(&line);
+        if response {
+            l.f("Line", off + s, end - s, line.clone());
+            match imap::Response::parse(&parsed) {
+                Some(r) => match (&r.kind, r.status) {
+                    (imap::Kind::Cont, _) => l.f("Continuation request", off + s, end - s, r.text.clone()),
+                    (kind, Some(st)) => {
+                        let tag = if let imap::Kind::Tagged(t) = kind { t.as_str() } else { "*" };
+                        l.f("Tag", off + s, tag.len(), String::from(tag));
+                        l.f("Status", off + s + tag.len() + 1, st.word().len(), String::from(st.word()));
+                        if let Some(c) = &r.code {
+                            l.f("Response code", off + s + tag.len() + st.word().len() + 3, c.len(), c.clone());
+                        }
+                    }
+                    _ if line.starts_with("* ") => l.f("Untagged", off + s + 2, e - s - 2, String::from(&line[2..])),
+                    _ => l.f("Message data", off + s, end - s, line.clone()),
+                },
+                None => l.f("Message data", off + s, end - s, line.clone()),
+            }
+        } else if let Some(c) = imap::Command::parse(&parsed).filter(|c| imap::verb_known(&c.verb)) {
+            l.f("Line", off + s, end - s, line.clone());
+            l.f("Tag", off + s, c.tag.len(), c.tag.clone());
+            l.f("Command", off + s + c.tag.len() + 1, c.verb.len(), c.verb.clone());
+            let at = c.tag.len() + c.verb.len() + 2;
+            if line.len() > at {
+                l.f("Arguments", off + s + at, e - s - at, String::from(&line[at..]));
+            }
+        } else {
+            l.f("Message data", off + s, end - s, line.clone());
+        }
+    }
+    l
+}
+
+/// the first line of a segment
+fn imap_info(b: &[u8]) -> String {
+    let n = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let l = String::from_utf8_lossy(&b[..n]);
+    let t = l.trim_end();
+    let mut s: String = t.chars().take(120).collect();
+    if t.chars().count() > 120 {
+        s.push_str("...");
+    }
+    s
 }
 
 fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
@@ -3005,6 +3162,10 @@ fn snmp_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
         None => format!("{}", vn),
     };
     l.f("Version", off + vt.off, vt.hdr + vt.len, vname.clone());
+    // SNMPv3: its own fields (what cannot be read as SNMPv3 is a problem as any other version)
+    if vn == 3 && crate::snmpv3::V3::parse(b).is_ok() {
+        return snmp_v3_fields(l, b, off);
+    }
     let Some(version) = version else {
         return Err(snmp::Bad::Version(vn));
     };
@@ -3089,6 +3250,9 @@ fn snmp_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
 /// "GetRequest 1234: SNMPv2-MIB::sysName.0", "Response 1234: SNMPv2-MIB::sysName.0 = STRING: R1",
 /// "Response 1234: noSuchName (index 1)", "SNMPv2-Trap 7: IF-MIB::linkDown", "Trap (v1): linkDown"
 fn snmp_info(b: &[u8]) -> String {
+    if let Ok(m) = crate::snmpv3::V3::parse(b) {
+        return snmp_v3_info(&m);
+    }
     let m = match snmp::Message::parse(b) {
         Ok(m) => m,
         Err(e) => return format!("SNMP (malformed: {})", e.text()),
@@ -3235,4 +3399,214 @@ fn telnet_info(b: &[u8]) -> String {
         })
         .collect();
     if parts.is_empty() { String::from("Telnet") } else { parts.join(", ") }
+}
+
+// ---------------------------------------------------------------- SSH
+
+/// the fields of a packet in the clear (`m`: its payload, at `at` in the frame)
+fn ssh_message(l: &mut B, m: &[u8], at: usize) {
+    use crate::ssh::{self, KexInit, R};
+    let Some(&code) = m.first() else {
+        return;
+    };
+    l.f("Message Code", at, 1, format!("{} ({})", ssh::msg_name(code), code));
+    let mut r = R::new(&m[1..]);
+    // a field of a string with its length
+    let text = |l: &mut B, name: &'static str, r: &mut R, show: &dyn Fn(&[u8]) -> String| {
+        let start = 1 + r.pos();
+        if let Some(v) = r.bytes() {
+            l.f(name, at + start, 4 + v.len(), show(v));
+        }
+    };
+    let words = |v: &[u8]| String::from_utf8_lossy(v).into_owned();
+    let hexes = |v: &[u8]| {
+        let h: Vec<String> = v.iter().take(32).map(|b| format!("{:02x}", b)).collect();
+        if v.len() > 32 { format!("{}... ({} bytes)", h.join(""), v.len()) } else { h.join("") }
+    };
+    match code {
+        ssh::MSG_KEXINIT => {
+            if r.skip(16).is_some() {
+                l.f("Cookie", at + 1, 16, hexes(&m[1..17]));
+            }
+            for name in ["KEX Algorithms", "Host Key Algorithms", "Ciphers client to server", "Ciphers server to client", "MACs client to server", "MACs server to client", "Compression client to server", "Compression server to client", "Languages client to server", "Languages server to client"] {
+                text(l, name, &mut r, &words);
+            }
+            if KexInit::parse(m).is_none() {
+                l.bad(String::from("a KEXINIT that cannot be read"));
+            }
+        }
+        ssh::MSG_KEX_ECDH_INIT => text(l, "Client Public Key", &mut r, &hexes),
+        ssh::MSG_KEX_ECDH_REPLY => {
+            text(l, "Host Key", &mut r, &|v: &[u8]| format!("{} {}", ssh::blob_type(v), ssh::fingerprint(v)));
+            text(l, "Server Public Key", &mut r, &hexes);
+            text(l, "Signature", &mut r, &hexes);
+        }
+        ssh::MSG_SERVICE_REQUEST | ssh::MSG_SERVICE_ACCEPT => text(l, "Service", &mut r, &words),
+        ssh::MSG_DISCONNECT => {
+            if let Some(c) = r.u32() {
+                l.f("Reason", at + 1, 4, format!("{} ({})", ssh::reason_name(c), c));
+            }
+            text(l, "Description", &mut r, &words);
+        }
+        ssh::MSG_DEBUG => {
+            r.u8();
+            text(l, "Message", &mut r, &words);
+        }
+        _ => {}
+    }
+}
+
+fn ssh_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::ssh::{dissect, Part};
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Ssh, off, len, String::from("SSH Protocol"));
+    for part in dissect(b) {
+        match part {
+            Part::Ident { at, len, line } => l.f("Identification", off + at, len, line),
+            Part::Packet { at, len, packet_length, padding, .. } => {
+                l.f("Packet Length", off + at, 4, format!("{}", packet_length));
+                l.f("Padding Length", off + at + 4, 1, format!("{}", padding));
+                let end = (at + 4 + packet_length as usize).saturating_sub(padding as usize).min(at + len);
+                ssh_message(&mut l, &b[at + 5..end], off + at + 5);
+                if at + 4 + packet_length as usize > at + len {
+                    l.f("Continuation", off + at + len, 0, String::from("the rest comes in the next segment"));
+                } else {
+                    l.f("Padding", off + end, padding as usize, format!("{} bytes", padding));
+                }
+            }
+            Part::Opaque { at, len } => l.f("Encrypted Packet", off + at, len, String::from("verschlüsselt")),
+        }
+    }
+    l
+}
+
+/// "Identification: SSH-2.0-...", "SSH_MSG_KEXINIT, SSH_MSG_NEWKEYS", "verschlüsselt (84 bytes)"
+fn ssh_info(b: &[u8]) -> String {
+    use crate::ssh::{dissect, msg_name, Part};
+    let parts: Vec<String> = dissect(b)
+        .into_iter()
+        .map(|p| match p {
+            Part::Ident { line, .. } => line,
+            Part::Packet { code, .. } => String::from(msg_name(code)),
+            Part::Opaque { len, .. } => format!("verschlüsselt ({} bytes)", len),
+        })
+        .collect();
+    if parts.is_empty() { String::from("SSH") } else { parts.join(", ") }
+}
+
+// ---------------------------------------------------------------- SNMPv3
+
+/// the fields of the PDU of a plain scoped PDU, as in the other versions
+fn snmp_v3_pdu(l: &mut B, off: usize, sp: &mut ber::Reader) -> Result<(), snmp::Bad> {
+    let pt = sp.peek()?;
+    let Some(kind) = snmp::Kind::of_tag(pt.tag) else {
+        return Err(snmp::Bad::Pdu(pt.tag));
+    };
+    l.l.title = format!("Simple Network Management Protocol, v3, {}", kind.name());
+    l.f("PDU", off + pt.off, pt.hdr, format!("{} (0x{:02x})", kind.name(), pt.tag));
+    let mut p = sp.seq(pt.tag)?;
+    let t = p.peek()?;
+    let id = p.int32()?;
+    l.f("Request ID", off + t.off, t.hdr + t.len, format!("{}", id));
+    let t = p.peek()?;
+    let es = p.int32()?;
+    let t2 = p.peek()?;
+    let ei = p.int32()?;
+    if kind == snmp::Kind::GetBulk {
+        l.f("Non-repeaters", off + t.off, t.hdr + t.len, format!("{}", es));
+        l.f("Max-repetitions", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+    } else {
+        l.f("Error status", off + t.off, t.hdr + t.len, format!("{} ({})", snmp::error_name(es), es));
+        l.f("Error index", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+    }
+    let mut list = p.seq(ber::T_SEQUENCE)?;
+    while !list.is_empty() {
+        let mut vb = list.seq(ber::T_SEQUENCE)?;
+        let ot = vb.peek()?;
+        let oid = vb.oid()?;
+        let name = crate::snmpv3::report_name(oid.arcs());
+        let shown = if name == "unknown counter" { snmp_name(&oid) } else { format!("{} ({})", name, oid) };
+        l.f("Object Name", off + ot.off, ot.hdr + ot.len, shown);
+        let vt = vb.peek()?;
+        let value = vb.value()?;
+        l.f("Value", off + vt.off, vt.hdr + vt.len, mib::show(oid.arcs(), &value, false));
+        vb.done()?;
+    }
+    Ok(())
+}
+
+fn snmp_v3_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
+    use crate::snmpv3::{F_AUTH, F_PRIV, F_REPORTABLE};
+    let mut top = ber::Reader::new(b);
+    let mut m = top.seq(ber::T_SEQUENCE)?;
+    m.int()?;
+    let mut g = m.seq(ber::T_SEQUENCE)?;
+    let t = g.peek()?;
+    let id = g.int32()?;
+    l.f("msgID", off + t.off, t.hdr + t.len, format!("{}", id));
+    let t = g.peek()?;
+    let max = g.int32()?;
+    l.f("msgMaxSize", off + t.off, t.hdr + t.len, format!("{}", max));
+    let t = g.peek()?;
+    let f = g.octets()?;
+    let flags = f.first().copied().unwrap_or(0);
+    let mut words = Vec::new();
+    for (bit, w) in [(F_AUTH, "auth"), (F_PRIV, "priv"), (F_REPORTABLE, "reportable")] {
+        if flags & bit != 0 {
+            words.push(w);
+        }
+    }
+    l.f("msgFlags", off + t.off, t.hdr + t.len, format!("0x{:02x} ({})", flags, if words.is_empty() { String::from("none") } else { words.join(", ") }));
+    let t = g.peek()?;
+    let model = g.int32()?;
+    l.f("msgSecurityModel", off + t.off, t.hdr + t.len, if model == 3 { String::from("USM (3)") } else { format!("{}", model) });
+    let t = m.expect(ber::T_OCTETS)?;
+    let mut s = m.inside(&t).seq(ber::T_SEQUENCE)?;
+    let hex = |v: &[u8]| if v.is_empty() { String::from("(empty)") } else { crate::snmpv3::engine_id_text(v) };
+    let x = s.peek()?;
+    let e = s.octets()?;
+    l.f("msgAuthoritativeEngineID", off + x.off, x.hdr + x.len, hex(e));
+    let x = s.peek()?;
+    let v = s.int32()?;
+    l.f("msgAuthoritativeEngineBoots", off + x.off, x.hdr + x.len, format!("{}", v));
+    let x = s.peek()?;
+    let v = s.int32()?;
+    l.f("msgAuthoritativeEngineTime", off + x.off, x.hdr + x.len, format!("{}", v));
+    let x = s.peek()?;
+    let u = s.octets()?;
+    l.f("msgUserName", off + x.off, x.hdr + x.len, String::from_utf8_lossy(u).into_owned());
+    let x = s.peek()?;
+    let a = s.octets()?;
+    l.f("msgAuthenticationParameters", off + x.off, x.hdr + x.len, hex(a));
+    let x = s.peek()?;
+    let p = s.octets()?;
+    l.f("msgPrivacyParameters", off + x.off, x.hdr + x.len, hex(p));
+    let t = m.peek()?;
+    if t.tag == ber::T_SEQUENCE {
+        let mut sp = m.seq(ber::T_SEQUENCE)?;
+        let x = sp.peek()?;
+        let c = sp.octets()?;
+        l.f("contextEngineID", off + x.off, x.hdr + x.len, hex(c));
+        let x = sp.peek()?;
+        let c = sp.octets()?;
+        l.f("contextName", off + x.off, x.hdr + x.len, String::from_utf8_lossy(c).into_owned());
+        snmp_v3_pdu(l, off, &mut sp)?;
+    } else {
+        let c = m.octets()?;
+        l.l.title = String::from("Simple Network Management Protocol, v3, verschlüsselt");
+        l.f("Encrypted scopedPDU", off + t.off, t.hdr + c.len(), String::from("verschlüsselt"));
+    }
+    Ok(())
+}
+
+/// "SNMPv3 GetRequest 12: user admin", "SNMPv3 verschlüsselt: user admin (authPriv)", "SNMPv3 Report:
+/// usmStatsUnknownEngineIDs"
+fn snmp_v3_info(m: &crate::snmpv3::V3) -> String {
+    let user = String::from_utf8_lossy(&m.usm.user).into_owned();
+    let level = m.level().map_or("?", |x| x.word());
+    match m.plain() {
+        None => format!("SNMPv3 verschlüsselt: user {} ({})", user, level),
+        Some(s) if s.pdu.kind == snmp::Kind::Report => format!("SNMPv3 Report: {}", s.pdu.varbinds.first().map_or("?", |v| crate::snmpv3::report_name(v.oid.arcs()))),
+        Some(s) => format!("SNMPv3 {} {}: user {} ({})", s.pdu.kind.name(), s.pdu.request_id, user, level),
+    }
 }

@@ -1,0 +1,175 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/web_site.jfnet
+# the Webbrowser on PC1's desktop (devwin/browser.rs) on fixtures/web_site.jfnet: an address typed
+# (a name through DNS1, without a scheme) shows WEB1's static page with its picture and its title
+# in the window's title; a link and back and forward with the buttons and the keys; a relative
+# link up a folder; text as preformatted text, Markdown, a fragment link that scrolls within a
+# page and comes back, an image opened by itself; Ctrl+L and Enter; closing the window drops
+# its state; pages of ours for what does not work: an unknown name, a refused port, a missing
+# page, a server's error, https
+# Ids (window 0): the address 26800, Öffnen 26801, Zurück 26803, Vor 26804, Neu laden 26805
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 900 680
+expect tab:"Desktop" selected
+dblclick listitem:"Webbrowser"
+expect dialog:"Webbrowser" exists
+expect text:"Webbrowser" exists
+# ---- an address typed: the page, its picture, its title
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+expect #26800 text "http://web.lab/"
+expect heading:"Bäckerei Krume" exists
+expect link:"Unser Brot" exists
+expect dialog:"Bäckerei Krume – Webbrowser" exists
+expect text:"200 OK · text/html · 594 Bytes · 149 µs" exists
+wait 500
+shot build/jfnetworker/browser_start.png window 26624
+# ---- a link and back
+click link:"Unser Brot"
+wait 500
+expect heading:"Unser Brot" exists
+expect #26800 text "http://web.lab/brot/"
+expect dialog:"Unser Brot – Webbrowser" exists
+click link:"Roggenbrot"
+wait 500
+expect heading:"Roggenbrot" exists
+expect #26800 text "http://web.lab/brot/roggen.html"
+click #26803
+expect heading:"Unser Brot" exists
+expect #26800 text "http://web.lab/brot/"
+click #26804
+expect heading:"Roggenbrot" exists
+# the keys: Alt+Left twice, Alt+Right
+key alt+left
+expect heading:"Unser Brot" exists
+key alt+left
+expect heading:"Bäckerei Krume" exists
+expect #26800 text "http://web.lab/"
+key alt+right
+expect heading:"Unser Brot" exists
+# a relative link up the folder (back to the start as a new entry: Vor has nothing left)
+click link:"Zur Startseite"
+wait 500
+expect heading:"Bäckerei Krume" exists
+expect #26800 text "http://web.lab/index.html"
+expect #26804 disabled
+# F5 asks again: the same page
+key f5
+wait 500
+expect heading:"Bäckerei Krume" exists
+# ---- text
+click link:"Eine Notiz als Text"
+wait 500
+expect #26800 text "http://web.lab/notiz.txt"
+expect dialog:"notiz.txt – Webbrowser" exists
+expect text:"200 OK · text/plain · 72 Bytes · 128 µs" exists
+shot build/jfnetworker/browser_text.png window 26624
+key alt+left
+# ---- Markdown and a fragment of it
+click link:"Hilfe in Markdown"
+wait 500
+expect heading:"Hilfe" exists
+expect dialog:"Hilfe – Webbrowser" exists
+click link:"Nach unten"
+expect #26800 text "http://web.lab/hilfe.md#zweiter-teil"
+expect heading:"Zweiter Teil" exists
+key alt+left
+expect #26800 text "http://web.lab/hilfe.md"
+key alt+left
+expect heading:"Bäckerei Krume" exists
+# ---- a long page: a fragment scrolls there, back returns
+click link:"Die Öffnungszeiten"
+wait 500
+expect #26800 text "http://web.lab/lang.html#zeiten"
+expect heading:"Öffnungszeiten" exists
+shot build/jfnetworker/browser_fragment.png window 26624
+click link:"Nach oben"
+expect #26800 text "http://web.lab/lang.html#oben"
+expect link:"Zu den Öffnungszeiten" exists
+key alt+left
+expect heading:"Öffnungszeiten" exists
+key alt+left
+expect heading:"Bäckerei Krume" exists
+# ---- a picture by itself, Ctrl+L and Enter
+key ctrl+l
+expect #26800 focused
+type "web.lab/logo.svg\n"
+wait 500
+expect #26800 text "http://web.lab/logo.svg"
+expect dialog:"logo.svg – Webbrowser" exists
+expect image:"logo.svg" exists
+# ---- a file it does not show
+click #26800
+key ctrl+a
+type "http://web.lab/daten.bin\n"
+wait 500
+expect heading:"Diese Datei zeigt der Browser nicht an" exists
+expect text:"Typ application/octet-stream, 64 Bytes." exists
+# ---- pages of ours: an unknown name
+click #26800
+key ctrl+a
+type "http://gibtsnicht.lab/\n"
+wait 500
+expect heading:"Seite nicht erreichbar" exists
+expect text:"Den Namen gibtsnicht.lab kann dieses Gerät nicht auflösen." exists
+expect text:"Keine Antwort" exists
+expect dialog:"Seite nicht erreichbar – Webbrowser" exists
+shot build/jfnetworker/browser_error_name.png window 26624
+# a refused port
+click #26800
+key ctrl+a
+type "http://10.0.0.1:81/\n"
+wait 500
+expect heading:"Seite nicht erreichbar" exists
+expect text:"10.0.0.1 lehnt die Verbindung ab: auf Port 81 lauscht kein Dienst." exists
+shot build/jfnetworker/browser_error_refused.png window 26624
+# no route: PC1 has no gateway
+click #26800
+key ctrl+a
+type "http://192.168.7.7/\n"
+wait 500
+expect text:"Zu 192.168.7.7 führt von hier kein Weg." exists
+# back over the error pages to the picture
+key alt+left
+expect text:"10.0.0.1 lehnt die Verbindung ab: auf Port 81 lauscht kein Dienst." exists
+# 404 and 500
+click #26800
+key ctrl+a
+type "http://web.lab/kaputt.html\n"
+wait 500
+expect heading:"Die Seite gibt es so nicht" exists
+expect text:"web.lab antwortet mit 404 Not Found." exists
+click #26800
+key ctrl+a
+type "http://web.lab:8080/kaputt\n"
+wait 500
+expect heading:"Der Ofen ist aus" exists
+click #26800
+key ctrl+a
+type "http://web.lab:8080/fehler\n"
+wait 500
+expect heading:"Der Server meldet einen Fehler" exists
+# too many redirects
+click #26800
+key ctrl+a
+type "http://web.lab:8080/schleife\n"
+wait 500
+expect heading:"Zu viele Weiterleitungen" exists
+# https: at once, without a request
+click #26800
+key ctrl+a
+type "https://web.lab/\n"
+expect heading:"Verschlüsselte Seite" exists
+expect text:"Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe." exists
+# ---- the window's state goes with it
+click button:"Schließen: Verschlüsselte Seite – Webbrowser"
+expect dialog:"Verschlüsselte Seite – Webbrowser" missing
+dblclick listitem:"Webbrowser"
+expect text:"Webbrowser" exists
+expect #26800 text "http://"
+expect #26803 disabled
+expect_nowarn

@@ -1,9 +1,9 @@
 // ses -- the command-line sessions of a device: the console (session 0, always there), local
 // terminals the app opens (the Terminal panel's further tabs, the desktop's terminal windows,
-// the IDE's terminal pane) and telnet sessions (telnetd.rs: the vty lines of IOS-like devices,
-// telnetd on Linux hosts)
+// the IDE's terminal pane) and sessions from the network: telnet (telnetd.rs: the vty lines of
+// IOS-like devices, telnetd on Linux hosts) and SSH (sshd.rs: the same lines, sshd on Linux hosts)
 //
-//   SesKind                       Console | Local | Telnet
+//   SesKind                       Console | Local | Telnet (from the network; Conn::ssh tells SSH)
 //   SesInfo                       what the device knows of a session: its id, kind, line name
 //                                 ("con 0", "tty 1", "vty 0"; Linux "tty1", "pts/0"), since,
 //                                 the last line typed, "terminal monitor", the shell's PID, its
@@ -44,9 +44,9 @@
 // in every session.  Output follows the session in place: the console's Report::CliOut, a local
 // session's Report::SesOut, a telnet session's connection.  Wake-ups of a session are
 // Ev::Ses { node, ses, epoch }; the SES_MARK bit marks the session's own ones (its start, the
-// telnet input, the idle timeout, its end).  Ending a session from inside it (exit, an idle
-// timeout, a closed connection) only marks it: it goes at the same moment in an event of its
-// own, after the engine left it.  Switching a device off ends every session but the console,
+// telnet input, the idle timeout, the time for an SSH login, its end).  Ending a session from
+// inside it (exit, an idle timeout, a closed connection) only marks it: it goes at the same
+// moment in an event of its own, after the engine left it.  Switching a device off ends every session but the console,
 // which starts afresh.
 
 use alloc::collections::VecDeque;
@@ -72,6 +72,8 @@ const W_END: u32 = SES_MARK | 0x0200_0000;
 pub(crate) const W_INPUT: u32 = SES_MARK | 0x0300_0000;
 /// | the idle timer's generation (24 bits)
 pub(crate) const W_IDLE: u32 = SES_MARK | 0x0400_0000;
+/// the time for an SSH login is up (sshd.rs)
+pub(crate) const W_SSH: u32 = SES_MARK | 0x0500_0000;
 
 /// what a session is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,11 +82,12 @@ pub enum SesKind {
     Console,
     /// a terminal the app opened: IOS "tty N" (it logs in as line con 0 says), Linux "pts/N"
     Local,
-    /// a telnet connection: IOS "vty N", Linux "pts/N" (telnetd.rs)
+    /// a connection from the network: IOS "vty N", Linux "pts/N" (telnetd.rs; Conn::ssh tells an
+    /// SSH one, sshd.rs)
     Telnet,
 }
 
-/// the telnet connection of a session (telnetd.rs)
+/// the connection of a session from the network: telnet (telnetd.rs) or SSH (sshd.rs)
 #[derive(Clone, Debug)]
 pub struct Conn {
     /// the server's service and the connection's socket
@@ -106,6 +109,22 @@ pub struct Conn {
     pub hide: bool,
     /// an input wake-up is scheduled
     pub woken: bool,
+    /// an SSH connection: the core and its session state (sshd.rs)
+    pub ssh: Option<alloc::boxed::Box<crate::sshd::SshConn>>,
+}
+
+impl Conn {
+    /// what the session writes goes into the connection's bytes
+    pub(crate) fn write_text(&mut self, text: &str) {
+        match self.ssh.as_mut() {
+            Some(x) => {
+                x.write(text.as_bytes());
+                let out = x.core.take_out();
+                self.tx.extend_from_slice(&out);
+            }
+            None => self.tx.extend_from_slice(&netpkt::telnet::to_nvt(text.as_bytes())),
+        }
+    }
 }
 
 /// the login of a Linux telnetd session ("PC1 login: ", "Password: ")
@@ -139,11 +158,13 @@ pub struct SesInfo {
     pub idle_gen: u32,
     /// it ends as soon as the engine left it
     pub ending: bool,
+    /// who a Linux session belongs to when it is not root (sshd.rs: another user of sshd)
+    pub account: String,
 }
 
 impl SesInfo {
     fn new(id: u32, kind: SesKind, line: String, no: u16, now: Ns) -> SesInfo {
-        SesInfo { id, kind, line, no, since: now, last: now, monitor: false, pid: 0, conn: None, login: None, prompted: false, idle_gen: 0, ending: false }
+        SesInfo { id, kind, line, no, since: now, last: now, monitor: false, pid: 0, conn: None, login: None, prompted: false, idle_gen: 0, ending: false, account: String::new() }
     }
     /// the console's (session 0)
     pub fn console(style: CliStyle) -> SesInfo {
@@ -153,7 +174,11 @@ impl SesInfo {
         i
     }
     fn footprint(&self) -> usize {
-        core::mem::size_of::<SesInfo>() + self.line.len() + self.conn.as_ref().map_or(0, |c| c.tx.len() + c.rx.len() + c.inq.iter().map(|l| l.len() + 24).sum::<usize>() + 256)
+        core::mem::size_of::<SesInfo>() + self.line.len() + self.account.len() + self.conn.as_ref().map_or(0, |c| c.tx.len() + c.rx.len() + c.inq.iter().map(|l| l.len() + 24).sum::<usize>() + 256 + c.ssh.as_ref().map_or(0, |x| x.footprint()))
+    }
+    /// who the session of a Linux shell belongs to
+    pub fn user_name(&self) -> &str {
+        if self.account.is_empty() { "root" } else { &self.account }
     }
 }
 
@@ -347,6 +372,9 @@ impl Engine {
             W_IDLE => {
                 self.in_ses(ni, s, |e| e.ses_idle(ni, epoch & 0x00FF_FFFF));
             }
+            W_SSH => {
+                self.in_ses(ni, s, |e| e.ssh_timeout(ni));
+            }
             W_END => self.ses_drop(ni, s),
             _ => {}
         }
@@ -394,7 +422,7 @@ impl Engine {
         };
         if remote {
             if let Some(c) = self.ses_info_mut(ni, s).and_then(|i| i.conn.as_mut()) {
-                c.tx.extend_from_slice(&netpkt::telnet::to_nvt(text.as_bytes()));
+                c.write_text(text);
             }
             self.ses_flush(ni, s);
             return;
@@ -557,7 +585,7 @@ impl Engine {
         let Some(c) = self.cdev_mut(ni) else {
             return;
         };
-        c.parked.remove(&s);
+        let status = c.parked.remove(&s).map_or(0, |p| p.sh.status);
         let Some(k) = c.sessions.iter().position(|i| i.id == s) else {
             return;
         };
@@ -566,6 +594,11 @@ impl Engine {
             self.cli.reports.push(Report::SesClosed { dev, ses: s });
         }
         if let Some(conn) = info.conn {
+            // SSH has last words: the exit status and the channel's end (sshd.rs)
+            if conn.ssh.is_some() {
+                self.ssh_drop(ni, conn, status);
+                return;
+            }
             if !conn.tx.is_empty() {
                 let _ = self.tcp_write(ni, conn.svc, conn.sock, &conn.tx, None);
             }
@@ -645,7 +678,7 @@ impl Engine {
             .iter()
             .map(|i| {
                 let user = if linux {
-                    String::from(if i.login.is_some() { "" } else { "root" })
+                    String::from(if i.login.is_some() { "" } else { i.user_name() })
                 } else if i.id == c.cur {
                     c.user.clone()
                 } else {
@@ -748,7 +781,10 @@ impl Engine {
         let host = self.host(ni);
         match self.cdev(ni).map_or(CliStyle::None, |c| c.style) {
             CliStyle::Ios => format!("{}{}", host, super::ios::prompt_suffix(p.mode)),
-            CliStyle::Linux => format!("root@{}:{}# ", host, p.sh.prompt_dir()),
+            CliStyle::Linux => match self.ses_info(ni, s).map(|i| i.user_name()) {
+                Some(u) if u != "root" => format!("{}@{}:{}$ ", u, host, p.sh.prompt_dir()),
+                _ => format!("root@{}:{}# ", host, p.sh.prompt_dir()),
+            },
             CliStyle::None => String::new(),
         }
     }
@@ -815,7 +851,7 @@ impl Engine {
             let (user, level) = if i.id == c.cur { (c.user.clone(), c.priv_level) } else { c.parked.get(&i.id).map(|p| (p.user.clone(), p.priv_level)).unwrap_or_default() };
             let who = if user.is_empty() { String::from("-") } else { user };
             let mark = if i.id == c.cur { '*' } else { ' ' };
-            let loc = i.conn.as_ref().map(|x| format!("{}", x.from)).unwrap_or_default();
+            let loc = i.conn.as_ref().map(|x| format!("{}{}", x.from, Engine::ssh_marker(i))).unwrap_or_default();
             s.push_str(&format!("{}   {:<10} {:<10} {:<10} {:<9} {}", mark, i.line, who, level, hms(now.saturating_sub(i.last)), loc).trim_end());
             s.push('\n');
         }

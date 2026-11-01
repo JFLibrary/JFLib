@@ -1,0 +1,65 @@
+# 802.1X, WPA-Enterprise und IMAP: SW1 lässt seine Ports Gi1/0/2 und Gi1/0/3 erst nach einer
+# Anmeldung über RADIUS (SRV1) offen. PC1 (anna, EAP-MD5) kommt hinein, PC2 (carla, EAP-PWD mit
+# falschem Passwort) bleibt draußen. Laptop1 meldet sich im Netz „Firma“ (WPA2-Enterprise) bei AP1
+# an: EAP-PWD über RADIUS gibt beiden Seiten das PMK, dann läuft der 4-Wege-Handshake. Zuletzt holt
+# PC1 eine Nachricht per IMAP und markiert sie auf dem Server.
+#
+# Die erste Anfrage von SW1 wartet auf ARP (IOS-artig hält er das Paket nicht zurück), die
+# Wiederholung nach 1 s trägt sie.
+run 3s
+SW1: enable
+SW1: show authentication sessions
+run 10ms
+expect SW1 output contains "anna"
+expect SW1 output contains "AUTHENTICATED"
+expect SRV1 svc radius metric accepts >= 1
+PC1: wpa_cli status
+run 10ms
+expect PC1 output contains "eth0: logged in as anna with EAP-MD5"
+# PC1 kommt durch den offenen Port, PC2 nicht
+PC1: ping -c 1 -W 1 10.0.0.1
+run 2s
+expect PC1 output contains "1 received"
+PC2: ping -c 1 -W 1 10.0.0.1
+run 2s
+expect PC2 output contains "0 received"
+PC2: wpa_cli status
+run 10ms
+expect PC2 output contains "eth0: refused as carla, waiting"
+SW1: show dot1x interface gi1/0/3
+run 10ms
+expect SW1 output contains "GigabitEthernet1/0/3: closed, only EAPOL passes"
+# das WLAN: der Laptop ist drin und erreicht den Router
+Laptop1: iw dev wlan0 link
+run 10ms
+expect Laptop1 output contains "connected to"
+expect Laptop1 output contains "security: WPA2-Enterprise (IEEE 802.1X, CCMP)"
+Laptop1: ping -c 1 -W 1 10.0.0.1
+run 2s
+expect Laptop1 output contains "1 received"
+# ein Port geht wieder zu, wenn der PC sich abmeldet
+PC1: wpa_cli logoff
+run 1s
+SW1: show dot1x interface gi1/0/2
+run 10ms
+expect SW1 output contains "GigabitEthernet1/0/2: closed, only EAPOL passes"
+PC1: wpa_cli logon
+run 2s
+SW1: show dot1x interface gi1/0/2
+run 10ms
+expect SW1 output contains "GigabitEthernet1/0/2: open"
+# IMAP: die Ordner, eine Nachricht, eine Markierung
+PC1: curl -u anna:geheim imap://10.0.0.10/
+run 2s
+expect PC1 output contains "\Trash"
+PC1: curl -u anna:geheim "imap://10.0.0.10/INBOX;UID=1"
+run 2s
+expect PC1 output contains "Subject: Hallo Anna"
+expect PC1 output contains "Der erste Text"
+expect SRV1 svc imap metric fetched == 1
+PC1: curl -u anna:geheim "imap://10.0.0.10/INBOX?UNSEEN"
+run 2s
+expect PC1 output contains "* SEARCH 2"
+SRV1: ls /var/mail/anna/cur
+run 10ms
+expect SRV1 output contains "1767225601.M1Q1.mail:2,S"

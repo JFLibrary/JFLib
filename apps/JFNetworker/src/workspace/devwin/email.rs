@@ -16,17 +16,25 @@
 // last send and the last fetch did.  Antworten fills a new message from the chosen one (to its
 // sender, "Re: ", the text quoted); Löschen removes the chosen message from the folder (a step).
 //
+// An IMAP account (the account's Kontotyp; jfn_sim::mailc): the folders of the server with their
+// counts in place of Posteingang and Gesendet, a column with the marks (Neu, ★) of the server's
+// flags, Abrufen brings the shown folder up to date, Löschen moves to Trash (there: for good),
+// Markieren sets \Flagged, showing a message sets \Seen, what was sent lands in Sent, a new folder
+// and deleting one in the row below the list; all of it through Action::MailImap, each a session.
+//
 // Ids (id = ID_MAIL0 + 0x400 k): + 1 Abrufen, + 2 Verfassen, + 3 Antworten, + 4 Löschen, + 5 Konto,
-// + 6 the folders (+ 7, + 8 their segments); + 0x10 .. + 0x1B the account's fields, Speichern and
-// Abbrechen; + 0x20 .. + 0x25 the new message's fields, Senden and Verwerfen; + 0x30 the text
-// shown; + 0x40 / + 0x41 the scroll views of the forms; + 0x100 the list (rows + 0x101 + i).
+// + 6 the folders (+ 7 .. their segments); + 0x10 .. + 0x1B the account's fields,
+// Speichern and Abbrechen; + 0x20 .. + 0x25 the new message's fields, Senden and Verwerfen; + 0x30
+// the text shown; + 0x40 / + 0x41 the scroll views of the forms; + 0x50 Kontotyp; + 0x51 the new
+// folder's name, + 0x52 Anlegen, + 0x53 Ordner löschen, + 0x54 Markieren; + 0x100 the list (rows +
+// 0x101 + i).  An IMAP account shows its first 8 folders: their segments end before the form's ids.
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_model::files::Store;
-use jfn_sim::mailc::{self, Account, MailDraft, MailEntry};
+use jfn_sim::mailc::{self, Account, ImapOp, MailDraft, MailEntry};
 use jfn_sim::{Action, Cmd};
 use netpkt::imf::{self, Message};
 use ui::*;
@@ -59,7 +67,15 @@ pub(crate) struct MailUi {
     // the account's form and what it started from
     f: [String; 8],
     keep: i32,
+    /// 0 POP3, 1 IMAP
+    kind: i32,
     src: Option<Account>,
+    /// the folder of an IMAP account
+    imap_folder: String,
+    /// the new folder's name
+    new_folder: String,
+    /// the message \Seen was asked for last
+    seen_asked: Option<u32>,
     pub err: String,
     /// a button of a form, handled after the widgets
     pending: Option<u32>,
@@ -79,17 +95,34 @@ impl MailUi {
             references: String::new(),
             f: Default::default(),
             keep: 0,
+            kind: 0,
             src: None,
+            imap_folder: String::from("INBOX"),
+            new_folder: String::new(),
+            seen_asked: None,
             err: String::new(),
             pending: None,
         }
     }
     /// the form from an account
     fn fill(&mut self, a: &Account) {
-        self.f = [a.name.clone(), a.address.clone(), a.smtp.clone(), a.smtp_port.to_string(), a.pop3.clone(), a.pop3_port.to_string(), a.user.clone(), a.password.clone()];
+        let imap = a.is_imap();
+        let (server, port) = if imap { (a.imap.clone(), a.imap_port) } else { (a.pop3.clone(), a.pop3_port) };
+        self.f = [a.name.clone(), a.address.clone(), a.smtp.clone(), a.smtp_port.to_string(), server, port.to_string(), a.user.clone(), a.password.clone()];
         self.keep = a.keep as i32;
+        self.kind = imap as i32;
         self.src = Some(a.clone());
     }
+}
+
+/// a folder of the server in the window's words
+fn folder_title(f: &str) -> String {
+    String::from(match f {
+        "INBOX" => t("Posteingang"),
+        "Sent" => t("Gesendet"),
+        "Trash" => t("Papierkorb"),
+        x => x,
+    })
 }
 
 /// a key for a row of the list
@@ -141,8 +174,29 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         s.fill(&Account::parse(""));
         s.view = View::Account;
     }
-    let dir = if s.folder == 1 { mailc::SENT } else { mailc::INBOX };
-    let mut list: Vec<MailEntry> = st.as_ref().map(|x| mailc::folder(x, dir)).unwrap_or_default();
+    let imap_acct = acct.as_ref().is_some_and(|a| a.is_imap());
+    let imap_folders: Vec<String> = if imap_acct {
+        let mut v = st.as_ref().map(mailc::imap_folders).unwrap_or_default();
+        v.truncate(8);
+        if v.is_empty() {
+            v = alloc::vec![String::from("INBOX")];
+        }
+        v
+    } else {
+        Vec::new()
+    };
+    if imap_acct && !imap_folders.contains(&s.imap_folder) {
+        s.imap_folder = String::from("INBOX");
+    }
+    let dir = if imap_acct {
+        mailc::imap_dir(&s.imap_folder)
+    } else if s.folder == 1 {
+        String::from(mailc::SENT)
+    } else {
+        String::from(mailc::INBOX)
+    };
+    let marks = if imap_acct { st.as_ref().map(|x| mailc::imap_marks(x, &s.imap_folder)).unwrap_or_default() } else { Default::default() };
+    let mut list: Vec<MailEntry> = st.as_ref().map(|x| mailc::folder(x, &dir)).unwrap_or_default();
     list.reverse();
     let keys: Vec<u64> = list.iter().map(|m| key_of(&m.path)).collect();
     s.grid.retain(&keys);
@@ -156,7 +210,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     if ui.button(id + 1, t("Abrufen")) & EV_ACT != 0 {
         act = Some(1);
     }
-    ui.tooltip(t("Neue Nachrichten per POP3 vom Server holen"));
+    ui.tooltip(if imap_acct { t("Den Ordner mit dem IMAP-Server abgleichen") } else { t("Neue Nachrichten per POP3 vom Server holen") });
     ui.next_icon(IC_ADD);
     ui.next_flags(if acct.is_some() { 0 } else { ST_DISABLED });
     if ui.button(id + 2, t("Verfassen")) & EV_ACT != 0 {
@@ -164,7 +218,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     }
     let can = cur.is_some() && s.view == View::List;
     ui.next_icon(IC_RETURN);
-    ui.next_flags(if can && s.folder == 0 && acct.is_some() { 0 } else { ST_DISABLED });
+    ui.next_flags(if can && (s.folder == 0 || imap_acct) && acct.is_some() { 0 } else { ST_DISABLED });
     if ui.button(id + 3, t("Antworten")) & EV_ACT != 0 {
         act = Some(3);
     }
@@ -172,6 +226,12 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.next_flags(if can { 0 } else { ST_DISABLED });
     if ui.button(id + 4, t("Löschen")) & EV_ACT != 0 {
         act = Some(4);
+    }
+    if imap_acct {
+        ui.next_flags(if can { 0 } else { ST_DISABLED });
+        if ui.button(id + 0x54, t("Markieren")) & EV_ACT != 0 {
+            act = Some(9);
+        }
     }
     ui.next_icon(IC_PERSON);
     ui.next_flags(ST_SUBTLE);
@@ -181,39 +241,95 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.box_end();
     match s.view {
         View::List => {
-            let mut sel = s.folder;
-            let names: Vec<String> = FOLDERS.iter().enumerate().map(|(i, f)| {
-                let c = if i as i32 == s.folder { list.len() } else { st.as_ref().map_or(0, |x| mailc::folder(x, if i == 1 { mailc::SENT } else { mailc::INBOX }).len()) };
-                format!("{} ({})", t(f), c)
-            }).collect();
-            let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-            if ui.segmented(id + 6, &mut sel, &refs) & EV_ACT != 0 {
-                s.folder = sel;
-                s.grid.select_only(None);
-                ui.repass();
+            if imap_acct {
+                // the server's folders
+                let mut sel = imap_folders.iter().position(|f| *f == s.imap_folder).map_or(0, |i| i as i32);
+                let names: Vec<String> = imap_folders
+                    .iter()
+                    .map(|f| {
+                        let c = if *f == s.imap_folder { list.len() } else { st.as_ref().map_or(0, |x| mailc::folder(x, &mailc::imap_dir(f)).len()) };
+                        format!("{} ({})", folder_title(f), c)
+                    })
+                    .collect();
+                let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+                if ui.segmented(id + 6, &mut sel, &refs) & EV_ACT != 0
+                    && let Some(f) = imap_folders.get(sel as usize)
+                {
+                    s.imap_folder = f.clone();
+                    s.grid.select_only(None);
+                    s.seen_asked = None;
+                    act = Some(1);
+                    ui.repass();
+                }
+            } else {
+                let mut sel = s.folder;
+                let names: Vec<String> = FOLDERS.iter().enumerate().map(|(i, f)| {
+                    let c = if i as i32 == s.folder { list.len() } else { st.as_ref().map_or(0, |x| mailc::folder(x, if i == 1 { mailc::SENT } else { mailc::INBOX }).len()) };
+                    format!("{} ({})", t(f), c)
+                }).collect();
+                let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+                if ui.segmented(id + 6, &mut sel, &refs) & EV_ACT != 0 {
+                    s.folder = sel;
+                    s.grid.select_only(None);
+                    ui.repass();
+                }
             }
+            let sent_view = if imap_acct { s.imap_folder == "Sent" } else { s.folder != 0 };
             if list.is_empty() {
                 ui.next_size(-1, 120);
                 ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER, 0);
-                let (title, text) = if s.folder == 0 { (t("Keine Nachrichten"), t("Abrufen holt die Nachrichten des Kontos vom POP3-Server.")) } else { (t("Nichts gesendet"), t("Verfassen schreibt eine neue Nachricht.")) };
+                let (title, text) = if imap_acct {
+                    (t("Keine Nachrichten"), t("Abrufen gleicht diesen Ordner mit dem IMAP-Server ab."))
+                } else if s.folder == 0 {
+                    (t("Keine Nachrichten"), t("Abrufen holt die Nachrichten des Kontos vom POP3-Server."))
+                } else {
+                    (t("Nichts gesendet"), t("Verfassen schreibt eine neue Nachricht."))
+                };
                 ui.empty_state(IC_MAIL, title, text);
                 ui.box_end();
             } else {
-                let cols = [
-                    GridCol::new(if s.folder == 0 { t("Von") } else { t("An") }, 160).flags(GC_NOSORT),
+                let mut cols = alloc::vec![
+                    GridCol::new(if !sent_view { t("Von") } else { t("An") }, 160).flags(GC_NOSORT),
                     GridCol::new(t("Betreff"), 220).flags(GC_NOSORT | GC_FILL),
                     GridCol::new(t("Datum"), 130).flags(GC_NOSORT),
                 ];
+                if imap_acct {
+                    cols.push(GridCol::new(t("Status"), 70).flags(GC_NOSORT));
+                }
                 ui.next_size(-1, 150);
                 let (first, end) = ui.grid_begin(id + 0x100, &mut s.grid, &cols, &keys);
                 for i in first..end {
                     let m = &list[i as usize];
                     ui.grid_row(&mut s.grid, i);
-                    ui.grid_text(&s.grid, 0, if s.folder == 0 { &m.from } else { &m.to });
+                    ui.grid_text(&s.grid, 0, if !sent_view { &m.from } else { &m.to });
                     ui.grid_text(&s.grid, 1, if m.subject.is_empty() { t("(ohne Betreff)") } else { &m.subject });
                     ui.grid_text(&s.grid, 2, &when(m.date));
+                    if imap_acct {
+                        let (seen, flagged) = mailc::uid_of_path(&m.path).and_then(|u| marks.get(&u).copied()).unwrap_or((false, false));
+                        let text = match (seen, flagged) {
+                            (false, true) => format!("{} ★", t("Neu")),
+                            (false, false) => String::from(t("Neu")),
+                            (true, true) => String::from("★"),
+                            (true, false) => String::new(),
+                        };
+                        ui.grid_text(&s.grid, 3, &text);
+                    }
                 }
                 ui.grid_end(&mut s.grid);
+            }
+            if imap_acct {
+                ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+                ui.next_size(180, 0);
+                ui.textbox(id + 0x51, Some(t("Neuer Ordner")), &mut s.new_folder, 60);
+                ui.next_flags(if s.new_folder.trim().is_empty() { ST_DISABLED } else { 0 });
+                if ui.button(id + 0x52, t("Anlegen")) & EV_ACT != 0 {
+                    act = Some(0x52);
+                }
+                ui.next_flags(if matches!(s.imap_folder.as_str(), "INBOX" | "Sent" | "Trash") { ST_DISABLED } else { 0 });
+                if ui.button(id + 0x53, t("Ordner löschen")) & EV_ACT != 0 {
+                    act = Some(0x53);
+                }
+                ui.box_end();
             }
             // the chosen message
             if let Some(m) = cur.as_ref().and_then(|c| st.as_ref().and_then(|x| mailc::read_mail(x, &c.path))) {
@@ -278,7 +394,64 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk.mail;
     let todo = act.or(s.pending.take());
+    // showing a message of an IMAP account sets \Seen on the server, once
+    if imap_acct && s.view == View::List {
+        let uid = cur.as_ref().and_then(|c| mailc::uid_of_path(&c.path));
+        if let Some(u) = uid
+            && s.seen_asked != Some(u)
+        {
+            s.seen_asked = Some(u);
+            if !marks.get(&u).is_some_and(|m| m.0) {
+                let folder = s.imap_folder.clone();
+                let _ = n.doc.sim.send(Cmd::Apply(Action::MailImap { dev, op: ImapOp::Flag { folder, uid: u, flag: String::from("\\Seen"), on: true } }));
+                ui.repass();
+            }
+        }
+    }
+    let Some(w) = n.devwin.get(k) else { return };
+    let s = &mut w.desk.mail;
+    let imap_op = |n: &mut Net, op: ImapOp| {
+        if let Err(e) = n.doc.sim.send(Cmd::Apply(Action::MailImap { dev, op }))
+            && let Some(w) = n.devwin.get(k)
+        {
+            w.desk.mail.err = tr::msg(&e.msg());
+        }
+    };
     match todo {
+        Some(1) if imap_acct => {
+            s.err.clear();
+            let folder = s.imap_folder.clone();
+            imap_op(n, ImapOp::Sync { folder });
+            ui.repass();
+        }
+        Some(9) => {
+            if let Some(u) = cur.as_ref().and_then(|c| mailc::uid_of_path(&c.path)) {
+                let on = !marks.get(&u).is_some_and(|m| m.1);
+                let folder = s.imap_folder.clone();
+                imap_op(n, ImapOp::Flag { folder, uid: u, flag: String::from("\\Flagged"), on });
+            }
+            ui.repass();
+        }
+        Some(4) if imap_acct => {
+            if let Some(u) = cur.as_ref().and_then(|c| mailc::uid_of_path(&c.path)) {
+                let folder = s.imap_folder.clone();
+                s.grid.select_only(None);
+                imap_op(n, ImapOp::Delete { folder, uid: u });
+            }
+            ui.repass();
+        }
+        Some(0x52) => {
+            let name = String::from(s.new_folder.trim());
+            s.new_folder.clear();
+            imap_op(n, ImapOp::CreateFolder { name });
+            ui.repass();
+        }
+        Some(0x53) => {
+            let name = s.imap_folder.clone();
+            s.imap_folder = String::from("INBOX");
+            imap_op(n, ImapOp::DeleteFolder { name });
+            ui.repass();
+        }
         Some(1) => {
             s.err.clear();
             if let Err(e) = n.doc.sim.send(Cmd::Apply(Action::MailFetch { dev })) {
@@ -289,7 +462,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             ui.repass();
         }
         Some(2) => {
-            *s = MailUi { view: View::Compose, folder: s.folder, src: s.src.take(), f: core::mem::take(&mut s.f), keep: s.keep, ..MailUi::new() };
+            *s = MailUi { view: View::Compose, folder: s.folder, src: s.src.take(), f: core::mem::take(&mut s.f), keep: s.keep, kind: s.kind, imap_folder: core::mem::take(&mut s.imap_folder), ..MailUi::new() };
             ui.focus(id + 0x20);
             ui.repass();
         }
@@ -390,7 +563,24 @@ fn account(ui: &mut Ui, id: u32, s: &mut MailUi, have: bool) {
         ui.next_size(-1, 0);
         ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern."));
     }
+    field(ui, t("Kontotyp"));
+    ui.next_size(240, 0);
+    if ui.combobox(id + 0x50, &mut s.kind, &["POP3", "IMAP"]) & EV_ACT != 0 {
+        // the default port goes with the type
+        let (from, to) = if s.kind == 1 { ("110", "143") } else { ("143", "110") };
+        if s.f[5] == from {
+            s.f[5] = String::from(to);
+        }
+        ui.repass();
+    }
+    ui.box_end();
     for (i, l) in LABELS.iter().enumerate() {
+        // i18n
+        let l = match i {
+            4 if s.kind == 1 => "IMAP-Server",
+            5 if s.kind == 1 => "IMAP-Port",
+            _ => l,
+        };
         field(ui, t(l));
         ui.next_size(240, 0);
         let flags = match i {
@@ -402,9 +592,11 @@ fn account(ui: &mut Ui, id: u32, s: &mut MailUi, have: bool) {
         ui.textbox(id + 0x10 + i as u32, hint, &mut s.f[i], flags);
         ui.box_end();
     }
-    field(ui, "");
-    ui.checkbox(id + 0x19, t("Nachrichten auf dem Server lassen"), &mut s.keep);
-    ui.box_end();
+    if s.kind == 0 {
+        field(ui, "");
+        ui.checkbox(id + 0x19, t("Nachrichten auf dem Server lassen"), &mut s.keep);
+        ui.box_end();
+    }
     ui.box_begin(0, BOX_H | BOX_END, 8);
     if ui.button(id + 0x1B, t("Abbrechen")) & EV_ACT != 0 {
         s.pending = Some(0x1B);
@@ -441,6 +633,8 @@ fn answer(s: &mut MailUi, m: &Message) {
         src: s.src.take(),
         f: core::mem::take(&mut s.f),
         keep: s.keep,
+        kind: s.kind,
+        imap_folder: core::mem::take(&mut s.imap_folder),
         ..MailUi::new()
     };
 }
@@ -455,7 +649,7 @@ fn send(n: &mut Net, k: usize, dev: u32) {
     let s = &mut w.desk.mail;
     match r {
         Ok(_) => {
-            *s = MailUi { view: View::List, folder: 1, src: s.src.take(), f: core::mem::take(&mut s.f), keep: s.keep, ..MailUi::new() };
+            *s = MailUi { view: View::List, folder: 1, src: s.src.take(), f: core::mem::take(&mut s.f), keep: s.keep, kind: s.kind, imap_folder: core::mem::take(&mut s.imap_folder), ..MailUi::new() };
         }
         Err(e) => s.err = tr::msg(&e.msg()),
     }
@@ -467,6 +661,7 @@ fn save(n: &mut Net, k: usize, dev: u32) {
     let s = &mut w.desk.mail;
     let f = s.f.clone();
     let keep = s.keep != 0;
+    let imap_kind = s.kind == 1;
     let port = |v: &str, def: u16| -> Option<u16> {
         if v.trim().is_empty() {
             return Some(def);
@@ -475,6 +670,8 @@ fn save(n: &mut Net, k: usize, dev: u32) {
     };
     let err = if !imf::addr_ok(f[1].trim()) {
         Some(tf("„{}“ ist keine E-Mail-Adresse.", &[f[1].trim()]))
+    } else if (f[2].trim().is_empty() || f[4].trim().is_empty()) && imap_kind {
+        Some(String::from(t("Das Konto braucht einen SMTP- und einen IMAP-Server.")))
     } else if f[2].trim().is_empty() || f[4].trim().is_empty() {
         Some(String::from(t("Das Konto braucht einen SMTP- und einen POP3-Server.")))
     } else if port(&f[3], 25).is_none() || port(&f[5], 110).is_none() {
@@ -491,8 +688,10 @@ fn save(n: &mut Net, k: usize, dev: u32) {
         address: String::from(f[1].trim()),
         smtp: String::from(f[2].trim()),
         smtp_port: port(&f[3], 25).unwrap_or(25),
-        pop3: String::from(f[4].trim()),
-        pop3_port: port(&f[5], 110).unwrap_or(110),
+        pop3: if imap_kind { String::new() } else { String::from(f[4].trim()) },
+        pop3_port: if imap_kind { 110 } else { port(&f[5], 110).unwrap_or(110) },
+        imap: if imap_kind { String::from(f[4].trim()) } else { String::new() },
+        imap_port: if imap_kind { port(&f[5], 143).unwrap_or(143) } else { 143 },
         user: String::from(f[6].trim()),
         password: f[7].clone(),
         keep,

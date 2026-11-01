@@ -58,6 +58,8 @@
 //   fault    fault injection with marks on the timeline: cables pulled or worse, power off,
 //            services stopped, slow disks, partitions; each one heals exactly what it did
 //   lab      the actions of the lab and the views of its services for the user interface
+//   units    services as units on Linux hosts: unit files, enable, restart policies
+//   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
 //            hashing; health checks, draining, numbers per backend
 //   kv       key-value store: hash ring with virtual nodes, replicas, a leader per key, read
@@ -138,6 +140,8 @@
 //            the problems CableTooLong and OpticMismatch
 //   mailtrace MNote: the decisions of mail as notes (Note::Mail) with their German sentences
 //   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
+//   webc     the Webbrowser's side in the engine: requests with redirects over the HTTP client
+//            (Action::WebFetch / WebCancel, Report::Web, Engine::web_client)
 //   mailc    the clients of mail: the SMTP conversation, connections by name, the E-Mail
 //            program's POP3 session, its account and folders (Action::MailSend / MailFetch,
 //            Engine::mail_client)
@@ -171,8 +175,19 @@
 //   cli::ses the sessions of a command line: the console, local terminals (Engine::cli_open,
 //            the Terminal panel's further tabs) and telnet sessions; show users, who, w, tty,
 //            ps's TTY column; Report::SesOut / SesPrompt / SesClosed, Cmd::Ses* (X1e)
+//   sshd     SSH on a device: the client "ssh" and "scp" as console programs, the servers (the
+//            vty lines of IOS-like devices, "sshd" on Linux hosts), a command-line session per
+//            connection, host keys as files, known_hosts, authorized_keys (X1f)
+//   sshtrace SshNote: what SSH servers and clients decide as notes (Note::Ssh)
 //   procs    the processes of a device as ps sees them (Engine::processes) and its programs'
 //            CPU time second by second (Engine::cpu_secs): the desktop's Systemmonitor (V2)
+//   dot1x    port access control (802.1X): the authenticator of IOS-like switches and of access
+//            points with WPA-Enterprise as the hidden service "dot1x-auth", RADIUS with EAP (X1g)
+//   supp     the supplicant of hosts: its wpa_supplicant-like file, the hidden service
+//            "wpa_supplicant", what wpa_cli asks of it (X1g)
+//   dot1xtrace DNote: the decisions of 802.1X as notes (Note::Dot1x)
+//   imapd    the IMAP server (a subset of RFC 9051 and 3501); "imap-server", the Maildir of smtpd and
+//            pop3d with folders, flags and UIDs (X1g)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -271,6 +286,15 @@ pub mod aaatrace;
 pub mod radiusd;
 pub mod telnetd;
 pub mod procs;
+pub mod units;
+pub mod deploy;
+pub mod webc;
+pub mod sshtrace;
+pub mod sshd;
+pub mod dot1xtrace;
+pub mod dot1x;
+pub mod supp;
+pub mod imapd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -338,16 +362,22 @@ pub use mailtrace::MNote;
 pub use mailc::{Account, MailClient, MailClientView, MailDraft, MailEntry, MailJob, MailOutcome};
 pub use smtpd::{MailUser, SmtpServer};
 pub use pop3d::Pop3Server;
+pub use imapd::ImapServer;
 pub use snmptrace::SNote;
 pub use snmpmib::{IfRow, View as SnmpView};
 pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
 pub use snmptrapd::{TrapReceiver, TrapRow};
 pub use auth::{LocalAuth, Secret, UserAcct};
 pub use aaa::{Aaa, AuthResult, Method, MethodList, RadiusServer, ServerGroup};
+pub use sshd::{SshCfg, SshServer};
+pub use sshtrace::SshNote;
 pub use aaatrace::ANote;
 pub use radiusd::{NasService, RadiusServerSvc};
 pub use telnetd::TelnetClient;
 pub use scriptsvc::DebugOp;
 pub use procs::{ProcKind, ProcRow};
 pub use telnetd::TelnetServer;
+pub use units::{UnitEnabled, UnitErr, UnitOp, UnitState, UnitView};
+pub use deploy::{DeployLine, DeployRun, Deployer, HostRun, HostState, RunState};
 pub use cli::ses::{SesKind, SesView};
+pub use webc::{WebClient, WebClientView, WebErr, WebFail, WebReq, WebResp};

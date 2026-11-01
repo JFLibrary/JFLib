@@ -1,0 +1,80 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/web_site.jfnet
+# the shot matrix of the Webbrowser (B1, B2) on PC1's desktop: the page with its picture, text, a
+# form, the question before a POST goes again, an error page, each light and dark at 100 and
+# 150 % (build/jfnetworker/browser_<view>_<theme>_<scale>.png)
+# Ids: the window 26624; the address 26800, Neu laden 26805; the shop's Bestellen 3841261573
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 900 680
+dblclick listitem:"Webbrowser"
+# ---- the page with its picture
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+expect heading:"Bäckerei Krume" exists
+shot build/jfnetworker/browser_page_light_100.png window 26624
+theme dark
+shot build/jfnetworker/browser_page_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/browser_page_dark_150.png window 26624
+theme light
+shot build/jfnetworker/browser_page_light_150.png window 26624
+scale 100 window 26624
+# ---- text
+click link:"Eine Notiz als Text"
+wait 500
+expect #26800 text "http://web.lab/notiz.txt"
+shot build/jfnetworker/browser_text_light_100.png window 26624
+theme dark
+shot build/jfnetworker/browser_text_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/browser_text_dark_150.png window 26624
+theme light
+shot build/jfnetworker/browser_text_light_150.png window 26624
+scale 100 window 26624
+# ---- a form
+click #26800
+key ctrl+a
+type "web.lab:8080\n"
+wait 500
+expect heading:"Der Laden" exists
+shot build/jfnetworker/browser_form_light_100.png window 26624
+theme dark
+shot build/jfnetworker/browser_form_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/browser_form_dark_150.png window 26624
+theme light
+shot build/jfnetworker/browser_form_light_150.png window 26624
+scale 100 window 26624
+# ---- the question before a POST goes again
+click #3841261573
+wait 500
+expect heading:"Bestellt" exists
+click #26805
+expect text:"Diese Seite ist die Antwort auf ein Formular. Neu laden sendet es noch einmal." exists
+shot build/jfnetworker/browser_ask_light_100.png window 26624
+theme dark
+shot build/jfnetworker/browser_ask_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/browser_ask_dark_150.png window 26624
+theme light
+shot build/jfnetworker/browser_ask_light_150.png window 26624
+scale 100 window 26624
+# ---- an error page
+click #26800
+key ctrl+a
+type "http://gibtsnicht.lab/\n"
+wait 500
+expect heading:"Seite nicht erreichbar" exists
+shot build/jfnetworker/browser_error_light_100.png window 26624
+theme dark
+shot build/jfnetworker/browser_error_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/browser_error_dark_150.png window 26624
+theme light
+shot build/jfnetworker/browser_error_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

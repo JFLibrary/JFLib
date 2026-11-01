@@ -371,6 +371,10 @@ fn pump_paged(n: &mut Net, paged: Option<(u32, u32)>) -> String {
                 files_changed(n, dev, &path, files);
                 continue;
             }
+            Report::Web { dev, id, result, .. } => {
+                crate::workspace::devwin::browser::report(n, dev, id, result);
+                continue;
+            }
         };
         let c = n.cons.get_ses(&n.doc.proj, dev, ses);
         let mut b: &[u8] = &bytes;

@@ -3065,7 +3065,8 @@ impl Ui {
             return;
         };
         let sp = doc.link_spots()[spot];
-        let t = doc.plain_range(TextPos::new(k, sp.a as usize), TextPos::new(k, sp.b as usize));
+        // (its own text: a list's marker in front of the block is no part of the link's name)
+        let t = doc.block_text(k, sp.a as usize, sp.b as usize);
         links.push(Link { r: lr, logical: self.ltr_rect(lr), label: t, spot }); // (visible rows only)
     }
 

@@ -76,6 +76,13 @@
 //                                                      communities, location, contact,
 //                                                      receivers, notifications, "no snmp-server"
 //                                                      (snmpd.rs)
+//   Unit                                               start, stop, restart, enable, disable a
+//                                                      unit of a Linux host (units.rs)
+//   Deploy / DeployAbort                               a rolling deployment over a list of hosts
+//                                                      (deploy.rs)
+//   WebFetch / WebCancel                               the Webbrowser of a host asks for a page
+//                                                      or gives a request up (webc.rs: the answer
+//                                                      comes as Report::Web)
 //   ScriptDebug                                        the debugger of a script service: stop,
 //                                                      go on, steps, breakpoints in virtual time
 //                                                      (scriptsvc.rs, DebugOp)
@@ -282,6 +289,21 @@ pub enum Action {
     Snmp { dev: u32, set: crate::snmpd::SnmpSet },
     /// the debugger of a script service: stop, go on, a step, breakpoints (scriptsvc.rs)
     ScriptDebug { dev: u32, svc: String, op: crate::scriptsvc::DebugOp },
+    /// start, stop, restart, enable, disable a unit of a Linux host (units.rs)
+    Unit { dev: u32, name: String, op: crate::units::UnitOp },
+    /// a rolling deployment over a list of hosts (deploy.rs)
+    Deploy { spec: jfn_model::unit::DeploySpec },
+    /// ends deployment `id` of device `dev` where it is (deploy.rs)
+    DeployAbort { dev: u32, id: u32 },
+    /// the Webbrowser of a device asks for a page or an image (webc.rs): the answer comes as
+    /// Report::Web
+    WebFetch { dev: u32, req: crate::webc::WebReq },
+    /// the Webbrowser gives a request up (webc.rs): no report comes for it
+    WebCancel { dev: u32, id: u64 },
+    /// the file of the supplicant now (a window's form): written, read again (supp.rs)
+    Supplicant { dev: u32, conf: String },
+    /// the E-Mail program's next step with its IMAP server (mailc.rs)
+    MailImap { dev: u32, op: crate::mailc::ImapOp },
 }
 
 /// why an action was refused (German text through Display)
@@ -419,6 +441,10 @@ impl Engine {
                     self.stp_power(ni, true);
                 }
                 self.wlan_power(ni, on);
+                if !on {
+                    // the bridge's ports close again with the authenticator gone (dot1x.rs)
+                    self.dot1x_power_off(ni);
+                }
                 Ok(())
             }
             Action::PortAdmin { dev, port, up } => {
@@ -664,6 +690,18 @@ impl Engine {
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
+            Action::MailImap { dev, op } => self.mail_job(dev, crate::mailc::MailJob::Imap(op)),
+            Action::Supplicant { dev, conf } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                // (one report for the project: the directory comes with the file's)
+                let t = self.file_time(ni);
+                if let Some(os) = self.os_mut(ni) {
+                    let _ = os.files.mkdir("/etc/wpa_supplicant", t, true);
+                }
+                self.file_put(ni, crate::supp::CONF, conf.as_bytes(), false).map_err(|e| ActErr::Refused(msg!("{}", e.errno_text())))?;
+                self.supp_reconfigure(ni, None);
+                Ok(())
+            }
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
@@ -674,6 +712,9 @@ impl Engine {
             Action::Snmp { dev, set } => self.snmp_apply(dev, set),
             // the debugger of a script (scriptsvc.rs)
             Action::ScriptDebug { dev, svc, op } => self.script_debug(dev, &svc, op),
+            // the Webbrowser (webc.rs)
+            Action::WebFetch { dev, req } => self.web_fetch(dev, req),
+            Action::WebCancel { dev, id } => self.web_cancel(dev, id),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
@@ -938,6 +979,8 @@ impl Engine {
         for s in &d.services {
             let _ = self.service_def(d.id, s);
         }
+        // the units it has enabled in its files (units.rs)
+        self.units_boot(ni);
         // its place on the canvas and its WLAN settings (wlan.rs)
         self.wlan_register(d, ni);
         Ok(ni)

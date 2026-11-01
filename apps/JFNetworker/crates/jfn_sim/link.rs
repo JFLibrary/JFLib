@@ -8,7 +8,7 @@
 //   Engine::refresh_link   after any change: notes LinkUp / LinkDown, drops what was on the
 //                          cable, flushes the bridges' MAC entries of that port, tells spanning
 //                          tree (stp.rs), the services and RIP (rip.rs) of both ends, and
-//                          IPv6 (nd.rs: ip6_kick)
+//                          IPv6 (nd.rs: ip6_kick), the authenticators (dot1x.rs)
 //   Engine::send_on        a frame on one direction of a link without asking whether it is up
 //                          (WLAN: the handshake before an association carries data; the AP's
 //                          frames to its stations)
@@ -244,6 +244,10 @@ impl Engine {
         for (n, p) in ends {
             self.snmp_link(n, p, up);
         }
+        // and the authenticators of the ports (dot1x.rs)
+        for (n, p) in ends {
+            self.dot1x_link(n, p);
+        }
     }
 
     /// re-evaluates every link of a node
@@ -435,7 +439,9 @@ impl Engine {
         let member = node.model.has(F_BRIDGE) && node.bridge.as_ref().is_some_and(|b| b.ports.get(pi as usize).is_some_and(|bp| bp.member));
         if member {
             self.bridge_input(ni, pi, frame, hop);
-        } else if node.ip.is_some() {
+        } else if frame.get(12..14) == Some(&netpkt::eth::ET_EAPOL.to_be_bytes()) && self.supp_rx(ni, pi, &frame, hop) {
+            // EAPOL goes to the supplicant of a host (supp.rs)
+        } else if node_has_ip(self, ni) {
             self.l3_from_port(ni, pi, frame, hop);
         } else {
             self.host_input(ni, pi, frame, hop);
@@ -454,6 +460,11 @@ impl Engine {
         };
         self.note(dev, Some(hop), if mine { Note::Delivered { port: pi } } else { Note::NotForMe { port: pi } });
     }
+}
+
+/// the node has an IP part
+fn node_has_ip(e: &Engine, ni: usize) -> bool {
+    matches!(e.nodes.get(ni), Some(Some(n)) if n.ip.is_some())
 }
 
 /// does a copper cable of this kind fit the ports' MDI / MDI-X roles?

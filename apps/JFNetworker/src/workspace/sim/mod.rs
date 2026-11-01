@@ -87,7 +87,7 @@ pub(crate) struct Cat {
     pub argb: u32,
 }
 
-pub(crate) const CATS: [Cat; 11] = [
+pub(crate) const CATS: [Cat; 12] = [
     Cat { name: "ICMP", bits: P_ICMP | P_ICMPV6, argb: 0xFF3F_8A52 },
     Cat { name: "ARP", bits: P_ARP, argb: 0xFFAA_7414 },
     Cat { name: "DNS", bits: P_DNS, argb: 0xFF7A_5C99 },
@@ -102,6 +102,8 @@ pub(crate) const CATS: [Cat; 11] = [
     // X1b: SNMP, a muted olive, apart from mail's berry red and ICMP's green (after "Andere",
     // so the numbers of the others stay)
     Cat { name: "SNMP", bits: P_SNMP, argb: 0xFF6E_7D2E },
+    // X1g: 802.1X and the EAPOL of WLAN, a muted rust, apart from OSPF/RIP's brown and mail's berry
+    Cat { name: "802.1X", bits: P_EAPOL, argb: 0xFFA8_5A3C },
 ];
 /// the category "Andere"
 pub(crate) const CAT_OTHER: usize = 8;
@@ -111,7 +113,7 @@ const _: () = assert!(CATS.len() <= 16);
 /// the category of a frame or decision: its top protocol's (an ICMP error quoting a UDP packet
 /// is ICMP)
 pub(crate) fn cat_of(mask: u32) -> usize {
-    const ORDER: [usize; 10] = [0, 1, 5, 2, 7, 6, 9, 3, 10, 4];
+    const ORDER: [usize; 11] = [0, 1, 5, 2, 7, 6, 9, 3, 10, 11, 4];
     ORDER.iter().copied().find(|&k| mask & CATS[k].bits != 0).unwrap_or(CAT_OTHER)
 }
 
