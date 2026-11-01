@@ -1,4 +1,4 @@
-// scriptls -- the language services of the Skripte tab: lib/script's services (script::ls,
+// scriptls -- the language services of the IDE's editor: lib/script's services (script::ls,
 // script::fmt) for the code editor of a draft, with the names the simulator's ScriptService
 // gives scripts
 //
@@ -7,12 +7,12 @@
 //                                   parameters and a short description in the window's
 //                                   language (our own words, t())
 //   Assist                          ui::CodeAssist on script::ls with those names: completion,
-//                                   hover, signature help (ui.code_editor_with)
+//                                   hover, signature help (ui.code_editor_with);
+//                                   Assist::with_loader(&load) also reads the files a script
+//                                   imports (completion of a module's names; the IDE)
 //   folds(doc)                      the folding ranges of the text into the document
 //   outline(text) -> Vec<Entry>     the fns (the ones declared inside indented) and the
 //                                   top-level lets, for the list beside the editor
-//   definition(doc, pos) -> bool    the caret to the declaration of the name at pos (inside
-//                                   the file; nothing to go to: false)
 //   rename(doc, pos, to) -> Result<usize, String>   every place of the name at pos renamed as
 //                                   one undo step of the draft -> how many; refused with
 //                                   lib/script's German reason (a keyword, no valid name, a
@@ -85,21 +85,24 @@ fn kind_of(k: ItemKind) -> u8 {
 }
 
 /// lib/script's services with the host's names (see the module comment)
-pub(crate) struct Assist {
+pub(crate) struct Assist<'a> {
     host: Vec<HostItem<'static>>,
+    /// the text of an imported file by the path written in import("…")
+    load: Option<&'a dyn Fn(&str) -> Option<String>>,
 }
 
-impl Assist {
-    pub(crate) fn new() -> Assist {
-        Assist { host: host_items() }
+impl<'a> Assist<'a> {
+    /// the services that read imported files through `load`
+    pub(crate) fn with_loader(load: &'a dyn Fn(&str) -> Option<String>) -> Assist<'a> {
+        Assist { host: host_items(), load: Some(load) }
     }
 
     fn cx(&self) -> CompleteCx<'_> {
-        CompleteCx { host: &self.host, load: None }
+        CompleteCx { host: &self.host, load: self.load }
     }
 }
 
-impl CodeAssist for Assist {
+impl CodeAssist for Assist<'_> {
     fn complete(&mut self, doc: &CodeDoc, at: TextPos, _: bool) -> Option<CompList> {
         let c = ls::complete(&doc.text(), doc.flat(at) as u32, &self.cx());
         let items = c.items.into_iter().map(|i| CompItem { label: i.label, detail: i.detail, doc: i.doc, kind: kind_of(i.kind), insert: String::new() }).collect();
@@ -145,14 +148,6 @@ pub(crate) fn outline(text: &str) -> Vec<Entry> {
         add(&mut out, &s, 0);
     }
     out
-}
-
-/// the caret to the declaration of the name at pos -> found one
-pub(crate) fn definition(doc: &mut CodeDoc, pos: TextPos) -> bool {
-    let Some(l) = ls::definition(&doc.text(), doc.flat(pos) as u32, &CompleteCx::default()).filter(|l| l.path.is_none()) else { return false };
-    let at = doc.unflat(l.span.start as usize);
-    doc.set_selection(TextSel::at(at));
-    true
 }
 
 /// the word at a position ("" when there is none)

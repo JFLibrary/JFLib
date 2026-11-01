@@ -4,35 +4,52 @@
 //
 //   DevWins::new()          none open
 //   open(n, ui, dev)        the device's window (one that is open comes to the front; at most
-//                           DEVWINS, the oldest gives its place up)
+//                           DEVWINS, the oldest gives its place up); a host's opens on its
+//                           Desktop, the others on Übersicht
 //   frame(n, ui)            the windows (after the main window's content)
 //   shows(n, dev)           the window that draws this device's console now (its CLI tab, the
-//                           desktop's prompt or MIB-Browser): the Terminal panel shows a note
-//                           instead
-//   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: Skripte)
+//                           desktop's Terminal or MIB-Browser window): the Terminal panel shows
+//                           a note instead
+//   open_on(n, ui, dev, tab)   the device's window on one of its tabs
+//   get(k) / peek(k)       device window k (for the tabs' modules and the IDE)
+//   fullscreen(n, ui)       F11 (CMD_DESK_FULL): the active device window into full screen and
+//                           back (ui.window_fullscreen), without one the main window
+//   win_id(k)               the window id of device window k
+//
+// A device's desktop (desktop.rs) lives in its window while it is open and in DevWins::kept
+// while it is closed: the session's state, so the desktop comes back as it was (its windows,
+// programs and what they show); a new or loaded project starts without any.
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
 //   services.rs  Dienste: what runs on the device, switched on and off
 //   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
-//   desktop.rs   Desktop of hosts: IP-Konfiguration, Eingabeaufforderung, Texteditor, Browser
-//   scripts.rs   Skripte of hosts: the device's scripts, a code editor with diagnostics, run,
-//                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
+//   desktop.rs   Desktop of hosts: the programs in windows of their own, icons, a taskbar with
+//                Start, full screen, the clock, Einstellungen (ids ID_DESK0 + 0x1000 k ..)
+//   progs.rs     the desktop's IP-Konfiguration and Webbrowser
+//   editor.rs    the desktop's Texteditor: the notes (notizen.txt) and the device's files
+//   filemgr.rs   the desktop's Dateimanager: folders and files, copy, move, import, export
+//   sysmon.rs    the desktop's Systemmonitor: processes (ps), services, CPU and memory
+//   scripts.rs   CMD_SCRIPTS ("IDE …": the desktop's IDE window, desktop::open_ide), the IDE's
+//                check while typing, helpers of its runtime marks (the IDE: workspace/ide, in
+//                the desktop's IDE window; ids ID_IDE0 + 0x1000 k ..)
 //   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
 //                delete, import, export (ids ID_FILES0 + 0x180 k ..)
 //   email.rs     the E-Mail program of the Desktop: account, inbox, sent, write, answer, send,
 //                fetch (ids ID_MAIL0 + 0x400 k ..)
 //   mib.rs       the MIB-Browser of the Desktop: the MIB's objects, Get, GetNext, Walk and Set
 //                as commands on the console (ids ID_MIB0 + 0x400 k ..)
-//   scriptls.rs  the language services of the Skripte tab's editor (lib/script's script::ls
-//                with the simulator's host names): completion, hover, signature help,
-//                folding, the outline, go to definition, rename, format
+//   scriptls.rs  the language services of the IDE's editor (lib/script's script::ls with the
+//                simulator's host names and the device's files for imports): completion,
+//                hover, signature help, folding, the outline, go to definition, rename, format
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
 // the same TermState as its tab in the Terminal panel, drawn here while the tab is shown.
 // Window k has the ids ID_DEVWIN0 + 0x200 k (the window) .. + 0x1FF: + 1 its tabs, + 0x10
-// the overview, + 0x20 the configuration, + 0x60 the services, + 0x80 the desktop, + 0x100
-// the interface table (rows + 1 + i).
+// the overview, + 0x20 the configuration, + 0x60 the services, + 0x80 the desktop's
+// IP-Konfiguration and Webbrowser (progs.rs; the desktop's own block is ID_DESK0 + 0x1000 k),
+// + 0x100 the interface table (rows + 1 + i).  F11 or the desktop's Vollbild put the window
+// into full screen (every tab can be shown that way).
 
 pub(crate) mod config;
 pub(crate) mod desktop;
@@ -43,7 +60,12 @@ pub(crate) mod files;
 pub(crate) mod email;
 pub(crate) mod mib;
 pub(crate) mod scriptls;
+pub(crate) mod progs;
+pub(crate) mod editor;
+pub(crate) mod filemgr;
+pub(crate) mod sysmon;
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -69,7 +91,6 @@ pub(crate) enum Tab {
     Services,
     Cli,
     Desktop,
-    Scripts,
     Files,
 }
 
@@ -83,7 +104,6 @@ impl Tab {
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
-            Tab::Scripts => "Skripte",
             Tab::Files => "Dateien",
         })
     }
@@ -104,9 +124,6 @@ fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
     if m.is_some_and(|m| m.has(F_HOST) && m.cli == CliStyle::Linux) {
         v.push(Tab::Desktop);
     }
-    if scripts::has_tab(&n.doc.proj, dev) {
-        v.push(Tab::Scripts);
-    }
     if files::has_tab(&n.doc.proj, dev) {
         v.push(Tab::Files);
     }
@@ -124,8 +141,8 @@ pub(crate) struct DevWin {
     pub desk: desktop::Desk,
     /// opened at (the oldest gives its place up)
     age: u32,
-    /// the Skripte tab
-    pub scr: scripts::Pane,
+    /// the IDE's state in this window (workspace/ide; drawn in the desktop's IDE window)
+    pub ide: crate::workspace::ide::Pane,
     /// the Dateien tab's grid
     pub files: GridState,
 }
@@ -135,26 +152,53 @@ pub(crate) struct DevWins {
     clock: u32,
     /// the settings editor of a service (svcedit.rs)
     pub svc: svcedit::SvcEdit,
-    /// the scripts being edited, of every window (they outlive a closed window)
-    pub drafts: scripts::Drafts,
+    /// the IDE's drafts and breakpoints, of every window (they outlive a closed window)
+    pub ide: crate::workspace::ide::Ides,
     /// the Dateien tab's file dialog
     pub files: files::FilesUi,
+    /// the desktops of devices whose window is closed (the session's: back when it opens)
+    kept: BTreeMap<u32, desktop::Desk>,
 }
 
 impl DevWins {
     pub(crate) fn new() -> DevWins {
-        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), drafts: scripts::Drafts::new(), files: files::FilesUi::new() }
+        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), ide: crate::workspace::ide::Ides::new(), files: files::FilesUi::new(), kept: BTreeMap::new() }
+    }
+
+    // a window goes: its desktop is kept for the device
+    fn close(&mut self, k: usize) {
+        if let Some(w) = self.wins.get_mut(k).and_then(|w| w.take()) {
+            self.kept.insert(w.dev, w.desk);
+        }
     }
 
     /// device window k (for the tabs' modules)
     pub(crate) fn get(&mut self, k: usize) -> Option<&mut DevWin> {
         self.wins.get_mut(k).and_then(|w| w.as_mut())
     }
+
+    /// device window k to look at
+    pub(crate) fn peek(&self, k: usize) -> Option<&DevWin> {
+        self.wins.get(k).and_then(|w| w.as_ref())
+    }
 }
 
 /// the id of device window k
 fn base(k: usize) -> u32 {
     ID_DEVWIN0 + 0x200 * k as u32
+}
+
+/// the window id of device window k (full screen, activation)
+pub(crate) fn win_id(k: usize) -> u32 {
+    base(k)
+}
+
+/// F11: the active device window into full screen and back; without one the main window
+pub(crate) fn fullscreen(n: &mut Net, ui: &mut Ui) {
+    let active = (0..DEVWINS).find(|&k| n.devwin.wins[k].is_some() && ui.window_state(base(k)) & UWS_ACTIVE != 0);
+    let id = active.map_or(0, base);
+    let on = ui.window_state(id) & UWS_FULLSCREEN == 0;
+    ui.window_fullscreen(id, on);
 }
 
 /// the device's window: an open one to the front, else a new one (the oldest one gives its
@@ -176,19 +220,24 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
         .iter()
         .position(|x| x.as_ref().is_none_or(|x| x.open.get() == 0))
         .unwrap_or_else(|| w.wins.iter().enumerate().min_by_key(|(_, x)| x.as_ref().map_or(0, |x| x.age)).map_or(0, |(k, _)| k));
-    // the old window's place and size stay
+    // the old window's place and size stay; its desktop is kept for its device
     let rect = w.wins[k].as_ref().map_or_else(|| Shared::new(WinRect::new(0, 0, 820, 560, 0)), |x| x.rect.clone());
+    w.close(k);
     let open = Shared::new(1);
+    // a host's desktop as the session left it
+    let desk = w.kept.remove(&dev).unwrap_or_else(|| desktop::Desk::new(dev));
+    let tab = if tabs_of(n, dev).contains(&Tab::Desktop) { Tab::Desktop } else { Tab::Overview };
+    let w = &mut n.devwin;
     w.wins[k] = Some(DevWin {
         dev,
-        tab: Tab::Overview,
+        tab,
         open,
         rect,
         ifs: GridState::default(),
         cfg: config::Form::new(),
-        desk: desktop::Desk::new(),
+        desk,
         age: w.clock,
-        scr: scripts::Pane::new(dev),
+        ide: crate::workspace::ide::Pane::new(dev),
         files: GridState::default(),
     });
     ui.window_activate(base(k));
@@ -210,8 +259,9 @@ pub(crate) fn open_on(n: &mut Net, ui: &mut Ui, dev: u32, tab: Tab) {
 pub(crate) fn shows(n: &Net, dev: u32) -> Option<u32> {
     n.devwin.wins.iter().enumerate().find_map(|(k, x)| {
         let x = x.as_ref()?;
-        // the desktop's prompt and the MIB-Browser (mib.rs) draw the console too
-        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && matches!(x.desk.app, desktop::App::Prompt | desktop::App::Mib));
+        // the desktop's Terminal and MIB-Browser (mib.rs) windows draw the console too (the
+        // IDE's Terminal pane is a session of its own)
+        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && x.desk.console_at.is_some());
         (x.dev == dev && x.open.get() != 0 && console).then(|| base(k))
     })
 }
@@ -221,10 +271,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     for k in 0..DEVWINS {
         let Some(w) = n.devwin.wins[k].as_ref() else { continue };
         let (dev, open, rect) = (w.dev, w.open.clone(), w.rect.clone());
-        // a deleted device closes its window
+        // a deleted device closes its window (its desktop goes with it)
         let Some(d) = n.doc.proj.device(dev) else {
             open.set(0);
             n.devwin.wins[k] = None;
+            n.devwin.kept.remove(&dev);
             continue;
         };
         let title = format!("{} – {}", d.name, catalog::model(&d.model).map_or(t("Gerät"), |m| t(m.name)));
@@ -234,7 +285,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         }
         ui.window_end();
         if open.get() == 0 {
-            n.devwin.wins[k] = None;
+            // a closed window leaves full screen (the next one in its place starts windowed)
+            if ui.window_state(id) & UWS_FULLSCREEN != 0 {
+                ui.window_fullscreen(id, false);
+            }
+            n.devwin.close(k);
         }
     }
 }
@@ -270,8 +325,12 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             console::view(n, ui, dev);
             ui.box_end();
         }
-        Tab::Desktop => desktop::tab(n, ui, k, id + 0x80, dev),
-        Tab::Scripts => scripts::tab(n, ui, k, ID_SCRIPTS0 + 0x400 * k as u32, dev),
+        Tab::Desktop => {
+            ui.next_size(-1, -1);
+            ui.box_begin(0, BOX_V, 0);
+            desktop::tab(n, ui, k, id + 0x80, dev);
+            ui.box_end();
+        }
         Tab::Files => files::tab(n, ui, k, dev),
     }
     ui.box_end();

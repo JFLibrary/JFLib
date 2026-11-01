@@ -47,7 +47,7 @@ pub const PAGES: &[Page] = &[
     Page { name: "du", path: "/usr/bin/du", call: "du [-s] [-h] [-a] [PFAD ...]", line: "den Platz von Verzeichnissen zeigen", text: "In Blöcken zu 1024 Bytes; jede Datei belegt ganze 4-KiB-Blöcke, jedes Verzeichnis einen.", opts: &[("-s", "nur die Summe je PFAD"), ("-h", "in K, M, G"), ("-a", "auch die Dateien")] },
     Page { name: "echo", path: B, call: "echo [-n] [-e] [TEXT ...]", line: "Text ausgeben", text: "", opts: &[("-n", "ohne Zeilenende"), ("-e", "\\n, \\t, \\\\ und \\xHH umsetzen")] },
     Page { name: "env", path: "/usr/bin/env", call: "env", line: "die exportierten Variablen zeigen", text: "", opts: &[] },
-    Page { name: "exit", path: B, call: "exit", line: "die Sitzung der Konsole bleibt offen", text: "Die Konsole eines simulierten Geräts schließt sich nicht.", opts: &[] },
+    Page { name: "exit", path: B, call: "exit", line: "eine weitere Sitzung beenden (die Konsole bleibt offen)", text: "Ein weiteres Terminal oder eine Telnet-Sitzung endet; die Konsole eines simulierten Geräts schließt sich nicht.", opts: &[] },
     Page { name: "export", path: B, call: "export [NAME[=WERT] ...]", line: "Variablen in die Umgebung übernehmen", text: "Ohne Argument zeigt export die Umgebung. Programme wie jfs sehen die exportierten Variablen.", opts: &[] },
     Page { name: "false", path: B, call: "false", line: "mit Status 1 enden", text: "", opts: &[] },
     Page { name: "fg", path: B, call: "fg [%N]", line: "auf einen Hintergrund-Job warten", text: "Die Konsole wartet, bis der Job endet; Strg+C beendet ihn.", opts: &[] },
@@ -61,7 +61,7 @@ pub const PAGES: &[Page] = &[
     Page { name: "hostname", path: "/usr/bin/hostname", call: "hostname [NAME]", line: "den Namen des Geräts zeigen oder ändern", text: "", opts: &[] },
     Page { name: "ip", path: "/usr/sbin/ip", call: "ip [-4|-6] [-br] address|link|route|neigh ...", line: "Adressen, Ports, Routen und Nachbarn", text: "ip OBJEKT help zeigt die Befehle eines Objekts.", opts: &[] },
     Page { name: "iw", path: "/usr/sbin/iw", call: "iw dev [IF info|link|scan|connect SSID [psk PASS]|disconnect|station dump]", line: "WLAN einstellen", text: "", opts: &[] },
-    Page { name: "jfs", path: "/usr/bin/jfs", call: "jfs DATEI.jfs [ARGUMENTE ...]", line: "ein Skript als Prozess ausführen", text: "Das Skript läuft wie ein Dienst des Geräts (net, http, timer, disk, log ins Journal), aber im Terminal: print schreibt dorthin, config.args hält die ARGUMENTE, config.file den Pfad. Es endet, wenn nichts mehr zu tun ist (Status 0), nach einem Fehler (1) oder mit Strg+C (130); mit & läuft es im Hintergrund.", opts: &[] },
+    Page { name: "jfs", path: "/usr/bin/jfs", call: "jfs DATEI.jfs [ARGUMENTE ...] | jfs --test DATEI.jfs ...", line: "ein Skript als Prozess ausführen", text: "Das Skript läuft wie ein Dienst des Geräts (net, http, timer, disk, log ins Journal), aber im Terminal: print schreibt dorthin, config.args hält die ARGUMENTE, config.file den Pfad. Es endet, wenn nichts mehr zu tun ist (Status 0), nach einem Fehler (1) oder mit Strg+C (130); mit & läuft es im Hintergrund. Mit --test laufen die Funktionen test_… der Dateien nacheinander, jede in einem frischen Programm und höchstens 10 Sekunden lang; ein Fehler oder ein assert, das nicht hält, lässt einen Test scheitern. Status 1, wenn einer scheiterte oder keiner gefunden wurde.", opts: &[] },
     Page { name: "jobs", path: B, call: "jobs [-l] [-p]", line: "die Hintergrund-Jobs zeigen", text: "", opts: &[("-l", "mit PID"), ("-p", "nur die PIDs")] },
     Page { name: "kill", path: B, call: "kill [-s SIGNAL | -SIGNAL] PID | %N ...", line: "einen Job beenden", text: "Signale: TERM (Vorgabe), KILL, INT, HUP. Dienste des Geräts beendet kill nicht; sie haben ihre eigenen Befehle.", opts: &[("-l", "die Signale")] },
     Page { name: "less", path: "/usr/bin/less", call: "less [DATEI ...]", line: "Text seitenweise zeigen", text: "Leertaste: die nächste Seite, Enter: eine Zeile, q: aufhören.", opts: &[] },
@@ -109,6 +109,9 @@ pub const PAGES: &[Page] = &[
     Page { name: "traceroute6", path: "/usr/bin/traceroute6", call: "traceroute6 ZIEL", line: "den Weg über IPv6 zeigen", text: "", opts: &[] },
     Page { name: "snmpget", path: "/usr/bin/snmpget", call: "snmpget -v VERSION -c COMMUNITY AGENT OID ...", line: "Werte eines SNMP-Agenten lesen", text: "Dazu snmpgetnext, snmpwalk, snmpbulkwalk und snmpset.", opts: &[] },
     Page { name: "lbctl", path: "/usr/bin/lbctl", call: "lbctl [status] [-s DIENST]", line: "den Loadbalancer des Labors zeigen", text: "Dazu kvctl, cachectl, mqctl und workerctl für die anderen Dienste des Labors.", opts: &[] },
+    Page { name: "who", path: "/usr/bin/who", call: "who", line: "die Sitzungen des Geräts zeigen", text: "Je Sitzung das Terminal (tty1 die Konsole, pts/N weitere Terminals und Telnet), seit wann und bei Telnet woher.", opts: &[] },
+    Page { name: "w", path: "/usr/bin/w", call: "w", line: "die Sitzungen und was in ihnen läuft", text: "Die Uhrzeit, wie lange das Gerät läuft, je Sitzung woher, seit wann, wie lange nichts getippt wurde und der laufende Befehl.", opts: &[] },
+    Page { name: "tty", path: "/usr/bin/tty", call: "tty", line: "das Terminal dieser Sitzung ausgeben", text: "", opts: &[] },
 ];
 
 /// the page of a command (and its aliases)

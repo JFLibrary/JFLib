@@ -52,6 +52,9 @@ pub(crate) enum Ev {
     Cli { node: usize, epoch: u32 },
     /// a fault with a duration heals (fault.rs); nothing when it was healed before
     Heal { id: u32 },
+    /// a command-line session other than the console goes on (cli/ses.rs): as Cli for that
+    /// session, or one of its own wake-ups (start, telnet input, idle timeout, end)
+    Ses { node: usize, ses: u32, epoch: u32 },
 }
 
 /// how a run ended
@@ -94,6 +97,8 @@ pub struct Engine {
     pub(crate) wlan: crate::wlan::WlanState,
     /// the cables' lengths and the ones too long or with optics that do not fit (phys.rs)
     pub(crate) phys: crate::phys::PhysState,
+    /// the last run of `jfs --test` per device (cli/jfstest.rs)
+    pub(crate) jfs_tests: BTreeMap<u32, crate::cli::jfstest::TestRun>,
 }
 
 impl Engine {
@@ -119,6 +124,7 @@ impl Engine {
             series: crate::series::Sampler::default(),
             wlan: crate::wlan::WlanState::default(),
             phys: crate::phys::PhysState::default(),
+            jfs_tests: BTreeMap::new(),
         }
     }
     /// the virtual time
@@ -216,6 +222,7 @@ impl Engine {
             Ev::Job { job, epoch } => self.job_tick(job, epoch),
             Ev::Cli { node, epoch } => self.cli_wake(node, epoch),
             Ev::Heal { id } => self.fault_due(id),
+            Ev::Ses { node, ses, epoch } => self.ses_wake(node, ses, epoch),
         }
     }
 

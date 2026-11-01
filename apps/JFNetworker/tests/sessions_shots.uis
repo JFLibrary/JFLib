@@ -1,0 +1,30 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/sessions.jfnet
+# shots of the sessions (X1e): ADMIN's console and a further session as tabs of the Terminal
+# panel, the session logged in to R1 over telnet with show users; light and dark at 100 and
+# 150 %.
+# Ids: ADMIN's console 25088 (input 25089); the further session 106496 (input 106497).
+size 1280 900
+theme light
+wait 600
+drag 630,671 630,380 8
+dblclick listitem:"ADMIN"
+expect #25089 focused
+type "ps\n"
+click button:"Neue Sitzung"
+expect tab:"ADMIN (2)" selected
+expect #106497 focused
+type "telnet 10.0.0.1\n"
+wait 600
+type "cisco\n"
+wait 600
+type "show users\n"
+wait 600
+expect text:"*   vty 0      -          1          00:00:00  10.0.0.100" exists
+shot build/jfnetworker/sessions_light.png
+theme dark
+shot build/jfnetworker/sessions_dark.png
+scale 150
+shot build/jfnetworker/sessions_dark_150.png
+theme light
+shot build/jfnetworker/sessions_light_150.png
+expect_nowarn

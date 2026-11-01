@@ -51,6 +51,18 @@ pub(crate) const JN_PORT_RADIO: u32 = 0x10_F110;
 pub(crate) const JN_PORT_WAN: u32 = 0x10_F111;
 // the Metriken panel (U6a)
 pub(crate) const JN_METRICS: u32 = 0x10_F112;
+// a host's desktop (V2: devwin/desktop.rs; 0x10_F160 .. 0x10_F17F)
+pub(crate) const JN_START: u32 = 0x10_F160;
+pub(crate) const JN_FULLSCREEN: u32 = 0x10_F161;
+pub(crate) const JN_APP_IPCONF: u32 = 0x10_F162;
+pub(crate) const JN_APP_EDITOR: u32 = 0x10_F163;
+pub(crate) const JN_APP_BROWSER: u32 = 0x10_F164;
+pub(crate) const JN_APP_MAIL: u32 = 0x10_F165;
+pub(crate) const JN_APP_MIB: u32 = 0x10_F166;
+pub(crate) const JN_APP_FILES: u32 = 0x10_F167;
+pub(crate) const JN_APP_MONITOR: u32 = 0x10_F168;
+pub(crate) const JN_APP_SETTINGS: u32 = 0x10_F169;
+pub(crate) const JN_APP_IDE: u32 = 0x10_F16A;
 
 /// the icon of a kind of port
 pub(crate) fn port_icon(m: jfn_model::Media) -> u32 {

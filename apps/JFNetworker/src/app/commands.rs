@@ -14,7 +14,7 @@
 // Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
-// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, Skripte of a host,
+// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, IDE of a host,
 // Umbenennen, Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
 // the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
 // windows, the log) are workspace/terminal.rs's.  The labs (U6b, workspace/task.rs): Datei ›
@@ -33,6 +33,8 @@
 // (Ctrl+Shift+G), Gruppe zuklappen / aufklappen, the context menu of a group; the background
 // picture (canvas/backdrop.rs): Ansicht › Hintergrundbild …, … sperren, … an Ansicht anpassen,
 // Hintergrund entfernen, the context menu of the picture.
+// The desktop of hosts (V2, devwin/desktop.rs): Vollbild (F11) puts the active device window
+// into full screen and back, without one the main window.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -44,7 +46,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 108] = [
+pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -122,7 +124,7 @@ pub(crate) static CMDS: [Command; 108] = [
     Command::new(CMD_TASK_PANEL, "&Aufgabe", IC_FLAG, MOD_CTRL | MOD_SHIFT, b'A' as u32, 0),
     Command::new(CMD_TASK_CHECK, "Ziele &prüfen", IC_ACCEPT, 0, VK_F9, CF_DISABLED),
     Command::new(CMD_TASK_HINT, "Nächster &Hinweis", IC_LIGHTBULB, 0, 0, CF_DISABLED),
-    Command::new(CMD_SCRIPTS, "&Skripte …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
+    Command::new(CMD_SCRIPTS, "&IDE …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
     Command::new(CMD_METRICS, "Me&triken", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'M' as u32, 0),
     Command::new(CMD_HEAL_ALL, "Alle &Fehler beheben", IC_REPAIR, 0, 0, CF_DISABLED),
     Command::new(CMD_AUTHOR, "&Aufgabe erstellen …", IC_EDIT, 0, 0, 0),
@@ -153,6 +155,8 @@ pub(crate) static CMDS: [Command; 108] = [
     Command::new(CMD_BG_LOCK, "Hintergrundbild &sperren", IC_LOCK, 0, 0, CF_DISABLED),
     Command::new(CMD_BG_FIT, "Hintergrundbild an &Ansicht anpassen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
+    Command::new(CMD_TERM_SESSION, "Neue &Sitzung", IC_ADD, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -559,6 +563,10 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // groups and the background picture of the canvas (G1)
         CMD_GROUP..=CMD_GROUP_EXPAND => return canvas::groups::command(n, ui, id),
         CMD_BG_OPEN..=CMD_BG_CHOSEN => return canvas::backdrop::command(n, ui, id),
+        // the desktop of hosts (V2): F11, the active device window into full screen and back
+        CMD_DESK_FULL => crate::workspace::devwin::fullscreen(n, ui),
+        // a further command-line session as a tab of the Terminal panel (X1e)
+        CMD_TERM_SESSION => return terminal::command(n, ui, id),
         _ => return false,
     }
     ui.repass();

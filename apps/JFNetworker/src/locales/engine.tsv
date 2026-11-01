@@ -1336,3 +1336,17 @@ beendet nach einem Fehler in {}, Zeile {}, Spalte {}: {}	ended after an error in
 läuft: Rückrufe {}, CPU-Zeit {}, Fehler {}, zuletzt in {}, Zeile {}, Spalte {}: {}	running: callbacks {}, CPU time {}, errors {}, the last in {}, line {}, column {}: {}
 Bedingung: {}	Condition: {}
 Das Skript läuft nicht.	The script is not running.
+
+# jfn_sim: command-line sessions and the telnet servers (cli/ses.rs, telnetd.rs, driver.rs, svcact.rs)
+Die Sitzung {} gibt es nicht.	There is no session {}.
+Das Gerät {} nimmt keine weitere Sitzung an.	Device {} takes no further session.
+„port“ ist eine Portnummer von 1 bis 65535.	“port” is a port number from 1 to 65535.
+„password“ ist ein Text.	“password” is a text.
+Port {}: {} Sitzungen angenommen, {} abgewiesen	Port {}: {} sessions accepted, {} refused
+IOS-artige Geräte nehmen Telnet auf ihren vty-Leitungen an (line vty).	IOS-like devices take Telnet on their vty lines (line vty).
+# IDE1: script services from files (jfn_sim scriptsvc.rs), their problems
+beendet nach einem Fehler: {}	ended after an error: {}
+„file“ ist der Pfad einer Datei des Geräts.	“file” is the path of a file of the device.
+Ein Skript hat „source“ oder „file“, nicht beides.	A script has “source” or “file”, not both.
+Skript {} auf {}: die Datei {} gibt es nicht.	Script {} on {}: the file {} does not exist.
+Skript {} auf {}: {}, Zeile {}, Spalte {}: {}	Script {} on {}: {}, line {}, column {}: {}

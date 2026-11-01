@@ -1,0 +1,55 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ide.jfnet
+# the IDE's tests (IDE1: workspace/ide/lower.rs on jfn_sim's cli/jfstest.rs) on SRV1 of
+# fixtures/ide.jfnet: Ctrl+Shift+T on test_lib.jfs types "jfs --test FILE" into the console,
+# the Tests pane shows the run (one test passes, test_greet fails with assert_eq's two values),
+# a click on the failure puts the caret on its line; the fix in lib.jfs and Tests ausführen
+# again: both pass.
+# Ids: the device window 26624; the IDE from 98304: Tests ausführen 98624, the tests' rows
+# 100097 + i, Terminal 98570, Tests 98573, the editor 98816.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+resizewin 26624 1100 760
+wait 300
+dblclick listitem:"app"
+wait 600
+dblclick listitem:"test_lib.jfs"
+wait 300
+expect tab:"test_lib.jfs" selected
+key ctrl+shift+t
+wait 1500
+expect #98573 selected
+expect tab:"Tests (1 fehlgeschlagen)" exists
+expect text:"2 Tests: 1 bestanden, 1 fehlgeschlagen" exists
+expect text:"bestanden: test_double (test_lib.jfs)" exists
+expect text:"fehlgeschlagen: test_greet (test_lib.jfs:6:3): assert_eq: erwartet \"Hallo /\", ist \"Hallo / (1 Zeichen)\"" exists
+shot build/jfnetworker/ide_tests.png window 26624
+# a click on the failure: its line
+click #100098
+wait 200
+expect #98816 focused
+expect text:"Zeile 6, Spalte 3" exists
+# the console ran it
+click #98570
+expect text:"FEHLER  test_greet (/root/app/test_lib.jfs:6:3): assert_eq: erwartet \"Hallo /\", ist \"Hallo / (1 Zeichen)\"" exists
+expect text:"2 Tests: 1 bestanden, 1 fehlgeschlagen" exists
+# the test wants the length too; saved by Tests ausführen, both pass
+click #98816
+key ctrl+home
+key down down down down down
+key end
+key left left
+type " (1 Zeichen)"
+wait 600
+click #98573
+wait 100
+click #98624
+wait 1500
+expect tab:"test_lib.jfs" selected
+expect text:"2 Tests: 2 bestanden, 0 fehlgeschlagen" exists
+expect tab:"Tests" exists
+expect_nowarn

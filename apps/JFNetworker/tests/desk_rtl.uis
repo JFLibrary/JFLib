@@ -1,0 +1,28 @@
+#!args --rtl --verify-dirty --open apps/JFNetworker/tests/fixtures/shell_tour.jfnet
+# a host's desktop in a mirrored window (workspace/devwin/desktop.rs, V2; ui/rtl.rs): the icons
+# stand at the right, Start and the windows' buttons on the right of the taskbar, the clock on
+# the left, the windows' title bars have their buttons at the left; the icons, the start menu
+# and the taskbar act as drawn.  Shots light and dark at 150 %.
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+expect tab:"Desktop" selected
+dblclick listitem:"Terminal"
+expect dialog:"Terminal" exists
+click button:"Start"
+click menuitem:"Dateimanager"
+expect dialog:"Dateimanager" exists
+expect button:"Dateimanager" checked
+click button:"Terminal"
+expect dialog:"Terminal" selected
+click button:"Minimieren: Terminal"
+expect button:"Terminal (minimiert)" exists
+click button:"Terminal (minimiert)"
+expect dialog:"Terminal" exists
+scale 150 window 26624
+shot build/jfnetworker/desk_rtl_light_150.png window 26624
+theme dark
+shot build/jfnetworker/desk_rtl_dark_150.png window 26624
+scale 100 window 26624
+expect_nowarn

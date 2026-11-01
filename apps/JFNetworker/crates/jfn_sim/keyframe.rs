@@ -489,6 +489,8 @@ impl Footprint {
         f.series = e.series.footprint();
         f.rest = size_of::<Engine>() + e.jobs.len() * (size_of::<crate::jobs::Job>() + 256) + e.cli.jobs.len() * 48;
         f.rest += e.faults().len() * size_of::<crate::fault::FaultMark>() + 256;
+        // the records of `jfs --test` (cli/jfstest.rs)
+        f.rest += crate::cli::jfstest::tests_footprint(e);
         f.rest += (e.wlan.devs.len() + e.wlan.stas.len() + e.wlan.assocs.len()) * 256;
         f.rest += e.trace.hops().len() * (size_of::<crate::trace::Hop>() + 16);
         f
@@ -512,6 +514,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
     b += cfg.auth.footprint() + cfg.aaa.footprint() + cfg.motd.len() + n.cli.gate.as_ref().map_or(0, |g| g.user.len() + g.methods.len() * 16 + 48);
     // the shell's session: its directory, variables, history, line and background jobs (V1)
     b += n.cli.sh.footprint();
+    // the further sessions: their infos, telnet buffers and waiting command lines (X1e)
+    b += n.cli.ses_footprint();
     if let Some(br) = &n.bridge {
         b += size_of::<crate::bridge::Bridge>() + br.ports.len() * size_of::<BridgePort>() + br.fdb.len() * (size_of::<FdbEntry>() + 40) + br.vlans.len() * 64 + 512;
     }

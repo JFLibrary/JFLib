@@ -1,0 +1,80 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ide.jfnet
+# the IDE's language services across files (IDE1: workspace/ide/editor.rs with SK6's script::ls
+# reading the device's files) on SRV1 of fixtures/ide.jfnet: completion of a module's names
+# after "lib." (server.jfs imports lib.jfs; the doc comment below the list), signature help of
+# a module's fn, F12 on lib.greet opens lib.jfs at its declaration, the outline of the shown file
+# (a click puts the caret there), Ctrl+click goes back inside the file, F2 renames a name in the
+# file (one undo step of the draft), Probleme lists the check's messages of the open files
+# (a click goes there).
+# Ids: the device window 26624; the IDE from 98304: the editor 98816, Gliederung 98567, the
+# outline's rows 98881 + i, the rename flyout's name 98513, Probleme 98571, its rows 99073 + i.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+resizewin 26624 1100 760
+wait 300
+dblclick listitem:"app"
+wait 600
+dblclick listitem:"server.jfs"
+wait 300
+expect #98816 focused
+# completion of the module's names, with the doc comment
+key ctrl+end
+type "lib.dou"
+expect listitem:"double – fn double(x)" exists
+expect text:"verdoppelt eine Zahl" exists
+key tab
+expect text:"Zeile 12, Spalte 11" exists
+type "("
+expect text:"fn double(x) – x – verdoppelt eine Zahl" exists
+type "2)"
+expect tab:"server.jfs ●" selected
+shot build/jfnetworker/ide_language_complete.png window 26624
+key ctrl+z ctrl+z ctrl+z ctrl+z
+expect tab:"server.jfs" selected
+# F12 on greet (line 7): lib.jfs opens at its declaration
+key ctrl+home
+key down down down down down down
+key end
+key left left left left left left left left left left left left
+key f12
+wait 200
+expect tab:"lib.jfs" selected
+expect text:"Zeile 3, Spalte 4" exists
+# the outline of lib.jfs; a click puts the caret on double
+click #98567
+expect listitem:"fn greet(path)" exists
+expect listitem:"fn double(x)" exists
+click listitem:"fn double(x)"
+wait 200
+expect text:"Zeile 8, Spalte 4" exists
+# F2 renames double in the file (the flyout with the name), one undo step of the draft
+key f2
+expect #98513 focused
+expect #98513 text "double"
+key ctrl+a
+type "twice\n"
+wait 200
+expect listitem:"fn twice(x)" exists
+expect tab:"lib.jfs ●" selected
+key ctrl+z
+expect listitem:"fn double(x)" exists
+expect tab:"lib.jfs" selected
+# Probleme: an unknown name in the file, a click goes there
+key ctrl+end
+type "\nprnt(1)"
+wait 300
+click #98571
+expect text:"lib.jfs:12:1: Unbekannter Name prnt – meinst du print?" exists
+click #98816
+key ctrl+home
+wait 600
+click #99073
+wait 200
+expect text:"Zeile 12, Spalte 1" exists
+shot build/jfnetworker/ide_language_problems.png window 26624
+expect_nowarn

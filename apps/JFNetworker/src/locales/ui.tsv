@@ -361,10 +361,8 @@ Die Formulare tippen ihre Befehle in die Konsole des Geräts; sie gelten sofort 
 Zuletzt in der Konsole:	Last in the console:
 IP-Konfiguration	IP configuration
 Adresse, Maske und Gateway oder DHCP	Address, mask and gateway, or DHCP
-Eingabeaufforderung	Command prompt
 Die Shell des Geräts	The device's shell
 Texteditor	Text editor
-Notizen zum Gerät	Notes on the device
 Webbrowser	Web browser
 Seiten als Text	Pages as text
 Dieses Gerät hat keine IPv4-Schnittstelle.	This device has no IPv4 interface.
@@ -378,7 +376,7 @@ z. B. 255.255.255.0	e.g. 255.255.255.0
 Per DHCP	By DHCP
 noch keine Adresse	no address yet
 , Gateway {}	, gateway {}
-Statische Einstellungen laufen als Befehle in der Eingabeaufforderung und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.	Static settings run as commands in the command prompt and become part of the startup configuration; DHCP gets address and gateway from the server.
+Statische Einstellungen laufen als Befehle im Terminal und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.	Static settings run as commands in the Terminal and become part of the startup configuration; DHCP gets address and gateway from the server.
 „{}“ ist keine Subnetzmaske.	“{}” is no subnet mask.
 gesichert	saved
 Verwerfen	Discard
@@ -394,7 +392,7 @@ Die Adresse nennt keinen Rechner.	The address names no host.
 {} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}	{} (the name is not known on this device), port {}, path {}
 Dieser Browser zeigt nur, wohin die Adresse führt.	This browser only shows where the address leads.
 Ziel: {}	Destination: {}
-Die Seite selbst holt „curl {}“ in der Eingabeaufforderung über den Simulator.	The page itself: “curl {}” in the command prompt fetches it through the simulator.
+Die Seite selbst holt „curl {}“ im Terminal über den Simulator.	The page itself: “curl {}” in the Terminal fetches it through the simulator.
 #
 # ---- the simulation mode (workspace/sim)
 Echtzeit	Real time
@@ -664,8 +662,6 @@ Worum es geht	What it is about
 # the script editor (U7): the Skripte tab of a host's device window (devwin/scripts.rs), the
 # scripts of a device in the project and the templates of "Neu" (doc/scripts.rs; the texts of
 # a template's code lines must stay free of quotes and backslashes), its keys in the overview
-&Skripte …	&Scripts …
-Skripte	Scripts
 Ein Skript braucht einen Namen.	A script needs a name.
 „{}“ geht nicht als Name: Buchstaben, Ziffern, - _ und . (am Anfang ein Buchstabe oder eine Ziffer, höchstens 32 Zeichen).	“{}” cannot be a name: letters, digits, - _ and . (a letter or digit first, at most 32 characters).
 Auf {} gibt es schon einen Dienst „{}“.	{} has a service “{}” already.
@@ -689,59 +685,32 @@ des Geräts und überstehen Neustarts und Stromausfälle.	of the device and surv
 kein Wert	no value
 Speicher bereit auf Port ${port}	Store ready on port ${port}
 Ein Skript reagiert auf Ereignisse: net.udp, net.listen, http.serve, timer.every …	A script reacts to events: net.udp, net.listen, http.serve, timer.every …
-Strg+S übernimmt es ins Projekt und in den laufenden Simulator.	Ctrl+S applies it to the project and the running simulator.
 Skript gestartet	Script started
-übersetzt nicht	does not compile
-nicht im Simulator	not in the simulator
 Gerät aus	device off
 rechnet	computing
 mit Fehler beendet	ended by an error
-Der Simulator führt dieses Skript nicht aus.	The simulator does not run this script.
-Der Simulator führt es nicht aus: {}	The simulator does not run it: {}
-CPU {} · Warteschlange {} (höchstens {}) · Rückrufe {} · Fehler {} · Speicher {}	CPU {} · queue {} (at most {}) · callbacks {} · errors {} · memory {}
-offen: {}	open: {}
 Fehler im Lauf ({}, bei {}): {}	Error while running ({}, at {}): {}
-Noch keine Skripte	No scripts yet
-Ein Skript ist ein eigenes Programm in der Sprache .jfs, das auf diesem Gerät als Dienst läuft: UDP, TCP, HTTP, Timer, die Disk. „Neu“ legt eines aus einer Vorlage an.	A script is a program of your own in the .jfs language that runs on this device as a service: UDP, TCP, HTTP, timers, the disk. “New” makes one from a template.
-Neu	New
-Ein neues Skript aus einer Vorlage	A new script from a template
-{} hat noch kein Skript.	{} has no script yet.
 1 Fehler	1 error
 {} Fehler	{} errors
-Löscht das Skript und was es auf der Disk abgelegt hat (Rückgängig bringt das Skript zurück, die Disk beginnt leer)	Deletes the script and what it stored on the disk (undo brings the script back, its disk starts empty)
-Neuer Name des Skripts	New name of the script
 Ausführen	Run
 Neu starten	Restart
-Neu starten: Speicher und Timer beginnen leer, die Disk und die Zahlen bleiben	Restart: memory and timers start empty, the disk and the numbers stay
-Holt die Fassung des Projekts zurück (Strg+Z im Editor nimmt das zurück)	Brings back the project's version (Ctrl+Z in the editor takes that back)
-Ins Projekt (ein Rückgängig-Schritt) und in das laufende Skript, das damit neu startet und seine Disk und Zahlen behält (Strg+S)	Into the project (one undo step) and into the running script, which restarts with it and keeps its disk and numbers (Ctrl+S)
 Zeile {}, Spalte {}	Line {}, column {}
 keine Meldungen	no messages
 1 Warnung	1 warning
 {} Warnungen	{} warnings
-geändert – Strg+S übernimmt, F8 springt zur nächsten Meldung	changed – Ctrl+S applies, F8 goes to the next message
 wie im Projekt	as in the project
-Fehler ({})	Errors ({})
 Ausgabe	Output
-Noch keine Ausgabe in diesem Lauf: print(…) schreibt hierher.	No output in this run yet: print(…) writes here.
-Keine Fehler in diesem Lauf (davor {}; die Konsole zeigt sie mit „script errors“).	No errors in this run ({} before; the console shows them with “script errors”).
-Keine Fehler in diesem Lauf.	No errors in this run.
-{} · Zeile {}, Spalte {} ({}): {}	{} · line {}, column {} ({}): {}
-Skript-Editor	Script editor
 Strg+S	Ctrl+S
-das Skript übernehmen: ins Projekt und in das laufende Skript	apply the script: to the project and to the running script
 F8 / Umschalt+F8	F8 / Shift+F8
 zur nächsten / vorigen Meldung (Fehler, Warnung, Fehler im Lauf)	to the next / previous message (error, warning, error while running)
 Strg+Z / Strg+Y	Ctrl+Z / Ctrl+Y
 im Editor rückgängig / wiederholen (außerhalb des Editors: das Projekt)	undo / redo in the editor (outside the editor: the project)
 Strg+F / Strg+H	Ctrl+F / Ctrl+H
-suchen / ersetzen	find / replace
 Strg+/	Ctrl+/
 Zeilen aus- und wieder einkommentieren	comment lines out and in again
 die gewählten Zeilen ein- und ausrücken	indent and outdent the chosen lines
 Alt+Pfeil auf / ab	Alt+Up / Down arrow
 die Zeilen verschieben	move the lines
-Fehler|Liste	Errors
 Löschen	Delete
 # the lab in the window (U6a): the Metriken panel (workspace/metrics.rs), the pills on the canvas (canvas/lab.rs), faults in the inspector (inspector/faults.rs)
 Metriken	Metrics
@@ -1266,7 +1235,7 @@ Agent	Agent
 z. B. 10.0.0.1	e.g. 10.0.0.1
 Community	Community
 Version	Version
-Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's command prompt.
+Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle im Terminal des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's Terminal.
 nicht lesbar	not readable
 Einzelwert	scalar
 Spalte einer Tabelle	column of a table
@@ -1279,7 +1248,7 @@ Walk	Walk
 der neue Wert	the new value
 Set	Set
 Agent und Community ohne Leerzeichen angeben.	Give the agent and the community without spaces.
-Die Antworten in der Eingabeaufforderung von {}	The answers in the command prompt of {}
+Die Antworten im Terminal von {}	The answers in the Terminal of {}
 Schreibt eine Zeile ins Protokoll des Geräts, mit dem Namen des Dienstes davor.	Writes a line to the device's log, with the service's name in front.
 Eine Zeile der Stufe debug ins Protokoll des Geräts.	A line of level debug in the device's log.
 Eine Zeile der Stufe info ins Protokoll des Geräts.	A line of level info in the device's log.
@@ -1313,9 +1282,256 @@ Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten.	A
 Formatieren	Format
 Gliederung	Outline
 Noch keine Funktionen und globalen Variablen.	No functions and global variables yet.
-Hier steht kein Name, der in diesem Skript deklariert ist.	There is no name here that this script declares.
 Formatieren geht erst ohne Syntaxfehler ({})	Formatting needs a script without syntax errors ({})
 Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile – ein Rückgängig-Schritt	Format (Shift+Alt+F): indentation, spaces, one statement per line – one undo step
 Name umbenennen	Rename name
-Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
-Neuer Name (jede Stelle im Skript)	New name (every place in the script)
+# ---- V2: the desktop of hosts (workspace/devwin/desktop.rs, progs.rs, editor.rs, filemgr.rs,
+# sysmon.rs; app/prefs.rs's section Desktop; the shortcuts' section Desktop)
+&Vollbild	&Full screen
+Vollbild	Full screen
+Vollbild (F11)	Full screen (F11)
+Start	Start
+Die Programme des Geräts	The device's programs
+Dateimanager	File manager
+Systemmonitor	System monitor
+IDE	IDE
+Ordner und Dateien des Geräts	The device's folders and files
+Notizen und Dateien des Geräts bearbeiten	Edit the device's notes and files
+Prozesse, Dienste, CPU und Speicher	Processes, services, CPU and memory
+Hintergrund, Symbole und Uhr des Desktops	The desktop's background, icons and clock
+Skripte des Geräts entwickeln	Develop the device's scripts
+Netzwerk	Network
+System	System
+Entwicklung	Development
+Die Konsole des Geräts ist im Fenster „{}“ offen.	The device's console is open in the window “{}”.
+Zeigen	Show
+Das Gerät ist ausgeschaltet: das Terminal der IDE öffnet, sobald es wieder läuft.	The device is off: the IDE's terminal opens once it runs again.
+Hintergrund	Background
+Der Hintergrund der Desktops aller Hosts; im Hochkontrast eine ruhige Fläche.	The background of every host's desktop; a plain area in high contrast.
+Schiefer	Slate
+Salbei	Sage
+Sand	Sand
+Nachtblau	Night blue
+Punktraster	Dot grid
+Größe der Symbole	Icon size
+Klein	Small
+Mittelgroß	Medium
+Groß	Large
+Uhr der Taskleiste	Taskbar clock
+Stunden und Minuten	Hours and minutes
+Mit Sekunden	With seconds
+Mit Datum	With the date
+Sie zeigt die Uhr des Geräts in der Simulation.	It shows the device's clock in the simulation.
+Sie gelten für die Desktops aller Hosts und stehen auch unter Werkzeuge › Einstellungen › Desktop; das Projekt und die Geräte ändern sie nicht.	They apply to every host's desktop and are also under Tools › Settings › Desktop; they change neither the project nor the devices.
+der Name ist vergeben	the name is taken
+das Gerät erlaubt es nicht	the device does not allow it
+„{}“ ist keine Textdatei.	“{}” is not a text file.
+Öffnen …	Open …
+Speichern unter …	Save as …
+„{}“ wurde nicht gespeichert: {}.	“{}” was not saved: {}.
+Notizen des Geräts	The device's notes
+Speichern unter	Save as
+Datei öffnen	Open a file
+Nach oben	Up
+Neuer Ordner	New folder
+Kopieren	Copy
+Ausschneiden	Cut
+Einfügen	Paste
+Neuer Name	New name
+OK	OK
+Der Ordner ist leer	The folder is empty
+Neuer Ordner legt einen an, Einfügen und Importieren … bringen Dateien hierher.	New folder makes one, Paste and Import … bring files here.
+Art	Kind
+Skript (jfs)	Script (jfs)
+Textdatei	Text file
+{} in Dateien darin	{} in the files inside
+{} ({} Bytes)	{} ({} bytes)
+vom System	by the system
+Einträge: {}	Entries: {}
+Einträge: {}; zum Verschieben bereit: {}	Entries: {}; ready to move: {}
+Einträge: {}; zum Kopieren bereit: {}	Entries: {}; ready to copy: {}
+{} gewählt	{} chosen
+{} von {} gewählt	{} of {} chosen
+„{}“ bleibt: {}.	“{}” stays: {}.
+„{}“ kommt nicht hierher: {}.	“{}” cannot come here: {}.
+„{}“ geht nicht: {}.	“{}” does not work: {}.
+Prozesse	Processes
+Leistung	Performance
+Das Gerät ist ausgeschaltet: es läuft nichts.	The device is switched off: nothing runs.
+Prozesse: {}	Processes: {}
+Beenden	End
+Beendet den gewählten Hintergrund-Job mit kill im Terminal; Dienste schaltet der Reiter Dienste.	Ends the chosen background job with kill in the Terminal; the Services tab switches services.
+PID	PID
+CPU-Zeit	CPU time
+Befehl	Command
+Auf diesem Gerät läuft kein Dienst.	No service runs on this device.
+CPU-Last	CPU load
+Die letzte Minute; {} CPUs wie bei top.	The last minute; {} CPUs as top counts them.
+Arbeitsspeicher der Skripte	Memory of the scripts
+{} KiB	{} KiB
+Die Heaps der Skript-Dienste, eine Messung je Sekunde.	The heaps of the script services, one sample a second.
+Noch keine Messwerte	No samples yet
+Alt+F6 / Alt+Umschalt+F6	Alt+F6 / Alt+Shift+F6
+zum nächsten / vorigen Fenster des Desktops	to the next / previous window of the desktop
+Alt+F10 / Alt+F9	Alt+F10 / Alt+F9
+das aktive Fenster maximieren und zurück / minimieren	maximize the active window and back / minimize it
+Alt+Minus	Alt+Minus
+das Menü des aktiven Fensters	the active window's menu
+Doppelklick / Eingabe	Double click / Enter
+das Programm eines Symbols öffnen	open an icon's program
+
+# ---- X1e: command-line sessions (doc/console.rs, workspace/terminal.rs)
+Neue &Sitzung	New &session
+Sitzung beendet	Session ended
+Keine weitere Sitzung	No further session
+Weiteres Terminal	Another terminal
+TTY	TTY
+{} nimmt keine weitere Sitzung an: es hat keine Befehlszeile oder keinen Strom.	{} takes no further session: it has no command line or no power.
+Telnet-Server	Telnet server
+# IDE1: the IDE of a host (workspace/ide, doc/ide.rs; the IDE tab of the device window)
+&IDE …	&IDE …
+den Namen gibt es dort schon	the name exists there already
+das Verzeichnis ist nicht leer	the folder is not empty
+das gehört zum System des Geräts	it belongs to the device's system
+Dieses Gerät hat keine Dateien.	This device has no files.
+„{}“ gibt es schon.	“{}” exists already.
+„{}“ lässt sich nicht löschen: {}.	“{}” cannot be deleted: {}.
+„{}“ läuft schon aus einer Datei.	“{}” runs from a file already.
+Strg+S speichert es, F5 führt es als Dienst aus.	Ctrl+S saves it, F5 runs it as a service.
+angehalten	paused
+Als Prozess läuft eine Datei: ein eingebettetes Skript erst in eine Datei umwandeln.	A file runs as a process: convert an embedded script into a file first.
+Tests laufen aus einer Datei: ein eingebettetes Skript erst in eine Datei umwandeln.	Tests run from a file: convert an embedded script into a file first.
+Als Dienst läuft eine .jfs-Datei oder ein Skript des Geräts.	A .jfs file or a script of the device runs as a service.
+Kein Dienst läuft aus der IDE: Als Dienst ausführen (F5) startet die Datei.	No service runs from the IDE: Run as service (F5) starts the file.
+Haltepunkt in Zeile {}: hält, wenn	Breakpoint in line {}: stops when
+Bedingung, z. B. n > 3	Condition, e.g. n > 3
+Ein Ausdruck in jfs; leer: ein Haltepunkt ohne Bedingung.	An expression in jfs; empty: a breakpoint without a condition.
+Erfasst	Captured
+Global	Global
+Lokal	Local
+Hauptprogramm	Main program
+Funktion ohne Namen	Function without a name
+Kein Dienst aus der IDE: Als Dienst ausführen (F5) startet die Datei; ein Klick links neben eine Zeilennummer (F9) setzt einen Haltepunkt.	No service from the IDE: Run as service (F5) starts the file; a click left of a line number (F9) sets a breakpoint.
+Haltepunkt	Breakpoint
+Schritt	Step
+Anhalten	Pause
+{}, Zeile {}, Spalte {}	{}, line {}, column {}
+{} hält in {} ({})	{} is paused in {} ({})
+die Bedingung scheiterte: {}	the condition failed: {}
+{} läuft: Haltepunkte halten ihn an, Anhalten (Strg+F9) beim nächsten Schritt.	{} is running: breakpoints stop it, Pause (Ctrl+F9) at the next step.
+{} läuft nicht: Als Dienst ausführen (F5) startet ihn.	{} is not running: Run as service (F5) starts it.
+Aufrufliste	Call stack
+Nur während der Dienst angehalten ist.	Only while the service is paused.
+Variablen	Variables
+Ausdrücke	Expressions
+Ausdruck, z. B. req.path	Expression, e.g. req.path
+Ausdruck hinzufügen	Add expression
+Ausdruck hinzufügen (Eingabe)	Add expression (Enter)
+Ausdruck entfernen	Remove expression
+Ausdrücke werden im gewählten Aufruf gelesen, ohne das Programm zu ändern.	Expressions are read in the chosen call without changing the program.
+„{}“ ist keine Textdatei: die IDE zeigt sie nicht.	“{}” is no text file: the IDE does not show it.
+„{}“ gibt es nicht.	“{}” does not exist.
+Das Skript „{}“ gibt es nicht.	The script “{}” does not exist.
+Hier steht kein Name, dessen Deklaration die IDE findet.	There is no name here whose declaration the IDE finds.
+(gelöscht)	(deleted)
+Ein Doppelklick im Explorer öffnet eine Datei; „Neue Datei …“ legt eine an. Ein Skript, das noch im Projekt steht, öffnet sich unter „Eingebettete Skripte“.	A double click in the Explorer opens a file; “New file …” makes one. A script that is still in the project opens under “Embedded scripts”.
+Keine Datei offen	No file open
+Tab schließen	Close tab
+Der Dienst {} läuft noch mit der Fassung vor dem Speichern – Neu starten übernimmt die Datei.	The service {} still runs the version from before saving – Restart takes the file.
+geändert – Strg+S speichert	changed – Ctrl+S saves
+Bedingter Haltepunkt	Conditional breakpoint
+Neuer Name (jede Stelle in der Datei)	New name (every place in the file)
+Eingebettete Skripte	Embedded scripts
+Dienst {}	Service {}
+ordner	folder
+Neue Datei …	New file …
+Neue Datei im gewählten Ordner	New file in the chosen folder
+Neuer Ordner im gewählten Ordner	New folder in the chosen folder
+Neuer Ordner …	New folder …
+Umbenennen (F2)	Rename (F2)
+Umbenennen …	Rename …
+Löschen (Entf) – ein Rückgängig-Schritt	Delete (Del) – one undo step
+In Datei umwandeln	Convert into a file
+In Datei umwandeln: das Skript kommt als Datei auf das Gerät, der Dienst startet von nun an aus ihr	Convert into a file: the script becomes a file of the device, the service starts from it from now on
+Neue Datei in {}	New file in {}
+Neuer Ordner in {}	New folder in {}
+Neuer Name für {}	New name for {}
+Ein Name fehlt.	A name is missing.
+„{}“ hat ungespeicherte Änderungen: erst speichern (Strg+S), dann umwandeln.	“{}” has unsaved changes: save first (Ctrl+S), then convert.
+Debugger	Debugger
+Tests	Tests
+Dienst {} ({}, bei {}): {}	Service {} ({}, at {}): {}
+Probleme ({})	Problems ({})
+Tests ({} fehlgeschlagen)	Tests ({} failed)
+Debugger (angehalten)	Debugger (paused)
+Noch keine Ausgabe von {} in diesem Lauf: print(…) schreibt hierher.	No output of {} in this run yet: print(…) writes here.
+Hier steht, was ein Dienst ausgibt, den die IDE ausführt (Als Dienst ausführen, F5). Ein Prozess schreibt ins Terminal.	Here is what a service prints that the IDE runs (Run as service, F5). A process writes to the terminal.
+Keine Probleme in den offenen Dateien.	No problems in the open files.
+Tests ausführen	Run tests
+Die Funktionen test_… der Datei laufen im Terminal mit jfs --test, jede in einem frischen Programm (Strg+Umschalt+T)	The file's test_… functions run in the terminal with jfs --test, each in a fresh program (Ctrl+Shift+T)
+Noch kein Testlauf auf diesem Gerät.	No test run on this device yet.
+{} Tests: {} bestanden, {} fehlgeschlagen	{} tests: {} passed, {} failed
+läuft … {} von {} Tests: {} bestanden, {} fehlgeschlagen	running … {} of {} tests: {} passed, {} failed
+bestanden: {} ({})	passed: {} ({})
+lässt sich nicht übersetzen: {}:{}:{}: {}	does not compile: {}:{}:{}: {}
+lässt sich nicht laden: {}: {}	does not load: {}: {}
+fehlgeschlagen: {} ({}:{}:{}): {}	failed: {} ({}:{}:{}): {}
+fehlgeschlagen: {} ({}): {}	failed: {} ({}): {}
+{} (eingebettet)	{} (embedded)
+Neues Skript: {}	New script: {}
+Alle speichern	Save all
+Bearbeiten	Edit
+Suchen …	Find …
+In Dateien suchen	Find in files
+In Dateien ersetzen	Replace in files
+Gehe zur Definition	Go to definition
+Name umbenennen …	Rename name …
+Als Prozess ausführen	Run as process
+Als Dienst ausführen	Run as service
+Debuggen	Debug
+Schritt über	Step over
+Schritt hinein	Step into
+Schritt heraus	Step out
+Haltepunkt an / aus	Breakpoint on / off
+Bedingter Haltepunkt …	Conditional breakpoint …
+Alle Haltepunkte entfernen	Remove all breakpoints
+Seitenleiste	Side bar
+Explorer	Explorer
+Untere Leiste	Lower area
+Dienst {}: nicht im Simulator	Service {}: not in the simulator
+„{}“ hat ungespeicherte Änderungen: erst speichern, dann in den Dateien ersetzen.	“{}” has unsaved changes: save first, then replace in the files.
+„{}“ kommt in keiner Datei vor.	“{}” is in no file.
+{} Stellen in {} Dateien ersetzt (ein Rückgängig-Schritt).	{} places replaced in {} files (one undo step).
+Ersetzen ein / aus	Replace on / off
+Ersetzen ein / aus (Strg+Umschalt+H)	Replace on / off (Ctrl+Shift+H)
+Ersetzen durch	Replace with
+Jede Stelle in jeder Datei – ein Rückgängig-Schritt des Projekts	Every place in every file – one undo step of the project
+Sucht in allen .jfs-Dateien des Geräts.	Searches all .jfs files of the device.
+Keine Treffer.	No matches.
+{} Treffer in {} Dateien	{} matches in {} files
+die Datei speichern (ein Rückgängig-Schritt des Projekts)	save the file (one undo step of the project)
+Strg+Umschalt+S	Ctrl+Shift+S
+alle geänderten Dateien speichern	save all changed files
+Strg+W	Ctrl+W
+den Tab schließen (seine Änderungen bleiben)	close the tab (its changes stay)
+Strg+Bild ab / Bild auf	Ctrl+PgDn / PgUp
+zum nächsten / vorigen Tab	to the next / previous tab
+Strg+Umschalt+F / H	Ctrl+Shift+F / H
+in Dateien suchen / ersetzen	find / replace in files
+F5 / Strg+F5	F5 / Ctrl+F5
+als Dienst ausführen (angehalten: fortsetzen) / als Prozess im Terminal	run as a service (paused: continue) / as a process in the terminal
+Umschalt+F5 / Strg+Umschalt+F5	Shift+F5 / Ctrl+Shift+F5
+stoppen / neu starten	stop / restart
+F9 / Strg+Umschalt+F9	F9 / Ctrl+Shift+F9
+Haltepunkt an / aus, einer mit Bedingung	breakpoint on / off, one with a condition
+F10 / F7 / Umschalt+F7	F10 / F7 / Shift+F7
+Schritt über / hinein / heraus	step over / into / out
+Strg+F9	Ctrl+F9
+anhalten	pause
+Strg+Umschalt+T	Ctrl+Shift+T
+die Tests der Datei ausführen	run the file's tests
+F12 / F2 / Umschalt+Alt+F	F12 / F2 / Shift+Alt+F
+zur Definition / Name umbenennen / formatieren	go to definition / rename a name / format
+in der Datei suchen / ersetzen	find / replace in the file
+Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
+Strg+B / Strg+J	Ctrl+B / Ctrl+J

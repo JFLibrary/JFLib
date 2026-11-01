@@ -158,7 +158,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -829,6 +829,9 @@ checked row with an icon gives the flyout a check column and an icon column):
   context_target() -> id              the widget whose context menu is open
   menu_item(id, label) -> EV          row inside a flyout (next_icon, next_flags
                                       ST_DISABLED / ST_CHECKED); activation closes popups
+  menu_item_keys(id, label, keys) -> EV   the same with the text of its keys at the row's
+                                      end, for keys the app's own widgets handle (IDE1)
+  key_text(vk, mods) -> "Strg+Umschalt+S"   a key as the accelerator texts write it
   menu_cmd(cmd) -> EV   menu_sep()    a row for a command (queues it), a separator
   menu_list(base, rows)               the rows of the Mi::List with that base (the asm's
                                       app-owned STRLIST buffer)
@@ -924,6 +927,12 @@ numbers for them.
 - **`fn menu_item(&mut self, id: u32, label: &str) -> u32`**
   ui_menu_item(id, label) -> EV_\*: menu row inside a flyout (next_icon; next_flags
   ST_DISABLED / ST_CHECKED); activation closes every popup
+- **`fn menu_item_keys(&mut self, id: u32, label: &str, keys: &str) -> u32`**
+  menu_item with `keys` (key_text) at the end of the row: a row whose keys the app
+  handles itself (no command of the table)
+- **`fn key_text(&self, vk: u32, mods: u32) -> String`**
+  a key with modifiers (MOD_\*) as the accelerator texts write it: "Strg+Umschalt+S",
+  "F5" (the UI language's names; accel_order_set holds)
 - **`fn menu_cmd(&mut self, cmd: u32) -> u32`**
   ui_menu_cmd(cmd) -> EV_\*: menu row for a command (widget id = command id)
 - **`fn menu_sep(&mut self) -> u32`**

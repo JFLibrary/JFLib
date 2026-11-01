@@ -45,12 +45,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   Einleitung, Ziele als Checkliste, die der Simulator laufend prüft, Hinweise und Fortschritt;
   die Einstellungen der Dienste lassen sich im Gerätefenster als JSON bearbeiten (siehe
   [Labore und Aufgaben](#labore-und-aufgaben)).
-- **Skript-Editor (U7):** der Reiter Skripte im Gerätefenster eines Hosts: Code-Editor mit
-  Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
-  Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
-  Fehler des Laufs, Vorlagen; seit SK6 mit Vervollständigung, Hover, Signaturhilfe, Sprung zur
-  Deklaration, Umbenennen, Formatieren, Falten und Gliederung (siehe
-  [Skript-Editor](#skript-editor)).
+- **IDE (IDE1, vormals Skript-Editor U7):** ein Programm des Desktops eines Hosts, maximiert
+  in seinem Fenster: ein Explorer über die Dateien des Geräts und die noch eingebetteten Skripte, Tabs mit Entwürfen,
+  die Sprachdienste von SK6 auch über Importe hinweg, Suchen und Ersetzen in Dateien, darunter
+  Ausgabe, Terminal, Probleme, Debugger und Tests; eine Datei läuft als Prozess (`jfs DATEI`) oder
+  als Dienst, der auf die Datei verweist (`"file"`), mit Haltepunkten, Schritten, Aufrufliste,
+  Variablen und Ausdrücken; die `test_…`-Funktionen einer Datei laufen mit `jfs --test` (siehe
+  [IDE](#ide)).
 - **Spanning Tree (R4):** STP (IEEE 802.1D) und RSTP (802.1w) auf den IOS-artigen Switches, je
   Switch eingeschaltet: Wahl der Root-Bridge, Rollen und Zustände, Proposal und Agreement,
   Edge-Ports, BPDU Guard, `show spanning-tree`, bernsteinfarbene LEDs an blockierten Ports
@@ -159,6 +160,16 @@ Queues, Lastgeneratoren, eigene Skripte).
   Dateien des Geräts; ein Skript-Dienst lässt sich in virtueller Zeit anhalten und schrittweise
   ausführen, mit Haltepunkten, Aufrufliste und Variablen (die Schnittstelle für die kommende
   IDE); `assert` und `assert_eq` für Tests (siehe [Skripte in Hosts](#skripte-in-hosts)).
+- **Mini-Desktop (V2):** das Gerätefenster eines Hosts ist ein kleiner PC – Programme in eigenen
+  Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
+  MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
+  F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
+- **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
+  Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
+  vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
+  Benutzer oder RADIUS, Sitzungslimit, Leerlaufzeit, `show users`, `clear line`, `terminal
+  monitor`) und `telnetd` auf Linux-Hosts (`who`, `w`, `tty`, `ps` mit TTY) (siehe
+  [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)).
 
 ## Bedienung
 
@@ -178,7 +189,8 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Tastatur:** Strg+1 … 8 zeigen die Bereiche und geben ihnen die Tastatur, Strg+9 die
   Topologie; dort wählt Tab die Geräte und Notizen, dann die Kabel (Eingabe auf einem Kabel: seine
   Eigenschaften). Werkzeugleiste und Palette sind Fokusgruppen (ein Tab-Halt, Pfeiltasten
-  innen). F1 zeigt alle Tastenkürzel.
+  innen). F1 zeigt alle Tastenkürzel. F11 schaltet das aktive Gerätefenster (ohne eines das
+  Hauptfenster) in den Vollbildmodus und zurück.
 - **Einstellungen** (Werkzeuge › Einstellungen, Strg+,): Raster und Rasterweite, Einrasten,
   Minimap, Tempo beim Start, Bewegung (wie das System, reduziert, voll), Sprache (wie das
   System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus). Sie liegen in
@@ -246,16 +258,17 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `task.uis` | das Panel „Aufgabe“ am Labor des Loadbalancers: leer ohne Labor, die Liste der Labore, Titel und Ziele der Reihe nach, die Einleitung zum Einklappen, „Prüfen“ mit den Befunden, Hinweise nacheinander, der Fortschritt; gelöst im Fenster: das Kabel zu WEB3, das dritte Backend in den Einstellungen von LB1 (Text ohne JSON mit Zeile und Spalte abgelehnt, eine Einstellung, die der Simulator ablehnt), alle Ziele erreicht; Rückgängig lässt sie erreicht, „Simulation zurücksetzen“ fängt neu an |
 | `labs.uis` | die Labore auf Englisch (`--lang en`): die Liste, das Panel mit den Texten der Labordatei, F9 mit den Befunden, ein Hinweis, Strg+Umschalt+A; das Cache-Labor über die Einstellungen von CACHE1 gelöst, dann (nach „Änderungen speichern?“ mit Verwerfen) das Campus-Labor in den Konsolen von MLS1, R1, PC3 und PC4 |
 | `task_shots.uis` | Bilder der Liste der Labore, des Panels (das Labor der Shards nach „Prüfen“ mit einem Hinweis) und der Einstellungen eines KV-Knotens, hell und dunkel mit 100 und 150 % (`build/jfnetworker/task_*.png`) |
-| `script_editor.uis` | den Skript-Editor (siehe [Skript-Editor](#skript-editor)) auf `fixtures/scripts.jfnet`: der Reiter aus dem Kontextmenü, die Liste mit Zustand und Fehlern, der Laufzeitfehler in Zeile 13 als Marke und in der Fehlerliste (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und übernimmt, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, Verwerfen, eine Vorlage (ihr Fehler: Port 7 ist belegt), Umbenennen, Löschen und Rückgängig, der Reiter Dienste |
-| `script_editor_en.uis` | den Skript-Editor auf Englisch: Kontextmenü, Reiter, Liste, Statuszeile, Meldungen, Ausgabe und Fehler, eine Vorlage auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
-| `script_shots.uis` | die Bilder des Skript-Editors hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
-| `script_ls.uis` | die Sprachdienste des Skript-Editors (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung (ein neues `fn`, ein Klick setzt die Schreibmarke, „Gliederung“ blendet sie aus) |
+| `script_editor.uis` | die eingebetteten Skripte in der IDE (siehe [IDE](#ide)) auf `fixtures/scripts.jfnet`: das maximierte Fenster der IDE auf dem Desktop aus dem Kontextmenü, die Skripte im Explorer, der Laufzeitfehler in Zeile 13 als Marke und in Probleme (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und speichert, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, eine Vorlage als neue Datei (als Dienst ausgeführt ihr Fehler: Port 7 ist belegt), Löschen und Rückgängig, der Reiter Dienste |
+| `script_editor_en.uis` | die IDE auf Englisch: Kontextmenü, Reiter, Explorer, Statuszeile, Meldungen in Problems, Output, die Namen der Werkzeugleiste, eine Vorlage als neue Datei auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
+| `script_shots.uis` | die Bilder eines eingebetteten Skripts in der IDE hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
+| `script_ls.uis` | die Sprachdienste in der IDE (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung der Seitenleiste (ein neues `fn`, ein Klick setzt die Schreibmarke) |
 | `script_ls_shots.uis` | die Bilder der Sprachdienste: die Vervollständigung von `net.`, die Signaturhilfe von `net.listen` hell und dunkel mit 100 und 150 %, das Flyout „Name umbenennen“ hell und dunkel (`build/jfnetworker/script_ls_*.png`) |
-| `model.uis`, Gruppe `scripted` | worauf der Skript-Editor baut: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
+| `model.uis`, Gruppe `scripted` | worauf die Skripte der IDE bauen: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
-`campus.jfnet` (die Abnahme), `scripts.jfnet` (zwei Skripte auf SRV1 für den Skript-Editor) und
+`campus.jfnet` (die Abnahme), `scripts.jfnet` (zwei eingebettete Skripte auf SRV1), `ide.jfnet`
+(Dateien und ein Dienst aus einer Datei auf SRV1 für die IDE) und
 die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `metrics.uis` | der Bereich Metriken auf `lab_window.jfnet`: ohne Messwerte, nach 8 s Statuszeile, Kacheln und Diagramme (die Zusammenfassungen ihrer Einträge), die Tastatur im Baum und in den Diagrammen, die Werte beim Überfahren, ein auf der Zeichenfläche gewähltes Gerät, der Simulationsmodus auch in der Vergangenheit, die Sparklines ab 75 % (siehe [Das Labor im Fenster](#das-labor-im-fenster)) |
 | `faults.uis` | Fehler aus dem Inspektor auf `lab_window.jfnet`: Strom aus, Rückgängig und Wiederholen, Wiederherstellen und Alle wiederherstellen samt Rückgängig, ein Dienst für 2 s, die Disk, ein Kabel gezogen und verschlechtert, eine Partition, Ablehnungen, das Projekt bleibt gespeichert, die Spur „Fehler“ der Zeitleiste und der Fehler als Bereich im Diagramm von LB1 |
@@ -318,6 +331,29 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `shell_terminal.uis` | PC1s Shell im Terminal-Panel: `mkdir`, `cd` (der Prompt zeigt `~/app`), Tab ergänzt einen Ordner mit `/`, eine Datei mit Leerzeichen, bei mehreren Treffern erst den gemeinsamen Teil und dann die Liste, eine Pipe, ein Skript als Prozess mit Strg+C beendet (`$?` 130), ein Job im Hintergrund mit `[1] PID` und seiner Fertig-Zeile, `less` mit --More-- |
 | `shell_shots.uis` | die Bilder der Shell (PC1 mit Ordnern, `tree`, einer Pipeline, `ps` und `ls -l`; R1 mit Ordnern in `flash:`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/shell_*.png`) |
 | `model.uis`, Gruppe `scriptmod` | Module und Debugger der Skripte (siehe [Skripte in Hosts](#skripte-in-hosts)): Importe aus den Dateien des Geräts mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler im Modul in Fehler, Log und Status, ein angehaltener Dienst mit verspäteten Timer-Runden, Schritte, ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Determinismus |
+| `desk_programs.uis` | der Desktop von PC1 (siehe [Desktop der Hosts](#desktop-der-hosts)): das Gerätefenster öffnet auf ihm, Symbole (ein Klick wählt, Doppelklick, Eingabe und Pfeiltasten), das Startmenü mit seinen Gruppen, drei Programme in Fenstern, die Taskleiste (aktivieren, minimieren, zurückholen, ihr Menü schließt ein Fenster), Maximieren und Minimieren mit der Titelleiste, Verschieben, Alt+F6, F11 und Vollbild, das Terminal als Konsole des Geräts (der Terminal-Bereich verweist dorthin), der Desktop wie zuvor, nachdem das Gerätefenster zu und wieder offen war |
+| `desk_files.uis` | Texteditor und Dateimanager: die Notizen, ein Text mit „Speichern unter …“ als Datei, die die Shell mit `cat` liest; Neuer Ordner, Umbenennen, Kopieren und Einfügen in den neuen Ordner, Löschen mit Rückgängig und Wiederholen, die Kopie per Doppelklick im Texteditor, Eigenschaften |
+| `desk_monitor.uis` | Systemmonitor und Einstellungen: ein Job aus dem Terminal (`sleep 100 &`) unter den Prozessen, mit „Beenden“ (`kill` im Terminal) beendet, `init` nicht; die Dienste von SRV1 mit dem laufenden Webserver, CPU-Last und Speicher; Hintergrund, Symbolgröße und Uhr, dieselben Werte unter Werkzeuge › Einstellungen |
+| `desk_terminals.uis` | weitere Terminal-Fenster (V2 mit den Sitzungen von X1e): „Weiteres Terminal“ im Startmenü öffnet „Terminal (2)“ mit eigener Sitzung (eigener Prompt und Verzeichnis, `tty` `/dev/pts/0`, `ps` mit `tty1` und `pts/0`), die Konsole behält ihr Verzeichnis, `who` zählt beide; Schließen des Fensters beendet die Sitzung |
+| `desk_ide.uis` | die IDE auf dem Desktop (IDE1 in V2s Fenster, ihr Terminal eine Sitzung von X1e): eine `.jfs`-Datei aus dem Dateimanager öffnet sich in der maximierten IDE, Strg+F5 führt sie im Terminal der IDE aus (`tty` `/dev/pts/0`), `who` an der Konsole zählt beide, Schließen des IDE-Fensters beendet ihre Sitzung |
+| `desk_rtl.uis` | der Desktop in einem gespiegelten Fenster: Symbole rechts, Taskleiste und Titelleisten gespiegelt, wie gezeichnet bedienbar; Bilder hell und dunkel mit 150 % |
+| `desk_shots.uis` | die Bilder des Desktops (drei Fenster, das Startmenü) hell und dunkel mit 100 und 150 %, Hochkontrast, die Hintergründe Netz und Sand mit großen Symbolen (`build/jfnetworker/desk_*.png`) |
+| `model.uis`, Gruppe `desk` | worauf der Desktop baut: die Prozesse von `jfn_sim/procs.rs` gegen `ps` (ein Job mit PID und Befehl, `kill`, ein Dienst, der kein Job ist), die CPU-Zeit je Sekunde gegen die Zahlen des Webservers, freie Namen, Kopien eines Ordnerbaums und Verschieben im Dateimanager, welches Fenster die Konsole zeigt, der Kontrast der Beschriftungen auf jedem Hintergrund in beiden Themes |
+| `model.uis`, Gruppe `sessions` | Sitzungen und Telnet-Server (siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)): zwei lokale Sitzungen von PC1 neben der Konsole mit eigenem Verzeichnis, Variablen, Verlauf und Jobs, ihre Prompt-Meldungen; eine lokale Sitzung von R1 (`tty 1`) mit eigenem Modus, `?` und Tab darin, `%SYS-5-CONFIG_I` nennt sie; eine geschlossene Sitzung (ihr Ping endet, Zeilen abgelehnt, Nummern nicht wieder vergeben), `exit`; Strom aus beendet alle bis auf die Konsole; Telnet von PC1 zu R1 mit Leitungspasswort (verdeckt, ein falsches, `show users` und `show line` von beiden Seiten, `?` über Telnet, `exit`), ohne Passwort abgewiesen, mit `login local` (Rechte 15, drei Fehlversuche schließen), mit AAA und RADIUS; fünf vty-Leitungen, die sechste Verbindung abgewiesen, `clear line`; die Leerlaufzeit (30 s, 10 min als Vorgabe); `show users` mit Leerlauf; `terminal monitor`; `transport input none` und `access-class`; `telnetd` auf SRV1 mit Login, `who`, `w`, `tty`; die TTY-Spalte von `ps`; die Wiederholung der Sitzungsbefehle beim Zurückspulen; Determinismus |
+| `scen_sessions.uis` | Golden-Szenario `sessions.scn`: der Admin-PC per Telnet an R1 (Loopback eingerichtet, `show users`, R1s Konsole nennt die vty-Leitung) und an R2 (`login local`), die vergessene Sitzung endet nach der Leerlaufzeit |
+| `sessions_terminal.uis` | eine zweite Sitzung von ADMIN im Terminal-Panel („Neue Sitzung“, der Tab „ADMIN (2)“) mit eigenem Prompt und Verzeichnis, `tty`, `who` von der Konsole, Schließen des Tabs beendet sie |
+| `telnet_vty.uis` | Telnet von ADMINs Konsole zu R1 und zurück: das Passwort verdeckt, R1s Prompt in der Konsole, `show users`, `exit`, der Prompt der Shell wieder |
+| `sessions_shots.uis` | die Bilder der Sitzungen (ADMIN mit einer zweiten Sitzung, darin per Telnet an R1 mit `show users`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/sessions_*.png`) |
+| `model.uis`, Gruppe `ide` | worauf die IDE baut (siehe [IDE](#ide)): ein Dienst aus einer Datei mit Importen neben ihr und `config.file`, `source` und `file` zugleich abgelehnt, eine fehlende Datei und eine, die sich nicht übersetzen lässt (Fehler, Status, `script errors`, Log, das Problem `ScriptFile`), Speichern ändert den laufenden Dienst nicht, ein Neustart liest die Datei, das Umwandeln eines eingebetteten Skripts als ein Schritt mit Rückgängig und Wiederholen (die Disk zählt weiter), Speichern, neue Datei und Ordner, Umbenennen, Löschen, ein Dienst zu einer Datei, Ersetzen in zwei Dateien als ein Schritt, `jfs --test` (Bericht, Ergebnisse, Exit-Code, eine Datei mit Fehler, die Zeitgrenze, ein Port für den nächsten Test), Determinismus, ein altes Projekt mit `source` unverändert, Suchen und Ersetzen mit ganzen Wörtern |
+| `ide_explorer.uis` | der Explorer der IDE auf `fixtures/ide.jfnet`: der Baum mit `/root` offen und dem eingebetteten Skript, eine neue Datei über das Flyout, ihr Tab und ihre Zeile mit „●“, Strg+S, F2 benennt um (der Tab geht mit), Entf löscht, Rückgängig des Projekts, ein neuer Ordner, ein Entwurf übersteht seinen geschlossenen Tab, Alle speichern, ein rückgängig gemachtes Speichern im Entwurf, das eingebettete Skript im Tab, „In Datei umwandeln“ (Tab und Dienst gehen mit, die Disk zählt weiter) und sein Rückgängig |
+| `ide_language.uis` | die Sprachdienste über Dateien hinweg: Vervollständigung von `lib.` mit dem Doku-Kommentar, Signaturhilfe einer Funktion des Moduls, F12 öffnet `lib.jfs` an der Deklaration, die Gliederung (ein Klick), F2 im Flyout und Rückgängig, Probleme mit einem Klick zur Stelle |
+| `ide_search.uis` | Suchen in der Datei (Strg+F) und in Dateien (Strg+Umschalt+F mit dem Wort an der Schreibmarke, die Treffer, ein Klick öffnet die Datei), ganze Wörter, Alle ersetzen (abgelehnt mit ungespeicherten Änderungen, dann ein Schritt), Rückgängig im Menü Bearbeiten |
+| `ide_run.uis` | Ausführen: `hallo.jfs` als Prozess im Terminal, `server.jfs` als Dienst `web` mit seiner Ausgabe und einer Anfrage von PC1, Speichern im Lauf mit dem Hinweis und „Neu starten“, Stoppen, Ausführen, der Reiter Dienste |
+| `ide_debug.uis` | der Debugger: F9 setzt einen Haltepunkt, eine Anfrage von PC1 hält `web` an (die Datei an der Zeile, Ort und Grund, Aufrufliste, Variablen), F10 zur nächsten Zeile mit neuer Variable, ein Ausdruck, F5 setzt fort und PC1 bekommt die Antwort, ein bedingter Haltepunkt (ein Syntaxfehler abgelehnt, er hält erst bei der dritten Anfrage), Alle Haltepunkte entfernen |
+| `ide_tests.uis` | die Tests: Strg+Umschalt+T auf `test_lib.jfs`, der Bereich Tests mit einem bestandenen und einem gescheiterten Test (beide Werte von `assert_eq`), ein Klick zur Zeile, der Bericht im Terminal, nach der Korrektur beide bestanden |
+| `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
+| `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
+| `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -350,6 +386,9 @@ Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
+Für die Sitzungen: `sessions.jfnet` (R1 mit Leitungspasswort, R2 mit `login local` und einer
+Minute Leerlaufzeit, ADMIN, SRV1 mit `telnetd` an SW1; das Szenario `sessions.scn` und die
+Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und `sessions_shots.uis`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -392,7 +431,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
-| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters mit seinen Sprachdiensten, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| IDE | [`src/workspace/ide/`](src/workspace/ide/mod.rs) ([`explorer.rs`](src/workspace/ide/explorer.rs), [`editor.rs`](src/workspace/ide/editor.rs), [`lower.rs`](src/workspace/ide/lower.rs), [`debug.rs`](src/workspace/ide/debug.rs), [`search.rs`](src/workspace/ide/search.rs)), [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/ide.rs`](src/doc/ide.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`crates/jfn_sim/cli/jfstest.rs`](crates/jfn_sim/cli/jfstest.rs), [`src/idetest.rs`](src/idetest.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | die IDE eines Hosts (Explorer, Tabs, Sprachdienste, Suchen in Dateien, Ausführen, Debugger, Tests) und ihr Reiter im Gerätefenster, die Schritte auf Dateien und Skripten im Projekt mit Rückgängig und Vorlagen, `jfs --test` in der Shell, die Selbsttests (Gruppen `ide`, `scripted`; siehe [IDE](#ide)) |
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
@@ -408,6 +447,8 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
+| Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
+| Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 
 ### Gerätekatalog
 
@@ -470,7 +511,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
 - **Konsolen** (Terminal-Bereich; [`src/workspace/terminal.rs`](src/workspace/terminal.rs),
   [`src/doc/console.rs`](src/doc/console.rs)): Ein Doppelklick auf ein Gerät (auch Enter auf
   der Zeichenfläche, „Konsole öffnen“ im Kontextmenü oder im Inspektor) öffnet seine
-  Befehlszeile als Tab. Jedes Gerät hat genau eine Konsole mit 5000 Zeilen Rückblick, Verlauf
+  Befehlszeile als Tab. Jedes Gerät hat eine Konsole (dazu weitere Sitzungen: „Neue Sitzung“,
+  siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)) mit 5000 Zeilen Rückblick, Verlauf
   (↑/↓), Suche (Strg+F) und den Meldungen seit dem Start. Eine Zeile geht als `Cmd::Cli` an das
   Gerät, seine Ausgabe kommt als `Report::CliOut`; Prompt und Modus liefert das Gerät, ein
   laufender Befehl hält die Eingabe zurück (vorab Getipptes läuft danach). IOS-artig: `?` zeigt
@@ -499,11 +541,11 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   sichern“), Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
-  Konsole wie im Terminal-Tab) und bei Hosts ein Desktop: IP-Konfiguration (statisch oder
-  DHCP), Eingabeaufforderung, Texteditor (`notizen.txt`: die Notizen des Geräts, gespeichert
-  im Projekt, bis der Simulator ein Dateisystem hat) und ein Webbrowser, der bisher nur Adressen
-  und Ports auflöst; Seiten über HTTP laden und zeigen ist Meilenstein B1 (siehe
-  [Fahrplan](#fahrplan)). Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
+  Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
+  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)); sein
+  Webbrowser löst bisher nur Adressen und Ports auf, Seiten über HTTP laden und zeigen ist
+  Meilenstein B1 (siehe [Fahrplan](#fahrplan)). F11 zeigt ein Gerätefenster mit jedem Reiter
+  im Vollbild. Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
   Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
   [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
@@ -1565,7 +1607,34 @@ eines davon (Rechenzeit und Preis einer Anweisung, Warteschlange, Grenzen, Offen
 letzter Fehler), `script errors NAME` die letzten Fehler mit Zeit, Zeile, Spalte und Aufrufen,
 `script output NAME` die Ausgabe von `print`; `script start|stop|restart NAME` steuert es, und
 `top` zeigt seine Rechenzeit. Für die Oberfläche gibt es `Engine::scripts(dev)` und
-`ScriptService::view`, `errors`, `output`, `source`; im Fenster der Skript-Editor (unten).
+`ScriptService::view`, `errors`, `output`, `source`, `file`; im Fenster die IDE (unten).
+
+**Dienste aus Dateien** (IDE1): statt des Quelltexts kann eine Definition eine Datei des Geräts
+nennen, `{"kind": "script", "name": "web", "config": {"file": "/root/app/server.jfs", "port":
+80}}` (ein relativer Pfad gilt ab `/root`; `source` und `file` zugleich lehnt der Simulator ab).
+Der Dienst liest die Datei bei jedem Start – mit dem Gerät, nach einem Stopp, bei einem Neustart
+– und übersetzt sie unter ihrem Pfad: ihre relativen Importe beginnen in ihrem Ordner, ihre
+Fehler nennen die Datei. Speichern ändert am laufenden Programm nichts; erst der nächste Start
+liest die gespeicherte Fassung (die IDE sagt das in ihrer Statuszeile und bietet „Neu starten“).
+Fehlt die Datei, ist sie kein Text oder lässt sie sich nicht übersetzen, scheitert der Start als
+Fehler des Dienstes mit der Datei (und Zeile und Spalte, wenn es eine Stelle gibt): in der
+Statuszeile („beendet nach einem Fehler: /root/app/server.jfs: die Datei gibt es nicht“), in
+`script errors`, im Log und in der Ereignisliste, und `Engine::problems` meldet `ScriptFile`
+(„Skript web auf SRV1: die Datei /root/app/server.jfs gibt es nicht.“). `config.file` nennt die
+Datei wie bei `jfs DATEI`. Projekte mit `source` laden und laufen wie bisher.
+
+**Tests in der Shell** ([`cli/jfstest.rs`](crates/jfn_sim/cli/jfstest.rs)): `jfs --test
+DATEI.jfs …` führt die Funktionen `test_…` der Dateien nacheinander in einem Prozess der Shell
+aus, jede in einem frischen Programm (die Datei wie ein Dienst sie liefe, mit
+`stop_on_error`: erst ihr Hauptprogramm, dann der Test, dann seine Timer und Rückrufe in
+virtueller Zeit). Ein Test besteht, wenn nichts mehr zu tun ist oder seine Zeit (10 s) um ist,
+und scheitert am ersten Fehler; `assert` und `assert_eq` werfen einen mit beiden Werten.
+Zwischen zwei Tests schließt, was der vorige offen hatte (`ScriptService::release`). Die
+Ausgabe folgt dem Runner `jfs` der Library („ok      NAME (DATEI)“, „FEHLER  NAME
+(DATEI:ZEILE:SPALTE): …“ mit dem, was der Test ausgab, „N Tests: P bestanden, F
+fehlgeschlagen“), der Exit-Code ist 1, wenn ein Test scheiterte, eine Datei nicht lud oder kein
+Test da war. `Engine::jfs_tests(dev)` hält den letzten Lauf eines Geräts (die Tests mit ihren
+Zeilen, die Ergebnisse, ob er fertig ist) für die IDE.
 Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
 Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
 Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
@@ -1582,7 +1651,7 @@ Moduls nennen seine Datei: `ScriptErr::file`, die Statuszeile („… in /home/u
 Zeile 7, Spalte 12: …“), `script errors`, die Zeile im Log und der Text der Notiz; eine fehlende
 Datei, ein Zyklus und ein Modul, das sich nicht übersetzen lässt, sind fangbare Fehler.
 
-**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt; noch ohne Oberfläche):
+**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt, siehe [IDE](#ide)):
 `Action::ScriptDebug { dev, svc, op }` mit `DebugOp::Pause` (anhalten an der nächsten
 Anweisung, im laufenden Rückruf oder im nächsten), `Continue`, `Step(Into | Over | Out)`,
 `Break { file, line, cond }` (`file` leer: der Quelltext des Dienstes, sonst der Pfad eines
@@ -1603,62 +1672,86 @@ im Modul in Fehler, Log und Status, ein angehaltenes Skript mit verspäteten Tim
 Schritt und ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Ablehnungen, Determinismus
 zweimal und mit einem Klon im Halt).
 
-### Skript-Editor
+### IDE
 
-Die Skripte eines Hosts bearbeitet der Reiter **Skripte** seines Gerätefensters (Kontextmenü
-eines Hosts › „Skripte …“; [`devwin/scripts.rs`](src/workspace/devwin/scripts.rs),
-[`doc/scripts.rs`](src/doc/scripts.rs)):
+Die Programme eines Hosts schreibt, startet, prüft und debuggt die **IDE**, ein Programm seines
+[Desktops](#desktop-der-hosts), das maximiert in seinem Fenster startet (Kontextmenü eines
+Hosts › „IDE …“ öffnet das Gerätefenster auf dem Desktop mit der IDE vorn, ebenso das Symbol
+und das Startmenü; [`src/workspace/ide/`](src/workspace/ide/mod.rs), im Fenster ein Aufruf von
+`ide::view` in `desktop::ide_window`). Eine `.jfs`-Datei, die der Dateimanager öffnet, kommt
+als Tab der IDE. Oben stehen die Menüs Datei,
+Bearbeiten, Ausführen, Debuggen und Ansicht (jede Zeile nennt ihre Tasten) und die
+Werkzeugleiste; links die Seitenleiste mit Explorer, Suchen und Gliederung, rechts der Editor
+mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger und Tests. Die Teiler behalten
+ihre Lage, Seitenleiste (Strg+B) und untere Leiste (Strg+J) lassen sich ausblenden und weichen,
+wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
 
-- **Liste:** die Skripte des Geräts in der Reihenfolge des Projekts mit Zustand (läuft, rechnet,
-  gestoppt, mit Fehler beendet, „übersetzt nicht“, wenn der Simulator die Definition aus der
-  Datei nicht nehmen konnte), CPU-Anteil der letzten Sekunden und Fehlern; „geändert“ markiert
-  nicht übernommene Änderungen. „Neu“ legt ein Skript aus einer Vorlage an (leer, UDP-Echo,
-  HTTP-Server, eine Abfrage, die regelmäßig eine URL abfragt und die Antwortzeit misst, ein
-  Schlüssel-Wert-Speicher auf der Disk; Kommentare und Texte in der Sprache des Fensters),
-  „Umbenennen“ und „Löschen“ ändern das Projekt. Jeder dieser Schritte ist ein
-  Rückgängig-Schritt, der das laufende Gerät behält: ein umbenanntes Skript läuft weiter (mit
-  Disk, Zahlen und Zeitreihen), ein gelöschtes nimmt mit, was es auf der Disk abgelegt hatte
-  (Rückgängig bringt das Skript zurück, seine Disk beginnt leer).
-- **Editor:** der Code-Editor der Library mit Hervorhebung für `.jfs`. Beim Tippen prüft er
-  höchstens alle 250 ms (Syntaxfehler, unbekannte Namen, `break` außerhalb einer Schleife …), und
-  die Fehler des laufenden Programms stehen mit Zeile und Spalte als Marken im Text – nur die
-  des aktuellen Laufs, ein Neustart räumt sie ab; ihre Zeilen folgen dem bearbeiteten Text, eine
-  geänderte Zeile verliert ihre Marke. F8 und Umschalt+F8 springen von Meldung zu Meldung, die
-  Statuszeile nennt die Stelle, die Zahl der Fehler und Warnungen und die Meldung an der
-  Schreibmarke. Jedes Skript hat einen Entwurf mit eigenem Rückgängig (Strg+Z im Editor), der
-  den Wechsel zu einem anderen Skript und das Schließen des Fensters übersteht, bis er
-  übernommen oder verworfen wird oder ein anderes Projekt kommt; ein unveränderter Entwurf
-  folgt dem Projekt.
-- **Sprachdienste (SK6):** der Editor kennt die Sprache ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs)
-  auf `script::ls` der Library). Beim Tippen eines Worts, nach einem Punkt und mit
-  Strg+Leertaste öffnet sich die Vervollständigung: die Namen im Gültigkeitsbereich, die Namen
-  des Simulators (`log`, `now`, `rand`, `config`, `timer`, `net`, `dns`, `http`, `disk`,
-  `metrics` mit ihren Funktionen) mit einer kurzen Beschreibung, die Standardbibliothek und die
-  Methoden von Texten, Listen, Maps und Bytes; Tab oder Eingabe setzt ein (ein
-  Rückgängig-Schritt). Der Zeiger auf einem Namen zeigt Art, Signatur und Doku-Kommentar (`///`
-  über einem `fn` oder `let`), in einem Aufruf zeigt die Signaturhilfe den Parameter an der
-  Schreibmarke. F12 oder Strg+Klick springen zur Deklaration in der Datei, F2 oder „Name
-  umbenennen“ benennt jede Stelle eines Namens auf einmal um (ein Flyout fragt nach dem neuen,
-  eine Ablehnung – Schlüsselwort, ungültiger oder schon vergebener Name, Syntaxfehler – steht
-  darin), Umschalt+Alt+F oder „Formatieren“ setzt das Skript neu (Einrückung, Leerzeichen, eine
-  Anweisung je Zeile; mit Syntaxfehlern abgelehnt) – beides ein Rückgängig-Schritt des
-  Entwurfs. Blöcke, mehrzeilige Kommentare und Listen lassen sich in der Leiste falten. Neben
-  dem Editor steht, wenn der Reiter breit genug ist, die Gliederung („Gliederung“ blendet sie
-  aus): die Funktionen (innere eingerückt) und die globalen Variablen, ein Klick setzt die
-  Schreibmarke auf den Namen. Die Spalte für Haltepunkte bleibt aus, bis es einen Debugger gibt.
-- **Übernehmen** (Strg+S im Editor): ein Quelltext, der sich übersetzen lässt, geht als ein
-  Rückgängig-Schritt ins Projekt (die `source` der Dienstdefinition, als Liste von Zeilen oder
-  als Text, wie sie war) und in das laufende Skript: es startet mit dem neuen Programm, Disk,
-  Zahlen, Fehler, Ausgabe und Zeitreihen bleiben, das Gerät startet nicht neu. Rückgängig und
-  Wiederholen tauschen das Programm genauso. Einen Quelltext mit Fehlern lehnt es mit dem
-  ersten ab. Strg+S speichert hier also nicht die Projektdatei.
-- **Ausführen, Stoppen, Neu starten** wirken nur im Simulator, wie `script start|stop|restart`
-  in der Shell; ob ein Skript mit dem Gerät startet, bleibt Sache des Projekts (Reiter Dienste).
-- **Unten:** die Ausgabe des aktuellen Laufs (`print`, folgt live) und seine Fehler mit Zeit,
-  Zeile und Spalte (ein Klick setzt die Schreibmarke dorthin); darüber die Kennzahlen: Zustand,
-  CPU, Warteschlange, Rückrufe, Fehler, Speicher und was das Skript offen hat.
+- **Explorer** ([`explorer.rs`](src/workspace/ide/explorer.rs)): die Dateien des Geräts als
+  Baum (Ordner zuerst; `/root` und die Ordner offener Dateien sind offen), `.jfs`-Dateien mit
+  Sprachdiensten, andere Textdateien öffnen sich ebenso; neben einer Datei stehen die Dienste,
+  die sie ausführen, ein „●“ markiert ungespeicherte Änderungen. Darüber die Skripte, deren
+  Quelltext noch in der Projektdatei steht („Eingebettete Skripte“). Doppelklick oder Eingabe
+  öffnet, „Neue Datei …“, „Neuer Ordner …“ (ein Flyout fragt nach dem Namen), Umbenennen (F2)
+  und Löschen (Entf) sind Rückgängig-Schritte des Projekts ([`doc/ide.rs`](src/doc/ide.rs)),
+  Datei › „Neues Skript: …“ legt eine `.jfs`-Datei aus einer Vorlage an. Ein Dienst behält den
+  Pfad, den er nennt: eine umbenannte oder gelöschte Datei fehlt ihm beim nächsten Start.
+- **In Datei umwandeln:** ein eingebettetes Skript wird zur Datei `/root/scripts/NAME.jfs`
+  (`NAME2.jfs` …, wenn es sie gibt) und seine Definition nennt `"file"` statt `"source"` – ein
+  Rückgängig-Schritt, der das Gerät laufen lässt: der Simulator bekommt erst die Datei, dann die
+  Definition, das Skript startet aus der Datei und behält Disk und Zahlen; Rückgängig bringt den
+  eingebetteten Quelltext zurück. Tab, Entwurf und Haltepunkte gehen mit.
+- **Tabs und Entwürfe** ([`editor.rs`](src/workspace/ide/editor.rs)): jede offene Datei hat
+  einen Entwurf mit eigenem Rückgängig, der den Wechsel der Tabs, das Schließen des Tabs und des
+  Fensters übersteht; ein unveränderter folgt dem Projekt (ein Rückgängig des Speicherns zeigt
+  den Text davor), ein Tab zeigt „●“ hinter dem Namen, solange er ungespeichert ist. Strg+S
+  speichert die Datei als einen Rückgängig-Schritt des Projekts (ein eingebettetes Skript: in
+  seine Definition, ein Quelltext mit Fehlern wird mit dem ersten abgelehnt), „Alle speichern“
+  (Strg+Umschalt+S) alle Dateien in einem Schritt; Strg+W schließt den Tab, Strg+Bild ab / auf
+  wechselt.
+- **Sprachdienste (SK6)** ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs) auf
+  `script::ls`): Prüfung beim Tippen (höchstens alle 250 ms), Vervollständigung mit den Namen
+  des Simulators und den Namen importierter Module (die IDE liest die Dateien des Geräts, auch
+  ungespeicherte Entwürfe), Hover, Signaturhilfe, Falten, F12 und Strg+Klick zur Deklaration –
+  bei `lib.greet` in die andere Datei, die sich dort öffnet –, F2 benennt in der Datei um,
+  Umschalt+Alt+F formatiert; die Gliederung der Seitenleiste zeigt die Funktionen und globalen
+  Variablen der offenen Datei. **Probleme** listet die Meldungen der offenen Dateien und die
+  Fehler des laufenden Dienstes, ein Klick geht hin; die Fehler des Laufs stehen als Marken im
+  Text, ihre Zeilen folgen dem bearbeiteten Text.
+- **Suchen** ([`search.rs`](src/workspace/ide/search.rs)): Strg+F sucht in der Datei (die
+  Suchleiste des Editors), Strg+Umschalt+F in allen `.jfs`-Dateien des Geräts (Groß- und
+  Kleinschreibung, ganze Wörter; was ein Entwurf zeigt, wo er ungespeichert ist), die Treffer
+  als Liste, ein Klick öffnet die Datei an der Stelle; „Alle ersetzen“ ändert jede Datei in
+  einem Rückgängig-Schritt und lehnt ab, solange eine Datei mit Treffern ungespeicherte
+  Änderungen hat.
+- **Ausführen** ([`debug.rs`](src/workspace/ide/debug.rs); zuvor speichert es alles):
+  „Als Prozess ausführen“ (Strg+F5) tippt `jfs DATEI` ins **Terminal** der IDE: eine eigene
+  Befehlszeilen-Sitzung neben der Konsole des Geräts (siehe
+  [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server); `pts/N`, geöffnet, wenn sie zum
+  ersten Mal gebraucht wird, nach dem Ausschalten des Geräts eine neue; sie endet mit dem
+  Fenster der IDE). „Als Dienst
+  ausführen“ (F5) startet den Skript-Dienst, der auf die Datei verweist, neu – gibt es keinen,
+  legt es einen als Rückgängig-Schritt an (`{"file": PFAD}`, nach der Datei benannt) –, bei einem
+  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt.
+  Stoppen (Umschalt+F5) und Neu starten (Strg+Umschalt+F5) wirken im Simulator wie
+  `script stop|restart`. Läuft der Dienst einer gespeicherten Datei noch mit der Fassung davor,
+  sagt die Statuszeile das mit einem Knopf „Neu starten“.
+- **Debugger:** ein Klick links neben eine Zeilennummer oder F9 setzt einen Haltepunkt,
+  Strg+Umschalt+F9 einen mit Bedingung (ein Flyout, die Bedingung ist ein Ausdruck in jfs).
+  Die Haltepunkte gehören je Datei zur IDE und gehen an den Dienst, den sie ausführt
+  (`DebugOp::Break`, auch in importierten Dateien). Hält er, öffnet sich die Datei an der Zeile
+  (der Ausführungspfeil in der Leiste) und der Bereich **Debugger** zeigt Ort und Grund, die
+  Aufrufliste (ein Klick wählt den Aufruf und geht zu seiner Zeile), die Variablen des Aufrufs
+  (lokal, erfasst, global; Listen und Maps klappen auf) und Ausdrücke, die im Aufruf gelesen
+  werden. F5 setzt fort, Strg+F9 hält an, F10 geht über, F7 hinein, Umschalt+F7 heraus (F11
+  bleibt dem Fenster). Angehalten wird in virtueller Zeit, die Simulation läuft weiter.
+- **Tests:** „Tests ausführen“ (Strg+Umschalt+T) tippt `jfs --test DATEI` ins Terminal; der
+  Bereich **Tests** zeigt den Lauf (`Engine::jfs_tests`): bestanden und gescheitert mit Datei,
+  Zeile, Spalte und Meldung, ein Klick geht zur Stelle des Fehlers.
 
-Der Simulator ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)) bietet dafür
+Solange die IDE die Tastatur hat, gelten ihre Tasten vor denen des Hauptfensters (F5, F7 und F9
+der Simulation und des Labors); die Übersicht der Tastenkürzel (F1) führt sie unter „IDE“.
+Was die IDE ändert, ist ein Schritt des Projekts mit Rückgängig; Haltepunkte, Tabs und Entwürfe
+gehören zur Sitzung. Der Simulator ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)) bietet dafür
 `Action::ScriptSource { dev, svc, config }`: das Skript bekommt eine neue Definition und bleibt
 derselbe Dienst (Nummer, Disk, Zahlen, Fehler, Ausgabe, Zeitreihen); eines, das laufen soll
 (läuft, nach einem Fehler beendet oder wartet auf Strom), startet sofort mit dem neuen Programm,
@@ -1669,7 +1762,8 @@ Dienst um, ohne ihn anzuhalten (seine Zeitreihen gehen mit). `ScriptService::run
 damit eine Anzeige nur Neues liest), `ScriptView::runs` zählt die Starts. Ersetzt
 `Action::Service` einen Dienst gleichen Namens, gibt der alte seine Bytes auf der Disk frei. Die
 Oberfläche schickt diese Actions über `Sim::keep` ([`src/doc/sim.rs`](src/doc/sim.rs),
-`keep_steps`), so laufen Bearbeiten, Rückgängig und Wiederholen ohne Neustart des Geräts.
+`keep_steps`; die Dateien eines Schritts vor seinen Diensten), so laufen Bearbeiten,
+Rückgängig und Wiederholen ohne Neustart des Geräts.
 
 ### Labore und Aufgaben
 
@@ -2699,12 +2793,10 @@ Administrative-User → 15, sonst 1, oder ein eigenes Vendor-Attribut `priv-lvl=
 als `password 0 ZIFFER` ein (eine führende Ziffer ist sonst eine Typnummer, wie beim
 Vorbild).
 
-Noch offen: der **vty-Telnet-Server** auf IOS-artigen Geräten (`line vty … transport input`,
-eine CLI-Sitzung je vty-Leitung, das Sitzungslimit und der Leerlauf-Timeout). Der NVT-Codec,
-der Client und der ganze Login-/AAA-Unterbau stehen; der Server braucht eine eigene
-CLI-Sitzung neben der einen Konsole je Gerät und folgt als Nächstes. Dadurch melden sich die
-Golden-Szenarien an den **Konsolen** an, nicht per Telnet an einer vty-Leitung. Ebenfalls
-offen: 802.1X und WPA-Enterprise (spätere Meilensteine).
+Der **vty-Telnet-Server** (eine Sitzung je vty-Leitung, `transport input`, die Anmeldung der
+Leitung über dieses Gate und AAA, Sitzungslimit, Leerlaufzeit) kam mit X1e, siehe
+[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server). Offen: 802.1X und WPA-Enterprise
+(spätere Meilensteine).
 
 Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
 `CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
@@ -3131,6 +3223,135 @@ Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(d
 `snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
 `snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
 
+### Desktop der Hosts
+
+Das Gerätefenster eines Hosts öffnet auf seinem **Desktop**
+([`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), Meilenstein V2): ein
+kleiner PC mit Programmen in eigenen Fenstern, Symbolen auf einem eigenen Hintergrund und einer
+Taskleiste. Die Fenster sind die der Library (`ui.desk_begin`, L7): Titelleiste, Verschieben,
+Größe an Rändern und Ecken, Maximieren (auch Doppelklick auf die Titelleiste), Minimieren,
+Einrasten an den Rändern und Hälften, Alt+F6 / Alt+Umschalt+F6 zum nächsten / vorigen Fenster,
+Alt+F10, Alt+F9 und Alt+Minus für das Menü des Fensters; für Screenreader ist jedes Fenster ein
+Dialog mit seinem Titel.
+
+- **Symbole und Start:** die Programme als Symbole in Spalten von links oben; ein Klick wählt
+  eines, ein Doppelklick oder Eingabe öffnet es. Die Symbole sind ein Tab-Halt (die Pfeiltasten
+  wählen innen) und für Screenreader eine Liste „Desktop“. „Start“ öffnet die Programme als Menü
+  in Gruppen: Netzwerk (IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser), System (Terminal,
+  Dateimanager, Systemmonitor, Einstellungen), Entwicklung (Texteditor, IDE).
+- **Taskleiste:** Start, eine Schaltfläche je offenem Fenster (ein Klick holt es nach vorn, ein
+  zweiter minimiert es, ein Rechtsklick öffnet sein Menü), Vollbild und die Uhr des Geräts in der
+  Simulation.
+- **Vollbild:** F11 schaltet das aktive Gerätefenster in den Vollbildmodus und zurück (ohne
+  aktives Gerätefenster das Hauptfenster), ebenso Vollbild in der Taskleiste; jeder Reiter lässt
+  sich so zeigen. Ein neues Fenster öffnet rechts der Symbole so groß, wie Platz ist; E-Mail,
+  MIB-Browser und IDE starten maximiert.
+- **Terminal:** die Konsole des Geräts – derselbe `TermState` wie im Reiter CLI und im
+  Terminal-Bereich, der dorthin verweist, solange das Fenster sie zeigt. „Weiteres Terminal“ im
+  Startmenü öffnet ein weiteres Terminal-Fenster mit einer eigenen Befehlszeilen-Sitzung
+  (siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server): `pts/N` auf Linux-Hosts,
+  `tty N` IOS-artig), betitelt „Terminal (2)“; Schließen des Fensters beendet die Sitzung, nach
+  dem Ausschalten des Geräts sagt das Fenster, dass sie endete.
+- **Dateimanager** ([`filemgr.rs`](src/workspace/devwin/filemgr.rs)): die Ordner als Baum, die
+  Einträge des Ordners mit Größe, Art und Zeit; Neuer Ordner, Umbenennen, Löschen, Kopieren,
+  Ausschneiden, Einfügen (ein vergebener Name bekommt „(Kopie)“), Öffnen (ein Ordner, eine Datei
+  in ihrem Programm, `.jfs`-Skripte in der IDE, alles andere im Texteditor), Eigenschaften,
+  Importieren … und Exportieren … über die Dateidialoge des Reiters Dateien – so kommt ein
+  `.jfs`-Skript herein und hinaus. In der Liste: Entf, F2, Strg+C / X / V, Eingabe. Jede
+  Änderung ist ein Rückgängig-Schritt des Projekts, dem der Simulator sofort folgt.
+- **Texteditor** ([`editor.rs`](src/workspace/devwin/editor.rs)): ohne Wahl die Notizen des
+  Geräts als `notizen.txt` – wie bisher im Projekt gespeichert, ältere Projekte bleiben, wie sie
+  waren; Öffnen … und Speichern unter … wählen Dateien des Geräts über eine kleine Auswahl, in
+  der die Notizen ein eigener Eintrag sind. Jede Speicherung ist ein Rückgängig-Schritt, den die
+  Shell sofort sieht (`cat`).
+- **Systemmonitor** ([`sysmon.rs`](src/workspace/devwin/sysmon.rs)): die Prozesse, wie `ps` sie
+  zeigt (PID, Benutzer, TTY, CPU-Zeit, Befehl; `Engine::processes` in
+  [`procs.rs`](crates/jfn_sim/procs.rs)) – „Beenden“ tippt `kill PID` ins Terminal, nur bei
+  Hintergrund-Jobs der Konsole (Jobs eines weiteren Terminals beendet dessen eigenes `kill`); die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
+  letzten Minute (`Engine::cpu_secs`, die vier CPUs von `top`) und der Speicher der Skripte (die
+  Zeitreihe `heap_kb`) als kleine Diagramme.
+- **IP-Konfiguration** und **Webbrowser** ([`progs.rs`](src/workspace/devwin/progs.rs)),
+  **E-Mail** ([`email.rs`](src/workspace/devwin/email.rs)), **MIB-Browser**
+  ([`mib.rs`](src/workspace/devwin/mib.rs)) wie zuvor, jetzt in Fenstern; der MIB-Browser zeigt
+  die Konsole unter dem Baum, solange das Terminal-Fenster nicht über ihm liegt.
+- **Einstellungen:** der Hintergrund (Schiefer, Salbei, Sand, Nachtblau, Punktraster, Netz; im
+  Hochkontrast die Fläche des Fensters ohne Muster), die Größe der Symbole und die Form der Uhr.
+  Sie sind Einstellungen des Benutzers für alle Desktops (`config://settings.ini`, auch unter
+  Werkzeuge › Einstellungen › Desktop), keine Konfiguration der simulierten Geräte.
+- **IDE:** startet maximiert, siehe [IDE](#ide); ihr Terminal ist eine eigene Sitzung, die mit
+  dem Fenster endet. Das Gerätefenster hat keinen eigenen Reiter für Skripte mehr.
+- **Wo der Zustand liegt:** Fenster, offene Programme und was sie zeigen gehören zur Sitzung,
+  nicht ins Projekt und nicht ins Rückgängig: je Gerät, solange die App läuft. Ein geschlossenes
+  und wieder geöffnetes Gerätefenster zeigt den Desktop wie zuvor; ein neues oder geladenes
+  Projekt beginnt ohne.
+
+Geprüft wird der Desktop in der Selbsttest-Gruppe `desk`
+([`src/desktoptest.rs`](src/desktoptest.rs)) und mit den Fensterskripten `desk_programs.uis`,
+`desk_files.uis`, `desk_monitor.uis`, `desk_rtl.uis` und `desk_shots.uis`; die Skripte von
+E-Mail und MIB-Browser öffnen ihre Programme dort.
+### Sitzungen und Telnet-Server
+
+Ein Gerät hat jetzt mehrere Befehlszeilen: die Konsole (Sitzung 0, immer da), weitere Terminals
+der Oberfläche und Telnet-Sitzungen über das Netz. Jede Sitzung hat ihren eigenen Zustand: Modus
+und Kontext (Interfaces, VLANs, Leitungsblock, Pool, Zugriffsliste, RADIUS-Gruppe und -Server),
+den laufenden Befehl mit vorab Getipptem, eine offene Frage, Rechtestufe, Login-Gate und Benutzer,
+den Dialog von `copy` und die Shell mit Verzeichnis, Variablen, Verlauf und Hintergrund-Jobs.
+Pro Gerät bleiben die Konfiguration, die `debug`-Schalter und die Zustände, die die Meldungen
+vergleichen; Meldungen (`%LINK`, `%SYS`, Debug-Ausgabe) gehen immer an die Konsole und an jede
+Sitzung mit `terminal monitor`.
+
+- **Lokale Sitzungen** ([`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs)):
+  `Engine::cli_open(dev)` öffnet eine (Linux `pts/N`, IOS-artig `tty N`, die sich anmeldet, wie
+  `line con 0` es verlangt), `cli_close(dev, s)` beendet sie, `cli_sessions(dev)` listet alle.
+  Zeilen, `?`, Tab, Strg+C, Prompt, Verzeichnis und Blättern gibt es je Sitzung
+  (`cli_ses_line`, `cli_ses_help`, `cli_ses_complete`, `cli_ses_interrupt`, `cli_ses_prompt`,
+  `cli_ses_busy`, `cli_ses_secret`, `cli_ses_reads`, `cli_ses_cwd`, `cli_ses_pager`); die API
+  ohne `ses` ist die der Konsole wie bisher. Eingaben sind Befehle des Treibers (`Cmd::SesOpen`,
+  `SesClose`, `SesLine`, `SesInterrupt`), die das Zurückspulen wiederholt; Ausgaben kommen als
+  `Report::SesOut`, `SesPrompt` und `SesClosed`. `exit` beendet eine weitere Sitzung (die
+  Konsole bleibt), Ausschalten beendet alle bis auf die Konsole, die frisch beginnt.
+- **Terminal-Panel:** „Neue Sitzung“ (das Plus in der Leiste des gezeigten Tabs) öffnet eine
+  weitere Sitzung seines Geräts als eigenen Tab „PC1 (2)“; Schließen des Tabs beendet sie. Der
+  CLI-Reiter des Gerätefensters bleibt die Konsole. Für Desktop und IDE gibt es
+  `console::open_session(n, dev)`, `view_session(n, ui, dev, s)` und `close_session(n, dev, s)`.
+  Läuft in einer Konsole ein Programm, das Zeilen liest (`telnet`, `nc`), bleibt die
+  Eingabezeile ohne eigenen Prompt; fragt die Gegenseite nach einem Passwort, wird es verdeckt
+  getippt.
+- **vty-Leitungen** ([`crates/jfn_sim/telnetd.rs`](crates/jfn_sim/telnetd.rs)): jeder Block
+  `line vty A B` gibt die Leitungen A bis B (Vorgabe `vty 0 4`: fünf); eine Verbindung auf TCP 23
+  nimmt die niedrigste freie Leitung, deren `transport input` Telnet erlaubt (Vorgabe `all`,
+  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen ab) und deren
+  `access-class LISTE in` die Quelle zulässt; sonst eine kurze Absage und Schluss. Angemeldet
+  wird wie an der Konsole: `password` mit `login`, `login local`, `login authentication LISTE`
+  über AAA und RADIUS, ohne `login` gar nicht; drei Fehlversuche schließen die Verbindung.
+  `exec-timeout M [S]` beendet eine Sitzung nach so langer Ruhe (Vorgabe 10 Minuten, `0 0` nie;
+  nicht, solange ein Befehl läuft). Der Server lauscht nur, solange eine Leitung jemanden
+  anmelden kann; die Vorgabe `line vty 0 4 / login` ohne Passwort lehnt Telnet sofort ab (IOS
+  sagte vorher „Password required, but none set“). `show users` (jede Leitung mit Benutzer,
+  Rechten, Leerlauf und Herkunft, die eigene mit `*`), `show line`, `clear line N | vty N |
+  console 0 | tty N`, `terminal [no] monitor`; `%SYS-5-CONFIG_I` nennt die Sitzung, von der die
+  Konfiguration kam. Der Server bietet `WILL SUPPRESS-GO-AHEAD` an und `WILL ECHO` nur, während
+  er ein Passwort erfragt (der Client hört dann mit dem Echo auf), wie Login-Programme es mit
+  einem zeilenweisen Client tun; Prompts und Ausgaben laufen als NVT-Text, `Interrupt Process`
+  bricht den laufenden Befehl ab.
+- **telnetd auf Linux-Hosts** (Dienst `telnetd`, `{"port": 23, "password": "…"}`): Anmeldung als
+  `root` mit dem Passwort des Dienstes, dann eine eigene Shell auf `pts/N`. `who`, `w` und `tty`
+  zeigen die Sitzungen; `ps` hat die Spalte `TTY` (`tty1` die Konsole, `pts/N`, `?` für init und
+  Dienste) und listet die Shells und Jobs jeder Sitzung.
+
+Entscheidungen: Eine weitere Sitzung eines IOS-artigen Geräts aus der Oberfläche ist eine
+Leitung `tty N` mit den Anmelderegeln von `line con 0` (wie ein zweites Terminal am
+Konsolenanschluss); die Nummern der Sitzungen werden nicht wieder vergeben. Weitere Sitzungen
+sprechen immer mit der Gegenwart (beim Zurückspulen antwortet nur die Konsole aus der
+Vergangenheit). Nicht nachgebildet: SSH, `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
+von Telnet (unser Client schickt ganze Zeilen).
+
+Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `SesKind`), die
+`cli_ses_*`-Formen und `cli_reads`, `Inline::open_session`, `TelnetServer`. Geprüft wird in der
+Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu das Szenario
+`sessions.scn` und die Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und
+`sessions_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -3200,7 +3421,7 @@ Geste).
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
-| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
+| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

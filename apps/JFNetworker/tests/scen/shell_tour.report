@@ -75,13 +75,13 @@
    9.000000000  PC1     [2]+  Running                 sleep 30 &
    9.000000000  ok      expect PC1 output contains "[2]+  Running                 sleep 30 &"
    9.000000000  PC1     root@PC1:~/projekt# ps
-   9.000000000  PC1       PID USER     TIME COMMAND
-   9.000000000  PC1         1 root     0:00 init
-   9.000000000  PC1       100 root     0:00 -sh
-   9.000000000  PC1       103 root     0:00 jfs src/zaehler.jfs 2
-   9.000000000  PC1       104 root     0:00 sleep 30
-   9.000000000  PC1       105 root     0:00 ps
-   9.000000000  ok      expect PC1 output contains "    1 root     0:00 init"
+   9.000000000  PC1       PID USER     TTY      TIME COMMAND
+   9.000000000  PC1         1 root     ?        0:00 init
+   9.000000000  PC1       100 root     tty1     0:00 -sh
+   9.000000000  PC1       103 root     tty1     0:00 jfs src/zaehler.jfs 2
+   9.000000000  PC1       104 root     tty1     0:00 sleep 30
+   9.000000000  PC1       105 root     tty1     0:00 ps
+   9.000000000  ok      expect PC1 output contains "    1 root     ?        0:00 init"
    9.000000000  --      run 1s
    9.000000000  PC1     Runde 1 von 2
    9.000000000  PC1     Runde 2 von 2
