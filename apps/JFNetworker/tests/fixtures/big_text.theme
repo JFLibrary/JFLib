@@ -1,0 +1,6 @@
+# a theme with larger body text: the boxes of labels follow the font (labels.uis)
+[theme]
+name = Grosse Schrift
+[text]
+body.size = 20
+body.line = 26

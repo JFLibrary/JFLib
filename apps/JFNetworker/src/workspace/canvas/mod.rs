@@ -27,12 +27,15 @@
 // Gruppieren / Gruppierung aufheben / zuklappen / aufklappen; a drag of a frame or cluster
 // moves everything below it, Delete on a group ungroups it (its members stay), F2 renames it.
 // backdrop.rs (G1): the background picture under the grid, its drag and handle while unlocked.
+// labels.rs (H3): slim texts; a double click on free canvas opens their input there, a double
+// click on one (or Enter, F2) edits it in place.
 
 pub(crate) mod backdrop;
 pub(crate) mod cables;
 pub(crate) mod connect;
 pub(crate) mod groups;
 pub(crate) mod lab;
+pub(crate) mod labels;
 pub(crate) mod paint;
 pub(crate) mod tools;
 pub(crate) mod wlan;
@@ -102,6 +105,9 @@ pub(crate) struct Canvas {
     /// drag or resize
     pub bd: backdrop::Backdrop,
     pub bg_drag: Option<[i64; 5]>,
+    /// the input of a label (labels.rs); the font its boxes were measured with
+    pub label: Option<labels::Input>,
+    pub label_font: Option<(u32, i32)>,
 }
 
 impl Canvas {
@@ -124,6 +130,8 @@ impl Canvas {
             grp: groups::Grp::default(),
             bd: backdrop::Backdrop::default(),
             bg_drag: None,
+            label: None,
+            label_font: None,
         }
     }
 
@@ -141,6 +149,8 @@ impl Canvas {
         self.lab = lab::Lab::default();
         self.grp = groups::Grp::default();
         self.bg_drag = None;
+        self.label = None;
+        self.label_font = None;
         let l = &p.layout;
         self.view = Some(if l.zoom_pm > 0 { View::At(l.zoom_pm as f32 / 1000.0, l.cx as f64, l.cy as f64) } else { View::Fit });
     }
@@ -176,6 +186,13 @@ impl Canvas {
     /// open the flyout for a device's name, a note's text or a group's name
     pub(crate) fn open_rename(&mut self, p: &Project, id: u32) {
         let (note, group, text) = match edits::item(p, id) {
+            Some(edits::Item::Note(_)) if edits::is_label(p, id) => {
+                // a label is edited in place (labels.rs)
+                self.label = p.note(id).map(labels::Input::edit);
+                self.st.sel.remove(&(id as u64));
+                self.rename = None;
+                return;
+            }
             Some(edits::Item::Device(_)) => (false, false, p.device(id).map(|d| d.name.clone()).unwrap_or_default()),
             Some(edits::Item::Note(_)) => (true, false, p.note(id).map(|n| n.text.clone()).unwrap_or_default()),
             Some(edits::Item::Link(_)) => return,
@@ -196,10 +213,12 @@ fn round(v: f64) -> i32 {
 
 /// the canvas in the dock's centre
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
-    // the scene follows the project
-    if n.canvas.scene.rev != n.doc.rev || n.canvas.scene.ver == 0 {
+    // the scene follows the project (and the boxes of its labels the font)
+    let refit = labels::refit(n, ui);
+    if refit || n.canvas.scene.rev != n.doc.rev || n.canvas.scene.ver == 0 {
         n.canvas.scene.build(&n.doc.proj, &n.syms, n.doc.rev);
     }
+    n.canvas.scene.editing = n.canvas.label.as_ref().and_then(|l| l.id);
     n.canvas.scene.grid = n.prefs.grid;
     let g = n.doc.proj.layout.grid;
     // the project's grid step, else the one of the settings
@@ -227,7 +246,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     groups::update(n);
     backdrop::update(n);
     let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7) ^ n.canvas.lab.key().rotate_left(13) ^ wlan::key(n).rotate_left(19);
-    let ver = ver ^ n.canvas.grp.key().rotate_left(23) ^ n.canvas.bd.key().rotate_left(29);
+    let ver = ver ^ n.canvas.grp.key().rotate_left(23) ^ n.canvas.bd.key().rotate_left(29) ^ n.canvas.scene.editing.unwrap_or(0).rotate_left(3);
     let tool = n.canvas.tool.dg();
     let dragging = n.palette.dragging;
     ui.next_size(-1, -1);
@@ -304,6 +323,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         tools::place(n, ui, model, at);
         ui.repass();
     }
+    labels::frame(n, ui);
     rename_flyout(n, ui);
     connect::popover(n, ui);
 }
@@ -386,6 +406,8 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
                 _ => {}
             }
         }
+        // a double click on free canvas: a label there (labels.rs)
+        DEv::DoubleClick { at } => labels::open_at(n, ui, at),
         // a group (G1): a cluster expands, a frame's title renames it; its button collapses it
         DEv::Activate(DHit::Node(k)) if groups::is_group(n, k) => groups::activate(n, ui, k as u32),
         DEv::Toggle(k) if groups::is_group(n, k) => groups::toggle(n, ui, k as u32),

@@ -1750,3 +1750,10 @@ HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or
 Secure geht nur über https	Secure works only over https
 SameSite=None braucht Secure	SameSite=None needs Secure
 Zertifikat abgelehnt	Certificate refused
+# ---- H3: labels on the canvas (canvas/labels.rs, the command table)
+Beschriftung einfügen	Insert label
+Beschriftung	Label
+Beschriftung: {}	Label: {}
+Text der Beschriftung	Text of the label
+Doppelklick auf freie Fläche	Double click on free space
+Beschriftung dort schreiben (Eingabe übernimmt, Umschalt+Eingabe: neue Zeile, Esc verwirft)	Write a label there (Enter takes it, Shift+Enter: new line, Esc discards)

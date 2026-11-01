@@ -197,6 +197,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   sich unter dem zweiten Gerät, Eingabe verbindet das beste Paar. Umschalt verbindet sofort.
 - **Konsole:** Doppelklick oder Eingabe auf einem Gerät öffnet seine Konsole im Terminal-Bereich
   (Strg+3), mit Umschalt das Gerätefenster.
+- **Beschriftung:** Doppelklick auf eine freie Stelle der Zeichenfläche (oder T: in der Mitte der
+  Ansicht) öffnet dort ein schmales Eingabefeld. Eingabe oder ein Klick daneben übernimmt den Text
+  (ein Schritt zum Rückgängigmachen), Umschalt+Eingabe beginnt eine neue Zeile, Esc verwirft; leer
+  wird nichts gespeichert. Die Beschriftung ist nur Text, ohne Karte, in der Textfarbe des Themes;
+  ein Rahmen zeigt sich beim Überfahren und wenn sie gewählt ist. Doppelklick oder F2 ändern sie an
+  Ort und Stelle, sie verschiebt, löscht und speichert sich wie eine Notiz. Das Werkzeug N legt
+  weiter die große Notiz an.
 - **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
   vor, Umschalt+F7 zurück; das Werkzeug P sendet eine einfache PDU (Quelle, dann Ziel – auch mit
   Tab und Eingabe). In der Vergangenheit zeigen die Geräte ihren Zustand von damals, „Von hier
@@ -257,6 +264,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `scen_*.uis` | die Golden-Szenarien (siehe [Szenarien](#szenarien-scn)), byte-gleich auf Windows und Linux |
 | `shell.uis` | Bereiche, Menüs, Ansicht, Info |
 | `catalog.uis`, `place.uis`, `edit.uis`, `links.uis`, `undo.uis` | Palette und Suche, Platzieren, Verschieben, Rahmenauswahl, Löschen, Umbenennen, Notizen, Kabel beim Löschen und Wiederherstellen, Rückgängig auf allen Wegen |
+| `labels.uis` | Beschriftungen (siehe [Bedienung](#bedienung)): Doppelklick und Text, Eingabe als ein Schritt, Esc lässt nichts zurück, ein Klick daneben übernimmt, leer wird nichts gespeichert, Umschalt+Eingabe, Ändern an Ort und Stelle mit Doppelklick und F2, Eigenschaften, Verschieben, Löschen, Rückgängig und Wiederholen, Speichern und Laden, T in der Mitte der Ansicht, eine Notiz daneben bleibt, eine Rahmenauswahl und andere Werkzeuge beginnen keine, kleine Beschriftungen bleiben bei niedrigem Zoom wählbar |
+| `labels_rtl.uis` | Beschriftungen im gespiegelten Fenster: das Feld unter dem Zeiger, die Beschriftung, wo geklickt wurde, ein Klick daneben übernimmt |
+| `label_shots.uis` | die Bilder der Beschriftungen (neben Geräten, Kabel und Notiz; gewählt und überfahren; das Eingabefeld) hell, dunkel und im Hochkontrast mit 100 und 150 %, gezoomt |
+| `model.uis`, Gruppe `labels` | das Modell der Beschriftungen: der Stil im Datei-Hin-und-Zurück, alte Dateien und unbekannte Werte bleiben Notizen, Anlegen samt Text als ein Schritt, Text und Größe gemeinsam, Rückgängig von Verschieben und Löschen, die Szene (Größe, Trefferfläche, Namen) |
 | `file.uis`, `file_reopen.uis` | Speichern unter `build/jfn_test.jfnet`, die Rückfrage, Öffnen, zuletzt geöffnete Dateien (`file_reopen.uis` läuft nach `file.uis`) |
 | `connect.uis`, `cable_types.uis`, `waypoints.uis`, `inspector.uis`, `engine.uis` | Verbinden und Port-Auswahl, jede Kabelart, Wegpunkte, die Eigenschaften, LEDs und Befunde des Simulators |
 | `terminal_ios.uis`, `terminal_linux.uis`, `device_window.uis`, `log.uis` | die Konsolen, Gerätefenster mit Formularen und Desktop, das Protokoll |

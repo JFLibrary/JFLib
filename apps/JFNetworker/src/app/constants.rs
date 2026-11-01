@@ -646,3 +646,8 @@ pub(crate) const TIMER_PAGE: u32 = 0x1C8;
 // timers 0x1CC .. 0x1CF; the commands and timers are not used)
 /// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
 pub(crate) const ID_DEV0: u32 = 0x0001_E800;
+// ---- H3: labels on the canvas (commands 990 .. 999, widgets 0x0001_F400 .. 0x0001_F4FF; no timers)
+/// Beschriftung einfügen: the input at the middle of the view (T)
+pub(crate) const CMD_LABEL: u32 = 990;
+/// the input of a label on the canvas (canvas/labels.rs)
+pub(crate) const ID_LABEL_BOX: u32 = 0x0001_F400;
