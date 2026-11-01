@@ -1514,7 +1514,11 @@ if (desc.render)(&args, &mut dst) == 0 {
   theme, §34), `--accent RRGGBB`, `--anim off`,
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
-  `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
+  `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=1`
+  (Windows: the windows show their frames through a swapchain, `=0`: nothing of the GPU anywhere;
+  GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
+  `jfgui_GPU_TRACE=1` prints its stages), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
+  taking the keyboard and without DWM's fade-in),
   `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_RENDER_PAR=0`
   (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
   (every render both ways, a `UIWARN` when a byte differs: run the scripts with it after a
@@ -1568,6 +1572,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
+| `gpu on\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer, a render after every input edge. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `same`: every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
@@ -1642,6 +1647,10 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
+* **Presenting through the GPU** (Windows, `jfgui_GPU=1`, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
+  UI"): the first frames, every frame of a resize and every window after a failure go the way below;
+  otherwise the rectangles go into a texture and a swapchain on a child window shows it, without
+  ever waiting for the display. Popups outside the window stay below's way.
 * **Presenting** (`plat::win_present(w, frame, rects)`, `bench` leaves it out): the frame's
   dirty rectangles are copied once toward the screen, straight from the framebuffer. Windows:
   into the window's kept copy, a DIB section, then BitBlt (batched, `GdiFlush`); WM_PAINT

@@ -1,0 +1,2 @@
+#!args --test resize
+# a resize and the modal size loop: CPU frames, the swapchain when the size has settled

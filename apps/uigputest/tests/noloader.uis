@@ -1,0 +1,2 @@
+#!args --test noloader
+# a failed start (no Vulkan loader): the CPU path for good, without a message

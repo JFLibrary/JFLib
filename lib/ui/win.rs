@@ -1319,27 +1319,31 @@ impl Ui {
     }
 
     /// uiw_present(n): the live window's framebuffer changed in n dirty rectangles (drects;
-    /// -1 = everything): hand it to the platform
+    /// -1 = everything): show it through the GPU (gpu_out.rs) or hand it to the platform
     pub(crate) fn uiw_present(&mut self, n: i32) {
-        if self.headless {
-            return;
-        }
         let cur = self.uiw_cur;
-        if cur == 0 {
-            let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
-            plat::present(&Ui::frame_of(&self.wp.rt.fb), rects);
+        let pw = if self.headless {
+            // a script's `gpu on`: real windows, else nothing to show
+            if !self.gp_scripted() {
+                return;
+            }
+            self.gp_script_pw(cur)
+        } else if cur == 0 {
+            0
+        } else if !self.m.win.hooks {
             return;
-        }
-        if !self.m.win.hooks {
-            return;
-        }
-        // uwp_present(index, &fb, rects, n)
-        let pw = self.uiw_pw(cur);
+        } else {
+            self.uiw_pw(cur) // uwp_present(index, &fb, rects, n)
+        };
         if pw < 0 {
+            return;
+        }
+        if self.gp_present(cur, pw, n) {
             return;
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
         plat::win_present(pw, &Ui::frame_of(&self.wp.rt.fb), rects);
+        self.gp_cpu_done(cur, pw);
     }
 
     /// (the platform's hit hook) publish the hit list of the live window's last pass for
@@ -2277,6 +2281,7 @@ impl Ui {
         if pw < 0 {
             return;
         }
+        self.gp_window_gone(i); // its swapchain before its window
         let pw = pw as usize & (WIN_MAX - 1);
         self.m.win.p2u[pw] = 0xFF;
         self.m.win.u2p[i as usize] = 0xFF;

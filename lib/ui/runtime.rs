@@ -689,8 +689,8 @@ impl Ui {
         }
         if render && self.need_render {
             self.need_render = false;
-            // headless: render only to verify
-            if !self.headless || self.verify_dirty {
+            // headless: render only to verify, or for a script's `gpu on`
+            if !self.headless || self.verify_dirty || self.gp_scripted() {
                 self.render();
                 self.present();
             }
@@ -1203,6 +1203,13 @@ pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 
     0
 }
 
+/// the real window and its loop whatever the command line says (test programs: `build_rs.py test`
+/// passes --script to them)
+pub fn run_window(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 {
+    let (mut ui, w, h) = prepare(desc, style);
+    window_main(&mut ui, app, w, h)
+}
+
 /// the interactive window loop (ui_main.s .am_window): the platform's window-indexed API
 /// (plat::window_create, wait_refresh, win_present, the hit hook) on every OS; the live
 /// redraw inside the Win32 modal size / move loop goes through plat::wait_refresh (the
@@ -1263,6 +1270,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
     if let Some(ini) = &saved {
         ui.ws_windows(ini);
     }
+    ui.gp_window_mode(); // the output through the GPU: its work starts after the first frame (gpu_out.rs)
     // hot reload: the session's log replayed before the first wait (hotreload.rs); diverged:
     // the watcher starts the app again afresh
     if !ui.hr_start(app) {
@@ -1312,6 +1320,9 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         if ui.tasks_ready() {
             deadline = 0;
         }
+        if let Some(t) = ui.gp_deadline() {
+            deadline = deadline.min(t.max(1)); // the GPU output's jobs and frames still to show
+        }
         // the live redraw inside the Win32 modal size / move loop (ui_refresh)
         plat::wait_refresh(deadline, &mut || ui.refresh(app));
         ui.clock_update();
@@ -1326,6 +1337,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         }
         ui.tick_timers();
         ui.process_events(app);
+        ui.gp_tick();
     }
     // the placement for the next run (winstate.rs), then every way out of the window loop
     // (close, quit, --auto-close) tells the app (U3)
@@ -1339,6 +1351,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
     ui.hr_end(); // hot reload: the log's end, the carried state (hotreload.rs)
     ui.call_cmd(app, UIC_EXIT, 0);
     ui.set_agent_enabled(false);
+    ui.gp_shutdown();
     super::perm::ask_here(false); // threads still waiting for an answer are refused
     plat::log_info("app", "exit");
     0

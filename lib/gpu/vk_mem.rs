@@ -7,10 +7,12 @@
 //   a.destroy_all(f, dev)                      every block (device teardown)
 //
 // One pool per (memory type, linear / optimal): buffers and optimally tiled images never share
-// a block, so bufferImageGranularity does not matter.  A block is 64 MiB of device memory or
-// 16 MiB of host memory (at most an eighth of its heap); a request above half a block gets a
-// block of its own.  Each block keeps a free list sorted by offset (first fit, neighbours merged
-// on free); one empty block per pool is kept for reuse, further empty ones are released.
+// a block, so bufferImageGranularity does not matter.  The blocks of a pool grow: 4 MiB of device
+// memory or 1 MiB of host memory first, each new block twice the last, up to 64 MiB / 16 MiB (at
+// most an eighth of the heap): a program with one small window reserves a few MiB, not 80.  A
+// request above an eighth of the largest block gets a block of its own.  Each block keeps a free
+// list sorted by offset (first fit, neighbours merged on free); one empty block per pool is kept
+// for reuse, further empty ones are released.
 // Host-visible blocks are mapped once for their lifetime (Alloc::ptr).
 //
 // Memory kinds: Device = DEVICE_LOCAL (preferably not host-visible: the BAR window stays
@@ -48,6 +50,7 @@ struct Pool {
     type_index: u32,
     linear: bool,
     block_size: u64,
+    next_block: u64,
     blocks: Vec<Option<Block>>,
 }
 
@@ -121,9 +124,10 @@ impl Allocator {
         }
         let t = self.props.memory_types[type_index as usize];
         let heap = self.props.memory_heaps[t.heap_index as usize].size;
-        let base = if t.property_flags & vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT != 0 { 16 * MIB } else { 64 * MIB };
+        let host = t.property_flags & vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT != 0;
+        let (first, base) = if host { (MIB, 16 * MIB) } else { (4 * MIB, 64 * MIB) };
         let block_size = base.min((heap / 8) & !(MIB - 1)).max(MIB);
-        self.pools.push(Pool { type_index, linear, block_size, blocks: Vec::new() });
+        self.pools.push(Pool { type_index, linear, block_size, next_block: first.min(block_size), blocks: Vec::new() });
         self.pools.len() - 1
     }
 
@@ -141,7 +145,9 @@ impl Allocator {
         let align = req.alignment.max(16);
         let size = align_up(req.size.max(1), 16);
         let bs = self.pools[pi].block_size;
-        if size <= bs / 2 {
+        // a block of its own above an eighth of the largest block: large textures and buffers
+        // go back to the driver as soon as they are freed
+        if size <= bs / 8 {
             let pool = &mut self.pools[pi];
             for (bi, b) in pool.blocks.iter_mut().enumerate() {
                 let Some(b) = b else { continue };
@@ -156,8 +162,16 @@ impl Allocator {
             }
         }
         // a new block (shared, or a dedicated one of exactly this size)
-        let dedicated = size > bs / 2;
-        let bsize = if dedicated { size } else { bs };
+        let dedicated = size > bs / 8;
+        let bsize = if dedicated {
+            size
+        } else {
+            // the pool's next size, large enough for this request with its alignment
+            let pool = &mut self.pools[pi];
+            let b = pool.next_block;
+            pool.next_block = (b * 2).min(bs);
+            b.max(size + align).min(bs)
+        };
         let mem = self.raw_alloc(f, dev, bsize, ti)?;
         let mut ptr = 0usize;
         if host {

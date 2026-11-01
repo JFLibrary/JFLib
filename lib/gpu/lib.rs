@@ -8,6 +8,7 @@
 //   instance.adapters() -> Result<Vec<Adapter>>   every GPU, discrete ones first
 //   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
 //                    index into adapters() or a part of the name)
+//   instance.adapters_low_power(display)          the GPUs for showing windows, frugal ones first
 //   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
 //   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
 //   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
@@ -34,10 +35,13 @@
 //   device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
 //                    passes, draws, indirect draws, timestamps; finish() -> CommandBuffer
 //   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
-//   queue.write_buffer / write_texture (staged, before the next submit), read_buffer (waits)
+//   queue.write_buffer / write_texture / write_texture_rects (staged in a ring, before the next
+//                    submit), read_buffer (waits)
 //   Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
+//   Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
 //   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
-//                    view(&frame), texture(&frame), present(frame, [cmd, ..]), resize()
+//                    view(&frame), texture(&frame), present(frame, [cmd, ..]), resize(),
+//                    try_acquire() (never waits or rebuilds), rebuild()
 //
 // Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
 // with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
@@ -83,10 +87,10 @@ mod vk_swap;
 
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
 pub use vk_dev::{Device, Queue};
-pub use vk_inst::{Adapter, Instance, validation_messages};
+pub use vk_inst::{Adapter, Instance, low_power_rank, validation_messages};
 pub use vk_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
                  ShaderModule, Texture, TextureView, Timestamps};
-pub use vk_swap::{Frame, Surface, Swapchain};
+pub use vk_swap::{Frame, Surface, Swapchain, TryAcquire};
 
 pub type Result<T> = core::result::Result<T, GpuError>;
 
@@ -1001,9 +1005,11 @@ pub struct SwapchainDesc {
     pub copy_src: bool,
     /// frames the CPU may record ahead of the GPU (1 ..= 3)
     pub frames_in_flight: u32,
+    /// images of the swapchain at least (0: the surface's minimum + 1)
+    pub min_images: u32,
 }
 
 impl SwapchainDesc {
     pub const DEFAULT: SwapchainDesc =
-        SwapchainDesc { present: PresentMode::Fifo, srgb: false, copy_src: false, frames_in_flight: 2 };
+        SwapchainDesc { present: PresentMode::Fifo, srgb: false, copy_src: false, frames_in_flight: 2, min_images: 0 };
 }

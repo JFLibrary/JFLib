@@ -1,0 +1,2 @@
+#!args --test dpi
+# a DPI change (WM_DPICHANGED, as when a window changes monitors): a bigger frame, the swapchain again
