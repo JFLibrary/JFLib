@@ -19,13 +19,19 @@
 // with splitters between them and towards the document area; a collapsed side is a rail of
 // icon buttons.  Left and right are the start and the end side: the layout is logical, so a
 // mirrored (RTL) window shows the left side at the right like everything else.
-// Dragging a tab (or the empty part of a tab strip: the whole group) shows drop markers at the
-// three edges of the area (a new group on that side) and on the group under the pointer (as a
-// tab, before, after it); a release over a tab strip inserts it there; anywhere else -- also
-// outside the window -- the panel floats in a tool window at the pointer (WF_TOOL, window ids
-// id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the same way onto the main
-// window's markers (the pointer stays with the floating window); its pin button or a double
-// click docks it where it came from, its close button hides its panels.  Esc cancels a drag.
+// A press on a tab (or on the empty part of a tab strip: the whole group) can drag only after it
+// was held for DOCK_HOLD_MS: then the tab shows it (DOCK_TAB_HOLD, the move cursor; a timer gives
+// the pass while the pointer rests), and the drag starts when the pointer moves past the usual
+// threshold from where it is at that moment.  Movement during the hold cancels nothing and never
+// counts (a slip or a tremor starts nothing), a release without a drag is a click if it is over
+// the tab.  Clicks, double clicks, the menu and the splitters need no hold.
+// A drag shows drop markers at the three edges of the area (a new group on that side) and on the
+// group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
+// there; anywhere else -- also outside the window -- the panel floats in a tool window at the
+// pointer (WF_TOOL, window ids id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the
+// same way onto the main window's markers (the pointer stays with the floating window); its pin
+// button or a double click docks it where it came from, its close button hides its panels.  Esc
+// cancels a hold and a drag (the release is no click then).
 // Keyboard: the tab strip of a group is one focus stop (Left / Right / Home / End switch tabs,
 // the menu key or Shift+F10 open the group's menu with every move), Ctrl+PgDn / Ctrl+PgUp switch
 // tabs while the focus is anywhere in the group, DockState::focus(id) brings a panel forward
@@ -65,6 +71,15 @@ pub const DOCK_MK_RIGHT: i32 = 1;
 pub const DOCK_MK_TOP: i32 = 2;
 pub const DOCK_MK_BOTTOM: i32 = 3;
 pub const DOCK_MK_CENTER: i32 = 4;
+/// a press on a tab or on the empty part of a tab strip can drag only after this many ms with
+/// the button down, so that a slip of the hand during a click neither moves nor floats a panel;
+/// clicks, double clicks (they float), the menu and the splitters need no hold
+pub const DOCK_HOLD_MS: u32 = 300;
+/// StyleShell::dock_tab, sp.flags: the press was held long enough, the tab can be moved now (a
+/// press on the strip's empty part: every tab of the group, they would all move)
+pub const DOCK_TAB_HOLD: u32 = 1;
+
+const UIT_HOLD: u32 = 0x7FFE_0050; // timer: the hold is over (a resting pointer gets no other pass)
 
 // metrics (DIP)
 const HDR: i32 = 32; // tab strip of a group, unless the style's SM_DOCK_HDR says otherwise
@@ -776,6 +791,10 @@ pub(crate) struct Rt {
     open_active: u32,
     hits0: usize,
     drag: Option<Drag>,
+    /// the window of a press held on a tab or a strip in the last pass (0: none or the main one)
+    held_win: u32,
+    /// the press (window, widget, press_ms) whose hold is over, the pointer at that moment
+    hold_at: Option<((u32, u32, u32), [i32; 2])>,
     acts: Vec<Act>,
     wins: Vec<WinSlot>,
     /// groups (gkey) that had the keyboard focus in the last pass / this pass
@@ -914,12 +933,18 @@ impl Ui {
                 w.applied = [i32::MIN; 4]; // a later window in this slot gets its own placement
             }
         }
-        // a drag whose widget went away (or was cancelled by Esc in another window)
+        // a drag whose widget went away
         if rt.drag.as_ref().is_some_and(|d| self.frame.wrapping_sub(d.seen) > 2) {
             rt.drag = None;
         }
-        if rt.drag.as_ref().is_some_and(|d| d.win != 0) && self.key(VK_ESCAPE) {
+        // a press held in a floating window (a hold or a drag): Esc comes here while no widget
+        // there has the focus
+        let held = core::mem::take(&mut rt.held_win);
+        if held != 0 && self.key(VK_ESCAPE) {
             rt.drag = None;
+            if let Some(p) = self.uiw_parts_mut(held) {
+                p.ctx.active = 0; // the release is no click
+            }
             self.repass = true;
         }
         let l = &self.wp.lay;
@@ -1313,6 +1338,7 @@ impl Ui {
         if !self.dk_drag(rt, sev, strip, (side, tag), panels, active, hdr, size) && sev & EV_DOUBLE != 0 {
             rt.acts.push(if float { Act::Home(tag as u8) } else { Act::Float(active, self.dk_float_near(rect, 24, 24)) });
         }
+        let strip_hold = self.dk_held(sev);
         if st.focus_req != 0 && st.focus_req == active {
             st.focus_req = 0;
             self.focus(strip);
@@ -1366,7 +1392,8 @@ impl Ui {
                 }
             }
             let (title, icon) = rt.info(p).map_or((String::new(), 0), |i| (i.title.clone(), i.icon));
-            let mut tsp = Sp { ev, label: Some(&title), icon, value: (p == active) as i32, value2: focus_in as i32, ..Sp::default() };
+            let flags = if strip_hold || self.dk_held(ev) { DOCK_TAB_HOLD } else { 0 };
+            let mut tsp = Sp { ev, flags, label: Some(&title), icon, value: (p == active) as i32, value2: focus_in as i32, ..Sp::default() };
             tsp.place(r);
             sh.dock_tab(self, &tsp);
             let mut s = state;
@@ -1462,12 +1489,21 @@ impl Ui {
         tabs
     }
 
-    // the drag of a tab or a strip (widget wid, its events ev): starts with EV_DRAG, follows
-    // the pointer, drops at the release -> true when the events belonged to the drag
+    // a press on a tab or a strip (its widget's events ev) was held long enough to drag
+    fn dk_held(&self, ev: u32) -> bool {
+        ev & EV_HELD != 0 && self.now_ms.wrapping_sub(self.wp.ctx.press_ms) >= DOCK_HOLD_MS
+    }
+
+    // the drag of a tab or a strip (widget wid, its events ev): held for DOCK_HOLD_MS, starts
+    // past the threshold from where the pointer was then, follows the pointer, drops at the
+    // release -> true when the events belonged to the drag
     #[allow(clippy::too_many_arguments)]
     fn dk_drag(&mut self, rt: &mut Rt, ev: u32, wid: u32, src: (u8, u32), panels: &[u32], active: u32, hdr: [i32; 4], size: [i32; 2]) -> bool {
         let win = self.uiw_cur;
         let frame = self.frame;
+        if ev & EV_HELD != 0 {
+            rt.held_win = win;
+        }
         if let Some(d) = rt.drag.as_mut() {
             if d.wid != wid || d.win != win {
                 return false;
@@ -1493,17 +1529,50 @@ impl Ui {
             }
             return true;
         }
-        if ev & EV_DRAG != 0 && ev & EV_HELD != 0 && !panels.is_empty() && !self.dragging() {
-            let (mx, my) = self.mouse();
-            let at = self.dk_main_point(mx, my);
-            let (px, py) = (self.wp.ctx.press_x, self.wp.ctx.press_y);
-            let grab = [self.px2dip(px - hdr[0]), self.px2dip(py - hdr[1])];
-            rt.drag = Some(Drag { panels: panels.to_vec(), active, src, win, wid, grab, size, at, seen: frame });
-            self.wp.ctx.last_click_id = 0; // a drag is no first click of a double click
+        let held = self.now_ms.wrapping_sub(self.wp.ctx.press_ms);
+        if ev & EV_HELD == 0 {
+            if ev & EV_COMMIT != 0 && held >= DOCK_HOLD_MS {
+                self.repass = true; // released: the next pass gives the pointer its cursor back
+            }
+            return false;
+        }
+        if panels.is_empty() || self.dragging() {
+            return false;
+        }
+        if self.key(VK_ESCAPE) {
+            self.wp.ctx.active = 0; // the release is no click
             self.repass = true;
             return true;
         }
-        false
+        if held >= DOCK_HOLD_MS || ev & EV_DRAG != 0 {
+            self.wp.ctx.last_click_id = 0; // a hold or a slip is no first click of a double click
+        }
+        if held < DOCK_HOLD_MS {
+            self.timer(UIT_HOLD, DOCK_HOLD_MS - held);
+            return false;
+        }
+        plat::set_cursor(CUR_MOVE); // (the active widget keeps it until the release)
+        // behave's threshold, but from the pointer at the end of the hold (EV_DRAG counts from
+        // the press): what it did during the hold starts nothing; (-1, -1) is outside the
+        // window (E_LEAVE), no place to measure from or to
+        let press = (win, wid, self.wp.ctx.press_ms);
+        let cur = [self.wp.ctx.mx, self.wp.ctx.my];
+        if cur == [-1, -1] {
+            return false;
+        }
+        let from = rt.hold_at.filter(|h| h.0 == press).map_or(cur, |h| h.1);
+        rt.hold_at = Some((press, from));
+        let lim = self.dp(4);
+        if cur[0].wrapping_sub(from[0]).wrapping_abs() <= lim && cur[1].wrapping_sub(from[1]).wrapping_abs() <= lim {
+            return false;
+        }
+        let (mx, my) = self.mouse();
+        let at = self.dk_main_point(mx, my);
+        let (px, py) = (self.wp.ctx.press_x, self.wp.ctx.press_y);
+        let grab = [self.px2dip(px - hdr[0]), self.px2dip(py - hdr[1])];
+        rt.drag = Some(Drag { panels: panels.to_vec(), active, src, win, wid, grab, size, at, seen: frame });
+        self.repass = true;
+        true
     }
 
     // a floating window: placement, window_begin, its tab strip, the content box -> the panel

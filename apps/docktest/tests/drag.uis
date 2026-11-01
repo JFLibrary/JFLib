@@ -3,6 +3,7 @@
 theme light
 # over the left group: its markers (as a tab, above, below) and the three edges
 down tab:"Eigenschaften"
+wait 320
 move 700,200
 move 140,200
 expect button:"Als Register" exists
@@ -20,19 +21,20 @@ expect button:"Als Register" missing
 expect text:"L: Dateien+Gliederung+[Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
 expect tab:"Eigenschaften" selected
 # below its own group: a group of its own under it
-drag tab:"Eigenschaften" 130,368
+drag tab:"Eigenschaften" 130,368 hold 320
 expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
 # the right edge: a new group on the (empty) right side
-drag tab:"Ausgabe" 930,312
+drag tab:"Ausgabe" 930,312 hold 320
 expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: [Ausgabe] | U: [Suche] | F: - | V: Verlauf" exists
 # onto a tab strip: inserted at that place (here: before Dateien)
-drag tab:"Ausgabe" 8,64
+drag tab:"Ausgabe" 8,64 hold 320
 expect text:"L: [Ausgabe]+Dateien+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: - | V: Verlauf" exists
 # tabs reorder inside their strip
-drag tab:"Ausgabe" 180,64
+drag tab:"Ausgabe" 180,64 hold 320
 expect text:"L: Dateien+Gliederung+[Ausgabe], [Eigenschaften] | R: - | U: [Suche] | F: - | V: Verlauf" exists
 # the empty part of a strip drags the whole group (here the Eigenschaften): to the bottom
 down 150,331
+wait 320
 move 300,331
 move 613,546
 expect button:"Unten andocken" hover
@@ -40,6 +42,7 @@ up
 expect text:"L: Dateien+Gliederung+[Ausgabe] | R: - | U: [Suche], [Eigenschaften] | F: - | V: Verlauf" exists
 # before the Suche group (the marker left of its middle)
 down tab:"Eigenschaften"
+wait 320
 move 500,200
 move tab:"Suche"
 move button:"Davor"
@@ -49,6 +52,7 @@ up
 expect text:"L: Dateien+Gliederung+[Ausgabe] | R: - | U: [Eigenschaften], [Suche] | F: - | V: Verlauf" exists
 # Esc cancels a drag
 down tab:"Suche"
+wait 320
 move 500,200
 move 30,312
 expect button:"Links andocken" hover

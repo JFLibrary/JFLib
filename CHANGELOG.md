@@ -127,6 +127,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** netpkt::decode::Proto has the new variants Smtp (TCP ports 25 and 587) and Pop3 (port 110), both with the bit P_MAIL (1 << 28); a match over every protocol needs arms for them
 - **ui:** ui::DEv has the new variants Toggle (a collapse button of a DN_TOGGLE node) and Resize (the handle of a DN_RESIZE node), ui::DHit Toggle and Resize; a match over every event or hit needs arms for them
 - **script:** script::Diagnostic, Error and TraceLine carry the file of their position (file), Status has the variant Paused, Host has load (with a default); exhaustive matches on Status and struct literals of Error and Diagnostic need the new parts; messages of single files are unchanged
+- **ui:** A dock tab, or the empty part of a dock's tab strip, can drag only after the button was held for 300 ms (`DOCK_HOLD_MS`): a click that slips no longer moves or floats a panel. At 300 ms the tab shows it (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`), movement before that does not count, Esc ends the hold; clicks, double clicks, the menu and the splitters need none. Scripts: `drag ... hold MS` (or `wait` after `down`)
 
 ### Fixed
 

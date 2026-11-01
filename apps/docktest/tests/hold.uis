@@ -1,0 +1,270 @@
+#!args --verify-dirty
+# the hold of a dock tab: a press on a tab or on a strip's empty part can drag only after
+# DOCK_HOLD_MS (300 ms) with the button down, and shows it (ui/dock.rs)
+theme light
+# quick drags to every kind of place: nothing moves, nothing floats, nothing changes
+drag tab:"Eigenschaften" 460,200
+expect window 501 closed
+drag tab:"Eigenschaften" 930,312
+drag tab:"Ausgabe" 8,64
+drag tab:"Gliederung" 4,64
+drag 840,64 613,546
+expect window 501 closed
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"Änderungen: 0" exists
+# 200 ms and a long way: no markers on it, the release is no drop
+down tab:"Eigenschaften"
+wait 200
+move 700,200
+move 140,200
+expect button:"Links andocken" missing
+expect button:"Als Register" missing
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"Änderungen: 0" exists
+# a click selects as ever, also with a slip past the threshold inside the tab
+wait 600
+click tab:"Gliederung"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+wait 600
+down 20,64
+move 40,64
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# two slips in a row are no double click: a repeated quick drag does not float the panel
+down 20,64
+move 40,64
+up
+down 20,64
+move 40,64
+up
+expect window 501 closed
+# the visible state comes at 300 ms, not before: the accent's frame along the tab's top edge
+wait 600
+down tab:"Eigenschaften"
+expect tab:"Eigenschaften" pressed
+expect pixel 750 52 #F3F3F3
+wait 299
+expect pixel 750 52 #F3F3F3
+wait 1
+expect pixel 750 52 #005FB8
+expect tab:"Eigenschaften" pressed
+shot build/dock/hold_light.png
+theme dark
+shot build/dock/hold_dark.png
+theme contrast
+shot build/dock/hold_contrast.png
+theme light
+# the time is up, the pointer has not moved: no drag yet, the release is a click and ends the state
+expect button:"Links andocken" missing
+up
+expect pixel 750 52 #F0F0F0
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# ... and no first click of a double click (320 ms between the presses)
+wait 600
+down tab:"Ausgabe"
+wait 320
+up
+click tab:"Ausgabe"
+expect window 501 closed
+# past the time the usual threshold of 4 DIP counts, from where the pointer is then
+wait 600
+down 750,64
+wait 320
+move 754,64
+expect button:"Links andocken" missing
+move 755,64
+expect button:"Links andocken" exists
+expect tab:"Eigenschaften" pressed
+expect pixel 750 52 #005FB8
+key esc
+expect button:"Links andocken" missing
+expect pixel 750 52 #F0F0F0
+up
+# movement during the hold cancels nothing and never counts, however far it went: the time is
+# up here and nothing starts until the pointer leaves that place
+wait 600
+down tab:"Eigenschaften"
+wait 100
+move 130,328
+expect button:"Als Register" missing
+wait 199
+expect button:"Als Register" missing
+wait 1
+expect button:"Als Register" missing
+expect tab:"Eigenschaften" pressed
+expect pixel 750 52 #005FB8
+wait 300
+expect button:"Als Register" missing
+move 134,328
+expect button:"Als Register" missing
+move 135,328
+expect button:"Als Register" hover
+up
+expect text:"L: Dateien+Gliederung+[Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# a slip of 10 DIP during the hold, a release at 400 ms without another move, still over the tab:
+# nothing moves, nothing floats, the release selects it
+wait 600
+down 125,64
+wait 100
+move 135,64
+wait 300
+expect button:"Links andocken" missing
+up
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the same slip off the tab and the strip: the tear-off this is all about; no drop, no click
+wait 600
+down 30,75
+wait 100
+move 30,85
+wait 300
+expect button:"Links andocken" missing
+up
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# a slip of 10 DIP during the hold, then a further 10 DIP after the time: 4 are not enough, then
+# the drag starts
+wait 600
+down 748,64
+wait 100
+move 758,64
+wait 200
+expect button:"Links andocken" missing
+move 762,64
+expect button:"Links andocken" missing
+move 768,64
+expect button:"Links andocken" exists
+move button:"Links andocken"
+up
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# ... on the empty part of a strip too
+wait 600
+down 840,64
+wait 100
+move 850,64
+wait 200
+expect button:"Links andocken" missing
+move 860,64
+expect button:"Links andocken" exists
+key esc
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# a hold of 320 ms, then a drag: it moves the tab, onto a marker, a strip, or out of the window
+drag tab:"Eigenschaften" 130,368 hold 320
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+drag tab:"Ausgabe" 8,64 hold 320
+expect text:"L: [Ausgabe]+Dateien+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: - | V: Verlauf" exists
+drag tab:"Ausgabe" 460,200 hold 320
+expect window 501 open
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: [Ausgabe] | V: Verlauf" exists
+click button:"Zurücksetzen"
+expect window 501 closed
+# a splitter needs no hold
+drag 677,300 577,300
+expect text:"Größen: 260/380/200" exists
+# two tabs and a strip with room: a quick drag of the strip does nothing, a hold shows the state
+# on both tabs (they would both move) and drags the whole group
+drag tab:"Suche" 780,64 hold 320
+expect text:"L: [Dateien]+Gliederung | R: Eigenschaften+[Suche] | U: [Ausgabe] | F: - | V: Verlauf" exists
+drag 830,64 300,546
+expect text:"L: [Dateien]+Gliederung | R: Eigenschaften+[Suche] | U: [Ausgabe] | F: - | V: Verlauf" exists
+down 830,64
+expect pixel 650 52 #F9F9F9
+expect pixel 750 52 #F9F9F9
+wait 300
+expect pixel 650 52 #005FB8
+expect pixel 750 52 #005FB8
+shot build/dock/hold_strip.png
+move 600,200
+move button:"Links andocken"
+expect button:"Links andocken" hover
+up
+expect text:"L: [Dateien]+Gliederung, Eigenschaften+[Suche] | R: - | U: [Ausgabe] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# Esc during a hold, before the time: no drag later on, the release is no click
+down tab:"Gliederung"
+wait 100
+key esc
+wait 300
+move 500,200
+expect button:"Links andocken" missing
+expect tab:"Gliederung" unpressed
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# ... and after the time, with the state showing
+wait 600
+down tab:"Gliederung"
+wait 320
+key esc
+expect tab:"Gliederung" unpressed
+move 500,200
+expect button:"Links andocken" missing
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# ... on the empty part of a strip too
+wait 600
+down 840,64
+wait 320
+key esc
+move 500,200
+expect button:"Links andocken" missing
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the menu and a double click need no hold
+wait 600
+rclick tab:"Ausgabe"
+expect menuitem:"Lösen" exists
+key esc
+dblclick tab:"Gliederung"
+expect window 501 open
+expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+# a floating window's tab: quick nothing, Esc during the hold, a hold drags it back; the moves
+# are in that window, which holds the pointer (a `move` into another one would be an E_LEAVE)
+window any
+drag tab:"Gliederung" 930,312
+window main
+expect window 501 open
+expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+window 501
+down tab:"Gliederung"
+wait 320
+key esc
+move 150,200
+window main
+expect button:"Rechts andocken" missing
+window 501
+up
+window main
+expect window 501 open
+expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+# ... Esc during its drag
+window 501
+down tab:"Gliederung"
+wait 320
+move 150,200
+window main
+expect button:"Rechts andocken" exists
+key esc
+expect button:"Rechts andocken" missing
+window 501
+up
+window main
+expect window 501 open
+expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+window any
+drag tab:"Gliederung" 930,312 hold 320
+window main
+expect window 501 closed
+expect text:"L: [Dateien] | R: [Eigenschaften], [Gliederung] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# 150 %: the frame is a hairline of that scale
+click button:"Zurücksetzen"
+scale 150
+down tab:"Eigenschaften"
+wait 320
+shot build/dock/hold_150.png
+up
+expect_nowarn

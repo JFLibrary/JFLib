@@ -220,6 +220,7 @@ pub(crate) struct W {
     pub(crate) moved: bool,
     pub(crate) press_x: i32,
     pub(crate) press_y: i32,
+    pub(crate) press_ms: u32, // the clock when the left button made a widget active
     pub(crate) hot: u32,
     pub(crate) hot_flags: u32,
     pub(crate) active: u32,
@@ -265,6 +266,7 @@ impl W {
             moved: false,
             press_x: 0,
             press_y: 0,
+            press_ms: 0,
             hot: 0,
             hot_flags: 0,
             active: 0,
@@ -775,6 +777,7 @@ impl Ui {
             if c.pressed & (1 << BTN_LEFT) != 0 && !c.press_used {
                 c.press_used = true;
                 c.active = id;
+                c.press_ms = now;
                 if flags & HB_FOCUS != 0 {
                     c.focus = id;
                     c.focus_visible = false;
