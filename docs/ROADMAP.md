@@ -1499,7 +1499,33 @@ Fensterrand hinaus.
   Sichtbarkeit, eine zweite Queue für Compute neben dem Zeichnen, Instanzlisten je Mesh statt
   Befehlen je Objekt. Es fehlen in `lib/gpu`: eine zweite Queue, Abfragen der
   Pipeline-Statistik.
-- **P2** · *fehlt* · G2: Shader-Compiler WGSL → SPIR-V mit Fehlermeldungen mit Zeile.
+- **P2** · *erledigt* (2026-11-01) · G2a: WGSL-Frontend `lib/wgsl` ([WGSL.md](WGSL.md)): Lexer,
+  Parser und Prüfung nach der W3C-Spezifikation (alle Literalformen, Template-Listen nach dem
+  Algorithmus der Spezifikation, die volle Grammatik mit Fehlererholung und Tiefengrenzen;
+  Deklarationen in beliebiger Reihenfolge, alle Typen, abstrakte Zahlen und Überladungen,
+  Konstantenauswertung exakt mit i64 / f64 und einmaligem Runden, Overrides, alle eingebauten
+  Funktionen außer Subgroups und buffer_view, Adressräume, Layouts, Attribute, Einstiegspunkte,
+  Verhalten von Anweisungen). Fehlermeldungen auf Deutsch mit Zeile und Spalte. Ergebnis ist ein
+  voll typisiertes IR für das Backend. Die sechs Shader der Messszene liegen als WGSL in
+  `lib/wgsl/bench`. `wgsltest`: 870 Prüfungen je Plattform, darunter 560 000 zufällige
+  Mutationen ohne Absturz in getrennten Läufen. Ein Shader mit 27 000 Zeilen braucht 135 ms
+  (Release). Gegen Chrome 156 stichprobenweise gleich bis auf fünf Fälle, in denen Chrome
+  großzügiger ist als die Spezifikation; dort gilt die Spezifikation. Es fehlen die
+  Uniformitätsanalyse (G2d), Subgroups, buffer_view und Prüfungen, die von Override-Werten oder
+  dem Bind-Group-Layout abhängen.
+- **P2** · *erledigt* (2026-11-01) · G2b: Unterbau für den Compiler. Spezialisierungskonstanten
+  in `lib/shader` (auch für die Arbeitsgruppengröße: auf Basis über das `WorkgroupSize`-Built-in,
+  auf Voll über `LocalSizeId`), `shader::reflect` (Einstiegspunkte, Konstanten und ihre Werte),
+  Pipeline-Konstanten in `lib/gpu` (umgerechnet wie in WebGPU, gegen Einstiegspunkte und
+  Grenzen geprüft). Texturen in Shadern erstmals auf der GPU getestet (Laden, Abtasten mit und
+  ohne Filter, Speichertexturen, Tiefenvergleich, Arrays, Würfel, Größenabfragen, Bindless):
+  exakt bzw. Fehler unter 1e-5. Das Vergleichswerkzeug `tools/wgsl_ref.mjs` holt Tints Urteil
+  über Chrome (headless, echte GPU), die Sammlung `tools/wgsl_corpus` hat 494 eigene Shader
+  samt Tints Urteil. Es fehlen: `Rgba32Sint` in `lib/gpu`, Konstanten nach Namen.
+- **P2** · *fehlt* · G2c: Backend IR → SPIR-V (Basis und Voll), die Messszene mit Shadern aus
+  WGSL, Vergleich mit der Tint-Sammlung.
+- **P2** · *fehlt* · G2d: Uniformitätsanalyse, Rest der Abweichungen zu Tint, Fehlermeldungen
+  feilen.
 - **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
   Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
   und Diagramm.
