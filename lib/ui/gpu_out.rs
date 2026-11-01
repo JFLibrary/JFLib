@@ -61,6 +61,21 @@
 // before anybody reads it).  Everything else, also the cells at the image's edge or with something
 // on top of it, goes the usual way.
 //
+// Canvases (G3c, canvas.rs).  While a canvas's view moves and its content stays, its content comes
+// from tiles: TILE x TILE px textures of the content at one scale (a Level), drawn once by
+// CanvasContent::draw_view on this thread (at most FILL_US per frame) and kept under a budget with
+// LRU eviction.  The render pass draws them with the transform: by copy (fs) at the level's scale
+// and whole pixels away, else bilinear (fs_tile).  In the cells the canvas ends up on top of (also
+// those it only partly covers, with the scissor at its edge) the CPU neither draws nor uploads it:
+// its command's hash stands only for where it lies (dirty.rs), Split::owed and Split::stale as for
+// images, gp_settle runs its Draw before anybody reads the framebuffer.  Cells with something over
+// it and cells without their tiles go the CPU's way: its Draw, the overlay, the upload.  SETTLE_US
+// after the last move gp_tick asks for a frame, the canvas is no longer apart, the CPU draws what
+// the view shows: at rest the picture is the CPU path's.  A frame that changes the content (new
+// CanvasDesc::ver, ui.canvas_gpu_damage) ends the gesture at once and costs no tile; a tile is only
+// drawn when a view moves over it.  Nothing of it exists before the first move, and nothing SETTLE
+// + CANVAS_UNUSED_US after the last one.  Right-to-left windows draw canvases on the CPU.
+//
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 // usable adapter or surface: the CPU path for good, silently.
@@ -68,19 +83,24 @@
 // Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
 // image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
-// jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget); lib/gpu's
-// jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+// jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
+// canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
+// jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_MB=n (the tiles' budget);
+// lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
 // without a GPU, it prints a SKIP once and does nothing):
-//   gpu on                 a real window per UI window (shown without activation) with
-//                          the output, every presented image compared with the framebuffer, a
-//                          render after every input edge; waits for the swapchain
+//   gpu on [fast]          a real window per UI window (shown without activation) with
+//                          the output, every presented image compared with the framebuffer (fast:
+//                          not compared, for measurements), a render after every input edge; waits
+//                          for the swapchain; a canvas stays apart until `gpu settle` or `same`
 //   gpu off                windows closed
 //   gpu wait [MS]          until the scoped windows are on the swapchain (after `size`, `gpu lose`)
 //   gpu expect gpu|cpu     the main window's stage
-//   gpu expect same        every window presents once more: the image read back = the framebuffer
-//                          byte for byte (x byte: 255), and no frame differed since the last check
+//   gpu settle             every canvas goes back to the CPU's picture now
+//   gpu expect same        every canvas settled, every window presents once more: the image read
+//                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
+//                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
 //   gpu expect screen      the composed screen at the window = the framebuffer (another window on
 //                          top of ours is a note, not a failure)
 //   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
@@ -89,11 +109,20 @@
 //   gpu expect raster N    at most N pixels of the base layer drawn since the last check
 //   gpu expect layers N    N layers above the base have a texture now
 //   gpu expect images N    N image textures exist
+//   gpu expect apart N     N canvases of the window come from tiles now
+//   gpu expect tiles N     N canvas tiles exist
+//   gpu expect fills N     at most N tiles were drawn since the last check
+//   gpu expect nodiff      no pixel of a canvas's tiles differed from the CPU's since the last
+//                          `same` or `nodiff`
 //   gpu budget BYTES       the images' budget
+//   gpu tilebudget BYTES   the tiles' budget
+//   gpu shot FILE          the image the window presents now (read back: also what a gesture's
+//                          tiles show; `shot` writes the framebuffer)
 //   gpu lose               the device behaves as lost from now on (Device::test_lose)
 //   gpu print              the counters
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::rc::{Rc, Weak};
 use alloc::string::String;
@@ -111,11 +140,13 @@ use gpu::{
 use rt::sync::SpinLock;
 
 use super::auto::{next_word, skip_ws, word_eq};
-use super::cmd::{render_layer, Cmd};
+use super::canvas::{CanvasGpu, CanvasView};
+use super::cmd::{render_layer, Cmd, DrawRef, Gfx};
 use super::consts::*;
 use super::dirty::TOP_BLOCKED;
 use super::{App, GpuOutput, Ui};
 use gfx::{Dc, Surface, FMT_A8, FMT_XRGB};
+use text::Text;
 
 /// the output without jfgui_GPU in the environment: on, jfgui_GPU=0 turns it off (docs/GPU.md
 /// "Ausgabe der UI" says what it costs)
@@ -166,6 +197,26 @@ const IMAGE_STEP_BYTES: u64 = 4 << 20;
 const IMAGES_KEPT: usize = 64;
 /// an image texture not drawn for this long goes with the next frame (us)
 const IMAGE_UNUSED_US: u64 = 30_000_000;
+/// a canvas's tile: its content, a texel of its neighbours around it (fs_tile reads them)
+const TILE: i32 = 256;
+const TILE_BORDER: i32 = 1;
+const TILE_TEX: i32 = TILE + 2 * TILE_BORDER;
+const TILE_BYTES: u64 = TILE_TEX as u64 * TILE_TEX as u64 * 4;
+/// the bytes canvas tiles may take (jfgui_GPU_CANVAS_MB)
+const CANVAS_BUDGET: u64 = 128 << 20;
+/// a frame draws tiles for at most this long; what is left goes the CPU's way in this frame (us)
+const FILL_US: u64 = 5_000;
+/// this long after a canvas's last move the CPU draws its picture (us)
+const SETTLE_US: u64 = 180_000;
+/// the tiles go this long after the last move (us)
+const CANVAS_UNUSED_US: u64 = 30_000_000;
+/// a level serves a view scaled by this much at most, then the next one is drawn
+const K_MIN: f64 = 0.55;
+const K_MAX: f64 = 1.9;
+/// whole pixels away, up to this much of a pixel: a copy
+const PHASE_TOL: f64 = 1.0 / 64.0;
+/// the scales kept per canvas
+const LEVELS_MAX: usize = 6;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
 /// wgsl::compile makes of it, --gen-shaders writes them again)
@@ -178,6 +229,7 @@ pub const GPU_OUT_WGSL: &str = include_str!("gpu_out.wgsl");
 pub const GPU_OUT_VS: &[u32] = spv::VS;
 pub const GPU_OUT_FS: &[u32] = spv::FS;
 pub const GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE;
+pub const GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Stage {
@@ -300,16 +352,63 @@ struct Image {
     used_us: u64,
 }
 
-/// an image drawn by the GPU in a window's frame: its place and steps (Dc::blit_scaled), the
-/// rectangles of its cells
+/// a tile's texture (Rc: a window's last frame keeps drawing an evicted one until its next)
+struct TileTex {
+    t: Texture,
+    group: BindGroup,
+    fresh: core::cell::Cell<bool>, // nothing uploaded yet (Layout::Undefined)
+}
+
+struct Tile {
+    tex: Rc<TileTex>,
+    tick: u64,
+}
+
+/// a canvas's tiles at one scale: grid pixel g shows the content point (g - f) / scale
+struct TileLevel {
+    scale: f64,
+    fx: f64,
+    fy: f64,
+    tiles: BTreeMap<(i32, i32), Tile>,
+}
+
+/// a canvas the output has seen
+struct Canvas {
+    win: usize,
+    id: u32,
+    ver: u32,
+    /// the view of the last frame and of the one before it
+    view: CanvasView,
+    prev: CanvasView,
+    known: bool,
+    damaged: bool,
+    /// its view comes from tiles, until this time; it moved in this frame
+    apart: bool,
+    until: u64,
+    moved: bool,
+    levels: Vec<TileLevel>,
+}
+
+/// a tile in a window's frame: its texture, its box in the window (x0, y0, x1, y1), the shader's
+/// place
+struct TileDraw {
+    tex: Rc<TileTex>,
+    b: [i32; 4],
+    place: [i32; 4],
+}
+
+/// what a quad draws: an image with its steps (Dc::blit_scaled), or a canvas's tiles (copied or
+/// scaled; loose: a difference from the CPU's picture is no failure) with its command's Draw and box
+enum QuadSrc {
+    Image { tex: Rc<ImageTex>, src: Rc<Surface>, w: i32, h: i32, step: [u32; 2] },
+    Canvas { f: DrawRef, w: i32, h: i32, tiles: Vec<TileDraw>, copy: bool, loose: bool },
+}
+
+/// an image or a canvas drawn by the GPU in a window's frame: its place, the rectangles of its cells
 struct Quad {
-    tex: Rc<ImageTex>,
-    src: Rc<Surface>,
     x: i32,
     y: i32,
-    w: i32,
-    h: i32,
-    step: [u32; 2],
+    src: QuadSrc,
     rects: Vec<[i32; 4]>,
 }
 
@@ -341,6 +440,11 @@ struct Split {
     any_owed: bool,
     any_stale: bool,
     quads: Vec<Quad>,
+    // ---- per cell: a canvas covers it only partly (the CPU draws the rest); a canvas moved
+    // there in this frame; a canvas moved in this frame
+    part: Vec<bool>,
+    redraw: Vec<bool>,
+    moved: bool,
 }
 
 impl Split {
@@ -359,6 +463,7 @@ struct Win {
     tex: Option<Tex>,
     rb: Option<Buffer>, // jfgui_GPU_VERIFY: the presented image
     rb_px: Vec<u8>,
+    rb_keep: Option<Vec<u8>>, // `gpu shot`: the image as presented
     full: bool,    // the texture lacks pixels: the whole frame goes up next
     undef: bool,   // the texture is new (Layout::Undefined)
     pending: bool, // the texture holds pixels that were not presented
@@ -378,6 +483,7 @@ struct Core {
     bgl: BindGroupLayout,
     pipe: RenderPipeline,
     pipe_image: RenderPipeline,
+    pipe_tile: RenderPipeline,
     format: Format,
     name: String,
 }
@@ -434,6 +540,21 @@ pub(crate) struct S {
     image_evicted: u64,
     tick: u64,
     look_at: u64,
+    canvases_on: bool,
+    canvases: Vec<Canvas>,
+    canvas_cpu: String,
+    canvas_pan: String,
+    canvas_budget: u64,
+    tile_bytes: u64,
+    tile_free: Vec<Rc<TileTex>>,
+    tile_sf: Surface,
+    tile_fills: u64,
+    tile_fill_us: u64,
+    tile_evicted: u64,
+    canvas_settles: u64,
+    canvas_free_at: u64,
+    tile_marked: u64, // `gpu expect fills`
+    diff_marked: u64, // `gpu expect nodiff`
 }
 
 impl Default for S {
@@ -464,6 +585,21 @@ impl Default for S {
             image_evicted: 0,
             tick: 0,
             look_at: 0,
+            canvases_on: false,
+            canvases: Vec::new(),
+            canvas_cpu: String::new(),
+            canvas_pan: String::new(),
+            canvas_budget: CANVAS_BUDGET,
+            tile_bytes: 0,
+            tile_free: Vec::new(),
+            tile_sf: Surface::default(),
+            tile_fills: 0,
+            tile_fill_us: 0,
+            tile_evicted: 0,
+            canvas_settles: 0,
+            canvas_free_at: 0,
+            tile_marked: 0,
+            diff_marked: 0,
         }
     }
 }
@@ -497,6 +633,75 @@ impl S {
         if let Some(mb) = plat::env("jfgui_GPU_IMAGE_MB").and_then(|v| v.parse::<u64>().ok()) {
             self.image_budget = mb << 20;
         }
+        self.canvases_on = self.layers_on && !off("jfgui_GPU_CANVAS");
+        self.canvas_cpu = plat::env("jfgui_GPU_CANVAS_CPU").unwrap_or_default();
+        self.canvas_pan = plat::env("jfgui_GPU_CANVAS_PAN").unwrap_or_default();
+        if let Some(mb) = plat::env("jfgui_GPU_CANVAS_MB").and_then(|v| v.parse::<u64>().ok()) {
+            self.canvas_budget = mb << 20;
+        }
+    }
+
+    /// how this canvas may use the GPU (the variables say what the widget's choice is not)
+    fn canvas_mode(&self, name: &str, gpu: CanvasGpu) -> CanvasGpu {
+        if self.canvas_cpu.split(',').any(|n| n == name) {
+            CanvasGpu::Cpu
+        } else if self.canvas_pan.split(',').any(|n| n == name) && gpu == CanvasGpu::Zoom {
+            CanvasGpu::Pan
+        } else {
+            gpu
+        }
+    }
+
+    /// every tile goes, with the device or with the time: the textures die when no frame draws them
+    fn canvases_gone(&mut self) {
+        for c in self.canvases.iter_mut() {
+            c.levels.clear();
+            c.apart = false;
+            c.moved = false;
+        }
+        self.tile_free.clear();
+        self.tile_bytes = 0;
+        self.canvas_free_at = 0;
+    }
+
+    /// a texture for a new tile: a free one, a new one, the one of the tile drawn longest ago
+    /// (not one of this frame) -> None: the budget is full of this frame's tiles
+    fn tile_texture(&mut self, tick: u64) -> Option<Rc<TileTex>> {
+        if let Some(k) = self.tile_free.iter().position(|t| Rc::strong_count(t) == 1) {
+            return Some(self.tile_free.swap_remove(k));
+        }
+        if self.tile_bytes + TILE_BYTES > self.canvas_budget {
+            let mut old: Option<(usize, usize, (i32, i32), u64)> = None;
+            for (ci, c) in self.canvases.iter().enumerate() {
+                for (li, l) in c.levels.iter().enumerate() {
+                    for (key, t) in l.tiles.iter() {
+                        if t.tick != tick && old.is_none_or(|o| t.tick < o.3) {
+                            old = Some((ci, li, *key, t.tick));
+                        }
+                    }
+                }
+            }
+            let (ci, li, key, _) = old?;
+            let t = self.canvases[ci].levels[li].tiles.remove(&key)?;
+            self.tile_evicted += 1;
+            if Rc::strong_count(&t.tex) == 1 {
+                return Some(t.tex);
+            }
+            self.tile_bytes -= TILE_BYTES; // (dies with the frame that still draws it)
+        }
+        let Dev::Ready(core) = &self.dev else { return None };
+        let t = core.dev.create_texture(&TextureDesc::d2(TILE_TEX as u32, TILE_TEX as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED)).ok()?;
+        let group = core.dev.create_bind_group(&BindGroupDesc {
+            layout: &core.bgl,
+            entries: &[BindEntry { binding: 0, resource: Resource::Texture(t.view()) }],
+        }).ok()?;
+        self.tile_bytes += TILE_BYTES;
+        Some(Rc::new(TileTex { t, group, fresh: core::cell::Cell::new(true) }))
+    }
+
+    /// the tiles of a level go to the free ones
+    fn tiles_free(&mut self, tiles: BTreeMap<(i32, i32), Tile>) {
+        self.tile_free.extend(tiles.into_values().map(|t| t.tex));
     }
 
     /// an image's texture goes (a window's last frame may keep drawing it)
@@ -596,6 +801,7 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
     let vs = ShaderModule::from_spirv(&dev, spv::VS)?;
     let fs = ShaderModule::from_spirv(&dev, spv::FS)?;
     let fs_image = ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?;
+    let fs_tile = ShaderModule::from_spirv(&dev, spv::FS_TILE)?;
     let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 16 })?;
     let pipeline = |fragment: &'_ ShaderModule, entry: &'static str| {
         dev.create_render_pipeline(&RenderPipelineDesc {
@@ -612,6 +818,7 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
     };
     let pipe = pipeline(&fs, "fs")?;
     let pipe_image = pipeline(&fs_image, "fs_image")?;
+    let pipe_tile = pipeline(&fs_tile, "fs_tile")?;
     let t5 = plat::time_us();
     if trace {
         plat::write_stderr(format!(
@@ -619,7 +826,7 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
             ms(t0, t1), ms(t1, t2), ms(t2, t3), ms(t3, t4), ms(t4, t5), adapter.info().name).as_bytes());
     }
     let name = adapter.info().name.clone();
-    Ok((Core { inst, dev, bgl, pipe, pipe_image, format, name }, built))
+    Ok((Core { inst, dev, bgl, pipe, pipe_image, pipe_tile, format, name }, built))
 }
 
 // ------------------------------------------------------------------ one frame
@@ -675,15 +882,38 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
     e.push_constants(0, &[0i32; 4]);
     e.draw(3, 1, 0, 0);
     let scissor = |e: &mut gpu::CommandEncoder, r: &[i32; 4]| e.set_scissor(r[0] as u32, r[1] as u32, r[2] as u32, r[3] as u32);
-    // the images the CPU left out
+    // the images and canvases the CPU left out
     if !w.sp.quads.is_empty() {
-        e.set_render_pipeline(&core.pipe_image);
         for q in &w.sp.quads {
-            e.set_bind_group(0, &q.tex.group);
-            e.push_constants(0, &[q.x, q.y, q.step[0] as i32, q.step[1] as i32]);
-            for r in &q.rects {
-                scissor(&mut e, r);
-                e.draw(3, 1, 0, 0);
+            match &q.src {
+                QuadSrc::Image { tex, step, .. } => {
+                    e.set_render_pipeline(&core.pipe_image);
+                    e.set_bind_group(0, &tex.group);
+                    e.push_constants(0, &[q.x, q.y, step[0] as i32, step[1] as i32]);
+                    for r in &q.rects {
+                        scissor(&mut e, r);
+                        e.draw(3, 1, 0, 0);
+                    }
+                }
+                QuadSrc::Canvas { tiles, copy, .. } => {
+                    e.set_render_pipeline(if *copy { &core.pipe } else { &core.pipe_tile });
+                    for t in tiles {
+                        let mut bound = false;
+                        for r in &q.rects {
+                            let (x0, y0) = (t.b[0].max(r[0]), t.b[1].max(r[1]));
+                            let (x1, y1) = (t.b[2].min(r[0] + r[2]), t.b[3].min(r[1] + r[3]));
+                            if x0 < x1 && y0 < y1 {
+                                if !bound {
+                                    bound = true;
+                                    e.set_bind_group(0, &t.tex.group);
+                                    e.push_constants(0, &t.place);
+                                }
+                                scissor(&mut e, &[x0, y0, x1 - x0, y1 - y0]);
+                                e.draw(3, 1, 0, 0);
+                            }
+                        }
+                    }
+                }
             }
         }
         e.set_render_pipeline(&core.pipe);
@@ -716,7 +946,18 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
         let n = fb.w as usize * fb.h as usize * 4;
         w.rb_px.resize(n, 0);
         rb.read(0, &mut w.rb_px[..n])?;
-        let (x, y, bad) = compare(&w.rb_px, fb, core.format == Format::Rgba8Unorm);
+        let swap_rb = core.format == Format::Rgba8Unorm;
+        if let Some(keep) = w.rb_keep.as_mut() {
+            keep.clear();
+            keep.extend_from_slice(&w.rb_px[..n]);
+        }
+        // what a gesture's tiles may show otherwise: counted, not compared
+        for q in &w.sp.quads {
+            if matches!(q.src, QuadSrc::Canvas { loose: true, .. }) {
+                loose_compare(&mut w.rb_px, fb, &q.rects, swap_rb, &mut w.out);
+            }
+        }
+        let (x, y, bad) = compare(&w.rb_px, fb, swap_rb);
         w.out.verified += 1;
         if bad != 0 {
             w.out.verify_bad += 1;
@@ -748,6 +989,75 @@ fn compare(img: &[u8], fb: &Surface, swap_rb: bool) -> (i32, i32, u64) {
         }
     }
     (fx, fy, bad)
+}
+
+// rectangles of the presented image (rows of w * 4 bytes): how far they are from the framebuffer
+// (GpuOutput::canvas_diff_*), then the framebuffer's pixels in them
+fn loose_compare(img: &mut [u8], fb: &Surface, rects: &[[i32; 4]], swap_rb: bool, out: &mut GpuOutput) {
+    let row = fb.w as usize * 4;
+    let (mut n, mut sum, mut top) = (0u64, 0u64, 0u32);
+    for r in rects {
+        for y in r[1] as usize..(r[1] + r[3]) as usize {
+            let a = &mut img[y * row + r[0] as usize * 4..y * row + (r[0] + r[2]) as usize * 4];
+            let b = &fb.px[y * fb.stride as usize + r[0] as usize * 4..y * fb.stride as usize + (r[0] + r[2]) as usize * 4];
+            for (p, q) in a.chunks_exact_mut(4).zip(b.chunks_exact(4)) {
+                let c = if swap_rb { [q[2], q[1], q[0]] } else { [q[0], q[1], q[2]] };
+                let d = (0..3).map(|i| p[i].abs_diff(c[i]) as u32).max().unwrap_or(0);
+                if d != 0 {
+                    n += 1;
+                    sum += d as u64;
+                    top = top.max(d);
+                    p[..3].copy_from_slice(&c);
+                }
+            }
+        }
+    }
+    out.canvas_diff_frames += (n != 0) as u64;
+    out.canvas_diff_px += n;
+    out.canvas_diff_sum += sum;
+    out.canvas_diff_max = out.canvas_diff_max.max(top);
+}
+
+// floor and round without libm
+fn flr(x: f64) -> f64 {
+    let t = x as i64 as f64;
+    if t > x { t - 1.0 } else { t }
+}
+
+fn rnd(x: f64) -> f64 {
+    flr(x + 0.5)
+}
+
+// a level for view v: at its scale whole pixels away, else (a zoom running) the one nearest in scale,
+// else a new one: for a zoom at the scale of the view before (the content there is drawn already, a
+// store may hold it) when the tiles can serve this one from there
+fn level_for(c: &mut Canvas, v: CanvasView, zoom: bool) -> usize {
+    let zoom = zoom && c.prev.scale != v.scale;
+    let near = |l: &TileLevel, v: CanvasView| {
+        let (dx, dy) = (v.ox - l.fx, v.oy - l.fy);
+        (dx - rnd(dx)).abs() < PHASE_TOL && (dy - rnd(dy)).abs() < PHASE_TOL
+    };
+    let mut best: Option<(usize, f64)> = None;
+    for (n, l) in c.levels.iter().enumerate() {
+        let k = v.scale / l.scale;
+        if k == 1.0 {
+            if near(l, v) {
+                return n;
+            }
+        } else if zoom && (K_MIN..=K_MAX).contains(&k) {
+            let far = if k < 1.0 { 1.0 / k } else { k };
+            if best.is_none_or(|b| far < b.1) {
+                best = Some((n, far));
+            }
+        }
+    }
+    if let Some(b) = best {
+        return b.0;
+    }
+    let p = c.prev;
+    let from = if zoom && p.scale > 0.0 && (K_MIN..=K_MAX).contains(&(v.scale / p.scale)) { p } else { v };
+    c.levels.push(TileLevel { scale: from.scale, fx: from.ox - flr(from.ox), fy: from.oy - flr(from.oy), tiles: BTreeMap::new() });
+    c.levels.len() - 1
 }
 
 // ------------------------------------------------------------------ cells
@@ -803,11 +1113,18 @@ fn cell_rects(out: &mut Vec<[i32; 4]>, cols: usize, rows: usize, w: i32, h: i32,
     }
 }
 
-// an image's pixels in window cell box b of the framebuffer, as Cmd::Image draws them there
-fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4]) {
+// an image's or a canvas's pixels in window box b of the framebuffer, as its command draws them there
+fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4], text: &mut Text) {
     let mut dc = Dc::new(fb.w, fb.h);
     dc.clip_push(b[0], b[1], b[2] - b[0], b[3] - b[1]);
-    dc.blit_scaled(fb, &q.src, q.x, q.y, q.w, q.h);
+    match &q.src {
+        QuadSrc::Image { src, w, h, .. } => dc.blit_scaled(fb, src, q.x, q.y, *w, *h),
+        QuadSrc::Canvas { f, w, h, .. } => {
+            dc.clip_push(q.x, q.y, *w, *h);
+            f.draw(&mut Gfx { dc: &mut dc, sf: fb, text }, [q.x, q.y, *w, *h]);
+            dc.clip_pop();
+        }
+    }
 }
 
 // every alpha 255: the image replaces what lies below it
@@ -928,6 +1245,7 @@ impl Ui {
             tex: None,
             rb: None,
             rb_px: Vec::new(),
+            rb_keep: None,
             full: true,
             undef: true,
             pending: false,
@@ -1012,6 +1330,7 @@ impl Ui {
         }
         let s = &mut self.m.gout;
         s.images_gone();
+        s.canvases_gone();
         let now = plat::time_us();
         if matches!(e, GpuError::Invalid(_) | GpuError::Unsupported(_)) {
             s.dev = Dev::Never(format!("{e}"));
@@ -1168,6 +1487,7 @@ impl Ui {
         self.gp_poll();
         let n = self.m.gout.wins.len();
         let now = plat::time_us();
+        self.gp_canvas_tick(now);
         for w in self.m.gout.wins.iter_mut().flatten() {
             if w.sp.linger_at != 0 && now >= w.sp.linger_at {
                 w.sp.linger_at = 0;
@@ -1324,6 +1644,14 @@ impl Ui {
         if s.trim_at != 0 {
             d = d.min(s.trim_at);
         }
+        if !s.script {
+            for c in s.canvases.iter().filter(|c| c.apart) {
+                d = d.min(c.until);
+            }
+        }
+        if s.canvas_free_at != 0 {
+            d = d.min(s.canvas_free_at);
+        }
         let ready = matches!(s.dev, Dev::Ready(_));
         let moving = plat::win_in_sizemove();
         for w in s.wins.iter().flatten() {
@@ -1367,6 +1695,14 @@ impl Ui {
         if let Some(w) = self.m.gout.wins.get_mut(i) {
             *w = None;
         }
+        let s = &mut self.m.gout;
+        for k in (0..s.canvases.len()).rev() {
+            if s.canvases[k].win == i {
+                let c = s.canvases.remove(k);
+                let n: usize = c.levels.iter().map(|l| l.tiles.len()).sum();
+                s.tile_bytes -= n as u64 * TILE_BYTES;
+            }
+        }
     }
 
     /// the window loop ended: everything of the GPU goes (a job still running after 2 s is left
@@ -1387,10 +1723,14 @@ impl Ui {
         if env_on("jfgui_GPU_VALIDATE") {
             s.wins.clear();
             s.images.clear();
+            s.canvases.clear();
+            s.tile_free.clear();
             s.dev = Dev::None;
         } else {
             core::mem::forget(core::mem::take(&mut s.wins));
             core::mem::forget(core::mem::take(&mut s.images));
+            core::mem::forget(core::mem::take(&mut s.canvases));
+            core::mem::forget(core::mem::take(&mut s.tile_free));
             core::mem::forget(core::mem::replace(&mut s.dev, Dev::None));
         }
         s.want = false;
@@ -1412,7 +1752,8 @@ impl Ui {
                 }
                 o.layer_store += u.store.px.capacity() as u64;
             }
-            o.image_quads = w.sp.quads.len() as u32;
+            o.image_quads = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::Image { .. })).count() as u32;
+            o.canvas_quads = w.sp.quads.len() as u32 - o.image_quads;
             o
         });
         o.wanted = s.want;
@@ -1421,6 +1762,13 @@ impl Ui {
         o.image_uploads = s.image_uploads;
         o.image_hits = s.image_hits;
         o.image_evicted = s.image_evicted;
+        o.canvas_apart = s.canvases.iter().filter(|c| c.apart && c.win == win as usize).count() as u32;
+        o.canvas_tiles = s.canvases.iter().flat_map(|c| c.levels.iter()).map(|l| l.tiles.len() as u32).sum();
+        o.canvas_bytes = s.tile_bytes;
+        o.canvas_fills = s.tile_fills;
+        o.canvas_fill_us = s.tile_fill_us;
+        o.canvas_evicted = s.tile_evicted;
+        o.canvas_settles = s.canvas_settles;
         match &s.dev {
             Dev::Ready(core) => {
                 o.adapter = core.name.clone();
@@ -1453,6 +1801,25 @@ impl Ui {
     /// (test aid) the bytes image textures may take
     pub fn gpu_test_image_budget(&mut self, bytes: u64) {
         self.m.gout.image_budget = bytes;
+    }
+
+    /// (test aid) the bytes canvas tiles may take
+    pub fn gpu_test_canvas_budget(&mut self, bytes: u64) {
+        self.m.gout.canvas_budget = bytes;
+    }
+
+    /// every canvas whose view comes from tiles goes back to the CPU's picture with the next frame
+    pub fn gpu_canvas_settle(&mut self) {
+        let mut any = false;
+        let s = &mut self.m.gout;
+        for c in s.canvases.iter_mut().filter(|c| c.apart) {
+            c.apart = false;
+            any = true;
+            s.canvas_settles += 1;
+        }
+        if any {
+            self.invalidate();
+        }
     }
 
     /// the pixels of the images the GPU draws into the framebuffers (Ui::fb reads them then)
@@ -1499,10 +1866,13 @@ impl Ui {
             sp.hole = vec![0; total];
             sp.owed = vec![false; total];
             sp.stale = vec![false; total];
+            sp.part = vec![false; total];
+            sp.redraw = vec![false; total];
             sp.any_owed = false;
             sp.any_stale = false;
         }
         sp.hole.fill(0);
+        sp.part.fill(false);
         let mut quads = core::mem::take(&mut sp.quads);
         quads.clear();
         // an image gone or drawn in another version takes its texture along
@@ -1660,7 +2030,7 @@ impl Ui {
                 let hole = &sp.hole;
                 cell_rects(&mut rects, cols, rows, fw, fh, |k| hole[k] == q);
                 let step = [(((sf.w as u64) << 16) / *iw as u64) as u32, (((sf.h as u64) << 16) / *ih as u64) as u32];
-                quads.push(Quad { tex, src: sf.clone(), x: *x, y: *y, w: *iw, h: *ih, step, rects });
+                quads.push(Quad { x: *x, y: *y, src: QuadSrc::Image { tex, src: sf.clone(), w: *iw, h: *ih, step }, rects });
             }
         }
         // what was not drawn for a long time gives its memory back
@@ -1677,6 +2047,302 @@ impl Ui {
         !w.sp.quads.is_empty()
     }
 
+    /// widgets build a CanvasDesc when this says so (canvas.rs)
+    pub(crate) fn gp_canvas_wanted(&self) -> bool {
+        let s = &self.m.gout;
+        s.want && s.canvases_on
+    }
+
+    /// a widget about to record canvas id with this content version: would a move of its view come
+    /// from tiles in the next frame?
+    pub(crate) fn gp_canvas_steady(&self, id: u32, ver: u32) -> bool {
+        let i = self.uiw_cur as usize;
+        let s = &self.m.gout;
+        s.want && s.canvases_on && !self.rtl && self.gp_split_wanted() && s.canvases.iter().find(|c| c.win == i && c.id == id).is_some_and(|c| c.ver == ver && !c.damaged)
+    }
+
+    /// dirty_compute, before hashing: what the view of each canvas of the frame did since the last
+    /// frame, and so which of them come from tiles now (W::canv)
+    pub(crate) fn gp_canvas_begin(&mut self) {
+        let i = self.uiw_cur as usize;
+        let can = self.wp.dirty.split && !self.rtl && self.dc.opac == 255 && self.gp_can_split(i);
+        let now = plat::time_us();
+        let Ui { m, wp, .. } = self;
+        let s = &mut m.gout;
+        wp.dirty.canv.clear();
+        for rec in wp.canv.recs.iter() {
+            let d = &rec.d;
+            let mode = s.canvas_mode(d.name, d.gpu);
+            if mode == CanvasGpu::Cpu {
+                continue;
+            }
+            let ci = s.canvases.iter().position(|c| c.win == i && c.id == d.id).unwrap_or_else(|| {
+                s.canvases.push(Canvas {
+                    win: i,
+                    id: d.id,
+                    ver: d.ver,
+                    view: d.view,
+                    prev: d.view,
+                    known: false,
+                    damaged: false,
+                    apart: false,
+                    until: 0,
+                    moved: false,
+                    levels: Vec::new(),
+                });
+                s.canvases.len() - 1
+            });
+            let new_ver = s.canvases[ci].ver != d.ver;
+            if new_ver {
+                let levels = core::mem::take(&mut s.canvases[ci].levels);
+                for l in levels {
+                    s.tiles_free(l.tiles);
+                }
+            }
+            let c = &mut s.canvases[ci];
+            let changed = new_ver || c.damaged;
+            let moved = c.known && c.view != d.view;
+            let (dx, dy) = (d.view.ox - c.view.ox, d.view.oy - c.view.oy);
+            let whole = d.view.scale == c.view.scale && (dx - rnd(dx)).abs() < PHASE_TOL && (dy - rnd(dy)).abs() < PHASE_TOL;
+            c.moved = false;
+            if changed || !can || rec.layer != 0 {
+                c.apart = false; // the CPU draws this frame, as without tiles
+            } else if moved {
+                c.apart = mode == CanvasGpu::Zoom || whole;
+                if c.apart {
+                    c.moved = true;
+                    c.until = now + SETTLE_US;
+                    s.canvas_free_at = c.until + CANVAS_UNUSED_US;
+                }
+            }
+            let c = &mut s.canvases[ci];
+            if moved {
+                c.prev = c.view;
+            }
+            c.ver = d.ver;
+            c.view = d.view;
+            c.damaged = false;
+            c.known = true;
+            if c.apart {
+                wp.dirty.canv.push((rec.index, d.rect));
+            }
+        }
+    }
+
+    /// dirty_compute, after hashing: the tiles each canvas apart needs now (the ones missing are
+    /// drawn for up to FILL_US), the cells the GPU draws it in -> any canvas apart
+    pub(crate) fn gp_plan_canvases(&mut self) -> bool {
+        let i = self.uiw_cur as usize;
+        if self.wp.dirty.canv.is_empty() {
+            return false;
+        }
+        let (fw, fh) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        let Ui { m, wp, text, .. } = self;
+        let font = text.get_font();
+        let s = &mut m.gout;
+        s.tick += 1;
+        let (tick, t0) = (s.tick, plat::time_us());
+        let fill_end = if s.script { u64::MAX } else { t0 + FILL_US };
+        let d = &wp.dirty;
+        let (cols, rows) = (d.cols as usize, d.rows as usize);
+        let Some(Some(w)) = s.wins.get_mut(i) else { return false };
+        let mut quads = core::mem::take(&mut w.sp.quads);
+        let mut sf = core::mem::take(&mut s.tile_sf);
+        if sf.px.is_empty() {
+            sf = Surface::new(TILE_TEX, TILE_TEX, FMT_XRGB);
+        }
+        for (tag0, seen) in d.imgs.iter().enumerate() {
+            let Some(Cmd::Custom { x, y, w: cw, h: ch, f: Some(f), .. }) = wp.cmd.layers[0].get(seen.index as usize) else { continue };
+            let Some(rec) = wp.canv.recs.iter().find(|r| r.layer == 0 && r.index == seen.index) else { continue };
+            let Some(ci) = s.canvases.iter().position(|c| c.win == i && c.id == rec.d.id) else { continue };
+            if quads.len() >= TOP_BLOCKED as usize - 1 {
+                continue;
+            }
+            let (tag, vis, v) = (tag0 as u8 + 1, seen.vis, rec.d.view);
+            let zoom = s.canvas_mode(rec.d.name, rec.d.gpu) == CanvasGpu::Zoom;
+            let (moved, li) = {
+                let c = &mut s.canvases[ci];
+                (c.moved, level_for(c, v, zoom))
+            };
+            let mut li = li;
+            if s.canvases[ci].levels.len() > LEVELS_MAX {
+                let old = s.canvases[ci].levels.remove(0);
+                s.tiles_free(old.tiles);
+                li -= 1;
+            }
+            // ---- the transform: window = o + (grid - f) * k
+            let (lscale, fx, fy) = {
+                let l = &s.canvases[ci].levels[li];
+                (l.scale, l.fx, l.fy)
+            };
+            let k = v.scale / lscale;
+            let (dx, dy) = (v.ox - fx, v.oy - fy);
+            let (rx, ry) = (rnd(dx), rnd(dy));
+            let copy = k == 1.0 && (dx - rx).abs() < PHASE_TOL && (dy - ry).abs() < PHASE_TOL;
+            let t = TILE as f64;
+            let range = |w0: i32, w1: i32, o: f64, f: f64| -> (i32, i32) {
+                let g = |w: f64| (w - o) / k + f;
+                (flr(g(w0 as f64 - 1.0) / t) as i32, flr(g(w1 as f64 + 1.0) / t) as i32)
+            };
+            let (ix0, ix1) = range(vis[0], vis[2], v.ox, fx);
+            let (iy0, iy1) = range(vis[1], vis[3], v.oy, fy);
+            // the pixel a position at the left or top of belongs to: the first whose centre lies there
+            let edge = |g: f64, o: f64, f: f64| -> i32 { (flr(o + (g - f) * k - 0.5) + 1.0) as i32 };
+            let mut tiles = Vec::new();
+            let mut missing: Vec<[i32; 4]> = Vec::new();
+            for iy in iy0..=iy1 {
+                for ix in ix0..=ix1 {
+                    let (gx, gy) = (ix as f64 * t, iy as f64 * t);
+                    let (b, place) = if copy {
+                        let (x0, y0) = (rx as i32 + ix * TILE, ry as i32 + iy * TILE);
+                        ([x0, y0, x0 + TILE, y0 + TILE], [x0 - TILE_BORDER, y0 - TILE_BORDER, 0, 0])
+                    } else {
+                        let b = [edge(gx, v.ox, fx), edge(gy, v.oy, fy), edge(gx + t, v.ox, fx), edge(gy + t, v.oy, fy)];
+                        let at = |g: f64, o: f64, f: f64| rnd((o + (g - TILE_BORDER as f64 - f) * k) * 256.0) as i32;
+                        let step = rnd(65536.0 / k) as i32;
+                        (b, [at(gx, v.ox, fx), at(gy, v.oy, fy), step, step])
+                    };
+                    if b[0] >= vis[2] || b[2] <= vis[0] || b[1] >= vis[3] || b[3] <= vis[1] || b[0] >= b[2] || b[1] >= b[3] {
+                        continue;
+                    }
+                    if let Some(tile) = s.canvases[ci].levels[li].tiles.get_mut(&(ix, iy)) {
+                        tile.tick = tick;
+                        tiles.push(TileDraw { tex: tile.tex.clone(), b, place });
+                        continue;
+                    }
+                    let t1 = plat::time_us();
+                    let tex = if t1 < fill_end { s.tile_texture(tick) } else { None };
+                    let Some(tex) = tex else {
+                        missing.push(b);
+                        continue;
+                    };
+                    let tv = CanvasView { scale: lscale, ox: fx - gx + TILE_BORDER as f64, oy: fy - gy + TILE_BORDER as f64 };
+                    let mut dc = Dc::new(TILE_TEX, TILE_TEX);
+                    dc.begin(&sf);
+                    rec.d.content.draw_view(&mut Gfx { dc: &mut dc, sf: &mut sf, text: &mut *text }, tv, [0, 0, TILE_TEX, TILE_TEX]);
+                    dc.end();
+                    let Dev::Ready(core) = &s.dev else {
+                        missing.push(b);
+                        continue;
+                    };
+                    let before = if tex.fresh.replace(false) { Layout::Undefined } else { Layout::Sampled };
+                    if core.dev.queue().write_texture_rects(&tex.t, &[[0, 0, TILE_TEX, TILE_TEX]], &sf.px, sf.stride as u32, before, Layout::Sampled).is_err() {
+                        missing.push(b); // (a failure of the device shows with the next present)
+                        continue;
+                    }
+                    s.tile_fills += 1;
+                    s.tile_fill_us += plat::time_us().saturating_sub(t1);
+                    s.trim_at = plat::time_us() + TRIM_US;
+                    if let Some(Some(w)) = s.wins.get_mut(i) {
+                        w.out.upload_bytes += TILE_BYTES;
+                    }
+                    tiles.push(TileDraw { tex: tex.clone(), b, place });
+                    s.canvases[ci].levels[li].tiles.insert((ix, iy), Tile { tex, tick });
+                }
+            }
+            // ---- the cells: on top of them and with its tiles the GPU draws it, else the CPU
+            let Some(Some(w)) = s.wins.get_mut(i) else { continue };
+            let sp = &mut w.sp;
+            if sp.hole.len() != cols * rows {
+                continue;
+            }
+            let q = quads.len() as u8 + 1;
+            let span = |a: i32, b: i32, n: usize| ((a.max(0) >> 5) as usize, (((b + CELL - 1).max(0) >> 5) as usize).min(n));
+            let (c0, c1) = span(vis[0], vis[2], cols);
+            let (r0, r1) = span(vis[1], vis[3], rows);
+            for r in r0..r1 {
+                for c in c0..c1 {
+                    let k = r * cols + c;
+                    if d.top.get(k) == Some(&tag) {
+                        let b = cell_box(k, cols, fw, fh);
+                        sp.hole[k] = q;
+                        sp.part[k] = b[0] < vis[0] || b[1] < vis[1] || b[2] > vis[2] || b[3] > vis[3];
+                        if moved {
+                            sp.owed[k] = true;
+                            sp.stale[k] = true;
+                        }
+                    }
+                    if moved {
+                        sp.redraw[k] = true;
+                    }
+                }
+            }
+            for b in &missing {
+                let (c0, c1) = span(b[0].max(vis[0]), b[2].min(vis[2]), cols);
+                let (r0, r1) = span(b[1].max(vis[1]), b[3].min(vis[3]), rows);
+                for r in r0..r1 {
+                    for c in c0..c1 {
+                        let k = r * cols + c;
+                        if sp.hole[k] == q {
+                            sp.hole[k] = 0;
+                            sp.part[k] = false;
+                        }
+                    }
+                }
+            }
+            sp.moved |= moved;
+            w.out.canvas_frames += moved as u64;
+            let mut rects = Vec::new();
+            let hole = &sp.hole;
+            cell_rects(&mut rects, cols, rows, fw, fh, |k| hole[k] == q);
+            for r in rects.iter_mut() {
+                let (x0, y0) = (r[0].max(vis[0]), r[1].max(vis[1]));
+                let (x1, y1) = ((r[0] + r[2]).min(vis[2]), (r[1] + r[3]).min(vis[3]));
+                *r = [x0, y0, x1 - x0, y1 - y0];
+            }
+            rects.retain(|r| r[2] > 0 && r[3] > 0);
+            if !rects.is_empty() {
+                let loose = !(rec.d.exact_pan && copy);
+                quads.push(Quad { x: *x, y: *y, src: QuadSrc::Canvas { f: f.clone(), w: *cw, h: *ch, tiles, copy, loose }, rects });
+            }
+        }
+        s.tile_sf = sf;
+        text.set_font(font.0, font.1);
+        if let Some(Some(w)) = s.wins.get_mut(i) {
+            w.sp.quads = quads;
+        }
+        true
+    }
+
+    /// the window loop: gestures over (a frame draws their picture), tiles nobody moved over for a
+    /// long time
+    fn gp_canvas_tick(&mut self, now: u64) {
+        let s = &mut self.m.gout;
+        if !s.script && s.canvases.iter().any(|c| c.apart && now >= c.until) {
+            for c in s.canvases.iter_mut().filter(|c| c.apart && now >= c.until) {
+                c.apart = false;
+                s.canvas_settles += 1;
+            }
+            self.invalidate();
+        }
+        let s = &mut self.m.gout;
+        if s.canvas_free_at != 0 && now >= s.canvas_free_at {
+            s.canvases_gone();
+            s.trim_at = now + TRIM_US;
+        }
+    }
+
+    /// ui.canvas_gpu_damage: the tiles over content rectangle r go, the next frame is the CPU's
+    pub(crate) fn gp_canvas_damage(&mut self, id: u32, r: [f64; 4]) {
+        let i = self.uiw_cur as usize;
+        let S { canvases, tile_free, .. } = &mut self.m.gout;
+        let Some(c) = canvases.iter_mut().find(|c| c.win == i && c.id == id) else { return };
+        c.damaged = true;
+        for l in c.levels.iter_mut() {
+            let t = TILE as f64;
+            let cell = |u: f64, f: f64, m: f64| flr((u * l.scale + f + m) / t) as i32;
+            let (ix0, ix1) = (cell(r[0], l.fx, -2.0), cell(r[2], l.fx, 2.0));
+            let (iy0, iy1) = (cell(r[1], l.fy, -2.0), cell(r[3], l.fy, 2.0));
+            l.tiles.retain(|&(ix, iy), tile| {
+                let hit = ix >= ix0 && ix <= ix1 && iy >= iy0 && iy <= iy1;
+                if hit {
+                    tile_free.push(tile.tex.clone());
+                }
+                !hit
+            });
+        }
+    }
+
     /// render_live, after dirty_compute: is this frame drawn layer by layer?  (Else it goes as
     /// without layers: the whole base texture holds the framebuffer's cells then.)
     pub(crate) fn gp_split_begin(&mut self, n: i32) -> bool {
@@ -1688,7 +2354,7 @@ impl Ui {
         let upper_now = self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty());
         let Some(w) = self.m.gout.win(i) else { return false };
         let sp = &mut w.sp;
-        let kept = sp.active || !sp.quads.is_empty() || sp.any_stale;
+        let kept = sp.active || !sp.quads.is_empty() || sp.any_stale || sp.moved;
         if !can {
             if kept {
                 self.gp_flatten(i);
@@ -1705,7 +2371,7 @@ impl Ui {
             return false;
         }
         let stale = sp.any_stale && sp.stale.iter().zip(sp.hole.iter()).any(|(&a, &h)| a && h == 0);
-        if n == 0 && !stale {
+        if n == 0 && !stale && !sp.moved {
             return false; // nothing changed
         }
         if self.wp.rt.present_n == 0 {
@@ -1740,8 +2406,10 @@ impl Ui {
             sp.hole = vec![0; total];
             sp.owed = vec![false; total];
             sp.stale = vec![false; total];
+            sp.part = vec![false; total];
+            sp.redraw = vec![false; total];
         }
-        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, linger_at, .. } = sp;
+        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, linger_at, part, redraw, .. } = sp;
         // ---- per cell: what changed, which layers touch it
         lowest.clear();
         lowest.resize(total, L_COUNT as u8);
@@ -1765,12 +2433,17 @@ impl Ui {
             if stale[k] && hole[k] == 0 {
                 low = 0; // the image the CPU left out is no longer drawn by the GPU
             }
-            lowest[k] = low as u8;
             for l in 1..L_COUNT {
                 if now[l][k] != now[l - 1][k] {
                     nr[k] |= 1 << l;
                 }
             }
+            // a canvas moved below: the CPU's way where the GPU does not draw it, and for a layer
+            // over it, which holds what lies below
+            if redraw[k] && (hole[k] == 0 || nr[k] != 0) {
+                low = 0;
+            }
+            lowest[k] = low as u8;
         }
         // explicit damage: its cells from the base up
         if n >= 0 {
@@ -1841,7 +2514,7 @@ impl Ui {
                         }
                         if owed[k] && hole[k] != 0 {
                             if let Some(q) = quads.get(hole[k] as usize - 1) {
-                                quad_blit(fb, q, b);
+                                quad_blit(fb, q, b, text);
                             }
                             owed[k] = false;
                         }
@@ -1850,7 +2523,7 @@ impl Ui {
                 }
             }
             let is_base = l == 0;
-            cell_rects(rects, cols, rows, fw, fh, |k| (lowest[k] as usize) <= l && (if is_base { hole[k] == 0 } else { nr[k] & bit != 0 }));
+            cell_rects(rects, cols, rows, fw, fh, |k| (lowest[k] as usize) <= l && (if is_base { hole[k] == 0 || part[k] } else { nr[k] & bit != 0 }));
             for r in rects.iter() {
                 dc.clip_push(r[0], r[1], r[2], r[3]);
                 render_layer(&wp.cmd.layers[l], 0, dc, fb, text, icon_hook, icon_style);
@@ -1902,6 +2575,8 @@ impl Ui {
         }
         sp.any_owed = sp.owed.iter().any(|&v| v);
         sp.any_stale = sp.stale.iter().any(|&v| v);
+        sp.redraw.fill(false);
+        sp.moved = false;
         sp.active = sp.upper.iter().any(|u| !u.rects.is_empty());
         sp.clean = true;
         sp.drawn = true;
@@ -1938,7 +2613,11 @@ impl Ui {
         let (mut owed, hole, quads) = (core::mem::take(&mut sp.owed), core::mem::take(&mut sp.hole), core::mem::take(&mut sp.quads));
         let (cols, rows) = (sp.cols, sp.rows);
         sp.any_owed = false;
-        if let Some(p) = self.uiw_parts_mut(i as u32) {
+        let font = self.text.get_font();
+        let cur = self.uiw_cur as usize;
+        let Ui { wp, m, text, .. } = self;
+        let parts = if i == cur { Some(wp) } else { m.win.recs[i & (WIN_MAX - 1)].save.as_deref_mut() };
+        if let Some(p) = parts {
             let fb = &mut p.rt.fb;
             let (fw, fh) = (fb.w, fb.h);
             let mut rects = Vec::new();
@@ -1946,10 +2625,11 @@ impl Ui {
                 let tag = q as u8 + 1;
                 cell_rects(&mut rects, cols, rows, fw, fh, |k| owed[k] && hole[k] == tag);
                 for r in &rects {
-                    quad_blit(fb, quad, [r[0], r[1], r[0] + r[2], r[1] + r[3]]);
+                    quad_blit(fb, quad, [r[0], r[1], r[0] + r[2], r[1] + r[3]], text);
                 }
             }
         }
+        self.text.set_font(font.0, font.1);
         owed.fill(false);
         let Some(Some(w)) = self.m.gout.wins.get_mut(i) else { return };
         (w.sp.owed, w.sp.hole, w.sp.quads) = (owed, hole, quads);
@@ -2035,7 +2715,9 @@ impl Ui {
             self.gp_tick();
             let s = &self.m.gout;
             let building = s.jobs.running.load(Ordering::Acquire) != 0;
-            let all = s.wins.iter().flatten().all(|w| w.stage == Stage::Gpu);
+            // (a window the system keeps at another size stays on the CPU path: a narrow tool window
+            // in a script's real window with a frame)
+            let all = s.wins.iter().flatten().all(|w| w.stage == Stage::Gpu || plat::win_size(w.pw) != w.size);
             if matches!(s.dev, Dev::Never(_)) {
                 return false;
             }
@@ -2056,11 +2738,11 @@ impl Ui {
 
     /// the script command `gpu` (the module's header)
     pub(crate) fn sc_gpu(&mut self, app: &mut dyn App, a: &[u8]) {
-        if word_eq(a, "on").is_some() {
+        if let Some(r) = word_eq(a, "on") {
             self.m.gout.script = true;
             self.m.gout.setup();
             self.m.gout.want = true;
-            self.m.gout.verify = true;
+            self.m.gout.verify = word_eq(skip_ws(r), "fast").is_none();
             self.m.gout.trace = env_on("jfgui_GPU_TRACE");
             self.m.gout.skip = false;
             self.dirty_force_full();
@@ -2071,7 +2753,10 @@ impl Ui {
             if !self.gp_script_wait(20_000) {
                 let why = match &self.m.gout.dev {
                     Dev::Never(w) => w.clone(),
-                    _ => String::from("the swapchain did not come"),
+                    _ => {
+                        let stages: Vec<(usize, Stage)> = self.m.gout.wins.iter().enumerate().filter_map(|(i, w)| w.as_ref().map(|w| (i, w.stage))).collect();
+                        format!("the swapchain did not come: {stages:?}")
+                    }
                 };
                 if matches!(self.m.gout.dev, Dev::Never(_)) {
                     self.gp_skip(&why);
@@ -2088,6 +2773,9 @@ impl Ui {
             s.wins.clear();
             s.images.clear();
             s.image_bytes = 0;
+            s.canvases.clear();
+            s.tile_free.clear();
+            s.tile_bytes = 0;
             s.dev = Dev::None;
             s.want = false;
             for pw in s.script_pw.iter_mut() {
@@ -2122,6 +2810,24 @@ impl Ui {
         if let Some(n) = word_eq(a, "budget") {
             let (v, _) = super::runtime::parse_int(skip_ws(n));
             self.gpu_test_image_budget(v.max(0) as u64);
+            return;
+        }
+        if let Some(n) = word_eq(a, "tilebudget") {
+            let (v, _) = super::runtime::parse_int(skip_ws(n));
+            self.gpu_test_canvas_budget(v.max(0) as u64);
+            return;
+        }
+        if let Some(r) = word_eq(a, "shot") {
+            let r = skip_ws(r);
+            self.gp_shot(&String::from_utf8_lossy(r).into_owned());
+            return;
+        }
+        if word_eq(a, "settle").is_some() {
+            if !self.m.gout.skip {
+                self.gpu_canvas_settle();
+                self.render();
+                self.present();
+            }
             return;
         }
         if word_eq(a, "print").is_some() {
@@ -2182,14 +2888,87 @@ impl Ui {
             if have != want as u32 {
                 self.fail(format!("{have} image textures").as_bytes());
             }
+        } else if let Some(n) = word_eq(r, "apart") {
+            let (want, _) = super::runtime::parse_int(skip_ws(n));
+            let have = self.gpu_output(i as u32).canvas_apart;
+            if have != want as u32 {
+                self.fail(format!("{have} canvases apart").as_bytes());
+            }
+        } else if let Some(n) = word_eq(r, "tiles") {
+            let (want, _) = super::runtime::parse_int(skip_ws(n));
+            let have = self.gpu_output(i as u32).canvas_tiles;
+            if have != want as u32 {
+                self.fail(format!("{have} canvas tiles").as_bytes());
+            }
+        } else if let Some(n) = word_eq(r, "fills") {
+            let (max, _) = super::runtime::parse_int(skip_ws(n));
+            let s = &mut self.m.gout;
+            let fills = s.tile_fills - core::mem::replace(&mut s.tile_marked, s.tile_fills);
+            if fills > max as u64 {
+                self.fail(format!("{fills} tiles drawn").as_bytes());
+            }
+        } else if word_eq(r, "nodiff").is_some() {
+            let o = self.gpu_output(i as u32);
+            let px = o.canvas_diff_px - core::mem::replace(&mut self.m.gout.diff_marked, o.canvas_diff_px);
+            if px != 0 {
+                self.fail(format!("{px} pixels of a canvas's tiles differ, by {} at most in this window so far", o.canvas_diff_max).as_bytes());
+            }
         } else {
             self.fail(b"unknown gpu expectation");
+        }
+    }
+
+    // `gpu shot`: the window presents once more, the image read back into a file
+    fn gp_shot(&mut self, file: &str) {
+        if self.m.gout.skip {
+            return;
+        }
+        self.render();
+        self.present();
+        let i = self.gp_scoped();
+        self.gp_settle_all();
+        let mut s = core::mem::take(&mut self.m.gout);
+        let mut raw = None;
+        let fb = self.uiw_parts(i as u32).map(|p| &p.rt.fb);
+        let (mut w_px, mut h_px) = (0, 0);
+        if let (Dev::Ready(core), Some(Some(w)), Some(fb)) = (&s.dev, s.wins.get_mut(i), fb) {
+            (w_px, h_px) = (fb.w, fb.h);
+            w.rb_keep = Some(Vec::new());
+            for _ in 0..50 {
+                match show(w, core, fb) {
+                    Ok(Shown::Wait) => { plat::wait(plat::time_us() + 4_000); }
+                    _ => break,
+                }
+            }
+            raw = w.rb_keep.take().filter(|v| !v.is_empty());
+            if core.format == Format::Rgba8Unorm {
+                if let Some(v) = raw.as_mut() {
+                    for p in v.chunks_exact_mut(4) {
+                        p.swap(0, 2);
+                    }
+                }
+            }
+        }
+        self.m.gout = s;
+        script_pump();
+        let saved = raw.is_some_and(|v| {
+            let mut sf = Surface::new(w_px, h_px, FMT_XRGB);
+            sf.px.copy_from_slice(&v);
+            Ui::save_png(&sf, file)
+        });
+        if !saved {
+            self.fail(b"no presented image (gpu on fast reads nothing back)");
         }
     }
 
     // every window on the GPU: present once more, read back, compare; no frame differed since the
     // last check
     fn gp_expect_same(&mut self) {
+        if self.m.gout.canvases.iter().any(|c| c.apart) {
+            self.gpu_canvas_settle();
+            self.render();
+            self.present();
+        }
         self.gp_settle_all();
         let mut s = core::mem::take(&mut self.m.gout);
         let mut msg = None;
@@ -2227,6 +3006,7 @@ impl Ui {
             msg = Some(String::from("no window on the swapchain"));
         }
         self.m.gout = s;
+        self.m.gout.diff_marked = self.gpu_output(self.gp_scoped() as u32).canvas_diff_px;
         script_pump();
         if let Some(m) = msg {
             self.fail(m.as_bytes());

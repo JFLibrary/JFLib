@@ -145,7 +145,10 @@ mod gpu_out;
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
 #[cfg(windows)]
-pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_VS, GPU_OUT_WGSL};
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
+// a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
+mod canvas;
+pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
 // ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
@@ -375,6 +378,8 @@ pub struct WinParts {
     pub(crate) rtl: rtl::W,
     /// the scroll views of the pass, their content grids of the last frame (scrollcopy.rs)
     pub(crate) scopy: scrollcopy::W,
+    /// the canvases of the pass (canvas.rs)
+    pub(crate) canv: canvas::W,
 }
 
 impl WinParts {
@@ -391,6 +396,7 @@ impl WinParts {
             chrome: Default::default(),
             rtl: Default::default(),
             scopy: Default::default(),
+            canv: Default::default(),
         }
     }
 }
@@ -497,6 +503,24 @@ pub struct GpuOutput {
     pub image_uploads: u64,
     pub image_hits: u64,
     pub image_evicted: u64,
+    /// canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
+    /// in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
+    /// and the time that took (us), tiles evicted, gestures ended by the CPU's picture
+    pub canvas_apart: u32,
+    pub canvas_quads: u32,
+    pub canvas_frames: u64,
+    pub canvas_tiles: u32,
+    pub canvas_bytes: u64,
+    pub canvas_fills: u64,
+    pub canvas_fill_us: u64,
+    pub canvas_evicted: u64,
+    pub canvas_settles: u64,
+    /// jfgui_GPU_VERIFY: where the tiles' picture differed from the CPU's during a gesture: frames,
+    /// pixels, the sum of the largest channel difference per pixel, the largest one
+    pub canvas_diff_frames: u64,
+    pub canvas_diff_px: u64,
+    pub canvas_diff_sum: u64,
+    pub canvas_diff_max: u32,
     /// time in the window's renders and presents (us)
     pub render_us: u64,
     pub present_us: u64,

@@ -1,0 +1,78 @@
+#!args --verify-dirty
+# the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan and a wheel zoom come
+# from tiles, the CPU's picture follows; every presented image is read back: outside the tiles it
+# equals the framebuffer during the gesture (their differences are counted), all of it at rest.
+# Without a GPU `gpu` prints a SKIP once and does nothing.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+theme light
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect apart 0
+gpu expect tiles 0
+gpu expect upload 100000000
+# ---- a pan with the middle button: tiles, nothing of the view goes up to the base
+drag 550,388 450,338 middle
+expect text:"Mitte: 596,346" exists
+gpu expect apart 1
+gpu print
+gpu expect same
+gpu expect apart 0
+gpu print
+# the same tiles serve the next pan: only what comes into view is drawn
+gpu expect fills 1000
+drag 550,388 530,378 middle
+gpu expect apart 1
+gpu expect fills 12
+gpu expect same
+# ---- a wheel zoom at the pointer
+wheel 550,388 120 ctrl
+expect text:"Zoom: 125 %" exists
+gpu expect apart 1
+gpu print
+wheel 550,388 120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu expect apart 0
+# ---- back: the wheel scrolls
+wheel 550,388 -240 ctrl
+gpu expect same
+wheel 550,388 -120
+gpu expect apart 1
+gpu expect same
+# ---- an edit drops what it touches: the CPU draws it as without tiles
+click "Einpassen"
+gpu expect same
+drag 550,388 530,378 middle
+gpu expect apart 1
+gpu expect same
+click listitem:"N15"
+gpu expect apart 0
+drag listitem:"N15" 40,0
+gpu expect apart 0
+gpu expect same
+drag 550,388 530,378 middle
+gpu expect apart 1
+gpu expect same
+# ---- the tiles' budget: nothing is kept above it, the rest goes the CPU's way
+gpu tilebudget 1000000
+wheel 550,388 120 ctrl
+gpu expect same
+wheel 550,388 -120 ctrl
+gpu expect same
+gpu tilebudget 134217728
+# ---- a lost device: every texture gone, the CPU path, the tiles come back with the next gesture
+gpu lose
+wheel 550,388 -120
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect tiles 0
+drag 550,388 530,378 middle
+gpu expect apart 1
+gpu expect same
+gpu print
+gpu expect screen
+gpu off
+quit

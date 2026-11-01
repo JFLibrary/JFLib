@@ -6,7 +6,7 @@
 @group(0) @binding(0) var frame: texture_2d<f32>;
 
 // where the texture's first pixel lies in the window; an image's steps (16.16 source pixels per
-// window pixel: Dc::blit_scaled)
+// window pixel: Dc::blit_scaled).  A scaled tile: x, y in 24.8, its steps the same way
 struct Place {
     x: i32,
     y: i32,
@@ -37,4 +37,18 @@ fn fs_image(@builtin(position) p: vec4f) -> @location(0) vec4f {
     let d = vec2u(vec2i(p.xy) - vec2i(place.x, place.y));
     let s = vec2u((d.x * place.step_x + (place.step_x >> 1u)) >> 16u, (d.y * place.step_y + (place.step_y >> 1u)) >> 16u);
     return vec4f(textureLoad(frame, s, 0).rgb, 1.0);
+}
+
+// a canvas's tile through a transform of the running gesture (lib/ui/canvas.rs): bilinear from four
+// texels, no sampler; the tile's border of one texel keeps them inside and joins the tiles
+@fragment
+fn fs_tile(@builtin(position) p: vec4f) -> @location(0) vec4f {
+    let o = vec2f(f32(place.x), f32(place.y)) / 256.0;
+    let t = (p.xy - o) * vec2f(f32(place.step_x), f32(place.step_y)) / 65536.0 - vec2f(0.5, 0.5);
+    let f = floor(t);
+    let w = t - f;
+    let a = vec2i(f);
+    let top = mix(textureLoad(frame, a, 0).rgb, textureLoad(frame, a + vec2i(1, 0), 0).rgb, w.x);
+    let bottom = mix(textureLoad(frame, a + vec2i(0, 1), 0).rgb, textureLoad(frame, a + vec2i(1, 1), 0).rgb, w.x);
+    return vec4f(mix(top, bottom, w.y), 1.0);
 }

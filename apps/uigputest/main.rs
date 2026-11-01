@@ -2028,10 +2028,10 @@ fn new_test(name: &str) -> Test {
 
 // ---------------------------------------------------------------- without a window
 
-fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>, Vec<u32>)> {
+fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>)> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     match wgsl::compile(ui::GPU_OUT_WGSL, &opt) {
-        Ok(o) => Some((o.entry("vs")?.words.clone(), o.entry("fs")?.words.clone(), o.entry("fs_image")?.words.clone())),
+        Ok(o) => Some((o.entry("vs")?.words.clone(), o.entry("fs")?.words.clone(), o.entry("fs_image")?.words.clone(), o.entry("fs_tile")?.words.clone())),
         Err(d) => {
             out(&format!("FAIL gpu_out.wgsl: {:?}", d.first().map(|x| format!("{x}"))));
             None
@@ -2040,9 +2040,9 @@ fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>, Vec<u32>)> {
 }
 
 fn gen_shaders(path: &str) -> i32 {
-    let Some((vs, fs, fs_image)) = compile_shaders() else { return 1 };
+    let Some((vs, fs, fs_image, fs_tile)) = compile_shaders() else { return 1 };
     let mut s = String::from("// written by uigputest --gen-shaders from gpu_out.wgsl (shader::BASIS, no robustness); do not edit\n");
-    for (name, w) in [("VS", &vs), ("FS", &fs), ("FS_IMAGE", &fs_image)] {
+    for (name, w) in [("VS", &vs), ("FS", &fs), ("FS_IMAGE", &fs_image), ("FS_TILE", &fs_tile)] {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
             s.push_str("    ");
@@ -2055,7 +2055,7 @@ fn gen_shaders(path: &str) -> i32 {
         s.push_str("];\n");
     }
     if plat::write_file(path, s.as_bytes()) {
-        out(&format!("wrote {path}: {} + {} + {} words", vs.len(), fs.len(), fs_image.len()));
+        out(&format!("wrote {path}: {} + {} + {} + {} words", vs.len(), fs.len(), fs_image.len(), fs_tile.len()));
         0
     } else {
         1
@@ -2063,9 +2063,9 @@ fn gen_shaders(path: &str) -> i32 {
 }
 
 fn t_shaders() -> i32 {
-    let Some((vs, fs, fs_image)) = compile_shaders() else { return 1 };
+    let Some((vs, fs, fs_image, fs_tile)) = compile_shaders() else { return 1 };
     let mut fails = 0;
-    for (name, a, b) in [("vs", &vs[..], ui::GPU_OUT_VS), ("fs", &fs[..], ui::GPU_OUT_FS), ("fs_image", &fs_image[..], ui::GPU_OUT_FS_IMAGE)] {
+    for (name, a, b) in [("vs", &vs[..], ui::GPU_OUT_VS), ("fs", &fs[..], ui::GPU_OUT_FS), ("fs_image", &fs_image[..], ui::GPU_OUT_FS_IMAGE), ("fs_tile", &fs_tile[..], ui::GPU_OUT_FS_TILE)] {
         if a == b {
             out(&format!("  ok   {name}: {} words as wgsl::compile makes them", b.len()));
         } else {
