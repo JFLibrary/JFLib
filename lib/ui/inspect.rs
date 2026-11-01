@@ -1310,6 +1310,7 @@ impl Ui {
             self.run_passes(app);
         } else if w("snap") {
             self.render();
+            self.gp_settle_all();
             let fb = &self.wp.rt.fb;
             self.m.ins.snap = Some((fb.w, fb.h, fb.px.clone()));
         } else if let Some(r) = word_eq(a, "expect") {

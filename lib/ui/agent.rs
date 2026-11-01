@@ -171,6 +171,7 @@ impl Host for UiHost<'_> {
             }
             "ui.render" => {
                 self.settle();
+                self.ui.gpu_settle();
                 let image = self.ui.fb();
                 let bytes = img_png::encode(&image.px, image.w as usize, image.h as usize, image.stride as usize, false);
                 if bytes.len() > 16 * 1024 * 1024 { return Err(error(ErrorCode::LimitExceeded, "Rendered PNG exceeds 16 MiB")); }

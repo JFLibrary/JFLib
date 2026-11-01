@@ -36,13 +36,38 @@
 // Popups (plat::popup: small, short-lived windows with a window region) and tooltips stay on the
 // CPU path: a swapchain takes tens of ms, longer than many of them live.
 //
+// Layers (G3b).  The framebuffer stays the truth: all layers flattened, byte for byte what the CPU
+// path holds.  What the GPU gets apart: a window's base texture holds the base layer only; each
+// layer above it with commands has a texture of its own that holds, in the 32 x 32 px cells the
+// layer touches, the pixels up to and including that layer, flattened on the CPU over what really
+// lies below (shadows, translucent widgets, subpixel text, RTL: nothing to get wrong, the same
+// kernels on the same pixels).  The render pass draws the base, then these cells opaque in layer
+// order; the GPU blends nothing (blending a premultiplied layer differs from drawing directly by
+// 1 .. 2 levels in about an eighth of its translucent pixels, measured, and subpixel text needs an
+// opaque target; docs/GPU.md).  Beside each texture the pixels below the layer stay in a Store,
+// cell by cell, so a layer that moves or closes puts them back in the framebuffer: nothing below
+// it is drawn again or uploaded; closing costs no upload at all.  dirty.rs tells per cell which
+// layer changed first (W::through): gp_split_draw restores below that layer, then draws and uploads
+// only from there on.  Something changing below an open layer draws what lies above it in those
+// cells, as ever.  Textures and stores exist while their layer has content.
+//
+// Images (G3b).  A big opaque Cmd::Image of the base layer that has cost as much in redraws as its
+// upload would (rent or buy: a static image never takes GPU memory) becomes a texture, cached by
+// surface identity and version, under a budget with LRU eviction.  In the cells it fills, as the
+// last command there, its pixels are drawn by the GPU with Dc::blit_scaled's integer mapping: the
+// CPU neither draws nor uploads them (Split::owed: the framebuffer lacks them; gp_settle draws them
+// before anybody reads it).  Everything else, also the cells at the image's edge or with something
+// on top of it, goes the usual way.
+//
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 // usable adapter or surface: the CPU path for good, silently.
 //
 // Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
 // image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
-// their times); lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+// their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
+// jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget); lib/gpu's
+// jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
 // without a GPU, it prints a SKIP once and does nothing):
@@ -58,11 +83,17 @@
 //                          top of ours is a note, not a failure)
 //   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
 //   gpu expect upload N    at most N bytes uploaded since the last check
+//   gpu expect base N      at most N bytes of them to the base texture since the last check
+//   gpu expect raster N    at most N pixels of the base layer drawn since the last check
+//   gpu expect layers N    N layers above the base have a texture now
+//   gpu expect images N    N image textures exist
+//   gpu budget BYTES       the images' budget
 //   gpu lose               the device behaves as lost from now on (Device::test_lose)
 //   gpu print              the counters
 
 use alloc::boxed::Box;
 use alloc::format;
+use alloc::rc::{Rc, Weak};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec;
@@ -78,8 +109,11 @@ use gpu::{
 use rt::sync::SpinLock;
 
 use super::auto::{next_word, skip_ws, word_eq};
+use super::cmd::{render_layer, Cmd};
+use super::consts::*;
+use super::dirty::TOP_BLOCKED;
 use super::{App, GpuOutput, Ui};
-use gfx::Surface;
+use gfx::{Dc, Surface, FMT_A8, FMT_XRGB};
 
 /// the output without jfgui_GPU in the environment: on, jfgui_GPU=0 turns it off (docs/GPU.md
 /// "Ausgabe der UI" says what it costs)
@@ -107,6 +141,25 @@ const BIG_UPLOAD: u64 = 128 << 10;
 const TRIM_US: u64 = 1_200_000;
 /// a Remote Desktop session is looked at again after this long (us)
 const REMOTE_LOOK_US: u64 = 10_000_000;
+/// the layers above the base
+const UPPER: usize = L_COUNT - 1;
+/// dirty.rs's cells: what a layer's texture and store are made of
+const CELL: i32 = 32;
+const CELL_ROW: usize = CELL as usize * 4;
+const CELL_BYTES: usize = CELL as usize * CELL_ROW;
+const NO_BLOCK: u32 = u32::MAX;
+/// a layer's texture: its size is rounded up to this (px), half of the spare room on each side
+/// of what it holds now
+const LAYER_STEP: i32 = 256;
+const LAYER_SPARE: i32 = 128;
+/// a layer's texture this many times larger than needed goes
+const LAYER_SHRINK: i64 = 4;
+/// the bytes image textures may take (jfgui_GPU_IMAGE_MB)
+const IMAGE_BUDGET: u64 = 256 << 20;
+/// images whose redraws are counted
+const IMAGES_KEPT: usize = 64;
+/// an image texture not drawn for this long goes with the next frame (us)
+const IMAGE_UNUSED_US: u64 = 30_000_000;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
 /// wgsl::compile makes of it, --gen-shaders writes them again)
@@ -118,6 +171,7 @@ mod spv {
 pub const GPU_OUT_WGSL: &str = include_str!("gpu_out.wgsl");
 pub const GPU_OUT_VS: &[u32] = spv::VS;
 pub const GPU_OUT_FS: &[u32] = spv::FS;
+pub const GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Stage {
@@ -132,6 +186,137 @@ struct Tex {
     group: BindGroup,
     w: i32,
     h: i32,
+}
+
+/// the pixels below a layer, cell by cell, while the layer touches the cell
+#[derive(Default)]
+struct Store {
+    idx: Vec<u32>,
+    px: Vec<u8>,
+    free: Vec<u32>,
+    used: u32,
+}
+
+impl Store {
+    fn has(&self, i: usize) -> bool {
+        self.idx.get(i).is_some_and(|&b| b != NO_BLOCK)
+    }
+
+    fn get(&self, i: usize) -> &[u8] {
+        &self.px[self.idx[i] as usize * CELL_BYTES..][..CELL_BYTES]
+    }
+
+    /// the cell's block, a new one when it has none (cells: the window's)
+    fn put(&mut self, i: usize, cells: usize) -> &mut [u8] {
+        if self.idx.len() != cells {
+            *self = Store { idx: vec![NO_BLOCK; cells], ..Store::default() };
+        }
+        let mut b = self.idx[i];
+        if b == NO_BLOCK {
+            b = self.free.pop().unwrap_or_else(|| {
+                let n = (self.px.len() / CELL_BYTES) as u32;
+                self.px.resize(self.px.len() + CELL_BYTES, 0);
+                n
+            });
+            self.idx[i] = b;
+            self.used += 1;
+        }
+        &mut self.px[b as usize * CELL_BYTES..][..CELL_BYTES]
+    }
+
+    fn drop_cell(&mut self, i: usize) {
+        if self.has(i) {
+            self.free.push(self.idx[i]);
+            self.idx[i] = NO_BLOCK;
+            self.used -= 1;
+        }
+    }
+}
+
+/// a layer's texture: holds the window's rectangle ox, oy, w, h
+struct LayerTex {
+    t: Texture,
+    group: BindGroup,
+    ox: i32,
+    oy: i32,
+    w: i32,
+    h: i32,
+    fresh: bool, // nothing uploaded yet (Layout::Undefined)
+}
+
+/// a layer above the base: its texture, the rectangles of its cells, the pixels below it
+#[derive(Default)]
+struct Upper {
+    tex: Option<LayerTex>,
+    rects: Vec<[i32; 4]>,
+    store: Store,
+}
+
+/// an image's texture (Rc: a window's last frame keeps drawing an evicted one until its next)
+struct ImageTex {
+    _t: Texture,
+    group: BindGroup,
+}
+
+/// an image the output has seen: what its redraws cost so far, its texture
+struct Image {
+    key: usize,
+    weak: Weak<Surface>, // holds the address: no other surface comes to this identity
+    ver: u32,
+    bytes: u64,
+    acc: u64,
+    opaque: Option<bool>,
+    tex: Option<Rc<ImageTex>>,
+    tick: u64,
+    used_us: u64,
+}
+
+/// an image drawn by the GPU in a window's frame: its place and steps (Dc::blit_scaled), the
+/// rectangles of its cells
+struct Quad {
+    tex: Rc<ImageTex>,
+    src: Rc<Surface>,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    step: [u32; 2],
+    rects: Vec<[i32; 4]>,
+}
+
+/// what a window on the swapchain keeps apart (the module's header)
+#[derive(Default)]
+struct Split {
+    upper: [Upper; UPPER],
+    /// a layer above the base has cells apart
+    active: bool,
+    /// the base texture holds no pixels of a layer above it
+    clean: bool,
+    /// this frame's uploads are done
+    drawn: bool,
+    err: Option<GpuError>,
+    // ---- per cell, this frame: the lowest layer that changed (L_COUNT: none); the layers that
+    // touch the cell (bits); the rectangles of a stage
+    m: Vec<u8>,
+    nr: Vec<u8>,
+    rects: Vec<[i32; 4]>,
+    // ---- per cell: the image on top of it (quad + 1) the GPU draws; the framebuffer lacks its
+    // pixels; the base texture lacks its pixels
+    cols: usize,
+    rows: usize,
+    hole: Vec<u8>,
+    owed: Vec<bool>,
+    stale: Vec<bool>,
+    any_owed: bool,
+    any_stale: bool,
+    quads: Vec<Quad>,
+}
+
+impl Split {
+    /// layers, images and whatever hangs on them go; the base texture is not clean then
+    fn reset(&mut self) {
+        *self = Split::default();
+    }
 }
 
 /// a window of the output
@@ -153,6 +338,7 @@ struct Win {
     fail_at: u64,  // no new swapchain before this time
     fail_ms: u64,
     out: GpuOutput,
+    sp: Split,
 }
 
 struct Core {
@@ -160,6 +346,7 @@ struct Core {
     dev: Device,
     bgl: BindGroupLayout,
     pipe: RenderPipeline,
+    pipe_image: RenderPipeline,
     format: Format,
     name: String,
 }
@@ -206,6 +393,16 @@ pub(crate) struct S {
     trim_at: u64,
     t0: u64,
     script_pw: [i32; super::consts::WIN_MAX],
+    layers_on: bool,
+    images_on: bool,
+    images: Vec<Image>,
+    image_budget: u64,
+    image_bytes: u64,
+    image_uploads: u64,
+    image_hits: u64,
+    image_evicted: u64,
+    tick: u64,
+    look_at: u64,
 }
 
 impl Default for S {
@@ -226,6 +423,16 @@ impl Default for S {
             trim_at: 0,
             t0: 0,
             script_pw: [-1; super::consts::WIN_MAX],
+            layers_on: false,
+            images_on: false,
+            images: Vec::new(),
+            image_budget: IMAGE_BUDGET,
+            image_bytes: 0,
+            image_uploads: 0,
+            image_hits: 0,
+            image_evicted: 0,
+            tick: 0,
+            look_at: 0,
         }
     }
 }
@@ -253,6 +460,30 @@ impl S {
         self.trace = env_on("jfgui_GPU_TRACE");
         self.t0 = plat::time_us();
         self.retry_ms = plat::env("jfgui_GPU_RETRY_MS").and_then(|v| v.parse().ok()).unwrap_or(RETRY_FIRST_MS);
+        let off = |name: &str| plat::env(name).is_some_and(|v| v == "0" || v.eq_ignore_ascii_case("off"));
+        self.layers_on = !off("jfgui_GPU_LAYERS");
+        self.images_on = self.layers_on && !off("jfgui_GPU_IMAGES");
+        if let Some(mb) = plat::env("jfgui_GPU_IMAGE_MB").and_then(|v| v.parse::<u64>().ok()) {
+            self.image_budget = mb << 20;
+        }
+    }
+
+    /// an image's texture goes (a window's last frame may keep drawing it)
+    fn evict(&mut self, k: usize) {
+        let e = &mut self.images[k];
+        if e.tex.take().is_some() {
+            self.image_bytes -= e.bytes;
+            self.image_evicted += 1;
+            self.trim_at = plat::time_us() + TRIM_US;
+        }
+    }
+
+    /// every image texture goes: the device with them
+    fn images_gone(&mut self) {
+        for e in self.images.iter_mut() {
+            e.tex = None;
+        }
+        self.image_bytes = 0;
     }
 
     fn desc(&self) -> SwapchainDesc {
@@ -332,18 +563,23 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
     let format = built.sc.format();
     let vs = ShaderModule::from_spirv(&dev, spv::VS)?;
     let fs = ShaderModule::from_spirv(&dev, spv::FS)?;
-    let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 0 })?;
-    let pipe = dev.create_render_pipeline(&RenderPipelineDesc {
-        layout: &layout,
-        vertex: ShaderStage::new(&vs, "vs"),
-        fragment: Some(ShaderStage::new(&fs, "fs")),
-        buffers: &[],
-        topology: Topology::Triangles,
-        cull: Cull::None,
-        front_cw: false,
-        targets: &[ColorTarget { format, blend: None, write_mask: 0xF }],
-        depth: None,
-    })?;
+    let fs_image = ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?;
+    let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 16 })?;
+    let pipeline = |fragment: &'_ ShaderModule, entry: &'static str| {
+        dev.create_render_pipeline(&RenderPipelineDesc {
+            layout: &layout,
+            vertex: ShaderStage::new(&vs, "vs"),
+            fragment: Some(ShaderStage::new(fragment, entry)),
+            buffers: &[],
+            topology: Topology::Triangles,
+            cull: Cull::None,
+            front_cw: false,
+            targets: &[ColorTarget { format, blend: None, write_mask: 0xF }],
+            depth: None,
+        })
+    };
+    let pipe = pipeline(&fs, "fs")?;
+    let pipe_image = pipeline(&fs_image, "fs_image")?;
     let t5 = plat::time_us();
     if trace {
         plat::write_stderr(format!(
@@ -351,7 +587,7 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
             ms(t0, t1), ms(t1, t2), ms(t2, t3), ms(t3, t4), ms(t4, t5), adapter.info().name).as_bytes());
     }
     let name = adapter.info().name.clone();
-    Ok((Core { inst, dev, bgl, pipe, format, name }, built))
+    Ok((Core { inst, dev, bgl, pipe, pipe_image, format, name }, built))
 }
 
 // ------------------------------------------------------------------ one frame
@@ -368,6 +604,7 @@ fn upload(w: &mut Win, core: &Core, fb: &Surface, rects: Option<&[[i32; 4]]>, tr
     core.dev.queue().write_texture_rects(&tex.t, rs, &fb.px, fb.stride as u32, before, Layout::Sampled)?;
     let bytes: u64 = rs.iter().map(|r| r[2].max(0) as u64 * r[3].max(0) as u64 * 4).sum();
     w.out.upload_bytes += bytes;
+    w.out.upload_base += bytes;
     if bytes > BIG_UPLOAD {
         *trim_at = plat::time_us() + TRIM_US;
     }
@@ -403,7 +640,33 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
     });
     e.set_render_pipeline(&core.pipe);
     e.set_bind_group(0, &tex.group);
+    e.push_constants(0, &[0i32; 4]);
     e.draw(3, 1, 0, 0);
+    let scissor = |e: &mut gpu::CommandEncoder, r: &[i32; 4]| e.set_scissor(r[0] as u32, r[1] as u32, r[2] as u32, r[3] as u32);
+    // the images the CPU left out
+    if !w.sp.quads.is_empty() {
+        e.set_render_pipeline(&core.pipe_image);
+        for q in &w.sp.quads {
+            e.set_bind_group(0, &q.tex.group);
+            e.push_constants(0, &[q.x, q.y, q.step[0] as i32, q.step[1] as i32]);
+            for r in &q.rects {
+                scissor(&mut e, r);
+                e.draw(3, 1, 0, 0);
+            }
+        }
+        e.set_render_pipeline(&core.pipe);
+    }
+    // the layers above, opaque: each cell holds what is there up to its layer
+    for u in &w.sp.upper {
+        if let Some(t) = &u.tex {
+            e.set_bind_group(0, &t.group);
+            e.push_constants(0, &[t.ox, t.oy, 0, 0]);
+            for r in &u.rects {
+                scissor(&mut e, r);
+                e.draw(3, 1, 0, 0);
+            }
+        }
+    }
     e.end_render();
     if let Some(rb) = &w.rb {
         let img = sc.texture(&fr);
@@ -455,6 +718,100 @@ fn compare(img: &[u8], fb: &Surface, swap_rb: bool) -> (i32, i32, u64) {
     (fx, fy, bad)
 }
 
+// ------------------------------------------------------------------ cells
+
+// the cell's box in the window (x0, y0, x1, y1)
+fn cell_box(i: usize, cols: usize, w: i32, h: i32) -> [i32; 4] {
+    let (c, r) = ((i % cols) as i32, (i / cols) as i32);
+    [c * CELL, r * CELL, ((c + 1) * CELL).min(w), ((r + 1) * CELL).min(h)]
+}
+
+fn cell_save(fb: &Surface, b: [i32; 4], to: &mut [u8]) {
+    let n = (b[2] - b[0]) as usize * 4;
+    for y in b[1]..b[3] {
+        let s = y as usize * fb.stride as usize + b[0] as usize * 4;
+        let d = (y - b[1]) as usize * CELL_ROW;
+        to[d..d + n].copy_from_slice(&fb.px[s..s + n]);
+    }
+}
+
+fn cell_load(fb: &mut Surface, b: [i32; 4], from: &[u8]) {
+    let n = (b[2] - b[0]) as usize * 4;
+    for y in b[1]..b[3] {
+        let d = y as usize * fb.stride as usize + b[0] as usize * 4;
+        let s = (y - b[1]) as usize * CELL_ROW;
+        fb.px[d..d + n].copy_from_slice(&from[s..s + n]);
+    }
+}
+
+// the cells f holds for as rectangles x, y, w, h cut to the w x h window: a run in a row extends a
+// rectangle of the row above with the same columns
+fn cell_rects(out: &mut Vec<[i32; 4]>, cols: usize, rows: usize, w: i32, h: i32, f: impl Fn(usize) -> bool) {
+    out.clear();
+    for row in 0..rows {
+        let mut c = 0;
+        while c < cols {
+            if !f(row * cols + c) {
+                c += 1;
+                continue;
+            }
+            let mut e = c + 1;
+            while e < cols && f(row * cols + e) {
+                e += 1;
+            }
+            let (x, rw, y) = (c as i32 * CELL, (e as i32 * CELL).min(w) - c as i32 * CELL, row as i32 * CELL);
+            let rh = (y + CELL).min(h) - y;
+            if let Some(r) = out.iter_mut().find(|r| r[0] == x && r[2] == rw && r[1] + r[3] == y) {
+                r[3] += rh;
+            } else {
+                out.push([x, y, rw, rh]);
+            }
+            c = e;
+        }
+    }
+}
+
+// an image's pixels in window cell box b of the framebuffer, as Cmd::Image draws them there
+fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4]) {
+    let mut dc = Dc::new(fb.w, fb.h);
+    dc.clip_push(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+    dc.blit_scaled(fb, &q.src, q.x, q.y, q.w, q.h);
+}
+
+// every alpha 255: the image replaces what lies below it
+fn surface_opaque(sf: &Surface) -> bool {
+    if sf.fmt == FMT_XRGB {
+        return true;
+    }
+    let (row, stride) = (sf.w as usize * 4, sf.stride as usize);
+    sf.fmt != FMT_A8 && sf.px.chunks(stride).take(sf.h as usize).all(|r| r[..row].chunks_exact(4).all(|p| p[3] == 255))
+}
+
+// the texture of an image, its whole pixels uploaded
+fn image_texture(core: &Core, sf: &Surface) -> gpu::Result<ImageTex> {
+    let t = core.dev.create_texture(&TextureDesc::d2(sf.w as u32, sf.h as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED))?;
+    core.dev.queue().write_texture_rects(&t, &[[0, 0, sf.w, sf.h]], &sf.px, sf.stride as u32, Layout::Undefined, Layout::Sampled)?;
+    let group = core.dev.create_bind_group(&BindGroupDesc {
+        layout: &core.bgl,
+        entries: &[BindEntry { binding: 0, resource: Resource::Texture(t.view()) }],
+    })?;
+    Ok(ImageTex { _t: t, group })
+}
+
+// a texture for what a layer holds now: bb (x0, y0, x1, y1) with spare room, inside the window
+fn layer_texture(core: &Core, bb: [i32; 4], fw: i32, fh: i32) -> gpu::Result<LayerTex> {
+    let size = |n: i32, lim: i32| ((n + LAYER_SPARE + LAYER_STEP - 1) / LAYER_STEP * LAYER_STEP).min(lim);
+    let (w, h) = (size(bb[2] - bb[0], fw), size(bb[3] - bb[1], fh));
+    let ox = (bb[0] - (w - (bb[2] - bb[0])) / 2).clamp(0, fw - w);
+    let oy = (bb[1] - (h - (bb[3] - bb[1])) / 2).clamp(0, fh - h);
+    let t = core.dev.create_texture(&TextureDesc::d2(w as u32, h as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED))?;
+    let group = core.dev.create_bind_group(&BindGroupDesc {
+        layout: &core.bgl,
+        entries: &[BindEntry { binding: 0, resource: Resource::Texture(t.view()) }],
+    })?;
+    Ok(LayerTex { t, group, ox, oy, w, h, fresh: true })
+}
+
 // ------------------------------------------------------------------ the runtime's calls
 
 impl Ui {
@@ -473,11 +830,18 @@ impl Ui {
         self.gp_poll();
         let t0 = plat::time_us();
         let i = cur as usize;
+        if self.m.gout.verify {
+            self.gp_settle(i); // the presented image is compared with the framebuffer
+        }
         let s = &mut self.m.gout;
         let Dev::Ready(core) = &s.dev else { return false };
         let Some(Some(w)) = s.wins.get_mut(i) else { return false };
         if w.stage != Stage::Gpu {
             return false;
+        }
+        if let Some(e) = w.sp.err.take() {
+            self.gp_failed(i, e);
+            return true;
         }
         let fb = &self.wp.rt.fb;
         let fits = w.tex.as_ref().is_some_and(|t| (t.w, t.h) == (fb.w, fb.h));
@@ -486,16 +850,21 @@ impl Ui {
             return true;
         }
         if plat::win_state(pw) & plat::WST_MINIMIZED != 0 {
-            w.full = true; // nobody sees it: the whole frame when the window comes back
-            w.pending = true;
+            self.gp_flatten(i); // nobody sees it: the whole frame when the window comes back
             return true;
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
         let soon = t0 < w.last_present + MIN_PRESENT_US && !s.script;
-        let r = upload(w, core, fb, rects, &mut s.trim_at).and_then(|_| if soon { Ok(Shown::Wait) } else { show(w, core, fb) });
+        // (a frame drawn layer by layer has uploaded its parts)
+        let up = if core::mem::take(&mut w.sp.drawn) { Ok(()) } else { upload(w, core, fb, rects, &mut s.trim_at) };
+        let r = up.and_then(|_| if soon { Ok(Shown::Wait) } else { show(w, core, fb) });
+        w.out.present_us += plat::time_us().saturating_sub(t0);
         match r {
             Ok(Shown::Done) | Ok(Shown::Wait) => {}
-            Ok(Shown::NoArea) => w.full = true,
+            Ok(Shown::NoArea) => {
+                self.gp_flatten(i);
+                return true;
+            }
             Ok(Shown::Stale) => {
                 self.gp_leave(i, "stale");
                 return true;
@@ -538,6 +907,7 @@ impl Ui {
             fail_at: 0,
             fail_ms: 0,
             out: GpuOutput::default(),
+            sp: Split::default(),
         });
         w.pw = pw;
         w.out.cpu_frames += 1;
@@ -551,6 +921,10 @@ impl Ui {
     /// back to the CPU path, the frame shown first (no gap): window i's size changed or its
     /// swapchain went stale; the swapchain is rebuilt when the size has settled
     fn gp_leave(&mut self, i: usize, why: &str) {
+        self.gp_settle(i);
+        if let Some(p) = self.uiw_parts_mut(i as u32) {
+            p.dirty.busy = false;
+        }
         let Some(fb) = self.uiw_parts(i as u32).map(|p| &p.rt.fb) else { return };
         let size = (fb.w, fb.h);
         let Some(Some(w)) = self.m.gout.wins.get(i) else { return };
@@ -564,6 +938,7 @@ impl Ui {
         let Some(w) = s.win(i) else { return };
         w.stage = Stage::Cpu;
         w.tex = None;
+        w.sp.reset();
         w.pending = false;
         w.size = size;
         w.stable_at = now;
@@ -600,10 +975,12 @@ impl Ui {
                 w.tex = None;
                 w.rb = None;
                 w.pending = false;
+                w.sp.reset();
                 w.out.error = Some(format!("{e}"));
             }
         }
         let s = &mut self.m.gout;
+        s.images_gone();
         let now = plat::time_us();
         if matches!(e, GpuError::Invalid(_) | GpuError::Unsupported(_)) {
             s.dev = Dev::Never(format!("{e}"));
@@ -780,6 +1157,9 @@ impl Ui {
     /// a frame that was not shown yet: window i's texture to the screen (a minimised window
     /// comes back: the whole frame first)
     fn gp_retry(&mut self, i: usize) {
+        if self.m.gout.verify {
+            self.gp_settle(i);
+        }
         let mut s = core::mem::take(&mut self.m.gout);
         let mut r = Ok(Shown::Done);
         let fb = self.uiw_parts(i as u32).map(|p| &p.rt.fb);
@@ -961,9 +1341,11 @@ impl Ui {
         // validation layer wants to see every object destroyed
         if env_on("jfgui_GPU_VALIDATE") {
             s.wins.clear();
+            s.images.clear();
             s.dev = Dev::None;
         } else {
             core::mem::forget(core::mem::take(&mut s.wins));
+            core::mem::forget(core::mem::take(&mut s.images));
             core::mem::forget(core::mem::replace(&mut s.dev, Dev::None));
         }
         s.want = false;
@@ -978,9 +1360,22 @@ impl Ui {
             o.on = w.stage == Stage::Gpu;
             o.building = matches!(w.stage, Stage::Job | Stage::Switch);
             o.pending = w.pending;
+            for u in &w.sp.upper {
+                if let Some(t) = &u.tex {
+                    o.layer_textures += 1;
+                    o.layer_bytes += t.w as u64 * t.h as u64 * 4;
+                }
+                o.layer_store += u.store.px.capacity() as u64;
+            }
+            o.image_quads = w.sp.quads.len() as u32;
             o
         });
         o.wanted = s.want;
+        o.image_textures = s.images.iter().filter(|e| e.tex.is_some()).count() as u32;
+        o.image_bytes = s.image_bytes;
+        o.image_uploads = s.image_uploads;
+        o.image_hits = s.image_hits;
+        o.image_evicted = s.image_evicted;
         match &s.dev {
             Dev::Ready(core) => {
                 o.adapter = core.name.clone();
@@ -1007,6 +1402,513 @@ impl Ui {
     pub fn gpu_test_lose(&mut self) {
         if let Dev::Ready(core) = &self.m.gout.dev {
             core.dev.test_lose();
+        }
+    }
+
+    /// (test aid) the bytes image textures may take
+    pub fn gpu_test_image_budget(&mut self, bytes: u64) {
+        self.m.gout.image_budget = bytes;
+    }
+
+    /// the pixels of the images the GPU draws into the framebuffers (Ui::fb reads them then)
+    pub fn gpu_settle(&mut self) {
+        self.gp_settle_all();
+    }
+
+    // ------------------------------------------------------------------ layers and images
+
+    /// render_live: does the live window keep its layers apart this frame?
+    pub(crate) fn gp_split_wanted(&self) -> bool {
+        let s = &self.m.gout;
+        s.want && s.layers_on && s.wins.get(self.uiw_cur as usize).and_then(|w| w.as_ref()).is_some_and(|w| w.stage == Stage::Gpu)
+    }
+
+    /// can window i's frame be drawn apart: the texture fits, it can be seen, no inspector draws
+    /// over the framebuffer
+    fn gp_can_split(&self, i: usize) -> bool {
+        let Some(Some(w)) = self.m.gout.wins.get(i) else { return false };
+        let fb = &self.wp.rt.fb;
+        !self.m.ins.on && !w.full && !w.undef && w.tex.as_ref().is_some_and(|t| (t.w, t.h) == (fb.w, fb.h)) && plat::win_state(w.pw) & plat::WST_MINIMIZED == 0
+    }
+
+    /// dirty_compute, after hashing (dirty.rs has W::imgs, W::top; cells: this frame, cells_prev:
+    /// the last): which images the GPU draws in this frame, in which cells -> anything apart
+    pub(crate) fn gp_plan_images(&mut self) -> bool {
+        let i = self.uiw_cur as usize;
+        if !self.gp_can_split(i) {
+            return true; // gp_split_begin settles and flattens with the last frame's images
+        }
+        let (fw, fh) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        let opaque_dc = self.dc.opac == 255;
+        let Ui { m, wp, .. } = self;
+        let s = &mut m.gout;
+        s.tick += 1;
+        let (tick, now) = (s.tick, plat::time_us());
+        let d = &wp.dirty;
+        let (cols, rows) = (d.cols as usize, d.rows as usize);
+        let total = cols * rows;
+        let Some(Some(w)) = s.wins.get_mut(i) else { return false };
+        let sp = &mut w.sp;
+        if (sp.cols, sp.rows) != (cols, rows) || sp.hole.len() != total {
+            (sp.cols, sp.rows) = (cols, rows);
+            sp.hole = vec![0; total];
+            sp.owed = vec![false; total];
+            sp.stale = vec![false; total];
+            sp.any_owed = false;
+            sp.any_stale = false;
+        }
+        sp.hole.fill(0);
+        let mut quads = core::mem::take(&mut sp.quads);
+        quads.clear();
+        // an image gone or drawn in another version takes its texture along
+        let (cur, prev) = (d.cells.as_deref().unwrap_or(&[]), d.cells_prev.as_deref().unwrap_or(&[]));
+        let mut k = 0;
+        while k < s.images.len() {
+            if s.images[k].weak.strong_count() == 0 {
+                s.evict(k);
+                s.images.remove(k);
+            } else {
+                k += 1;
+            }
+        }
+        if s.images_on && opaque_dc {
+            for (tag0, seen) in d.imgs.iter().enumerate() {
+                let tag = tag0 as u8 + 1;
+                let Some(Cmd::Image { x, y, w: iw, h: ih, sf, ver }) = wp.cmd.layers[0].get(seen.index as usize) else { continue };
+                if sf.w <= 0 || sf.h <= 0 || sf.px.is_empty() || sf.fmt == FMT_A8 {
+                    continue;
+                }
+                let key = Rc::as_ptr(sf) as usize;
+                let vis = seen.vis;
+                // the cells it is on top of, whole; what is new in this frame
+                let (c0, c1) = (((vis[0] + CELL - 1) >> 5).max(0) as usize, (((vis[2].min(fw) + (if vis[2] >= fw { CELL - 1 } else { 0 })) >> 5).max(0) as usize).min(cols));
+                let (r0, r1) = (((vis[1] + CELL - 1) >> 5).max(0) as usize, (((vis[3].min(fh) + (if vis[3] >= fh { CELL - 1 } else { 0 })) >> 5).max(0) as usize).min(rows));
+                let mut changed = 0u64;
+                let mut any = false;
+                for r in r0..r1 {
+                    for c in c0..c1 {
+                        let k = r * cols + c;
+                        if d.top.get(k) == Some(&tag) {
+                            any = true;
+                            if cur.get(k) != prev.get(k) {
+                                changed += CELL_BYTES as u64;
+                            }
+                        }
+                    }
+                }
+                if !any {
+                    continue;
+                }
+                // another version of this surface: that one is over
+                let mut q = 0;
+                while q < s.images.len() {
+                    if s.images[q].key == key && s.images[q].ver != *ver {
+                        s.evict(q);
+                        s.images.remove(q);
+                    } else {
+                        q += 1;
+                    }
+                }
+                let at = match s.images.iter().position(|e| e.key == key) {
+                    Some(at) => {
+                        s.images[at].acc += changed;
+                        at
+                    }
+                    None => {
+                        if s.images.len() >= IMAGES_KEPT {
+                            let Some(old) = (0..s.images.len()).min_by_key(|&k| s.images[k].tick) else { continue };
+                            s.evict(old);
+                            s.images.remove(old);
+                        }
+                        s.images.push(Image {
+                            key,
+                            weak: Rc::downgrade(sf),
+                            ver: *ver,
+                            bytes: sf.w as u64 * sf.h as u64 * 4,
+                            acc: 0,
+                            opaque: None,
+                            tex: None,
+                            tick,
+                            used_us: now,
+                        });
+                        s.images.len() - 1
+                    }
+                };
+                s.images[at].tick = tick;
+                s.images[at].used_us = now;
+                // rent or buy: the redraws have cost what the upload costs
+                let e = &s.images[at];
+                if e.tex.is_none() && e.acc >= e.bytes && e.bytes <= s.image_budget {
+                    if let Dev::Ready(core) = &s.dev {
+                        let lim = core.dev.limits().max_texture_2d as i32;
+                        let opaque = e.opaque.unwrap_or_else(|| surface_opaque(sf));
+                        s.images[at].opaque = Some(opaque);
+                        if opaque && sf.w <= lim && sf.h <= lim {
+                            let need = s.images[at].bytes;
+                            while s.image_bytes + need > s.image_budget {
+                                let old = (0..s.images.len()).filter(|&k| s.images[k].tex.is_some() && s.images[k].tick != tick).min_by_key(|&k| s.images[k].tick);
+                                let Some(old) = old else { break };
+                                s.evict(old);
+                            }
+                            if s.image_bytes + need <= s.image_budget {
+                                if let Dev::Ready(core) = &s.dev {
+                                    // (a device gone or no memory: the CPU draws it, a failure of the
+                                    // device shows with the next present)
+                                    if let Ok(tex) = image_texture(core, sf) {
+                                        s.images[at].tex = Some(Rc::new(tex));
+                                        s.image_bytes += need;
+                                        s.image_uploads += 1;
+                                        s.trim_at = plat::time_us() + TRIM_US;
+                                        if let Some(Some(w)) = s.wins.get_mut(i) {
+                                            w.out.upload_bytes += need;
+                                        }
+                                    } else {
+                                        s.images[at].opaque = Some(false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let Some(tex) = s.images[at].tex.clone() else { continue };
+                if quads.len() >= TOP_BLOCKED as usize - 1 {
+                    continue;
+                }
+                s.image_hits += 1;
+                let Some(Some(w)) = s.wins.get_mut(i) else { continue };
+                let sp = &mut w.sp;
+                let q = quads.len() as u8 + 1;
+                for r in r0..r1 {
+                    for c in c0..c1 {
+                        let k = r * cols + c;
+                        if d.top.get(k) == Some(&tag) {
+                            sp.hole[k] = q;
+                        }
+                    }
+                }
+                let mut rects = Vec::new();
+                let hole = &sp.hole;
+                cell_rects(&mut rects, cols, rows, fw, fh, |k| hole[k] == q);
+                let step = [(((sf.w as u64) << 16) / *iw as u64) as u32, (((sf.h as u64) << 16) / *ih as u64) as u32];
+                quads.push(Quad { tex, src: sf.clone(), x: *x, y: *y, w: *iw, h: *ih, step, rects });
+            }
+        }
+        // what was not drawn for a long time gives its memory back
+        if now >= s.look_at && !s.images.is_empty() {
+            s.look_at = now + IMAGE_UNUSED_US / 4;
+            for k in 0..s.images.len() {
+                if now.saturating_sub(s.images[k].used_us) > IMAGE_UNUSED_US {
+                    s.evict(k);
+                }
+            }
+        }
+        let Some(Some(w)) = s.wins.get_mut(i) else { return false };
+        w.sp.quads = quads;
+        !w.sp.quads.is_empty()
+    }
+
+    /// render_live, after dirty_compute: is this frame drawn layer by layer?  (Else it goes as
+    /// without layers: the whole base texture holds the framebuffer's cells then.)
+    pub(crate) fn gp_split_begin(&mut self, n: i32) -> bool {
+        if !self.wp.dirty.split {
+            return false;
+        }
+        let i = self.uiw_cur as usize;
+        let can = self.gp_can_split(i);
+        let upper_now = self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty());
+        let Some(w) = self.m.gout.win(i) else { return false };
+        let sp = &mut w.sp;
+        let kept = sp.active || !sp.quads.is_empty() || sp.any_stale;
+        if !can {
+            if kept {
+                self.gp_flatten(i);
+            }
+            self.wp.dirty.busy = false;
+            return false;
+        }
+        if !kept && !upper_now {
+            sp.clean = true; // what a layer left in the base texture has changed and gone up
+            self.wp.dirty.busy = false;
+            return false;
+        }
+        let stale = sp.any_stale && sp.stale.iter().zip(sp.hole.iter()).any(|(&a, &h)| a && h == 0);
+        if n == 0 && !stale {
+            return false; // nothing changed
+        }
+        if self.wp.rt.present_n == 0 {
+            self.wp.rt.present_n = -1;
+        }
+        true
+    }
+
+    /// render_live: the frame layer by layer (the module's header): from the lowest layer that
+    /// changed in a cell upwards: back to the pixels below it, save them for each layer that
+    /// touches the cell, draw the layer, upload the cell to the layer's texture
+    pub(crate) fn gp_split_draw(&mut self, n: i32) {
+        let icon_style = (self.style, self.color(T_ACCENT), self.theme_dark, self.color(T_TEXT_DISABLED), self.wp.rt.dpi as u32);
+        let i = self.uiw_cur as usize;
+        let Ui { m, wp, dc, text, icon_hook, drects, .. } = self;
+        let s = &mut m.gout;
+        let S { dev, wins, trim_at, .. } = s;
+        let (Dev::Ready(core), Some(Some(w))) = (&*dev, wins.get_mut(i)) else {
+            for l in wp.cmd.layers.iter() {
+                render_layer(l, 0, dc, &mut wp.rt.fb, text, icon_hook, icon_style);
+            }
+            return;
+        };
+        let d = &wp.dirty;
+        let (cols, rows) = (d.cols as usize, d.rows as usize);
+        let total = cols * rows;
+        let fb = &mut wp.rt.fb;
+        let (fw, fh) = (fb.w, fb.h);
+        let Win { sp, tex: base, out, pending, .. } = w;
+        if sp.hole.len() != total {
+            (sp.cols, sp.rows) = (cols, rows);
+            sp.hole = vec![0; total];
+            sp.owed = vec![false; total];
+            sp.stale = vec![false; total];
+        }
+        let Split { upper, m: lowest, nr, rects, hole, owed, stale, quads, .. } = sp;
+        // ---- per cell: what changed, which layers touch it
+        lowest.clear();
+        lowest.resize(total, L_COUNT as u8);
+        nr.clear();
+        nr.resize(total, 0);
+        let all = d.forced || (!sp.active && !sp.clean);
+        let now: [&[u64]; L_COUNT] = core::array::from_fn(|l| d.through(true, l));
+        let was: [&[u64]; L_COUNT] = core::array::from_fn(|l| d.through(false, l));
+        for k in 0..total {
+            let mut low = L_COUNT;
+            if all || was[0].len() != total {
+                low = 0;
+            } else {
+                for l in 0..L_COUNT {
+                    if now[l][k] != was[l][k] {
+                        low = l;
+                        break;
+                    }
+                }
+            }
+            if stale[k] && hole[k] == 0 {
+                low = 0; // the image the CPU left out is no longer drawn by the GPU
+            }
+            lowest[k] = low as u8;
+            for l in 1..L_COUNT {
+                if now[l][k] != now[l - 1][k] {
+                    nr[k] |= 1 << l;
+                }
+            }
+        }
+        // explicit damage: its cells from the base up
+        if n >= 0 {
+            for r in drects.iter().take(n as usize).skip(d.n0.max(0) as usize) {
+                let (c0, c1) = ((r[0].max(0) >> 5) as usize, (((r[0] + r[2] + CELL - 1) >> 5).max(0) as usize).min(cols));
+                let (r0, r1) = ((r[1].max(0) >> 5) as usize, (((r[1] + r[3] + CELL - 1) >> 5).max(0) as usize).min(rows));
+                for row in r0..r1 {
+                    lowest[row * cols + c0..row * cols + c1.max(c0)].fill(0);
+                }
+            }
+        }
+        // ---- the layers' textures: a new one takes all of its cells
+        let mut err = None;
+        for (u, l) in upper.iter_mut().zip(1..) {
+            let bit = 1u8 << l;
+            let mut bb = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+            for k in (0..total).filter(|&k| nr[k] & bit != 0) {
+                let b = cell_box(k, cols, fw, fh);
+                bb = [bb[0].min(b[0]), bb[1].min(b[1]), bb[2].max(b[2]), bb[3].max(b[3])];
+            }
+            if bb[0] >= bb[2] {
+                if u.tex.take().is_some() {
+                    *trim_at = plat::time_us() + TRIM_US; // (destroyed when the GPU has finished: a look then)
+                }
+                continue;
+            }
+            let area = (bb[2] - bb[0]) as i64 * (bb[3] - bb[1]) as i64;
+            let fits = u.tex.as_ref().is_some_and(|t| {
+                bb[0] >= t.ox && bb[1] >= t.oy && bb[2] <= t.ox + t.w && bb[3] <= t.oy + t.h
+                    && (t.w as i64 * t.h as i64) <= (area * LAYER_SHRINK).max((LAYER_STEP * LAYER_STEP) as i64)
+            });
+            if !fits {
+                u.tex = None;
+                match layer_texture(core, bb, fw, fh) {
+                    Ok(t) => u.tex = Some(t),
+                    Err(e) => err = Some(e),
+                }
+                for k in (0..total).filter(|&k| nr[k] & bit != 0) {
+                    lowest[k] = lowest[k].min(l);
+                }
+            }
+        }
+        // ---- stage by stage
+        let stride = fb.stride as usize;
+        for l in 0..L_COUNT {
+            let bit = 1u8 << l;
+            if l > 0 {
+                for k in 0..total {
+                    let low = lowest[k] as usize;
+                    if low > l {
+                        continue;
+                    }
+                    let b = cell_box(k, cols, fw, fh);
+                    if low == l {
+                        // what lay below this layer: kept by the lowest layer that was here, else
+                        // the framebuffer holds it already
+                        if let Some(u) = upper[l - 1..].iter().find(|u| u.store.has(k)) {
+                            cell_load(fb, b, u.store.get(k));
+                            owed[k] = false;
+                        }
+                    }
+                    if nr[k] & bit != 0 {
+                        if owed[k] && hole[k] != 0 {
+                            if let Some(q) = quads.get(hole[k] as usize - 1) {
+                                quad_blit(fb, q, b);
+                            }
+                            owed[k] = false;
+                        }
+                        cell_save(fb, b, upper[l - 1].store.put(k, total));
+                    }
+                }
+            }
+            let is_base = l == 0;
+            cell_rects(rects, cols, rows, fw, fh, |k| (lowest[k] as usize) <= l && (if is_base { hole[k] == 0 } else { nr[k] & bit != 0 }));
+            for r in rects.iter() {
+                dc.clip_push(r[0], r[1], r[2], r[3]);
+                render_layer(&wp.cmd.layers[l], 0, dc, fb, text, icon_hook, icon_style);
+                dc.clip_pop();
+            }
+            let bytes: u64 = rects.iter().map(|r| r[2] as u64 * r[3] as u64 * 4).sum();
+            if is_base {
+                out.base_px += bytes / 4;
+                for k in 0..total {
+                    if lowest[k] == 0 {
+                        let h = hole[k] != 0;
+                        owed[k] = h;
+                        stale[k] = h;
+                    }
+                }
+                if err.is_none() {
+                    if let Some(t) = base.as_ref() {
+                        if let Err(e) = core.dev.queue().write_texture_rects(&t.t, rects, &fb.px, stride as u32, Layout::Sampled, Layout::Sampled) {
+                            err = Some(e);
+                        }
+                    }
+                }
+                out.upload_base += bytes;
+            } else {
+                let u = &mut upper[l - 1];
+                if err.is_none() {
+                    if let Some(t) = u.tex.as_mut() {
+                        let before = if t.fresh { Layout::Undefined } else { Layout::Sampled };
+                        match core.dev.queue().write_texture_rects_at(&t.t, rects, (t.ox, t.oy), &fb.px, stride as u32, before, Layout::Sampled) {
+                            Ok(()) => t.fresh = t.fresh && rects.is_empty(),
+                            Err(e) => err = Some(e),
+                        }
+                    }
+                }
+                for k in 0..total {
+                    if nr[k] & bit == 0 {
+                        u.store.drop_cell(k);
+                    }
+                }
+                if u.store.used == 0 {
+                    u.store = Store::default();
+                }
+                cell_rects(&mut u.rects, cols, rows, fw, fh, |k| nr[k] & bit != 0);
+            }
+            out.upload_bytes += bytes;
+            if bytes > BIG_UPLOAD {
+                *trim_at = plat::time_us() + TRIM_US;
+            }
+        }
+        sp.any_owed = sp.owed.iter().any(|&v| v);
+        sp.any_stale = sp.stale.iter().any(|&v| v);
+        sp.active = sp.upper.iter().any(|u| u.tex.is_some());
+        sp.clean = true;
+        sp.drawn = true;
+        sp.err = err;
+        *pending = true;
+        out.split_frames += 1;
+        wp.dirty.busy = sp.active || !sp.quads.is_empty();
+    }
+
+    /// render_live's end: its time; n: the rectangles a frame without layers drew
+    pub(crate) fn gp_frame_done(&mut self, t0: u64, n: i32, split: bool) {
+        let i = self.uiw_cur as usize;
+        let (fw, fh) = (self.wp.rt.fb.w as u64, self.wp.rt.fb.h as u64);
+        let px = if split {
+            0
+        } else if n < 0 {
+            fw * fh
+        } else {
+            self.drects.iter().take(n as usize).map(|r| r[2].max(0) as u64 * r[3].max(0) as u64).sum()
+        };
+        if let Some(w) = self.m.gout.win(i) {
+            w.out.render_us += plat::time_us().saturating_sub(t0);
+            w.out.base_px += px;
+        }
+    }
+
+    /// the images the GPU draws of window i into its framebuffer, where it lacks them
+    fn gp_settle(&mut self, i: usize) {
+        let Some(Some(w)) = self.m.gout.wins.get_mut(i) else { return };
+        if !w.sp.any_owed {
+            return;
+        }
+        let sp = &mut w.sp;
+        let (mut owed, hole, quads) = (core::mem::take(&mut sp.owed), core::mem::take(&mut sp.hole), core::mem::take(&mut sp.quads));
+        let (cols, rows) = (sp.cols, sp.rows);
+        sp.any_owed = false;
+        if let Some(p) = self.uiw_parts_mut(i as u32) {
+            let fb = &mut p.rt.fb;
+            let (fw, fh) = (fb.w, fb.h);
+            let mut rects = Vec::new();
+            for (q, quad) in quads.iter().enumerate() {
+                let tag = q as u8 + 1;
+                cell_rects(&mut rects, cols, rows, fw, fh, |k| owed[k] && hole[k] == tag);
+                for r in &rects {
+                    quad_blit(fb, quad, [r[0], r[1], r[0] + r[2], r[1] + r[3]]);
+                }
+            }
+        }
+        owed.fill(false);
+        let Some(Some(w)) = self.m.gout.wins.get_mut(i) else { return };
+        (w.sp.owed, w.sp.hole, w.sp.quads) = (owed, hole, quads);
+    }
+
+    /// every window's framebuffer holds its whole frame
+    pub(crate) fn gp_settle_all(&mut self) {
+        for i in 0..self.m.gout.wins.len() {
+            self.gp_settle(i);
+        }
+    }
+
+    /// back to one texture: the framebuffer is whole again and goes up with the next look; layers
+    /// and images come back with the next change
+    fn gp_flatten(&mut self, i: usize) {
+        self.gp_settle(i);
+        let s = &mut self.m.gout;
+        let trim = plat::time_us() + TRIM_US;
+        let mut freed = false;
+        if let Some(Some(w)) = s.wins.get_mut(i) {
+            freed = w.sp.active;
+            w.sp.reset();
+            w.full = true;
+            w.pending = true;
+        }
+        if freed {
+            s.trim_at = trim;
+        }
+        if let Some(p) = self.uiw_parts_mut(i as u32) {
+            p.dirty.busy = false;
+        }
+    }
+
+    /// (--verify-dirty) the frame was repaired: it goes up as a whole
+    pub(crate) fn gp_repaired(&mut self) {
+        let i = self.uiw_cur as usize;
+        if self.m.gout.wins.get(i).and_then(|w| w.as_ref()).is_some_and(|w| w.stage == Stage::Gpu) {
+            self.gp_flatten(i);
         }
     }
 
@@ -1105,6 +2007,8 @@ impl Ui {
             self.gp_wait_jobs(3000);
             let s = &mut self.m.gout;
             s.wins.clear();
+            s.images.clear();
+            s.image_bytes = 0;
             s.dev = Dev::None;
             s.want = false;
             for pw in s.script_pw.iter_mut() {
@@ -1134,6 +2038,11 @@ impl Ui {
         }
         if word_eq(a, "lose").is_some() {
             self.gpu_test_lose();
+            return;
+        }
+        if let Some(n) = word_eq(a, "budget") {
+            let (v, _) = super::runtime::parse_int(skip_ws(n));
+            self.gpu_test_image_budget(v.max(0) as u64);
             return;
         }
         if word_eq(a, "print").is_some() {
@@ -1170,6 +2079,30 @@ impl Ui {
             if bytes > max as u64 {
                 self.fail(format!("{bytes} bytes uploaded").as_bytes());
             }
+        } else if let Some(n) = word_eq(r, "base") {
+            let (max, _) = super::runtime::parse_int(skip_ws(n));
+            let bytes = self.m.gout.win(i).map_or(0, |w| core::mem::take(&mut w.out.upload_base));
+            if bytes > max as u64 {
+                self.fail(format!("{bytes} bytes uploaded to the base texture").as_bytes());
+            }
+        } else if let Some(n) = word_eq(r, "raster") {
+            let (max, _) = super::runtime::parse_int(skip_ws(n));
+            let px = self.m.gout.win(i).map_or(0, |w| core::mem::take(&mut w.out.base_px));
+            if px > max as u64 {
+                self.fail(format!("{px} pixels of the base layer drawn").as_bytes());
+            }
+        } else if let Some(n) = word_eq(r, "layers") {
+            let (want, _) = super::runtime::parse_int(skip_ws(n));
+            let have = self.gpu_output(i as u32).layer_textures;
+            if have != want as u32 {
+                self.fail(format!("{have} layer textures").as_bytes());
+            }
+        } else if let Some(n) = word_eq(r, "images") {
+            let (want, _) = super::runtime::parse_int(skip_ws(n));
+            let have = self.gpu_output(i as u32).image_textures;
+            if have != want as u32 {
+                self.fail(format!("{have} image textures").as_bytes());
+            }
         } else {
             self.fail(b"unknown gpu expectation");
         }
@@ -1178,6 +2111,7 @@ impl Ui {
     // every window on the GPU: present once more, read back, compare; no frame differed since the
     // last check
     fn gp_expect_same(&mut self) {
+        self.gp_settle_all();
         let mut s = core::mem::take(&mut self.m.gout);
         let mut msg = None;
         let mut any = false;
@@ -1222,6 +2156,7 @@ impl Ui {
 
     // the window's DC (the CPU path) or the composed screen against the framebuffer
     fn gp_expect_pixels(&mut self, i: usize, screen: bool) {
+        self.gp_settle_all();
         let pw = self.m.gout.script_pw[i & (super::consts::WIN_MAX - 1)];
         if pw < 0 {
             self.fail(b"no window");

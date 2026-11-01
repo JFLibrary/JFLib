@@ -29,6 +29,16 @@
 //     adapter   the ranking of adapters for the UI; on this machine the adapter of the display
 //     hwnd      (information, no failure) a swapchain directly on a window: GDI before it, GDI
 //               after it was destroyed: why lib/ui's swapchains live on a child window
+//     layers    every combination of the layers above the base (shadows, translucent parts, text)
+//               opened, moved and closed: the presented image equals the framebuffer each time,
+//               nothing of the base is drawn or uploaded, closing uploads nothing, the textures go
+//               with their layer; a change below open layers; a new size; a lost device
+//     images    a big image: no texture while it does not change, one after the redraws have cost
+//               its upload, then only the cells at its edge go up; drawn over, under a layer, in
+//               a new version, at another size, scaled up; eviction, over the budget, translucent
+//               (stays on the CPU), a lost device
+//     imgplain  the same image without reading back (the framebuffer really lacks its pixels):
+//               Ui::gpu_settle, and the way back to the CPU path shows them
 //   uigputest --gen-shaders FILE   lib/ui/gpu_out_spv.rs from lib/ui/gpu_out.wgsl
 //   uigputest --bench latency [--scene small|full] [--n N] [--burst]   event -> present returned and
 //                             event -> the screen changed (a thread posts key presses and reads the
@@ -36,6 +46,10 @@
 //   uigputest --bench idle|caret      a window with nothing to do / with a blinking caret, until
 //                             --auto-close: frames and uploads on stdout (the process's counters
 //                             are read from outside)
+//   uigputest --bench layers [--n N]  one window of 1920 x 1080 over a full page: a popup, a tooltip,
+//                             a dialog dragged, a big image, N frames each; per scene and frame
+//                             the median and p95 of render, present, bytes uploaded and pixels of
+//                             the base drawn; memory.  jfgui_GPU_LAYERS=0: one texture (G3a)
 //
 // Every test runs under VK_LAYER_KHRONOS_validation when it is installed (a message fails the
 // test) and with jfgui_GPU_VERIFY=1, except where a test says otherwise.  --plain: neither.
@@ -47,11 +61,13 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
+use gfx::{Surface, FMT_XRGB};
 use ui::*;
 
 const DESC: AppDesc = AppDesc { title: "uigputest", flags: AF_RESIZABLE, w: 640, h: 480, min_w: 200, min_h: 150, ..AppDesc::NONE };
@@ -83,7 +99,43 @@ struct Watch {
     last_bad: AtomicU32,
 }
 
+/// what a test or a bench draws beside the picture: panels on the layers above the base, images
+#[derive(Default)]
+struct Scene {
+    /// bit 0: L_DIALOG, bit 1: L_POPUP, bit 2: L_TIP
+    mask: u32,
+    dx: i32,
+    dy: i32,
+    panel: [i32; 2],
+    smoke: bool,
+    /// images: surface, version, x, y, w, h
+    imgs: Vec<(Rc<Surface>, u32, [i32; 4])>,
+    /// a rectangle of the base over the first image
+    over: bool,
+    /// a full page below it all, its version
+    page: u32,
+    page_on: bool,
+    /// a small widget that changes
+    tick: u32,
+}
+
+/// a surface full of detail: no two neighbours alike
+fn pattern(w: i32, h: i32, fmt: u8, alpha: u32) -> Rc<Surface> {
+    let mut sf = Surface::new(w, h, fmt);
+    let stride = sf.stride as usize;
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            let (a, b, c) = ((x * 7 + y * 3) as u32 & 255, (x * 3 ^ y * 5) as u32 & 255, (x + y * 11) as u32 & 255);
+            let p = c | b << 8 | a << 16 | alpha << 24;
+            let o = y * stride + x * 4;
+            sf.px[o..o + 4].copy_from_slice(&p.to_le_bytes());
+        }
+    }
+    Rc::new(sf)
+}
+
 struct Test {
+    sc: Scene,
     name: String,
     fails: u32,
     pc: u32,
@@ -641,6 +693,621 @@ impl Test {
         }
     }
 
+    /// the counters since the last mark: upload, to the base, base pixels
+    fn since_mark(&self, ui: &Ui) -> (u64, u64, u64) {
+        let o = ui.gpu_output(0);
+        (o.upload_bytes - self.mark[0], o.upload_base - self.mark[1], o.base_px - self.mark[2])
+    }
+
+    fn set_mark(&mut self, ui: &Ui) {
+        let o = ui.gpu_output(0);
+        self.mark[0] = o.upload_bytes;
+        self.mark[1] = o.upload_base;
+        self.mark[2] = o.base_px;
+        self.mark[3] = o.split_frames;
+    }
+
+    /// no presented image differed so far
+    fn same_so_far(&mut self, ui: &Ui, what: &str) {
+        let o = ui.gpu_output(0);
+        if o.verified != 0 {
+            self.ok(o.verify_bad == 0, &format!("{what}: {} images read back, {} differ", o.verified, o.verify_bad));
+        }
+    }
+
+    fn t_layers(&mut self, ui: &mut Ui) {
+        // the panel of a layer: 240 x 160, its shadow, the 32 px cells around it
+        let panel = |n: u64| n * (240 + 2 * (24 + 32)) as u64 * (160 + 2 * (24 + 32)) as u64 * 4;
+        const COMBOS: u32 = 8;
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.set_mark(ui);
+                    self.since = plat::time_us();
+                    self.mode = 1; // the combination
+                    self.pc = 10;
+                }
+            }
+            // ---- every combination: open it from nothing, move it, close it
+            10 => {
+                self.sc.mask = self.mode;
+                self.set_mark(ui);
+                self.next();
+            }
+            11 => {
+                if self.after(40) {
+                    let (up, base, px) = self.since_mark(ui);
+                    let m = self.sc.mask;
+                    let n = m.count_ones();
+                    let o = ui.gpu_output(0);
+                    self.ok(o.layer_textures == n, &format!("layers {m:03b} open: {} textures", o.layer_textures));
+                    self.ok(base == 0 && px == 0, &format!("layers {m:03b} open: {base} bytes to the base, {px} of its pixels drawn"));
+                    self.ok(up > 0 && up <= panel(n as u64), &format!("layers {m:03b} open: {up} bytes uploaded"));
+                    self.same_so_far(ui, "open");
+                    self.set_mark(ui);
+                    self.sc.dx = 13;
+                    self.sc.dy = 21;
+                    self.next();
+                }
+            }
+            12 => {
+                if self.after(40) {
+                    let (up, base, px) = self.since_mark(ui);
+                    let m = self.sc.mask;
+                    self.ok(base == 0 && px == 0, &format!("layers {m:03b} moved: {base} bytes to the base, {px} of its pixels drawn"));
+                    self.ok(up > 0 && up <= panel(m.count_ones() as u64), &format!("layers {m:03b} moved: {up} bytes uploaded"));
+                    self.same_so_far(ui, "moved");
+                    self.set_mark(ui);
+                    self.sc.mask = 0;
+                    self.sc.dx = 0;
+                    self.sc.dy = 0;
+                    self.next();
+                }
+            }
+            13 => {
+                if self.after(40) {
+                    let (up, base, px) = self.since_mark(ui);
+                    let o = ui.gpu_output(0);
+                    self.ok(up == 0 && base == 0 && px == 0, &format!("closed: {up} bytes uploaded, {px} pixels of the base drawn"));
+                    self.ok(o.layer_textures == 0 && o.layer_store == 0, &format!("closed: {} textures, {} bytes kept", o.layer_textures, o.layer_store));
+                    self.same_so_far(ui, "closed");
+                    self.mode += 1;
+                    self.pc = if self.mode < COMBOS { 10 } else { 20 };
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
+                }
+            }
+            // ---- one layer closes under another, the top one moves off
+            20 => {
+                self.sc.mask = 7;
+                self.next();
+            }
+            21 => {
+                if self.after(40) {
+                    self.set_mark(ui);
+                    self.sc.mask = 5; // the popup goes, the dialog and the tooltip stay
+                    self.next();
+                }
+            }
+            22 => {
+                if self.after(40) {
+                    let (_, base, px) = self.since_mark(ui);
+                    self.ok(base == 0 && px == 0, &format!("the middle layer closed: {base} bytes to the base"));
+                    self.same_so_far(ui, "the middle layer closed");
+                    self.ok(ui.gpu_output(0).layer_textures == 2, "the middle layer's texture is gone");
+                    self.set_mark(ui);
+                    self.sc.mask = 7;
+                    self.next();
+                }
+            }
+            // ---- something changes below open layers
+            23 => {
+                if self.after(40) {
+                    self.set_mark(ui);
+                    self.patch = 0xFF00_C0F0;
+                    self.next();
+                }
+            }
+            24 => {
+                if self.after(40) {
+                    let (up, base, _) = self.since_mark(ui);
+                    self.ok(base > 0 && up > base, &format!("a change below: {base} bytes to the base, {} to the layers", up - base));
+                    self.same_so_far(ui, "a change below");
+                    // the layers' pixels below follow the change: closing shows it
+                    self.set_mark(ui);
+                    self.sc.mask = 0;
+                    self.next();
+                }
+            }
+            25 => {
+                if self.after(40) {
+                    let (up, _, px) = self.since_mark(ui);
+                    self.ok(up == 0 && px == 0, &format!("closed after the change: {up} bytes uploaded"));
+                    self.screen_check(ui, "closed after the change");
+                    self.sc.mask = 7;
+                    self.sc.smoke = true;
+                    self.next();
+                }
+            }
+            // ---- a layer over the whole window
+            26 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.layer_textures == 3, "smoke over the whole window");
+                    self.same_so_far(ui, "smoke");
+                    self.set_mark(ui);
+                    self.sc.smoke = false;
+                    self.sc.mask = 7;
+                    self.next();
+                }
+            }
+            27 => {
+                if self.after(60) {
+                    let (_, base, px) = self.since_mark(ui);
+                    self.ok(base == 0 && px == 0, &format!("smoke gone: {base} bytes to the base, {px} of its pixels drawn"));
+                    self.same_so_far(ui, "smoke gone");
+                    // a new size with open layers: through the CPU path, back with them
+                    let (x, y) = plat::win_get_rect(0).map_or((100, 100), |r| (r[0], r[1]));
+                    plat::win_test(plat::WT_MOVE, 0, [x, y, 700, 520]);
+                    self.mark[2] = ui.gpu_output(0).leaves as u64;
+                    self.next();
+                }
+            }
+            28 => {
+                if ui.fb().w == 700 && ui.gpu_output(0).leaves as u64 > self.mark[2] {
+                    let o = ui.gpu_output(0);
+                    self.ok(!o.on && o.layer_textures == 0, "a new size: the CPU path, no layer textures");
+                    self.next();
+                } else if self.after(2000) {
+                    self.ok(false, "a new size: no CPU frame");
+                    self.finish(ui);
+                }
+            }
+            29 => {
+                if self.wait_on(ui, 5000) == Some(true) {
+                    self.sc.dx = 30; // the next change brings the layers back
+                    self.next();
+                }
+            }
+            30 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.layer_textures == 3, &format!("after the new size: {} layer textures", o.layer_textures));
+                    self.same_so_far(ui, "after the new size");
+                    ui.gpu_test_lose();
+                    self.sc.dx = 45;
+                    self.next();
+                }
+            }
+            // ---- a lost device with open layers
+            31 => {
+                let o = ui.gpu_output(0);
+                if !o.on {
+                    self.ok(o.layer_textures == 0, "lost: the CPU path, no layer textures");
+                    self.next();
+                } else if self.after(1000) {
+                    self.ok(false, "lost: still on the swapchain");
+                    self.finish(ui);
+                }
+            }
+            32 => {
+                if self.wait_on(ui, 8000) == Some(true) {
+                    self.sc.dx = 60;
+                    self.next();
+                }
+            }
+            33 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.layer_textures == 3, &format!("a new device: {} layer textures", o.layer_textures));
+                    self.same_so_far(ui, "a new device");
+                    self.sc.mask = 0;
+                    self.next();
+                }
+            }
+            34 => {
+                if self.after(60) {
+                    self.ok(ui.gpu_output(0).layer_textures == 0, "closed");
+                    self.screen_check(ui, "the end");
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// the image's pixel the CPU draws at window pixel x, y of rectangle r
+    fn image_px(sf: &Surface, r: [i32; 4], x: i32, y: i32) -> u32 {
+        let sx = ((x - r[0]) as u64 * (((sf.w as u64) << 16) / r[2] as u64) + (((sf.w as u64) << 16) / r[2] as u64 >> 1)) >> 16;
+        let sy = ((y - r[1]) as u64 * (((sf.h as u64) << 16) / r[3] as u64) + (((sf.h as u64) << 16) / r[3] as u64 >> 1)) >> 16;
+        let o = sy as usize * sf.stride as usize + sx as usize * 4;
+        u32::from_le_bytes([sf.px[o], sf.px[o + 1], sf.px[o + 2], sf.px[o + 3]]) & 0xFF_FFFF
+    }
+
+    /// the first image moved by a pixel in this pass
+    fn image_step(&mut self) {
+        if let Some(e) = self.sc.imgs.first_mut() {
+            e.2[0] = 20 + (e.2[0] - 20 + 1) % 40;
+        }
+    }
+
+    fn t_images(&mut self, ui: &mut Ui) {
+        const IW: i32 = 1600;
+        const IH: i32 = 1200;
+        const BYTES: u64 = IW as u64 * IH as u64 * 4;
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.sc.imgs.push((pattern(IW, IH, FMT_XRGB, 255), 1, [20, 30, 500, 400]));
+                    self.next();
+                }
+            }
+            1 => {
+                // something elsewhere changes, the image does not
+                self.patch = self.patch.wrapping_add(0x11);
+                if self.after(300) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_textures == 0, "shown once and not changing: no texture");
+                    self.set_mark(ui);
+                    self.next();
+                }
+            }
+            2 => {
+                // redrawn every pass: the texture comes when that has cost what its upload costs
+                self.image_step();
+                let o = ui.gpu_output(0);
+                if o.image_textures == 1 {
+                    let (up, _, _) = self.since_mark(ui);
+                    self.ok(o.image_uploads == 1 && o.image_bytes == BYTES, &format!("the texture: {} upload(s), {} bytes", o.image_uploads, o.image_bytes));
+                    self.ok(up >= BYTES && up < BYTES * 3, &format!("redraws + the upload: {up} bytes, the image {BYTES}"));
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, "no texture after 5 s of redraws");
+                    self.finish(ui);
+                }
+            }
+            3 => {
+                self.image_step();
+                if self.after(30) {
+                    self.set_mark(ui);
+                    self.next();
+                }
+            }
+            4 => {
+                self.image_step();
+                self.mode += 1;
+                if self.mode >= 12 {
+                    let (up, _, _) = self.since_mark(ui);
+                    let per = up / self.mode as u64;
+                    // 500 x 400 moved: only the cells at its edges (without the texture 800 000 bytes)
+                    let o = ui.gpu_output(0);
+                    self.ok(per <= 300_000, &format!("moved: {per} bytes per frame"));
+                    self.ok(o.image_quads == 1 && o.image_uploads == 1, &format!("drawn by the GPU, {} upload(s)", o.image_uploads));
+                    self.same_so_far(ui, "moved");
+                    self.sc.over = true;
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            5 => {
+                // something of the base over it: those cells the usual way
+                if self.after(40) {
+                    self.same_so_far(ui, "drawn over");
+                    self.sc.over = false;
+                    self.sc.mask = 7;
+                    self.next();
+                }
+            }
+            6 => {
+                // the layers over it
+                if self.after(40) {
+                    self.ok(ui.gpu_output(0).layer_textures == 3, "three layers over the image");
+                    self.same_so_far(ui, "layers over it");
+                    self.set_mark(ui);
+                    self.sc.mask = 0;
+                    self.next();
+                }
+            }
+            7 => {
+                if self.after(40) {
+                    let (up, _, px) = self.since_mark(ui);
+                    self.ok(up == 0 && px == 0, &format!("the layers closed over it: {up} bytes uploaded"));
+                    self.same_so_far(ui, "closed over it");
+                    // moved while a layer is open
+                    self.sc.mask = 2;
+                    self.next();
+                }
+            }
+            8 => {
+                self.image_step();
+                if self.after(60) {
+                    self.same_so_far(ui, "moved below a layer");
+                    self.sc.mask = 0;
+                    // at another size, and one to one, scaled up: the same texture
+                    if let Some(e) = self.sc.imgs.first_mut() {
+                        e.2 = [20, 30, 640, 480];
+                    }
+                    self.next();
+                }
+            }
+            9 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_uploads == 1, "another size: no new upload");
+                    self.same_so_far(ui, "another size");
+                    if let Some(e) = self.sc.imgs.first_mut() {
+                        e.2 = [-100, -50, IW, IH];
+                    }
+                    self.next();
+                }
+            }
+            10 => {
+                if self.after(60) {
+                    self.same_so_far(ui, "one to one, cut by the window");
+                    if let Some(e) = self.sc.imgs.first_mut() {
+                        e.2 = [-300, -300, IW * 2 + 5, IH * 2 + 3];
+                    }
+                    self.next();
+                }
+            }
+            11 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_uploads == 1 && o.image_quads == 1, "scaled up: drawn by the GPU");
+                    self.same_so_far(ui, "scaled up");
+                    self.mark[3] = o.image_evicted;
+                    if let Some(e) = self.sc.imgs.first_mut() {
+                        e.1 = 2; // a new version
+                        e.2 = [20, 30, 500, 400];
+                    }
+                    self.next();
+                }
+            }
+            12 => {
+                if self.after(60) {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_textures == 0 && o.image_evicted == self.mark[3] + 1 && o.image_bytes == 0, "a new version: the old texture is gone");
+                    self.same_so_far(ui, "a new version");
+                    self.next();
+                }
+            }
+            13 => {
+                self.image_step();
+                if ui.gpu_output(0).image_textures == 1 {
+                    // a second image takes the first one's place under a small budget
+                    ui.gpu_test_image_budget(BYTES);
+                    self.mark[3] = ui.gpu_output(0).image_evicted;
+                    self.sc.imgs.clear();
+                    self.sc.imgs.push((pattern(IW, IH, FMT_XRGB, 255), 1, [20, 30, 500, 400]));
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, "the new version got no texture");
+                    self.finish(ui);
+                }
+            }
+            14 => {
+                self.image_step();
+                let o = ui.gpu_output(0);
+                if o.image_evicted > self.mark[3] && o.image_textures == 1 && o.image_bytes == BYTES {
+                    self.ok(true, "evicted: the image that was not drawn, the budget holds");
+                    self.same_so_far(ui, "evicted");
+                    // over the budget: the CPU goes on drawing it
+                    ui.gpu_test_image_budget(BYTES / 2);
+                    self.sc.imgs.clear();
+                    self.sc.imgs.push((pattern(IW, IH, FMT_XRGB, 255), 1, [20, 30, 500, 400]));
+                    self.mode = 0;
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, &format!("no eviction: {} textures, {} bytes", o.image_textures, o.image_bytes));
+                    self.finish(ui);
+                }
+            }
+            15 => {
+                self.image_step();
+                self.mode += 1;
+                if self.mode >= 30 {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_quads == 0, "over the budget: drawn by the CPU");
+                    self.same_so_far(ui, "over the budget");
+                    ui.gpu_test_image_budget(256 << 20);
+                    // translucent: the CPU blends it, whatever it costs
+                    self.sc.imgs.clear();
+                    self.sc.imgs.push((pattern(IW, IH, gfx::FMT_PARGB, 255), 1, [20, 30, 500, 400]));
+                    // (premultiplied values above the alpha would not be valid: a pattern under 128)
+                    if let Some(e) = self.sc.imgs.first_mut() {
+                        let mut sf = Surface::new(IW, IH, gfx::FMT_PARGB);
+                        let stride = sf.stride as usize;
+                        for y in 0..IH as usize {
+                            for x in 0..IW as usize {
+                                let v = ((x * 3 + y) & 127) as u32;
+                                let p = v | v << 8 | v << 16 | 128u32 << 24;
+                                let o = y * stride + x * 4;
+                                sf.px[o..o + 4].copy_from_slice(&p.to_le_bytes());
+                            }
+                        }
+                        e.0 = Rc::new(sf);
+                    }
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            16 => {
+                self.image_step();
+                self.mode += 1;
+                if self.mode >= 40 {
+                    let o = ui.gpu_output(0);
+                    self.ok(o.image_quads == 0, "translucent: drawn by the CPU");
+                    self.same_so_far(ui, "translucent");
+                    // opaque in a format with alpha: as XRGB
+                    self.sc.imgs.clear();
+                    self.sc.imgs.push((pattern(IW, IH, gfx::FMT_PARGB, 255), 1, [20, 30, 500, 400]));
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            17 => {
+                self.image_step();
+                let o = ui.gpu_output(0);
+                if o.image_quads == 1 {
+                    self.ok(true, "alpha 255 everywhere: drawn by the GPU");
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, "alpha 255 everywhere: no texture");
+                    self.finish(ui);
+                }
+            }
+            18 => {
+                self.image_step();
+                if self.after(40) {
+                    self.same_so_far(ui, "premultiplied, opaque");
+                    self.mark[3] = ui.gpu_output(0).image_uploads;
+                    ui.gpu_test_lose();
+                    self.next();
+                }
+            }
+            // ---- a lost device: the CPU path, then the texture again
+            19 => {
+                self.image_step();
+                let o = ui.gpu_output(0);
+                if !o.on {
+                    self.ok(o.image_quads == 0 && o.image_textures == 0 && o.image_bytes == 0, "lost: no image textures");
+                    self.next();
+                } else if self.after(1000) {
+                    self.ok(false, "lost: still on the swapchain");
+                    self.finish(ui);
+                }
+            }
+            20 => {
+                self.image_step();
+                if self.wait_on(ui, 8000) == Some(true) {
+                    self.next();
+                }
+            }
+            21 => {
+                self.image_step();
+                let o = ui.gpu_output(0);
+                if o.image_quads == 1 && o.image_uploads > self.mark[3] {
+                    self.ok(true, "a new device: the texture again");
+                    self.next();
+                } else if self.after(4000) {
+                    self.ok(false, "a new device: no texture");
+                    self.finish(ui);
+                }
+            }
+            22 => {
+                self.image_step();
+                if self.after(40) {
+                    self.same_so_far(ui, "a new device");
+                    self.sc.imgs.clear();
+                    self.next();
+                }
+            }
+            23 => {
+                if self.after(60) {
+                    self.ok(ui.gpu_output(0).image_quads == 0, "the image gone from the page");
+                    self.same_so_far(ui, "the image gone from the page");
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// no read-back: the framebuffer lacks what the GPU draws
+    fn t_imgplain(&mut self, ui: &mut Ui) {
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.sc.imgs.push((pattern(1000, 800, FMT_XRGB, 255), 1, [20, 30, 500, 400]));
+                    self.next();
+                }
+            }
+            1 => {
+                self.image_step();
+                if ui.gpu_output(0).image_quads == 1 {
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, "no texture after 5 s of redraws");
+                    self.finish(ui);
+                }
+            }
+            2 => {
+                self.image_step();
+                if self.after(100) {
+                    self.mode = 1; // stands still from here on
+                    self.next();
+                }
+            }
+            3 => {
+                if self.after(60) {
+                    // the framebuffer lacks the image until asked
+                    let r = self.sc.imgs[0].2;
+                    let sf = self.sc.imgs[0].0.clone();
+                    let (x, y) = (r[0] + 200, r[1] + 200);
+                    let read = |ui: &Ui| {
+                        let fb = ui.fb();
+                        let o = y as usize * fb.stride as usize + x as usize * 4;
+                        u32::from_le_bytes([fb.px[o], fb.px[o + 1], fb.px[o + 2], fb.px[o + 3]]) & 0xFF_FFFF
+                    };
+                    let want = Test::image_px(&sf, r, x, y);
+                    let before = read(ui);
+                    ui.gpu_settle();
+                    let after = read(ui);
+                    self.ok(before != want, &format!("the CPU drew nothing of it: the framebuffer holds {before:06x} at {x}, {y}, the image {want:06x}"));
+                    self.ok(after == want, &format!("settled: {after:06x}"));
+                    // on the screen it is the image's pixel
+                    if let Some(w) = plat::win_get_rect(0) {
+                        let got = screen_px(w[0] + x, w[1] + y);
+                        if got != want && plat::win_test(plat::WT_FROM_POINT, 0, [x, y, 0, 0]) != 1 {
+                            out("note: the screen: another window lies on top of ours (no result)");
+                        } else {
+                            self.ok(got == want, &format!("the screen shows {got:06x}"));
+                        }
+                    }
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            4 => {
+                // moved again (the framebuffer lacks it), then the way back to the CPU path
+                self.image_step();
+                if self.after(60) {
+                    ui.gpu_test_lose();
+                    self.image_step();
+                    self.mode = 1;
+                    self.next();
+                }
+            }
+            5 => {
+                self.mode = 1;
+                if !ui.gpu_output(0).on {
+                    self.next();
+                } else if self.after(1000) {
+                    self.ok(false, "lost: still on the swapchain");
+                    self.finish(ui);
+                }
+            }
+            6 => {
+                if self.after(100) {
+                    let r = self.sc.imgs[0].2;
+                    let sf = self.sc.imgs[0].0.clone();
+                    let (x, y) = (r[0] + 200, r[1] + 200);
+                    let want = Test::image_px(&sf, r, x, y);
+                    if let Some(w) = plat::win_get_rect(0) {
+                        let got = screen_px(w[0] + x, w[1] + y);
+                        if got != want && plat::win_test(plat::WT_FROM_POINT, 0, [x, y, 0, 0]) != 1 {
+                            out("note: the screen: another window lies on top of ours (no result)");
+                        } else {
+                            self.ok(got == want, &format!("back on the CPU path the screen shows the image: {got:06x}"));
+                        }
+                    }
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn t_csd(&mut self, ui: &mut Ui) {
         const WM_NCHITTEST: u32 = 0x0084;
         match self.pc {
@@ -776,6 +1443,7 @@ impl App for Test {
                 }
             }
         }
+        draw_page(self, ui);
         // the picture: six bands, a patch that changes, or one colour over everything
         let (w, h) = (ui.fb().w, ui.fb().h);
         if self.full != 0 {
@@ -792,6 +1460,7 @@ impl App for Test {
             ui.draw_color(self.patch);
             ui.draw_rect(100, 100, 200, 40);
         }
+        draw_scene(self, ui);
         if self.caret {
             ui.next_size(200, 30);
             if !self.t_first {
@@ -843,6 +1512,9 @@ impl App for Test {
                 "idle" => self.t_idle(ui),
                 "csd" => self.t_csd(ui),
                 "monitors" => self.t_monitors(ui),
+                "layers" => self.t_layers(ui),
+                "images" => self.t_images(ui),
+                "imgplain" => self.t_imgplain(ui),
                 _ => {
                     self.done = true;
                     ui.quit();
@@ -865,6 +1537,305 @@ impl App for Test {
         }
         false
     }
+}
+
+// a full page for the bench: rows of rounded boxes with text (what lies below the layers)
+fn draw_page(t: &Test, ui: &mut Ui) {
+    if !t.sc.page_on {
+        return;
+    }
+    let (w, h) = (ui.fb().w, ui.fb().h);
+    ui.draw_color(0xFF20_2428);
+    ui.draw_rect(0, 0, w, h);
+    let font = (13u32 << 16) | FONT_REG;
+    let tint = t.sc.page.wrapping_mul(0x0003_0507) & 0x0007_0707;
+    let mut y = 8;
+    let mut row = 0;
+    while y < h {
+        let mut x = 8;
+        let mut col = 0;
+        while x < w {
+            ui.cmd_rrect(x, y, 112, 28, 4, 1, 0xFF30_3840 + tint, 0xFF50_5860, 0xFF40_4850);
+            ui.draw_color(0xFFE0_E4E8);
+            let label = format!("Zeile {row} Feld {col}");
+            ui.draw_text(x + 6, y + 19, &label, font);
+            x += 120;
+            col += 1;
+        }
+        y += 36;
+        row += 1;
+    }
+}
+
+// the images and panels of a test or a bench
+fn draw_scene(t: &Test, ui: &mut Ui) {
+    let sc = &t.sc;
+    for (sf, ver, r) in &sc.imgs {
+        ui.draw_image(sf, *ver, r[0], r[1], r[2], r[3]);
+    }
+    if sc.over {
+        if let Some((_, _, r)) = sc.imgs.first() {
+            ui.draw_color(0xFF40_8040);
+            ui.draw_rect(r[0] + 100, r[1] + 100, 150, 60);
+            ui.draw_color(0xFFFF_FFFF);
+            ui.draw_text(r[0] + 110, r[1] + 130, "darüber", (14u32 << 16) | FONT_REG);
+        }
+    }
+    if sc.page_on {
+        // something small that changes (a clock, a progress value)
+        ui.draw_color(0xFF10_1418);
+        ui.draw_rect(ui.fb().w - 200, 8, 192, 28);
+        ui.draw_color(0xFFFF_E080);
+        let label = format!("Takt {}", sc.tick);
+        ui.draw_text(ui.fb().w - 190, 27, &label, (14u32 << 16) | FONT_REG);
+    }
+    let (pw, ph) = (if sc.panel[0] != 0 { sc.panel[0] } else { 240 }, if sc.panel[1] != 0 { sc.panel[1] } else { 160 });
+    for (idx, layer) in [(0, L_DIALOG), (1, L_POPUP), (2, L_TIP)] {
+        if sc.mask & (1 << idx) == 0 {
+            continue;
+        }
+        let prev = ui.cmd_layer(layer);
+        if sc.smoke && idx == 0 {
+            ui.draw_color(0x8000_0000);
+            ui.draw_rect(0, 0, ui.fb().w, ui.fb().h);
+        }
+        let (x, y) = (60 + 90 * idx + sc.dx, 50 + 60 * idx + sc.dy);
+        // shadow, translucent fill, border; text, shapes, a translucent rectangle, a clip
+        ui.draw_color(0x6000_0000);
+        ui.cmd_shadow(x, y, pw, ph, 8, 12);
+        ui.cmd_rrect(x, y, pw, ph, 8, 1, 0xE0F0_E8D8, 0xFF40_4040, 0xFF20_2020);
+        ui.draw_color(0xFF10_2030);
+        let font = (14u32 << 16) | FONT_REG;
+        let mut ty = y + 26;
+        let mut k = 0;
+        while ty < y + ph - 60 {
+            let label = format!("Ebene {layer}, Zeile {k}");
+            ui.draw_text(x + 14, ty, &label, font);
+            ty += 22;
+            k += 1;
+        }
+        ui.draw_color(0x8000_A0FF);
+        ui.draw_rect(x + 12, y + ph - 56, 100, 30);
+        ui.draw_color(0xFFC0_4020);
+        ui.draw_circle((x + 160) << 8, (y + ph - 40) << 8, 16 << 8, 0);
+        ui.draw_color(0xC020_8040);
+        ui.draw_line((x + 120) << 8, (y + ph - 16) << 8, (x + 220) << 8, (y + ph - 44) << 8, 3 << 8);
+        ui.draw_clip(x + 200, y + 6, 30, 30);
+        ui.draw_color(0xFF00_8080);
+        ui.draw_rrect(x + 190, y, 60, 60, 12);
+        ui.draw_unclip();
+        ui.cmd_layer(prev);
+    }
+}
+
+// ---------------------------------------------------------------- layers and images: what they save
+
+/// a bench's scene: what changes in each frame
+struct Stage {
+    name: &'static str,
+    frames: usize,
+    set: fn(&mut Scene, usize),
+    /// frames before the samples start (e.g. until an image has its texture)
+    settle: usize,
+    /// sample only the frames where this holds
+    pick: fn(usize) -> bool,
+}
+
+fn every(_: usize) -> bool {
+    true
+}
+
+fn even(k: usize) -> bool {
+    k % 2 == 0
+}
+
+fn odd(k: usize) -> bool {
+    k % 2 == 1
+}
+
+#[derive(Clone, Copy)]
+struct Sample {
+    render: u64,
+    present: u64,
+    up: u64,
+    base: u64,
+}
+
+struct LayerBench {
+    t: Test,
+    stages: Vec<Stage>,
+    stage: usize,
+    frame: usize,
+    samples: Vec<Sample>,
+    last: Sample,
+    n: usize,
+    started: bool,
+    wait: u32,
+    done: bool,
+    big: Option<Rc<Surface>>,
+    mem: String,
+}
+
+fn counters(ui: &Ui) -> Sample {
+    let o = ui.gpu_output(0);
+    Sample { render: o.render_us, present: o.present_us, up: o.upload_bytes, base: o.base_px }
+}
+
+impl App for LayerBench {
+    fn frame(&mut self, ui: &mut Ui) {
+        // this pass's frame comes after this call: the last one's costs are in the counters
+        let now = counters(ui);
+        if !self.started {
+            // the page, the swapchain
+            self.t.sc.page_on = true;
+            if ui.gpu_output(0).on || ui.gpu_output(0).never {
+                self.wait += 1;
+                if self.wait > 40 {
+                    self.started = true;
+                    self.last = now;
+                    let o = ui.gpu_output(0);
+                    out(&format!("path: on={} {} ({}), window {}x{}, reserved {} MiB", o.on, o.adapter, o.present_mode, ui.fb().w, ui.fb().h, o.reserved >> 20));
+                }
+            }
+            self.t.frame(ui);
+            ui.timer(1, 8);
+            return;
+        }
+        if self.stage < self.stages.len() {
+            let (st_frames, st_settle, st_pick, st_set, st_name) = {
+                let st = &self.stages[self.stage];
+                (st.frames, st.settle, st.pick, st.set, st.name)
+            };
+            if self.frame > st_settle && st_pick(self.frame - 1) {
+                self.samples.push(Sample {
+                    render: now.render - self.last.render,
+                    present: now.present - self.last.present,
+                    up: now.up - self.last.up,
+                    base: now.base - self.last.base,
+                });
+            }
+            self.last = now;
+            if self.frame >= st_frames + st_settle {
+                report(st_name, &mut self.samples);
+                let o = ui.gpu_output(0);
+                self.mem.push_str(&format!("MEM {st_name}: layer textures {} = {} KiB, kept below {} KiB, image textures {} = {} MiB, uploads {}, reserved {} MiB\n",
+                    o.layer_textures, o.layer_bytes >> 10, o.layer_store >> 10, o.image_textures, o.image_bytes >> 20, o.image_uploads, o.reserved >> 20));
+                self.samples.clear();
+                self.stage += 1;
+                self.frame = 0;
+                self.t.sc = Scene { page_on: true, ..Scene::default() };
+                if self.stage == 5 || self.stage == 6 || self.stage == 7 || self.stage == 8 {
+                    if let Some(b) = &self.big {
+                        self.t.sc.imgs.push((b.clone(), 1, [20, 60, 1200, 900]));
+                    }
+                }
+            } else {
+                (st_set)(&mut self.t.sc, self.frame);
+                self.frame += 1;
+            }
+        } else if !self.done {
+            self.done = true;
+            plat::write_stdout(self.mem.as_bytes());
+            let o = ui.gpu_output(0);
+            out(&format!("TOTAL frames {} split {} verified {} differ {}", o.frames, o.split_frames, o.verified, o.verify_bad));
+            ui.quit();
+        }
+        let _ = self.n;
+        self.t.frame(ui);
+        ui.timer(1, 8);
+    }
+
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        self.t.command(ui, id, arg)
+    }
+}
+
+fn report(name: &str, v: &mut [Sample]) {
+    if v.is_empty() {
+        out(&format!("RESULT {name}: no samples"));
+        return;
+    }
+    fn stat(v: &mut [Sample], f: fn(&Sample) -> u64) -> (u64, u64) {
+        let mut x: Vec<u64> = v.iter().map(f).collect();
+        x.sort_unstable();
+        (x[x.len() / 2], x[x.len() * 95 / 100])
+    }
+    let (rm, rp) = stat(v, |s| s.render);
+    let (pm, pp) = stat(v, |s| s.present);
+    let (um, up) = stat(v, |s| s.up);
+    let (bm, bp) = stat(v, |s| s.base);
+    out(&format!("RESULT {name:<16} n={:<4} render {rm:>6} us (p95 {rp:>6})  present {pm:>6} us (p95 {pp:>6})  upload {um:>9} B (p95 {up:>9})  base px {bm:>8} (p95 {bp:>8})", v.len()));
+}
+
+fn layer_bench(n: usize) -> i32 {
+    let big = pattern(4000, 3000, FMT_XRGB, 255);
+    let stages = alloc::vec![
+        // a popup over the page: open, close
+        Stage { name: "popup open", frames: n, settle: 0, pick: even, set: |s, k| {
+            s.panel = [320, 420];
+            s.mask = if k % 2 == 0 { 2 } else { 0 };
+        } },
+        Stage { name: "popup close", frames: n, settle: 0, pick: odd, set: |s, k| {
+            s.panel = [320, 420];
+            s.mask = if k % 2 == 0 { 2 } else { 0 };
+        } },
+        Stage { name: "popup move", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.panel = [320, 420];
+            s.mask = 2;
+            s.dx = (k as i32 * 7) % 700;
+            s.dy = (k as i32 * 3) % 300;
+        } },
+        Stage { name: "tooltip", frames: n, settle: 0, pick: every, set: |s, k| {
+            s.panel = [200, 72];
+            s.mask = if k % 2 == 0 { 4 } else { 0 };
+        } },
+        Stage { name: "dialog drag", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.panel = [560, 380];
+            s.mask = 1;
+            s.dx = (k as i32 * 3) % 900;
+            s.dy = (k as i32 * 2) % 500;
+        } },
+        // a big image: something beside it changes; it stands still under a popup; it moves
+        Stage { name: "image, beside", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.tick = k as u32;
+        } },
+        Stage { name: "image, page", frames: n, settle: 0, pick: every, set: |s, k| {
+            s.page = k as u32; // the whole page changes
+        } },
+        Stage { name: "image, moved", frames: n, settle: 60, pick: every, set: |s, k| {
+            if let Some(e) = s.imgs.first_mut() {
+                e.2[0] = 20 + (k as i32 % 60);
+            }
+        } },
+        Stage { name: "image, popup", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.panel = [320, 420];
+            s.mask = if k % 2 == 0 { 2 } else { 0 };
+        } },
+        // smoke over the whole window with a dialog
+        Stage { name: "smoke dialog", frames: n, settle: 2, pick: every, set: |s, k| {
+            s.panel = [560, 380];
+            s.mask = 1;
+            s.smoke = true;
+            s.dx = (k as i32 * 3) % 900;
+        } },
+    ];
+    let mut app = LayerBench {
+        t: new_test("bench"),
+        stages,
+        stage: 0,
+        frame: 0,
+        samples: Vec::new(),
+        last: Sample { render: 0, present: 0, up: 0, base: 0 },
+        n,
+        started: false,
+        wait: 0,
+        done: false,
+        big: Some(big),
+        mem: String::new(),
+    };
+    app.t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
+    let d = AppDesc { w: 1920, h: 1000, flags: AF_RESIZABLE, ..DESC };
+    ui::run_window(&d, &mut app, &style::STYLE)
 }
 
 // ---------------------------------------------------------------- latency
@@ -1019,15 +1990,16 @@ fn new_test(name: &str) -> Test {
         caret: false,
         mode: 0,
         bench: None,
+        sc: Scene::default(),
     }
 }
 
 // ---------------------------------------------------------------- without a window
 
-fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>)> {
+fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>, Vec<u32>)> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     match wgsl::compile(ui::GPU_OUT_WGSL, &opt) {
-        Ok(o) => Some((o.entry("vs")?.words.clone(), o.entry("fs")?.words.clone())),
+        Ok(o) => Some((o.entry("vs")?.words.clone(), o.entry("fs")?.words.clone(), o.entry("fs_image")?.words.clone())),
         Err(d) => {
             out(&format!("FAIL gpu_out.wgsl: {:?}", d.first().map(|x| format!("{x}"))));
             None
@@ -1036,9 +2008,9 @@ fn compile_shaders() -> Option<(Vec<u32>, Vec<u32>)> {
 }
 
 fn gen_shaders(path: &str) -> i32 {
-    let Some((vs, fs)) = compile_shaders() else { return 1 };
+    let Some((vs, fs, fs_image)) = compile_shaders() else { return 1 };
     let mut s = String::from("// written by uigputest --gen-shaders from gpu_out.wgsl (shader::BASIS, no robustness); do not edit\n");
-    for (name, w) in [("VS", &vs), ("FS", &fs)] {
+    for (name, w) in [("VS", &vs), ("FS", &fs), ("FS_IMAGE", &fs_image)] {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
             s.push_str("    ");
@@ -1051,7 +2023,7 @@ fn gen_shaders(path: &str) -> i32 {
         s.push_str("];\n");
     }
     if plat::write_file(path, s.as_bytes()) {
-        out(&format!("wrote {path}: {} + {} words", vs.len(), fs.len()));
+        out(&format!("wrote {path}: {} + {} + {} words", vs.len(), fs.len(), fs_image.len()));
         0
     } else {
         1
@@ -1059,9 +2031,9 @@ fn gen_shaders(path: &str) -> i32 {
 }
 
 fn t_shaders() -> i32 {
-    let Some((vs, fs)) = compile_shaders() else { return 1 };
+    let Some((vs, fs, fs_image)) = compile_shaders() else { return 1 };
     let mut fails = 0;
-    for (name, a, b) in [("vs", &vs[..], ui::GPU_OUT_VS), ("fs", &fs[..], ui::GPU_OUT_FS)] {
+    for (name, a, b) in [("vs", &vs[..], ui::GPU_OUT_VS), ("fs", &fs[..], ui::GPU_OUT_FS), ("fs_image", &fs_image[..], ui::GPU_OUT_FS_IMAGE)] {
         if a == b {
             out(&format!("  ok   {name}: {} words as wgsl::compile makes them", b.len()));
         } else {
@@ -1266,7 +2238,10 @@ fn run() -> i32 {
             let d = AppDesc { w: 1280, h: 800, ..DESC };
             return ui::run_window(&d, &mut t, &style::STYLE);
         }
-        out("--bench latency|idle|caret");
+        if b == "layers" {
+            return layer_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(200));
+        }
+        out("--bench latency|idle|caret|layers");
         return 2;
     }
     let Some(test) = val("--test") else {
@@ -1292,10 +2267,13 @@ fn run() -> i32 {
         "noloader" => {
             plat::setenv("jfgui_GPU_DLL", Some("missing-vulkan-loader.dll"));
         }
-        "lose" => {
+        "lose" | "layers" | "images" | "imgplain" => {
             plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));
         }
         _ => {}
+    }
+    if test == "imgplain" {
+        plat::setenv("jfgui_GPU_VERIFY", None);
     }
     let mut t = new_test(&test);
     let d = if test == "csd" { AppDesc { flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR, ..DESC } } else { DESC };

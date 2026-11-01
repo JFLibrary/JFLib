@@ -1010,8 +1010,11 @@ impl Device {
     pub fn is_lost(&self) -> bool {
         self.sh.check().is_err()
     }
-    /// (test aid) behave as a lost device from now on
+    /// (test aid) behave as a lost device from now on (a lost device runs nothing any more and
+    /// its resources may go at once; here the GPU may still work on the last submission: it
+    /// finishes first)
     pub fn test_lose(&self) {
+        let _ = self.wait_idle();
         self.sh.mark_lost();
     }
     /// the validation layer watches this device
@@ -1133,15 +1136,40 @@ impl Queue {
         if (stride as u64) < tw as u64 * bb || (data.len() as u64) < stride as u64 * th as u64 {
             return Err(GpuError::Invalid("write_texture_rects: data smaller than the texture"));
         }
+        self.write_texture_rects_at(t, rects, (0, 0), data, stride, before, after)
+    }
+
+    /// write_texture_rects from an image of another size: rectangles (x, y, w, h) of `data`, an
+    /// image in rows of `stride` bytes, go to (x - origin.0, y - origin.1) of the texture; what
+    /// lies outside the image or the texture is skipped
+    #[allow(clippy::too_many_arguments)]
+    pub fn write_texture_rects_at(&self, t: &crate::Texture, rects: &[[i32; 4]], origin: (i32, i32), data: &[u8], stride: u32, before: Layout,
+                                  after: Layout) -> Result<()> {
+        let f = t.format();
+        let bb = f.block_bytes() as u64;
+        if f.is_compressed() || f.is_depth() || t.depth() != 1 {
+            return Err(GpuError::Invalid("write_texture_rects: an uncompressed 2D colour texture"));
+        }
+        let (tw, th) = (t.width() as i32, t.height() as i32);
+        if stride == 0 {
+            return Err(GpuError::Invalid("write_texture_rects: stride 0"));
+        }
+        // the image's size: rows that lie completely in data, as many pixels as a row holds
+        let (iw, ih) = ((stride as u64 / bb).min(i32::MAX as u64) as i64, (data.len() as u64 / stride as u64).min(i32::MAX as u64) as i64);
         let mut regions: Vec<vk::BufferImageCopy> = Vec::with_capacity(rects.len());
         let mut total = 0u64;
         let sub = crate::vk_res::subresources(t, 0, 1, 0, 1);
+        let (ox, oy) = (origin.0 as i64, origin.1 as i64);
         for r in rects {
-            let (x0, y0) = (r[0].max(0), r[1].max(0));
-            let (x1, y1) = (r[0].saturating_add(r[2]).min(tw), r[1].saturating_add(r[3]).min(th));
+            // in the texture's coordinates, cut to the texture and the image
+            let x0 = (r[0] as i64 - ox).max(0).max(-ox);
+            let y0 = (r[1] as i64 - oy).max(0).max(-oy);
+            let x1 = (r[0] as i64 + r[2] as i64 - ox).min(tw as i64).min(iw - ox);
+            let y1 = (r[1] as i64 + r[3] as i64 - oy).min(th as i64).min(ih - oy);
             if x1 <= x0 || y1 <= y0 {
                 continue;
             }
+            let (x0, y0, x1, y1) = (x0 as i32, y0 as i32, x1 as i32, y1 as i32);
             let (w, h) = ((x1 - x0) as u32, (y1 - y0) as u32);
             regions.push(vk::BufferImageCopy {
                 buffer_offset: total,
@@ -1162,14 +1190,14 @@ impl Queue {
         let (sbuf, soff, ptr) = sh.stage(&mut st, total)?;
         let cb = st.upload.as_ref().map_or(0, |u| u.slot.cb);
         for g in regions.iter_mut() {
-            let (x, y) = (g.image_offset.x as usize, g.image_offset.y as usize);
+            let (x, y) = ((g.image_offset.x as i64 + ox) as usize, (g.image_offset.y as i64 + oy) as usize);
             let (w, h) = (g.image_extent.width as usize, g.image_extent.height as usize);
             let row = w * bb as usize;
             let mut dst = ptr + g.buffer_offset as usize;
             for yy in y..y + h {
                 let from = yy * stride as usize + x * bb as usize;
-                // SAFETY: the row lies in data (checked against the texture's size) and in the
-                // staged range of `total` bytes, whose rectangles follow each other.
+                // SAFETY: the row lies in data (cut to the image above) and in the staged range
+                // of `total` bytes, whose rectangles follow each other.
                 unsafe { core::ptr::copy_nonoverlapping(data.as_ptr().add(from), dst as *mut u8, row) };
                 dst += row;
             }

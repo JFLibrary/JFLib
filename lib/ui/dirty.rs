@@ -16,11 +16,16 @@
 // marks its cells.  The same pass fills the content grids of the scroll views
 // (scrollcopy.rs): dirty cells whose pixels a scrolled view still shows elsewhere are copied
 // there before the rectangles are drawn.
+//
+// While a window's frames go through the GPU (gpu_out.rs, W::split) the pass also keeps the hash
+// of every cell after each layer (W::through: what changed in which layer) and notes the big
+// images of the base layer and which cells they end up on top of (W::top, W::imgs).
 
 use alloc::vec;
 use alloc::vec::Vec;
 
 use super::cmd::{cmd_bbox, cmd_parts, pos_mix, Cmd};
+use super::consts::L_COUNT;
 use super::Ui;
 
 const CELL_SHIFT: u32 = 5; // 32 px cells
@@ -50,6 +55,19 @@ pub(crate) struct Dmg {
     y1: i32,
 }
 
+/// images of the base layer from this many visible pixels on are noted for the GPU output
+pub(crate) const IMG_MIN_PX: i64 = 256 * 256;
+/// W::top: more than an image touches the cell, or something after it
+pub(crate) const TOP_BLOCKED: u8 = 255;
+
+/// a big image of the base layer in this frame: its record, the part of it the clips leave
+/// (x0, y0, x1, y1)
+#[derive(Clone, Copy)]
+pub(crate) struct ImgSeen {
+    pub(crate) index: u32,
+    pub(crate) vis: [i32; 4],
+}
+
 /// a canvas whose rectangle is known: id (0 = free), window, frame, rect
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Cvs {
@@ -67,6 +85,34 @@ pub(crate) struct W {
     pub(crate) cols: u32,
     pub(crate) rows: u32,
     pub(crate) full: bool,
+    /// (gpu_out.rs) the GPU output keeps the layers apart: the hashes through each layer, the
+    /// big images
+    pub(crate) split: bool,
+    /// (gpu_out.rs) the last frame had layers or images apart: no scroll copies
+    pub(crate) busy: bool,
+    /// this frame: everything was asked for, or explicit damage went into a full redraw
+    pub(crate) forced: bool,
+    /// the rectangles of drects before the explicit damage
+    pub(crate) n0: i32,
+    /// the hashes through layer l, for the layers below a layer with commands (empty: as through
+    /// l + 1), of this frame and the last
+    pub(crate) pre: [Vec<u64>; L_COUNT - 1],
+    pub(crate) pre_prev: [Vec<u64>; L_COUNT - 1],
+    /// per cell: 0 nothing yet, k the k-th image of imgs is on top, TOP_BLOCKED
+    pub(crate) top: Vec<u8>,
+    pub(crate) imgs: Vec<ImgSeen>,
+}
+
+impl W {
+    /// (after dirty_compute, whose swap made cells_prev this frame's) the hashes through layer l
+    /// of this frame or of the last one
+    pub(crate) fn through(&self, now: bool, l: usize) -> &[u64] {
+        let (pre, all) = if now { (&self.pre_prev, &self.cells_prev) } else { (&self.pre, &self.cells) };
+        match pre[l.min(L_COUNT - 1)..].iter().find(|k| !k.is_empty()) {
+            Some(k) => k,
+            None => all.as_deref().unwrap_or(&[]),
+        }
+    }
 }
 
 // the clip tracked while hashing (C_CLIP / C_UNCLIP of a layer)
@@ -180,6 +226,8 @@ impl Ui {
         let n = cols as usize * rows as usize;
         d.cells = Some(vec![0; n]);
         d.cells_prev = Some(vec![0; n]);
+        d.pre = Default::default();
+        d.pre_prev = Default::default();
         d.full = true;
     }
 
@@ -270,6 +318,15 @@ impl Ui {
     /// content only moved copy their still valid cells first (scrollcopy.rs).
     pub(crate) fn dirty_compute(&mut self, w: i32, h: i32) -> i32 {
         self.cells_ensure(w, h);
+        {
+            let d = &mut self.wp.dirty;
+            d.forced = d.full;
+            d.top.clear();
+            d.imgs.clear();
+            for k in d.pre.iter_mut() {
+                k.clear();
+            }
+        }
         let mut sc = self.sc_pass(w, h);
         if self.wp.dirty.cells.is_none() || self.wp.dirty.cells_prev.is_none() {
             self.sc_plan(sc, 0, 0, false);
@@ -280,10 +337,15 @@ impl Ui {
         // ---- hash every command into its cells (and into the scroll views' content grids)
         {
             let Ui { wp, .. } = self;
-            let cells = wp.dirty.cells.as_mut().unwrap();
+            let d = &mut wp.dirty;
+            let split = d.split;
+            let cells = d.cells.as_mut().unwrap();
             cells.fill(0);
             let grids = sc.on();
             for (l, layer) in wp.cmd.layers.iter().enumerate() {
+                if split && l > 0 && !layer.is_empty() {
+                    d.pre[l - 1].extend_from_slice(cells);
+                }
                 let mut dc = DClip::new();
                 for (i, c) in layer.iter().enumerate() {
                     if grids {
@@ -332,12 +394,28 @@ impl Ui {
                     let c1 = ((bb[2] - 1) >> CELL_SHIFT).min(cols - 1);
                     let r0 = (bb[1] >> CELL_SHIFT).max(0);
                     let r1 = ((bb[3] - 1) >> CELL_SHIFT).min(rows - 1);
+                    // (the GPU output) the big images of the base layer and what lies over them
+                    let mut tag = 0;
+                    if split && l == 0 && matches!(c, Cmd::Image { .. }) && dc.over == 0 && d.imgs.len() < TOP_BLOCKED as usize - 1
+                        && (bb[2] - bb[0]) as i64 * (bb[3] - bb[1]) as i64 >= IMG_MIN_PX
+                    {
+                        if d.top.is_empty() {
+                            d.top.resize(cols as usize * rows as usize, 0);
+                        }
+                        d.imgs.push(ImgSeen { index: i as u32, vis: bb });
+                        tag = d.imgs.len() as u8;
+                    }
+                    let track = l == 0 && !d.top.is_empty();
                     let mut r = r0;
                     while r <= r1 {
                         let mut k = c0;
                         while k <= c1 {
                             let i = (r * cols + k) as usize;
                             cells[i] = (cells[i].rotate_left(7) ^ hh).wrapping_mul(HASH_K);
+                            if track {
+                                let t = &mut d.top[i];
+                                *t = if *t != 0 { TOP_BLOCKED } else { tag };
+                            }
                             k += 1;
                         }
                         r += 1;
@@ -347,7 +425,14 @@ impl Ui {
         }
         // ---- compare with the previous frame, build rectangles
         let pending = self.dmg.iter().any(|d| d.win == self.uiw_cur);
-        let allowed = !self.wp.dirty.full && !pending;
+        // the GPU output's images of this frame; scroll copies move pixels of the framebuffer, which
+        // keeps no separate layers and may lack an image's pixels
+        let split = self.wp.dirty.split;
+        let apart = split && {
+            let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy) && self.gp_plan_images();
+            quads || self.wp.dirty.busy || self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty())
+        };
+        let allowed = !self.wp.dirty.full && !pending && !apart;
         let mut plan = self.sc_plan(sc, cols, rows, allowed);
         let want = plan.as_ref().is_some_and(|p| self.sc_want(p));
         let force = self.verify_dirty; // (checked frames copy whenever they can)
@@ -387,8 +472,10 @@ impl Ui {
         };
         // (U1) explicit damage (canvas_damage) of this window
         let n0 = self.drects.len() as i32;
+        self.wp.dirty.n0 = n0;
         let n = self.dmg_take(n0, w, h);
         if n < 0 {
+            self.wp.dirty.forced = true;
             self.dirty_swap();
             return self.dirty_full_take(w, h);
         }
@@ -419,6 +506,9 @@ impl Ui {
 
     // .dc_full: everything; the pending damage of this window is covered
     fn dirty_full_take(&mut self, w: i32, h: i32) -> i32 {
+        if self.dmg.iter().any(|d| d.win == self.uiw_cur) {
+            self.wp.dirty.forced = true; // (the damage is not told apart any more)
+        }
         self.wp.dirty.full = false;
         self.drects.clear();
         self.dmg_take(0, w, h);
@@ -430,5 +520,6 @@ impl Ui {
     fn dirty_swap(&mut self) {
         let d = &mut self.wp.dirty;
         core::mem::swap(&mut d.cells, &mut d.cells_prev);
+        core::mem::swap(&mut d.pre, &mut d.pre_prev);
     }
 }
