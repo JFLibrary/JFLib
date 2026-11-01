@@ -17494,6 +17494,14 @@ COLOR_TARGETS_MAX: usize = 8
   - `draw_indirect_count: bool` -- draw_indexed_indirect_count
   - `bindless: bool` -- Bindless tables (descriptor indexing, update after bind)
   - `subgroups: bool` -- subgroup operations (basic, vote, ballot, arithmetic, shuffle) in compute shaders
+  - `subgroups_webgpu: bool` -- what WebGPU's `subgroups` feature needs (lib/wgsl's `enable subgroups`): the operations
+    of `subgroups` plus relative shuffles and quad operations, in compute and fragment shaders
+  - `subgroup_stages: u32` -- the stages with subgroup operations (subgroup_stage::\*) and the operations
+    (subgroup_op::\*), as the device reports them
+  - `subgroup_ops: u32`
+  - `subgroup_size_control: bool` -- Device::create_compute_pipeline_sized: a required subgroup size (WGSL @subgroup_size;
+    Limits::subgroup_min_size ..= subgroup_max_size)
+  - `subgroup_extended_types: bool` -- subgroup operations on f16 values too
   - `draw_parameters: bool` -- the base vertex / base instance / draw index builtins
   - `shader_f16: bool`
   - `shader_f64: bool`
@@ -17545,6 +17553,8 @@ COLOR_TARGETS_MAX: usize = 8
   - `max_anisotropy: f32`
   - `timestamp_period_ns: f32` -- nanoseconds per timestamp tick
   - `subgroup_size: u32` -- threads per subgroup (0: unknown)
+  - `subgroup_min_size: u32` -- the subgroup sizes shaders can get (without size control: subgroup_size twice)
+  - `subgroup_max_size: u32`
   - `max_bindless_textures: u32` -- the most slots of a Bindless table (Voll; 0 on Basis)
   - `max_bindless_samplers: u32`
   - `max_bindless_buffers: u32`
@@ -17948,6 +17958,31 @@ COLOR_TARGETS_MAX: usize = 8
 **`impl SwapchainDesc`**
 
 - **`const DEFAULT: SwapchainDesc = SwapchainDesc { present: PresentMode::Fifo, srgb: false, ...`**
+
+**`mod subgroup_stage`**
+
+the bits of Features::subgroup_stages
+
+```rust
+COMPUTE: u32 = 1
+FRAGMENT: u32 = 2
+VERTEX: u32 = 4
+```
+
+**`mod subgroup_op`**
+
+the bits of Features::subgroup_ops (the Vulkan feature bits)
+
+```rust
+BASIC: u32 = 1
+VOTE: u32 = 2
+ARITHMETIC: u32 = 4
+BALLOT: u32 = 8
+SHUFFLE: u32 = 0x10
+SHUFFLE_RELATIVE: u32 = 0x20
+CLUSTERED: u32 = 0x40
+QUAD: u32 = 0x80
+```
 
 ### `gpu/vk_cmd.rs`
 
@@ -18368,6 +18403,10 @@ GPU has finished the submissions made before it was dropped (vk_dev.rs).
 **`impl Device`**
 
 - **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
+- **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
+  create_compute_pipeline with a required subgroup size (WGSL @subgroup_size, what
+  wgsl::Output::subgroup_size returns): Features::subgroup_size_control, a power of two in
+  Limits::subgroup_min_size ..= subgroup_max_size; size 0: the driver's choice
 - **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
 
 - **`struct Timestamps(pub(crate) Arc<TsInner>)`**
@@ -19511,6 +19550,16 @@ Invocation: u32 = 4
 QueueFamily: u32 = 5
 ```
 
+**`mod group_op`**
+
+the group operation literal of OpGroupNonUniform{IAdd, FAdd ...}
+
+```rust
+Reduce: u32 = 0
+InclusiveScan: u32 = 1
+ExclusiveScan: u32 = 2
+```
+
 **`mod sem`**
 
 memory semantics bits (the value of a constant id operand)
@@ -19710,6 +19759,8 @@ Candidate Recommendation (2026-10-26); where Chrome's Tint differs, the docs say
                                               error / warning, German message, notes
   bench                                       the six benchmark shaders of docs/SHADER.md
                                               as WGSL text
+  Diagnostic::render(&src)                    with the source line and a caret span
+  analyze_uniformity(&module, src, &Options)  the uniformity analysis alone (uniformity.rs)
   compile(src, &CompileOptions) -> Result<Output, Vec<Diagnostic>>   check + lower to
                                               SPIR-V, one module per entry point (spirv.rs)
   Output::constants / workgroup_size / check_pipeline, check_interface, Limits
@@ -19731,16 +19782,30 @@ values are capped in size (consteval::MAX_ELEMS), every count is checked.
 
 - **`struct Diagnostic`**
   a message for the editor: position (1-based; columns count characters, end_col is
-  exclusive and on the same line), error or warning, German text; start / end: the byte
-  range in the source; notes point at related places ("hier deklariert")
+  exclusive and on the same line), error, warning or info (`error` and `info` both false: a
+  warning), German text; start / end: the byte range in the source; notes point at related
+  places ("hier deklariert")
   - `line: u32`
   - `col: u32`
   - `end_col: u32`
   - `error: bool`
+  - `info: bool` -- a message of severity info (diagnostic(info, ...)); it is neither error nor warning
   - `msg: String`
   - `start: u32`
   - `end: u32`
   - `notes: Vec<Note>`
+
+**`impl Diagnostic`**
+
+- **`fn render(&self, src: &str) -> String`**
+  the message with its source line and a caret span under the place, and each note the
+  same way, for a terminal:
+
+  ```text
+  4:29: Fehler: `workgroupBarrier` darf nur in uniformem Kontrollfluss aufgerufen werden
+     4 | fn g(c: u32) { if c == 0u { workgroupBarrier(); } }
+       |                             ^^^^^^^^^^^^^^^^
+  ```
 
 - **`struct Options`**
   what the checker accepts beyond core WGSL
@@ -19758,6 +19823,10 @@ values are capped in size (consteval::MAX_ELEMS), every count is checked.
 - **`fn check_with(src: &str, opt: &Options) -> Result<Module, Vec<Diagnostic>>`**
   parse and check with the given options
 
+- **`fn analyze_uniformity(m: &Module, src: &str, opt: &Options) -> Vec<Diagnostic>`**
+  the uniformity analysis of a checked module alone (check runs it already; for tools and
+  measurements): the diagnostics it gives
+
 - **`struct LineMap`**
   the start of every line (byte offsets); line breaks as WGSL defines them: LF, VT, FF, CR
   (alone or before LF), NEL, LS, PS
@@ -19770,6 +19839,8 @@ values are capped in size (consteval::MAX_ELEMS), every count is checked.
   1-based line and character column of a byte offset
 - **`fn diag(&self, src: &str, start: u32, end: u32, error: bool, msg: String) -> Diagnostic`**
   a diagnostic for the byte range start..end (end_col stays on the first line)
+- **`fn line_text<'s>(&self, src: &'s str, line: u32) -> &'s str`**
+  the text of a 1-based line without its line break
 - **`fn note(&self, src: &str, start: u32, end: u32, msg: String) -> Note`**
   a note for the byte range start..end
 
@@ -19801,6 +19872,10 @@ IMMEDIATE_ADDRESS_SPACE: u32 = 1 << 8
 FRAGMENT_DEPTH: u32 = 1 << 9
 /// v.xy = ... (swizzle views)
 SWIZZLE_ASSIGNMENT: u32 = 1 << 10
+/// a uniformity scope of its own for the subgroup and quad functions
+SUBGROUP_UNIFORMITY: u32 = 1 << 11
+/// @builtin(subgroup_id) and @builtin(num_subgroups)
+SUBGROUP_ID: u32 = 1 << 12
 /// enable-extensions the device may offer (the WebGPU features)
 F16: u32 = 1 << 16
 /// enable clip_distances: @builtin(clip_distances)
@@ -19811,11 +19886,22 @@ DUAL_SOURCE_BLENDING: u32 = 1 << 18
 PRIMITIVE_INDEX: u32 = 1 << 19
 /// enable atomic_vec2u_min_max: atomicStoreMin / Max on atomic<vec2<u32>>
 ATOMIC_VEC2U_MIN_MAX: u32 = 1 << 20
+/// enable subgroups: the subgroup and quad built-in functions and values
+SUBGROUPS: u32 = 1 << 21
+/// enable subgroup_size_control: @subgroup_size (turns subgroups on too)
+SUBGROUP_SIZE_CONTROL: u32 = 1 << 22
 /// what a browser offers and this front end implements: the language features of Chrome
-/// 156 except buffer_view, subgroup_id and subgroup_uniformity (and without
-/// fragment_depth, which Chrome offers only with --enable-unsafe-webgpu: implemented,
-/// opt-in), the enable-extensions except subgroups and subgroup_size_control
-ALL: u32 = (0x7ff & !FRAGMENT_DEPTH) | 0x1f << 16
+/// 156 except buffer_view (and without fragment_depth, which Chrome offers only with
+/// --enable-unsafe-webgpu: implemented, opt-in), the enable-extensions
+ALL: u32 = (0x1fff & !FRAGMENT_DEPTH) | 0x7f << 16
+```
+
+- **`const fn for_device(f16: bool, subgroups: bool, subgroup_size_control: bool) -> u32`**
+  ALL for a device: the enable-extensions it lacks are off, as WebGPU gates them on the
+  features of the device (lib/gpu: Features::shader_f16, subgroups_webgpu,
+  subgroup_size_control)
+
+```rust
 /// (name, bit, is a language extension) for every extension name WGSL defines; bit 0:
 /// known but not implemented here
 NAMES: &[(&str, u32, bool)] = &[ ("readonly_and_readwrite_storage_textures", READONLY_A ...
@@ -19879,6 +19965,11 @@ Literals keep their text (the printer writes it back unchanged) and their decode
   - `severity: Ident`
   - `rule: Ident`
   - `rule2: Option<Ident>`
+
+**`impl DiagnosticControl`**
+
+- **`fn rule_span(&self) -> Span`**
+  the place of the whole rule name
 
 - **`enum AttrKind`**
   the arguments of an attribute
@@ -20168,7 +20259,7 @@ anything (docs/WGSL.md, "Das IR")
   Module            types (interned: equal types have equal TypeIds), structs with their
                     layout, globals, overrides, functions (callees before callers), entry
                     points with their interface, the module-scope expression arena, enabled
-                    extensions, diagnostic filters (kept for the uniformity analysis, G2d)
+                    extensions, diagnostic filters (read by the uniformity analysis)
   Type              Scalar / Vector / Matrix / Atomic / Array (count, stride) / Struct /
                     Pointer / Reference / SwizzleView / Sampler / Texture
   Expr / ExprKind   one arena per function (Function::exprs) and one for module scope
@@ -20502,7 +20593,7 @@ BUILTIN_VALUES: [(&str, BuiltinValue); 20] = [ ("vertex_index", BuiltinValue::Ve
   - `BitNot`
 
 - **`enum Builtin`**
-  the built-in functions (spec section 17; no subgroup and quad functions, no buffer views)
+  the built-in functions (spec section 17; no buffer views)
   - `All`
   - `Any`
   - `Select`
@@ -20625,6 +20716,31 @@ BUILTIN_VALUES: [(&str, BuiltinValue); 20] = [ ("vertex_index", BuiltinValue::Ve
   - `TextureBarrier`
   - `WorkgroupBarrier`
   - `WorkgroupUniformLoad`
+  - `SubgroupAdd`
+  - `SubgroupExclusiveAdd`
+  - `SubgroupInclusiveAdd`
+  - `SubgroupAll`
+  - `SubgroupAnd`
+  - `SubgroupAny`
+  - `SubgroupBallot`
+  - `SubgroupBroadcast`
+  - `SubgroupBroadcastFirst`
+  - `SubgroupElect`
+  - `SubgroupMax`
+  - `SubgroupMin`
+  - `SubgroupMul`
+  - `SubgroupExclusiveMul`
+  - `SubgroupInclusiveMul`
+  - `SubgroupOr`
+  - `SubgroupShuffle`
+  - `SubgroupShuffleDown`
+  - `SubgroupShuffleUp`
+  - `SubgroupShuffleXor`
+  - `SubgroupXor`
+  - `QuadBroadcast`
+  - `QuadSwapDiagonal`
+  - `QuadSwapX`
+  - `QuadSwapY`
 
 - **`enum ExprKind`**
   expression nodes (see the module comment for the conventions)
@@ -20783,6 +20899,7 @@ BUILTIN_VALUES: [(&str, BuiltinValue); 20] = [ ("vertex_index", BuiltinValue::Ve
   - `func: u32` -- Module::functions index
   - `stage: Stage`
   - `workgroup_size: Option<[WgSize; 3]>` -- compute only
+  - `subgroup_size: Option<WgSize>` -- @subgroup_size (compute only, subgroup_size_control)
   - `inputs: Vec<IoVar>`
   - `outputs: Vec<IoVar>`
   - `globals: Vec<u32>` -- every module-scope variable statically accessed (ascending)
@@ -21076,7 +21193,9 @@ pipeline -- what WebGPU checks when it creates a pipeline from a compiled entry 
   output.workgroup_size(entry, constants) -> Result<[u32; 3], String>
   output.check_pipeline(entry, constants, &Limits) -> Result<(), String>   the above plus the
        limits (workgroup size and invocations, workgroup memory, colour targets, inter-stage
-       locations, immediate bytes) and the storage texture formats WebGPU's core allows
+       locations, immediate bytes), the storage texture formats WebGPU's core allows and the
+       function bodies the entry point reaches: with the overrides' values an expression may
+       become a constant that is an error (1 / a, sqrt(a), v[a], x << a, clamp(x, a, b) ...)
   check_interface(vertex, fragment) -> Result<(), String>   every fragment input has a vertex
        output at its location with the same component type and count (at least)
   Limits::WEBGPU   WebGPU's default limits (what a browser gives without requiredLimits)
@@ -21092,6 +21211,8 @@ pipeline -- what WebGPU checks when it creates a pipeline from a compiled entry 
   - `max_immediate_size: u32`
   - `bgra8unorm_storage: bool` -- the device offers bgra8unorm-storage
   - `texture_formats_tier2: bool` -- texture-formats-tier2: read_write storage textures of more formats
+  - `subgroup_min_size: u32` -- the sizes @subgroup_size may ask for (subgroupMinSize, subgroupMaxSize of the adapter)
+  - `subgroup_max_size: u32`
 
 **`impl Limits`**
 
@@ -21105,6 +21226,9 @@ pipeline -- what WebGPU checks when it creates a pipeline from a compiled entry 
   the module comment); pass them to lib/gpu as Constant { id, value }
 - **`fn workgroup_size(&self, entry: &str, given: &[(&str, f64)]) -> Result<[u32; 3], String>`**
   the workgroup size of a compute entry point with these pipeline constants
+- **`fn subgroup_size(&self, entry: &str, given: &[(&str, f64)]) -> Result<Option<u32>, String>`**
+  the @subgroup_size of a compute entry point with these pipeline constants (None: it has
+  none)
 - **`fn check_pipeline(&self, entry: &str, given: &[(&str, f64)], lim: &Limits) -> Result<(), String>`**
   what WebGPU checks when it creates a pipeline from this entry point (module comment)
 
@@ -21233,6 +21357,9 @@ HIDDEN_BASE: u32 = 0x2_0000
   - `primitive_index: bool` -- @builtin(primitive_index): the Geometry capability (geometryShader)
   - `clip_distance: bool` -- @builtin(clip_distances) (shaderClipDistance)
   - `sample_rate_shading: bool` -- @interpolate(.., sample), @builtin(sample_index) (sampleRateShading)
+  - `subgroup_extended_types: bool` -- subgroup operations on f16 (shaderSubgroupExtendedTypes)
+  - `subgroup_ops: u32` -- the subgroup operations a module uses (SUBGROUP_\* of lib/gpu's Features::subgroup_ops):
+    1 basic, 2 vote, 4 arithmetic, 8 ballot, 16 shuffle, 32 shuffle relative, 128 quad
 
 - **`enum SpecSource`**
   where a specialization constant's value comes from
@@ -21246,6 +21373,8 @@ HIDDEN_BASE: u32 = 0x2_0000
   - `words: Vec<u32>` -- the SPIR-V module of this entry point (its entry point has the same name)
   - `workgroup_size: Option<[u32; 3]>` -- compute: the workgroup size with the overrides' defaults (None: an override without
     default decides it; Output::workgroup_size computes it for pipeline constants)
+  - `subgroup_size: Option<u32>` -- @subgroup_size with the overrides' defaults (None: not written, or an override without
+    default; Output::subgroup_size computes it for pipeline constants)
   - `resources: Vec<Resource>`
   - `immediate_size: u32` -- bytes of the var&lt;immediate> block (0: none); lib/gpu: PipelineLayoutDesc::push_constants
   - `inputs: Vec<StageVar>`

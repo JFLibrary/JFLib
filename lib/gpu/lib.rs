@@ -235,6 +235,18 @@ pub struct Features {
     pub bindless: bool,
     /// subgroup operations (basic, vote, ballot, arithmetic, shuffle) in compute shaders
     pub subgroups: bool,
+    /// what WebGPU's `subgroups` feature needs (lib/wgsl's `enable subgroups`): the operations
+    /// of `subgroups` plus relative shuffles and quad operations, in compute and fragment shaders
+    pub subgroups_webgpu: bool,
+    /// the stages with subgroup operations (subgroup_stage::*) and the operations
+    /// (subgroup_op::*), as the device reports them
+    pub subgroup_stages: u32,
+    pub subgroup_ops: u32,
+    /// Device::create_compute_pipeline_sized: a required subgroup size (WGSL @subgroup_size;
+    /// Limits::subgroup_min_size ..= subgroup_max_size)
+    pub subgroup_size_control: bool,
+    /// subgroup operations on f16 values too
+    pub subgroup_extended_types: bool,
     /// the base vertex / base instance / draw index builtins
     pub draw_parameters: bool,
     pub shader_f16: bool,
@@ -277,6 +289,25 @@ pub struct Features {
     pub ray_pipeline: bool,
 }
 
+/// the bits of Features::subgroup_stages
+pub mod subgroup_stage {
+    pub const COMPUTE: u32 = 1;
+    pub const FRAGMENT: u32 = 2;
+    pub const VERTEX: u32 = 4;
+}
+
+/// the bits of Features::subgroup_ops (the Vulkan feature bits)
+pub mod subgroup_op {
+    pub const BASIC: u32 = 1;
+    pub const VOTE: u32 = 2;
+    pub const ARITHMETIC: u32 = 4;
+    pub const BALLOT: u32 = 8;
+    pub const SHUFFLE: u32 = 0x10;
+    pub const SHUFFLE_RELATIVE: u32 = 0x20;
+    pub const CLUSTERED: u32 = 0x40;
+    pub const QUAD: u32 = 0x80;
+}
+
 /// the device's limits
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Limits {
@@ -304,6 +335,9 @@ pub struct Limits {
     pub timestamp_period_ns: f32,
     /// threads per subgroup (0: unknown)
     pub subgroup_size: u32,
+    /// the subgroup sizes shaders can get (without size control: subgroup_size twice)
+    pub subgroup_min_size: u32,
+    pub subgroup_max_size: u32,
     /// the most slots of a Bindless table (Voll; 0 on Basis)
     pub max_bindless_textures: u32,
     pub max_bindless_samplers: u32,

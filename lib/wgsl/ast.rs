@@ -75,6 +75,16 @@ pub struct DiagnosticControl {
     pub rule2: Option<Ident>,
 }
 
+impl DiagnosticControl {
+    /// the place of the whole rule name
+    pub fn rule_span(&self) -> Span {
+        match &self.rule2 {
+            Some(r2) => Span::new(self.rule.span.start, r2.span.end),
+            None => self.rule.span,
+        }
+    }
+}
+
 /// the arguments of an attribute
 #[derive(Clone, PartialEq, Debug)]
 pub enum AttrKind {

@@ -644,6 +644,7 @@ fn run_level(t: &mut T, dev: &Device, minor: u32, what: &str) {
     crate::t_wgsl2::workgroup(t, dev, minor, what);
     crate::t_wgsl2::discard(t, dev, minor, what);
     crate::t_wgsl2::textures(t, dev, minor, what);
+    crate::t_wgsl3::subgroups(t, dev, minor, what);
 }
 
 /// NaN operands: WGSL's min / max return the other operand, comparisons are unordered;

@@ -130,8 +130,9 @@ pub fn run(t: &mut T) {
     if t.verbose { crate::out("10000 nested blocks: error\n"); }
     t.check("10000 nested blocks: error", wgsl::check(&blocks(10000)).is_err());
     let ifs = |n: usize| format!("fn f(c: bool) {{ {} {} }}", "if c { ".repeat(n), "}".repeat(n));
-    if t.verbose { crate::out("100 nested ifs check\n"); }
-    t.check("100 nested ifs check", wgsl::check(&ifs(100)).is_ok());
+    if t.verbose { crate::out("63 nested ifs check\n"); }
+    t.check("63 nested ifs check", wgsl::check(&ifs(63)).is_ok());
+    t.check("64 nested ifs: error", wgsl::check(&ifs(64)).is_err());
     let loops = |n: usize| format!("fn f() {{ {} {} }}", "loop { break; ".repeat(n), "}".repeat(n));
     if t.verbose { crate::out("60 nested loops check\n"); }
     t.check("60 nested loops check", wgsl::check(&loops(60)).is_ok());
@@ -169,6 +170,7 @@ pub fn run(t: &mut T) {
     let elifs = |n: usize| format!("fn f(c: bool) {{ if c {{}} {} }}", "else if c {} ".repeat(n));
     if t.verbose { crate::out("120 else-ifs check\n"); }
     t.check("120 else-ifs check", wgsl::check(&elifs(120)).is_ok());
+    t.check("125 else-ifs: error", wgsl::check(&elifs(125)).is_err());
     if t.verbose { crate::out("5000 else-ifs: error\n"); }
     t.check("5000 else-ifs: error", wgsl::check(&elifs(5000)).is_err());
     let swz = |n: usize| format!("fn f() {{ var v: vec4f; v{} = vec2f(); }}", ".wzyx".repeat(n) + ".xy");
@@ -176,7 +178,7 @@ pub fn run(t: &mut T) {
     t.check("swizzle view chain checks", wgsl::check(&swz(50)).is_ok());
     // the deepest valid module in a thread with 512 KB of stack (exact on Linux; Windows only
     // commits less, the reserve is the 1 MB of the main thread)
-    let worst = nesting("worst", 96);
+    let worst = nesting("worst", 61);
     let verbose = t.verbose;
     let th = plat::thread_spawn(512 * 1024, alloc::boxed::Box::new(move || {
         let ok = wgsl::check(&worst).is_ok();
@@ -310,6 +312,14 @@ pub fn perf(t: &mut T) {
     ));
     t.check("print of the big shader", p.len() > src.len() / 2);
     if let Ok(m) = &r {
+        // the uniformity analysis alone (check has run it once)
+        let t4 = plat::time_us();
+        let u = wgsl::analyze_uniformity(m, &src, &wgsl::Options::default());
+        let us = plat::time_us() - t4;
+        crate::out(&format!("perf: the uniformity analysis of the big shader {:.1} ms ({:.1} % of parse+check), {} diagnostics\n", us as f64 / 1000.0, us as f64 / 1000.0 / check_ms * 100.0, u.len()));
+        t.check("the big shader is uniform", u.is_empty());
+    }
+    if let Ok(m) = &r {
         let t4 = plat::time_us();
         let o = wgsl::compile_module(m, &wgsl::CompileOptions::new(shader::VOLL));
         let us = plat::time_us() - t4;
@@ -327,4 +337,13 @@ pub fn perf(t: &mut T) {
     let us = (plat::time_us() - t0) as f64 / 20.0;
     crate::out(&format!("perf: the six benchmark shaders: {:.0} us per round\n", us));
     t.check("timing sane", us > 0.0);
+    let mods: alloc::vec::Vec<(wgsl::Module, &str)> = wgsl::bench::ALL.iter().filter_map(|(_, s)| wgsl::check(s).ok().map(|m| (m, *s))).collect();
+    let t0 = plat::time_us();
+    for _ in 0..20 {
+        for (m, s) in &mods {
+            let _ = wgsl::analyze_uniformity(m, s, &wgsl::Options::default());
+        }
+    }
+    let ua = (plat::time_us() - t0) as f64 / 20.0;
+    crate::out(&format!("perf: their uniformity analysis: {:.1} us per round ({:.1} %)\n", ua, ua / us * 100.0));
 }

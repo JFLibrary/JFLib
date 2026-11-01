@@ -75,7 +75,10 @@ rb.read(0, &mut out)?;
   `create_bindless` (eine große Tabelle: Bindung 0 Texturen, 1 Sampler, 2 Speicherpuffer,
   3 Speichertexturen; `set_texture`, `set_sampler`, `set_buffer`, `set_storage_texture`,
   `group()`, `layout()`).
-- **Pipelines**: `create_compute_pipeline`, `create_render_pipeline` (Vertex + Fragment,
+- **Pipelines**: `create_compute_pipeline`, `create_compute_pipeline_sized(&desc, größe)` (eine
+  verlangte Subgroup-Größe, WGSLs `@subgroup_size`: `Features::subgroup_size_control`, eine
+  Zweierpotenz in `Limits::subgroup_min_size` … `subgroup_max_size`, die Workgroup-Größe in x ein
+  Vielfaches), `create_render_pipeline` (Vertex + Fragment,
   dynamisches Rendern, Tiefentest, Mischen, Culling; Vertex-Eingaben sind optional,
   Vertex-Pulling aus Speicherpuffern geht ohne sie). Jede Stufe ist ein `ShaderStage { module,
   entry, constants }` (`ShaderStage::new(module, entry)` ohne Konstanten) mit ihren
@@ -173,7 +176,13 @@ Typs). Getestet von `gputest --test spec` (unten).
 | Basis | was WebGPU und Vulkan 1.1 können: Rechen-Shader, Speicherpuffer, einzelne indirekte Aufrufe, Textur-Arrays, Zeitstempel wo vorhanden | Vulkan 1.1, eine Warteschlange für Grafik und Rechnen, Zeitleisten-Semaphoren, dynamisches Rendern (Kern in 1.3 oder `VK_KHR_dynamic_rendering`) |
 | Voll | zusätzlich Bindless-Tabellen, `draw_indexed_indirect_count`, mehrere indirekte Aufrufe, Draw-Parameter, Subgruppen-Operationen | Vulkan 1.3 mit Descriptor-Indexing (update-after-bind, partially bound, non-uniform), drawIndirectCount, multiDrawIndirect, drawIndirectFirstInstance, shaderDrawParameters, Subgruppen (basic, vote, ballot, arithmetic, shuffle) im Rechen-Shader |
 
-`device.level()` und `device.features()` sagen, was da ist. Mesh-Shader und Raytracing werden
+`device.level()` und `device.features()` sagen, was da ist. Subgroups: `Features::subgroups` (die
+Operationen, die die Stufe Voll braucht, in Compute-Shadern), `subgroups_webgpu` (was WebGPUs Feature
+`subgroups` und WGSLs `enable subgroups` brauchen: dazu relative Shuffles und Quads, auch in
+Fragment-Shadern; so bindet `wgsl::feature::for_device` die Erweiterung ans Gerät),
+`subgroup_stages` und `subgroup_ops` wie gemeldet, `subgroup_size_control` (Vulkan 1.3),
+`subgroup_extended_types` (f16; beide werden eingeschaltet, wo vorhanden), `Limits::subgroup_size`,
+`subgroup_min_size`, `subgroup_max_size`. Mesh-Shader und Raytracing werden
 in `Features` gemeldet (`mesh_shader`, `ray_query`, `ray_pipeline`), aber noch nicht
 eingeschaltet. `DeviceDesc { max_level: Level::Basis }` erzwingt ein Basis-Gerät (zum Testen
 der Basis-Pfade auf großer Hardware).
@@ -270,7 +279,7 @@ für Messungen den Configurator ausschalten.
 | `window.uis` | Fenster mit Swapchain: FIFO-Bilder, dargestelltes Bild zurückgelesen, Größe geändert, minimiert / wiederhergestellt, IMMEDIATE und MAILBOX |
 | `errors.uis` | `jfgui_GPU=0`, fehlender Loader, `jfgui_GPU_ADAPTER` ohne Treffer, ungültige Aufrufe (Fehler, kein Absturz), verlorenes Gerät und ein neues danach |
 | `scene.uis` | die Messszene (unten) mit den handgeschriebenen SPIR-V-Shadern und mit den von `lib/wgsl` übersetzten WGSL-Shadern: `move` = `move_all` Bit für Bit, `cull` = `cull_ref`, ein Bild bekannter Würfel (Lage, Farbe, Tiefe, Rückseiten), indirekter und Einzel-Pfad gleich, die WGSL-Bilder = die SPIR-V-Bilder Pixel für Pixel; WGSL-`move` ohne Robustheit bitgleich, mit erlaubter Kontraktion gemeldet (der Treiber fusioniert: 1,33 Mio. Wörter weichen ab) |
-| `wgsl.uis` | das WGSL-Back-End auf der GPU, auf SPIR-V 1.6 und auf einem Basis-Gerät mit 1.3 ([`t_wgsl.rs`](../apps/gputest/t_wgsl.rs), [`t_wgsl2.rs`](../apps/gputest/t_wgsl2.rs)): jeder Operator und jede numerische eingebaute Funktion auf Laufzeitwerten (150 Fälle, 13 469 Ergebnisse, neun davon mit f16) gegen den Konstantenauswerter von `lib/wgsl` mit den Genauigkeiten der Spezifikation und WGSLs Laufzeitregeln (Division durch 0, `MIN / -1`, Shifts ab der Bitbreite); NaN bei `min` / `max` / `clamp` / Vergleichen (gemeldet: 7 von 7 wie WGSL); Overrides als Spezialisierungskonstanten und eingesetzt, mit Standardwerten, Fehlerfällen; Robustheit (Schreiben hinter ein Laufzeit-Array und ein festes Array, Lesen weit außerhalb); Workgroup-Speicher genullt, Atomics dort, `workgroupUniformLoad`; `discard` (Farbe, Atomic danach, `dpdx` danach); `textureStore` außerhalb übersprungen, `textureLoad` außerhalb geklemmt. `--dump DATEI` schreibt die Fälle für [`tools/wgsl_run.mjs`](../tools/wgsl_run.mjs) (Chrome rechnet dieselben Shader), `--chrome ERGEBNIS` vergleicht dessen Ergebnisse mit denselben Referenzen |
+| `wgsl.uis` | das WGSL-Back-End auf der GPU, auf SPIR-V 1.6 und auf einem Basis-Gerät mit 1.3 ([`t_wgsl.rs`](../apps/gputest/t_wgsl.rs), [`t_wgsl2.rs`](../apps/gputest/t_wgsl2.rs), [`t_wgsl3.rs`](../apps/gputest/t_wgsl3.rs)): die Subgroup- und Quad-Funktionen auf Laufzeitwerten gegen eine CPU-Referenz, die Subgroup-Größe und aktive Lanes kennt (Workgroups von 1 bis 256 Aufrufen, ein Zweig auf dem Aufruf), f16, `@subgroup_size`, Quad-Swaps im Fragment-Shader; jeder Operator und jede numerische eingebaute Funktion auf Laufzeitwerten (150 Fälle, 13 469 Ergebnisse, neun davon mit f16) gegen den Konstantenauswerter von `lib/wgsl` mit den Genauigkeiten der Spezifikation und WGSLs Laufzeitregeln (Division durch 0, `MIN / -1`, Shifts ab der Bitbreite); NaN bei `min` / `max` / `clamp` / Vergleichen (gemeldet: 7 von 7 wie WGSL); Overrides als Spezialisierungskonstanten und eingesetzt, mit Standardwerten, Fehlerfällen; Robustheit (Schreiben hinter ein Laufzeit-Array und ein festes Array, Lesen weit außerhalb); Workgroup-Speicher genullt, Atomics dort, `workgroupUniformLoad`; `discard` (Farbe, Atomic danach, `dpdx` danach); `textureStore` außerhalb übersprungen, `textureLoad` außerhalb geklemmt. `--dump DATEI` schreibt die Fälle für [`tools/wgsl_run.mjs`](../tools/wgsl_run.mjs) (Chrome rechnet dieselben Shader), `--chrome ERGEBNIS` vergleicht dessen Ergebnisse mit denselben Referenzen |
 | `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE; indirekt und einzeln mit den WGSL-Shadern |
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |

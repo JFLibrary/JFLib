@@ -890,12 +890,14 @@ impl<'a> Parser<'a> {
                 let r: PResult<()> = (|| {
                     loop {
                         if self.kind() == Tok::Break && self.peek(1) == Tok::If {
+                            let kw = self.tok();
                             self.next();
                             self.next();
                             break_if = Some(self.expression()?);
                             self.expect(Tok::Semi, "nach `break if`")?;
                             if self.kind() != Tok::RBrace {
-                                return Err(self.error(String::from("`break if` muss die letzte Anweisung von `continuing` sein")));
+                                self.error_at(kw.start, kw.end, String::from("`break if` muss die letzte Anweisung von `continuing` sein"));
+                                return Err(Fail);
                             }
                             break;
                         }
@@ -975,19 +977,27 @@ impl<'a> Parser<'a> {
         self.expression_after(u)
     }
 
-    fn mixing(&mut self, a: BinOp, b: BinOp) -> Fail {
+    /// at (when known): the place of the first operator
+    fn mixing(&mut self, a: BinOp, b: BinOp, at: Option<u32>) -> Fail {
         let msg = if a.is_comparison() && b.is_comparison() {
             format!("Vergleiche lassen sich nicht verketten (`{}` nach `{}`) – setze Klammern", b.text(), a.text())
         } else {
             format!("`{}` und `{}` dürfen nicht ohne Klammern gemischt werden", a.text(), b.text())
         };
-        self.error(msg)
+        match at {
+            Some(s) => {
+                let end = self.tok().end;
+                self.error_at(s, end, msg);
+                Fail
+            }
+            None => self.error(msg),
+        }
     }
 
     /// after an expression: an operator that may not follow is a mixing error
-    fn check_end(&mut self, last: BinOp) -> PResult<()> {
+    fn check_end(&mut self, last: BinOp, at: u32) -> PResult<()> {
         if let Some(op) = bin_of(self.kind()) {
-            return Err(self.mixing(last, op));
+            return Err(self.mixing(last, op, Some(at)));
         }
         Ok(())
     }
@@ -996,6 +1006,7 @@ impl<'a> Parser<'a> {
         let k = self.kind();
         if matches!(k, Tok::And | Tok::Or | Tok::Xor) {
             let op = bin_of(k).unwrap_or(BinOp::And);
+            let at = self.tok().start;
             let mut e = u;
             let mut links = 0;
             while self.kind() == k {
@@ -1006,13 +1017,14 @@ impl<'a> Parser<'a> {
                 let span = e.span.to(r.span);
                 e = self.mk(ExprKind::Binary(op, Box::new(e), Box::new(r)), span)?;
             }
-            self.check_end(op)?;
+            self.check_end(op, at)?;
             return Ok(e);
         }
         let mut e = self.relational_after(u)?;
         let k = self.kind();
         if matches!(k, Tok::AndAnd | Tok::OrOr) {
             let op = if k == Tok::AndAnd { BinOp::LogAnd } else { BinOp::LogOr };
+            let at = self.tok().start;
             let mut links = 0;
             while self.kind() == k {
                 links += 1;
@@ -1023,11 +1035,11 @@ impl<'a> Parser<'a> {
                 let span = e.span.to(r.span);
                 e = self.mk(ExprKind::Binary(op, Box::new(e), Box::new(r)), span)?;
             }
-            self.check_end(op)?;
+            self.check_end(op, at)?;
         } else if let ExprKind::Binary(op, ..) = e.kind {
             if matches!(self.kind(), Tok::And | Tok::Or | Tok::Xor) {
                 let b = bin_of(self.kind()).unwrap_or(BinOp::And);
-                return Err(self.mixing(op, b));
+                return Err(self.mixing(op, b, None));
             }
         }
         Ok(e)
@@ -1040,12 +1052,13 @@ impl<'a> Parser<'a> {
             Tok::Lt | Tok::Gt | Tok::Le | Tok::Ge | Tok::EqEq | Tok::NotEq => bin_of(k).unwrap_or(BinOp::Eq),
             _ => return Ok(s),
         };
+        let at = self.tok().start;
         self.next();
         let u2 = self.unary()?;
         let r = self.shift_after(u2)?;
         if let Some(b) = bin_of(self.kind()) {
             if b.is_comparison() || matches!(group(b), "bit") {
-                return Err(self.mixing(op, b));
+                return Err(self.mixing(op, b, Some(at)));
             }
         }
         let span = s.span.to(r.span);
@@ -1056,11 +1069,12 @@ impl<'a> Parser<'a> {
         let k = self.kind();
         if matches!(k, Tok::Shl | Tok::Shr) {
             let op = bin_of(k).unwrap_or(BinOp::Shl);
+            let at = self.tok().start;
             self.next();
             let r = self.unary()?;
             if let Some(b) = bin_of(self.kind()) {
                 if matches!(group(b), "arith" | "shift" | "bit") {
-                    return Err(self.mixing(op, b));
+                    return Err(self.mixing(op, b, Some(at)));
                 }
             }
             let span = u.span.to(r.span);
@@ -1101,7 +1115,7 @@ impl<'a> Parser<'a> {
                 (None, ExprKind::Binary(op, ..)) => *op,
                 _ => BinOp::Add,
             };
-            return Err(self.mixing(a, b));
+            return Err(self.mixing(a, b, None));
         }
         Ok(e)
     }

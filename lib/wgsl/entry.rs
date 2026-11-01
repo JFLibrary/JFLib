@@ -23,27 +23,28 @@ fn builtin_ok(c: &mut Checker, b: BuiltinValue, stage: ir::Stage, input: bool, t
     let v3u = c.t.vec(3, Scalar::U32);
     let v4f = c.t.vec(4, Scalar::F32);
     let (stages, dir_ok, ty_ok, want): (&[ir::Stage], bool, bool, &str) = match b {
-        VertexIndex | InstanceIndex => (&[Vertex], input, t == U32, "u32"),
+        VertexIndex | InstanceIndex => (&[Vertex], input, t == U32, "`u32`"),
         ClipDistances => (
             &[Vertex],
             !input,
             matches!(c.t.get(t), Type::Array { elem: F32, count: ArrayCount::Fixed(n), .. } if n <= 8),
-            "array<f32, N> mit N <= 8",
+            "`array<f32, N>` mit N <= 8",
         ),
         Position => {
             if stage == Vertex {
-                (&[Vertex], !input, t == v4f, "vec4<f32>")
+                (&[Vertex], !input, t == v4f, "`vec4<f32>`")
             } else {
-                (&[Fragment], input, t == v4f, "vec4<f32>")
+                (&[Fragment], input, t == v4f, "`vec4<f32>`")
             }
         }
-        FrontFacing => (&[Fragment], input, t == BOOL, "bool"),
-        FragDepth => (&[Fragment], !input, t == F32, "f32"),
-        PrimitiveIndex | SampleIndex => (&[Fragment], input, t == U32, "u32"),
-        SampleMask => (&[Fragment], true, t == U32, "u32"),
-        LocalInvocationIndex | GlobalInvocationIndex | WorkgroupIndex => (&[Compute], input, t == U32, "u32"),
-        LocalInvocationId | GlobalInvocationId | WorkgroupId | NumWorkgroups => (&[Compute], input, t == v3u, "vec3<u32>"),
-        _ => (&[], false, false, "?"),
+        FrontFacing => (&[Fragment], input, t == BOOL, "`bool`"),
+        FragDepth => (&[Fragment], !input, t == F32, "`f32`"),
+        PrimitiveIndex | SampleIndex => (&[Fragment], input, t == U32, "`u32`"),
+        SampleMask => (&[Fragment], true, t == U32, "`u32`"),
+        LocalInvocationIndex | GlobalInvocationIndex | WorkgroupIndex => (&[Compute], input, t == U32, "`u32`"),
+        LocalInvocationId | GlobalInvocationId | WorkgroupId | NumWorkgroups => (&[Compute], input, t == v3u, "`vec3<u32>`"),
+        SubgroupInvocationId | SubgroupSize => (&[Compute, Fragment], input, t == U32, "`u32`"),
+        SubgroupId | NumSubgroups => (&[Compute], input, t == U32, "`u32`"),
     };
     let dir = if input { "Eingabe" } else { "Ausgabe" };
     if !stages.contains(&stage) || !dir_ok {
@@ -56,6 +57,31 @@ fn builtin_ok(c: &mut Checker, b: BuiltinValue, stage: ir::Stage, input: bool, t
 }
 
 impl<'a> Checker<'a> {
+    /// the name of an attribute within a declaration's range (the range itself when it is not
+    /// there): the IR keeps no spans of IO attributes
+    fn attr_name_at(&self, sp: Span, name: &str) -> Span {
+        let text = self.src.get(sp.start as usize..sp.end as usize).unwrap_or("");
+        let mut at = 0;
+        while let Some(k) = text[at..].find(name) {
+            let i = at + k;
+            if text[..i].trim_end().ends_with('@') {
+                let s = sp.start + i as u32;
+                return Span::new(s, s + name.len() as u32);
+            }
+            at = i + name.len();
+        }
+        sp
+    }
+
+    /// the `var` of a module-scope variable's declaration (its range starts with the attributes)
+    fn var_keyword(&self, sp: Span) -> Span {
+        let text = self.src.get(sp.start as usize..sp.end as usize).unwrap_or("");
+        match text.find("var") {
+            Some(k) => Span::new(sp.start + k as u32, sp.start + k as u32 + 3),
+            None => sp,
+        }
+    }
+
     pub fn entry_points(&mut self) {
         for fi in 0..self.fns.len() {
             let Some(stage) = self.fns[fi].stage else { continue };
@@ -95,11 +121,13 @@ impl<'a> Checker<'a> {
         }
         if let Some(b) = io.builtin {
             if let Err(m) = builtin_ok(self, b, stage, input, ty) {
-                return Err(self.err(sp, m));
+                let at = self.attr_name_at(sp, "builtin");
+                return Err(self.err(at, m));
             }
             if let Some(p) = out.iter().find(|v| v.kind == IoKind::Builtin(b)) {
                 let pn = p.name.clone();
-                return Err(self.err(sp, format!("`@builtin({})` steht zweimal ({} und {})", b.name(), pn, name)));
+                let at = self.attr_name_at(sp, "builtin");
+                return Err(self.err(at, format!("`@builtin({})` steht zweimal ({} und {})", b.name(), pn, name)));
             }
             out.push(IoVar { name, ty, param, member, kind: IoKind::Builtin(b), invariant: io.invariant, depth_mode: io.depth_mode });
             return Ok(());
@@ -161,11 +189,13 @@ impl<'a> Checker<'a> {
         }
         let mut outputs = Vec::new();
         if let Some(rt) = f.ret {
+            // (the range of the result: its attributes and the type)
+            let rsp = decl.ret.as_ref().map(|r| r.0.first().map_or(r.1.span, |a| a.span.to(r.1.span))).unwrap_or(name_sp);
             if stage == ir::Stage::Compute {
-                let _ = self.err(name_sp, String::from("ein Compute-Einstiegspunkt hat keinen Rückgabewert"));
+                let at = decl.ret.as_ref().and_then(|r| r.0.first()).map_or(rsp, |a| a.name.span);
+                let _ = self.err(at, String::from("ein Compute-Einstiegspunkt hat keinen Rückgabewert"));
                 ok = false;
             } else {
-                let rsp = decl.ret.as_ref().map(|r| r.1.span).unwrap_or(name_sp);
                 if self.io_list(rt, f.ret_io, "return", None, rsp, false, stage, &mut outputs).is_err() {
                     ok = false;
                 }
@@ -180,38 +210,65 @@ impl<'a> Checker<'a> {
         let mut wg_ovr = BTreeSet::new();
         if stage == ir::Stage::Compute {
             if let Some(a) = self.attr(&decl.attrs, "workgroup_size") {
-                match self.workgroup_size(a.args(), &mut wg_ovr) {
+                match self.workgroup_size(a.args(), a.name.span, &mut wg_ovr) {
                     Ok(w) => wg = Some(w),
                     Err(_) => ok = false,
                 }
             }
         }
+        let mut subgroup_size = None;
+        if stage == ir::Stage::Compute {
+            if let Some(a) = self.attr(&decl.attrs, "subgroup_size") {
+                if let Some(x) = a.args().first() {
+                    match self.subgroup_size(x, a.name.span, &mut wg_ovr) {
+                        Ok(s) => subgroup_size = Some(s),
+                        Err(_) => ok = false,
+                    }
+                }
+            }
+        }
         // what the stage may use
         let sname = stage.name();
+        // (at the use, in the entry point or a function it calls; the note names the entry point)
+        let entry_note = format!("der {}-Einstiegspunkt `{}`", sname, f.name);
         if stage != ir::Stage::Fragment && info.uses_discard {
-            let _ = self.err(name_sp, format!("`discard` ist nur in Fragment-Shadern erlaubt, `{}` ist ein {}-Einstiegspunkt", f.name, sname));
+            let at = info.discard_use.unwrap_or(name_sp);
+            let _ = self.err_note(at, String::from("`discard` ist nur in Fragment-Shadern erlaubt"), name_sp, entry_note.clone());
             ok = false;
         }
         if stage != ir::Stage::Fragment {
             if let Some((usp, n)) = &info.frag_use {
-                let _ = self.err_note(name_sp, format!("`{}` gibt es nur in Fragment-Shadern, `{}` ist ein {}-Einstiegspunkt", n, f.name, sname), *usp, String::from("hier benutzt"));
+                let _ = self.err_note(*usp, format!("`{}` gibt es nur in Fragment-Shadern", n), name_sp, entry_note.clone());
                 ok = false;
             }
         }
         if stage != ir::Stage::Compute {
             if let Some((usp, n)) = &info.compute_use {
-                let _ = self.err_note(name_sp, format!("`{}` gibt es nur in Compute-Shadern, `{}` ist ein {}-Einstiegspunkt", n, f.name, sname), *usp, String::from("hier benutzt"));
+                let _ = self.err_note(*usp, format!("`{}` gibt es nur in Compute-Shadern", n), name_sp, entry_note.clone());
+                ok = false;
+            }
+        }
+        if stage == ir::Stage::Vertex {
+            if let Some((usp, n)) = &info.not_vertex_use {
+                let _ = self.err_note(*usp, format!("`{}` gibt es nur in Compute- und Fragment-Shadern", n), name_sp, entry_note.clone());
                 ok = false;
             }
         }
         let globals: Vec<u32> = info.globals.iter().copied().collect();
+        // the limit of private variables a shader uses
+        let private: u64 = globals.iter().map(|&g| &self.m.globals[g as usize]).filter(|g| g.space == AddressSpace::Private).map(|g| self.t.layout(g.ty).map_or(0, |x| x.1 as u64)).sum();
+        if private > MAX_PRIVATE_BYTES {
+            let _ = self.err(name_sp, format!("die private-Variablen von `{}` belegen {} Byte, erlaubt sind {}", f.name, private, MAX_PRIVATE_BYTES));
+            ok = false;
+        }
         let mut resources: Vec<(u32, Binding)> = Vec::new();
         let mut immediate = None;
         for &g in &globals {
             let gl = self.m.globals[g as usize].clone();
             match gl.space {
                 AddressSpace::Workgroup if stage != ir::Stage::Compute => {
-                    let _ = self.err_note(name_sp, format!("die workgroup-Variable `{}` gibt es nur in Compute-Shadern", gl.name), gl.span, String::from("hier deklariert"));
+                    let at = info.global_use.get(&g).copied().unwrap_or(name_sp);
+                    let _ = self.err_note(at, format!("die `workgroup`-Variable `{}` gibt es nur in Compute-Shadern", gl.name), gl.span, String::from("hier deklariert"));
                     ok = false;
                 }
                 AddressSpace::Storage if stage == ir::Stage::Vertex && gl.access == Access::ReadWrite => {
@@ -236,7 +293,8 @@ impl<'a> Checker<'a> {
                 if let Some(&(pg, _)) = resources.iter().find(|r| r.1 == b) {
                     let pspan = self.m.globals[pg as usize].span;
                     let pname = self.m.globals[pg as usize].name.clone();
-                    let _ = self.err_note(gl.span, format!("`{}` und `{}` haben beide @group({}) @binding({}) im Einstiegspunkt `{}`", pname, gl.name, b.group, b.binding, f.name), pspan, String::from("hier"));
+                    let at = self.var_keyword(gl.span);
+                    let _ = self.err_note(at, format!("`{}` und `{}` haben beide `@group({})` `@binding({})` im Einstiegspunkt `{}`", pname, gl.name, b.group, b.binding, f.name), pspan, String::from("hier"));
                     ok = false;
                 }
                 resources.push((g, b));
@@ -269,6 +327,7 @@ impl<'a> Checker<'a> {
             func: fi,
             stage,
             workgroup_size: wg,
+            subgroup_size,
             inputs,
             outputs,
             globals,
@@ -278,7 +337,35 @@ impl<'a> Checker<'a> {
         })
     }
 
-    fn workgroup_size(&mut self, args: &[crate::ast::Expr], ovr: &mut BTreeSet<u32>) -> R<[WgSize; 3]> {
+    /// @subgroup_size: a const-expression (at least 1, a power of two) or an override-expression
+    /// of type i32 or u32
+    fn subgroup_size(&mut self, a: &crate::ast::Expr, at: Span, ovr: &mut BTreeSet<u32>) -> R<WgSize> {
+        let saved_f = self.f.take();
+        let r = (|| {
+            let te = self.value(a)?;
+            if !matches!(te.ty, I32 | U32 | AINT) || te.stage == Phase::Runtime {
+                return Err(self.err(at, format!("`@subgroup_size` braucht einen const- oder override-Ausdruck vom Typ `i32` oder `u32`, nicht `{}`", self.tn(te.ty))));
+            }
+            if te.stage == Phase::Const {
+                let v = te.val.as_ref().and_then(crate::consteval::as_int).unwrap_or(1);
+                if v < 1 {
+                    return Err(self.err(at, format!("`@subgroup_size` muss mindestens 1 sein, nicht {}", v)));
+                }
+                if v > u32::MAX as i128 || (v as u64).count_ones() != 1 {
+                    return Err(self.err(at, format!("`@subgroup_size` muss eine Zweierpotenz sein, nicht {}", v)));
+                }
+                return Ok(WgSize::Const(v as u32));
+            }
+            let te = if te.ty == AINT { self.convert(te, I32)? } else { te };
+            let id = self.node(&te);
+            collect_overrides(&self.m.exprs, id, ovr);
+            Ok(WgSize::Override(id))
+        })();
+        self.f = saved_f;
+        r
+    }
+
+    fn workgroup_size(&mut self, args: &[crate::ast::Expr], at: Span, ovr: &mut BTreeSet<u32>) -> R<[WgSize; 3]> {
         let saved_f = self.f.take();
         let mut tes = Vec::new();
         let mut res = Ok(());
@@ -296,15 +383,13 @@ impl<'a> Checker<'a> {
         self.f = saved_f;
         res?;
         // one type for all: the concrete one, or i32
-        if let Some(bad) = tes.iter().find(|t| !matches!(t.ty, I32 | U32 | AINT)) {
-            let sp = bad.span;
-            return Err(self.err(sp, String::from("die Argumente von `@workgroup_size` müssen alle i32 oder alle u32 sein")));
+        if tes.iter().any(|t| !matches!(t.ty, I32 | U32 | AINT)) {
+            return Err(self.err(at, String::from("die Argumente von `@workgroup_size` müssen alle `i32` oder alle `u32` sein")));
         }
         let concrete: Vec<TypeId> = tes.iter().map(|t| t.ty).filter(|&t| !self.t.is_abstract(t)).collect();
         let ty = concrete.first().copied().unwrap_or(I32);
         if concrete.iter().any(|&t| t != ty) || (ty != I32 && ty != U32) {
-            let sp = args.first().map(|a| a.span).unwrap_or_default().to(args.last().map(|a| a.span).unwrap_or_default());
-            return Err(self.err(sp, String::from("die Argumente von `@workgroup_size` müssen alle i32 oder alle u32 sein")));
+            return Err(self.err(at, String::from("die Argumente von `@workgroup_size` müssen alle `i32` oder alle `u32` sein")));
         }
         let mut out = [WgSize::Const(1); 3];
         let saved_f = self.f.take();
