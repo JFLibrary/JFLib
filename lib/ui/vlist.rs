@@ -559,6 +559,14 @@ impl Ui {
                 self.animating = true;
             }
         }
+        // the finger's way (touch.rs)
+        let (_, pan) = self.pan_take(id);
+        if pan != 0 {
+            s.pending = 0;
+            s.reveal = None;
+            let p = s.rows.pos() + pan as i64;
+            s.rows.set_pos(p);
+        }
         if let Some((i, _)) = s.reveal {
             s.rows.reveal(i, view);
         }
@@ -831,6 +839,11 @@ impl Ui {
                 }
             }
         }
+        // a finger may roll it (touch.rs)
+        let max = (s.rows.total() - view as i64).clamp(0, i32::MAX as i64) as i32;
+        let pos = s.rows.pos().clamp(0, i32::MAX as i64) as i32;
+        self.pan_push(o.id, o.hit0, o.layer as u8, true, super::touch::AX_V, [0, pos], [0, max]);
+        let s = &mut o.st;
         // the focus visual on the whole list when no row is selected
         if o.vev & EV_FOCUS != 0 && self.wp.ctx.focus_visible && s.sel < 0 {
             let st = self.style;

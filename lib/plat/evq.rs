@@ -35,6 +35,10 @@ pub const PD_PRESSURE: u32 = 0xFFFF; // bits 0..15 pressure 1..PRESSURE_ONE, 0 =
 pub const PD_TYPE_SHIFT: u32 = 16; // bits 16..17 PTR_*
 pub const PD_TILTX_SHIFT: u32 = 18; // bits 18..24 i7 tilt x in degrees (-63..63, + = right)
 pub const PD_TILTY_SHIFT: u32 = 25; // bits 25..31 i7 tilt y in degrees (+ = towards the user)
+// a finger (PTR_TOUCH) has no tilt: bits 18..31 are the low 14 bits of the sample's time in the
+// clock of jfgui_input / Ui::now (ui touch.rs); button 0 on E_UP: the finger was cancelled
+pub const PD_TIME_SHIFT: u32 = 18;
+pub const PD_TIME_MASK: u32 = 0x3FFF;
 pub const PRESSURE_ONE: i32 = 65535;
 
 struct Ring {

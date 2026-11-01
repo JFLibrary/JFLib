@@ -838,6 +838,11 @@ impl Ui {
                 self.wp.ctx.wheel_y = 0;
             } // at the end: the page may scroll
         }
+        // a finger may roll it; its way (touch.rs)
+        let (_, pan) = self.pan_take(id);
+        sy = clamp_y(sy.wrapping_add(pan));
+        let hit_end = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
+        self.pan_view(id, hit_end.saturating_sub(1), super::touch::AX_V, [0, sy], [0, ch.wrapping_sub(vh).max(0)]);
         // the caret line and x
         let mut cl = 0;
         let mut cx = 0;

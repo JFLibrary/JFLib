@@ -205,6 +205,12 @@ JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeRender(
     return result != 0 ? -1 : presented;
 }
 
+/* (jfgui_PERF) microseconds spent presenting so far (lib/plat/web.rs) */
+extern double jfgui_present_us(void);
+JNIEXPORT jlong JNICALL Java_org_jflib_gallery_GalleryActivity_nativePresentUs(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    return (jlong)jfgui_present_us();
+}
 JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFrameDelay(JNIEnv *env, jclass cls) {
     (void)env; (void)cls;
     return started ? (jint)jfgui_frame_delay() : 250;
@@ -237,6 +243,23 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEvent(
     if (!started) return;
     jfgui_event((uint32_t)type, (uint32_t)button, (uint32_t)mods, 0, x, y, (uint32_t)data);
     jfgui_input(time_ms());
+}
+/* The raw finger (GalleryActivity.onTouchEvent -> lib/ui/touch.rs): type E_DOWN 2, E_MOVE 1, E_UP 3 in
+ * px of the bitmap; button 1, cancelled 0; time as SystemClock.uptimeMillis (CLOCK_MONOTONIC, as
+ * jfgui_host_time_us).  The samples of one MotionEvent are handed over together (last). */
+extern uint32_t jfgui_touch_reached(void);
+JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFinger(
+        JNIEnv *env, jclass cls, jint type, jint button, jint x, jint y, jlong time, jboolean last) {
+    (void)env; (void)cls;
+    if (!started) return;
+    uint32_t now = time_ms();
+    uint32_t at = (uint32_t)((uint64_t)time - epoch_ms);
+    jfgui_event((uint32_t)type, (uint32_t)button, 0, 0, x, y, (3u << 16) | ((at & 0x3FFFu) << 18));
+    if (last) jfgui_input(now);
+}
+JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFingerReached(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    return started && jfgui_touch_reached();
 }
 /* "NAME=value" into the app's environment before it starts (LANGUAGE: the system's locales). */
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEnv(

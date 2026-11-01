@@ -38,6 +38,10 @@ pub const HB_CURSOR_SHIFT: u32 = 12; // cursor shape: flags | CUR_* << HB_CURSOR
 // own (lists, grids, trees: behave gives no EV_ACT for them)
 pub const HB_SPACE: u32 = 0x10000;
 pub const HB_OWNKEYS: u32 = 0x20000;
+// behave only: a finger moving along this axis belongs to the widget, not to the scroll view
+// around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
+pub const HB_GRAB_H: u32 = 0x40000;
+pub const HB_GRAB_V: u32 = 0x80000;
 
 // ------------------------------------------------------------------ semantic kinds and states
 pub const K_BOX: u16 = 0;

@@ -53,7 +53,7 @@ pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 pub(crate) mod system_host;
 pub use system_host::{jfgui_note, jfgui_system};
 #[cfg(target_os = "android")]
-pub use system_host::jfgui_touch_drag;
+pub use system_host::jfgui_touch_reached;
 pub(crate) use system_host::sys_settings_host;
 // sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
 #[path = "web_sensors.rs"]
@@ -189,6 +189,13 @@ static CALENDAR: SpinLock<Date> = SpinLock::new(Date {
 static STARTED: AtomicBool = AtomicBool::new(false);
 static WAKE_PENDING: AtomicBool = AtomicBool::new(false);
 static AGENT: AtomicBool = AtomicBool::new(false);
+/// the page's main pointer is a finger (`pointer: coarse`, a capability bit of the host)
+static TOUCH_PRIMARY: AtomicBool = AtomicBool::new(false);
+const HOST_COARSE: u32 = 262144;
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub(crate) fn touch_primary() -> bool {
+    TOUCH_PRIMARY.load(Ordering::Relaxed)
+}
 
 /// An owned app runtime registered once when the browser entrypoint returns.
 pub trait WebApplication {
@@ -851,8 +858,8 @@ pub extern "C" fn jfgui_input(time_ms: u32) {
     drain_wake();
     let _ = with_app(|app| app.input(time_ms));
 }
-/// Idle host scheduling hint. The host must still wake immediately for new input.
-#[cfg(target_os = "android")]
+/// Idle host scheduling hint (0: the next frame now). The host must still wake immediately for
+/// new input.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_frame_delay() -> u32 {
     with_app(|app| app.frame_delay()).unwrap_or(250)
@@ -958,6 +965,7 @@ pub extern "C" fn jfgui_agent(enabled: u32) -> u32 {
 pub extern "C" fn jfgui_capabilities(bits: u32) {
     let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT;
     CAP_EXTRA.store(bits & allowed as u32, Ordering::Relaxed);
+    TOUCH_PRIMARY.store(bits & HOST_COARSE != 0, Ordering::Relaxed);
     HANDLES.store(bits & HOST_HANDLES != 0, Ordering::Relaxed);
     web_screen::set_eyedropper(bits & web_screen::HOST_EYEDROPPER != 0);
 }

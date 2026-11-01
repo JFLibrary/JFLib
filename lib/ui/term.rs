@@ -547,6 +547,8 @@ fn ansi256(n: u32) -> u8 {
 
 /// the state of one console (see the module header); the app keeps it between frames
 pub struct TermState {
+    /// a finger's way below a whole row (px, touch.rs)
+    pan_rem: i32,
     /// the text before the input (SGR allowed)
     pub prompt: String,
     /// TM_LINE, TM_BUSY, TM_RAW, TM_SECRET
@@ -624,6 +626,7 @@ impl TermState {
             sel: None,
             sel_drag: false,
             at_bottom: true,
+            pan_rem: 0,
             top: 0,
             unseen: false,
             seen_added: 0,
@@ -1452,6 +1455,18 @@ impl Ui {
                 self.wp.ctx.wheel_y = 0;
             }
         }
+        // a finger may roll it, row by row (the way below a row waits); its way (touch.rs)
+        let lh = m.lh.max(1) as i64;
+        let (_, pan) = self.pan_take(id);
+        if pan != 0 {
+            let p = (top - first) as i64 * lh + st.pan_rem as i64 + pan as i64;
+            let t = clamp_top(first as i64 + p.div_euclid(lh));
+            st.pan_rem = if t >= bottom || t <= first && p < 0 { 0 } else { p.rem_euclid(lh) as i32 };
+            top = t;
+        }
+        let hit_end = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
+        let (pos, max) = ((top - first) as i64 * lh + st.pan_rem as i64, (bottom - first) as i64 * lh);
+        self.pan_view(id, hit_end.saturating_sub(1), super::touch::AX_V, [0, pos.min(i32::MAX as i64) as i32], [0, max.min(i32::MAX as i64) as i32]);
         st.at_bottom = top >= bottom;
         st.top = top;
         if st.at_bottom {

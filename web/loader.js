@@ -113,28 +113,32 @@ function activate(on) {
   }
 }
 controlButton.onclick=()=>activate(!enabled);
-function event(type,button=0,x=0,y=0,data=0,mods=0,hover=false) { if(started) send({type:"event",event:[type,button,mods,0,Math.round(x),Math.round(y),data>>>0],hover}); }
+// at: a finger's sample time on the page's clock (the worker puts it into the data: lib/ui/touch.rs)
+function event(type,button=0,x=0,y=0,data=0,mods=0,hover=false,at=0) { if(started) send({type:"event",event:[type,button,mods,0,Math.round(x),Math.round(y),data>>>0],hover,at}); }
 const mods=e=>(e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0)|(e.getModifierState?.("AltGraph")?16:0);
 const pos=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];};
 const button=e=>[1,3,2,4,5][e.button]||1;
+// a finger's samples carry their time: pan, fling and tap are decided in lib/ui/touch.rs
+const fingerAt=e=>e.pointerType==="touch" ? performance.timeOrigin+e.timeStamp : 0;
 const pen=e=>{
   const type=e.pointerType==="pen"?(e.button===5?2:1):e.pointerType==="touch"?3:0;
   if(!type)return 0;
   const pressure=Math.max(1,Math.min(65535,Math.round((e.pressure??1)*65535)));
+  if(type===3) return pressure|(3<<16);
   const tilt=value=>Math.max(-63,Math.min(63,Math.round(value||0)))&127;
   return pressure|(type<<16)|(tilt(e.tiltX)<<18)|(tilt(e.tiltY)<<25);
 };
 // The accessibility tree as an ARIA shadow tree over the canvas (a11y.js; ?a11y=0: none).
 const shadow=params.get("a11y")!=="0" && a11yRoot ? new Shadow(a11yRoot,{input,act:m=>send({type:"a11y-act",...m})}) : null;
 if(shadow) Object.defineProperty(window,"jfguiA11y",{value:shadow}); // read-only handle for tests
-canvas.onpointerdown=e=>{if(!e.isPrimary)return;e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);event(2,button(e),...pos(e),pen(e),mods(e));};
+canvas.onpointerdown=e=>{if(!e.isPrimary)return;e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);event(2,button(e),...pos(e),pen(e),mods(e),false,fingerAt(e));};
 canvas.onpointermove=e=>{
   if(!e.isPrimary)return;
   const samples=e.buttons ? e.getCoalescedEvents?.() : null;
-  for(const sample of samples?.length ? samples : [e]) event(1,0,...pos(sample),pen(sample),mods(e),!e.buttons);
+  for(const sample of samples?.length ? samples : [e]) event(1,0,...pos(sample),pen(sample),mods(e),!e.buttons,fingerAt(sample));
 };
-canvas.onpointerup=e=>{if(!e.isPrimary)return;event(3,button(e),...pos(e),pen(e),mods(e));if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
-canvas.onpointercancel=e=>event(3,1,...pos(e),0,mods(e));
+canvas.onpointerup=e=>{if(!e.isPrimary)return;event(3,button(e),...pos(e),pen(e),mods(e),false,fingerAt(e));if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
+canvas.onpointercancel=e=>e.pointerType==="touch" ? event(3,0,...pos(e),pen(e),mods(e),false,fingerAt(e)) : event(3,1,...pos(e),0,mods(e));
 canvas.onpointerleave=()=>event(12);
 canvas.oncontextmenu=e=>e.preventDefault();
 canvas.onwheel=e=>{e.preventDefault();const factor=e.deltaMode===1?30:e.deltaMode===2?canvas.clientHeight:1;const dy=Math.max(-32768,Math.min(32767,Math.round(-e.deltaY*factor))),dx=Math.max(-32768,Math.min(32767,Math.round(e.deltaX*factor)));event(4,0,...pos(e),(dy&65535)|((dx&65535)<<16),mods(e));};
@@ -328,7 +332,8 @@ worker.onmessage=({data:m})=>{
     const buffers=m.buffer ? [m.buffer] : patches.map(p=>p.pixels);
     worker.postMessage({type:"recycle",buffers},buffers);
   }
-  else if(m.type==="batch-complete") {inFlight=false;schedule();}
+  // (while a finger is down or something moves the next frame comes with the display's)
+  else if(m.type==="batch-complete") {inFlight=false;if(m.busy&&!outgoing.length)send({type:"tick"});schedule();}
   else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();system.ready();if(shadow)send({type:"a11y",on:true});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
   else if(m.type==="service") service(m);
   else if(m.type==="rpc" || (m.type==="error" && m.id)) {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.type==="error"?p.reject(new Error(m.message)):p.resolve(m.result);}}
@@ -367,5 +372,5 @@ try {
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
 lastScreens=screenLine(screen,true); // the first frame knows the monitor already
-send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)});
+send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
 initialSecrets?.fill(0); // postMessage copied them

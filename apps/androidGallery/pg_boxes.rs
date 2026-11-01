@@ -69,9 +69,12 @@ impl Boxes {
                 }
                 ui.scroll_end();
                 ui.text(TS_BODY, &format!("Zuletzt: Knopf {}", self.chips));
-                ui.next_size(SIZE_FILL, 0);
-                ui.scrollbar(ID_SBAR, &mut self.sbar, 1000, 250, false);
-                ui.text(TS_BODY, &format!("Rollleiste: {}", self.sbar));
+                // (a finger gets no scroll bars: the library's own rule, nothing to show here)
+                if !ui.touch_mode() {
+                    ui.next_size(SIZE_FILL, 0);
+                    ui.scrollbar(ID_SBAR, &mut self.sbar, 1000, 250, false);
+                    ui.text(TS_BODY, &format!("Rollleiste: {}", self.sbar));
+                }
             }
             _ => {
                 if ui.expander_begin(ID_EXP, "Erweiterte Einstellungen", &mut self.exp_open) != 0 {

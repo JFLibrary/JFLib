@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Choreographer;
+import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.KeyCharacterMap;
 import android.view.MotionEvent;
@@ -33,13 +34,16 @@ public final class GalleryActivity extends Activity {
     static { System.loadLibrary("jfgui_android"); }
     static native int nativeRender(Bitmap bitmap, int dpi, boolean newSurface);
     private static native int nativeFrameDelay();
+    private static native long nativePresentUs();
     static native byte[] nativeEditorState();
     static native void nativeEditorReplace(int id, byte[] text, int anchor, int caret);
     static native void nativeEvent(int type, int button, int mods, int x, int y, int data);
     private static native void nativeText(byte[] text);
     private static native boolean nativeIme();
-    // the widget under a new touch takes drags in every direction (ui.touch_drag)
-    private static native boolean nativeTouchDrag(int x, int y);
+    // the raw finger: pan, fling, tap and long press are decided in Rust (lib/ui/touch.rs)
+    private static native void nativeFinger(int type, int button, int x, int y, long time, boolean last);
+    // the gesture that just ended reached a widget (a tap, a drag), it did not only scroll
+    private static native boolean nativeFingerReached();
     // the accessibility tree (GalleryAccessibility): mirror on / off, its updates, an action
     static native void nativeA11y(boolean on);
     static native byte[] nativeA11yTake();
@@ -49,6 +53,12 @@ public final class GalleryActivity extends Activity {
     /** A frame now: what a sensor or a fix changed (GallerySensors, GallerySystem.back). */
     static void frameNow() {
         if (current != null && current.gallery != null) current.gallery.requestFrame();
+    }
+    /** A finger rested long enough: the system's feedback (lib/ui/touch.rs asks for it). */
+    static void longPressed() {
+        if (current == null || current.gallery == null) return;
+        current.gallery.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        current.gallery.performLongClick();
     }
 
     private static native void nativeEnv(byte[] entry);
@@ -97,6 +107,11 @@ public final class GalleryActivity extends Activity {
         // the system's languages for the app's texts and formats, before it starts
         String langs = android.os.LocaleList.getDefault().toLanguageTags();
         if (!langs.isEmpty()) env("LANGUAGE", langs);
+        // the device's numbers for the finger (lib/ui/touch.rs): slop, fling velocities (DIP), long press (ms)
+        ViewConfiguration vc = ViewConfiguration.get(this);
+        float dip = getResources().getDisplayMetrics().density;
+        env("jfgui_TOUCH", Math.round(vc.getScaledTouchSlop() / dip) + " " + Math.round(vc.getScaledMinimumFlingVelocity() / dip)
+            + " " + Math.round(vc.getScaledMaximumFlingVelocity() / dip) + " " + ViewConfiguration.getLongPressTimeout());
         // config:// data:// cache:// on internal storage (lib/plat/android_files.rs)
         env("jfgui_ANDROID_FILES", getFilesDir().getAbsolutePath());
         env("jfgui_ANDROID_CACHE", getCacheDir().getAbsolutePath());
@@ -176,22 +191,27 @@ public final class GalleryActivity extends Activity {
         private Bitmap frame;
         private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final Rect dest = new Rect();
-        private final int slop;
-        private int dpi, mode, pointerId = -1;
-        private float renderScale = 1, downX, downY, lastY, wheelRemainder;
-        private boolean resumed, newSurface, grabs;
+        private int dpi, pointerId = -1;
+        private float renderScale = 1;
+        private boolean resumed, newSurface, mouseDown;
+        private int mouseButton = 1;
         private GalleryInputConnection connection;
         private String failure;
         private final GalleryAccessibility a11y;
+        private long[] perf;
+        private long perfPresent;
+        private int perfN;
 
         GalleryView(Context context) {
             super(context);
             setFocusable(true);
             setFocusableInTouchMode(true);
             setContentDescription("jfgui Pocket Gallery");
-            slop = ViewConfiguration.get(context).getScaledTouchSlop();
             // library px -> view px: the bitmap is drawn scaled by 1 / renderScale
             a11y = new GalleryAccessibility(this, () -> 1.0 / renderScale, this::requestFrame);
+            Intent start = ((Activity)context).getIntent();
+            if ((context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0 && start != null
+                && "1".equals(start.getStringExtra("jfgui_PERF"))) perf = new long[120];
         }
         void resume() {
             if (resumed) return;
@@ -238,11 +258,30 @@ public final class GalleryActivity extends Activity {
         }
         private void render() {
             if (frame != null && failure == null) {
+                long start = perf != null ? System.nanoTime() : 0;
                 int status = nativeRender(frame, dpi, newSurface);
+                if (perf != null && status > 0) perfAdd(System.nanoTime() - start);
                 newSurface = false;
                 if (status < 0) failure = "jfgui konnte nicht starten (" + status + ").";
                 if (status != 0) invalidate();
             }
+        }
+        // debug builds with the extra jfgui_PERF=1: how long nativeRender takes on frames that
+        // changed something, in logcat (tag jfgui-perf) every 120 of them
+        private void perfAdd(long nanos) {
+            perf[perfN++] = nanos;
+            if (perfN < perf.length) return;
+            long[] v = perf.clone();
+            java.util.Arrays.sort(v);
+            long sum = 0;
+            for (long x : v) sum += x;
+            long present = nativePresentUs();
+            android.util.Log.i("jfgui-perf", String.format(java.util.Locale.ROOT,
+                "nativeRender over %d changed frames: mean %.2f ms, median %.2f, p95 %.2f, max %.2f (%dx%d), of the mean presenting %.2f",
+                v.length, sum / 1e6 / v.length, v[v.length / 2] / 1e6, v[v.length * 95 / 100] / 1e6, v[v.length - 1] / 1e6,
+                frame.getWidth(), frame.getHeight(), (present - perfPresent) / 1e3 / v.length));
+            perfPresent = present;
+            perfN = 0;
         }
         @Override protected void onDraw(Canvas canvas) {
             if (failure != null) {
@@ -252,77 +291,81 @@ public final class GalleryActivity extends Activity {
             } else if (frame != null) canvas.drawBitmap(frame, null, dest, paint);
         }
         private void pointer(int type, float x, float y) {
-            nativeEvent(type, 1, 0, Math.round(x * renderScale), Math.round(y * renderScale), 0);
+            nativeEvent(type, 0, 0, Math.round(x * renderScale), Math.round(y * renderScale), 0);
+        }
+        private void finger(int type, int button, float x, float y, long time, boolean last) {
+            nativeFinger(type, button, Math.round(x * renderScale), Math.round(y * renderScale), time, last);
         }
         private void cancelGesture() {
-            // Release outside every widget so cancellation cannot accidentally click a button.
-            removeCallbacks(longPress);
-            if (mode == 2) pointer(3, -10000, -10000);
-            mode = 0; pointerId = -1;
+            if (pointerId >= 0) nativeFinger(3, 0, 0, 0, android.os.SystemClock.uptimeMillis(), true);
+            pointerId = -1;
         }
-        // a finger that stays: the right button (a context menu); if it then moves after all, an
-        // ordinary drag or scroll (a slider held for a moment)
-        private final Runnable longPress = () -> {
-            if (mode != 1) return;
-            mode = 4;
-            int x = Math.round(downX * renderScale), y = Math.round(downY * renderScale);
-            nativeEvent(1, 0, 0, x, y, 0);
-            nativeEvent(2, 2, 0, x, y, 0);
-            nativeEvent(3, 2, 0, x, y, 0);
-            performLongClick();
+        // a real mouse (DeX, USB): an ordinary pointer, no gestures; the scroll bars come back
+        private boolean mouse(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                if (connection != null) connection.finishComposingText();
+                requestFocus();
+                int buttons = event.getButtonState();
+                mouseButton = (buttons & MotionEvent.BUTTON_SECONDARY) != 0 ? 2 : (buttons & MotionEvent.BUTTON_TERTIARY) != 0 ? 3 : 1;
+                pointer(1, event.getX(), event.getY());
+                nativeEvent(2, mouseButton, modifiers(event.getMetaState()), Math.round(event.getX() * renderScale), Math.round(event.getY() * renderScale), 0);
+                mouseDown = true;
+            } else if (action == MotionEvent.ACTION_MOVE) {
+                pointer(1, event.getX(), event.getY());
+            } else if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) && mouseDown) {
+                mouseDown = false;
+                nativeEvent(3, mouseButton, modifiers(event.getMetaState()), Math.round(event.getX() * renderScale), Math.round(event.getY() * renderScale), 0);
+                afterGesture();
+            }
             requestFrame();
-        };
+            return true;
+        }
+        // a tap or a drag ended: the system's click, the text field's state, the keyboard follows
+        private void afterGesture() {
+            performClick();
+            if (connection != null) connection.syncFromNative();
+            InputMethodManager ime = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (nativeIme()) ime.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
+            else ime.hideSoftInputFromWindow(getWindowToken(), 0);
+        }
         @Override public boolean onTouchEvent(MotionEvent event) {
+            if (event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE || mouseDown) return mouse(event);
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
                 if (connection != null) connection.finishComposingText();
                 requestFocus();
                 pointerId = event.getPointerId(0);
-                downX = event.getX(); downY = lastY = event.getY();
-                mode = 1; wheelRemainder = 0;
-                grabs = nativeTouchDrag(Math.round(downX * renderScale), Math.round(downY * renderScale));
-                postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
+                finger(2, 1, event.getX(), event.getY(), event.getEventTime(), true);
+                requestFrame();
                 return true;
             }
-            int index = event.findPointerIndex(pointerId);
+            int index = pointerId >= 0 ? event.findPointerIndex(pointerId) : -1;
             if (action == MotionEvent.ACTION_CANCEL || index < 0) { cancelGesture(); return true; }
             if (action == MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.getActionIndex()) == pointerId) {
                 cancelGesture(); return true;
             }
-            float x = event.getX(index), y = event.getY(index);
             if (action == MotionEvent.ACTION_MOVE) {
-                if ((mode == 1 || mode == 4) && Math.hypot(x - downX, y - downY) > slop) {
-                    removeCallbacks(longPress);
-                    mode = !grabs && Math.abs(y - downY) > Math.abs(x - downX) ? 3 : 2;
-                    if (mode == 2) pointer(2, downX, downY);
-                }
-                if (mode == 2) pointer(1, x, y);
-                if (mode == 3) {
-                    // Wheel routing in Ui uses the last pointer position, even before the first tap.
-                    pointer(1, x, y);
-                    // The library uses 120 wheel units for 48 DIP of scroll travel.
-                    wheelRemainder += (y - lastY) / getResources().getDisplayMetrics().density * 2.5f;
-                    int delta = (int)wheelRemainder;
-                    wheelRemainder -= delta;
-                    if (delta != 0) nativeEvent(4, 0, 0, Math.round(x * renderScale),
-                        Math.round(y * renderScale), delta & 0xffff);
-                }
-                lastY = y;
+                // every sample of the batch with its own time: the velocity needs them
+                for (int h = 0, n = event.getHistorySize(); h < n; h++)
+                    finger(1, 0, event.getHistoricalX(index, h), event.getHistoricalY(index, h), event.getHistoricalEventTime(h), false);
+                finger(1, 0, event.getX(index), event.getY(index), event.getEventTime(), true);
             } else if (action == MotionEvent.ACTION_UP) {
-                removeCallbacks(longPress);
-                if (mode == 1) pointer(2, downX, downY);
-                if (mode == 1 || mode == 2) {
-                    pointer(3, x, y);
-                    performClick();
-                    if (connection != null) connection.syncFromNative();
-                    InputMethodManager ime = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-                    if (nativeIme()) ime.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
-                    else ime.hideSoftInputFromWindow(getWindowToken(), 0);
-                }
-                mode = 0; pointerId = -1;
+                finger(3, 1, event.getX(index), event.getY(index), event.getEventTime(), true);
+                if (nativeFingerReached()) afterGesture();
+                pointerId = -1;
             }
             requestFrame();
             return true;
+        }
+        @Override public boolean onHoverEvent(MotionEvent event) {
+            // a mouse moving without a button: hover, the scroll bars
+            if (event.isFromSource(InputDevice.SOURCE_MOUSE) && event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE) {
+                pointer(1, event.getX(), event.getY());
+                requestFrame();
+                return true;
+            }
+            return super.onHoverEvent(event);
         }
         @Override public boolean performClick() { super.performClick(); return true; }
         @Override public boolean onGenericMotionEvent(MotionEvent event) {

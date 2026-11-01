@@ -168,18 +168,35 @@ pub fn back_trap(on: bool) {
     let _ = on;
 }
 
-/// (ui, every pass) no widget takes touch drags yet (ui.touch_drag; Android, jfgui_touch_drag)
-pub fn touch_drag_clear() {
-    #[cfg(target_os = "android")]
-    web::system_host::touch_drag_clear();
+/// (ui touch.rs) the host says at the start that its pointer is a finger (a phone's browser:
+/// `pointer: coarse`; on Android it is known): no scroll bars from the first frame on
+pub fn touch_primary() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    return web::touch_primary();
+    #[cfg(not(target_arch = "wasm32"))]
+    false
 }
 
-/// (ui) a touch that starts in this rectangle (px) drags instead of scrolling (Android)
-pub fn touch_drag_add(r: [i32; 4]) {
+/// (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):
+/// Android asks after the finger lifted whether the keyboard has to follow
+pub fn touch_reached(reached: bool) {
     #[cfg(target_os = "android")]
-    web::system_host::touch_drag_add(r);
+    web::system_host::touch_reached(reached);
     #[cfg(not(target_os = "android"))]
-    let _ = r;
+    let _ = reached;
+}
+
+/// (ui touch.rs) a finger rested long enough: the host's feedback (Android: performLongClick)
+pub fn touch_long_press() {
+    #[cfg(target_os = "android")]
+    web::system_host::touch_long_press();
+}
+
+/// where a window the user moves may be (x, y; w its width; screen the area's size; dpi for the
+/// margin): the title bar stays on the screen, at least 48 DIP of the window at each side
+pub fn reach_clamp(p: [i32; 2], w: i32, screen: [i32; 2], dpi: i32) -> [i32; 2] {
+    let m = 48 * dpi / 96;
+    [p[0].clamp(m.min(w) - w, (screen[0] - m).max(m.min(w) - w)), p[1].clamp(0, (screen[1] - m).max(0))]
 }
 /// Starting the app when the user logs in (Run key, XDG autostart, Background portal, an MSIX
 /// package's StartupTask).

@@ -789,6 +789,9 @@ impl Ui {
                 plat::begin_move(); // (the live window: plat::win_use)
                 self.wp.ctx.active = 0; // the OS owns the pointer now
                 self.wp.ctx.mbtn &= !(1 << BTN_LEFT);
+            } else if self.headless && self.mptype == PTR_TOUCH && self.wp.ctx.active == ids && self.wp.ctx.mbtn & (1 << BTN_LEFT) != 0 {
+                let pressed = self.wp.ctx.pressed & (1 << BTN_LEFT) != 0;
+                self.touch_window_drag(i, pressed); // (a script's finger moves it as the platform would)
             }
             let title = alloc::string::String::from(self.uiw_title(i));
             self.wp.ctx.last_state = 0;
@@ -932,6 +935,8 @@ impl Ui {
         let st = self.style;
         let t = self.dp(st.metric(SM_GRIP)); // edge handle thickness
         let c = self.dp(st.metric(SM_GRIP_CORNER)); // corner handle size
+        // a finger needs more than a pointer (not at the top: the title bar moves the window)
+        let (tf, cf) = if self.m.touch.on { (t.max(self.dp(14)), c.max(self.dp(32))) } else { (t, c) };
         let (w, h) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
         use plat::{EDGE_BOTTOM, EDGE_TOP};
         // right-to-left: the logical left edge is the window's right one
@@ -939,14 +944,14 @@ impl Ui {
         let (nwse, nesw) = if self.rtl { (CUR_SIZE_NESW, CUR_SIZE_NWSE) } else { (CUR_SIZE_NWSE, CUR_SIZE_NESW) };
         // edges: top, bottom, left, right (between the corners)
         self.grip(0, EDGE_TOP, CUR_SIZE_NS, c, 0, w - c - c, t);
-        self.grip(1, EDGE_BOTTOM, CUR_SIZE_NS, c, h - t, w - c - c, t);
-        self.grip(2, left, CUR_SIZE_WE, 0, c, t, h - c - c);
-        self.grip(3, right, CUR_SIZE_WE, w - t, c, t, h - c - c);
+        self.grip(1, EDGE_BOTTOM, CUR_SIZE_NS, cf, h - tf, w - cf - cf, tf);
+        self.grip(2, left, CUR_SIZE_WE, 0, c, tf, h - c - cf);
+        self.grip(3, right, CUR_SIZE_WE, w - tf, c, tf, h - c - cf);
         // corners (squares)
         self.grip(4, EDGE_TOP | left, nwse, 0, 0, c, c);
         self.grip(5, EDGE_TOP | right, nesw, w - c, 0, c, c);
-        self.grip(6, EDGE_BOTTOM | left, nesw, 0, h - c, c, c);
-        self.grip(7, EDGE_BOTTOM | right, nwse, w - c, h - c, c, c);
+        self.grip(6, EDGE_BOTTOM | left, nesw, 0, h - cf, cf, cf);
+        self.grip(7, EDGE_BOTTOM | right, nwse, w - cf, h - cf, cf, cf);
         // the caption buttons on top again (the same widget: continuation boxes)
         let layer = self.wp.ctx.cmd_layer_ui as u8;
         for k in 0..self.wp.chrome.cap_n as usize {
