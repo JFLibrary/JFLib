@@ -1,0 +1,3 @@
+#!args --test sensors-policy
+# (Rust only) plattest --test sensors-policy: a manifest without location and sensors refuses both
+# (PERMDENY), the rights parse.

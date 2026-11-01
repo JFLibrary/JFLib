@@ -1,0 +1,57 @@
+#!args --size 390x780 --anim off --theme light
+# "Kompass": the heading from gravity and the magnetic field or the rotation estimate; 0 to 360
+# clockwise from north, the dial turns against it.
+click #900
+click menuitem:"Kompass"
+expect text:"Keine Richtung" exists
+expect text:"Magnetfeld: nicht verfügbar" exists
+shot build/shots/androidGallery/compass_none.png
+
+sensor gravity 0 0 9.81
+expect text:"Keine Richtung" exists
+sensor magnet 0 20 -40
+expect text:"0° N" exists
+shot build/shots/androidGallery/compass_north.png
+# north lies 90 degrees to the right of the top: the top points west
+sensor magnet 20 0 -40
+expect text:"270° W" exists
+sensor magnet -20 0 -40
+expect text:"90° O" exists
+sensor magnet 0 -20 -40
+expect text:"180° S" exists
+sensor magnet 14 14 -40
+expect text:"315° NW" exists
+shot build/shots/androidGallery/compass_nw.png
+sensor magnet -14 14 -40
+expect text:"45° NO" exists
+sensor magnet -14 -14 -40
+expect text:"135° SO" exists
+sensor magnet 14 -14 -40
+expect text:"225° SW" exists
+
+# not calibrated: the magnetometer's lowest accuracy
+sensor magnet 14 -14 -40 0
+expect text:"Ungenau: das Telefon in einer Acht bewegen." exists
+sensor magnet 14 -14 -40 3
+expect text:"Ungenau: das Telefon in einer Acht bewegen." missing
+
+# the rotation estimate: 90 degrees clockwise (the top to the east)
+sensor rot 0 0 -0.7071068 0.7071068
+expect text:"90° O" exists
+# only relative, and no field: the page says so
+sensor none magnet
+sensor rot 0 0 0 1 rel
+expect text:"0° N" exists
+expect text:"Relativ zum Start: ohne Magnetfeld kein Norden." exists
+shot build/shots/androidGallery/compass_relative.png
+
+theme dark
+shot build/shots/androidGallery/compass_dark.png
+theme light
+system background
+sensor expect rot paused
+system foreground
+sensor expect rot waiting
+key esc
+sensor expect rot off
+expect_nowarn

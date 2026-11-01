@@ -59,6 +59,8 @@ autostart                             # plat::autostart_set (start at login)
 audio.output                          # plat::audio, ui.beep (sound)
 input.global                          # plat::hotkey_register (global shortcuts)
 screen.capture                        # plat::screen::capture_start (pictures of the screen)
+location                              # plat::sensors::location_watch (where the device is)
+sensors                               # plat::sensors::watch (accelerometer, gyroscope, compass, rotation)
 net.connect api.example.com:443 *.cdn.example.com:443
 net.connect 192.168.0.0/16:631 localhost:8000-8099
 net.listen  127.0.0.1:0               # a local server on a free port
@@ -84,6 +86,8 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `audio.output` | – | `plat::audio`: streams (`Stream::open`, `open_fill`), `play`, `play_file` and the system's sounds (`sound`), so also `ui.beep` and `ui.dialog_sound`; without it they are refused and `available()` is `false`. Only apps that play sound list it: a Flatpak gets the sound server's socket for it, which also allows recording ([Packages](#limits)) |
 | `input.global` | – | `plat::hotkey_register` / `ui.hotkey_register`: global shortcuts, chords the app hears while another program has the keyboard (RegisterHotKey, XGrabKey, the GlobalShortcuts portal); the app learns only that its own chord was pressed, never other keys |
 | `screen.capture` | – | `plat::screen::capture_start` / `ui.screenshot`: pictures of the whole screen or a part of it (BitBlt, GetImage, the screenshot portal). Picking one pixel's colour (`ui.pick_color`, the colour picker's pipette) needs no right: the user chooses the pixel, as a file in the file dialog |
+| `location` | – | `plat::sensors::location_watch`: where the device is, however it knows (Android's `LocationManager`, the browser's geolocation). The system's own permission comes on top: Android asks `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (the app's `android/AndroidManifest.xml` must list them: `build_rs.py` refuses to build otherwise), the browser asks by itself. Windows and Linux have no location yet: `LocationState::Unavailable` |
+| `sensors` | – | `plat::sensors::watch`: accelerometer, gravity, gyroscope, magnetic field, the rotation estimate. Android and the browsers ask no permission for them (Safari does), but they tell a lot: how the user walks, what the fingers type. Hence a rule of its own. Windows and Linux have no sensors yet: `SensorState::Unavailable` |
 | `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH) |
 | `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port |
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
@@ -480,15 +484,16 @@ A refused call fails the way a missing or unreadable target fails: `None`, `fals
 `NetError` of kind `NetErrorKind::Denied` (network), `SecretError::Denied` (secrets;
 `secret_available()` is `false`), `AutostartError::Denied` (autostart),
 `AudioError::Denied` (sound: `sound()` and `ui.beep` give `false`, `audio::available()` is
-`false`; a headless script sees `expect sound none`), `HotkeyError::Denied` (input.global)
-or `ScreenError::Denied` (screen.capture).
+`false`; a headless script sees `expect sound none`), `HotkeyError::Denied` (input.global),
+`ScreenError::Denied` (screen.capture), `LocationState::Denied` (location; the guard runs nothing)
+or `SensorState::Denied` (sensors; the guard runs nothing).
 In addition:
 
 - stderr shows `PERMDENY <kind> <target>` once per target, for example
   `PERMDENY fs.write C:/Users/me/Desktop/out.png`, `PERMDENY net.connect evil.example` or
   `PERMDENY secrets imap.example.org` (the service of the refused secret), `PERMDENY autostart`,
   `PERMDENY audio.output` (once per run, however many sounds), `PERMDENY input.global`,
-  `PERMDENY screen.capture`, `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
+  `PERMDENY screen.capture`, `PERMDENY location`, `PERMDENY sensors`, `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
   a question put to the user shows as `PERMASK <kind> <target> (<rule>)`;
 - `plat::policy::denials()` returns the last 64 refusals (`kind`, `target`, `plugin`) for a
   log or a diagnostics page;
@@ -533,7 +538,8 @@ In addition:
   native plugins on Android, so `process`, `net.*` and `plugins` have nothing to allow;
   `secrets` allows the store of the Android Keystore (checked in `plat` before the Java side
   is asked), `audio.output` the AAudio streams and the system's sounds (Android itself asks
-  no permission for playing sound). The rules do not reach Android's own storage (the app's private folders,
+  no permission for playing sound), `location` and `sensors` what `plat::sensors` starts (for
+  the location Android's own permission follows). The rules do not reach Android's own storage (the app's private folders,
   `content://` documents): the Java side of the bridge (`android/*.java`) does not go through
   `plat`. The Android build is checked by building it;
   the manifest has not been run on a device in the test suite.

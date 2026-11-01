@@ -15,6 +15,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Added
 
+- **plat:** The device's motion sensors and location (`plat::sensors`: `watch`, `state`, `read`, `attitude`, `location_watch`, `location_state`, `location_fix`): Android through `SensorManager` and `LocationManager` (no Google Play services, the runtime permission from a user action), browsers through `devicemotion`, `deviceorientation` and `geolocation`; Windows and Linux report "not available"; stopped in the background; the rights `location` and `sensors` (also `ask`, `PERMDENY`); `plat::back_trap` (Android's back key as Esc)
+- **ui:** `UIC_SENSOR`, `UIC_LOCATION`, `ui.touch_drag` (a widget takes a finger's vertical drags on Android), a long press as the right button on Android, the script commands `sensor` and `location`
+- **build:** `tools/android.py` refuses an APK whose PERMISSIONS has `location` while its AndroidManifest.xml lists neither location permission; the packages note `location` and `sensors`
 - **crypto:** MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5 (`hmac_md5`), for protocols defined with MD5 (RADIUS); documented as broken for collisions, as `sha1` is
 - **netpkt:** SSH version 2 without I/O (`ssh`: a `Core` for both sides of a connection with curve25519-sha256, ssh-ed25519, rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr, aes256-ctr with hmac-sha2-256, logins by none, password and publickey, session channels with windows; `KeyPair` with OpenSSH key files; checked against OpenSSH's client by `tools/ssh_interop.py --core`) and SNMPv3 (`snmpv3`: messages, the USM with key localisation, HMAC-MD5-96, HMAC-SHA-96 and the SHA-2 tags of RFC 7860, AES-128-CFB of RFC 3826, engine IDs, report PDUs); `decode` dissects both; `netpkt` now depends on `crypto`
 - **crypto:** RSA key generation and PKCS #1 v1.5 signing (`rsa::PrivateKey`), `aes::Aes` is `Clone`

@@ -171,6 +171,10 @@ function dispatch(m) {
     // the system's settings and states that changed (system.js), a notification's answer (notify.js)
     case "system": if(wasm.jfgui_system) {const data=encode.encode(String(m.text||""));inbox(data);wasm.jfgui_system(data.length);input();} break;
     case "note": if(wasm.jfgui_note) {wasm.jfgui_note(m.id>>>0,+!!m.clicked);input();} break;
+    // the motion sensors and the location (sensors.js, lib/plat/web_sensors.rs)
+    case "sensor": if(wasm.jfgui_sensor) {wasm.jfgui_sensor(m.bit>>>0,m.x,m.y,m.z,m.w,m.flags>>>0);input();} break;
+    case "sensor-state": if(wasm.jfgui_sensor_state) {wasm.jfgui_sensor_state(m.mask>>>0,m.state>>>0);input();} break;
+    case "location": if(wasm.jfgui_location) {wasm.jfgui_location(m.state>>>0,m.lat??NaN,m.lon??NaN,m.accuracy??NaN,m.altitude??NaN,m.speed??NaN,m.bearing??NaN,m.age??0,m.source>>>0);input();} break;
     case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
     case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;

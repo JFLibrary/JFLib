@@ -59,18 +59,17 @@ impl System {
         let s = self.settings(ui);
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
         ui.heading(2, TS_SUBTITLE, "06  System");
-        if self.selftest && self.scrolled < 10 && ui.now() != self.scroll_at {
+        if self.selftest && ui.now() != self.scroll_at {
             // the card at the top of the screen, or as far as the page goes (android_system.py
-            // taps its widgets); once a frame, again in the next ones until the scroll view knows
-            // its extent
+            // taps its widgets); once a frame, also later: the scroll view has to learn its
+            // extent, and a finger on a real phone moves the page.  Down at most 10 times, for a
+            // page too short to bring the card up
             self.scroll_at = ui.now();
             let top = ui.px2dip(ui.last_rect()[1]);
             let (_, y) = ui.scroll_pos(10);
-            if top > 16 {
+            if top < 0 && y > 0 || top > 16 && self.scrolled < 10 {
                 self.scrolled += 1;
-                ui.scroll_to(10, -1, y + top - 8);
-            } else {
-                self.scrolled = 10;
+                ui.scroll_to(10, -1, (y + top - 8).max(0));
             }
         }
         ui.next_size(0, 40);

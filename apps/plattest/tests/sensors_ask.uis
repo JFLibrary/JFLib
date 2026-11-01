@@ -1,0 +1,3 @@
+#!args --test sensors-ask
+# (Rust only) plattest --test sensors-ask: location and sensors behind ask lines: refused while nobody
+# answers, running after a yes, the decisions recorded.

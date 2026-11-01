@@ -1532,7 +1532,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   `apps/androidGallery` carries instrumentations for input, accessibility and files
   (`python apps/androidGallery/tests/android_files.py --serial S --apk APK`: internal storage
   across a restart, the system's picker answered through UiAutomation, `content://`, the
-  clipboard); see [apps/androidGallery/README.md](../apps/androidGallery/README.md).
+  clipboard), the sensors and the location (`android_sensors.py --serial S`, also for a real
+  phone: it says what to do); see [apps/androidGallery/README.md](../apps/androidGallery/README.md).
 * Look at screenshots (`shot`) with an image viewer or the Read tool; test dark and light and
   150 %. Real windows: `python tools/wincap.py build/win/NAME.exe --out cap.png`,
   `python tools/wslcap.py --title T --out cap.png -- build/linux/NAME`.
@@ -1575,6 +1576,8 @@ in DIP):
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
 | `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass) |
+| `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
+| `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
 | `expect wm none\|move\|menu\|minimize\|maximize\|restore\|close\|lower\|resize EDGE` | what the title bar or the resize band asked the window manager for since the last check (headless runs only record it; EDGE `n`, `s`, `w`, `e`, `nw`, `ne`, `sw`, `se`, physical) |
 | `system hotkey ID`, `system pick RRGGBB\|cancel` | a recorded global shortcut pressed (`UIC_HOTKEY`); the user's answer to a running colour pick (`UIC_PICK`, a `CP_PIPETTE` picker; section 21) |
 | `clip text "s"`, `clip file F`, `clip dib F`, `clip clear`, `clip save F [bmp]`, `clip expect none\|text\|image\|png` | the headless clipboard (never the real one) |
@@ -4940,3 +4943,70 @@ Tests: `apps/desktest` (`tests/move.uis`, `resize.uis`, `maxmin.uis`, `keys.uis`
 `taskbar.uis`, `shrink.uis`, `save.uis`, `fullscreen.uis`, `rtl.uis`, `a11y.uis`, `shots.uis`,
 all with `--verify-dirty`); `desktest --check-fullscreen` checks the platform with real
 windows (Windows, X11, Wayland), `tests/fullscreen_web.mjs` the browser's Fullscreen API.
+
+## 36. Sensors and location: `plat::sensors`
+
+The device's motion sensors and its location, on Android and in the browser; on Windows and Linux
+every sensor is `Unavailable` (see [ROADMAP.md](ROADMAP.md) §1 for what a native version would
+use). A guard starts what a page needs and dropping it stops it; nothing runs without one, and
+the library stops everything while the app is in the background (`UIC_SUSPEND` 2, a hidden tab,
+Android's `onStop`) and starts it again when it is back. Nothing polls: a new reading wakes the UI
+thread and arrives as a command.
+
+```rust
+use plat::sensors::{self, SENSOR_GRAVITY, SENSOR_MAGNET, SensorState};
+
+// on opening the page (dropping the guard stops them)
+self.watch = Some(sensors::watch(SENSOR_GRAVITY | SENSOR_MAGNET));
+
+// App::frame: the latest values
+if sensors::state(SENSOR_MAGNET) == SensorState::Unavailable { ui.text(TS_BODY, "Kein Kompass"); }
+if let Some(a) = sensors::attitude() {
+    let heading = a.heading.map_or(String::from("-"), |h| format!("{h:.0}"));
+    ui.text(TS_BODY, &format!("{:.1} {:.1} {heading}", a.pitch, a.roll));
+}
+
+// App::command: UIC_SENSOR with the SENSOR_* bits, UIC_LOCATION with the state: a new frame
+fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    if id == UIC_SENSOR || id == UIC_LOCATION {
+        ui.invalidate();
+        return true;
+    }
+    false
+}
+```
+
+| Function | What it does |
+| --- | --- |
+| `sensors::watch(SENSOR_*) -> SensorWatch` | the sensors run while the guard lives (counted per sensor); a sensor the device lacks is no error |
+| `sensors::state(bit) -> SensorState` | `Off`, `Waiting` (started, no reading yet), `Running`, `Paused`, `Denied` (the manifest, Safari's question), `Unavailable` |
+| `sensors::read(bit) -> Option<Reading>` | the last reading: `v` (x, y, z; the rotation: a quaternion), `accuracy` 0 to 3, `absolute` |
+| `sensors::attitude() -> Option<Attitude>` | `pitch`, `roll`, `side` (degrees), `heading` (0 to 360 clockwise from north: where the top points lying flat, the back when upright), `absolute`, `up`, from what runs: gravity from the gravity sensor, the rotation estimate or the accelerometer, heading from the rotation estimate, otherwise from gravity and the magnetic field; `attitude_of` computes the same from given values |
+| `sensors::location_watch() -> LocationWatch` | the location runs while the guard lives; the first start may ask the user, so call it from a user action |
+| `sensors::location_state() -> LocationState` | `Off`, `Searching`, `Fix`, `Paused`, `Denied` (the manifest or the user; also when the user takes it back), `Disabled` (the system's switch), `Unavailable` |
+| `sensors::location_fix() -> Option<Fix>` | `latitude`, `longitude`, what the provider gave of `accuracy`, `altitude`, `speed`, `bearing`, `source`, and `age_ms()` |
+
+Axes are the device's: x to the right of the screen, y to its top, z out of it. The accelerometer
+and gravity are in m/s^2 (lying flat, screen up: z = +9.81), the gyroscope in rad/s, the magnetic
+field in microtesla, the rotation a unit quaternion from the device's axes to east, north, up.
+
+| | Sensors | Location |
+| --- | --- | --- |
+| Android ([`android/GallerySensors.java`](../android/GallerySensors.java)) | `SensorManager` at about 30 Hz: accelerometer, gravity, gyroscope, magnetic field, rotation vector (else the game rotation vector, without north) | `LocationManager`: GPS and network providers, no Google Play services; `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` in the app's manifest, asked at the first start; "approximate" gives the network provider only; a permission taken back shows as `Denied` when the app is back |
+| Browser ([`web/sensors.js`](../web/sensors.js)) | `devicemotion`, `deviceorientation` (absolute with `deviceorientationabsolute` or Safari's `webkitCompassHeading`), Safari's `requestPermission` from the click, or the next tap when it wants a gesture of its own; no magnetic field; what gave nothing after 1.5 s is `Unavailable` until an event says otherwise. The sign of iOS's acceleration is corrected (not run on an iPhone yet) | `navigator.geolocation.watchPosition`; the permission's change event (taken back: `Denied`, given again: it runs on); needs a secure context |
+| Windows, Linux | `Unavailable` | `Unavailable` |
+
+`sensors` and `location` are rights of the manifest, with `ask` lines like the others
+([PERMISSIONS.md](PERMISSIONS.md)): without them `state` says `Denied`, stderr `PERMDENY sensors`,
+and after an `ask` line's answer (`UIC_PERMISSION`) the app starts the guard again.
+
+Scripts feed readings (`sensor ...`, `location ...`, §12's table) so pages can be tested anywhere:
+`apps/androidGallery/tests/level.uis`, `attitude.uis`, `compass.uis`, `gps.uis`; in the browser
+`sensors_web.mjs` (Playwright: geolocation, Chromium's virtual sensors, dispatched events), on an
+emulator or a real phone `android_sensors.py`; `plattest --test sensors` checks the arithmetic
+without hardware.
+
+Two more things for finger-first pages on Android: `plat::back_trap(on)` makes the back key an Esc
+for the app (a page goes back on `UIC_ESCAPE`), and `ui.touch_drag()` after a widget gives it
+vertical drags that would otherwise scroll the page (a colour wheel, a vertical slider, the handle
+of a row). A long press is a right click, so `ui.context_menu` works with the finger.

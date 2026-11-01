@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve, extname, sep} from 'node:path';
-import {loadPlaywright, chromiumOptions} from '../../../tools/tests/playwright.mjs';
+import {loadPlaywright, chromiumOptions, launchWasm} from '../../../tools/tests/playwright.mjs';
 
 const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')) || 'build');
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
@@ -65,7 +65,7 @@ const ok=(cond,what)=>{assert.ok(cond,what);checks++;};
 const engines=option('engines','chromium,firefox').split(',');
 try {
   for(const engine of engines) {
-    const browser=await pw[engine].launch({...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed')});
+    const browser=await launchWasm(pw[engine],{...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed')});
     try {
       const context=await browser.newContext({viewport:{width:420,height:900}});
       const page=await context.newPage();

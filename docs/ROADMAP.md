@@ -132,8 +132,16 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   Löcher), der In-Process-Sandkasten greift darin zusätzlich. Getestet mit `apps/sandboxtest`
   (`sandbox strict`, versucht per rohen Syscalls Verbotenes und Erlaubtes) unter Windows und
   Linux (WSL, Landlock-ABI 7) und `plattest --test permask`.
-- **P3** · *fehlt* · OS-Berechtigungen für Kamera, Mikrofon, Standort (Android-Laufzeitrechte,
-  Portale).
+- **P3** · *teilweise* (2026-11-01) · OS-Berechtigungen für Kamera, Mikrofon und Standort
+  (Android-Laufzeitrechte, Portale). Standort erledigt auf Android und im Browser: die Rechte
+  `location` und `sensors` im Manifest (auch mit `ask`, `PERMDENY`), `plat::sensors`
+  ([GUIDE §36](GUIDE.md)), Androids `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` aus einer
+  Nutzeraktion gefragt, abgelehnt und zurückgenommen behandelt, `tools/android.py` verweigert ein
+  Manifest ohne sie. Es fehlen: Kamera und Mikrofon; Windows und Linux melden „nicht verfügbar“.
+  Eine native Version nähme unter Windows `Windows.Devices.Sensors` und
+  `Windows.Devices.Geolocation` (über `win_winrt.rs`; MSIX: `DeviceCapability location`), unter
+  Linux iio-sensor-proxy (`net.hadess.SensorProxy` auf dem Systembus) und GeoClue
+  (`org.freedesktop.GeoClue2`, in Flatpak das Location-Portal), beides über `linux_dbus.rs`.
 
 ## 2. Virtuelles Dateisystem und Ressourcen
 
@@ -1812,6 +1820,25 @@ Fensterrand hinaus.
     Antworten des Pickers nach einem Prozessende, Papierkorb und `plat::fs` auf Android, Tests
     auf einem echten Gerät (dort nur die arm64-APK gebaut) und mit Cloud-Anbietern, die über
     Pipes liefern; die Zwischenablage liest nur mit Fensterfokus (Androids Regel).
+- **P2** · *erledigt* (2026-11-01) · Android-Galerie mit dem technischen Umfang der großen
+  Galerie und die Sensoren des Telefons ([apps/androidGallery/README.md](../apps/androidGallery/README.md),
+  [GUIDE §36](GUIDE.md)).
+  - Seiten hinter den Karten der Startseite, für den Finger (eine Spalte, 44 DIP): Schaltflächen,
+    Menüs (Menüleiste, Kalender, Kontextmenü), Texteingabe, Listen und Bäume, Container, Werte und
+    Farben, Fenster und Dialoge, Randfälle. Dazu im Host: die Zurück-Taste als Esc
+    (`plat::back_trap`), langes Drücken als rechte Taste, `ui.touch_drag` für senkrechte Züge auf
+    Farbrad, senkrechten Reglern und Griffen statt Seite rollen.
+  - Sensoren: `plat::sensors` mit Wasserwaage, Handylage, Kompass und GPS (ohne Karten, ohne
+    Netzwerk), gestartet nur auf ihrer Seite, im Hintergrund gestoppt; `android/GallerySensors.java`,
+    `web/sensors.js`, Skriptbefehle `sensor` und `location`.
+  - Geprüft mit `tests/pages.uis`, `level.uis`, `attitude.uis`, `compass.uis`, `gps.uis` (Windows,
+    Linux), `tests/sensors_web.mjs` (Chromium, Firefox), `tests/android_sensors.py` (Emulator
+    API 35; am 2026-11-01 auch auf einem Samsung SM-A566B mit Android 16, dort auch
+    `android_system.py`, beide grün). Das Telefon lag dabei still: Dass Lage und Kompass einer
+    Bewegung folgen, und ein Fix vom GPS statt vom Netz, stehen dort noch aus (das Skript meldet
+    beides). Es fehlen: Wischen und langes Drücken im Browser auf dem Telefon (dort rollt der
+    Finger die Seite noch nicht),
+    Hinweise (Tooltips) mit dem Finger, größere Menüzeilen in den Menüs der Menüleiste.
 - **P2** · *fehlt* · Safari / iOS im Web-Testplan.
 
 ## 10. Auslieferung und Updates

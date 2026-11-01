@@ -167,6 +167,8 @@ fn what(kind: &str) -> &'static str {
         "net.connect" => tr("Eine Netzwerkverbindung aufbauen"),
         "net.listen" => tr("Netzwerkverbindungen annehmen"),
         "agent" => tr("Eine Aktion für den Agenten ausführen"),
+        "location" => tr("Den Standort abfragen"),
+        "sensors" => tr("Die Bewegungssensoren lesen"),
         _ => tr("Zugriff erlauben?"),
     }
 }

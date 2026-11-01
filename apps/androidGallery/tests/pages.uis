@@ -1,0 +1,313 @@
+#!args --size 390x780 --anim off --theme light
+# The pages behind the start page, as a finger goes through them: the menu at the top, the card at
+# the end of the start page, the bar above a page, Esc (Android: the back key, plat::back_trap).
+# Every family of widgets of the big gallery works here too.
+shot build/shots/androidGallery/home.png
+expect #930 missing
+expect_nowarn
+
+# ---- the menu of the pages: no Tab stop on the start page; "&" shown as "&"
+click #900
+expect #900 open
+expect menuitem:"Menüs & Auswahl" exists
+shot build/shots/androidGallery/home_menu.png
+click menuitem:"Schaltflächen"
+expect #930 exists
+expect #100 missing
+
+# ---- "Schaltflächen": a tall window shows the whole page
+size 390 1700
+expect text:"Klicks: 0" exists
+click #1000
+click #1001
+expect text:"Klicks: 2" exists
+expect #1002 disabled
+click #1004
+expect #1004 checked
+click #1012
+expect #1012 checked
+expect text:"Werkzeug: Radierer" exists
+click #1022
+expect #1022 checked
+click #1025
+expect #1025 unchecked
+click #1040
+expect #1040 value 50
+expect text:"Wert: 50 %" exists
+shot build/shots/androidGallery/buttons.png
+expect #1000 rect 16 * 358 44
+size 390 780
+# back by the bar
+click #930
+expect #100 exists
+expect #1000 missing
+
+# ---- the card at the end of the start page; back on it the position is the same
+wheel 100,700 -6000
+wait 50
+expect "Randfälle" rect 36 * 318 48
+click button:"Container"
+expect #5000 exists
+key esc
+expect "Randfälle" rect 36 * 318 48
+click button:"Menüs & Auswahl"
+expect #2001 exists
+expect_nowarn
+
+# ---- "Menüs & Auswahl": the menu bar with submenus and the recent list
+click "Datei"
+expect menuitem:"Neu" exists
+click menuitem:"Speichern"
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+click "Ansicht"
+expect menuitem:"Raster" checked
+move menuitem:"Zoom"
+click menuitem:"Vergrößern"
+expect text:"Letzter Befehl: Vergrößern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+click "Datei"
+move menuitem:"Zuletzt geöffnet"
+expect menuitem:"katze.jpg" exists
+click menuitem:"katze.jpg"
+expect text:"Letzter Befehl: katze.jpg   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+# the combo box, the calendar
+click #2001
+click listitem:"Stern"
+expect text:"Letzter Befehl: katze.jpg   Form: Stern   Stärke: Mittel   Zoom: 110 %" exists
+click #2024
+expect button:"Heute" exists
+shot build/shots/androidGallery/menus_calendar.png
+key esc
+expect button:"Heute" missing
+# drop-down, split button
+click #2002
+expect menuitem:"Breit" exists
+click menuitem:"Breit"
+expect text:"Letzter Befehl: katze.jpg   Form: Stern   Stärke: Breit   Zoom: 110 %" exists
+click #0x800007DA
+expect menuitem:"Als Bild einfügen" exists
+click menuitem:"Als Bild einfügen"
+expect text:"Letzter Befehl: Als Bild einfügen   Form: Stern   Stärke: Breit   Zoom: 110 %" exists
+# the context menu: the right button (Android: a long press), the same menu from a button
+rclick #2020
+expect menuitem:"Eigenschaften" exists
+click menuitem:"Eigenschaften"
+expect text:"Letzter Befehl: Eigenschaften   Form: Stern   Stärke: Breit   Zoom: 110 %" exists
+click #2022
+expect menuitem:"Kopieren" exists
+shot build/shots/androidGallery/menus_popup.png
+click menuitem:"Kopieren"
+expect text:"Letzter Befehl: Kopieren   Form: Stern   Stärke: Breit   Zoom: 110 %" exists
+# the tool drop-down with checked rows
+click #2030
+expect menuitem:"Pinsel" checked
+click menuitem:"Lupe"
+click #2030
+expect menuitem:"Lupe" checked
+key esc
+# Esc: a popup first, then the page
+click #2002
+key esc
+expect #2001 exists
+key esc
+expect #100 exists
+expect #2001 missing
+wheel 100,700 6000
+wait 50
+
+# ---- "Texteingabe"
+click #900
+click menuitem:"Texteingabe"
+size 390 1500
+click #3000
+type "Hallo"
+key enter
+expect text:"Eingabe: Hallo   (übernommen: 1)" exists
+click #3001
+type "geheim"
+expect #3001 text "●●●●●●"
+click #3002
+key ctrl+a
+type "42"
+key enter
+expect text:"Werte: 42 und 3,5" exists
+click #3004
+key ctrl+end
+type "\nZeile 4"
+expect #3004 text "Zeile 1\nZeile 2\nZeile 3\nZeile 4"
+shot build/shots/androidGallery/texts.png
+click #3011
+type "Ada"
+click #3015
+expect text:"Abgeschickt: 1" exists
+# a smaller window (Android's keyboard): the box with the focus stays visible
+click #3015
+click #3011
+size 390 300
+expect #3011 focused
+expect #3011 rect * 240 * 44
+size 390 1500
+expect_nowarn
+# Esc: first the box, then the page
+key esc
+key esc
+expect #100 exists
+click #900
+click menuitem:"Listen & Bäume"
+
+# ---- "Listen & Bäume"
+expect text:"Auswahl: 2   Doppelt getippt: 0" exists
+click listitem:"Eintrag 5"
+expect text:"Auswahl: 4   Doppelt getippt: 0" exists
+wheel #4000 -600
+wait 50
+shot build/shots/androidGallery/lists.png
+click #4351
+expect #4351 unchecked
+drag 36,441 36,537
+expect text:"Reihenfolge: 2 3 1 4 5 6 7 8 9 10 11 12" exists
+expect text:"Auswahl: 2   Verschoben: 1" exists
+expect text:"Knoten: –" exists
+click listitem:"Fotos"
+expect text:"Knoten: Fotos" exists
+expect listitem:"Urlaub" exists
+expect listitem:"Strand.jpg" missing
+key right
+key right
+expect listitem:"Strand.jpg" exists
+shot build/shots/androidGallery/tree.png
+click #4501
+wait 50
+expect_nowarn
+key esc
+
+# ---- "Container"
+click #900
+click menuitem:"Container"
+click "Erweiterte Einstellungen"
+expect #5011 exists
+click #5011
+expect #5011 checked
+click tab:"Hinweise"
+expect "Gespeichert" exists
+click #5023
+expect "Gespeichert" missing
+click #5030
+expect "Gespeichert" exists
+shot build/shots/androidGallery/boxes.png
+click #5031
+expect "Meldung" exists
+click tab:"Rollen"
+click #5052
+expect text:"Zuletzt: Knopf 3" exists
+wheel #5040 -600
+wait 50
+shot build/shots/androidGallery/boxes_scroll.png
+key esc
+
+# ---- "Werte & Farben"
+click #900
+click menuitem:"Werte & Farben"
+size 390 1500
+click #6000
+expect #6001 text "50,0"
+click #6002
+expect #6002 value 50
+shot build/shots/androidGallery/colors.png
+click #6018
+expect menuitem:"Farbe merken" exists
+click menuitem:"Farbe merken"
+expect text:"Gemerkt: #C82E7EE6" exists
+click #6020
+wait 50
+shot build/shots/androidGallery/colors_wheel.png
+expect_nowarn
+key esc
+
+# ---- "Fenster & Dialoge"
+size 390 780
+click #900
+click menuitem:"Fenster & Dialoge"
+expect text:"Bereit" exists
+expect window 7100 closed
+click #7000
+expect window 7100 open
+expect #7000 checked
+click #7101
+expect #7101 value 51
+expect text:"Pinselgröße: 51   Name:    Form: Rund" exists
+click #7102
+type "Dicker Pinsel"
+shot build/shots/androidGallery/window_tool.png desktop
+close window 7100
+expect window 7100 closed
+expect #7000 unchecked
+# the modal dialog with a nested one
+click #7001
+expect window 7200 modal
+click #7201
+expect #7201 checked
+click #7202
+expect window 7300 open
+click #7301
+expect #7301 checked
+click #7302
+type "sRGB"
+key enter
+expect text:"Übernommen: 1" exists
+shot build/shots/androidGallery/window_nested.png desktop
+click button:"Schließen"
+expect window 7300 closed
+click button:"OK"
+expect window 7200 closed
+expect text:"Dialog: 1   Seitendialog: 0" exists
+# the content dialog
+click #7004
+expect dialog:"Änderungen speichern?" exists
+shot build/shots/androidGallery/window_dialog.png
+click button:"Speichern"
+expect dialog:"Änderungen speichern?" missing
+expect text:"Dialog: 1   Seitendialog: 1" exists
+# values in a window, the status bar follows
+click #7002
+expect window 7400 open
+close window 7400
+# popups leave their window and stay on the screen
+click #7003
+expect window 7500 open
+click #7501
+expect menuitem:"Schließen" exists
+shot build/shots/androidGallery/window_popups.png desktop
+click menuitem:"Schließen"
+expect text:"Zuletzt: Schließen" exists
+close window 7500
+expect_nowarn
+key esc
+expect #100 exists
+
+# ---- "Randfälle": the corners of the screen
+click #900
+click menuitem:"Randfälle"
+expect #8011 rect 12 724 * 44
+click #8000
+expect menuitem:"Löschen" exists
+shot build/shots/androidGallery/edge_menu.png
+click menuitem:"Löschen"
+expect text:"Zuletzt: Löschen" exists
+click #8011
+expect listitem:"Dezember" exists
+shot build/shots/androidGallery/edge_combo.png
+key esc
+click #8012
+expect button:"Heute" exists
+shot build/shots/androidGallery/edge_calendar.png
+key esc
+rclick #8013
+expect menuitem:"Anordnen" exists
+move menuitem:"Anordnen"
+expect menuitem:"Ganz nach hinten" exists
+shot build/shots/androidGallery/edge_context.png
+click menuitem:"Ganz nach hinten"
+expect text:"Zuletzt: Ganz nach hinten" exists
+key esc
+expect #100 exists
+expect_nowarn

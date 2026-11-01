@@ -1,0 +1,59 @@
+#!args --size 390x780 --anim off --theme light
+# "Handylage": pitch, roll, yaw and the phone drawn; from gravity and the magnetic field, or from the
+# rotation estimate; the gyroscope's values.
+click #900
+click menuitem:"Handylage"
+expect text:"Keine Daten" exists
+expect text:"Drehrate: nicht verfügbar" exists
+shot build/shots/androidGallery/attitude_none.png
+
+# flat, the top to the north
+sensor gravity 0 0 9.81
+sensor magnet 0 20 -40
+expect text:"Nicken: 0,0°" exists
+expect text:"Rollen: 0,0°" exists
+expect text:"Gieren: 0,0°" exists
+shot build/shots/androidGallery/attitude_flat.png
+
+# upright, the back to the north: the same heading
+sensor gravity 0 9.81 0
+sensor magnet 0 -40 -20
+expect text:"Nicken: 90,0°" exists
+expect text:"Gieren: 0,0°" exists
+shot build/shots/androidGallery/attitude_upright.png
+
+# the right edge down by 30 degrees, the top to the east
+sensor gravity -4.905 0 8.496
+sensor magnet -18 0 -36
+expect text:"Rollen: 30,0°" exists
+expect text:"Nicken: 0,0°" exists
+sensor expect magnet running
+
+# the rotation estimate wins for the heading: a quarter turn to the left -> the top to the west
+sensor gravity 0 0 9.81
+sensor rot 0 0 0.7071068 0.7071068
+sensor expect rot running
+expect text:"Gieren: 270,0°" exists
+shot build/shots/androidGallery/attitude_west.png
+# and it alone gives pitch and roll
+sensor none gravity
+sensor none accel
+expect text:"Gieren: 270,0°" exists
+
+# a rotation without north, the magnetic field gone
+sensor none magnet
+sensor rot 0 0 0 1 rel
+expect text:"Gieren: 0,0° (relativ)" exists
+
+sensor gyro 0.1 0.2 0.3
+sensor expect gyro running
+expect text:"0,10 0,20 0,30 rad/s" exists
+
+# no rotation, no field: no yaw
+sensor none rot
+sensor gravity 0 0 9.81
+expect text:"Gieren: keine Angabe" exists
+key esc
+sensor expect rot off
+sensor expect gyro off
+expect_nowarn

@@ -1,7 +1,8 @@
 // Loads Playwright for the browser tests. PLAYWRIGHT_MODULE (a package directory such as
 // /path/to/node_modules/playwright, or a module name) wins; otherwise Node's normal
 // resolution from the working directory and from this repository (node_modules, NODE_PATH).
-// chromiumOptions() picks the Chromium the tests launch.
+// chromiumOptions() picks the Chromium the tests launch; launchWasm() a browser that can compile
+// WebAssembly.
 import {existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {join, resolve} from 'node:path';
@@ -49,4 +50,23 @@ function chromeInstalled() {
 export function chromiumOptions() {
   if(process.env.CHROME_PATH)return {executablePath:process.env.CHROME_PATH};
   return chromeInstalled() ? {channel:'chrome'} : {};
+}
+
+// type.launch(options), a browser that can compile WebAssembly: Playwright's Firefox starts now
+// and then without a compiler (WebAssembly.compile throws "no WebAssembly compiler available" for
+// the whole run of that browser, seen in up to a quarter of the starts; a reload does not help, a
+// new start does).
+export async function launchWasm(type,options) {
+  const module='new Uint8Array([0,97,115,109,1,0,0,0])';
+  for(let tries=1;;tries++) {
+    const browser=await type.launch(options);
+    const page=await browser.newPage();
+    await page.goto('data:text/html,<!doctype html><title>x</title>');
+    const error=await page.evaluate(`(async()=>{try{await WebAssembly.compile(${module});return '';}catch(e){return String(e.message);}})()`);
+    // (Firefox's session store may trip over a window closed this soon: harmless)
+    await page.close().catch(()=>{});
+    if(!error) return browser;
+    await browser.close();
+    if(tries>=8) throw new Error(`${type.name()}: ${error} (${tries} starts)`);
+  }
 }

@@ -8,9 +8,28 @@ Einfügen über die System-Zwischenablage; [`files.rs`](files.rs)) sowie „Sich
 (ein Wert im Android Keystore bzw. im Browser-Speicher von `plat::secret`; [`secrets.rs`](secrets.rs))
 und „System“ (Einstellungen des Systems live, eine Benachrichtigung, Bildschirm anlassen,
 Lebenszyklus; [`system.rs`](system.rs)). Vertikal wischen scrollt die
-Seite; horizontal ziehen bewegt den Slider. Die App braucht nur `POST_NOTIFICATIONS` (gefragt
-bei der ersten Benachrichtigung) und `WAKE_LOCK` (Bildschirm anlassen), keinen
-Netzwerkzugang: Dokumente anderer Apps erreicht sie nur über die Freigabe im Picker.
+Seite; horizontal ziehen bewegt den Slider; langes Drücken ist die rechte Taste.
+
+Hinter der Startseite (die Karte „07 Weitere Seiten“ am Ende, das Menü oben rechts; die Zurück-Taste
+führt zurück) liegt der technische Umfang der großen Galerie [`apps/gallery`](../gallery/main.rs),
+für den Finger angeordnet (eine Spalte, 44 DIP):
+
+| Seite | Inhalt | Datei |
+| --- | --- | --- |
+| Schaltflächen | Schaltflächen, Werkzeugleiste, Checkboxen, Radio, Schalter, Segmente, Regler (auch senkrecht), Karte | [`pg_basic.rs`](pg_basic.rs) |
+| Menüs & Auswahl | Menüleiste mit Untermenüs und zuletzt geöffneten Dateien, Auswahlliste, Kalender, Aufklapp-, Teil- und Befehlsknöpfe, Kontextmenü, Hinweise | [`pg_menus.rs`](pg_menus.rs) |
+| Texteingabe | Textfelder, Kennwort, Zahlenfelder, mehrzeilig, Formular im Raster, Umbruch und Kürzung | [`pg_text.rs`](pg_text.rs) |
+| Listen & Bäume | 200 Einträge virtualisiert, Zeilen zum Ziehen mit Griff, Baum mit Checkboxen, Zeichenfläche mit `canvas_damage` | [`pg_lists.rs`](pg_lists.rs) |
+| Container | Tabs, Expander, Hinweisleisten, kurze Meldungen, waagerechtes Rollen, Rollleiste | [`pg_boxes.rs`](pg_boxes.rs) |
+| Werte & Farben | Dezimalregler, Eigenschaftszeilen, Winkel, Verschieben, Farbspuren, Farbrad, Farbwähler | [`pg_colors.rs`](pg_colors.rs) |
+| Fenster & Dialoge | Werkzeugfenster, verschachtelte modale Dialogfenster, Seitendialog, Popups aus einem Fenster, Statusleiste | [`pg_windows.rs`](pg_windows.rs) |
+| Randfälle | Bedienelemente in den Ecken: ihre Menüs, Listen und der Kalender bleiben auf dem Bildschirm | [`pg_edge.rs`](pg_edge.rs) |
+| Wasserwaage, Handylage, Kompass, GPS | die Sensoren und der Standort des Geräts (`plat::sensors`), unten | [`pg_sensors.rs`](pg_sensors.rs) |
+
+Die App braucht `POST_NOTIFICATIONS` (gefragt bei der ersten Benachrichtigung), `WAKE_LOCK`
+(Bildschirm anlassen) und `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (gefragt, wenn der
+Schalter der GPS-Seite angeht), keinen Netzwerkzugang: Dokumente anderer Apps erreicht sie nur über
+die Freigabe im Picker. Eine `PERMISSIONS`-Datei hat die Galerie nicht: sie zeigt alles.
 
 ## APK bauen
 
@@ -305,6 +324,54 @@ den Screen Wake Lock über einen versteckten Tab hinweg und `UIC_SUSPEND`.
 Am 01.11.2026 auf einem x86_64-Emulator mit Android 15 / API 35: 37 Prüfungen bestanden
 (das Wegwischen nimmt SystemUI im Emulator nicht immer als Geste an; dann meldet das Skript es
 als nicht geprüft). Browser: 45 Prüfungen in Chromium, 41 in Firefox, mit `--threads` 86.
+
+## Seiten, Sensoren und Standort prüfen (seit 01.11.2026)
+
+**Wasserwaage**: flach eine runde Libelle, auf der Kante ein Rohr, grün innerhalb von 0,5°.
+**Handylage**: Nicken, Rollen, Gieren und das Telefon gezeichnet, alle fünf Sensoren mit ihren
+Werten. **Kompass**: die Richtung auf einer Skala, die sich dagegen dreht; ohne Magnetfeld relativ
+zum Start, und das steht dann da. **GPS**: Breite, Länge, Genauigkeit, Höhe, Tempo, Richtung, Alter,
+Quelle; keine Karte, kein Netzwerkzugriff der App. Eine Seite startet nur, was sie braucht, und
+stoppt es beim Verlassen; im Hintergrund stoppt die Library alles (`UIC_SUSPEND`). Der Standort
+startet erst mit dem Schalter, denn der darf fragen. API: [`docs/GUIDE.md`](../../docs/GUIDE.md) §36.
+
+```powershell
+# überall, ohne Hardware: Lesewerte aus dem Skript (sensor ..., location ...)
+python build_rs.py test androidGallery
+# Browser
+python build_rs.py app androidGallery --target web
+node apps/androidGallery/tests/sensors_web.mjs build --engines=chromium,firefox [--threads]
+# Emulator oder Telefon
+python build_rs.py app androidGallery --target android --android-abi x86_64
+python apps/androidGallery/tests/android_sensors.py --serial SERIAL [--apk build/android/androidGallery-x86_64-debug.apk]
+```
+
+- `tests/pages.uis` geht mit dem Finger durch alle Seiten und ihre Widgets (mit Shots unter
+  `build/shots/androidGallery/`), `tests/level.uis`, `attitude.uis`, `compass.uis`, `gps.uis` prüfen
+  die Sensorseiten mit Lesewerten aus dem Skript: Rechnung, Zustände, was läuft und was nicht, den
+  Hintergrund, Ablehnung, abgeschaltetes System.
+- `tests/sensors_web.mjs`: `setGeolocation` und Berechtigung (auch entzogen und wieder erteilt),
+  Chromiums virtuelle Sensoren über CDP, in beiden Browsern `DeviceMotionEvent` und
+  `DeviceOrientationEvent` als Objekte, Safaris `requestPermission` als Stellvertreter.
+- `tests/android_sensors.py` startet die Galerie mit `jfgui_SELFTEST=sensors` und `jfgui_PAGE=...`
+  (ihr Zustand in `data://sensors-state.txt`), tippt wie ein Nutzer und bedient den echten Dialog
+  des Systems. Auf dem Emulator setzt es Werte mit `adb emu sensor set` und `adb emu geo fix` und
+  vergleicht; auf einem Telefon sagt es, was zu tun ist („Telefon flach und still auf den Tisch
+  legen“), prüft auf Plausibilität (Schwerkraft etwa 9,8 m/s², Richtung 0 bis 360), wartet bis zu 60 s auf eine
+  Position und meldet sonst „no fix (indoors?)“, ohne dass das ein Fehler wäre. Am Ende stellt es
+  alles wieder her: beide Standortrechte samt Merkern, den Standortschalter des Systems, die
+  Sensorwerte des Emulators. Das Telefon muss entsperrt sein.
+
+Am 01.11.2026: auf einem x86_64-Emulator mit Android 15 / API 35 54 Prüfungen, Browser 104 Prüfungen
+in Chromium und Firefox. Auf einem Samsung SM-A566B mit Android 16: `android_sensors.py` 48 Prüfungen,
+`android_system.py` 37 Prüfungen. Das Telefon lag dabei still, und die Position kam vom Netz: Dass
+Lage und Kompass einer Bewegung folgen und ein Fix vom GPS sind dort noch nicht geprüft (das Skript
+meldet beides am Ende).
+
+Offen: Im Browser auf dem Telefon rollt der Finger die Seite noch nicht und langes Drücken ist keine
+rechte Taste (der Android-Host macht beides selbst); Hinweise (Tooltips) gibt es nur mit Maus oder
+Stift; die Zeilen der Menüleiste sind Desktop-hoch; iOS (das Vorzeichen seiner Beschleunigung, die
+Geste für `requestPermission`) ist nicht auf einem Gerät gelaufen.
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

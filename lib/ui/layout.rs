@@ -261,6 +261,22 @@ impl Ui {
         self.wp.ctx.last_rect
     }
 
+    /// ui_touch_drag: a finger that starts on the last widget drags it in every direction instead
+    /// of scrolling the page with a vertical swipe (Android: a colour wheel, a vertical slider, the
+    /// handle of a row; a horizontal drag always reaches the widget).  Call it after the widget,
+    /// every frame; the main window only.  Elsewhere nothing happens
+    pub fn touch_drag(&mut self) {
+        if self.uiw_cur != 0 {
+            return;
+        }
+        let [x, y, w, h] = self.wp.ctx.last_rect;
+        let clip = self.wp.ctx.uiclip;
+        let (x0, y0, x1, y1) = (x.max(clip[0]), y.max(clip[1]), (x + w).min(clip[2]), (y + h).min(clip[3]));
+        if x1 > x0 && y1 > y0 {
+            plat::touch_drag_add([x0, y0, x1 - x0, y1 - y0]);
+        }
+    }
+
     /// ui_box_id: id of the current box (the root box's id at the top level; 0 outside a pass)
     pub fn box_id(&self) -> u32 {
         self.wp.lay.boxes.last().map_or(0, |b| b.id)

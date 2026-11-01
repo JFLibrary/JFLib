@@ -225,6 +225,15 @@ def main():
             return any(f"|{PKG}|{note_id}|jfgui-note|" in line for line in listed.splitlines())
         return f"Benachrichtigung Nummer {note_id}" in d.sh("dumpsys", "notification", "--noredact")
 
+    # the system lists a note a moment after the app's call returned (seen: up to 0.4 s on an emulator)
+    def listed(note_id, timeout=5):
+        end = time.time() + timeout
+        while time.time() < end:
+            if posted(note_id):
+                return True
+            time.sleep(0.2)
+        return False
+
     def focused():
         return ACTIVITY.replace("/.", "/" + PKG + ".") in "".join(
             line for line in d.sh("dumpsys", "window").splitlines() if "mCurrentFocus" in line or "mFocusedApp" in line)
@@ -235,6 +244,17 @@ def main():
             if f"{PKG}/{PKG}.GalleryActivity" in block.split("\n", 1)[0]:
                 return block
         return ""
+
+    # FLAG_KEEP_SCREEN_ON on the activity's window: AOSP prints the flags' names, One UI their
+    # number; None when the window is not listed
+    def keeps_screen_on():
+        block = window_flags()
+        if not block:
+            return None
+        if "KEEP_SCREEN_ON" in block:
+            return True
+        m = re.search(r"\bfl=(?:0x)?([0-9a-fA-F]+)\b", block)
+        return m is not None and int(m.group(1), 16) & 0x80 != 0
 
     # the wake locks held now (dumpsys power: the "Wake Locks: size=N" block; its history below
     # names released ones too)
@@ -299,7 +319,9 @@ def main():
 
         # ------------------------------------------------------------ settings live
         print("settings:", flush=True)
-        for mode, want in (("yes", "1"), ("no", "0")):
+        # the first step has to change something: the phone may already be dark
+        modes = (("yes", "1"), ("no", "0"))
+        for mode, want in (modes[::-1] if s.get("dark_system") == "1" else modes):
             d.sh("cmd", "uimode", "night", mode)
             s = wait(lambda s, w=want: s["dark_system"] == w and num(s, "settings") > base, f"night {mode}")
             if ok(s is not None and num(s, "bits") & 1, f"cmd uimode night {mode}: dark={want}, UIC_SETTINGS with SET_THEME"):
@@ -345,11 +367,11 @@ def main():
             n += 1
             ok(dialog("permission_allow_button", "the permission dialog"), "the system asks again: \"Allow\"")
             s = wait(lambda s: num(s, "shown") == n, "shown after allowing")
-            ok(s is not None and posted(n), f"allowed: notification {n} posted (cmd notification list)")
+            ok(s is not None and listed(n), f"allowed: notification {n} posted (cmd notification list)")
         else:
             ok(tap_label("Benachrichtigung"), "tap \"Benachrichtigung\"")
             n += 1
-            ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and posted(n), f"notification {n} posted")
+            ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and listed(n), f"notification {n} posted")
         # tap it in the shade: UIC_NOTE, the activity in front
         d.sh("cmd", "statusbar", "expand-notifications")
         note = find(label(f"Benachrichtigung Nummer {n}"), "the notification in the shade")
@@ -363,7 +385,7 @@ def main():
         awake()
         ok(tap_label("Benachrichtigung"), "tap \"Benachrichtigung\" (granted)")
         n += 1
-        ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and posted(n), f"granted: notification {n} posted")
+        ok(wait(lambda s: num(s, "shown") == n, "shown") is not None and listed(n), f"granted: notification {n} posted")
         d.sh("cmd", "statusbar", "expand-notifications")
         note = find(label(f"Benachrichtigung Nummer {n}"), "the notification in the shade")
         if note is not None:
@@ -396,11 +418,11 @@ def main():
         ok(tap_label("Bildschirm anlassen"), "tap \"Bildschirm anlassen\"")
         s = wait(lambda s: s["keep"] == "1" and num(s, "inhibited") == 3, "kept on")
         ok(s is not None, "plat::inhibit(INHIBIT_IDLE) holds idle and suspend")
-        ok("KEEP_SCREEN_ON" in window_flags(), "dumpsys window: the activity's window has FLAG_KEEP_SCREEN_ON")
+        ok(keeps_screen_on() is True, "dumpsys window: the activity's window has FLAG_KEEP_SCREEN_ON")
         ok(f"jfgui:{PKG}" in wake_locks(), "dumpsys power: the partial WakeLock jfgui:org.jflib.gallery")
         ok(tap_label("Bildschirm anlassen"), "tap \"Bildschirm anlassen\" again")
         ok(wait(lambda s: s["keep"] == "0" and num(s, "inhibited") == 0, "released") is not None, "the guard dropped")
-        ok("KEEP_SCREEN_ON" not in window_flags(), "dumpsys window: no FLAG_KEEP_SCREEN_ON")
+        ok(keeps_screen_on() is False, "dumpsys window: no FLAG_KEEP_SCREEN_ON")
         ok(f"jfgui:{PKG}" not in wake_locks(), "dumpsys power: the WakeLock released")
 
         # ------------------------------------------------------------ the lifecycle

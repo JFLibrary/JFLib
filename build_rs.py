@@ -494,7 +494,8 @@ def app_targets(name):
 # do everything (as before).  "ask KEY ARGS [\"reason\"]" asks the user at the first access;
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
-PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture")
+PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture",
+                  "location", "sensors")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
 PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
 PERM_KEYS_PACKAGE = ("recent",)                                    # only the packages read it (Flatpak)
@@ -1303,7 +1304,7 @@ def web_assets(name, directory):
 def _web_assets(name, directory):
     """Shared browser host, emitted beside each app; the GUI stays entirely in WASM."""
     source = ROOT / "web"
-    for filename in ("loader.js", "worker.js", "bridge.js", "storage.js", "secrets.js", "handles.js", "a11y.js", "audio.js", "system.js", "notify.js", "host.css"):
+    for filename in ("loader.js", "worker.js", "bridge.js", "storage.js", "secrets.js", "handles.js", "a11y.js", "audio.js", "system.js", "notify.js", "sensors.js", "host.css"):
         shutil.copyfile(source / filename, directory / filename)
     html = (source / "index.html").read_text(encoding="utf-8").replace("{{APP}}", name)
     (directory / "index.html").write_bytes(html.encode("utf-8"))

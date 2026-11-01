@@ -537,6 +537,11 @@ def finish_args(perms, extra=()):
             notes.append("fs.user: Dateien über die Portale (Dateidialog, Dokument-Portal für „Öffnen mit“)")
         elif key in ("url", "print", "autostart", "input.global", "screen.capture"):
             notes.append(f"{key}: über das Portal, kein Loch nötig")
+        elif key == "location":
+            notes.append("location: unter Linux noch nicht gebaut (später das Location-Portal, kein Loch nötig)")
+        elif key == "sensors":
+            notes.append("sensors: unter Linux noch nicht gebaut (später iio-sensor-proxy über "
+                         "--system-talk-name=net.hadess.SensorProxy)")
         elif key == "recent":
             if "--filesystem=xdg-data/recently-used.xbel" not in args:
                 args.append("--filesystem=xdg-data/recently-used.xbel")

@@ -155,6 +155,32 @@ pub mod tray;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
+
+pub mod sensors;
+
+/// Android: while `on`, the back key reaches the app as Esc (a page of the app goes back, a popup
+/// closes; `UIC_ESCAPE` when nothing took it) instead of ending the activity.  Elsewhere nothing:
+/// there Esc is a key of its own
+pub fn back_trap(on: bool) {
+    #[cfg(target_os = "android")]
+    web::system_host::back_trap(on);
+    #[cfg(not(target_os = "android"))]
+    let _ = on;
+}
+
+/// (ui, every pass) no widget takes touch drags yet (ui.touch_drag; Android, jfgui_touch_drag)
+pub fn touch_drag_clear() {
+    #[cfg(target_os = "android")]
+    web::system_host::touch_drag_clear();
+}
+
+/// (ui) a touch that starts in this rectangle (px) drags instead of scrolling (Android)
+pub fn touch_drag_add(r: [i32; 4]) {
+    #[cfg(target_os = "android")]
+    web::system_host::touch_drag_add(r);
+    #[cfg(not(target_os = "android"))]
+    let _ = r;
+}
 /// Starting the app when the user logs in (Run key, XDG autostart, Background portal, an MSIX
 /// package's StartupTask).
 pub mod autostart;

@@ -4,6 +4,7 @@ import {openSecrets, encodeSecrets} from "./secrets.js";
 import * as handles from "./handles.js";
 import {Shadow, decode as decodeA11y} from "./a11y.js";
 import {SystemHost} from "./system.js";
+import {SensorHost} from "./sensors.js";
 const canvas=document.querySelector("#screen"), input=document.querySelector("#input"), status=document.querySelector("#status");
 const fileInput=document.querySelector("#files"), controlButton=document.querySelector("#control");
 const viewport=document.querySelector("#viewport"), a11yRoot=document.querySelector("#a11y");
@@ -17,6 +18,8 @@ let audio=null;
 const audioHost=()=>audio||=import("./audio.js").then(x=>new x.AudioHost(worker));
 // the system's settings, notifications, the screen kept on, the lifecycle (system.js, notify.js)
 const system=new SystemHost(m=>send(m));
+// the motion sensors and the location (sensors.js)
+const sensors=new SensorHost(m=>send(m),canvas);
 const pending=new Map(), ports=new Set();
 // One acknowledged batch at a time: a busy worker must not accumulate old frames
 // or hover positions. Input edges and every pressed-pointer sample stay ordered.
@@ -308,7 +311,7 @@ async function service(m) {
       try {const r=await new EyeDropper().open();send({type:"color",id:m.id,status:2,rgb:parseInt(String(r.sRGBHex).slice(1),16)&0xFFFFFF});}
       catch(error) {send({type:"color",id:m.id,status:error?.name==="AbortError"?-4:errorCode(error),rgb:0});}
     }
-    else if(!system.service(m)) complete(m.id,-3);
+    else if(!system.service(m) && !sensors.service(m)) complete(m.id,-3);
   } catch(error) {complete(m.id,errorCode(error));report(error.message);}
 }
 worker.onmessage=({data:m})=>{

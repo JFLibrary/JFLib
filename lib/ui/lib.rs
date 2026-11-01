@@ -175,6 +175,7 @@ mod rtl;
 mod runtime;
 // the monitors, global shortcuts, the colour pick, pictures of the screen (plat::screen, hotkey)
 mod screen;
+mod sensors;
 // scroll copies: a scrolled view's still valid pixels are moved instead of drawn (scrollcopy.rs)
 mod scrollcopy;
 mod stock;

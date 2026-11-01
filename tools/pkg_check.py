@@ -590,6 +590,9 @@ def meta_checks(d):
     a4, n4 = pkg_linux.finish_args([("fs.user", []), ("audio.output", []), ("audio.output", [])])
     check(a4 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--socket=pulseaudio"] and any(n.startswith("audio.output") for n in n4),
           "flatpak: audio.output: --socket=pulseaudio once, with a note")
+    a6, n6 = pkg_linux.finish_args([("fs.user", []), ("location", []), ("sensors", [])])
+    check(a6 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"] and any(n.startswith("location") for n in n6)
+          and any(n.startswith("sensors") for n in n6), "flatpak: location, sensors: no hole yet, noted")
     a5, n5 = pkg_linux.finish_args([("fs.user", []), ("recent", []), ("recent", [])])
     check(a5 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--filesystem=xdg-data/recently-used.xbel"]
           and any(n.startswith("recent") for n in n5), "flatpak: recent: the host's recently-used.xbel once, with a note")
@@ -646,6 +649,9 @@ def meta_checks(d):
     t_update_channel(d)
     caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("audio.output", [])])
     check(caps == [] and any(n.startswith("audio.output") for n in cnotes), "msix: audio.output needs no capability (noted)")
+    caps, cnotes = pkg_msix.capabilities([("location", []), ("sensors", [])])
+    check(caps == [] and any(n.startswith("location") for n in cnotes) and any(n.startswith("sensors") for n in cnotes),
+          "msix: location, sensors: nothing declared while plat has no Windows version (noted)")
     for bad_meta, what in (({"schemes": "https"}, "a reserved scheme"), ({"version": "70000.1"}, "a version part > 65535"),
                            ({"msix_name": "x"}, "a short identity name"),
                            ({"filetypes": "fxd|application/x-jf-fixture|Fixture|own; png,fxd|image/png|PNG"}, "an extension in two file types")):
