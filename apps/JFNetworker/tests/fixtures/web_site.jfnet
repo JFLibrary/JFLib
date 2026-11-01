@@ -1,0 +1,214 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Eine kleine Website",
+  "description": "WEB1 zeigt die Dateien aus /var/www (http-server mit \"root\") und einen Laden als Skript (laden.jfs auf Port 8080). DNS1 kennt web.lab. PC1 öffnet die Seiten im Webbrowser seines Desktops.",
+  "seed": 11,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.10/24 dev eth0\necho \"nameserver 10.0.0.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 400,
+      "y": -80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "www",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "root": "/var/www"
+          }
+        },
+        {
+          "kind": "script",
+          "name": "laden",
+          "disabled": false,
+          "config": {
+            "file": "/root/app/laden.jfs",
+            "port": 8080
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/app",
+          "dir": true
+        },
+        {
+          "path": "/root/app/laden.jfs",
+          "text": "// laden.jfs: ein kleiner Laden als Webserver: die Suche sendet mit GET, die Bestellung mit POST\nlet port = config.port ?? 8080\nlet bestellungen = 0\n\nfn seite(titel, inhalt) {\n  return \"<html><head><title>${titel}</title></head><body><h1>${titel}</h1>${inhalt}</body></html>\"\n}\n\nfn html(res, status, titel, inhalt) {\n  res.send(status, seite(titel, inhalt), {\"Content-Type\": \"text/html; charset=utf-8\"})\n}\n\n// Text aus einem Formular ohne Tags\nfn sauber(s) {\n  return (s ?? \"\").replace(\"&\", \"&amp;\").replace(\"<\", \"&lt;\")\n}\n\nlet start = \"<p>Was darf es sein?</p>\" +\n  \"<form action='/suche' method='get'><p><label>Suchwort <input name='q'></label> <input type='submit' value='Suchen'></p></form>\" +\n  \"<form action='/bestellen' method='post'><p><label>Ware <input name='ware' value='Roggenbrot'></label> \" +\n  \"<label>Menge <input name='menge' value='1'></label> <input type='submit' value='Bestellen'></p></form>\" +\n  \"<p><a href='/weiter'>Ein Link, der weiterleitet</a></p>\"\n\nhttp.serve(port, fn(req, res) {\n  let p = req.path\n  if p == \"/\" {\n    return html(res, 200, \"Der Laden\", start)\n  }\n  if p == \"/suche\" {\n    return html(res, 200, \"Suche\", \"<p>Gesucht wurde: ${sauber(req.query.q)}</p><p><a href='/'>Zurück zum Laden</a></p>\")\n  }\n  if p == \"/bestellen\" {\n    if req.method != \"POST\" {\n      return res.send(405, \"Bestellen geht nur mit POST.\\n\", {\"Allow\": \"POST\"})\n    }\n    bestellungen += 1\n    let f = req.form ?? {}\n    return html(res, 200, \"Bestellt\", \"<p>Bestellung ${bestellungen}: ${sauber(f.menge)} mal ${sauber(f.ware)}</p><p><a href='/'>Zurück zum Laden</a></p>\")\n  }\n  if p == \"/weiter\" {\n    return res.send(302, \"\", {\"Location\": \"/suche?q=weitergeleitet\"})\n  }\n  if p == \"/schleife\" {\n    return res.send(302, \"\", {\"Location\": \"/schleife\"})\n  }\n  if p == \"/moved\" {\n    return res.send(301, \"\", {\"Location\": \"/echo\"})\n  }\n  if p == \"/found\" {\n    return res.send(302, \"\", {\"Location\": \"/echo\"})\n  }\n  if p == \"/see\" {\n    return res.send(303, \"\", {\"Location\": \"/echo\"})\n  }\n  if p == \"/temp\" {\n    return res.send(307, \"\", {\"Location\": \"/echo\"})\n  }\n  if p == \"/perm\" {\n    return res.send(308, \"\", {\"Location\": \"/echo\"})\n  }\n  if p == \"/echo\" {\n    return \"${req.method} ${req.body}\\n\"\n  }\n  if p == \"/kaputt\" {\n    return html(res, 500, \"Der Ofen ist aus\", \"<p>Eine Seite des Servers zu seinem Fehler.</p>\")\n  }\n  if p == \"/fehler\" {\n    return 503\n  }\n  if p == \"/leer\" {\n    return res.send(204, \"\")\n  }\n  // /langsam bekommt nie eine Antwort\n  if p == \"/langsam\" {\n    return\n  }\n  res.send(404, \"Das führt der Laden nicht.\\n\")\n})\nprint(\"Der Laden öffnet auf Port ${port}\")\n"
+        },
+        {
+          "path": "/var/www",
+          "dir": true
+        },
+        {
+          "path": "/var/www/brot",
+          "dir": true
+        },
+        {
+          "path": "/var/www/brot/index.html",
+          "text": "<html><head><title>Unser Brot</title></head><body>\n<h1>Unser Brot</h1>\n<p>Jeden Morgen frisch: <a href=\"roggen.html\">Roggenbrot</a> und <a href=\"./weizen.html\">Weizenbrot</a>.</p>\n<p><a href=\"../index.html\">Zur Startseite</a></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/brot/roggen.html",
+          "text": "<html><head><title>Roggenbrot</title></head><body>\n<h1>Roggenbrot</h1><p>Mit Sauerteig, zwei Tage geführt.</p><p><a href=\"./\">Zurück zum Brot</a></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/brot/weizen.html",
+          "text": "<html><head><title>Weizenbrot</title></head><body>\n<h1>Weizenbrot</h1><p>Hell und locker.</p><p><a href=\"./\">Zurück zum Brot</a></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/daten.bin",
+          "base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+Pw=="
+        },
+        {
+          "path": "/var/www/hilfe.md",
+          "text": "# Hilfe\n\nDiese Seite ist in *Markdown* geschrieben.\n\n- [Zur Startseite](index.html)\n- [Nach unten](#zweiter-teil)\n\n## Erster Teil\n\nDer Server gibt die Datei mit dem Typ `text/markdown` aus.\n\n## Zweiter Teil\n\nHier geht es weiter.\n"
+        },
+        {
+          "path": "/var/www/index.html",
+          "text": "<!doctype html>\n<html>\n<head><title>Bäckerei Krume</title></head>\n<body>\n<h1>Bäckerei Krume</h1>\n<p><img src=\"logo.svg\" alt=\"Das Zeichen der Bäckerei\" width=\"96\" height=\"96\"></p>\n<p>Willkommen auf der kleinen Website im simulierten Netz.</p>\n<ul>\n<li><a href=\"brot/\">Unser Brot</a></li>\n<li><a href=\"notiz.txt\">Eine Notiz als Text</a></li>\n<li><a href=\"hilfe.md\">Hilfe in Markdown</a></li>\n<li><a href=\"lang.html#zeiten\">Die Öffnungszeiten</a></li>\n<li><a href=\"http://web.lab:8080/\">Der Laden</a></li>\n<li><a href=\"kaputt.html\">Eine Seite, die es nicht gibt</a></li>\n</ul>\n</body>\n</html>\n"
+        },
+        {
+          "path": "/var/www/lang.html",
+          "text": "<html><head><title>Eine lange Seite</title></head><body>\n<h1 id=\"oben\">Eine lange Seite</h1>\n<p><a href=\"#zeiten\">Zu den Öffnungszeiten</a></p>\n<p>Absatz 1: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 2: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 3: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 4: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 5: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 6: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 7: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 8: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 9: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 10: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 11: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 12: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 13: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 14: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 15: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 16: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 17: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 18: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 19: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 20: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 21: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 22: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 23: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 24: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 25: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 26: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 27: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 28: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 29: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 30: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 31: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 32: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 33: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 34: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 35: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 36: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 37: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 38: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 39: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<p>Absatz 40: Hier steht etwas über den Ofen, das Mehl und den Teig.</p>\n<h2 id=\"zeiten\">Öffnungszeiten</h2>\n<p>Montag bis Samstag von 6 bis 18 Uhr.</p>\n<p><a href=\"#oben\">Nach oben</a></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/logo.svg",
+          "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"96\" height=\"96\" viewBox=\"0 0 96 96\">\n<rect x=\"4\" y=\"4\" width=\"88\" height=\"88\" rx=\"16\" fill=\"#B5763A\"/>\n<path d=\"M20 60 Q20 32 48 32 Q76 32 76 60 Z\" fill=\"#F4DDB5\"/>\n<path d=\"M34 42 l6 12 M48 40 l0 14 M62 42 l-6 12\" stroke=\"#8A5526\" stroke-width=\"4\" fill=\"none\"/>\n</svg>\n"
+        },
+        {
+          "path": "/var/www/notiz.txt",
+          "text": "Notiz der Backstube\n\n  Mehl     25 kg\n  Hefe      2 kg\n  Salz      1 kg\n"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "DNS1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname DNS1\nip addr add 10.0.0.53/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "dns",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "lab",
+                "records": [
+                  "web A 10.0.0.1",
+                  "dns A 10.0.0.53"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

@@ -617,3 +617,8 @@ pub(crate) const SES_SLOTS: u32 = 192;
 /// parts)
 pub(crate) const ID_IDE0: u32 = 0x0001_8000;
 // (the IDE's check while typing keeps TIMER_SCRIPT_CHECK of the Skripte tab it replaces)
+// ---- B1, B2: the Webbrowser (commands 870 .. 889, widgets 0x0001_C000 .. 0x0001_CFFF, timers
+// 0x1BC .. 0x1BF; the commands and timers are not used)
+/// the Webbrowser in device window k: ID_BROWSER0 + 0x100 k the page (its toolbar: the desktop's
+/// block + 0x30, devwin/browser.rs)
+pub(crate) const ID_BROWSER0: u32 = 0x0001_C000;

@@ -56,6 +56,8 @@
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
 // idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
+// browsertest.rs: the Webbrowser (group browser: netpkt::uri, jfn_sim::webc, the static files of
+// http-server, req.form of scripts, what devwin/browser.rs decides).
 
 use alloc::format;
 use alloc::string::String;
@@ -139,9 +141,11 @@ mod desktoptest;
 mod sessiontest;
 #[path = "idetest.rs"]
 mod idetest;
+#[path = "browsertest.rs"]
+mod browsertest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 46] = [
+    let groups: [(&'static str, fn(&mut T)); 47] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -188,6 +192,7 @@ pub fn run() -> i32 {
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
+        ("browser", browsertest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

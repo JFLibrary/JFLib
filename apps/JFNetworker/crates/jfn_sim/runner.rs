@@ -165,6 +165,8 @@ fn drain(d: &mut Inline, r: &mut Rep) {
             }
             // a scenario types at the consoles only (telnet sessions print on the client's)
             Report::SesOut { .. } | Report::SesPrompt { .. } | Report::SesClosed { .. } => {}
+            // the Webbrowser is a window's (a scenario fetches with curl)
+            Report::Web { .. } => {}
         }
     }
 }

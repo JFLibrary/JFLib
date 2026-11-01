@@ -164,6 +164,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
   MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
   F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
+- **Webbrowser (B1, B2):** echte kleine Websites aus dem simulierten Netz im Desktop eines Hosts:
+  HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und Skripten mit
+  `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene Fehlerseiten (siehe
+  [Webbrowser](#webbrowser)).
 - **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
   Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
   vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
@@ -354,6 +358,12 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
 | `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
+| `model.uis`, Gruppe `browser` | der Webbrowser (siehe [Webbrowser](#webbrowser)): URLs mit allen Beispielen aus RFC 3986 5.4, Prozent- und Formular-Kodierung, die Adresszeile, jede Fehlerart, die Regeln der Weiterleitungen und ihre Grenze, Typen, Formulare mit GET und POST gegen ein Skript (`req.query`, `req.form`), Dateien mit `"root"`, Verlauf, Fragmente, Anhalten, Strom aus unter einer Anfrage, Wiederholung beim Zurückspulen, Determinismus |
+| `browser_pages.uis` | der Webbrowser auf dem Desktop von PC1 (`fixtures/web_site.jfnet`): Adresse tippen (Name über DNS), Seite mit Bild und Titel, Link und zurück (Knöpfe und Tasten), relative Links, Text, Markdown, Fragmente, ein Bild allein, Strg+L; eigene Seiten für einen unbekannten Namen, einen abgelehnten Port, keinen Weg, 404, 500, 503, zu viele Weiterleitungen und `https:`; Schließen verwirft den Zustand |
+| `browser_forms.uis` | Formulare gegen das `jfs`-Skript `laden.jfs`: GET mit Query in der Adresse, Zurück bringt das Formular mit dem Eingegebenen, POST mit dem Knopf, Neu laden fragt vor dem zweiten Senden, ein Link mit Weiterleitung, Anhalten und Esc, die angehaltene Simulation, Tab in die Felder |
+| `browser_requests.uis` | was der Webbrowser ins Netz schickt, an den Zahlen des Webservers im Reiter Dienste: Seite und Bild sind zwei Anfragen, Zurück und Vor keine, Neu laden fragt wieder (auch nach dem Bild); der Desktop kommt nach dem Schließen des Gerätefensters so zurück, wie er war |
+| `browser_shots.uis` | die Bilder des Webbrowsers (Seite mit Bild, Text, Formular, die Frage vor dem erneuten Senden, Fehlerseite) hell und dunkel mit 100 und 150 % (`build/jfnetworker/browser_*.png`) |
+| `scen_web_site.uis` | das Golden-Szenario einer kleinen Website (`scen/web_site.scn`): `curl` holt, was der Browser holt: Seiten über den Namen, die Weiterleitung eines Ordners, Typen, eine fehlende Seite, ein Pfad aus dem Ordner hinaus, Formulare mit GET und POST, Weiterleitungen und ihre Grenze, eine gespeicherte Seite |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -383,6 +393,9 @@ von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login
 Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 `telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
+Für den Webbrowser: `web_site.jfnet` (WEB1 mit den Dateien aus `/var/www` und dem Laden als
+Skript, DNS1 mit `web.lab`, PC1 mit dem Browser; das Szenario `web_site.scn` und die Fensterskripte
+`browser_*.uis`).
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
@@ -448,6 +461,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
+| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 
 ### Gerätekatalog
@@ -542,9 +556,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
   Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
-  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)); sein
-  Webbrowser löst bisher nur Adressen und Ports auf, Seiten über HTTP laden und zeigen ist
-  Meilenstein B1 (siehe [Fahrplan](#fahrplan)). F11 zeigt ein Gerätefenster mit jedem Reiter
+  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)), darunter der
+  [Webbrowser](#webbrowser). F11 zeigt ein Gerätefenster mit jedem Reiter
   im Vollbild. Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
   Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
@@ -1014,7 +1027,8 @@ von [`lib/netio/http.rs`](../../lib/netio/http.rs). Der Dissektor zeigt Anfragen
   Kopfzeilen und Chunks; Rechenzeit mit Streuung, Worker mit Warteschlange (voll: sofort 503
   mit `Retry-After`), Fehlerrate pro Server oder Route; Keep-Alive mit Leerlauf-Timeout (75 s)
   und höchstens 1000 Anfragen pro Verbindung, Timeout für den Kopf, 100-continue, 400, 404,
-  405 mit `Allow`, 413, 414, 431 und 505.
+  405 mit `Allow`, 413, 414, 431 und 505. Mit `"root": "/var/www"` antwortet er zusätzlich aus
+  den Dateien des Geräts (siehe [Webbrowser](#webbrowser)).
 - **Client** (`http-client`): N Anfragen an eine URL in Abständen. Der Agent dahinter
   (auch für `curl` und den Lastgenerator) löst Namen auf, hält Verbindungen pro Host offen,
   pipelinet auf Wunsch, kennt Timeouts für Verbindung und Anfrage und wiederholt eine Anfrage
@@ -1587,7 +1601,7 @@ Konfiguration sieht das Skript als `config` (`config.port`):
 | `net.connect(adresse, port, {connect, data, close, binary})` | TCP-Client (Namen löst `dns.resolve` auf) |
 | `net.udp(port, fn(sock, msg), {binary})` | UDP-Socket mit `send(adresse, port, daten)` und `close()`; `msg` ist `{data, from, port}`, Port 0 ein flüchtiger |
 | `dns.resolve(name, fn(err, adressen))` | der Resolver des Geräts (Suchdomänen, Cache) |
-| `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}`, `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
+| `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}` (`query`: die Felder der URL, dekodiert), bei einem Inhalt vom Typ `application/x-www-form-urlencoded` dazu `form` mit dessen Feldern (sonst fehlt es: `req.form ?? {}`), `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
 | `http.request(url, fn(err, resp))`, `http.request({url, method, headers, body, timeout_ms}, ..)` | HTTP-Client mit gehaltenen Verbindungen, Namen über den Resolver, ohne Angabe 30 s Timeout; `resp` ist `{status, headers, body}` |
 | `disk.get(key, fn(err, wert))`, `disk.put(key, wert, fn(err))`, `disk.delete(key, fn(err, war_da))`, `disk.scan(präfix, fn(err, einträge))` | JSON-Werte auf der Disk des Geräts mit ihren Zugriffszeiten und ihrer Kapazität (`"disk": {...}` wie beim KV-Knoten) |
 | `metrics.inc(name, n)`, `metrics.gauge(name, wert)`, `metrics.observe(name, wert)` | Zahlen des Dienstes für `expect … svc NAME metric X`; `observe` ergibt `NAME_count`, `NAME_p50`, `NAME_p95`, `NAME_p99` und `NAME_max` über fünf Minuten |
@@ -3270,7 +3284,9 @@ Dialog mit seinem Titel.
   Hintergrund-Jobs der Konsole (Jobs eines weiteren Terminals beendet dessen eigenes `kill`); die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
   letzten Minute (`Engine::cpu_secs`, die vier CPUs von `top`) und der Speicher der Skripte (die
   Zeitreihe `heap_kb`) als kleine Diagramme.
-- **IP-Konfiguration** und **Webbrowser** ([`progs.rs`](src/workspace/devwin/progs.rs)),
+- **Webbrowser** ([`browser.rs`](src/workspace/devwin/browser.rs)): Seiten aus dem simulierten
+  Netz, siehe [Webbrowser](#webbrowser).
+- **IP-Konfiguration** ([`progs.rs`](src/workspace/devwin/progs.rs)),
   **E-Mail** ([`email.rs`](src/workspace/devwin/email.rs)), **MIB-Browser**
   ([`mib.rs`](src/workspace/devwin/mib.rs)) wie zuvor, jetzt in Fenstern; der MIB-Browser zeigt
   die Konsole unter dem Baum, solange das Terminal-Fenster nicht über ihm liegt.
@@ -3351,6 +3367,72 @@ Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `Ses
 Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu das Szenario
 `sessions.scn` und die Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und
 `sessions_shots.uis`.
+
+### Webbrowser
+
+Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 und B2) ist
+ein Programm des Desktops: Er zeigt echte kleine Websites aus dem simulierten Netz mit dem
+`ui.html_view` der Library, nicht mit einer eigenen HTML/CSS-Engine. Ein echtes Internet gibt es
+nicht. Seiten liefern `http-server`-Routen, Dateien des Geräts und Skripte mit `http.serve`, wie
+PHP oder Node. Beispiel: [`tests/fixtures/web_site.jfnet`](tests/fixtures/web_site.jfnet) mit einer
+statischen Website und einem Laden als Skript.
+
+- **Bedienung:** Adresszeile (Eingabe öffnet, Strg+L springt hinein; ohne Schema gilt `http://`),
+  Zurück und Vor (auch Alt+Links, Alt+Rechts), Neu laden (F5; während des Ladens Anhalten, auch
+  Esc). Die Statuszeile nennt beim Laden das Ziel, danach Status, Typ, Größe, Dauer und
+  Weiterleitungen und unter dem Zeiger das Ziel eines Links; der Seitentitel steht im Fenstertitel
+  und in der Taskleiste. Steht die Simulation, sagt die Statuszeile, dass die Antwort mit ihr
+  kommt; im Simulationsmodus gehen die Pakete mit den Schritten.
+- **Inhalte:** `text/html` im Dokument der Library (mit deren CSS-Teilmenge und Formularen),
+  `text/markdown`, `text/plain` und anderer Text als vorformatierter Text, Bilder allein auf einer
+  kleinen Seite, alles andere als Hinweis mit Typ und Größe. Der Titel kommt aus `<title>`, sonst
+  aus der ersten Überschrift, sonst aus dem Dateinamen.
+- **Links und Bilder:** relative Adressen löst [`netpkt::uri`](../../lib/netpkt/uri.rs) nach
+  RFC 3986 auf. Ein Link auf ein Fragment springt innerhalb der Seite (das Element mit der `id`
+  oder `<a name>`, in Markdown die Überschrift mit diesem Kürzel) und ist ein eigener Schritt im
+  Verlauf. Bilder holt der Browser mit eigenen GET-Anfragen (`data:` entschlüsselt er selbst) und
+  merkt sie sich je Fenster, bis Neu laden sie verwirft; die Seite liest keine Datei des echten
+  Rechners (`MI_APP`).
+- **Verlauf:** je Fenster 30 Einträge mit ihrem Dokument: Zurück und Vor zeigen die Seite sofort
+  ohne Anfrage, an derselben Stelle und mit den eingegebenen Feldwerten, auch wenn die Simulation
+  steht. Neu laden fragt den Server wieder. Das Schließen des Fensters verwirft alles.
+- **Formulare (B2):** Senden geht als GET mit der Query oder als POST mit
+  `application/x-www-form-urlencoded` an die `action`, aufgelöst gegen die Seite; die Antwort ist
+  ein neuer Eintrag. Neu laden einer POST-Antwort fragt erst („Erneut senden“), denn die Anfrage
+  kann etwas auslösen (die zweite Bestellung). Ein Skript liest die Felder aus `req.query` und
+  `req.form` (das es nur bei einem Formular-Inhalt gibt, daher `req.form ?? {}`, wo auch anderes
+  ankommt).
+- **Fehlerseiten:** eigene Seiten mit Grund, Adresse und Hinweis: Verbindung abgelehnt,
+  Zeitüberschreitung, Name unbekannt, kein Weg, abgebrochene Verbindung, zu viele Weiterleitungen,
+  4xx und 5xx ohne eigene Seite des Servers (eine HTML-Seite des Servers zeigt der Browser, wie
+  sie ist). `https:` sagt, dass verschlüsselte Seiten mit einer späteren Ausbaustufe kommen (B4).
+
+**Im Simulator** ([`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs)): Das Programm ist ein
+versteckter Dienst „webbrowser“ des Hosts über demselben HTTP-Client wie `curl`, also mit DNS,
+TCP, Trace und Simulationsmodus. `Cmd::Apply(Action::WebFetch { dev, req })` schickt eine Anfrage
+(`WebReq`: id, Methode, URL, Kopfzeilen, Inhalt), `Action::WebCancel { dev, id }` gibt sie auf.
+Die Antwort kommt als `Report::Web { dev, id, at, result }`: `WebResp` (endgültige URL, Status,
+Kopfzeilen, Inhalt, Weiterleitungen, Dauer) oder `WebFail` (`WebErr`, URL, Grund). Weil die
+Anfragen Aktionen sind, spielt das Zurückspulen sie mit. Weiterleitungen (301, 302, 303, 307, 308,
+höchstens 10) folgt der Dienst selbst: 301 und 302 machen aus POST ein GET (wie Browser), 303 aus
+allem außer GET und HEAD, 307 und 308 behalten Methode und Inhalt; jede ist eine Notiz im Trace.
+Eine Anfrage hat 30 s virtuelle Zeit je Sprung. Im Reiter Dienste erscheint der Dienst nicht.
+
+**Dateien als Website:** `http-server` mit `"root": "/var/www"` beantwortet GET und HEAD, die keine
+Route nimmt, aus diesem Ordner des Geräts: `index.html` im Ordner, 301 auf den Ordner mit `/`, der
+Typ aus der Endung (`netpkt::http::mime_of`), andere Methoden 405. Der Pfad bleibt im Ordner (auch
+`%2e%2e`), das Lesen kostet die Zeit der Platte, eine gespeicherte Seite gilt sofort. Ohne `root`
+und ohne Routen antwortet der Server wie bisher mit „Hallo von {host}“.
+
+Entscheidungen: Zurück und Vor zeigen die gemerkte Seite statt neu zu fragen (so geht es auch bei
+stehender Simulation, und das Netz sieht nur, was ein Browser mit Cache auch schickte). Bilder
+kommen über `MI_APP` statt `MI_ASK`, damit relative Pfade einer Seite nicht als Dateien des echten
+Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>`, Seitenskripte und HTTPS
+(B3, B4), Datei-Felder und Mehrfachauswahl in Formularen.
+
+Geprüft wird in der Selbsttest-Gruppe `browser` ([`src/browsertest.rs`](src/browsertest.rs)), dazu
+das Szenario `web_site.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
+`browser_requests.uis` und `browser_shots.uis`.
 
 ## Performance
 

@@ -141,12 +141,14 @@ type "Labor-PC am Rand des Netzes"
 expect text:"geändert" exists
 click #90369
 expect text:"gesichert" exists
-# the browser says where it would go
+# the browser goes there over the network (the gateway set above leads nowhere: the request waits)
 dblclick listitem:"Webbrowser"
 click #26800
 key ctrl+a
 type "http://10.0.2.10/index.html\n"
-expect text:"Ziel: 10.0.2.10, Port 80, Pfad /index.html" exists
+wait 500
+expect #26800 text "http://10.0.2.10/index.html"
+expect text:"Lädt von 10.0.2.10 …" exists
 # dark and 150 % (IP-Konfiguration in front again: its taskbar button)
 click button:"IP-Konfiguration"
 theme dark

@@ -78,7 +78,10 @@
 //                        and http.serve take both families (os.rs: ANY), a peer over IPv6 is
 //                        its IPv6 address
 //   http.serve(port, fn(req, res))      once per script: req {method, path, target, query,
-//                        headers, body, peer, peer_port}, res.send(status, body, headers),
+//                        headers, body, peer, peer_port, form}: query the fields of the URL, form
+//                        those of a body sent as application/x-www-form-urlencoded (only then:
+//                        req.form ?? {} for a handler that also gets others), both decoded (a
+//                        repeated name: its last value); res.send(status, body, headers),
 //                        res.json(status, value, headers), even from a later callback; a
 //                        handler that returns a str, bytes, a list, a map or a status (int)
 //                        without using res answers with it, one that fails answers 500
@@ -912,7 +915,7 @@ fn req_map(vm: &mut Vm, r: &ReqIn) -> Result<Value, script::Error> {
     let headers = headers_map(vm, &r.head.headers)?;
     let body = vm.new_str(&String::from_utf8_lossy(&r.body))?;
     let peer = format!("{}", r.peer.0);
-    vm_map(
+    let m = vm_map(
         vm,
         &[
             ("method", F::S(&r.head.method)),
@@ -924,7 +927,19 @@ fn req_map(vm: &mut Vm, r: &ReqIn) -> Result<Value, script::Error> {
             ("peer", F::S(&peer)),
             ("peer_port", F::I(r.peer.1 as i64)),
         ],
-    )
+    )?;
+    // a form's fields, for its body only: other requests cost the script what they did
+    if r.head.headers.get("content-type").is_some_and(|t| t.split(';').next().unwrap_or("").trim().eq_ignore_ascii_case("application/x-www-form-urlencoded")) {
+        let form = vm.new_map()?;
+        for (k, v) in netpkt::uri::form_decode(&String::from_utf8_lossy(&r.body)) {
+            let k = vm.new_str(&k)?;
+            let v = vm.new_str(&v)?;
+            vm.map_set(form, k, v)?;
+        }
+        let k = vm.new_str("form")?;
+        vm.map_set(m, k, form)?;
+    }
+    Ok(m)
 }
 
 /// an answer of http.request as the script sees it

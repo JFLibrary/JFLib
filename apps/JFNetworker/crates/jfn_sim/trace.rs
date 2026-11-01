@@ -480,6 +480,8 @@ pub enum Note {
     /// logins, AAA, RADIUS and the vty telnet sessions (aaa.rs, radiusd.rs, telnetd.rs;
     /// aaatrace.rs: layer 7)
     Aaa(crate::aaatrace::ANote),
+    /// the Webbrowser follows a redirect (webc.rs): the status and where it leads
+    WebRedirect { status: u16, to: String },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -690,6 +692,7 @@ impl Note {
                 | Note::HttpIdleClose { .. }
                 | Note::HttpReply { .. }
                 | Note::HttpFailed { .. }
+                | Note::WebRedirect { .. }
         )
     }
     /// something was thrown away
@@ -1189,6 +1192,7 @@ impl Note {
             Note::Mail(n) => n.message(),
             Note::Snmp(n) => n.message(),
             Note::Aaa(n) => n.message(),
+            Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
         }
     }
 }

@@ -364,7 +364,6 @@ Adresse, Maske und Gateway oder DHCP	Address, mask and gateway, or DHCP
 Die Shell des Geräts	The device's shell
 Texteditor	Text editor
 Webbrowser	Web browser
-Seiten als Text	Pages as text
 Dieses Gerät hat keine IPv4-Schnittstelle.	This device has no IPv4 interface.
 Adresse	Address
 Statisch	Static
@@ -383,16 +382,6 @@ Verwerfen	Discard
 Speichern	Save
 Notizen zu diesem Gerät: Aufgaben, Zugangsdaten des Labors, was noch fehlt …	Notes on this device: tasks, the lab's credentials, what is still missing …
 Öffnen	Open
-Eine Adresse eingeben und „Öffnen“.	Enter an address and “Open”.
-Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen.	This browser cannot open encrypted pages (https).
-„{}“ ist keine Portnummer.	“{}” is no port number.
-Die Adresse nennt keinen Rechner.	The address names no host.
-{}, Port {}, Pfad {}	{}, port {}, path {}
-{} ({}), Port {}, Pfad {}	{} ({}), port {}, path {}
-{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}	{} (the name is not known on this device), port {}, path {}
-Dieser Browser zeigt nur, wohin die Adresse führt.	This browser only shows where the address leads.
-Ziel: {}	Destination: {}
-Die Seite selbst holt „curl {}“ im Terminal über den Simulator.	The page itself: “curl {}” in the Terminal fetches it through the simulator.
 #
 # ---- the simulation mode (workspace/sim)
 Echtzeit	Real time
@@ -1535,3 +1524,50 @@ zur Definition / Name umbenennen / formatieren	go to definition / rename a name 
 in der Datei suchen / ersetzen	find / replace in the file
 Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
 Strg+B / Strg+J	Ctrl+B / Ctrl+J
+Seiten aus dem simulierten Netz	Pages from the simulated network
+Seite nicht erreichbar	Page not reachable
+{} lehnt die Verbindung ab: auf Port {} lauscht kein Dienst.	{} refuses the connection: no service listens on port {}.
+Läuft der Webserver auf dem Gerät? Der Reiter Dienste und „ss -tln“ zeigen, was lauscht.	Is the web server running on the device? The Services tab and “ss -tln” show what listens.
+{} hat nicht rechtzeitig geantwortet.	{} did not answer in time.
+Kommt das Gerät per ping an? Der Simulationsmodus zeigt, wo die Pakete bleiben.	Does the device answer ping? The simulation mode shows where the packets end up.
+Den Namen {} kann dieses Gerät nicht auflösen.	This device cannot resolve the name {}.
+Stimmt der Name? Ein Name braucht einen Eintrag in /etc/hosts oder einen Namensserver in /etc/resolv.conf.	Is the name right? A name needs an entry in /etc/hosts or a name server in /etc/resolv.conf.
+Zu {} führt von hier kein Weg.	No path leads from here to {}.
+Hat das Gerät eine Adresse und ein Gateway, und sind die Kabel gesteckt?	Does the device have an address and a gateway, and are the cables plugged in?
+Die Verbindung zu {} brach mitten in der Antwort ab.	The connection to {} broke in the middle of the answer.
+Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat.	The request ended because the device or its service stopped.
+Zu viele Weiterleitungen	Too many redirects
+{} leitet immer weiter.	{} keeps redirecting.
+Oft zeigen zwei Seiten aufeinander; curl -L -v im Terminal zeigt die Kette.	Often two pages point at each other; curl -L -v in the terminal shows the chain.
+Verschlüsselte Seite	Encrypted page
+Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe.	This browser cannot open encrypted pages (https) yet: they come with a later stage.
+Dieselbe Seite über http:// geht, wenn der Server dort antwortet.	The same page over http:// works if the server answers there.
+Adresse kann nicht geöffnet werden	The address cannot be opened
+Dieser Browser öffnet http-Adressen im simulierten Netz.	This browser opens http addresses in the simulated network.
+Seite	Page
+{} Bytes	{} bytes
+eine Weiterleitung	one redirect
+{} Weiterleitungen	{} redirects
+gekürzt	cut short
+Der Server meldet einen Fehler	The server reports an error
+Die Seite gibt es so nicht	There is no such page
+Keine Seite	No page
+{} antwortet mit {} {}.	{} answers with {} {}.
+Die Antwort hat keinen Inhalt	The answer has no content
+Diese Datei zeigt der Browser nicht an	The browser does not show this file
+Typ {}, {} Bytes.	Type {}, {} bytes.
+Keine Antwort	No answer
+Zurück (Alt+Links)	Back (Alt+Left)
+Vor	Forward
+Vor (Alt+Rechts)	Forward (Alt+Right)
+Neu laden	Reload
+Neu laden (F5)	Reload (F5)
+Anhalten (Esc)	Stop (Esc)
+Adresse (Strg+L)	Address (Ctrl+L)
+Diese Seite ist die Antwort auf ein Formular. Neu laden sendet es noch einmal.	This page is the answer to a form. Reloading sends it again.
+Eine Adresse eingeben und „Öffnen“: Seiten kommen von den Webservern und Skripten im simulierten Netz.	Enter an address and “Open”: pages come from the web servers and scripts in the simulated network.
+Lädt von {} …	Loading from {} …
+Lädt von {} … Die Simulation ist angehalten: die Antwort kommt, wenn sie weiterläuft.	Loading from {} … The simulation is paused: the answer comes when it runs again.
+Lädt von {} … Im Simulationsmodus geht die Anfrage mit den Schritten voran.	Loading from {} … In simulation mode the request moves on with the steps.
+{} · ein Bild lädt noch …	{} · one picture still loading …
+{} · {} Bilder laden noch …	{} · {} pictures still loading …

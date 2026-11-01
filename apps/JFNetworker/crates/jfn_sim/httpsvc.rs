@@ -3,8 +3,8 @@
 // base::metrics (p50 / p95 / p99 per second and over the last five minutes)
 //
 //   kind          config (JSON; every member may be left out)
-//   http-server   {"port": 80, "workers": 0, "queue": 0, "time_ms": 0, "jitter_ms": 0,
-//                  "error_rate": 0, "error_status": 500, "keepalive_ms": 75000,
+//   http-server   {"port": 80, "root": "/var/www", "workers": 0, "queue": 0, "time_ms": 0,
+//                  "jitter_ms": 0, "error_rate": 0, "error_status": 500, "keepalive_ms": 75000,
 //                  "max_requests": 1000, "header_timeout_ms": 60000, "max_body": 1048576,
 //                  "backlog": 0, "server": "jfn-httpd/1.0", "routes": [{"path": "/",
 //                  "method": "GET", "status": 200, "body": "Hallo von {host}\n",
@@ -34,7 +34,15 @@
 // server's); with "workers" > 0 at most that many work at once, the others wait in order,
 // and beyond "queue" waiting ones (> 0) a request gets 503 at once.  The error rate (the
 // route's, else the server's) answers a request with error_status after its time.  Without
-// routes the server answers every path with "Hallo von {host}".
+// routes and without "root" the server answers every path with "Hallo von {host}".
+//
+// Static files: "root" names a folder of the device.  A GET or HEAD that no route of its method
+// takes is answered from the files below it: the path percent-decoded and without dot segments
+// (it cannot climb out of the folder), a folder's index.html, a folder without its "/" redirected
+// (301) to the path with it, the type from the file's extension (netpkt::http::mime_of); the
+// read takes the disk's time, on top of the server's time.  Other methods on a file get 405 with
+// Allow, everything else what the routes say (404).  Files are read at each request, so a saved
+// page shows at once.
 //
 // Client: `count` requests (0: until stopped) one after the other, each `interval_ms` after
 // the previous answer.
@@ -80,7 +88,8 @@ use base::metrics::{Hist, Window};
 use base::rng::Pcg32;
 use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
-use netpkt::http::{Headers, Version};
+use netpkt::http::{self, Headers, Version};
+use netpkt::uri;
 
 use crate::http::{Agent, Done, Fail, Reply, ReqIn, Req, Serve, ServeCfg, Url, Wheel};
 use crate::kernel::{Engine, Ns, MS, SEC};
@@ -418,6 +427,8 @@ pub struct HttpServer {
     pub jitter: Ns,
     pub error_ppm: u32,
     pub error_status: u16,
+    /// the folder of the device whose files it serves ("root"; None: none)
+    pub root: Option<String>,
     serve: Serve,
     wheel: Wheel<u64>,
     work: BTreeMap<u64, Work>,
@@ -454,6 +465,7 @@ impl HttpServer {
             jitter: 0,
             error_ppm: 0,
             error_status: 500,
+            root: None,
             serve: Serve::new(cfg, K_HTTP),
             wheel: Wheel::new(K_OWN),
             work: BTreeMap::new(),
@@ -530,6 +542,9 @@ impl HttpServer {
         let m = r.head.method.as_str();
         let hit = self.routes.iter().position(|x| x.path_matches(path) && x.method_matches(m));
         let Some(i) = hit else {
+            if let Some((rep, disk)) = self.file_answer(os, r) {
+                return (rep, self.time + jitter_of(&mut self.rng, self.jitter) + disk, None);
+            }
             let allowed: Vec<String> = self.routes.iter().filter(|x| x.path_matches(path)).map(|x| if x.method.is_empty() || x.method == "*" { String::from("*") } else { x.method.to_ascii_uppercase() }).collect();
             if allowed.is_empty() {
                 return (Reply::status_page(404), self.time + jitter_of(&mut self.rng, self.jitter), None);
@@ -574,6 +589,43 @@ impl HttpServer {
             h.add(k, v);
         }
         (Reply { status: rt.status, headers: h, body, chunk: rt.chunk, close: false }, time, call)
+    }
+
+    /// the answer of the static files ("root") and how long the disk takes for it; None when
+    /// there is no such file
+    fn file_answer(&self, os: &mut OsApi, r: &ReqIn) -> Option<(Reply, Ns)> {
+        let root = self.root.as_deref()?;
+        let wire = r.head.path();
+        let path = String::from_utf8(uri::percent_decode(wire)).ok()?;
+        if !path.starts_with('/') || path.contains('\0') {
+            return None;
+        }
+        let clean = uri::remove_dot_segments(&path);
+        let mut file = format!("{}{}", root.trim_end_matches('/'), clean);
+        if os.file_stat(&file)?.dir {
+            if !clean.ends_with('/') {
+                let query = r.head.target.find('?').map_or("", |i| &r.head.target[i..]);
+                let mut rep = Reply::status_page(301);
+                rep.headers.add("Location", &format!("{}/{}", wire, query));
+                return Some((rep, 0));
+            }
+            file.push_str("index.html");
+            if os.file_stat(&file)?.dir {
+                return None;
+            }
+        }
+        let m = r.head.method.as_str();
+        if m != "GET" && m != "HEAD" {
+            let mut rep = Reply::status_page(405);
+            rep.headers.add("Allow", "GET, HEAD");
+            return Some((rep, 0));
+        }
+        let body = os.file_read(&file).ok()?;
+        let now = os.now();
+        let disk = os.disk_read(body.len() as u64).saturating_sub(now);
+        let mut h = Headers::new();
+        h.add("Content-Type", http::mime_of(&file));
+        Some((Reply { status: 200, headers: h, body, chunk: 0, close: false }, disk))
     }
 
     fn arrive(&mut self, os: &mut OsApi, r: ReqIn) {
@@ -1708,7 +1760,13 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
                 }
                 s.routes.push(rt);
             }
-            if s.routes.is_empty() {
+            if let Some(root) = text("root") {
+                if !root.starts_with('/') {
+                    return Err(msg!("\u{201e}root\u{201c} muss ein absoluter Pfad sein: {}", root));
+                }
+                s.root = Some(root);
+            }
+            if s.routes.is_empty() && s.root.is_none() {
                 let mut r = HttpRoute::new("*", "Hallo von {host}\n");
                 r.method = String::new();
                 s.routes.push(r);

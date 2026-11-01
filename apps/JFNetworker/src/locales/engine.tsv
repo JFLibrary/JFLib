@@ -1350,3 +1350,9 @@ beendet nach einem Fehler: {}	ended after an error: {}
 Ein Skript hat „source“ oder „file“, nicht beides.	A script has “source” or “file”, not both.
 Skript {} auf {}: die Datei {} gibt es nicht.	Script {} on {}: the file {} does not exist.
 Skript {} auf {}: {}, Zeile {}, Spalte {}: {}	Script {} on {}: {}, line {}, column {}: {}
+„root“ muss ein absoluter Pfad sein: {}	“root” must be an absolute path: {}
+Webbrowser: Weiterleitung {} nach {}.	Web browser: redirect {} to {}.
+Nach {} Weiterleitungen kam noch eine: es bleibt dabei.	After {} redirects came another one: it stops here.
+Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.	Encrypted pages (https) come with a later stage.
+Das Gerät oder der Dienst hat angehalten.	The device or the service stopped.
+{} Anfragen, {} Antworten, {} gescheitert	{} requests, {} answers, {} failed
