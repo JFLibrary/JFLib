@@ -85,7 +85,8 @@
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 // jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
 // canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
-// jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_MB=n (the tiles' budget);
+// jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
+// jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
@@ -458,8 +459,8 @@ impl Split {
 struct Win {
     pw: i32,
     stage: Stage,
-    surf: Option<gpu::Surface>,
     sc: Option<Swapchain>, // also on the CPU path: the next build reuses it (oldSwapchain)
+    surf: Option<gpu::Surface>, // (after sc: it goes first)
     tex: Option<Tex>,
     rb: Option<Buffer>, // jfgui_GPU_VERIFY: the presented image
     rb_px: Vec<u8>,
@@ -545,6 +546,7 @@ pub(crate) struct S {
     canvas_cpu: String,
     canvas_pan: String,
     canvas_budget: u64,
+    canvas_settle_us: u64,
     tile_bytes: u64,
     tile_free: Vec<Rc<TileTex>>,
     tile_sf: Surface,
@@ -590,6 +592,7 @@ impl Default for S {
             canvas_cpu: String::new(),
             canvas_pan: String::new(),
             canvas_budget: CANVAS_BUDGET,
+            canvas_settle_us: SETTLE_US,
             tile_bytes: 0,
             tile_free: Vec::new(),
             tile_sf: Surface::default(),
@@ -639,6 +642,9 @@ impl S {
         if let Some(mb) = plat::env("jfgui_GPU_CANVAS_MB").and_then(|v| v.parse::<u64>().ok()) {
             self.canvas_budget = mb << 20;
         }
+        if let Some(ms) = plat::env("jfgui_GPU_CANVAS_SETTLE_MS").and_then(|v| v.parse::<u64>().ok()) {
+            self.canvas_settle_us = ms * 1000;
+        }
     }
 
     /// how this canvas may use the GPU (the variables say what the widget's choice is not)
@@ -667,10 +673,17 @@ impl S {
     /// a texture for a new tile: a free one, a new one, the one of the tile drawn longest ago
     /// (not one of this frame) -> None: the budget is full of this frame's tiles
     fn tile_texture(&mut self, tick: u64) -> Option<Rc<TileTex>> {
-        if let Some(k) = self.tile_free.iter().position(|t| Rc::strong_count(t) == 1) {
-            return Some(self.tile_free.swap_remove(k));
+        if self.tile_bytes + TILE_BYTES <= self.canvas_budget {
+            if let Some(k) = self.tile_free.iter().position(|t| Rc::strong_count(t) == 1) {
+                return Some(self.tile_free.swap_remove(k));
+            }
         }
-        if self.tile_bytes + TILE_BYTES > self.canvas_budget {
+        // (the budget may have become smaller: as many as it takes)
+        while self.tile_bytes + TILE_BYTES > self.canvas_budget {
+            if self.tile_free.pop().is_some() {
+                self.tile_bytes -= TILE_BYTES; // (dies with the frame that still draws it)
+                continue;
+            }
             let mut old: Option<(usize, usize, (i32, i32), u64)> = None;
             for (ci, c) in self.canvases.iter().enumerate() {
                 for (li, l) in c.levels.iter().enumerate() {
@@ -682,12 +695,9 @@ impl S {
                 }
             }
             let (ci, li, key, _) = old?;
-            let t = self.canvases[ci].levels[li].tiles.remove(&key)?;
+            self.canvases[ci].levels[li].tiles.remove(&key)?;
             self.tile_evicted += 1;
-            if Rc::strong_count(&t.tex) == 1 {
-                return Some(t.tex);
-            }
-            self.tile_bytes -= TILE_BYTES; // (dies with the frame that still draws it)
+            self.tile_bytes -= TILE_BYTES;
         }
         let Dev::Ready(core) = &self.dev else { return None };
         let t = core.dev.create_texture(&TextureDesc::d2(TILE_TEX as u32, TILE_TEX as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED)).ok()?;
@@ -1240,8 +1250,8 @@ impl Ui {
         let w = s.wins[i].get_or_insert_with(|| Win {
             pw,
             stage: Stage::Cpu,
-            surf: None,
             sc: None,
+            surf: None,
             tex: None,
             rb: None,
             rb_px: Vec::new(),
@@ -2069,6 +2079,7 @@ impl Ui {
         let now = plat::time_us();
         let Ui { m, wp, .. } = self;
         let s = &mut m.gout;
+        let settle = s.canvas_settle_us;
         wp.dirty.canv.clear();
         for rec in wp.canv.recs.iter() {
             let d = &rec.d;
@@ -2111,7 +2122,7 @@ impl Ui {
                 c.apart = mode == CanvasGpu::Zoom || whole;
                 if c.apart {
                     c.moved = true;
-                    c.until = now + SETTLE_US;
+                    c.until = now + settle;
                     s.canvas_free_at = c.until + CANVAS_UNUSED_US;
                 }
             }

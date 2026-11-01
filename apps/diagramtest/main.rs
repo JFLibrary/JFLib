@@ -18,6 +18,8 @@
 // (4)" at their middle, which a double click opens again; edges into it end at the cluster,
 // the one inside is hidden) and the area "Fläche" under N25 and N26 (DN_RESIZE | DN_OUTLINE,
 // key 600: its handle resizes it).
+//
+// --grid N adds N x N boxes with their edges below the 30 (a big model for measurements).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -298,6 +300,19 @@ impl Scene {
         s.add_edge(p(29, 2), p(30, 1), DR_BEZIER, &[], false);
         s.add_edge(p(12, 4), p(18, 3), DR_STRAIGHT, &[], false);
         s.add_edge(p(18, 4), p(24, 3), DR_ORTHO, &[], false);
+        if let Some(g) = plat::arg_value("--grid").and_then(|v| v.parse::<u64>().ok()) {
+            for y in 0..g {
+                for x in 0..g {
+                    let k = s.add_node(32.0 + x as f32 * 168.0, 800.0 + y as f32 * 104.0);
+                    if x > 0 {
+                        s.add_edge(port_key(k - 1, 2), port_key(k, 1), DR_BEZIER, &[], false);
+                    }
+                    if y > 0 {
+                        s.add_edge(port_key(k - g, 4), port_key(k, 3), DR_ORTHO, &[], false);
+                    }
+                }
+            }
+        }
         if plat::args().iter().any(|a| a == "--frames") {
             s.frames.push(Frame { key: FRAME0 + 1, label: String::from("G1"), members: alloc::vec![n(8), n(9), n(14), n(15)], collapsed: false, rect: [0.0; 4] });
             s.areas.push(Area { key: AREA0 + 1, label: String::from("Fläche"), rect: [32.0, 472.0, 304.0, 104.0] });

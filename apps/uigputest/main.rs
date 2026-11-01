@@ -39,6 +39,13 @@
 //               (stays on the CPU), a lost device
 //     imgplain  the same image without reading back (the framebuffer really lacks its pixels):
 //               Ui::gpu_settle, and the way back to the CPU path shows them
+//     canvas    a canvas (lib/ui/canvas.rs): no tile while its view stands still, a pan and a zoom
+//               from tiles with next to nothing drawn or uploaded, the CPU's picture and no more
+//               frames after them, an edit, damage, a popup and something of the base over it, a
+//               new size, eviction, a budget of nothing, a lost device
+//     canvasplain  the same without reading back: during a gesture the framebuffer lacks the view,
+//               Ui::gpu_settle gives it; at rest it holds it
+//     canvasoff jfgui_GPU=0: the same canvas on the CPU path: no tiles, the framebuffer in every frame
 //   uigputest --gen-shaders FILE   lib/ui/gpu_out_spv.rs from lib/ui/gpu_out.wgsl
 //   uigputest --bench latency [--scene small|full] [--n N] [--burst]   event -> present returned and
 //                             event -> the screen changed (a thread posts key presses and reads the
@@ -117,6 +124,91 @@ struct Scene {
     page_on: bool,
     /// a small widget that changes
     tick: u32,
+    /// a canvas (lib/ui/canvas.rs), with something over it
+    canvas: Option<TestCanvas>,
+}
+
+const CANVAS_ID: u32 = 700;
+const CANVAS_RECT: [i32; 4] = [20, 20, 600, 440];
+const CANVAS_CELL: f64 = 64.0;
+
+/// a canvas of a test: its view and content version; a rectangle of the base over it
+#[derive(Clone, Copy)]
+struct TestCanvas {
+    view: CanvasView,
+    ver: u32,
+    over: bool,
+    mode: CanvasGpu,
+}
+
+/// the content: cells of 64 x 64 units in colours of their place and version; a ring and a line in
+/// some of them (shapes in absolute coordinates: what cannot be the same everywhere)
+struct CanvasFill {
+    ver: u32,
+}
+
+fn cell_color(i: i64, j: i64, ver: u32) -> u32 {
+    let (a, b) = (i.rem_euclid(16) as u32, j.rem_euclid(16) as u32);
+    0xFF00_0000 | (a * 15) << 16 | (b * 15) << 8 | (ver.wrapping_mul(37) & 0xFF)
+}
+
+// the first whole pixel at or right of x
+fn px_at(x: f64) -> i32 {
+    let f = x + 0.5;
+    let t = f as i64;
+    (if (t as f64) > f { t - 1 } else { t }) as i32
+}
+
+fn cell_of(x: i32, o: f64, s: f64) -> i64 {
+    let mut i = ((x as f64 - o) / s / CANVAS_CELL) as i64 - 1;
+    while px_at(o + (i + 1) as f64 * CANVAS_CELL * s) <= x {
+        i += 1;
+    }
+    i
+}
+
+impl CanvasContent for CanvasFill {
+    fn draw_view(&self, g: &mut Gfx, v: CanvasView, _rect: [i32; 4]) {
+        let k = g.dc.clip;
+        if k[2] <= k[0] || k[3] <= k[1] {
+            return;
+        }
+        let (i0, i1) = (cell_of(k[0], v.ox, v.scale), cell_of(k[2] - 1, v.ox, v.scale));
+        let (j0, j1) = (cell_of(k[1], v.oy, v.scale), cell_of(k[3] - 1, v.oy, v.scale));
+        for j in j0..=j1 {
+            for i in i0..=i1 {
+                let (x0, x1) = (px_at(v.ox + i as f64 * CANVAS_CELL * v.scale), px_at(v.ox + (i + 1) as f64 * CANVAS_CELL * v.scale));
+                let (y0, y1) = (px_at(v.oy + j as f64 * CANVAS_CELL * v.scale), px_at(v.oy + (j + 1) as f64 * CANVAS_CELL * v.scale));
+                g.dc.set_color(cell_color(i, j, self.ver));
+                g.dc.fill(g.sf, x0, y0, x1 - x0, y1 - y0);
+                if (i + j).rem_euclid(8) == 0 {
+                    let (cx, cy) = ((x0 + x1) << 7, (y0 + y1) << 7);
+                    g.dc.set_color(0xFFFF_FFFF);
+                    g.shapes().stroke_circle_fx(cx, cy, (x1 - x0) << 6, 2 << 8);
+                    g.dc.set_color(0xFF00_0000);
+                    g.shapes().line_fx(x0 << 8, y0 << 8, x1 << 8, y1 << 8, 1 << 8);
+                }
+            }
+        }
+    }
+}
+
+/// the canvas's command through its view
+struct CanvasShow {
+    view: CanvasView,
+    c: Rc<CanvasFill>,
+}
+
+impl Draw for CanvasShow {
+    fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
+        self.c.draw_view(g, self.view, r);
+    }
+}
+
+// the framebuffer's pixel of the canvas at x, y where its content is one colour there (None: a ring)
+fn canvas_expected(c: &TestCanvas, x: i32, y: i32) -> Option<u32> {
+    let (i, j) = (cell_of(x, c.view.ox, c.view.scale), cell_of(y, c.view.oy, c.view.scale));
+    ((i + j).rem_euclid(8) != 0).then(|| cell_color(i, j, c.ver) & 0xFF_FFFF)
 }
 
 /// a surface full of detail: no two neighbours alike
@@ -1222,6 +1314,400 @@ impl Test {
     }
 
     /// no read-back: the framebuffer lacks what the GPU draws
+    fn canvas_set(&mut self) {
+        self.sc.canvas = Some(TestCanvas { view: CanvasView { scale: 1.0, ox: 20.0, oy: 20.0 }, ver: 1, over: false, mode: CanvasGpu::Zoom });
+    }
+
+    // a step of a gesture: `f` on the view for n frames -> done
+    fn canvas_move(&mut self, n: u32, f: fn(&mut CanvasView, u32)) -> bool {
+        let k = self.mode;
+        if let Some(c) = self.sc.canvas.as_mut() {
+            f(&mut c.view, k);
+        }
+        self.mode += 1;
+        if self.mode > n {
+            self.mode = 0;
+            return true;
+        }
+        false
+    }
+
+    fn t_canvas(&mut self, ui: &mut Ui) {
+        const TILE_BYTES: u64 = 258 * 258 * 4;
+        let o = ui.gpu_output(0);
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.canvas_set();
+                    self.next();
+                }
+            }
+            1 => {
+                if self.after(150) {
+                    self.ok(o.canvas_apart == 0 && o.canvas_tiles == 0 && o.canvas_bytes == 0, "a canvas that does not move: no tile");
+                    self.set_mark(ui);
+                    self.next();
+                }
+            }
+            2 => {
+                // a pan by whole pixels: its tiles once, then next to nothing
+                if self.canvas_move(30, |v, k| v.ox = 20.0 - 3.0 * (k + 1) as f64) {
+                    let (up, _, _) = self.since_mark(ui);
+                    self.ok(o.canvas_apart == 1, "a pan: the canvas comes from tiles");
+                    self.ok(o.canvas_quads == 1 && o.canvas_frames >= 8, &format!("drawn by the GPU, {} frames", o.canvas_frames));
+                    self.ok(o.canvas_tiles >= 4 && o.canvas_bytes == o.canvas_tiles as u64 * TILE_BYTES, &format!("{} tiles, {} KiB", o.canvas_tiles, o.canvas_bytes >> 10));
+                    // 600 x 440 fall into 33 frames: what the tiles take, no view
+                    self.ok(up < o.canvas_bytes + 1_500_000, &format!("uploaded: {up} bytes, the view's pixels alone are {} per frame", 600 * 440 * 4));
+                    self.same_so_far(ui, "during a pan: outside the tiles");
+                    self.next();
+                }
+            }
+            3 => {
+                // the gesture ends: a frame of the CPU, then nothing
+                if ui.gpu_output(0).canvas_apart == 0 && self.after(50) {
+                    self.ok(o.canvas_settles == 1, "the CPU's picture after the pan");
+                    self.mark[3] = o.frames;
+                    self.next();
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            4 => {
+                if self.after(300) {
+                    self.ok(o.frames <= self.mark[3] + 1, &format!("at rest: {} frames after it", o.frames - self.mark[3]));
+                    self.same_so_far(ui, "at rest after a pan");
+                    self.ok(o.canvas_diff_max <= 16, &format!("a pan's tiles against the CPU: {} pixels differ, by {} at most", o.canvas_diff_px, o.canvas_diff_max));
+                    self.next();
+                }
+            }
+            5 => {
+                // a zoom: scaled tiles, the CPU's picture after it
+                if self.canvas_move(20, |v, k| {
+                    let s = 1.0 + 0.02 * (k + 1) as f64;
+                    v.ox = 20.0 - 40.0 * s;
+                    v.oy = 20.0 - 30.0 * s;
+                    v.scale = s;
+                }) {
+                    self.ok(o.canvas_apart == 1, "a zoom: the canvas comes from tiles");
+                    self.same_so_far(ui, "during a zoom: outside the tiles");
+                    self.next();
+                }
+            }
+            6 => {
+                if o.canvas_apart == 0 && self.after(50) {
+                    self.ok(o.canvas_settles == 2, "the CPU's picture after the zoom");
+                    self.ok(o.canvas_diff_px != 0, &format!("scaled tiles against the CPU: {} pixels differ, by {} at most", o.canvas_diff_px, o.canvas_diff_max));
+                    self.same_so_far(ui, "at rest after a zoom");
+                    self.next();
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            7 => {
+                // an edit: the CPU at once, the tiles gone
+                if let Some(c) = self.sc.canvas.as_mut() {
+                    c.ver += 1;
+                }
+                self.next();
+            }
+            8 => {
+                if self.after(20) {
+                    self.ok(o.canvas_apart == 0 && o.canvas_tiles == 0, &format!("an edit: nothing apart, {} tiles", o.canvas_tiles));
+                    self.same_so_far(ui, "after an edit");
+                    self.next();
+                }
+            }
+            9 => {
+                // a pan, then damage in the content: its tiles go, the frame is the CPU's
+                if self.mode <= 6 {
+                    let _ = self.canvas_move(6, |v, k| v.ox = 8.0 - 2.0 * k as f64);
+                    if self.mode == 0 {
+                        self.mode = 7;
+                    }
+                } else if self.after(60) {
+                    self.mode = 0;
+                    self.mark[2] = o.canvas_tiles as u64;
+                    ui.canvas_gpu_damage(CANVAS_ID, [0.0, 0.0, 40.0, 40.0]);
+                    self.next();
+                }
+            }
+            10 => {
+                if self.after(20) {
+                    self.ok(o.canvas_apart == 0 && (o.canvas_tiles as u64) < self.mark[2], &format!("damage: nothing apart, {} of {} tiles left", o.canvas_tiles, self.mark[2]));
+                    self.same_so_far(ui, "after damage");
+                    // a popup, something of the base over the canvas
+                    self.sc.mask = 2;
+                    if let Some(c) = self.sc.canvas.as_mut() {
+                        c.over = true;
+                    }
+                    self.next();
+                }
+            }
+            11 => {
+                if self.canvas_move(10, |v, k| v.oy = 20.0 - 4.0 * (k + 1) as f64) {
+                    self.ok(o.layer_textures == 1 && o.canvas_apart == 1, "a pan under a popup and a rectangle: a layer and tiles");
+                    self.same_so_far(ui, "a pan under a popup");
+                    self.next();
+                }
+            }
+            12 => {
+                if self.canvas_move(10, |v, k| {
+                    let s = 1.0 + 0.01 * (k + 1) as f64;
+                    v.scale = s;
+                }) {
+                    self.same_so_far(ui, "a zoom under a popup");
+                    self.next();
+                }
+            }
+            13 => {
+                if o.canvas_apart == 0 && self.after(50) {
+                    self.same_so_far(ui, "at rest under a popup");
+                    self.sc.mask = 0;
+                    if let Some(c) = self.sc.canvas.as_mut() {
+                        c.over = false;
+                    }
+                    self.next();
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            14 => {
+                // eviction: room for 16 tiles, a long way
+                if self.after(50) {
+                    self.same_so_far(ui, "the popup closed");
+                    ui.gpu_test_canvas_budget(16 * TILE_BYTES);
+                    self.mark[1] = o.canvas_evicted;
+                    self.next();
+                }
+            }
+            15 => {
+                if self.canvas_move(60, |v, k| {
+                    v.scale = 1.0;
+                    v.ox = 20.0 - 32.0 * (k + 1) as f64;
+                }) {
+                    self.ok(o.canvas_evicted > self.mark[1], &format!("evicted: {} tiles", o.canvas_evicted - self.mark[1]));
+                    self.ok(o.canvas_bytes <= 16 * TILE_BYTES, &format!("{} KiB of tiles under a budget of {} KiB", o.canvas_bytes >> 10, (16 * TILE_BYTES) >> 10));
+                    self.same_so_far(ui, "under a small budget");
+                    // no room at all: the CPU's way
+                    ui.gpu_test_canvas_budget(0);
+                    ui.gpu_canvas_settle();
+                    self.next();
+                }
+            }
+            16 => {
+                if self.after(100) {
+                    self.mark[0] = o.canvas_fills;
+                    self.next();
+                }
+            }
+            17 => {
+                if self.canvas_move(8, |v, k| v.oy = 20.0 + 3.0 * k as f64) {
+                    self.same_so_far(ui, "a budget of nothing");
+                    ui.gpu_test_canvas_budget(128 << 20);
+                    ui.gpu_canvas_settle();
+                    self.next();
+                }
+            }
+            18 => {
+                // a lost device: the frame on the CPU path, the tiles gone; a new one: tiles again
+                if self.after(100) {
+                    ui.gpu_test_lose();
+                    self.next();
+                }
+            }
+            19 => {
+                if let Some(c) = self.sc.canvas.as_mut() {
+                    c.view.ox += 1.0;
+                }
+                if !o.on && o.leaves >= 1 {
+                    self.ok(o.canvas_tiles == 0 && o.canvas_bytes == 0, "the device lost: no tiles");
+                    self.next();
+                } else if self.after(5000) {
+                    self.ok(false, "the device was not noticed");
+                    self.finish(ui);
+                }
+            }
+            20 => {
+                if let Some(true) = self.wait_on(ui, 15_000) {
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            21 => {
+                if self.after(100) && self.canvas_move(6, |v, k| v.ox = -60.0 - 5.0 * k as f64) {
+                    self.ok(o.canvas_tiles > 0 && o.canvas_apart == 1, &format!("a new device: {} tiles", o.canvas_tiles));
+                    self.same_so_far(ui, "with the new device");
+                    self.next();
+                }
+            }
+            22 => {
+                if o.canvas_apart == 0 && self.after(50) {
+                    self.same_so_far(ui, "at rest with the new device");
+                    self.next();
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            23 => {
+                // a new size: back to the CPU path, the swapchain again; a pan from tiles
+                self.mark[1] = o.leaves as u64;
+                let (x, y) = plat::win_get_rect(0).map_or((100, 100), |r| (r[0], r[1]));
+                plat::win_test(plat::WT_MOVE, 0, [x, y, 720, 500]);
+                self.next();
+            }
+            24 => {
+                if o.leaves as u64 > self.mark[1] && o.on {
+                    self.next();
+                } else if self.after(10_000) {
+                    self.ok(false, "no swapchain after the new size");
+                    self.finish(ui);
+                }
+            }
+            25 => {
+                if self.after(50) && self.canvas_move(6, |v, k| v.oy = 40.0 - 5.0 * k as f64) {
+                    self.pc = 27;
+                }
+            }
+            27 => {
+                if o.canvas_apart == 1 {
+                    self.ok(o.canvas_frames > 0, "a new size: tiles again");
+                    self.pc = 26;
+                } else if self.after(1000) {
+                    self.ok(false, "a new size: no tiles");
+                    self.finish(ui);
+                }
+            }
+            26 => {
+                if o.canvas_apart == 0 && self.after(50) {
+                    self.same_so_far(ui, "at rest at the new size");
+                    self.finish(ui);
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // the canvas's cells in the framebuffer -> how many are wrong
+    fn canvas_fb_wrong(&self, ui: &Ui) -> u32 {
+        let Some(c) = self.sc.canvas.as_ref() else { return 0 };
+        let fb = ui.fb();
+        let mut bad = 0;
+        let r = CANVAS_RECT;
+        let mut y = r[1] + 3;
+        while y < r[1] + r[3] {
+            let mut x = r[0] + 3;
+            while x < r[0] + r[2] {
+                if let Some(want) = canvas_expected(c, x, y) {
+                    let o = y as usize * fb.stride as usize + x as usize * 4;
+                    let have = u32::from_le_bytes([fb.px[o], fb.px[o + 1], fb.px[o + 2], 0]);
+                    if have != want && bad < 3 {
+                        out(&format!("  at {x}, {y}: {have:06x}, not {want:06x}"));
+                    }
+                    bad += (have != want) as u32;
+                }
+                x += 37;
+            }
+            y += 41;
+        }
+        bad
+    }
+
+    fn t_canvas_plain(&mut self, ui: &mut Ui) {
+        let o = ui.gpu_output(0);
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.canvas_set();
+                    self.next();
+                }
+            }
+            1 => {
+                if self.after(150) {
+                    self.ok(self.canvas_fb_wrong(ui) == 0, "at rest: the framebuffer holds the canvas");
+                    self.next();
+                }
+            }
+            2 => {
+                if self.canvas_move(12, |v, k| v.ox = 20.0 - 7.0 * (k + 1) as f64) {
+                    self.next();
+                }
+            }
+            3 => {
+                if self.after(30) {
+                    self.pc = 6;
+                }
+            }
+            6 => {
+                // the frame with the last view is out: the framebuffer lacks it, gpu_settle gives it
+                let wrong = self.canvas_fb_wrong(ui);
+                self.ok(o.canvas_apart == 1 && wrong != 0, &format!("during a gesture the framebuffer lacks the view: {wrong} samples differ"));
+                ui.gpu_settle();
+                let wrong = self.canvas_fb_wrong(ui);
+                self.ok(wrong == 0, &format!("Ui::gpu_settle: {wrong} samples wrong"));
+                self.pc = 4;
+                self.since = plat::time_us();
+                self.since_pass = self.passes;
+            }
+            4 => {
+                if o.canvas_apart == 0 && self.after(50) {
+                    self.next();
+                } else if self.after(3000) {
+                    self.ok(false, "still apart after 3 s");
+                    self.finish(ui);
+                }
+            }
+            5 => {
+                // (its frame follows this pass)
+                if self.after(40) {
+                    let wrong = self.canvas_fb_wrong(ui);
+                    self.ok(wrong == 0, &format!("the gesture over: {wrong} samples wrong"));
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn t_canvas_off(&mut self, ui: &mut Ui) {
+        let o = ui.gpu_output(0);
+        match self.pc {
+            0 => {
+                self.canvas_set();
+                self.ok(!ui.canvas_gpu_wanted(), "jfgui_GPU=0: nobody asks for a CanvasDesc");
+                self.next();
+            }
+            1 => {
+                if self.after(50) {
+                    self.ok(self.canvas_fb_wrong(ui) == 0, "the framebuffer holds the canvas");
+                    self.next();
+                }
+            }
+            2 => {
+                if self.canvas_move(20, |v, k| {
+                    v.ox = 20.0 - 5.0 * (k + 1) as f64;
+                    v.scale = 1.0 + 0.01 * k as f64;
+                }) {
+                    self.next();
+                }
+            }
+            3 => {
+                if self.after(30) {
+                    self.ok(self.canvas_fb_wrong(ui) == 0, "moved: the framebuffer holds it in every frame");
+                    self.ok(o.canvas_tiles == 0 && o.canvas_frames == 0 && !o.on, "the CPU path, no tiles");
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn t_imgplain(&mut self, ui: &mut Ui) {
         match self.pc {
             0 => {
@@ -1526,6 +2012,9 @@ impl App for Test {
                 "layers" => self.t_layers(ui),
                 "images" => self.t_images(ui),
                 "imgplain" => self.t_imgplain(ui),
+                "canvas" => self.t_canvas(ui),
+                "canvasplain" => self.t_canvas_plain(ui),
+                "canvasoff" => self.t_canvas_off(ui),
                 _ => {
                     self.done = true;
                     ui.quit();
@@ -1581,6 +2070,20 @@ fn draw_page(t: &Test, ui: &mut Ui) {
 // the images and panels of a test or a bench
 fn draw_scene(t: &Test, ui: &mut Ui) {
     let sc = &t.sc;
+    if let Some(c) = &sc.canvas {
+        let r = CANVAS_RECT;
+        let content = Rc::new(CanvasFill { ver: c.ver });
+        let d: DrawRef = Rc::new(CanvasShow { view: c.view, c: content.clone() });
+        let hash = c.view.scale.to_bits() as u32 ^ (c.view.ox.to_bits() >> 20) as u32 ^ (c.view.oy.to_bits() >> 8) as u32 ^ c.ver;
+        ui.draw_clip(r[0], r[1], r[2], r[3]);
+        ui.cmd_custom(r[0], r[1], r[2], r[3], Some(d), 0, hash);
+        ui.canvas_gpu(CanvasDesc { id: CANVAS_ID, name: "test", rect: r, view: c.view, ver: c.ver, content, gpu: c.mode, exact_pan: false });
+        if c.over {
+            ui.draw_color(0xC040_8040);
+            ui.draw_rect(r[0] + 100, r[1] + 100, 150, 60);
+        }
+        ui.draw_unclip();
+    }
     for (sf, ver, r) in &sc.imgs {
         ui.draw_image(sf, *ver, r[0], r[1], r[2], r[3]);
     }
@@ -2290,7 +2793,7 @@ fn run() -> i32 {
     plat::setenv("jfgui_STATE", Some("0"));
     plat::setenv("jfgui_TEST_NOACTIVATE", Some("1"));
     // `switch` without the variable: the swapchain is the default
-    plat::setenv("jfgui_GPU", if test == "off" { Some("0") } else if test == "switch" { None } else { Some("1") });
+    plat::setenv("jfgui_GPU", if test == "off" || test == "canvasoff" { Some("0") } else if test == "switch" { None } else { Some("1") });
     if !plain {
         plat::setenv("jfgui_GPU_VERIFY", Some("1"));
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));
@@ -2299,12 +2802,17 @@ fn run() -> i32 {
         "noloader" => {
             plat::setenv("jfgui_GPU_DLL", Some("missing-vulkan-loader.dll"));
         }
+        "canvas" | "canvasplain" => {
+            plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));
+            // (frames read back on a loaded machine: a move must not count as over between two of them)
+            plat::setenv("jfgui_GPU_CANVAS_SETTLE_MS", Some("500"));
+        }
         "lose" | "layers" | "images" | "imgplain" => {
             plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));
         }
         _ => {}
     }
-    if test == "imgplain" {
+    if test == "imgplain" || test == "canvasplain" {
         plat::setenv("jfgui_GPU_VERIFY", None);
     }
     let mut t = new_test(&test);
