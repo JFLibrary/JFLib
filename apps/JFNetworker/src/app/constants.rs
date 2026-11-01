@@ -646,3 +646,29 @@ pub(crate) const TIMER_PAGE: u32 = 0x1C8;
 // timers 0x1CC .. 0x1CF; the commands and timers are not used)
 /// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
 pub(crate) const ID_DEV0: u32 = 0x0001_E800;
+// ---- ST1: the start page (commands 1000 .. 1019, widgets 0x0001_F800 .. 0x0001_FFFF, timers 0x1D0 ..
+// 0x1D3; the timers are not used)
+/// Datei › Startseite (asks about unsaved changes first), Datei › Projektinfo …
+pub(crate) const CMD_START_PAGE: u32 = 1000;
+pub(crate) const CMD_PROJECT_INFO: u32 = 1001;
+/// the page chose a template (arg: its index in startpage::TEMPLATES), a lab or assessment (arg: its
+/// index in the page's list); a missing recent file leaves the list (arg: its index)
+pub(crate) const CMD_SP_TEMPLATE: u32 = 1002;
+pub(crate) const CMD_SP_LEARN: u32 = 1003;
+pub(crate) const CMD_SP_FORGET: u32 = 1004;
+/// the page as a pane, its scroll view, "Öffnen …"
+pub(crate) const ID_SP_PANE: u32 = 0x0001_F800;
+pub(crate) const ID_SP_SCROLL: u32 = 0x0001_F801;
+pub(crate) const ID_SP_OPEN: u32 = 0x0001_F802;
+/// the cards of Neu: + 0 the empty project, + 1 + k template k
+pub(crate) const ID_SP_NEW: u32 = 0x0001_F810;
+/// the rows of Zuletzt (+ i) and the buttons that take a missing file off the list (+ i)
+pub(crate) const ID_SP_RECENT: u32 = 0x0001_F820;
+pub(crate) const ID_SP_FORGET: u32 = 0x0001_F830;
+/// the Projektinfo dialog, its description (a text box of many lines: + 1 .. 3 are its own), its author
+pub(crate) const ID_SP_INFO: u32 = 0x0001_F840;
+pub(crate) const ID_SP_INFO_DESC: u32 = 0x0001_F844;
+pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
+/// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
+/// the courses of AK1 can follow)
+pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;

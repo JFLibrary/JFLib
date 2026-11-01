@@ -68,6 +68,9 @@
 // place, scale, opacity and lock; null without).  Both are view data the simulator never sees;
 // a group's id comes from the same counter as devices, links and notes.  Older files have
 // neither and look as before.
+//
+// The project's info (ST1): "description" says what it is about, "author" who made it ("" without);
+// older files have no author.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -238,6 +241,8 @@ record! {
         pub groups: Vec<crate::group::Group>,
         /// the picture under the logical canvas (background.rs; None: none)
         pub background: Option<crate::background::Background>,
+        /// who made it (Datei › Projektinfo; "": nobody named)
+        pub author: String,
     }
 }
 

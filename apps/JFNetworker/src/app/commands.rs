@@ -35,6 +35,9 @@
 // Hintergrund entfernen, the context menu of the picture.
 // The desktop of hosts (V2, devwin/desktop.rs): Vollbild (F11) puts the active device window
 // into full screen and back, without one the main window.
+// The start page (ST1, workspace/startpage.rs): Datei › Startseite goes back to it (the save question
+// first), Datei › Projektinfo … edits the project's description and author; while the page shows, only
+// what makes sense without a project stays enabled.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -46,7 +49,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 110] = [
+pub(crate) static CMDS: [Command; 112] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -157,6 +160,8 @@ pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
     Command::new(CMD_TERM_SESSION, "Neue &Sitzung", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_START_PAGE, "S&tartseite", IC_HOME, 0, 0, 0),
+    Command::new(CMD_PROJECT_INFO, "Projekt&info …", IC_INFO, 0, 0, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -167,7 +172,8 @@ pub(crate) static MENUBAR: [Mi; 6] = [
     Mi::Menu("&Werkzeuge", &M_TOOLS),
     Mi::Menu("&Hilfe", &M_HELP),
 ];
-static M_FILE: [Mi; 11] = [
+static M_FILE: [Mi; 13] = [
+    Mi::Cmd(CMD_START_PAGE),
     Mi::Cmd(CMD_NEW),
     Mi::Cmd(CMD_OPEN),
     Mi::Cmd(CMD_LAB_OPEN),
@@ -175,6 +181,7 @@ static M_FILE: [Mi; 11] = [
     Mi::Sep,
     Mi::Cmd(CMD_SAVE),
     Mi::Cmd(CMD_SAVE_AS),
+    Mi::Cmd(CMD_PROJECT_INFO),
     Mi::Sep,
     Mi::Sub("E&xportieren", &M_EXPORT),
     Mi::Sep,
@@ -367,6 +374,9 @@ fn flag(on: bool, f: u32) -> u32 {
 
 /// enabled / checked per command (every frame, before the widgets)
 pub(crate) fn states(n: &Net, ui: &mut Ui) {
+    if crate::workspace::startpage::states(n, ui) {
+        return;
+    }
     let h = &n.doc.hist;
     let sel = !n.canvas.st.sel.is_empty();
     let any = !n.doc.proj.devices.is_empty() || !n.doc.proj.notes.is_empty();
@@ -573,6 +583,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_DESK_FULL => crate::workspace::devwin::fullscreen(n, ui),
         // a further command-line session as a tab of the Terminal panel (X1e)
         CMD_TERM_SESSION => return terminal::command(n, ui, id),
+        // the start page and the project's info (workspace/startpage.rs)
+        CMD_START_PAGE..=CMD_SP_FORGET => return crate::workspace::startpage::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

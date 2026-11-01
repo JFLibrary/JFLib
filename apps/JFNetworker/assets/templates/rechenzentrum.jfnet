@@ -1,0 +1,619 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Rechenzentrum (Leaf-Spine)",
+  "description": "Zwei Spines, vier Leafs, acht Server; geroutet mit OSPF über gleich gute Wege.",
+  "seed": 24,
+  "next_id": 32,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "Spine1",
+      "model": "jf-s48x",
+      "x": 220,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname Spine1\n!\nip routing\n!\ninterface Loopback0\n ip address 10.255.0.1 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Leaf1\n no switchport\n ip address 10.0.11.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Leaf2\n no switchport\n ip address 10.0.12.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/51\n description Leaf3\n no switchport\n ip address 10.0.13.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/52\n description Leaf4\n no switchport\n ip address 10.0.14.1 255.255.255.252\n ip ospf network point-to-point\n!\nrouter ospf 1\n router-id 10.255.0.1\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n no passive-interface HundredGigE1/0/51\n no passive-interface HundredGigE1/0/52\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "Spine2",
+      "model": "jf-s48x",
+      "x": 520,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname Spine2\n!\nip routing\n!\ninterface Loopback0\n ip address 10.255.0.2 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Leaf1\n no switchport\n ip address 10.0.21.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Leaf2\n no switchport\n ip address 10.0.22.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/51\n description Leaf3\n no switchport\n ip address 10.0.23.1 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/52\n description Leaf4\n no switchport\n ip address 10.0.24.1 255.255.255.252\n ip ospf network point-to-point\n!\nrouter ospf 1\n router-id 10.255.0.2\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n no passive-interface HundredGigE1/0/51\n no passive-interface HundredGigE1/0/52\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "Leaf1",
+      "model": "jf-s48x",
+      "x": 0,
+      "y": 180,
+      "off": false,
+      "startup_config": "hostname Leaf1\n!\nip routing\n!\nvlan 101\n name Rack1\n!\ninterface Loopback0\n ip address 10.255.1.1 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Spine1\n no switchport\n ip address 10.0.11.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Spine2\n no switchport\n ip address 10.0.21.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface TenGigabitEthernet1/0/1\n switchport access vlan 101\n switchport mode access\n!\ninterface TenGigabitEthernet1/0/2\n switchport access vlan 101\n switchport mode access\n!\ninterface Vlan101\n description Rack 1\n ip address 10.1.1.1 255.255.255.0\n!\nrouter ospf 1\n router-id 10.255.1.1\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "Leaf2",
+      "model": "jf-s48x",
+      "x": 240,
+      "y": 180,
+      "off": false,
+      "startup_config": "hostname Leaf2\n!\nip routing\n!\nvlan 102\n name Rack2\n!\ninterface Loopback0\n ip address 10.255.1.2 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Spine1\n no switchport\n ip address 10.0.12.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Spine2\n no switchport\n ip address 10.0.22.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface TenGigabitEthernet1/0/1\n switchport access vlan 102\n switchport mode access\n!\ninterface TenGigabitEthernet1/0/2\n switchport access vlan 102\n switchport mode access\n!\ninterface Vlan102\n description Rack 2\n ip address 10.1.2.1 255.255.255.0\n!\nrouter ospf 1\n router-id 10.255.1.2\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "Leaf3",
+      "model": "jf-s48x",
+      "x": 480,
+      "y": 180,
+      "off": false,
+      "startup_config": "hostname Leaf3\n!\nip routing\n!\nvlan 103\n name Rack3\n!\ninterface Loopback0\n ip address 10.255.1.3 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Spine1\n no switchport\n ip address 10.0.13.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Spine2\n no switchport\n ip address 10.0.23.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface TenGigabitEthernet1/0/1\n switchport access vlan 103\n switchport mode access\n!\ninterface TenGigabitEthernet1/0/2\n switchport access vlan 103\n switchport mode access\n!\ninterface Vlan103\n description Rack 3\n ip address 10.1.3.1 255.255.255.0\n!\nrouter ospf 1\n router-id 10.255.1.3\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "Leaf4",
+      "model": "jf-s48x",
+      "x": 720,
+      "y": 180,
+      "off": false,
+      "startup_config": "hostname Leaf4\n!\nip routing\n!\nvlan 104\n name Rack4\n!\ninterface Loopback0\n ip address 10.255.1.4 255.255.255.255\n no shutdown\n!\ninterface HundredGigE1/0/49\n description Spine1\n no switchport\n ip address 10.0.14.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface HundredGigE1/0/50\n description Spine2\n no switchport\n ip address 10.0.24.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface TenGigabitEthernet1/0/1\n switchport access vlan 104\n switchport mode access\n!\ninterface TenGigabitEthernet1/0/2\n switchport access vlan 104\n switchport mode access\n!\ninterface Vlan104\n description Rack 4\n ip address 10.1.4.1 255.255.255.0\n!\nrouter ospf 1\n router-id 10.255.1.4\n passive-interface default\n no passive-interface HundredGigE1/0/49\n no passive-interface HundredGigE1/0/50\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": -60,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.1.1.11/24 dev eth1\nip route add default via 10.1.1.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 8,
+      "name": "SRV2",
+      "model": "server-1u",
+      "x": 60,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV2\nip addr add 10.1.1.12/24 dev eth1\nip route add default via 10.1.1.1\n",
+      "services": [
+        {
+          "kind": "http-client",
+          "name": "start",
+          "disabled": false,
+          "config": {
+            "url": "http://10.1.2.11/",
+            "count": 3,
+            "interval_ms": 2000,
+            "delay_ms": 30000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 9,
+      "name": "SRV3",
+      "model": "server-1u",
+      "x": 180,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV3\nip addr add 10.1.2.11/24 dev eth1\nip route add default via 10.1.2.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 10,
+      "name": "SRV4",
+      "model": "server-1u",
+      "x": 300,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV4\nip addr add 10.1.2.12/24 dev eth1\nip route add default via 10.1.2.1\n",
+      "services": [
+        {
+          "kind": "http-client",
+          "name": "start",
+          "disabled": false,
+          "config": {
+            "url": "http://10.1.3.11/",
+            "count": 3,
+            "interval_ms": 2000,
+            "delay_ms": 30000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 11,
+      "name": "SRV5",
+      "model": "server-1u",
+      "x": 420,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV5\nip addr add 10.1.3.11/24 dev eth1\nip route add default via 10.1.3.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 12,
+      "name": "SRV6",
+      "model": "server-1u",
+      "x": 540,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV6\nip addr add 10.1.3.12/24 dev eth1\nip route add default via 10.1.3.1\n",
+      "services": [
+        {
+          "kind": "http-client",
+          "name": "start",
+          "disabled": false,
+          "config": {
+            "url": "http://10.1.4.11/",
+            "count": 3,
+            "interval_ms": 2000,
+            "delay_ms": 30000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 13,
+      "name": "SRV7",
+      "model": "server-1u",
+      "x": 660,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV7\nip addr add 10.1.4.11/24 dev eth1\nip route add default via 10.1.4.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 14,
+      "name": "SRV8",
+      "model": "server-1u",
+      "x": 780,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname SRV8\nip addr add 10.1.4.12/24 dev eth1\nip route add default via 10.1.4.1\n",
+      "services": [
+        {
+          "kind": "http-client",
+          "name": "start",
+          "disabled": false,
+          "config": {
+            "url": "http://10.1.1.11/",
+            "count": 3,
+            "interval_ms": 2000,
+            "delay_ms": 30000
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 15,
+      "a": {
+        "dev": 1,
+        "port": "HundredGigE1/0/49"
+      },
+      "b": {
+        "dev": 3,
+        "port": "HundredGigE1/0/49"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 16,
+      "a": {
+        "dev": 1,
+        "port": "HundredGigE1/0/50"
+      },
+      "b": {
+        "dev": 4,
+        "port": "HundredGigE1/0/49"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 17,
+      "a": {
+        "dev": 1,
+        "port": "HundredGigE1/0/51"
+      },
+      "b": {
+        "dev": 5,
+        "port": "HundredGigE1/0/49"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 18,
+      "a": {
+        "dev": 1,
+        "port": "HundredGigE1/0/52"
+      },
+      "b": {
+        "dev": 6,
+        "port": "HundredGigE1/0/49"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 19,
+      "a": {
+        "dev": 2,
+        "port": "HundredGigE1/0/49"
+      },
+      "b": {
+        "dev": 3,
+        "port": "HundredGigE1/0/50"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 20,
+      "a": {
+        "dev": 2,
+        "port": "HundredGigE1/0/50"
+      },
+      "b": {
+        "dev": 4,
+        "port": "HundredGigE1/0/50"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 21,
+      "a": {
+        "dev": 2,
+        "port": "HundredGigE1/0/51"
+      },
+      "b": {
+        "dev": 5,
+        "port": "HundredGigE1/0/50"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 22,
+      "a": {
+        "dev": 2,
+        "port": "HundredGigE1/0/52"
+      },
+      "b": {
+        "dev": 6,
+        "port": "HundredGigE1/0/50"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 100000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 23,
+      "a": {
+        "dev": 7,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 24,
+      "a": {
+        "dev": 8,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 25,
+      "a": {
+        "dev": 9,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 26,
+      "a": {
+        "dev": 10,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 27,
+      "a": {
+        "dev": 11,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 28,
+      "a": {
+        "dev": 12,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 29,
+      "a": {
+        "dev": 13,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 6,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 30,
+      "a": {
+        "dev": 14,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 6,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 31,
+      "x": -60,
+      "y": 450,
+      "w": 880,
+      "h": 40,
+      "text": "Rack N: 10.1.N.0/24, Gateway 10.1.N.1 am Leaf · Fabric: 10.0.xy.0/30 · Loopbacks: 10.255.0.0/16"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 10
+}

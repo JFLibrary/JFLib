@@ -9,7 +9,8 @@
 // route), faults.rs the lab's fault injection on each of them (a device, a cable, the
 // partition of several devices) and the active faults (also on the project's page).  Here:
 // notes edit their text, several things show what is selected and switch all
-// their devices on or off, the project edits its title and shows file, state and counts (with
+// their devices on or off, the project shows its description and author (Datei › Projektinfo …),
+// edits its title and shows file, state and counts (with
 // the cables that are up).  Every change is one undo step; the simulator follows each.  Edit buffers
 // keep what the user typed until Enter, a button or Esc; they start over when the value
 // changes elsewhere (undo, the canvas).
@@ -213,6 +214,14 @@ fn several(n: &mut Net, ui: &mut Ui, sel: &[u32]) {
 
 fn project(n: &mut Net, ui: &mut Ui) {
     ui.text(TS_SUBTITLE, t("Projekt"));
+    // what it is about and who made it (Datei › Projektinfo …)
+    if !n.doc.proj.description.is_empty() {
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_WRAP, &n.doc.proj.description);
+    }
+    if !n.doc.proj.author.is_empty() {
+        row(ui, t("Autor"), &n.doc.proj.author);
+    }
     let title = n.doc.proj.title.clone();
     let ins = &mut n.inspector;
     if ins.title_src != title {

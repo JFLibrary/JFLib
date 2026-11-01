@@ -276,7 +276,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
 // ---------------------------------------------------------------- the panel
 
 /// the name of a lab's topic in the current language
-fn topic_name(topic: &str) -> &str {
+pub(crate) fn topic_name(topic: &str) -> &str {
     match topic {
         "net" => t("Netzwerk"),
         "ds" => t("Verteilte Systeme"),
@@ -285,7 +285,7 @@ fn topic_name(topic: &str) -> &str {
 }
 
 /// "1 Ziel", "4 Ziele"; an assessment's points ("20 Punkte"), with its goals when it has some
-fn size_text(goals: usize, points: u32) -> String {
+pub(crate) fn size_text(goals: usize, points: u32) -> String {
     match (goals, points) {
         (_, 0) => goals_text(goals),
         (0, p) => crate::workspace::assess::points_text(p),

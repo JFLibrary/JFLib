@@ -5,8 +5,8 @@
 //                              Minimap; Simulation: Tempo beim Start, Bewegung; Allgemein:
 //                              Sprache, automatisch speichern (Sekunden, 0 aus); Desktop (the
 //                              hosts' desktops, V2): Hintergrund, Größe der Symbole, Uhr der
-//                              Taskleiste; the recent files live in the same file outside the
-//                              schema
+//                              Taskleiste; Startseite: Beim Start anzeigen; the recent files live
+//                              in the same file outside the schema
 //   DESK_*_COUNT, desk_names(k)   the desktop's choices for its Einstellungen program
 //   Prefs::open(headless)      the user's file; headless runs (--script, --shot) keep them in
 //                              memory only (Settings::new), so tests never read or write them
@@ -62,8 +62,13 @@ const DESK_CLOCK: Key<usize> = Key::choice("desk.clock", 0, &DESK_CLOCKS)
     .label("Uhr der Taskleiste")
     .help("Sie zeigt die Uhr des Geräts in der Simulation.");
 
-static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d, DESK_BG.d, DESK_ICON.d, DESK_CLOCK.d])
-    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien"), ("desk", "Desktop")]);
+// the start page (ST1, workspace/startpage.rs)
+const START_PAGE: Key<bool> = Key::bool("start.show", true)
+    .label("Beim Start anzeigen")
+    .help("Ohne diese Seite beginnt das Programm mit einem leeren Projekt.");
+
+static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d, DESK_BG.d, DESK_ICON.d, DESK_CLOCK.d, START_PAGE.d])
+    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien"), ("desk", "Desktop"), ("start", "Startseite")]);
 
 /// the backgrounds, icon sizes and clocks of the desktop (DESK_BGS, DESK_ICONS, DESK_CLOCKS)
 pub(crate) const DESK_BG_COUNT: usize = DESK_BGS.len();
@@ -117,6 +122,8 @@ pub(crate) struct Prefs {
     pub desk_bg: usize,
     pub desk_icons: usize,
     pub desk_clock: usize,
+    /// the window opens on the start page (when nothing was opened)
+    pub start_page: bool,
     /// they belong to the user's file (not a headless run)
     pub kept: bool,
 }
@@ -137,6 +144,7 @@ impl Prefs {
             desk_bg: 0,
             desk_icons: 1,
             desk_clock: 0,
+            start_page: true,
             kept: false,
         };
         p.pull();
@@ -176,6 +184,7 @@ impl Prefs {
         self.desk_bg = s.get(&DESK_BG);
         self.desk_icons = s.get(&DESK_ICON);
         self.desk_clock = s.get(&DESK_CLOCK);
+        self.start_page = s.get(&START_PAGE);
     }
 
     /// the toggles of the Ansicht menu and the desktop's Einstellungen program into the
