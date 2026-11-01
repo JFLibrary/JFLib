@@ -1,0 +1,149 @@
+# JFNetworker-Szenario web_https.scn: „Ein Hofladen mit Stil, Keksen und Schloss“, 4 Geräte, 3 Verbindungen, Seed 41
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  --      run 1s
+   1.000000000  PC1     root@PC1:~# curl -s https://web.lab/ohne.html
+   1.000000000  --      run 100ms
+   1.000163488  PC1     <!doctype html>
+   1.000163488  PC1     <html><head><title>Ohne Stylesheet</title></head><body>
+   1.000163488  PC1     <h1>Ohne Stylesheet</h1>
+   1.000163488  PC1     <p>Diese Seite fragt nur nach sich selbst.</p>
+   1.000163488  PC1     <p><a href="index.html">Zur Startseite</a></p>
+   1.000163488  PC1     </body></html>
+   1.100000000  ok      expect PC1 output contains "<title>Ohne Stylesheet</title>"
+   1.100000000  PC1     root@PC1:~# curl -v https://web.lab/notiz.txt
+   1.100000000  --      run 100ms
+   1.100000000  PC1     *   Trying 10.0.0.1:443...
+   1.100002888  PC1     * Connected to web.lab (10.0.0.1) port 443
+   1.100022160  PC1     * TLS connection using TLS 1.3 / TLS_CHACHA20_POLY1305_SHA256
+   1.100022160  PC1     * Server certificate:
+   1.100022160  PC1     *  subject: CN=web.lab
+   1.100022160  PC1     *  start date: Thu, 01 Jan 2026 00:00:00 GMT
+   1.100022160  PC1     *  expire date: Fri, 01 Jan 2027 00:00:00 GMT
+   1.100022160  PC1     *  subjectAltName: host "web.lab" matched
+   1.100022160  PC1     *  issuer: CN=JFNetworker Lab CA
+   1.100022160  PC1     *  certificate verify ok.
+   1.100022160  PC1     > GET /notiz.txt HTTP/1.1
+   1.100022160  PC1     > Host: web.lab
+   1.100022160  PC1     > User-Agent: curl/8.5.0
+   1.100022160  PC1     > Accept: */*
+   1.100022160  PC1     > 
+   1.100151512  PC1     < HTTP/1.1 200 OK
+   1.100151512  PC1     < Server: jfn-httpd/1.0
+   1.100151512  PC1     < Date: Thu, 01 Jan 2026 00:00:00 GMT
+   1.100151512  PC1     < Content-Type: text/plain; charset=utf-8
+   1.100151512  PC1     < Content-Length: 29
+   1.100151512  PC1     < Connection: keep-alive
+   1.100151512  PC1     < 
+   1.100151512  PC1     Eine Notiz, kein Stylesheet.
+   1.100151512  PC1     * Connection #0 to host web.lab left intact
+   1.200000000  ok      expect PC1 output contains "* TLS connection using TLS 1.3 / TLS_CHACHA20_POLY1305_SHA256"
+   1.200000000  ok      expect PC1 output contains "*  subject: CN=web.lab"
+   1.200000000  ok      expect PC1 output contains "*  issuer: CN=JFNetworker Lab CA"
+   1.200000000  ok      expect PC1 output contains "*  certificate verify ok."
+   1.200000000  ok      expect PC1 output contains "Eine Notiz, kein Stylesheet."
+   1.200000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective} %{time_appconnect}\n" https://www.web.lab/ohne.html
+   1.200000000  --      run 100ms
+   1.200157968  PC1     200 HTTPS 0 https://www.web.lab/ohne.html 0.000025
+   1.300000000  ok      expect PC1 output contains "200 HTTPS 0 https://www.web.lab/ohne.html"
+   1.300000000  PC1     root@PC1:~# curl -sS https://web.lab:8441/
+   1.300000000  --      run 100ms
+   1.300021552  PC1     curl: (60) SSL certificate problem: self-signed certificate
+   1.400000000  ok      expect PC1 output contains "curl: (60) SSL certificate problem: self-signed certificate"
+   1.400000000  PC1     root@PC1:~# curl -sS https://web.lab:8442/
+   1.400000000  --      run 100ms
+   1.400021472  PC1     curl: (60) SSL certificate problem: certificate has expired
+   1.500000000  ok      expect PC1 output contains "curl: (60) SSL certificate problem: certificate has expired"
+   1.500000000  PC1     root@PC1:~# curl -sS https://web.lab:8443/
+   1.500000000  --      run 100ms
+   1.500021568  PC1     curl: (60) SSL certificate problem: no alternative certificate subject name matches target host name 'web.lab'
+   1.600000000  ok      expect PC1 output contains "curl: (60) SSL certificate problem: no alternative certificate subject name matches target host name 'web.lab'"
+   1.600000000  PC1     root@PC1:~# curl -sS https://web.lab:8444/
+   1.600000000  --      run 100ms
+   1.600021472  PC1     curl: (60) SSL certificate problem: certificate is not yet valid
+   1.700000000  ok      expect PC1 output contains "curl: (60) SSL certificate problem: certificate is not yet valid"
+   1.700000000  PC1     root@PC1:~# curl -s -k https://web.lab:8441/ohne.html
+   1.700000000  --      run 100ms
+   1.700153816  PC1     <!doctype html>
+   1.700153816  PC1     <html><head><title>Ohne Stylesheet</title></head><body>
+   1.700153816  PC1     <h1>Ohne Stylesheet</h1>
+   1.700153816  PC1     <p>Diese Seite fragt nur nach sich selbst.</p>
+   1.700153816  PC1     <p><a href="index.html">Zur Startseite</a></p>
+   1.700153816  PC1     </body></html>
+   1.800000000  ok      expect PC1 output contains "<title>Ohne Stylesheet</title>"
+   1.800000000  PC1     root@PC1:~# curl -k -v -o /dev/null https://web.lab:8442/ohne.html
+   1.800000000  --      run 100ms
+   1.800000000  PC1       % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+   1.800000000  PC1                                      Dload  Upload   Total   Spent    Left  Speed
+   1.800000000  PC1       0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 10.0.0.1:8442...
+   1.800002888  PC1     * Connected to web.lab (10.0.0.1) port 8442
+   1.800021472  PC1     * TLS connection using TLS 1.3 / TLS_CHACHA20_POLY1305_SHA256
+   1.800021472  PC1     * Server certificate:
+   1.800021472  PC1     *  subject: CN=web.lab
+   1.800021472  PC1     *  start date: Wed, 27 Nov 2024 00:00:00 GMT
+   1.800021472  PC1     *  expire date: Thu, 27 Nov 2025 00:00:00 GMT
+   1.800021472  PC1     *  subjectAltName: host "web.lab" matched
+   1.800021472  PC1     *  issuer: CN=JFNetworker Lab CA
+   1.800021472  PC1     *  certificate verify result: certificate has expired, continuing anyway.
+   1.800021472  PC1     > GET /ohne.html HTTP/1.1
+   1.800021472  PC1     > Host: web.lab:8442
+   1.800021472  PC1     > User-Agent: curl/8.5.0
+   1.800021472  PC1     > Accept: */*
+   1.800021472  PC1     > 
+   1.800153736  PC1     < HTTP/1.1 200 OK
+   1.800153736  PC1     < Server: jfn-httpd/1.0
+   1.800153736  PC1     < Date: Thu, 01 Jan 2026 00:00:00 GMT
+   1.800153736  PC1     < Content-Type: text/html; charset=utf-8
+   1.800153736  PC1     < Content-Length: 206
+   1.800153736  PC1     < Connection: keep-alive
+   1.800153736  PC1     < 
+   1.800153736  PC1     100   206  100   206    0     0  1314k      0 --:--:-- --:--:-- --:--:--  201k
+   1.800153736  PC1     * Connection #0 to host web.lab left intact
+   1.900000000  ok      expect PC1 output contains "*  certificate verify result: certificate has expired, continuing anyway."
+   1.900000000  PC1     root@PC1:~# curl -s https://andere.lab:8443/ohne.html
+   1.900000000  --      run 100ms
+   1.900157392  PC1     <!doctype html>
+   1.900157392  PC1     <html><head><title>Ohne Stylesheet</title></head><body>
+   1.900157392  PC1     <h1>Ohne Stylesheet</h1>
+   1.900157392  PC1     <p>Diese Seite fragt nur nach sich selbst.</p>
+   1.900157392  PC1     <p><a href="index.html">Zur Startseite</a></p>
+   1.900157392  PC1     </body></html>
+   2.000000000  ok      expect PC1 output contains "<title>Ohne Stylesheet</title>"
+   2.000000000  PC1     root@PC1:~# curl -s https://web.lab:8445/
+   2.000000000  --      run 100ms
+   2.000030834  PC1     Über TLS: 
+   2.100000000  ok      expect PC1 output contains "Über TLS: "
+   2.100000000  PC1     root@PC1:~# curl -s -i http://web.lab:8081/
+   2.100000000  --      run 100ms
+   2.100011184  PC1     HTTP/1.1 301 Moved Permanently
+   2.100011184  PC1     Server: jfn-httpd/1.0
+   2.100011184  PC1     Date: Thu, 01 Jan 2026 00:00:01 GMT
+   2.100011184  PC1     Content-Type: text/plain
+   2.100011184  PC1     Content-Length: 0
+   2.100011184  PC1     Connection: keep-alive
+   2.100011184  PC1     Location: https://web.lab/
+   2.100011184  PC1     
+   2.200000000  ok      expect PC1 output contains "Location: https://web.lab/"
+   2.200000000  PC1     root@PC1:~# curl -s -L -o /dev/null -w "%{http_code} %{num_redirects} %{url_effective}\n" http://web.lab:8081/
+   2.200000000  --      run 100ms
+   2.200011184  PC1     301 0 http://web.lab:8081/
+   2.200175688  PC1     200 1 https://web.lab/
+   2.300000000  ok      expect PC1 output contains "200 1 https://web.lab/"
+   2.300000000  PC1     root@PC1:~# curl -sS https://web.lab:80/
+   2.300000000  --      run 100ms
+   2.300012272  PC1     curl: (35) TLS connect error: not a TLS record
+   2.400000000  ok      expect PC1 output contains "curl: (35) TLS connect error"
+   2.400000000  PC1     root@PC1:~# curl -sS http://web.lab:443/
+   2.400000000  --      run 100ms
+   2.400008896  PC1     curl: (18) transfer closed with outstanding read data remaining
+   2.500000000  ok      expect WEB1 svc selbst metric tls_failed == 1 (1)
+   2.500000000  ok      expect WEB1 svc selbst metric tls_handshakes == 1 (1)
+   2.500000000  ok      expect WEB1 svc alt metric tls_failed == 1 (1)
+   2.500000000  ok      expect WEB1 svc anders metric tls_failed == 1 (1)
+   2.500000000  ok      expect WEB1 svc spaeter metric tls_failed == 1 (1)
+   2.500000000  --      TLS 1.3 auf dem Kabel, jede Ablehnung eines Zertifikats und was -k daraus macht
+# 23 von 23 Erwartungen erfüllt

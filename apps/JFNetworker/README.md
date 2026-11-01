@@ -165,10 +165,11 @@ Queues, Lastgeneratoren, eigene Skripte).
   Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
   MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
   F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
-- **Webbrowser (B1, B2, B3):** echte kleine Websites aus dem simulierten Netz im Desktop eines
+- **Webbrowser (B1 bis B4):** echte kleine Websites aus dem simulierten Netz im Desktop eines
   Hosts: HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und
   Skripten mit `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene
-  Fehlerseiten, Seitenskripte in `jfs` mit Konsole (siehe [Webbrowser](#webbrowser)).
+  Fehlerseiten, Seitenskripte in `jfs`, Stylesheets aus `<link>`, Cookies, HTTPS mit echtem TLS 1.3
+  und eine Entwickleransicht (siehe [Webbrowser](#webbrowser)).
 - **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
   Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
   vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
@@ -389,6 +390,13 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `pagescript` | die Seitenskripte ohne Fenster (`fixtures/web_scripts.jfnet`): Elemente finden, lesen, ändern, anlegen, Ereignisse mit Blase und Standardaktion, Zeitgeber auf einer gegebenen Uhr, `fetch` und `src` durch den HTTP-Client einer Engine, `location`, Fuel, Speicher, Tiefe und Grenzen des Dokuments, Endlosschleifen, Fehler mit Quelle, Zeile und Spalte, die Reihenfolge der Skripte, was eine Seite nicht erreicht, zweimal dasselbe Ergebnis |
 | `browser_scripts.uis` | die Seitenskripte im Fenster auf dem Desktop von PC1: Klicks ändern die Seite (mit Titel), Eingaben, eine Liste, ein gestopptes und ein erlaubtes Absenden, die Uhr bei laufender und stehender Simulation, `fetch`, die Konsole mit Zeile und Spalte, eine kaputte Seite, die Endlosschleife lässt das Fenster bedienbar, Zurück, Vor und Neu laden, Zeitgeber warten auf einer Seite, die nicht zu sehen ist |
 | `browser_script_shots.uis` | die Bilder der Seitenskripte (Zähler, Liste, Formular, Konsole mit Fehlern) hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_*.png`) |
+| `model.uis`, Gruppe `webdev` | B4 des Webbrowsers ohne Fenster (`fixtures/web_dev.jfnet`): Stylesheets und wie der Browser ihre Antworten nimmt, Cookies über das Netz mit jedem Attribut und auf der virtuellen Uhr, `HttpOnly` gegen `document.cookie`, `Secure`, `SameSite`, `Set-Cookie` auf Weiterleitungen und das Cookie des nächsten Sprungs, HTTPS mit jedem Zertifikatsfehler und dem Weitermachen, der Handshake auf dem Kabel und in den Worten des Inspektors, das Netzwerkprotokoll, der Dokumentbaum, zwei gleiche Läufe und eine Wiederholung über die Aufzeichnung |
+| `browser_styles.uis` | Stylesheets im Fenster: zwei `<link>` und ein `<style>` in Dokumentreihenfolge (der Reiter Elemente sagt, was ein Element bekam), Zurück fragt nichts, Neu laden alles, eine Seite mit kaputten Stylesheets zeigt sich und die Konsole sagt warum |
+| `browser_cookies.uis` | Cookies im Fenster: `Set-Cookie` mit jedem Attribut, die Tabelle der Seite, was die Dose ablehnt, `document.cookie` ohne `HttpOnly`, `fetch` trägt sie, eine Anmeldung, deren Weiterleitung das Cookie setzt, Löschen, was das Schließen des Browsers überlebt |
+| `browser_https.uis` | HTTPS im Fenster: das Schloss und die Karte des Zertifikats, die Warnseite für jeden Fehler mit „Trotzdem fortfahren“ und dem Weg zurück, ein Port ohne TLS, die Weiterleitung von http nach https, was das Schließen vergisst |
+| `browser_devtools.uis` | die Entwickleransicht: F12 und der Knopf, Netzwerk mit Köpfen und Inhalt, ein Protokoll je Dokument, Elemente lebendig unter einem Skript, Anhalten beendet auch `fetch`, die Konsole bleibt beim Wechsel der Skalierung am Ende |
+| `browser_dev_shots.uis` | die Bilder von B4 (Seite mit Stylesheets, Warnung, Karte, die vier Reiter) hell und dunkel mit 100 und 150 % (`build/jfnetworker/dev_*.png`) |
+| `scen_web_https.uis` | das Golden-Szenario von HTTPS (`scen/web_https.scn`): `curl` über TLS, der Handshake mit `-v`, jede Ablehnung und was `-k` daraus macht, ein Skript mit TLS, die Weiterleitung nach https, ein Port ohne TLS |
 | `scen_web_site.uis` | das Golden-Szenario einer kleinen Website (`scen/web_site.scn`): `curl` holt, was der Browser holt: Seiten über den Namen, die Weiterleitung eines Ordners, Typen, eine fehlende Seite, ein Pfad aus dem Ordner hinaus, Formulare mit GET und POST, Weiterleitungen und ihre Grenze, eine gespeicherte Seite |
 | `dot1x_panel.uis` | 802.1X im Fenster auf `fixtures/dot1x_lab.jfnet`: die Kabel der geschlossenen Ports heißen „nicht autorisiert“, das Feld „Anmeldung am Netz (802.1X)“ der IP-Konfiguration auf PC1 (ohne Identität ein Hinweis; EAP-MD5, der Port geht auf), PC2 mit falschem Passwort und EAP-PWD (bleibt zu), der RADIUS-Server im Inspektor eines Enterprise-Netzes, der Laptop im Unternehmens-WLAN |
 | `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
@@ -430,7 +438,11 @@ Für den Webbrowser: `web_site.jfnet` (WEB1 mit den Dateien aus `/var/www` und d
 Skript, DNS1 mit `web.lab`, PC1 mit dem Browser; das Szenario `web_site.scn` und die Fensterskripte
 `browser_*.uis`) und `web_scripts.jfnet` (dasselbe Netz mit Seiten mit Skripten: Zähler, Liste,
 Formular, Uhr, Daten über `fetch` von `api.jfs`, kaputte Skripte, eine Endlosschleife, die Adresse,
-Klicks; die selftest-Gruppe `pagescript` und `browser_scripts.uis`, `browser_script_shots.uis`).
+Klicks; die selftest-Gruppe `pagescript` und `browser_scripts.uis`, `browser_script_shots.uis`)
+und `web_dev.jfnet` (ein Hofladen mit Stylesheets, Cookies aus `konto.jfs`, einem Zertifikat der
+Lab-CA auf Port 443 und je einem mit Fehler auf den Ports 8441 bis 8444; die selftest-Gruppe `webdev`,
+das Szenario `web_https.scn` und die Fensterskripte `browser_styles.uis`, `browser_cookies.uis`,
+`browser_https.uis`, `browser_devtools.uis`, `browser_dev_shots.uis`).
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
@@ -502,7 +514,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
-| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs) (Seitenskripte: der Host der VM, die Konsole), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
+| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs) (Seitenskripte: der Host der VM, die Konsole), [`src/workspace/devwin/devtools.rs`](src/workspace/devwin/devtools.rs) (die Entwickleransicht), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`crates/jfn_sim/tlssim.rs`](crates/jfn_sim/tlssim.rs) (Zertifikate des Labors, TLS-Notizen), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986), [`lib/netpkt/cookie.rs`](../../lib/netpkt/cookie.rs) (Cookies nach RFC 6265), [`lib/netpkt/tls.rs`](../../lib/netpkt/tls.rs) und [`lib/netpkt/x509.rs`](../../lib/netpkt/x509.rs) (TLS 1.3 ohne I/O) |
 | SSH | [`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs), [`crates/jfn_sim/sshd.rs`](crates/jfn_sim/sshd.rs), [`sshtrace.rs`](crates/jfn_sim/sshtrace.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs), [`src/sshtest.rs`](src/sshtest.rs) | das Protokoll ohne I/O, Client und Server auf den Geräten, Schlüssel als Dateien, `known_hosts`, `authorized_keys`, `scp` |
 | SNMPv3 | [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs), [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmpv3test.rs`](src/snmpv3test.rs) | die Nachricht, USM, VACM, die Reports, die Werkzeuge, der MIB-Browser |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
@@ -3606,7 +3618,7 @@ Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu 
 
 ### Webbrowser
 
-Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 bis B3) ist
+Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 bis B4) ist
 ein Programm des Desktops: Er zeigt echte kleine Websites aus dem simulierten Netz mit dem
 `ui.html_view` der Library, nicht mit einer eigenen HTML/CSS-Engine. Ein echtes Internet gibt es
 nicht. Seiten liefern `http-server`-Routen, Dateien des Geräts und Skripte mit `http.serve`, wie
@@ -3641,7 +3653,7 @@ statischen Website und einem Laden als Skript.
 - **Fehlerseiten:** eigene Seiten mit Grund, Adresse und Hinweis: Verbindung abgelehnt,
   Zeitüberschreitung, Name unbekannt, kein Weg, abgebrochene Verbindung, zu viele Weiterleitungen,
   4xx und 5xx ohne eigene Seite des Servers (eine HTML-Seite des Servers zeigt der Browser, wie
-  sie ist). `https:` sagt, dass verschlüsselte Seiten mit einer späteren Ausbaustufe kommen (B4).
+  sie ist), ein Port ohne TLS; für ein Zertifikat mit Fehler die Warnseite (unten).
 
 **Im Simulator** ([`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs)): Das Programm ist ein
 versteckter Dienst „webbrowser“ des Hosts über demselben HTTP-Client wie `curl`, also mit DNS,
@@ -3663,8 +3675,7 @@ und ohne Routen antwortet der Server wie bisher mit „Hallo von {host}“.
 Entscheidungen: Zurück und Vor zeigen die gemerkte Seite statt neu zu fragen (so geht es auch bei
 stehender Simulation, und das Netz sieht nur, was ein Browser mit Cache auch schickte). Bilder
 kommen über `MI_APP` statt `MI_ASK`, damit relative Pfade einer Seite nicht als Dateien des echten
-Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>` und HTTPS (B4), Datei-Felder
-und Mehrfachauswahl in Formularen.
+Rechners gelesen werden. Nicht nachgebildet: Datei-Felder und Mehrfachauswahl in Formularen.
 
 **Seitenskripte (B3, [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs)):**
 Eine Seite aus dem simulierten Netz führt `<script type="text/jfs">` aus, im Dokument oder mit `src`,
@@ -3721,10 +3732,92 @@ als `MdEv::click`; das Element unter dem Zeiger sucht `MdDoc::element_at`, ohne 
 etwas ändert. **Gemeinsame Namen** kommen aus `Vm::add_script`: ein Skript sieht die Namen der Skripte
 davor, nicht die der späteren.
 
-Geprüft wird in den Selbsttest-Gruppen `browser` ([`src/browsertest.rs`](src/browsertest.rs)) und
-`pagescript` ([`src/pagescripttest.rs`](src/pagescripttest.rs)), dazu das Szenario `web_site.scn` und
-die Fensterskripte `browser_pages.uis`, `browser_forms.uis`, `browser_requests.uis`,
-`browser_shots.uis`, `browser_scripts.uis` und `browser_script_shots.uis`.
+**Stylesheets (B4):** Jedes `<link rel="stylesheet" href>` holt der Browser einmal wie ein Bild und
+gibt den Text dem Dokument der Library (`MdDoc::set_sheet`); er zählt dort, wo der `<link>` zwischen
+den `<style>`-Elementen steht, mit Spezifität und Reihenfolge der CSS-Teilmenge der Library. Auch ein
+`<link>`, den ein Skript einfügt, wird geholt. Medien außer `screen` und `all` bleiben draußen. Ein
+Stylesheet, das nicht kommt (404, kein Server, ein anderer Typ als `text/css`, über 1 MiB), ist eine
+Zeile in der Konsole, die Seite bleibt; die Statuszeile nennt die Zahl der Fehler. `@import` gehört
+nicht zur Teilmenge. Holen kostet eine Anfrage je Adresse, bis Neu laden den Speicher des Fensters leert.
+Seiten ohne Stylesheets rendern wie zuvor.
+
+**Cookies (B4):** Die Dose gehört zum Browser des Geräts: Zustand des Fensters, nicht des Projekts.
+[`netpkt::cookie`](../../lib/netpkt/cookie.rs) liest `Set-Cookie` nach RFC 6265 (`Path`, `Domain`,
+`Expires`, `Max-Age`, `Secure`, `HttpOnly`) und `SameSite` aus RFC 6265bis, soweit ein kleiner Browser es
+braucht: `Strict` nur innerhalb der Site, `Lax` und kein Attribut auch bei einer Navigation mit GET,
+`None` immer, aber nur mit `Secure`. Die Site sind die letzten zwei Namensteile (ohne Public-Suffix-Liste;
+ein `Domain` ohne Punkt zählt als öffentliches Suffix). Ablauf und `Max-Age` laufen auf der Uhr des Geräts,
+also auf virtueller Zeit. Schließt man den Browser, gehen die Sitzungs-Cookies und die übernommenen
+Zertifikate, Cookies mit Datum bleiben beim Gerätefenster. Was die Dose ablehnt, steht mit Grund in der
+Konsole. Skripte lesen `document.cookie` ohne die `HttpOnly`-Cookies; eine Zuweisung
+(`document.cookie = "a=1; Path=/"`) gilt am Ende des Aufrufs, wie `location.href`, denn `jfs` hat keine
+Setter; `document.set_cookie(s)` gilt sofort.
+
+Weiterleitungen folgt die Engine, also trägt jede Anfrage einen Schnappschuss der Dose
+(`WebReq::jar`, ein `Arc`): Jeder Sprung liest seine `Cookie`-Zeile aus der eigenen Kopie, und ein
+`Set-Cookie` unterwegs ändert sie für den nächsten Sprung. Im `Report::Web` kommen alle Sprünge mit ihren
+Kopfzeilen und der Uhrzeit des Geräts zurück, und das Fenster legt sie der Reihe nach in die echte
+Dose. Die Engine behält danach nichts. Weil der Schnappschuss in der Aktion steckt, spielt das
+Zurückspulen genau dieselben Anfragen ab.
+
+**HTTPS (B4): echtes TLS 1.3.** Auf dem Kabel liegen echte Records und ein echter Handshake:
+ClientHello und ServerHello im Klartext, danach alles mit ChaCha20-Poly1305 verschlüsselt, das
+Zertifikat echtes X.509 mit Ed25519, die Signatur und beide Finished geprüft. Der Kern steht ohne I/O in
+[`netpkt::tls`](../../lib/netpkt/tls.rs) und [`netpkt::x509`](../../lib/netpkt/x509.rs) und ist in
+`coretest` (Gruppe `tlscore`) gegen die RFC-8448-Werte und in beide Richtungen gegen `netio::tls` geprüft,
+mit `python tools/tls_interop.py --core` auch auf echten Sockets gegen OpenSSL als Client und als Server.
+Warum ein zweiter Kern: `netio::tls` nennt `plat` (Zufall, Uhr, Sockets), den darf der Simulator nicht
+nennen; `lib/netpkt/ssh.rs` hat es ebenso gemacht.
+
+**Was daran simuliert ist:** Die Schlüssel kommen aus dem Startwert des Projekts: Sie schützen nichts Echtes,
+und eine Wiederholung ist Bit für Bit gleich. Der Handshake kostet keine virtuelle Rechenzeit, nur die des
+Netzes. Einzige Wurzel ist die „JFNetworker Lab CA“, der jedes Gerät vertraut und die es nur hier gibt.
+Es gibt nur eine Suite (`TLS_CHACHA20_POLY1305_SHA256`), X25519 und Ed25519, kein HelloRetryRequest, keine
+Client-Zertifikate, keine Wiederaufnahme, keine Sperrlisten.
+
+- **Server:** `http-server` mit `"tls"` spricht TLS, sein Port ist dann 443, wenn `"port"` nichts anderes
+  sagt. `{"names": ["web.lab", "10.0.0.1"], "issuer": "lab" | "self", "org": "..", "days": 365, "age_days": 0,
+  "starts_in_days": 0}` (alles darf fehlen; ohne `names` gilt der Gerätename, nur diese Namen zählen, nicht
+  der Common Name; die Tage zählen vom Start der Simulation, so bleibt das Zertifikat bei einem Neustart
+  gleich). Ein Skript: `http.serve(443, f, {tls: {names: ["web.lab"]}})`. Im Reiter Dienste steht
+  „Port 443 (TLS)“, die Metriken sind `tls_handshakes` und `tls_failed`.
+- **Browser:** Das Schloss neben der Adresse öffnet die Karte des Zertifikats (Inhaber, Aussteller, Zeiten,
+  Namen, Fingerabdruck, Suite). Bei selbst signiert, unbekanntem Aussteller, abgelaufen, noch nicht gültig
+  oder falschem Namen schickt der Browser den Alert, wie TLS es will, und zeigt die Warnseite: was nicht
+  stimmt, „Trotzdem fortfahren“ und „Zurück zur sicheren Seite“. Weitermachen merkt sich dieses eine
+  Zertifikat (SHA-256 des Blatts) im Fenster und fragt neu; das Schloss wird dann zum Warnzeichen.
+- **Inspektor und Simulationsmodus:** Der Dissektor zeigt Records und was im Klartext geht, Feld für Feld
+  (Version, Random, Suites, SNI, Key Share, Alerts), alles Verschlüsselte als `verschlüsselt`. Die
+  Entscheidungen sind Notizen („TLS: Handshake mit … fertig“, „Zertifikat … abgelehnt“). TLS zählt zur
+  Kategorie TCP/HTTP, eine neue Kategorie braucht es nicht.
+- **curl:** `curl https://…` mit Exit 60 bei einem Zertifikatsfehler und 35 bei anderen TLS-Fehlern, `-k`
+  macht trotzdem weiter, `-v` zeigt das Zertifikat, `-w` kennt `%{scheme}`, `%{ssl_verify_result}`,
+  `%{time_appconnect}`. Weiterleitungen über das Schema hinweg gehen mit `-L`.
+
+**Entwickleransicht (B4, [`src/workspace/devwin/devtools.rs`](src/workspace/devwin/devtools.rs)):** F12 oder der
+Knopf neben „Öffnen“, unter der Seite mit einem Teiler, Zustand des Fensters ohne Rückgängig-Schritt und ohne
+Änderung am Projekt.
+
+- **Konsole:** was B3 hatte; ab jetzt auch auf Seiten ohne Skripte (Stylesheets, Cookies). Strg+Umschalt+J
+  und der Knopf der Skriptseiten öffnen sie direkt. Am Ende bleibt sie auch, wenn die Skalierung wechselt.
+- **Netzwerk:** jede Anfrage der Seite mit Methode, Adresse, Status, Typ, Größe, Zeit und wer fragte
+  (Adresszeile, Link, Formular, `<img>`, `<link>`, `<script src>`, `fetch`, Skript); eine Weiterleitung ist
+  eine eigene Zeile. Eine gewählte Zeile zeigt die Köpfe von Anfrage und Antwort, TLS und den Inhalt (Text bis
+  32 KiB, sonst die ersten Bytes). Jedes Dokument hat sein Protokoll, es kommt mit Zurück wieder.
+- **Elemente:** der Dokumentbaum, lebendig unter den Skripten, mit Attributen; ein gewähltes Element zeigt, was
+  die Stylesheets ihm geben (`MdDoc::style_of`, ohne Geerbtes).
+- **Cookies:** die Cookies dieser Seite mit Domain, Pfad, Ablauf und Merkmalen, einzeln oder alle zu löschen.
+
+Anhalten (Esc) beendet alles, was unterwegs ist: die Seite, Bilder, Stylesheets, `fetch` und `src`; die
+Rückruf-Funktion hört „Angehalten“.
+
+Geprüft wird in den Selbsttest-Gruppen `browser` ([`src/browsertest.rs`](src/browsertest.rs)),
+`pagescript` ([`src/pagescripttest.rs`](src/pagescripttest.rs)) und `webdev`
+([`src/webdevtest.rs`](src/webdevtest.rs)), den coretest-Gruppen `cookie` und `tlscore`, dazu die Szenarien
+`web_site.scn` und `web_https.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
+`browser_requests.uis`, `browser_shots.uis`, `browser_scripts.uis`, `browser_script_shots.uis`,
+`browser_styles.uis`, `browser_cookies.uis`, `browser_https.uis`, `browser_devtools.uis` und
+`browser_dev_shots.uis`.
 ### SSH
 
 SSH Version 2 läuft auf den Geräten wie alles andere Byte für Byte: echte Schlüssel, echter

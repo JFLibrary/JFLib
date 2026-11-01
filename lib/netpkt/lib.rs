@@ -90,6 +90,14 @@
 //             for one line about a packet                            (RFC 3748, 1994, 5931)
 //   imap      Line and LineReader (tags, literals), Command, Response, Item, SeqSet, FetchItem,
 //             SearchKey, envelope, internal_date, the parts of a message  (RFC 9051, 3501)
+//   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
+//             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
+//             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
+//   x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+//             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
+//   tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
+//             send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,
+//             the names of the protocol's numbers, dissect; uses crate crypto  (RFC 8446)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -139,6 +147,9 @@ pub mod ssh;
 pub mod snmpv3;
 pub mod eap;
 pub mod imap;
+pub mod cookie;
+pub mod x509;
+pub mod tls;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

@@ -10,6 +10,8 @@
 // The group sshcore checks netpkt::ssh and netpkt::snmpv3 (sshcoret.rs, snmpv3t.rs).
 // The group eap checks netpkt::eap, the EAP parts of netpkt::eapol and netpkt::radius, crypto::eappwd
 // and the crate eapm (eapt.rs), and netpkt::imap (imapt.rs).
+// The group cookie checks netpkt::cookie (cookiet.rs), the group tlscore netpkt::tls and netpkt::x509
+// against netio::tls (tlscoret.rs).
 // The group scriptls checks script's language services and formatter (scriptlst.rs).
 // The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
 // The group scriptmod checks script's modules, debugger and test functions (scriptmodt.rs).
@@ -48,6 +50,8 @@ mod sshd;
 mod store;
 mod tlst;
 mod sshcoret;
+mod cookiet;
+mod tlscoret;
 mod snmpv3t;
 mod cmdtreet;
 mod scriptvmt;
@@ -143,6 +147,15 @@ fn run() -> i32 {
     if let Some(u) = plat::arg_value("--tls-web") {
         return tlst::web(&u, plat::arg_value("--ca").as_deref());
     }
+    if let Some(d) = plat::arg_value("--tls-core-pki") {
+        return tlscoret::write_pki(&d);
+    }
+    if let Some(p) = plat::arg_value("--tls-core-serve").and_then(|p| p.parse().ok()) {
+        return tlscoret::serve(p);
+    }
+    if let Some(p) = plat::arg_value("--tls-core-get").and_then(|p| p.parse().ok()) {
+        return tlscoret::get(p);
+    }
     if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
         return sshd::serve(p);
     }
@@ -152,7 +165,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 40] = [
+    let groups: [(&'static str, fn(&mut T)); 42] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -193,6 +206,8 @@ fn run() -> i32 {
         ("scriptmod", scriptmodt::run),
         ("sshcore", sshcoret::run),
         ("eap", eapt::run),
+        ("cookie", cookiet::run),
+        ("tlscore", tlscoret::run),
     ];
     let mut failed = 0;
     let mut total = 0;

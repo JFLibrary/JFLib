@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/web_dev.jfnet --scenario apps/JFNetworker/tests/scen/web_https.scn --golden apps/JFNetworker/tests/scen/web_https.report
+# golden scenario of simulated HTTPS (B4): WEB1 has a certificate of the lab CA on port 443 and one with a
+# fault each on ports 8441 to 8444, a script with TLS on 8445, a redirect to https on 8081; PC1 fetches
+# with curl what the Webbrowser fetches: the page over https, the handshake with -v, each refusal and what
+# -k makes of it, a port without TLS.  The GUI program runs tests/scen/web_https.scn on
+# tests/fixtures/web_dev.jfnet without a window and ends with the report, which must equal
+# tests/scen/web_https.report byte for byte on every target (the script itself is not run)

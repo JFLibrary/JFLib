@@ -344,6 +344,8 @@ pub struct MdDoc {
     // input was cut, the changes of the blocks the view has not taken yet
     pub(crate) dom: Dom,
     sheet: Rc<Sheet>,
+    // the texts of its <link rel="stylesheet"> elements, by their addresses as written (set_sheet)
+    linked: BTreeMap<String, String>,
     cut: bool,
     change: Option<DocChange>,
 }
@@ -2284,7 +2286,7 @@ impl MdDoc {
     fn derive(&mut self) {
         let mut dom = core::mem::take(&mut self.dom);
         let mut d = MdDoc::default();
-        let sheet = Rc::new(Sheet::of(&dom));
+        let sheet = Rc::new(Sheet::of(&dom, &self.linked));
         let mut h = dom_read(&dom, &sheet, true);
         let ranges = core::mem::take(&mut h.ranges);
         let para_blk = html_blocks(h, &mut d, 0, 0, 0, 0);
@@ -2408,6 +2410,46 @@ impl MdDoc {
         let redo: Vec<usize> = (nn - s..nn).filter(|&j| old[j - nn + on] != new[j] || !same(&old[j - nn + on], &new[j])).collect();
         let range = (a, on - a - s, nn - a - s);
         DocChange { range: (range.1 > 0 || range.2 > 0).then_some(range), redo, full: true, images, spots }
+    }
+
+    /// the addresses the document's <link rel="stylesheet"> elements name, as written, each once,
+    /// in document order (media other than screen / all left out); the view reads nothing by
+    /// itself: the app fetches them and answers with set_sheet
+    pub fn sheet_links(&self) -> &[String] {
+        self.sheet.links()
+    }
+
+    /// the text of a linked style sheet (None: it could not be had, its rules go): it counts where
+    /// its <link> stands among the <style> elements, from the next update on (a text for an
+    /// address no link names is kept for a link that comes later)
+    pub fn set_sheet(&mut self, href: &str, css: Option<&str>) {
+        let href = href.trim();
+        match css {
+            Some(c) => {
+                if self.linked.get(href).is_some_and(|x| x == c) {
+                    return;
+                }
+                self.linked.insert(String::from(href), String::from(c));
+            }
+            None => {
+                if self.linked.remove(href).is_none() {
+                    return;
+                }
+            }
+        }
+        if self.sheet.links().iter().any(|l| l == href) {
+            self.dom.changed = true;
+            self.dom.touched = None;
+        }
+    }
+
+    /// what the cascade gives an element ("property:value;" of the rules that match and its style
+    /// attribute, inherited properties not among them); empty for none, Markdown or a gone node
+    pub fn style_of(&self, n: MdNode) -> String {
+        match self.elem(n) {
+            Some(i) => self.sheet.style_of(&self.dom, i),
+            None => String::new(),
+        }
     }
 
     /// the boxes of CSS (MdBlock::boxes)

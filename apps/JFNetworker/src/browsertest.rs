@@ -54,7 +54,7 @@ fn req(id: u64, method: &str, url: &str, ctype: &str, body: &str) -> WebReq {
     if !ctype.is_empty() {
         headers.add("Content-Type", ctype);
     }
-    WebReq { id, method: s(method), url: s(url), headers, body: Vec::from(body.as_bytes()) }
+    WebReq { id, method: s(method), url: s(url), headers, body: Vec::from(body.as_bytes()), ..WebReq::default() }
 }
 
 fn web_reports(e: &mut Engine) -> Vec<(u64, Result<WebResp, WebFail>)> {
@@ -242,9 +242,12 @@ fn errors(t: &mut T) {
     let far = fetch_from(&mut e, PC1, req(4, "GET", "http://10.0.0.99/", "", ""), 40 * SEC);
     t.check("nobody at the address", matches!(kind(&far), Some(WebErr::NoRoute | WebErr::Timeout)));
     // not http
-    let r = get(&mut e, "https://web.lab/");
-    t.eq("https", kind(&r), Some(WebErr::Https));
-    t.check("https: a later milestone", r.and_then(|x| x.err()).is_some_and(|f| f.msg.text().contains("späteren Ausbaustufe")));
+    // https goes to port 443, where nobody listens here (a server that speaks TLS: group webdev)
+    t.eq("https: port 443", kind(&get(&mut e, "https://web.lab/")), Some(WebErr::Refused));
+    // the web server of port 80 speaks no TLS: its answer is no record
+    let r = get(&mut e, "https://web.lab:80/");
+    t.eq("https: a port without TLS", kind(&r), Some(WebErr::Tls));
+    t.check("https: says why", r.and_then(|x| x.err()).is_some_and(|f| f.msg.text().contains("protocol_version")));
     t.eq("another scheme", kind(&get(&mut e, "ftp://web.lab/")), Some(WebErr::BadUrl));
     t.eq("no host", kind(&get(&mut e, "http:///a")), Some(WebErr::BadUrl));
     t.eq("a bad port", kind(&get(&mut e, "http://web.lab:99999/")), Some(WebErr::BadUrl));

@@ -642,3 +642,7 @@ pub(crate) const ID_ENT_METHOD: u32 = 0x0001_DC81;
 pub(crate) const ID_PAGE0: u32 = 0x0001_E000;
 /// a frame for a page's next timer: TIMER_PAGE + k % 4
 pub(crate) const TIMER_PAGE: u32 = 0x1C8;
+// ---- B4: the Webbrowser's developer view (commands 950 .. 969, widgets 0x0001_E800 .. 0x0001_EFFF,
+// timers 0x1CC .. 0x1CF; the commands and timers are not used)
+/// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
+pub(crate) const ID_DEV0: u32 = 0x0001_E800;

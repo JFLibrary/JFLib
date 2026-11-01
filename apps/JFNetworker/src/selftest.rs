@@ -165,9 +165,11 @@ mod pagescripttest;
 mod dot1xtest;
 #[path = "imaptest.rs"]
 mod imaptest;
+#[path = "webdevtest.rs"]
+mod webdevtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 53] = [
+    let groups: [(&'static str, fn(&mut T)); 54] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -217,6 +219,7 @@ pub fn run() -> i32 {
         ("units", unitstest::run),
         ("browser", browsertest::run),
         ("pagescript", pagescripttest::run),
+        ("webdev", webdevtest::run),
         ("ssh", sshtest::run),
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),

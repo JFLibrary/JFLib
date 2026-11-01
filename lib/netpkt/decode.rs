@@ -20,6 +20,10 @@
 // packet with its length, padding and message name, the lists of a KEXINIT and the values of the
 // key exchange; everything after NEWKEYS is one field with the value "verschlüsselt" (a German
 // word on purpose: it is what the inspector's reader needs to see, no protocol term) (ssh.rs).
+// TLS (TCP ports 443 and 8443) shows every record a segment holds with its type, version and length;
+// what goes in the clear field by field (ClientHello and ServerHello with their random, session id,
+// suites and extensions, an alert in the clear); everything protected is one field with the value
+// "verschlüsselt" (tls.rs).  Only what a capture tool can see without keys is here.
 // HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 // shows the start line, the header lines and the body bytes of every message the segment
 // holds; a segment in the middle of a message is a "Continuation".
@@ -643,6 +647,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Radius => Some(radius_layer(frame, off, len)),
             Proto::Telnet => Some(telnet_layer(frame, off, len)),
             Proto::Ssh => Some(ssh_layer(frame, off, len)),
+            Proto::Tls => Some(tls_layer(frame, off, len)),
             Proto::Eap => Some(eap_layer(frame, off, len)),
             Proto::Imap => Some(imap_layer(frame, off, len, mail_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
@@ -1110,6 +1115,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Radius => Some(radius_info(b)),
         Proto::Telnet => Some(telnet_info(b)),
         Proto::Ssh => Some(ssh_info(b)),
+        Proto::Tls => Some(tls_info(b)),
         Proto::Eap => Some(crate::eap::info(b)),
         Proto::Imap => Some(imap_info(b)),
         _ => None,
@@ -3492,6 +3498,174 @@ fn ssh_info(b: &[u8]) -> String {
         })
         .collect();
     if parts.is_empty() { String::from("SSH") } else { parts.join(", ") }
+}
+
+// ---------------------------------------------------------------- TLS
+
+// the fields of a hello: `m` the handshake message's body at `at` in the frame -> the SNI
+fn tls_hello(l: &mut B, m: &[u8], at: usize, client: bool) -> Option<()> {
+    use crate::tls::{ext_name, group_name, sig_name, suite_name, EXT_GROUPS, EXT_KEY_SHARE, EXT_SERVER_NAME, EXT_SIG_ALGS, EXT_VERSIONS};
+    let hexes = |v: &[u8]| {
+        let h: Vec<String> = v.iter().take(32).map(|b| format!("{:02x}", b)).collect();
+        h.concat()
+    };
+    let list16 = |v: &[u8], name: fn(u16) -> &'static str| {
+        let w: Vec<String> = v.chunks_exact(2).map(|c| {
+            let x = u16::from_be_bytes([c[0], c[1]]);
+            format!("{} (0x{:04x})", name(x), x)
+        }).collect();
+        w.join(", ")
+    };
+    let version = |x: u16| match x {
+        0x0304 => "TLS 1.3",
+        0x0303 => "TLS 1.2",
+        0x0301 => "TLS 1.0",
+        _ => "unknown",
+    };
+    l.f("Version", at, 2, format!("{} (0x{:02x}{:02x})", version(be16(m.get(..2)?, 0)), m[0], m[1]));
+    l.f("Random", at + 2, 32, hexes(m.get(2..34)?));
+    let n = *m.get(34)? as usize;
+    l.f("Session ID", at + 34, 1 + n, hexes(m.get(35..35 + n)?));
+    let mut p = 35 + n;
+    if client {
+        let k = be16(m.get(p..p + 2)?, 0) as usize;
+        l.f("Cipher Suites", at + p, 2 + k, list16(m.get(p + 2..p + 2 + k)?, suite_name));
+        p += 2 + k;
+        let k = *m.get(p)? as usize;
+        l.f("Compression Methods", at + p, 1 + k, format!("{} (null)", k));
+        p += 1 + k;
+    } else {
+        let s = be16(m.get(p..p + 2)?, 0);
+        l.f("Cipher Suite", at + p, 2, format!("{} (0x{:04x})", suite_name(s), s));
+        l.f("Compression Method", at + p + 2, 1, format!("{}", m.get(p + 2)?));
+        p += 3;
+    }
+    let total = be16(m.get(p..p + 2)?, 0) as usize;
+    p += 2;
+    let end = p + total;
+    while p + 4 <= end {
+        let e = be16(m, p);
+        let k = be16(m, p + 2) as usize;
+        let v = m.get(p + 4..p + 4 + k)?;
+        let shown = match e {
+            EXT_SERVER_NAME => String::from_utf8_lossy(v.get(5..).unwrap_or(&[])).into_owned(),
+            EXT_GROUPS => list16(v.get(2..).unwrap_or(&[]), group_name),
+            EXT_SIG_ALGS => list16(v.get(2..).unwrap_or(&[]), sig_name),
+            EXT_VERSIONS => {
+                let w = if client { v.get(1..).unwrap_or(&[]) } else { v };
+                let names: Vec<&str> = w.chunks_exact(2).map(|c| version(u16::from_be_bytes([c[0], c[1]]))).collect();
+                names.join(", ")
+            }
+            EXT_KEY_SHARE => {
+                let w = if client { v.get(2..).unwrap_or(&[]) } else { v };
+                let g = w.get(..2).map_or(0, |c| u16::from_be_bytes([c[0], c[1]]));
+                format!("{}: {}", group_name(g), hexes(w.get(4..).unwrap_or(&[])))
+            }
+            _ => format!("{} bytes", k),
+        };
+        let name = match e {
+            EXT_SERVER_NAME => "Extension server_name",
+            EXT_GROUPS => "Extension supported_groups",
+            EXT_SIG_ALGS => "Extension signature_algorithms",
+            EXT_VERSIONS => "Extension supported_versions",
+            EXT_KEY_SHARE => "Extension key_share",
+            _ => "Extension",
+        };
+        let shown = if name == "Extension" { format!("{} (0x{:04x}): {}", ext_name(e), e, shown) } else { shown };
+        l.f(name, at + p, 4 + k, shown);
+        p += 4 + k;
+    }
+    Some(())
+}
+
+fn tls_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::tls::{alert_name, ct_name, dissect, hs_name, Part, CT_ALERT, CT_CCS, CT_DATA, CT_HANDSHAKE, HS_CLIENT_HELLO, HS_SERVER_HELLO};
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Tls, off, len, String::from("Transport Layer Security"));
+    for part in dissect(b) {
+        match part {
+            Part::Record { at, len: n, ty, version, length } => {
+                l.f("Content Type", off + at, 1, format!("{} ({})", ct_name(ty), ty));
+                l.f("Record Version", off + at + 1, 2, format!("0x{:04x}", version));
+                l.f("Length", off + at + 3, 2, format!("{}", length));
+                let body = &b[at + 5..at + n];
+                match ty {
+                    CT_HANDSHAKE if body.len() >= 4 => {
+                        l.f("Handshake Type", off + at + 5, 1, format!("{} ({})", hs_name(body[0]), body[0]));
+                        l.f("Handshake Length", off + at + 6, 3, format!("{}", (body[1] as usize) << 16 | (body[2] as usize) << 8 | body[3] as usize));
+                        if matches!(body[0], HS_CLIENT_HELLO | HS_SERVER_HELLO) && tls_hello(&mut l, &body[4..], off + at + 9, body[0] == HS_CLIENT_HELLO).is_none() {
+                            l.bad(String::from("a hello that cannot be read"));
+                        }
+                    }
+                    CT_ALERT if body.len() == 2 => {
+                        l.f("Alert Level", off + at + 5, 1, String::from(if body[0] == 2 { "fatal (2)" } else { "warning (1)" }));
+                        l.f("Alert Description", off + at + 6, 1, format!("{} ({})", alert_name(body[1]), body[1]));
+                    }
+                    CT_CCS => {}
+                    CT_DATA => l.f("Encrypted Record", off + at + 5, n - 5, String::from("verschlüsselt")),
+                    _ => {}
+                }
+                if n < 5 + length {
+                    l.f("Continuation", off + at + n, 0, String::from("the rest comes in the next segment"));
+                }
+            }
+            Part::Rest { at, len: n } => l.f("Continuation", off + at, n, String::from("the rest of a record")),
+        }
+    }
+    l
+}
+
+/// "Client Hello (web.lab)", "Server Hello, verschlüsselt (1036 bytes)", "Alert (unknown_ca)"
+fn tls_info(b: &[u8]) -> String {
+    use crate::tls::{alert_name, dissect, hs_name, Part, CT_ALERT, CT_CCS, CT_DATA, CT_HANDSHAKE, HS_CLIENT_HELLO};
+    let mut parts: Vec<String> = Vec::new();
+    let mut hidden = 0usize;
+    for p in dissect(b) {
+        match p {
+            Part::Record { at, len, ty, .. } => {
+                let body = &b[at + 5..at + len];
+                match ty {
+                    CT_DATA => hidden += body.len() + 5,
+                    CT_HANDSHAKE if body.len() >= 4 => {
+                        let mut s = String::from(hs_name(body[0]));
+                        if body[0] == HS_CLIENT_HELLO {
+                            if let Some(n) = tls_sni(&body[4..]) {
+                                s = format!("{} ({})", s, n);
+                            }
+                        }
+                        parts.push(s);
+                    }
+                    CT_ALERT if body.len() == 2 => parts.push(format!("Alert ({})", alert_name(body[1]))),
+                    CT_CCS => parts.push(String::from("Change Cipher Spec")),
+                    _ => {}
+                }
+            }
+            Part::Rest { len, .. } => hidden += len,
+        }
+    }
+    if hidden > 0 {
+        parts.push(format!("verschlüsselt ({} bytes)", hidden));
+    }
+    if parts.is_empty() { String::from("TLS") } else { parts.join(", ") }
+}
+
+// the SNI of a ClientHello's body
+fn tls_sni(m: &[u8]) -> Option<String> {
+    use crate::tls::EXT_SERVER_NAME;
+    let n = *m.get(34)? as usize;
+    let mut p = 35 + n;
+    p += 2 + be16(m.get(p..p + 2)?, 0) as usize;
+    p += 1 + *m.get(p)? as usize;
+    let end = p + 2 + be16(m.get(p..p + 2)?, 0) as usize;
+    p += 2;
+    while p + 4 <= end {
+        let (e, k) = (be16(m, p), be16(m, p + 2) as usize);
+        if e == EXT_SERVER_NAME {
+            return Some(String::from_utf8_lossy(m.get(p + 9..p + 4 + k)?).into_owned());
+        }
+        p += 4 + k;
+    }
+    None
 }
 
 // ---------------------------------------------------------------- SNMPv3

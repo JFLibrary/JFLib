@@ -1,0 +1,107 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/web_dev.jfnet
+# the shot matrix of the Webbrowser's B4 on PC1's desktop: a page with its style sheets, the warning about
+# a certificate, the certificate's card, the developer view's four tabs, each light and dark at 100 and
+# 150 % (build/jfnetworker/dev_<view>_<theme>_<scale>.png)
+# Ids: the window 26624; the address 26800; the lock 124929; the developer view's button 124928
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 980 720
+dblclick listitem:"Webbrowser"
+# ---- a page with its style sheets
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+expect heading:"Hofladen Sonnenfeld" exists
+shot build/jfnetworker/dev_page_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_page_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_page_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_page_light_150.png window 26624
+scale 100 window 26624
+# ---- Netzwerk
+key f12
+click tab:"Netzwerk"
+click text:"http://web.lab/basis.css"
+expect text:"Anfrage" exists
+shot build/jfnetworker/dev_net_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_net_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_net_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_net_light_150.png window 26624
+scale 100 window 26624
+# ---- Elemente
+click tab:"Elemente"
+click listitem:"<h1>"
+expect text:"Stile aus dem Stylesheet" exists
+shot build/jfnetworker/dev_elements_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_elements_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_elements_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_elements_light_150.png window 26624
+scale 100 window 26624
+# ---- Cookies, on a page that set some
+click #26800
+key ctrl+a
+type "web.lab:8080/kekse\n"
+wait 500
+click tab:"Cookies"
+expect text:"sitzung" exists
+shot build/jfnetworker/dev_cookies_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_cookies_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_cookies_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_cookies_light_150.png window 26624
+scale 100 window 26624
+# ---- Konsole, with what the jar refused
+click tab:"Konsole"
+expect text:"Cookie sicher von web.lab nicht gespeichert: Secure geht nur über https" exists
+shot build/jfnetworker/dev_console_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_console_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_console_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_console_light_150.png window 26624
+scale 100 window 26624
+key f12
+# ---- the warning about a certificate
+click #26800
+key ctrl+a
+type "https://web.lab:8442/\n"
+wait 1000
+expect heading:"Diese Verbindung ist nicht sicher" exists
+shot build/jfnetworker/dev_warning_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_warning_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_warning_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_warning_light_150.png window 26624
+scale 100 window 26624
+# ---- the certificate's card
+click #26800
+key ctrl+a
+type "https://web.lab/\n"
+wait 1000
+click #124929
+expect text:"Fingerabdruck (SHA-256)" exists
+shot build/jfnetworker/dev_card_light_100.png window 26624
+theme dark
+shot build/jfnetworker/dev_card_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/dev_card_dark_150.png window 26624
+theme light
+shot build/jfnetworker/dev_card_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn
