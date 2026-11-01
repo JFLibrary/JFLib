@@ -107,6 +107,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Cookies as RFC 6265 reads them, without I/O and a clock (`netpkt::cookie`: `SetCookie::parse`, `parse_date`, `Jar`, SameSite from RFC 6265bis as far as a small browser needs it)
 - **netpkt:** TLS 1.3 without I/O and a clock (`netpkt::tls`: a `Core` for both sides, TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519, a seed gives the same bytes) and certificates of a private PKI (`netpkt::x509`); `decode` dissects TLS records
 - **ui:** Style sheets from outside for the document view: `MdDoc::sheet_links`, `MdDoc::set_sheet` (a text counts where its `<link>` stands), `MdDoc::style_of` (what the cascade gives an element)
+- **JFNetworker:** More devices in the catalog, all manufacturer-neutral with fixed ports: JF-S8 (unmanaged, no command line), JF-S8P, JF-S24, JF-S48P, JF-S24M (2.5G, PoE++), the leaf and spine L3 switches JF-S48Y and JF-S32C, the branch router JF-R2, the firewalls JF-FW2 and JF-FW8, the access point JF-AP7 (802.11be), a repeater and a bridge without a command line, symbols for the small boxes
 
 ### Changed
 
@@ -128,6 +129,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui::DEv has the new variants Toggle (a collapse button of a DN_TOGGLE node) and Resize (the handle of a DN_RESIZE node), ui::DHit Toggle and Resize; a match over every event or hit needs arms for them
 - **script:** script::Diagnostic, Error and TraceLine carry the file of their position (file), Status has the variant Paused, Host has load (with a default); exhaustive matches on Status and struct literals of Error and Diagnostic need the new parts; messages of single files are unchanged
 - **ui:** A dock tab, or the empty part of a dock's tab strip, can drag only after the button was held for 300 ms (`DOCK_HOLD_MS`): a click that slips no longer moves or floats a panel. At 300 ms the tab shows it (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`), movement before that does not count, Esc ends the hold; clicks, double clicks, the menu and the splitters need none. Scripts: `drag ... hold MS` (or `wait` after `down`)
+- **JFNetworker:** The title of JF-FW says what a firewall does today, a router with access lists and NAT; zones and stateful filtering come with milestone F2
 
 ### Fixed
 

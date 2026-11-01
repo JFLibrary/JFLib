@@ -1,8 +1,8 @@
 # the symbol sheet light and dark: every symbol at 32, 64 and 128 DIP and without power
 # (rasters from the SymbolCache), then at 250 % where 128 DIP is 320 px (vectors)
 theme light
-size 1430 1170
-expect text:"Gerätesymbole (26)" exists
+size 1430 1320
+expect text:"Gerätesymbole (30)" exists
 expect "Dunkel" exists
 shot build/symboltest/sheet_light.png
 click "Dunkel"

@@ -14,9 +14,10 @@
 // Media::name, a model's name and title (the tables marked "i18n" for tools/i18n_check.py).
 //
 // The models are vendor neutral but modern: multi-gigabit copper, SFP+/SFP28/QSFP28 optics,
-// PoE, WLAN 802.11ax with 6 GHz.  Network devices speak the IOS-like command line and use IOS interface names;
+// PoE, WLAN 802.11ax and 802.11be with 6 GHz.  Network devices speak the IOS-like command line and use IOS interface names;
 // hosts have a Linux-like shell and Linux names (eth0, wlan0).  `features` (F_*) tells the
-// simulator which parts a device has (bridge, router, host OS, ...).
+// simulator which parts a device has (bridge, router, host OS, ...).  A firewall today is a router
+// with access lists and NAT, its title says so; zones and stateful filtering come with milestone F2.
 
 use alloc::format;
 use alloc::string::String;
@@ -172,6 +173,8 @@ pub enum Poe {
     None,
     /// supplies power (a PoE+ switch port)
     Pse,
+    /// supplies more power (a PoE++ switch port, IEEE 802.3bt)
+    PseBt,
     /// is powered through this port (AP, phone, camera)
     Pd,
 }
@@ -182,7 +185,8 @@ pub const F_HOST: u32 = 1;
 pub const F_BRIDGE: u32 = 2;
 /// forwards IP between interfaces (router, L3 switch)
 pub const F_ROUTER: u32 = 4;
-/// stateful filtering and zones
+/// a firewall model; nothing reads it yet: it routes with access lists and NAT, zones and stateful
+/// filtering come with milestone F2
 pub const F_FIREWALL: u32 = 8;
 /// bridges its radios with its wired port (access point)
 pub const F_AP: u32 = 16;
@@ -190,7 +194,8 @@ pub const F_AP: u32 = 16;
 pub const F_HUB: u32 = 32;
 /// the provider network / Internet
 pub const F_CLOUD: u32 = 64;
-/// network address translation for a private LAN (home router, firewall)
+/// a model made for address translation (home router, firewall); nothing reads it: NAT comes from
+/// the device's configuration
 pub const F_NAT: u32 = 128;
 /// not a device (a note on the canvas)
 pub const F_ANNOTATION: u32 = 256;
@@ -225,6 +230,7 @@ const fn console() -> PortGroup {
 
 pub const K1G: u32 = 1_000_000;
 pub const K2G5: u32 = 2_500_000;
+pub const K5G: u32 = 5_000_000;
 pub const K10G: u32 = 10_000_000;
 pub const K25G: u32 = 25_000_000;
 pub const K100G: u32 = 100_000_000;
@@ -310,6 +316,7 @@ impl Model {
                 let base = if m.is_optical() { msg!("{}× {} {}", g.count, speed_str(g.kbps), m.name()) } else { msg!("{}× {}", g.count, speed_str(g.kbps)) };
                 match g.poe {
                     Poe::Pse => msg!("{} PoE+", base),
+                    Poe::PseBt => msg!("{} PoE++", base),
                     Poe::Pd => msg!("{} (PoE-gespeist)", base),
                     Poe::None => base,
                 }
@@ -351,7 +358,7 @@ pub fn speed_msg(kbps: u32) -> Msg {
 }
 
 use Media::*;
-use Poe::{None as NoPoe, Pd, Pse};
+use Poe::{None as NoPoe, Pd, Pse, PseBt};
 
 // i18n: name title
 static CATALOG: &[Model] = &[
@@ -486,6 +493,132 @@ static CATALOG: &[Model] = &[
         ],
     },
     Model {
+        id: "jf-s8",
+        name: "JF-S8",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Tisch-Switch 8× 1G, unmanaged (ohne Befehlszeile)",
+        symbol: "switch_desk",
+        cli: CliStyle::None,
+        features: F_BRIDGE,
+        name_prefix: "SW",
+        groups: &[grp("port", 0, 8, Rj45, K1G, true, NoPoe)],
+    },
+    Model {
+        id: "jf-s8p",
+        name: "JF-S8P",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Kompakt-Switch 8× 1G PoE+, 2× 10G SFP+",
+        symbol: "switch_desk",
+        cli: CliStyle::Ios,
+        features: F_BRIDGE,
+        name_prefix: "SW",
+        groups: &[
+            grp("GigabitEthernet1/0/", 1, 8, Rj45, K1G, true, Pse),
+            grp("TenGigabitEthernet1/1/", 1, 2, SfpPlus, K10G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-s24",
+        name: "JF-S24",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Access-Switch 24× 1G, 4× 10G SFP+",
+        symbol: "switch_l2",
+        cli: CliStyle::Ios,
+        features: F_BRIDGE,
+        name_prefix: "SW",
+        groups: &[
+            grp("GigabitEthernet1/0/", 1, 24, Rj45, K1G, true, NoPoe),
+            grp("TenGigabitEthernet1/1/", 1, 4, SfpPlus, K10G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-s48p",
+        name: "JF-S48P",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Access-Switch 48× 1G PoE+, 4× 10G SFP+",
+        symbol: "switch_l2",
+        cli: CliStyle::Ios,
+        features: F_BRIDGE,
+        name_prefix: "SW",
+        groups: &[
+            grp("GigabitEthernet1/0/", 1, 48, Rj45, K1G, true, Pse),
+            grp("TenGigabitEthernet1/1/", 1, 4, SfpPlus, K10G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-s24m",
+        name: "JF-S24M",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Multi-Gigabit-Switch 24× 2.5G PoE++, 4× 25G SFP28",
+        symbol: "switch_l2",
+        cli: CliStyle::Ios,
+        features: F_BRIDGE,
+        name_prefix: "SW",
+        groups: &[
+            grp("TwoGigabitEthernet1/0/", 1, 24, Rj45, K2G5, true, PseBt),
+            grp("TwentyFiveGigE1/1/", 1, 4, Sfp28, K25G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-r4",
+        name: "JF-R4",
+        kind: DeviceKind::Router,
+        category: Category::Network,
+        title: "Edge-Router 4× 1G, 2× 10G SFP+, 2× Seriell",
+        symbol: "router",
+        cli: CliStyle::Ios,
+        features: F_ROUTER,
+        name_prefix: "R",
+        groups: &[
+            grp("GigabitEthernet0/0/", 0, 4, Rj45, K1G, false, NoPoe),
+            grp("TenGigabitEthernet0/1/", 0, 2, SfpPlus, K10G, false, NoPoe),
+            grp("Serial0/2/", 0, 2, Serial, 2048, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-r2",
+        name: "JF-R2",
+        kind: DeviceKind::Router,
+        category: Category::Network,
+        title: "Filial-Router 2× 1G, 2× Seriell",
+        symbol: "router",
+        cli: CliStyle::Ios,
+        features: F_ROUTER,
+        name_prefix: "R",
+        groups: &[
+            grp("GigabitEthernet0/0/", 0, 2, Rj45, K1G, false, NoPoe),
+            grp("Serial0/1/", 0, 2, Serial, 2048, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-r8",
+        name: "JF-R8",
+        kind: DeviceKind::Router,
+        category: Category::Network,
+        title: "Core-Router 8× 10G SFP+, 2× 100G QSFP28",
+        symbol: "router",
+        cli: CliStyle::Ios,
+        features: F_ROUTER,
+        name_prefix: "CR",
+        groups: &[
+            one("GigabitEthernet0", Rj45, K1G, false, NoPoe),
+            grp("TenGigabitEthernet0/0/", 0, 8, SfpPlus, K10G, false, NoPoe),
+            grp("HundredGigE0/1/", 0, 2, Qsfp28, K100G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
         id: "jf-s24l3",
         name: "JF-S24L3",
         kind: DeviceKind::L3Switch,
@@ -518,36 +651,33 @@ static CATALOG: &[Model] = &[
         ],
     },
     Model {
-        id: "jf-r4",
-        name: "JF-R4",
-        kind: DeviceKind::Router,
+        id: "jf-s48y",
+        name: "JF-S48Y",
+        kind: DeviceKind::L3Switch,
         category: Category::Network,
-        title: "Edge-Router 4× 1G, 2× 10G SFP+, 2× Seriell",
-        symbol: "router",
+        title: "Leaf-Switch (L3) 48× 25G SFP28, 8× 100G QSFP28",
+        symbol: "switch_l3",
         cli: CliStyle::Ios,
-        features: F_ROUTER,
-        name_prefix: "R",
+        features: F_BRIDGE | F_ROUTER,
+        name_prefix: "Leaf",
         groups: &[
-            grp("GigabitEthernet0/0/", 0, 4, Rj45, K1G, false, NoPoe),
-            grp("TenGigabitEthernet0/1/", 0, 2, SfpPlus, K10G, false, NoPoe),
-            grp("Serial0/2/", 0, 2, Serial, 2048, false, NoPoe),
+            grp("TwentyFiveGigE1/0/", 1, 48, Sfp28, K25G, false, NoPoe),
+            grp("HundredGigE1/0/", 49, 8, Qsfp28, K100G, false, NoPoe),
             console(),
         ],
     },
     Model {
-        id: "jf-r8",
-        name: "JF-R8",
-        kind: DeviceKind::Router,
+        id: "jf-s32c",
+        name: "JF-S32C",
+        kind: DeviceKind::L3Switch,
         category: Category::Network,
-        title: "Core-Router 8× 10G SFP+, 2× 100G QSFP28",
-        symbol: "router",
+        title: "Spine-Switch (L3) 32× 100G QSFP28",
+        symbol: "switch_l3",
         cli: CliStyle::Ios,
-        features: F_ROUTER,
-        name_prefix: "CR",
+        features: F_BRIDGE | F_ROUTER,
+        name_prefix: "Spine",
         groups: &[
-            one("GigabitEthernet0", Rj45, K1G, false, NoPoe),
-            grp("TenGigabitEthernet0/0/", 0, 8, SfpPlus, K10G, false, NoPoe),
-            grp("HundredGigE0/1/", 0, 2, Qsfp28, K100G, false, NoPoe),
+            grp("HundredGigE1/0/", 1, 32, Qsfp28, K100G, false, NoPoe),
             console(),
         ],
     },
@@ -579,13 +709,37 @@ static CATALOG: &[Model] = &[
         name_prefix: "Hub",
         groups: &[grp("port", 0, 8, Rj45, 100_000, true, NoPoe)],
     },
+    Model {
+        id: "repeater",
+        name: "Repeater",
+        kind: DeviceKind::Hub,
+        category: Category::Network,
+        title: "Repeater 2× 1G (Schicht 1: verlängert eine Kupferstrecke)",
+        symbol: "repeater",
+        cli: CliStyle::None,
+        features: F_HUB,
+        name_prefix: "Rep",
+        groups: &[grp("port", 0, 2, Rj45, K1G, true, NoPoe)],
+    },
+    Model {
+        id: "bridge",
+        name: "Bridge",
+        kind: DeviceKind::Switch,
+        category: Category::Network,
+        title: "Bridge 2× 1G (Schicht 2: lernt Adressen, ohne Befehlszeile)",
+        symbol: "bridge",
+        cli: CliStyle::None,
+        features: F_BRIDGE,
+        name_prefix: "Br",
+        groups: &[grp("port", 0, 2, Rj45, K1G, true, NoPoe)],
+    },
     // ---- security
     Model {
         id: "jf-fw",
         name: "JF-FW",
         kind: DeviceKind::Firewall,
         category: Category::Security,
-        title: "Next-Generation-Firewall 8× 1G, 2× 10G SFP+",
+        title: "Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+",
         symbol: "firewall_ngfw",
         cli: CliStyle::Ios,
         features: F_ROUTER | F_FIREWALL | F_NAT,
@@ -593,6 +747,38 @@ static CATALOG: &[Model] = &[
         groups: &[
             grp("GigabitEthernet0/", 0, 8, Rj45, K1G, false, NoPoe),
             grp("TenGigabitEthernet0/", 8, 2, SfpPlus, K10G, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-fw2",
+        name: "JF-FW2",
+        kind: DeviceKind::Firewall,
+        category: Category::Security,
+        title: "Kleine Firewall (Router mit ACLs und NAT) 1G WAN, 4× 1G LAN",
+        symbol: "firewall_desk",
+        cli: CliStyle::Ios,
+        features: F_ROUTER | F_FIREWALL | F_NAT,
+        name_prefix: "FW",
+        groups: &[
+            grp("GigabitEthernet0/", 0, 1, Rj45, K1G, false, NoPoe),
+            grp("GigabitEthernet0/", 1, 4, Rj45, K1G, true, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-fw8",
+        name: "JF-FW8",
+        kind: DeviceKind::Firewall,
+        category: Category::Security,
+        title: "Rechenzentrums-Firewall (Router mit ACLs und NAT) 8× 10G SFP+, 4× 100G QSFP28",
+        symbol: "firewall_ngfw",
+        cli: CliStyle::Ios,
+        features: F_ROUTER | F_FIREWALL | F_NAT,
+        name_prefix: "FW",
+        groups: &[
+            grp("TenGigabitEthernet0/0/", 0, 8, SfpPlus, K10G, false, NoPoe),
+            grp("HundredGigE0/1/", 0, 4, Qsfp28, K100G, false, NoPoe),
             console(),
         ],
     },
@@ -612,6 +798,24 @@ static CATALOG: &[Model] = &[
             one("Dot11Radio0", RadioAp, 574_000, false, NoPoe),
             one("Dot11Radio1", RadioAp, 2_400_000, false, NoPoe),
             one("Dot11Radio2", RadioAp, 2_400_000, false, NoPoe),
+            console(),
+        ],
+    },
+    Model {
+        id: "jf-ap7",
+        name: "JF-AP7",
+        kind: DeviceKind::AccessPoint,
+        category: Category::WirelessWan,
+        title: "WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist)",
+        symbol: "ap_wifi6e",
+        cli: CliStyle::Ios,
+        features: F_AP | F_BRIDGE,
+        name_prefix: "AP",
+        groups: &[
+            one("FiveGigabitEthernet0", Rj45, K5G, false, Pd),
+            one("Dot11Radio0", RadioAp, 1_376_000, false, NoPoe),
+            one("Dot11Radio1", RadioAp, 5_765_000, false, NoPoe),
+            one("Dot11Radio2", RadioAp, 11_530_000, false, NoPoe),
             console(),
         ],
     },
@@ -856,6 +1060,8 @@ impl Form {
 pub fn form(m: &Model) -> Form {
     match m.kind {
         DeviceKind::Pc | DeviceKind::Printer | DeviceKind::IpPhone | DeviceKind::SmartTv | DeviceKind::HomeRouter | DeviceKind::Modem | DeviceKind::Hub => Form::Desktop,
+        // the small boxes among the switches, routers and firewalls
+        _ if matches!(m.id, "jf-s8" | "jf-s8p" | "bridge" | "jf-r2" | "jf-fw2") => Form::Desktop,
         DeviceKind::Laptop | DeviceKind::Smartphone | DeviceKind::Tablet => Form::Handheld,
         DeviceKind::AccessPoint | DeviceKind::IotCamera | DeviceKind::IotSensor => Form::Ceiling,
         DeviceKind::Server if m.id == "server-tower" => Form::Tower,
@@ -870,7 +1076,7 @@ pub fn rack_units(m: &Model) -> u8 {
         return 0;
     }
     match m.id {
-        "jf-r8" | "database" | "container-host" => 2,
+        "jf-r8" | "jf-fw8" | "database" | "container-host" => 2,
         _ => 1,
     }
 }

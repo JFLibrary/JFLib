@@ -68,6 +68,9 @@
 // part of radiusd and wlan, cli/dot1x.rs).
 // imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
 // mailc.rs and cli/mail.rs).
+// modelstest.rs: the device models of wave 17 at work (group models: the ports of each, a ping
+// through each new switch, routing, a serial line, ACLs and NAT on the firewalls, the repeater,
+// the bridge, the access point).
 
 use alloc::format;
 use alloc::string::String;
@@ -167,9 +170,11 @@ mod dot1xtest;
 mod imaptest;
 #[path = "webdevtest.rs"]
 mod webdevtest;
+#[path = "modelstest.rs"]
+mod modelstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 54] = [
+    let groups: [(&'static str, fn(&mut T)); 55] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -224,6 +229,7 @@ pub fn run() -> i32 {
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),
         ("imap", imaptest::run),
+        ("models", modelstest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

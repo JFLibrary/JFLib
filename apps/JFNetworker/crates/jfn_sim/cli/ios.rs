@@ -674,6 +674,7 @@ fn type_help(ty: &str) -> String {
     String::from(match ty {
         "GigabitEthernet" => "Gigabit Ethernet port (1 Gbit/s)",
         "TwoGigabitEthernet" => "Multi-gigabit Ethernet port (2.5 Gbit/s)",
+        "FiveGigabitEthernet" => "Multi-gigabit Ethernet port (5 Gbit/s)",
         "TenGigabitEthernet" => "10 Gigabit Ethernet port",
         "TwentyFiveGigE" => "25 Gigabit Ethernet port",
         "HundredGigE" => "100 Gigabit Ethernet port",
