@@ -118,6 +118,8 @@ pub(crate) fn run(t: &mut T) {
     local_login(t);
     enable_levels(t);
     config_roundtrip(t);
+    submodes(t);
+    bad_methods(t);
     radius_login(t);
     radius_reject(t);
     wrong_secret(t);
@@ -215,6 +217,46 @@ fn config_roundtrip(t: &mut T) {
     let _ = cli(&mut e2, R1, &["admin"], 0);
     let _ = cli(&mut e2, R1, &["adminpw"], 0);
     t.eq("reload: login still works", e2.cli_prompt(R1), s("R1#"));
+}
+
+/// the submodes of the servers: exit goes back one level, end leaves the configuration, do runs
+/// an EXEC command
+fn submodes(t: &mut T) {
+    let mut e = engine(&project("hostname R1\n!\nend\n", None));
+    run_for(&mut e, SEC);
+    let _ = cli(&mut e, R1, &["enable", "configure terminal"], 0);
+    for (enter, prompt) in [("radius server s1", "R1(config-radius-server)#"), ("aaa group server radius g1", "R1(config-sg-radius)#")] {
+        let _ = cli(&mut e, R1, &[enter], 0);
+        t.eq(&format!("{}: the prompt", enter), e.cli_prompt(R1), s(prompt));
+        let o = cli(&mut e, R1, &["exit"], 0);
+        t.eq(&format!("{}: exit goes back one level", enter), e.cli_prompt(R1), s("R1(config)#"));
+        t.eq(&format!("{}: exit leaves no configuration", enter), o, s(""));
+        let _ = cli(&mut e, R1, &[enter], 0);
+        t.check(&format!("{}: do", enter), cli(&mut e, R1, &["do show users"], 0).contains("Line") && e.cli_prompt(R1) == prompt);
+        let _ = cli(&mut e, R1, &["end"], 0);
+        t.eq(&format!("{}: end leaves", enter), e.cli_prompt(R1), s("R1#"));
+        let _ = cli(&mut e, R1, &["configure terminal"], 0);
+    }
+    // another command of the device's configuration still falls back to it
+    let _ = cli(&mut e, R1, &["radius server s1", "hostname R2"], 0);
+    t.eq("a global command in the submode", e.cli_prompt(R1), s("R2(config)#"));
+}
+
+/// a word that is no method: the console says so and nothing changes; a boot keeps the line
+fn bad_methods(t: &mut T) {
+    let want = "% Unknown authentication method \"quatsch\"";
+    let mut e = engine(&project("hostname R1\n!\nend\n", None));
+    run_for(&mut e, SEC);
+    let _ = cli(&mut e, R1, &["enable", "configure terminal", "aaa new-model"], 0);
+    let before = e.running_config(R1);
+    for line in ["aaa authentication login default quatsch", "aaa authentication login LISTE local quatsch", "aaa authentication enable default quatsch", "aaa authorization exec default quatsch", "aaa accounting exec default start-stop quatsch"] {
+        t.eq(line, cli(&mut e, R1, &[line], 0), format!("{}\n", want));
+    }
+    t.eq("no method at all", cli(&mut e, R1, &["aaa authorization exec default group"], 0), s("% Unknown authentication method \"group\"\n"));
+    t.eq("nothing changed", e.running_config(R1), before);
+    t.check("good ones stay silent", cli(&mut e, R1, &["aaa authentication login default local"], 0).is_empty());
+    let e2 = engine(&project("hostname R1\n!\naaa new-model\naaa authentication login default quatsch\n!\nend\n", None));
+    t.eq("boot: the line and the error", e2.boot_errors(R1).iter().map(|x| (x.line, x.msg.clone())).collect::<Vec<_>>(), alloc::vec![(4, s(want))]);
 }
 
 // a router that authenticates console logins against RADIUS, with a local fallback

@@ -3927,6 +3927,26 @@ let tidy = script::fmt::format(src)?;                    // or the syntax errors
   rename and its refusals; completion in scope, after a dot, of an import and on broken code;
   hover; signature help; folding; the outline; the formatter on every syntax form, idempotent,
   the same code).
+**Scripts of one VM** ([`module.rs`](../lib/script/module.rs)), as a page has several `<script>`
+elements: `vm.add_script(name, src)` links a further script while the VM is idle, then `run()` runs
+its top-level code with fresh fuel. Their top-level names are one scope: a script sees the `fn`s and
+`let`s of the program and of the scripts before it, the same variables, and a name it declares again
+is that variable; it does not see the names of a later one. It is compiled the way the program was
+(`compile_with`: an unknown name is an error). `Err` gives its diagnostics and the VM goes on as it
+was; an error while it runs ends only that invocation, and errors and traces name each script's file.
+
+```rust
+let stub = script::compile_with("", "", HOST_NAMES)?;
+let mut vm = Vm::new(&stub, limits);
+vm.run(&mut host, u64::MAX);                     // the empty program
+for (name, src) in scripts {
+    match vm.add_script(name, src) {
+        Ok(()) => { vm.run(&mut host, u64::MAX); }   // Done or Error; the next one runs anyway
+        Err(diags) => report(&diags),
+    }
+}
+```
+
 **Modules** ([`module.rs`](../lib/script/module.rs)): `import(path)` is a function, not
 syntax. It gives the top-level names of another file as a map -- its `fn`s and `let`s, without
 the names that start with `_` -- with the values they have when the module's code has run:
@@ -4411,6 +4431,11 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   the focused link, Esc drops it, Ctrl+A, Ctrl+C / Ctrl+Insert copy text (list markers, cells by
   tabs, images as their alt texts) and HTML. `MdViewState` also gives `selection()`,
   `selected_text()`, `selected_html()`, `select_all()`, `scroll_to_block(i)`.
+* Clicks on an HTML document: `MdEv::click` names the element a click on the text hit: the inline
+  element around the character under the pointer, else the block's element, beside the blocks the
+  document's root; none after a drag; Enter on a link gives its element. A field's widget keeps its
+  own clicks (`MdEv::field`, `submit`). `MdDoc::element_at(block, byte)` finds such an element for
+  any place of a block's text.
 * Links are reported, not opened: `MdEv::link` carries the target; with `MV_OPEN_LINKS` the view
   also hands it to `open_url` (whose scheme rules and the app's `url` permission apply) -- only
   after the user's click or Enter, never by itself.
@@ -4530,7 +4555,8 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   elements: what the user typed, checked or chose (or the app set) stays, a field the user left
   alone follows its document value; a focused field keeps the focus when fields come or go
   before it. `MdBlock::node`, `MdField::node`, `MdForm::node` name the elements, `field_of(n)`
-  finds a field. A new document (`set_html` with another text) starts afresh. Markdown
+  finds a field, `element_at(block, byte)` the element at a place of a block's text, `dom_size()`
+  gives the nodes and bytes of the tree (for a host that limits what others write into it). A new document (`set_html` with another text) starts afresh. Markdown
   documents have no elements. The tree is capped (256 open elements, 2^20 nodes), a query's work
   is bounded by the tree's size.
 * Accessibility: the view is a `K_BOX` (label `st.label`, default "Dokument"; value: the scroll

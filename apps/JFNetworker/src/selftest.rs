@@ -62,6 +62,8 @@
 // jfn_sim::units, deploy, cli/units.rs, the lab 05-microservices).
 // browsertest.rs: the Webbrowser (group browser: netpkt::uri, jfn_sim::webc, the static files of
 // http-server, req.form of scripts, what devwin/browser.rs decides).
+// pagescripttest.rs: the Webbrowser's page scripts (group pagescript: the host on a document without
+// a window, fuel and limits, errors with their place, the order of scripts, location, twice the same).
 // dot1xtest.rs: 802.1X and WPA-Enterprise (group dot1x: jfn_sim::dot1x, supp, dot1xtrace, the EAP
 // part of radiusd and wlan, cli/dot1x.rs).
 // imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
@@ -157,13 +159,15 @@ mod idetest;
 mod unitstest;
 #[path = "browsertest.rs"]
 mod browsertest;
+#[path = "pagescripttest.rs"]
+mod pagescripttest;
 #[path = "dot1xtest.rs"]
 mod dot1xtest;
 #[path = "imaptest.rs"]
 mod imaptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 52] = [
+    let groups: [(&'static str, fn(&mut T)); 53] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -212,6 +216,7 @@ pub fn run() -> i32 {
         ("ide", idetest::run),
         ("units", unitstest::run),
         ("browser", browsertest::run),
+        ("pagescript", pagescripttest::run),
         ("ssh", sshtest::run),
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),

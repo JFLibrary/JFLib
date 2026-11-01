@@ -31,6 +31,9 @@
 //   fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
 //   import(path)                 modules (module.rs): another file's top-level names as a map,
 //                                read through Host::load, run once per VM
+//   Vm::add_script(name, src)    a further script of a VM, as the <script> elements of a page
+//                                are (module.rs): their top-level names are one scope, the errors
+//                                name each script's file
 //   debugger (debug.rs)          Vm::set_breakpoint, request_pause, step(Step), run() ->
 //                                Status::Paused(Pause), frames, locals, upvalues,
 //                                frame_globals, eval; Program::line_table / break_lines
@@ -233,7 +236,7 @@ pub fn compile(src: &str) -> Result<Program, Vec<Diagnostic>> {
 pub fn compile_named(name: &str, src: &str) -> Result<Program, Vec<Diagnostic>> {
     let (prog, mut d) = parse::parse_program(name, src);
     d.extend(check::resolve(&prog, GLOBALS));
-    finish(&prog, src, d, None)
+    finish(&prog, src, d, None, &[])
 }
 
 /// compile_named() for a host with names of its own instead of GLOBALS: `globals` are the
@@ -242,7 +245,15 @@ pub fn compile_named(name: &str, src: &str) -> Result<Program, Vec<Diagnostic>> 
 /// declared nor known is an error ("Unbekannter Name prnt – meinst du print?"), so a typing
 /// error stops the script before it runs; the other warnings still do not
 pub fn compile_with(name: &str, src: &str, globals: &[&str]) -> Result<Program, Vec<Diagnostic>> {
-    let mut known: Vec<&str> = Vec::with_capacity(globals.len() + 16);
+    let known = known_names(globals);
+    let (prog, mut d) = parse::parse_program(name, src);
+    d.extend(check::resolve_strict(&prog, &known));
+    finish(&prog, src, d, Some(globals.iter().map(|g| String::from(*g)).collect()), &[])
+}
+
+/// the names compile_with knows: the built-ins, the standard library, the host's
+fn known_names<'a>(globals: &[&'a str]) -> Vec<&'a str> {
+    let mut known: Vec<&'a str> = Vec::with_capacity(globals.len() + 16);
     for n in library() {
         let root = n.split('.').next().unwrap_or(n);
         if !known.contains(&root) {
@@ -250,20 +261,39 @@ pub fn compile_with(name: &str, src: &str, globals: &[&str]) -> Result<Program, 
         }
     }
     known.extend_from_slice(globals);
+    known
+}
+
+/// a further script of a VM (Vm::add_script), compiled the way its program was (strict: the host's
+/// names of compile_with); `shared` are the top-level names of the scripts before it
+pub(crate) fn compile_shared(name: &str, src: &str, strict: Option<&[String]>, shared: &[String]) -> Result<Program, Vec<Diagnostic>> {
     let (prog, mut d) = parse::parse_program(name, src);
-    d.extend(check::resolve_strict(&prog, &known));
-    finish(&prog, src, d, Some(globals.iter().map(|g| String::from(*g)).collect()))
+    let names: Vec<&str> = shared.iter().map(|s| s.as_str()).collect();
+    match strict {
+        Some(g) => {
+            let g: Vec<&str> = g.iter().map(|s| s.as_str()).collect();
+            let mut known = known_names(&g);
+            known.extend_from_slice(&names);
+            d.extend(check::resolve_strict(&prog, &known));
+        }
+        None => {
+            let mut known = names;
+            known.extend_from_slice(GLOBALS);
+            d.extend(check::resolve(&prog, &known));
+        }
+    }
+    finish(&prog, src, d, strict.map(|g| g.to_vec()), shared)
 }
 
 /// the program, or the errors among the diagnostics of parsing and resolving (with the file);
 /// strict: the host's names of compile_with, for the modules the program imports
-fn finish(prog: &ast::Program, src: &str, mut d: Vec<Diagnostic>, strict: Option<Vec<String>>) -> Result<Program, Vec<Diagnostic>> {
+fn finish(prog: &ast::Program, src: &str, mut d: Vec<Diagnostic>, strict: Option<Vec<String>>, shared: &[String]) -> Result<Program, Vec<Diagnostic>> {
     d.retain(|x| x.error);
     if !d.is_empty() {
         d.sort_by_key(|x| (x.line, x.col));
         return Err(named(&prog.name, d));
     }
-    let mut code = compile::generate(prog, src);
+    let mut code = compile::generate(prog, src, shared);
     code.strict = strict;
     Ok(Program { code: Arc::new(code) })
 }

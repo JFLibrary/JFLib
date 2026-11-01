@@ -345,6 +345,7 @@ struct MdTest {
     form: MdViewState,
     field: String,
     sent: String,
+    clicked: String,
     asked: Vec<String>,
     waiting: Vec<String>,
     // --page dom: the page, the steps taken
@@ -399,6 +400,7 @@ impl MdTest {
             form,
             field: String::new(),
             sent: String::new(),
+            clicked: String::new(),
             asked: Vec::new(),
             waiting: Vec::new(),
             page_dom,
@@ -533,6 +535,10 @@ impl MdTest {
         ui.box_end();
         ui.next_size(-1, -1);
         let ev = ui.doc_view(ID_DOM, &mut self.dom, 0);
+        if let Some(n) = ev.click {
+            let d = self.dom.doc();
+            self.clicked = format!("{}#{}", d.tag(n), d.attr(n, "id").unwrap_or(""));
+        }
         if let Some(s) = ev.submit {
             let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
             self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
@@ -543,6 +549,7 @@ impl MdTest {
         ui.text(TS_BODY, &format!("Schritt: {}", self.step));
         ui.text(TS_BODY, &format!("Fokus: {}", focus));
         ui.text(TS_BODY, &format!("Auswahl: {} Zeichen", st.selected_text().chars().count()));
+        ui.text(TS_BODY, &format!("Klick: {}", if self.clicked.is_empty() { "-" } else { &self.clicked }));
         ui.box_end();
         ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
     }

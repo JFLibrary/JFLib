@@ -1659,3 +1659,25 @@ Postfach (IMAP)	Mailbox (IMAP)
 IMAP-Server	IMAP server
 IMAP-Port	IMAP port
 802.1X	802.1X
+Konsole der Seitenskripte (Strg+Umschalt+J)	The page scripts' console (Ctrl+Shift+J)
+{} · Skriptfehler: {} (Konsole)	{} · Script errors: {} (console)
+Leeren	Clear
+Noch keine Ausgabe.	No output yet.
+Seitenskripte lesen keine Dateien: import geht hier nicht.	Page scripts read no files: import does not work here.
+rand() gibt eine Zahl in [0, 1), rand(n) eine ganze Zahl von 0 bis n - 1, rand(a, b) eine von a bis b	rand() gives a number in [0, 1), rand(n) an integer from 0 to n - 1, rand(a, b) one from a to b
+{}: die Zeit muss eine Zahl ab 0 sein (Millisekunden)	{}: the time must be a number from 0 on (milliseconds)
+{}: hier muss eine Funktion stehen	{}: a function is needed here
+Zu viele Zeitgeber auf dieser Seite.	Too many timers on this page.
+fetch: die URL fehlt	fetch: the URL is missing
+Zu viele offene Anfragen auf dieser Seite.	Too many open requests on this page.
+location.assign: die Adresse fehlt	location.assign: the address is missing
+{}: hier muss ein Text stehen	{}: a text is needed here
+Das Dokument dieser Seite ist zu groß geworden.	This page's document has grown too large.
+{}: das Ereignis muss click, input oder submit sein	{}: the event must be click, input or submit
+Zu viele Ereignis-Funktionen auf dieser Seite.	Too many event functions on this page.
+Das Dokument dieser Seite ist zu tief verschachtelt.	This page's document is nested too deeply.
+Das Element lässt sich hier nicht einfügen.	The element cannot be inserted here.
+{}: und {} weitere Fehler	{}: and {} more errors
+{}: das Skript kam nicht: {} {}	{}: the script did not come: {} {}
+{}: das Skript ist zu groß ({} Bytes)	{}: the script is too large ({} bytes)
+{}: das Skript kam nicht: {}	{}: the script did not come: {}

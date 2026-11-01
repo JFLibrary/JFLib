@@ -287,7 +287,8 @@ pub(crate) struct Cx {
     pub(crate) d: Device,
     pub(crate) st: Store,
     pub(crate) cur: Option<Key>,
-    /// the service to run and debug: the shown tab's, else the one run last
+    /// the service to run and debug: the shown tab's (the unit that holds its file comes first),
+    /// else the one run last
     pub(crate) target: Option<String>,
     pub(crate) view: Option<ScriptView>,
     pub(crate) paused: Option<Pause>,
@@ -301,19 +302,22 @@ impl Cx {
     pub(crate) fn of(n: &mut Net, k: usize, d: &Device, st: &Store) -> Option<Cx> {
         let p = &n.devwin.get(k)?.ide;
         let cur = p.cur_key().cloned();
-        let last = p.target.clone().filter(|t| scripts::find(d, t).is_some());
+        let e = n.doc.sim.engine();
+        let last = p.target.clone().filter(|t| scripts::find(d, t).is_some() || e.unit(d.id, t).is_some_and(|u| u.file.is_some()));
         let target = match &cur {
             Some(Key::Inline(name)) => Some(name.clone()),
-            Some(Key::File(path)) => {
-                let b = dide::bound(d, st, path);
-                match &last {
-                    Some(l) if b.contains(l) => Some(l.clone()),
-                    _ => b.into_iter().next().or(last),
+            Some(Key::File(path)) => match dide::unit_of(e, d, st, path, last.as_deref()) {
+                Some(u) => Some(u),
+                None => {
+                    let b = dide::bound(d, st, path);
+                    match &last {
+                        Some(l) if b.contains(l) => Some(l.clone()),
+                        _ => b.into_iter().next().or(last),
+                    }
                 }
-            }
+            },
             None => last,
         };
-        let e = n.doc.sim.engine();
         let svc = target.as_ref().and_then(|t| e.service::<ScriptService>(d.id, t));
         let view = svc.map(|s| s.view(e.now()));
         let paused = svc.and_then(|s| s.paused());

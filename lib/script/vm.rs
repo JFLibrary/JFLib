@@ -26,6 +26,8 @@
 //                                                          (module.rs; default: none)
 //   vm.modules()                                           the program's name, the modules'
 //                                                          paths
+//   vm.add_script(name, src)  then run() as above          a further script with the same
+//                                                          top-level names (module.rs)
 //
 // Fuel is virtual CPU time: one unit per instruction, more for instructions that copy (string
 // and list concatenation, literals, iterating a map), plus what natives charge.  run(host,
@@ -395,7 +397,7 @@ impl Vm {
         let permanent = heap.objs.len() as u32;
         heap.bytes = 0;
         let natives = code.hosts.iter().map(|h| (Arc::from(h.name.as_str()), builtin_of(&h.name))).collect();
-        let unit = Unit { path: crate::module::norm_path("", &code.name), gbase: 0, gcount: code.globals.len() as u32, pbase: 0, state: UnitState::Ready, map: None };
+        let unit = Unit { path: crate::module::norm_path("", &code.name), gbase: 0, gcount: code.globals.len() as u32, pbase: 0, state: UnitState::Ready, map: None, script: false };
         Vm {
             globals: vec![Value::Nil; code.globals.len()],
             hostv: vec![None; code.hosts.len()],
@@ -488,7 +490,7 @@ impl Vm {
         }
         if self.frames.len() == 1 && self.frames[0].closure.is_none() && self.frames[0].pc == 0 {
             // the top-level code: the stack check push_frame does for calls
-            if 1 + self.code.protos[0].max_stack as usize + 4 > self.lim.stack as usize {
+            if 1 + self.code.protos[self.frames[0].proto as usize].max_stack as usize + 4 > self.lim.stack as usize {
                 let e = self.error_here(ErrorKind::Stack, format!("Der Stapel ist voll (mehr als {} Werte)", self.lim.stack));
                 self.abort();
                 self.running = false;
@@ -568,11 +570,18 @@ impl Vm {
         core::mem::take(&mut self.out)
     }
 
-    /// a global of the script (not of its modules), or the value the host gave a host name
+    /// a global of the script or of the scripts added to it (not of its modules), or the value
+    /// the host gave a host name
     pub fn global(&self, name: &str) -> Option<Value> {
         let n = self.units[0].gcount as usize;
         if let Some(i) = self.code.globals[..n].iter().position(|g| g == name) {
             return Some(self.globals[i]);
+        }
+        for u in self.units.iter().filter(|u| u.script) {
+            let (b, n) = (u.gbase as usize, u.gcount as usize);
+            if let Some(i) = self.code.globals[b..b + n].iter().position(|g| g == name) {
+                return Some(self.globals[b + i]);
+            }
         }
         let i = self.code.hosts.iter().position(|h| h.name == name)?;
         self.hostv[i]

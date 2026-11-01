@@ -106,6 +106,7 @@ pub fn run(t: &mut T) {
     linux_shell(t);
     linux_ping(t);
     round_trip(t);
+    svi_boot(t);
     driver_reports(t);
 }
 
@@ -532,6 +533,41 @@ fn round_trip(t: &mut T) {
     t.check("boot error on the console", out(&mut eb, sw).contains("switchport acess vlan 10\n             ^\n% Invalid input detected at '^' marker.\n"));
     t.eq("linux boot error", eb.boot_errors(pc1).iter().map(|x| x.msg.clone()).collect::<Vec<_>>(), alloc::vec![String::from("Cannot find device \"eth7\"")]);
     t.eq("startup kept", eb.startup_config(pc1), String::from("ip addr add 10.0.0.1/24 dev eth7\n"));
+}
+
+// a saved VLAN interface boots as it was: the running configuration writes only "shutdown", so an
+// interface a configuration that boots names is up unless its block says so (Vlan1 ships shut down)
+fn svi_boot(t: &mut T) {
+    let (p, _pc1, sw, _mls) = switched();
+    let boot = |e: &Engine| {
+        let mut q = p.clone();
+        if let Some(d) = q.device_mut(sw) {
+            d.startup_config = e.running_config(sw);
+        }
+        engine(&q)
+    };
+    let up = |e: &Engine, name: &str| e.ifaces(sw).iter().find(|f| f.name == name).map(|f| f.admin_up);
+    let mut e = engine(&p);
+    t.eq("vlan 1 ships shut down", up(&e, "Vlan1"), Some(false));
+    t.eq("saved shut down: it boots shut down", up(&boot(&e), "Vlan1"), Some(false));
+    let _ = lines(&mut e, sw, &["en", "conf t", "interface vlan 1", "ip address 10.0.0.2 255.255.255.0", "no shutdown", "interface vlan 10", "shutdown", "end"]);
+    let run = e.running_config(sw);
+    t.check("no shutdown writes no line", run.contains("interface Vlan1\n ip address 10.0.0.2 255.255.255.0\n!\n") && run.contains("interface Vlan10\n no ip address\n shutdown\n!\n"));
+    let e2 = boot(&e);
+    t.eq("saved up: boots clean", e2.boot_errors(sw), Vec::new());
+    t.eq("saved up: it boots up", up(&e2, "Vlan1"), Some(true));
+    t.eq("a VLAN interface saved shut down stays so", up(&e2, "Vlan10"), Some(false));
+    t.eq("svi round trip", e2.running_config(sw), run);
+    // what a configuration does not name keeps the default
+    let mut q = p.clone();
+    if let Some(d) = q.device_mut(sw) {
+        d.startup_config = String::from("hostname SW1\n!\nend\n");
+    }
+    t.eq("not named: vlan 1 stays shut down", up(&engine(&q), "Vlan1"), Some(false));
+    // only a boot: typing the line changes nothing
+    let mut e3 = engine(&p);
+    let _ = lines(&mut e3, sw, &["en", "conf t", "interface vlan 1", "end"]);
+    t.eq("typed: vlan 1 stays shut down", up(&e3, "Vlan1"), Some(false));
 }
 
 fn driver_reports(t: &mut T) {

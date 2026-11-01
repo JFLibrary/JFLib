@@ -1,6 +1,7 @@
 // debug -- running from the IDE and its debugger: Als Prozess ausführen (`jfs FILE` typed into
-// the device's console), Als Dienst ausführen (the device's script service bound to the file,
-// one is made when there is none; an inline script's own service), Stoppen, Neu starten, Tests
+// the device's console), Als Dienst ausführen (the unit that runs the file starts anew, else the
+// device's script service bound to the file, one is made when there is none; an inline script's
+// own service), Stoppen, Neu starten (a unit's service through its unit), Tests
 // (`jfs --test FILE` in the console), and SK7's debugger on the service the IDE runs
 //
 //   Op                           Continue, Pause, Step(Into | Over | Out)
@@ -33,7 +34,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_sim::{Action, Cmd, DebugOp, ScriptService, ScriptState, ScriptView};
+use jfn_sim::{Action, Cmd, DebugOp, ScriptService, ScriptState, ScriptView, UnitOp};
 use script::{PauseReason, Step, Value};
 use ui::*;
 
@@ -89,6 +90,12 @@ fn send(n: &mut Net, a: Action) -> Result<(), String> {
     n.doc.sim.send(Cmd::Apply(a)).map(|_| ()).map_err(|e| crate::app::tr::msg(&e.msg()))
 }
 
+/// the service `name` belongs to a unit file: it goes through the unit (its state, the journal,
+/// what needs it)
+fn is_unit(n: &Net, dev: u32, name: &str) -> bool {
+    n.doc.sim.engine().unit(dev, name).is_some_and(|u| u.file.is_some())
+}
+
 /// a path as one word of the shell
 fn word(p: &str) -> String {
     if p.chars().all(|c| c.is_alphanumeric() || "/._-+".contains(c)) { String::from(p) } else { format!("'{}'", p.replace('\'', "'\\''")) }
@@ -137,6 +144,13 @@ pub(crate) fn run_service(n: &mut Net, k: usize, cx: &Cx) -> Result<(), String> 
     let name = match &cx.cur {
         Some(Key::Inline(name)) => name.clone(),
         Some(Key::File(path)) if path.ends_with(".jfs") => {
+            // a unit holds the file: it starts anew with what was saved
+            if let Some(name) = dide::unit_of(n.doc.sim.engine(), &cx.d, &cx.st, path, cx.target.as_deref()) {
+                editor::save(n, k, cx, true)?;
+                send(n, Action::Unit { dev: cx.dev, name: name.clone(), op: UnitOp::Restart })?;
+                finish_run(n, k, cx.dev, &name);
+                return Ok(());
+            }
             let b = dide::bound(&cx.d, &cx.st, path);
             match b.iter().find(|x| cx.target.as_ref() == Some(*x)).or(b.first()) {
                 Some(x) => x.clone(),
@@ -174,6 +188,7 @@ fn finish_run(n: &mut Net, k: usize, dev: u32, name: &str) {
 /// Stoppen: the target stops (a process in the IDE's terminal gets Ctrl+C)
 pub(crate) fn stop(n: &mut Net, cx: &Cx) -> Result<(), String> {
     match (&cx.target, cx.term) {
+        (Some(name), _) if cx.running() && is_unit(n, cx.dev, name) => send(n, Action::Unit { dev: cx.dev, name: name.clone(), op: UnitOp::Stop }),
         (Some(name), _) if cx.running() => scripts::run(&mut n.doc, cx.dev, name, false),
         (_, Some(ses)) if cx.busy => n.doc.sim.send(Cmd::SesInterrupt { dev: cx.dev, ses }).map(|_| ()).map_err(|e| crate::app::tr::msg(&e.msg())),
         _ => Ok(()),
@@ -183,7 +198,11 @@ pub(crate) fn stop(n: &mut Net, cx: &Cx) -> Result<(), String> {
 /// Neu starten: the target starts again (from the saved file)
 pub(crate) fn restart(n: &mut Net, k: usize, cx: &Cx) -> Result<(), String> {
     let Some(name) = cx.target.clone() else { return Ok(()) };
-    scripts::restart(&mut n.doc, cx.dev, &name)?;
+    if is_unit(n, cx.dev, &name) {
+        send(n, Action::Unit { dev: cx.dev, name: name.clone(), op: UnitOp::Restart })?;
+    } else {
+        scripts::restart(&mut n.doc, cx.dev, &name)?;
+    }
     finish_run(n, k, cx.dev, &name);
     Ok(())
 }
