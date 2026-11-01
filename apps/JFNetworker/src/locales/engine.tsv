@@ -1426,3 +1426,45 @@ Nach {} Weiterleitungen kam noch eine: es bleibt dabei.	After {} redirects came 
 Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.	Encrypted pages (https) come with a later stage.
 Das Gerät oder der Dienst hat angehalten.	The device or the service stopped.
 {} Anfragen, {} Antworten, {} gescheitert	{} requests, {} answers, {} failed
+# X1f: SSH (sshd.rs, sshtrace.rs, svcact.rs)
+„password_auth“ ist true oder false.	“password_auth” is true or false.
+„key_auth“ ist true oder false.	“key_auth” is true or false.
+„users“ ist eine Liste.	“users” is a list.
+Ein Benutzer in „users“ braucht „name“.	A user in “users” needs “name”.
+SSH: neuer Schlüssel {} ({} Bit, {}).	SSH: new {} key ({} bits, {}).
+SSH: Schlüssel {} gelöscht.	SSH: {} key deleted.
+SSH: Verbindung von {} auf vty {}.	SSH: connection from {} on vty {}.
+SSH: Verbindung von {}.	SSH: connection from {}.
+SSH: Verbindung von {} abgelehnt ({}).	SSH: connection from {} refused ({}).
+SSH: Schlüsselaustausch mit {} fertig ({}, Schlüssel {}), die Verbindung ist verschlüsselt.	SSH: key exchange with {} done ({}, key {}), the connection is encrypted.
+SSH: {} von {} angemeldet ({}).	SSH: {} from {} logged in ({}).
+SSH: Anmeldung von {} aus {} abgelehnt ({}).	SSH: login of {} from {} refused ({}).
+SSH: zu viele Versuche von {} aus {}: die Verbindung endet.	SSH: too many tries of {} from {}: the connection ends.
+SSH: Anmeldung von {} dauerte zu lange: die Verbindung endet.	SSH: the login from {} took too long: the connection ends.
+SSH: Sitzung von {}: {}.	SSH: session from {}: {}.
+SSH: Sitzung von {} nach Leerlauf geschlossen.	SSH: session from {} closed after being idle.
+SSH: Sitzung von {} geschlossen.	SSH: session from {} closed.
+SSH: Verbindung mit {} abgebrochen ({}).	SSH: connection with {} broken off ({}).
+SSH: verbunden mit {} Port {}.	SSH: connected to {} port {}.
+SSH: {} Port {} nicht erreicht ({}).	SSH: {} port {} not reached ({}).
+SSH: Schlüssel von {} neu gemerkt ({}).	SSH: remembered the new key of {} ({}).
+SSH: Schlüssel von {} hat sich geändert ({}): Verbindung verweigert.	SSH: the key of {} has changed ({}): connection refused.
+SSH: Schlüssel von {} nicht angenommen ({}).	SSH: the key of {} was not accepted ({}).
+SSH: als {} bei {} angemeldet ({}).	SSH: logged in as {} at {} ({}).
+SSH: Anmeldung als {} bei {} aufgegeben.	SSH: gave up logging in as {} at {}.
+SSH: Sitzung mit {} beendet (Status {}).	SSH: session with {} ended (status {}).
+SCP: {} ({} Byte) an {} geschickt.	SCP: sent {} ({} bytes) to {}.
+SCP: {} ({} Byte) von {} geholt.	SCP: fetched {} ({} bytes) from {}.
+IOS-artige Geräte nehmen SSH auf ihren vty-Leitungen an (crypto key generate, line vty).	IOS-like devices take SSH on their vty lines (crypto key generate, line vty).
+# X1f: SNMPv3 (snmpd.rs, snmptrace.rs)
+„{}“ ist keine Engine-ID (5 bis 32 Bytes hexadezimal).	“{}” is no engine ID (5 to 32 bytes in hexadecimal).
+Ein SNMPv3-Benutzer braucht „name“ ohne Leerzeichen.	An SNMPv3 user needs “name” without spaces.
+„{}“ ist keine Stufe (noAuthNoPriv, authNoPriv, authPriv).	“{}” is no level (noAuthNoPriv, authNoPriv, authPriv).
+„{}“ von {} braucht mindestens 8 Zeichen.	“{}” of {} needs at least 8 characters.
+„{}“ ist kein Verfahren (MD5, SHA, SHA-256, SHA-384, SHA-512).	“{}” is no protocol (MD5, SHA, SHA-256, SHA-384, SHA-512).
+„{}“ ist kein Verfahren (AES; DES gibt es hier nicht).	“{}” is no protocol (AES; there is no DES here).
+„{}“ ist kein Objekt.	“{}” is no object.
+SNMPv3: {} von {} (Benutzer {}, {}, Kennung {}, {} Variablen).	SNMPv3: {} from {} (user {}, {}, id {}, {} bindings).
+SNMPv3: Report {} an {}.	SNMPv3: report {} to {}.
+SNMPv3: {} hat die Engine-ID {}.	SNMPv3: {} has the engine ID {}.
+SNMPv3: {} lehnt ab: {}.	SNMPv3: {} refuses: {}.

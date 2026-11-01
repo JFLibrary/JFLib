@@ -13,6 +13,13 @@
 // dissectors; the payload of the others shows as one field.
 // BPDUs of STP and RSTP (LLC SAP 0x42) show every field and flag (stp.rs).
 // Field names and values follow the usual capture-tool wording (English protocol terms).
+// SNMPv3 (RFC 3412, 3414) shows msgID, msgMaxSize, msgFlags with their names, the security model,
+// the engine ID, boots and time, the user, the authentication and privacy parameters, and the scoped
+// PDU as in 2c, or the field "Encrypted scopedPDU" with the value "verschlüsselt" (snmpv3.rs).
+// SSH (TCP port 22) shows the identification line and, while the connection is in the clear, each
+// packet with its length, padding and message name, the lists of a KEXINIT and the values of the
+// key exchange; everything after NEWKEYS is one field with the value "verschlüsselt" (a German
+// word on purpose: it is what the inspector's reader needs to see, no protocol term) (ssh.rs).
 // HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 // shows the start line, the header lines and the body bytes of every message the segment
 // holds; a segment in the middle of a message is a "Continuation".
@@ -618,6 +625,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Snmp => Some(snmp_layer(frame, off, len)),
             Proto::Radius => Some(radius_layer(frame, off, len)),
             Proto::Telnet => Some(telnet_layer(frame, off, len)),
+            Proto::Ssh => Some(ssh_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1082,6 +1090,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Snmp => Some(snmp_info(b)),
         Proto::Radius => Some(radius_info(b)),
         Proto::Telnet => Some(telnet_info(b)),
+        Proto::Ssh => Some(ssh_info(b)),
         _ => None,
     }
 }
@@ -3005,6 +3014,10 @@ fn snmp_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
         None => format!("{}", vn),
     };
     l.f("Version", off + vt.off, vt.hdr + vt.len, vname.clone());
+    // SNMPv3: its own fields (what cannot be read as SNMPv3 is a problem as any other version)
+    if vn == 3 && crate::snmpv3::V3::parse(b).is_ok() {
+        return snmp_v3_fields(l, b, off);
+    }
     let Some(version) = version else {
         return Err(snmp::Bad::Version(vn));
     };
@@ -3089,6 +3102,9 @@ fn snmp_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
 /// "GetRequest 1234: SNMPv2-MIB::sysName.0", "Response 1234: SNMPv2-MIB::sysName.0 = STRING: R1",
 /// "Response 1234: noSuchName (index 1)", "SNMPv2-Trap 7: IF-MIB::linkDown", "Trap (v1): linkDown"
 fn snmp_info(b: &[u8]) -> String {
+    if let Ok(m) = crate::snmpv3::V3::parse(b) {
+        return snmp_v3_info(&m);
+    }
     let m = match snmp::Message::parse(b) {
         Ok(m) => m,
         Err(e) => return format!("SNMP (malformed: {})", e.text()),
@@ -3235,4 +3251,214 @@ fn telnet_info(b: &[u8]) -> String {
         })
         .collect();
     if parts.is_empty() { String::from("Telnet") } else { parts.join(", ") }
+}
+
+// ---------------------------------------------------------------- SSH
+
+/// the fields of a packet in the clear (`m`: its payload, at `at` in the frame)
+fn ssh_message(l: &mut B, m: &[u8], at: usize) {
+    use crate::ssh::{self, KexInit, R};
+    let Some(&code) = m.first() else {
+        return;
+    };
+    l.f("Message Code", at, 1, format!("{} ({})", ssh::msg_name(code), code));
+    let mut r = R::new(&m[1..]);
+    // a field of a string with its length
+    let text = |l: &mut B, name: &'static str, r: &mut R, show: &dyn Fn(&[u8]) -> String| {
+        let start = 1 + r.pos();
+        if let Some(v) = r.bytes() {
+            l.f(name, at + start, 4 + v.len(), show(v));
+        }
+    };
+    let words = |v: &[u8]| String::from_utf8_lossy(v).into_owned();
+    let hexes = |v: &[u8]| {
+        let h: Vec<String> = v.iter().take(32).map(|b| format!("{:02x}", b)).collect();
+        if v.len() > 32 { format!("{}... ({} bytes)", h.join(""), v.len()) } else { h.join("") }
+    };
+    match code {
+        ssh::MSG_KEXINIT => {
+            if r.skip(16).is_some() {
+                l.f("Cookie", at + 1, 16, hexes(&m[1..17]));
+            }
+            for name in ["KEX Algorithms", "Host Key Algorithms", "Ciphers client to server", "Ciphers server to client", "MACs client to server", "MACs server to client", "Compression client to server", "Compression server to client", "Languages client to server", "Languages server to client"] {
+                text(l, name, &mut r, &words);
+            }
+            if KexInit::parse(m).is_none() {
+                l.bad(String::from("a KEXINIT that cannot be read"));
+            }
+        }
+        ssh::MSG_KEX_ECDH_INIT => text(l, "Client Public Key", &mut r, &hexes),
+        ssh::MSG_KEX_ECDH_REPLY => {
+            text(l, "Host Key", &mut r, &|v: &[u8]| format!("{} {}", ssh::blob_type(v), ssh::fingerprint(v)));
+            text(l, "Server Public Key", &mut r, &hexes);
+            text(l, "Signature", &mut r, &hexes);
+        }
+        ssh::MSG_SERVICE_REQUEST | ssh::MSG_SERVICE_ACCEPT => text(l, "Service", &mut r, &words),
+        ssh::MSG_DISCONNECT => {
+            if let Some(c) = r.u32() {
+                l.f("Reason", at + 1, 4, format!("{} ({})", ssh::reason_name(c), c));
+            }
+            text(l, "Description", &mut r, &words);
+        }
+        ssh::MSG_DEBUG => {
+            r.u8();
+            text(l, "Message", &mut r, &words);
+        }
+        _ => {}
+    }
+}
+
+fn ssh_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::ssh::{dissect, Part};
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Ssh, off, len, String::from("SSH Protocol"));
+    for part in dissect(b) {
+        match part {
+            Part::Ident { at, len, line } => l.f("Identification", off + at, len, line),
+            Part::Packet { at, len, packet_length, padding, .. } => {
+                l.f("Packet Length", off + at, 4, format!("{}", packet_length));
+                l.f("Padding Length", off + at + 4, 1, format!("{}", padding));
+                let end = (at + 4 + packet_length as usize).saturating_sub(padding as usize).min(at + len);
+                ssh_message(&mut l, &b[at + 5..end], off + at + 5);
+                if at + 4 + packet_length as usize > at + len {
+                    l.f("Continuation", off + at + len, 0, String::from("the rest comes in the next segment"));
+                } else {
+                    l.f("Padding", off + end, padding as usize, format!("{} bytes", padding));
+                }
+            }
+            Part::Opaque { at, len } => l.f("Encrypted Packet", off + at, len, String::from("verschlüsselt")),
+        }
+    }
+    l
+}
+
+/// "Identification: SSH-2.0-...", "SSH_MSG_KEXINIT, SSH_MSG_NEWKEYS", "verschlüsselt (84 bytes)"
+fn ssh_info(b: &[u8]) -> String {
+    use crate::ssh::{dissect, msg_name, Part};
+    let parts: Vec<String> = dissect(b)
+        .into_iter()
+        .map(|p| match p {
+            Part::Ident { line, .. } => line,
+            Part::Packet { code, .. } => String::from(msg_name(code)),
+            Part::Opaque { len, .. } => format!("verschlüsselt ({} bytes)", len),
+        })
+        .collect();
+    if parts.is_empty() { String::from("SSH") } else { parts.join(", ") }
+}
+
+// ---------------------------------------------------------------- SNMPv3
+
+/// the fields of the PDU of a plain scoped PDU, as in the other versions
+fn snmp_v3_pdu(l: &mut B, off: usize, sp: &mut ber::Reader) -> Result<(), snmp::Bad> {
+    let pt = sp.peek()?;
+    let Some(kind) = snmp::Kind::of_tag(pt.tag) else {
+        return Err(snmp::Bad::Pdu(pt.tag));
+    };
+    l.l.title = format!("Simple Network Management Protocol, v3, {}", kind.name());
+    l.f("PDU", off + pt.off, pt.hdr, format!("{} (0x{:02x})", kind.name(), pt.tag));
+    let mut p = sp.seq(pt.tag)?;
+    let t = p.peek()?;
+    let id = p.int32()?;
+    l.f("Request ID", off + t.off, t.hdr + t.len, format!("{}", id));
+    let t = p.peek()?;
+    let es = p.int32()?;
+    let t2 = p.peek()?;
+    let ei = p.int32()?;
+    if kind == snmp::Kind::GetBulk {
+        l.f("Non-repeaters", off + t.off, t.hdr + t.len, format!("{}", es));
+        l.f("Max-repetitions", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+    } else {
+        l.f("Error status", off + t.off, t.hdr + t.len, format!("{} ({})", snmp::error_name(es), es));
+        l.f("Error index", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+    }
+    let mut list = p.seq(ber::T_SEQUENCE)?;
+    while !list.is_empty() {
+        let mut vb = list.seq(ber::T_SEQUENCE)?;
+        let ot = vb.peek()?;
+        let oid = vb.oid()?;
+        let name = crate::snmpv3::report_name(oid.arcs());
+        let shown = if name == "unknown counter" { snmp_name(&oid) } else { format!("{} ({})", name, oid) };
+        l.f("Object Name", off + ot.off, ot.hdr + ot.len, shown);
+        let vt = vb.peek()?;
+        let value = vb.value()?;
+        l.f("Value", off + vt.off, vt.hdr + vt.len, mib::show(oid.arcs(), &value, false));
+        vb.done()?;
+    }
+    Ok(())
+}
+
+fn snmp_v3_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
+    use crate::snmpv3::{F_AUTH, F_PRIV, F_REPORTABLE};
+    let mut top = ber::Reader::new(b);
+    let mut m = top.seq(ber::T_SEQUENCE)?;
+    m.int()?;
+    let mut g = m.seq(ber::T_SEQUENCE)?;
+    let t = g.peek()?;
+    let id = g.int32()?;
+    l.f("msgID", off + t.off, t.hdr + t.len, format!("{}", id));
+    let t = g.peek()?;
+    let max = g.int32()?;
+    l.f("msgMaxSize", off + t.off, t.hdr + t.len, format!("{}", max));
+    let t = g.peek()?;
+    let f = g.octets()?;
+    let flags = f.first().copied().unwrap_or(0);
+    let mut words = Vec::new();
+    for (bit, w) in [(F_AUTH, "auth"), (F_PRIV, "priv"), (F_REPORTABLE, "reportable")] {
+        if flags & bit != 0 {
+            words.push(w);
+        }
+    }
+    l.f("msgFlags", off + t.off, t.hdr + t.len, format!("0x{:02x} ({})", flags, if words.is_empty() { String::from("none") } else { words.join(", ") }));
+    let t = g.peek()?;
+    let model = g.int32()?;
+    l.f("msgSecurityModel", off + t.off, t.hdr + t.len, if model == 3 { String::from("USM (3)") } else { format!("{}", model) });
+    let t = m.expect(ber::T_OCTETS)?;
+    let mut s = m.inside(&t).seq(ber::T_SEQUENCE)?;
+    let hex = |v: &[u8]| if v.is_empty() { String::from("(empty)") } else { crate::snmpv3::engine_id_text(v) };
+    let x = s.peek()?;
+    let e = s.octets()?;
+    l.f("msgAuthoritativeEngineID", off + x.off, x.hdr + x.len, hex(e));
+    let x = s.peek()?;
+    let v = s.int32()?;
+    l.f("msgAuthoritativeEngineBoots", off + x.off, x.hdr + x.len, format!("{}", v));
+    let x = s.peek()?;
+    let v = s.int32()?;
+    l.f("msgAuthoritativeEngineTime", off + x.off, x.hdr + x.len, format!("{}", v));
+    let x = s.peek()?;
+    let u = s.octets()?;
+    l.f("msgUserName", off + x.off, x.hdr + x.len, String::from_utf8_lossy(u).into_owned());
+    let x = s.peek()?;
+    let a = s.octets()?;
+    l.f("msgAuthenticationParameters", off + x.off, x.hdr + x.len, hex(a));
+    let x = s.peek()?;
+    let p = s.octets()?;
+    l.f("msgPrivacyParameters", off + x.off, x.hdr + x.len, hex(p));
+    let t = m.peek()?;
+    if t.tag == ber::T_SEQUENCE {
+        let mut sp = m.seq(ber::T_SEQUENCE)?;
+        let x = sp.peek()?;
+        let c = sp.octets()?;
+        l.f("contextEngineID", off + x.off, x.hdr + x.len, hex(c));
+        let x = sp.peek()?;
+        let c = sp.octets()?;
+        l.f("contextName", off + x.off, x.hdr + x.len, String::from_utf8_lossy(c).into_owned());
+        snmp_v3_pdu(l, off, &mut sp)?;
+    } else {
+        let c = m.octets()?;
+        l.l.title = String::from("Simple Network Management Protocol, v3, verschlüsselt");
+        l.f("Encrypted scopedPDU", off + t.off, t.hdr + c.len(), String::from("verschlüsselt"));
+    }
+    Ok(())
+}
+
+/// "SNMPv3 GetRequest 12: user admin", "SNMPv3 verschlüsselt: user admin (authPriv)", "SNMPv3 Report:
+/// usmStatsUnknownEngineIDs"
+fn snmp_v3_info(m: &crate::snmpv3::V3) -> String {
+    let user = String::from_utf8_lossy(&m.usm.user).into_owned();
+    let level = m.level().map_or("?", |x| x.word());
+    match m.plain() {
+        None => format!("SNMPv3 verschlüsselt: user {} ({})", user, level),
+        Some(s) if s.pdu.kind == snmp::Kind::Report => format!("SNMPv3 Report: {}", s.pdu.varbinds.first().map_or("?", |v| crate::snmpv3::report_name(v.oid.arcs()))),
+        Some(s) => format!("SNMPv3 {} {}: user {} ({})", s.pdu.kind.name(), s.pdu.request_id, user, level),
+    }
 }

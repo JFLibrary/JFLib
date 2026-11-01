@@ -1618,3 +1618,8 @@ Lädt von {} … Die Simulation ist angehalten: die Antwort kommt, wenn sie weit
 Lädt von {} … Im Simulationsmodus geht die Anfrage mit den Schritten voran.	Loading from {} … In simulation mode the request moves on with the steps.
 {} · ein Bild lädt noch …	{} · one picture still loading …
 {} · {} Bilder laden noch …	{} · {} pictures still loading …
+SSH-Server	SSH server
+Stufe	Level
+Signatur	Signature
+Verschlüsselung	Encryption
+Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen.	Give the agent and the user without spaces, passwords with at least 8 characters.

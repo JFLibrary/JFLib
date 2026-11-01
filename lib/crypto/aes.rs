@@ -173,6 +173,7 @@ fn sub_word(w: [u8; 4]) -> [u8; 4] {
     [blocks[0][0], blocks[0][1], blocks[0][2], blocks[0][3]]
 }
 
+#[derive(Clone)]
 pub struct Aes {
     /// the round keys, bitsliced for four blocks
     rk: Vec<Planes>,

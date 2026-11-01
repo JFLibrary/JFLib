@@ -106,7 +106,7 @@ fn shell(cmd: &str, stdin: &[u8]) -> (Vec<u8>, Vec<u8>, u32) {
 }
 
 /// the test commands
-fn run_command(cmd: &str, stdin: &[u8]) -> (Vec<u8>, Vec<u8>, u32) {
+pub(crate) fn run_command(cmd: &str, stdin: &[u8]) -> (Vec<u8>, Vec<u8>, u32) {
     if SHELL.load(Ordering::Relaxed) {
         return shell(cmd, stdin);
     }
@@ -246,8 +246,13 @@ fn host_key() -> Keypair {
     Keypair::from_seed(&crypto::sha256(b"coretest ssh host key"))
 }
 
+/// the same key for netpkt::ssh
+pub(crate) fn host_key_pair() -> netpkt::ssh::KeyPair {
+    netpkt::ssh::KeyPair::Ed25519(host_key())
+}
+
 /// a test server on a free loopback port for `n` connections -> its port
-fn spawn(n: usize, logins: Arc<Logins>) -> u16 {
+pub(crate) fn spawn(n: usize, logins: Arc<Logins>) -> u16 {
     let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)) else { return 0 };
     let port = l.local_addr().map_or(0, |a| a.port);
     let _ = plat::thread_spawn(256 * 1024, Box::new(move || {
@@ -260,7 +265,7 @@ fn spawn(n: usize, logins: Arc<Logins>) -> u16 {
     port
 }
 
-fn connect(port: u16, check: HostKeyCheck) -> Result<Client, SshError> {
+pub(crate) fn connect(port: u16, check: HostKeyCheck) -> Result<Client, SshError> {
     let s = TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, port), 3000)?;
     s.set_read_timeout(Some(10_000));
     Client::connect(Box::new(s), check)

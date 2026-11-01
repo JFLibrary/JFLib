@@ -26,6 +26,7 @@
 //   (aaatrace.rs: Note::Aaa holds logins, AAA, RADIUS and the vty telnet sessions, layer 7)
 //   Note::Unit, Note::Deploy         a unit's start, stop, end and restart (units.rs), the
 //                                    steps of a deployment (deploy.rs), layer 7
+//   (sshtrace.rs: Note::Ssh holds what SSH servers and clients decide, layer 7)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -488,6 +489,8 @@ pub enum Note {
     Deploy { id: u32, what: Msg },
     /// the Webbrowser follows a redirect (webc.rs): the status and where it leads
     WebRedirect { status: u16, to: String },
+    /// a decision of SSH: sshtrace.rs
+    Ssh(crate::sshtrace::SshNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -616,6 +619,7 @@ impl Note {
             Note::Snmp(_) => 7,
             Note::Aaa(_) => 7,
             Note::Unit { .. } | Note::Deploy { .. } => 7,
+            Note::Ssh(_) => 7,
             _ => 2,
         }
     }
@@ -761,6 +765,7 @@ impl Note {
             || matches!(self, Note::Mail(n) if n.is_drop())
             || matches!(self, Note::Snmp(n) if n.is_drop())
             || matches!(self, Note::Aaa(n) if n.is_drop())
+            || matches!(self, Note::Ssh(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1202,6 +1207,7 @@ impl Note {
             Note::Snmp(n) => n.message(),
             Note::Aaa(n) => n.message(),
             Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
+            Note::Ssh(n) => n.message(),
         }
     }
 }
@@ -1673,6 +1679,7 @@ impl Note {
             Note::Mail(n) => n.mask(),
             Note::Snmp(n) => n.mask(),
             Note::Aaa(n) => n.mask(),
+            Note::Ssh(n) => n.mask(),
             _ => 0,
         }
     }

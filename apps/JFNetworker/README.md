@@ -179,6 +179,11 @@ Queues, Lastgeneratoren, eigene Skripte).
   von Hosts bereitstellen, einer nach dem anderen mit Gesundheitsprüfung und Abbruch beim ersten
   Fehler, ein Lasttest mit den Metriken daneben und das Labor `05-microservices` (siehe
   [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)).
+- **SSH und SNMPv3 (X1f):** SSH Version 2 mit echtem Schlüsselaustausch und echter Verschlüsselung:
+  `crypto key generate`, `ip ssh`, `transport input ssh` und `ssh -l` auf den IOS-artigen Geräten, der
+  Dienst `sshd`, `ssh`, `scp` und `ssh-keygen` auf den Hosts mit `known_hosts` und `authorized_keys`;
+  SNMPv3 mit Benutzern, Gruppen und Sichten, HMAC und AES, den Report-PDUs und `-v 3` in den Werkzeugen und
+  im MIB-Browser (siehe [SSH](#ssh) und [SNMP](#snmp)).
 
 ## Bedienung
 
@@ -352,6 +357,12 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_sessions.uis` | Golden-Szenario `sessions.scn`: der Admin-PC per Telnet an R1 (Loopback eingerichtet, `show users`, R1s Konsole nennt die vty-Leitung) und an R2 (`login local`), die vergessene Sitzung endet nach der Leerlaufzeit |
 | `sessions_terminal.uis` | eine zweite Sitzung von ADMIN im Terminal-Panel („Neue Sitzung“, der Tab „ADMIN (2)“) mit eigenem Prompt und Verzeichnis, `tty`, `who` von der Konsole, Schließen des Tabs beendet sie |
 | `telnet_vty.uis` | Telnet von ADMINs Konsole zu R1 und zurück: das Passwort verdeckt, R1s Prompt in der Konsole, `show users`, `exit`, der Prompt der Shell wieder |
+| `model.uis`, Gruppe `ssh` | SSH (siehe [SSH](#ssh)): ein PC per SSH an einem Router mit lokalem Benutzer und mit RADIUS samt Rückfall, `transport input` lehnt Telnet oder SSH ab, `show ip ssh`, `show ssh`, `show users`, falsche Passwörter und ihre Grenze, die Zeit für eine Anmeldung, die Leerlaufzeit, exec-Modus mit Status, der IOS-artige Client, RSA- und Ed25519-Schlüssel, `debug ip ssh`, die Running-Config, ein Schlüssel über einen Neustart; `sshd` mit Passwort und mit Schlüssel aus `ssh-keygen` und `authorized_keys`, `known_hosts` (Frage, gemerkt, geänderter Schlüssel abgelehnt, `-R`), ein weiterer Benutzer, `who` und `w`, Strg+C und `~.`, `scp` hin und her; die Pakete im Klaren und verschlüsselt, Zurückspulen und Determinismus |
+| `model.uis`, Gruppe `snmpv3` | SNMPv3 (siehe [SNMP](#snmp)): Get, Walk, Bulk und Set auf jeder Stufe, die Discovery, jeder Report, das Zeitfenster und die Boots nach einem Neustart, Sichten und Gruppen, die IOS-artigen Befehle mit Running-Config und einem Start daraus, `snmpd` auf Linux, was auf der Leitung steht, Determinismus |
+| `scen_ssh_snmpv3.uis` | Golden-Szenario `ssh_snmpv3.scn`: der Admin-PC per SSH an R1 (Telnet aus, Host-Schlüssel gemerkt, Loopback eingerichtet), exec-Modus an R2 mit RSA-Schlüssel, sein Schlüssel per `scp` auf SRV1 und danach ohne Passwort, `snmpget` und `snmpset` mit Version 3 an SW1, R1 und SRV1 mit Sicht und Reports, zuletzt ein abgelehnter neuer Schlüssel |
+| `ssh_session.uis` | SSH von ADMINs Konsole zu R1 und zurück: die Frage nach dem Schlüssel, das Passwort verdeckt, R1s Prompt, `show users`, `exit`, beim zweiten Mal keine Frage, `~.` |
+| `snmpv3_mib.uis` | der MIB-Browser mit einem Benutzer der Version 3: Benutzer, Stufe, Signatur und Passwörter statt der Community, Get auf authPriv und authNoPriv, ein falsches Passwort |
+| `ssh_shots.uis` | die Bilder von SSH (Konsole mit Sitzung an R1) und SNMPv3 (MIB-Browser) hell und dunkel mit 100 und 150 % (`build/jfnetworker/ssh_*.png`, `snmpv3_*.png`) |
 | `sessions_shots.uis` | die Bilder der Sitzungen (ADMIN mit einer zweiten Sitzung, darin per Telnet an R1 mit `show users`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/sessions_*.png`) |
 | `model.uis`, Gruppe `ide` | worauf die IDE baut (siehe [IDE](#ide)): ein Dienst aus einer Datei mit Importen neben ihr und `config.file`, `source` und `file` zugleich abgelehnt, eine fehlende Datei und eine, die sich nicht übersetzen lässt (Fehler, Status, `script errors`, Log, das Problem `ScriptFile`), Speichern ändert den laufenden Dienst nicht, ein Neustart liest die Datei, das Umwandeln eines eingebetteten Skripts als ein Schritt mit Rückgängig und Wiederholen (die Disk zählt weiter), Speichern, neue Datei und Ordner, Umbenennen, Löschen, ein Dienst zu einer Datei, Ersetzen in zwei Dateien als ein Schritt, `jfs --test` (Bericht, Ergebnisse, Exit-Code, eine Datei mit Fehler, die Zeitgrenze, ein Port für den nächsten Test), Determinismus, ein altes Projekt mit `source` unverändert, Suchen und Ersetzen mit ganzen Wörtern |
 | `ide_explorer.uis` | der Explorer der IDE auf `fixtures/ide.jfnet`: der Baum mit `/root` offen und dem eingebetteten Skript, eine neue Datei über das Flyout, ihr Tab und ihre Zeile mit „●“, Strg+S, F2 benennt um (der Tab geht mit), Entf löscht, Rückgängig des Projekts, ein neuer Ordner, ein Entwurf übersteht seinen geschlossenen Tab, Alle speichern, ein rückgängig gemachtes Speichern im Entwurf, das eingebettete Skript im Tab, „In Datei umwandeln“ (Tab und Dienst gehen mit, die Disk zählt weiter) und sein Rückgängig |
@@ -413,6 +424,11 @@ die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::p
 Für die Sitzungen: `sessions.jfnet` (R1 mit Leitungspasswort, R2 mit `login local` und einer
 Minute Leerlaufzeit, ADMIN, SRV1 mit `telnetd` an SW1; das Szenario `sessions.scn` und die
 Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und `sessions_shots.uis`).
+Für SSH und SNMPv3: `ssh_snmpv3.jfnet` (R1 mit Ed25519-Schlüssel, nur SSH, R2 mit RSA-Schlüssel, SW1 mit
+Benutzern der Version 3 und einer Sicht, ADMIN, SRV1 mit `sshd` und `snmpd`; das Szenario `ssh_snmpv3.scn`
+und die Fensterskripte `ssh_session.uis`, `snmpv3_mib.uis` und `ssh_shots.uis`), die coretest-Gruppe
+`sshcore` (`netpkt::ssh` und `netpkt::snmpv3` gegen Vektoren von außen und gegen `netio::ssh` über TCP) und
+`python tools/ssh_interop.py --core` (der OpenSSH-Client gegen den Kern, mit jeder Chiffre).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -474,6 +490,8 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
 | Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
+| SSH | [`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs), [`crates/jfn_sim/sshd.rs`](crates/jfn_sim/sshd.rs), [`sshtrace.rs`](crates/jfn_sim/sshtrace.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs), [`src/sshtest.rs`](src/sshtest.rs) | das Protokoll ohne I/O, Client und Server auf den Geräten, Schlüssel als Dateien, `known_hosts`, `authorized_keys`, `scp` |
+| SNMPv3 | [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs), [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmpv3test.rs`](src/snmpv3test.rs) | die Nachricht, USM, VACM, die Reports, die Werkzeuge, der MIB-Browser |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 
 ### Gerätekatalog
@@ -3350,7 +3368,7 @@ coldStart sagt es schon). Ein Absender, den die Zugriffsliste abweist, zählt wi
 Community. Unter Linux gilt ein Set, solange der Dienst läuft; die Einstellungen ändert es nicht.
 sysObjectID nennt nie die Nummer eines Herstellers.
 
-Noch offen: SNMPv3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
+Noch offen: Traps der Version 3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
 IPv6, Tabellen über die Ressourcen der Hosts, ein Agent für den MIB-Browser ohne die Konsole.
 
 Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(dev)`,
@@ -3361,6 +3379,51 @@ Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(d
 ([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
 `snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
 `snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
+**SNMPv3** (RFC 3411–3415, 3826, 7860; [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs)): dieselben
+Agenten sprechen auch Version 3 mit dem User-based Security Model und VACM; ohne Benutzer antworten sie
+nur auf die Discovery.
+
+- **Sicherheitsstufen:** noAuthNoPriv, authNoPriv (HMAC-MD5-96, HMAC-SHA-96, die SHA-2-Varianten
+  SHA-256, SHA-384 und SHA-512 von RFC 7860), authPriv (dazu AES-128-CFB). DES gibt es nicht, weil
+  `lib/crypto` keines hat. Die Schlüssel werden aus dem Passwort abgeleitet und für die Engine
+  lokalisiert (RFC 3414 A.2).
+- **IOS-artig:** `snmp-server engineID local HEX`, `snmp-server view NAME OID included|excluded`,
+  `snmp-server group NAME v3 noauth|auth|priv [read SICHT] [write SICHT]` (ohne `read`: alles unter
+  1.3.6.1, ohne `write`: nichts), `snmp-server user NAME GRUPPE v3 [auth md5|sha|sha256|sha384|sha512
+  PASSWORT [priv aes 128 PASSWORT]]` (Passwörter mit mindestens 8 Zeichen), die `no`-Formen, `show snmp
+  user`, `show snmp group`, `show snmp view`, `show snmp engineID`. In der Running-Config steht ein
+  Benutzer mit `encrypted` und den lokalisierten Schlüsseln, nie mit dem Passwort; eine gespeicherte
+  Konfiguration bootet so. Ändert sich die Engine-ID, passen die Schlüssel nicht mehr, wie beim
+  Vorbild: der Benutzer muss neu eingegeben werden.
+- **Linux:** in den Einstellungen von `snmpd` `"engine_id": "80007ed9…"` und `"users": [{"name": "admin",
+  "level": "authPriv", "auth": "SHA", "auth_password": "…", "priv": "AES", "priv_password": "…", "access":
+  "rw", "subtree": "1.3.6.1.2.1.1"}]`.
+- **Werkzeuge:** `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset` nehmen `-v 3 -u BENUTZER
+  [-l noAuthNoPriv|authNoPriv|authPriv] [-a MD5|SHA|SHA-256|SHA-384|SHA-512] [-A PASSWORT] [-x AES] [-X
+  PASSWORT] [-e ENGINE] [-Z BOOTS,ZEIT] [-n KONTEXT]`. Ohne `-e` kommt erst die Discovery; ein signierter
+  Report über die Zeit setzt ihre Uhr, die Anfrage geht noch einmal; jeder andere Report endet mit einem
+  eigenen Satz.
+- **Reports:** ein Agent prüft in der Reihenfolge des RFC und antwortet mit einem Report-PDU:
+  usmStatsUnknownEngineIDs (das ist die Discovery), usmStatsUnknownUserNames, usmStatsUnsupportedSecLevels,
+  usmStatsWrongDigests (dazu `%SNMP-3-AUTHFAIL` und authenticationFailure, wo das an ist),
+  usmStatsNotInTimeWindows (Boots oder mehr als 150 s Unterschied, signiert), usmStatsDecryptionErrors,
+  snmpUnknownContexts; ohne das Report-Flag bleibt es bei der Zählung. Boots zählt jeden Start des Agenten
+  (es bleibt, solange das Projekt offen ist), die Zeit läuft seit diesem Start.
+- **Sichten:** außerhalb der Sicht antwortet Get mit noSuchObject, GetNext und GetBulk gehen darüber hinweg,
+  Set bekommt noAccess; ein Benutzer ohne passende Gruppe bekommt authorizationError.
+- **Im Fenster:** der MIB-Browser hat die Version 3 mit Benutzer, Stufe, Signatur und den Passwörtern
+  (verdeckt getippt). Der Paket-Tab zeigt msgID, msgMaxSize, msgFlags, das Modell, Engine-ID, Boots, Zeit,
+  Benutzer und die Parameter, und das scopedPDU oder „verschlüsselt“.
+
+Entscheidungen: Die Engine-ID ist ohne Einstellung Format 3 mit der MAC des ersten Interfaces unter der
+Enterprise-Nummer für Dokumentation. Eine Nachricht der Version 3, die sich nicht lesen lässt, zählt wie
+eine Version, die der Agent nicht spricht. Traps und Informs bleiben bei den Versionen 1 und 2c.
+Die usmStats-Zähler stehen nur im Report, nicht in der MIB des Agenten (ein Walk über 1.3.6.1.6.3 fände
+sie nicht).
+
+Geprüft wird in der Selbsttest-Gruppe `snmpv3` ([`src/snmpv3test.rs`](src/snmpv3test.rs)), Byte für Byte
+(RFC 3414 A.3, RFC 3826) in der coretest-Gruppe `sshcore`.
 
 ### Desktop der Hosts
 
@@ -3461,7 +3524,8 @@ Sitzung mit `terminal monitor`.
 - **vty-Leitungen** ([`crates/jfn_sim/telnetd.rs`](crates/jfn_sim/telnetd.rs)): jeder Block
   `line vty A B` gibt die Leitungen A bis B (Vorgabe `vty 0 4`: fünf); eine Verbindung auf TCP 23
   nimmt die niedrigste freie Leitung, deren `transport input` Telnet erlaubt (Vorgabe `all`,
-  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen ab) und deren
+  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen Telnet ab; siehe
+  [SSH](#ssh)) und deren
   `access-class LISTE in` die Quelle zulässt; sonst eine kurze Absage und Schluss. Angemeldet
   wird wie an der Konsole: `password` mit `login`, `login local`, `login authentication LISTE`
   über AAA und RADIUS, ohne `login` gar nicht; drei Fehlversuche schließen die Verbindung.
@@ -3484,7 +3548,7 @@ Entscheidungen: Eine weitere Sitzung eines IOS-artigen Geräts aus der Oberfläc
 Leitung `tty N` mit den Anmelderegeln von `line con 0` (wie ein zweites Terminal am
 Konsolenanschluss); die Nummern der Sitzungen werden nicht wieder vergeben. Weitere Sitzungen
 sprechen immer mit der Gegenwart (beim Zurückspulen antwortet nur die Konsole aus der
-Vergangenheit). Nicht nachgebildet: SSH, `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
+Vergangenheit). Nicht nachgebildet: `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
 von Telnet (unser Client schickt ganze Zeilen).
 
 Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `SesKind`), die
@@ -3558,6 +3622,76 @@ Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>`, Seitensk
 Geprüft wird in der Selbsttest-Gruppe `browser` ([`src/browsertest.rs`](src/browsertest.rs)), dazu
 das Szenario `web_site.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
 `browser_requests.uis` und `browser_shots.uis`.
+### SSH
+
+SSH Version 2 läuft auf den Geräten wie alles andere Byte für Byte: echte Schlüssel, echter
+Schlüsselaustausch, echte Verschlüsselung, im Mitschnitt echte SSH-Pakete. Das Protokoll steht ohne
+I/O in der Library ([`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs)): curve25519-sha256, Host- und
+Benutzerschlüssel ssh-ed25519 und rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr und
+aes256-ctr mit hmac-sha2-256, Anmeldung mit none, password und publickey, Sitzungskanäle mit
+pty-req, shell, exec, Fenstern und exit-status. Geprüft ist es auch gegen den OpenSSH-Client
+(`python tools/ssh_interop.py --core`). Der Kennungstext ist `SSH-2.0-JFNetworker_1`. Ohne
+Schlüssel lauscht niemand; ältere Projekte laufen wie bisher.
+
+- **IOS-artiger Server** ([`sshd.rs`](crates/jfn_sim/sshd.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs)):
+  `ip domain-name NAME` (auch `ip domain name`), `crypto key generate rsa [general-keys] [modulus
+  N]` (1024 bis 4096, ohne: 2048), `crypto key generate ed25519`, `crypto key zeroize [rsa|ed25519]`,
+  `ip ssh version 2`, `ip ssh time-out SEK` (120), `ip ssh authentication-retries N` (3), die
+  `no`-Formen; auf den Leitungen `transport input ssh|telnet|all|none` (ohne: all, wie bei Telnet).
+  Der Server lauscht auf TCP 22, solange ein Host-Schlüssel da ist und eine Leitung SSH nimmt und
+  jemanden anmelden kann. Eine Verbindung ist eine Sitzung wie bei Telnet, auf der niedrigsten
+  freien vty-Leitung; angemeldet wird über dasselbe Gate: `password` mit `login`, `login local`,
+  `login authentication LISTE` über AAA und RADIUS. `access-class` und `exec-timeout` gelten
+  genauso. `show ip ssh`, `show ssh`, `show crypto key mypubkey [rsa|ed25519]`, `show users`
+  (Herkunft mit `(ssh)`), `debug ip ssh`.
+- **IOS-artiger Client:** `ssh [-v 2] [-c CHIFFRE] -l BENUTZER [-p PORT] HOST`; er nimmt jeden
+  Host-Schlüssel, wie die Vorgabe der Geräte.
+- **Linux-Server** (Dienst `sshd`): `{"port": 22, "password": "…", "users": [{"name": "deploy",
+  "password": "…"}], "password_auth": true, "key_auth": true}`. Ohne Passwort kommt root nur mit
+  Schlüssel hinein; `~/.ssh/authorized_keys` (`/root`, sonst `/home/NAME`) nennt die Schlüssel. Seinen
+  Host-Schlüssel legt er beim ersten Start in `/etc/ssh/ssh_host_ed25519_key(.pub)` an, als Datei des
+  Geräts (ein Rückgängig-Schritt wie jede geschriebene Datei); ohne die Datei gibt der nächste Start
+  einen neuen. Die Sitzung ist eine Shell auf `pts/N`; `who`, `w`, `tty` und `ps` zeigen sie, ein
+  weiterer Benutzer hat seinen Namen, sein Heimatverzeichnis und den Prompt `NAME@HOST:~$ `.
+- **Linux-Client:** `ssh [-p PORT] [-l BENUTZER] [-i DATEI] [-c CHIFFRE] [-o OPTION=WERT] [-q]
+  [BENUTZER@]HOST [BEFEHL …]`. Das erste Mal fragt er in eigenen Worten, ob er den Host-Schlüssel
+  merken soll (`~/.ssh/known_hosts` im Format von OpenSSH, `[host]:port` bei anderem Port); ein
+  geänderter Schlüssel wird abgelehnt, ohne Frage. `-o StrictHostKeyChecking=yes|no|accept-new|ask`,
+  `-o BatchMode=yes`, `-o UserKnownHostsFile=DATEI`. Er meldet sich mit `~/.ssh/id_ed25519` oder
+  `~/.ssh/id_rsa` an, wenn es sie gibt, sonst mit einem Passwort (verdeckt getippt, drei Versuche).
+  Sein Status ist der der Gegenseite (`exit N`, der Befehl), 255 bei einem Fehler. Strg+C wirkt auf
+  der Gegenseite, die Zeile `~.` beendet die Verbindung.
+- **`ssh-keygen`:** `[-t ed25519|rsa] [-b BITS] [-f DATEI] [-N ""] [-C KOMMENTAR] [-q]`, `-l -f DATEI`,
+  `-y -f DATEI`, `-R HOST`; die Dateien haben das Format von OpenSSH (ohne Passwort).
+- **`scp`:** `[-P PORT] [-i DATEI] [-q] [-o OPTION=WERT] QUELLE ZIEL`, eine Seite `[BENUTZER@]HOST:PFAD`:
+  eine Datei hin oder her über das alte rcp-Protokoll (`scp -t`, `scp -f`), das der Linux-Server selbst
+  spricht.
+- **Paket-Tab:** Kennungstext, Paketlänge, Padding und Name der Nachricht, solange die Verbindung
+  im Klaren läuft (die Listen eines KEXINIT, die Werte des Austauschs), danach „verschlüsselt“.
+  Die Kategorie bleibt TCP/HTTP. **Notizen:** `Note::Ssh(SshNote)` für alles, was Server und Client
+  entscheiden; die Probleme-Liste bleibt dafür offen.
+
+Entscheidungen: Eine Verbindung ohne Anmeldung belegt die vty-Leitung schon, wie beim Vorbild. Eine
+Leitung ohne `login` lässt jeden hinein, eine mit `login` und Leitungspasswort nimmt das Passwort bei
+jedem Benutzernamen. Ein Schlüssel ist eine Datei in `nvram:` (`dir nvram:` zeigt ihn), keine Zeile der
+Running-Config: er bleibt über einen Neustart und liegt im Projekt; eine Zeile `crypto key generate`
+in einer Startkonfiguration erzeugt nur, solange keiner da ist, und meldet beim Start nichts ans
+Projekt (derselbe Seed ergibt denselben Schlüssel). Ein neuer Schlüssel ersetzt den alten ohne
+Frage. Der Schlüssel braucht einen eigenen Gerätenamen und `ip domain-name`, wie in den klassischen
+Übungen. Unser Client schickt ganze Zeilen und zeigt, was kommt (wie bei Telnet): Terminalsteuerung
+wird nicht ausgewertet, eine Zeile, die auf „assword: “ endet, verdeckt die nächste Eingabe. Virtuelle
+CPU-Zeit kostet der Schlüsselaustausch nicht. Zufall kommt aus dem Strom des Geräts: 32 Bytes je
+Verbindung als Seed des Kerns, daraus Schlüssel, Nonces und Padding.
+
+Nicht nachgebildet: Port-Weiterleitung, Agent, Kompression, Schlüsseldateien mit Passwort, DSA und
+ECDSA, `ip ssh pubkey-chain` (IOS-artig nur Passwörter), die strikte Schlüsselaushandlung von OpenSSH,
+Host-Schlüssel je Adresse.
+
+Für Programme: `SshServer`, `SshCfg`, `SshNote`, `Conn::ssh`, `SesInfo::account`; in der Library
+`netpkt::ssh` (`Core`, `Event`, `KeyPair`, `Cipher`, `dissect`) und `crypto::rsa::PrivateKey`. Geprüft wird
+in der Selbsttest-Gruppe `ssh` ([`src/sshtest.rs`](src/sshtest.rs)) und der coretest-Gruppe `sshcore`,
+dazu das Szenario `ssh_snmpv3.scn` und die Fensterskripte `ssh_session.uis`, `snmpv3_mib.uis` und
+`ssh_shots.uis`.
 
 ## Performance
 

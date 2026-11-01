@@ -27,6 +27,7 @@
 //   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
 //   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
 //             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
+//   rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
 //
 // No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups

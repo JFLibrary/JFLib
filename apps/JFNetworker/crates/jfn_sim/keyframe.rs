@@ -516,6 +516,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
     b += n.cli.sh.footprint();
     // the further sessions: their infos, telnet buffers and waiting command lines (X1e)
     b += n.cli.ses_footprint();
+    // the SSH settings (X1f; a session's core counts with the session, a server's with services)
+    b += cfg.ssh.footprint();
     if let Some(br) = &n.bridge {
         b += size_of::<crate::bridge::Bridge>() + br.ports.len() * size_of::<BridgePort>() + br.fdb.len() * (size_of::<FdbEntry>() + 40) + br.vlans.len() * 64 + 512;
     }
