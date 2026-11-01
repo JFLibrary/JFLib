@@ -401,6 +401,8 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
 | `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
+| `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
+| `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
 Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -523,13 +525,52 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 ### Gerätekatalog
 
 Herstellerneutrale, moderne Modelle: PC (2.5G), Laptop, Smartphone und Tablet (WLAN 802.11ax mit 6 GHz),
-Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Access-Switch 24× 1G PoE+ mit
-4× 10G SFP+, L3-Switches (1G und 10GBASE-T mit 100G QSFP28), Edge- und Core-Router (bis 100G,
-serielle WAN-Ports), Heimrouter mit WLAN, Hub; Next-Generation-Firewall; WLAN-Access-Point (802.11ax, 6 GHz),
-Modem/ONT, Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache, Message Queue,
-Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
+Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Rack- und Tisch-Switches, Filial-,
+Edge- und Core-Router (bis 100G, serielle WAN-Ports), L3-Switches (1G und 10GBASE-T mit 100G QSFP28,
+Leaf und Spine), Heimrouter mit WLAN, Hub, Repeater, Bridge; Firewalls; WLAN-Access-Points (802.11ax
+und 802.11be, 6 GHz), Modem/ONT, Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache,
+Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
 (`GigabitEthernet1/0/1`, Abkürzungen wie `gi1/0/1` gehen überall), Hosts Linux-Namen (`eth0`,
 `wlan0`).
+
+| Modell | Art | Ports |
+|---|---|---|
+| JF-S8 | Tisch-Switch, unmanaged: keine Befehlszeile, keine Adresse | 8× 1G (`port0` bis `port7`) |
+| JF-S8P | Kompakt-Switch auf dem Tisch | 8× 1G PoE+, 2× 10G SFP+, Konsole |
+| JF-S24 | Access-Switch | 24× 1G, 4× 10G SFP+, Konsole |
+| JF-S24P | Access-Switch | 24× 1G PoE+, 4× 10G SFP+, Konsole |
+| JF-S48P | Access-Switch | 48× 1G PoE+, 4× 10G SFP+, Konsole |
+| JF-S24M | Multi-Gigabit-Switch | 24× 2.5G PoE++, 4× 25G SFP28, Konsole |
+| JF-S24L3 | L3-Switch | 24× 1G, 4× 10G SFP+, Konsole |
+| JF-S48X | L3-Switch im Rechenzentrum | 48× 10GBASE-T, 6× 100G QSFP28, Konsole |
+| JF-S48Y | L3-Switch, Leaf | 48× 25G SFP28, 8× 100G QSFP28, Konsole |
+| JF-S32C | L3-Switch, Spine | 32× 100G QSFP28, Konsole |
+| JF-R2 | Filial-Router | 2× 1G, 2× Seriell, Konsole |
+| JF-R4 | Edge-Router | 4× 1G, 2× 10G SFP+, 2× Seriell, Konsole |
+| JF-R8 | Core-Router | 1× 1G, 8× 10G SFP+, 2× 100G QSFP28, Konsole |
+| Heimrouter | Router mit WLAN und NAT, Linux-Befehlszeile | 1G WAN, 4× 1G LAN, Funk |
+| Hub | Schicht 1, ohne Befehlszeile | 8× 100M (`port0` bis `port7`) |
+| Repeater | Schicht 1 wie der Hub, ohne Befehlszeile | 2× 1G (`port0`, `port1`) |
+| Bridge | Schicht 2, lernt Adressen, ohne Befehlszeile | 2× 1G (`port0`, `port1`) |
+| JF-FW | Firewall | 8× 1G, 2× 10G SFP+, Konsole |
+| JF-FW2 | kleine Firewall auf dem Tisch | 1× 1G WAN (`Gi0/0`), 4× 1G LAN (`Gi0/1` bis `Gi0/4`), Konsole |
+| JF-FW8 | Firewall im Rechenzentrum | 8× 10G SFP+, 4× 100G QSFP28, Konsole |
+| JF-AP6E | Access Point 802.11ax | 1× 2.5G (PoE-gespeist), 3× Funk, Konsole |
+| JF-AP7 | Access Point 802.11be | 1× 5G (PoE-gespeist), 3× Funk, Konsole |
+
+Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu dazukam, verhält sich so:
+
+- **Die Firewalls sind heute Router mit Access-Listen und NAT.** Ohne Liste lassen sie alles durch,
+  auch was von außen beginnt; ihre Titel sagen das. Zonen und zustandsbehaftetes Filtern kommen mit
+  Meilenstein F2.
+- **PoE ist bisher nur eine Angabe am Port** (PoE+, PoE++, PoE-gespeist): Es gibt kein Leistungsbudget.
+- **Der Repeater** wiederholt jeden Rahmen an den anderen Port und verlängert so eine Kupferstrecke.
+  Die Grenze gilt je Kabel: zweimal 90 m gehen, zweimal 120 m nicht.
+- **Die Bridge** lernt die Adressen ihrer beiden Seiten und lässt einen Rahmen, dessen Ziel auf derselben
+  Seite liegt, nicht hinüber.
+- **JF-AP7** sendet auf 2,4, 5 und 6 GHz mit den Raten von 802.11be (1,3, 5,7 und 11,5 Gbit/s). Die
+  Stationen im Katalog sprechen 802.11ax, also begrenzt ihr Funkteil die Rate (ein Laptop bleibt bei
+  höchstens 2,4 Gbit/s).
 
 ### Kabel
 
