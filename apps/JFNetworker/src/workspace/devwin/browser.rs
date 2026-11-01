@@ -1,5 +1,5 @@
 // browser -- the Webbrowser on the Desktop of a host's device window: real small pages from the
-// simulated network (milestones B1 and B2), shown with the library's document view instead of
+// simulated network (milestones B1, B2, B3), shown with the library's document view instead of
 // an HTML engine of our own
 //
 //   Browser::new()                    nothing open
@@ -41,15 +41,26 @@
 // application/x-www-form-urlencoded, to the action resolved against the page; the answer is a new
 // entry.  Links: MdEv::link resolved against the page (netpkt::uri).
 //
+// Page scripts (B3, pagescript.rs): a document's VM is Doc::page, made with the document from a
+// server's HTML: it comes back with its entry on Back and Forward and runs nothing while it is not
+// shown, Reload makes a new one.  Every pass runs what is due on the simulation's clock (page_pump);
+// the events of the view go to its handlers, which decide about the link and the form; requests of
+// fetch and of src scripts go like the pictures' (scripted: their document, a weak reference, for
+// a document no entry has any more gets nothing).  A window with a page's timers waiting asks
+// for a frame when the next one falls due (TIMER_PAGE).  The console's pane is below the page
+// (Konsole, Ctrl+Shift+J; only for pages with scripts).
+//
 // Keys while its window is the active one: Enter in the address line, Ctrl+L the address line,
 // Alt+Left / Alt+Right, F5, Esc stops a page on its way.
 //
 // Ids: id = the desktop's block + 0x30 (+ 0 the address, + 1 Öffnen, + 3 Zurück, + 4 Vor, + 5 Neu
-// laden / Anhalten, + 6 / + 7 the question of a POST's reload); the page ID_BROWSER0 + 0x100 k.
+// laden / Anhalten, + 6 / + 7 the question of a POST's reload); the page ID_BROWSER0 + 0x100 k; the
+// console ID_PAGE0 + 0x80 k (+ 0 Konsole, + 1 its pane, + 2 Leeren).
 
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
-use alloc::rc::Rc;
+use alloc::rc::{Rc, Weak};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::cell::RefCell;
@@ -62,6 +73,8 @@ use ui::*;
 use crate::app::constants::*;
 use crate::app::tr::{self, t, tf};
 use crate::app::Net;
+
+use super::pagescript::{console_pane, seed_of, ConSeen, PageScript};
 
 /// entries of a window's history at most (the oldest go)
 pub(crate) const HIST_MAX: usize = 30;
@@ -166,6 +179,8 @@ struct Doc {
     url: String,
     /// the status line
     status: String,
+    /// its scripts (None: it has none)
+    page: Option<Box<PageScript>>,
 }
 
 /// an entry of the history
@@ -209,11 +224,16 @@ pub(crate) struct Browser {
     focus_page: bool,
     /// the last request's number (it goes on after a close: the engine may still report)
     seq: u64,
+    /// requests of page scripts: the document they came from
+    scripted: BTreeMap<u64, Weak<RefCell<Doc>>>,
+    /// the console's pane is open, the lines it showed
+    console: bool,
+    con_seen: ConSeen,
 }
 
 impl Browser {
     pub(crate) fn new() -> Browser {
-        Browser { addr: String::from("http://"), hist: Hist::new(), load: None, pics: BTreeMap::new(), cache: BTreeMap::new(), hover: String::new(), ask: false, focus_page: false, seq: 0 }
+        Browser { addr: String::from("http://"), hist: Hist::new(), load: None, pics: BTreeMap::new(), cache: BTreeMap::new(), hover: String::new(), ask: false, focus_page: false, seq: 0, scripted: BTreeMap::new(), console: false, con_seen: ConSeen::default() }
     }
 
     /// "Titel – Webbrowser", the program's name alone without a page
@@ -228,6 +248,7 @@ impl Browser {
     pub(crate) fn close(&mut self) -> Vec<u64> {
         let mut ids: Vec<u64> = self.pics.keys().copied().collect();
         ids.extend(self.load.as_ref().map(|l| l.id));
+        ids.extend(self.scripted.keys().copied());
         let seq = self.seq;
         *self = Browser::new();
         self.seq = seq;
@@ -421,7 +442,7 @@ fn html_doc(html: &str, title: String, url: &str, status: String) -> Doc {
     view.label = String::from(t("Seite"));
     view.set_html(html);
     let title = if title.is_empty() { title_of(view.doc()) } else { title };
-    Doc { view, title, url: String::from(url), status }
+    Doc { view, title, url: String::from(url), status, page: None }
 }
 
 // the status line of an answer
@@ -444,8 +465,8 @@ fn status_line(r: &WebResp, ctype: &str, cut: bool) -> String {
     parts.join(" \u{00B7} ")
 }
 
-// the document of an answer
-fn doc_of(r: &WebResp) -> Doc {
+// the document of an answer; seed: for its scripts' chance
+fn doc_of(r: &WebResp, seed: u64) -> Doc {
     let ctype = r.headers.get("content-type").unwrap_or("");
     let mut kind = classify(ctype, &r.body);
     if r.body.is_empty() {
@@ -461,14 +482,18 @@ fn doc_of(r: &WebResp) -> Doc {
         return html_doc(&html, String::from(title), &r.url, status);
     }
     match kind {
-        Kind::Html => html_doc(&text, String::new(), &r.url, status),
+        Kind::Html => {
+            let mut d = html_doc(&text, String::new(), &r.url, status);
+            d.page = PageScript::of(&d.view, &text, &r.url, seed);
+            d
+        }
         Kind::Markdown => {
             let mut view = MdViewState::new();
             view.images = MI_APP;
             view.label = String::from(t("Seite"));
             view.set_markdown(&text);
             let title = title_of(view.doc());
-            Doc { view, title, url: r.url.clone(), status }
+            Doc { view, title, url: r.url.clone(), status, page: None }
         }
         Kind::Text => {
             let html = format!("<pre>{}</pre>", esc(&text));
@@ -494,13 +519,22 @@ fn doc_of(r: &WebResp) -> Doc {
 
 /// a report of the engine for this device's browser
 pub(crate) fn report(n: &mut Net, dev: u32, id: u64, result: Result<WebResp, WebFail>) {
+    let seed = seed_of(n.doc.sim.engine().seed(), dev, id);
     let Some(d) = n.devwin.desk_of(dev) else { return };
     let s = &mut d.web;
+    if let Some(w) = s.scripted.remove(&id) {
+        if let Some(doc) = w.upgrade() {
+            if let Some(p) = doc.borrow_mut().page.as_mut() {
+                p.answer(id, result.map_err(|f| tr::msg(&f.msg)));
+            }
+        }
+        return;
+    }
     if s.load.as_ref().is_some_and(|l| l.id == id) {
         let load = s.load.take();
         if let Some(l) = load {
             let (url, doc) = match &result {
-                Ok(r) => (r.url.clone(), doc_of(r)),
+                Ok(r) => (r.url.clone(), doc_of(r, seed)),
                 Err(f) => {
                     let why = tr::msg(&f.msg);
                     let (title, html) = error_page(f.kind, &f.url, &why);
@@ -743,6 +777,80 @@ fn lost_requests(n: &mut Net, k: usize, dev: u32) {
             p.doc.borrow_mut().view.set_image(&p.addr, None);
         }
     }
+    let gone: Vec<u64> = s.scripted.keys().copied().filter(|id| !active.contains(id)).collect();
+    for id in gone {
+        if let Some(doc) = s.scripted.remove(&id).and_then(|w| w.upgrade()) {
+            if let Some(p) = doc.borrow_mut().page.as_mut() {
+                p.answer(id, Err(String::from(t("Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat."))));
+            }
+        }
+    }
+}
+
+// the scripts of the document shown: what is due now, and a frame for what comes next
+fn page_pump(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
+    let now = n.doc.sim.engine().now();
+    let past = n.doc.sim.view_at().is_some();
+    let speed = match n.doc.sim.mode() {
+        Mode::Realtime { speed_pm } if !past => speed_pm,
+        _ => 0,
+    };
+    let Some(w) = n.devwin.get(k) else { return };
+    let s = &mut w.desk.web;
+    let Some((doc, url)) = s.hist.cur().map(|e| (e.doc.clone(), e.url.clone())) else { return };
+    {
+        let mut d = doc.borrow_mut();
+        let d = &mut *d;
+        let Some(p) = d.page.as_mut() else { return };
+        p.set_location(&url);
+        // (while the view stands in the past no script runs)
+        if !past {
+            p.pump(&mut d.view, now, &mut s.seq);
+        }
+        if let Some(ms) = p.wake(now, speed) {
+            ui.timer(TIMER_PAGE + k as u32 % 4, ms);
+        }
+    }
+    page_effects(n, ui, k, dev, &doc);
+}
+
+// what the scripts of a document asked for
+fn page_effects(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, doc: &Rc<RefCell<Doc>>) {
+    let fx = match doc.borrow_mut().page.as_mut() {
+        Some(p) => p.take_effects(),
+        None => return,
+    };
+    if fx.changed {
+        let mut d = doc.borrow_mut();
+        let x = title_of(d.view.doc());
+        if !x.is_empty() && x != d.title {
+            d.title = x;
+            ui.repass();
+        }
+    }
+    for req in fx.fetch {
+        let id = req.id;
+        if let Some(w) = n.devwin.get(k) {
+            w.desk.web.scripted.insert(id, Rc::downgrade(doc));
+        }
+        if let Err(e) = n.doc.sim.send(Cmd::Apply(Action::WebFetch { dev, req })) {
+            let why = tr::msg(&e.msg());
+            if let Some(w) = n.devwin.get(k) {
+                w.desk.web.scripted.remove(&id);
+            }
+            if let Some(p) = doc.borrow_mut().page.as_mut() {
+                p.answer(id, Err(why));
+            }
+            ui.repass();
+        }
+    }
+    if let Some(target) = fx.nav {
+        follow(n, k, dev, &target);
+        ui.repass();
+    } else if fx.reload {
+        reload(n, k, dev, false);
+        ui.repass();
+    }
 }
 
 // ---------------------------------------------------------------- the window
@@ -762,11 +870,15 @@ enum Act {
 /// the Webbrowser of device window k
 pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     lost_requests(n, k, dev);
+    page_pump(n, ui, k, dev);
     let mode = n.doc.sim.mode();
+    let now = n.doc.sim.engine().now();
     let page_id = ID_BROWSER0 + 0x100 * k as u32;
+    let con_id = ID_PAGE0 + 0x80 * k as u32;
     let Some(w) = n.devwin.get(k) else { return };
     let front = w.desk.front == super::desktop::Prog::Browser.key();
     let s = &mut w.desk.web;
+    let scripts = s.hist.cur().is_some_and(|e| e.doc.borrow().page.is_some());
     let mut act: Option<Act> = None;
     if front {
         if ui.capture_shortcut(VK_LEFT, MOD_ALT) {
@@ -781,6 +893,9 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             ui.focus(id);
             let text = s.addr.clone();
             ui.textbox_select(id, &text, 0, text.len());
+        } else if scripts && ui.capture_shortcut(b'J' as u32, MOD_CTRL | MOD_SHIFT) {
+            s.console = !s.console;
+            ui.repass();
         }
     }
     let loading = s.load.is_some();
@@ -813,6 +928,16 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     if ui.button(id + 1, t("Öffnen")) & EV_ACT != 0 {
         act = Some(Act::Open);
     }
+    if scripts {
+        let mut on = s.console as i32;
+        ui.next_icon(crate::workspace::icons::JN_TERMINAL);
+        ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
+        if ui.toggle_button(con_id, t("Konsole"), &mut on) & EV_ACT != 0 {
+            s.console = on != 0;
+            ui.repass();
+        }
+        ui.tooltip(t("Konsole der Seitenskripte (Strg+Umschalt+J)"));
+    }
     ui.box_end();
     // Reload of a POST result: the question above the page
     if s.ask {
@@ -835,9 +960,15 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         Some(d) => {
             ui.next_size(-1, -1);
             let mut d = d.borrow_mut();
-            let ev = ui.doc_view(page_id, &mut d.view, 0);
+            let mut ev = ui.doc_view(page_id, &mut d.view, 0);
             wanted = d.view.image_requests();
-            s.hover = ev.hover.unwrap_or_default();
+            s.hover = ev.hover.take().unwrap_or_default();
+            // the page's handlers decide about its link and its form
+            let dd = &mut *d;
+            if let Some(p) = dd.page.as_mut() {
+                let (link, submit) = p.events(&mut dd.view, ev.clone(), now, &mut s.seq);
+                (ev.link, ev.submit) = (link, submit);
+            }
             if let Some(l) = ev.link {
                 act = Some(Act::Link(l));
             }
@@ -873,7 +1004,11 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             Mode::Simulation => tf("Lädt von {} … Im Simulationsmodus geht die Anfrage mit den Schritten voran.", &[&host]),
         }
     } else if let Some(d) = &doc {
-        let st = d.borrow().status.clone();
+        let mut st = d.borrow().status.clone();
+        let errors = d.borrow().page.as_ref().map_or(0, |p| p.console().errors());
+        if errors > 0 && !s.console {
+            st = tf("{} · Skriptfehler: {} (Konsole)", &[&st, &errors.to_string()]);
+        }
         match waiting {
             0 => st,
             1 => tf("{} · ein Bild lädt noch …", &[&st]),
@@ -882,13 +1017,26 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     } else {
         String::new()
     };
+    // the console of the page's scripts
+    if scripts && s.console {
+        if let Some(d) = &doc {
+            let mut d = d.borrow_mut();
+            if let Some(p) = d.page.as_mut() {
+                if console_pane(ui, con_id + 1, p.console(), &mut s.con_seen) {
+                    p.clear_console();
+                    ui.repass();
+                }
+            }
+        }
+    }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, &line);
     // what the widgets and keys asked for, after them
-    if let Some(d) = &doc
-        && !wanted.is_empty()
-    {
-        fetch_pictures(n, k, dev, d, wanted);
+    if let Some(d) = &doc {
+        if !wanted.is_empty() {
+            fetch_pictures(n, k, dev, d, wanted);
+        }
+        page_effects(n, ui, k, dev, d);
     }
     let Some(a) = act else { return };
     let Some(w) = n.devwin.get(k) else { return };

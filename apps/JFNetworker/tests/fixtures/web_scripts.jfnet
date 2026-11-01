@@ -1,0 +1,218 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Seiten mit Skripten",
+  "description": "WEB1 zeigt Seiten mit Skripten in jfs aus /var/www: einen Zähler, eine Liste, ein Formular, eine Uhr, Daten über fetch (api.jfs auf Port 8080), kaputte Skripte und eine Endlosschleife. DNS1 kennt web.lab. PC1 öffnet die Seiten im Webbrowser seines Desktops.",
+  "seed": 12,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.10/24 dev eth0\necho \"nameserver 10.0.0.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 400,
+      "y": -80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "www",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "root": "/var/www"
+          }
+        },
+        {
+          "kind": "script",
+          "name": "api",
+          "disabled": false,
+          "config": {
+            "file": "/root/app/api.jfs",
+            "port": 8080
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/app",
+          "dir": true
+        },
+        {
+          "path": "/root/app/api.jfs",
+          "text": "// api.jfs: Daten für die Seiten mit Skripten\nlet port = config.port ?? 8080\nhttp.serve(port, fn(req, res) {\n  if req.path == \"/waren.json\" {\n    return res.json(200, {waren: [\"Roggenbrot\", \"Weizenbrot\", \"Brezel\"]})\n  }\n  if req.path == \"/senden\" {\n    let f = req.form ?? {}\n    let eilig = f.eilig ?? \"nein\"\n    return res.send(200, \"<html><head><title>Danke</title></head><body><h1>Danke</h1><p>Name: ${f.name}, Menge: ${f.menge}, eilig: ${eilig}</p></body></html>\", {\"Content-Type\": \"text/html; charset=utf-8\"})\n  }\n  res.send(404, \"gibt es nicht\\n\")\n})\n"
+        },
+        {
+          "path": "/var/www",
+          "dir": true
+        },
+        {
+          "path": "/var/www/index.html",
+          "text": "<!doctype html>\n<html><head><title>Seiten mit Skripten</title></head><body>\n<h1>Seiten mit Skripten</h1>\n<ul>\n<li><a href=\"zaehler.html\">Ein Zähler</a></li>\n<li><a href=\"liste.html\">Eine Liste</a></li>\n<li><a href=\"formular.html\">Ein Formular</a></li>\n<li><a href=\"uhr.html\">Eine Uhr</a></li>\n<li><a href=\"daten.html\">Daten holen</a></li>\n<li><a href=\"kaputt.html\">Kaputte Skripte</a></li>\n<li><a href=\"schleife.html\">Eine Endlosschleife</a></li>\n<li><a href=\"ort.html?a=1&amp;b=zwei#teil\">Die Adresse</a></li>\n<li><a href=\"klicks.html\">Klicks und Blasen</a></li>\n</ul>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/zaehler.html",
+          "text": "<!doctype html>\n<html><head><title>Ein Zähler</title></head><body>\n<h1>Ein Zähler</h1>\n<p id=\"anzeige\">Stand: <b id=\"stand\">0</b></p>\n<p><button id=\"plus\">Plus</button> <button id=\"null\">Null</button></p>\n<p><a href=\"index.html\">Zur Startseite</a></p>\n<script type=\"text/jfs\" src=\"zahl.jfs\"></script>\n<script type=\"text/jfs\">\nlet knopf = document.by_id(\"plus\")\nknopf.on(\"click\", fn(ev) {\n  schreibe(zahl + 1)\n})\ndocument.by_id(\"null\").on(\"click\", fn(ev) {\n  schreibe(0)\n  log.warn(\"zurück auf null\")\n})\nprint(\"bereit\")\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/zahl.jfs",
+          "text": "// zahl.jfs: was die Seite des Zählers teilt\nlet zahl = 0\n\nfn schreibe(n) {\n  zahl = n\n  document.by_id(\"stand\").set_text(zahl)\n  document.set_title(\"Stand ${zahl}\")\n}\n"
+        },
+        {
+          "path": "/var/www/liste.html",
+          "text": "<!doctype html>\n<html><head><title>Eine Liste</title></head><body>\n<h1>Eine Liste</h1>\n<p><label for=\"neu\">Neuer Eintrag</label> <input id=\"neu\" name=\"neu\"> <button id=\"dazu\">Dazu</button> <button id=\"weg\">Den letzten weg</button></p>\n<p id=\"zahl\">Einträge: 0</p>\n<p id=\"echo\">Getippt: nichts</p>\n<ul id=\"liste\"></ul>\n<script type=\"text/jfs\">\nlet liste = document.by_id(\"liste\")\nlet feld = document.by_id(\"neu\")\nlet n = 0\nfn neu_zahl() {\n  n = len(liste.children())\n  document.by_id(\"zahl\").set_text(\"Einträge: ${n}\")\n}\ndocument.by_id(\"dazu\").on(\"click\", fn(ev) {\n  let e = document.create(\"li\")\n  e.set_text(feld.value())\n  e.add_class(\"eintrag\")\n  liste.append(e)\n  feld.set_value(\"\")\n  neu_zahl()\n})\ndocument.by_id(\"weg\").on(\"click\", fn(ev) {\n  let k = liste.children()\n  if len(k) > 0 {\n    k[len(k) - 1].remove()\n  }\n  neu_zahl()\n})\nfeld.on(\"input\", fn(ev) {\n  document.by_id(\"echo\").set_text(\"Getippt: ${ev.target.value()}\")\n})\n// ein Klick auf einen Eintrag streicht ihn an: über die Liste, die Blase steigt\nliste.on(\"click\", fn(ev) {\n  if ev.target.matches(\"li\") {\n    ev.target.toggle_class(\"erledigt\")\n    ev.target.set_attr(\"title\", \"angeklickt\")\n    document.by_id(\"echo\").set_text(\"Angeklickt: ${ev.target.text()}\")\n  }\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/formular.html",
+          "text": "<!doctype html>\n<html><head><title>Ein Formular</title></head><body>\n<h1>Bestellen</h1>\n<form id=\"f\" action=\"http://web.lab:8080/senden\" method=\"post\">\n<p><label for=\"name\">Name</label> <input id=\"name\" name=\"name\"></p>\n<p><label for=\"menge\">Menge</label> <input id=\"menge\" name=\"menge\" value=\"1\"></p>\n<p><label><input type=\"checkbox\" id=\"eilig\" name=\"eilig\" value=\"ja\"> Eilig</label></p>\n<p><input type=\"submit\" id=\"los\" value=\"Abschicken\"></p>\n</form>\n<p id=\"meldung\">Noch nichts geprüft.</p>\n<script type=\"text/jfs\">\nlet meldung = document.by_id(\"meldung\")\ndocument.by_id(\"f\").on(\"submit\", fn(ev) {\n  if str.trim(ev.data.name ?? \"\") == \"\" {\n    ev.prevent()\n    meldung.set_text(\"Bitte einen Namen eingeben.\")\n    return\n  }\n  // was der Handler ändert, geht mit\n  document.by_id(\"menge\").set_value(int(ev.data.menge) * 2)\n  meldung.set_text(\"Wird gesendet …\")\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/uhr.html",
+          "text": "<!doctype html>\n<html><head><title>Eine Uhr</title></head><body>\n<h1>Eine Uhr</h1>\n<p id=\"takte\">Takte: 0</p>\n<p id=\"spaeter\">Noch nichts.</p>\n<p><button id=\"halt\">Halt</button></p>\n<script type=\"text/jfs\">\nlet takte = 0\nlet t = timer.every(500, fn() {\n  takte += 1\n  document.by_id(\"takte\").set_text(\"Takte: ${takte}\")\n})\ntimer.after(2000, fn() {\n  document.by_id(\"spaeter\").set_text(\"Zwei Sekunden sind um.\")\n})\ndocument.by_id(\"halt\").on(\"click\", fn(ev) {\n  timer.cancel(t)\n  document.by_id(\"takte\").add_class(\"steht\")\n  print(\"Die Uhr steht bei ${takte}.\")\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/daten.html",
+          "text": "<!doctype html>\n<html><head><title>Daten holen</title></head><body>\n<h1>Daten holen</h1>\n<p><button id=\"holen\">Holen</button> <button id=\"falsch\">Falsch holen</button></p>\n<p id=\"stand\">Noch nichts geholt.</p>\n<ul id=\"waren\"></ul>\n<script type=\"text/jfs\">\ndocument.by_id(\"holen\").on(\"click\", fn(ev) {\n  document.by_id(\"stand\").set_text(\"Kommt …\")\n  fetch(\"http://web.lab:8080/waren.json\", fn(err, r) {\n    if err != nil {\n      document.by_id(\"stand\").set_text(\"Fehler: ${err}\")\n      return\n    }\n    let d = json.decode(r.body)\n    let l = document.by_id(\"waren\")\n    for w in d.waren {\n      let e = document.create(\"li\")\n      e.set_text(w)\n      l.append(e)\n    }\n    document.by_id(\"stand\").set_text(\"Status ${r.status}: ${len(d.waren)} Waren\")\n  })\n})\ndocument.by_id(\"falsch\").on(\"click\", fn(ev) {\n  fetch({url: \"http://gibtsnicht.lab/\", method: \"GET\"}, fn(err, r) {\n    document.by_id(\"stand\").set_text(\"Fehler beim Holen: ${err != nil}\")\n    print(\"Ohne Antwort: ${err}\")\n  })\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/kaputt.html",
+          "text": "<!doctype html>\n<html><head><title>Kaputte Skripte</title></head><body>\n<h1>Kaputte Skripte</h1>\n<p id=\"eins\">Skript eins lief nicht.</p>\n<p id=\"zwei\">Skript zwei lief nicht.</p>\n<p id=\"drei\">Skript drei lief nicht.</p>\n<p id=\"vier\">Skript vier lief nicht.</p>\n<p id=\"fremd\">Skripte anderer Art laufen nicht.</p>\n<script type=\"text/jfs\">\nlet halb = = 1\n</script>\n<script type=\"text/jfs\">\ndocument.by_id(\"eins\").set_text(\"Skript eins lief.\")\nprint(1 / 0)\ndocument.by_id(\"eins\").set_text(\"Das kommt nie.\")\n</script>\n<script type=\"text/jfs\" src=\"gibtsnicht.jfs\"></script>\n<script type=\"text/jfs\">\nunbekannt()\n</script>\n<script type=\"text/javascript\">document.by_id(\"fremd\").set_text(\"Lief doch.\")</script>\n<script>document.by_id(\"fremd\").set_text(\"Lief doch.\")</script>\n<script type=\"text/jfs\">\ndocument.by_id(\"zwei\").set_text(\"Skript zwei lief.\")\nfn wirft() {\n  throw \"absichtlich\"\n}\ndocument.by_id(\"drei\").on(\"click\", fn(ev) {\n  wirft()\n})\nprint(import(\"/etc/passwd\"))\n</script>\n<script type=\"text/jfs\">\nprint(type(http), type(disk))\n</script>\n<script type=\"text/jfs\">\ndocument.by_id(\"drei\").set_text(\"Skript drei lief.\")\n</script>\n<script type=\"text/jfs\">\ndocument.by_id(\"vier\").set_text(\"Skript vier lief.\")\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/schleife.html",
+          "text": "<!doctype html>\n<html><head><title>Eine Endlosschleife</title></head><body>\n<h1>Eine Endlosschleife</h1>\n<p id=\"stand\">Klicks: 0</p>\n<p><button id=\"dreh\">Endlos</button> <button id=\"zaehl\">Zählen</button></p>\n<p><a id=\"weiter\" href=\"index.html\">Zur Startseite</a></p>\n<script type=\"text/jfs\">\nwhile true {\n}\n</script>\n<script type=\"text/jfs\">\nlet klicks = 0\ndocument.by_id(\"dreh\").on(\"click\", fn(ev) {\n  let i = 0\n  while true {\n    i += 1\n  }\n})\ndocument.by_id(\"zaehl\").on(\"click\", fn(ev) {\n  klicks += 1\n  document.by_id(\"stand\").set_text(\"Klicks: ${klicks}\")\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/ort.html",
+          "text": "<!doctype html>\n<html><head><title>Die Adresse</title></head><body>\n<h1 id=\"oben\">Die Adresse</h1>\n<p id=\"href\">-</p>\n<p id=\"teile\">-</p>\n<p><button id=\"neu\">Laden</button> <button id=\"geh\">Woandershin</button> <button id=\"geh2\">Über href</button> <button id=\"teil\">Zum Teil</button></p>\n<p id=\"stand\">Geladen: 1</p>\n<h2 id=\"unten\">Unten</h2>\n<script type=\"text/jfs\">\ndocument.by_id(\"href\").set_text(location.href)\ndocument.by_id(\"teile\").set_text(\"${location.scheme} ${location.host} ${location.hostname} ${location.port ?? \"-\"} ${location.path} ${location.query} ${location.fragment}\")\ndocument.by_id(\"neu\").on(\"click\", fn(ev) { location.reload() })\ndocument.by_id(\"geh\").on(\"click\", fn(ev) { location.assign(\"index.html\") })\ndocument.by_id(\"geh2\").on(\"click\", fn(ev) { location.href = \"zaehler.html\" })\ndocument.by_id(\"teil\").on(\"click\", fn(ev) { location.assign(\"#unten\") })\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/klicks.html",
+          "text": "<!doctype html>\n<html><head><title>Klicks und Blasen</title></head><body>\n<h1 id=\"kopf\">Klicks und Blasen</h1>\n<p id=\"spur\">Spur:</p>\n<p id=\"zufall\">-</p>\n<p id=\"absatz\">Text mit <span id=\"teil\">einem Teil</span> darin.</p>\n<p><a id=\"halt\" href=\"index.html\">Dieser Link bleibt hier</a></p>\n<p><a id=\"geht\" href=\"index.html\">Dieser Link geht</a></p>\n<div id=\"kasten\"><p id=\"innen\">Innen</p><p id=\"still\">Bis hier und nicht weiter</p></div>\n<script type=\"text/jfs\">\nlet spur = document.by_id(\"spur\")\nfn merke(x) {\n  spur.set_text(\"${spur.text()} ${x}\")\n}\ndocument.by_id(\"halt\").on(\"click\", fn(ev) {\n  ev.prevent()\n  merke(\"halt\")\n})\ndocument.by_id(\"teil\").on(\"click\", fn(ev) { merke(\"teil\") })\ndocument.by_id(\"absatz\").on(\"click\", fn(ev) { merke(\"absatz:${ev.target.attr(\"id\")}\") })\ndocument.by_id(\"kasten\").on(\"click\", fn(ev) { merke(\"kasten\") })\ndocument.by_id(\"still\").on(\"click\", fn(ev) {\n  ev.stop()\n  merke(\"still\")\n})\ndocument.on(\"click\", fn(ev) { merke(\"dok\") })\ndocument.by_id(\"zufall\").set_text(\"${rand(1000)} ${rand(1000)} ${now() >= 0}\")\n</script>\n</body></html>\n"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "DNS1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname DNS1\nip addr add 10.0.0.53/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "dns",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "lab",
+                "records": [
+                  "web A 10.0.0.1",
+                  "dns A 10.0.0.53"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

@@ -164,10 +164,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
   MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
   F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
-- **Webbrowser (B1, B2):** echte kleine Websites aus dem simulierten Netz im Desktop eines Hosts:
-  HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und Skripten mit
-  `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene Fehlerseiten (siehe
-  [Webbrowser](#webbrowser)).
+- **Webbrowser (B1, B2, B3):** echte kleine Websites aus dem simulierten Netz im Desktop eines
+  Hosts: HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und
+  Skripten mit `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene
+  Fehlerseiten, Seitenskripte in `jfs` mit Konsole (siehe [Webbrowser](#webbrowser)).
 - **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
   Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
   vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
@@ -385,6 +385,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `browser_forms.uis` | Formulare gegen das `jfs`-Skript `laden.jfs`: GET mit Query in der Adresse, Zurück bringt das Formular mit dem Eingegebenen, POST mit dem Knopf, Neu laden fragt vor dem zweiten Senden, ein Link mit Weiterleitung, Anhalten und Esc, die angehaltene Simulation, Tab in die Felder |
 | `browser_requests.uis` | was der Webbrowser ins Netz schickt, an den Zahlen des Webservers im Reiter Dienste: Seite und Bild sind zwei Anfragen, Zurück und Vor keine, Neu laden fragt wieder (auch nach dem Bild); der Desktop kommt nach dem Schließen des Gerätefensters so zurück, wie er war |
 | `browser_shots.uis` | die Bilder des Webbrowsers (Seite mit Bild, Text, Formular, die Frage vor dem erneuten Senden, Fehlerseite) hell und dunkel mit 100 und 150 % (`build/jfnetworker/browser_*.png`) |
+| `model.uis`, Gruppe `pagescript` | die Seitenskripte ohne Fenster (`fixtures/web_scripts.jfnet`): Elemente finden, lesen, ändern, anlegen, Ereignisse mit Blase und Standardaktion, Zeitgeber auf einer gegebenen Uhr, `fetch` und `src` durch den HTTP-Client einer Engine, `location`, Fuel, Speicher, Tiefe und Grenzen des Dokuments, Endlosschleifen, Fehler mit Quelle, Zeile und Spalte, die Reihenfolge der Skripte, was eine Seite nicht erreicht, zweimal dasselbe Ergebnis |
+| `browser_scripts.uis` | die Seitenskripte im Fenster auf dem Desktop von PC1: Klicks ändern die Seite (mit Titel), Eingaben, eine Liste, ein gestopptes und ein erlaubtes Absenden, die Uhr bei laufender und stehender Simulation, `fetch`, die Konsole mit Zeile und Spalte, eine kaputte Seite, die Endlosschleife lässt das Fenster bedienbar, Zurück, Vor und Neu laden, Zeitgeber warten auf einer Seite, die nicht zu sehen ist |
+| `browser_script_shots.uis` | die Bilder der Seitenskripte (Zähler, Liste, Formular, Konsole mit Fehlern) hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_*.png`) |
 | `scen_web_site.uis` | das Golden-Szenario einer kleinen Website (`scen/web_site.scn`): `curl` holt, was der Browser holt: Seiten über den Namen, die Weiterleitung eines Ordners, Typen, eine fehlende Seite, ein Pfad aus dem Ordner hinaus, Formulare mit GET und POST, Weiterleitungen und ihre Grenze, eine gespeicherte Seite |
 | `dot1x_panel.uis` | 802.1X im Fenster auf `fixtures/dot1x_lab.jfnet`: die Kabel der geschlossenen Ports heißen „nicht autorisiert“, das Feld „Anmeldung am Netz (802.1X)“ der IP-Konfiguration auf PC1 (ohne Identität ein Hinweis; EAP-MD5, der Port geht auf), PC2 mit falschem Passwort und EAP-PWD (bleibt zu), der RADIUS-Server im Inspektor eines Enterprise-Netzes, der Laptop im Unternehmens-WLAN |
 | `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
@@ -424,7 +427,9 @@ Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
 Für den Webbrowser: `web_site.jfnet` (WEB1 mit den Dateien aus `/var/www` und dem Laden als
 Skript, DNS1 mit `web.lab`, PC1 mit dem Browser; das Szenario `web_site.scn` und die Fensterskripte
-`browser_*.uis`).
+`browser_*.uis`) und `web_scripts.jfnet` (dasselbe Netz mit Seiten mit Skripten: Zähler, Liste,
+Formular, Uhr, Daten über `fetch` von `api.jfs`, kaputte Skripte, eine Endlosschleife, die Adresse,
+Klicks; die selftest-Gruppe `pagescript` und `browser_scripts.uis`, `browser_script_shots.uis`).
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
@@ -496,7 +501,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
-| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
+| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs) (Seitenskripte: der Host der VM, die Konsole), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
 | SSH | [`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs), [`crates/jfn_sim/sshd.rs`](crates/jfn_sim/sshd.rs), [`sshtrace.rs`](crates/jfn_sim/sshtrace.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs), [`src/sshtest.rs`](src/sshtest.rs) | das Protokoll ohne I/O, Client und Server auf den Geräten, Schlüssel als Dateien, `known_hosts`, `authorized_keys`, `scp` |
 | SNMPv3 | [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs), [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmpv3test.rs`](src/snmpv3test.rs) | die Nachricht, USM, VACM, die Reports, die Werkzeuge, der MIB-Browser |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
@@ -3600,7 +3605,7 @@ Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu 
 
 ### Webbrowser
 
-Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 und B2) ist
+Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 bis B3) ist
 ein Programm des Desktops: Er zeigt echte kleine Websites aus dem simulierten Netz mit dem
 `ui.html_view` der Library, nicht mit einer eigenen HTML/CSS-Engine. Ein echtes Internet gibt es
 nicht. Seiten liefern `http-server`-Routen, Dateien des Geräts und Skripte mit `http.serve`, wie
@@ -3657,12 +3662,68 @@ und ohne Routen antwortet der Server wie bisher mit „Hallo von {host}“.
 Entscheidungen: Zurück und Vor zeigen die gemerkte Seite statt neu zu fragen (so geht es auch bei
 stehender Simulation, und das Netz sieht nur, was ein Browser mit Cache auch schickte). Bilder
 kommen über `MI_APP` statt `MI_ASK`, damit relative Pfade einer Seite nicht als Dateien des echten
-Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>`, Seitenskripte und HTTPS
-(B3, B4), Datei-Felder und Mehrfachauswahl in Formularen.
+Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>` und HTTPS (B4), Datei-Felder
+und Mehrfachauswahl in Formularen.
 
-Geprüft wird in der Selbsttest-Gruppe `browser` ([`src/browsertest.rs`](src/browsertest.rs)), dazu
-das Szenario `web_site.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
-`browser_requests.uis` und `browser_shots.uis`.
+**Seitenskripte (B3, [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs)):**
+Eine Seite aus dem simulierten Netz führt `<script type="text/jfs">` aus, im Dokument oder mit `src`,
+in der Sprache von `lib/script`; JavaScript gibt es nicht, nur dieser `type` läuft. Die Skripte
+laufen in der Reihenfolge des Dokuments und teilen sich ihre obersten Namen; ein `src`-Skript wird
+zuerst geholt, die nächsten warten darauf, ein Fehler beim Holen steht in der Konsole und das
+nächste läuft.
+
+| Name | Was es tut |
+|---|---|
+| `document` | `by_id(id)`, `find(sel)`, `find_all(sel)` (Selektoren wie in CSS: Tag, `#id`, `.klasse`, `[attr=v]`, Nachfahre, Kind), `create(tag)`, `create_text(s)`, `body()`, `title()`, `set_title(s)`, `on(typ, f)`, `off(typ, f)` |
+| ein Element | `find`, `find_all`, `matches(sel)`, `parent()`, `children()`, `next()`, `prev()`, `text()`, `set_text(x)`, `html()`, `set_html(s)`, `attr(n)`, `set_attr(n, x)`, `remove_attr(n)`, `has_class(k)`, `add_class(k)`, `remove_class(k)`, `toggle_class(k)`, `append(n)`, `insert(n, vor)`, `remove()`, bei Feldern `value()`, `set_value(x)`, `checked()`, `set_checked(b)`, dazu `on`, `off`, `same(anderes)` und die Felder `tag`, `kind` |
+| Ereignisse | `click` (ein Klick auf Text, Link, Knopf, Kästchen; Eingabe auf einem Link), `input` (Text, Liste, Kästchen), `submit` (ein Formular, `ev.data` mit seinen Feldern); `ev.target`, `ev.current`, `ev.type`; `ev.prevent()` hält einen Link oder ein Formular auf, `ev.stop()` den Weg nach oben |
+| `timer` | `after(ms, f)`, `every(ms, f)` geben eine Nummer, `cancel(nummer)` |
+| `fetch` | `fetch(url oder {url, method, headers, body}, fn(err, resp))`: `resp` hat `status`, `reason`, `headers`, `body`, `url`, `redirects`; `err` ist der Grund als Text, wenn keine Antwort kam (ein 404 ist eine Antwort) |
+| `location` | `href`, `scheme`, `host`, `hostname`, `port`, `path`, `query`, `fragment`; `assign(url)` oder `location.href = url` geht dorthin, `reload()` lädt neu |
+| `print`, `log`, `log.warn`, `log.error` | in die Konsole des Browsers |
+| `now()`, `rand()` | die Zeit der Simulation in ms; Zufall aus dem Seed des Projekts, dem Gerät, der Adresse und der Anfrage |
+
+Dazu kommt die Standardbibliothek (`str`, `list`, `map`, `json`, `math`). **Mehr bekommt eine Seite
+nicht:** keine Dateien des Geräts und keine des echten Rechners, kein `import`, kein `net`, `disk`
+oder `http`, keine Zeit und kein Zufall von außen. Skripte, die später ins Dokument kommen
+(`set_html`, `create`), laufen nicht. `fetch` darf jede `http`-Adresse fragen: Eine Same-Origin-Regel
+gibt es hier nicht.
+
+Ereignisse steigen vom Ziel über seine Eltern bis zum Dokument auf, so genügt für eine Liste ein
+Handler an der Liste; eine Fangphase gibt es nicht. Ein Klick trifft das innerste Element unter dem
+Zeiger. Nur die Standardaktion von Links und Formularen lässt sich aufhalten. Ein Formular geht mit
+den Werten und der Adresse, die seine Handler ihm gelassen haben.
+
+Die VM läuft auf dem UI-Thread, und keine Seite kann das Programm anhalten: Jedes Skript, jeder
+Handler, Zeitgeber und jede Antwort hat 2 000 000 Schritte Fuel; danach endet dieser Aufruf mit einem
+Fehler in der Konsole, und die Seite bleibt bedienbar. Ein Bild führt höchstens 4 000 000 Schritte
+aus, der Rest wartet aufs nächste. Dazu Grenzen für Speicher (8 MiB), Aufruftiefe (200), das Dokument
+(200 000 Knoten, 64 MiB, 1000 Ebenen), Zeitgeber, Handler und offene Anfragen. Fehler nennen die
+Quelle (Adresse der Seite oder `src`) mit Zeile und Spalte in der Datei, auch beim Übersetzen; ein
+Fehler hält das nächste Skript nicht auf. Die Statuszeile nennt die Zahl der Fehler, solange die
+Konsole zu ist.
+
+Alles läuft auf der Uhr der Simulation: Steht sie, warten Zeitgeber (Antworten auf Anfragen auch).
+Zwei Läufe desselben Fensterskripts geben dasselbe Ergebnis. Anfragen sind Aktionen
+(`Action::WebFetch`), das Zurückspulen spielt sie also mit. Die VM selbst gehört zum Fenster, nicht
+zum Projekt: kein Rückgängig-Schritt, keine Änderung am Projekt, sie geht mit dem Fenster.
+
+Die Konsole öffnet der Knopf neben „Öffnen“ (Strg+Umschalt+J); sie erscheint nur bei Seiten mit
+Skripten.
+
+Entscheidungen: **Eine VM je Dokument** statt je Fenster, denn der Verlauf behält je Eintrag sein
+Dokument. Sie gehört zum Dokument wie die Feldwerte und die Stelle: Zurück und Vor bringen eine Seite
+mit ihrem Zustand zurück, ohne Skripte neu zu starten; Neu laden macht eine neue. Solange eine Seite
+nicht zu sehen ist, läuft nichts: Fällige Zeitgeber feuern beim Zurückkommen einmal, `timer.every`
+macht von dort aus weiter, Antworten warten der Reihe nach. **Klicks** nennt die Ansicht der Library
+als `MdEv::click`; das Element unter dem Zeiger sucht `MdDoc::element_at`, ohne dass sich an den Blöcken
+etwas ändert. **Gemeinsame Namen** kommen aus `Vm::add_script`: ein Skript sieht die Namen der Skripte
+davor, nicht die der späteren.
+
+Geprüft wird in den Selbsttest-Gruppen `browser` ([`src/browsertest.rs`](src/browsertest.rs)) und
+`pagescript` ([`src/pagescripttest.rs`](src/pagescripttest.rs)), dazu das Szenario `web_site.scn` und
+die Fensterskripte `browser_pages.uis`, `browser_forms.uis`, `browser_requests.uis`,
+`browser_shots.uis`, `browser_scripts.uis` und `browser_script_shots.uis`.
 ### SSH
 
 SSH Version 2 läuft auf den Geräten wie alles andere Byte für Byte: echte Schlüssel, echter

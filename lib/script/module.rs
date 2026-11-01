@@ -33,6 +33,17 @@
 // file, and a file without a directory ("-e", an inline script) passes it on as it is: the
 // host reads it relative to its working directory.  Fuel: 1 per 64 bytes of source on top of
 // the call, then the module's code as it runs.
+//
+// Scripts of a VM (the <script> elements of a page): vm.add_script(name, src) links a further
+// script the way import links a module, with its top-level code pending as an invocation of its
+// own (only while idle; run() runs it, with fresh fuel), but without a scope of its own: the fns and
+// lets of the program and of the scripts added before are its names too, the same variables (a
+// let of the same name assigns them), and what it declares the next ones see.  A script does not
+// see the names of a later one.  It is compiled the way the program was (compile_with: a name
+// neither declared, known nor of a script before is an error); Err: the errors, the VM is as it
+// was and goes on (the next script); an error while it runs ends only that invocation, and what it
+// declared so far stays.  Errors and traces name `name` as written (no path rules), vm.global finds
+// their names too.  At most MAX_UNITS scripts and modules together.
 
 use alloc::format;
 use alloc::string::String;
@@ -69,6 +80,8 @@ pub(crate) struct Unit {
     pub state: UnitState,
     /// the map import gives, once its code has run
     pub map: Option<Value>,
+    /// a further script (Vm::add_script): its top-level names are those of the program
+    pub script: bool,
 }
 
 /// see the module comment
@@ -119,14 +132,14 @@ fn normalize(p: &str) -> String {
 }
 
 /// an instruction of a module moved to its places in the linked code
-fn reloc(op: Op, pb: u32, kb: u32, gb: u32, h: &[u32]) -> Op {
+fn reloc(op: Op, pb: u32, kb: u32, g: &[u32], h: &[u32]) -> Op {
     match op {
         Op::Const(k) => Op::Const(k + kb),
         Op::GetField(k) => Op::GetField(k + kb),
         Op::SetField(k) => Op::SetField(k + kb),
         Op::CallMethod(k, a) => Op::CallMethod(k + kb, a),
-        Op::GetGlobal(g) => Op::GetGlobal(g + gb),
-        Op::SetGlobal(g) => Op::SetGlobal(g + gb),
+        Op::GetGlobal(x) => Op::GetGlobal(g[x as usize]),
+        Op::SetGlobal(x) => Op::SetGlobal(g[x as usize]),
         Op::GetHost(x) => Op::GetHost(h[x as usize]),
         Op::GetHostField(x) => Op::GetHostField(h[x as usize]),
         Op::AssignHost(x) => Op::AssignHost(h[x as usize]),
@@ -194,7 +207,7 @@ impl Vm {
             Ok(p) => p,
             Err(d) => return self.module_error(&path, &d),
         };
-        let u = self.link(&prog, path)?;
+        let u = self.link(&prog, path, &[], false)?;
         let pbase = self.units[u].pbase;
         if self.frames.len() as u32 >= self.lim.depth {
             let m = format!("Zu viele Aufrufe ineinander (mehr als {}) – endet die Rekursion?", self.lim.depth);
@@ -234,8 +247,9 @@ impl Vm {
         Err(Exc::Throw(v))
     }
 
-    /// link a compiled module behind the VM's code -> its unit
-    fn link(&mut self, prog: &Program, path: String) -> Result<usize, Exc> {
+    /// link a compiled module or script behind the VM's code -> its unit; shared: where the first
+    /// globals of a script already are (the names of the scripts before it)
+    fn link(&mut self, prog: &Program, path: String, shared: &[u32], script: bool) -> Result<usize, Exc> {
         let m = &*prog.code;
         let unit = self.units.len() as u32;
         let mut code: Code = (*self.code).clone();
@@ -267,6 +281,9 @@ impl Vm {
                 }
             }
         }
+        // its globals: the shared ones where they are, the others after the ones there
+        let new = &m.globals[shared.len()..];
+        let places: Vec<u32> = shared.iter().copied().chain((0..new.len() as u32).map(|i| gbase + i)).collect();
         // the constants: its strings live on the heap, rooted from Vm::consts
         for c in &m.consts {
             let v = match c {
@@ -287,20 +304,54 @@ impl Vm {
             let mut p = p.clone();
             p.unit = unit;
             for op in p.code.iter_mut() {
-                *op = reloc(*op, pbase, kbase, gbase, &hmap);
+                *op = reloc(*op, pbase, kbase, &places, &hmap);
             }
-            // the top-level code ends with its map (it has no return statements of its own)
-            if let (0, Some(last @ Op::Return)) = (i, p.code.last_mut()) {
+            // the top-level code ends with its map (it has no return statements of its own); a
+            // script's is an invocation of its own
+            if let (0, false, Some(last @ Op::Return)) = (i, script, p.code.last_mut()) {
                 *last = Op::EndModule;
             }
             code.protos.push(p);
         }
-        code.globals.extend(m.globals.iter().cloned());
+        code.globals.extend(new.iter().cloned());
         self.globals.resize(code.globals.len(), Value::Nil);
         self.code = Arc::new(code);
-        self.units.push(Unit { path, gbase, gcount: m.globals.len() as u32, pbase, state: UnitState::Ready, map: None });
+        self.units.push(Unit { path, gbase, gcount: new.len() as u32, pbase, state: UnitState::Ready, map: None, script });
         self.dbg_rebind();
         Ok(unit as usize)
+    }
+
+    /// a further script of this VM (see the module comment): its top-level code is pending, run()
+    /// runs it -> Err: why it cannot run (its errors; line 0: the VM is busy, too many scripts),
+    /// the VM stays as it was
+    pub fn add_script(&mut self, name: &str, src: &str) -> Result<(), Vec<Diagnostic>> {
+        let refuse = |m: String| vec![Diagnostic { line: 0, col: 0, end_col: 0, error: true, msg: m, file: String::from(name) }];
+        if self.busy() {
+            return Err(refuse(String::from("Die VM ist noch beschäftigt – erst run() bis zum Ende")));
+        }
+        if self.units.len() >= MAX_UNITS {
+            return Err(refuse(format!("Zu viele Skripte (mehr als {})", MAX_UNITS - 1)));
+        }
+        let (mut names, mut places) = (Vec::new(), Vec::new());
+        for (i, u) in self.units.iter().enumerate() {
+            if i == 0 || u.script {
+                for g in u.gbase..u.gbase + u.gcount {
+                    names.push(self.code.globals[g as usize].clone());
+                    places.push(g);
+                }
+            }
+        }
+        let prog = crate::compile_shared(name, src, self.code.strict.as_deref(), &names)?;
+        let u = match self.link(&prog, String::from(name), &places, true) {
+            Ok(u) => u,
+            Err(Exc::Msg(m)) | Err(Exc::Fatal(_, m)) => return Err(refuse(m)),
+            Err(Exc::Throw(_)) => return Err(refuse(String::from("lässt sich nicht binden"))),
+        };
+        self.stack.clear();
+        self.stack.push(Value::Nil);
+        self.frames.push(Frame { proto: self.units[u].pbase, closure: None, base: 1, pc: 0 });
+        self.call_fuel = 0;
+        Ok(())
     }
 
     /// a module's top-level code returned (the frame of function `proto`): its map
@@ -345,8 +396,8 @@ impl Vm {
         r
     }
 
-    /// the files of the VM: the program's name, then the modules' paths in the order they
-    /// were imported (one that failed and was imported again once per try)
+    /// the files of the VM: the program's name, then the modules' paths and the scripts' names in
+    /// the order they came (a module that failed and was imported again once per try)
     pub fn modules(&self) -> Vec<String> {
         self.units.iter().map(|u| u.path.clone()).collect()
     }
