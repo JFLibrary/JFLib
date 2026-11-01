@@ -1522,8 +1522,24 @@ Fensterrand hinaus.
   exakt bzw. Fehler unter 1e-5. Das Vergleichswerkzeug `tools/wgsl_ref.mjs` holt Tints Urteil
   über Chrome (headless, echte GPU), die Sammlung `tools/wgsl_corpus` hat 494 eigene Shader
   samt Tints Urteil. Es fehlen: `Rgba32Sint` in `lib/gpu`, Konstanten nach Namen.
-- **P2** · *fehlt* · G2c: Backend IR → SPIR-V (Basis und Voll), die Messszene mit Shadern aus
-  WGSL, Vergleich mit der Tint-Sammlung.
+- **P2** · *erledigt* (2026-11-01) · G2c: Backend IR → SPIR-V in `lib/wgsl` (`wgsl::compile`,
+  ein Modul je Einstiegspunkt, Basis und Voll). Alles, was das Frontend annimmt, außer den
+  Lücken unten: alle Adressräume und Layouts, alle eingebauten Funktionen samt Texturen und
+  Atomics, `discard` (Voll über Demote, Basis wie Tint), die Laufzeitregeln von WGSL (Division
+  durch 0, Shifts, sättigende Umwandlung) und Robustheit (Indizes und Texturkoordinaten
+  geklemmt). Overrides werden Spezialisierungskonstanten. `Output::constants` rechnet sie samt
+  abgeleiteter Ausdrücke auf der CPU aus und nimmt Namen oder `@id`, mit den Fehlern von
+  WebGPU. Dazu kommen die Pipeline-Prüfungen von WebGPU (`check_pipeline`, `check_interface`).
+  672 Module (322 Quellen, beide Stufen) bestehen `shader::val` und `spirv-val`. Gegen Tint
+  stimmen 478 von 494 Dateien der Sammlung; die 16 übrigen sind 11 Fälle der
+  Uniformitätsanalyse, 4 Subgroups und `01f`. Auf der GPU gleichen 13 469 Ergebnisse dem
+  Konstantenauswerter, gegen Chrome 156 ohne Unterschied. Die Messszene mit WGSL-Shadern ergibt
+  dieselben Bilder wie mit SPIR-V und ist gleich schnell (1,62 ms statt 1,63 ms bei 1 Mio.
+  Würfeln in 1080p). Die Robustheit kostet in `move` 0,007 ms (2,8 %). Die sechs Shader
+  übersetzen in 1,3 ms (Release). Es fehlen: Pipeline-Fehler von Override-Ausdrücken in
+  Funktionen, die Prüfung der Puffergröße beim Binden, `layout: 'auto'`, std140-Zerlegung für
+  `matCx2` (braucht `uniformBufferStandardLayout`), Dual-Source-Blending in den Pipelines von
+  `lib/gpu`, mehrere Ebenen bei `texture_external`.
 - **P2** · *fehlt* · G2d: Uniformitätsanalyse, Rest der Abweichungen zu Tint, Fehlermeldungen
   feilen.
 - **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,

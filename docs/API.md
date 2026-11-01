@@ -18012,8 +18012,8 @@ buffer slots, staged uploads, submission
        from WGSL (lib/wgsl): f16 in uniform buffers and push constants, the standard uniform
        buffer layout, demote-to-helper (discard on Vulkan 1.3), clip distances, the
        primitive index (geometryShader), sample-rate shading, dual-source blending in
-       shaders, the extended storage image formats, storage reads without format.  Not enabled: robust buffer
-       access (speed; lib/wgsl's back end clamps indices instead).
+       shaders, the extended storage image formats, storage reads without format.  Not
+       enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
