@@ -10,10 +10,12 @@ the suite builds and runs it like every app.
 """
 import contextlib
 import io
+import os
 import re
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -447,6 +449,70 @@ static TIPS: [&str; 2] = [
         rep = i18n_check.check_lib()
         self.assertEqual([x for x in rep.lines if x[0] in ("missing", "untranslated", "error")], [])
         self.assertGreater(rep.texts, 100)
+
+
+class IncrementalCache(Temp):
+    """build_rs.incremental_flags: the state a rustc killed during ThinLTO leaves goes, the others stay"""
+
+    def session(self, stem, suffix, keys_age=None):
+        """inc/spell/spell-x/s-STEM-SUFFIX with its lock file (100 s old) and keys (KEYS_AGE s old)"""
+        now = time.time()
+        d = self.dir / "inc" / "spell" / "spell-x" / f"s-{stem}-{suffix}"
+        d.mkdir(parents=True)
+        lock = d.with_name(f"s-{stem}.lock")
+        lock.touch()
+        os.utime(lock, (now - 100, now - 100))
+        if keys_age is not None:
+            (d / "thin-lto-past-keys.bin").touch()
+            os.utime(d / "thin-lto-past-keys.bin", (now - keys_age, now - keys_age))
+        return lock
+
+    def check(self):
+        inc = self.dir / "inc" / "spell"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(build_rs.incremental_flags(inc), ["-C", f"incremental={inc}"])
+        return inc.exists(), out.getvalue()
+
+    def test_no_cache_yet(self):
+        self.assertEqual(self.check(), (False, ""))
+
+    def test_finished_session_stays(self):
+        self.session("hnr7aaaaaa-0000001", "svh", keys_age=0)
+        self.assertEqual(self.check(), (True, ""))
+
+    def test_compile_error_keeps_the_cache(self):
+        self.session("hnr7aaaaaa-0000001", "svh", keys_age=500)
+        self.session("hnr7bbbbbb-0000002", "working", keys_age=500)
+        self.assertEqual(self.check(), (True, ""))
+
+    def test_killed_before_thinlto_keeps_the_cache(self):
+        self.session("hnr7bbbbbb-0000002", "working")
+        self.assertEqual(self.check(), (True, ""))
+
+    def test_killed_during_thinlto_discards_the_cache(self):
+        self.session("hnr7aaaaaa-0000001", "svh", keys_age=50)
+        self.session("hnr7bbbbbb-0000002", "working", keys_age=50)
+        kept, out = self.check()
+        self.assertFalse(kept)
+        self.assertIn("killed during ThinLTO", out)
+
+    def test_compile_error_before_a_finished_build_keeps_the_cache(self):
+        """the -working folder shares its keys with the later session, so they look rewritten"""
+        self.session("hnr7aaaaaa-0000001", "working", keys_age=0)
+        self.session("hnr7bbbbbb-0000002", "svh", keys_age=0)
+        self.assertEqual(self.check(), (True, ""))
+
+    def test_running_rustc_keeps_the_cache(self):
+        lock = self.session("hnr7bbbbbb-0000002", "working", keys_age=50)
+        with open(lock, "r+b") as f:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(self.check(), (True, ""))
 
 
 if __name__ == "__main__":

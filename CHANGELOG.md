@@ -155,6 +155,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Linux: the caption buttons of a frameless window win over the resize band (their top row and the close button's corner started a resize before); no band on the tiled edges of a tiled window; jfgui_CSD=1 also asks for no system frame (X11, Wayland's xdg-decoration)
 - **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
 - **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
+- **tools:** A development build no longer leaves a broken incremental cache behind when rustc is killed during ThinLTO: rustc overwrites the last good session's keys through a hard link, its next run then kept stale objects and exited 0, and every app linking that crate failed with undefined symbol anon.*.llvm.*; build_rs.py now detects the killed session and discards the crate's cache before compiling
 
 ### Security
 

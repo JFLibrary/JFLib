@@ -62,6 +62,8 @@ reload, ui/hotreload.rs).  --release:
 opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and 6-10 % smaller,
 rewrite/REPORT.md section 2; R13 measured with 3).  A crate is rebuilt only when
 its sources, its dependencies or the flags changed (hash stamps in <out>/<target>/.stamp).
+An incremental cache left by a rustc killed during ThinLTO is discarded before the crate's next
+build (incremental_flags).
 
 Rules checked before every build (`check`):
   * every crate root starts with #![no_std]; only alloc / core are `extern crate`d
@@ -311,6 +313,54 @@ def compile_rlib(cmd, root, out, deps, piped, ready):
     # cgu.0.rcgu.o); with --out-dir they lose the "lib" and the LTO step lays out the exe
     # differently
     run_cmd(cmd + ext + [f"--emit=metadata={rmeta},link", "-o", out, root], on_meta=ready)
+
+
+def session_lock_held(lock):
+    """is a rustc still working in this incremental session?  It holds the session's lock file
+    while it runs: LockFileEx on the first byte on Windows, flock on Linux."""
+    try:
+        with open(lock, "r+b") as f:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    return False
+
+
+def incremental_flags(inc):
+    """-C incremental=inc, after discarding the cache if the last rustc there was killed during
+    ThinLTO.  A new session (s-*-working, renamed when rustc finishes) starts as hard links to
+    the files of the last good one, and ThinLTO overwrites thin-lto-past-keys.bin in place, so
+    the kill (Ctrl+C, taskkill) has changed the good session's keys too.  The next rustc takes
+    them for its own, keeps old objects although the modules they import from changed, and exits
+    0 with an rlib whose objects name symbols nobody defines: every app that links it then fails
+    with "undefined symbol: anon.<hash>.N.llvm.<hash>".
+    A compile error leaves a -working folder too, but its keys are older than its lock file: the
+    cache stays.  Only the newest session counts: an older -working folder shares its keys with
+    the sessions after it, and this check has already run before each of them.
+    A cache that broke without this check (its rustc exited 0, nothing shows it here): delete
+    <out>/<target>/inc/CRATE and .stamp/CRATE."""
+    for crate in inc.glob("*"):
+        newest = max((d for d in crate.glob("s-*") if d.is_dir()), key=lambda d: d.name, default=None)
+        if newest is None or not newest.name.endswith("-working"):
+            continue
+        lock = newest.with_name(newest.name.removesuffix("-working") + ".lock")
+        try:
+            rewritten = (newest / "thin-lto-past-keys.bin").stat().st_mtime >= lock.stat().st_mtime
+        except OSError:                     # no keys yet, or rustc is just removing the session
+            continue
+        if rewritten and not session_lock_held(lock):
+            print(f"note: rustc was killed during ThinLTO, discarding its incremental cache {inc}")
+            shutil.rmtree(inc, ignore_errors=True)
+            break
+    return ["-C", f"incremental={inc}"]
 
 
 def crate_dir(root_file):
@@ -907,7 +957,7 @@ class Builder:
             return False
         cmd = ["rustc"] + self.flags(name) + ["--crate-type", "rlib", "--crate-name", name]
         if not self.release:
-            cmd += ["-C", f"incremental={self.dir / 'inc' / name}"]
+            cmd += incremental_flags(self.dir / "inc" / name)
         compile_rlib(cmd, RS / root, out, [(d, self.rlib(d)) for d in deps], self.piped, ready)
         if self.target in ("win", "linux") and compute_crate(name) and name != "simd":
             check_intrinsics(name, out)
@@ -1048,7 +1098,7 @@ class Builder:
                                       "--initial-memory=33554432", "--export=__stack_pointer")
                         for x in ("-C", "link-arg=" + arg)]
         elif not self.release:
-            cmd += ["-C", f"incremental={self.dir / 'inc' / key}"]
+            cmd += incremental_flags(self.dir / "inc" / key)
         for d in crates:
             cmd += ["--extern", f"{d}={self.rlib(d)}"]
         cmd += ["--extern", f"style={self.rlib(scrate)}"]
@@ -1113,7 +1163,7 @@ class Builder:
         if self.release:
             cmd += ["-C", "lto"]
         else:
-            cmd += ["-C", f"incremental={self.dir / 'inc' / key}"]
+            cmd += incremental_flags(self.dir / "inc" / key)
         for d in crates:
             cmd += ["--extern", f"{d}={self.rlib(d)}"]
         if style:
@@ -2012,7 +2062,7 @@ class ModuleBuilder:
                 return False
             cmd = ["rustc"] + self.flags(crate) + ["--crate-type", "rlib", "--crate-name", crate]
             if not self.b.release:
-                cmd += ["-C", f"incremental={self.dir / 'inc' / crate}"]
+                cmd += incremental_flags(self.dir / "inc" / crate)
             compile_rlib(cmd, RS / root, out, [(nm, self.rlib(dep)) for dep, nm in zip(deps, names)],
                          self.b.piped, ready)
             if compute_crate(crate) and crate != "simd":
