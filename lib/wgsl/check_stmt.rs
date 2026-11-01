@@ -22,6 +22,12 @@ pub const RETURN: u8 = 2;
 pub const BREAK: u8 = 4;
 pub const CONTINUE: u8 = 8;
 
+/// statements nest less deeply than this (Chrome's limit; spec 2.4 has 127 for braces alone):
+/// the function body is depth 0, a statement of a block one more than the block, the block of
+/// an if, loop, for or while one more than the statement, an else-if one more than the if before
+/// it, a case's block two more than its switch, a continuing block two more than its loop
+pub const MAX_STMT_DEPTH: u32 = 127;
+
 /// a statement's behavior and IR
 type Out = (u8, Option<ir::Stmt>);
 
@@ -54,12 +60,43 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// a block that belongs to a statement (one level below it)
     fn block(&mut self, b: &ast::Block) -> (u8, Vec<ir::Stmt>) {
+        if !self.depth_ok(b.span) {
+            return (NEXT, Vec::new());
+        }
+        self.deeper(1);
+        let r = self.bare_block(b);
+        self.deeper(-1);
+        r
+    }
+
+    fn bare_block(&mut self, b: &ast::Block) -> (u8, Vec<ir::Stmt>) {
         self.only_diag(&b.attrs, b.span);
         self.push_scope();
         let r = self.stmts(&b.stmts);
         self.pop_scope();
         r
+    }
+
+    fn deeper(&mut self, by: i32) {
+        if let Some(f) = self.f.as_mut() {
+            f.depth = f.depth.wrapping_add_signed(by);
+        }
+    }
+
+    /// a statement one level below the current one: an error at the limit (once per function)
+    fn depth_ok(&mut self, sp: Span) -> bool {
+        let Some(f) = self.f.as_mut() else { return true };
+        if f.depth + 1 < MAX_STMT_DEPTH {
+            return true;
+        }
+        if !f.depth_reported {
+            f.depth_reported = true;
+            let at = Span::new(sp.start, sp.end.min(sp.start + 1));
+            let _ = self.err(at, format!("die Anweisungen sind zu tief verschachtelt (erlaubt sind {} Ebenen)", MAX_STMT_DEPTH - 1));
+        }
+        false
     }
 
     fn stmts(&mut self, v: &[ast::Stmt]) -> (u8, Vec<ir::Stmt>) {
@@ -73,9 +110,15 @@ impl<'a> Checker<'a> {
             // code after return / break / continue is checked, but never runs
             if acc & NEXT == 0 && !warned && !matches!(s.kind, StmtKind::Empty) {
                 warned = true;
-                self.warn(Span::new(s.span.start, s.span.start + 1), String::from("unerreichbarer Code"));
+                self.warn(Span::new(s.span.start, s.span.start + 1), String::from(UNREACHABLE));
             }
-            let (b, st) = match self.stmt(s) {
+            if !self.depth_ok(s.span) {
+                break;
+            }
+            self.deeper(1);
+            let r = self.stmt(s);
+            self.deeper(-1);
+            let (b, st) = match r {
                 Ok(x) => x,
                 Err(_) => (NEXT, None),
             };
@@ -127,7 +170,7 @@ impl<'a> Checker<'a> {
         match &s.kind {
             StmtKind::Empty => Ok((NEXT, None)),
             StmtKind::Block(b) => {
-                let (beh, v) = self.block(b);
+                let (beh, v) = self.bare_block(b);
                 Ok((beh, Some(ir::Stmt::Block(v))))
             }
             StmtKind::Return(e) => {
@@ -153,23 +196,40 @@ impl<'a> Checker<'a> {
                 let (mut beh, t) = self.block(then);
                 // else-if chain: built from the back
                 let mut parts = Vec::with_capacity(else_ifs.len());
-                for ei in else_ifs {
-                    let c2 = self.condition(&ei.cond, "else if")?;
-                    let (b2, t2) = self.block(&ei.body);
-                    beh |= b2;
-                    parts.push((c2, t2));
-                }
-                let mut tail = match else_ {
-                    Some(b) => {
-                        let (b3, e) = self.block(b);
-                        beh |= b3;
-                        e
+                let start_depth = self.f.as_ref().map_or(0, |f| f.depth);
+                let r = (|| {
+                    for ei in else_ifs {
+                        if !self.depth_ok(ei.body.span) {
+                            return Err(E);
+                        }
+                        self.deeper(1);
+                        let c2 = self.condition(&ei.cond, "else if")?;
+                        let (b2, t2) = self.block(&ei.body);
+                        beh |= b2;
+                        parts.push((c2, t2));
                     }
-                    None => {
-                        beh |= NEXT;
-                        Vec::new()
+                    Ok(())
+                })();
+                let tail = if r.is_ok() {
+                    match else_ {
+                        Some(b) => {
+                            let (b3, e) = self.block(b);
+                            beh |= b3;
+                            Some(e)
+                        }
+                        None => {
+                            beh |= NEXT;
+                            Some(Vec::new())
+                        }
                     }
+                } else {
+                    None
                 };
+                if let Some(f) = self.f.as_mut() {
+                    f.depth = start_depth;
+                }
+                r?;
+                let mut tail = tail.unwrap_or_default();
                 while let Some((c2, t2)) = parts.pop() {
                     tail = alloc::vec![ir::Stmt::If { cond: c2, then: t2, else_: tail }];
                 }
@@ -217,6 +277,7 @@ impl<'a> Checker<'a> {
             StmtKind::Discard => {
                 if let Some(f) = self.f.as_mut() {
                     f.info.uses_discard = true;
+                    f.info.discard_use.get_or_insert(sp);
                 }
                 Ok((NEXT, Some(ir::Stmt::Discard)))
             }
@@ -250,7 +311,7 @@ impl<'a> Checker<'a> {
                     return Err(self.err(e.span, String::from("`++` / `--` brauchen Lese- und Schreibzugriff")));
                 }
                 if store != I32 && store != U32 {
-                    return Err(self.err(e.span, format!("`++` / `--` gibt es nur für i32 und u32, nicht für `{}`", self.tn(store))));
+                    return Err(self.err(e.span, format!("`++` / `--` gibt es nur für `i32` und `u32`, nicht für `{}`", self.tn(store))));
                 }
                 self.note_rw(r.id);
                 let one = if store == I32 { Value::I32(1) } else { Value::U32(1) };
@@ -259,7 +320,7 @@ impl<'a> Checker<'a> {
                 Ok((NEXT, Some(ir::Stmt::Compound { lhs: r.id, op, rhs: c })))
             }
             StmtKind::ConstAssert(e) => {
-                self.const_assert(e)?;
+                self.const_assert(e, sp)?;
                 Ok((NEXT, None))
             }
         }
@@ -277,7 +338,7 @@ impl<'a> Checker<'a> {
     fn condition(&mut self, e: &ast::Expr, what: &str) -> R<ExprId> {
         let te = self.value(e)?;
         if te.ty != BOOL {
-            return Err(self.err(e.span, format!("die Bedingung von `{}` muss bool sein, nicht `{}`", what, self.tn(te.ty))));
+            return Err(self.err(e.span, format!("die Bedingung von `{}` muss `bool` sein, nicht `{}`", what, self.tn(te.ty))));
         }
         Ok(self.node(&te))
     }
@@ -285,7 +346,7 @@ impl<'a> Checker<'a> {
     fn switch(&mut self, selector: &ast::Expr, clauses: &[ast::Clause], sp: Span) -> R<Out> {
         let sel = self.value(selector)?;
         if !matches!(sel.ty, I32 | U32 | AINT) {
-            return Err(self.err(selector.span, format!("der `switch`-Ausdruck muss i32 oder u32 sein, nicht `{}`", self.tn(sel.ty))));
+            return Err(self.err(selector.span, format!("der `switch`-Ausdruck muss `i32` oder `u32` sein, nicht `{}`", self.tn(sel.ty))));
         }
         // the case values (const-expressions)
         let mut cases: Vec<(TE, usize)> = Vec::new();
@@ -328,7 +389,7 @@ impl<'a> Checker<'a> {
         let concrete = core::iter::once(&sel).chain(cases.iter().map(|c| &c.0)).find(|t| !self.t.is_abstract(t.ty)).map(|t| t.ty);
         let ty = concrete.unwrap_or(I32);
         if ty != I32 && ty != U32 {
-            return Err(self.err(selector.span, format!("der `switch`-Ausdruck muss i32 oder u32 sein, nicht `{}`", self.tn(ty))));
+            return Err(self.err(selector.span, format!("der `switch`-Ausdruck muss `i32` oder `u32` sein, nicht `{}`", self.tn(ty))));
         }
         let sel = self.convert(sel, ty)?;
         let mut values: Vec<(i64, Span, usize)> = Vec::new();
@@ -352,8 +413,16 @@ impl<'a> Checker<'a> {
         if let Some(f) = self.f.as_mut() {
             f.ctl.push(Ctl { kind: CtlKind::Switch, depth: usize::MAX, decls: Vec::new(), continues: Vec::new() });
         }
+        // the limit counts every selector, default too
+        let selectors: usize = clauses.iter().map(|c| c.sels.len()).sum();
+        if selectors > MAX_CASE_SELECTORS {
+            let _ = self.err(Span::new(sp.start, sp.start + 6), format!("`switch` hat {} case-Werte, erlaubt sind {}", selectors, MAX_CASE_SELECTORS));
+            ok = false;
+        }
         for (k, c) in clauses.iter().enumerate() {
+            self.deeper(1);
             let (b, body) = self.block(&c.body);
+            self.deeper(-1);
             beh |= b;
             let selectors: Vec<i64> = values.iter().filter(|v| v.2 == k).map(|v| v.0).collect();
             let default = c.sels.iter().any(|s| matches!(s, ast::CaseSel::Default(_)));
@@ -371,7 +440,9 @@ impl<'a> Checker<'a> {
         Ok((beh, Some(ir::Stmt::Switch { selector: sid, cases: out })))
     }
 
-    fn loop_combine(&mut self, b1: u8, b2: u8, sp: Span) -> R<u8> {
+    /// errors_before: the error count when the loop started (an error inside may have taken
+    /// the loop's exit away: no second error)
+    fn loop_combine(&mut self, b1: u8, b2: u8, sp: Span, errors_before: usize) -> R<u8> {
         let r = if b1 == RETURN {
             RETURN
         } else if (b1 | b2) & BREAK == 0 {
@@ -380,17 +451,22 @@ impl<'a> Checker<'a> {
             (b1 | b2 | NEXT) & !(BREAK | CONTINUE)
         };
         if r == 0 {
+            if self.errors > errors_before {
+                return Ok(NEXT);
+            }
             return Err(self.err(Span::new(sp.start, sp.start + 4), String::from("die Schleife endet nie (kein `break`, kein `return`)")));
         }
         Ok(r)
     }
 
     fn loop_(&mut self, body: &[ast::Stmt], cont: Option<&ast::Continuing>, sp: Span) -> R<Out> {
+        let errors_before = self.errors;
         if let Some(f) = self.f.as_mut() {
             let depth = f.scopes.len() + 1;
             f.ctl.push(Ctl { kind: CtlKind::Loop, depth, decls: Vec::new(), continues: Vec::new() });
         }
         self.push_scope();
+        self.deeper(1);
         let (b1, stmts) = self.stmts(body);
         let mut b2 = NEXT;
         let mut cstmts = Vec::new();
@@ -405,7 +481,9 @@ impl<'a> Checker<'a> {
             }
             self.only_diag(&c.body.attrs, c.body.span);
             self.push_scope();
+            self.deeper(1);
             let (b, v) = self.stmts(&c.body.stmts);
+            self.deeper(-1);
             b2 = b;
             cstmts = v;
             if let Some(e) = &c.break_if {
@@ -424,6 +502,7 @@ impl<'a> Checker<'a> {
                 uses = f.cont_uses.pop().unwrap_or_default();
             }
         }
+        self.deeper(-1);
         self.pop_scope();
         let ctl = self.f.as_mut().and_then(|f| f.ctl.pop());
         // a continue must not skip a declaration the continuing block uses
@@ -445,12 +524,13 @@ impl<'a> Checker<'a> {
         if err {
             return Err(E);
         }
-        let beh = self.loop_combine(b1, b2 & !(CONTINUE | RETURN), sp)?;
+        let beh = self.loop_combine(b1, b2 & !(CONTINUE | RETURN), sp, errors_before)?;
         Ok((beh, Some(ir::Stmt::Loop { body: stmts, continuing: cstmts, break_if })))
     }
 
     /// for and while (while: no init, no update)
     fn for_(&mut self, init: Option<&ast::Stmt>, cond: Option<&ast::Expr>, update: Option<&ast::Stmt>, body: &ast::Block, sp: Span) -> R<Out> {
+        let errors_before = self.errors;
         self.push_scope();
         let r = (|| {
             let mut pre = Vec::new();
@@ -476,7 +556,9 @@ impl<'a> Checker<'a> {
                 f.ctl.push(Ctl { kind: CtlKind::Loop, depth: usize::MAX, decls: Vec::new(), continues: Vec::new() });
             }
             self.only_diag(&body.attrs, body.span);
+            self.deeper(1);
             let (b, stmts) = self.stmts(&body.stmts);
+            self.deeper(-1);
             if let Some(f) = self.f.as_mut() {
                 f.ctl.pop();
             }
@@ -487,7 +569,7 @@ impl<'a> Checker<'a> {
                 b1 = BREAK | b;
             }
             lbody.extend(stmts);
-            let beh = self.loop_combine(b1, NEXT, sp)?;
+            let beh = self.loop_combine(b1, NEXT, sp, errors_before)?;
             let lp = ir::Stmt::Loop { body: lbody, continuing: cont, break_if: None };
             let st = if pre.is_empty() {
                 lp
@@ -589,6 +671,9 @@ impl<'a> Checker<'a> {
                 };
                 let tsp = v.ty.as_ref().map(|t| t.span).unwrap_or(v.name.span);
                 self.store_type_ok(AddressSpace::Function, Access::ReadWrite, ty, tsp)?;
+                if let Some(n) = self.t.big_array(ty) {
+                    return Err(self.err(tsp, format!("ein Array mit {} Elementen: außerhalb von Speicherpuffern sind höchstens 65535 erlaubt", n)));
+                }
                 let init = match init {
                     Some(te) => {
                         let te = self.convert(te, ty)?;

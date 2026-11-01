@@ -86,6 +86,112 @@ fn as_u32(fx: &mut Fx, v: Id, t: TypeId) -> Id {
     v
 }
 
+/// the lane or quad index of a broadcast: SPIR-V wants an unsigned constant, WGSL allows i32
+fn const_index(fx: &mut Fx, e: ExprId) -> Id {
+    let idx = match fx.exprs.get(e as usize).map(|x| &x.kind) {
+        Some(ExprKind::Const(v)) => crate::consteval::as_int(v).unwrap_or(0) as u32,
+        _ => 0,
+    };
+    fx.g.b.const_u32(idx)
+}
+
+/// a subgroup or quad function: OpGroupNonUniform*, scope Subgroup
+fn subgroup(fx: &mut Fx, b: Builtin, args: &[ExprId], ty: TypeId) -> V {
+    use Builtin::*;
+    use spv::group_op::{ExclusiveScan, InclusiveScan, Reduce};
+    let a: Vec<Id> = args.iter().map(|&x| fx.val(x)).collect();
+    let rt = fx.sty(ty);
+    let scope = fx.g.b.const_u32(spv::scope::Subgroup);
+    fx.g.b.capability(Cap::GroupNonUniform);
+    let t0 = args.first().map(|&x| fx.tyof(x)).unwrap_or(ty);
+    let s = fx.scalar(t0);
+    if s == Scalar::F16 {
+        fx.g.needs.subgroup_extended_types = true;
+    }
+    // the arithmetic and bit operations: (opcode, group operation)
+    let arith = |int: u16, sint: u16, float: u16| -> u16 {
+        match s {
+            Scalar::I32 => sint,
+            Scalar::U32 => int,
+            _ => float,
+        }
+    };
+    let reduction = match b {
+        SubgroupAdd => Some((arith(op::GroupNonUniformIAdd, op::GroupNonUniformIAdd, op::GroupNonUniformFAdd), Reduce)),
+        SubgroupExclusiveAdd => Some((arith(op::GroupNonUniformIAdd, op::GroupNonUniformIAdd, op::GroupNonUniformFAdd), ExclusiveScan)),
+        SubgroupInclusiveAdd => Some((arith(op::GroupNonUniformIAdd, op::GroupNonUniformIAdd, op::GroupNonUniformFAdd), InclusiveScan)),
+        SubgroupMul => Some((arith(op::GroupNonUniformIMul, op::GroupNonUniformIMul, op::GroupNonUniformFMul), Reduce)),
+        SubgroupExclusiveMul => Some((arith(op::GroupNonUniformIMul, op::GroupNonUniformIMul, op::GroupNonUniformFMul), ExclusiveScan)),
+        SubgroupInclusiveMul => Some((arith(op::GroupNonUniformIMul, op::GroupNonUniformIMul, op::GroupNonUniformFMul), InclusiveScan)),
+        SubgroupMin => Some((arith(op::GroupNonUniformUMin, op::GroupNonUniformSMin, op::GroupNonUniformFMin), Reduce)),
+        SubgroupMax => Some((arith(op::GroupNonUniformUMax, op::GroupNonUniformSMax, op::GroupNonUniformFMax), Reduce)),
+        SubgroupAnd => Some((op::GroupNonUniformBitwiseAnd, Reduce)),
+        SubgroupOr => Some((op::GroupNonUniformBitwiseOr, Reduce)),
+        SubgroupXor => Some((op::GroupNonUniformBitwiseXor, Reduce)),
+        _ => None,
+    };
+    if let Some((opc, gop)) = reduction {
+        fx.g.b.capability(Cap::GroupNonUniformArithmetic);
+        fx.g.needs.subgroup_ops |= 4;
+        return V::Id(fx.g.b.emit(opc, Some(rt), &[scope.0, gop, a[0].0]));
+    }
+    fx.g.needs.subgroup_ops |= 1;
+    let r = match b {
+        SubgroupElect => fx.g.b.emit(op::GroupNonUniformElect, Some(rt), &[scope.0]),
+        SubgroupAll | SubgroupAny => {
+            fx.g.b.capability(Cap::GroupNonUniformVote);
+            fx.g.needs.subgroup_ops |= 2;
+            let opc = if b == SubgroupAll { op::GroupNonUniformAll } else { op::GroupNonUniformAny };
+            fx.g.b.emit(opc, Some(rt), &[scope.0, a[0].0])
+        }
+        SubgroupBallot | SubgroupBroadcastFirst => {
+            fx.g.b.capability(Cap::GroupNonUniformBallot);
+            fx.g.needs.subgroup_ops |= 8;
+            let opc = if b == SubgroupBallot { op::GroupNonUniformBallot } else { op::GroupNonUniformBroadcastFirst };
+            fx.g.b.emit(opc, Some(rt), &[scope.0, a[0].0])
+        }
+        SubgroupBroadcast => {
+            // (before SPIR-V 1.5 the id must be a constant: it is, the front end checks it)
+            fx.g.b.capability(Cap::GroupNonUniformBallot);
+            fx.g.needs.subgroup_ops |= 8;
+            let id = const_index(fx, args[1]);
+            fx.g.b.emit(op::GroupNonUniformBroadcast, Some(rt), &[scope.0, a[0].0, id.0])
+        }
+        SubgroupShuffle | SubgroupShuffleXor => {
+            fx.g.b.capability(Cap::GroupNonUniformShuffle);
+            fx.g.needs.subgroup_ops |= 16;
+            let id = as_u32(fx, a[1], fx.tyof(args[1]));
+            let opc = if b == SubgroupShuffle { op::GroupNonUniformShuffle } else { op::GroupNonUniformShuffleXor };
+            fx.g.b.emit(opc, Some(rt), &[scope.0, a[0].0, id.0])
+        }
+        SubgroupShuffleUp | SubgroupShuffleDown => {
+            fx.g.b.capability(Cap::GroupNonUniformShuffleRelative);
+            fx.g.needs.subgroup_ops |= 32;
+            let opc = if b == SubgroupShuffleUp { op::GroupNonUniformShuffleUp } else { op::GroupNonUniformShuffleDown };
+            fx.g.b.emit(opc, Some(rt), &[scope.0, a[0].0, a[1].0])
+        }
+        QuadBroadcast => {
+            fx.g.b.capability(Cap::GroupNonUniformQuad);
+            fx.g.needs.subgroup_ops |= 128;
+            let c = const_index(fx, args[1]);
+            fx.g.b.emit(op::GroupNonUniformQuadBroadcast, Some(rt), &[scope.0, a[0].0, c.0])
+        }
+        QuadSwapX | QuadSwapY | QuadSwapDiagonal => {
+            fx.g.b.capability(Cap::GroupNonUniformQuad);
+            fx.g.needs.subgroup_ops |= 128;
+            let dir = match b {
+                QuadSwapX => 0,
+                QuadSwapY => 1,
+                _ => 2,
+            };
+            let c = fx.g.b.const_u32(dir);
+            fx.g.b.emit(op::GroupNonUniformQuadSwap, Some(rt), &[scope.0, a[0].0, c.0])
+        }
+        _ => return V::None,
+    };
+    V::Id(r)
+}
+
 pub(crate) fn builtin(fx: &mut Fx, b: Builtin, args: &[ExprId], ty: TypeId) -> V {
     use Builtin::*;
     if crate::builtins::is_texture_fn(b) {
@@ -128,6 +234,7 @@ pub(crate) fn builtin(fx: &mut Fx, b: Builtin, args: &[ExprId], ty: TypeId) -> V
             };
             return V::Id(fx.array_length(&p));
         }
+        _ if crate::builtins::feature(b) == crate::feature::SUBGROUPS => return subgroup(fx, b, args, ty),
         _ => {}
     }
     let t0 = fx.tyof(args[0]);

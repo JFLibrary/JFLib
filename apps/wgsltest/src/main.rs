@@ -2,7 +2,8 @@
 // literals, template lists), the parser (statements, precedence, error recovery, depth
 // limit), print -> parse round trips, positive and negative checker cases for every rule
 // (each negative case asserts the message's position and a key part of its text), constant
-// evaluation against i64 / f64 computations and f32 rounding, the IR of a few shaders (types,
+// evaluation against i64 / f64 computations and f32 rounding, the uniformity analysis and the
+// subgroup front end (unif.rs), the IR of a few shaders (types,
 // layouts, entry point interfaces), the six benchmark shaders, robustness (mutations of valid
 // shaders, deep nesting: errors, never a panic) and compile-time numbers for a large shader.
 // Console program; exit code 1 when a check fails.
@@ -10,6 +11,8 @@
 //   python build_rs.py test wgsltest
 //   build/win/wgsltest.exe [--check] [--only GROUP] [--verbose]
 //   build/win/wgsltest.exe --file F.wgsl     check one file and print the diagnostics
+//   build/win/wgsltest.exe --verdict F.wgsl  the corpus group's verdict on one file (valid, error,
+//                                            pipeline-error) and why
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -28,6 +31,7 @@ mod coverage;
 mod irtest;
 mod lexparse;
 mod robust;
+mod unif;
 
 /// the result collector of a check group
 pub struct T {
@@ -157,14 +161,14 @@ fn check_file(path: &str) -> i32 {
     match wgsl::check(&src) {
         Ok(m) => {
             for w in &m.warnings {
-                out(&format!("{}: {}\n", path, w));
+                out(&format!("{}: {}", path, w.render(&src)));
             }
             out(&format!("{}: ok, {} functions, {} entry points\n", path, m.functions.len(), m.entry_points.len()));
             0
         }
         Err(d) => {
             for x in &d {
-                out(&format!("{}: {}\n", path, x));
+                out(&format!("{}: {}", path, x.render(&src)));
             }
             1
         }
@@ -198,16 +202,26 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--spv") {
         return backend::spv_file(&f);
     }
+    if let Some(f) = plat::arg_value("--verdict") {
+        let Some(bytes) = plat::read_file(&f) else {
+            out(&format!("cannot read {}\n", f));
+            return 2;
+        };
+        let (v, why) = backend::verdict(&String::from_utf8_lossy(&bytes));
+        out(&format!("{} {}\n", v, why.lines().next().unwrap_or("")));
+        return 0;
+    }
     if plat::args().iter().any(|a| a == "--stack") {
         return stack_probe();
     }
     let only = plat::arg_value("--only").map(String::from);
     let verbose = plat::args().iter().any(|a| a == "--verbose");
-    let groups: [(&'static str, fn(&mut T)); 13] = [
+    let groups: [(&'static str, fn(&mut T)); 14] = [
         ("lex", lexparse::lex),
         ("parse", lexparse::parse),
         ("print", lexparse::print),
         ("check", checks::run),
+        ("unif", unif::run),
         ("consts", consts::run),
         ("ir", irtest::run),
         ("bench", bench::run),

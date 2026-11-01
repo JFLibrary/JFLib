@@ -141,6 +141,11 @@ pub struct Needs {
     pub clip_distance: bool,
     /// @interpolate(.., sample), @builtin(sample_index) (sampleRateShading)
     pub sample_rate_shading: bool,
+    /// subgroup operations on f16 (shaderSubgroupExtendedTypes)
+    pub subgroup_extended_types: bool,
+    /// the subgroup operations a module uses (SUBGROUP_* of lib/gpu's Features::subgroup_ops):
+    /// 1 basic, 2 vote, 4 arithmetic, 8 ballot, 16 shuffle, 32 shuffle relative, 128 quad
+    pub subgroup_ops: u32,
 }
 
 /// where a specialization constant's value comes from
@@ -162,6 +167,9 @@ pub struct EntryOut {
     /// compute: the workgroup size with the overrides' defaults (None: an override without
     /// default decides it; Output::workgroup_size computes it for pipeline constants)
     pub workgroup_size: Option<[u32; 3]>,
+    /// @subgroup_size with the overrides' defaults (None: not written, or an override without
+    /// default; Output::subgroup_size computes it for pipeline constants)
+    pub subgroup_size: Option<u32>,
     pub resources: Vec<Resource>,
     /// bytes of the var<immediate> block (0: none); lib/gpu: PipelineLayoutDesc::push_constants
     pub immediate_size: u32,
@@ -212,7 +220,7 @@ pub fn compile(src: &str, opt: &CompileOptions) -> Result<Output, Vec<Diagnostic
 }
 
 fn diag(msg: String) -> Diagnostic {
-    Diagnostic { line: 1, col: 1, end_col: 1, error: true, msg, start: 0, end: 0, notes: Vec::new() }
+    Diagnostic { line: 1, col: 1, end_col: 1, error: true, info: false, msg, start: 0, end: 0, notes: Vec::new() }
 }
 
 /// compile a checked module

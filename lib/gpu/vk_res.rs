@@ -1252,6 +1252,26 @@ pub struct RenderPipeline(pub(crate) Arc<PipeInner>);
 
 impl Device {
     pub fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline> {
+        self.compute_pipeline(desc, 0)
+    }
+
+    /// create_compute_pipeline with a required subgroup size (WGSL @subgroup_size, what
+    /// wgsl::Output::subgroup_size returns): Features::subgroup_size_control, a power of two in
+    /// Limits::subgroup_min_size ..= subgroup_max_size; size 0: the driver's choice
+    pub fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline> {
+        if size != 0 {
+            if !self.sh.features.subgroup_size_control {
+                return Err(GpuError::Unsupported("subgroup size control"));
+            }
+            let lim = &self.sh.limits;
+            if !size.is_power_of_two() || size < lim.subgroup_min_size || size > lim.subgroup_max_size {
+                return Err(GpuError::Invalid("the required subgroup size is not a power of two within Limits::subgroup_min_size ..= subgroup_max_size"));
+            }
+        }
+        self.compute_pipeline(desc, size)
+    }
+
+    fn compute_pipeline(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline> {
         let sh = &self.sh;
         sh.check()?;
         let (map, data, set) = stage_info(sh, &desc.shader, shader::Model::GLCompute)?;
@@ -1271,10 +1291,19 @@ impl Device {
             p_data: data.as_ptr() as *const c_void,
         };
         let name = nul_name(desc.shader.entry);
+        if size != 0 && wg[0] % size != 0 {
+            return Err(GpuError::Invalid("the workgroup size in x is not a multiple of the required subgroup size"));
+        }
+        let required = vk::PipelineShaderStageRequiredSubgroupSizeCreateInfo {
+            s_type: vk::STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO,
+            p_next: core::ptr::null_mut(),
+            required_subgroup_size: size,
+        };
         let ci = vk::ComputePipelineCreateInfo {
             s_type: vk::STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             stage: vk::PipelineShaderStageCreateInfo {
                 s_type: vk::STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                p_next: if size != 0 { &required as *const _ as *const c_void } else { core::ptr::null() },
                 stage: vk::SHADER_STAGE_COMPUTE_BIT,
                 module: desc.shader.module.0.h,
                 p_name: name.as_ptr(),

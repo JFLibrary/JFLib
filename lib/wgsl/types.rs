@@ -73,6 +73,32 @@ impl Types {
 
     /// the table of a checked module again (the back end's constant evaluation: the ids are
     /// the module's, since the checker interned in the same order)
+    /// NestDepth(t) of spec 6.2.11 (0 for what is not composite); every type in the table is
+    /// within the limit, so this recursion is bounded
+    pub fn nest_depth(&self, t: TypeId) -> u32 {
+        match self.get(t) {
+            Type::Vector(..) => 1,
+            Type::Matrix(..) => 2,
+            Type::Array { elem, .. } => 1 + self.nest_depth(elem),
+            Type::Struct(i) => 1 + self.structs.get(i as usize).map_or(0, |s| s.members.iter().map(|m| self.nest_depth(m.ty)).max().unwrap_or(0)),
+            _ => 0,
+        }
+    }
+
+    /// the element count of a fixed-size array at or above the limit Chrome has outside
+    /// storage buffers (65536), in t or in what t holds
+    pub fn big_array(&self, t: TypeId) -> Option<u32> {
+        match self.get(t) {
+            Type::Array { elem, count, .. } => match count {
+                ArrayCount::Fixed(n) if n >= 65536 => Some(n),
+                _ => self.big_array(elem),
+            },
+            Type::Struct(i) => self.structs.get(i as usize)?.members.iter().find_map(|m| self.big_array(m.ty)),
+            Type::Pointer { space, store, .. } if space != AddressSpace::Storage => self.big_array(store),
+            _ => None,
+        }
+    }
+
     pub fn from_module(types: &[Type], structs: &[Struct]) -> Types {
         let mut t = Types::new();
         t.structs = structs.to_vec();

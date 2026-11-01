@@ -180,9 +180,10 @@ impl<'a> Checker<'a> {
         None
     }
 
-    fn note_global(&mut self, g: u32) {
+    fn note_global(&mut self, g: u32, sp: Span) {
         if let Some(f) = self.f.as_mut() {
             f.info.globals.insert(g);
+            f.info.global_use.entry(g).or_insert(sp);
         }
     }
 
@@ -201,7 +202,7 @@ impl<'a> Checker<'a> {
                 Suffix::F => self.cst(F32, Some(Value::F32(*v as f32)), sp),
                 Suffix::H => {
                     if !self.has(feature::F16) {
-                        return Err(self.err(sp, String::from("f16-Literale (Suffix h) brauchen `enable f16;`")));
+                        return Err(self.err(sp, String::from("f16-Literale (Suffix `h`) brauchen `enable f16;`")));
                     }
                     self.cst(F16, Some(Value::F16(*v as f32)), sp)
                 }
@@ -276,7 +277,7 @@ impl<'a> Checker<'a> {
                         if self.f.is_none() || self.module_arena {
                             return Err(self.err_note(sp, format!("die Variable `{}` ist in const- und override-Ausdrücken nicht erlaubt", id.name), dsp, String::from("hier deklariert")));
                         }
-                        self.note_global(g);
+                        self.note_global(g, sp);
                         let gl = &self.m.globals[g as usize];
                         let (space, ty, access) = (gl.space, gl.ty, gl.access);
                         let rt = self.t.reference(space, ty, access);
@@ -289,9 +290,24 @@ impl<'a> Checker<'a> {
             }
             None => match predeclared_kind(&id.name) {
                 Some(k) => Err(self.err(sp, format!("`{}` ist {} und kein Wert", id.name, k))),
-                None => Err(self.err(sp, format!("`{}` ist hier nicht bekannt", id.name))),
+                None => {
+                    let hint = self.name_hint(&id.name, false);
+                    Err(self.err(sp, format!("`{}` ist hier nicht bekannt{}", id.name, hint)))
+                }
             },
         }
+    }
+
+    /// " – meintest du `x`?": the names in scope; for a call also the built-in functions
+    fn name_hint(&self, name: &str, call: bool) -> String {
+        let mut names: Vec<&str> = self.names.keys().copied().collect();
+        if let Some(f) = self.f.as_ref() {
+            names.extend(f.scopes.iter().flatten().map(|e| e.0.as_str()));
+        }
+        if call {
+            names.extend(builtins::TABLE.iter().map(|e| e.0));
+        }
+        suggestion(name, names.into_iter())
     }
 
     fn auto_deref(&mut self, te: TE) -> R<TE> {
@@ -311,7 +327,7 @@ impl<'a> Checker<'a> {
         match i.ty {
             I32 | U32 => Ok(i),
             AINT => self.convert(i, I32),
-            _ => Err(self.err(e.span, format!("ein Index muss i32 oder u32 sein, nicht `{}`", self.tn(i.ty)))),
+            _ => Err(self.err(e.span, format!("ein Index muss `i32` oder `u32` sein, nicht `{}`", self.tn(i.ty)))),
         }
     }
 
@@ -466,7 +482,10 @@ impl<'a> Checker<'a> {
             Type::Struct(si) => {
                 let Some((k, mty)) = self.t.structs.get(si as usize).and_then(|s| s.members.iter().position(|m| m.name == name.name).map(|k| (k, s.members[k].ty))) else {
                     let sname = self.tn(store);
-                    return Err(self.err(name.span, format!("die Struktur `{}` hat kein Member `{}`", sname, name.name)));
+                    let members: Vec<&str> = self.t.structs[si as usize].members.iter().map(|m| m.name.as_str()).collect();
+                    let hint = suggestion(&name.name, members.iter().copied());
+                    let dsp = self.t.structs[si as usize].span;
+                    return Err(self.err_note(name.span, format!("die Struktur `{}` hat kein Member `{}`{}", sname, name.name, hint), dsp, String::from("hier deklariert")));
                 };
                 if is_ref {
                     let rt = self.t.reference(space, mty, access);
@@ -524,16 +543,16 @@ impl<'a> Checker<'a> {
                 match self.t.get(r.ty) {
                     Type::Reference { space, store, access } => {
                         if space == AddressSpace::Handle {
-                            return Err(self.err(sp, String::from("von Texturen und Samplern lässt sich keine Adresse nehmen")));
+                            return Err(self.err(x.span, String::from("von Texturen und Samplern lässt sich keine Adresse nehmen")));
                         }
                         if self.is_vector_component(r.id) {
-                            return Err(self.err(sp, String::from("von einer Vektorkomponente lässt sich keine Adresse nehmen")));
+                            return Err(self.err(x.span, String::from("von einer Vektorkomponente lässt sich keine Adresse nehmen")));
                         }
                         let pt = self.t.ptr(space, store, access);
                         Ok(self.mk(ir::ExprKind::AddrOf(r.id), pt, Phase::Runtime, sp))
                     }
-                    Type::SwizzleView { .. } => Err(self.err(sp, String::from("von einem Swizzle lässt sich keine Adresse nehmen"))),
-                    _ => Err(self.err(sp, format!("`&` braucht eine Variable oder einen Speicherbezug, nicht einen Wert vom Typ `{}`", self.tn(r.ty)))),
+                    Type::SwizzleView { .. } => Err(self.err(x.span, String::from("von einem Swizzle lässt sich keine Adresse nehmen"))),
+                    _ => Err(self.err(x.span, format!("`&` braucht eine Variable oder einen Speicherbezug, nicht einen Wert vom Typ `{}`", self.tn(r.ty)))),
                 }
             }
             UnOp::Deref => {
@@ -869,12 +888,15 @@ impl<'a> Checker<'a> {
                     let t = self.ty(&te)?;
                     return self.construct(t, args, sp);
                 }
-                if builtins::SUBGROUP_NAMES.contains(&id.name.as_str()) {
-                    return Err(self.err(id.span, format!("`{}` (subgroups / buffer_view) wird von diesem Compiler noch nicht unterstützt", id.name)));
+                if builtins::BUFFER_VIEW_NAMES.contains(&id.name.as_str()) {
+                    return Err(self.err(id.span, format!("`{}` (buffer_view) wird von diesem Compiler noch nicht unterstützt", id.name)));
                 }
                 match predeclared_kind(&id.name) {
                     Some(k) => Err(self.err(id.span, format!("`{}` ist {} und keine Funktion", id.name, k))),
-                    None => Err(self.err(id.span, format!("die Funktion `{}` ist hier nicht bekannt", id.name))),
+                    None => {
+                        let hint = self.name_hint(&id.name, true);
+                        Err(self.err(id.span, format!("die Funktion `{}` ist hier nicht bekannt{}", id.name, hint)))
+                    }
                 }
             }
         }
@@ -957,6 +979,13 @@ impl<'a> Checker<'a> {
             if f.info.compute_use.is_none() {
                 f.info.compute_use = info.compute_use.clone();
             }
+            if f.info.not_vertex_use.is_none() {
+                f.info.not_vertex_use = info.not_vertex_use.clone();
+            }
+            f.info.discard_use = f.info.discard_use.or(info.discard_use);
+            for (g, usp) in &info.global_use {
+                f.info.global_use.entry(*g).or_insert(*usp);
+            }
         }
         let ty = info.ret.unwrap_or(builtins::NONE);
         Ok(self.mk(ir::ExprKind::Call(fi, ids), ty, Phase::Runtime, sp))
@@ -1000,6 +1029,12 @@ impl<'a> Checker<'a> {
         let tname = self.tn(t);
         if !self.t.is_constructible(t) {
             return Err(self.err(sp, format!("`{}` ist nicht konstruierbar", tname)));
+        }
+        if let Some(n) = self.t.big_array(t) {
+            return Err(self.err(sp, format!("ein Array mit {} Elementen: außerhalb von Speicherpuffern sind höchstens 65535 erlaubt", n)));
+        }
+        if args.len() > MAX_ARRAY_CONSTRUCTOR && matches!(self.t.get(t), Type::Array { .. }) {
+            return Err(self.err(sp, format!("ein Array-Konstruktor mit {} Elementen: erlaubt sind {}", args.len(), MAX_ARRAY_CONSTRUCTOR)));
         }
         let vals = self.args_of(args)?;
         if vals.is_empty() {
@@ -1197,6 +1232,9 @@ impl<'a> Checker<'a> {
     /// vecN(…), matCxR(…), array(…) without template parameters: the component type is
     /// inferred by overload resolution
     fn construct_inferred(&mut self, generator: &str, args: &[Expr], sp: Span) -> R<TE> {
+        if generator == "array" && args.len() > MAX_ARRAY_CONSTRUCTOR {
+            return Err(self.err(sp, format!("ein Array-Konstruktor mit {} Elementen: erlaubt sind {}", args.len(), MAX_ARRAY_CONSTRUCTOR)));
+        }
         let vals = self.args_of(args)?;
         let f16 = self.has(feature::F16);
         if generator == "array" {
@@ -1430,13 +1468,20 @@ impl<'a> Checker<'a> {
             if flags & builtins::COMPUTE != 0 && f.info.compute_use.is_none() {
                 f.info.compute_use = Some((sp, String::from(name)));
             }
+            if flags & builtins::NOT_VERTEX != 0 && f.info.not_vertex_use.is_none() {
+                f.info.not_vertex_use = Some((sp, String::from(name)));
+            }
         }
     }
 
     fn builtin_call(&mut self, b: Builtin, flags: u8, id: &ast::Ident, args: &[Expr], sp: Span) -> R<TE> {
         let feat = builtins::feature(b);
         if feat != 0 && !self.has(feat) {
-            let what = if feat == feature::ATOMIC_VEC2U_MIN_MAX { "`enable atomic_vec2u_min_max;`" } else { "eine Spracherweiterung, die hier nicht verfügbar ist" };
+            let what = match feat {
+                feature::ATOMIC_VEC2U_MIN_MAX => "`enable atomic_vec2u_min_max;`",
+                feature::SUBGROUPS => "`enable subgroups;`",
+                _ => "eine Spracherweiterung, die hier nicht verfügbar ist",
+            };
             return Err(self.err(id.span, format!("`{}` braucht {}", id.name, what)));
         }
         if self.f.is_none() || self.module_arena {
@@ -1496,7 +1541,14 @@ impl<'a> Checker<'a> {
         for (v, &p) in vals.into_iter().zip(sig.params()) {
             conv.push(self.convert(v, p)?);
         }
-        self.builtin_const_checks(b, &conv)?;
+        // the lane or quad index of a broadcast is a const-expression
+        if matches!(b, SubgroupBroadcast | QuadBroadcast) {
+            if let Some(idx) = conv.get(1).filter(|c| c.stage != Phase::Const) {
+                let sp = idx.span;
+                return Err(self.err(sp, format!("das Argument `id` von `{}` muss ein const-Ausdruck sein", id.name)));
+            }
+        }
+        self.builtin_const_checks(b, &conv, sp)?;
         let all_const = conv.iter().all(|c| c.stage == Phase::Const);
         if flags & builtins::CONST != 0 && all_const {
             let val = if self.no_eval == 0 && conv.iter().all(|c| c.val.is_some()) {
@@ -1516,54 +1568,20 @@ impl<'a> Checker<'a> {
     }
 
     /// errors a built-in reports when some of its arguments are constants
-    fn builtin_const_checks(&mut self, b: Builtin, a: &[TE]) -> R<()> {
+    fn builtin_const_checks(&mut self, b: Builtin, a: &[TE], sp: Span) -> R<()> {
         if self.no_eval > 0 {
             return Ok(());
         }
-        let c = |i: usize| a.get(i).filter(|x| x.stage == Phase::Const).and_then(|x| x.val.clone());
-        let ints = |v: &Value| -> Vec<i128> { match v { Value::Comp(cs) => cs.iter().filter_map(consteval::as_int).collect(), _ => consteval::as_int(v).into_iter().collect() } };
-        match b {
-            Builtin::ExtractBits | Builtin::InsertBits => {
-                let (oi, ci) = if b == Builtin::ExtractBits { (1, 2) } else { (2, 3) };
-                if let (Some(o), Some(n)) = (c(oi), c(ci)) {
-                    let (o, n) = (consteval::as_int(&o).unwrap_or(0), consteval::as_int(&n).unwrap_or(0));
-                    if o + n > 32 {
-                        return Err(self.err(a[oi].span.to(a[ci].span), format!("offset + count = {} ist größer als 32", o + n)));
-                    }
-                }
+        let vals: Vec<(Option<Value>, TypeId)> = a.iter().map(|x| (x.val.clone().filter(|_| x.stage == Phase::Const), x.ty)).collect();
+        match builtins::arg_checks(&self.t, b, &vals) {
+            Ok(()) => Ok(()),
+            Err((from, to, msg)) => {
+                // (the range of the subgroup functions is about one argument, the others'
+                // about the call)
+                let at = if builtins::feature(b) == feature::SUBGROUPS { a[from].span.to(a[to].span) } else { sp };
+                Err(self.err(at, msg))
             }
-            Builtin::Clamp => {
-                if let (Some(lo), Some(hi)) = (c(1), c(2)) {
-                    let (lv, hv) = (comps(&self.t, &lo, a[1].ty), comps(&self.t, &hi, a[2].ty));
-                    let bad = if self.t.is_scalar(a[1].ty) { consteval::as_f64(&lo) > consteval::as_f64(&hi) } else { lv.iter().zip(&hv).any(|(x, y)| consteval::as_f64(x) > consteval::as_f64(y)) };
-                    if bad {
-                        return Err(self.err(a[1].span.to(a[2].span), String::from("clamp: die Untergrenze ist größer als die Obergrenze")));
-                    }
-                }
-            }
-            Builtin::Smoothstep => {
-                if let (Some(e0), Some(e1)) = (c(0), c(1)) {
-                    let eq = if self.t.is_scalar(a[0].ty) { consteval::as_f64(&e0) == consteval::as_f64(&e1) } else { comps(&self.t, &e0, a[0].ty).iter().zip(comps(&self.t, &e1, a[1].ty)).any(|(x, y)| consteval::as_f64(x) == consteval::as_f64(&y)) };
-                    if eq {
-                        return Err(self.err(a[0].span.to(a[1].span), String::from("smoothstep: edge0 und edge1 dürfen nicht gleich sein")));
-                    }
-                }
-            }
-            Builtin::Ldexp => {
-                if let Some(e) = c(1) {
-                    let bias = match self.t.scalar_of(a[0].ty) {
-                        Some(Scalar::F32) => 127,
-                        Some(Scalar::F16) => 15,
-                        _ => 1023,
-                    };
-                    if ints(&if self.t.is_scalar(a[1].ty) { e.clone() } else { Value::Comp(comps(&self.t, &e, a[1].ty)) }).iter().any(|&x| x > bias + 1) {
-                        return Err(self.err(a[1].span, format!("ldexp: der Exponent ist größer als {}", bias + 1)));
-                    }
-                }
-            }
-            _ => {}
         }
-        Ok(())
     }
 
     fn texture_call(&mut self, b: Builtin, id: &ast::Ident, args: &[Expr], sp: Span) -> R<TE> {
@@ -1727,6 +1745,15 @@ impl<'a> Checker<'a> {
             _ => inner,
         };
         Ok(self.mk(ir::ExprKind::Builtin(b, ids), rt, Phase::Runtime, sp))
+    }
+}
+
+/// the name the spec gives the second parameter of a subgroup shuffle or broadcast
+pub fn subgroup_arg_name(b: Builtin) -> &'static str {
+    match b {
+        Builtin::SubgroupShuffleUp | Builtin::SubgroupShuffleDown => "delta",
+        Builtin::SubgroupShuffleXor => "mask",
+        _ => "id",
     }
 }
 

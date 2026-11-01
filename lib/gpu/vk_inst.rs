@@ -484,6 +484,8 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
     dip.s_type = vk::STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
     let mut sub: vk::PhysicalDeviceSubgroupProperties = vk::Zero::zero();
     sub.s_type = vk::STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+    let mut size_ctl: vk::PhysicalDeviceSubgroupSizeControlProperties = vk::Zero::zero();
+    size_ctl.s_type = vk::STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES;
     let mut drv: vk::PhysicalDeviceDriverProperties = vk::Zero::zero();
     drv.s_type = vk::STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
     let mut p2: vk::PhysicalDeviceProperties2 = vk::Zero::zero();
@@ -494,6 +496,9 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
     let api = p2.properties.api_version;
     let v12 = api >= vk::API_VERSION_1_2;
     let has_drv = v12 || exts.driver_properties_khr;
+    if api >= vk::API_VERSION_1_3 {
+        dip.p_next = &mut size_ctl as *mut _ as *mut c_void;
+    }
     sub.p_next = if v12 { &mut dip as *mut _ as *mut c_void } else { core::ptr::null_mut() };
     drv.p_next = &mut sub as *mut _ as *mut c_void;
     p2.p_next = if has_drv { &mut drv as *mut _ as *mut c_void } else { &mut sub as *mut _ as *mut c_void };
@@ -590,6 +595,16 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
     let need_ops = vk::SUBGROUP_FEATURE_BASIC_BIT | vk::SUBGROUP_FEATURE_VOTE_BIT | vk::SUBGROUP_FEATURE_ARITHMETIC_BIT
         | vk::SUBGROUP_FEATURE_BALLOT_BIT | vk::SUBGROUP_FEATURE_SHUFFLE_BIT;
     let subgroups = sub.supported_stages & vk::SHADER_STAGE_COMPUTE_BIT != 0 && sub.supported_operations & need_ops == need_ops;
+    let webgpu_ops = need_ops | vk::SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT | vk::SUBGROUP_FEATURE_QUAD_BIT;
+    let webgpu_stages = vk::SHADER_STAGE_COMPUTE_BIT | vk::SHADER_STAGE_FRAGMENT_BIT;
+    let subgroups_webgpu = sub.supported_stages & webgpu_stages == webgpu_stages && sub.supported_operations & webgpu_ops == webgpu_ops;
+    let mut subgroup_stages = 0;
+    for (bit, stage) in [(vk::SHADER_STAGE_COMPUTE_BIT, crate::subgroup_stage::COMPUTE), (vk::SHADER_STAGE_FRAGMENT_BIT, crate::subgroup_stage::FRAGMENT), (vk::SHADER_STAGE_VERTEX_BIT, crate::subgroup_stage::VERTEX)] {
+        if sub.supported_stages & bit != 0 {
+            subgroup_stages |= stage;
+        }
+    }
+    let subgroup_size_control = v13 && f13.f[vk::F13_SUBGROUP_SIZE_CONTROL] != 0 && size_ctl.required_subgroup_size_stages & vk::SHADER_STAGE_COMPUTE_BIT != 0;
     let bindless = v12
         && [
             vk::F12_DESCRIPTOR_INDEXING,
@@ -613,6 +628,11 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         draw_indirect_count: b12(vk::F12_DRAW_INDIRECT_COUNT) && v12,
         bindless,
         subgroups,
+        subgroups_webgpu,
+        subgroup_stages,
+        subgroup_ops: sub.supported_operations,
+        subgroup_size_control,
+        subgroup_extended_types: v12 && b12(vk::F12_SHADER_SUBGROUP_EXTENDED_TYPES),
         draw_parameters: b11(vk::F11_SHADER_DRAW_PARAMETERS),
         shader_f16: v12 && b12(vk::F12_SHADER_FLOAT16),
         shader_f64: b10(vk::F10_SHADER_FLOAT64),
@@ -674,6 +694,8 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         max_anisotropy: lim.max_sampler_anisotropy,
         timestamp_period_ns: lim.timestamp_period,
         subgroup_size: sub.subgroup_size,
+        subgroup_min_size: if subgroup_size_control { size_ctl.min_subgroup_size } else { sub.subgroup_size },
+        subgroup_max_size: if subgroup_size_control { size_ctl.max_subgroup_size } else { sub.subgroup_size },
         max_bindless_textures: uab(vk::DIP_MAX_SET_UAB_SAMPLED_IMAGES, vk::DIP_MAX_PER_STAGE_UAB_SAMPLED_IMAGES),
         max_bindless_samplers: uab(vk::DIP_MAX_SET_UAB_SAMPLERS, vk::DIP_MAX_PER_STAGE_UAB_SAMPLERS),
         max_bindless_buffers: uab(vk::DIP_MAX_SET_UAB_STORAGE_BUFFERS, vk::DIP_MAX_PER_STAGE_UAB_STORAGE_BUFFERS),

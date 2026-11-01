@@ -11,7 +11,9 @@
 //            with WebGPU's default limits and the file's `// constants:` line, check_interface
 //            between the first vertex and each fragment entry point) -- valid, error or
 //            pipeline-error; a file we accept and Tint rejects fails unless ALLOW_ACCEPT lists
-//            it, a file we reject and Tint accepts fails unless KNOWN_REJECT lists it
+//            it, a file we reject and Tint accepts fails unless KNOWN_REJECT lists it; on the
+//            unif and diag files our warnings and infos must match Tint's (type and line); the
+//            position of the first error is compared with Tint's on every error file
 //   --spv FILE [--out DIR]   compile one file at both levels, write DIR/<file>.<entry>.1x.spv,
 //            print lib/shader's verdict (a tool for the development)
 
@@ -24,32 +26,28 @@ use crate::{out, T};
 const OUT: &str = "build/wgsltest";
 const CORPUS: &str = "tools/wgsl_corpus";
 
-/// corpus files we accept and Tint rejects: the uniformity analysis (step G2d) is missing
-const ALLOW_ACCEPT: &[&str] = &[
-    // derivative_uniformity: textureSample / derivatives in non-uniform control flow (G2d)
-    "diag/err_default_error.wgsl",
-    "diag/err_error_directive.wgsl",
-    "unif/err_sample_after_nonuniform_loop_break.wgsl",
-    "unif/err_sample_after_nonuniform_return.wgsl",
-    "unif/err_short_circuit_nonuniform.wgsl",
-    // barriers and workgroupUniformLoad / storage reads in non-uniform control flow (G2d)
-    "unif/err_barrier_read_write_storage.wgsl",
-    "unif/err_parameter_nonuniform_call.wgsl",
-    "unif/err_pointer_param_nonuniform.wgsl",
-    "unif/err_storage_barrier_nonuniform.wgsl",
-    "unif/err_workgroup_plain_load.wgsl",
-    "unif/err_barrier_nonuniform_if.wgsl",
-];
+/// corpus files we accept and Tint rejects: none (never accept what Chrome rejects)
+const ALLOW_ACCEPT: &[&str] = &[];
 
-/// corpus files we reject and Tint accepts (docs/WGSL.md "Korpus")
+/// corpus files we reject and Tint accepts (docs/WGSL.md "Abweichungen"): the spec's rule where
+/// Chrome is more lenient
 const KNOWN_REJECT: &[&str] = &[
     // `01f`: the spec's decimal float grammar has no leading zero before a suffix; Tint takes it
     "lex/err_float_leading_zero_suffix.wgsl",
-    // subgroups are not implemented yet ("noch nicht unterstützt")
-    "enable/ok_subgroups.wgsl",
-    "enable/ok_subgroups_f16.wgsl",
-    "diag/ok_subgroup_uniformity_rule.wgsl",
-    "requires/ok_subgroup_id.wgsl",
+    // over the minimum of spec 2.4, which Chrome exceeds (see check.rs, MAX_*)
+    "limits/err_array_constructor_2048.wgsl",
+    "limits/err_array_constructor_typed_2048.wgsl",
+    "limits/err_case_selectors_1024.wgsl",
+    "limits/err_case_selectors_in_one_clause_1024.wgsl",
+    "limits/err_function_8196.wgsl",
+    "limits/err_function_two_blocks.wgsl",
+    "limits/err_nesting_array_16.wgsl",
+    "limits/err_nesting_matrix_counts_two.wgsl",
+    "limits/err_nesting_struct_16.wgsl",
+    "limits/err_private_8196.wgsl",
+    "limits/err_private_through_helper.wgsl",
+    "limits/err_private_two_variables.wgsl",
+    "limits/err_struct_members_1024.wgsl",
 ];
 
 /// lib/shader's validator with the options the module needs
@@ -223,6 +221,117 @@ pub fn expected() -> Vec<(String, String)> {
     out
 }
 
+/// a message of Tint's from expected.json
+#[derive(Clone, Default, Debug)]
+pub struct TintMessage {
+    pub kind: String,
+    pub line: u32,
+    pub col: u32,
+    pub text: String,
+}
+
+impl TintMessage {
+    /// a message of its own, not a note of the one before (notes also have the type info)
+    pub fn is_main(&self) -> bool {
+        self.kind != "info" || self.text.contains("uniform control flow") && self.text.contains("must only be called") || self.text.contains("to be uniform") || self.text.contains("code is unreachable")
+    }
+}
+
+/// the JSON string at s[at..] (at the opening quote) and the place after it
+fn json_string(s: &str, at: usize) -> (String, usize) {
+    let b = s.as_bytes();
+    let mut out: Vec<u8> = Vec::new();
+    let mut i = at + 1;
+    while i < b.len() && b[i] != b'"' {
+        if b[i] == b'\\' && i + 1 < b.len() {
+            i += 1;
+            match b[i] {
+                b'n' => out.push(b'\n'),
+                b't' => out.push(b'\t'),
+                b'r' => out.push(b'\r'),
+                b'u' => {
+                    // (enough for the comparisons: the text is not shown)
+                    out.push(b'?');
+                    i += 4;
+                }
+                c => out.push(c),
+            }
+        } else {
+            out.push(b[i]);
+        }
+        i += 1;
+    }
+    (String::from_utf8_lossy(&out).into_owned(), i + 1)
+}
+
+/// Tint's messages per corpus file from expected.json
+pub fn expected_messages() -> Vec<(String, Vec<TintMessage>)> {
+    let Some(b) = plat::read_file(&plat::fs::join(CORPUS, "expected.json")) else { return Vec::new() };
+    let s = String::from_utf8_lossy(&b).into_owned();
+    let bytes = s.as_bytes();
+    let mut out = Vec::new();
+    let Some(files) = s.find("\"files\"") else { return out };
+    let mut at = files;
+    while let Some(k) = s[at..].find(".wgsl\": {") {
+        let end = at + k + 5;
+        let start = s[..end].rfind('"').map(|i| i + 1).unwrap_or(end);
+        let path = String::from(&s[start..end]);
+        let next = s[end + 1..].find(".wgsl\": {").map(|n| end + 1 + n).unwrap_or(s.len());
+        let mut msgs = Vec::new();
+        if let Some(m) = s[end..next].find("\"messages\": [") {
+            let mut i = end + m + 13;
+            loop {
+                while i < next && matches!(bytes[i], b' ' | b'\n' | b'\r' | b',') {
+                    i += 1;
+                }
+                if i >= next || bytes[i] != b'{' {
+                    break;
+                }
+                i += 1;
+                let mut one = TintMessage::default();
+                loop {
+                    while i < next && matches!(bytes[i], b' ' | b'\n' | b'\r' | b',') {
+                        i += 1;
+                    }
+                    if i >= next || bytes[i] == b'}' {
+                        i += 1;
+                        break;
+                    }
+                    let (key, n) = json_string(&s, i);
+                    i = n + 1;
+                    while i < next && bytes[i] == b' ' {
+                        i += 1;
+                    }
+                    if bytes[i] == b'"' {
+                        let (v, n) = json_string(&s, i);
+                        i = n;
+                        match key.as_str() {
+                            "type" => one.kind = v,
+                            "text" => one.text = v,
+                            _ => {}
+                        }
+                    } else {
+                        let st = i;
+                        while i < next && !matches!(bytes[i], b',' | b'}' | b'\n' | b'\r') {
+                            i += 1;
+                        }
+                        let v: u32 = s[st..i].trim().parse().unwrap_or(0);
+                        match key.as_str() {
+                            "lineNum" => one.line = v,
+                            "linePos" => one.col = v,
+                            _ => {}
+                        }
+                    }
+                }
+                msgs.push(one);
+            }
+        }
+        out.push((path, msgs));
+        at = end;
+    }
+    out
+}
+
 /// the `// constants: {"name": value, ...}` line of a corpus file
 pub fn constants_line(src: &str) -> Vec<(String, f64)> {
     let mut out = Vec::new();
@@ -371,10 +480,12 @@ pub fn spirv(t: &mut T) {
 
 pub fn corpus(t: &mut T) {
     let exp = expected();
+    let tint = expected_messages();
     let files = corpus_files();
     t.check("expected.json read", !exp.is_empty());
     t.eq("corpus files", files.len(), exp.len());
     let (mut agree, mut accept_reject, mut reject_accept, mut pipe_valid, mut pipe_err) = (0, 0, 0, 0, 0);
+    let (mut pos_same, mut pos_all, mut warn_same, mut warn_all) = (0, 0, 0, 0);
     let mut lists: Vec<String> = Vec::new();
     for (path, src) in &files {
         let Some(want) = exp.iter().find(|(p, _)| p == path).map(|x| x.1.as_str()) else {
@@ -382,6 +493,35 @@ pub fn corpus(t: &mut T) {
             continue;
         };
         let (got, why) = verdict(src);
+        let msgs: &[TintMessage] = tint.iter().find(|(q, _)| q == path).map(|x| x.1.as_slice()).unwrap_or(&[]);
+        let checked = wgsl::check(src);
+        // the first error: the same place as Tint's?
+        if let (Err(d), Some(first)) = (&checked, msgs.iter().find(|m| m.kind == "error")) {
+            if let Some(e) = d.iter().find(|x| x.error) {
+                pos_all += 1;
+                if (e.line, e.col) == (first.line, first.col) {
+                    pos_same += 1;
+                } else if t.verbose {
+                    out(&format!("    position {}: {}:{} here, {}:{} in Tint ({})\n", path, e.line, e.col, first.line, first.col, first.text));
+                }
+            }
+        }
+        // the warnings and infos on the uniformity and diagnostic files: type and line
+        if path.starts_with("unif/") || path.starts_with("diag/") {
+            let ours: &[wgsl::Diagnostic] = match &checked {
+                Ok(m) => &m.warnings,
+                Err(d) => d,
+            };
+            let mut a: Vec<(&str, u32)> = ours.iter().filter(|d| !d.error).map(|d| (if d.info { "info" } else { "warning" }, d.line)).collect();
+            let mut b: Vec<(&str, u32)> = msgs.iter().filter(|m| m.is_main() && m.kind != "error").map(|m| (m.kind.as_str(), m.line)).collect();
+            a.sort();
+            b.sort();
+            warn_all += 1;
+            if a == b {
+                warn_same += 1;
+            }
+            t.eq(&format!("{}: warnings and infos (type, line) like Tint's", path), a, b);
+        }
         if got == want {
             agree += 1;
             t.ok += 1;
@@ -428,6 +568,8 @@ pub fn corpus(t: &mut T) {
         let (got, _) = verdict(src);
         t.check(&format!("{}: still differs from Tint (or remove it from the list)", p), got != want);
     }
-    out(&format!("   corpus: {} files, {} agree with Tint; we accept / Tint rejects {} (allowed: uniformity), we reject / Tint accepts {}, \
+    out(&format!("   corpus: {} files, {} agree with Tint; we accept / Tint rejects {}, we reject / Tint accepts {}, \
                   pipeline errors only Tint finds {}, other {}\n", files.len(), agree, accept_reject, reject_accept, pipe_valid, pipe_err));
+    out(&format!("   corpus: first error at Tint's place in {} of {} files; warnings and infos like Tint's in {} of {} unif / diag files\n", pos_same, pos_all, warn_same, warn_all));
+    t.check("the first error is at Tint's place in at least 435 files", pos_same >= 435);
 }
