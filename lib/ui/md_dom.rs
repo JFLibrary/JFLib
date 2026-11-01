@@ -22,6 +22,10 @@
 //   remove(n) (out of the document, kept: it may go in again) / free(n) (gone: its handles and
 //   those of its descendants refer to nothing) / set_inner_html(n, html)
 //   MdNode::raw() / MdNode::from_raw(v): a handle as a number (the objects of a script host)
+//   doc.element_at(block, byte) -> the innermost element around that byte of a block's text (an
+//   inline element, else MdBlock::node; a click: MdEv::click)
+//   doc.dom_size() -> (live nodes, bytes of their names, texts and attributes): what a host that
+//   lets others change the tree limits
 //
 // The tree: HTML read the way browsers do, simplified -- void elements (br, img, input ...),
 // raw text (script, style, textarea, title, template, noscript, svg), a <p> closed by a block,
@@ -45,7 +49,7 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::md_doc::MdDoc;
+use crate::md_doc::{MdDoc, MB_ROW};
 use crate::rich_html::{attrs, decode, find_ci, tag_end};
 
 pub(crate) const NIL: u32 = u32::MAX;
@@ -1119,6 +1123,73 @@ impl MdDoc {
     /// top level of the HTML
     pub fn root(&self) -> MdNode {
         self.dom.handle(0)
+    }
+
+    /// the live nodes of the tree (out of the document too) and the bytes of their names, texts
+    /// and attributes; linear in the tree
+    pub fn dom_size(&self) -> (usize, usize) {
+        let live = self.dom.nodes.iter().filter(|n| n.serial != 0);
+        live.fold((0, 0), |(c, b), n| (c + 1, b + n.name.len() + n.attrs.iter().map(|a| a.0.len() + a.1.len()).sum::<usize>()))
+    }
+
+    /// the innermost element around byte `byte` of block k's text: blocks know only their own
+    /// element (MdBlock::node), so this reads the inline content of that element again and lines
+    /// its characters up with the block's text, blanks aside (linear in the element).  An image's
+    /// or a field's U+FFFC is its element; a byte at the end, or content that does not line up
+    /// (hidden by a style sheet, say), gives the block's element; NONE: no block, or none of an
+    /// element (a document from Markdown)
+    pub fn element_at(&self, k: usize, byte: usize) -> MdNode {
+        let Some(b) = self.blocks().get(k) else { return MdNode::NONE };
+        let Some(top) = self.node(b.node) else { return MdNode::NONE };
+        let want: Vec<char> = b.text.chars().filter(|c| !c.is_whitespace()).collect();
+        let upto = b.text.get(..byte).map_or(usize::MAX, |s| s.chars().filter(|c| !c.is_whitespace()).count());
+        let row = b.kind == MB_ROW;
+        // (the characters of a run of inline content, with their elements)
+        let mut run: Vec<(char, u32)> = Vec::with_capacity(want.len());
+        let lined_up = |run: &[(char, u32)]| run.len() == want.len() && run.iter().zip(&want).all(|(a, w)| a.0 == *w);
+        let mut st: Vec<u32> = Vec::new();
+        let d = &self.dom;
+        let mut k = d.nodes[top as usize].last;
+        while k != NIL {
+            st.push(k);
+            k = d.nodes[k as usize].prev;
+        }
+        while let Some(x) = st.pop() {
+            let n = &d.nodes[x as usize];
+            if n.kind == K_TEXT {
+                run.extend(n.name.chars().filter(|c| !c.is_whitespace()).map(|c| (c, n.parent)));
+                continue;
+            }
+            if d.hidden_attr(x) || n.attrs.iter().any(|a| a.0 == "style" && a.1.replace(' ', "").contains("display:none")) {
+                continue;
+            }
+            match n.name.as_str() {
+                "script" | "style" | "title" | "head" | "template" | "noscript" | "meta" | "link" | "base" | "wbr" | "br" => continue,
+                "input" if n.attrs.iter().any(|a| a.0 == "type" && a.1.eq_ignore_ascii_case("hidden")) => continue,
+                "img" | "input" | "select" | "textarea" | "button" => {
+                    run.push(('\u{FFFC}', x));
+                    continue;
+                }
+                t if !row && code(t) != C_INLINE => {
+                    // the element's other paragraphs and blocks are blocks of their own
+                    if lined_up(&run) {
+                        break;
+                    }
+                    run.clear();
+                    continue;
+                }
+                _ => {}
+            }
+            let mut k = n.last;
+            while k != NIL {
+                st.push(k);
+                k = d.nodes[k as usize].prev;
+            }
+        }
+        if !lined_up(&run) {
+            return b.node;
+        }
+        run.get(upto).map_or(b.node, |c| d.handle(c.1))
     }
 
     /// the first element in the document with this id

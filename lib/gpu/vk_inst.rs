@@ -11,6 +11,11 @@
 //        rendering)
 //   instance.adapter() -> Result<Adapter>     jfgui_GPU_ADAPTER: an index into adapters() or a
 //        part of the name (case-insensitive); otherwise the first usable adapter
+//   instance.adapters_low_power(display) -> Result<Vec<Adapter>>   the adapters for showing
+//        windows (the UI's output): no CPU, virtual or unusable ones; the one that drives the
+//        display (vendor and device id, plat::win_display_adapter) first, integrated before
+//        discrete (low_power_rank); jfgui_GPU_ADAPTER as for adapter()
+//   adapter.can_present(&surface)            its queue can present to the surface
 //   adapter.info() / features() / limits() / level()   (level: the highest it supports)
 //   validation_messages() -> (errors, warnings)  counted by the debug messenger of every
 //        instance of the process (tests fail on errors)
@@ -326,7 +331,6 @@ impl Instance {
             return Err(err(r));
         }
         pds.truncate(n as usize);
-        let mut list: Vec<Adapter> = pds.into_iter().map(|pd| probe(sh, pd)).collect();
         let rank = |k: AdapterKind| match k {
             AdapterKind::Discrete => 0,
             AdapterKind::Integrated => 1,
@@ -334,8 +338,7 @@ impl Instance {
             AdapterKind::Cpu => 3,
             AdapterKind::Other => 4,
         };
-        list.sort_by_key(|a| rank(a.info.kind));
-        Ok(list)
+        Ok(by_rank(pds.into_iter().map(|pd| probe(sh, pd)).map(|a| (rank(a.info.kind), a)).collect()))
     }
 
     /// the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
@@ -357,6 +360,58 @@ impl Instance {
         }
         list.into_iter().find(|a| a.info.missing.is_none()).ok_or(GpuError::NoAdapter)
     }
+
+    /// the adapters for showing windows without waking more hardware than needed, the most
+    /// frugal first: only integrated and discrete GPUs (a CPU or virtual adapter is no gain over
+    /// the CPU path), the one that drives the display (vendor id, device id) before the others,
+    /// integrated before discrete.  jfgui_GPU_ADAPTER picks one as in adapter().  Programs that
+    /// want a GPU for themselves keep adapter().
+    pub fn adapters_low_power(&self, display: Option<(u32, u32)>) -> Result<Vec<Adapter>> {
+        if plat::env("jfgui_GPU_ADAPTER").is_some_and(|s| !s.is_empty()) {
+            return self.adapter().map(|a| alloc::vec![a]);
+        }
+        let list: Vec<(u32, Adapter)> = self
+            .adapters()?
+            .into_iter()
+            .filter(|a| a.info.missing.is_none())
+            .filter_map(|a| {
+                let drives = display.is_some_and(|(v, d)| a.info.vendor_id == v && a.info.device_id == d);
+                low_power_rank(a.info.kind, drives).map(|r| (r, a))
+            })
+            .collect();
+        if list.is_empty() {
+            return Err(GpuError::NoAdapter);
+        }
+        Ok(by_rank(list))
+    }
+}
+
+/// the adapters by rank, stable within a rank (a handful: every program with a UI links this,
+/// a general sort of these large records takes 14 KiB of code)
+fn by_rank(mut list: Vec<(u32, Adapter)>) -> Vec<Adapter> {
+    let mut out = Vec::with_capacity(list.len());
+    while !list.is_empty() {
+        let mut best = 0;
+        for i in 1..list.len() {
+            if list[i].0 < list[best].0 {
+                best = i;
+            }
+        }
+        out.push(list.remove(best).1);
+    }
+    out
+}
+
+/// the order of adapters for showing windows, lower first (None: not for this): the adapter that
+/// drives the display needs no copy across GPUs and is awake anyway; an integrated one before a
+/// discrete one that would have to wake up
+pub fn low_power_rank(kind: AdapterKind, drives_display: bool) -> Option<u32> {
+    let k = match kind {
+        AdapterKind::Integrated => 0,
+        AdapterKind::Discrete => 1,
+        _ => return None,
+    };
+    Some(if drives_display { k } else { 2 + k })
 }
 
 fn layer_present(lf: &vk::LoaderFns) -> bool {
@@ -423,6 +478,17 @@ impl Adapter {
     /// the highest level a device of this adapter supports
     pub fn level(&self) -> Level {
         if self.voll { Level::Voll } else { Level::Basis }
+    }
+    /// a device of this adapter can show images on the surface
+    pub fn can_present(&self, surface: &crate::Surface) -> bool {
+        let Some(support) = self.inst.f.get_physical_device_surface_support_khr else { return false };
+        if !self.exts.swapchain {
+            return false;
+        }
+        let mut ok = 0;
+        // SAFETY: plain query with a queue family of this adapter and a live surface.
+        let r = unsafe { support(self.pd, self.family, surface.0.h, &mut ok) };
+        r == vk::SUCCESS && ok != 0
     }
 }
 

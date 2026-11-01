@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -256,6 +256,26 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   ui_list, ui_chrome).  win.rs keeps one of these per window and swaps it with `Ui::wp`
   when another window is built (core::mem::swap); a new window starts from `WinParts::new`.
 
+- **`struct GpuOutput`**
+  what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
+  tests and measurements
+  - `wanted: bool` -- the output is switched on for this run (jfgui_GPU, the `gpu on` of a script)
+  - `on: bool` -- the window's frames go through its swapchain now
+  - `building: bool` -- its swapchain is being built
+  - `pending: bool` -- a frame waits for a free image, or for the window to come back
+  - `never: bool` -- no output in this run: no Vulkan, no usable adapter or surface, this target
+  - `adapter: alloc::string::String` -- the adapter (empty: none yet) and the present mode in use
+  - `present_mode: &'static str`
+  - `error: Option<alloc::string::String>` -- what the last failure said (None: the last switch went well)
+  - `reserved: u64` -- bytes of GPU and staging memory the device holds in blocks
+  - `frames: u64` -- frames presented through the swapchain / the CPU path
+  - `cpu_frames: u64`
+  - `upload_bytes: u64` -- bytes uploaded to the window's texture
+  - `switches: u32` -- switches to the swapchain, and back to the CPU path
+  - `leaves: u32`
+  - `verified: u64` -- jfgui_GPU_VERIFY: images read back and compared, those that differed
+  - `verify_bad: u64`
+
 - **`struct Ui`**
   the UI context: everything ASMLIB keeps in g_\* variables
   - `desc: AppDesc`
@@ -352,6 +372,10 @@ event carries its window (Event::win).
   ui_title: the window title (the AppDesc title until set_title)
 
 - **`fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32`**
+
+- **`fn run_window(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32`**
+  the real window and its loop whatever the command line says (test programs: `build_rs.py test`
+  passes --script to them)
 
 #### `ui/tasks.rs`
 
@@ -3949,6 +3973,9 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 notify; headless runs play none)
   expect scrollcopy [N]|none    at least N (default 1) frames / no frame moved pixels by a
                                 scroll copy since the last check (scrollcopy.rs)
+  gpu on|off|wait [MS]|lose|print   gpu expect gpu|cpu|same|window|screen|upload N
+                                (Windows, else a SKIP) real windows through the swapchain, every
+                                presented image read back and compared (gpu_out.rs)
   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
                                 script also warns about a widget id used twice in a pass)
 (K1) Files and clipboard, drag and drop:
@@ -6968,6 +6995,10 @@ blocks follow at MdDoc::update (md_view.rs does it every frame)
   remove(n) (out of the document, kept: it may go in again) / free(n) (gone: its handles and
   those of its descendants refer to nothing) / set_inner_html(n, html)
   MdNode::raw() / MdNode::from_raw(v): a handle as a number (the objects of a script host)
+  doc.element_at(block, byte) -> the innermost element around that byte of a block's text (an
+  inline element, else MdBlock::node; a click: MdEv::click)
+  doc.dom_size() -> (live nodes, bytes of their names, texts and attributes): what a host that
+  lets others change the tree limits
 
 The tree: HTML read the way browsers do, simplified -- void elements (br, img, input ...),
 raw text (script, style, textarea, title, template, noscript, svg), a <p> closed by a block,
@@ -7006,6 +7037,16 @@ the nearest ancestor that takes it), a query at most a budget proportional to th
 - **`fn root(&self) -> MdNode`**
   the document's root (MdNode::NONE for a document from Markdown): its children are the
   top level of the HTML
+- **`fn dom_size(&self) -> (usize, usize)`**
+  the live nodes of the tree (out of the document too) and the bytes of their names, texts
+  and attributes; linear in the tree
+- **`fn element_at(&self, k: usize, byte: usize) -> MdNode`**
+  the innermost element around byte `byte` of block k's text: blocks know only their own
+  element (MdBlock::node), so this reads the inline content of that element again and lines
+  its characters up with the block's text, blanks aside (linear in the element).  An image's
+  or a field's U+FFFC is its element; a byte at the end, or content that does not line up
+  (hidden by a style sheet, say), gives the block's element; NONE: no block, or none of an
+  element (a document from Markdown)
 - **`fn by_id(&self, id: &str) -> Option<MdNode>`**
   the first element in the document with this id
 - **`fn select(&self, sel: &str) -> Vec<MdNode>`**
@@ -7087,13 +7128,16 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
        (st.set_markdown / set_html / set_doc)
-  MdEv { ev, link, hover, field, submit }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
+  MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
        activated); link: the activated link's target (a click on it, Enter on the focused
        one); hover: the target of the link under the pointer; field: a form field the user
        changed (typed, toggled, chose) or a button without a submit / reset action he pressed;
        submit: a form was sent (MdSubmit: the form, its action and method, the name / value
-       pairs, the button).  The view fills the place it gets (natural 480 x 320 DIP;
-       next_size(-1, -1) fills).
+       pairs, the button); click: the element of an HTML document a click on the text hit (the
+       inline element around the character under the pointer, else the block's, the document's
+       root beside the blocks; none after a drag; Enter on a link: its element; a field's
+       widget takes its own clicks: field, submit).  The view fills the place it gets (natural
+       480 x 320 DIP; next_size(-1, -1) fills).
   MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
        (the name for screen readers; "" = "Dokument") / doc() / selection() /
        set_selection(sel) / select_all() / selected_text() / selected_html() /
@@ -7201,6 +7245,7 @@ MI_APP: u8 = 2
   - `field: Option<usize>` -- a field the user changed this frame, or a button (MF_BUTTON) he pressed (index of
     doc().fields())
   - `submit: Option<MdSubmit>` -- a form sent this frame (Enter in a field, a submit button)
+  - `click: Option<MdNode>` -- the element a click hit this frame, or the link Enter activated (see the module header)
 
 - **`struct MdSubmit`**
   a form being sent: what a browser would send (MdViewState::form_data)
@@ -8246,6 +8291,99 @@ ID_HASH_BASE: u32 = 0x0800_0000
   close the scope of the last id_push / id_push_str
 - **`fn id_scope<R>(&mut self, n: u32, f: impl FnOnce(&mut Ui) -> R) -> R`**
   id_push(n), f(ui), id_pop()
+
+#### `ui/gpu_out.rs` (Windows)
+
+Source: [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs)
+
+```text
+gpu_out -- UI windows on the screen through a swapchain (Windows; docs/GPU.md "Ausgabe der UI")
+
+The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
+it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
+the texture to the swapchain image, the image is presented.  All windows share one device.
+
+  gp_window_mode()             window_main: is the output wanted (jfgui_GPU, Remote Desktop)
+  gp_present(cur, pw, n)       uiw_present: true when the GPU showed the frame, else the caller
+                               presents through the CPU path and calls gp_cpu_done(cur, pw)
+  gp_tick() / gp_deadline()    the window loop: finished jobs, frames that found no free image;
+                               the time of the next look (None: nothing to look at, no wake-up)
+  gp_window_gone(i)            before window i's plat window is destroyed
+  gp_shutdown()                window_main's end
+  sc_gpu(app, args)            the script command `gpu` (below)
+  Ui::gpu_output(win)          what a window shows through (status and counters for tests)
+
+Stages of a window: Cpu (plat::win_present: GDI, as without a GPU) -> Job (its swapchain is
+being built on a worker thread, the CPU path goes on) -> Switch (the whole framebuffer uploaded
+and presented on the hidden child, then the child shown) -> Gpu.  Back to Cpu: the window's size
+changed (also the modal size loop: every frame of a resize is a CPU frame, drawn before
+SetWindowPos returns, so nothing lags behind the frame; the swapchain is rebuilt when the size
+has settled), or an error.  Going back shows the framebuffer through the CPU path first, then
+hides the child: no gap, no wrong frame.  The first frames of a program are CPU frames: the
+instance, device and swapchain (hundreds of ms the first time) are made on a worker thread that
+starts after the first frame, so the first frame never waits for them.
+
+The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
+window GDI stays invisible there, also after the swapchain is gone.
+
+Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
+and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
+after the last present (nothing shows faster, the GPU need not draw it).  Nothing runs while the
+app is idle: no thread, no timer, no frame.  Minimised windows upload nothing; they get the whole
+frame when they come back.
+
+Popups (plat::popup: small, short-lived windows with a window region) and tooltips stay on the
+CPU path: a swapchain takes tens of ms, longer than many of them live.
+
+A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
+frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
+usable adapter or surface: the CPU path for good, silently.
+
+Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
+image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
+their times); lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+
+Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
+without a GPU, it prints a SKIP once and does nothing):
+  gpu on                 a real window per UI window (shown without activation) with
+                         the output, every presented image compared with the framebuffer, a
+                         render after every input edge; waits for the swapchain
+  gpu off                windows closed
+  gpu wait [MS]          until the scoped windows are on the swapchain (after `size`, `gpu lose`)
+  gpu expect gpu|cpu     the main window's stage
+  gpu expect same        every window presents once more: the image read back = the framebuffer
+                         byte for byte (x byte: 255), and no frame differed since the last check
+  gpu expect screen      the composed screen at the window = the framebuffer (another window on
+                         top of ours is a note, not a failure)
+  gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
+  gpu expect upload N    at most N bytes uploaded since the last check
+  gpu lose               the device behaves as lost from now on (Device::test_lose)
+  gpu print              the counters
+```
+
+**`impl Ui`**
+
+- **`fn gpu_output(&self, win: u32) -> GpuOutput`**
+  what window `win` (a UI window index, 0 = main) shows through
+- **`fn gpu_test_lose(&mut self)`**
+  (test aid) the device behaves as lost from now on: the next frame goes back to the CPU
+  path, a new device follows
+
+#### `ui/gpu_out_off.rs`
+
+Source: [`lib/ui/gpu_out_off.rs`](../lib/ui/gpu_out_off.rs)
+
+```text
+gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows only for now):
+every frame takes the platform's path, no Vulkan code is linked
+```
+
+**`impl Ui`**
+
+- **`fn gpu_output(&self, _win: u32) -> GpuOutput`**
+  what window `win` (a UI window index, 0 = main) shows through: here the platform's path
+- **`fn gpu_test_lose(&mut self)`**
+  (test aid) on Windows: the device behaves as lost from now on
 
 #### `ui/inspect.rs`
 
@@ -17490,6 +17628,7 @@ in the browser, Metal; they provide the same types and methods.
   instance.adapters() -> Result<Vec<Adapter>>   every GPU, discrete ones first
   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
                    index into adapters() or a part of the name)
+  instance.adapters_low_power(display)          the GPUs for showing windows, frugal ones first
   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
@@ -17516,10 +17655,13 @@ in the browser, Metal; they provide the same types and methods.
   device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
                    passes, draws, indirect draws, timestamps; finish() -> CommandBuffer
   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
-  queue.write_buffer / write_texture (staged, before the next submit), read_buffer (waits)
+  queue.write_buffer / write_texture / write_texture_rects (staged in a ring, before the next
+                   submit), read_buffer (waits)
   Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
+  Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
-                   view(&frame), texture(&frame), present(frame, [cmd, ..]), resize()
+                   view(&frame), texture(&frame), present(frame, [cmd, ..]), resize(),
+                   try_acquire() (never waits or rebuilds), rebuild()
 
 Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
 with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
@@ -18083,6 +18225,7 @@ COLOR_TARGETS_MAX: usize = 8
   - `srgb: bool` -- an sRGB format (the GPU encodes gamma on writes)
   - `copy_src: bool` -- the images may be copied from (read-back of the presented image)
   - `frames_in_flight: u32` -- frames the CPU may record ahead of the GPU (1 ..= 3)
+  - `min_images: u32` -- images of the swapchain at least (0: the surface's minimum + 1)
 
 **`impl SwapchainDesc`**
 
@@ -18237,6 +18380,7 @@ buffer slots, staged uploads, submission
   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
+  queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
   queue.read_buffer(&buf, off, &mut [T])          copies, submits and waits (slow path)
   queue.flush() -> Result<SubmitId>               submit the pending uploads now
   device.wait(id, timeout_ns) -> Result<bool>     false: timed out
@@ -18248,10 +18392,14 @@ The timeline: one timeline semaphore per device; every submit signals the next v
 submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 latest submit and is destroyed once that value is reached -- earlier if no submit is
 pending.  Command buffers come from slots (a transient command pool with one buffer each),
-reused once their submission completed.  Uploads: staging chunks of at least 4 MiB of
-Upload memory, filled front to back; their copies are recorded into one upload command
-buffer that ends with a global barrier (copy writes -> every later access) and is put
-before the caller's command buffers in the next vkQueueSubmit.
+reused once their submission completed.  Uploads: the data goes into the staging ring, the
+copies into one upload command buffer that ends with a global barrier (copy writes -> every
+later access) and is put before the caller's command buffers in the next vkQueueSubmit.
+The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
+a full chunk is reused once the GPU has passed the last submission that reads from it (two
+are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
+by the next one that fits and released when none came for a second (Device::poll): a frame of
+small rectangles costs what they hold, not a full frame or a new allocation.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
 ```
@@ -18289,6 +18437,8 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
   wait for every submission so far
 - **`fn completed(&self) -> SubmitId`**
   the last submission the GPU has finished
+- **`fn is_done(&self, id: SubmitId) -> bool`**
+  the submission id is done on the GPU (asks the driver; never waits)
 - **`fn memory_reserved(&self) -> u64`**
   bytes of device and host memory the device holds in blocks
 
@@ -18303,6 +18453,11 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn write_texture(&self, dst: &TextureRegion, data: &[u8], layout: DataLayout, before: Layout, after: Layout) -> Result<()>`**
   write texels into a texture region before the next submission (staged): the region
   goes from `before` to CopyDst, gets the data, then goes to `after`
+- **`fn write_texture_rects(&self, t: &crate::Texture, rects: &[[i32; 4]], data: &[u8], stride: u32, before: Layout, after: Layout) -> Result<()>`**
+  write rectangles (x, y, w, h; clipped to the texture, empty ones skipped) of mip 0, layer 0
+  of a 2D texture from `data`, an image of the texture's size in rows of `stride` bytes (a
+  framebuffer), before the next submission; the staged bytes are those of the rectangles.
+  The whole level goes from `before` to CopyDst and then to `after`, once for all of them
 - **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
   read a buffer's contents at offset (copies through a readback buffer when needed,
   submits and waits for the GPU: the slow path, for tools and tests)
@@ -18325,6 +18480,11 @@ vk_inst -- Vulkan instance and adapters
        rendering)
   instance.adapter() -> Result<Adapter>     jfgui_GPU_ADAPTER: an index into adapters() or a
        part of the name (case-insensitive); otherwise the first usable adapter
+  instance.adapters_low_power(display) -> Result<Vec<Adapter>>   the adapters for showing
+       windows (the UI's output): no CPU, virtual or unusable ones; the one that drives the
+       display (vendor and device id, plat::win_display_adapter) first, integrated before
+       discrete (low_power_rank); jfgui_GPU_ADAPTER as for adapter()
+  adapter.can_present(&surface)            its queue can present to the surface
   adapter.info() / features() / limits() / level()   (level: the highest it supports)
   validation_messages() -> (errors, warnings)  counted by the debug messenger of every
        instance of the process (tests fail on errors)
@@ -18355,6 +18515,17 @@ messages, info level and up).
   every GPU of the system, discrete ones first (AdapterInfo::missing: unusable ones)
 - **`fn adapter(&self) -> Result<Adapter>`**
   the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
+- **`fn adapters_low_power(&self, display: Option<(u32, u32)>) -> Result<Vec<Adapter>>`**
+  the adapters for showing windows without waking more hardware than needed, the most
+  frugal first: only integrated and discrete GPUs (a CPU or virtual adapter is no gain over
+  the CPU path), the one that drives the display (vendor id, device id) before the others,
+  integrated before discrete.  jfgui_GPU_ADAPTER picks one as in adapter().  Programs that
+  want a GPU for themselves keep adapter().
+
+- **`fn low_power_rank(kind: AdapterKind, drives_display: bool) -> Option<u32>`**
+  the order of adapters for showing windows, lower first (None: not for this): the adapter that
+  drives the display needs no copy across GPUs and is awake anyway; an integrated one before a
+  discrete one that would have to wake up
 
 - **`struct Adapter`**
   a GPU of the system
@@ -18367,6 +18538,8 @@ messages, info level and up).
 - **`fn limits(&self) -> &Limits`**
 - **`fn level(&self) -> Level`**
   the highest level a device of this adapter supports
+- **`fn can_present(&self, surface: &crate::Surface) -> bool`**
+  a device of this adapter can show images on the surface
 
 ### `gpu/vk_res.rs`
 
@@ -18566,12 +18739,19 @@ vk_swap -- window surfaces and swapchains
   device.create_swapchain(&surface, &SwapchainDesc) -> Result<Swapchain>
        B8G8R8A8 (or R8G8B8A8) UNORM / SRGB, sRGB non-linear colour space; the present mode of
        the desc or jfgui_GPU_PRESENT=fifo|mailbox|immediate, FIFO when the surface lacks it;
-       image count: the surface's minimum + 1; copy_src adds TRANSFER_SRC (read-back)
+       image count: the surface's minimum + 1 (or SwapchainDesc::min_images); copy_src adds
+       TRANSFER_SRC (read-back)
   sc.acquire() -> Result<Option<Frame>>    None while the window is minimised or has no area;
        rebuilds the swapchain first when the window's size changed, the last present said
        out-of-date / suboptimal, resize() or set_present_mode() asked for it, or the last frame
        was never presented; waits until the frame slot's previous submission is done
        (frames_in_flight)
+  sc.try_acquire() -> Result<TryAcquire>   never waits, never rebuilds: Frame, NotReady (no
+       image free yet, or the frame slot's previous submission runs), Stale (the window's size
+       changed, the last present said out-of-date / suboptimal, resize() asked: rebuild() first),
+       NoArea (minimised)
+  sc.rebuild()                             what acquire() does when stale (any thread, once
+       the swapchain has moved there; waits for the queue to be idle)
   sc.view(&frame) / texture(&frame)        the image: Layout::Undefined at the start of the
        frame's commands, Layout::Present at their end
   sc.present(frame, [cmd, ..]) -> Result<SubmitId>   submit (waiting for the image at the
@@ -18597,9 +18777,19 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
 
 - **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
   the surface of plat window `window` (an index of plat::win_create)
+- **`fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
+  whose size and state are those of plat window `window`
 
 - **`struct Frame`**
   an acquired swapchain image (present it with Swapchain::present)
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no image is free yet, or the frame slot's previous submission still runs: try again later
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window is minimised or has no area
 
 **`impl Frame`**
 
@@ -18616,6 +18806,11 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
 
 **`impl Swapchain`**
 
+- **`fn rebuild(&mut self) -> Result<()>`**
+  (re)create the swapchain for the window's size now; the old images may still be in use:
+  waits for the queue to be idle (resizes are rare)
+- **`fn try_acquire(&mut self) -> Result<TryAcquire>`**
+  the next image to draw into, without waiting and without rebuilding (see TryAcquire)
 - **`fn acquire(&mut self) -> Result<Option<Frame>>`**
   the next image to draw into; None while the window is minimised or has no area
 - **`fn view(&self, frame: &Frame) -> &TextureView`**
@@ -26159,7 +26354,8 @@ wait, presentation, cursors                                     [src/plat/win/wi
   win_native(w) -> NativeWindow     (gpu) HWND + HINSTANCE for a GPU surface (lib/gpu); such
                                     a window is never given to win_present: without a kept
                                     copy WM_PAINT paints nothing and the swapchain's images
-                                    stay on screen
+                                    stay on screen.  The UI's windows draw on both: their
+                                    swapchain lives on a child (win_gpuout.rs)
   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -26471,6 +26667,61 @@ coordinates, so the UI hit-tests them like the rest of the window.
 - **`fn popup_placed(_slot: u32) -> Option<[i32; 2]>`**
   (§6) the platform never moves a popup on Windows
 
+### `plat/win_gpuout.rs` (Windows)
+
+Source: [`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)
+
+```text
+win_gpuout -- the child window a window's GPU output draws on (lib/ui's presenter, docs/GPU.md)
+
+  win_gpu_child(w) -> NativeWindow     the child of window w for a swapchain, created hidden on
+                                       the first call and given the client size of w
+  win_gpu_child_show(w, show)          show it (sized to the client area) / hide it
+  win_gpu_child_destroy(w)             destroy it (a swapchain on it must be gone)
+  win_release_kept(w)                  free the copy WM_PAINT repaints from (the child shows
+                                       the window; the next win_present makes a new copy)
+  win_in_sizemove()                    the modal move / size loop runs
+  win_display_adapter(w) -> (vendor id, device id)   the GPU that drives the window's monitor
+  win_remote_session()                 this is a Remote Desktop session
+
+Why a child: once a swapchain has presented on a window, what GDI draws on that window stays
+invisible, also after the swapchain and its surface are destroyed (measured: DWM keeps showing
+the last image; gputest and tests/ of uigputest).  So the top-level window stays the CPU path
+for its whole life; the swapchain lives on a child that covers its client area.  Hiding the
+child shows at once what the CPU path last drew; a child that is shown before its first
+present shows that too (a child has no redirection surface of its own and this one never
+paints).
+
+The child takes no input: WS_DISABLED and HTTRANSPARENT send everything to the parent (hit
+tests with the parent's resize band included), WindowFromPoint does not find it, it never has
+the focus.  It is destroyed together with its parent.
+```
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+  (gpu) the child window of window w for its swapchain: hidden when new, the client size of w
+  (None: no such window, or the child could not be made)
+
+- **`fn win_gpu_child_show(w: i32, show: bool)`**
+  (gpu) show the child of window w over its client area (sized to it), or hide it: what the
+  window's CPU present last drew is what shows then
+
+- **`fn win_gpu_child_destroy(w: i32)`**
+  (gpu) destroy the child of window w (the swapchain on it must be gone)
+
+- **`fn win_release_kept(w: i32)`**
+  (gpu) window w's copy for WM_PAINT is not needed while the child shows the window (the next
+  win_present makes a new one)
+
+- **`fn win_in_sizemove() -> bool`**
+  the modal move / size loop of a window runs (the program's own loop waits for its end)
+
+- **`fn win_remote_session() -> bool`**
+  this program runs in a Remote Desktop session (the GPU output stays off)
+
+- **`fn win_display_adapter(w: i32) -> Option<(u32, u32)>`**
+  the PCI vendor and device id of the GPU that drives the monitor window w is on (None: not
+  known, not a PCI device)
+
 ### `plat/win_shell.rs` (Windows)
 
 Source: [`lib/plat/win_shell.rs`](../lib/plat/win_shell.rs)
@@ -26551,7 +26802,16 @@ and poke our own windows only (no input is injected into the system)
     WT_SCROLL     move the client rows a[0] .. a[0] + a[1] by a[2] rows inside the window
                   (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
                   sending the pixels again) -> microseconds taken
+    WT_NOANIM     no DWM transitions for window w (fade-in, minimise) -> 1
+    WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w: window w -> 1, its GPU
+                  child -> 2, another window (of any program) -> 0
+    WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
+                  keyboard and the other windows alone) -> 1
   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+  win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
+  win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
+  win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
+  win_test_usage() -> (cpu us, working set, private bytes)  this process
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 ```
@@ -26572,6 +26832,9 @@ WT_CLIP_ACCESS: u32 = 12
 WT_POPUP_SEND: u32 = 13
 WT_POST_CHARS: u32 = 14
 WT_SCROLL: u32 = 15
+WT_NOANIM: u32 = 16
+WT_FROM_POINT: u32 = 17
+WT_SHOW: u32 = 18
 ```
 
 - **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
@@ -26581,6 +26844,20 @@ WT_SCROLL: u32 = 15
   (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
   a DIB section; under DWM the window's own surface, also where other windows cover it) ->
   (w, h, rows of w \* 4 bytes B, G, R, x)
+
+- **`fn win_test_usage() -> (u64, u64, u64)`**
+  (test aid) (CPU time of this process so far in us, its working set in bytes, its private bytes)
+
+- **`fn win_test_window_at(x: i32, y: i32) -> isize`**
+  (test aid) the window at a screen point, from any thread (a screen check: is ours on top there?)
+
+- **`fn win_test_post(hwnd: isize, msg: u32, wp: usize, lp: isize) -> bool`**
+  (test aid) PostMessageW to a window by its handle, from any thread -> posted
+
+- **`fn win_test_screen(x: i32, y: i32, w: i32, h: i32) -> Option<alloc::vec::Vec<u8>>`**
+  (test aid) what the screen shows now in the rectangle x, y, w, h (screen px): BitBlt from the
+  screen's DC, so under DWM the composed desktop -- other windows on top included.  Any thread;
+  -> rows of w \* 4 bytes B, G, R, x
 
 - **`fn file_dialog_autoclose(ms: u32, name: Option<&str>)`**
   (test aid) close the next file_dialog after ms: Cancel (name None) or name + OK
@@ -29230,6 +29507,10 @@ The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* c
   segment that frees up, Wayland: the frame callback, the browser and Android: the
   composition and the hand-over to the host).  For measurements (linuxtest --test pbench).
 
+- **`fn present_account(t0: u64, frame: bool)`**
+  add the time since t0 (time_us) to present_time; frame: a win_present call, or a frame the
+  UI showed through the GPU instead
+
 - **`fn win_use(w: i32)`**
   the window the single-window per-window calls refer to (-1 = none)
 
@@ -31036,6 +31317,9 @@ diagnostics, compiler, VM with fuel and a garbage collector
   fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
   import(path)                 modules (module.rs): another file's top-level names as a map,
                                read through Host::load, run once per VM
+  Vm::add_script(name, src)    a further script of a VM, as the <script> elements of a page
+                               are (module.rs): their top-level names are one scope, the errors
+                               name each script's file
   debugger (debug.rs)          Vm::set_breakpoint, request_pause, step(Step), run() ->
                                Status::Paused(Pause), frames, locals, upvalues,
                                frame_globals, eval; Program::line_table / break_lines
@@ -31735,6 +32019,8 @@ mark-and-sweep collector, the host interface
                                                          (module.rs; default: none)
   vm.modules()                                           the program's name, the modules'
                                                          paths
+  vm.add_script(name, src)  then run() as above          a further script with the same
+                                                         top-level names (module.rs)
 
 Fuel is virtual CPU time: one unit per instruction, more for instructions that copy (string
 and list concatenation, literals, iterating a map), plus what natives charge.  run(host,
@@ -31889,7 +32175,8 @@ drives exec one instruction at a time (exec_debug) and checks between them where
 - **`fn take_output(&mut self) -> String`**
   what print() wrote, emptying the buffer
 - **`fn global(&self, name: &str) -> Option<Value>`**
-  a global of the script (not of its modules), or the value the host gave a host name
+  a global of the script or of the scripts added to it (not of its modules), or the value
+  the host gave a host name
 - **`fn set_global(&mut self, name: &str, v: Value) -> bool`**
   set a global of the script, or give a name the script takes from the host a value (a
   map for config, say); false when the script uses no such name.  The value of a host
@@ -32346,13 +32633,28 @@ does not start with "/" or a drive ("C:/") is relative to the directory of the i
 file, and a file without a directory ("-e", an inline script) passes it on as it is: the
 host reads it relative to its working directory.  Fuel: 1 per 64 bytes of source on top of
 the call, then the module's code as it runs.
+
+Scripts of a VM (the <script> elements of a page): vm.add_script(name, src) links a further
+script the way import links a module, with its top-level code pending as an invocation of its
+own (only while idle; run() runs it, with fresh fuel), but without a scope of its own: the fns and
+lets of the program and of the scripts added before are its names too, the same variables (a
+let of the same name assigns them), and what it declares the next ones see.  A script does not
+see the names of a later one.  It is compiled the way the program was (compile_with: a name
+neither declared, known nor of a script before is an error); Err: the errors, the VM is as it
+was and goes on (the next script); an error while it runs ends only that invocation, and what it
+declared so far stays.  Errors and traces name `name` as written (no path rules), vm.global finds
+their names too.  At most MAX_UNITS scripts and modules together.
 ```
 
 **`impl Vm`**
 
+- **`fn add_script(&mut self, name: &str, src: &str) -> Result<(), Vec<Diagnostic>>`**
+  a further script of this VM (see the module comment): its top-level code is pending, run()
+  runs it -> Err: why it cannot run (its errors; line 0: the VM is busy, too many scripts),
+  the VM stays as it was
 - **`fn modules(&self) -> Vec<String>`**
-  the files of the VM: the program's name, then the modules' paths in the order they
-  were imported (one that failed and was imported again once per try)
+  the files of the VM: the program's name, then the modules' paths and the scripts' names in
+  the order they came (a module that failed and was imported again once per try)
 
 ### `script/debug.rs`
 

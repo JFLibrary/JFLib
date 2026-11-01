@@ -1,0 +1,2 @@
+#!args --test hwnd
+# (information) GDI and a swapchain on one window, then on a child: printed, no failure

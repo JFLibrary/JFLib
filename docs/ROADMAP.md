@@ -1452,9 +1452,11 @@ Fensterrand hinaus.
   eines Felds, vor dem Felder kommen oder gehen; `MdBlock`/`MdField`/`MdForm::node`,
   `field_of`. Getestet mit `mdviewtest --test unit` (Gruppen `dom`, `dom changes` mit 300
   zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
-  Linux). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten das ganze Dokument neu ab
-  statt nur den betroffenen Container; Element unter einer Textposition (Klick-Ereignisse) gibt
-  es nur blockweise (`MdBlock::node`).
+  Linux). Seit B3 (2026-11-01) nennt `MdEv::click` das Element unter einem Klick, auch inline
+  (`MdDoc::element_at`, `mdviewtest --test unit`, `doc_clicks.uis`), `MdDoc::dom_size` die Größe des
+  Baums, und `Vm::add_script` in `lib/script` gibt die Skripte einer Seite in eine VM mit gemeinsamen
+  obersten Namen (coretest `scriptmod`). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten
+  das ganze Dokument neu ab statt nur den betroffenen Container.
   (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
   (media screen/all) und `style=`; Selektoren wie in (3) (Tag, `*`, `#id`, `.klasse`,
   Attribute, Nachfahre, Kind, Listen); Kaskade nach Spezifität und Reihenfolge, dann
@@ -1645,9 +1647,23 @@ Fensterrand hinaus.
   Absturz. Es fehlen: `buffer_view`, `layout: 'auto'`, die Anzahl der Bindungen je Stufe,
   volle Subgroups bei `@subgroup_size` (`REQUIRE_FULL_SUBGROUPS`), Tests auf anderen GPUs und
   unter Linux.
-- **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
-  Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
-  und Diagramm.
+- **P2** · *erledigt* (2026-11-01) · G3a: UI-Fenster unter Windows zeigen ihr Bild über eine
+  Swapchain, standardmäßig an (`jfgui_GPU=0` schaltet ab)
+  ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), [GPU.md](GPU.md#ausgabe-der-ui)). Die UI rechnet
+  weiter auf der CPU; die ersten Bilder kommen über den CPU-Weg, Geräteaufbau auf einem
+  Hintergrundthread, Rückfall bei Größenänderung, Fehler, Remote Desktop oder fehlendem Vulkan.
+  Die Swapchain liegt auf einem Kindfenster, weil GDI auf einem Fenster unsichtbar bleibt, sobald
+  dort eine Swapchain präsentiert hat. 70 zurückgelesene Bilder auf den Galerie-Seiten stimmen Byte
+  für Byte. Start, Größenänderung und Latenz sind wie beim CPU-Weg. Der Standard kostet: im Leerlauf
+  1,6–5 ms CPU je Sekunde durch Treiberthreads, 47 MiB Arbeitsspeicher und 42 MiB GPU mehr, das
+  Beenden dauert 100 ms länger; sichtbar wird der Gewinn erst mit G3b und G3c. Jede Windows-App wird
+  187 KB größer, auch mit abgeschaltetem Weg. Es fehlen Messungen auf anderen GPUs und Laptops, mit
+  60 Hz, ein echter Treiber-Reset, Sperrbildschirm und Remote Desktop im laufenden Betrieb, der Stift
+  auf echter Hardware.
+- **P2** · *fehlt* · G3b: Ebenen (Basis, Dialog, Popup, Tooltip) als eigene Texturen und
+  `Cmd::Image` als GPU-Textur.
+- **P2** · *fehlt* · G3c: Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel,
+  JFNetworker, Bildbetrachter und Diagramm.
 - **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
   Auflösungsgrenze), Browser (WebGPU).
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,

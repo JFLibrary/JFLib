@@ -6,13 +6,16 @@
 //   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
 //   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
 //        (st.set_markdown / set_html / set_doc)
-//   MdEv { ev, link, hover, field, submit }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
+//   MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
 //        activated); link: the activated link's target (a click on it, Enter on the focused
 //        one); hover: the target of the link under the pointer; field: a form field the user
 //        changed (typed, toggled, chose) or a button without a submit / reset action he pressed;
 //        submit: a form was sent (MdSubmit: the form, its action and method, the name / value
-//        pairs, the button).  The view fills the place it gets (natural 480 x 320 DIP;
-//        next_size(-1, -1) fills).
+//        pairs, the button); click: the element of an HTML document a click on the text hit (the
+//        inline element around the character under the pointer, else the block's, the document's
+//        root beside the blocks; none after a drag; Enter on a link: its element; a field's
+//        widget takes its own clicks: field, submit).  The view fills the place it gets (natural
+//        480 x 320 DIP; next_size(-1, -1) fills).
 //   MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
 //        (the name for screen readers; "" = "Dokument") / doc() / selection() /
 //        set_selection(sel) / select_all() / selected_text() / selected_html() /
@@ -176,6 +179,8 @@ pub struct MdEv {
     pub field: Option<usize>,
     /// a form sent this frame (Enter in a field, a submit button)
     pub submit: Option<MdSubmit>,
+    /// the element a click hit this frame, or the link Enter activated (see the module header)
+    pub click: Option<MdNode>,
 }
 
 /// a form being sent: what a browser would send (MdViewState::form_data)
@@ -1970,6 +1975,7 @@ impl Ui {
         }
         let sel0 = st.sel;
         let mut activate: Option<usize> = None;
+        let mut clicked = false;
         // ---- keys
         if focused && n > 0 {
             activate = self.md_keys(st, id, view_h, cw, drtl, &fc);
@@ -2059,6 +2065,7 @@ impl Ui {
             }
         } else if !held {
             if ev & EV_ACT != 0 && !st.dragged {
+                clicked = true;
                 if let Some(k) = st.press_link {
                     if self.md_link_at(st, &vis, mx, my, cx, vy, cw, drtl) == Some(k) {
                         activate = Some(k);
@@ -2077,8 +2084,14 @@ impl Ui {
                 }
                 out.link = Some(url);
                 out.ev |= EV_ACT;
+                out.click = (!clicked).then(|| st.doc.element_at(sp.block, sp.a as usize)).filter(|n| !n.is_none());
                 self.repass();
             }
+        }
+        if clicked {
+            let n = self.md_element_at(st, &vis, mx - cx, my - vy, cw, drtl);
+            out.click = (!n.is_none()).then_some(n);
+            self.repass();
         }
         if st.sel != sel0 {
             self.repass();
@@ -2316,6 +2329,40 @@ impl Ui {
             return Some(TextPos::new(k, r.b as usize));
         }
         Some(TextPos::new(k, r.hit(x - bx(fb)) as usize))
+    }
+
+    // the element under the pointer (x, y as for md_hit): the one around the character there, else
+    // that block's, beside the blocks the document's root
+    fn md_element_at(&self, st: &MdViewState, vis: &[(usize, i32)], x: i32, y: i32, cw: i32, drtl: bool) -> MdNode {
+        let root = st.doc.root();
+        let Some(&(k, top)) = vis.iter().rev().find(|v| v.1 <= y) else { return root };
+        let Some(lay) = st.lc.lays.get(&k) else { return root };
+        let ly = y - top - lay.gap;
+        if ly < 0 || ly >= lay.ch {
+            return root;
+        }
+        let block = st.doc.blocks().get(k).map_or(root, |b| b.node);
+        for fb in &lay.boxes {
+            let x0 = box_x(0, cw, fb.x, fb.w, drtl);
+            let px = x - x0;
+            for r in &fb.flow.rows {
+                let ry = fb.y + r.y;
+                if ly < ry || ly >= ry + r.h {
+                    continue;
+                }
+                for p in &r.pieces {
+                    if px >= p.x && px < p.x + p.w {
+                        // the stop that starts the character under the pointer (the stops of a
+                        // piece that runs right to left stand at the characters' right edges)
+                        let rtl = r.stops.iter().filter(|s| s.0 >= p.a && s.0 <= p.b).map(|s| (s.0, s.1)).min_by_key(|s| s.0).is_some_and(|s| s.1 > p.x);
+                        let at = r.stops.iter().filter(|s| s.0 >= p.a && s.0 < p.b && if rtl { s.1 >= px } else { s.1 <= px });
+                        let hit = if rtl { at.min_by_key(|s| s.1) } else { at.max_by_key(|s| s.1) };
+                        return hit.map_or(block, |s| st.doc.element_at(k, s.0 as usize));
+                    }
+                }
+            }
+        }
+        block
     }
 
     // the link spot under the pointer (window px)

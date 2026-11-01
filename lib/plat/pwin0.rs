@@ -36,8 +36,9 @@ pub fn present_time() -> (u64, u64) {
     (PRESENT_N.load(Ordering::Relaxed), PRESENT_US.load(Ordering::Relaxed))
 }
 
-/// add the time since t0 (time_us) to present_time; frame: a win_present call
-pub(crate) fn present_account(t0: u64, frame: bool) {
+/// add the time since t0 (time_us) to present_time; frame: a win_present call, or a frame the
+/// UI showed through the GPU instead
+pub fn present_account(t0: u64, frame: bool) {
     PRESENT_US.fetch_add(time_us().saturating_sub(t0), Ordering::Relaxed);
     if frame {
         PRESENT_N.fetch_add(1, Ordering::Relaxed);
@@ -82,7 +83,14 @@ pub fn window_create_at(title: &str, w_dip: i32, h_dip: i32, af: u32, x: i32, y:
     if maximized && cfg!(windows) {
         win_cmd(w, WCMD_MAXIMIZE);
     }
-    win_show(w, PWS_SHOW);
+    // (tests) jfgui_TEST_NOACTIVATE: the window of a test leaves the keyboard where it is and
+    // appears at once (Windows: without DWM's fade-in)
+    let test = crate::env("jfgui_TEST_NOACTIVATE").is_some();
+    #[cfg(windows)]
+    if test {
+        win_test(WT_NOANIM, w, [0; 4]);
+    }
+    win_show(w, if test { PWS_SHOWNA } else { PWS_SHOW });
     if maximized && !cfg!(windows) {
         win_cmd(w, WCMD_MAXIMIZE);
     }

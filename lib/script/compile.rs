@@ -1,7 +1,8 @@
 // compile -- from the syntax tree to bytecode (code.rs)
 //
-//   generate(&program, src) -> Code   (lib.rs's compile() parses and resolves first, so the
-//                                      tree has no errors here)
+//   generate(&program, src, shared) -> Code   (lib.rs's compile() parses and resolves first, so
+//                                      the tree has no errors here; shared: the top-level names
+//                                      of the scripts before it in a VM, its first globals)
 //
 // Two passes.  analyze() resolves every name with the scope rules of ast.rs, in the same walk
 // as check::resolve: a use of a name (keyed by the byte where it starts) refers to a local
@@ -65,15 +66,27 @@ struct Analyzer<'a> {
     depth: u32,
 }
 
-fn analyze(p: &Program) -> Analysis {
+fn analyze<'a>(p: &'a Program, shared: &'a [String]) -> Analysis {
     let mut z = Analyzer { a: Analysis::default(), top: BTreeMap::new(), scopes: Vec::new(), depth: 0 };
+    for n in shared {
+        let g = z.a.globals.len() as u32;
+        z.a.globals.push(n.clone());
+        z.top.insert(n, g);
+    }
     for s in &p.body {
         if let StmtKind::Let { name, .. } | StmtKind::Fn(FnDef { name: Some(name), .. }) = &s.kind {
-            if !z.top.contains_key(name.text.as_str()) {
-                let g = z.a.globals.len() as u32;
-                z.a.globals.push(name.text.clone());
-                z.top.insert(&name.text, g);
-                z.a.gdecl.insert(name.span.start, g);
+            match z.top.get(name.text.as_str()) {
+                // a name of a script before: the same variable
+                Some(&g) if (g as usize) < shared.len() => {
+                    z.a.gdecl.insert(name.span.start, g);
+                }
+                Some(_) => {}
+                None => {
+                    let g = z.a.globals.len() as u32;
+                    z.a.globals.push(name.text.clone());
+                    z.top.insert(&name.text, g);
+                    z.a.gdecl.insert(name.span.start, g);
+                }
             }
         }
     }
@@ -268,7 +281,7 @@ struct Gen<'a> {
 }
 
 /// see the module comment
-pub(crate) fn generate(prog: &Program, src: &str) -> Code {
+pub(crate) fn generate(prog: &Program, src: &str, shared: &[String]) -> Code {
     let mut lines = vec![0u32];
     for (i, b) in src.bytes().enumerate() {
         if b == b'\n' {
@@ -278,7 +291,7 @@ pub(crate) fn generate(prog: &Program, src: &str) -> Code {
     let mut g = Gen {
         src,
         lines,
-        an: analyze(prog),
+        an: analyze(prog, shared),
         names: BTreeMap::new(),
         consts: Vec::new(),
         kstr: BTreeMap::new(),

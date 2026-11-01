@@ -1,0 +1,3 @@
+#!args --test windows
+# a second window on the same device, a popup window on the CPU path, the second window closed and
+# shown again

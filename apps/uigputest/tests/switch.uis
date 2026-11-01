@@ -1,0 +1,3 @@
+#!args --test switch
+# the first frames on the CPU path, then the swapchain, the screen unchanged; little goes up for a
+# small change; a burst of frames waits for nothing

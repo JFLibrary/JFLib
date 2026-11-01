@@ -21,6 +21,9 @@
 //   bound(d, store, path) -> Vec<String>   the script services of the device that run the file
 //   bind(doc, dev, path) -> Result<String, String>   a new script service {"file": path} named
 //                                    after the file (free_name), started at once -> its name
+//   unit_of(engine, d, store, path, last) -> Option<String>   the unit that holds the file, by the
+//                                    name of its service (see there): the IDE restarts that
+//                                    instead of a service of the file
 //   default_path(store, name)        where "In Datei umwandeln" puts script NAME:
 //                                    /root/scripts/NAME.jfs, NAME2.jfs ... when that is taken
 //   convert(doc, dev, name) -> Result<String, String>   the inline script becomes the file
@@ -43,6 +46,7 @@ use alloc::vec::Vec;
 use agent_core::jmap::Value;
 use jfn_model::files::{FsErr, Store};
 use jfn_model::{Device, Project, ServiceDef};
+use jfn_sim::{Engine, UnitState};
 
 use super::{edits, scripts, Doc};
 use crate::app::tr::{t, tf};
@@ -211,6 +215,22 @@ pub(crate) fn file_of(def: &ServiceDef) -> Option<&str> {
 /// the script services of device `d` that run file `path` (canonical)
 pub(crate) fn bound(d: &Device, st: &Store, path: &str) -> Vec<String> {
     scripts::of(d).iter().filter(|s| file_of(s).and_then(|f| st.norm(f).ok()).as_deref() == Some(path)).map(|s| s.name.clone()).collect()
+}
+
+/// the unit that holds file `path` (canonical), by the name of its service: one that runs or waits
+/// for its restart always (a service of the file would fail at the unit's port); `last`, the one
+/// the IDE ran last even when stopped, and one that failed, while no script service is bound to
+/// the file.  Any other unit file changes nothing: it has not started the file
+pub(crate) fn unit_of(e: &Engine, d: &Device, st: &Store, path: &str, last: Option<&str>) -> Option<String> {
+    let units = e.units_of_file(d.id, path);
+    let free = bound(d, st, path).is_empty();
+    let holds = |s: UnitState| matches!(s, UnitState::Active | UnitState::AutoRestart);
+    units
+        .iter()
+        .find(|(n, s)| Some(n.as_str()) == last && (holds(*s) || free))
+        .or_else(|| units.iter().find(|(_, s)| holds(*s)))
+        .or_else(|| units.iter().find(|(_, s)| *s == UnitState::Failed && free))
+        .map(|(n, _)| n.clone())
 }
 
 /// the name a file gives a script service ("server" of /root/app/server.jfs)

@@ -305,6 +305,35 @@ fn redirects(t: &mut T) {
     let r = fetch_from(&mut e, PC1, req(8, "GET", "http://web.lab:8080/schleife", "", ""), SEC);
     t.eq("too many redirects", kind(&r), Some(WebErr::TooManyRedirects));
     t.eq("followed up to the limit", e.web_client(PC1).map_or(0, |v| v.redirects) - v0, MAX_REDIRECTS as u64);
+    // curl -L goes the same way; -X stays the word of every request, the data goes all the same
+    let curl = |e: &mut Engine, args: &str| {
+        let _ = e.take_reports();
+        let _ = e.cli_line(PC1, &format!("curl -s -L {}", args));
+        run_for(e, SEC);
+        let mut o = String::new();
+        for r in e.take_reports() {
+            if let Report::CliOut { dev: PC1, bytes, .. } = r {
+                o.push_str(&String::from_utf8_lossy(&bytes));
+            }
+        }
+        o
+    };
+    for (path, want) in [("/moved", "GET \n"), ("/found", "GET \n"), ("/see", "GET \n"), ("/temp", "POST a=1\n"), ("/perm", "POST a=1\n")] {
+        t.eq(&format!("curl -L -d to {}", path), curl(&mut e, &format!("-d a=1 http://web.lab:8080{}", path)), s(want));
+    }
+    t.eq("curl -X POST -d: the word stays, the data goes", curl(&mut e, "-X POST -d a=1 http://web.lab:8080/found"), s("POST \n"));
+    t.eq("curl -X PUT -d: the same", curl(&mut e, "-X PUT -d a=1 http://web.lab:8080/moved"), s("PUT \n"));
+    t.eq("curl: 307 keeps the -X word and the data", curl(&mut e, "-X PUT -d a=1 http://web.lab:8080/temp"), s("PUT a=1\n"));
+    t.eq("curl: the next URL posts again", curl(&mut e, "-d a=1 http://web.lab:8080/found http://web.lab:8080/echo"), s("GET \nPOST a=1\n"));
+    let v = curl(&mut e, "-v -d a=1 http://web.lab:8080/see");
+    t.check("curl -v: POST, then GET", v.contains("> POST /see HTTP/1.1\r\n") && v.contains("> GET /echo HTTP/1.1\r\n"));
+    t.eq("curl -v: data only on the first request", v.matches("> Content-Length: 3\r\n").count(), 1);
+    t.eq("curl -v: its type too", v.matches("> Content-Type: application/x-www-form-urlencoded\r\n").count(), 1);
+    t.check("curl -v says so", v.contains("* The redirect drops the data of -d\n"));
+    let v = curl(&mut e, "-v -d a=1 http://web.lab:8080/temp");
+    t.check("curl -v: 307 keeps the data", !v.contains("drops the data") && v.matches("> Content-Length: 3\r\n").count() == 2);
+    let v = curl(&mut e, "-v -d a=1 -H 'Content-Type: text/plain' http://web.lab:8080/found");
+    t.eq("curl -v: a type of -H stays on every request", v.matches("> Content-Type: text/plain\r\n").count(), 2);
     // a redirect of the static server: a folder without its slash
     let r = get(&mut e, "http://web.lab/brot?x=1");
     t.eq("a folder gets its slash", r.as_ref().and_then(|x| x.as_ref().ok()).map(|a| a.url.clone()), Some(s("http://web.lab/brot/?x=1")));

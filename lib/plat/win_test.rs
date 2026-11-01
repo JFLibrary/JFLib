@@ -26,7 +26,16 @@
 //     WT_SCROLL     move the client rows a[0] .. a[0] + a[1] by a[2] rows inside the window
 //                   (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
 //                   sending the pixels again) -> microseconds taken
+//     WT_NOANIM     no DWM transitions for window w (fade-in, minimise) -> 1
+//     WT_FROM_POINT WindowFromPoint at client pixel a[0], a[1] of window w: window w -> 1, its GPU
+//                   child -> 2, another window (of any program) -> 0
+//     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
+//                   keyboard and the other windows alone) -> 1
 //   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+//   win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
+//   win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
+//   win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
+//   win_test_usage() -> (cpu us, working set, private bytes)  this process
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
 //                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 
@@ -60,10 +69,17 @@ unsafe extern "system" {
     fn GetPixel(dc: isize, x: i32, y: i32) -> u32;
 }
 
+#[link(name = "dwmapi", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32;
+}
+
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn GetCurrentThreadId() -> u32;
     fn GetLastError() -> u32;
+    fn GetProcessTimes(p: isize, c: *mut u64, e: *mut u64, k: *mut u64, u: *mut u64) -> i32;
+    fn K32GetProcessMemoryInfo(p: isize, m: *mut u8, cb: u32) -> u32;
 }
 
 pub const WT_PIXEL: u32 = 1;
@@ -81,6 +97,9 @@ pub const WT_CLIP_ACCESS: u32 = 12;
 pub const WT_POPUP_SEND: u32 = 13;
 pub const WT_POST_CHARS: u32 = 14;
 pub const WT_SCROLL: u32 = 15;
+pub const WT_NOANIM: u32 = 16;
+pub const WT_FROM_POINT: u32 = 17;
+pub const WT_SHOW: u32 = 18;
 
 const RDW_INVALIDATE: u32 = 1;
 const RDW_UPDATENOW: u32 = 0x100;
@@ -179,6 +198,26 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                         SendMessageW(h, WM_DPICHANGED, d | d << 16, &q as *const Rect as isize);
                         1
                     }
+                    WT_NOANIM => {
+                        let on = 1u32; // DWMWA_TRANSITIONS_FORCEDISABLED
+                        (DwmSetWindowAttribute(h, 3, &on, 4) == 0) as i64
+                    }
+                    WT_FROM_POINT => {
+                        let mut p = Point { x: a[0], y: a[1] };
+                        super::ClientToScreen(h, &mut p);
+                        let at = super::WindowFromPoint(p);
+                        if at == h {
+                            1
+                        } else if at != 0 && rec(w).is_some_and(|r| r.gchild.get() == at) {
+                            2
+                        } else {
+                            0
+                        }
+                    }
+                    WT_SHOW => {
+                        super::ShowWindow(h, a[0]);
+                        1
+                    }
                     WT_VISIBLE => (IsWindowVisible(h) != 0) as i64,
                     WT_ENABLED => (IsWindowEnabled(h) != 0) as i64,
                     WT_ACTIVE => (GetActiveWindow() == h) as i64,
@@ -233,6 +272,78 @@ pub fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
             super::GdiFlush();
             if ok {
                 out = Some((cw, ch, core::slice::from_raw_parts(bits, (cw * ch * 4) as usize).to_vec()));
+            }
+            super::SelectObject(mdc, old);
+        }
+        if bmp != 0 {
+            super::DeleteObject(bmp);
+        }
+        if mdc != 0 {
+            super::DeleteDC(mdc);
+        }
+        out
+    }
+}
+
+/// (test aid) (CPU time of this process so far in us, its working set in bytes, its private bytes)
+pub fn win_test_usage() -> (u64, u64, u64) {
+    #[repr(C)]
+    #[derive(Default)]
+    struct Counters {
+        cb: u32,
+        faults: u32,
+        peak_ws: usize,
+        ws: usize,
+        q: [usize; 4],
+        pagefile: usize,
+        peak_pagefile: usize,
+        private: usize,
+    }
+    let (mut c, mut e, mut k, mut u) = (0u64, 0u64, 0u64, 0u64);
+    let mut m = Counters { cb: core::mem::size_of::<Counters>() as u32, ..Default::default() };
+    // SAFETY: the current process's pseudo handle, valid out-parameters.
+    unsafe {
+        GetProcessTimes(-1, &mut c, &mut e, &mut k, &mut u);
+        K32GetProcessMemoryInfo(-1, &mut m as *mut Counters as *mut u8, m.cb);
+    }
+    ((k + u) / 10, m.ws as u64, m.private as u64)
+}
+
+/// (test aid) the window at a screen point, from any thread (a screen check: is ours on top there?)
+pub fn win_test_window_at(x: i32, y: i32) -> isize {
+    // SAFETY: a POINT by value.
+    unsafe { super::WindowFromPoint(Point { x, y }) }
+}
+
+/// (test aid) PostMessageW to a window by its handle, from any thread -> posted
+pub fn win_test_post(hwnd: isize, msg: u32, wp: usize, lp: isize) -> bool {
+    // SAFETY: a posted message; the handle is checked by the system.
+    unsafe { PostMessageW(hwnd, msg, wp, lp) != 0 }
+}
+
+/// (test aid) what the screen shows now in the rectangle x, y, w, h (screen px): BitBlt from the
+/// screen's DC, so under DWM the composed desktop -- other windows on top included.  Any thread;
+/// -> rows of w * 4 bytes B, G, R, x
+pub fn win_test_screen(x: i32, y: i32, w: i32, h: i32) -> Option<alloc::vec::Vec<u8>> {
+    if w <= 0 || h <= 0 {
+        return None;
+    }
+    let bmi = super::BitmapInfoHeader { size: 40, w, h: -h, planes: 1, bits: 32, ..Default::default() };
+    let mut bits: *mut u8 = core::ptr::null_mut();
+    // SAFETY: a memory DC and a DIB section of w x h 32-bit pixels, the screen's DC; all made
+    // here are freed again, the screen's DC released.
+    unsafe {
+        let mdc = super::CreateCompatibleDC(0);
+        let bmp = if mdc != 0 { super::CreateDIBSection(mdc, &bmi, 0, &mut bits, 0, 0) } else { 0 };
+        let mut out = None;
+        if bmp != 0 && !bits.is_null() {
+            let old = super::SelectObject(mdc, bmp);
+            let dc = GetDC(0);
+            let ok = super::BitBlt(mdc, 0, 0, w, h, dc, x, y, super::SRCCOPY) != 0;
+            ReleaseDC(0, dc);
+            super::GdiFlush();
+            if ok {
+                out = Some(core::slice::from_raw_parts(bits, (w * h * 4) as usize).to_vec());
             }
             super::SelectObject(mdc, old);
         }

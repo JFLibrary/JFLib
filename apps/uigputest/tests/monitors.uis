@@ -1,0 +1,2 @@
+#!args --test monitors
+# moved to another monitor (with two; else SKIP): the frames go on

@@ -1,0 +1,28 @@
+#!args --page dom --verify-dirty
+# MdEv::click: the element a click on the text hits (--page dom shows its tag and id): a block's
+# element, an inline element in a paragraph, a link, the document's root beside the blocks, nothing
+# after a drag; Enter on the focused link; a click on a field goes to its widget
+size 1000 720
+theme light
+expect text:"Klick: -" exists
+click heading:"Seite mit Skript"
+expect text:"Klick: h2#kopf" exists
+click listitem:"Zweiter Eintrag"
+expect text:"Klick: li#" exists
+# the bold number of "Stand: 0 Schritte", then its paragraph at the first word
+click 73,104
+expect text:"Klick: b#" exists
+click 40,104
+expect text:"Klick: p#stand" exists
+# a link: its element (also with Enter on it)
+click link:"Erster Link"
+expect text:"Klick: a#link" exists
+click heading:"Seite mit Skript"
+expect text:"Klick: h2#kopf" exists
+# a drag selects, no click
+drag 40,104 90,104
+expect text:"Klick: h2#kopf" exists
+# a field's widget takes its click
+click 143,210
+expect text:"Klick: h2#kopf" exists
+expect_nowarn

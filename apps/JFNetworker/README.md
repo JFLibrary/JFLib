@@ -7,7 +7,8 @@ Simulationsmodus Schritt für Schritt mit Paketansicht, und später Dienste, mit
 horizontal skalierte Systeme aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches,
 Queues, Lastgeneratoren, eigene Skripte).
 
-**Stand (2026-10-20): Phase 1 ist fertig** (siehe [Fahrplan](#fahrplan)).
+**Stand (2026-11-01): Die Phasen 1 bis 4 und 6 sind fertig, in Phase 5 fehlt noch B4** (siehe
+[Fahrplan](#fahrplan)).
 
 - **Topologie-Editor:** 26 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
   per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem Kabeltyp (Kupfer,
@@ -164,10 +165,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
   MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
   F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
-- **Webbrowser (B1, B2):** echte kleine Websites aus dem simulierten Netz im Desktop eines Hosts:
-  HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und Skripten mit
-  `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene Fehlerseiten (siehe
-  [Webbrowser](#webbrowser)).
+- **Webbrowser (B1, B2, B3):** echte kleine Websites aus dem simulierten Netz im Desktop eines
+  Hosts: HTML, Markdown und Text von `http-server`-Routen, Dateien (`"root": "/var/www"`) und
+  Skripten mit `http.serve`; Links, Bilder, Formulare mit GET und POST, Verlauf, eigene
+  Fehlerseiten, Seitenskripte in `jfs` mit Konsole (siehe [Webbrowser](#webbrowser)).
 - **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
   Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
   vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
@@ -376,6 +377,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
 | `model.uis`, Gruppe `units` | Einheiten und Bereitstellen (siehe [Einheiten, Bereitstellen und Lasttest](#einheiten-bereitstellen-und-lasttest)): Unit-Dateien und ihre Fehler, jedes Wort von `systemctl` mit seinem Exit-Code, erzeugte Einheiten, Einschalten über einen Stromausfall und Speichern und Laden, die Neustart-Regeln mit Startgrenze, `Requires` und `After`, `journalctl` mit `-u`, `-n`, `-f` und Strg+C (auch in einer anderen Sitzung und im Hintergrund), eine Bereitstellung, deren Prüfung auf dem zweiten Host scheitert, eine, die durchgeht, Zurückrollen, Ablehnungen, Abbrechen, Determinismus (zwei Läufe, ein Klon mitten im Lauf, ein Nachspielen aus Keyframes), das Labor `05-microservices` ungelöst, gelöst und mit allen Hosts zugleich verdorben |
 | `scen_deploy.uis` | das Golden-Szenario (`scen/deploy.scn`): `systemctl` und `journalctl` auf DEV1, eine Einheit, die scheitert und neu startet, eine Bereitstellung, die an WEB2 scheitert, eine, die durchgeht, ein Stromausfall, ein Zurückrollen |
+| `ide_unit.uis` | F5 auf einer Datei, die als Einheit läuft: `systemctl start web` macht die Einheit zum Ziel der IDE, F5 speichert und startet sie neu (PC1 bekommt die neue Fassung, kein zweiter Dienst), Stoppen und Neu starten gehen über die Einheit |
 | `deploy_ide.uis` | Bereitstellen aus der IDE auf die Gruppe Webserver: die Vorschläge des Bereichs, der Fortschritt je Host, das Scheitern auf WEB2 mit seinem Grund, der Lauf, der durchgeht, eine Liste von Hosts, eine fehlende Einheit, Einheit anlegen, Abbrechen |
 | `load_ide.uis` | der Lasttest aus der IDE: ein Ziel ohne URL, offene Last mit Kacheln und Diagrammen, die Zusammenfassung, geschlossene Last, Stoppen, der Lauf im Panel Metriken |
 | `deploy_shots.uis` | die Bilder von Bereitstellen und Lasttest hell und dunkel mit 100 und 150 %, klein und in hohem Kontrast (`build/jfnetworker/deploy_shots_*.png`) |
@@ -384,6 +386,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `browser_forms.uis` | Formulare gegen das `jfs`-Skript `laden.jfs`: GET mit Query in der Adresse, Zurück bringt das Formular mit dem Eingegebenen, POST mit dem Knopf, Neu laden fragt vor dem zweiten Senden, ein Link mit Weiterleitung, Anhalten und Esc, die angehaltene Simulation, Tab in die Felder |
 | `browser_requests.uis` | was der Webbrowser ins Netz schickt, an den Zahlen des Webservers im Reiter Dienste: Seite und Bild sind zwei Anfragen, Zurück und Vor keine, Neu laden fragt wieder (auch nach dem Bild); der Desktop kommt nach dem Schließen des Gerätefensters so zurück, wie er war |
 | `browser_shots.uis` | die Bilder des Webbrowsers (Seite mit Bild, Text, Formular, die Frage vor dem erneuten Senden, Fehlerseite) hell und dunkel mit 100 und 150 % (`build/jfnetworker/browser_*.png`) |
+| `model.uis`, Gruppe `pagescript` | die Seitenskripte ohne Fenster (`fixtures/web_scripts.jfnet`): Elemente finden, lesen, ändern, anlegen, Ereignisse mit Blase und Standardaktion, Zeitgeber auf einer gegebenen Uhr, `fetch` und `src` durch den HTTP-Client einer Engine, `location`, Fuel, Speicher, Tiefe und Grenzen des Dokuments, Endlosschleifen, Fehler mit Quelle, Zeile und Spalte, die Reihenfolge der Skripte, was eine Seite nicht erreicht, zweimal dasselbe Ergebnis |
+| `browser_scripts.uis` | die Seitenskripte im Fenster auf dem Desktop von PC1: Klicks ändern die Seite (mit Titel), Eingaben, eine Liste, ein gestopptes und ein erlaubtes Absenden, die Uhr bei laufender und stehender Simulation, `fetch`, die Konsole mit Zeile und Spalte, eine kaputte Seite, die Endlosschleife lässt das Fenster bedienbar, Zurück, Vor und Neu laden, Zeitgeber warten auf einer Seite, die nicht zu sehen ist |
+| `browser_script_shots.uis` | die Bilder der Seitenskripte (Zähler, Liste, Formular, Konsole mit Fehlern) hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_*.png`) |
 | `scen_web_site.uis` | das Golden-Szenario einer kleinen Website (`scen/web_site.scn`): `curl` holt, was der Browser holt: Seiten über den Namen, die Weiterleitung eines Ordners, Typen, eine fehlende Seite, ein Pfad aus dem Ordner hinaus, Formulare mit GET und POST, Weiterleitungen und ihre Grenze, eine gespeicherte Seite |
 | `dot1x_panel.uis` | 802.1X im Fenster auf `fixtures/dot1x_lab.jfnet`: die Kabel der geschlossenen Ports heißen „nicht autorisiert“, das Feld „Anmeldung am Netz (802.1X)“ der IP-Konfiguration auf PC1 (ohne Identität ein Hinweis; EAP-MD5, der Port geht auf), PC2 mit falschem Passwort und EAP-PWD (bleibt zu), der RADIUS-Server im Inspektor eines Enterprise-Netzes, der Laptop im Unternehmens-WLAN |
 | `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
@@ -423,7 +428,9 @@ Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
 Für den Webbrowser: `web_site.jfnet` (WEB1 mit den Dateien aus `/var/www` und dem Laden als
 Skript, DNS1 mit `web.lab`, PC1 mit dem Browser; das Szenario `web_site.scn` und die Fensterskripte
-`browser_*.uis`).
+`browser_*.uis`) und `web_scripts.jfnet` (dasselbe Netz mit Seiten mit Skripten: Zähler, Liste,
+Formular, Uhr, Daten über `fetch` von `api.jfs`, kaputte Skripte, eine Endlosschleife, die Adresse,
+Klicks; die selftest-Gruppe `pagescript` und `browser_scripts.uis`, `browser_script_shots.uis`).
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
@@ -495,7 +502,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
-| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
+| Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs) (Seitenskripte: der Host der VM, die Konsole), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986) |
 | SSH | [`lib/netpkt/ssh.rs`](../../lib/netpkt/ssh.rs), [`crates/jfn_sim/sshd.rs`](crates/jfn_sim/sshd.rs), [`sshtrace.rs`](crates/jfn_sim/sshtrace.rs), [`cli/ssh.rs`](crates/jfn_sim/cli/ssh.rs), [`src/sshtest.rs`](src/sshtest.rs) | das Protokoll ohne I/O, Client und Server auf den Geräten, Schlüssel als Dateien, `known_hosts`, `authorized_keys`, `scp` |
 | SNMPv3 | [`lib/netpkt/snmpv3.rs`](../../lib/netpkt/snmpv3.rs), [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmpv3test.rs`](src/snmpv3test.rs) | die Nachricht, USM, VACM, die Reports, die Werkzeuge, der MIB-Browser |
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
@@ -1783,9 +1790,13 @@ wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
   Fenster der IDE). „Als Dienst
   ausführen“ (F5) startet den Skript-Dienst, der auf die Datei verweist, neu – gibt es keinen,
   legt es einen als Rückgängig-Schritt an (`{"file": PFAD}`, nach der Datei benannt) –, bei einem
-  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt.
+  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt. Läuft
+  die Datei schon als [Einheit](#einheiten-bereitstellen-und-lasttest), startet F5 diese Einheit
+  neu und legt keinen zweiten Dienst an, der am Port scheiterte; ebenso eine gescheiterte Einheit,
+  solange kein Dienst auf die Datei verweist. Eine Einheit, die nie lief, bleibt außen vor.
   Stoppen (Umschalt+F5) und Neu starten (Strg+Umschalt+F5) wirken im Simulator wie
-  `script stop|restart`. Läuft der Dienst einer gespeicherten Datei noch mit der Fassung davor,
+  `script stop|restart`, bei einer Einheit wie `systemctl stop|restart`. Läuft der Dienst einer
+  gespeicherten Datei noch mit der Fassung davor,
   sagt die Statuszeile das mit einem Knopf „Neu starten“.
 - **Debugger:** ein Klick links neben eine Zeilennummer oder F9 setzt einen Haltepunkt,
   Strg+Umschalt+F9 einen mit Bedingung (ein Flyout, die Bedingung ist ein Ausdruck in jfs).
@@ -3595,7 +3606,7 @@ Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu 
 
 ### Webbrowser
 
-Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 und B2) ist
+Der Webbrowser ([`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs), B1 bis B3) ist
 ein Programm des Desktops: Er zeigt echte kleine Websites aus dem simulierten Netz mit dem
 `ui.html_view` der Library, nicht mit einer eigenen HTML/CSS-Engine. Ein echtes Internet gibt es
 nicht. Seiten liefern `http-server`-Routen, Dateien des Geräts und Skripte mit `http.serve`, wie
@@ -3652,12 +3663,68 @@ und ohne Routen antwortet der Server wie bisher mit „Hallo von {host}“.
 Entscheidungen: Zurück und Vor zeigen die gemerkte Seite statt neu zu fragen (so geht es auch bei
 stehender Simulation, und das Netz sieht nur, was ein Browser mit Cache auch schickte). Bilder
 kommen über `MI_APP` statt `MI_ASK`, damit relative Pfade einer Seite nicht als Dateien des echten
-Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>`, Seitenskripte und HTTPS
-(B3, B4), Datei-Felder und Mehrfachauswahl in Formularen.
+Rechners gelesen werden. Nicht nachgebildet: Cookies, CSS aus `<link>` und HTTPS (B4), Datei-Felder
+und Mehrfachauswahl in Formularen.
 
-Geprüft wird in der Selbsttest-Gruppe `browser` ([`src/browsertest.rs`](src/browsertest.rs)), dazu
-das Szenario `web_site.scn` und die Fensterskripte `browser_pages.uis`, `browser_forms.uis`,
-`browser_requests.uis` und `browser_shots.uis`.
+**Seitenskripte (B3, [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs)):**
+Eine Seite aus dem simulierten Netz führt `<script type="text/jfs">` aus, im Dokument oder mit `src`,
+in der Sprache von `lib/script`; JavaScript gibt es nicht, nur dieser `type` läuft. Die Skripte
+laufen in der Reihenfolge des Dokuments und teilen sich ihre obersten Namen; ein `src`-Skript wird
+zuerst geholt, die nächsten warten darauf, ein Fehler beim Holen steht in der Konsole und das
+nächste läuft.
+
+| Name | Was es tut |
+|---|---|
+| `document` | `by_id(id)`, `find(sel)`, `find_all(sel)` (Selektoren wie in CSS: Tag, `#id`, `.klasse`, `[attr=v]`, Nachfahre, Kind), `create(tag)`, `create_text(s)`, `body()`, `title()`, `set_title(s)`, `on(typ, f)`, `off(typ, f)` |
+| ein Element | `find`, `find_all`, `matches(sel)`, `parent()`, `children()`, `next()`, `prev()`, `text()`, `set_text(x)`, `html()`, `set_html(s)`, `attr(n)`, `set_attr(n, x)`, `remove_attr(n)`, `has_class(k)`, `add_class(k)`, `remove_class(k)`, `toggle_class(k)`, `append(n)`, `insert(n, vor)`, `remove()`, bei Feldern `value()`, `set_value(x)`, `checked()`, `set_checked(b)`, dazu `on`, `off`, `same(anderes)` und die Felder `tag`, `kind` |
+| Ereignisse | `click` (ein Klick auf Text, Link, Knopf, Kästchen; Eingabe auf einem Link), `input` (Text, Liste, Kästchen), `submit` (ein Formular, `ev.data` mit seinen Feldern); `ev.target`, `ev.current`, `ev.type`; `ev.prevent()` hält einen Link oder ein Formular auf, `ev.stop()` den Weg nach oben |
+| `timer` | `after(ms, f)`, `every(ms, f)` geben eine Nummer, `cancel(nummer)` |
+| `fetch` | `fetch(url oder {url, method, headers, body}, fn(err, resp))`: `resp` hat `status`, `reason`, `headers`, `body`, `url`, `redirects`; `err` ist der Grund als Text, wenn keine Antwort kam (ein 404 ist eine Antwort) |
+| `location` | `href`, `scheme`, `host`, `hostname`, `port`, `path`, `query`, `fragment`; `assign(url)` oder `location.href = url` geht dorthin, `reload()` lädt neu |
+| `print`, `log`, `log.warn`, `log.error` | in die Konsole des Browsers |
+| `now()`, `rand()` | die Zeit der Simulation in ms; Zufall aus dem Seed des Projekts, dem Gerät, der Adresse und der Anfrage |
+
+Dazu kommt die Standardbibliothek (`str`, `list`, `map`, `json`, `math`). **Mehr bekommt eine Seite
+nicht:** keine Dateien des Geräts und keine des echten Rechners, kein `import`, kein `net`, `disk`
+oder `http`, keine Zeit und kein Zufall von außen. Skripte, die später ins Dokument kommen
+(`set_html`, `create`), laufen nicht. `fetch` darf jede `http`-Adresse fragen: Eine Same-Origin-Regel
+gibt es hier nicht.
+
+Ereignisse steigen vom Ziel über seine Eltern bis zum Dokument auf, so genügt für eine Liste ein
+Handler an der Liste; eine Fangphase gibt es nicht. Ein Klick trifft das innerste Element unter dem
+Zeiger. Nur die Standardaktion von Links und Formularen lässt sich aufhalten. Ein Formular geht mit
+den Werten und der Adresse, die seine Handler ihm gelassen haben.
+
+Die VM läuft auf dem UI-Thread, und keine Seite kann das Programm anhalten: Jedes Skript, jeder
+Handler, Zeitgeber und jede Antwort hat 2 000 000 Schritte Fuel; danach endet dieser Aufruf mit einem
+Fehler in der Konsole, und die Seite bleibt bedienbar. Ein Bild führt höchstens 4 000 000 Schritte
+aus, der Rest wartet aufs nächste. Dazu Grenzen für Speicher (8 MiB), Aufruftiefe (200), das Dokument
+(200 000 Knoten, 64 MiB, 1000 Ebenen), Zeitgeber, Handler und offene Anfragen. Fehler nennen die
+Quelle (Adresse der Seite oder `src`) mit Zeile und Spalte in der Datei, auch beim Übersetzen; ein
+Fehler hält das nächste Skript nicht auf. Die Statuszeile nennt die Zahl der Fehler, solange die
+Konsole zu ist.
+
+Alles läuft auf der Uhr der Simulation: Steht sie, warten Zeitgeber (Antworten auf Anfragen auch).
+Zwei Läufe desselben Fensterskripts geben dasselbe Ergebnis. Anfragen sind Aktionen
+(`Action::WebFetch`), das Zurückspulen spielt sie also mit. Die VM selbst gehört zum Fenster, nicht
+zum Projekt: kein Rückgängig-Schritt, keine Änderung am Projekt, sie geht mit dem Fenster.
+
+Die Konsole öffnet der Knopf neben „Öffnen“ (Strg+Umschalt+J); sie erscheint nur bei Seiten mit
+Skripten.
+
+Entscheidungen: **Eine VM je Dokument** statt je Fenster, denn der Verlauf behält je Eintrag sein
+Dokument. Sie gehört zum Dokument wie die Feldwerte und die Stelle: Zurück und Vor bringen eine Seite
+mit ihrem Zustand zurück, ohne Skripte neu zu starten; Neu laden macht eine neue. Solange eine Seite
+nicht zu sehen ist, läuft nichts: Fällige Zeitgeber feuern beim Zurückkommen einmal, `timer.every`
+macht von dort aus weiter, Antworten warten der Reihe nach. **Klicks** nennt die Ansicht der Library
+als `MdEv::click`; das Element unter dem Zeiger sucht `MdDoc::element_at`, ohne dass sich an den Blöcken
+etwas ändert. **Gemeinsame Namen** kommen aus `Vm::add_script`: ein Skript sieht die Namen der Skripte
+davor, nicht die der späteren.
+
+Geprüft wird in den Selbsttest-Gruppen `browser` ([`src/browsertest.rs`](src/browsertest.rs)) und
+`pagescript` ([`src/pagescripttest.rs`](src/pagescripttest.rs)), dazu das Szenario `web_site.scn` und
+die Fensterskripte `browser_pages.uis`, `browser_forms.uis`, `browser_requests.uis`,
+`browser_shots.uis`, `browser_scripts.uis` und `browser_script_shots.uis`.
 ### SSH
 
 SSH Version 2 läuft auf den Geräten wie alles andere Byte für Byte: echte Schlüssel, echter
@@ -3879,7 +3946,7 @@ Geste).
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
-| 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
+| 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) ✓ · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 | 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

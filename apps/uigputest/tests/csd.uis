@@ -1,0 +1,3 @@
+#!args --test csd
+# a window with the library's frame: hit tests through the child, maximised and in full screen on the
+# swapchain
