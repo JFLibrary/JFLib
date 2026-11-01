@@ -64,6 +64,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
+- [wgsl](#wgsl) -- the WGSL front end: lexer, parser, semantic checker, constant evaluation, the typed IR, the benchmark shaders as WGSL
+  <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [print.rs](#wgslprintrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
@@ -19605,6 +19607,1411 @@ Rules (Rule::*):
 
 - **`fn validate(words: &[u32]) -> Result<(), Vec<Error>>`**
   check a module (the rules of the module comment) -> Ok or every error found
+
+## wgsl
+
+*the WGSL front end: lexer, parser, semantic checker, constant evaluation, the typed IR, the benchmark shaders as WGSL* -- crate root [`lib/wgsl/lib.rs`](../lib/wgsl/lib.rs)
+
+```text
+wgsl -- JFLib's WGSL front end: source text -> a checked, fully typed module (step G2a of
+the GPU plan; docs/WGSL.md).  The back end (G2c) lowers the IR to SPIR-V with lib/shader;
+the browser path (G4) hands the same text to WebGPU.  The reference is the W3C WGSL
+Candidate Recommendation (2026-10-26); where Chrome's Tint differs, the docs say so.
+
+  parse(src) -> (Ast, Vec<Diagnostic>)        the syntax tree of everything that parsed and
+                                              the lexer / parser errors (several per run)
+  check(src) -> Result<Module, Vec<Diagnostic>>   parse + semantic check with the default
+                                              Options; Ok carries the warnings in
+                                              Module::warnings
+  check_with(src, &Options)                   the same with a chosen set of language features
+  print(&ast) -> String                       the AST as WGSL text (parse -> print -> parse
+                                              gives the same tree)
+  lex::tokens(src)                            the tokens (template lists discovered)
+  ir                                          the checked module: types with layout, globals,
+                                              overrides, functions (expression arenas,
+                                              statements), entry points with their interface
+  Diagnostic                                  1-based line, column in characters, end column,
+                                              error / warning, German message, notes
+  bench                                       the six benchmark shaders of docs/SHADER.md
+                                              as WGSL text
+
+Never panics on any input: nesting deeper than parse::MAX_DEPTH is an error, constant
+values are capped in size (consteval::MAX_ELEMS), every count is checked.
+```
+
+### `wgsl` crate root
+
+- **`struct Note`**
+  a note attached to a diagnostic: where the related declaration is
+  - `line: u32`
+  - `col: u32`
+  - `end_col: u32`
+  - `msg: String`
+
+- **`struct Diagnostic`**
+  a message for the editor: position (1-based; columns count characters, end_col is
+  exclusive and on the same line), error or warning, German text; start / end: the byte
+  range in the source; notes point at related places ("hier deklariert")
+  - `line: u32`
+  - `col: u32`
+  - `end_col: u32`
+  - `error: bool`
+  - `msg: String`
+  - `start: u32`
+  - `end: u32`
+  - `notes: Vec<Note>`
+
+- **`struct Options`**
+  what the checker accepts beyond core WGSL
+  - `features: u32` -- feature::\* bits: the language extensions the implementation supports (they apply
+    without `requires`, as in a browser) and the enable-extensions the device offers
+    (they apply only after `enable`)
+
+- **`fn parse(src: &str) -> (Ast, Vec<Diagnostic>)`**
+  the syntax tree and the syntax errors (empty when the source parses)
+
+- **`fn check(src: &str) -> Result<Module, Vec<Diagnostic>>`**
+  parse and check with the default options: the module (warnings in Module::warnings) or
+  every error found (and the warnings)
+
+- **`fn check_with(src: &str, opt: &Options) -> Result<Module, Vec<Diagnostic>>`**
+  parse and check with the given options
+
+- **`struct LineMap`**
+  the start of every line (byte offsets); line breaks as WGSL defines them: LF, VT, FF, CR
+  (alone or before LF), NEL, LS, PS
+
+**`impl LineMap`**
+
+- **`fn new(src: &str) -> LineMap`**
+  the line starts of a source
+- **`fn pos(&self, src: &str, at: u32) -> (u32, u32)`**
+  1-based line and character column of a byte offset
+- **`fn diag(&self, src: &str, start: u32, end: u32, error: bool, msg: String) -> Diagnostic`**
+  a diagnostic for the byte range start..end (end_col stays on the first line)
+- **`fn note(&self, src: &str, start: u32, end: u32, msg: String) -> Note`**
+  a note for the byte range start..end
+
+**`mod feature`**
+
+the language extensions (`requires`) and enable extensions this front end implements; a
+module may use an extension only when its bit is set here (Options::features)
+
+```rust
+/// storage textures with read and read_write access, textureBarrier
+READONLY_AND_READWRITE_STORAGE_TEXTURES: u32 = 1 << 0
+/// dot4U8Packed, dot4I8Packed, pack4xI8 ... unpack4xU8
+PACKED_4X8_INTEGER_DOT_PRODUCT: u32 = 1 << 1
+/// pointer parameters in storage / uniform / workgroup, to parts of variables
+UNRESTRICTED_POINTER_PARAMETERS: u32 = 1 << 2
+/// p.x and p[i] on pointers
+POINTER_COMPOSITE_ACCESS: u32 = 1 << 3
+/// uniform buffers with the storage layout rules
+UNIFORM_BUFFER_STANDARD_LAYOUT: u32 = 1 << 4
+/// let of texture and sampler type
+TEXTURE_AND_SAMPLER_LET: u32 = 1 << 5
+/// the further storage texel formats (r8unorm, rg16float ...)
+TEXTURE_FORMATS_TIER1: u32 = 1 << 6
+/// @builtin(global_invocation_index) and @builtin(workgroup_index)
+LINEAR_INDEXING: u32 = 1 << 7
+/// var<immediate> (push constants)
+IMMEDIATE_ADDRESS_SPACE: u32 = 1 << 8
+/// @builtin(frag_depth, less | greater)
+FRAGMENT_DEPTH: u32 = 1 << 9
+/// v.xy = ... (swizzle views)
+SWIZZLE_ASSIGNMENT: u32 = 1 << 10
+/// enable-extensions the device may offer (the WebGPU features)
+F16: u32 = 1 << 16
+/// enable clip_distances: @builtin(clip_distances)
+CLIP_DISTANCES: u32 = 1 << 17
+/// enable dual_source_blending: @blend_src
+DUAL_SOURCE_BLENDING: u32 = 1 << 18
+/// enable primitive_index: @builtin(primitive_index)
+PRIMITIVE_INDEX: u32 = 1 << 19
+/// enable atomic_vec2u_min_max: atomicStoreMin / Max on atomic<vec2<u32>>
+ATOMIC_VEC2U_MIN_MAX: u32 = 1 << 20
+/// everything this front end implements (the language features of Chrome 156 except
+/// buffer_view, subgroup_id and subgroup_uniformity; the enable-extensions except
+/// subgroups and subgroup_size_control)
+ALL: u32 = 0x7ff | 0x1f << 16
+/// (name, bit, is a language extension) for every extension name WGSL defines; bit 0:
+/// known but not implemented here
+NAMES: &[(&str, u32, bool)] = &[ ("readonly_and_readwrite_storage_textures", READONLY_A ...
+```
+
+### `wgsl/ast.rs`
+
+Source: [`lib/wgsl/ast.rs`](../lib/wgsl/ast.rs)
+
+```text
+ast -- the syntax tree of a WGSL module, every node with its byte span
+
+  Ast { directives, decls }      the module in source order
+  Decl                           fn, var, const, override, alias, struct, const_assert
+  Stmt / StmtKind                every statement of spec section 9 (for and while stay as
+                                 written; the IR desugars them)
+  Expr / ExprKind                expressions; a type is an expression too (an identifier
+                                 with an optional template list: `array<vec4<f32>, 4>`)
+  Attr                           `@name(args)`; @diagnostic keeps its two names
+
+Literals keep their text (the printer writes it back unchanged) and their decoded value.
+```
+
+- **`struct Span`**
+  a byte range in the source
+  - `start: u32`
+  - `end: u32`
+
+**`impl Span`**
+
+- **`fn new(start: u32, end: u32) -> Span`**
+  start..end
+- **`fn to(self, b: Span) -> Span`**
+  from the start of self to the end of b
+- **`fn contains(self, b: Span) -> bool`**
+  b lies inside self
+
+- **`struct Ident`**
+  a name with its place
+  - `name: String`
+  - `span: Span`
+
+- **`struct Ast`**
+  a parsed module: directives, then declarations in source order
+  - `directives: Vec<Directive>`
+  - `decls: Vec<Decl>`
+
+- **`enum DirectiveKind`**
+  enable / requires / diagnostic
+  - `Enable(Vec<Ident>)`
+  - `Requires(Vec<Ident>)`
+  - `Diagnostic(DiagnosticControl)`
+
+- **`struct Directive`**
+  a directive with its range
+  - `kind: DirectiveKind`
+  - `span: Span`
+
+- **`struct DiagnosticControl`**
+  `(severity, rule)` or `(severity, a.b)`
+  - `severity: Ident`
+  - `rule: Ident`
+  - `rule2: Option<Ident>`
+
+- **`enum AttrKind`**
+  the arguments of an attribute
+  - `Plain { args: Vec<Expr>, parens: bool }` -- @name or @name(args)
+  - `Diagnostic(DiagnosticControl)`
+
+- **`struct Attr`**
+  an attribute `@name(args)`
+  - `name: Ident`
+  - `kind: AttrKind`
+  - `span: Span`
+
+**`impl Attr`**
+
+- **`fn args(&self) -> &[Expr]`**
+  the arguments (none for @diagnostic)
+
+- **`struct Param`**
+  a function parameter
+  - `attrs: Vec<Attr>`
+  - `name: Ident`
+  - `ty: Expr`
+  - `span: Span`
+
+- **`struct FnDecl`**
+  a function declaration
+  - `attrs: Vec<Attr>`
+  - `name: Ident`
+  - `params: Vec<Param>`
+  - `ret: Option<(Vec<Attr>, Expr)>` -- the return type and its attributes
+  - `body: Block`
+
+- **`struct Member`**
+  a struct member
+  - `attrs: Vec<Attr>`
+  - `name: Ident`
+  - `ty: Expr`
+  - `span: Span`
+
+- **`enum VarKind`**
+  var, let, const and override declarations
+  - `Var`
+  - `Let`
+  - `Const`
+  - `Override`
+
+- **`struct VarDecl`**
+  a var / let / const / override declaration
+  - `kind: VarKind`
+  - `attrs: Vec<Attr>`
+  - `templ: Option<Vec<Expr>>` -- var&lt;...>: address space and access mode as written
+  - `name: Ident`
+  - `ty: Option<Expr>`
+  - `init: Option<Expr>`
+  - `span: Span`
+
+- **`enum DeclKind`**
+  the module-scope declarations
+  - `Fn(FnDecl)`
+  - `Var(VarDecl)`
+  - `Alias { name: Ident, ty: Expr }`
+  - `Struct { name: Ident, members: Vec<Member> }`
+  - `ConstAssert(Expr)`
+
+- **`struct Decl`**
+  a module-scope declaration with its range
+  - `kind: DeclKind`
+  - `span: Span`
+
+**`impl Decl`**
+
+- **`fn name(&self) -> Option<&Ident>`**
+  the declared name (None for const_assert)
+
+- **`struct Block`**
+  a compound statement (attributes, statements)
+  - `attrs: Vec<Attr>`
+  - `stmts: Vec<Stmt>`
+  - `span: Span`
+
+- **`enum CaseSel`**
+  a case selector
+  - `Default(Span)`
+  - `Expr(Expr)`
+
+- **`struct Clause`**
+  a switch clause
+  - `sels: Vec<CaseSel>`
+  - `default_alone: bool` -- `default:` alone (no `case`)
+  - `body: Block`
+  - `span: Span`
+
+- **`struct ElseIf`**
+  an else-if clause
+  - `cond: Expr`
+  - `body: Block`
+  - `span: Span`
+
+- **`struct Continuing`**
+  the continuing block of a loop, with its optional break-if
+  - `body: Block`
+  - `break_if: Option<Expr>`
+  - `span: Span`
+
+- **`enum AssignOp`**
+  = and the compound assignment operators
+  - `Assign`
+  - `Add`
+  - `Sub`
+  - `Mul`
+  - `Div`
+  - `Rem`
+  - `And`
+  - `Or`
+  - `Xor`
+  - `Shr`
+  - `Shl`
+
+**`impl AssignOp`**
+
+- **`fn text(self) -> &'static str`**
+  the spelling
+- **`fn binary(self) -> Option<BinOp>`**
+  the binary operator of a compound assignment
+
+- **`enum StmtKind`**
+  the statements
+  - `Empty` -- `;`
+  - `Block(Block)`
+  - `Return(Option<Expr>)`
+  - `If { attrs: Vec<Attr>, cond: Expr, then: Block, else_ifs: Vec<ElseIf>, else_: Option<Block> }` -- if / else if / else (the else-if clauses in order)
+  - `Switch { attrs: Vec<Attr>, selector: Expr, body_attrs: Vec<Attr>, clauses: Vec<Clause>, body_span: Span }`
+  - `Loop { attrs: Vec<Attr>, body: Block, continuing: Option<Continuing> }`
+  - `For { attrs: Vec<Attr>, init: Option<Box<Stmt>>, cond: Option<Expr>, update: Option<Box<Stmt>>, body: Block }`
+  - `While { attrs: Vec<Attr>, cond: Expr, body: Block }`
+  - `Break`
+  - `Continue`
+  - `Discard`
+  - `Call(Expr)` -- a function call statement (the expression is a Call)
+  - `Decl(VarDecl)`
+  - `Assign { lhs: Expr, op: AssignOp, rhs: Expr }`
+  - `Phony(Expr)` -- `_ = e`
+  - `Incr(Expr)`
+  - `Decr(Expr)`
+  - `ConstAssert(Expr)`
+
+- **`struct Stmt`**
+  a statement with its range
+  - `kind: StmtKind`
+  - `span: Span`
+
+- **`enum UnOp`**
+  unary operators
+  - `Neg`
+  - `Not`
+  - `BitNot`
+  - `Deref`
+  - `AddrOf`
+
+**`impl UnOp`**
+
+- **`fn text(self) -> &'static str`**
+  the spelling
+
+- **`enum BinOp`**
+  binary operators
+  - `Add`
+  - `Sub`
+  - `Mul`
+  - `Div`
+  - `Rem`
+  - `And`
+  - `Or`
+  - `Xor`
+  - `Shl`
+  - `Shr`
+  - `LogAnd`
+  - `LogOr`
+  - `Eq`
+  - `Ne`
+  - `Lt`
+  - `Le`
+  - `Gt`
+  - `Ge`
+
+**`impl BinOp`**
+
+- **`fn text(self) -> &'static str`**
+  the spelling
+- **`fn is_comparison(self) -> bool`**
+  == != &lt; &lt;= > >=
+
+- **`enum ExprKind`**
+  the expressions
+  - `Bool(bool)`
+  - `Int(String, i64, Suffix)` -- text, value, suffix
+  - `Float(String, f64, Suffix)`
+  - `Ident(Ident, Option<Vec<Expr>>)` -- a name with an optional template list (also a type)
+  - `Call(Ident, Option<Vec<Expr>>, Vec<Expr>)` -- callee (a function, a type or a type-generator), template args, arguments
+  - `Paren(Box<Expr>)`
+  - `Unary(UnOp, Box<Expr>)`
+  - `Binary(BinOp, Box<Expr>, Box<Expr>)`
+  - `Index(Box<Expr>, Box<Expr>)`
+  - `Member(Box<Expr>, Ident)` -- `.name` (a member or a swizzle)
+  - `Error` -- what the parser put where an expression failed
+
+- **`struct Expr`**
+  an expression (a type is one too) with its range and height
+  - `kind: ExprKind`
+  - `span: Span`
+  - `depth: u32` -- the height of the tree (a leaf is 1); every pass over it recurses this deep
+
+**`impl Expr`**
+
+- **`fn error(span: Span) -> Expr`**
+  the placeholder of a failed expression
+- **`fn new(kind: ExprKind, span: Span) -> Expr`**
+  a node with its height computed from the children
+
+### `wgsl/bench.rs`
+
+Source: [`lib/wgsl/bench.rs`](../lib/wgsl/bench.rs)
+
+```text
+bench -- the six shaders of the GPU benchmark scene as WGSL (lib/wgsl/bench/*.wgsl): the
+same bindings and data contract as the SPIR-V shaders of lib/shader/bench.rs (docs/SHADER.md
+"Benchmark-Vertrag"); G2c compiles them and compares them with those.
+
+  MOVE, CULL, CULL_RESET, VS_INSTANCED, VS_SINGLE, FS_LAMBERT   the source texts
+  ALL                                                           (name, text) of all six
+
+The push constants are `var<immediate> pc: Push` (language extension
+immediate_address_space, which Chrome supports): 20 bytes at offset 0 as before, so
+vs_single keeps reading pc.object_index and move / cull keep their parameters.  Every
+entry point is `main`; each file is a complete module.
+```
+
+```rust
+/// move.wgsl
+MOVE: &str = include_str!("bench/move.wgsl")
+/// cull.wgsl
+CULL: &str = include_str!("bench/cull.wgsl")
+/// cull_reset.wgsl
+CULL_RESET: &str = include_str!("bench/cull_reset.wgsl")
+/// vs_instanced.wgsl
+VS_INSTANCED: &str = include_str!("bench/vs_instanced.wgsl")
+/// vs_single.wgsl
+VS_SINGLE: &str = include_str!("bench/vs_single.wgsl")
+/// fs_lambert.wgsl
+FS_LAMBERT: &str = include_str!("bench/fs_lambert.wgsl")
+/// (name, source) of the six shaders
+ALL: [(&str, &str); 6] = [ ("move", MOVE), ("cull", CULL), ("cull_reset", CULL_RES ...
+```
+
+### `wgsl/check.rs`
+
+Source: [`lib/wgsl/check.rs`](../lib/wgsl/check.rs)
+
+```text
+check -- the semantic checker, module level: directives, the module-scope declarations in
+dependency order, name resolution, types, attributes, structs with layout, global
+variables, overrides, consts, function signatures, const_assert; then check_expr.rs (the
+expressions), check_stmt.rs (function bodies, behaviors) and entry.rs (entry points)
+
+  check(src, &ast, &opts) -> Result<Module, Vec<Diagnostic>>
+
+Order: every module-scope declaration's dependencies (the module-scope names it mentions,
+respecting local scopes) are collected first; an iterative depth-first search orders them
+(callees before callers) and reports cycles ("zyklische Abhängigkeit"), so no check
+recurses from one declaration into another.  Errors: each failing construct reports once
+and yields E; whatever depends on it fails silently.  At most MAX_ERRORS errors are kept.
+```
+
+**`impl ir::ExprKind`**
+
+- **`fn children(&self, out: &mut Vec<ExprId>)`**
+  push the child expressions
+
+### `wgsl/ir.rs`
+
+Source: [`lib/wgsl/ir.rs`](../lib/wgsl/ir.rs)
+
+```text
+ir -- the checked module: what the back end (G2c) lowers to SPIR-V without re-deriving
+anything (docs/WGSL.md, "Das IR")
+
+  Module            types (interned: equal types have equal TypeIds), structs with their
+                    layout, globals, overrides, functions (callees before callers), entry
+                    points with their interface, the module-scope expression arena, enabled
+                    extensions, diagnostic filters (kept for the uniformity analysis, G2d)
+  Type              Scalar / Vector / Matrix / Atomic / Array (count, stride) / Struct /
+                    Pointer / Reference / SwizzleView / Sampler / Texture
+  Expr / ExprKind   one arena per function (Function::exprs) and one for module scope
+                    (Module::exprs); every node has its concrete type
+  Stmt              structured statements; for and while are desugared to Loop
+  Value             a folded constant (the value of every const-expression)
+
+Conventions:
+  * Every const-expression is folded into ExprKind::Const with a concrete type; abstract
+    types (AbstractInt, AbstractFloat) never appear in function or module arenas.
+  * References are explicit: Global(g) and Local(var) have Reference type; Load(e) reads
+    one; AddrOf / Deref convert between Reference and Pointer.  Index and Member on a
+    reference give a reference; on a value they give a value.  p.x on a pointer
+    (pointer_composite_access) is written Member(Deref(p), 0).
+  * Swizzle(base, comps, n): on a value: a vector value; on a reference with read_write
+    access (swizzle_assignment) the node has SwizzleView type -- Load reads the vector,
+    Assign / Compound write the listed components.  A single-letter swizzle is Member(base,
+    component).
+  * Binary operands have equal types except: matrix * scalar, scalar * matrix, matrix *
+    vector, vector * matrix, matrix * matrix, float vector * float scalar (both orders, for
+    OpVectorTimesScalar), the shifts (right operand u32 / vecN<u32>), and comparisons
+    (bool result).  Other mixed scalar / vector arithmetic gets an explicit Splat.
+  * Builtin(f, args): the arguments already have the types of the chosen overload; the
+    overload is determined by f and the argument types.
+  * Construct: vectors from scalars and vectors (as written), matrices from column vectors
+    (scalar arguments are grouped into Construct columns), arrays and structs from
+    elements / members.  Convert: numeric conversion (scalar, vector or matrix); identity
+    conversions are removed.
+  * Overrides stay symbolic: Override(i) leaves inside expressions; override-expressions
+    at module scope (override initializers, private var initializers, workgroup sizes,
+    override-sized array counts) live in Module::exprs.
+  * Compound assignment and ++ / -- evaluate the left side once: Compound { lhs, op, rhs }
+    (++ is Compound with op Add and the constant 1).
+```
+
+- **`type TypeId = u32`**
+  an index into Module::types (equal types have equal ids)
+
+- **`type ExprId = u32`**
+  an index into an expression arena (Function::exprs or Module::exprs)
+
+```rust
+// the scalar TypeIds (interned first, in this order)
+BOOL: TypeId = 0
+/// AbstractInt (never in a checked module's arenas)
+AINT: TypeId = 1
+/// AbstractFloat (never in a checked module's arenas)
+AFLOAT: TypeId = 2
+/// i32
+I32: TypeId = 3
+/// u32
+U32: TypeId = 4
+/// f32
+F32: TypeId = 5
+/// f16
+F16: TypeId = 6
+/// the type of a call without a result (Call / Builtin nodes of void functions)
+VOID: TypeId = 7
+```
+
+- **`enum Scalar`**
+  the scalar types (AbstractInt / AbstractFloat only for analysis)
+  - `Bool`
+  - `AbstractInt`
+  - `AbstractFloat`
+  - `I32`
+  - `U32`
+  - `F32`
+  - `F16`
+
+**`impl Scalar`**
+
+- **`const ALL: [Scalar; 7] = [Scalar::Bool, Scalar::AbstractInt, Scalar::AbstractFloat ...`**
+  every scalar in TypeId order
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+- **`fn id(self) -> TypeId`**
+  the TypeId of the scalar
+- **`fn is_abstract(self) -> bool`**
+  AbstractInt or AbstractFloat
+- **`fn is_float(self) -> bool`**
+  AbstractFloat, f32, f16
+- **`fn is_int(self) -> bool`**
+  AbstractInt, i32, u32
+- **`fn is_numeric(self) -> bool`**
+  not bool
+- **`fn size(self) -> u32`**
+  byte size in memory (bool: 4)
+
+- **`enum AddressSpace`**
+  the address spaces (Handle: textures and samplers)
+  - `Function`
+  - `Private`
+  - `Workgroup`
+  - `Uniform`
+  - `Storage`
+  - `Immediate`
+  - `Handle`
+
+**`impl AddressSpace`**
+
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+
+- **`enum Access`**
+  access modes of memory views
+  - `Read`
+  - `Write`
+  - `ReadWrite`
+
+**`impl Access`**
+
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+- **`fn readable(self) -> bool`**
+  read or read_write
+- **`fn writable(self) -> bool`**
+  write or read_write
+
+- **`enum ArrayCount`**
+  the element count of an array type
+  - `Fixed(u32)`
+  - `Override(u32)` -- an identifier naming an override (Module::overrides index)
+  - `Expr(ExprId)` -- another override-expression (Module::exprs; every such type is distinct)
+  - `Runtime`
+
+- **`enum TexDim`**
+  texture dimensionalities
+  - `D1`
+  - `D2`
+  - `D2Array`
+  - `D3`
+  - `Cube`
+  - `CubeArray`
+
+**`impl TexDim`**
+
+- **`fn suffix(self) -> &'static str`**
+  the type-name suffix ("2d_array")
+- **`fn coords(self) -> u8`**
+  coordinate components (cube: the direction vector)
+- **`fn arrayed(self) -> bool`**
+  2d_array or cube_array
+
+- **`enum TexelFormat`**
+  the texel formats of storage textures (spec 6.6.1)
+  - `Rgba8unorm`
+  - `Rgba8snorm`
+  - `Rgba8uint`
+  - `Rgba8sint`
+  - `Rgba16unorm`
+  - `Rgba16snorm`
+  - `Rgba16uint`
+  - `Rgba16sint`
+  - `Rgba16float`
+  - `Rg8unorm`
+  - `Rg8snorm`
+  - `Rg8uint`
+  - `Rg8sint`
+  - `Rg16unorm`
+  - `Rg16snorm`
+  - `Rg16uint`
+  - `Rg16sint`
+  - `Rg16float`
+  - `R32uint`
+  - `R32sint`
+  - `R32float`
+  - `Rg32uint`
+  - `Rg32sint`
+  - `Rg32float`
+  - `Rgba32uint`
+  - `Rgba32sint`
+  - `Rgba32float`
+  - `Bgra8unorm`
+  - `R8unorm`
+  - `R8snorm`
+  - `R8uint`
+  - `R8sint`
+  - `R16unorm`
+  - `R16snorm`
+  - `R16uint`
+  - `R16sint`
+  - `R16float`
+  - `Rgb10a2unorm`
+  - `Rgb10a2uint`
+  - `Rg11b10ufloat`
+
+```rust
+/// (name, format, needs texture_formats_tier1)
+TEXEL_FORMATS: [(&str, TexelFormat, bool); 40] = [ ("rgba8unorm", TexelFormat::Rgba8unorm, false), ("rgba8 ...
+```
+
+**`impl TexelFormat`**
+
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+- **`fn channel(self) -> Scalar`**
+  the channel type in the shader: f32, i32 or u32
+
+- **`enum TexKind`**
+  texture kinds (with the sampled type, format and access where they have one)
+  - `Sampled(Scalar)` -- texture_1d&lt;T> ... texture_cube_array&lt;T>; T is f32, i32 or u32
+  - `Multisampled(Scalar)`
+  - `Depth`
+  - `DepthMultisampled`
+  - `Storage(TexelFormat, Access)`
+  - `External`
+
+- **`enum Type`**
+  a type (see the module comment)
+  - `Scalar(Scalar)`
+  - `Vector(u8, Scalar)`
+  - `Matrix(u8, u8, Scalar)` -- columns, rows, element (f32, f16 or AbstractFloat)
+  - `Atomic(TypeId)` -- atomic&lt;i32>, atomic&lt;u32> or atomic&lt;vec2&lt;u32>> (the TypeId of the inner type)
+  - `Array { elem: TypeId, count: ArrayCount, stride: u32 }` -- stride: roundUp(align, size) of the element (0 for abstract elements)
+  - `Struct(u32)` -- Module::structs index
+  - `Pointer { space: AddressSpace, store: TypeId, access: Access }`
+  - `Reference { space: AddressSpace, store: TypeId, access: Access }`
+  - `SwizzleView { space: AddressSpace, elem: Scalar, n: u8, k: u8 }` -- swizzle&lt;AS, S, N, K>: K components of a vecN&lt;S> in memory (swizzle_assignment)
+  - `Sampler { comparison: bool }`
+  - `Texture(TexDim, TexKind)`
+  - `Void` -- no value: the type of a call to a function without result type (TypeId VOID)
+
+- **`enum BuiltinStruct`**
+  the predeclared structures of built-in results
+  - `Frexp(u8, Scalar)` -- frexp: (vector width or 1, fract scalar type)
+  - `Modf(u8, Scalar)` -- modf: (vector width or 1, scalar type)
+  - `AtomicCompareExchange(Scalar)` -- atomicCompareExchangeWeak: old_value type (i32 / u32)
+
+- **`enum BuiltinValue`**
+  the built-in values of @builtin(...)
+  - `VertexIndex`
+  - `InstanceIndex`
+  - `ClipDistances`
+  - `Position`
+  - `FrontFacing`
+  - `FragDepth`
+  - `PrimitiveIndex`
+  - `SampleIndex`
+  - `SampleMask`
+  - `LocalInvocationId`
+  - `LocalInvocationIndex`
+  - `GlobalInvocationId`
+  - `GlobalInvocationIndex`
+  - `WorkgroupId`
+  - `WorkgroupIndex`
+  - `NumWorkgroups`
+  - `SubgroupInvocationId`
+  - `SubgroupSize`
+  - `SubgroupId`
+  - `NumSubgroups`
+
+```rust
+/// (name, value) of every built-in value
+BUILTIN_VALUES: [(&str, BuiltinValue); 20] = [ ("vertex_index", BuiltinValue::VertexIndex), ("instance ...
+```
+
+**`impl BuiltinValue`**
+
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+
+- **`enum InterpType`**
+  @interpolate types
+  - `Perspective`
+  - `Linear`
+  - `Flat`
+
+- **`enum InterpSampling`**
+  @interpolate samplings
+  - `Center`
+  - `Centroid`
+  - `Sample`
+  - `First`
+  - `Either`
+
+- **`enum DepthMode`**
+  the depth mode of @builtin(frag_depth, less | greater) (fragment_depth)
+  - `Less`
+  - `Greater`
+
+- **`struct Io`**
+  the IO attributes of a parameter, return type or struct member
+  - `builtin: Option<BuiltinValue>`
+  - `depth_mode: Option<DepthMode>`
+  - `location: Option<u32>`
+  - `blend_src: Option<u32>`
+  - `interpolate: Option<(InterpType, Option<InterpSampling>)>` -- as written (None: not written)
+  - `invariant: bool`
+
+- **`struct StructMember`**
+  a member with its layout and IO attributes
+  - `name: String`
+  - `ty: TypeId`
+  - `offset: u32` -- byte offset, size (@size or the type's), alignment (@align or the type's)
+  - `size: u32`
+  - `align: u32`
+  - `io: Io`
+  - `span: Span`
+
+- **`struct Struct`**
+  a structure with its layout (the same in every address space)
+  - `name: String`
+  - `members: Vec<StructMember>`
+  - `align: u32`
+  - `size: u32` -- roundUp(align, end of the last member); with a runtime-sized last member: the size
+    without its elements
+  - `runtime_sized: bool`
+  - `builtin: Option<BuiltinStruct>`
+  - `span: Span`
+
+- **`enum Value`**
+  a folded constant; Zero is the zero value of whatever type the node has
+  - `Bool(bool)`
+  - `AInt(i64)`
+  - `AFloat(f64)`
+  - `I32(i32)`
+  - `U32(u32)`
+  - `F32(f32)`
+  - `F16(f32)` -- an f16 value (exactly representable in f16), held as f32
+  - `Comp(Vec<Value>)` -- vector, matrix (columns), array or struct components
+  - `Zero`
+
+- **`fn f16_bits(x: f32) -> u16`**
+  the bits of an f16 value held as f32
+
+- **`enum UnaryOp`**
+  unary operators (&, \* are AddrOf / Deref)
+  - `Neg`
+  - `Not` -- logical not (bool, vecN&lt;bool>)
+  - `BitNot`
+
+- **`enum Builtin`**
+  the built-in functions (spec section 17; no subgroup and quad functions, no buffer views)
+  - `All`
+  - `Any`
+  - `Select`
+  - `ArrayLength`
+  - `Abs`
+  - `Acos`
+  - `Acosh`
+  - `Asin`
+  - `Asinh`
+  - `Atan`
+  - `Atanh`
+  - `Atan2`
+  - `Ceil`
+  - `Clamp`
+  - `Cos`
+  - `Cosh`
+  - `CountLeadingZeros`
+  - `CountOneBits`
+  - `CountTrailingZeros`
+  - `Cross`
+  - `Degrees`
+  - `Determinant`
+  - `Distance`
+  - `Dot`
+  - `Dot4U8Packed`
+  - `Dot4I8Packed`
+  - `Exp`
+  - `Exp2`
+  - `ExtractBits`
+  - `FaceForward`
+  - `FirstLeadingBit`
+  - `FirstTrailingBit`
+  - `Floor`
+  - `Fma`
+  - `Fract`
+  - `Frexp`
+  - `InsertBits`
+  - `InverseSqrt`
+  - `Ldexp`
+  - `Length`
+  - `Log`
+  - `Log2`
+  - `Max`
+  - `Min`
+  - `Mix`
+  - `Modf`
+  - `Normalize`
+  - `Pow`
+  - `QuantizeToF16`
+  - `Radians`
+  - `Reflect`
+  - `Refract`
+  - `ReverseBits`
+  - `Round`
+  - `Saturate`
+  - `Sign`
+  - `Sin`
+  - `Sinh`
+  - `Smoothstep`
+  - `Sqrt`
+  - `Step`
+  - `Tan`
+  - `Tanh`
+  - `Transpose`
+  - `Trunc`
+  - `Dpdx`
+  - `DpdxCoarse`
+  - `DpdxFine`
+  - `Dpdy`
+  - `DpdyCoarse`
+  - `DpdyFine`
+  - `Fwidth`
+  - `FwidthCoarse`
+  - `FwidthFine`
+  - `TextureDimensions`
+  - `TextureGather`
+  - `TextureGatherCompare`
+  - `TextureLoad`
+  - `TextureNumLayers`
+  - `TextureNumLevels`
+  - `TextureNumSamples`
+  - `TextureSample`
+  - `TextureSampleBias`
+  - `TextureSampleCompare`
+  - `TextureSampleCompareLevel`
+  - `TextureSampleGrad`
+  - `TextureSampleLevel`
+  - `TextureSampleBaseClampToEdge`
+  - `TextureStore`
+  - `AtomicLoad`
+  - `AtomicStore`
+  - `AtomicAdd`
+  - `AtomicSub`
+  - `AtomicMax`
+  - `AtomicMin`
+  - `AtomicAnd`
+  - `AtomicOr`
+  - `AtomicXor`
+  - `AtomicExchange`
+  - `AtomicCompareExchangeWeak`
+  - `AtomicStoreMin`
+  - `AtomicStoreMax`
+  - `Pack4x8snorm`
+  - `Pack4x8unorm`
+  - `Pack4xI8`
+  - `Pack4xU8`
+  - `Pack4xI8Clamp`
+  - `Pack4xU8Clamp`
+  - `Pack2x16snorm`
+  - `Pack2x16unorm`
+  - `Pack2x16float`
+  - `Unpack4x8snorm`
+  - `Unpack4x8unorm`
+  - `Unpack4xI8`
+  - `Unpack4xU8`
+  - `Unpack2x16snorm`
+  - `Unpack2x16unorm`
+  - `Unpack2x16float`
+  - `StorageBarrier`
+  - `TextureBarrier`
+  - `WorkgroupBarrier`
+  - `WorkgroupUniformLoad`
+
+- **`enum ExprKind`**
+  expression nodes (see the module comment for the conventions)
+  - `Const(Value)`
+  - `Override(u32)`
+  - `Global(u32)`
+  - `Local(u32)`
+  - `Param(u32)`
+  - `Load(ExprId)`
+  - `AddrOf(ExprId)`
+  - `Deref(ExprId)`
+  - `Index(ExprId, ExprId)`
+  - `Member(ExprId, u32)` -- struct member or vector component (constant index)
+  - `Swizzle(ExprId, [u8; 4], u8)` -- base, components, count (2..4)
+  - `Unary(UnaryOp, ExprId)`
+  - `Binary(BinOp, ExprId, ExprId)`
+  - `Construct(Vec<ExprId>)`
+  - `Splat(ExprId)`
+  - `Convert(ExprId)`
+  - `Bitcast(ExprId)`
+  - `Call(u32, Vec<ExprId>)` -- Module::functions index, arguments
+  - `Builtin(Builtin, Vec<ExprId>)`
+
+- **`struct Expr`**
+  an expression node with its concrete type and source range
+  - `kind: ExprKind`
+  - `ty: TypeId`
+  - `span: Span`
+
+- **`struct Case`**
+  a switch clause
+  - `selectors: Vec<i64>` -- the selector values (i32 or u32, as i64)
+  - `default: bool`
+  - `body: Vec<Stmt>`
+
+- **`enum Stmt`**
+  statements (for and while are desugared to Loop)
+  - `Block(Vec<Stmt>)`
+  - `Var { local: u32, init: Option<ExprId> }`
+  - `Let { local: u32, init: ExprId }`
+  - `Assign { lhs: ExprId, rhs: ExprId }`
+  - `Compound { lhs: ExprId, op: BinOp, rhs: ExprId }`
+  - `Phony(ExprId)` -- `_ = e`: evaluate and drop
+  - `Call(ExprId)` -- a call whose result (if any) is dropped
+  - `If { cond: ExprId, then: Vec<Stmt>, else_: Vec<Stmt> }`
+  - `Switch { selector: ExprId, cases: Vec<Case> }`
+  - `Loop { body: Vec<Stmt>, continuing: Vec<Stmt>, break_if: Option<ExprId> }`
+  - `Break`
+  - `Continue`
+  - `Return(Option<ExprId>)`
+  - `Discard`
+
+- **`enum LocalKind`**
+  what a local is
+  - `Var` -- a function-scope variable: Local(i) is a reference to ty
+  - `Let` -- a let: Local(i) is the value (ty may be a pointer, texture or sampler)
+
+- **`struct Local`**
+  a function-scope var or let
+  - `name: String`
+  - `ty: TypeId`
+  - `kind: LocalKind`
+  - `span: Span`
+
+- **`struct Param`**
+  a function parameter (io: the IO attributes of an entry point parameter)
+  - `name: String`
+  - `ty: TypeId`
+  - `io: Io`
+  - `span: Span`
+
+- **`enum Stage`**
+  shader stages
+  - `Vertex`
+  - `Fragment`
+  - `Compute`
+
+**`impl Stage`**
+
+- **`fn name(self) -> &'static str`**
+  the WGSL spelling
+
+- **`struct Function`**
+  a checked function
+  - `name: String`
+  - `params: Vec<Param>`
+  - `ret: Option<TypeId>`
+  - `ret_io: Io`
+  - `stage: Option<Stage>`
+  - `must_use: bool`
+  - `locals: Vec<Local>`
+  - `exprs: Vec<Expr>`
+  - `body: Vec<Stmt>`
+  - `calls: Vec<u32>` -- the functions called directly
+  - `globals: Vec<u32>` -- module-scope variables and overrides used, including by callees (ascending)
+  - `overrides: Vec<u32>`
+  - `uses_discard: bool` -- discard reachable from here (callees included)
+  - `span: Span`
+
+- **`struct Binding`**
+  @group / @binding of a resource
+  - `group: u32`
+  - `binding: u32`
+
+- **`struct Global`**
+  a module-scope variable
+  - `name: String`
+  - `space: AddressSpace`
+  - `access: Access`
+  - `ty: TypeId` -- the store type
+  - `binding: Option<Binding>`
+  - `init: Option<ExprId>` -- Module::exprs (private variables: a Const or an override-expression)
+  - `std140: bool` -- uniform buffers: the type also satisfies the strict uniform layout rules (16-byte
+    array strides and struct alignment, std140-compatible); always true elsewhere
+  - `span: Span`
+
+- **`struct Override`**
+  a pipeline-overridable constant
+  - `name: String`
+  - `id: Option<u16>` -- @id(n)
+  - `ty: TypeId` -- a concrete scalar type
+  - `init: Option<ExprId>` -- the default (Module::exprs)
+  - `span: Span`
+
+- **`struct Const`**
+  a module-scope const (folded; kept for tools, the IR never refers to it)
+  - `name: String`
+  - `ty: TypeId`
+  - `value: Value`
+  - `span: Span`
+
+- **`enum WgSize`**
+  one workgroup_size dimension
+  - `Const(u32)`
+  - `Override(ExprId)` -- an override-expression in Module::exprs
+
+- **`enum IoKind`**
+  how a stage input / output is bound
+  - `Builtin(BuiltinValue)`
+  - `Location { location: u32, blend_src: Option<u32>, interp: Option<(InterpType, InterpSampling)> }` -- location, blend_src, interpolation with the defaults applied (None for integer
+    vertex inputs and fragment outputs, where it does not apply)
+
+- **`struct IoVar`**
+  one shader stage input or output
+  - `name: String` -- "param" or "param.member" (outputs: "return" or "return.member")
+  - `ty: TypeId`
+  - `param: Option<u32>` -- the parameter (inputs; None for outputs)
+  - `member: Option<u32>` -- the struct member when the parameter / return type is a struct
+  - `kind: IoKind`
+  - `invariant: bool`
+  - `depth_mode: Option<DepthMode>`
+
+- **`struct EntryPoint`**
+  an entry point and its interface
+  - `name: String`
+  - `func: u32` -- Module::functions index
+  - `stage: Stage`
+  - `workgroup_size: Option<[WgSize; 3]>` -- compute only
+  - `inputs: Vec<IoVar>`
+  - `outputs: Vec<IoVar>`
+  - `globals: Vec<u32>` -- every module-scope variable statically accessed (ascending)
+  - `resources: Vec<(u32, Binding)>` -- the resource variables among them with their (group, binding)
+  - `overrides: Vec<u32>` -- the overrides statically accessed (also through initializers, array sizes and the
+    workgroup size)
+  - `immediate: Option<u32>` -- the immediate data variable, if one is used
+
+- **`enum Severity`**
+  diagnostic filter severities
+  - `Error`
+  - `Warning`
+  - `Info`
+  - `Off`
+
+- **`struct DiagnosticFilter`**
+  a diagnostic filter: the affected range (the whole module for global ones)
+  - `severity: Severity`
+  - `rule: String` -- "derivative_uniformity", "a.b"
+  - `range: Span`
+  - `global: bool`
+
+- **`struct Module`**
+  the checked module
+  - `types: Vec<Type>`
+  - `structs: Vec<Struct>`
+  - `globals: Vec<Global>`
+  - `overrides: Vec<Override>`
+  - `consts: Vec<Const>`
+  - `functions: Vec<Function>`
+  - `entry_points: Vec<EntryPoint>`
+  - `exprs: Vec<Expr>` -- module-scope expressions (override-expressions and folded initializers)
+  - `enables: u32` -- feature::\* bits enabled with `enable` and named in `requires`
+  - `requires: u32`
+  - `diagnostic_filters: Vec<DiagnosticFilter>`
+  - `warnings: Vec<Diagnostic>`
+
+**`impl Module`**
+
+- **`fn ty(&self, t: TypeId) -> &Type`**
+  the type of a TypeId
+- **`fn type_name(&self, t: TypeId) -> String`**
+  the WGSL spelling of a type ("vec3&lt;f32>", "ptr&lt;storage, S, read>")
+- **`fn function(&self, name: &str) -> Option<&Function>`**
+  a function by name
+- **`fn entry_point(&self, name: &str) -> Option<&EntryPoint>`**
+  an entry point by name
+- **`fn global(&self, name: &str) -> Option<&Global>`**
+  a module-scope variable by name
+- **`fn struct_named(&self, name: &str) -> Option<&Struct>`**
+  a structure by name
+
+- **`fn type_name(types: &[Type], structs: &[Struct], t: TypeId) -> String`**
+  see Module::type_name
+
+### `wgsl/lex.rs`
+
+Source: [`lib/wgsl/lex.rs`](../lib/wgsl/lex.rs)
+
+```text
+lex -- the tokens of WGSL (spec section 3) and template list discovery (3.9)
+
+  tokens(src) -> (Vec<Token>, Vec<Diagnostic>)   every token (no blankspace, no comments),
+                                    ending with Eof; never fails: a bad character, an
+                                    unterminated comment, a reserved word or a malformed
+                                    number becomes an Error token (or a Reserved one) plus
+                                    a diagnostic
+  discover_templates(src)           the byte offsets of every '<' that starts and every '>'
+                                    that ends a template list (the spec's algorithm, code
+                                    point by code point); tokens() turns them into
+                                    TemplateStart / TemplateEnd
+  int_value(text) / float_value(text)   decode a literal token (range rules of 3.5.2)
+  round_bits(m, e, sticky, fmt)     m * 2^e rounded to f16 / f32 / f64 (nearest even)
+
+Blankspace is Pattern_White_Space (space, tab, LF, VT, FF, CR, NEL, LRM, RLM, LS, PS);
+block comments nest; identifiers are XID_Start (or _) + XID_Continue (xid.rs); `_` alone
+is the Underscore token, `__x` is an error.  Punctuation is matched longest first except
+where discovery found a template delimiter.  Splitting `--` / `&&` where the grammar wants
+two tokens (`a--b` is `a - -b`) is the parser's job.
+```
+
+- **`enum Tok`**
+  token kinds: identifiers, literals, keywords, syntactic tokens, template delimiters
+  - `Ident`
+  - `Int`
+  - `Float`
+  - `Reserved` -- a reserved word (reported; the parser takes it as an identifier)
+  - `Error`
+  - `Eof`
+  - `Alias`
+  - `Break`
+  - `Case`
+  - `Const`
+  - `ConstAssert`
+  - `Continue`
+  - `Continuing`
+  - `Default`
+  - `Diagnostic`
+  - `Discard`
+  - `Else`
+  - `Enable`
+  - `False`
+  - `Fn`
+  - `For`
+  - `If`
+  - `Let`
+  - `Loop`
+  - `Override`
+  - `Requires`
+  - `Return`
+  - `Struct`
+  - `Switch`
+  - `True`
+  - `Var`
+  - `While`
+  - `And`
+  - `AndAnd`
+  - `Arrow`
+  - `At`
+  - `Slash`
+  - `Bang`
+  - `LBracket`
+  - `RBracket`
+  - `LBrace`
+  - `RBrace`
+  - `Colon`
+  - `Comma`
+  - `Eq`
+  - `EqEq`
+  - `NotEq`
+  - `Gt`
+  - `Ge`
+  - `Shr`
+  - `Lt`
+  - `Le`
+  - `Shl`
+  - `Percent`
+  - `Minus`
+  - `MinusMinus`
+  - `Dot`
+  - `Plus`
+  - `PlusPlus`
+  - `Or`
+  - `OrOr`
+  - `LParen`
+  - `RParen`
+  - `Semi`
+  - `Star`
+  - `Tilde`
+  - `Underscore`
+  - `Xor`
+  - `PlusEq`
+  - `MinusEq`
+  - `StarEq`
+  - `SlashEq`
+  - `PercentEq`
+  - `AndEq`
+  - `OrEq`
+  - `XorEq`
+  - `ShrEq`
+  - `ShlEq`
+  - `TemplateStart`
+  - `TemplateEnd`
+
+```rust
+/// the keywords of spec section 16.1
+KEYWORDS: [(&str, Tok); 26] = [ ("alias", Tok::Alias), ("break", Tok::Break), ("case", ...
+/// the reserved words of spec section 16.2, sorted
+RESERVED: &[&str] = &[ "NULL", "Self", "abstract", "active", "alignas", "alig ...
+```
+
+**`impl Tok`**
+
+- **`fn text(self) -> &'static str`**
+  the spelling for messages ("`;`", "Bezeichner")
+- **`fn is_keyword(self) -> bool`**
+  one of KEYWORDS
+
+- **`struct Token`**
+  a token: kind and byte range
+  - `kind: Tok`
+  - `start: u32`
+  - `end: u32`
+
+- **`fn is_blank(c: char) -> bool`**
+  Pattern_White_Space
+
+- **`fn scan_number(src: &str, i: usize) -> Option<(usize, bool)>`**
+  the end of the numeric literal starting at i (longest match of the literal regexes), and
+  whether it is a float; None when no literal starts here
+
+- **`fn scan_ident(src: &str, i: usize) -> Option<usize>`**
+  the end of an ident_pattern_token at i (also `_` alone)
+
+- **`fn discover_templates(src: &str) -> (Vec<u32>, Vec<u32>)`**
+  the template list delimiters (spec 3.9): (starts, ends), ascending byte offsets
+
+- **`fn word_kind(w: &str) -> Tok`**
+  a keyword, a reserved word or an identifier
+
+- **`fn tokens(src: &str) -> (Vec<Token>, Vec<Diagnostic>)`**
+  see the module comment
+
+- **`enum Suffix`**
+  the suffix of a numeric literal
+  - `None`
+  - `I`
+  - `U`
+  - `F`
+  - `H`
+
+- **`fn int_value(text: &str) -> Result<(i64, Suffix), String>`**
+  an integer literal's value and suffix; Err: a German message (out of range)
+
+- **`enum Fmt`**
+  the format a float literal is rounded to
+  - `F16`
+  - `F32`
+  - `F64`
+
+- **`fn round_bits(m: u128, e: i64, sticky: bool, fmt: Fmt) -> Option<(f64, bool)>`**
+  m \* 2^e (plus a sticky bit for nonzero digits beyond m) rounded to nearest even in fmt:
+  Some((value, exact)), None on overflow; the value is returned as f64 (exact for every fmt)
+
+- **`fn f64_parts(x: f64) -> (u128, i64, bool)`**
+  decompose a finite f64 into (mantissa, exponent) with x = m \* 2^e
+
+- **`fn round_f64(x: f64, fmt: Fmt) -> Option<f64>`**
+  round a finite f64 to f16 / f32 (nearest even): None on overflow
+
+- **`fn float_value(text: &str) -> Result<(f64, Suffix), String>`**
+  a float literal's value (in f64; exact for the suffix's type) and suffix; Err: a German
+  message (overflow, an inexact hexadecimal f / h literal)
+
+### `wgsl/parse.rs`
+
+Source: [`lib/wgsl/parse.rs`](../lib/wgsl/parse.rs)
+
+```text
+parse -- the WGSL parser: recursive descent over the tokens of lex.rs (the grammar of spec
+section 18), with error recovery
+
+  parse(src) -> (Ast, Vec<Diagnostic>)   the tree of everything that parsed and the errors
+                                         of lexer and parser (the first error of a
+                                         statement or declaration; at most MAX_ERRORS)
+  Expressions follow the grammar exactly, including what it forbids: `&`, `|` and `^` take
+  unary operands and do not mix with each other or with other operators; a shift takes
+  unary operands; comparisons do not chain; `&&` and `||` do not mix.  Each of these gets
+  its own message ("`&` und `|` dürfen nicht ohne Klammern gemischt werden").
+  Tokens are split where the grammar needs the shorter one: `a--b` is `a - (-b)`, `&&x` is
+  `&(&x)` (spec 3.1: the longest token valid in the parser state).
+  Recovery: an error ends the statement; the parser skips to the next `;` or `}` of the
+  same brace level (inside a function) or to the next declaration keyword at brace level 0.
+  Stack: nesting deeper than MAX_DEPTH (blocks, statements, parentheses, template lists,
+  unary operators, and the links of operator, postfix and else-if chains -- every later
+  pass recurses over them) is an error, never a stack overflow.
+```
+
+```rust
+/// nesting limit (see the module comment)
+MAX_DEPTH: u32 = 128
+/// braces inside a function (the function body counts; WGSL guarantees 127)
+MAX_BRACES: u32 = 127
+/// the height of an expression tree (operator chains included)
+MAX_EXPR_DEPTH: u32 = 256
+/// the parser stops after this many errors
+MAX_ERRORS: usize = 25
+```
+
+- **`fn parse(src: &str) -> (Ast, Vec<Diagnostic>)`**
+  see the module comment
+
+### `wgsl/print.rs`
+
+Source: [`lib/wgsl/print.rs`](../lib/wgsl/print.rs)
+
+```text
+print -- the AST as WGSL text: four-space indentation, one statement per line, literals as
+written, parentheses exactly where the tree has Paren nodes (so parse(print(ast)) gives
+the same tree, spans aside; comments are not kept)
+
+  print(&ast) -> String
+```
+
+- **`fn print(ast: &Ast) -> String`**
+  see the module comment
+
+### `wgsl/xid.rs`
+
+Source: [`lib/wgsl/xid.rs`](../lib/wgsl/xid.rs)
+
+```text
+xid -- XID_Start / XID_Continue for WGSL identifiers (UAX #31), generated by
+tools/gen_xid.py from Python's Unicode 15.1.0 database; do not edit
+
+  class(c) -> 0 (no identifier character), 1 (XID_Continue only), 2 (XID_Start)
+```
+
+```rust
+/// the Unicode version of the table
+UNICODE_VERSION: &str = "15.1.0"
+```
+
+- **`fn class(c: char) -> u8`**
+  the identifier class of a character (see the module comment)
+
+- **`fn is_start(c: char) -> bool`**
+  XID_Start
+
+- **`fn is_continue(c: char) -> bool`**
+  XID_Continue
 
 ## plat
 
