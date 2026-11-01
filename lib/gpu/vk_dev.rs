@@ -30,7 +30,8 @@
 // (SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
 // submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 // latest submit and is destroyed once that value is reached -- earlier if no submit is
-// pending.  Command buffers come from slots (a transient command pool with one buffer each),
+// pending; while the upload command buffer is open (it may name the resource) with the value
+// of the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
 // reused once their submission completed.  Uploads: the data goes into the staging ring, the
 // copies into one upload command buffer that ends with a global barrier (copy writes -> every
 // later access) and is put before the caller's command buffers in the next vkQueueSubmit.
@@ -488,10 +489,11 @@ impl Shared {
         v
     }
 
-    /// destroy g once the GPU has finished every submission made so far
+    /// destroy g once the GPU has finished every submission made so far, and the open upload
+    /// buffer, whose copies may name g (a texture written and dropped before the next submit)
     pub fn defer(&self, g: Garbage) {
         let mut st = self.st.lock();
-        let v = self.submitted();
+        let v = self.submitted() + st.upload.is_some() as u64;
         if v <= self.completed.load(Ordering::Acquire) || self.lost.load(Ordering::Relaxed) {
             self.destroy(&mut st, g);
         } else {

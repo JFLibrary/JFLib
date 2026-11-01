@@ -114,6 +114,8 @@ fn rects(t: &mut T, g: &Gpu) -> Option<()> {
     let mut one = alloc::vec![0u8; stride as usize * 2];
     one[..4].copy_from_slice(&[9, 8, 7, 255]);
     t.res(q.write_texture_rects_at(&small, &[[0, 0, 5, 100]], (0, 0), &one, stride, Layout::Sampled, Layout::Sampled), "a short image")?;
+    // `small` goes now, its copy still in the open upload buffer: it stays until that has run
+    // (validate.uis: destroyed at once, the buffer would be invalid)
     Some(())
 }
 

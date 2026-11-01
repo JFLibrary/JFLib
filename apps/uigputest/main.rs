@@ -1252,16 +1252,19 @@ impl Test {
                     let r = self.sc.imgs[0].2;
                     let sf = self.sc.imgs[0].0.clone();
                     let (x, y) = (r[0] + 200, r[1] + 200);
-                    let read = |ui: &Ui| {
+                    let read_at = |ui: &Ui, x: i32, y: i32| {
                         let fb = ui.fb();
                         let o = y as usize * fb.stride as usize + x as usize * 4;
                         u32::from_le_bytes([fb.px[o], fb.px[o + 1], fb.px[o + 2], fb.px[o + 3]]) & 0xFF_FFFF
                     };
+                    let read = |ui: &Ui| read_at(ui, x, y);
                     let want = Test::image_px(&sf, r, x, y);
-                    let before = read(ui);
+                    // many points: the pattern is blocky, one of them can match an older position
+                    let pts: Vec<(i32, i32)> = (0..64).map(|k| (x + (k % 8) * 11, y + (k / 8) * 13)).collect();
+                    let lacking = pts.iter().filter(|&&(px, py)| read_at(ui, px, py) != Test::image_px(&sf, r, px, py)).count();
                     ui.gpu_settle();
                     let after = read(ui);
-                    self.ok(before != want, &format!("the CPU drew nothing of it: the framebuffer holds {before:06x} at {x}, {y}, the image {want:06x}"));
+                    self.ok(lacking > 0, &format!("the CPU drew nothing of it: the framebuffer differs from the image in {lacking} of {} points", pts.len()));
                     self.ok(after == want, &format!("settled: {after:06x}"));
                     // on the screen it is the image's pixel
                     if let Some(w) = plat::win_get_rect(0) {
