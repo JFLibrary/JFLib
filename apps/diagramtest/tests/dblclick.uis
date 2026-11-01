@@ -1,0 +1,96 @@
+#!args --verify-dirty
+# a double click (ui/diagram.rs): on the background DEv::DoubleClick with the world point of the
+# second press, no marquee after it; a press that became a drag is no first click, so a marquee
+# followed by a click is none; too slow or too far is none, with Shift or Ctrl none, with another
+# tool none; on a node it stays Activate.  The status line shows the last event.
+theme light
+expect text:"Ereignis: –" exists
+# the first press is nothing yet, the second one reports
+click 60,700
+expect text:"Ereignis: –" exists
+wait 600
+dblclick 60,700
+expect text:"Ereignis: Doppelklick: 7,609" exists
+wait 600
+# a marquee, then a click at its start: no double click
+drag 40,690 90,720
+expect text:"Ereignis: Doppelklick: 7,609" exists
+click 40,690
+expect text:"Ereignis: Doppelklick: 7,609" exists
+# ... and the click after it makes one
+click 40,690
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+# a key between the clicks: two clicks of their own
+click 200,700
+key ctrl+a
+expect text:"Auswahl: 51" exists
+click 200,700
+expect text:"Auswahl: 0" exists
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+# too slow, too far
+click 60,700
+wait 600
+click 60,700
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+click 60,700
+click 200,700
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+# Shift and Ctrl keep their meaning
+dblclick 60,700 shift
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+dblclick 60,700 ctrl
+expect text:"Ereignis: Doppelklick: -13,599" exists
+wait 600
+# the second press starts no marquee: a drag from it over N13 selects nothing
+click 40,300
+down 40,300
+move 160,340
+move 210,420
+up
+expect text:"Auswahl: 0" exists
+expect text:"Ereignis: Doppelklick: -13,209" exists
+wait 600
+# a node's click selects, the background's clears
+click listitem:"N1"
+expect text:"Auswahl: 1" exists
+wait 600
+click 60,700
+expect text:"Auswahl: 0" exists
+wait 600
+# on a node it stays Activate
+dblclick listitem:"N1"
+expect text:"Ereignis: Aktiviert: N1" exists
+expect listitem:"N1" selected
+wait 600
+# on an edge as well
+dblclick 215,164
+expect text:"Ereignis: Aktiviert: E1" exists
+wait 600
+key esc
+# after it a press on the background needs a new first click
+click 60,700
+expect text:"Ereignis: Aktiviert: E1" exists
+wait 600
+# Hand and Verbinden do nothing new, Platzieren places twice
+click button:"Hand"
+dblclick 60,700
+expect text:"Ereignis: Aktiviert: E1" exists
+wait 600
+click button:"Verbinden"
+dblclick 60,700
+expect text:"Ereignis: Aktiviert: E1" exists
+wait 600
+click button:"Platzieren"
+dblclick 60,700
+expect text:"Knoten: 32" exists
+expect text:"Ereignis: Platziert: N32" exists
+click button:"Auswahl"
+wait 600
+dblclick 400,700
+expect text:"Ereignis: Doppelklick: 347,609" exists
+expect_nowarn

@@ -3053,6 +3053,16 @@ for ev in evs {
   (`DEv::Click` at a snapped point). Middle drag, Space + drag and the wheel pan, Ctrl + wheel
   zooms at the pointer; arrows nudge, Del, Ctrl+A, Esc, Tab, Enter, Ctrl + plus / minus / 0
   work while the canvas has the focus.
+* A double click on a node, port or edge is `DEv::Activate`, one on the background with
+  `DG_SELECT` (no Shift, no Ctrl) `DEv::DoubleClick { at }` with the world point of the second
+  press, not snapped: no marquee and no second `Click` follow it, and a press that became a drag
+  (a marquee) or a key between the clicks makes none. The time is the theme's
+  `double_click_ms`. `DN_HITMIN` gives a small node, a line of text say, a hit box of at least
+  16 x 16 DIP around it, so it stays selectable at low zoom. To type right on the canvas, place a `ui.textbox_presented` over it
+  with `ui.next_rect_px` (in a mirrored window its logical x is `ui.rtl_map(x + w - 1, r[0], r[2])`,
+  the canvas is not mirrored) and give the keyboard back with `ui.focus_quiet(id)` after a pointer
+  gesture: it is
+  `ui.focus` without the focus ring. JFNetworker's labels do this (`canvas/labels.rs`).
 * Painting: the `DgPaint` runs at render time with a `DgFrame` (`vp`: world <-> px, `clip`: the
   world part to paint, `geo.routes`: the polyline of every edge, the theme's colours and fonts,
   `moving`). Cull with `f.visible(rect)` / `f.route_visible(route,

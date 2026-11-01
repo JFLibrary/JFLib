@@ -11,6 +11,7 @@
 // which also bumps the model version).  Painter draws edges and boxes at render time;
 // selection, ports, handles and the rest come from the widget.
 // Commands for scripts: `cmd 900 F` sets DiagramState::test_keys (1 Space held, 2 Ctrl held).
+// A double click on the background shows its world point in the status line (tests/dblclick.uis).
 //
 // --frames adds a group and an area (the frames of G1, tests/frames.uis): the frame "G1" around
 // N8, N9, N14 and N15 (DN_FRAME | DN_TOGGLE | DN_STEP, key 500: hit on its title bar and border,
@@ -517,6 +518,7 @@ impl DiagramTest {
                     self.last = format!("Platziert: {}", sc.label(k));
                 }
             }
+            DEv::DoubleClick { at } => self.last = format!("Doppelklick: {},{}", rnd(at[0] as f64), rnd(at[1] as f64)),
             DEv::Activate(h) => {
                 // a cluster opens again
                 let mut sc = self.sc.borrow_mut();

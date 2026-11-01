@@ -71,6 +71,7 @@ pub use diagram::{
     DPT_USED, DR_BEZIER, DR_ORTHO, DR_STRAIGHT,
 };
 pub use diagram::{dg_toggle_rect, DN_FRAME, DN_OUTLINE, DN_RESIZE, DN_STEP, DN_TOGGLE}; // frames, groups, a backdrop (G1)
+pub use diagram::DN_HITMIN; // a small text stays selectable at low zoom
 mod dirty;
 mod dnd;
 // (ROADMAP §6) the editors with a text model of their own: the shared core, rich text, code
