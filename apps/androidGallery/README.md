@@ -363,7 +363,10 @@ python apps/androidGallery/tests/android_sensors.py --serial SERIAL [--apk build
   Sensorwerte des Emulators. Das Telefon muss entsperrt sein.
 
 Am 01.11.2026: auf einem x86_64-Emulator mit Android 15 / API 35 54 Prüfungen, Browser 104 Prüfungen
-in Chromium und Firefox. Auf einem echten Telefon lief das Skript noch nicht.
+in Chromium und Firefox. Auf einem Samsung SM-A566B mit Android 16: `android_sensors.py` 48 Prüfungen,
+`android_system.py` 37 Prüfungen. Das Telefon lag dabei still, und die Position kam vom Netz: Dass
+Lage und Kompass einer Bewegung folgen und ein Fix vom GPS sind dort noch nicht geprüft (das Skript
+meldet beides am Ende).
 
 Offen: Im Browser auf dem Telefon rollt der Finger die Seite noch nicht und langes Drücken ist keine
 rechte Taste (der Android-Host macht beides selbst); Hinweise (Tooltips) gibt es nur mit Maus oder

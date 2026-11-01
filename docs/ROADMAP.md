@@ -1831,8 +1831,11 @@ Fensterrand hinaus.
     `web/sensors.js`, Skriptbefehle `sensor` und `location`.
   - Geprüft mit `tests/pages.uis`, `level.uis`, `attitude.uis`, `compass.uis`, `gps.uis` (Windows,
     Linux), `tests/sensors_web.mjs` (Chromium, Firefox), `tests/android_sensors.py` (Emulator
-    API 35). Es fehlen: der Lauf auf einem echten Telefon (das Skript ist dafür gebaut), Wischen
-    und langes Drücken im Browser auf dem Telefon (dort rollt der Finger die Seite noch nicht),
+    API 35; am 2026-11-01 auch auf einem Samsung SM-A566B mit Android 16, dort auch
+    `android_system.py`, beide grün). Das Telefon lag dabei still: Dass Lage und Kompass einer
+    Bewegung folgen, und ein Fix vom GPS statt vom Netz, stehen dort noch aus (das Skript meldet
+    beides). Es fehlen: Wischen und langes Drücken im Browser auf dem Telefon (dort rollt der
+    Finger die Seite noch nicht),
     Hinweise (Tooltips) mit dem Finger, größere Menüzeilen in den Menüs der Menüleiste.
 - **P2** · *fehlt* · Safari / iOS im Web-Testplan.
 
