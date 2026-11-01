@@ -387,7 +387,7 @@ python apps/androidGallery/tests/android_touch.py --serial SERIAL
 ```
 
 `tests/android_touch.py` arbeitet mit `input motionevent` und `input swipe` und liest die Lage aus
-`uiautomator dump`; es ändert nur den Zustand der App (32 Prüfungen auf dem Emulator und auf dem
+`uiautomator dump`; es ändert nur den Zustand der App (35 Prüfungen auf dem Emulator und auf dem
 SM-A566B am 01.11.2026). Eine Debug-APK mit dem Extra `jfgui_PERF` (`am start ... --es jfgui_PERF 1`)
 schreibt alle 120 geänderten Bilder die Zeiten von `nativeRender` ins Logcat (Tag `jfgui-perf`).
 
@@ -400,13 +400,14 @@ Entwicklungsbau (ein Release-Bau ist kaum schneller, die Zeit liegt in `gfx` und
 | Bilder | 499 | 1274 |
 | ruckelnd (`dumpsys gfxinfo`) | 58 % | 6 % |
 | Bildzeit Median / 95 % | 24 / 36 ms | 11 / 14 ms |
-| verpasste Vsyncs | 159 | 0 |
+| verpasste Vsyncs | 159 | 0 bis 1 |
 | `nativeRender` Median / 95 % | 12 / 16 ms | 5,7 / 8 ms |
 | Abstand der Bilder (Median) | 16,6 ms | 8,3 ms |
 
 `nativeRender` nachher: etwa 1,9 ms bringen die Bilder durch den Speicher (`jfgui_present_us`), der
 Rest ist Aufbau und Zeichnen ohne SIMD (auf ARM rechnet `lib/simd` skalar). Die Seite „Werte &
-Farben“ mit ihren Verläufen bleibt bei 7 ms und verfehlt manchmal einen Vsync.
+Farben“ mit ihren Verläufen bleibt bei 7 ms und verfehlt manchmal einen Vsync (23 % ruckelnd, 12 ms im
+Median).
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

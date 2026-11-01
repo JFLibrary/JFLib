@@ -1848,7 +1848,7 @@ Fensterrand hinaus.
     an der Titelleiste in alle Richtungen, nicht aus der Reichweite, breitere Griffe.
   - Bilder im Takt des Displays, solange ein Finger liegt oder etwas rollt; beim Finger immer
     Scroll-Kopien, auch für flache Zellen. SM-A566B, 120 Hz, Startseite: `dumpsys gfxinfo` Median
-    von 24 auf 11 ms, verpasste Vsyncs von 159 auf 0, `nativeRender` von etwa 12 auf etwa 6 ms.
+    von 24 auf 11 ms, verpasste Vsyncs von 159 auf 0 bis 1, `nativeRender` von etwa 12 auf etwa 6 ms.
   - Skriptbefehle `tap`, `longpress`, `swipe`, `flick`, `finger`; geprüft mit `touch.uis` (mehrere
     Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
   - Offen: NEON für `lib/simd` (auf ARM rechnet der Rasterer skalar, dort liegt ein großer Teil der
