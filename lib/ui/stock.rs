@@ -15,7 +15,7 @@ use alloc::string::String;
 use crate::consts::*;
 use crate::keys::*;
 use crate::theme::color_mix;
-use crate::{Sp, StyleData, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DTB_ICONS};
+use crate::{Sp, StyleData, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_TAB_HOLD, DTB_ICONS};
 
 /// the stock data-view and shell painters (Style::data / Style::shell default)
 pub struct Stock;
@@ -622,7 +622,8 @@ pub(crate) fn dock_tab(ui: &mut Ui, sp: &Sp) {
     let r = sp.rect();
     let m = ui.dp(2);
     let (x, y, w, h) = (r[0] + m, r[1] + ui.dp(4), r[2] - m * 2, r[3] - ui.dp(8));
-    let bg = if sp.ev & EV_HELD != 0 {
+    let hold = sp.flags & DOCK_TAB_HOLD != 0;
+    let bg = if hold || sp.ev & EV_HELD != 0 {
         ui.color(T_SUBTLE_PRESSED)
     } else if sp.ev & EV_HOVER != 0 {
         ui.color(T_SUBTLE_HOVER)
@@ -630,6 +631,11 @@ pub(crate) fn dock_tab(ui: &mut Ui, sp: &Sp) {
         0
     };
     fill(ui, x, y, w, h, ui.dp(4), bg);
+    if hold {
+        // held long enough to be dragged: a hairline of the accent around the pressed fill
+        let a = ui.color(T_ACCENT);
+        frame(ui, x, y, w, h, ui.dp(4), ui.hair(), a);
+    }
     let sel = sp.value != 0;
     let fg = ui.color(if sel { T_TEXT } else { T_TEXT2 });
     let mut tx = r[0] + ui.dp(10);

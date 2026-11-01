@@ -2,7 +2,7 @@
 # floating panels in tool windows and back (ui/dock.rs; windows 501 ..)
 theme light
 # dragged out of its group onto the document: a floating window, the tab under the pointer
-drag tab:"Eigenschaften" 460,200
+drag tab:"Eigenschaften" 460,200 hold 320
 expect window 501 open
 expect text:"L: [Dateien]+Gliederung | R: - | U: [Ausgabe], [Suche] | F: [Eigenschaften] | V: Verlauf" exists
 expect window 501 rect 392 156 280 480
@@ -18,7 +18,7 @@ click button:"Speichern"
 expect text:"float 0 300 100 280 480 1 0 13 13" exists
 # its tab dragged back onto the main window's right edge marker
 window any
-drag tab:"Eigenschaften" 930,312
+drag tab:"Eigenschaften" 930,312 hold 320
 window main
 expect window 501 closed
 expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
@@ -40,7 +40,7 @@ expect window 502 open
 expect text:"L: Dateien+[Gliederung] | R: - | U: [Ausgabe] | F: [Eigenschaften], [Suche] | V: Verlauf" exists
 # a floating tab dragged onto a group's marker in the main window becomes a tab there
 window any
-drag tab:"Suche" 613,492
+drag tab:"Suche" 613,492 hold 320
 window main
 expect window 502 closed
 expect text:"L: Dateien+[Gliederung] | R: - | U: Ausgabe+[Suche] | F: [Eigenschaften] | V: Verlauf" exists
@@ -55,7 +55,7 @@ window 501
 expect tab:"Eigenschaften" focused
 # a drag of the floating window's only tab elsewhere moves the window
 window any
-drag tab:"Eigenschaften" 600,150
+drag tab:"Eigenschaften" 600,150 hold 320
 expect window 501 open
 window main
 expect text:"F: [Eigenschaften]" missing

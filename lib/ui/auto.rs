@@ -11,7 +11,9 @@
 //   style NAME                    another style linked into the app (Ui::set_style)
 //   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
 //   rclick S        dblclick S [shift|ctrl|alt]...
-//                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
+//                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
+//                   drag ... hold MS   the button rests MS ms before the first move (like
+//                   `wait`: timers and animations run), the hold a dock tab asks for
 //                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
 //   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
 //                   following pointer events (touch: they are a finger, as in the next lines)
@@ -1392,8 +1394,9 @@ impl Ui {
             }
             q = r;
         }
-        // optional words: shift ctrl alt (held during the drag), right / middle (button)
+        // optional words: shift ctrl alt (held during the drag), right / middle (button), hold MS
         let mut btn = BTN_LEFT;
+        let mut hold = 0;
         let saved_mods = self.sc.script_mods;
         let mut mods = saved_mods;
         loop {
@@ -1417,6 +1420,10 @@ impl Ui {
                 p0 = a0;
                 p1 = a1;
                 after = r;
+            } else if let Some(r) = word_eq(w, "hold") {
+                let (ms, r) = parse_int(skip_ws(r));
+                hold = ms;
+                after = r;
             } else {
                 let mut d = b"unknown drag option ".to_vec();
                 d.extend_from_slice(w);
@@ -1434,6 +1441,7 @@ impl Ui {
         self.mouse_to(app, bx, by);
         let d = self.sc.sc_pdata;
         self.inject(app, plat::E_DOWN, btn, bx, by, d);
+        self.advance_time(app, hold);
         for i in 1..=steps {
             if pen_type != 0 {
                 // (PN1) P0 + (P1 - P0) * i / steps

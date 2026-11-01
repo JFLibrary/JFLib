@@ -248,7 +248,7 @@ pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{
     DockPanel, DockState, DOCK_BOTTOM, DOCK_CENTER, DOCK_FLOAT, DOCK_FLOAT_MAX, DOCK_LEFT, DOCK_MK_BOTTOM, DOCK_MK_CENTER, DOCK_MK_LEFT,
-    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT,
+    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT, DOCK_HOLD_MS, DOCK_TAB_HOLD,
 };
 // the taskbar button's progress and jump list tasks (ui.taskbar_progress / taskbar_tasks)
 pub use plat::taskbar::{JumpTask, TaskbarProgress};
