@@ -216,7 +216,7 @@ impl Draw for LevelDraw {
                 let room = rad - br;
                 // not beyond the wall
                 let n = s.x * s.x + s.y * s.y;
-                let f = if n > 1.0 { 1.0 / rt_sqrt(n) } else { 1.0 };
+                let f = if n > 1.0 { 1.0 / root(n) } else { 1.0 };
                 let (bx, by) = (cx + s.x * f * room, cy - s.y * f * room);
                 disc(g, bx, by, br, bubble);
                 ring(g, bx, by, br, t * 1.5, s.look.line());
@@ -226,7 +226,7 @@ impl Draw for LevelDraw {
 }
 
 // Newton's root: enough for a screen position
-fn rt_sqrt(n: f32) -> f32 {
+fn root(n: f32) -> f32 {
     let mut x = if n > 1.0 { n } else { 1.0 };
     for _ in 0..6 {
         x = 0.5 * (x + n / x);
@@ -586,7 +586,7 @@ impl Sensors {
             None => ui.text(TS_SUBTITLE, "Keine Richtung"),
         }
         // Android: 0 = "unreliable", the magnetometer asks for the figure eight
-        if ps::read(SENSOR_MAGNET).is_some_and(|r| r.accuracy == 0) && ps::read(SENSOR_ROTATION).is_none() {
+        if ps::read(SENSOR_MAGNET).is_some_and(|r| r.accuracy == 0) {
             ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Ungenau: das Telefon in einer Acht bewegen.");
         }
         self.rows(ui, mask_of(Page::Compass));

@@ -260,7 +260,8 @@ public final class GalleryActivity extends Activity {
             if (mode == 2) pointer(3, -10000, -10000);
             mode = 0; pointerId = -1;
         }
-        // a finger that stays: the right button (a context menu), nothing more of this touch
+        // a finger that stays: the right button (a context menu); if it then moves after all, an
+        // ordinary drag or scroll (a slider held for a moment)
         private final Runnable longPress = () -> {
             if (mode != 1) return;
             mode = 4;
@@ -290,7 +291,7 @@ public final class GalleryActivity extends Activity {
             }
             float x = event.getX(index), y = event.getY(index);
             if (action == MotionEvent.ACTION_MOVE) {
-                if (mode == 1 && Math.hypot(x - downX, y - downY) > slop) {
+                if ((mode == 1 || mode == 4) && Math.hypot(x - downX, y - downY) > slop) {
                     removeCallbacks(longPress);
                     mode = !grabs && Math.abs(y - downY) > Math.abs(x - downX) ? 3 : 2;
                     if (mode == 2) pointer(2, downX, downY);

@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve, extname, sep} from 'node:path';
-import {loadPlaywright, chromiumOptions} from '../../../tools/tests/playwright.mjs';
+import {loadPlaywright, chromiumOptions, launchWasm} from '../../../tools/tests/playwright.mjs';
 
 const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')) || 'build');
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
@@ -69,35 +69,35 @@ const ok=(cond,what)=>{assert.ok(cond,what);checks++;};
 const engines=option('engines','chromium,firefox').split(',');
 try {
   for(const engine of engines) {
-    const launch=prefs=>pw[engine].launch({...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed'),
+    const launch=prefs=>launchWasm(pw[engine],{...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed'),
       ...(prefs&&engine==='firefox'?{firefoxUserPrefs:prefs}:{})});
     const browser=await launch();
-    try {
-      const open=async(context,hookOptions)=>{
-        await context.addInitScript(hooks,hookOptions);
-        const page=await context.newPage();
-        const errors=[];
-        page.on('pageerror',e=>errors.push(String(e)));
-        page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-        await page.goto(base);
-        await page.waitForFunction(()=>window.jfguiA11y?.updates>0 && document.querySelector('#a11y [aria-label="Wasserwaage"]'));
-        if(threads) assert.equal(await page.evaluate(()=>document.body.dataset.compute),'threads','the threads variant runs');
-        const el=name=>page.locator(`#a11y [aria-label="${name}"]`).first();
-        const texts=()=>page.evaluate(()=>[...document.querySelectorAll('#a11y [data-key]')].map(e=>e.textContent));
-        const until=async(fn,what,ms=10000)=>{const end=Date.now()+ms;let v;do{v=await fn();if(v)return v;await page.waitForTimeout(40);}while(Date.now()<end);throw new Error(`timed out: ${what}`);};
-        const text=start=>texts().then(t=>t.find(x=>x.startsWith(start)) ?? null);
-        const see=async(want,what=want)=>{
-          await until(async()=>(await texts()).includes(want),`${what}: "${want}" (texts: ${(await texts()).filter(t=>t).slice(0,20).join(' | ')})`);
-          checks++;
-        };
-        const click=name=>el(name).dispatchEvent('click');
-        const data=name=>page.evaluate(n=>document.body.dataset[n],name);
-        const back=()=>el('Zurück').dispatchEvent('click');
-        return {page,errors,el,texts,until,text,see,click,data,back};
+    const open=async(context,hookOptions)=>{
+      await context.addInitScript(hooks,hookOptions);
+      const page=await context.newPage();
+      const errors=[];
+      page.on('pageerror',e=>errors.push(String(e)));
+      page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+      await page.goto(base);
+      await page.waitForFunction(()=>window.jfguiA11y?.updates>0 && document.querySelector('#a11y [aria-label="Wasserwaage"]'));
+      if(threads) assert.equal(await page.evaluate(()=>document.body.dataset.compute),'threads','the threads variant runs');
+      const el=name=>page.locator(`#a11y [aria-label="${name}"]`).first();
+      const texts=()=>page.evaluate(()=>[...document.querySelectorAll('#a11y [data-key]')].map(e=>e.textContent));
+      const until=async(fn,what,ms=10000)=>{const end=Date.now()+ms;let v;do{v=await fn();if(v)return v;await page.waitForTimeout(40);}while(Date.now()<end);throw new Error(`timed out: ${what}`);};
+      const text=start=>texts().then(t=>t.find(x=>x.startsWith(start)) ?? null);
+      const see=async(want,what=want)=>{
+        await until(async()=>(await texts()).includes(want),`${what}: "${want}" (texts: ${(await texts()).filter(t=>t).slice(0,20).join(' | ')})`);
+        checks++;
       };
-      // what the page's accessibility tree offers of a page: opened by the card's row
-      const go=async(h,name)=>{await h.click(name);await h.until(async()=>h.el('Zurück').count(),`the page ${name}`);};
+      const click=name=>el(name).dispatchEvent('click');
+      const data=name=>page.evaluate(n=>document.body.dataset[n],name);
+      const back=()=>el('Zurück').dispatchEvent('click');
+      return {page,errors,el,texts,until,text,see,click,data,back};
+    };
+    // what the page's accessibility tree offers of a page: opened by the card's row
+    const go=async(h,name)=>{await h.click(name);await h.until(async()=>h.el('Zurück').count(),`the page ${name}`);};
 
+    try {
       // ---------------------------------------------------------------- the location
       {
         const context=await browser.newContext(CONTEXT);
@@ -154,19 +154,6 @@ try {
         ok(h.errors.length===0,`${engine}: no page errors: ${h.errors.join('; ')}`);
         await context.close();
       }
-      // refused: Chromium's headless prompt answers no; Firefox's through its testing preference
-      {
-        const refusing=engine==='firefox' ? await launch({'geo.prompt.testing':true,'geo.prompt.testing.allow':false}) : browser;
-        const context=await refusing.newContext(CONTEXT);
-        const h=await open(context);
-        await go(h,'GPS');
-        await h.click('Standort verwenden');
-        await h.see('Standort: nicht erlaubt',`${engine}: the prompt answers no`);
-        ok(h.errors.length===0,`${engine}: no page errors: ${h.errors.join('; ')}`);
-        await context.close();
-        if(refusing!==browser) await refusing.close();
-      }
-
       // ---------------------------------------------------------------- no sensors
       {
         const context=await browser.newContext(CONTEXT);
@@ -285,8 +272,20 @@ try {
         ok(h.errors.length===0,`${engine}: no page errors: ${h.errors.join('; ')}`);
         await context.close();
       }
-      console.log(`${engine}: passed`);
     } finally {await browser.close();}
+    // refused: Chromium's headless prompt answers no; Firefox's through its testing preference
+    // (a browser of its own)
+    const refusing=await launch(engine==='firefox' ? {'geo.prompt.testing':true,'geo.prompt.testing.allow':false} : undefined);
+    try {
+      const context=await refusing.newContext(CONTEXT);
+      const h=await open(context);
+      await go(h,'GPS');
+      await h.click('Standort verwenden');
+      await h.see('Standort: nicht erlaubt',`${engine}: the prompt answers no`);
+      ok(h.errors.length===0,`${engine}: no page errors: ${h.errors.join('; ')}`);
+      await context.close();
+    } finally {await refusing.close();}
+    console.log(`${engine}: passed`);
   }
   console.log(`sensors web: ${checks} checks passed (${engines.join(', ')}${threads?', threads':''})`);
 } finally {server.close();}

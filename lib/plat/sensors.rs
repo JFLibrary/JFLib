@@ -601,12 +601,13 @@ pub(crate) fn host_sensor_state(mask: u32, state: u32) {
     }
 }
 
-// the host's location: a state (LocationState as a number) or, with coordinates, a fix.  NaN: the
-// provider does not say.  age_ms: how old the fix is now
+// the host's location: a state (LocationState as a number) or, with coordinates, a fix (state Fix
+// without them: the last fix counts again).  NaN: the provider does not say.  age_ms: how old the
+// fix is now
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(not(any(target_arch = "wasm32", target_os = "android")), allow(dead_code))]
 pub(crate) fn host_location(state: u32, lat: f64, lon: f64, accuracy: f64, altitude: f64, speed: f64, bearing: f64, age_ms: f64, source: u32) {
-    if state != LocationState::Fix as u32 {
+    if state != LocationState::Fix as u32 || lat.is_nan() {
         location_state_set(state);
         return;
     }
