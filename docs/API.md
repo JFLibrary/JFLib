@@ -4839,7 +4839,7 @@ HB_GRAB_V: u32 = 0x80000
 // finger moving along this axis is the widget's (not the scroll view's around it); with both the
 // press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
 // resting for the long-press time: a panel that starts to move then, until then the finger goes
-// to what is around it); TF_HOLD_LONG the same after 800 ms (a panel's title bar; ui.touch_hold_part
+// to what is around it); TF_HOLD_LONG the same after a second (a panel's title bar; ui.touch_hold_part
 // shows it); TF_REST a finger that rests presses like one that moved, no context menu (a canvas); TF_TWO
 // a second finger is the widget's: no press, no click, it reads ui.touch_two or ui.touch_fingers (pan and
 // zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing special (the finger rolls what is
@@ -9342,7 +9342,7 @@ with speed (least squares over the last 100 ms, as Android's VelocityTracker; 50
 the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
 and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
 tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
-host give feedback; TF_HOLD: the left button, the drag starts, TF_HOLD_LONG after 800 ms; TF_REST:
+host give feedback; TF_HOLD: the left button, the drag starts, TF_HOLD_LONG after a second; TF_REST:
 the left button, no context menu: a canvas); if it moves after that, the same decision.  After the
 finger left, the hover goes.
 
