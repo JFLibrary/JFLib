@@ -78,7 +78,7 @@ pub fn capture(e: &Engine) -> (Vec<u8>, usize) {
         let i = match ifs.get(&h.link) {
             Some(i) => *i,
             None => {
-                let serial = e.link_rt(h.link).is_some_and(|l| l.cable == jfn_model::CableKind::Serial);
+                let serial = e.link_rt(h.link).is_some_and(|l| l.cable.is_serial());
                 let i = w.add_interface(&format!("{} \u{2013} {}", name(h.from.0, h.from.1), name(h.to.0, h.to.1)), if serial { LINKTYPE_C_HDLC } else { LINKTYPE_ETHERNET }, 0);
                 ifs.insert(h.link, i);
                 i

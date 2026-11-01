@@ -1,0 +1,34 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Kabel einer alten Datei",
+  "description": "Die acht Kabelarten vor H2, ohne grade und color (selftest-Gruppe cables): was die Datei nicht sagt, bleibt wie es war",
+  "seed": 11,
+  "next_id": 40,
+  "devices": [
+    { "id": 1, "name": "PC1", "model": "pc", "x": -280, "y": -180 },
+    { "id": 2, "name": "SW1", "model": "jf-s24p", "x": -140, "y": -60 },
+    { "id": 3, "name": "SW2", "model": "jf-s24p", "x": 0, "y": -60 },
+    { "id": 4, "name": "R1", "model": "jf-r4", "x": 140, "y": -60 },
+    { "id": 5, "name": "R2", "model": "jf-r4", "x": 280, "y": -60 },
+    { "id": 6, "name": "Laptop1", "model": "laptop", "x": -280, "y": 100 },
+    { "id": 7, "name": "AP1", "model": "jf-ap6e", "x": -140, "y": 100 },
+    { "id": 8, "name": "Modem1", "model": "modem-ont", "x": 140, "y": 100 },
+    { "id": 9, "name": "Internet1", "model": "cloud", "x": 280, "y": 100 },
+    { "id": 10, "name": "SW3", "model": "jf-s24p", "x": 0, "y": 100 },
+    { "id": 11, "name": "TV1", "model": "smart-tv", "x": -140, "y": 200 }
+  ],
+  "links": [
+    { "id": 20, "a": { "dev": 1, "port": "eth0" }, "b": { "dev": 2, "port": "GigabitEthernet1/0/1" }, "cable": "copper", "cable_fixed": false, "kbps": 1000000, "delay_ns": 50, "route": "straight" },
+    { "id": 21, "a": { "dev": 2, "port": "GigabitEthernet1/0/2" }, "b": { "dev": 3, "port": "GigabitEthernet1/0/2" }, "cable": "copper-cross", "cable_fixed": false, "kbps": 1000000, "delay_ns": 50, "route": "straight" },
+    { "id": 22, "a": { "dev": 2, "port": "TenGigabitEthernet1/1/1" }, "b": { "dev": 3, "port": "TenGigabitEthernet1/1/1" }, "cable": "fiber-mm", "cable_fixed": false, "kbps": 10000000, "delay_ns": 500, "route": "ortho" },
+    { "id": 23, "a": { "dev": 3, "port": "TenGigabitEthernet1/1/2" }, "b": { "dev": 10, "port": "TenGigabitEthernet1/1/2" }, "cable": "fiber-sm", "cable_fixed": true, "kbps": 10000000, "delay_ns": 500, "route": "straight" },
+    { "id": 24, "a": { "dev": 4, "port": "Serial0/2/0" }, "b": { "dev": 5, "port": "Serial0/2/0" }, "cable": "serial", "cable_fixed": false, "kbps": 2048, "delay_ns": 2000000, "route": "straight" },
+    { "id": 25, "a": { "dev": 1, "port": "usb0" }, "b": { "dev": 2, "port": "Console" }, "cable": "console", "cable_fixed": false, "kbps": 115, "delay_ns": 0, "route": "straight" },
+    { "id": 26, "a": { "dev": 6, "port": "wlan0" }, "b": { "dev": 7, "port": "Dot11Radio1" }, "cable": "wireless", "cable_fixed": false, "kbps": 2400000, "delay_ns": 0, "route": "straight" },
+    { "id": 27, "a": { "dev": 8, "port": "wan0" }, "b": { "dev": 9, "port": "wan0" }, "cable": "wan", "cable_fixed": false, "kbps": 1000000, "delay_ns": 5000000, "route": "straight" },
+    { "id": 28, "a": { "dev": 11, "port": "eth0" }, "b": { "dev": 10, "port": "GigabitEthernet1/0/1" }, "cable": "copper", "cable_fixed": false, "kbps": 1000000, "delay_ns": 50, "route": "straight" }
+  ],
+  "notes": [],
+  "layout": { "zoom_pm": 1000, "cx": 0, "cy": 0, "grid": 20 }
+}

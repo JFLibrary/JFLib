@@ -108,6 +108,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** TLS 1.3 without I/O and a clock (`netpkt::tls`: a `Core` for both sides, TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519, a seed gives the same bytes) and certificates of a private PKI (`netpkt::x509`); `decode` dissects TLS records
 - **ui:** Style sheets from outside for the document view: `MdDoc::sheet_links`, `MdDoc::set_sheet` (a text counts where its `<link>` stands), `MdDoc::style_of` (what the cascade gives an element)
 - **JFNetworker:** More devices in the catalog, all manufacturer-neutral with fixed ports: JF-S8 (unmanaged, no command line), JF-S8P, JF-S24, JF-S48P, JF-S24M (2.5G, PoE++), the leaf and spine L3 switches JF-S48Y and JF-S32C, the branch router JF-R2, the firewalls JF-FW2 and JF-FW8, the access point JF-AP7 (802.11be), a repeater and a bridge without a command line, symbols for the small boxes
+- **JFNetworker:** Choosing a cable first: a Kabel part in the palette (Automatisch and a tile per kind) sets the Verbinden tool with that kind, the port choice offers only pairs it fits and what cannot fit is refused with its reason at the target. New kinds appended (serial with a chosen DCE or DTE end, telephone, coax, DAC, AOC), Media::Rj11 and Media::Coax with a cable modem and a DSL modem, a category (Cat5e .. Cat8, OM3, OM4, OS2) and a colour on the link, the project setting Auto-MDI-X aus; old files load unchanged, the golden reports stay as they are
 
 ### Changed
 

@@ -51,7 +51,8 @@ pub(crate) const CMD_ROUTE_CURVE: u32 = 92;
 pub(crate) const CMD_DISCONNECT: u32 = 93;
 /// switch the selected devices on or off
 pub(crate) const CMD_POWER: u32 = 94;
-/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k]
+/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k] for the first
+/// CABLE_KINDS0, the others from CMD_CABLE_MORE (cable_cmd)
 pub(crate) const CMD_CABLE0: u32 = 100;
 
 // ---- timers (App::command(UIC_TIMER, id))
@@ -646,3 +647,20 @@ pub(crate) const TIMER_PAGE: u32 = 0x1C8;
 // timers 0x1CC .. 0x1CF; the commands and timers are not used)
 /// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
 pub(crate) const ID_DEV0: u32 = 0x0001_E800;
+// ---- H2: the choice of cables (commands 970 .. 989, widgets 0x0001_F000 .. 0x0001_F3FF, no timers)
+/// the kinds CMD_CABLE0 has room for; CMD_CABLE_MORE + k is CableKind::ALL[CABLE_KINDS0 + k]
+pub(crate) const CABLE_KINDS0: usize = 8;
+pub(crate) const CMD_CABLE_MORE: u32 = 970;
+/// the command that gives the selected cables CableKind::ALL[k]
+pub(crate) const fn cable_cmd(k: usize) -> u32 {
+    if k < CABLE_KINDS0 { CMD_CABLE0 + 1 + k as u32 } else { CMD_CABLE_MORE + (k - CABLE_KINDS0) as u32 }
+}
+/// the palette's Kabel part: its expander, its tiles as one Tab stop, the tiles (+ 0
+/// "Automatisch", + 1 + k CableKind::ALL[k])
+pub(crate) const ID_CABLE_PART: u32 = 0x0001_F000;
+pub(crate) const ID_CABLE_GROUP: u32 = 0x0001_F001;
+pub(crate) const ID_CABLE_TILE: u32 = 0x0001_F010;
+/// the inspector of a cable: its category and colour; of the project: "Auto-MDI-X aus"
+pub(crate) const ID_INS_GRADE: u32 = 0x0001_F040;
+pub(crate) const ID_INS_CABLE_COLOR: u32 = 0x0001_F041;
+pub(crate) const ID_PROJ_MDIX: u32 = 0x0001_F042;

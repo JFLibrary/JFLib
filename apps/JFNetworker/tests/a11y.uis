@@ -24,10 +24,12 @@ shot build/jfnetworker/a11y_cable.png
 key enter
 expect tab:"Eigenschaften" focused
 expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
-# placing: Ctrl+1 puts the keyboard into the device search, Tab to the first category's tiles
-# (one stop, the arrows move), Enter places the device in the middle of the view
+# placing: Ctrl+1 puts the keyboard into the device search, Tab over the Kabel part's expander to
+# the first category's tiles (one stop, the arrows move), Enter places the device in the middle of
+# the view
 key ctrl+1
 expect #16385 focused
+key tab
 key tab
 key tab
 expect button:"PC" focused

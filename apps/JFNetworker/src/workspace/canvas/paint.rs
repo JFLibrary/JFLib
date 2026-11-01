@@ -23,9 +23,13 @@
 // Gi port, the next free Te port, ...): a drag from dot to dot connects at once.
 //
 // Cables are drawn along the widget's routes in their kind's colour and pattern, without
-// relying on colour alone: copper graphite (crossover dashed), fibre muted orange, serial brick
-// red with a zigzag in the middle, console light blue dotted, radio thin teal dotted, WAN a
-// double line; an unplugged cable is faded.  12 units before each end sits the port's LED from
+// relying on colour alone (stroke_cable, the palette's tiles too): copper graphite (crossover
+// dashed), fibre muted orange (multimode solid, single-mode dash-dot), serial brick red with a
+// zigzag in the middle (a chosen end: a dot before the DCE end, "DCE" beside its port name),
+// console light blue dotted, radio thin teal dotted, WAN a double line, telephone violet
+// dash-dot-dot, coax a hollow tube, DAC ochre with cross ticks, AOC thick orange dashed; a colour
+// the user gave a cable replaces its kind's colour, not its pattern (cable_tint; status stays on
+// the LEDs); an unplugged cable is faded.  12 units before each end sits the port's LED from
 // the simulator (green up, red down, grey without power, amber blocking or learning); from
 // 100 % on the short port names stand next to it.  Levels of detail: below 50 % no names and no
 // LEDs, below 30 % a tinted square instead of the symbol; while a gesture moves the view or
@@ -51,11 +55,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
-use gfx::dash::{DASH_DASH, DASH_DOT, DASH_SOLID, LCAP_FLAT};
+use gfx::dash::{DASH_DASH, DASH_DASHDOT, DASH_DASHDOTDOT, DASH_DOT, DASH_SOLID, LCAP_FLAT};
 use jfn_model::catalog::PortSpec;
 use jfn_model::group::Groups;
 use jfn_model::project::Route;
-use jfn_model::{catalog, ifname, CableKind, Project};
+use jfn_model::{catalog, ifname, CableColor, CableKind, Project};
 use jfn_sim::Led;
 use ui::*;
 
@@ -119,9 +123,11 @@ pub(crate) struct SNote {
 pub(crate) struct SLink {
     pub id: u32,
     pub cable: CableKind,
+    /// the colour the user gave it (a line of several cables: none)
+    pub color: CableColor,
     /// unplugged on purpose
     pub down: bool,
-    /// the short port names ("Gi1/0/1")
+    /// the short port names ("Gi1/0/1"; a serial line's DCE end says so)
     pub names: [String; 2],
     /// the side of each end's port name (1: left of the way out of the device, -1: right;
     /// parallel cables put them outside)
@@ -416,12 +422,16 @@ impl Scene {
             self.edges.push(DEdge { key, a: end(ea, ia), b: end(eb, ib), route, wps: wp0..self.wps.len() as u32 });
             // a line names a device's port when it carries one cable
             let name = |own: bool, port: &str| if own && single { ifname::short(port) } else { String::new() };
-            let names = if d.1 { [name(ea == l.a.dev, &l.a.port), name(eb == l.b.dev, &l.b.port)] } else { [ifname::short(&l.a.port), ifname::short(&l.b.port)] };
+            let mut names = if d.1 { [name(ea == l.a.dev, &l.a.port), name(eb == l.b.dev, &l.b.port)] } else { [ifname::short(&l.a.port), ifname::short(&l.b.port)] };
+            if let Some(k) = l.cable.dce_end().filter(|&k| !names[k].is_empty()) {
+                names[k] = alloc::format!("{} DCE", names[k]);
+            }
             let down = if d.1 { agg.iter().all(|&(id, _)| p.link(id).is_some_and(|x| x.down)) } else { l.down };
             for &(id, rev) in &agg {
                 self.via.insert(id, (key, rev));
             }
-            self.links.push(SLink { id: l.id, cable: l.cable, down, names, sides, agg });
+            let color = if single { l.color } else { CableColor::Plain };
+            self.links.push(SLink { id: l.id, cable: l.cable, color, down, names, sides, agg });
         }
         // the devices with their ports: the cables' ends (hidden), one free port per group
         let mut sym_of: BTreeMap<&'static str, Option<usize>> = BTreeMap::new();
@@ -567,11 +577,16 @@ pub(crate) fn cable_style(k: CableKind) -> (u32, f32, u32) {
     match k {
         CableKind::CopperStraight => (0xFF5A_6169, 2.0, DASH_SOLID),
         CableKind::CopperCross => (0xFF5A_6169, 2.0, DASH_DASH),
-        CableKind::FiberMm | CableKind::FiberSm => (0xFFB5_681F, 2.0, DASH_SOLID),
-        CableKind::Serial => (0xFFB0_453F, 2.0, DASH_SOLID),
+        CableKind::FiberMm => (0xFFB5_681F, 2.0, DASH_SOLID),
+        CableKind::FiberSm => (0xFFB5_681F, 2.0, DASH_DASHDOT),
+        CableKind::Serial | CableKind::SerialDce | CableKind::SerialDte => (0xFFB0_453F, 2.0, DASH_SOLID),
         CableKind::Console => (0xFF4F_86C6, 1.5, DASH_DOT),
         CableKind::Wireless => (0xFF3D_8C84, 1.0, DASH_DOT),
         CableKind::Wan => (0xFF5A_6169, 1.2, DASH_SOLID),
+        CableKind::Phone => (0xFF7B_5EA7, 1.6, DASH_DASHDOTDOT),
+        CableKind::Coax => (0xFF6F_5A48, 3.4, DASH_SOLID),
+        CableKind::Dac => (0xFF8A_6A2A, 2.2, DASH_SOLID),
+        CableKind::Aoc => (0xFFB5_681F, 3.0, DASH_DASH),
     }
 }
 
@@ -580,6 +595,113 @@ pub(crate) fn cable_color(k: CableKind, dark: bool, down: bool, bg: u32) -> u32 
     let argb = cable_style(k).0;
     let argb = if dark { color_mix(argb, 0xFFFF_FFFF, 72) } else { argb };
     if down { color_mix(argb, bg | 0xFF00_0000, 150) } else { argb }
+}
+
+/// the colour the user gave a cable in a theme (at least 3:1 against the canvas in both themes
+/// and in the contrast themes, selftest group cables; none of the LEDs' green, red and amber)
+pub(crate) fn cable_tint(c: CableColor, dark: bool) -> Option<u32> {
+    let (light, night) = match c {
+        CableColor::Plain => return None,
+        CableColor::Blue => (0xFF2F_6FB5, 0xFF7F_B0E6),
+        CableColor::Teal => (0xFF1F_8585, 0xFF5C_C4C4),
+        CableColor::Violet => (0xFF7A_55B8, 0xFFB3_9AE6),
+        CableColor::Pink => (0xFFC2_407F, 0xFFE8_8BB8),
+        CableColor::Brown => (0xFF8A_5A2E, 0xFFC9_A27A),
+        CableColor::Slate => (0xFF4A_5A6A, 0xFFA9_B8C6),
+    };
+    Some(if dark { night } else { light })
+}
+
+/// the colour of a cable with what the user gave it
+pub(crate) fn link_color(k: CableKind, c: CableColor, dark: bool, down: bool, bg: u32) -> u32 {
+    match cable_tint(c, dark) {
+        Some(argb) if down => color_mix(argb, bg | 0xFF00_0000, 150),
+        Some(argb) => argb,
+        None => cable_color(k, dark, down, bg),
+    }
+}
+
+/// a cable along its route in the pattern of its kind (the canvas, the palette's tiles; len: the
+/// route's length, bg: what lies under it, argb: cable_color or link_color)
+pub(crate) fn stroke_cable(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], len: f32, k: CableKind, argb: u32, bg: u32) {
+    let (_, w, dash) = cable_style(k);
+    match k {
+        CableKind::Wan => {
+            for d in [-1.6f32, 1.6] {
+                dg_stroke_edge(g, vp, &offset(pts, d), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
+            }
+        }
+        CableKind::Serial | CableKind::SerialDce | CableKind::SerialDte if len > 40.0 => {
+            // the line with a gap in the middle, a zigzag across it
+            let (mid, u) = at_len(pts, len * 0.5);
+            let nrm = [-u[1], u[0]];
+            let at = |t: f32, n: f32| [mid[0] + u[0] * t + nrm[0] * n, mid[1] + u[1] * t + nrm[1] * n];
+            dg_stroke_edge(g, vp, &cut(pts, 0.0, len * 0.5 - 6.0), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
+            dg_stroke_edge(g, vp, &cut(pts, len * 0.5 + 6.0, len), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
+            let zig = [at(-6.0, 0.0), at(-2.0, 5.0), at(2.0, -5.0), at(6.0, 0.0)];
+            dg_stroke_edge(g, vp, &zig, w, argb, LCAP_FLAT, LCAP_FLAT, DASH_SOLID);
+            // a chosen end: a dot before the DCE end (behind the LED on a long cable)
+            if let Some(e) = k.dce_end() {
+                let d = (len * 0.2).min(24.0);
+                let (c, _) = if e == 0 { at_len(pts, d) } else { at_len_back(pts, d) };
+                let q = vp.to_screen(c);
+                let r = fl(2.8 * vp.scale() as f32 + 0.5).max(2);
+                let mut sh = g.shapes();
+                sh.dc.set_color(argb);
+                sh.fill_rrect(fl(q[0] + 0.5) - r, fl(q[1] + 0.5) - r, r * 2, r * 2, r);
+            }
+        }
+        CableKind::Coax => {
+            // a tube: the jacket, a core in the colour under it
+            dg_stroke_edge(g, vp, pts, w, argb, LCAP_FLAT, LCAP_FLAT, dash);
+            dg_stroke_edge(g, vp, pts, w * 0.36, bg | 0xFF00_0000, LCAP_FLAT, LCAP_FLAT, DASH_SOLID);
+        }
+        CableKind::Dac => {
+            // the line with ticks across it
+            dg_stroke_edge(g, vp, pts, w, argb, LCAP_FLAT, LCAP_FLAT, dash);
+            let step = if len > 80.0 { 16.0 } else { 9.0 };
+            // (evenly over its length: what the steps leave over goes to both ends)
+            let mut s = (len - step * (len / step) as i32 as f32 + step) * 0.5;
+            while s < len {
+                let (c, u) = at_len(pts, s);
+                let nrm = [-u[1] * 4.0, u[0] * 4.0];
+                dg_stroke_edge(g, vp, &[[c[0] - nrm[0], c[1] - nrm[1]], [c[0] + nrm[0], c[1] + nrm[1]]], w * 0.7, argb, LCAP_FLAT, LCAP_FLAT, DASH_SOLID);
+                s += step;
+            }
+        }
+        _ => dg_stroke_edge(g, vp, pts, w, argb, LCAP_FLAT, LCAP_FLAT, dash),
+    }
+}
+
+/// the drawing of a cable tile of the palette: a piece of the cable (None: "Automatisch", a thin
+/// line with a dot in the middle), render time
+pub(crate) struct CableSample {
+    pub kind: Option<CableKind>,
+    pub dark: bool,
+    /// the panel's background and the colour of "Automatisch"
+    pub bg: u32,
+    pub plain: u32,
+    /// px per 96 DIP
+    pub dpi: i32,
+}
+
+impl Draw for CableSample {
+    fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
+        let vp = Viewport { zoom: 1.0, cx: 0.0, cy: 0.0, rect: r, dpi: self.dpi };
+        let half = (r[2] as f32 * 0.5 * 96.0 / self.dpi.max(1) as f32 - 2.0).max(8.0);
+        let pts = [[-half, 0.0], [half, 0.0]];
+        match self.kind {
+            Some(k) => stroke_cable(g, &vp, &pts, half * 2.0, k, cable_color(k, self.dark, false, self.bg), self.bg),
+            None => {
+                dg_stroke_edge(g, &vp, &pts, 1.2, self.plain, LCAP_FLAT, LCAP_FLAT, DASH_SOLID);
+                let q = vp.to_screen([0.0, 0.0]);
+                let d = fl(3.0 * vp.scale() as f32 + 0.5).max(2);
+                let mut sh = g.shapes();
+                sh.dc.set_color(self.plain);
+                sh.fill_rrect(fl(q[0] + 0.5) - d, fl(q[1] + 0.5) - d, d * 2, d * 2, d);
+            }
+        }
+    }
 }
 
 /// floor for drawing positions
@@ -837,12 +959,12 @@ fn wrap(g: &mut Gfx, text: &str, w: i32) -> Vec<String> {
 fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene, edges: &[u32], lod: bool) {
     for &i in edges {
         let (Some(l), Some(rt)) = (sc.links.get(i as usize), f.geo.routes.get(i as usize)) else { continue };
-        let (_, w, dash) = cable_style(l.cable);
+        let (_, w, _) = cable_style(l.cable);
         if !f.route_visible(rt, w + 6.0) {
             continue;
         }
         let pts = &rt.pts;
-        let argb = cable_color(l.cable, f.dark, l.down, f.bg);
+        let argb = link_color(l.cable, l.color, f.dark, l.down, f.bg);
         let len = dg_length(pts);
         if !(len > 0.5) {
             continue;
@@ -851,24 +973,7 @@ fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene, edges: &[u32], lod: bool) {
             dg_hairline(g, &f.vp, pts, argb);
             continue;
         }
-        match l.cable {
-            CableKind::Wan => {
-                for k in [-1.6f32, 1.6] {
-                    dg_stroke_edge(g, &f.vp, &offset(pts, k), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
-                }
-            }
-            CableKind::Serial if len > 40.0 => {
-                // the line with a gap in the middle, a zigzag across it
-                let (mid, u) = at_len(pts, len * 0.5);
-                let nrm = [-u[1], u[0]];
-                let at = |t: f32, n: f32| [mid[0] + u[0] * t + nrm[0] * n, mid[1] + u[1] * t + nrm[1] * n];
-                dg_stroke_edge(g, &f.vp, &cut(pts, 0.0, len * 0.5 - 6.0), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
-                dg_stroke_edge(g, &f.vp, &cut(pts, len * 0.5 + 6.0, len), w, argb, LCAP_FLAT, LCAP_FLAT, dash);
-                let zig = [at(-6.0, 0.0), at(-2.0, 5.0), at(2.0, -5.0), at(6.0, 0.0)];
-                dg_stroke_edge(g, &f.vp, &zig, w, argb, LCAP_FLAT, LCAP_FLAT, DASH_SOLID);
-            }
-            _ => dg_stroke_edge(g, &f.vp, pts, w, argb, LCAP_FLAT, LCAP_FLAT, dash),
-        }
+        stroke_cable(g, &f.vp, pts, len, l.cable, argb, f.bg);
         // a line of several cables of a cluster: their count in its middle
         if l.agg.len() > 1 && f.vp.zoom >= 0.5 {
             paint_count(g, f, pts, len, l.agg.len());

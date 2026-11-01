@@ -32,6 +32,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use base::cmdtree::Parsed;
+use jfn_model::cable::CableKind;
 use jfn_model::catalog::{speed_str, Media, F_AP, F_BRIDGE, F_HOST, F_ROUTER};
 use jfn_model::ifname;
 use netpkt::{Ipv4, Prefix4};
@@ -469,6 +470,13 @@ impl Engine {
             } else {
                 s.push_str(&format!("  Hardware is {}, address is {} (bia {})\n", hw, mac.cisco(), mac.cisco()));
             }
+            // the cable on a port (a serial line of a chosen end says which one this is)
+            let cable = pv.and_then(|p| p.link).and_then(|li| Some((li, self.links.get(li)?.as_ref()?)));
+            if let (Some(p), Some((_, l))) = (port, cable)
+                && let (Some(dce), Some(end)) = (l.cable.dce_end(), l.end_of(ni, p))
+            {
+                s.push_str(&format!("  Serial cable end: {}\n", if end as usize == dce { "DCE" } else { "DTE" }));
+            }
             if let Some(d) = n.cli.cfg.descr.get(&name) {
                 s.push_str(&format!("  Description: {}\n", d));
             }
@@ -507,7 +515,21 @@ impl Engine {
                 && !serial
                 && kind.is_none_or(|k| matches!(k, IfKind::Port(_)))
             {
-                let media = if p.spec.media == Media::Rj45 { String::from("RJ45") } else { format!("{} {}", speed_str(p.spec.kbps), p.spec.media.name()) };
+                let mut media = if p.spec.media == Media::Rj45 { String::from("RJ45") } else { format!("{} {}", speed_str(p.spec.kbps), p.spec.media.name()) };
+                // what the cable adds: DAC, AOC, its category
+                if let Some((li, l)) = cable {
+                    match l.cable {
+                        CableKind::Dac => media.push_str(" DAC"),
+                        CableKind::Aoc => media.push_str(" AOC"),
+                        k => {
+                            let grade = self.phys.grade.get(&li).copied().unwrap_or_default();
+                            if grade != jfn_model::cable::CableGrade::Unset && grade.fits(k) {
+                                media.push(' ');
+                                media.push_str(grade.name());
+                            }
+                        }
+                    }
+                }
                 if link {
                     s.push_str(&format!("  Full Duplex, {}Mbps, link type is auto, media type is {}\n", kbps / 1000, media));
                 } else {
@@ -521,6 +543,7 @@ impl Engine {
                 match *f {
                     crate::phys::PhysFault::TooLong { len_m, max_m, std } => s.push_str(&format!("  Cable is {} m long, {} allows {} m: no link\n", len_m, std, max_m)),
                     crate::phys::PhysFault::Optics(_) => s.push_str("  Optics do not fit the far end or the fibre: no link\n"),
+                    crate::phys::PhysFault::Grade { grade, std } => s.push_str(&format!("  A {} cable does not carry {}: no link\n", grade.name(), std)),
                 }
             }
             if x.is_some() && !serial && !matches!(kind, Some(IfKind::Loopback(_))) {

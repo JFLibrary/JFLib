@@ -10,9 +10,11 @@ Queues, Lastgeneratoren, eigene Skripte).
 **Stand (2026-11-01): Alle Phasen des Fahrplans sind fertig** (siehe [Fahrplan](#fahrplan)).
 
 - **Topologie-Editor:** 26 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
-  per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem Kabeltyp (Kupfer,
-  gekreuzt, Glasfaser, seriell, Konsole, Funk, WAN), Kabel mit LEDs, Wegpunkten und Verlauf,
-  Notizen, Rückgängig für alles, Projekte als `.jfnet`.
+  per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem oder vorher gewähltem
+  Kabeltyp (Kupfer gerade und gekreuzt, Glasfaser Multimode und Singlemode, seriell mit
+  gewähltem Ende, Konsole, Funk, WAN, Telefon, Koax, DAC, AOC; Kategorien Cat5e bis Cat8 und OM3
+  bis OS2), Kabel mit LEDs, Wegpunkten, Verlauf und Farbe, Notizen, Rückgängig für alles, Projekte
+  als `.jfnet`.
 - **Simulator im Editor:** läuft in Echtzeit mit und folgt jeder Änderung. Switching mit VLANs,
   IPv4 mit ARP, Routing (auch L3-Switches), ICMP, Ping und Traceroute, UDP und TCP (RFC 9293),
   DHCP mit Relay, DNS, Syslog, NTP, HTTP mit Lastgenerator; die Probleme-Liste zeigt doppelte
@@ -195,6 +197,10 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Verbinden (C):** von Gerät zu Gerät ziehen oder beide anklicken; per Tastatur Strg+9 (die
   Topologie), Tab zum ersten Gerät, Eingabe, Tab zum zweiten, Eingabe – die Port-Auswahl öffnet
   sich unter dem zweiten Gerät, Eingabe verbindet das beste Paar. Umschalt verbindet sofort.
+- **Kabel zuerst wählen:** der Bereich „Kabel“ oben in der Palette: Strg+1, Tab zum Bereich
+  (Eingabe klappt ihn auf), Tab zu den Kacheln, die Pfeiltasten wählen, Eingabe setzt das Werkzeug
+  Verbinden mit dieser Art; es bleibt bis Esc oder zu einem anderen Werkzeug, die Statusleiste
+  nennt die Art.
 - **Konsole:** Doppelklick oder Eingabe auf einem Gerät öffnet seine Konsole im Terminal-Bereich
   (Strg+3), mit Umschalt das Gerätefenster.
 - **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
@@ -220,7 +226,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   SW1 Gi1/0/1, Kupfer, gerade, aktiv“), die Leinwand heißt „Topologie“; die Farben der
   Pakete und Kabel halten in beiden Themes und im Hochkontrast mindestens 3:1 gegen die Fläche
   (Selbsttest). Die meisten Kabelarten unterscheiden sich auch in der Linie (gekreuzt
-  gestrichelt, Konsole und Funk gepunktet, seriell mit Blitz, WAN doppelt), Pakete nennen
+  gestrichelt, Singlemode Strich-Punkt, Konsole und Funk gepunktet, seriell mit Blitz, WAN doppelt,
+  Telefon Strich-Punkt-Punkt, Koax als Röhre, DAC mit Querstrichen, AOC dick gestrichelt), Pakete nennen
   Inhalt und Weg für Screenreader und in der Ereignisliste; „reduzierte Bewegung“ lässt Pakete
   springen statt gleiten.
 
@@ -259,6 +266,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `catalog.uis`, `place.uis`, `edit.uis`, `links.uis`, `undo.uis` | Palette und Suche, Platzieren, Verschieben, Rahmenauswahl, Löschen, Umbenennen, Notizen, Kabel beim Löschen und Wiederherstellen, Rückgängig auf allen Wegen |
 | `file.uis`, `file_reopen.uis` | Speichern unter `build/jfn_test.jfnet`, die Rückfrage, Öffnen, zuletzt geöffnete Dateien (`file_reopen.uis` läuft nach `file.uis`) |
 | `connect.uis`, `cable_types.uis`, `waypoints.uis`, `inspector.uis`, `engine.uis` | Verbinden und Port-Auswahl, jede Kabelart, Wegpunkte, die Eigenschaften, LEDs und Befunde des Simulators |
+| `cable_palette.uis` | das Kabel zuerst wählen: der Bereich „Kabel“ und die Suche, die Grenzen im Tooltip, Verbinden mit der gewählten Art, nur passende Paare, Glas in RJ45 mit Grund abgelehnt, falsches Kupfer unter „Auto-MDI-X aus“ mit seinem Fehler, ein Rückgängig-Schritt je Änderung, das Popover hält die Art beim Portwechsel, Kategorie und Farbe im Inspektor, das Kontextmenü, die Tastatur, Esc |
+| `cable_shots.uis` | die Bilder aller Kabelarten (`fixtures/cable_kinds.jfnet`), hell und dunkel, 100 und 150 % |
+| `model.uis`, Gruppe `cables` | die Kabelwahl (siehe [Kabel](#kabel)): jede Art auf jedem Paar von Medien, wo sie passt und wo nicht, die Grenzen je Kategorie, die Modems und der Koax-Port des Smart-TV, eine Datei von vor H2 (`fixtures/cables_v1.jfnet`) mit denselben Arten und Link-Zuständen, Speichern und Laden mit Kategorien und Farben, die Engine (`Action::CableGrade`, `Action::StrictMdix`, Note, Problem), `show interfaces`, die Rangfolge und die Gründe für eine gewählte Art, die Liste des Popovers, Kontrast der Farben; das Szenario zweimal |
+| `scen_cable_grades.uis` | Golden-Szenario (`fixtures/cable_grades.jfnet`): Cat5e an 10G unten, Cat6 über 55 m unten, Cat6a bis 100 m, DAC über 7 m unten, das DCE-Ende serieller Kabel in `show interfaces` |
 | `terminal_ios.uis`, `terminal_linux.uis`, `device_window.uis`, `log.uis` | die Konsolen, Gerätefenster mit Formularen und Desktop, das Protokoll |
 | `simulation.uis`, `events.uis`, `packet.uis`, `pdu.uis` | Schritte, Ereignisse und Zeitleiste, Paket-Tab, PDUs und pcapng-Export |
 | `a11y.uis` | alles ohne Maus: Kabel und Geräte als Einträge, Tab über Geräte und Kabel, Platzieren aus der Palette, Verbinden per Eingabe, Konsole, Simulation mit F5/F7 und der PDU per Eingabe, die Tastenkürzel |
@@ -528,7 +539,7 @@ Herstellerneutrale, moderne Modelle: PC (2.5G), Laptop, Smartphone und Tablet (W
 Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Rack- und Tisch-Switches, Filial-,
 Edge- und Core-Router (bis 100G, serielle WAN-Ports), L3-Switches (1G und 10GBASE-T mit 100G QSFP28,
 Leaf und Spine), Heimrouter mit WLAN, Hub, Repeater, Bridge; Firewalls; WLAN-Access-Points (802.11ax
-und 802.11be, 6 GHz), Modem/ONT, Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache,
+und 802.11be, 6 GHz), Modem/ONT, Kabelmodem (Koax), DSL-Modem (RJ11), Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache,
 Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
 (`GigabitEthernet1/0/1`, Abkürzungen wie `gi1/0/1` gehen überall), Hosts Linux-Namen (`eth0`,
 `wlan0`).
@@ -577,8 +588,51 @@ Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu d
 `cable_kind` nennt das richtige Kabel für zwei Ports: Kupfer gerade oder gekreuzt (nach MDI /
 MDI-X; mit Auto-MDI-X funktionieren beide), Glasfaser für SFP/SFP+/SFP28 untereinander und
 QSFP28 mit QSFP28, seriell, Konsolenkabel (Konsole an USB), Funk (WLAN-Gerät an Access Point)
-und WAN-Leitungen. Beim schnellen Verbinden wählt `suggest_ports` das Portpaar: Funk, wenn ein
+und WAN-Leitungen, Telefonkabel (RJ11 an RJ11 oder an den WAN-Port des Providers) und
+Koaxialkabel (Koax an Koax oder an den WAN-Port). Beim schnellen Verbinden wählt `suggest_ports` das Portpaar: Funk, wenn ein
 Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinsten Portnummern.
+
+Dazu kann der Nutzer selbst wählen, und `cable_fits` prüft, ob es steckt:
+
+| Art (`cable` in der Datei) | passt in | Grenze |
+|---|---|---|
+| Kupfer gerade und gekreuzt (`copper`, `copper-cross`) | RJ45 | nach Kategorie, ohne Kategorie wie bisher |
+| Glasfaser Multimode und Singlemode (`fiber-mm`, `fiber-sm`) | SFP, SFP+, SFP28 untereinander, QSFP28 mit QSFP28 | nach Optik und Kategorie |
+| Seriell (`serial`), erstes Ende DCE oder DTE (`serial-dce`, `serial-dte`) | seriell | V.35 nach Takt |
+| Konsole (`console`), Funk (`wireless`), WAN (`wan`) | Konsole und USB, WLAN und Access Point, WAN | RS-232 15 m, keine, keine |
+| Telefon (`phone`) | RJ11, WAN | 1000 m (VDSL2) |
+| Koax (`coax`) | Koax, WAN | 500 m (RG-6) |
+| DAC (`dac`) | SFP+, SFP28 untereinander, QSFP28 mit QSFP28 | 7 m, ohne Optik |
+| AOC (`aoc`) | wie DAC | 100 m, ohne Optik |
+
+Ein falsches Kupferkabel steckt, unter „Auto-MDI-X aus“ (Projektinspektor, `strict_mdix`, ein
+Rückgängig-Schritt) bleibt die Leitung dann unten und das Problem nennt das richtige Kabel; Glas
+in RJ45 steckt nicht. Ein gewähltes serielles Ende ändert nur, was man sieht: den Punkt und
+„DCE“ an diesem Ende auf der Zeichenfläche und die Zeile `Serial cable end: DCE` oder `DTE` in
+`show interfaces`. Einen Befehl `clock rate` kennt die Engine nicht, und kein Ende liefert einen
+Takt; das unveränderte `serial` älterer Dateien nennt kein Ende.
+
+Die **Kategorie** (`grade` in der Datei) ist ein Feld des Kabels statt weiterer Arten; ohne sie
+gelten die Grenzen wie bisher:
+
+| Kategorie | bis 5G | 10G | 25G, 40G |
+|---|---|---|---|
+| Cat5e | 100 m | trägt es nicht | trägt es nicht |
+| Cat6 | 100 m | 55 m | trägt es nicht |
+| Cat6a, Cat7 | 100 m | 100 m | trägt es nicht |
+| Cat8 | 100 m | 100 m | 30 m |
+
+| Kategorie | Optik | 1G | 10G | 25G | 40G | 100G |
+|---|---|---|---|---|---|---|
+| OM3 (wie ohne Kategorie) | SR | 550 m | 300 m | 70 m | 100 m | 70 m |
+| OM4 | SR | 550 m | 400 m | 100 m | 150 m | 100 m |
+| OS2 (wie ohne Kategorie) | LR | 5 km | 10 km | 10 km | 10 km | 10 km |
+
+Trägt eine Kategorie die Speed nicht, bleibt die Leitung unten wie bei einem zu langen Kabel, mit
+Notiz, Logzeile und Problem (`ProblemKind::CableGrade`); eine Kategorie, die nicht zur Art passt,
+zählt nicht und wird in `check()` gewarnt. Die **Farbe** (`color`, Blau, Türkis, Violett, Pink,
+Braun, Schiefer; Vorgabe: die der Art) ist nur fürs Auge und ersetzt die Farbe der Art, nicht ihr
+Muster; der Simulator sieht sie nicht, den Zustand zeigen weiter die LEDs.
 
 ### Im Editor: Verbinden, Kabel, Inspektor
 
@@ -589,14 +643,27 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   Gegenstelle, Ports ohne Partner mit dem Grund; das beste Paar ist gewählt, darunter das Kabel
   („Automatisch: Kupfer, gerade“ oder ein anderes, das passt); Enter verbindet. Umschalt beim
   Loslassen oder ein Zug von Port-Punkt zu Port-Punkt (beim Überfahren erscheint je
-  Portgruppe der nächste freie Port als Punkt am Rand) verbindet sofort.
+  Portgruppe der nächste freie Port als Punkt am Rand) verbindet sofort. Das Popover hält die
+  gewählte Art, nicht ihren Platz in der Liste: passt sie zu einem anderen Portpaar nicht, gilt
+  dort „Automatisch“, und zurück ist sie wieder da.
+- **Kabel zuerst wählen** (Bereich „Kabel“ der Palette): „Automatisch“ und eine Kachel je Art mit
+  einem Stück dieses Kabels; der Tooltip nennt die Grenzen, die Suche findet die Arten. Die Wahl
+  setzt das Werkzeug Verbinden mit dieser Art (die Statusleiste nennt sie), bis Esc oder zu einem
+  anderen Werkzeug; ein zweiter Klick auf die Kachel geht zurück zu Auswahl. Das Ziel ist dann nur
+  in Akzentfarbe umrandet, wenn die Art dort passt, und die Port-Auswahl zeigt nur die Ports, in
+  die sie steckt, und bietet nur passende Paare an; was gar nicht passt, bleibt rot mit dem Grund
+  im Tooltip („Glasfaser, Multimode passt nicht in einen RJ45-Port.“), beim Loslassen kommt die
+  Warnung mit dem Grund, keine Port-Auswahl. „Automatisch“ verhält sich wie ohne Wahl.
 - **Kabel** laufen vom Rand des einen Geräts zum Rand des anderen, gerade, rechtwinklig oder
   als Kurve durch ihre Wegpunkte, und zeigen ihre Art nicht nur über die Farbe: Kupfer
-  durchgezogen, gekreuzt gestrichelt, Glasfaser orange, seriell mit Zickzack, Konsole
-  gepunktet, Funk dünn gepunktet, WAN doppelt. 12 Einheiten vor jedem Ende sitzt die LED des
+  durchgezogen, gekreuzt gestrichelt, Glasfaser orange (Multimode durchgezogen, Singlemode
+  Strich-Punkt), seriell mit Zickzack (ein gewähltes Ende: ein Punkt vor dem DCE-Ende, „DCE“ am
+  Portnamen), Konsole gepunktet, Funk dünn gepunktet, WAN doppelt, Telefon violett
+  Strich-Punkt-Punkt, Koax als Röhre, DAC mit Querstrichen, AOC dick gestrichelt; eine gewählte
+  Farbe ersetzt nur die Farbe der Art. 12 Einheiten vor jedem Ende sitzt die LED des
   Ports aus dem Simulator (grün aktiv, rot unten, grau ohne Strom, bernstein für blockierend
   und lernend); ab 100 % stehen die Portnamen daneben. Der Tooltip nennt Ports, Art, Speed,
-  Zustand und Pakete pro Sekunde. Ein gewähltes Kabel hat „+“-Griffe in der Mitte seiner
+  Zustand, Pakete pro Sekunde, Kategorie und Grenze. Ein gewähltes Kabel hat „+“-Griffe in der Mitte seiner
   Abschnitte (ziehen fügt einen Wegpunkt ein, Doppelklick auf einen Wegpunkt entfernt ihn),
   das Kontextmenü wechselt Verlauf und Kabeltyp und trennt; Entf oder das × neben einem
   überfahrenen Kabel trennt es. Alles ist rückgängig zu machen.
@@ -678,7 +745,9 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
 [Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`. Die physische
 Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
 `optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
-und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
+und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher. Ein Kabel kann
+`grade` (seine Kategorie, siehe [Kabel](#kabel)) und `color` (eine Farbe fürs Auge) haben; was
+eine Datei nicht sagt, bleibt, wie es war.
 Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild))
 stehen in `groups` (`[]` ohne) und `background` (`null` ohne); auch sie fehlen älteren Dateien.
 
@@ -2155,7 +2224,7 @@ die Aufgabe der Abschnitt `assess` des Labors (siehe [`lab.rs`](crates/jfn_model
 
 `feedback` ist `items`, `score` oder `end`, `time_limit_s` 0 ohne Grenze. `what` ist
 `hostname`, `address`, `state`, `vlan`, `mode`, `route`, `service` (mit `svc` und dem Pfad
-`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart), `config`
+`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart, `serial` nimmt auch beide gewählten Enden), `config`
 (Zeilen, die eines Blocks eingerückt) oder `check` (`checks`: Erwartungen, die zugleich
 gelten); `cmp` ist `norm` (Vorgabe), `exact` oder `any` (dann ist `value` eine Liste). Was auf
 seinem Vorgabewert steht, fehlt in der Datei; ohne `points` zählt ein Kriterium 1. Ein Labor
@@ -3101,7 +3170,7 @@ Pläne (|Δx| + |Δy| in den Koordinaten aller Standorte), 3,5 m je Etage (zwisc
 hinunter ins Erdgeschoss und wieder hinauf) und hinunter zum anderen Ende, dazu 10 % Reserve.
 Die Internet-Wolke hat keinen Ort (3 m), Funk keine Länge.
 
-**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3),
+**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3; ein Kabel mit Kategorie: siehe [Kabel](#kabel)),
 für die Speed, mit der das Kabel läuft (die kleinere beider Ports und seiner Einstellung):
 
 | Medium | Speed | Norm | Grenze |
@@ -3163,7 +3232,7 @@ Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_
 `set_place`, `place_device`, `set_len`, `set_optic`), `catalog::form`, `rack_units`, `Optic`,
 `Action::CableLen { link, len_m }`, `Action::Optic { dev, port, optic }`,
 `Engine::cable_phys(link)`, `link_idx_up(link)`, `Note::Phys(PhysNote)`,
-`ProblemKind::CableTooLong` und `OpticMismatch`. Geprüft wird das in der Selbsttest-Gruppe
+`ProblemKind::CableTooLong`, `OpticMismatch` und `CableGrade`. Geprüft wird das in der Selbsttest-Gruppe
 `phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
 Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
 

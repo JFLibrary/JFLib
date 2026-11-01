@@ -45,7 +45,7 @@ use crate::node::PortCounters;
 pub const ENTERPRISE: [u32; 7] = [1, 3, 6, 1, 4, 1, 32473];
 
 /// the leaf of each model below 1.3.6.1.4.1.32473.1 (a new model gets the next free number)
-pub const MODEL_LEAVES: [(&str, u32); 42] = [
+pub const MODEL_LEAVES: [(&str, u32); 44] = [
     ("pc", 1),
     ("laptop", 2),
     ("smartphone", 3),
@@ -88,6 +88,8 @@ pub const MODEL_LEAVES: [(&str, u32); 42] = [
     ("jf-fw2", 40),
     ("jf-fw8", 41),
     ("jf-ap7", 42),
+    ("cable-modem", 43),
+    ("dsl-modem", 44),
 ];
 
 /// sysObjectID of a model (an unknown one: .1.0)
@@ -486,7 +488,7 @@ fn interfaces(e: &Engine, ni: usize, a: &AgentPart) -> Vec<IfRow> {
     let port_type = |m: Media| match m {
         Media::Serial => 22,
         Media::RadioAp | Media::RadioClient => 71,
-        Media::Wan => 1,
+        Media::Wan | Media::Rj11 | Media::Coax => 1,
         _ => 6,
     };
     let mut v: Vec<IfRow> = Vec::new();

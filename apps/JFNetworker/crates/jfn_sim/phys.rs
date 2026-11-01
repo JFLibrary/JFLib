@@ -4,6 +4,7 @@
 //
 //   Action::CableLen { link, len_m }        the cable's length in metres (action.rs; 0: unknown)
 //   Action::Optic { dev, port, optic }      the transceiver in a port's cage
+//   Action::CableGrade { link, grade }      the cable's category (H2; Connect carries Link::grade)
 //   Engine::cable_phys(link) -> Option<CablePhys>   length, speed, reach and what keeps it down
 //   PhysFault                               why a cable stays down (too long, the optics)
 //   PhysNote                                the notes about it (Note::Phys, layer 1)
@@ -11,8 +12,10 @@
 // The engine knows lengths only as numbers: from_project and Action::Connect take Link::len_m
 // as the cable's length -- the project resolves automatic ones (jfn_model::phys::length: the
 // app and load.rs put the result there) -- and Action::CableLen changes it; 0 means unknown and
-// is never too long.  The limit is jfn_model::phys::reach for the cable's kind at the speed it
-// runs (link_kbps) with the optic of its ends; WLAN associations, WAN lines and radio have none.
+// is never too long.  The limit is jfn_model::phys::reach_graded for the cable's kind and category
+// at the speed it runs (link_kbps) with the optic of its ends; WLAN associations, WAN lines and
+// radio have none.  A category that does not carry that speed at all (Cat5e and 10GBASE-T) keeps
+// the cable down whatever its length, with the same notes, log lines and problem.
 //
 // Decision: a cable over its limit does not come up (no link with errors): IEEE 802.3 promises
 // nothing beyond its reach, and a clear state teaches better.  It shows everywhere: both LEDs
@@ -28,7 +31,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use jfn_model::cable::CableKind;
+use jfn_model::cable::{CableGrade, CableKind};
 use jfn_model::catalog::{CliStyle, Optic};
 use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
@@ -46,6 +49,8 @@ pub enum PhysFault {
     TooLong { len_m: u32, max_m: u32, std: &'static str },
     /// the optics of its ends do not fit each other or the fibre
     Optics(OpticFault),
+    /// its category does not carry the standard its speed needs
+    Grade { grade: CableGrade, std: &'static str },
 }
 
 /// the physical side of a cable (Engine::cable_phys)
@@ -66,6 +71,8 @@ pub struct CablePhys {
 pub struct PhysState {
     pub(crate) len: BTreeMap<usize, u32>,
     pub(crate) bad: BTreeMap<usize, PhysFault>,
+    /// the categories of the cables that have one
+    pub(crate) grade: BTreeMap<usize, CableGrade>,
 }
 
 /// a decision about a cable (Note::Phys; ports are the noting device's)
@@ -75,6 +82,8 @@ pub enum PhysNote {
     TooLong { port: u16, len_m: u32, max_m: u32, std: &'static str },
     /// the optic of this end, the other end's, the fibre: they do not fit
     Optics { port: u16, own: Optic, other: Optic, fiber: CableKind },
+    /// the category of the cable on a port does not carry the standard its speed needs
+    Grade { port: u16, grade: CableGrade, std: &'static str },
 }
 
 impl PhysNote {
@@ -84,6 +93,7 @@ impl PhysNote {
             PhysNote::TooLong { port: p, len_m, max_m, std } => msg!("Kabel an {} zu lang: {} m, erlaubt {} m ({}); die Leitung bleibt aus.", port(*p), len_m, max_m, std),
             PhysNote::Optics { port: p, own, other, .. } if own != other => msg!("Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.", own.short(), port(*p), other.short()),
             PhysNote::Optics { port: p, own, fiber, .. } => msg!("{} passt nicht zur Optik {} an {}; die Leitung bleibt aus.", phrase(fiber.title()), own.short(), port(*p)),
+            PhysNote::Grade { port: p, grade, std } => msg!("{}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.", grade.name(), port(*p), std),
         }
     }
 }
@@ -101,7 +111,11 @@ impl Engine {
             return Some(PhysFault::Optics(f));
         }
         let len = self.phys.len.get(&li).copied().unwrap_or(0);
-        let r = mphys::reach(l.cable, self.link_kbps(li), oa)?;
+        let grade = self.phys.grade.get(&li).copied().unwrap_or_default();
+        let r = mphys::reach_graded(l.cable, grade, self.link_kbps(li), oa)?;
+        if !r.carries() {
+            return Some(PhysFault::Grade { grade, std: r.std });
+        }
         if len > r.max_m { Some(PhysFault::TooLong { len_m: len, max_m: r.max_m, std: r.std }) } else { None }
     }
 
@@ -110,10 +124,14 @@ impl Engine {
         !self.phys.bad.is_empty() && self.phys.bad.contains_key(&li)
     }
 
-    /// a new cable: its length (0: unknown) and what follows from it, before it is refreshed
-    pub(crate) fn phys_init(&mut self, li: usize, len_m: u32) {
+    /// a new cable: its length (0: unknown), its category and what follows from them, before it
+    /// is refreshed
+    pub(crate) fn phys_init(&mut self, li: usize, len_m: u32, grade: CableGrade) {
         if len_m > 0 {
             self.phys.len.insert(li, len_m);
+        }
+        if grade != CableGrade::Unset {
+            self.phys.grade.insert(li, grade);
         }
         match self.phys_eval(li) {
             Some(f) => {
@@ -143,6 +161,7 @@ impl Engine {
     pub(crate) fn phys_forget(&mut self, li: usize) {
         self.phys.len.remove(&li);
         self.phys.bad.remove(&li);
+        self.phys.grade.remove(&li);
     }
 
     /// the notes and log lines of a cable that is down for a physical reason (refresh_link
@@ -185,6 +204,14 @@ impl Engine {
                     };
                     (PhysNote::Optics { port: pi, own, other, fiber }, log)
                 }
+                PhysFault::Grade { grade, std } => (
+                    PhysNote::Grade { port: pi, grade, std },
+                    if style == CliStyle::Ios {
+                        format!("%PHY-4-CABLE_GRADE: {}: a {} cable does not carry {}; the link stays down", name, grade.name(), std)
+                    } else {
+                        format!("{}: {} cable does not carry {}, no carrier", name, grade.name(), std)
+                    },
+                ),
             };
             self.note(dev, None, Note::Phys(note));
             if style == CliStyle::Ios {
@@ -205,6 +232,21 @@ impl Engine {
             self.phys.len.remove(&li);
         } else {
             self.phys.len.insert(li, len_m);
+        }
+        self.phys_update(li);
+        Ok(())
+    }
+
+    /// Action::CableGrade
+    pub(crate) fn set_cable_grade(&mut self, link: u32, grade: CableGrade) -> Result<(), ActErr> {
+        let li = *self.link_idx.get(&link).ok_or(ActErr::UnknownLink(link))?;
+        if self.phys.grade.get(&li).copied().unwrap_or_default() == grade {
+            return Ok(());
+        }
+        if grade == CableGrade::Unset {
+            self.phys.grade.remove(&li);
+        } else {
+            self.phys.grade.insert(li, grade);
         }
         self.phys_update(li);
         Ok(())
@@ -236,10 +278,11 @@ impl Engine {
         let l = self.links.get(li)?.as_ref()?;
         let kbps = self.link_kbps(li);
         let optic = self.nodes.get(l.ends[0].0).and_then(|x| x.as_ref()).and_then(|x| x.ports.get(l.ends[0].1 as usize)).and_then(|x| x.spec.optic);
+        let grade = self.phys.grade.get(&li).copied().unwrap_or_default();
         Some(CablePhys {
             len_m: self.phys.len.get(&li).copied().unwrap_or(0),
             kbps,
-            reach: if crate::wlan::is_assoc_id(l.id) { None } else { mphys::reach(l.cable, kbps, optic) },
+            reach: if crate::wlan::is_assoc_id(l.id) { None } else { mphys::reach_graded(l.cable, grade, kbps, optic) },
             fault: self.phys.bad.get(&li).copied(),
         })
     }
@@ -260,6 +303,7 @@ impl Engine {
                     ProblemKind::OpticMismatch,
                     msg!("{} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.", phrase(l.cable.title()), name(0), name(1), o.short()),
                 ),
+                PhysFault::Grade { grade, std } => (ProblemKind::CableGrade, msg!("{}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.", grade.name(), name(0), name(1), std)),
             };
             out.push(Problem { kind, severity: Severity::Error, dev: dev(0), port: Some(l.ends[0].1), link: Some(l.id), others: alloc::vec![dev(1)], text: m.text(), msg: m });
         }

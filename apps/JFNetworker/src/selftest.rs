@@ -71,6 +71,8 @@
 // modelstest.rs: the device models of wave 17 at work (group models: the ports of each, a ping
 // through each new switch, routing, a serial line, ACLs and NAT on the firewalls, the repeater,
 // the bridge, the access point).
+// cablestest.rs: the choice of cables (group cables: jfn_model::cable, phys::reach_graded, the
+// engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
 
 use alloc::format;
 use alloc::string::String;
@@ -136,6 +138,8 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "cablestest.rs"]
+mod cablestest;
 #[path = "mailtest.rs"]
 mod mailtest;
 #[path = "groupstest.rs"]
@@ -174,7 +178,7 @@ mod webdevtest;
 mod modelstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 55] = [
+    let groups: [(&'static str, fn(&mut T)); 56] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -230,6 +234,7 @@ pub fn run() -> i32 {
         ("dot1x", dot1xtest::run),
         ("imap", imaptest::run),
         ("models", modelstest::run),
+        ("cables", cablestest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

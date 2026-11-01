@@ -485,7 +485,8 @@ impl Grader {
         let ok = kinds.is_empty()
             || kinds.iter().any(|k| match it.cmp {
                 Compare::Exact => k.trim() == l.cable.as_str(),
-                _ => CableKind::parse(k.trim()) == Some(l.cable),
+                // (a task that asks for a serial line takes either chosen end)
+                _ => CableKind::parse(k.trim()).is_some_and(|w| w == l.cable || (w == CableKind::Serial && l.cable.is_serial())),
             });
         Graded { held: ok, found: msg!("falsches Kabel: {}", phrase(l.cable.title())), ..Graded::default() }
     }
