@@ -133,6 +133,10 @@ pub enum Media {
     RadioClient,
     /// coax / DSL / GPON line of a modem or the provider cloud
     Wan,
+    /// telephone line of a DSL modem
+    Rj11,
+    /// coaxial line of a cable modem or a TV
+    Coax,
 }
 
 impl Media {
@@ -151,6 +155,8 @@ impl Media {
             Media::RadioAp => "Funk (AP)",
             Media::RadioClient => "Funk",
             Media::Wan => "WAN",
+            Media::Rj11 => "RJ11",
+            Media::Coax => "Koax",
         }
     }
     /// an optics cage (SFP family or QSFP28)
@@ -306,6 +312,8 @@ impl Model {
             Media::RadioAp | Media::RadioClient => msg!("{}× Funk {}", g.count, speed_str(g.kbps)),
             Media::Serial => msg!("{}× Seriell", g.count),
             Media::Wan => msg!("{}× WAN", g.count),
+            Media::Rj11 => msg!("{}× RJ11", g.count),
+            Media::Coax => msg!("{}× Koax", g.count),
             m => {
                 let base = if m.is_optical() { msg!("{}× {} {}", g.count, speed_str(g.kbps), m.name()) } else { msg!("{}× {}", g.count, speed_str(g.kbps)) };
                 match g.poe {
@@ -461,12 +469,12 @@ static CATALOG: &[Model] = &[
         name: "Smart-TV",
         kind: DeviceKind::SmartTv,
         category: Category::EndDevices,
-        title: "Smart-TV (1G, WLAN)",
+        title: "Smart-TV (1G, WLAN, Koax)",
         symbol: "smart_tv",
         cli: CliStyle::Linux,
         features: F_HOST,
         name_prefix: "TV",
-        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), one("wlan0", RadioClient, 1_200_000, false, NoPoe)],
+        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), one("wlan0", RadioClient, 1_200_000, false, NoPoe), one("coax0", Coax, K1G, false, NoPoe)],
     },
     // ---- network
     Model {
@@ -761,6 +769,31 @@ static CATALOG: &[Model] = &[
         features: F_ANNOTATION,
         name_prefix: "Notiz",
         groups: &[],
+    },
+    // ---- the modems of a coaxial and a telephone line (H2)
+    Model {
+        id: "cable-modem",
+        name: "Kabelmodem",
+        kind: DeviceKind::Modem,
+        category: Category::WirelessWan,
+        title: "Kabelmodem (Koax, 1G LAN)",
+        symbol: "modem_ont",
+        cli: CliStyle::None,
+        features: F_BRIDGE,
+        name_prefix: "Modem",
+        groups: &[one("coax0", Coax, K1G, false, NoPoe), one("lan0", Rj45, K1G, true, NoPoe)],
+    },
+    Model {
+        id: "dsl-modem",
+        name: "DSL-Modem",
+        kind: DeviceKind::Modem,
+        category: Category::WirelessWan,
+        title: "DSL-Modem (RJ11, 1G LAN)",
+        symbol: "modem_ont",
+        cli: CliStyle::None,
+        features: F_BRIDGE,
+        name_prefix: "Modem",
+        groups: &[one("dsl0", Rj11, 100_000, false, NoPoe), one("lan0", Rj45, K1G, true, NoPoe)],
     },
 ];
 

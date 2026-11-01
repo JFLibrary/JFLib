@@ -8,10 +8,12 @@
 //   rename(p, id, name) -> Result<edit>        jfn_model's name rules (valid_name, unique),
 //                                              applied when it is allowed
 //   note_text(p, id, text) / title(p, text)    the text of a note, the project's title
+//   strict_mdix(p, on) -> edit                 "Auto-MDI-X aus" of the project (not applied yet)
 //   connect(p, a, b, cable) -> Result<(id, edit)>   a new link (jfn_model's cable rules: None
 //                                              takes the right cable), applied
-//   link_edit(p, id, label, f) -> edit         any change of one link: kind, speed, delay,
-//                                              loss, plug, route, waypoints (not applied yet)
+//   link_edit(p, id, label, f) -> edit         any change of one link: kind, category, colour,
+//                                              speed, delay, loss, plug, route, waypoints (not
+//                                              applied yet)
 //   link_since(p, before, label) -> edit       a link changed live (a waypoint drag): the step
 //                                              from `before` to what it is now
 //   device_edit(p, id, label, f) -> edit       any change of one device: power, configuration,
@@ -324,6 +326,30 @@ pub(crate) fn title(p: &Project, text: &str) -> Option<Box<dyn Edit<Project>>> {
         return None;
     }
     Some(Box::new(Title { from: p.title.clone(), to }))
+}
+
+struct StrictMdix {
+    to: bool,
+}
+
+impl Edit<Project> for StrictMdix {
+    fn apply(&mut self, p: &mut Project) {
+        p.strict_mdix = self.to;
+    }
+    fn revert(&mut self, p: &mut Project) {
+        p.strict_mdix = !self.to;
+    }
+    fn label(&self) -> &str {
+        "Auto-MDI-X ändern"
+    }
+}
+
+/// "Auto-MDI-X aus" on or off -> the undo step (not applied yet), None when it is so already
+pub(crate) fn strict_mdix(p: &Project, on: bool) -> Option<Box<dyn Edit<Project>>> {
+    if p.strict_mdix == on {
+        return None;
+    }
+    Some(Box::new(StrictMdix { to: on }))
 }
 
 // ---------------------------------------------------------------- links

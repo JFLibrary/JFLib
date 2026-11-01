@@ -74,7 +74,7 @@ pub(crate) fn port_icon(m: jfn_model::Media) -> u32 {
         Console => JN_PORT_CONSOLE,
         Usb => JN_PORT_USB,
         RadioAp | RadioClient => JN_PORT_RADIO,
-        Wan => JN_PORT_WAN,
+        Wan | Rj11 | Coax => JN_PORT_WAN,
     }
 }
 

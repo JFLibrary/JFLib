@@ -192,7 +192,7 @@ fn statusbar(n: &mut Net, ui: &mut Ui) {
     if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note) {
         ui.text(TS_CAPTION | TX_TERTIARY, t("Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet"));
     }
-    if n.canvas.tool == Tool::Connect {
+    if matches!(n.canvas.tool, Tool::Connect(_)) {
         match n.canvas.kb_from.and_then(|d| n.doc.proj.device(d)) {
             Some(a) => ui.text(TS_CAPTION | TX_TERTIARY, &tf("Ende A: {} – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab", &[&a.name])),
             None => ui.text(TS_CAPTION | TX_TERTIARY, t("Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet")),

@@ -20,7 +20,7 @@ use ui::*;
 
 use super::scene::{Level, SItem, Scene, What, RACK_PAD, RACK_W, RACK_X, RU};
 use crate::app::Net;
-use crate::workspace::canvas::paint::{cable_color, cable_style};
+use crate::workspace::canvas::paint::{cable_style, link_color};
 use crate::workspace::icons::Symbols;
 
 pub(crate) struct Painter {
@@ -278,7 +278,7 @@ fn cables(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
         }
         let (_, w, dash) = cable_style(c.cable);
         let w = if c.link.is_none() { w + 1.5 } else { w };
-        let argb = if c.bad { opaque(f.color(T_CRIT)) } else { cable_color(c.cable, f.dark, c.down, f.bg) };
+        let argb = if c.bad { opaque(f.color(T_CRIT)) } else { link_color(c.cable, c.color, f.dark, c.down, f.bg) };
         let dash = if c.bad { DASH_DASH } else if c.cable == jfn_model::CableKind::Console { DASH_DOT } else { dash };
         if f.route_visible(rt, w + 2.0) {
             dg_stroke_edge(g, &f.vp, &rt.pts, w, argb, LCAP_FLAT, LCAP_FLAT, dash);

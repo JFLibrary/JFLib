@@ -30,6 +30,7 @@
 //                       on the device (files.rs)
 //   CableTooLong        a cable longer than its medium allows at its speed (phys.rs, P1)
 //   OpticMismatch       the optics of a fibre's ends do not fit each other or the fibre
+//   CableGrade          a cable's category does not carry the speed of its ports (phys.rs, H2)
 //   MailMxNowhere       an MX record whose host has no address in any zone (error), or no SMTP
 //                       server runs at its address (warning; smtpd.rs)
 //   MailOpenRelay       an SMTP server that relays for every sender ("open_relay", warning)
@@ -136,6 +137,8 @@ pub enum ProblemKind {
     Dot1xNoServer,
     /// a port asks for 802.1X but the device has it switched off
     Dot1xOff,
+    /// a cable whose category does not carry the speed of its ports (phys.rs)
+    CableGrade,
 }
 
 /// a problem of the set-up

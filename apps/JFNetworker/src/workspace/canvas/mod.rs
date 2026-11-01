@@ -212,10 +212,14 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     if n.canvas.st.name != t("Topologie") {
         n.canvas.st.name = String::from(t("Topologie"));
     }
-    // Esc gives up an armed tile before the canvas takes it for its selection
-    if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Pdu) && ui.popup_count() == 0 && ui.modal_active() == 0 && ui.key(VK_ESCAPE) {
+    // Esc gives up an armed tile before the canvas takes it for its selection, and a kind of cable
+    // chosen in the palette (while none is being drawn: Esc ends that first)
+    let armed = matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Pdu) || (matches!(n.canvas.tool, Tool::Connect(Some(_))) && n.canvas.conn.is_none());
+    if armed && ui.popup_count() == 0 && ui.modal_active() == 0 && ui.key(VK_ESCAPE) {
         n.canvas.tool = Tool::Select;
+        n.canvas.kb_from = None;
     }
+    connect::drop_refusal(n);
     crate::doc::autosave::bar(n, ui);
     infobar(n, ui);
     let minimap = n.prefs.minimap;
@@ -395,7 +399,7 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
         // the PDU tool the source or destination; else its console (Shift: its device window),
         // a note: its text
         DEv::Activate(DHit::Node(k)) => match n.canvas.tool {
-            Tool::Connect if n.doc.proj.device(k as u32).is_some() => connect::key_pick(n, ui, k as u32),
+            Tool::Connect(_) if n.doc.proj.device(k as u32).is_some() => connect::key_pick(n, ui, k as u32),
             Tool::Pdu if n.doc.proj.device(k as u32).is_some() => crate::workspace::sim::pdu::pick_dev(n, ui, k as u32),
             _ => crate::workspace::terminal::activate(n, ui, k as u32),
         },

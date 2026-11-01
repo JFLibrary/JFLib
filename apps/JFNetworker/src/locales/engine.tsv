@@ -66,7 +66,7 @@ IoT-Sensor (WLAN 2,4 GHz)	IoT sensor (WLAN 2.4 GHz)
 IP-Kamera	IP camera
 IP-Kamera (1G, PoE)	IP camera (1G, PoE)
 Smart-TV	Smart TV
-Smart-TV (1G, WLAN)	Smart TV (1G, WLAN)
+Smart-TV (1G, WLAN, Koax)	Smart TV (1G, WLAN, coax)
 JF-S24P	JF-S24P
 Access-Switch 24× 1G PoE+, 4× 10G SFP+	Access switch 24× 1G PoE+, 4× 10G SFP+
 JF-S24L3	JF-S24L3
@@ -1543,3 +1543,34 @@ selbst signiert	self-signed
 unbekannter Aussteller	unknown issuer
 falscher Name	wrong name
 ohne Fehler	no fault
+Farbe der Kabelart	Color of the cable kind
+Türkis	Teal
+Pink	Pink
+Braun	Brown
+Seriell, erstes Ende DCE	Serial, first end DCE
+Seriell, erstes Ende DTE	Serial, first end DTE
+Telefonkabel (RJ11)	Telephone cable (RJ11)
+Koaxialkabel	Coaxial cable
+Direktkabel (DAC)	Direct attach cable (DAC)
+Aktives Glasfaserkabel (AOC)	Active optical cable (AOC)
+Multimode	Multimode
+Singlemode	Single-mode
+Seriell DCE	Serial DCE
+Seriell DTE	Serial DTE
+Telefon	Telephone
+Koax	Coax
+DAC	DAC
+AOC	AOC
+keine Längengrenze	no length limit
+{} m bei {}	{} m at {}
+nicht bei {}	not at {}
+RJ11	RJ11
+{}× RJ11	{}× RJ11
+{}× Koax	{}× coax
+Kabelmodem	Cable modem
+Kabelmodem (Koax, 1G LAN)	Cable modem (coax, 1G LAN)
+DSL-Modem	DSL modem
+DSL-Modem (RJ11, 1G LAN)	DSL modem (RJ11, 1G LAN)
+Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.	Category {} does not fit {}; the limits without a category apply.
+{}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.	{} cable on {} does not carry {}; the link stays down.
+{}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.	{} cable between {} and {} does not carry {}; the link stays down.

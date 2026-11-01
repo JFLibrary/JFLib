@@ -485,7 +485,7 @@ impl Footprint {
         for l in e.links.iter().flatten() {
             f.cables += size_of::<LinkRt>() + l.queued() * size_of::<Queued>();
         }
-        f.cables += e.links.len() * size_of::<Option<LinkRt>>() + e.link_idx.len() * 48;
+        f.cables += e.links.len() * size_of::<Option<LinkRt>>() + e.link_idx.len() * 48 + e.phys.grade.len() * 48;
         f.series = e.series.footprint();
         f.rest = size_of::<Engine>() + e.jobs.len() * (size_of::<crate::jobs::Job>() + 256) + e.cli.jobs.len() * 48;
         f.rest += e.faults().len() * size_of::<crate::fault::FaultMark>() + 256;

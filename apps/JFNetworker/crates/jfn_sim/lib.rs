@@ -136,8 +136,9 @@
 //            between them (Inline::rewind_on), a replay to any recorded moment (Restore), a
 //            past state that becomes the present (Inline::resume); footprint, digest
 //   phys     the physical layer (P1): cable lengths against the reach of their media, the
-//            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
-//            the problems CableTooLong and OpticMismatch
+//            optics of fibres, the categories of cables; Action::CableLen / Optic / CableGrade,
+//            cable_phys, PhysNote (Note::Phys), the problems CableTooLong, OpticMismatch and
+//            CableGrade
 //   mailtrace MNote: the decisions of mail as notes (Note::Mail) with their German sentences
 //   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
 //   webc     the Webbrowser's side in the engine: requests with redirects over the HTTP client

@@ -5,12 +5,13 @@
 //   frame(n, ui)                the panel's content (a dock panel on the right)
 //
 // device.rs shows a device (name, power, model, interfaces from the simulator with the quick
-// settings of the chosen one, cables), cable.rs a cable (ends, kind, speed, delay, loss, plug,
-// route), faults.rs the lab's fault injection on each of them (a device, a cable, the
+// settings of the chosen one, cables), cable.rs a cable (ends, kind, category, colour, speed,
+// delay, loss, plug, route), faults.rs the lab's fault injection on each of them (a device, a cable, the
 // partition of several devices) and the active faults (also on the project's page).  Here:
 // notes edit their text, several things show what is selected and switch all
-// their devices on or off, the project edits its title and shows file, state and counts (with
-// the cables that are up).  Every change is one undo step; the simulator follows each.  Edit buffers
+// their devices on or off, the project edits its title, shows file, state and counts (with
+// the cables that are up) and has "Auto-MDI-X aus" (Project::strict_mdix).  Every change is one undo
+// step; the simulator follows each.  Edit buffers
 // keep what the user typed until Enter, a button or Esc; they start over when the value
 // changes elsewhere (undo, the canvas).
 //
@@ -262,6 +263,16 @@ fn project(n: &mut Net, ui: &mut Ui) {
         TS_CAPTION | TX_SECONDARY | TX_WRAP,
         t("Ziehen Sie ein Gerät aus der Palette auf die Zeichenfläche, oder klicken Sie eine Kachel und dann auf die Fläche (Umschalt: mehrere). Verbinden (C): von einem Gerät auf ein anderes ziehen."),
     );
+    // a wrong copper cable holds its link down (Project::strict_mdix, one undo step)
+    let mut strict = n.doc.proj.strict_mdix as i32;
+    if ui.switch(ID_PROJ_MDIX, t("Auto-MDI-X aus"), &mut strict) & EV_ACT != 0 {
+        if let Some(e) = edits::strict_mdix(&n.doc.proj, strict != 0) {
+            n.doc.apply(e);
+        }
+        ui.repass();
+    }
+    ui.next_size(-1, 0);
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Aus: ein falsches Kupferkabel hält die Leitung unten, wie an einem Port ohne Auto-MDI-X."));
     // the lab's active faults (faults.rs)
     faults::project(n, ui);
     // the scale of the WLAN ranges, once there is a radio (wlan.rs)

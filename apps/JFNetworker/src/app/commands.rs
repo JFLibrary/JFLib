@@ -46,7 +46,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 110] = [
+pub(crate) static CMDS: [Command; 116] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -157,6 +157,12 @@ pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
     Command::new(CMD_TERM_SESSION, "Neue &Sitzung", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE, "Seriell, erstes Ende D&CE", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 1, "Seriell, erstes Ende D&TE", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 2, "Te&lefonkabel (RJ11)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 3, "Koa&xialkabel", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 4, "&Direktkabel (DAC)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 5, "Akti&ves Glasfaserkabel (AOC)", 0, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -348,7 +354,7 @@ pub(crate) static M_GROUP: [Mi; 9] = [
 ];
 /// the context menu of the background picture (G1, while it is not locked)
 pub(crate) static M_BACKDROP: [Mi; 5] = [Mi::Cmd(CMD_BG_LOCK), Mi::Cmd(CMD_BG_FIT), Mi::Cmd(CMD_BG_OPEN), Mi::Sep, Mi::Cmd(CMD_BG_REMOVE)];
-static M_CABLE_KIND: [Mi; 10] = [
+static M_CABLE_KIND: [Mi; 16] = [
     Mi::Cmd(CMD_CABLE0),
     Mi::Sep,
     Mi::Cmd(CMD_CABLE0 + 1),
@@ -359,6 +365,12 @@ static M_CABLE_KIND: [Mi; 10] = [
     Mi::Cmd(CMD_CABLE0 + 6),
     Mi::Cmd(CMD_CABLE0 + 7),
     Mi::Cmd(CMD_CABLE0 + 8),
+    Mi::Cmd(CMD_CABLE_MORE),
+    Mi::Cmd(CMD_CABLE_MORE + 1),
+    Mi::Cmd(CMD_CABLE_MORE + 2),
+    Mi::Cmd(CMD_CABLE_MORE + 3),
+    Mi::Cmd(CMD_CABLE_MORE + 4),
+    Mi::Cmd(CMD_CABLE_MORE + 5),
 ];
 
 fn flag(on: bool, f: u32) -> u32 {
@@ -385,7 +397,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     let t = n.canvas.tool;
     ui.cmd_state(CMD_TOOL_SELECT, flag(t == Tool::Select, CF_CHECKED));
     ui.cmd_state(CMD_TOOL_HAND, flag(t == Tool::Hand, CF_CHECKED));
-    ui.cmd_state(CMD_TOOL_CONNECT, flag(t == Tool::Connect, CF_CHECKED));
+    ui.cmd_state(CMD_TOOL_CONNECT, flag(matches!(t, Tool::Connect(_)), CF_CHECKED));
     ui.cmd_state(CMD_TOOL_NOTE, flag(t == Tool::Note, CF_CHECKED));
     crate::workspace::sim::states(n, ui);
     cables::states(n, ui);
@@ -469,7 +481,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             return false;
         }
         UIC_ESCAPE => {
-            if !matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Connect | Tool::Pdu) {
+            if !matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Connect(_) | Tool::Pdu) {
                 return false;
             }
             n.canvas.tool = Tool::Select;
@@ -522,7 +534,11 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         _ if (CMD_PANEL0..CMD_PANEL0 + PANELS.len() as u32).contains(&id) => focus_panel(n, ui, PANELS[(id - CMD_PANEL0) as usize]),
         CMD_TOOL_SELECT => tools::set(n, Tool::Select),
         CMD_TOOL_HAND => tools::set(n, Tool::Hand),
-        CMD_TOOL_CONNECT => tools::set(n, Tool::Connect),
+        // (the kind the palette chose stays)
+        CMD_TOOL_CONNECT => {
+            let kind = if let Tool::Connect(k) = n.canvas.tool { k } else { None };
+            tools::set(n, Tool::Connect(kind));
+        }
         CMD_TOOL_NOTE => tools::set(n, Tool::Note),
         CMD_ABOUT => n.shell.about.set(1),
         CMD_FOCUS_CANVAS => ui.focus(ID_CANVAS),
@@ -535,9 +551,12 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_ROUTE_CURVE => cables::set_route(n, jfn_model::project::Route::Curve),
         CMD_DISCONNECT => cables::disconnect_selection(n),
         CMD_POWER => cables::toggle_power(n),
-        _ if (CMD_CABLE0..=CMD_CABLE0 + CableKind::ALL.len() as u32).contains(&id) => {
+        _ if (CMD_CABLE0..=CMD_CABLE0 + CABLE_KINDS0 as u32).contains(&id) => {
             let k = (id - CMD_CABLE0) as usize;
             cables::set_kind(n, if k == 0 { None } else { Some(CableKind::ALL[k - 1]) });
+        }
+        _ if (CMD_CABLE_MORE..CMD_CABLE_MORE + (CableKind::ALL.len() - CABLE_KINDS0) as u32).contains(&id) => {
+            cables::set_kind(n, Some(CableKind::ALL[CABLE_KINDS0 + (id - CMD_CABLE_MORE) as usize]));
         }
         CMD_CONSOLE..=CMD_LOG_CLEAR => return terminal::command(n, ui, id),
         // the simulation mode (workspace/sim)

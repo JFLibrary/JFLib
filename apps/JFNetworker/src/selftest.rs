@@ -68,6 +68,8 @@
 // part of radiusd and wlan, cli/dot1x.rs).
 // imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
 // mailc.rs and cli/mail.rs).
+// cablestest.rs: the choice of cables (group cables: jfn_model::cable, phys::reach_graded, the
+// engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
 
 use alloc::format;
 use alloc::string::String;
@@ -133,6 +135,8 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "cablestest.rs"]
+mod cablestest;
 #[path = "mailtest.rs"]
 mod mailtest;
 #[path = "groupstest.rs"]
@@ -169,7 +173,7 @@ mod imaptest;
 mod webdevtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 54] = [
+    let groups: [(&'static str, fn(&mut T)); 55] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -224,6 +228,7 @@ pub fn run() -> i32 {
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),
         ("imap", imaptest::run),
+        ("cables", cablestest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

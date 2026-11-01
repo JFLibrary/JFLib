@@ -68,6 +68,10 @@
 //                                                      do not fit keep a cable down); Connect
 //                                                      takes Link::len_m as the cable's length
 //                                                      (0: unknown), AddDevice the device's optics
+//   CableGrade / StrictMdix                            a cable's category (phys.rs; Connect takes
+//                                                      Link::grade), the project's "Auto-MDI-X aus"
+//                                                      (H2: a wrong copper cable holds its link
+//                                                      down; every link looks again)
 //   MailSend / MailFetch                               the E-Mail program of a host sends a
 //                                                      message or fetches the new ones of its
 //                                                      account (mailc.rs: a job of its own,
@@ -279,6 +283,10 @@ pub enum Action {
     Files { dev: u32, files: Vec<jfn_model::files::File> },
     /// the length of a cable in metres (0: unknown, never too long; phys.rs)
     CableLen { link: u32, len_m: u32 },
+    /// the category of a cable (Unset: none; phys.rs)
+    CableGrade { link: u32, grade: jfn_model::cable::CableGrade },
+    /// a wrong copper cable holds its link down (Project::strict_mdix)
+    StrictMdix { on: bool },
     /// the transceiver in a port's optics cage (phys.rs)
     Optic { dev: u32, port: String, optic: jfn_model::catalog::Optic },
     /// the E-Mail program of a device sends a message (mailc.rs)
@@ -704,6 +712,14 @@ impl Engine {
             }
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
+            Action::CableGrade { link, grade } => self.set_cable_grade(link, grade),
+            Action::StrictMdix { on } => {
+                self.strict_mdix = on;
+                for li in 0..self.links.len() {
+                    self.refresh_link(li);
+                }
+                Ok(())
+            }
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
             // the E-Mail program (mailc.rs)
             Action::MailSend { dev, draft } => self.mail_job(dev, crate::mailc::MailJob::Send(draft)),
@@ -1051,8 +1067,9 @@ impl Engine {
                 node.ports[p as usize].link = Some(li);
             }
         }
-        // its length and what follows from it (phys.rs); one that never comes up says why
-        self.phys_init(li, l.len_m);
+        // its length and category and what follows from them (phys.rs); one that never comes up
+        // says why
+        self.phys_init(li, l.len_m, l.grade);
         self.refresh_link(li);
         if self.phys_bad(li) {
             self.phys_down(li);

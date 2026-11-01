@@ -1,24 +1,26 @@
 // tools -- the tools of the topology canvas and what a click with them does
 //
-//   Tool::{Select, Hand, Connect, Note, Place(model)}   the toolbar's tools (V, H, C, N) and a
-//                                   palette tile armed for placing (DG_PLACE); Pdu (P) picks the
-//                                   source and destination of a simple PDU (DG_PLACE, sim/pdu.rs)
+//   Tool::{Select, Hand, Connect(kind), Note, Place(model)}   the toolbar's tools (V, H, C, N)
+//                                   and a palette tile armed for placing (DG_PLACE); Pdu (P) picks
+//                                   the source and destination of a simple PDU (DG_PLACE, sim/pdu.rs)
 //   tool.dg() / status()            the ui::diagram tool, the status text
 //   set(n, tool)                    switch (the armed tile is dropped)
 //   arm(n, model)                   a tile was clicked: place it with the next click (again:
 //                                   back to Auswahl)
+//   choose_cable(n, kind, toggle)   a cable tile: Verbinden with that kind (None: "Automatisch");
+//                                   with toggle (a click) the chosen one goes back to Auswahl
 //   place(n, model, at)             a device centred on the world point at (snapped), selected
 //   place_note(n, at)               a note at the point, then its editor opens
 //   place_centre(n, model)          Enter on a tile: into the middle of the view
 //   origin(n, at) / click_point(n, at)   where a device lands (the canvas' preview)
 //
-// Connect (C) draws cables: from one device to another, or two clicks (connect.rs); it stays
-// until Esc or another tool.  A placing click with Shift keeps the tile armed for the next
-// device; without it the canvas returns to Auswahl.
+// Connect (C) draws cables: from one device to another, or two clicks (connect.rs); it stays,
+// with the kind the palette chose (C keeps it), until Esc or another tool.  A placing click with
+// Shift keeps the tile armed for the next device; without it the canvas returns to Auswahl.
 
 use alloc::string::String;
 
-use jfn_model::catalog;
+use jfn_model::{catalog, CableKind};
 use ui::*;
 
 use super::paint::{DEV_H, DEV_W};
@@ -30,7 +32,8 @@ use crate::doc::edits;
 pub(crate) enum Tool {
     Select,
     Hand,
-    Connect,
+    /// draws cables; a kind from the palette joins only the ports it fits (None: "Automatisch")
+    Connect(Option<CableKind>),
     Note,
     /// a catalog model (its index in catalog()) waits for a click on the canvas
     Place(usize),
@@ -44,7 +47,7 @@ impl Tool {
         match self {
             Tool::Select => DG_SELECT,
             Tool::Hand => DG_PAN,
-            Tool::Connect => DG_CONNECT,
+            Tool::Connect(_) => DG_CONNECT,
             Tool::Note | Tool::Place(_) | Tool::Pdu => DG_PLACE,
         }
     }
@@ -54,7 +57,8 @@ impl Tool {
         match self {
             Tool::Select => String::from(t("Auswahl")),
             Tool::Hand => String::from(t("Hand")),
-            Tool::Connect => String::from(t("Verbinden")),
+            Tool::Connect(None) => String::from(t("Verbinden")),
+            Tool::Connect(Some(k)) => tf("Verbinden: {}", &[t(k.title())]),
             Tool::Note => String::from(t("Notiz")),
             Tool::Place(i) => tf("Platzieren: {}", &[catalog::catalog().get(i).map_or("?", |m| t(m.name))]),
             Tool::Pdu => String::from(t("Einfache PDU")),
@@ -67,6 +71,13 @@ pub(crate) fn set(n: &mut Net, tool: Tool) {
     n.canvas.tool = tool;
     n.canvas.conn = None;
     n.canvas.kb_from = None;
+}
+
+/// a cable tile of the palette: Verbinden with that kind (None: "Automatisch"); with toggle (a
+/// click, not Enter) the chosen one goes back to Auswahl
+pub(crate) fn choose_cable(n: &mut Net, kind: Option<CableKind>, toggle: bool) {
+    let tool = Tool::Connect(kind);
+    set(n, if toggle && n.canvas.tool == tool { Tool::Select } else { tool });
 }
 
 /// a palette tile was clicked: arm it (a second click disarms); the note tile is the Notiz tool

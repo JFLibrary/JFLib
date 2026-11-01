@@ -27,7 +27,7 @@ click button:"Endgeräte (9)"
 click button:"Netzwerk (7)"
 click button:"Sicherheit (1)"
 expect button:"JF-FW" exists
-click button:"WLAN und WAN (3)"
+click button:"WLAN und WAN (5)"
 expect button:"JF-AP6E" exists
 expect button:"Modem/ONT" exists
 expect button:"Internet" exists

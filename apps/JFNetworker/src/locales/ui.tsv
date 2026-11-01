@@ -1750,3 +1750,25 @@ HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or
 Secure geht nur über https	Secure works only over https
 SameSite=None braucht Secure	SameSite=None needs Secure
 Zertifikat abgelehnt	Certificate refused
+Seriell, erstes Ende D&CE	Serial, first end D&CE
+Seriell, erstes Ende D&TE	Serial, first end D&TE
+Te&lefonkabel (RJ11)	Te&lephone cable (RJ11)
+Koa&xialkabel	Coa&xial cable
+&Direktkabel (DAC)	&Direct attach cable (DAC)
+Akti&ves Glasfaserkabel (AOC)	Acti&ve optical cable (AOC)
+{} · Grenze {} m ({})	{} · limit {} m ({})
+{} verbindet keine freien Ports von {} und {}.	{} joins no free ports of {} and {}.
+Dieses Kabel passt hier nicht	This cable does not fit here
+Verbinden: {}	Connect: {}
+Ohne Angabe	Not stated
+Kategorie	Category
+Kabelfarbe	Cable color
+Nur zum Unterscheiden: den Zustand zeigen die LEDs.	Only to tell cables apart: the LEDs show the state.
+Auto-MDI-X aus	Auto-MDI-X off
+Aus: ein falsches Kupferkabel hält die Leitung unten, wie an einem Port ohne Auto-MDI-X.	Off: a wrong copper cable holds the link down, as on a port without auto-MDI-X.
+Kabel: {}	Cable: {}
+Automatisch: das richtige Kabel für die beiden Ports	Automatic: the right cable for the two ports
+trägt {} nicht	does not carry {}
+{}-Kabel trägt {} nicht. Die Leitung bleibt aus.	{} cable does not carry {}. The link stays down.
+{} – Kategorie reicht nicht	{} – category too low
+{}, Kategorie reicht nicht	{}, category too low
