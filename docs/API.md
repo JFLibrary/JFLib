@@ -6921,6 +6921,10 @@ blocks follow at MdDoc::update (md_view.rs does it every frame)
   remove(n) (out of the document, kept: it may go in again) / free(n) (gone: its handles and
   those of its descendants refer to nothing) / set_inner_html(n, html)
   MdNode::raw() / MdNode::from_raw(v): a handle as a number (the objects of a script host)
+  doc.element_at(block, byte) -> the innermost element around that byte of a block's text (an
+  inline element, else MdBlock::node; a click: MdEv::click)
+  doc.dom_size() -> (live nodes, bytes of their names, texts and attributes): what a host that
+  lets others change the tree limits
 
 The tree: HTML read the way browsers do, simplified -- void elements (br, img, input ...),
 raw text (script, style, textarea, title, template, noscript, svg), a <p> closed by a block,
@@ -6959,6 +6963,16 @@ the nearest ancestor that takes it), a query at most a budget proportional to th
 - **`fn root(&self) -> MdNode`**
   the document's root (MdNode::NONE for a document from Markdown): its children are the
   top level of the HTML
+- **`fn dom_size(&self) -> (usize, usize)`**
+  the live nodes of the tree (out of the document too) and the bytes of their names, texts
+  and attributes; linear in the tree
+- **`fn element_at(&self, k: usize, byte: usize) -> MdNode`**
+  the innermost element around byte `byte` of block k's text: blocks know only their own
+  element (MdBlock::node), so this reads the inline content of that element again and lines
+  its characters up with the block's text, blanks aside (linear in the element).  An image's
+  or a field's U+FFFC is its element; a byte at the end, or content that does not line up
+  (hidden by a style sheet, say), gives the block's element; NONE: no block, or none of an
+  element (a document from Markdown)
 - **`fn by_id(&self, id: &str) -> Option<MdNode>`**
   the first element in the document with this id
 - **`fn select(&self, sel: &str) -> Vec<MdNode>`**
@@ -7040,13 +7054,16 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
        (st.set_markdown / set_html / set_doc)
-  MdEv { ev, link, hover, field, submit }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
+  MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
        activated); link: the activated link's target (a click on it, Enter on the focused
        one); hover: the target of the link under the pointer; field: a form field the user
        changed (typed, toggled, chose) or a button without a submit / reset action he pressed;
        submit: a form was sent (MdSubmit: the form, its action and method, the name / value
-       pairs, the button).  The view fills the place it gets (natural 480 x 320 DIP;
-       next_size(-1, -1) fills).
+       pairs, the button); click: the element of an HTML document a click on the text hit (the
+       inline element around the character under the pointer, else the block's, the document's
+       root beside the blocks; none after a drag; Enter on a link: its element; a field's
+       widget takes its own clicks: field, submit).  The view fills the place it gets (natural
+       480 x 320 DIP; next_size(-1, -1) fills).
   MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
        (the name for screen readers; "" = "Dokument") / doc() / selection() /
        set_selection(sel) / select_all() / selected_text() / selected_html() /
@@ -7154,6 +7171,7 @@ MI_APP: u8 = 2
   - `field: Option<usize>` -- a field the user changed this frame, or a button (MF_BUTTON) he pressed (index of
     doc().fields())
   - `submit: Option<MdSubmit>` -- a form sent this frame (Enter in a field, a submit button)
+  - `click: Option<MdNode>` -- the element a click hit this frame, or the link Enter activated (see the module header)
 
 - **`struct MdSubmit`**
   a form being sent: what a browser would send (MdViewState::form_data)
@@ -30615,6 +30633,9 @@ diagnostics, compiler, VM with fuel and a garbage collector
   fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
   import(path)                 modules (module.rs): another file's top-level names as a map,
                                read through Host::load, run once per VM
+  Vm::add_script(name, src)    a further script of a VM, as the <script> elements of a page
+                               are (module.rs): their top-level names are one scope, the errors
+                               name each script's file
   debugger (debug.rs)          Vm::set_breakpoint, request_pause, step(Step), run() ->
                                Status::Paused(Pause), frames, locals, upvalues,
                                frame_globals, eval; Program::line_table / break_lines
@@ -31314,6 +31335,8 @@ mark-and-sweep collector, the host interface
                                                          (module.rs; default: none)
   vm.modules()                                           the program's name, the modules'
                                                          paths
+  vm.add_script(name, src)  then run() as above          a further script with the same
+                                                         top-level names (module.rs)
 
 Fuel is virtual CPU time: one unit per instruction, more for instructions that copy (string
 and list concatenation, literals, iterating a map), plus what natives charge.  run(host,
@@ -31468,7 +31491,8 @@ drives exec one instruction at a time (exec_debug) and checks between them where
 - **`fn take_output(&mut self) -> String`**
   what print() wrote, emptying the buffer
 - **`fn global(&self, name: &str) -> Option<Value>`**
-  a global of the script (not of its modules), or the value the host gave a host name
+  a global of the script or of the scripts added to it (not of its modules), or the value
+  the host gave a host name
 - **`fn set_global(&mut self, name: &str, v: Value) -> bool`**
   set a global of the script, or give a name the script takes from the host a value (a
   map for config, say); false when the script uses no such name.  The value of a host
@@ -31925,13 +31949,28 @@ does not start with "/" or a drive ("C:/") is relative to the directory of the i
 file, and a file without a directory ("-e", an inline script) passes it on as it is: the
 host reads it relative to its working directory.  Fuel: 1 per 64 bytes of source on top of
 the call, then the module's code as it runs.
+
+Scripts of a VM (the <script> elements of a page): vm.add_script(name, src) links a further
+script the way import links a module, with its top-level code pending as an invocation of its
+own (only while idle; run() runs it, with fresh fuel), but without a scope of its own: the fns and
+lets of the program and of the scripts added before are its names too, the same variables (a
+let of the same name assigns them), and what it declares the next ones see.  A script does not
+see the names of a later one.  It is compiled the way the program was (compile_with: a name
+neither declared, known nor of a script before is an error); Err: the errors, the VM is as it
+was and goes on (the next script); an error while it runs ends only that invocation, and what it
+declared so far stays.  Errors and traces name `name` as written (no path rules), vm.global finds
+their names too.  At most MAX_UNITS scripts and modules together.
 ```
 
 **`impl Vm`**
 
+- **`fn add_script(&mut self, name: &str, src: &str) -> Result<(), Vec<Diagnostic>>`**
+  a further script of this VM (see the module comment): its top-level code is pending, run()
+  runs it -> Err: why it cannot run (its errors; line 0: the VM is busy, too many scripts),
+  the VM stays as it was
 - **`fn modules(&self) -> Vec<String>`**
-  the files of the VM: the program's name, then the modules' paths in the order they
-  were imported (one that failed and was imported again once per try)
+  the files of the VM: the program's name, then the modules' paths and the scripts' names in
+  the order they came (a module that failed and was imported again once per try)
 
 ### `script/debug.rs`
 
