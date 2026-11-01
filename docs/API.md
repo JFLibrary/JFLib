@@ -159,7 +159,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
@@ -603,6 +603,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn focus(&mut self, id: u32)`**
   ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
   looked up in whichever window emits it in the next pass (that window is activated).
+- **`fn focus_quiet(&mut self, id: u32)`**
+  the keyboard focus to a widget of this window without the focus ring: the keyboard goes
+  back to it after a pointer gesture (a ring only follows keyboard navigation)
 - **`fn focused(&self) -> u32`**
   ui_focused: id of the focused widget (0 = none)
 - **`fn key(&mut self, vk: u32) -> bool`**
@@ -2707,13 +2710,19 @@ Places: a side holds tab groups (left / right: one above the other, bottom: side
 with splitters between them and towards the document area; a collapsed side is a rail of
 icon buttons.  Left and right are the start and the end side: the layout is logical, so a
 mirrored (RTL) window shows the left side at the right like everything else.
-Dragging a tab (or the empty part of a tab strip: the whole group) shows drop markers at the
-three edges of the area (a new group on that side) and on the group under the pointer (as a
-tab, before, after it); a release over a tab strip inserts it there; anywhere else -- also
-outside the window -- the panel floats in a tool window at the pointer (WF_TOOL, window ids
-id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the same way onto the main
-window's markers (the pointer stays with the floating window); its pin button or a double
-click docks it where it came from, its close button hides its panels.  Esc cancels a drag.
+A press on a tab (or on the empty part of a tab strip: the whole group) can drag only after it
+was held for DOCK_HOLD_MS: then the tab shows it (DOCK_TAB_HOLD, the move cursor; a timer gives
+the pass while the pointer rests), and the drag starts when the pointer moves past the usual
+threshold from where it is at that moment.  Movement during the hold cancels nothing and never
+counts (a slip or a tremor starts nothing), a release without a drag is a click if it is over
+the tab.  Clicks, double clicks, the menu and the splitters need no hold.
+A drag shows drop markers at the three edges of the area (a new group on that side) and on the
+group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
+there; anywhere else -- also outside the window -- the panel floats in a tool window at the
+pointer (WF_TOOL, window ids id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the
+same way onto the main window's markers (the pointer stays with the floating window); its pin
+button or a double click docks it where it came from, its close button hides its panels.  Esc
+cancels a hold and a drag (the release is no click then).
 Keyboard: the tab strip of a group is one focus stop (Left / Right / Home / End switch tabs,
 the menu key or Shift+F10 open the group's menu with every move), Ctrl+PgDn / Ctrl+PgUp switch
 tabs while the focus is anywhere in the group, DockState::focus(id) brings a panel forward
@@ -2746,6 +2755,13 @@ DOCK_MK_RIGHT: i32 = 1
 DOCK_MK_TOP: i32 = 2
 DOCK_MK_BOTTOM: i32 = 3
 DOCK_MK_CENTER: i32 = 4
+/// a press on a tab or on the empty part of a tab strip can drag only after this many ms with
+/// the button down, so that a slip of the hand during a click neither moves nor floats a panel;
+/// clicks, double clicks (they float), the menu and the splitters need no hold
+DOCK_HOLD_MS: u32 = 300
+/// StyleShell::dock_tab, sp.flags: the press was held long enough, the tab can be moved now (a
+/// press on the strip's empty part: every tab of the group, they would all move)
+DOCK_TAB_HOLD: u32 = 1
 ```
 
 - **`struct DockPanel<'a>`**
@@ -3891,7 +3907,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   style NAME                    another style linked into the app (Ui::set_style)
   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
   rclick S        dblclick S [shift|ctrl|alt]...
-                  drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
+                  drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
+                  drag ... hold MS   the button rests MS ms before the first move (like
+                  `wait`: timers and animations run), the hold a dock tab asks for (its drag
+                  counts from where the pointer is then, so the moves must leave that place)
                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
                   following pointer events (touch: they are a finger, as in the next lines)
@@ -4576,7 +4595,8 @@ the widget families are being ported; a finished style overrides every function.
     the tab strip of a dock group (rect = the strip, SM_DOCK_HDR high), value as dock_group
   - `fn dock_tab_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32)`
     a tab of a dock group: label, icon, ev, value 1 = the shown panel, value2 1 = the focus
-    is in the group; size -> (w, h), the core takes w (a tab is as high as the strip)
+    is in the group, flags DOCK_TAB_HOLD = held long enough to be dragged (show it through
+    the tokens); size -> (w, h), the core takes w (a tab is as high as the strip)
   - `fn dock_tab(&self, ui: &mut Ui, sp: &Sp)`
   - `fn dock_rail(&self, ui: &mut Ui, sp: &Sp)`
     the rail of a collapsed dock side (rect), flags DOCK_LEFT / DOCK_RIGHT / DOCK_BOTTOM
@@ -6399,7 +6419,9 @@ frame) or in its top right corner: a click there reports DEv::Toggle (no selecti
 DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
 frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
 its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
-DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
+DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).  A DN_HITMIN node
+(a line of text) is hit in a box of at least 16 x 16 DIP around it, so it stays selectable at
+low zoom.
 
 Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 ports at a position relative to their node's top left corner, edges from key a to key b
@@ -6416,7 +6438,9 @@ under the pointer, the topmost node (a DN_TOGGLE node's button first), the neare
 (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
-(Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
+(Shift: sideways), Ctrl + wheel zooms at the pointer.  A double click on the background with
+DG_SELECT (no Shift, no Ctrl) reports DEv::DoubleClick at the second press; a press that became
+a drag (a marquee) or a key between the clicks makes none.  Keys while the canvas has the focus:
 arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
 a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
 the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
@@ -6452,6 +6476,7 @@ DN_TOGGLE: u32 = 8  // a collapse button (DEv::Toggle), see dg_toggle_rect
 DN_STEP: u32 = 16  // moves by whole grid steps (its corner keeps its offset to the grid)
 DN_RESIZE: u32 = 32  // selected: a handle at the bottom right corner resizes it
 DN_OUTLINE: u32 = 64  // an outline in the overview (DN_FRAME nodes are always)
+DN_HITMIN: u32 = 128  // hit in a box of at least 16 x 16 DIP around it (a small text)
 /// port flags (DPort::flags)
 DPT_HIDDEN: u32 = 1  // neither shown nor hit
 DPT_USED: u32 = 2  // shown filled (connected)
@@ -6549,6 +6574,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `Context(DHit, [i32; 2])` -- right click, Shift+F10 or the menu key: at = window px (logical, for popups)
   - `Delete` -- Del with a selection: delete st.sel
   - `Click { at: [f32; 2] }` -- a click on the background, or anywhere with DG_PLACE (snapped then); world units
+  - `DoubleClick { at: [f32; 2] }` -- a double click on the background with DG_SELECT (no Shift, no Ctrl): the world point of
+    the second press, not snapped; neither a Click nor a marquee follows it
   - `ViewChanged` -- zoom or centre changed
   - `Toggle(u64)` -- a click on the collapse button of a DN_TOGGLE node
   - `Resize { key: u64, rect: [f32; 4], done: bool }` -- the resize handle of a DN_RESIZE node was dragged: its new box x, y, w, h (world, the
@@ -9959,6 +9986,46 @@ POP_ROWS: usize = 10
   - `Rename(TextPos)` -- rename the word at the position (F2)
   - `Format` -- format the document (Shift+Alt+F)
   - `Breakpoint(usize)` -- a click in the breakpoints' column of line (from 0)
+
+#### `ui/action_card.rs`
+
+Source: [`lib/ui/action_card.rs`](../lib/ui/action_card.rs)
+
+```text
+action_card -- a card or a list row that does one thing when it is chosen: a template on a
+start page, a recent file, a lesson
+
+  ui.action_card(id, name, &CardDesc) -> EV_*   EV_ACT when it was clicked, or Enter or Space
+                                                while it has the keyboard
+
+CardDesc says what it shows: a title (with an icon and a badge beside it), a text below (wrapped,
+or one line cut with "…"), a caption at the far end, and above them a picture area (`picture_h`
+DIP, 0: none) with the app's drawing, without one the icon large and centred.  `name` is what
+screen readers and scripts call it (K_BUTTON); the texts follow as records of their own.
+
+next_size sets the width (natural: 200 DIP); the height follows the content, and in a row of
+cards they all take the row's height.  next_flags: ST_SUBTLE a list row (no card at rest, the
+hover fill alone), ST_CHECKED selected, ST_DISABLED no input (the texts in the disabled colour).
+The card is one Tab stop; a button of its own (remove from a list) goes beside it, not into it.
+```
+
+- **`struct CardDesc<'a>`**
+  what an action card shows (ui.action_card); ..Default::default() for the parts it has not
+  - `title: &'a str`
+  - `icon: u32` -- beside the title; with a picture area and no drawing, large in that area (0: none)
+  - `text: &'a str` -- below the title ("": none)
+  - `one_line: bool` -- title and text stay on one line, cut with "…" (lists); else they wrap
+  - `badge: Option<(u32, &'a str)>` -- a BADGE_\* kind and its label, beside the title
+  - `aside: &'a str` -- a caption at the far end ("": none)
+  - `picture_h: i32` -- the height of the picture area above the texts (DIP; 0: none)
+  - `draw: Option<DrawRef>` -- what it shows and the version of that drawing (render time, as cmd_custom)
+  - `draw_ver: u32`
+
+**`impl Ui`**
+
+- **`fn action_card(&mut self, id: u32, name: &str, d: &CardDesc) -> u32`**
+  action_card(id, name, &desc) -> EV_\*: a card or list row that does one thing (the top of
+  action_card.rs); next_size sets its width, next_flags ST_SUBTLE, ST_CHECKED, ST_DISABLED
 
 ## agent_core
 
