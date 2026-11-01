@@ -184,6 +184,21 @@ pub fn finger(win: u8, phase: FingerPhase, id: u8, x: i32, y: i32, age_ms: u32) 
     evq_push(finger_event(win, phase, id, x, y, age_ms))
 }
 
+/// (Wayland, X11) how old a sample with the display server's time stamp t (ms) is: that clock's zero
+/// is unknown, so the difference to ours is taken against the smallest one seen (the sample that came at
+/// once).  offset: the host keeps it
+#[cfg(target_os = "linux")]
+pub(crate) fn finger_age(offset: &mut Option<i32>, t: u32) -> u32 {
+    let d = ((crate::time_us() / 1000) as u32).wrapping_sub(t) as i32;
+    let o = match *offset {
+        Some(o) if d.wrapping_sub(o) >= 0 => o,
+        _ => d,
+    };
+    *offset = Some(o);
+    let age = d.wrapping_sub(o) as u32;
+    if age > 5000 { 0 } else { age }
+}
+
 /// pen input on (default) / off (pens become plain mouse events)
 pub fn pen_enable(on: bool) {
     PEN_OFF.store(!on, Ordering::Relaxed);

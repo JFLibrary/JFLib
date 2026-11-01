@@ -1,11 +1,11 @@
-// linux_wl_input -- Wayland seat: pointer, keyboard, key repeat, the event helper
+// linux_wl_input -- Wayland seat: pointer, keyboard, touch, key repeat, the event helper
 //                                                                  [src/plat/linux/wl_input.s]
 //
 //   Wl::push(type, btn, x, y, data)   evq_push with the current MOD_* bits and the event's
 //                                     window (inp.evwin)
 //   Wl::input_service(now) -> next key-repeat deadline (u64::MAX none)   (wait)
 //   Wl::release_buttons()             E_UP for every held button (move / resize grabs)
-//   wlh_seat_caps, wlh_ptr_*, wlh_kb_* event handlers
+//   wlh_seat_caps, wlh_ptr_*, wlh_kb_*, wlh_touch_* event handlers
 //
 // Pointer events belong to the window the pointer entered (ptr_win), keyboard events to the
 // window with the keyboard focus (kb_win).  Pointer positions are converted from surface
@@ -15,6 +15,10 @@
 // (touchpads); vertical is negated so that up = positive, like Win32.
 // Keys: the keymap is parsed by linux_xkb.rs; key repeat uses repeat_info (default 25/s
 // after 600 ms) with its own deadline in wait (modifiers never repeat).
+// wl_touch: every finger goes to plat::finger, for the window of its surface (a popup's: its owner,
+// moved by its offset), at that window's scale; its slot is the finger's id.  A finger's serial
+// serves xdg_toplevel.move / resize (the compositor sees that it is a touch and follows the finger);
+// a child window follows through the library's drag (linux_wl_child.rs).
 
 use rt::os::{syscall6, SYS_MMAP, SYS_MUNMAP};
 
@@ -33,9 +37,27 @@ const BTN_CODE_LEFT: u32 = 0x110; // linux/input-event-codes.h
 // evdev BTN_LEFT.. BTN_BACK -> BTN_*
 static BTN_MAP: [u8; 7] = [BTN_LEFT, BTN_RIGHT, BTN_MIDDLE, BTN_X1, BTN_X2, BTN_X2, BTN_X1];
 
+/// fingers at once
+pub(crate) const FINGERS: usize = 10;
+/// Drag::tool of a child window that follows finger k: this + k
+pub(crate) const FINGER_TOOL: i32 = 1000;
+
+/// a finger that is down
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Finger {
+    pub used: bool,
+    id: i32,    // wl_touch's id of the point
+    pub win: i32,
+    off: [i32; 2], // the offset of the popup it came down on
+    pub at: [i32; 2], // the last position (px of the window)
+}
+
 pub(crate) struct Input {
     pub ptr: u32, // wl_pointer
     pub kb: u32,  // wl_keyboard
+    pub touch: u32, // wl_touch
+    pub fingers: [Finger; FINGERS],
+    touch_clock: Option<i32>,
     pub csd: u32, // wp_cursor_shape_device_v1 of the pointer
     pub enter_serial: u32,
     pub btn_serial: u32,
@@ -68,6 +90,9 @@ impl Input {
         Input {
             ptr: 0,
             kb: 0,
+            touch: 0,
+            fingers: [Finger { used: false, id: 0, win: 0, off: [0; 2], at: [0; 2] }; FINGERS],
+            touch_clock: None,
             csd: 0,
             enter_serial: 0,
             btn_serial: 0,
@@ -201,6 +226,18 @@ pub(crate) fn wlh_seat_caps(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             wl.w.send(p, &POINTER_RELEASE, &[]);
         }
     }
+    if caps & 4 != 0 {
+        if wl.inp.touch == 0 {
+            wl.inp.touch = wl.w.send(wl.g.seat, &SEAT_GET_TOUCH, &[A::N(&IFACE_WL_TOUCH)]);
+        }
+    } else if wl.inp.touch != 0 {
+        let t = wl.inp.touch;
+        wl.inp.touch = 0;
+        wl.fingers_cancel();
+        if wl.g.seat_ver >= 3 {
+            wl.w.send(t, &TOUCH_RELEASE, &[]);
+        }
+    }
     if caps & 2 != 0 {
         if wl.inp.kb == 0 {
             wl.inp.kb = wl.w.send(wl.g.seat, &SEAT_GET_KEYBOARD, &[A::N(&IFACE_WL_KEYBOARD)]);
@@ -213,6 +250,109 @@ pub(crate) fn wlh_seat_caps(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             wl.w.send(k, &KEYBOARD_RELEASE, &[]);
         }
     }
+}
+
+// ------------------------------------------------------------------ touch
+
+impl Wl {
+    // fixed -> px at the scale of window w (without a window s120_test, as the pointer)
+    fn finger_px(&self, w: usize, fixed: i32) -> i32 {
+        let r = &self.win[w & (PW_MAX - 1)];
+        let s = if r.flags & super::window::WLWF_USED != 0 { r.s120 } else { self.inp.s120_test };
+        (fixed as i64 * s as i64 / 30720) as i32
+    }
+
+    fn finger_slot(&self, id: i32) -> Option<usize> {
+        self.inp.fingers.iter().position(|f| f.used && f.id == id)
+    }
+
+    fn finger_push(&mut self, k: usize, phase: crate::FingerPhase, age: u32) {
+        let f = self.inp.fingers[k];
+        let win = (f.win as u32 & (PW_MAX as u32 - 1)) as u8;
+        let mut e = crate::finger_event(win, phase, k as u8, f.at[0], f.at[1], age);
+        e.mods = wl_mods() as u8;
+        crate::evq_push(e);
+    }
+
+    /// the finger that is down on window w: its slot and position (a drag of a child window)
+    pub(crate) fn finger_on(&self, w: usize) -> Option<(usize, i32, i32)> {
+        self.inp.fingers.iter().position(|f| f.used && f.win == w as i32).map(|k| (k, self.inp.fingers[k].at[0], self.inp.fingers[k].at[1]))
+    }
+
+    /// wl_touch.cancel: every finger is gone, no click, no fling
+    pub(crate) fn fingers_cancel(&mut self) {
+        if self.drag.on && self.drag.tool >= FINGER_TOOL {
+            self.child_drag_end();
+        }
+        for k in 0..FINGERS {
+            if self.inp.fingers[k].used {
+                self.finger_push(k, crate::FingerPhase::Cancel, 0);
+                self.inp.fingers[k].used = false;
+            }
+        }
+    }
+}
+
+/// down(serial, time, surface, id, x, y)
+pub(crate) fn wlh_touch_down(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
+    let surf = a.u(2);
+    let mut w = wl.find(surf);
+    let mut off = [0; 2];
+    if w < 0 {
+        // a popup: its owner and offset (the pointer's offset is kept)
+        let (px, py) = (wl.inp.off_x, wl.inp.off_y);
+        w = wl.popup_ptr(surf);
+        off = [wl.inp.off_x, wl.inp.off_y];
+        wl.inp.off_x = px;
+        wl.inp.off_y = py;
+        if w < 0 {
+            return;
+        }
+    }
+    wl.inp.btn_serial = a.u(0);
+    wl.inp.input_serial = a.u(0);
+    let id = a.i(3);
+    if let Some(k) = wl.finger_slot(id) {
+        wl.finger_push(k, crate::FingerPhase::Cancel, 0); // (it never lifted)
+        wl.inp.fingers[k].used = false;
+    }
+    let Some(k) = wl.inp.fingers.iter().position(|f| !f.used) else { return };
+    let at = [wl.finger_px(w as usize, a.i(4)) + off[0], wl.finger_px(w as usize, a.i(5)) + off[1]];
+    wl.inp.fingers[k] = Finger { used: true, id, win: w, off, at };
+    wl.child_press(w, at[0], at[1]); // the keyboard between a toplevel and its child windows
+    let age = crate::evq::finger_age(&mut wl.inp.touch_clock, a.u(1));
+    wl.finger_push(k, crate::FingerPhase::Down, age);
+}
+
+/// up(serial, time, id)
+pub(crate) fn wlh_touch_up(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
+    let Some(k) = wl.finger_slot(a.i(2)) else { return };
+    if wl.drag.on && wl.drag.tool == FINGER_TOOL + k as i32 {
+        wl.child_drag_end();
+    }
+    let age = crate::evq::finger_age(&mut wl.inp.touch_clock, a.u(1));
+    wl.finger_push(k, crate::FingerPhase::Up, age);
+    wl.inp.fingers[k].used = false;
+}
+
+/// motion(time, id, x, y)
+pub(crate) fn wlh_touch_motion(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
+    let Some(k) = wl.finger_slot(a.i(1)) else { return };
+    let f = wl.inp.fingers[k];
+    let w = f.win as usize;
+    let at = [wl.finger_px(w, a.i(2)) + f.off[0], wl.finger_px(w, a.i(3)) + f.off[1]];
+    wl.inp.fingers[k].at = at;
+    if wl.drag.on && wl.drag.tool == FINGER_TOOL + k as i32 {
+        wl.child_drag_motion(f.win, at[0], at[1]); // a child window moved / resized by the library: no move
+        return;
+    }
+    let age = crate::evq::finger_age(&mut wl.inp.touch_clock, a.u(0));
+    wl.finger_push(k, crate::FingerPhase::Move, age);
+}
+
+/// cancel: the compositor took them
+pub(crate) fn wlh_touch_cancel(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
+    wl.fingers_cancel();
 }
 
 // ------------------------------------------------------------------ pointer

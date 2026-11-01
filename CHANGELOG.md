@@ -104,6 +104,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **eapm:** lib/eapm: EAP-MD5 and EAP-PWD as peer and server state machines without I/O
 - **ui:** The document view reports the element a click hit (`MdEv::click`, `MdDoc::element_at`), and `MdDoc::dom_size` the size of its tree
 - **script:** Several scripts in one VM with one scope of top-level names (`Vm::add_script`), as the <script> elements of a page
+- **ui:** Fingers on the desktop: the recogniser's two-finger gesture (`ui.touch_two`, `TwoFingers`), `TF_REST`, `TF_HOLD_LONG` and `ui.touch_hold_part` (`WF_TOUCH_HOLD` waits 800 ms and shows it), touch targets of 44 DIP from the background, a tap stays a click when the finger rolls within the slop, the pen comes first (a palm does nothing), the on-screen keyboard follows a finger's focus, the script commands `pinch`, `pan2`, `expect keyboard`
+- **plat:** Fingers on Windows and Linux: `WM_POINTER` of `PT_TOUCH` instead of the system's mouse emulation (`lib/plat/win_touch.rs`; a finger over a window frame belongs to the window under it, a window follows a finger through `begin_move` / `begin_resize`, `touch_keyboard` through `InputPane`), `wl_touch` on Wayland (main and child windows, popups), XInput 2.2 touch on X11
+- **build:** `tools/touchcheck.py`: real contacts through `InjectTouchInput` on a real window, no touch screen needed; skips with a message when the desktop is locked or the window covered
 
 ### Changed
 

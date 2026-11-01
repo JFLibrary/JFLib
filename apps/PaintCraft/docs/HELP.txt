@@ -41,3 +41,5 @@ Einstellungen > Aktualisierung kann GitHub-Veröffentlichungen über HTTPS prüf
 
 Projekt und Fehlerberichte
 Hilfe > Webseite öffnet das JFLib-Projekt. Hilfe > Feedback öffnet dessen Fehlerliste. Hilfe > Info zeigt Versions- und Diagnoseangaben, die in die Zwischenablage kopiert werden können.
+
+Mit den Fingern: Zwei Finger zoomen und verschieben die Ansicht. Ein Finger malt mit dem aktuellen Werkzeug, bis ein Stift benutzt wurde, danach verschiebt er die Ansicht (Einstellungen > Stift & Tablett). Werkzeugfenster bewegen sich, wenn man oben auf der Titelleiste kurz drückt und hält.

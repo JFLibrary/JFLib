@@ -786,7 +786,8 @@ impl Ui {
             // WM_NCHITTEST, Linux with a press here)
             self.behave(ids, HB_DRAG);
             if self.m.win.recs[(i as usize) & (WIN_MAX - 1)].flags & WF_TOUCH_HOLD != 0 {
-                self.touch_grab(super::touch::AX_ALL | TF_HOLD as u8);
+                self.touch_grab(super::touch::AX_ALL | (TF_HOLD | TF_HOLD_LONG) as u8);
+                self.touch_hold_show(ids);
             }
             if !self.headless && self.wp.ctx.active == ids && self.wp.ctx.pressed & (1 << BTN_LEFT) != 0 {
                 plat::begin_move(); // (the live window: plat::win_use)
@@ -916,7 +917,8 @@ impl Ui {
     /// with the forced library title bar (jfgui_CSD=1: scripts test the band), recording the
     /// request.
     pub(crate) fn edge_grips(&mut self) {
-        let on = if self.headless { plat::getenv("jfgui_CSD").is_some_and(|v| v.starts_with('1')) } else { !cfg!(windows) };
+        // (Windows: the system's frame, for a finger it is invisible and greedy: win_touch.rs)
+        let on = if self.headless { plat::getenv("jfgui_CSD").is_some_and(|v| v.starts_with('1')) } else { !cfg!(windows) || self.m.touch.on };
         // (with a finger the main window fills the phone's page: its edges belong to the content)
         if !on || (self.m.touch.on && self.uiw_cur == 0) {
             return;

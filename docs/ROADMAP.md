@@ -1869,10 +1869,24 @@ Fensterrand hinaus.
     Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
   - Offen: NEON für `lib/simd` (auf ARM rechnet der Rasterer skalar, dort liegt ein großer Teil der
     verbleibenden 6 ms); die Bilder gehen zweimal durch den Speicher (Fenster, dann Bitmap), vom
-    GPU-Weg abgesehen; Zoom mit zwei Fingern (die Naht steht: `TF_TWO`, `ui.touch_fingers`); Ziehen
-    und Ablegen braucht in rollenden Sichten einen Griff (`ui.touch_drag`); Windows und Linux melden
-    noch keine Finger (dort `plat::finger` rufen, die Maus-Emulation des Systems abschalten); der
+    GPU-Weg abgesehen; Ziehen und Ablegen braucht in rollenden Sichten einen Griff (`ui.touch_drag`); der
     Browser auf einem echten Telefon ist nur in Chromiums Emulation geprüft.
+- **P2** · *erledigt, auf dem Gerät noch zu prüfen* (2026-11-01) · Finger auf dem Desktop, angestoßen von PaintCraft auf einem
+  Surface ([GUIDE §37](GUIDE.md), [`lib/plat/win_touch.rs`](../lib/plat/win_touch.rs),
+  [`apps/PaintCraft/docs/TOUCH.md`](../apps/PaintCraft/docs/TOUCH.md)):
+  - Windows: `WM_POINTER` statt Maus-Emulation (kein Strg + Rad aus dem Pinch, keine Rechtsklicks), mehrere Finger mit Id;
+    ein Finger über einem Fensterrahmen gehört dem Fenster, dessen Inhalt darunter liegt (der breite Kontakt traf sonst den
+    unsichtbaren Rahmen eines Werkzeugfensters); ein Fenster folgt dem Finger selbst (`begin_move`). Bildschirmtastatur über
+    `InputPane`.
+  - Linux: `wl_touch` (Hauptfenster, Kindfenster, Popups) und XInput-2.2-Touch auf X11.
+  - Bibliothek: Zwei-Finger-Geste (`ui.touch_two`), Halten vor dem Ziehen eines Panels (`WF_TOUCH_HOLD`, 800 ms, mit
+    Anzeige), größere Trefferflächen vom Hintergrund aus (44 DIP), der Stift geht vor (Handballen), `TF_REST`, ein Tippen
+    bleibt ein Klick, wenn der Finger etwas rollt.
+  - PaintCraft: Pinch und Verschieben in jede Richtung, ein Finger malt oder verschiebt (Einstellung).
+  - Geprüft: Skripte (`pinch`, `pan2`), Attrappen und eingespeiste Ereignisse (`plattest --test touch`), echte Kontakte ohne
+    Touchscreen (`tools/touchcheck.py`). Offen: alles, was nur ein echter Finger zeigt, und die Bildschirmtastatur
+    (Prüfliste in `TOUCH.md`, `docs/LINUX_TESTPLAN.md` Abschnitt 9); `wl_touch` und XI 2.2 liefen noch nie gegen
+    einen echten Compositor oder X-Server mit Touch.
 - **P2** · *fehlt* · Safari / iOS im Web-Testplan.
 
 ## 10. Auslieferung und Updates

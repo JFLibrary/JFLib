@@ -44,6 +44,13 @@ expect window 601 rect 24 48 260 120
 window 601
 finger down 100,20
 wait 500
+finger move 110,30
+finger up
+window any
+expect window 601 rect 24 48 260 120
+window 601
+finger down 100,20
+wait 900
 finger move 130,50
 finger up
 window any
@@ -52,3 +59,61 @@ window 601
 tap 240,20
 window any
 expect window 601 closed
+
+# ------------------------------------------------------------ the on-screen keyboard follows a finger's focus
+system env jfgui_CSD 0
+wait 16
+expect keyboard hidden
+focus #202
+expect dialog:"Editor" selected
+expect keyboard hidden
+wait 16
+tap #201
+wait 16
+expect #201 focused
+expect keyboard shown
+tap #202
+wait 16
+expect #202 focused
+expect keyboard hidden
+wait 200
+# a mouse that gives the focus asks for no keyboard
+pointer mouse
+click #201
+wait 16
+expect #201 focused
+expect keyboard hidden
+click #202
+pointer touch
+wait 200
+
+# ------------------------------------------------------------ a widget that takes one finger or two
+tap #602
+wait 16
+expect text:"ein Klick" exists
+wait 200
+finger down 200,20
+wait 16
+finger move 260,20
+wait 16
+expect text:"ein Finger zieht" exists
+finger up
+wait 200
+pinch 400,20 100 200 200
+expect text:"zwei: 400,20 von 400,20 mal 200 00" exists
+wait 200
+pan2 300,20 40 10 200
+expect text:"zwei: 340,30 von 300,20 mal 100 00" exists
+wait 200
+# the second finger right after the first one moved off: the press is taken back and it says so
+finger down 300,20
+wait 16
+finger move 330,20
+wait 16
+finger 1 down 500,20
+wait 16
+finger 1 move 520,20
+expect text:"zwei: 425,20 von 415,20 mal 111 00" exists
+finger 1 up
+finger up
+wait 200

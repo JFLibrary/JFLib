@@ -348,6 +348,26 @@ struct Xfer {
     off: usize,
 }
 
+/// a finger that is down (linux_x11_xi.rs)
+#[derive(Clone, Copy, Default)]
+struct XFinger {
+    used: bool,
+    tid: u32, // XI's touch id
+    win: i32,
+    root: [i32; 2], // the last position on the root window
+}
+
+/// a window that follows a finger
+#[derive(Clone, Copy, Default)]
+struct XDrag {
+    on: bool,
+    slot: usize,
+    win: i32,
+    edges: u32,
+    start: [i32; 2],
+    rect: [i32; 4],
+}
+
 /// a pen device  [x11_xi.s XD_*]
 #[derive(Clone, Copy, Default)]
 struct Xd {
@@ -470,6 +490,10 @@ struct X11 {
     xi_atoms: [u32; 3],
     xi_ndev: u32,
     xi_want: bool,
+    xi_touch: bool, // the server has XI 2.2: fingers are selected
+    xi_fingers: [XFinger; 10],
+    xi_clock: Option<i32>,
+    xi_drag: XDrag,
     xi_time: u32,
     xi_data: u32,
     xi_valid: bool,
@@ -632,6 +656,10 @@ impl X11 {
             xi_atoms: [0; 3],
             xi_ndev: 0,
             xi_want: false,
+            xi_touch: false,
+            xi_fingers: [XFinger::default(); 10],
+            xi_clock: None,
+            xi_drag: XDrag::default(),
             xi_time: 0,
             xi_data: 0,
             xi_valid: false,
@@ -819,10 +847,18 @@ impl Display for Backend {
         with_x(|s| s.win_cmd(w, cmd))
     }
     fn win_begin_move(&mut self, w: i32) {
-        with_x(|s| s.moveresize(w, X11_MOVERESIZE_MOVE))
+        with_x(|s| {
+            if !s.xi_finger_drag(w, 0) {
+                s.moveresize(w, X11_MOVERESIZE_MOVE)
+            }
+        })
     }
     fn win_begin_resize(&mut self, w: i32, edges: u32) {
-        with_x(|s| s.begin_resize(w, edges))
+        with_x(|s| {
+            if !s.xi_finger_drag(w, edges & 15) {
+                s.begin_resize(w, edges)
+            }
+        })
     }
     fn win_size(&mut self, w: i32) -> (i32, i32) {
         with_x(|s| s.win_size(w))

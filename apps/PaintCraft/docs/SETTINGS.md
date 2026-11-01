@@ -41,7 +41,7 @@ ignoriert); Aufzählungen nur über bekannte Namen. `version` > 1 wird gelesen w
 | Abschnitt | Schlüssel | Bedeutung / Bereich |
 |---|---|---|
 | PaintCraft | version | 1 |
-| UI | theme, accent, animations, peninput | `light`/`dark`/`system`; `RRGGBB` oder leer; 0/1; (PN1) 0/1 Stifteingabe („Windows-Tinte“, `plat_pen_enable`) |
+| UI | theme, accent, animations, peninput, finger | `light`/`dark`/`system`; `RRGGBB` oder leer; 0/1; (PN1) 0/1 Stifteingabe („Windows-Tinte“, `plat_pen_enable`); 0 ein Finger auf der Leinwand malt, bis ein Stift benutzt wurde, 1 malt immer, 2 verschiebt immer ([TOUCH.md](TOUCH.md)) |
 | MainWindow | x, y, width, height, maximized | Client-Ursprung in Bildschirm-px; Client-Größe in DIP (640..16384 × 400..16384, geklemmt); normale Größe auch wenn maximiert. Nur mit echtem Fenster (headless unverändert) |
 | ToolsWindow, HistoryWindow, LayersWindow, ColorsWindow | visible, x, y (+ width, height bei Verlauf/Ebenen; expanded bei Farben) | WINRECT der wnd_*.s-Module: DIP relativ zum Client-Ursprung des Hauptfensters, ±20000 (sonst Standardplatz); Größe 120..4000 × 80..4000 |
 | Colors | primary, secondary, palette | `AARRGGBB`; Palette = bis 96 Farben, kommagetrennt (ungültige Einträge übersprungen) |
@@ -81,7 +81,7 @@ unten „Schließen“. Änderungen wirken sofort (wie paint.net), Schließen/Es
 | Aktualisierung | alle Elemente deaktiviert + Begründung (keine Netzwerk-/TLS-Implementierung) |
 | Diagnose | schreibgeschützter mehrzeiliger Text #5580 (Version, OS, CPU, Befehlssätze, Prozessoren/Threads, RAM, Verlauf, DPI/Theme, Bilder, Pfade: Einstellungsdatei, Temp, Paletten, geladene Module, Effektanzahl), „In die Zwischenablage kopieren“ #5581 |
 | Plugin-Fehler | (P1, M8) „Alle Plugins wurden fehlerfrei geladen.“ oder die Fehlerzeilen (Datei: Meldung), dann „Geladene Plugins“ (Name Version – Autor · Datei: Anzahlen); `plug_errors` / `plug_count` / `plug_text` aus plugins.s, docs/PLUGINS.md.  Effekte ▸ „Plugin-Fehler…“ öffnet diese Seite (sichtbar, solange es Fehler gibt). |
-| Stift & Tablett | (PN1, M8; SP_PEN = 8, am Listenende) Kontrollkästchen „Windows-Tinte“ (ST_PEN, `[UI] peninput`, `plat_pen_enable`: aus = Stifte wie eine Maus) mit eigener Fußnote; „Kein Stift und kein Grafiktablett gefunden.“ bzw. „Gefundene Stifte und Grafiktabletts: N“ (`plat_pen_devices`; Record #5591 Text, Wert = Anzahl).  Ein Knopf zu den Stift-Einstellungen von Windows (wie in paint.net) fehlt. |
+| Stift & Tablett | (PN1, M8; SP_PEN = 8, am Listenende) Kontrollkästchen „Windows-Tinte“ (ST_PEN, `[UI] peninput`, `plat_pen_enable`: aus = Stifte wie eine Maus) mit eigener Fußnote; „Kein Stift und kein Grafiktablett gefunden.“ bzw. „Gefundene Stifte und Grafiktabletts: N“ (`plat_pen_devices`; Record #5591 Text, Wert = Anzahl).  Darunter die Auswahl „Ein Finger auf der Leinwand“ (#5592, `[UI] finger`, [TOUCH.md](TOUCH.md)).  Ein Knopf zu den Stift-Einstellungen von Windows (wie in paint.net) fehlt. |
 
 Seiten und Optionen folgen dem Einstellungsdialog von paint.net, alle Texte sind eigene
 Formulierungen (nur kurze übliche Wörter wie „Schließen“ oder „Sprache“ stimmen überein).

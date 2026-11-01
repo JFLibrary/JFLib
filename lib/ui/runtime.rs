@@ -177,6 +177,7 @@ impl Runtime {
         let (mut ui, w, h) = prepare(desc, style);
         ui.headless = true;
         ui.wp.rt.fb = Surface::new(ui.dp(w), ui.dp(h), FMT_XRGB);
+        ui.m.touch.on = false; // (a run does not depend on the machine: `pointer touch`)
         ui.set_time(0);
         let mut app: alloc::boxed::Box<dyn App> = alloc::boxed::Box::new(app);
         if ui.wp.rt.fb.px.is_empty() || !app.init(&mut ui) { return Err(2); }
@@ -1179,6 +1180,7 @@ pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 
     }
     // ---- headless run (virtual clock starting at 0)
     ui.headless = true;
+    ui.m.touch.on = false; // (a run does not depend on the machine: `pointer touch`)
     ui.sys_apply(plat::sys_settings_env()); // only jfgui_* overrides: shots match everywhere
     // missing characters from system fonts: only on request, so shots stay the same everywhere
     ui.text.set_system_fallback(plat::env("jfgui_FONT_FALLBACK").is_some_and(|v| v.starts_with('1')));

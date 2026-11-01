@@ -566,6 +566,20 @@ fn sd_page_pen(p: &mut Pn, ui: &mut Ui) {
     ui.next_size(-1, 0);
     ui.text(TS_BODY | TX_WRAP, &t);
     sd_sem(ui, ID_SET_PENDEV, &t, n); // probe: the text, value = the count
+    // what one finger does on the canvas (two fingers always zoom and move the view)
+    ui.spacer(12);
+    ui.next_size(-1, 0);
+    ui.text(TS_BODY, crate::preferences::localization::tr("Ein Finger auf der Leinwand"));
+    let rows = [
+        crate::preferences::localization::tr("Automatisch: malt, bis ein Stift benutzt wurde"),
+        crate::preferences::localization::tr("Malt mit dem aktuellen Werkzeug"),
+        crate::preferences::localization::tr("Verschiebt die Ansicht"),
+    ];
+    let mut f = p.st.st.finger as i32;
+    ui.next_size(360, 0);
+    ui.combobox(ID_SET_FINGER, &mut f, &rows);
+    p.st.st.finger = f as u32;
+    sd_note(ui, crate::preferences::localization::tr("Zwei Finger zoomen und verschieben die Ansicht immer. Solange der Stift auf dem Bildschirm oder nah darüber ist, zählen Finger nicht: Der Handballen malt nicht und verschiebt nichts."));
 }
 
 // Diagnose: read-only text + copy button

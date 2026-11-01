@@ -179,6 +179,7 @@ mod t_cliprich;
 // drag and drop between programs: the shared part, Windows' OLE objects
 mod t_dnd;
 mod t_pen;
+mod t_touch;
 mod t_spawn;
 mod t_window;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
@@ -324,6 +325,7 @@ fn plattest() -> i32 {
         Some("panic") => t_panic,
         Some("window") => t_window::t_window, // plat-win
         Some("pen") => t_pen::t_pen,             // plat-win
+        Some("touch") => t_touch::t_touch,
         Some("cursor") => t_cursor::t_cursor,    // plat-win
         Some("cliprich") => t_cliprich::t_cliprich,
         Some("cliprich-owner") => t_cliprich::t_owner,

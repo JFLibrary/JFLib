@@ -95,7 +95,7 @@ pub(crate) fn wtools_frame(p: &mut Pn, ui: &mut Ui) {
     // (two columns: too narrow for the title)
     let title = if cols == 2 { "" } else { "Werkzeuge" };
     let rect = p.wtools.rect.clone();
-    if ui.window_begin(WINID_TOOLS, title, Some(&open), WF_TOOL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_TOOLS, title, Some(&open), WF_TOOL | WF_AUTOHEIGHT | WF_TOUCH_HOLD, Some(&rect)) {
         ui.box_begin(0, BOX_V | BOX_XSTART | (WT_PAD << PAD_SHIFT), WT_GAP);
         let mut i = 0;
         while i < TOOL_COUNT {
