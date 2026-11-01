@@ -52,7 +52,7 @@ click button:"Sicherheit (3)"
 expect button:"JF-FW" exists
 expect button:"JF-FW2" exists
 expect button:"JF-FW8" exists
-click button:"WLAN und WAN (4)"
+click button:"WLAN und WAN (6)"
 expect button:"JF-AP6E" exists
 expect button:"JF-AP7" exists
 shot build/jfnetworker/models_palette_folded.png
