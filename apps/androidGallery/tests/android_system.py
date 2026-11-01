@@ -245,6 +245,17 @@ def main():
                 return block
         return ""
 
+    # FLAG_KEEP_SCREEN_ON on the activity's window: AOSP prints the flags' names, One UI their
+    # number; None when the window is not listed
+    def keeps_screen_on():
+        block = window_flags()
+        if not block:
+            return None
+        if "KEEP_SCREEN_ON" in block:
+            return True
+        m = re.search(r"\bfl=(?:0x)?([0-9a-fA-F]+)\b", block)
+        return m is not None and int(m.group(1), 16) & 0x80 != 0
+
     # the wake locks held now (dumpsys power: the "Wake Locks: size=N" block; its history below
     # names released ones too)
     def wake_locks():
@@ -308,7 +319,9 @@ def main():
 
         # ------------------------------------------------------------ settings live
         print("settings:", flush=True)
-        for mode, want in (("yes", "1"), ("no", "0")):
+        # the first step has to change something: the phone may already be dark
+        modes = (("yes", "1"), ("no", "0"))
+        for mode, want in (modes[::-1] if s.get("dark_system") == "1" else modes):
             d.sh("cmd", "uimode", "night", mode)
             s = wait(lambda s, w=want: s["dark_system"] == w and num(s, "settings") > base, f"night {mode}")
             if ok(s is not None and num(s, "bits") & 1, f"cmd uimode night {mode}: dark={want}, UIC_SETTINGS with SET_THEME"):
@@ -405,11 +418,11 @@ def main():
         ok(tap_label("Bildschirm anlassen"), "tap \"Bildschirm anlassen\"")
         s = wait(lambda s: s["keep"] == "1" and num(s, "inhibited") == 3, "kept on")
         ok(s is not None, "plat::inhibit(INHIBIT_IDLE) holds idle and suspend")
-        ok("KEEP_SCREEN_ON" in window_flags(), "dumpsys window: the activity's window has FLAG_KEEP_SCREEN_ON")
+        ok(keeps_screen_on() is True, "dumpsys window: the activity's window has FLAG_KEEP_SCREEN_ON")
         ok(f"jfgui:{PKG}" in wake_locks(), "dumpsys power: the partial WakeLock jfgui:org.jflib.gallery")
         ok(tap_label("Bildschirm anlassen"), "tap \"Bildschirm anlassen\" again")
         ok(wait(lambda s: s["keep"] == "0" and num(s, "inhibited") == 0, "released") is not None, "the guard dropped")
-        ok("KEEP_SCREEN_ON" not in window_flags(), "dumpsys window: no FLAG_KEEP_SCREEN_ON")
+        ok(keeps_screen_on() is False, "dumpsys window: no FLAG_KEEP_SCREEN_ON")
         ok(f"jfgui:{PKG}" not in wake_locks(), "dumpsys power: the WakeLock released")
 
         # ------------------------------------------------------------ the lifecycle

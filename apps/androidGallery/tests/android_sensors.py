@@ -129,12 +129,27 @@ def main():
         print(f"  skip {what}", flush=True)
         notes.append(what)
 
-    def ask_person(what, seconds=12):
-        """(a phone) what the person should do; an emulator has no person"""
+    def ask_person(what, seconds=12, watch=(), label=""):
+        """(a phone) what the person should do; an emulator has no person.  With `watch` (angles
+        in the state): whether they moved meanwhile, which is a note, not a failure"""
         if emulator:
             return
         print(f"\n  >>> Bitte jetzt: {what} ({seconds} s Zeit)", flush=True)
-        time.sleep(seconds)
+        first, moved = {}, 0.0
+        end = time.time() + seconds
+        while time.time() < end:
+            s = state()
+            for key in watch:
+                try:
+                    v = float(s[key])
+                except (KeyError, ValueError):
+                    continue
+                moved = max(moved, angle_diff(v, first.setdefault(key, v)))
+            time.sleep(0.4)
+        if watch and moved >= 15:
+            ok(True, f"{label} follows the phone: {moved:.0f} degrees")
+        elif watch:
+            skip(f"{label}: only {moved:.0f} degrees of movement seen (was the phone moved?)")
 
     # ---------------------------------------------------------------- what is restored
     def perm_state(perm):
@@ -367,7 +382,7 @@ def main():
             if emulator:
                 emu_sensor("acceleration", 0, 0, G)
                 emu_sensor("magnetic-field", 0, 20, -40)
-            ask_person("Telefon flach halten und langsam drehen")
+            ask_person("Telefon flach halten und langsam drehen", watch=("heading",), label="the heading")
             s = wait(lambda s: 0 <= float(s["heading"]) < 360, "a heading", 25)
             ok(s is not None, f"heading between 0 and 360: {(s or {}).get('heading')}")
             if emulator and s is not None and sensor_state(s, "rot") != "running":
@@ -387,7 +402,7 @@ def main():
             s2 = wait(lambda s: sensor_state(s, "gyro") != "running" or vec(s["gyro"])[0] > 0.05, "the gyroscope's value")
             ok(s2 is not None, f"the gyroscope: {(s2 or {}).get('gyro')}")
             emu_sensor("gyroscope", 0, 0, 0)
-        ask_person("Telefon in die Hand nehmen und kippen", 6)
+        ask_person("Telefon in die Hand nehmen und kippen", 8, watch=("pitch", "roll"), label="pitch and roll")
         s = wait(lambda s: -90 <= float(s["pitch"]) <= 90 and -180 <= float(s["roll"]) <= 180, "pitch and roll in range")
         ok(s is not None or sensor_state(state(), "accel") == "unavailable", f"pitch, roll in range: {(s or {}).get('pitch')} {(s or {}).get('roll')}")
 
@@ -438,6 +453,8 @@ def main():
             else:
                 ok(-90 <= float(s["lat"]) <= 90 and -180 <= float(s["lon"]) <= 180, f"a fix: {s['lat']} {s['lon']}, accuracy {s.get('accuracy')} m, age {s['age']} ms, source {s.get('source')}")
                 ok(float(s.get("accuracy", "0")) >= 0 and int(s["age"]) >= 0, "accuracy and age make sense")
+                if "gps" not in s.get("source", "").lower():
+                    skip(f"the fix came from {s.get('source')}: the satellites themselves not checked")
         # the system's switch
         if sdk >= 30:
             location_set(False)
