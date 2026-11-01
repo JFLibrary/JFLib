@@ -50,7 +50,7 @@
 // the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
 // and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
 // tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
-// host give feedback; TF_HOLD: the left button, the drag starts, TF_HOLD_LONG after 800 ms; TF_REST:
+// host give feedback; TF_HOLD: the left button, the drag starts, TF_HOLD_LONG after a second; TF_REST:
 // the left button, no context menu: a canvas); if it moves after that, the same decision.  After the
 // finger left, the hover goes.
 //
@@ -110,7 +110,7 @@ pub(crate) const CAPTION_MIN_W: i32 = 120;
 const OUTSIDE: i32 = -10000;
 /// TF_HOLD_LONG: a panel's title bar moves after resting this long; nothing shows before HOLD_SHOW_MS
 /// (a tap shows nothing)
-const HOLD_LONG_MS: u32 = 800;
+const HOLD_LONG_MS: u32 = 1000;
 const HOLD_SHOW_MS: u32 = 120;
 /// a finger within this time after the pen's last sign of life is a palm
 const PALM_MS: u32 = 500;

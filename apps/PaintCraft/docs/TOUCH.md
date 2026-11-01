@@ -11,7 +11,7 @@ Bibliothek dazu: [`lib/ui/touch.rs`](../../../lib/ui/touch.rs), [GUIDE §37](../
 | Ein Finger | Malt mit dem aktuellen Werkzeug, oder verschiebt die Ansicht (Einstellung, unten) |
 | Tippen | Ein Klick an der Stelle, auch wenn der Finger dabei ein paar Pixel rollt |
 | Finger liegt, ohne sich zu bewegen | Der Druck kommt nach 400 ms (ein Punkt des Pinsels), kein Kontextmenü |
-| Werkzeugfenster: oben drücken und halten | Nach 0,8 s läuft eine Linie unter der Titelleiste voll, dann folgt das Fenster dem Finger in jede Richtung. Ein schnelles Wischen dort tut nichts |
+| Werkzeugfenster: oben drücken und halten | In einer Sekunde läuft eine Linie unter der Titelleiste voll, dann folgt das Fenster dem Finger in jede Richtung. Ein schnelles Wischen dort tut nichts |
 | Zoomregler, Zahnrad und andere kleine Knöpfe | Auch ein Finger knapp daneben trifft: Auf dem Hintergrund gewinnt das nächste kleine Bedienelement in 44 DIP Reichweite; mit der Maus ändert sich nichts |
 | Zweiter Finger kurz nach dem ersten (unter 200 ms) | Der angefangene Strich wird zurückgenommen, es zählt die Zwei-Finger-Geste. Später stört ein zweiter Finger den Strich nicht |
 
@@ -72,7 +72,7 @@ Mit dem Finger, ohne Stift:
 2. **Zoomregler** unten rechts: nach links und rechts ziehen. Die Zoomzahl ändert sich, das Ebenen-Fenster darüber bleibt, wie
    es ist. Auch einmal auf den Regler tippen.
 3. **Ein Werkzeugfenster verschieben:** oben auf die Titelleiste drücken und liegen lassen. Eine blaue Linie läuft in
-   gut einer halben Sekunde voll, danach folgt das Fenster dem Finger, nach oben, unten, links, rechts. Ist die Zeit
+   knapp einer Sekunde voll, danach folgt das Fenster dem Finger, nach oben, unten, links, rechts. Ist die Zeit
    angenehm, zu lang oder zu kurz (`HOLD_LONG_MS` in `lib/ui/touch.rs`)? Schnell darüberwischen darf nichts bewegen.
 4. **Knöpfe in einem Werkzeugfenster** antippen (Pinsel, Radierer): Das Werkzeug wechselt, das Fenster bleibt liegen.
 5. **Zoomen:** zwei Finger auf die Leinwand und auseinanderziehen. Läuft es flüssig, ohne Stufen? Der Punkt zwischen den

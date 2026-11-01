@@ -64,7 +64,7 @@ expect #9909 value 10000
 # rests on the title bar, then goes down only
 window 24577
 finger down 20,10
-wait 900
+wait 1100
 finger move 20,130
 finger up
 window any
@@ -73,7 +73,7 @@ wait 200
 # up and to the right
 window 24577
 finger down 20,10
-wait 900
+wait 1100
 finger move 320,-40
 finger up
 window any
