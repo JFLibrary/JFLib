@@ -185,11 +185,18 @@ pub fn run(t: &mut T) {
         } else if verbose {
             crate::out("worst case: ok\n");
         }
+        // and through the back end (a library: the module has no entry point), at both levels
+        for minor in [shader::BASIS, shader::VOLL] {
+            let r = wgsl::spirv::compile_library(&worst, &wgsl::CompileOptions::new(minor));
+            if !r.is_ok_and(|o| shader::val::validate(&o.entries[0].words).is_ok()) {
+                crate::out("FAIL robust: worst case does not compile to valid SPIR-V\n");
+            }
+        }
     }));
     if let Some(th) = th {
         th.join();
     }
-    t.check("worst-case nesting in 512 KB", true);
+    t.check("worst-case nesting in 512 KB, also compiled to SPIR-V", true);
     // many declarations in a dependency chain (no recursion between declarations)
     let mut many = String::from("const c0 = 1;\n");
     for k in 1..20000 {
@@ -302,6 +309,14 @@ pub fn perf(t: &mut T) {
         (t3 - t2) as f64 / 1000.0
     ));
     t.check("print of the big shader", p.len() > src.len() / 2);
+    if let Ok(m) = &r {
+        let t4 = plat::time_us();
+        let o = wgsl::compile_module(m, &wgsl::CompileOptions::new(shader::VOLL));
+        let us = plat::time_us() - t4;
+        let words = o.as_ref().map(|o| o.entries.iter().map(|e| e.words.len()).sum::<usize>()).unwrap_or(0);
+        crate::out(&format!("perf: the big shader lowered to SPIR-V 1.6 in {:.1} ms ({} words)\n", us as f64 / 1000.0, words));
+        t.check("big shader compiles", o.is_ok_and(|o| shader::val::validate(&o.entries[0].words).is_ok()));
+    }
     // the benchmark shaders
     let t0 = plat::time_us();
     for _ in 0..20 {

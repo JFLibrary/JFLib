@@ -33,7 +33,7 @@ use alloc::vec::Vec;
 use gpu::*;
 use shader::bench;
 
-use crate::scene::{Mode, Scene, bench_camera};
+use crate::scene::{Mode, Scene, Shaders, bench_camera};
 use crate::{Gpu, T, out};
 
 #[derive(Clone, Debug)]
@@ -53,12 +53,15 @@ pub struct Config {
     /// the window covers its monitor without a frame (plat WCMD_FULLSCREEN; the size is the
     /// monitor's)
     pub fullscreen: bool,
+    /// --shaders spirv | wgsl, --robust 0 (WGSL without index clamping), --fused (WGSL move and
+    /// cull without NoContraction)
+    pub shaders: Shaders,
 }
 
 impl Config {
     pub fn new(n: u32) -> Config {
         Config { n, w: 1920, h: 1080, mode: Mode::Indirect, window: None, frames: 300, warmup: 60, inflight: 3, verify: false,
-                 shot: None, fullscreen: false }
+                 shot: None, fullscreen: false, shaders: Shaders::Spirv }
     }
 }
 
@@ -163,6 +166,15 @@ pub fn parse(n: u32) -> core::result::Result<Config, String> {
     c.inflight = num("--inflight", 1, 3)?.unwrap_or(c.inflight);
     c.verify = args.iter().any(|a| a == "--verify");
     c.shot = plat::arg_value("--shot");
+    let robust = plat::arg_value("--robust").is_none_or(|v| v != "0");
+    let exact = !args.iter().any(|a| a == "--fused");
+    if let Some(s) = plat::arg_value("--shaders") {
+        c.shaders = match s.as_str() {
+            "spirv" => Shaders::Spirv,
+            "wgsl" => Shaders::Wgsl { robust, exact },
+            _ => return Err(format!("--shaders {s}: spirv or wgsl")),
+        };
+    }
     if args.iter().any(|a| a == "--fullscreen") {
         c.fullscreen = true;
         c.window = c.window.or(Some(PresentMode::Immediate));
@@ -228,7 +240,7 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
             let surf = t.res(Surface::new(&g.inst, w), "Surface::new")?;
             let desc = SwapchainDesc { present, frames_in_flight: k as u32, ..SwapchainDesc::DEFAULT };
             let mut sc = t.res(dev.create_swapchain(&surf, &desc), "create_swapchain")?;
-            let s = Scene::new(t, dev, c.n, sc.format(), k)?;
+            let s = Scene::new(t, dev, c.n, sc.format(), k, c.shaders)?;
             rep.out = format!("{:?}", sc.present_mode()).to_lowercase();
             let mut depth: Option<Texture> = None;
             let mut last = plat::time_us();
@@ -296,7 +308,7 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
                                                               TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC)), "colour target")?;
         let depth = t.res(dev.create_texture(&TextureDesc::d2(c.w, c.h, Format::Depth32Float, TextureUsage::DEPTH_TARGET)),
                           "depth target")?;
-        let s = Scene::new(t, dev, c.n, Format::Rgba8Unorm, k)?;
+        let s = Scene::new(t, dev, c.n, Format::Rgba8Unorm, k, c.shaders)?;
         rep.out = String::from("offscreen");
         rep.w = c.w;
         rep.h = c.h;
@@ -495,8 +507,8 @@ pub fn compare_words(got: &[u32], want: &[u32]) -> (usize, usize, usize, Option<
 pub fn print(c: &Config, r: &Report) {
     let mode = if c.mode == Mode::Indirect { "indirect" } else { "single" };
     let vis = r.visible.med / c.n.max(1) as f64;
-    out(&format!("scene: {} cubes, {}x{} {}, {mode}, {} frames in flight, {} frames after {} warm-up", c.n, r.w, r.h, r.out,
-                 c.inflight, r.frames, c.warmup));
+    out(&format!("scene: {} cubes, {}x{} {}, {mode}, {} shaders, {} frames in flight, {} frames after {} warm-up", c.n, r.w, r.h,
+                 r.out, c.shaders.name(), c.inflight, r.frames, c.warmup));
     out(&format!("  visible: {:.0} cubes (median) = {:.1} %", r.visible.med, vis * 100.0));
     out(&format!("  CPU: record {:.3} ms, record + submit {:.3} ms median, {:.3} p99; waiting for the GPU: {:.3} ms median",
                  r.rec.med, r.cpu.med, r.cpu.p99, r.wait.med));
@@ -512,10 +524,10 @@ pub fn print(c: &Config, r: &Report) {
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99; {:.2} G triangles/s submitted", r.frame.mean,
                  r.frame.med, r.frame.p99, tris / 1e9));
     out(&format!(
-        "RESULT n={} res={}x{} mode={mode} out={} inflight={} frames={} vis={:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} \
+        "RESULT n={} res={}x{} mode={mode} shaders={} out={} inflight={} frames={} vis={:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} \
          wait={:.4}/{:.4} move={:.4}/{:.4} cull={:.4}/{:.4} draw={:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} \
          frame={:.4}/{:.4} framemean={:.4} busy={:.3} gtris={:.3}",
-        c.n, r.w, r.h, r.out, c.inflight, r.frames, vis, r.rec.med, r.rec.p99, r.cpu.med, r.cpu.p99, r.wait.med, r.wait.p99,
+        c.n, r.w, r.h, c.shaders.name().replace(' ', "_"), r.out, c.inflight, r.frames, vis, r.rec.med, r.rec.p99, r.cpu.med, r.cpu.p99, r.wait.med, r.wait.p99,
         r.gpu_move.med, r.gpu_move.p99, r.gpu_cull.med, r.gpu_cull.p99, r.gpu_draw.med, r.gpu_draw.p99, r.gpu_total.med,
         r.gpu_total.p99, r.gpu_frame.med, r.gpu_frame.p99, r.frame.med, r.frame.p99, r.frame.mean, r.busy, tris / 1e9
     ));

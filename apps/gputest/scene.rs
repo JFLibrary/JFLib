@@ -2,9 +2,12 @@
 // the GPU with the shaders and the data contract of lib/shader/bench.rs (docs/SHADER.md
 // "Benchmark-Vertrag"; the method and the numbers: docs/GPU.md "Messszene")
 //
-//   Scene::new(t, dev, n, color, slots) -> Option<Scene>   pipelines for one colour format,
-//        the buffers for n objects (created once on the GPU: move at time 0), per frame slot a
-//        camera staging buffer, a DrawCmd read-back and four timestamps
+//   Scene::new(t, dev, n, color, slots, shaders) -> Option<Scene>   pipelines for one colour
+//        format, the buffers for n objects (created once on the GPU: move at time 0), per frame
+//        slot a camera staging buffer, a DrawCmd read-back and four timestamps; the shaders:
+//        Shaders::Spirv (lib/shader/bench.rs) or Shaders::Wgsl (lib/wgsl/bench/*.wgsl compiled
+//        by lib/wgsl's back end at the device's level; robust: WebGPU's index clamping, exact:
+//        move and cull with NoContraction like the SPIR-V shaders)
 //   scene.set_camera(slot, &cam)      the slot's camera, before its frame is recorded
 //   scene.record(e, slot, mode, time, color, depth)   one frame (below)
 //   scene.gpu_ms(slot) / scene.visible(slot)   the four timestamps and the instance count of the
@@ -34,6 +37,47 @@ use gpu::*;
 use shader::bench::{self, Camera, DrawCmd, Push, Shader};
 
 use crate::T;
+
+/// which shaders the scene runs
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shaders {
+    /// the hand-written SPIR-V of lib/shader/bench.rs
+    Spirv,
+    /// lib/wgsl/bench/*.wgsl through lib/wgsl's back end
+    Wgsl { robust: bool, exact: bool },
+}
+
+impl Shaders {
+    /// WGSL as gputest uses it by default: robust, move and cull exact
+    pub const WGSL: Shaders = Shaders::Wgsl { robust: true, exact: true };
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Shaders::Spirv => "spirv",
+            Shaders::Wgsl { robust: true, exact: true } => "wgsl",
+            Shaders::Wgsl { robust: false, exact: true } => "wgsl (robust off)",
+            Shaders::Wgsl { robust: true, exact: false } => "wgsl (contraction allowed)",
+            Shaders::Wgsl { .. } => "wgsl (robust off, contraction allowed)",
+        }
+    }
+}
+
+/// the words of a benchmark shader in the chosen set (WGSL: compiled; the front end runs on
+/// this thread, which has the 1 MB main stack)
+pub fn shader_words(s: Shader, minor: u32, set: Shaders) -> core::result::Result<Vec<u32>, alloc::string::String> {
+    match set {
+        Shaders::Spirv => Ok(s.build(minor)),
+        Shaders::Wgsl { robust, exact } => {
+            let src = wgsl::bench::ALL.iter().find(|x| x.0 == s.name()).map(|x| x.1).unwrap_or("");
+            let exact = exact && matches!(s, Shader::Move | Shader::Cull);
+            let opt = wgsl::CompileOptions { robust, exact, ..wgsl::CompileOptions::new(minor) };
+            match wgsl::compile(src, &opt) {
+                Ok(o) => o.entries.into_iter().next().map(|e| e.words).ok_or_else(|| alloc::string::String::from("no entry point")),
+                Err(d) => Err(d.first().map(|x| format!("{x}")).unwrap_or_default()),
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -74,9 +118,18 @@ fn push_words(p: &Push) -> [u32; 5] {
 }
 
 impl Scene {
-    pub fn new(t: &mut T, dev: &Device, n: u32, color: Format, slots: usize) -> Option<Scene> {
+    pub fn new(t: &mut T, dev: &Device, n: u32, color: Format, slots: usize, set: Shaders) -> Option<Scene> {
         let minor = if dev.level() == Level::Voll { shader::VOLL } else { shader::BASIS };
-        let mut module = |s: Shader| t.res(ShaderModule::from_spirv(dev, &s.build(minor)), &format!("shader {}", s.name()));
+        let mut module = |s: Shader| {
+            let words = match shader_words(s, minor, set) {
+                Ok(w) => w,
+                Err(e) => {
+                    t.fail(&format!("{} {}: {e}", set.name(), s.name()));
+                    return None;
+                }
+            };
+            t.res(ShaderModule::from_spirv(dev, &words), &format!("shader {} ({})", s.name(), set.name()))
+        };
         let (ms, cs, vi, vsg, fs) = (module(Shader::Move)?, module(Shader::Cull)?, module(Shader::VsInstanced)?,
                                      module(Shader::VsSingle)?, module(Shader::FsLambert)?);
         let b = |binding, kind, stages| Binding { binding, kind, stages };

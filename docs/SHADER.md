@@ -111,7 +111,9 @@ gleiche Wörter). Der Builder prüft Typen nur so weit, wie er Ergebnistypen abl
 Benutzung (Instruktion nach dem Terminator, Block ohne Terminator) endet mit einem Panic, alles
 andere findet der Validator.
 
-`spv` enthält die Opcodes (`op::FAdd` …), die Enums `Cap`, `Sc`, `Dec`, `Bi`, `Model`, `Mode`,
+`spv` enthält die Opcodes (`op::FAdd` …), die Enums `Cap` (auch die 16-Bit-Speicher-Capabilities
+`StorageBuffer16BitAccess`, `UniformAndStorageBuffer16BitAccess`, `StoragePushConstant16`,
+`StorageInputOutput16`), `Sc`, `Dec`, `Bi`, `Model`, `Mode`,
 `Dim`, `Fmt`, `Lang` mit Namenstabellen, `scope::*`, `sem::*`, `glsl::*` und die
 Operanden-Grammatik (`OPS`), die Disassembler und Validator teilen; `parse` zerlegt Wörter in
 Instruktionen und Operanden.
@@ -208,7 +210,9 @@ Benchmark-Module und alle 35 Beispiel-Module ist die Ausgabe Zeile für Zeile gl
 
 `val::validate(words) -> Result<(), Vec<Error>>`, `Error { rule, at, msg }` (`at`: Wort-Offset
 der Instruktion). Er prüft, was ein Modul-Builder falsch machen kann – kein vollständiger Ersatz
-für `spirv-val`.
+für `spirv-val`. `val::validate_with(words, &val::Options { uniform_standard_layout })` nimmt
+Uniform-Blöcke im Storage-Layout an (std430 statt std140, wie mit Vulkans
+uniformBufferStandardLayout; `lib/wgsl` braucht das für WGSLs `mat2x2f` in Uniform-Puffern).
 
 | Regel | Was geprüft wird |
 |---|---|
@@ -430,5 +434,6 @@ Konstantenausdrücken modulo 2³² über, `01f` ist für Tint ein gültiges Lite
 
 Mesh- und Task-Shader (`MeshEXT` / `TaskEXT` sind nur als Modelle bekannt), Subgroup-Operationen,
 `OpTypeForwardPointer` / Physical Storage Buffer, Row-Major-Layouts
-im Layout-Helfer, Switch-Literale breiter als 32 Bit, MSL-Ausgabe, der WGSL-Compiler selbst (G2);
-der Validator deckt die oben genannten Lücken nicht ab.
+im Layout-Helfer, Switch-Literale breiter als 32 Bit, MSL-Ausgabe; der Validator deckt die oben
+genannten Lücken nicht ab. Der WGSL-Übersetzer, der diese Crate als Back-End benutzt, ist
+[`lib/wgsl`](WGSL.md) (G2c).

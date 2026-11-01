@@ -1,0 +1,4 @@
+#!args --test wgsl
+# lib/wgsl's back end on the GPU: compute shaders compiled from WGSL evaluate every operator and
+# numeric built-in on runtime values, compared with lib/wgsl's constant evaluator (float accuracy
+# as the spec's table allows) and WGSL's runtime rules; SPIR-V 1.6 and 1.3

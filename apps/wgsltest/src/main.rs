@@ -19,9 +19,12 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 
+mod backend;
+mod backend_api;
 mod bench;
 mod checks;
 mod consts;
+mod coverage;
 mod irtest;
 mod lexparse;
 mod robust;
@@ -192,12 +195,15 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--file") {
         return check_file(&f);
     }
+    if let Some(f) = plat::arg_value("--spv") {
+        return backend::spv_file(&f);
+    }
     if plat::args().iter().any(|a| a == "--stack") {
         return stack_probe();
     }
     let only = plat::arg_value("--only").map(String::from);
     let verbose = plat::args().iter().any(|a| a == "--verbose");
-    let groups: [(&'static str, fn(&mut T)); 9] = [
+    let groups: [(&'static str, fn(&mut T)); 13] = [
         ("lex", lexparse::lex),
         ("parse", lexparse::parse),
         ("print", lexparse::print),
@@ -207,6 +213,10 @@ fn run() -> i32 {
         ("bench", bench::run),
         ("robust", robust::run),
         ("perf", robust::perf),
+        ("spirv", backend::spirv),
+        ("corpus", backend::corpus),
+        ("backend", backend_api::run),
+        ("perf_backend", backend_api::perf_backend),
     ];
     let mut failed = 0;
     let mut total = 0;

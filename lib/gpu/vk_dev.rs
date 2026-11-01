@@ -9,8 +9,12 @@
 //        the Vulkan memory model only together with its device scope (else Device-scope
 //        atomics, as in the benchmark's cull, would be invalid); on Voll also descriptor
 //        indexing (update after bind, partially bound, non-uniform indexing) and
-//        draw-indirect-count; maintenance4 on Vulkan 1.3 (LocalSizeId).  Not enabled: robust
-//        buffer access (speed).
+//        draw-indirect-count; maintenance4 on Vulkan 1.3 (LocalSizeId); for shaders compiled
+//        from WGSL (lib/wgsl): f16 in uniform buffers and push constants, the standard uniform
+//        buffer layout, demote-to-helper (discard on Vulkan 1.3), clip distances, the
+//        primitive index (geometryShader), sample-rate shading, dual-source blending in
+//        shaders, the extended storage image formats, storage reads without format.  Not enabled: robust buffer
+//        access (speed; lib/wgsl's back end clamps indices instead).
 //   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
@@ -132,6 +136,9 @@ const E10: &[usize] = &[
     vk::F10_FULL_DRAW_INDEX_UINT32,
     vk::F10_IMAGE_CUBE_ARRAY,
     vk::F10_INDEPENDENT_BLEND,
+    vk::F10_GEOMETRY_SHADER,
+    vk::F10_SAMPLE_RATE_SHADING,
+    vk::F10_DUAL_SRC_BLEND,
     vk::F10_MULTI_DRAW_INDIRECT,
     vk::F10_DRAW_INDIRECT_FIRST_INSTANCE,
     vk::F10_DEPTH_CLAMP,
@@ -140,21 +147,30 @@ const E10: &[usize] = &[
     vk::F10_TEXTURE_COMPRESSION_BC,
     vk::F10_VERTEX_PIPELINE_STORES_AND_ATOMICS,
     vk::F10_FRAGMENT_STORES_AND_ATOMICS,
+    vk::F10_SHADER_STORAGE_IMAGE_EXTENDED_FORMATS,
+    vk::F10_SHADER_STORAGE_IMAGE_READ_WITHOUT_FORMAT,
     vk::F10_SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT,
     vk::F10_SHADER_UNIFORM_BUFFER_ARRAY_DYNAMIC_INDEXING,
     vk::F10_SHADER_SAMPLED_IMAGE_ARRAY_DYNAMIC_INDEXING,
     vk::F10_SHADER_STORAGE_BUFFER_ARRAY_DYNAMIC_INDEXING,
     vk::F10_SHADER_STORAGE_IMAGE_ARRAY_DYNAMIC_INDEXING,
+    vk::F10_SHADER_CLIP_DISTANCE,
     vk::F10_SHADER_FLOAT64,
     vk::F10_SHADER_INT64,
     vk::F10_SHADER_INT16,
 ];
-const E11: &[usize] = &[vk::F11_STORAGE_BUFFER_16BIT_ACCESS, vk::F11_SHADER_DRAW_PARAMETERS];
+const E11: &[usize] = &[
+    vk::F11_STORAGE_BUFFER_16BIT_ACCESS,
+    vk::F11_UNIFORM_AND_STORAGE_BUFFER_16BIT_ACCESS,
+    vk::F11_STORAGE_PUSH_CONSTANT16,
+    vk::F11_SHADER_DRAW_PARAMETERS,
+];
 const E12: &[usize] = &[
     vk::F12_STORAGE_BUFFER_8BIT_ACCESS,
     vk::F12_SHADER_FLOAT16,
     vk::F12_SHADER_INT8,
     vk::F12_SCALAR_BLOCK_LAYOUT,
+    vk::F12_UNIFORM_BUFFER_STANDARD_LAYOUT,
     vk::F12_HOST_QUERY_RESET,
     vk::F12_TIMELINE_SEMAPHORE,
     vk::F12_BUFFER_DEVICE_ADDRESS,
@@ -174,7 +190,12 @@ const E12_VOLL: &[usize] = &[
     vk::F12_DESCRIPTOR_BINDING_PARTIALLY_BOUND,
     vk::F12_RUNTIME_DESCRIPTOR_ARRAY,
 ];
-const E13: &[usize] = &[vk::F13_SYNCHRONIZATION2, vk::F13_DYNAMIC_RENDERING, vk::F13_MAINTENANCE4];
+const E13: &[usize] = &[
+    vk::F13_SHADER_DEMOTE_TO_HELPER_INVOCATION,
+    vk::F13_SYNCHRONIZATION2,
+    vk::F13_DYNAMIC_RENDERING,
+    vk::F13_MAINTENANCE4,
+];
 
 fn pick<const N: usize>(have: &[u32; N], want: &[usize]) -> [u32; N] {
     let mut out = [0u32; N];

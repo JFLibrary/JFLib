@@ -70,7 +70,6 @@ pub const PASS: &[(&str, &str)] = &[
     ("frexp and modf", "fn f() { var x = modf(1.5); x.fract = 1; let y = frexp(1.5); let z: f32 = y.fract; let w: i32 = y.exp; const c = frexp(8.0); const_assert c.exp == 4; }"),
     ("entry points", "struct VOut { @builtin(position) pos: vec4f, @location(0) @interpolate(flat) id: u32, @location(1) @interpolate(linear, sample) c: vec2f }\n@vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32, @location(0) p: vec4f) -> VOut { var o: VOut; o.pos = p; o.id = vi + ii; return o; }\nstruct FOut { @builtin(frag_depth) d: f32, @builtin(sample_mask) m: u32, @location(0) c: vec4f }\n@fragment fn fs(@builtin(position) p: vec4f, @builtin(front_facing) ff: bool, @builtin(sample_index) si: u32, @builtin(sample_mask) mi: u32, @location(0) @interpolate(flat) id: u32) -> FOut { var o: FOut; o.d = p.z; o.m = mi; return o; }\n@compute @workgroup_size(8, 8) fn cs(@builtin(local_invocation_id) l: vec3u, @builtin(local_invocation_index) li: u32, @builtin(global_invocation_id) g: vec3u, @builtin(workgroup_id) w: vec3u, @builtin(num_workgroups) n: vec3u, @builtin(global_invocation_index) gi: u32, @builtin(workgroup_index) wi: u32) {}"),
     ("invariant position", "@vertex fn main() -> @invariant @builtin(position) vec4f { return vec4f(); }"),
-    ("frag depth mode", "@fragment fn main() -> @builtin(frag_depth, greater) f32 { return 1.0f; }"),
     ("same binding in different entry points", "@group(0) @binding(0) var<uniform> a: vec4f;\n@group(0) @binding(0) var<uniform> b: vec4f;\n@fragment fn f1() -> @location(0) vec4f { return a; }\n@fragment fn f2() -> @location(0) vec4f { return b; }"),
     ("immediate data", "struct P { a: f32, b: u32 }\nvar<immediate> p: P;\n@compute @workgroup_size(1) fn main() { _ = p.a + f32(p.b); }"),
     ("diagnostic filters", "diagnostic(off, derivative_uniformity);\n@diagnostic(warning, derivative_uniformity) fn f(x: f32) { if x > 0.0 @diagnostic(off, derivative_uniformity) { } @diagnostic(info, derivative_uniformity) { } loop @diagnostic(off, derivative_uniformity) { break; } }"),
@@ -422,4 +421,9 @@ pub fn run(t: &mut T) {
     t.fail_with("immediate off", "var<$immediate> a: f32;", "kein Adressraum", &off(feature::IMMEDIATE_ADDRESS_SPACE));
     t.fail_with("f16 not offered", "enable $f16;", "nicht verfügbar", &off(feature::F16));
     t.fail_with("fragment_depth off", "@fragment fn main() -> @builtin(frag_depth, $less) f32 { return 1.0; }", "fragment_depth", &off(feature::FRAGMENT_DEPTH));
+    // fragment_depth is implemented but not in feature::ALL: Chrome 156 offers it only with
+    // --enable-unsafe-webgpu (tools/wgsl_corpus/requires/err_unsafe_only_feature.wgsl)
+    t.fail("fragment_depth not by default", "@fragment fn main() -> @builtin(frag_depth, $less) f32 { return 1.0; }", "fragment_depth");
+    t.pass_with("frag depth mode", "@fragment fn main() -> @builtin(frag_depth, greater) f32 { return 1.0f; }",
+                &Options { features: feature::ALL | feature::FRAGMENT_DEPTH });
 }

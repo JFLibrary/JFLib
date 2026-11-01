@@ -1417,50 +1417,7 @@ impl<'a> Checker<'a> {
     }
 
     fn bitcast_value(&self, v: &Value, from: TypeId, to: TypeId) -> Result<Value, String> {
-        // flatten to 32-bit words (f16 pairs packed), then rebuild
-        let cs = if self.t.is_scalar(from) { alloc::vec![v.clone()] } else { comps(&self.t, v, from) };
-        let mut words: Vec<u32> = Vec::new();
-        let mut half: Option<u16> = None;
-        for c in &cs {
-            match *c {
-                Value::I32(x) => words.push(x as u32),
-                Value::U32(x) => words.push(x),
-                Value::F32(x) => words.push(x.to_bits()),
-                Value::F16(x) => {
-                    let b = f16_bits(x);
-                    match half.take() {
-                        None => half = Some(b),
-                        Some(lo) => words.push(lo as u32 | (b as u32) << 16),
-                    }
-                }
-                _ => words.push(0),
-            }
-        }
-        let s = self.t.scalar_of(to).unwrap_or(Scalar::U32);
-        let mut out = Vec::new();
-        for w in words {
-            match s {
-                Scalar::I32 => out.push(Value::I32(w as i32)),
-                Scalar::U32 => out.push(Value::U32(w)),
-                Scalar::F32 => {
-                    let f = f32::from_bits(w);
-                    if !f.is_finite() {
-                        return Err(String::from("bitcast ergibt NaN oder unendlich, das ist in einem const-Ausdruck nicht erlaubt"));
-                    }
-                    out.push(Value::F32(f));
-                }
-                _ => {
-                    for h in [w as u16, (w >> 16) as u16] {
-                        let f = builtins::f16_from_bits(h);
-                        if !f.is_finite() {
-                            return Err(String::from("bitcast ergibt NaN oder unendlich, das ist in einem const-Ausdruck nicht erlaubt"));
-                        }
-                        out.push(Value::F16(f));
-                    }
-                }
-            }
-        }
-        Ok(if self.t.is_scalar(to) { out.into_iter().next().unwrap_or(Value::Zero) } else { Value::Comp(out) })
+        consteval::bitcast(&self.t, v, from, to)
     }
 
     // ---- built-in calls

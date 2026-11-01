@@ -148,6 +148,14 @@ struct V<'a> {
     mdecs: BTreeMap<(u32, u32), Vec<(u32, Vec<u32>)>>,
     funcs: Vec<FnInfo>,
     need: BTreeMap<u32, usize>,
+    opt: Options,
+}
+
+/// what the device allows beyond Vulkan's defaults (validate_with)
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    /// uniformBufferStandardLayout: uniform blocks laid out like storage blocks (std430)
+    pub uniform_standard_layout: bool,
 }
 
 impl Types for V<'_> {
@@ -737,7 +745,7 @@ impl<'a> V<'a> {
                 if !matches!(self.t(inner), Some(Ty::Struct { .. })) || !(block || (sc == 2 && bblock && self.minor < 4)) {
                     self.err(Rule::Storage, k, format!("{} variables must point to a struct decorated Block", s));
                 } else {
-                    let rule = if sc == 2 && !bblock { Lay::Std140 } else { Lay::Std430 };
+                    let rule = if sc == 2 && !bblock && !self.opt.uniform_standard_layout { Lay::Std140 } else { Lay::Std430 };
                     let size = self.block_layout(k, inner, rule, true);
                     if sc == 9 && size > 128 {
                         self.err(Rule::BlockLayout, k, format!("the push-constant block has {} bytes (at most 128)", size));
@@ -1916,6 +1924,11 @@ impl<'a> V<'a> {
 
 /// check a module (the rules of the module comment) -> Ok or every error found
 pub fn validate(words: &[u32]) -> Result<(), Vec<Error>> {
+    validate_with(words, &Options::default())
+}
+
+/// validate with device options (a uniform buffer in the storage layout)
+pub fn validate_with(words: &[u32], opt: &Options) -> Result<(), Vec<Error>> {
     let e = |msg: &str| Err(alloc::vec![Error { rule: Rule::Header, at: 0, msg: String::from(msg) }]);
     if words.len() < 5 {
         return e("fewer than 5 words");
@@ -1949,6 +1962,7 @@ pub fn validate(words: &[u32]) -> Result<(), Vec<Error>> {
         mdecs: BTreeMap::new(),
         funcs: Vec::new(),
         need: BTreeMap::new(),
+        opt: *opt,
     };
     for k in 0..v.ins.len() {
         let r = v.ins[k].res;

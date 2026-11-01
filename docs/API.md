@@ -64,8 +64,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
-- [wgsl](#wgsl) -- the WGSL front end: lexer, parser, semantic checker, constant evaluation, the typed IR, the benchmark shaders as WGSL
-  <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [print.rs](#wgslprintrs) · [xid.rs](#wgslxidrs)
+- [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
+  <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
@@ -17445,6 +17445,15 @@ COLOR_TARGETS_MAX: usize = 8
   - `shader_i64: bool`
   - `shader_i8: bool`
   - `storage_16bit: bool` -- 16 / 8 bit values in storage buffers
+  - `uniform_16bit: bool` -- 16-bit values in uniform buffers and push constants too (WGSL f16 there)
+  - `push_constant_16bit: bool`
+  - `uniform_standard_layout: bool` -- uniform buffers in the storage layout (uniformBufferStandardLayout: a WGSL uniform
+    buffer whose layout is not std140, e.g. mat2x2f)
+  - `demote: bool` -- OpDemoteToHelperInvocation (lib/wgsl's discard at the level Voll)
+  - `clip_distances: bool` -- WGSL @builtin(clip_distances), @builtin(primitive_index) (geometryShader),
+    @interpolate(.., sample) / @builtin(sample_index) (sampleRateShading)
+  - `primitive_index: bool`
+  - `sample_shading: bool`
   - `storage_8bit: bool`
   - `texture_bc: bool` -- BC1 .. BC7 compressed textures
   - `anisotropy: bool`
@@ -17999,8 +18008,12 @@ buffer slots, staged uploads, submission
        the Vulkan memory model only together with its device scope (else Device-scope
        atomics, as in the benchmark's cull, would be invalid); on Voll also descriptor
        indexing (update after bind, partially bound, non-uniform indexing) and
-       draw-indirect-count; maintenance4 on Vulkan 1.3 (LocalSizeId).  Not enabled: robust
-       buffer access (speed).
+       draw-indirect-count; maintenance4 on Vulkan 1.3 (LocalSizeId); for shaders compiled
+       from WGSL (lib/wgsl): f16 in uniform buffers and push constants, the standard uniform
+       buffer layout, demote-to-helper (discard on Vulkan 1.3), clip distances, the
+       primitive index (geometryShader), sample-rate shading, dual-source blending in
+       shaders, the extended storage image formats, storage reads without format.  Not enabled: robust buffer
+       access (speed; lib/wgsl's back end clamps indices instead).
   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
@@ -19605,16 +19618,23 @@ Rules (Rule::*):
   - `at: usize` -- the word offset of the instruction (0: the module)
   - `msg: String`
 
+- **`struct Options`**
+  what the device allows beyond Vulkan's defaults (validate_with)
+  - `uniform_standard_layout: bool` -- uniformBufferStandardLayout: uniform blocks laid out like storage blocks (std430)
+
 - **`fn validate(words: &[u32]) -> Result<(), Vec<Error>>`**
   check a module (the rules of the module comment) -> Ok or every error found
 
+- **`fn validate_with(words: &[u32], opt: &Options) -> Result<(), Vec<Error>>`**
+  validate with device options (a uniform buffer in the storage layout)
+
 ## wgsl
 
-*the WGSL front end: lexer, parser, semantic checker, constant evaluation, the typed IR, the benchmark shaders as WGSL* -- crate root [`lib/wgsl/lib.rs`](../lib/wgsl/lib.rs)
+*the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL* -- crate root [`lib/wgsl/lib.rs`](../lib/wgsl/lib.rs)
 
 ```text
-wgsl -- JFLib's WGSL front end: source text -> a checked, fully typed module (step G2a of
-the GPU plan; docs/WGSL.md).  The back end (G2c) lowers the IR to SPIR-V with lib/shader;
+wgsl -- JFLib's WGSL compiler: source text -> a checked, fully typed module (the front end,
+step G2a of the GPU plan) -> SPIR-V through lib/shader (the back end, G2c; docs/WGSL.md);
 the browser path (G4) hands the same text to WebGPU.  The reference is the W3C WGSL
 Candidate Recommendation (2026-10-26); where Chrome's Tint differs, the docs say so.
 
@@ -19634,6 +19654,11 @@ Candidate Recommendation (2026-10-26); where Chrome's Tint differs, the docs say
                                               error / warning, German message, notes
   bench                                       the six benchmark shaders of docs/SHADER.md
                                               as WGSL text
+  compile(src, &CompileOptions) -> Result<Output, Vec<Diagnostic>>   check + lower to
+                                              SPIR-V, one module per entry point (spirv.rs)
+  Output::constants / workgroup_size / check_pipeline, check_interface, Limits
+                                              pipeline constants and WebGPU's pipeline
+                                              checks (pipeline.rs)
 
 Never panics on any input: nesting deeper than parse::MAX_DEPTH is an error, constant
 values are capped in size (consteval::MAX_ELEMS), every count is checked.
@@ -19730,10 +19755,11 @@ DUAL_SOURCE_BLENDING: u32 = 1 << 18
 PRIMITIVE_INDEX: u32 = 1 << 19
 /// enable atomic_vec2u_min_max: atomicStoreMin / Max on atomic<vec2<u32>>
 ATOMIC_VEC2U_MIN_MAX: u32 = 1 << 20
-/// everything this front end implements (the language features of Chrome 156 except
-/// buffer_view, subgroup_id and subgroup_uniformity; the enable-extensions except
-/// subgroups and subgroup_size_control)
-ALL: u32 = 0x7ff | 0x1f << 16
+/// what a browser offers and this front end implements: the language features of Chrome
+/// 156 except buffer_view, subgroup_id and subgroup_uniformity (and without
+/// fragment_depth, which Chrome offers only with --enable-unsafe-webgpu: implemented,
+/// opt-in), the enable-extensions except subgroups and subgroup_size_control
+ALL: u32 = (0x7ff & !FRAGMENT_DEPTH) | 0x1f << 16
 /// (name, bit, is a language extension) for every extension name WGSL defines; bit 0:
 /// known but not implemented here
 NAMES: &[(&str, u32, bool)] = &[ ("readonly_and_readwrite_storage_textures", READONLY_A ...
@@ -20973,6 +20999,64 @@ MAX_ERRORS: usize = 25
 - **`fn parse(src: &str) -> (Ast, Vec<Diagnostic>)`**
   see the module comment
 
+### `wgsl/pipeline.rs`
+
+Source: [`lib/wgsl/pipeline.rs`](../lib/wgsl/pipeline.rs)
+
+```text
+pipeline -- what WebGPU checks when it creates a pipeline from a compiled entry point
+(docs/WGSL.md "Overrides" and "Pipeline-Prüfungen")
+
+  output.constants(entry, &[(key, value)]) -> Result<Vec<(u32, f64)>, String>
+       the pipeline constants for lib/gpu (gpu::Constant { id, value }): keys as in WebGPU's
+       GPUProgrammableStage.constants (the override's name, or its @id as a decimal number
+       when it has one), values converted the way WebGPU converts them; every override the
+       entry point uses is then evaluated on the CPU (initializers with the front end's
+       constant evaluator) and every specialization constant of the module gets its final
+       value, the hidden ones (workgroup sizes, array counts) too.  Errors as WebGPU
+       reports them: an unknown key, a value out of the type's range, an override without
+       initializer left unset, an evaluation error (division by zero ...), a workgroup size
+       or array count of 0
+  output.workgroup_size(entry, constants) -> Result<[u32; 3], String>
+  output.check_pipeline(entry, constants, &Limits) -> Result<(), String>   the above plus the
+       limits (workgroup size and invocations, workgroup memory, colour targets, inter-stage
+       locations, immediate bytes) and the storage texture formats WebGPU's core allows
+  check_interface(vertex, fragment) -> Result<(), String>   every fragment input has a vertex
+       output at its location with the same component type and count (at least)
+  Limits::WEBGPU   WebGPU's default limits (what a browser gives without requiredLimits)
+```
+
+- **`struct Limits`**
+  the limits a pipeline is checked against
+  - `max_compute_invocations: u32`
+  - `max_workgroup_size: [u32; 3]`
+  - `max_workgroup_storage: u32`
+  - `max_color_attachments: u32`
+  - `max_inter_stage_variables: u32`
+  - `max_immediate_size: u32`
+  - `bgra8unorm_storage: bool` -- the device offers bgra8unorm-storage
+  - `texture_formats_tier2: bool` -- texture-formats-tier2: read_write storage textures of more formats
+
+**`impl Limits`**
+
+- **`const WEBGPU: Limits = Limits { max_compute_invocations: 256, max_workgroup_size ...`**
+  WebGPU's default limits (Chrome 156 without requiredLimits)
+
+**`impl Output`**
+
+- **`fn constants(&self, entry: &str, given: &[(&str, f64)]) -> Result<Vec<(u32, f64)>, String>`**
+  the pipeline constants (SpecId, value) of an entry point for WebGPU-style constants (see
+  the module comment); pass them to lib/gpu as Constant { id, value }
+- **`fn workgroup_size(&self, entry: &str, given: &[(&str, f64)]) -> Result<[u32; 3], String>`**
+  the workgroup size of a compute entry point with these pipeline constants
+- **`fn check_pipeline(&self, entry: &str, given: &[(&str, f64)], lim: &Limits) -> Result<(), String>`**
+  what WebGPU checks when it creates a pipeline from this entry point (module comment)
+
+- **`fn check_interface(m: &Module, vs: &EntryOut, fs: &EntryOut) -> Result<(), String>`**
+  WebGPU's inter-stage rules for a vertex and a fragment entry point: every fragment input
+  at a location has a vertex output there with the same component type, at least as many
+  components and the same interpolation
+
 ### `wgsl/print.rs`
 
 Source: [`lib/wgsl/print.rs`](../lib/wgsl/print.rs)
@@ -20987,6 +21071,165 @@ the same tree, spans aside; comments are not kept)
 
 - **`fn print(ast: &Ast) -> String`**
   see the module comment
+
+### `wgsl/spirv.rs`
+
+Source: [`lib/wgsl/spirv.rs`](../lib/wgsl/spirv.rs)
+
+```text
+spirv -- the back end (step G2c of the GPU plan; docs/WGSL.md "Back-End"): the checked IR
+lowered to SPIR-V with lib/shader, one SPIR-V module per entry point
+
+  compile(src, &CompileOptions) -> Result<Output, Vec<Diagnostic>>   check + lower
+  compile_module(&Module, &CompileOptions)   the same for a module checked before
+  Output { entries, overrides, module, warnings }
+       EntryOut: name, stage, words, workgroup size (with the defaults), resources with
+       (group, binding, kind, minimum size), immediate bytes, stage inputs / outputs, the
+       device features the module needs, the specialization constants it declares
+  output.constants(entry, &[(key, value)])   the pipeline constants for lib/gpu (pipeline.rs)
+
+Levels: CompileOptions::minor = shader::BASIS (SPIR-V 1.3, Vulkan 1.1) or shader::VOLL
+(SPIR-V 1.6, Vulkan 1.3).
+
+Types: every WGSL type has a value type (function, private and workgroup memory, SSA values)
+and, when it is host-shareable, a laid-out type (Offset, ArrayStride, MatrixStride; uniform,
+storage and push-constant memory).  SPIR-V 1.4+ (Vulkan's VUID-StandaloneSpirv-None-10684)
+forbids explicit layouts outside those storage classes: at Voll the two are different types and
+loads and stores of composites convert with OpCopyLogical; at Basis (1.3) the laid-out type
+is the value type too.  Buffers: the store type is wrapped in a Block struct { inner } unless
+it is a struct with a runtime-sized array (that struct is the Block: Vulkan allows runtime
+arrays only as the last member of the Block itself).
+
+Overrides: by default every override an entry point uses is a specialization constant
+(SpecId = @id, or OVERRIDE_BASE + its index without @id); override-expressions that size a
+workgroup or an array are hidden u32 specialization constants (HIDDEN_BASE + the expression).
+Output::constants evaluates every override on the CPU (the front end's constant evaluator)
+and returns the values of all of them, so derived overrides need no OpSpecConstantOp.
+CompileOptions::constants substitutes the values instead (Tint's way): no specialization
+constants at all.
+
+The function bodies: spirv_func.rs (statements, expressions, memory, calls, the entry
+point wrapper), spirv_builtin.rs (the built-in functions and textures).
+```
+
+```rust
+/// the SpecId of an override without @id: OVERRIDE_BASE + its index in Module::overrides
+OVERRIDE_BASE: u32 = 0x1_0000
+/// the SpecId of a hidden constant (a workgroup size or array count from an override-expression):
+/// HIDDEN_BASE + the expression's index in Module::exprs
+HIDDEN_BASE: u32 = 0x2_0000
+```
+
+- **`struct CompileOptions<'a>`**
+  what compile does
+  - `minor: u32` -- shader::BASIS (SPIR-V 1.3, Vulkan 1.1) or shader::VOLL (SPIR-V 1.6, Vulkan 1.3); 4 and 5
+    work as well
+  - `entry: Option<&'a str>` -- one entry point (None: every entry point of the module)
+  - `constants: Option<&'a [(&'a str, f64)]>` -- None: overrides become specialization constants (set them with Output::constants);
+    Some: the pipeline constants as WebGPU takes them (key: the override's name, or its @id
+    as a decimal number), substituted as constants
+  - `features: u32` -- the front end's features (Options::features)
+  - `robust: bool` -- WebGPU's robustness: indices clamped to the array, vector, matrix, runtime array
+    (arrayLength) and texture bounds, out-of-bounds texture stores skipped
+  - `exact: bool` -- NoContraction on every float addition, subtraction, multiplication, division and
+    product: no fused multiply-add, results as the operations are written (WGSL itself
+    lets an implementation contract)
+
+**`impl CompileOptions<'_>`**
+
+- **`const fn new(minor: u32) -> CompileOptions<'static>`**
+  level `minor`, every entry point, specialization constants, robust, contraction allowed
+
+- **`enum ResourceKind`**
+  what a binding holds
+  - `UniformBuffer`
+  - `StorageBuffer { read_only: bool }`
+  - `Texture { dim: TexDim, kind: TexKind }` -- texture_1d&lt;T> ... texture_cube_array&lt;T>, texture_multisampled_2d, the depth textures
+  - `StorageTexture { dim: TexDim, format: TexelFormat, access: Access }`
+  - `Sampler { comparison: bool }`
+  - `ExternalTexture` -- texture_external: a plain 2D float texture here
+
+- **`struct Resource`**
+  a resource of an entry point (lib/gpu: one Binding per resource)
+  - `group: u32`
+  - `binding: u32`
+  - `name: String`
+  - `kind: ResourceKind`
+  - `min_size: u64` -- buffers: the smallest binding size the shader may access (a runtime-sized array with one
+    element; WebGPU's minBindingSize); 0 otherwise
+
+- **`struct StageVar`**
+  one stage input or output
+  - `name: String`
+  - `kind: IoKind`
+  - `ty: TypeId` -- the WGSL type (Module::types)
+
+- **`struct Needs`**
+  device features a module needs beyond the level's core
+  - `f16: bool` -- f16 arithmetic (shaderFloat16)
+  - `storage16: bool` -- f16 in storage buffers / uniform buffers / push constants (the 16-bit storage features)
+  - `uniform16: bool`
+  - `push16: bool`
+  - `uniform_standard_layout: bool` -- a uniform buffer whose layout is not std140 (uniformBufferStandardLayout)
+  - `demote: bool` -- OpDemoteToHelperInvocation (Voll: discard)
+  - `int64_atomics: bool` -- 64-bit atomics (atomicStoreMin / Max on atomic&lt;vec2&lt;u32>>)
+  - `storage_without_format: bool` -- storage textures without a format in the shader (bgra8unorm)
+  - `primitive_index: bool` -- @builtin(primitive_index): the Geometry capability (geometryShader)
+  - `clip_distance: bool` -- @builtin(clip_distances) (shaderClipDistance)
+  - `sample_rate_shading: bool` -- @interpolate(.., sample), @builtin(sample_index) (sampleRateShading)
+
+- **`enum SpecSource`**
+  where a specialization constant's value comes from
+  - `Override(u32)` -- an override (Module::overrides index)
+  - `Expr(ExprId)` -- a module-scope override-expression as u32 (Module::exprs index)
+
+- **`struct EntryOut`**
+  an entry point compiled
+  - `name: String`
+  - `stage: Stage`
+  - `words: Vec<u32>` -- the SPIR-V module of this entry point (its entry point has the same name)
+  - `workgroup_size: Option<[u32; 3]>` -- compute: the workgroup size with the overrides' defaults (None: an override without
+    default decides it; Output::workgroup_size computes it for pipeline constants)
+  - `resources: Vec<Resource>`
+  - `immediate_size: u32` -- bytes of the var&lt;immediate> block (0: none); lib/gpu: PipelineLayoutDesc::push_constants
+  - `inputs: Vec<StageVar>`
+  - `outputs: Vec<StageVar>`
+  - `needs: Needs`
+  - `spec: Vec<(u32, SpecSource)>` -- the specialization constants declared: (SpecId, source)
+  - `overrides: Vec<u32>` -- the overrides the entry point uses (Module::overrides indices)
+
+- **`struct OverrideInfo`**
+  an override of the module
+  - `name: String`
+  - `id: u32` -- the SpecId (= @id when written)
+  - `explicit_id: bool` -- whether @id was written (then WebGPU keys the constant by the number, not the name)
+  - `ty: Scalar`
+  - `has_default: bool` -- it has an initializer (else a pipeline must set it)
+
+- **`struct Output`**
+  the result of compile
+  - `entries: Vec<EntryOut>`
+  - `overrides: Vec<OverrideInfo>`
+  - `module: Module` -- the checked module (Output::constants evaluates its overrides)
+  - `warnings: Vec<Diagnostic>`
+  - `minor: u32`
+
+**`impl Output`**
+
+- **`fn entry(&self, name: &str) -> Option<&EntryOut>`**
+  an entry point by name
+
+- **`fn compile(src: &str, opt: &CompileOptions) -> Result<Output, Vec<Diagnostic>>`**
+  check and compile WGSL source (see the module comment)
+
+- **`fn compile_module(m: &Module, opt: &CompileOptions) -> Result<Output, Vec<Diagnostic>>`**
+  compile a checked module
+
+- **`fn compile_library(src: &str, opt: &CompileOptions) -> Result<Output, Vec<Diagnostic>>`**
+  compile every function of a module without entry points (a library: the functions are
+  lowered with value and pointer parameters, uncalled, beside an empty compute entry point
+  `library`; functions with texture or sampler parameters are left out).  For tests: SPIR-V
+  validators check every function of a module.
 
 ### `wgsl/xid.rs`
 
