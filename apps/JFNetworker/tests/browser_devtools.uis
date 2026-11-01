@@ -1,0 +1,142 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/web_dev.jfnet
+# the developer view of the Webbrowser (B4) on PC1's desktop: F12 and its button, the tabs; Netzwerk with
+# a row per request and hop, a chosen row's heads and body, who asked; Elemente live as a script changes
+# the page, with attributes and styles; Konsole; each document its own log; Anhalten ends fetch and src
+# requests too; the console stays at its end when the scale changes; no project change (the title
+# stays clean); it works in a small window
+# Ids (window 0): the window 26624; the address 26800, Zurück 26803, Neu laden / Anhalten 26805; the
+# console's button 122880; the developer view's button 124928, Schließen 124932
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 900 680
+dblclick listitem:"Webbrowser"
+expect #124928 exists
+# nothing shown yet: nothing to look at
+key f12
+expect tab:"Netzwerk" missing
+key f12
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+expect heading:"Hofladen Sonnenfeld" exists
+# ---- F12, the button, Schließen
+key f12
+expect tab:"Konsole" exists
+expect tab:"Netzwerk" exists
+expect tab:"Elemente" exists
+expect tab:"Cookies" exists
+key f12
+expect tab:"Netzwerk" missing
+click #124928
+expect tab:"Netzwerk" exists
+click #124932
+expect tab:"Netzwerk" missing
+click #124928
+# ---- Netzwerk: the page, its sheets and picture
+click tab:"Netzwerk"
+expect text:"Methode" exists
+expect text:"Wer fragte" exists
+expect text:"Adresszeile" exists
+expect text:"http://web.lab/" exists
+expect text:"text/html" exists
+expect text:"<link>" exists
+expect text:"<img>" exists
+# a chosen row: its heads and its body
+click text:"http://web.lab/basis.css"
+expect text:"Anfrage" exists
+expect text:"GET http://web.lab/basis.css" exists
+expect text:"Accept: text/css, */*;q=0.1" exists
+expect text:"Antwort" exists
+expect text:"Server: jfn-httpd/1.0" exists
+expect text:"Content-Type: text/css; charset=utf-8" exists
+expect text:"Inhalt (222 Bytes)" exists
+# ---- a link: another document, another log; who asked; a redirect is a row of its own
+click link:"Anmelden"
+wait 500
+expect heading:"Nicht angemeldet" missing
+expect text:"http://web.lab:8080/login" exists
+expect text:"http://web.lab/basis.css" missing
+expect text:"Link" exists
+expect text:"302 Found" exists
+key alt+left
+expect heading:"Hofladen Sonnenfeld" exists
+expect text:"http://web.lab/basis.css" exists
+# ---- a failure is a row that says why
+click #26800
+key ctrl+a
+type "web.lab:81/\n"
+wait 500
+expect heading:"Seite nicht erreichbar" exists
+expect text:"http://web.lab:81/" exists
+expect text:"Fehler" exists
+click text:"http://web.lab:81/"
+expect text:"keine Verbindung: Verbindung abgelehnt" exists
+# ---- Elemente: the tree, live as a script changes the page
+click #26800
+key ctrl+a
+type "web.lab/baum.html\n"
+wait 500
+expect heading:"Der Baum" exists
+click tab:"Elemente"
+expect listitem:"<html>" exists
+expect listitem:"<h1>" exists
+expect listitem:"<ul id=\"liste\">" exists
+click listitem:"<ul id=\"liste\">"
+key right
+expect listitem:"<li id=\"eins\" class=\"rot\">" exists
+expect listitem:"<li data-neu=\"ja\">" missing
+click button:"Dazu"
+wait 100
+expect listitem:"<li data-neu=\"ja\">" exists
+# what an element has
+click listitem:"<li id=\"eins\" class=\"rot\">"
+expect text:"Attribute" exists
+expect text:"id = \"eins\"" exists
+expect text:"class = \"rot\"" exists
+expect text:"color: #AA0000" exists
+expect text:"font-weight: bold" exists
+click listitem:"<li data-neu=\"ja\">"
+expect text:"data-neu = \"ja\"" exists
+expect text:"color: #AA0000" missing
+# a page of Markdown or text has its own; a page of ours too
+click tab:"Konsole"
+expect text:"Noch keine Ausgabe." exists
+# ---- Anhalten: fetch on its way ends too and its callback hears why
+click #26800
+key ctrl+a
+type "web.lab/langsam.html\n"
+wait 500
+expect heading:"Langsam" exists
+expect text:"gefragt" exists
+expect text:"Es läuft noch." exists
+expect button:"Anhalten" exists
+click tab:"Netzwerk"
+expect text:"http://web.lab:8080/nie" exists
+expect text:"…" exists
+click #26805
+wait 100
+expect text:"Ende: Angehalten" exists
+expect button:"Neu laden" exists
+expect text:"Fehler" exists
+click text:"http://web.lab:8080/nie"
+expect text:"Angehalten" exists
+# Esc does the same
+click #26805
+wait 500
+expect text:"Es läuft noch." exists
+key esc
+wait 100
+expect text:"Ende: Angehalten" exists
+# ---- the console at its end stays there when the scale changes
+click tab:"Konsole"
+click #26800
+key ctrl+a
+type "web.lab/zeilen.html\n"
+wait 500
+wait 100
+expect text:"die letzte Zeile" exists
+expect same build/jfnetworker/none.png 0 0 0 0
+expect_nowarn

@@ -1,6 +1,7 @@
 // pagescript -- the page scripts of the Webbrowser (B3): <script type="text/jfs"> in a page from
 // the simulated network runs in lib/script's VM with a host of its own, on the document the view
-// shows (md_dom.rs through MdViewState::doc_mut); the Console a small pane shows (B4 grows it)
+// shows (md_dom.rs through MdViewState::doc_mut); the Console a tab of the developer view shows
+// (devtools.rs, B4)
 //
 //   PageScript::of(&view, html, url, seed) -> Option<Box<PageScript>>   the page's scripts in
 //        document order, None without any (a page without scripts costs nothing); nothing runs yet
@@ -15,8 +16,10 @@
 //        the ids from `seq`), a navigation, a reload, the document changed
 //   wake(now, running) -> Option<ms>       when a frame is needed for what waits; running: the
 //        virtual clock moves (speed per mille)
-//   console() / clear_console()            what the page printed, logged and got wrong
-//   console_pane(ui, id, &console, &mut ConSeen)   the pane
+//   console() / console_mut() / clear_console()   what the page printed, logged and got wrong
+//   console_pane(ui, id, &console, &mut ConSeen)   the console's part of the developer view
+//   jar_in(&mut jar, clock) / jar_out(&mut jar)    the browser lends its cookies around a pump or
+//        events call (document.cookie; clock: the device clock's seconds)
 //
 // One VM per document (Doc::page): it comes and goes with the document, as the fields' values and
 // the place do, so Back and Forward find a page as it was; it runs nothing while it is not shown
@@ -37,7 +40,11 @@
 //   location             {href, scheme, host, hostname, port, path, query, fragment}, assign(url)
 //                        (or location.href = url), reload(): after the callback, a fragment scrolls
 //   document             by_id(id), find(sel), find_all(sel), create(tag), create_text(s), body(),
-//                        title(), set_title(s), on(type, f), off(type, f)
+//                        title(), set_title(s), on(type, f), off(type, f); cookie: a text, the cookies
+//                        of this address without the HttpOnly ones, as of the start of this call;
+//                        document.cookie = "a=1; Path=/" stores one when the call ends (jfs has no
+//                        setters: location.href does the same), set_cookie(s) at once, and the text
+//                        is new after it.  What the jar refuses is a line of the console
 //   an element           {kind, node, tag}: find(sel), find_all(sel), matches(sel), parent(),
 //                        children() (elements), next(), prev(), text(), set_text(x), html(),
 //                        set_html(s), attr(name), set_attr(name, x), remove_attr(name),
@@ -78,10 +85,12 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::format;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use base::rng::Pcg32;
 use jfn_sim::{Ns, WebReq, WebResp, MS};
+use netpkt::cookie::{Jar, Origin, Refused};
 use netpkt::http::Headers;
 use netpkt::uri::Uri;
 use script::{num, Cx, Error, Fail, Host, Limits, Pin, Status, Value, Vm};
@@ -156,7 +165,7 @@ pub(crate) struct Console {
 }
 
 impl Console {
-    fn push(&mut self, kind: ConKind, text: &str) {
+    pub(crate) fn push(&mut self, kind: ConKind, text: &str) {
         let mut text = String::from(text);
         if text.len() > CON_LINE {
             let mut cut = CON_LINE;
@@ -184,6 +193,12 @@ impl Console {
         self.errors
     }
 
+    pub(crate) fn clear(&mut self) {
+        self.lines.clear();
+        self.errors = 0;
+        self.total += 1;
+    }
+
     /// the lines as text, one per line (the checks)
     pub(crate) fn text(&self) -> String {
         let v: Vec<&str> = self.lines.iter().map(|l| l.text.as_str()).collect();
@@ -192,21 +207,26 @@ impl Console {
 }
 
 /// what the console's pane remembers: the lines it showed; new ones scroll to the end, once the
-/// pane has measured them
+/// pane has measured them; a pane at its end stays there when the scale changes (the place is in
+/// pixels and the lines take another number of them)
 #[derive(Default)]
 pub(crate) struct ConSeen {
     total: u64,
     scroll: bool,
+    /// it went to the end and the user has not scrolled up since
+    at_end: bool,
+    /// the place and the scale of the last pass
+    y: i32,
+    dpi: i32,
 }
 
 /// the console's pane: `id` the scroll view, + 1 Leeren -> Leeren was pressed
 pub(crate) fn console_pane(ui: &mut Ui, id: u32, c: &Console, seen: &mut ConSeen) -> bool {
     let mut clear = false;
-    ui.next_size(-1, 148);
-    ui.box_begin(0, BOX_V | BOX_CARD | pad(6), 4);
+    ui.next_size(-1, -1);
+    ui.box_begin(0, BOX_V, 4);
     ui.next_size(-1, 0);
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.text(TS_BODY_STRONG, t("Konsole"));
     ui.spacer(-1);
     ui.next_flags(ST_COMPACT | ST_SUBTLE);
     if ui.button(id + 1, t("Leeren")) & EV_ACT != 0 {
@@ -239,14 +259,26 @@ pub(crate) fn console_pane(ui: &mut Ui, id: u32, c: &Console, seen: &mut ConSeen
     ui.box_end();
     ui.scroll_end();
     ui.box_end();
+    let (y, dpi) = (ui.scroll_pos(id).1, ui.dpi());
     if seen.total != c.total {
         seen.total = c.total;
         seen.scroll = true;
         ui.repass();
     } else if seen.scroll {
         seen.scroll = false;
+        seen.at_end = true;
         ui.scroll_to(id, -1, 1 << 24);
+    } else if seen.dpi != dpi {
+        // another scale: at the end stays at the end, once the lines are measured again
+        if seen.at_end {
+            seen.scroll = true;
+            ui.repass();
+        }
+    } else if y < seen.y {
+        seen.at_end = false;
     }
+    seen.y = y;
+    seen.dpi = dpi;
     clear
 }
 
@@ -308,6 +340,47 @@ struct Shared {
     /// nodes of the document at the last look: what a query costs
     nodes: usize,
     document: Value,
+    /// the browser's cookies while a call runs, the device clock's seconds, the text document.cookie
+    /// holds (None: not written yet)
+    jar: Arc<Jar>,
+    clock: i64,
+    cookie_seen: Option<String>,
+}
+
+impl Shared {
+    // a cookie from the page -> what to say when the jar refuses it
+    fn store_cookie(&mut self, text: &str) -> Option<String> {
+        let u = Uri::parse(&self.url);
+        let host = String::from(u.host().unwrap_or(""));
+        let secure = u.scheme.as_deref() == Some("https");
+        let o = Origin { host: &host, path: if u.path.is_empty() { "/" } else { &u.path }, secure, http: false };
+        if host.is_empty() {
+            return None;
+        }
+        let clock = self.clock;
+        let Err(e) = Arc::make_mut(&mut self.jar).store(text, o, clock) else { return None };
+        let name = text.split(['=', ';']).next().unwrap_or("").trim();
+        Some(tf("Cookie {} nicht gespeichert: {}", &[name, refused_text(e)]))
+    }
+
+    // what document.cookie reads now
+    fn cookie_text(&self) -> String {
+        let u = Uri::parse(&self.url);
+        let Some(host) = u.host() else { return String::new() };
+        self.jar.script_text(host, if u.path.is_empty() { "/" } else { &u.path }, u.scheme.as_deref() == Some("https"), self.clock)
+    }
+}
+
+/// why the jar refuses a cookie, in words
+pub(crate) fn refused_text(e: Refused) -> &'static str {
+    match e {
+        Refused::Syntax => t("kein Name"),
+        Refused::TooLarge => t("zu groß"),
+        Refused::Domain => t("die Domain passt nicht zur Adresse"),
+        Refused::HttpOnly => t("HttpOnly dürfen Skripte nicht setzen oder überschreiben"),
+        Refused::Secure => t("Secure geht nur über https"),
+        Refused::SameSiteNone => t("SameSite=None braucht Secure"),
+    }
 }
 
 /// the scripts of a document (see the module header)
@@ -558,7 +631,7 @@ impl PageHost<'_> {
         let pin = cx.pin(f);
         self.s.fetches.insert(id, pin);
         let u = Uri::parse(&self.s.url).join(text.trim()).encoded();
-        self.s.fx.fetch.push(WebReq { id, method, url: u.text(), headers, body });
+        self.s.fx.fetch.push(WebReq { id, method, url: u.text(), headers, body, ..WebReq::default() });
         Ok(Value::Nil)
     }
 
@@ -776,6 +849,27 @@ impl PageHost<'_> {
                 };
                 d.set_text(n, &s);
                 self.s.fx.changed = true;
+                Ok(Value::Nil)
+            }
+            "set_cookie" => {
+                let Some(x) = cx.str(a).map(String::from) else {
+                    return Err(cx.error(&tf("{}: hier muss ein Text stehen", &["document.set_cookie"])));
+                };
+                cx.charge(x.len() as u64 / 16 + 64);
+                let document = self.s.document;
+                // (what this call assigned before comes first; the words in the output's order)
+                let assigned = cx.map_get_str(document, "cookie").and_then(|v| cx.str(v)).map(String::from);
+                let mut said = None;
+                if let Some(w) = assigned.filter(|w| self.s.cookie_seen.as_deref() != Some(w.as_str())) {
+                    said = self.s.store_cookie(&w);
+                }
+                for l in said.into_iter().chain(self.s.store_cookie(&x)) {
+                    cx.print(&format!("{}{}\n", MARK_WARN, l));
+                }
+                let text = self.s.cookie_text();
+                let (k, v) = (cx.new_str("cookie")?, cx.new_str(&text)?);
+                cx.map_set(document, k, v)?;
+                self.s.cookie_seen = Some(text);
                 Ok(Value::Nil)
             }
             "on" => self.on(cx, AT_DOCUMENT, a, b),
@@ -1016,8 +1110,49 @@ impl PageScript {
             grown: 0,
             nodes: doc.dom_size().0,
             document,
+            jar: Arc::new(Jar::new()),
+            clock: 0,
+            cookie_seen: None,
         };
         Some(Box::new(PageScript { vm, s, location, items, loading: None, loaded: None, ready: VecDeque::new() }))
+    }
+
+    /// the browser's cookies for the next pump or events call
+    pub(crate) fn jar_in(&mut self, jar: &mut Arc<Jar>, clock: i64) {
+        core::mem::swap(&mut self.s.jar, jar);
+        self.s.clock = clock;
+    }
+
+    /// and back, as the scripts left them
+    pub(crate) fn jar_out(&mut self, jar: &mut Arc<Jar>) {
+        core::mem::swap(&mut self.s.jar, jar);
+    }
+
+    // document.cookie as of now
+    fn sync_cookie(&mut self) {
+        let text = self.s.cookie_text();
+        if self.s.cookie_seen.as_deref() != Some(text.as_str()) {
+            if let Err(e) = set_str(&mut self.vm, self.s.document, "cookie", &text) {
+                self.s.console.push(ConKind::Error, &e.msg);
+            }
+            self.s.cookie_seen = Some(text);
+        }
+    }
+
+    // document.cookie = ...: what a script left there goes to the jar
+    fn take_cookie(&mut self) {
+        let written = self.vm.map_get_str(self.s.document, "cookie").and_then(|v| self.vm.str(v)).map(String::from);
+        if let Some(w) = written {
+            if self.s.cookie_seen.as_deref() != Some(w.as_str()) {
+                if let Some(l) = self.s.store_cookie(&w) {
+                    self.s.console.push(ConKind::Warn, &l);
+                }
+                self.s.cookie_seen = None;
+            }
+        } else {
+            self.s.cookie_seen = None;
+        }
+        self.sync_cookie();
     }
 
     // what print and log wrote, into the console
@@ -1055,11 +1190,13 @@ impl PageScript {
                 self.write_location(&url);
             }
         }
+        self.take_cookie();
         self.vm.call_fuel().max(CALL_MIN)
     }
 
     // a function value with these arguments -> the fuel it counts
     fn invoke(&mut self, view: &mut MdViewState, f: Value, args: &[Value]) -> u64 {
+        self.sync_cookie();
         if let Err(e) = self.vm.call_value(f, args) {
             self.s.console.push(ConKind::Error, &e.msg);
             return CALL_MIN;
@@ -1083,6 +1220,7 @@ impl PageScript {
 
     // a script's source into the VM and to its end
     fn run_script(&mut self, view: &mut MdViewState, name: &str, src: &str) -> u64 {
+        self.sync_cookie();
         match self.vm.add_script(name, src) {
             Err(ds) => {
                 for d in ds.iter().take(5) {
@@ -1137,7 +1275,7 @@ impl PageScript {
                     let id = self.s.seq;
                     let mut headers = Headers::new();
                     headers.add("Accept", "text/plain, */*;q=0.5");
-                    self.s.fx.fetch.push(WebReq { id, method: String::from("GET"), url: url.clone(), headers, body: Vec::new() });
+                    self.s.fx.fetch.push(WebReq { id, method: String::from("GET"), url: url.clone(), headers, body: Vec::new(), ..WebReq::default() });
                     self.loading = Some((id, url));
                 }
                 None => return,
@@ -1390,10 +1528,17 @@ impl PageScript {
         &self.s.console
     }
 
+    pub(crate) fn console_mut(&mut self) -> &mut Console {
+        &mut self.s.console
+    }
+
     pub(crate) fn clear_console(&mut self) {
-        self.s.console.lines.clear();
-        self.s.console.errors = 0;
-        self.s.console.total += 1;
+        self.s.console.clear();
+    }
+
+    /// the src script on its way: its request
+    pub(crate) fn src_request(&self) -> Option<u64> {
+        self.loading.as_ref().map(|l| l.0)
     }
 
     /// the timers that wait, for a check

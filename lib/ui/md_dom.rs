@@ -1115,7 +1115,7 @@ impl MdDoc {
         self.dom.get(n)
     }
 
-    fn elem(&self, n: MdNode) -> Option<u32> {
+    pub(crate) fn elem(&self, n: MdNode) -> Option<u32> {
         self.node(n).filter(|&i| self.dom.nodes[i as usize].kind != K_TEXT)
     }
 

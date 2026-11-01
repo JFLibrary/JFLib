@@ -30,9 +30,10 @@
 //                                    elements; one block element's paragraph read again
 //
 // Style sheets (the viewer's reader only; RichDoc::from_html takes the style attributes as
-// before): the <style> elements of the tree (media screen / all, type text/css) in document
-// order give rules -- selectors of md_dom.rs (tag, *, #id, .class, [attr], descendant and
-// child) with declarations; comments, at-rules and rules whose selector is not in the subset
+// before): the <style> elements of the tree (media screen / all, type text/css) and the
+// <link rel="stylesheet"> elements whose text the app gave (MdDoc::set_sheet: a link reads
+// nothing by itself) in document order give rules -- selectors of md_dom.rs (tag, *, #id,
+// .class, [attr], descendant and child) with declarations; comments, at-rules and rules whose selector is not in the subset
 // are left out.  An element's style is the cascade: the declarations of the rules that match
 // by specificity and source order, its style attribute's, then the !important ones the same
 // way (of each property the last).  The text's properties are inherited as the formats are
@@ -282,7 +283,7 @@ fn embedded(s: &str) -> Option<RichDoc> {
 /// header)
 pub(crate) fn html_read(s: &str) -> HRead {
     let d = Dom::parse(s);
-    let sheet = Sheet::of(&d);
+    let sheet = Sheet::of(&d, &BTreeMap::new());
     dom_read(&d, &sheet, false)
 }
 
@@ -1597,9 +1598,9 @@ struct Rule {
     decls: u32,
 }
 
-/// the style sheets of a document (its <style> elements in document order; media other than
-/// screen / all and types other than text/css are left out): the rules by the id, class or
-/// tag their subject needs
+/// the style sheets of a document (its <style> elements and the <link rel="stylesheet"> elements
+/// the app gave a text for, in document order; media other than screen / all and types other than
+/// text/css are left out): the rules by the id, class or tag their subject needs
 #[derive(Debug, Default)]
 pub(crate) struct Sheet {
     rules: Vec<Rule>,
@@ -1610,18 +1611,29 @@ pub(crate) struct Sheet {
     any: Vec<u32>,
     // bytes of CSS read
     size: usize,
+    // the addresses of its links, as written, in document order (each once)
+    links: Vec<String>,
+}
+
+// a <link> element that names a style sheet (a rel with the word, an address)
+fn sheet_link<'a>(d: &'a Dom, x: u32) -> Option<&'a str> {
+    let rel = d.attr(x, "rel")?;
+    if !rel.split_ascii_whitespace().any(|w| w.eq_ignore_ascii_case("stylesheet")) {
+        return None;
+    }
+    d.attr(x, "href").map(str::trim).filter(|h| !h.is_empty())
 }
 
 impl Sheet {
-    /// the style sheets of a document's tree
-    pub(crate) fn of(d: &Dom) -> Sheet {
+    /// the style sheets of a document's tree; linked: the texts of its links by their addresses
+    pub(crate) fn of(d: &Dom, linked: &BTreeMap<String, String>) -> Sheet {
         let mut s = Sheet::default();
         if !d.is_html() {
             return s;
         }
         for x in d.subtree(0) {
             let n = &d.nodes[x as usize];
-            if n.kind != K_ELEM || n.name != "style" {
+            if n.kind != K_ELEM || (n.name != "style" && n.name != "link") {
                 continue;
             }
             let media = d.attr(x, "media").unwrap_or("").to_ascii_lowercase();
@@ -1629,9 +1641,34 @@ impl Sheet {
             if (!media.trim().is_empty() && !media.contains("screen") && !media.contains("all")) || (!ty.is_empty() && ty != "text/css") {
                 continue;
             }
-            s.add(&d.text_of(x));
+            if n.name == "style" {
+                s.add(&d.text_of(x));
+                continue;
+            }
+            let Some(href) = sheet_link(d, x) else { continue };
+            if !s.links.iter().any(|l| l == href) {
+                s.links.push(String::from(href));
+            }
+            if let Some(css) = linked.get(href) {
+                s.add(css);
+            }
         }
         s
+    }
+
+    /// the addresses its <link> elements name (MdDoc::sheet_links)
+    pub(crate) fn links(&self) -> &[String] {
+        &self.links
+    }
+
+    /// element i's style as the cascade gives it: "property:value;" of the rules that match and
+    /// its style attribute (MdDoc::style_of)
+    pub(crate) fn style_of(&self, d: &Dom, i: u32) -> String {
+        let mut budget = self.budget(64);
+        match self.attrs_of(d, i, &mut budget) {
+            Some(at) => at.into_iter().find(|a| a.0 == "style").map_or(String::new(), |a| a.1),
+            None => String::from(d.attr(i, "style").unwrap_or("")),
+        }
     }
 
     /// no rules

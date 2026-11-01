@@ -159,15 +159,16 @@ key ctrl+a
 type "http://web.lab:8080/schleife\n"
 wait 500
 expect heading:"Zu viele Weiterleitungen" exists
-# https: at once, without a request
+# https: a request to port 443, where nobody listens in this network (a server with TLS: browser_https.uis)
 click #26800
 key ctrl+a
 type "https://web.lab/\n"
-expect heading:"Verschlüsselte Seite" exists
-expect text:"Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe." exists
+wait 500
+expect heading:"Seite nicht erreichbar" exists
+expect text:"web.lab lehnt die Verbindung ab: auf Port 443 lauscht kein Dienst." exists
 # ---- the window's state goes with it
-click button:"Schließen: Verschlüsselte Seite – Webbrowser"
-expect dialog:"Verschlüsselte Seite – Webbrowser" missing
+click button:"Schließen: Seite nicht erreichbar – Webbrowser"
+expect dialog:"Seite nicht erreichbar – Webbrowser" missing
 dblclick listitem:"Webbrowser"
 expect text:"Webbrowser" exists
 expect #26800 text "http://"

@@ -34,7 +34,7 @@ use netpkt::IpAddr;
 
 use super::print::JobOut;
 use super::print6::up6;
-use crate::http::{Agent, AgentEv, Done, Fail, Req, Url, UrlErr};
+use crate::http::{Agent, AgentEv, Done, Fail, Req, TlsReq, Url, UrlErr};
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{ConsoleEv, Metric, Owner, OsApi, Service, SvcEvent, ANY, ANY4};
 use crate::resolver::Family;
@@ -277,6 +277,8 @@ struct CurlOpts {
     no_meter: bool,
     /// -4 / -6: the address family to look names up for
     family: Option<Family>,
+    /// -k: any certificate goes
+    insecure: bool,
 }
 
 const CURL_HELP: &str = concat!(
@@ -285,6 +287,7 @@ const CURL_HELP: &str = concat!(
     " -f, --fail                treat answers from 400 on as errors (exit 22)\n",
     " -H, --header 'NAME: VALUE'  add or replace a request header\n",
     " -i, --include             write the response head before the body\n",
+    " -k, --insecure            go on with a server certificate that has faults\n",
     " -I, --head                send HEAD and write only the response head\n",
     " -L, --location            follow redirects (--max-redirs N)\n",
     " -m, --max-time SECONDS    give up after this long\n",
@@ -300,11 +303,11 @@ const CURL_HELP: &str = concat!(
     " -4, --ipv4                look names up for IPv4 addresses only\n",
     " -6, --ipv6                look names up for IPv6 addresses only\n",
     " -V, --version             say which curl this is\n",
-    "Only http:// URLs work here (an IPv6 address in brackets: http://[2001:db8::1]/); the\n",
+    "http:// and https:// URLs work here (an IPv6 address in brackets: http://[2001:db8::1]/); the\n",
     "transfer runs in the simulator's virtual time.\n",
 );
 
-const CURL_VERSION: &str = "curl 8.5.0 (JFNetworker): HTTP/1.1 over the simulator's TCP\nProtocols: http\nFeatures: (none)\n";
+const CURL_VERSION: &str = "curl 8.5.0 (JFNetworker): HTTP/1.1 over the simulator's TCP and TLS 1.3\nProtocols: http https\nFeatures: SSL\n";
 
 /// the value of a time option ("1.5" seconds)
 fn secs_of(s: &str) -> Option<Ns> {
@@ -341,7 +344,8 @@ fn parse_curl(args: &[String]) -> Result<CurlOpts, (String, i32)> {
             "http1.1" => o.http10 = false,
             "4" | "ipv4" => o.family = Some(Family::V4),
             "6" | "ipv6" => o.family = Some(Family::V6),
-            "k" | "insecure" | "compressed" | "no-buffer" | "N" => {}
+            "k" | "insecure" => o.insecure = true,
+            "compressed" | "no-buffer" | "N" => {}
             "no-progress-meter" => o.no_meter = true,
             "X" | "request" => o.method = Some(String::from(v())),
             "d" | "data" | "data-raw" | "data-binary" | "data-ascii" => {
@@ -511,6 +515,8 @@ struct Transfer {
     redirects: u32,
     /// this request carries the data of -d (a redirect can end that)
     posting: bool,
+    /// https
+    secure: bool,
 }
 
 /// curl on the console
@@ -542,9 +548,9 @@ impl Curl {
     /// the next URL, or the end
     fn next(&mut self, os: &mut OsApi) {
         while let Some(u) = self.queue.pop_front() {
-            match Url::parse(&u) {
-                Ok(url) => {
-                    self.begin(os, url, u, 0, true);
+            match Url::parse_web(&u) {
+                Ok((url, secure)) => {
+                    self.begin(os, url, u, 0, true, secure);
                     return;
                 }
                 Err(e) => {
@@ -563,7 +569,7 @@ impl Curl {
         }
         os.exit(self.exit);
     }
-    fn begin(&mut self, os: &mut OsApi, url: Url, given: String, redirects: u32, posting: bool) {
+    fn begin(&mut self, os: &mut OsApi, url: Url, given: String, redirects: u32, posting: bool, secure: bool) {
         let o = &self.o;
         let data = o.data.as_ref().filter(|_| posting);
         let method = if o.head {
@@ -577,7 +583,8 @@ impl Curl {
         };
         let mut h = Headers::new();
         let ua = o.agent.clone().unwrap_or_else(|| String::from("curl/8.5.0"));
-        for (k, v) in [("Host", url.host_header()), ("User-Agent", ua), ("Accept", String::from("*/*"))] {
+        let host = if secure { url.host_header_tls() } else { url.host_header() };
+        for (k, v) in [("Host", host), ("User-Agent", ua), ("Accept", String::from("*/*"))] {
             match o.headers.iter().find(|(n, _)| n.eq_ignore_ascii_case(k)) {
                 Some((n, val)) if !val.is_empty() => h.add(n, val),
                 Some(_) => {}
@@ -620,8 +627,9 @@ impl Curl {
             os.timer(K_OWN, now + SEC);
         }
         self.conns_before = self.agent.stats.connects;
-        let id = self.agent.submit(os, req);
-        self.cur = Some(Transfer { id, url, given, start: now, meter, body: 0, expect: None, head: None, skip_body: false, after: None, redirects, posting });
+        let tls = secure.then(|| TlsReq { insecure: self.o.insecure, accept: Vec::new() });
+        let id = self.agent.submit_tls(os, req, tls);
+        self.cur = Some(Transfer { id, url, given, start: now, meter, body: 0, expect: None, head: None, skip_body: false, after: None, redirects, posting, secure });
         self.show(os);
     }
     fn v(&self, os: &mut OsApi, s: &str) {
@@ -636,6 +644,12 @@ impl Curl {
             match e {
                 AgentEv::Trying { addr, port, .. } => self.v(os, &format!("*   Trying {}...\n", ep(addr, port))),
                 AgentEv::Connected { remote, .. } => self.v(os, &format!("* Connected to {} ({}) port {}\n", host, remote.0, remote.1)),
+                AgentEv::Secured { info, .. } => {
+                    if self.o.verbose {
+                        let s = secured_lines(&info, &host);
+                        os.print(&s);
+                    }
+                }
                 AgentEv::Reusing { .. } => self.v(os, &format!("* Re-using existing connection with host {}\n", host)),
                 AgentEv::ConnectFailed { addr, port, local, end, .. } => {
                     if let (Some(l), Some(e)) = (local, end.and_then(|e| e.errno())) {
@@ -757,7 +771,10 @@ impl Curl {
             }
             Err(f) => {
                 let phase = if d.resolved.is_none() { Phase::Resolving } else if d.connected.is_none() { Phase::Connecting } else { Phase::Transfer };
-                let (code, msg) = curl_error(f, phase, &host, port, ms);
+                let (code, msg) = match f {
+                    Fail::Tls { .. } => tls_error(f, d.tls.as_ref(), &host),
+                    _ => curl_error(f, phase, &host, port, ms),
+                };
                 self.v(os, &format!("* {}\n", msg));
                 meter_end(os, false);
                 self.v(os, "* Closing connection\n");
@@ -778,7 +795,7 @@ impl Curl {
             && let Ok(r) = &d.result
             && matches!(r.head.status, 301 | 302 | 303 | 307 | 308)
             && let Some(loc) = r.head.header("location")
-            && let Some(next) = t.url.join(loc)
+            && let Some((next, next_secure)) = t.url.join_web(t.secure, loc)
         {
             if t.redirects >= self.o.max_redirs {
                 self.exit = 47;
@@ -788,15 +805,15 @@ impl Curl {
                 os.exit(47);
                 return;
             }
-            self.v(os, &format!("* Issue another request to this URL: '{}'\n", next.text()));
+            self.v(os, &format!("* Issue another request to this URL: '{}'\n", next.text_web(next_secure)));
             // the browser's rule (webc.rs): 301, 302 and 303 end the POST of -d, 307 and 308 keep it;
             // the word of -X stays on every request, as with curl itself
             let posting = t.posting && redirected(r.head.status, String::from("POST"), Vec::new()).0 == "POST";
             if t.posting && !posting && self.o.data.is_some() {
                 self.v(os, "* The redirect drops the data of -d\n");
             }
-            let given = next.text();
-            self.begin(os, next, given, t.redirects + 1, posting);
+            let given = next.text_web(next_secure);
+            self.begin(os, next, given, t.redirects + 1, posting, next_secure);
             return;
         }
         self.next(os);
@@ -851,14 +868,16 @@ impl Curl {
                         "content_type" => head.and_then(|h| h.header("content-type")).map(String::from).unwrap_or_default(),
                         "exitcode" => format!("{}", code),
                         "errormsg" => String::from(msg),
-                        "url_effective" => t.url.text(),
+                        "url_effective" => t.url.text_web(t.secure),
                         "url" => t.given.clone(),
                         "redirect_url" => head.filter(|h| (300..400).contains(&h.status)).and_then(|h| h.header("location")).and_then(|l| t.url.join(l)).map(|u| u.text()).unwrap_or_default(),
                         "method" => d.method.clone(),
-                        "scheme" => String::from("HTTP"),
+                        "scheme" => String::from(if t.secure { "HTTPS" } else { "HTTP" }),
+                        "ssl_verify_result" => format!("{}", d.tls.as_ref().map_or(0, |i| i.faults)),
                         "time_namelookup" => secs(d.resolved),
                         "time_connect" => secs(d.connected),
-                        "time_appconnect" | "time_redirect" => String::from("0.000000"),
+                        "time_appconnect" => secs(d.secured),
+                        "time_redirect" => String::from("0.000000"),
                         "time_pretransfer" => secs(d.sent),
                         "time_starttransfer" => secs(d.first),
                         "time_total" => secs(Some(d.end)),
@@ -908,6 +927,61 @@ fn curl_error(f: &Fail, phase: Phase, host: &str, port: u16, ms: u64) -> (i32, S
         Fail::Truncated { of: None, .. } => (18, String::from("transfer closed with outstanding read data remaining")),
         Fail::Bad(e) if e.text().contains("HTTP/1") || e.text().contains("status") => (1, String::from("Received HTTP/0.9 when not allowed")),
         Fail::Bad(_) => (8, String::from("Weird server reply")),
+        Fail::Tls { why, .. } => (35, format!("TLS connect error: {}", why)),
+    }
+}
+
+/// a date of a certificate
+fn cert_date(t: i64) -> String {
+    netpkt::http::http_date(t)
+}
+
+/// what -v says about a TLS connection
+fn secured_lines(i: &crate::http::TlsInfo, host: &str) -> String {
+    let mut s = format!("* TLS connection using {} / {}\n", i.version, i.suite);
+    if let Some(c) = i.chain.first() {
+        s.push_str("* Server certificate:\n");
+        s.push_str(&format!("*  subject: CN={}\n", c.subject_cn));
+        s.push_str(&format!("*  start date: {}\n", cert_date(c.not_before)));
+        s.push_str(&format!("*  expire date: {}\n", cert_date(c.not_after)));
+        if c.names(host) {
+            s.push_str(&format!("*  subjectAltName: host \"{}\" matched\n", host));
+        }
+        s.push_str(&format!("*  issuer: CN={}\n", c.issuer_cn));
+    }
+    if i.faults != 0 {
+        s.push_str(&format!("*  certificate verify result: {}, continuing anyway.\n", fault_text(i.faults, host)));
+    } else {
+        s.push_str("*  certificate verify ok.\n");
+    }
+    s
+}
+
+/// the fault of a certificate as one phrase (the worst of them)
+fn fault_text(f: u32, host: &str) -> String {
+    use netpkt::x509::{F_EXPIRED, F_NAME, F_NOT_YET, F_SELF_SIGNED, F_UNKNOWN_ISSUER};
+    if f & F_EXPIRED != 0 {
+        String::from("certificate has expired")
+    } else if f & F_NOT_YET != 0 {
+        String::from("certificate is not yet valid")
+    } else if f & F_SELF_SIGNED != 0 {
+        String::from("self-signed certificate")
+    } else if f & F_UNKNOWN_ISSUER != 0 {
+        String::from("unable to get local issuer certificate")
+    } else if f & F_NAME != 0 {
+        format!("no alternative certificate subject name matches target host name '{}'", host)
+    } else {
+        String::from("certificate verify failed")
+    }
+}
+
+/// curl's exit status and message for a TLS failure: 60 for a certificate refused, 35 for the rest
+fn tls_error(f: &Fail, info: Option<&crate::http::TlsInfo>, host: &str) -> (i32, String) {
+    let faults = info.map_or(0, |i| i.faults);
+    match f {
+        Fail::Tls { ours: true, .. } if faults != 0 => (60, format!("SSL certificate problem: {}", fault_text(faults, host))),
+        Fail::Tls { alert, ours, why } => (35, format!("TLS connect error: {}", if *alert != 0 && !*ours { netpkt::tls::alert_name(*alert) } else { why })),
+        _ => (35, String::from("TLS connect error")),
     }
 }
 

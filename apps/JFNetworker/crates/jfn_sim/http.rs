@@ -12,6 +12,7 @@
 //                 idle timeout and a request limit, a header timeout, 100-continue, 400 / 413 /
 //                 414 / 431 / 505 for what cannot be read; the owner takes complete requests
 //                 (take) and answers each when it likes (respond)
+//                 With ServeCfg::tls it speaks TLS on its connections (netpkt::tls): HTTP inside
 //   Agent         the client side: requests to hosts (names through the resolver), kept-alive
 //                 connections reused per host (a limit per host, optional pipelining),
 //                 connect and total timeouts, one retry when a reused connection turns out to
@@ -23,25 +24,34 @@
 //                 connection that cannot be set up goes on to the next address (as curl tries
 //                 them one after the other; no parallel attempts of Happy Eyeballs)
 //
+//                 submit_tls(os, req, TlsReq) sends a request over TLS on connections of its own
+//                 (Url::parse_web reads https: URLs; Done::tls and AgentEv::Secured say what came:
+//                 TlsInfo with the server's chain, its faults, whether they were excused)
+//
 // Both live inside a service: the service hands them its SvcEvents (on() says whether an event
 // was theirs) and the firing of their timer key.  Times are the engine's virtual time; a Date
 // header comes from the device clock.  Fail::msg() words a failure as a Msg for the app's
 // catalogue (Fail::text() is its German text).
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
 use netpkt::http::{self, Event, Framing, Head, Headers, HttpErr, Parser, Version};
+use netpkt::tls::{self, ClientCfg, Core, Identity};
+use netpkt::x509::Cert;
 use netpkt::{IpAddr, Ipv4, Ipv6};
 
 use crate::kernel::Ns;
 use crate::os::{OsApi, SvcEvent};
 use crate::resolver::{Family, LookupErr};
 use crate::tcp::{SockOpts, TcpEnd};
+use crate::tlssim::{self, TlsNote};
 use crate::trace::{HopId, Note};
 
 // ---------------------------------------------------------------- deadlines
@@ -235,6 +245,41 @@ impl Url {
     pub fn text(&self) -> String {
         format!("http://{}{}", self.host_header(), self.target)
     }
+    /// an http or https URL ("host/path" alone means http) and whether it is https; another
+    /// scheme is an error as for parse.  The default port of https is 443
+    pub fn parse_web(s: &str) -> Result<(Url, bool), UrlErr> {
+        let t = s.trim();
+        let secure = t.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://"));
+        if !secure {
+            return Url::parse(t).map(|u| (u, false));
+        }
+        let rest = &t[8..];
+        let auth = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+        // the port only when the URL says it (a bare IPv6 address has colons of its own)
+        let host_part = auth.rsplit_once('@').map_or(auth, |x| x.1);
+        let has_port = host_part.rsplit_once(':').is_some_and(|(_, p)| !p.contains(']'));
+        let mut u = Url::parse(&format!("http://{}", rest))?;
+        if !has_port {
+            u.port = tls::PORT;
+        }
+        Ok((u, true))
+    }
+    /// the Host header over https: the port only when it is not 443
+    pub fn host_header_tls(&self) -> String {
+        if self.port == tls::PORT { self.host_text() } else { format!("{}:{}", self.host_text(), self.port) }
+    }
+    /// the whole URL again, for https or not
+    pub fn text_web(&self, secure: bool) -> String {
+        if secure { format!("https://{}{}", self.host_header_tls(), self.target) } else { self.text() }
+    }
+    /// a Location against this URL (absolute http or https, absolute path, relative) -> where it
+    /// leads and whether that is https
+    pub fn join_web(&self, secure: bool, loc: &str) -> Option<(Url, bool)> {
+        if loc.contains("://") {
+            return Url::parse_web(loc).ok();
+        }
+        self.join(loc).map(|u| (u, secure))
+    }
     /// a target relative to this URL (a Location header): absolute URLs, absolute paths
     pub fn join(&self, loc: &str) -> Option<Url> {
         if loc.contains("://") {
@@ -275,12 +320,14 @@ pub struct ServeCfg {
     pub max_body: u64,
     /// the Server header ("" leaves it out)
     pub server: String,
+    /// its connections speak TLS with this certificate
+    pub tls: Option<Arc<Identity>>,
 }
 
 impl Default for ServeCfg {
     fn default() -> ServeCfg {
         // the values of a common Linux web server
-        ServeCfg { port: 80, backlog: 0, opts: SockOpts::default(), keepalive: 75 * crate::kernel::SEC, max_requests: 1000, header_timeout: 60 * crate::kernel::SEC, max_body: 1 << 20, server: String::from("jfn-httpd/1.0") }
+        ServeCfg { port: 80, backlog: 0, opts: SockOpts::default(), keepalive: 75 * crate::kernel::SEC, max_requests: 1000, header_timeout: 60 * crate::kernel::SEC, max_body: 1 << 20, server: String::from("jfn-httpd/1.0"), tls: None }
     }
 }
 
@@ -361,6 +408,9 @@ struct SConn {
     closing: bool,
     eof: bool,
     timer: Option<(u64, SWait)>,
+    /// its TLS, and what that wants to send and the socket did not take yet
+    tls: Option<Box<Core>>,
+    wire: Vec<u8>,
 }
 
 /// what a server counted
@@ -380,6 +430,9 @@ pub struct ServeStats {
     pub header_timeouts: u64,
     /// answers that found their connection gone
     pub lost: u64,
+    /// TLS handshakes finished, and those that failed
+    pub handshakes: u64,
+    pub tls_failed: u64,
 }
 
 /// the server side of HTTP in a service
@@ -461,7 +514,14 @@ impl Serve {
                     let (local, peer) = os.tcp_info(s).map(|r| (r.local, r.remote)).unwrap_or((none, none));
                     let mut parser = Parser::requests();
                     parser.max_body = self.cfg.max_body;
-                    self.conns.insert(s, SConn { peer, local, parser, order: VecDeque::new(), answers: BTreeMap::new(), out: Vec::new(), cur: None, served: 0, closing: false, eof: false, timer: None });
+                    let tls = match &self.cfg.tls {
+                        Some(id) => {
+                            let seed = tlssim::seed_of(os);
+                            Some(Box::new(Core::server((**id).clone(), &seed)))
+                        }
+                        None => None,
+                    };
+                    self.conns.insert(s, SConn { peer, local, parser, order: VecDeque::new(), answers: BTreeMap::new(), out: Vec::new(), cur: None, served: 0, closing: false, eof: false, timer: None, tls, wire: Vec::new() });
                     self.stats.connections += 1;
                     self.retime(os, s);
                 }
@@ -567,6 +627,7 @@ impl Serve {
     fn read(&mut self, os: &mut OsApi, sock: u32, hop: HopId) {
         let data = os.tcp_recv(sock, usize::MAX);
         self.stats.bytes_in += data.len() as u64;
+        let data = self.tls_in(os, sock, data);
         let now = os.now();
         let max_req = self.cfg.max_requests;
         let mut bad: Option<HttpErr> = None;
@@ -641,6 +702,45 @@ impl Serve {
             self.flush(os, sock);
         }
         self.retime(os, sock);
+    }
+    /// what came through its TLS (without TLS: as it came): the plain text; a failure closes the
+    /// connection after its alert
+    fn tls_in(&mut self, os: &mut OsApi, sock: u32, data: Vec<u8>) -> Vec<u8> {
+        let Some(c) = self.conns.get_mut(&sock) else {
+            return data;
+        };
+        let Some(t) = c.tls.as_mut() else {
+            return data;
+        };
+        t.push(&data);
+        let plain = t.read();
+        let peer = c.peer.0;
+        let mut failed = false;
+        for e in t.take_events() {
+            match e {
+                tls::Event::Hello { name } => os.note(Note::Tls(TlsNote::Hello { from: peer, name })),
+                tls::Event::Established => {
+                    self.stats.handshakes += 1;
+                    os.note(Note::Tls(TlsNote::Established { peer, suite: String::from(tls::suite_name(tls::SUITE)) }));
+                }
+                tls::Event::Failed(f) => {
+                    failed = true;
+                    self.stats.tls_failed += 1;
+                    os.note(Note::Tls(TlsNote::Failed { peer, alert: String::from(tls::alert_name(f.alert)), ours: f.ours }));
+                }
+                tls::Event::PeerClosed | tls::Event::Certificate { .. } => {}
+            }
+        }
+        if failed {
+            if let Some(c) = self.conns.get_mut(&sock) {
+                c.closing = true;
+                c.order.clear();
+                c.answers.clear();
+                c.out.clear();
+            }
+        }
+        self.flush(os, sock);
+        plain
     }
     /// answers a request; false when its connection is gone
     pub fn respond(&mut self, os: &mut OsApi, id: u64, r: Reply) -> bool {
@@ -719,12 +819,27 @@ impl Serve {
                 c.answers.clear();
             }
         }
-        if !c.out.is_empty() {
+        if let Some(t) = c.tls.as_mut() {
+            // HTTP goes into records once the handshake is done; at the end comes close_notify
+            if t.established() && !c.out.is_empty() {
+                t.send(&c.out);
+                c.out.clear();
+            }
+            if c.out.is_empty() && c.order.is_empty() && c.closing {
+                t.close();
+            }
+            c.wire.extend_from_slice(&t.take_out());
+            if !c.wire.is_empty() {
+                let n = os.tcp_send(sock, &c.wire);
+                c.wire.drain(..n);
+                self.stats.bytes_out += n as u64;
+            }
+        } else if !c.out.is_empty() {
             let n = os.tcp_send(sock, &c.out);
             c.out.drain(..n);
             self.stats.bytes_out += n as u64;
         }
-        if c.out.is_empty() && c.order.is_empty() && c.closing {
+        if c.out.is_empty() && c.wire.is_empty() && c.order.is_empty() && c.closing {
             if let Some((t, _)) = c.timer.take() {
                 self.wheel.cancel(t);
             }
@@ -794,6 +909,8 @@ pub enum Fail {
     Bad(HttpErr),
     /// the connection was closed under it (the owner, a pipelined neighbour)
     Aborted,
+    /// TLS ended it: the alert, whether this side sent it, a word for the log
+    Tls { alert: u8, ours: bool, why: &'static str },
 }
 
 impl Fail {
@@ -814,12 +931,36 @@ impl Fail {
             Fail::Truncated { got, .. } => msg!("Antwort unvollständig ({} Bytes)", got),
             Fail::Bad(e) => msg!("Antwort nicht lesbar: {}", e.text()),
             Fail::Aborted => msg!("abgebrochen"),
+            Fail::Tls { alert, ours: true, .. } => msg!("TLS: Alert {} gesendet", tls::alert_name(*alert)),
+            Fail::Tls { alert, ours: false, .. } => msg!("TLS: Alert {} vom Server", tls::alert_name(*alert)),
         }
     }
     /// a timeout (total or connect)
     pub fn is_timeout(&self) -> bool {
         matches!(self, Fail::Timeout { .. } | Fail::ConnectTimeout) || *self == Fail::Connect(TcpEnd::Timeout)
     }
+}
+
+/// how a request goes over TLS
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TlsReq {
+    /// any certificate goes (curl -k)
+    pub insecure: bool,
+    /// these leaf certificates go whatever their faults (SHA-256 of the DER)
+    pub accept: Vec<[u8; 32]>,
+}
+
+/// what TLS said about a connection: for an answer, and for a certificate refused
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TlsInfo {
+    /// the server's chain, leaf first
+    pub chain: Vec<Cert>,
+    /// what is wrong with it (x509 F_* bits)
+    pub faults: u32,
+    /// it has faults and the connection went on all the same
+    pub excused: bool,
+    pub version: String,
+    pub suite: String,
 }
 
 /// a finished request
@@ -849,6 +990,9 @@ pub struct Done {
     pub head_len: u64,
     pub req_len: u64,
     pub req_head: u64,
+    /// the TLS handshake's end, and what TLS said (None: no TLS, or it did not get that far)
+    pub secured: Option<Ns>,
+    pub tls: Option<TlsInfo>,
 }
 
 /// a step of a request as it happens (when the Agent traces)
@@ -856,6 +1000,8 @@ pub struct Done {
 pub enum AgentEv {
     Trying { id: u64, addr: IpAddr, port: u16 },
     Connected { id: u64, conn: u32, local: (IpAddr, u16), remote: (IpAddr, u16) },
+    /// the TLS handshake is done
+    Secured { id: u64, conn: u32, info: TlsInfo },
     Reusing { id: u64, conn: u32 },
     /// the connection was not set up (local: the port it tried from)
     ConnectFailed { id: u64, addr: IpAddr, port: u16, local: Option<(IpAddr, u16)>, end: Option<TcpEnd> },
@@ -873,6 +1019,8 @@ pub enum AgentEv {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CState {
     Connecting,
+    /// TCP is up, the TLS handshake runs
+    Securing,
     Open,
 }
 
@@ -894,6 +1042,13 @@ struct CConn {
     used: u32,
     timer: Option<u64>,
     local: Option<(IpAddr, u16)>,
+    /// its TLS (with the name and the trust, a request needs a connection that has the same), what
+    /// that wants to send and the socket did not take yet, what its server's chain was
+    tls: Option<Box<Core>>,
+    tls_req: Option<(String, TlsReq)>,
+    wire: Vec<u8>,
+    info: Option<TlsInfo>,
+    secured: Option<Ns>,
 }
 
 #[derive(Clone, Debug)]
@@ -921,6 +1076,10 @@ struct AReq {
     retried: bool,
     timer: Option<u64>,
     local: Option<(IpAddr, u16)>,
+    /// over TLS: its name and trust
+    tls: Option<(String, TlsReq)>,
+    secured: Option<Ns>,
+    info: Option<TlsInfo>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1030,6 +1189,11 @@ impl Agent {
 
     /// sends a request (when its address and a connection are there); its id
     pub fn submit(&mut self, os: &mut OsApi, req: Req) -> u64 {
+        self.submit_tls(os, req, None)
+    }
+
+    /// the same, over TLS when `tls` says how: the name of the URL is what the certificate must name
+    pub fn submit_tls(&mut self, os: &mut OsApi, req: Req, tls: Option<TlsReq>) -> u64 {
         self.next += 1;
         let id = self.next;
         let now = os.now();
@@ -1041,6 +1205,7 @@ impl Agent {
             Family::V6 => !a.is_v4(),
         });
         let host = req.url.host.clone();
+        let tls = tls.map(|t| (host.clone(), t));
         self.reqs.insert(
             id,
             AReq {
@@ -1065,6 +1230,9 @@ impl Agent {
                 retried: false,
                 timer,
                 local: None,
+                tls,
+                secured: None,
+                info: None,
             },
         );
         self.stats.requests += 1;
@@ -1132,7 +1300,7 @@ impl Agent {
 
     /// the bytes its requests and answers on their way hold (a keyframe's footprint)
     pub fn held_bytes(&self) -> usize {
-        self.reqs.values().map(|r| r.req.body.len() + r.body.len() + r.req.url.target.len()).sum::<usize>() + self.conns.values().map(|c| c.out.len()).sum::<usize>()
+        self.reqs.values().map(|r| r.req.body.len() + r.body.len() + r.req.url.target.len()).sum::<usize>() + self.conns.values().map(|c| c.out.len() + c.wire.len() + c.tls.as_ref().map_or(0, |t| t.footprint())).sum::<usize>()
     }
 
     /// closes the kept-alive connections that wait for nothing
@@ -1185,11 +1353,12 @@ impl Agent {
         };
         let key = (addr, r.req.url.port);
         let reuse = r.req.reuse;
+        let tls_req = r.tls.clone();
         if reuse {
             let pipe = self.pipeline.max(1);
-            let pick = self.conns.iter().find(|(_, c)| c.key == key && c.state == CState::Open && c.reusable && c.queue.is_empty() && c.inflight.len() < pipe && (c.inflight.is_empty() || pipe > 1)).map(|(s, _)| *s);
+            let pick = self.conns.iter().find(|(_, c)| c.key == key && c.tls_req == tls_req && c.state == CState::Open && c.reusable && c.queue.is_empty() && c.inflight.len() < pipe && (c.inflight.is_empty() || pipe > 1)).map(|(s, _)| *s);
             // with pipelining a connection being set up takes more requests
-            let setting_up = if pipe > 1 { self.conns.iter().find(|(_, c)| c.key == key && c.state == CState::Connecting && c.reusable && c.queue.len() < pipe).map(|(s, _)| *s) } else { None };
+            let setting_up = if pipe > 1 { self.conns.iter().find(|(_, c)| c.key == key && c.tls_req == tls_req && c.state == CState::Connecting && c.reusable && c.queue.len() < pipe).map(|(s, _)| *s) } else { None };
             if pick.is_none()
                 && let Some(s) = setting_up
             {
@@ -1210,11 +1379,14 @@ impl Agent {
                 {
                     self.wheel.cancel(t);
                 }
+                let (info, secured) = self.conns.get(&s).map_or((None, None), |c| (c.info.clone(), c.secured));
                 if let Some(r) = self.reqs.get_mut(&id) {
                     r.reused = true;
                     r.conn = Some(no);
                     r.sock = Some(s);
                     r.connected = Some(os.now());
+                    r.info = info;
+                    r.secured = secured;
                 }
                 self.stats.reused += 1;
                 self.ev(AgentEv::Reusing { id, conn: no });
@@ -1242,7 +1414,7 @@ impl Agent {
                 parser.max_body = u64::MAX;
                 let mut q = VecDeque::new();
                 q.push_back(id);
-                self.conns.insert(s, CConn { no, key, state: CState::Connecting, parser, queue: q, inflight: VecDeque::new(), out: Vec::new(), reusable: reuse, got: false, used: 0, timer, local });
+                self.conns.insert(s, CConn { no, key, state: CState::Connecting, parser, queue: q, inflight: VecDeque::new(), out: Vec::new(), reusable: reuse, got: false, used: 0, timer, local, tls: None, tls_req, wire: Vec::new(), info: None, secured: None });
                 if let Some(r) = self.reqs.get_mut(&id) {
                     r.sock = Some(s);
                     r.conn = Some(no);
@@ -1280,7 +1452,7 @@ impl Agent {
         let Some(c) = self.conns.get_mut(&sock) else {
             return;
         };
-        c.state = CState::Open;
+        c.state = if c.tls_req.is_some() { CState::Securing } else { CState::Open };
         if let Some(t) = c.timer.take() {
             self.wheel.cancel(t);
         }
@@ -1288,6 +1460,27 @@ impl Agent {
         let (local, remote) = info.map(|r| (r.local, r.remote)).unwrap_or(((IpAddr::V4(Ipv4::UNSPECIFIED), 0), (c.key.0, c.key.1)));
         c.local = Some(local);
         let no = c.no;
+        // over TLS: the requests wait for the handshake's end
+        if let Some((name, how)) = c.tls_req.clone() {
+            let seed = tlssim::seed_of(os);
+            let cfg = ClientCfg { name, anchors: tlssim::anchors(), now: os.clock().div_euclid(1_000_000_000), insecure: how.insecure, accept: how.accept };
+            let Some(c) = self.conns.get_mut(&sock) else {
+                return;
+            };
+            c.tls = Some(Box::new(Core::client(cfg, &seed)));
+            let ids: Vec<u64> = c.queue.iter().copied().collect();
+            for (k, id) in ids.iter().enumerate() {
+                if let Some(r) = self.reqs.get_mut(id) {
+                    r.connected = Some(now);
+                    r.local = Some(local);
+                }
+                if k == 0 {
+                    self.ev(AgentEv::Connected { id: *id, conn: no, local, remote });
+                }
+            }
+            self.flush(os, sock);
+            return;
+        }
         let ids: Vec<u64> = c.queue.drain(..).collect();
         for (k, id) in ids.iter().enumerate() {
             if let Some(r) = self.reqs.get_mut(id) {
@@ -1303,6 +1496,84 @@ impl Agent {
         self.flush(os, sock);
     }
 
+    /// what came through a connection's TLS (without TLS: as it came): the plain text; the
+    /// handshake's end sends what waited, a failure ends the connection and what is on it (true)
+    fn tls_in(&mut self, os: &mut OsApi, sock: u32, data: Vec<u8>) -> (Vec<u8>, bool) {
+        let now = os.now();
+        let Some(c) = self.conns.get_mut(&sock) else {
+            return (data, false);
+        };
+        let Some(t) = c.tls.as_mut() else {
+            return (data, false);
+        };
+        t.push(&data);
+        let plain = t.read();
+        let events = t.take_events();
+        let chain: Vec<Cert> = t.peer_certs().to_vec();
+        let (faults, excused, host) = (t.faults(), t.excused(), String::from(t.name()));
+        let info = TlsInfo { chain, faults, excused, version: String::from(tls::VERSION), suite: String::from(tls::suite_name(tls::SUITE)) };
+        let peer = c.key.0;
+        let no = c.no;
+        for e in events {
+            match e {
+                tls::Event::Certificate { faults } if faults != 0 && excused => {
+                    os.note(Note::Tls(TlsNote::CertExcused { host: host.clone(), faults }));
+                }
+                tls::Event::Established => {
+                    os.note(Note::Tls(TlsNote::Established { peer, suite: info.suite.clone() }));
+                    let Some(c) = self.conns.get_mut(&sock) else {
+                        return (Vec::new(), true);
+                    };
+                    c.state = CState::Open;
+                    c.info = Some(info.clone());
+                    c.secured = Some(now);
+                    let ids: Vec<u64> = c.queue.drain(..).collect();
+                    for (k, id) in ids.iter().enumerate() {
+                        if let Some(r) = self.reqs.get_mut(id) {
+                            r.secured = Some(now);
+                            r.info = Some(info.clone());
+                        }
+                        if k == 0 {
+                            self.ev(AgentEv::Secured { id: *id, conn: no, info: info.clone() });
+                        }
+                        self.send(os, sock, *id, false);
+                    }
+                }
+                tls::Event::Failed(f) => {
+                    if f.ours && faults != 0 {
+                        os.note(Note::Tls(TlsNote::CertRefused { host: host.clone(), faults }));
+                    } else {
+                        os.note(Note::Tls(TlsNote::Failed { peer, alert: String::from(tls::alert_name(f.alert)), ours: f.ours }));
+                    }
+                    // the alert goes out, then the connection ends; what is on it fails
+                    let Some(mut c) = self.conns.remove(&sock) else {
+                        return (Vec::new(), true);
+                    };
+                    if let Some(t) = c.timer.take() {
+                        self.wheel.cancel(t);
+                    }
+                    if let Some(t) = c.tls.as_mut() {
+                        c.wire.extend_from_slice(&t.take_out());
+                    }
+                    if !c.wire.is_empty() {
+                        os.tcp_send(sock, &c.wire);
+                    }
+                    os.tcp_close(sock);
+                    for id in c.inflight.iter().chain(c.queue.iter()).copied().collect::<Vec<u64>>() {
+                        if let Some(r) = self.reqs.get_mut(&id) {
+                            r.info = Some(info.clone());
+                        }
+                        self.fail(os, id, Fail::Tls { alert: f.alert, ours: f.ours, why: f.why });
+                    }
+                    return (Vec::new(), true);
+                }
+                _ => {}
+            }
+        }
+        self.flush(os, sock);
+        (plain, false)
+    }
+
     /// hands a request to its connection (`write`: write it at once)
     fn send(&mut self, os: &mut OsApi, sock: u32, id: u64, write: bool) {
         let now = os.now();
@@ -1315,7 +1586,7 @@ impl Agent {
         let q = &r.req;
         let mut h = Headers::new();
         if q.headers.get("host").is_none() {
-            h.add("Host", &q.url.host_header());
+            h.add("Host", &if r.tls.is_some() { q.url.host_header_tls() } else { q.url.host_header() });
         }
         for (k, v) in &q.headers.0 {
             h.add(k, v);
@@ -1345,6 +1616,18 @@ impl Agent {
         let Some(c) = self.conns.get_mut(&sock) else {
             return;
         };
+        if let Some(t) = c.tls.as_mut() {
+            if c.state == CState::Open && !c.out.is_empty() {
+                t.send(&c.out);
+                c.out.clear();
+            }
+            c.wire.extend_from_slice(&t.take_out());
+            if !c.wire.is_empty() {
+                let n = os.tcp_send(sock, &c.wire);
+                c.wire.drain(..n);
+            }
+            return;
+        }
         if c.out.is_empty() || c.state != CState::Open {
             return;
         }
@@ -1358,6 +1641,11 @@ impl Agent {
         let now = os.now();
         let data = os.tcp_recv(sock, usize::MAX);
         self.stats.bytes_in += data.len() as u64;
+        let (data, gone) = self.tls_in(os, sock, data);
+        if gone {
+            self.pump(os);
+            return;
+        }
         // a FIN ends a body that runs until the close; a RST ends nothing in order
         let eof = fin && matches!(end, None | Some(TcpEnd::Closed));
         let connecting = self.conns.get(&sock).is_some_and(|c| c.state == CState::Connecting);
@@ -1522,6 +1810,7 @@ impl Agent {
             self.wheel.cancel(t);
         }
         os.tcp_close(sock);
+        let securing = c.state == CState::Securing;
         let mut first = true;
         for id in c.inflight.iter().chain(c.queue.iter()).copied().collect::<Vec<u64>>() {
             let (reused, retried, got) = self.reqs.get(&id).map(|r| (r.reused, r.retried, r.first.is_some())).unwrap_or((false, true, true));
@@ -1529,7 +1818,9 @@ impl Agent {
             if retry {
                 self.retry(os, id);
             } else if first {
-                let f = if eof {
+                let f = if eof && securing {
+                    Fail::Tls { alert: 0, ours: false, why: "the connection ended in the handshake" }
+                } else if eof {
                     if got {
                         let (gotn, of) = self.reqs.get(&id).map(|r| (r.body_len, r.head.as_ref().and_then(|h| h.headers.content_length().ok().flatten()))).unwrap_or((0, None));
                         Fail::Truncated { got: gotn, of }
@@ -1650,10 +1941,16 @@ impl Agent {
     }
 
     fn drop_conn(&mut self, os: &mut OsApi, s: u32) {
-        if let Some(c) = self.conns.remove(&s)
-            && let Some(t) = c.timer
-        {
-            self.wheel.cancel(t);
+        if let Some(mut c) = self.conns.remove(&s) {
+            if let Some(t) = c.timer {
+                self.wheel.cancel(t);
+            }
+            // TLS says goodbye before TCP does
+            if let Some(t) = c.tls.as_mut() {
+                t.close();
+                c.wire.extend_from_slice(&t.take_out());
+                os.tcp_send(s, &c.wire);
+            }
         }
         os.tcp_close(s);
     }
@@ -1683,6 +1980,8 @@ impl Agent {
             head_len: r.head_len,
             req_len: r.req_len,
             req_head: r.req_head,
+            secured: r.secured,
+            tls: r.info,
         })
     }
 

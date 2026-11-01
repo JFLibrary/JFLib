@@ -234,6 +234,7 @@ pub mod tcp;
 pub mod tcpsvc;
 pub mod http;
 pub mod httpsvc;
+pub mod tlssim;
 pub mod pdu;
 pub mod disk;
 pub mod fault;

@@ -67,6 +67,8 @@ pub(crate) mod sysmon;
 pub(crate) mod browser;
 // page scripts of the Webbrowser (B3): the VM's host on a document, the console
 pub(crate) mod pagescript;
+// the Webbrowser's developer view (B4)
+pub(crate) mod devtools;
 
 use alloc::collections::BTreeMap;
 use alloc::format;

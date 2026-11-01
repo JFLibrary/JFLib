@@ -481,7 +481,7 @@ fn order(t: &mut T) {
     x.pump();
     t.eq("still waiting", x.console().as_str(), "eins 1");
     let id = x.sent[0].id;
-    x.p.answer(id, Ok(WebResp { url: x.sent[0].url.clone(), status: 200, reason: String::from("OK"), headers: Headers::new(), body: b"fn b(x) { return x + 1 }\nprint(\"zwei\")\nprint(1 / 0)".to_vec(), redirects: 0, took: 0 }));
+    x.p.answer(id, Ok(WebResp { url: x.sent[0].url.clone(), status: 200, reason: String::from("OK"), headers: Headers::new(), body: b"fn b(x) { return x + 1 }\nprint(\"zwei\")\nprint(1 / 0)".to_vec(), redirects: 0, took: 0, ..WebResp::default() }));
     x.pump();
     let c = x.console();
     t.check("the src script ran, its error names it", c.contains("zwei\nhttp://web.lab/lib/b.jfs:3:"));
@@ -498,11 +498,11 @@ fn order(t: &mut T) {
     // 404, too large
     let mut x = page("<script type=\"text/jfs\" src=\"a.jfs\"></script><script type=\"text/jfs\" src=\"b.jfs\"></script>");
     let id = x.sent[0].id;
-    x.p.answer(id, Ok(WebResp { url: String::new(), status: 404, reason: String::from("Not Found"), headers: Headers::new(), body: b"print(1)".to_vec(), redirects: 0, took: 0 }));
+    x.p.answer(id, Ok(WebResp { url: String::new(), status: 404, reason: String::from("Not Found"), headers: Headers::new(), body: b"print(1)".to_vec(), redirects: 0, took: 0, ..WebResp::default() }));
     x.pump();
     t.check("an error status", x.console().contains("http://web.lab/a.jfs: das Skript kam nicht: 404 Not Found"));
     let id = x.sent[1].id;
-    x.p.answer(id, Ok(WebResp { url: String::new(), status: 200, reason: String::from("OK"), headers: Headers::new(), body: alloc::vec![b' '; (1 << 20) + 1], redirects: 0, took: 0 }));
+    x.p.answer(id, Ok(WebResp { url: String::new(), status: 200, reason: String::from("OK"), headers: Headers::new(), body: alloc::vec![b' '; (1 << 20) + 1], redirects: 0, took: 0, ..WebResp::default() }));
     x.pump();
     t.check("too large", x.console().contains("das Skript ist zu groß"));
     // no scripts: no VM; scripts that come later do not run
@@ -557,7 +557,7 @@ fn location(t: &mut T) {
     h.add("X", "y");
     let (a, b) = (x.sent[0].id, x.sent[1].id);
     x.p.answer(b, Err(String::from("kein Weg")));
-    x.p.answer(a, Ok(WebResp { url: String::from("http://web.lab/a"), status: 404, reason: String::from("Not Found"), headers: h, body: b"leer".to_vec(), redirects: 1, took: 0 }));
+    x.p.answer(a, Ok(WebResp { url: String::from("http://web.lab/a"), status: 404, reason: String::from("Not Found"), headers: h, body: b"leer".to_vec(), redirects: 1, took: 0, ..WebResp::default() }));
     t.eq("an answer wants a frame", x.p.wake(x.now, 0), Some(1));
     t.eq("an answer waits for a pass", x.console().as_str(), "");
     x.pump();
@@ -600,7 +600,7 @@ fn open(e: &mut Engine, path: &str) -> Option<Page> {
     let mut h = Headers::new();
     h.add("Accept", "text/html");
     let _ = e.take_reports();
-    let _ = e.apply(Action::WebFetch { dev: PC1, req: WebReq { id: 1, method: String::from("GET"), url: url.clone(), headers: h, body: Vec::new() } });
+    let _ = e.apply(Action::WebFetch { dev: PC1, req: WebReq { id: 1, method: String::from("GET"), url: url.clone(), headers: h, body: Vec::new(), ..WebReq::default() } });
     let t = e.now() + 500 * MS;
     e.run_until(t, 8_000_000);
     let mut body = None;

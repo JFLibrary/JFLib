@@ -1,5 +1,5 @@
 // browser -- the Webbrowser on the Desktop of a host's device window: real small pages from the
-// simulated network (milestones B1, B2, B3), shown with the library's document view instead of
+// simulated network (milestones B1 to B4), shown with the library's document view instead of
 // an HTML engine of our own
 //
 //   Browser::new()                    nothing open
@@ -8,15 +8,15 @@
 //                                     or image of that request
 //   Browser::window_title()           the page's title and the program's name (the desktop's
 //                                     window and taskbar)
-//   Browser::close() -> ids           the window closes: its state goes, the requests to give up
-//                                     (desktop.rs)
+//   Browser::close() -> ids           the window closes: its state goes but for the cookies that
+//                                     last, the requests to give up (desktop.rs)
 //
 // Requests go to the simulator as Action::WebFetch through Cmd::Apply, so rewinding replays them;
 // the engine's program (jfn_sim::webc) resolves the name, connects, follows redirects and reports
 // the answer or an error kind.  While the simulation stands nothing moves: the status line says so.
 // A request the engine no longer knows (a past state became the present) ends as an error page.
 //
-// A page: address(text) reads the address line (no scheme: http), https: and other schemes
+// A page: address(text) reads the address line (no scheme: http), schemes but http and https
 // give a page of ours at once, without a request.  classify(type, body) picks the view: HTML
 // (ui.doc_view on MdDoc::html), Markdown, images (a small page around the picture); text/plain
 // and other text as preformatted text; what is no text a note with type and size.  An answer of
@@ -50,31 +50,51 @@
 // for a frame when the next one falls due (TIMER_PAGE).  The console's pane is below the page
 // (Konsole, Ctrl+Shift+J; only for pages with scripts).
 //
+// Style sheets (B4): every <link rel="stylesheet"> the document names (doc.sheet_links(), also one a
+// script adds) is fetched once like a picture, a text/css answer goes to the document (doc.set_sheet)
+// and counts where its link stands among the <style> elements; a sheet that fails is a console line and
+// the page stays as it is.  Cookies (B4): the jar is the window's (netpkt::cookie, an Arc); every
+// request carries a snapshot of it with who asks (stamp), the engine reads the Cookie header of each
+// hop from that, and the Set-Cookie headers of all hops come back in the report and go into the jar in
+// their order (store_cookies).  HTTPS (B4): a certificate with faults brings a warning page of ours with
+// what is wrong; Trotzdem fortfahren remembers that certificate (SHA-256 of the leaf, window state) and
+// asks again; the lock beside the address opens a card with the certificate.  Anhalten ends all that is
+// on its way: the page, pictures, sheets, fetch and src requests.
+//
+// The developer view (devtools.rs): F12 or its button; Konsole, Netzwerk, Elemente, Cookies; below the
+// page, with a splitter.  Each document has its own log (Doc::net) and tree.
+//
 // Keys while its window is the active one: Enter in the address line, Ctrl+L the address line,
-// Alt+Left / Alt+Right, F5, Esc stops a page on its way.
+// Alt+Left / Alt+Right, F5, F12, Esc stops what is on its way.
 //
 // Ids: id = the desktop's block + 0x30 (+ 0 the address, + 1 Öffnen, + 3 Zurück, + 4 Vor, + 5 Neu
 // laden / Anhalten, + 6 / + 7 the question of a POST's reload); the page ID_BROWSER0 + 0x100 k; the
-// console ID_PAGE0 + 0x80 k (+ 0 Konsole, + 1 its pane, + 2 Leeren).
+// console ID_PAGE0 + 0x80 k (+ 0 Konsole, + 1 its pane, + 2 Leeren); the rest devtools.rs.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
+use alloc::collections::BTreeSet;
 use alloc::rc::{Rc, Weak};
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
+use jfn_sim::webc::{TlsInfo, WebHop};
 use jfn_sim::{Action, Cmd, Mode, WebErr, WebFail, WebReq, WebResp};
+use netpkt::cookie::{site_of, Jar, Origin};
 use netpkt::http::Headers;
 use netpkt::uri::{self, Uri};
+use netpkt::x509::{F_BAD_SIGNATURE, F_EXPIRED, F_NAME, F_NOT_YET, F_SELF_SIGNED, F_UNKNOWN_ISSUER};
 use ui::*;
 
 use crate::app::constants::*;
 use crate::app::tr::{self, t, tf};
 use crate::app::Net;
 
-use super::pagescript::{console_pane, seed_of, ConSeen, PageScript};
+use super::devtools::{self, date_text, net_add, net_answer, net_stopped, pending_row, rows_of, Dev, NetRow, Who, TAB_CONSOLE};
+use super::pagescript::{refused_text, seed_of, ConKind, ConSeen, Console, PageScript};
 
 /// entries of a window's history at most (the oldest go)
 pub(crate) const HIST_MAX: usize = 30;
@@ -82,6 +102,9 @@ pub(crate) const HIST_MAX: usize = 30;
 const MAX_SHOWN: usize = 1 << 20;
 /// bytes of pictures a window keeps; beyond that it starts over
 const CACHE_MAX: usize = 32 << 20;
+/// bytes of a style sheet at most
+const SHEET_MAX: usize = 1 << 20;
+const ACCEPT_SHEET: &str = "text/css, */*;q=0.1";
 const ACCEPT_PAGE: &str = "text/html, text/markdown;q=0.9, text/plain;q=0.8, */*;q=0.5";
 const ACCEPT_IMAGE: &str = "image/*, */*;q=0.5";
 const FORM_TYPE: &str = "application/x-www-form-urlencoded";
@@ -172,15 +195,54 @@ impl Nav {
 }
 
 /// a document with what the window keeps of it
-struct Doc {
-    view: MdViewState,
+pub(crate) struct Doc {
+    pub(crate) view: MdViewState,
     title: String,
     /// its URL: what images and links resolve against
-    url: String,
+    pub(crate) url: String,
     /// the status line
     status: String,
     /// its scripts (None: it has none)
     page: Option<Box<PageScript>>,
+    /// the console of a page without scripts (a sheet that failed, a cookie refused)
+    con: Console,
+    /// what it asked for: the network log; the sheets it asked for, as it names them
+    pub(crate) net: Vec<NetRow>,
+    asked: BTreeSet<String>,
+    /// what TLS said (https)
+    tls: Option<TlsInfo>,
+    /// a warning about a certificate: what to ask again, the certificate to go on with
+    warn: Option<(Nav, [u8; 32])>,
+    /// the document tree of the developer view, it was opened once
+    pub(crate) tree: TreeState,
+    pub(crate) tree_seen: bool,
+}
+
+impl Doc {
+    fn new(view: MdViewState, title: String, url: String, status: String) -> Doc {
+        Doc { view, title, url, status, page: None, con: Console::default(), net: Vec::new(), asked: BTreeSet::new(), tls: None, warn: None, tree: TreeState::default(), tree_seen: false }
+    }
+
+    pub(crate) fn console(&self) -> &Console {
+        match &self.page {
+            Some(p) => p.console(),
+            None => &self.con,
+        }
+    }
+
+    pub(crate) fn clear_console(&mut self) {
+        match &mut self.page {
+            Some(p) => p.clear_console(),
+            None => self.con.clear(),
+        }
+    }
+
+    fn con_push(&mut self, kind: ConKind, text: &str) {
+        match &mut self.page {
+            Some(p) => p.console_mut().push(kind, text),
+            None => self.con.push(kind, text),
+        }
+    }
 }
 
 /// an entry of the history
@@ -198,12 +260,21 @@ struct Load {
     nav: Nav,
     /// Reload: the answer takes the place of the entry shown
     replace: bool,
+    who: Who,
+    start: jfn_sim::Ns,
 }
 
 /// a picture on its way
 struct Pic {
     /// as the document names it, and as it was asked for
     addr: String,
+    url: String,
+    doc: Rc<RefCell<Doc>>,
+}
+
+/// a style sheet on its way
+struct SheetReq {
+    href: String,
     url: String,
     doc: Rc<RefCell<Doc>>,
 }
@@ -226,14 +297,21 @@ pub(crate) struct Browser {
     seq: u64,
     /// requests of page scripts: the document they came from
     scripted: BTreeMap<u64, Weak<RefCell<Doc>>>,
-    /// the console's pane is open, the lines it showed
-    console: bool,
-    con_seen: ConSeen,
+    /// the lines the console showed
+    pub(crate) con_seen: ConSeen,
+    /// the cookies, as of now
+    pub(crate) jar: Arc<Jar>,
+    /// the sheets on their way, the certificates the user went on with, the lock's card is open
+    sheets: BTreeMap<u64, SheetReq>,
+    accepted: Vec<[u8; 32]>,
+    cert_open: bool,
+    /// the developer view
+    pub(crate) dev: Dev,
 }
 
 impl Browser {
     pub(crate) fn new() -> Browser {
-        Browser { addr: String::from("http://"), hist: Hist::new(), load: None, pics: BTreeMap::new(), cache: BTreeMap::new(), hover: String::new(), ask: false, focus_page: false, seq: 0, scripted: BTreeMap::new(), console: false, con_seen: ConSeen::default() }
+        Browser { addr: String::from("http://"), hist: Hist::new(), load: None, pics: BTreeMap::new(), cache: BTreeMap::new(), hover: String::new(), ask: false, focus_page: false, seq: 0, scripted: BTreeMap::new(), con_seen: ConSeen::default(), jar: Arc::new(Jar::new()), sheets: BTreeMap::new(), accepted: Vec::new(), cert_open: false, dev: Dev::default() }
     }
 
     /// "Titel – Webbrowser", the program's name alone without a page
@@ -249,9 +327,14 @@ impl Browser {
         let mut ids: Vec<u64> = self.pics.keys().copied().collect();
         ids.extend(self.load.as_ref().map(|l| l.id));
         ids.extend(self.scripted.keys().copied());
+        ids.extend(self.sheets.keys().copied());
         let seq = self.seq;
+        // (what lasts longer than the session stays with the device window)
+        let mut jar = core::mem::take(&mut self.jar);
+        Arc::make_mut(&mut jar).drop_session();
         *self = Browser::new();
         self.seq = seq;
+        self.jar = jar;
         ids
     }
 }
@@ -419,7 +502,8 @@ fn host_of(url: &str) -> String {
 /// the page of a failure: its title and HTML (error pages are our own design and words)
 pub(crate) fn error_page(kind: WebErr, url: &str, why: &str) -> (String, String) {
     let host = host_of(url);
-    let port = Uri::parse(url).port().map_or_else(|| String::from("80"), |p| p.to_string());
+    let u = Uri::parse(url);
+    let port = u.port().map_or_else(|| String::from(if u.scheme.as_deref() == Some("https") { "443" } else { "80" }), |p| p.to_string());
     let (title, reason, hint) = match kind {
         WebErr::Refused => (t("Seite nicht erreichbar"), tf("{} lehnt die Verbindung ab: auf Port {} lauscht kein Dienst.", &[&host, &port]), t("Läuft der Webserver auf dem Gerät? Der Reiter Dienste und „ss -tln“ zeigen, was lauscht.")),
         WebErr::Timeout => (t("Seite nicht erreichbar"), tf("{} hat nicht rechtzeitig geantwortet.", &[&host]), t("Kommt das Gerät per ping an? Der Simulationsmodus zeigt, wo die Pakete bleiben.")),
@@ -428,11 +512,47 @@ pub(crate) fn error_page(kind: WebErr, url: &str, why: &str) -> (String, String)
         WebErr::Broken => (t("Seite nicht erreichbar"), tf("Die Verbindung zu {} brach mitten in der Antwort ab.", &[&host]), ""),
         WebErr::Stopped => (t("Seite nicht erreichbar"), String::from(t("Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat.")), ""),
         WebErr::TooManyRedirects => (t("Zu viele Weiterleitungen"), tf("{} leitet immer weiter.", &[&host]), t("Oft zeigen zwei Seiten aufeinander; curl -L -v im Terminal zeigt die Kette.")),
-        WebErr::Https => (t("Verschlüsselte Seite"), String::from(t("Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe.")), t("Dieselbe Seite über http:// geht, wenn der Server dort antwortet.")),
-        WebErr::BadUrl => (t("Adresse kann nicht geöffnet werden"), String::from(t("Dieser Browser öffnet http-Adressen im simulierten Netz.")), ""),
+        WebErr::Cert => (t("Diese Verbindung ist nicht sicher"), tf("Das Zertifikat von {} ist nicht in Ordnung.", &[&host]), ""),
+        WebErr::Tls => (t("Keine sichere Verbindung"), tf("Mit {} kam keine verschlüsselte Verbindung zustande.", &[&host]), t("Spricht der Dienst auf diesem Port überhaupt TLS? Der Reiter Dienste zeigt es, der Simulationsmodus zeigt den Handshake.")),
+        WebErr::BadUrl => (t("Adresse kann nicht geöffnet werden"), String::from(t("Dieser Browser öffnet http- und https-Adressen im simulierten Netz.")), ""),
     };
     let html = own_page(title, &[reason, String::from(why), String::from(hint)], url);
     (String::from(title), html)
+}
+
+/// what is wrong with a certificate, sentence by sentence, for the warning page
+pub(crate) fn fault_lines(i: &TlsInfo, host: &str) -> Vec<String> {
+    let mut v = Vec::new();
+    let Some(c) = i.chain.first() else { return v };
+    if i.faults & F_SELF_SIGNED != 0 {
+        v.push(tf("Das Zertifikat ist von {} selbst unterschrieben: niemand, dem dieses Gerät vertraut, bürgt dafür.", &[&c.subject_cn]));
+    }
+    if i.faults & F_UNKNOWN_ISSUER != 0 {
+        v.push(tf("Das Zertifikat stammt von {}: diesem Aussteller vertraut das Gerät nicht.", &[&c.issuer_cn]));
+    }
+    if i.faults & F_EXPIRED != 0 {
+        v.push(tf("Das Zertifikat ist abgelaufen: es galt bis {}.", &[&date_text(c.not_after)]));
+    }
+    if i.faults & F_NOT_YET != 0 {
+        v.push(tf("Das Zertifikat gilt erst ab {}.", &[&date_text(c.not_before)]));
+    }
+    if i.faults & F_NAME != 0 {
+        v.push(tf("Das Zertifikat gilt für {}, nicht für {}.", &[&c.name_list().join(", "), host]));
+    }
+    if i.faults & F_BAD_SIGNATURE != 0 {
+        v.push(String::from(t("Die Unterschrift des Zertifikats stimmt nicht.")));
+    }
+    v
+}
+
+// the warning page of a certificate with faults
+fn cert_page(i: &TlsInfo, url: &str) -> (String, String) {
+    let title = t("Diese Verbindung ist nicht sicher");
+    let host = host_of(url);
+    let mut paras = alloc::vec![tf("Der Server {} hat sich nicht ausweisen können. Wer mithört oder sich dazwischenstellt, wäre nicht zu erkennen.", &[&host])];
+    paras.extend(fault_lines(i, &host));
+    paras.push(String::from(t("Oben lässt sich trotzdem fortfahren: dieses Fenster merkt sich dann dieses eine Zertifikat.")));
+    (String::from(title), own_page(title, &paras, url))
 }
 
 // the document of a page in HTML
@@ -442,7 +562,7 @@ fn html_doc(html: &str, title: String, url: &str, status: String) -> Doc {
     view.label = String::from(t("Seite"));
     view.set_html(html);
     let title = if title.is_empty() { title_of(view.doc()) } else { title };
-    Doc { view, title, url: String::from(url), status, page: None }
+    Doc::new(view, title, String::from(url), status)
 }
 
 // the status line of an answer
@@ -461,6 +581,9 @@ fn status_line(r: &WebResp, ctype: &str, cut: bool) -> String {
     }
     if cut {
         parts.push(String::from(t("gekürzt")));
+    }
+    if let Some(i) = &r.tls {
+        parts.push(if i.faults != 0 { String::from(t("Zertifikat mit Fehlern")) } else { i.version.clone() });
     }
     parts.join(" \u{00B7} ")
 }
@@ -493,7 +616,7 @@ fn doc_of(r: &WebResp, seed: u64) -> Doc {
             view.label = String::from(t("Seite"));
             view.set_markdown(&text);
             let title = title_of(view.doc());
-            Doc { view, title, url: r.url.clone(), status, page: None }
+            Doc::new(view, title, r.url.clone(), status)
         }
         Kind::Text => {
             let html = format!("<pre>{}</pre>", esc(&text));
@@ -522,9 +645,22 @@ pub(crate) fn report(n: &mut Net, dev: u32, id: u64, result: Result<WebResp, Web
     let seed = seed_of(n.doc.sim.engine().seed(), dev, id);
     let Some(d) = n.devwin.desk_of(dev) else { return };
     let s = &mut d.web;
+    // the cookies of its hops first: what comes next reads them
+    let hops: &[WebHop] = match &result {
+        Ok(r) => &r.hops,
+        Err(f) => &f.hops,
+    };
+    let refused = store_cookies(&mut s.jar, hops);
     if let Some(w) = s.scripted.remove(&id) {
         if let Some(doc) = w.upgrade() {
-            if let Some(p) = doc.borrow_mut().page.as_mut() {
+            let mut d = doc.borrow_mut();
+            let who = d.net.iter().find(|r| r.req == id).map_or(Who::Fetch, |r| r.who);
+            let start = d.net.iter().find(|r| r.req == id).map_or(0, |r| r.start);
+            net_answer(&mut d.net, id, rows_of(id, who, start, &result));
+            for l in &refused {
+                d.con_push(ConKind::Warn, l);
+            }
+            if let Some(p) = d.page.as_mut() {
                 p.answer(id, result.map_err(|f| tr::msg(&f.msg)));
             }
         }
@@ -533,19 +669,50 @@ pub(crate) fn report(n: &mut Net, dev: u32, id: u64, result: Result<WebResp, Web
     if s.load.as_ref().is_some_and(|l| l.id == id) {
         let load = s.load.take();
         if let Some(l) = load {
-            let (url, doc) = match &result {
-                Ok(r) => (r.url.clone(), doc_of(r, seed)),
+            let rows = rows_of(id, l.who, l.start, &result);
+            let (url, mut doc) = match &result {
+                Ok(r) => {
+                    let mut dc = doc_of(r, seed);
+                    dc.tls = r.tls.clone();
+                    (r.url.clone(), dc)
+                }
                 Err(f) => {
                     let why = tr::msg(&f.msg);
-                    let (title, html) = error_page(f.kind, &f.url, &why);
-                    (f.url.clone(), html_doc(&html, title, &f.url, String::from(t("Keine Antwort"))))
+                    let (title, html) = match (&f.kind, &f.tls) {
+                        (WebErr::Cert, Some(i)) => cert_page(i, &f.url),
+                        _ => error_page(f.kind, &f.url, &why),
+                    };
+                    let mut dc = html_doc(&html, title, &f.url, String::from(t("Keine Antwort")));
+                    dc.tls = f.tls.clone();
+                    if f.kind == WebErr::Cert {
+                        let fp = f.tls.as_ref().and_then(|i| i.chain.first()).map(|c| c.fingerprint());
+                        dc.warn = fp.map(|x| (l.nav.clone(), x));
+                    }
+                    (f.url.clone(), dc)
                 }
             };
+            doc.net = rows;
+            for x in &refused {
+                doc.con_push(ConKind::Warn, x);
+            }
+            s.cert_open = false;
             arrive(s, l.nav, l.replace, url, doc);
         }
         return;
     }
+    if let Some(sh) = s.sheets.remove(&id) {
+        sheet_came(s, id, sh, &result, &refused);
+        return;
+    }
     let Some(p) = s.pics.remove(&id) else { return };
+    {
+        let mut d = p.doc.borrow_mut();
+        let start = d.net.iter().find(|r| r.req == id).map_or(0, |r| r.start);
+        net_answer(&mut d.net, id, rows_of(id, Who::Image, start, &result));
+        for l in &refused {
+            d.con_push(ConKind::Warn, l);
+        }
+    }
     let bytes = match result {
         Ok(r) if r.status < 300 => Some(r.body),
         _ => None,
@@ -557,6 +724,66 @@ pub(crate) fn report(n: &mut Net, dev: u32, id: u64, result: Result<WebResp, Web
         s.cache.insert(p.url.clone(), Rc::new(b.clone()));
     }
     p.doc.borrow_mut().view.set_image(&p.addr, bytes.as_deref());
+}
+
+/// the Set-Cookie headers of a request's hops into the jar, in their order, each at the clock of its
+/// answer -> what it refused, as console lines
+pub(crate) fn store_cookies(jar: &mut Arc<Jar>, hops: &[WebHop]) -> Vec<String> {
+    let mut out = Vec::new();
+    for h in hops {
+        let u = Uri::parse(&h.url);
+        let Some(host) = u.host() else { continue };
+        let path = if u.path.is_empty() { "/" } else { u.path.as_str() };
+        let secure = u.scheme.as_deref() == Some("https");
+        for (k, v) in &h.headers.0 {
+            if !k.eq_ignore_ascii_case("set-cookie") {
+                continue;
+            }
+            let o = Origin { host, path, secure, http: true };
+            if let Err(e) = Arc::make_mut(jar).store(v, o, h.clock) {
+                let name = v.split(['=', ';']).next().unwrap_or("").trim();
+                out.push(tf("Cookie {} von {} nicht gespeichert: {}", &[name, host, refused_text(e)]));
+            }
+        }
+    }
+    out
+}
+
+/// what a sheet's answer gives: its text, or the console's line why not
+pub(crate) fn sheet_text(result: &Result<WebResp, WebFail>, url: &str) -> Result<String, String> {
+    match result {
+        Ok(r) if r.status < 200 || r.status >= 300 => Err(tf("{}: das Stylesheet kam nicht: {} {}", &[url, &r.status.to_string(), &r.reason])),
+        Ok(r) if r.body.len() > SHEET_MAX => Err(tf("{}: das Stylesheet ist zu groß ({} Bytes)", &[url, &r.body.len().to_string()])),
+        Ok(r) => {
+            let ctype = r.headers.get("content-type").unwrap_or("");
+            let kind = ctype.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
+            if !kind.is_empty() && kind != "text/css" {
+                return Err(tf("{}: das ist kein Stylesheet: Typ {}", &[url, &kind]));
+            }
+            Ok(text_of(ctype, &r.body).0)
+        }
+        Err(f) => Err(tf("{}: das Stylesheet kam nicht: {}", &[url, &tr::msg(&f.msg)])),
+    }
+}
+
+// a style sheet's answer: its text into the document, or a line of the console
+fn sheet_came(s: &mut Browser, id: u64, sh: SheetReq, result: &Result<WebResp, WebFail>, refused: &[String]) {
+    let mut d = sh.doc.borrow_mut();
+    let start = d.net.iter().find(|r| r.req == id).map_or(0, |r| r.start);
+    net_answer(&mut d.net, id, rows_of(id, Who::Sheet, start, result));
+    for l in refused {
+        d.con_push(ConKind::Warn, l);
+    }
+    match sheet_text(result, &sh.url) {
+        Ok(text) => {
+            d.view.doc_mut().set_sheet(&sh.href, Some(&text));
+            if s.cache.values().map(|x| x.len()).sum::<usize>() + text.len() > CACHE_MAX {
+                s.cache.clear();
+            }
+            s.cache.insert(sh.url.clone(), Rc::new(text.into_bytes()));
+        }
+        Err(l) => d.con_push(ConKind::Error, &l),
+    }
 }
 
 // a document arrived: a new entry, or the place of the one shown
@@ -608,16 +835,26 @@ fn drop_load(n: &mut Net, k: usize, dev: u32) {
     }
 }
 
-// a request for a page, or at once a page of ours when it cannot be asked for
-fn go(n: &mut Net, k: usize, dev: u32, nav: Nav, replace: bool) {
+// what a request carries of the window: its cookies, who asks (the site of a page; "" the user), a
+// navigation or not, the certificates the user went on with
+fn stamp(s: &Browser, req: &mut WebReq, page: Option<&str>, top: bool) {
+    req.jar = Some(s.jar.clone());
+    req.site = page.map_or(String::new(), |p| Uri::parse(p).host().map(site_of).unwrap_or_default());
+    req.top = top;
+    req.accept = s.accepted.clone();
+}
+
+// a request for a page, or at once a page of ours when it cannot be asked for; who: the address line
+// and a reload come from the user, a link, a form and a script from the page shown
+fn go(n: &mut Net, k: usize, dev: u32, nav: Nav, replace: bool, who: Who) {
     drop_load(n, k, dev);
+    let now = n.doc.sim.engine().now();
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk.web;
     s.ask = false;
     let u = Uri::parse(&nav.url);
     let local = match u.scheme.as_deref() {
-        Some("http") => None,
-        Some("https") => Some(WebErr::Https),
+        Some("http") | Some("https") => None,
         _ => Some(WebErr::BadUrl),
     };
     if let Some(kind) = local {
@@ -635,8 +872,10 @@ fn go(n: &mut Net, k: usize, dev: u32, nav: Nav, replace: bool) {
     if !nav.ctype.is_empty() {
         headers.add("Content-Type", &nav.ctype);
     }
-    let req = WebReq { id, method: nav.method.clone(), url: nav.url.clone(), headers, body: nav.body.clone() };
-    s.load = Some(Load { id, nav, replace });
+    let mut req = WebReq { id, method: nav.method.clone(), url: nav.url.clone(), headers, body: nav.body.clone(), ..WebReq::default() };
+    let page = s.hist.cur().map(|e| e.url.clone()).filter(|_| !matches!(who, Who::Address | Who::Reload));
+    stamp(s, &mut req, page.as_deref(), true);
+    s.load = Some(Load { id, nav, replace, who, start: now });
     let r = n.doc.sim.send(Cmd::Apply(Action::WebFetch { dev, req }));
     if let Err(e) = r {
         let why = tr::msg(&e.msg());
@@ -652,7 +891,7 @@ fn go(n: &mut Net, k: usize, dev: u32, nav: Nav, replace: bool) {
 }
 
 // a link of the page, or the address of a form's answer: a fragment of this page scrolls
-fn follow(n: &mut Net, k: usize, dev: u32, target: &str) {
+fn follow(n: &mut Net, k: usize, dev: u32, target: &str, who: Who) {
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk.web;
     let Some((page, doc, nav)) = s.hist.cur().map(|e| (e.url.clone(), e.doc.clone(), e.nav.clone())) else { return };
@@ -670,7 +909,7 @@ fn follow(n: &mut Net, k: usize, dev: u32, target: &str) {
             s.addr = url.clone();
             s.hist.push(Entry { url, nav, doc, top });
         }
-        _ => go(n, k, dev, Nav::get(&u.text()), false),
+        _ => go(n, k, dev, Nav::get(&u.text()), false, who),
     }
 }
 
@@ -686,9 +925,9 @@ fn open_address(n: &mut Net, k: usize, dev: u32) {
     let cur = s.hist.cur().map(|e| e.url.clone());
     if cur.as_deref() == Some(url.as_str()) {
         s.cache.clear();
-        go(n, k, dev, Nav::get(&url), true);
+        go(n, k, dev, Nav::get(&url), true, Who::Reload);
     } else {
-        go(n, k, dev, Nav::get(&url), false);
+        go(n, k, dev, Nav::get(&url), false, Who::Address);
     }
 }
 
@@ -702,11 +941,12 @@ fn reload(n: &mut Net, k: usize, dev: u32, sure: bool) {
         return;
     }
     s.cache.clear();
-    go(n, k, dev, nav, true);
+    go(n, k, dev, nav, true, Who::Reload);
 }
 
 // what the document wants: the pictures it waits for
 fn fetch_pictures(n: &mut Net, k: usize, dev: u32, doc: &Rc<RefCell<Doc>>, wanted: Vec<String>) {
+    let now = n.doc.sim.engine().now();
     for addr in wanted {
         let page = doc.borrow().url.clone();
         let abs = Uri::parse(&page).join(&addr).encoded();
@@ -715,7 +955,7 @@ fn fetch_pictures(n: &mut Net, k: usize, dev: u32, doc: &Rc<RefCell<Doc>>, wante
             doc.borrow_mut().view.set_image(&addr, bytes.as_deref());
             continue;
         }
-        if abs.scheme.as_deref() != Some("http") {
+        if !matches!(abs.scheme.as_deref(), Some("http") | Some("https")) {
             doc.borrow_mut().view.set_image(&addr, None);
             continue;
         }
@@ -730,13 +970,69 @@ fn fetch_pictures(n: &mut Net, k: usize, dev: u32, doc: &Rc<RefCell<Doc>>, wante
         let id = s.seq;
         let mut headers = Headers::new();
         headers.add("Accept", ACCEPT_IMAGE);
-        let req = WebReq { id, method: String::from("GET"), url: url.clone(), headers, body: Vec::new() };
+        let mut req = WebReq { id, method: String::from("GET"), url: url.clone(), headers, body: Vec::new(), ..WebReq::default() };
+        stamp(s, &mut req, Some(&page), false);
+        net_add(&mut doc.borrow_mut().net, pending_row(&req, Who::Image, now));
         s.pics.insert(id, Pic { addr: addr.clone(), url, doc: doc.clone() });
         if n.doc.sim.send(Cmd::Apply(Action::WebFetch { dev, req })).is_err() {
             if let Some(w) = n.devwin.get(k) {
                 w.desk.web.pics.remove(&id);
             }
+            net_stopped(&mut doc.borrow_mut().net, id);
             doc.borrow_mut().view.set_image(&addr, None);
+        }
+    }
+}
+
+// the style sheets a document names that it has not asked for yet
+fn fetch_sheets(n: &mut Net, k: usize, dev: u32, doc: &Rc<RefCell<Doc>>) {
+    let new: Vec<String> = {
+        let d = doc.borrow();
+        d.view.doc().sheet_links().iter().filter(|l| !d.asked.contains(*l)).cloned().collect()
+    };
+    if new.is_empty() {
+        return;
+    }
+    let now = n.doc.sim.engine().now();
+    for href in new {
+        doc.borrow_mut().asked.insert(href.clone());
+        let page = doc.borrow().url.clone();
+        let abs = Uri::parse(&page).join(&href).encoded();
+        if abs.scheme.as_deref() == Some("data") {
+            let bytes = data_url(&href).unwrap_or_default();
+            let text = String::from_utf8_lossy(&bytes).into_owned();
+            doc.borrow_mut().view.doc_mut().set_sheet(&href, Some(&text));
+            continue;
+        }
+        if !matches!(abs.scheme.as_deref(), Some("http") | Some("https")) {
+            let l = tf("{}: das Stylesheet kam nicht: nur http und https gehen", &[&href]);
+            doc.borrow_mut().con_push(ConKind::Error, &l);
+            continue;
+        }
+        let url = Uri { fragment: None, ..abs }.text();
+        let Some(w) = n.devwin.get(k) else { return };
+        let s = &mut w.desk.web;
+        if let Some(b) = s.cache.get(&url).cloned() {
+            let text = String::from_utf8_lossy(&b).into_owned();
+            doc.borrow_mut().view.doc_mut().set_sheet(&href, Some(&text));
+            continue;
+        }
+        s.seq += 1;
+        let id = s.seq;
+        let mut headers = Headers::new();
+        headers.add("Accept", ACCEPT_SHEET);
+        let mut req = WebReq { id, method: String::from("GET"), url: url.clone(), headers, body: Vec::new(), ..WebReq::default() };
+        stamp(s, &mut req, Some(&page), false);
+        net_add(&mut doc.borrow_mut().net, pending_row(&req, Who::Sheet, now));
+        s.sheets.insert(id, SheetReq { href, url: url.clone(), doc: doc.clone() });
+        if let Err(e) = n.doc.sim.send(Cmd::Apply(Action::WebFetch { dev, req })) {
+            let why = tr::msg(&e.msg());
+            if let Some(w) = n.devwin.get(k) {
+                w.desk.web.sheets.remove(&id);
+            }
+            net_stopped(&mut doc.borrow_mut().net, id);
+            let l = tf("{}: das Stylesheet kam nicht: {}", &[&url, &why]);
+            doc.borrow_mut().con_push(ConKind::Error, &l);
         }
     }
 }
@@ -747,7 +1043,28 @@ fn stop(n: &mut Net, k: usize, dev: u32) {
     let Some(w) = n.devwin.get(k) else { return };
     let pics = core::mem::take(&mut w.desk.web.pics);
     for (id, p) in pics {
+        net_stopped(&mut p.doc.borrow_mut().net, id);
         p.doc.borrow_mut().view.set_image(&p.addr, None);
+        let _ = n.doc.sim.send(Cmd::Apply(Action::WebCancel { dev, id }));
+    }
+    let Some(w) = n.devwin.get(k) else { return };
+    let sheets = core::mem::take(&mut w.desk.web.sheets);
+    let scripted = core::mem::take(&mut w.desk.web.scripted);
+    for (id, sh) in sheets {
+        net_stopped(&mut sh.doc.borrow_mut().net, id);
+        let l = tf("{}: das Stylesheet kam nicht: {}", &[&sh.url, t("Angehalten")]);
+        sh.doc.borrow_mut().con_push(ConKind::Warn, &l);
+        let _ = n.doc.sim.send(Cmd::Apply(Action::WebCancel { dev, id }));
+    }
+    // fetch and src: their callbacks hear why, the page goes on
+    for (id, weak) in scripted {
+        if let Some(doc) = weak.upgrade() {
+            let mut d = doc.borrow_mut();
+            net_stopped(&mut d.net, id);
+            if let Some(p) = d.page.as_mut() {
+                p.answer(id, Err(String::from(t("Angehalten"))));
+            }
+        }
         let _ = n.doc.sim.send(Cmd::Apply(Action::WebCancel { dev, id }));
     }
     let Some(w) = n.devwin.get(k) else { return };
@@ -774,12 +1091,20 @@ fn lost_requests(n: &mut Net, k: usize, dev: u32) {
     let gone: Vec<u64> = s.pics.keys().copied().filter(|id| !active.contains(id)).collect();
     for id in gone {
         if let Some(p) = s.pics.remove(&id) {
+            net_stopped(&mut p.doc.borrow_mut().net, id);
             p.doc.borrow_mut().view.set_image(&p.addr, None);
+        }
+    }
+    let gone: Vec<u64> = s.sheets.keys().copied().filter(|id| !active.contains(id)).collect();
+    for id in gone {
+        if let Some(sh) = s.sheets.remove(&id) {
+            net_stopped(&mut sh.doc.borrow_mut().net, id);
         }
     }
     let gone: Vec<u64> = s.scripted.keys().copied().filter(|id| !active.contains(id)).collect();
     for id in gone {
         if let Some(doc) = s.scripted.remove(&id).and_then(|w| w.upgrade()) {
+            net_stopped(&mut doc.borrow_mut().net, id);
             if let Some(p) = doc.borrow_mut().page.as_mut() {
                 p.answer(id, Err(String::from(t("Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat."))));
             }
@@ -790,6 +1115,7 @@ fn lost_requests(n: &mut Net, k: usize, dev: u32) {
 // the scripts of the document shown: what is due now, and a frame for what comes next
 fn page_pump(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     let now = n.doc.sim.engine().now();
+    let clock = clock_of(n, dev);
     let past = n.doc.sim.view_at().is_some();
     let speed = match n.doc.sim.mode() {
         Mode::Realtime { speed_pm } if !past => speed_pm,
@@ -805,7 +1131,9 @@ fn page_pump(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         p.set_location(&url);
         // (while the view stands in the past no script runs)
         if !past {
+            p.jar_in(&mut s.jar, clock);
             p.pump(&mut d.view, now, &mut s.seq);
+            p.jar_out(&mut s.jar);
         }
         if let Some(ms) = p.wake(now, speed) {
             ui.timer(TIMER_PAGE + k as u32 % 4, ms);
@@ -828,16 +1156,22 @@ fn page_effects(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, doc: &Rc<RefCell<D
             ui.repass();
         }
     }
-    for req in fx.fetch {
+    let now = n.doc.sim.engine().now();
+    for mut req in fx.fetch {
         let id = req.id;
+        let page = doc.borrow().url.clone();
+        let who = if doc.borrow().page.as_ref().and_then(|p| p.src_request()) == Some(id) { Who::Src } else { Who::Fetch };
         if let Some(w) = n.devwin.get(k) {
+            stamp(&w.desk.web, &mut req, Some(&page), false);
             w.desk.web.scripted.insert(id, Rc::downgrade(doc));
         }
+        net_add(&mut doc.borrow_mut().net, pending_row(&req, who, now));
         if let Err(e) = n.doc.sim.send(Cmd::Apply(Action::WebFetch { dev, req })) {
             let why = tr::msg(&e.msg());
             if let Some(w) = n.devwin.get(k) {
                 w.desk.web.scripted.remove(&id);
             }
+            net_stopped(&mut doc.borrow_mut().net, id);
             if let Some(p) = doc.borrow_mut().page.as_mut() {
                 p.answer(id, Err(why));
             }
@@ -845,7 +1179,7 @@ fn page_effects(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, doc: &Rc<RefCell<D
         }
     }
     if let Some(target) = fx.nav {
-        follow(n, k, dev, &target);
+        follow(n, k, dev, &target, Who::Script);
         ui.repass();
     } else if fx.reload {
         reload(n, k, dev, false);
@@ -853,7 +1187,47 @@ fn page_effects(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, doc: &Rc<RefCell<D
     }
 }
 
+// the device clock's seconds (what cookies expire by)
+fn clock_of(n: &Net, dev: u32) -> i64 {
+    n.doc.sim.engine().clock(dev).unwrap_or(jfn_sim::EPOCH_UNIX_NS).div_euclid(1_000_000_000)
+}
+
 // ---------------------------------------------------------------- the window
+
+// the card of a page's certificate
+fn cert_card(ui: &mut Ui, i: &TlsInfo, url: &str) {
+    ui.next_size(-1, 0);
+    ui.box_begin(0, BOX_V | BOX_CARD | pad(8), 4);
+    ui.next_size(-1, 0);
+    ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
+    ui.icon(if i.faults != 0 { IC_WARNING } else { IC_LOCK }, 16);
+    ui.text(TS_BODY_STRONG, if i.faults != 0 { t("Verschlüsselt, aber das Zertifikat hat Fehler") } else { t("Verschlüsselte Verbindung") });
+    ui.box_end();
+    let host = host_of(url);
+    let mut rows: Vec<(&str, String)> = alloc::vec![(t("Verbindung"), format!("{}, {}", i.version, i.suite))];
+    if let Some(c) = i.chain.first() {
+        rows.push((t("Ausgestellt für"), if c.subject_org.is_empty() { c.subject_cn.clone() } else { format!("{} ({})", c.subject_cn, c.subject_org) }));
+        rows.push((t("Ausgestellt von"), if c.issuer_org.is_empty() { c.issuer_cn.clone() } else { format!("{} ({})", c.issuer_cn, c.issuer_org) }));
+        rows.push((t("Gültig ab"), date_text(c.not_before)));
+        rows.push((t("Gültig bis"), date_text(c.not_after)));
+        rows.push((t("Namen"), c.name_list().join(", ")));
+        rows.push((t("Fingerabdruck (SHA-256)"), c.fingerprint_text()));
+    }
+    ui.gridbox_begin(0, &[0, -1], 0, 4);
+    for (k, v) in &rows {
+        ui.text(TS_CAPTION | TX_SECONDARY, k);
+        ui.next_size(-1, 0);
+        ui.text(TS_CAPTION | TX_WRAP, v);
+    }
+    ui.gridbox_end();
+    for l in fault_lines(i, &host) {
+        ui.next_size(-1, 0);
+        ui.text(TS_CAPTION | TX_WRAP, &l);
+    }
+    ui.next_size(-1, 0);
+    ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, t("Ein Zertifikat aus dem simulierten Netz: seine Schlüssel kommen aus dem Startwert des Projekts und schützen nichts Echtes."));
+    ui.box_end();
+}
 
 enum Act {
     Open,
@@ -865,6 +1239,8 @@ enum Act {
     KeepPage,
     Link(String),
     Submit(MdSubmit),
+    /// the warning's Trotzdem fortfahren
+    GoOn,
 }
 
 /// the Webbrowser of device window k
@@ -873,8 +1249,10 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     page_pump(n, ui, k, dev);
     let mode = n.doc.sim.mode();
     let now = n.doc.sim.engine().now();
+    let clock = clock_of(n, dev);
     let page_id = ID_BROWSER0 + 0x100 * k as u32;
     let con_id = ID_PAGE0 + 0x80 * k as u32;
+    let dev_id = ID_DEV0 + 0x80 * k as u32;
     let Some(w) = n.devwin.get(k) else { return };
     let front = w.desk.front == super::desktop::Prog::Browser.key();
     let s = &mut w.desk.web;
@@ -887,18 +1265,23 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             act = Some(Act::Forward);
         } else if ui.capture_shortcut(VK_F5, 0) {
             act = Some(Act::Reload);
-        } else if s.load.is_some() && ui.capture_shortcut(VK_ESCAPE, 0) {
+        } else if (s.load.is_some() || !s.pics.is_empty() || !s.sheets.is_empty() || !s.scripted.is_empty()) && ui.capture_shortcut(VK_ESCAPE, 0) {
             act = Some(Act::Stop);
         } else if ui.capture_shortcut(b'L' as u32, MOD_CTRL) {
             ui.focus(id);
             let text = s.addr.clone();
             ui.textbox_select(id, &text, 0, text.len());
         } else if scripts && ui.capture_shortcut(b'J' as u32, MOD_CTRL | MOD_SHIFT) {
-            s.console = !s.console;
+            toggle_console(s);
+            ui.repass();
+        } else if ui.capture_shortcut(VK_F12, 0) {
+            s.dev.open = !s.dev.open;
             ui.repass();
         }
     }
     let loading = s.load.is_some();
+    // what the button stops: all that is on its way
+    let busy = loading || !s.pics.is_empty() || !s.sheets.is_empty() || !s.scripted.is_empty();
     ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
     let flag = |on: bool| ST_ICON_ONLY | ST_SUBTLE | if on { 0 } else { ST_DISABLED };
     ui.next_icon(IC_BACK);
@@ -913,12 +1296,23 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         act = Some(Act::Forward);
     }
     ui.tooltip(t("Vor (Alt+Rechts)"));
-    ui.next_icon(if loading { IC_STOP } else { IC_REFRESH });
-    ui.next_flags(flag(loading || s.hist.cur().is_some()));
-    if ui.button(id + 5, if loading { t("Anhalten") } else { t("Neu laden") }) & EV_ACT != 0 {
-        act = Some(if loading { Act::Stop } else { Act::Reload });
+    ui.next_icon(if busy { IC_STOP } else { IC_REFRESH });
+    ui.next_flags(flag(busy || s.hist.cur().is_some()));
+    if ui.button(id + 5, if busy { t("Anhalten") } else { t("Neu laden") }) & EV_ACT != 0 {
+        act = Some(if busy { Act::Stop } else { Act::Reload });
     }
-    ui.tooltip(if loading { t("Anhalten (Esc)") } else { t("Neu laden (F5)") });
+    ui.tooltip(if busy { t("Anhalten (Esc)") } else { t("Neu laden (F5)") });
+    // the lock of a page that came over TLS
+    let tls = s.hist.cur().and_then(|e| e.doc.borrow().tls.clone());
+    if let Some(i) = &tls {
+        ui.next_icon(if i.faults != 0 { IC_WARNING } else { IC_LOCK });
+        ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
+        if ui.button(dev_id + 1, t("Zertifikat")) & EV_ACT != 0 {
+            s.cert_open = !s.cert_open;
+            ui.repass();
+        }
+        ui.tooltip(if i.faults != 0 { t("Verschlüsselt, aber das Zertifikat hat Fehler") } else { t("Verschlüsselte Verbindung: das Zertifikat zeigen") });
+    }
     ui.next_size(-1, 0);
     let ev = ui.textbox(id, Some("http://10.0.0.10/"), &mut s.addr, 2000);
     if ev & EV_COMMIT != 0 && ui.focused() == id {
@@ -929,15 +1323,23 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         act = Some(Act::Open);
     }
     if scripts {
-        let mut on = s.console as i32;
+        let mut on = (s.dev.open && s.dev.tab == TAB_CONSOLE) as i32;
         ui.next_icon(crate::workspace::icons::JN_TERMINAL);
         ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
         if ui.toggle_button(con_id, t("Konsole"), &mut on) & EV_ACT != 0 {
-            s.console = on != 0;
+            toggle_console(s);
             ui.repass();
         }
         ui.tooltip(t("Konsole der Seitenskripte (Strg+Umschalt+J)"));
     }
+    let mut on = s.dev.open as i32;
+    ui.next_icon(IC_SETTINGS);
+    ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
+    if ui.toggle_button(dev_id, t("Entwickleransicht"), &mut on) & EV_ACT != 0 {
+        s.dev.open = on != 0;
+        ui.repass();
+    }
+    ui.tooltip(t("Entwickleransicht: Konsole, Netzwerk, Elemente, Cookies (F12)"));
     ui.box_end();
     // Reload of a POST result: the question above the page
     if s.ask {
@@ -953,9 +1355,45 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         ui.box_end();
     }
+    // a certificate with faults: the question above its page
+    let warned = s.hist.cur().is_some_and(|e| e.doc.borrow().warn.is_some());
+    if warned {
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_CARD | pad(6), 8);
+        ui.icon(IC_WARNING, 16);
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_WRAP, t("Das Zertifikat dieses Servers hat Fehler. Nur fortfahren, wenn klar ist, warum."));
+        if ui.button(dev_id + 2, t("Trotzdem fortfahren")) & EV_ACT != 0 {
+            act = Some(Act::GoOn);
+        }
+        if s.hist.can_back() {
+            if ui.accent_button(dev_id + 3, t("Zurück zur sicheren Seite")) & EV_ACT != 0 {
+                act = Some(Act::Back);
+            }
+        }
+        ui.box_end();
+    }
+    if s.cert_open {
+        if let Some(i) = &tls {
+            let url = s.hist.cur().map(|e| e.url.clone()).unwrap_or_default();
+            cert_card(ui, i, &url);
+        }
+    }
     // the page
     let doc = s.hist.cur().map(|e| e.doc.clone());
     let mut wanted = Vec::new();
+    // the developer view: the page and it share the room, with a splitter
+    let dev_open = s.dev.open && doc.is_some();
+    if dev_open {
+        ui.next_size(-1, -1);
+        ui.box_begin(0, BOX_V | BOX_FIXED, 0);
+        let h = ui.px2dip(ui.box_rect()[3]);
+        if s.dev.pos == 0 && h > 0 {
+            s.dev.pos = h * 55 / 100;
+        }
+        ui.next_size(-1, -1);
+        ui.split_begin(dev_id + 5, s.dev.pos.max(80), true);
+    }
     match &doc {
         Some(d) => {
             ui.next_size(-1, -1);
@@ -966,7 +1404,9 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             // the page's handlers decide about its link and its form
             let dd = &mut *d;
             if let Some(p) = dd.page.as_mut() {
+                p.jar_in(&mut s.jar, clock);
                 let (link, submit) = p.events(&mut dd.view, ev.clone(), now, &mut s.seq);
+                p.jar_out(&mut s.jar);
                 (ev.link, ev.submit) = (link, submit);
             }
             if let Some(l) = ev.link {
@@ -992,6 +1432,20 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             ui.box_end();
         }
     }
+    // the developer view below it
+    if dev_open {
+        ui.split_next();
+        let mut close = false;
+        if let Some(d) = &doc {
+            close = devtools::pane(ui, dev_id, con_id, s, d, clock);
+        }
+        ui.split_end(&mut s.dev.pos);
+        ui.box_end();
+        if close {
+            s.dev.open = false;
+            ui.repass();
+        }
+    }
     // the status line
     let waiting = doc.as_ref().map_or(0, |d| s.pics.values().filter(|p| Rc::ptr_eq(&p.doc, d)).count());
     let line = if !s.hover.is_empty() {
@@ -1005,9 +1459,9 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
     } else if let Some(d) = &doc {
         let mut st = d.borrow().status.clone();
-        let errors = d.borrow().page.as_ref().map_or(0, |p| p.console().errors());
-        if errors > 0 && !s.console {
-            st = tf("{} · Skriptfehler: {} (Konsole)", &[&st, &errors.to_string()]);
+        let errors = d.borrow().console().errors();
+        if errors > 0 && !s.dev.open {
+            st = if scripts { tf("{} · Skriptfehler: {} (Konsole)", &[&st, &errors.to_string()]) } else { tf("{} · Fehler: {} (Entwickleransicht, F12)", &[&st, &errors.to_string()]) };
         }
         match waiting {
             0 => st,
@@ -1017,18 +1471,6 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     } else {
         String::new()
     };
-    // the console of the page's scripts
-    if scripts && s.console {
-        if let Some(d) = &doc {
-            let mut d = d.borrow_mut();
-            if let Some(p) = d.page.as_mut() {
-                if console_pane(ui, con_id + 1, p.console(), &mut s.con_seen) {
-                    p.clear_console();
-                    ui.repass();
-                }
-            }
-        }
-    }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, &line);
     // what the widgets and keys asked for, after them
@@ -1036,6 +1478,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         if !wanted.is_empty() {
             fetch_pictures(n, k, dev, d, wanted);
         }
+        fetch_sheets(n, k, dev, d);
         page_effects(n, ui, k, dev, d);
     }
     let Some(a) = act else { return };
@@ -1061,12 +1504,32 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         Act::Stop => stop(n, k, dev),
         Act::Resend => reload(n, k, dev, true),
         Act::KeepPage => s.ask = false,
-        Act::Link(l) => follow(n, k, dev, &l),
+        Act::Link(l) => follow(n, k, dev, &l, Who::Link),
         Act::Submit(f) => {
             s.focus_page = true;
             let page = s.hist.cur().map(|e| e.url.clone()).unwrap_or_default();
-            go(n, k, dev, form_nav(&page, &f), false);
+            go(n, k, dev, form_nav(&page, &f), false, Who::Form);
+        }
+        Act::GoOn => {
+            let warn = s.hist.cur().and_then(|e| e.doc.borrow().warn.clone());
+            if let Some((nav, fp)) = warn {
+                if !s.accepted.contains(&fp) {
+                    s.accepted.push(fp);
+                }
+                s.focus_page = true;
+                go(n, k, dev, nav, true, Who::Address);
+            }
         }
     }
     ui.repass();
+}
+
+// the console's tab: open on it, or shut when it shows
+fn toggle_console(s: &mut Browser) {
+    if s.dev.open && s.dev.tab == TAB_CONSOLE {
+        s.dev.open = false;
+    } else {
+        s.dev.open = true;
+        s.dev.tab = TAB_CONSOLE;
+    }
 }

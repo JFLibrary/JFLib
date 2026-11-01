@@ -1,0 +1,106 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/web_dev.jfnet
+# style sheets in the Webbrowser (B4) on PC1's desktop: a page with two <link rel="stylesheet"> and a
+# <style> between them: both sheets are fetched, the document order decides (the Elemente tab says
+# what an element got), Back asks for nothing, Reload asks again; a page with sheets that fail shows
+# all the same and the console says why; a page without sheets asks for nothing but itself
+# Ids (window 0): the window 26624; the address 26800, Zurück 26803, Neu laden 26805; the developer
+# view's button 124928, its tabs 124934
+size 1280 900
+theme light
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 1000 760
+dblclick listitem:"Webbrowser"
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+expect heading:"Hofladen Sonnenfeld" exists
+expect text:"Heute frisch: Äpfel und Birnen." exists
+shot build/jfnetworker/styles_page.png window 26624
+# ---- what the page fetched, in the order it named them
+click #124928
+click tab:"Netzwerk"
+expect text:"http://web.lab/" exists
+expect text:"http://web.lab/basis.css" exists
+expect text:"http://web.lab/ende.css" exists
+expect text:"http://web.lab/zeichen.svg" exists
+expect text:"<link>" exists
+expect text:"<img>" exists
+expect text:"text/css" exists
+# ---- what an element got: <h1> the <style>'s colour over basis.css, basis.css's italic
+click tab:"Elemente"
+click listitem:"<h1>"
+expect text:"color: #8A1C1C" exists
+expect text:"font-style: italic" exists
+expect text:"Stile aus dem Stylesheet" exists
+# the next one down: what is in the card
+key down
+expect text:"Stile aus dem Stylesheet" exists
+expect text:"class = \"karte\"" exists
+expect text:"padding: 8px" exists
+expect text:"background: #E8F0F8" exists
+# ---- the page's own numbers: the page and three requests besides it
+click tab:"Konsole"
+expect text:"Noch keine Ausgabe." exists
+key f12
+expect tab:"Konsole" missing
+# ---- a page without sheets asks for nothing else
+click link:"Ohne Stylesheet"
+wait 500
+expect heading:"Ohne Stylesheet" exists
+key f12
+click tab:"Netzwerk"
+expect text:"http://web.lab/ohne.html" exists
+expect text:"http://web.lab/basis.css" missing
+click tab:"Konsole"
+key f12
+# ---- Back: the page as it was, nothing goes out
+key alt+left
+expect heading:"Hofladen Sonnenfeld" exists
+key f12
+click tab:"Netzwerk"
+expect text:"http://web.lab/ende.css" exists
+click tab:"Konsole"
+key f12
+close window 26624
+dblclick listitem:"WEB1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"Port 80: 5 Anfragen, 5 Antworten, 0 in Arbeit, 0 wartend" exists
+close window 26624
+# ---- Reload asks for all of it again
+dblclick listitem:"PC1" shift
+expect window 26624 open
+expect heading:"Hofladen Sonnenfeld" exists
+click #26805
+wait 1000
+expect heading:"Hofladen Sonnenfeld" exists
+close window 26624
+dblclick listitem:"WEB1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"Port 80: 9 Anfragen, 9 Antworten, 0 in Arbeit, 0 wartend" exists
+close window 26624
+# ---- sheets that fail: the page shows, the console says why
+dblclick listitem:"PC1" shift
+expect window 26624 open
+click #26800
+key ctrl+a
+type "web.lab/kaputt.html\n"
+wait 1000
+expect heading:"Kaputte Stylesheets" exists
+expect text:"Die Seite zeigt sich trotzdem, die Konsole nennt die Gründe." exists
+key f12
+click tab:"Konsole"
+expect text:"http://web.lab/fehlt.css: das Stylesheet kam nicht: 404 Not Found" exists
+expect text:"http://web.lab/notiz.txt: das ist kein Stylesheet: Typ text/plain" exists
+expect text:"http://web.lab:81/zu.css: das Stylesheet kam nicht: keine Verbindung: Verbindung abgelehnt" exists
+click tab:"Netzwerk"
+expect text:"http://web.lab/ende.css" exists
+expect text:"404 Not Found" exists
+expect text:"Fehler" exists
+click tab:"Elemente"
+key f12
+shot build/jfnetworker/styles_broken.png window 26624
+expect_nowarn

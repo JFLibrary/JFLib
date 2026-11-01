@@ -1586,11 +1586,7 @@ Die Anfrage endete, weil das Gerät oder sein Dienst angehalten hat.	The request
 Zu viele Weiterleitungen	Too many redirects
 {} leitet immer weiter.	{} keeps redirecting.
 Oft zeigen zwei Seiten aufeinander; curl -L -v im Terminal zeigt die Kette.	Often two pages point at each other; curl -L -v in the terminal shows the chain.
-Verschlüsselte Seite	Encrypted page
-Verschlüsselte Seiten (https) kann dieser Browser noch nicht öffnen: sie kommen mit einer späteren Ausbaustufe.	This browser cannot open encrypted pages (https) yet: they come with a later stage.
-Dieselbe Seite über http:// geht, wenn der Server dort antwortet.	The same page over http:// works if the server answers there.
 Adresse kann nicht geöffnet werden	The address cannot be opened
-Dieser Browser öffnet http-Adressen im simulierten Netz.	This browser opens http addresses in the simulated network.
 Seite	Page
 {} Bytes	{} bytes
 eine Weiterleitung	one redirect
@@ -1681,3 +1677,75 @@ Das Element lässt sich hier nicht einfügen.	The element cannot be inserted her
 {}: das Skript kam nicht: {} {}	{}: the script did not come: {} {}
 {}: das Skript ist zu groß ({} Bytes)	{}: the script is too large ({} bytes)
 {}: das Skript kam nicht: {}	{}: the script did not come: {}
+Das Zertifikat von {} ist nicht in Ordnung.	The certificate of {} is not in order.
+Diese Verbindung ist nicht sicher	This connection is not secure
+Keine sichere Verbindung	No secure connection
+Mit {} kam keine verschlüsselte Verbindung zustande.	No encrypted connection with {} came about.
+Spricht der Dienst auf diesem Port überhaupt TLS? Der Reiter Dienste zeigt es, der Simulationsmodus zeigt den Handshake.	Does the service on this port speak TLS at all? The Services tab tells, the simulation mode shows the handshake.
+Dieser Browser öffnet http- und https-Adressen im simulierten Netz.	This browser opens http and https addresses in the simulated network.
+Das Zertifikat ist von {} selbst unterschrieben: niemand, dem dieses Gerät vertraut, bürgt dafür.	The certificate is signed by {} itself: nobody this device trusts vouches for it.
+Das Zertifikat stammt von {}: diesem Aussteller vertraut das Gerät nicht.	The certificate comes from {}: this device does not trust that issuer.
+Das Zertifikat ist abgelaufen: es galt bis {}.	The certificate has expired: it was valid until {}.
+Das Zertifikat gilt erst ab {}.	The certificate is valid only from {}.
+Das Zertifikat gilt für {}, nicht für {}.	The certificate is valid for {}, not for {}.
+Die Unterschrift des Zertifikats stimmt nicht.	The signature of the certificate is wrong.
+Der Server {} hat sich nicht ausweisen können. Wer mithört oder sich dazwischenstellt, wäre nicht zu erkennen.	The server {} could not prove who it is. Someone listening in or standing in between could not be told apart.
+Oben lässt sich trotzdem fortfahren: dieses Fenster merkt sich dann dieses eine Zertifikat.	You can go on all the same above: this window then remembers this one certificate.
+Zertifikat mit Fehlern	certificate with faults
+Cookie {} von {} nicht gespeichert: {}	Cookie {} from {} not stored: {}
+{}: das Stylesheet kam nicht: {} {}	{}: the style sheet did not come: {} {}
+{}: das Stylesheet ist zu groß ({} Bytes)	{}: the style sheet is too large ({} bytes)
+{}: das ist kein Stylesheet: Typ {}	{}: that is no style sheet: type {}
+{}: das Stylesheet kam nicht: {}	{}: the style sheet did not come: {}
+{}: das Stylesheet kam nicht: nur http und https gehen	{}: the style sheet did not come: only http and https work
+Angehalten	Stopped
+Verschlüsselt, aber das Zertifikat hat Fehler	Encrypted, but the certificate has faults
+Verschlüsselte Verbindung	Encrypted connection
+Verbindung	Connection
+Ausgestellt für	Issued to
+Ausgestellt von	Issued by
+Gültig ab	Valid from
+Gültig bis	Valid until
+Namen	Names
+Fingerabdruck (SHA-256)	Fingerprint (SHA-256)
+Ein Zertifikat aus dem simulierten Netz: seine Schlüssel kommen aus dem Startwert des Projekts und schützen nichts Echtes.	A certificate from the simulated network: its keys come from the project's seed and protect nothing real.
+Zertifikat	Certificate
+Verschlüsselte Verbindung: das Zertifikat zeigen	Encrypted connection: show the certificate
+Entwickleransicht	Developer view
+Entwickleransicht: Konsole, Netzwerk, Elemente, Cookies (F12)	Developer view: console, network, elements, cookies (F12)
+Das Zertifikat dieses Servers hat Fehler. Nur fortfahren, wenn klar ist, warum.	This server's certificate has faults. Go on only if you know why.
+Trotzdem fortfahren	Go on anyway
+Zurück zur sicheren Seite	Back to safety
+{} · Fehler: {} (Entwickleransicht, F12)	{} · errors: {} (developer view, F12)
+Adresszeile	Address line
+Formular	Form
+{} Bytes, zu Beginn: {}	{} bytes, at the start: {}
+Sitzung	Session
+Anfrage	Request
+Antwort	Response
+Noch keine Antwort.	No response yet.
+Zertifikat für {}, ausgestellt von {}	Certificate for {}, issued by {}
+Inhalt ({} Bytes)	Body ({} bytes)
+Diese Seite hat noch keine Anfragen.	This page has no requests yet.
+Methode	Method
+Wer fragte	Asked by
+Nur HTML-Seiten haben einen Dokumentbaum.	Only HTML pages have a document tree.
+Attribute	Attributes
+Keine.	None.
+Stile aus dem Stylesheet	Styles from the style sheet
+Diese Seite hat keine Cookies.	This page has no cookies.
+Domain	Domain
+Läuft ab	Expires
+Merkmale	Attributes
+Cookie löschen	Delete cookie
+Alle löschen	Delete all
+Cookies	Cookies
+Elemente	Elements
+Entwickleransicht schließen	Close the developer view
+Cookie {} nicht gespeichert: {}	Cookie {} not stored: {}
+kein Name	no name
+zu groß	too large
+die Domain passt nicht zur Adresse	the domain does not fit the address
+HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or overwrite HttpOnly
+Secure geht nur über https	Secure works only over https
+SameSite=None braucht Secure	SameSite=None needs Secure
