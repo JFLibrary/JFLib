@@ -124,10 +124,9 @@ const imports = { jfgui: {
 function dispatch(m) {
   switch(m.type) {
     case "tick": break;
-    case "event":
-      // a finger's sample time, in this worker's clock (lib/plat/evq.rs PD_TIME_SHIFT)
-      if(m.at) m.event[6]=(m.event[6]&0x3FFFF|(Math.floor(m.at-performance.timeOrigin)&0x3FFF)<<18)>>>0;
-      wasm.jfgui_event(...m.event); input(); break;
+    case "event": wasm.jfgui_event(...m.event); input(); break;
+    // a raw finger; how old the sample is by now (lib/plat/web.rs jfgui_finger, lib/ui/touch.rs)
+    case "finger": wasm.jfgui_finger(...m.finger,Math.max(0,Math.round(performance.timeOrigin+performance.now()-m.at)));input();break;
     case "text": {
       // Whole code points (never half a surrogate pair); jfgui_text answers the characters it
       // queued, the rest follows once input() handed them to the app (no rendering between).

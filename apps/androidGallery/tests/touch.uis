@@ -1,4 +1,4 @@
-#!args --size 390x780 --anim off --theme light
+#!args --size 390x780 --anim off --theme light --verify-dirty
 # The finger (lib/ui/touch.rs): the pan 1:1 with its direction locked, nested views, sideways, the
 # fling and what stops it, a tap, the long press, widgets that take the finger, no scroll bars, a
 # window moved by finger.  The start page's scroll view is #10, a page's #20 + its number.
@@ -24,12 +24,12 @@ expect #10 value 0
 finger down 195,600
 finger move 195,595
 expect #10 value 0
-# out of the slop: nothing moves yet ...
+# out of the slop: what lies beyond it moves ...
 finger move 195,590
-expect #10 value 0
-# ... the slop's way is caught up within the next moves
+expect #10 value 2
+# ... and the slop's way is caught up within the next moves
 finger move 195,580
-expect #10 value 15
+expect #10 value 17
 finger move 195,570
 expect #10 value 30
 finger move 195,470
@@ -61,8 +61,9 @@ expect #10 value 0
 # ---- direction locked: a vertical start stays vertical, nothing sideways here anyway ...
 finger down 195,500
 finger move 195,450
+expect #10 value 42
 finger move 300,400
-expect #10 value 75
+expect #10 value 100
 finger move 100,300
 expect #10 value 200
 finger up
@@ -71,6 +72,38 @@ expect #10 value 0
 # ... and a sideways start on a page that only rolls up and down is no scroll
 swipe 50,500 350,510 300 hold
 expect #10 value 0
+
+# ---- a second finger takes nothing from the first: two fingers are no tap ...
+finger down #100
+finger 1 down 195,650
+finger 1 up
+finger up
+expect text:"Klicks: 0" exists
+wait 200
+# ... the pan goes on with the first; when it lifts, with the other one
+finger down 195,600
+finger move 195,550
+finger move 195,500
+expect #10 value 100
+finger 1 down 300,650
+finger 1 move 300,300
+expect #10 value 100
+finger move 195,480
+expect #10 value 120
+finger up
+expect #10 value 120
+finger 1 move 300,250
+expect #10 value 170
+finger 1 up
+wait 16
+expect #10 value 170
+swipe 195,100 195,700 300 hold
+expect #10 value 0
+# a cancelled finger does not click
+finger down #100
+finger cancel
+expect text:"Klicks: 0" exists
+wait 200
 
 # ---- the fling: on after the finger lifted, slowing down, at last at rest
 flick 195,700 0 -200 80
@@ -130,6 +163,19 @@ swipe 195,100 195,700 300 hold
 swipe 195,100 195,700 300 hold
 expect #10 value 0
 wait 1000
+
+# ---- a press ends when the first finger lifts, the rest does nothing
+expect #10 value 0
+finger down 100,483
+finger move 200,483
+expect #130 value 30..80
+finger 1 down 195,650
+finger up
+expect #130 unpressed
+finger 1 move 195,300
+expect #10 value 0
+finger 1 up
+wait 200
 
 # ---- no scroll bars while the pointer is a finger; a mouse brings them back
 pointer mouse
@@ -204,7 +250,7 @@ expect text:"Zuletzt: Knopf 0" exists
 finger down 300,186
 finger move 280,186
 finger move 260,186
-expect #5040 value 230
+expect #5040 value 240
 finger move 200,120
 expect #5040 value 300
 expect #25 value 0
@@ -229,6 +275,36 @@ wait 100
 expect #5040 value 300..800
 wait 3000
 expect #5040 value 800..1800
+# what a widget may ask of a finger (ui.touch_take): only after resting ...
+size 390 500
+expect #5042 value 0
+expect #25 value 0
+flick #5042 80 0 300
+expect #5042 value 0
+expect #25 value 0
+finger down #5042
+wait 500
+finger move 300,0
+finger up
+expect #5042 value 50..100
+# ... a vertical swipe on it rolls what is around it
+# ... a second finger is its own: no press, it can read them
+expect text:"Finger darauf: 0" exists
+finger down #5042
+finger 1 down 195,450
+wait 16
+expect text:"Finger darauf: 2" exists
+finger 1 move 195,440
+finger 1 up
+finger up
+wait 16
+expect text:"Finger darauf: 0" exists
+# only a tap
+expect #5043 value 0
+flick #5043 80 0 300
+expect #5043 value 0
+tap #5043
+expect #5043 value 45..55
 size 390 780
 pointer mouse
 key esc

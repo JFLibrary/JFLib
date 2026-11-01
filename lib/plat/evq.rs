@@ -8,6 +8,8 @@
 //        event: pressure -1 = the device has none (-> 0), else clamped to 1..PRESSURE_ONE;
 //        type PTR_*; tilts in degrees, clamped to -63..63.  0 for PTR_MOUSE and while pen
 //        input is off.
+//   finger(win, phase, id, x, y, age_ms) -> false when it was dropped: a host's raw finger, any
+//        platform (the UI's gesture recogniser takes it: ui/touch.rs); finger_event: its Event
 //   pen_enable(on)    pen input on (default) / off: off = pens report plain mouse events
 //   pen_enabled() -> bool
 //
@@ -35,10 +37,11 @@ pub const PD_PRESSURE: u32 = 0xFFFF; // bits 0..15 pressure 1..PRESSURE_ONE, 0 =
 pub const PD_TYPE_SHIFT: u32 = 16; // bits 16..17 PTR_*
 pub const PD_TILTX_SHIFT: u32 = 18; // bits 18..24 i7 tilt x in degrees (-63..63, + = right)
 pub const PD_TILTY_SHIFT: u32 = 25; // bits 25..31 i7 tilt y in degrees (+ = towards the user)
-// a finger (PTR_TOUCH) has no tilt: bits 18..31 are the low 14 bits of the sample's time in the
-// clock of jfgui_input / Ui::now (ui touch.rs); button 0 on E_UP: the finger was cancelled
-pub const PD_TIME_SHIFT: u32 = 18;
-pub const PD_TIME_MASK: u32 = 0x3FFF;
+// a finger (finger_event, PTR_TOUCH) has no tilt: bits 18..30 how old the sample was when it was
+// pushed (ms), bit 31 it was cancelled; Event::btn is the finger's id
+pub const PD_AGE_SHIFT: u32 = 18;
+pub const PD_AGE_MASK: u32 = 0x1FFF;
+pub const PD_CANCEL: u32 = 1 << 31;
 pub const PRESSURE_ONE: i32 = 65535;
 
 struct Ring {
@@ -144,6 +147,41 @@ pub fn evq_pen_data(pressure: i32, typ: u32, tilt_x: i32, tilt_y: i32) -> u32 {
     v |= ((tilt_x.clamp(-63, 63) & 127) as u32) << PD_TILTX_SHIFT;
     v |= ((tilt_y.clamp(-63, 63) & 127) as u32) << PD_TILTY_SHIFT;
     v
+}
+
+/// what happens to a finger (finger)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FingerPhase {
+    Down,
+    Move,
+    Up,
+    /// the system took it: no click, no fling
+    Cancel,
+}
+
+/// the Event of a raw finger: E_DOWN / E_MOVE / E_UP with PTR_TOUCH in its data.  id: the host's
+/// number of this finger while it is down (a second one has another); age_ms: how old the sample
+/// is now (the velocity needs it; 0 when the host does not know)
+pub fn finger_event(win: u8, phase: FingerPhase, id: u8, x: i32, y: i32, age_ms: u32) -> Event {
+    let typ = match phase {
+        FingerPhase::Down => crate::E_DOWN,
+        FingerPhase::Move => crate::E_MOVE,
+        FingerPhase::Up | FingerPhase::Cancel => crate::E_UP,
+    };
+    let mut data = crate::PTR_TOUCH << PD_TYPE_SHIFT | age_ms.min(PD_AGE_MASK) << PD_AGE_SHIFT;
+    if phase == FingerPhase::Cancel {
+        data |= PD_CANCEL;
+    }
+    Event { typ, btn: id, mods: 0, win, x, y, data }
+}
+
+/// A host's raw finger, in px of its window (Event::win as for every pointer event): this is all a
+/// platform does for touch; pan, fling, tap, long press and what takes the finger are decided in
+/// ui/touch.rs.  Every finger goes through here, in the order they happen; a finger that goes away
+/// without an Up gets a Cancel.  The browser and Android, whose windows live in one surface, come
+/// through jfgui_finger instead.  -> false when the event was dropped
+pub fn finger(win: u8, phase: FingerPhase, id: u8, x: i32, y: i32, age_ms: u32) -> bool {
+    evq_push(finger_event(win, phase, id, x, y, age_ms))
 }
 
 /// pen input on (default) / off (pens become plain mouse events)

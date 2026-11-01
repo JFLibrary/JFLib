@@ -864,6 +864,19 @@ pub extern "C" fn jfgui_input(time_ms: u32) {
 pub extern "C" fn jfgui_frame_delay() -> u32 {
     with_app(|app| app.frame_delay()).unwrap_or(250)
 }
+/// The host's raw finger (crate::finger's job here, where the windows live in one surface): phase 0
+/// down, 1 move, 2 up, 3 cancel; id the host's small number of this finger; x, y px of the canvas;
+/// age_ms how old the sample is now.  The host calls jfgui_input after a batch.  -> 1 queued
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_finger(phase: u32, id: u32, x: i32, y: i32, age_ms: u32) -> u32 {
+    let phase = match phase {
+        0 => crate::FingerPhase::Down,
+        1 => crate::FingerPhase::Move,
+        2 => crate::FingerPhase::Up,
+        _ => crate::FingerPhase::Cancel,
+    };
+    windows::event(crate::finger_event(0, phase, id as u8, x, y, age_ms)) as u32
+}
 /// Enqueue a bounded platform event; pointer/resize events update virtual window routing.
 /// The lifecycle comes this way too: E_POWER with data 2 when the page was hidden / Android's
 /// activity stopped (onStop), 3 when it is visible / started again (UIC_SUSPEND 2 / 0).

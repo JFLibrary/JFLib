@@ -407,7 +407,9 @@ impl App for Desk {
         ui.box_end();
         // the tool window
         let (wo, wr) = (self.tool_open.clone(), self.tool_rect.clone());
-        if ui.window_begin(ID_TOOL, "Werkzeug", Some(&wo), WF_TOOL | WF_RESIZABLE, Some(&wr)) {
+        // (tests/touch.uis: a window a finger moves only after resting on its title bar)
+        let hold = if plat::env("jfgui_DESKTEST_HOLD").is_some() { WF_TOUCH_HOLD } else { 0 };
+        if ui.window_begin(ID_TOOL, "Werkzeug", Some(&wo), WF_TOOL | WF_RESIZABLE | hold, Some(&wr)) {
             ui.box_begin(0, BOX_V | PAD_12, 8);
             ui.text(TS_BODY, "Ein Werkzeugfenster");
             if ui.button(ID_TOOLTEXT, "Vollbild umschalten") & EV_ACT != 0 {

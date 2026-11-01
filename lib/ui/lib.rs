@@ -185,6 +185,7 @@ mod taskbar;
 mod tasks;
 mod term;
 mod touch;
+pub use touch::Finger;
 pub use term::{TermEv, TermState, TF_CTRL_SHIFT6, TF_NO_FRAME, TF_NO_INPUT, TF_QHELP, TK_KEY, TM_BUSY, TM_LINE, TM_RAW, TM_SECRET};
 pub mod theme;
 mod timeline;

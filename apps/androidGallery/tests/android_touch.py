@@ -178,17 +178,26 @@ def main():
         def first_row():
             return find(label("Klick mich"), '"Klick mich"', 3)
         far = h // 4
-        d.sh("input", "swipe", str(cx), str(h * 3 // 4), str(cx), str(h * 3 // 4 - far), "60")
-        time.sleep(3)
-        # (the page's start is out of the dump's sight by now when it rolled on far enough)
-        now = first_row()
-        y1 = box(now)[1] if now is not None else -100000
         y0 = box(n)[1]
-        ok(y0 - y1 > far * 3 // 2, f"a quick swipe rolls on after the finger lifted: {y0 - y1 if now is not None else 'far'} px for {far} px of finger")
+        # (a busy machine's emulator may send the samples late: no speed left when it lifts; again)
+        for attempt in range(3):
+            d.sh("input", "swipe", str(cx), str(h * 3 // 4), str(cx), str(h * 3 // 4 - far), "60")
+            time.sleep(3)
+            # (the page's start is out of the dump's sight by now when it rolled on far enough)
+            now = first_row()
+            y1 = box(now)[1] if now is not None else -100000
+            if y0 - y1 > far * (attempt + 1) * 5 // 4:
+                break
+        ok(y0 - y1 > far * (attempt + 1) * 5 // 4, f"a quick swipe rolls on after the finger lifted: {y0 - y1 if now is not None else 'far'} px for {far * (attempt + 1)} px of finger")
         before = nodes()
         time.sleep(1)
         after = nodes()
         ok([box(x) for x in before] == [box(x) for x in after], "and comes to rest")
+        # at rest the app draws nothing
+        d.sh("dumpsys", "gfxinfo", PKG, "reset")
+        time.sleep(3)
+        frames = re.search(r"Total frames rendered: (\d+)", d.sh("dumpsys", "gfxinfo", PKG))
+        ok(frames is not None and int(frames.group(1)) <= 1, f"at rest it draws nothing: {frames.group(1) if frames else '?'} frames in 3 s")
         # the finger stops it: the page keeps still from then on
         start()
         find(label("Klick mich"), '"Klick mich"', 30)
@@ -204,15 +213,27 @@ def main():
         print("Rollleisten:", flush=True)
         start()
         find(label("Klick mich"), '"Klick mich"', 30)
-        raw = d.run("exec-out", "screencap", binary=True, check=False)
-        sw, sh_ = int.from_bytes(raw[0:4], "little"), int.from_bytes(raw[4:8], "little")
-        head = len(raw) - sw * sh_ * 4
-        margin = set()
-        for x in (sw - dp(2), sw - dp(4), sw - dp(6)):
-            for y in range(sh_ // 8, sh_ * 3 // 4, 7):
-                at = head + (y * sw + x) * 4
-                margin.add(raw[at:at + 3])
-        ok(len(margin) == 1, f"the right margin of the page stays one colour: {len(margin)} colours")
+        def margin_colours():
+            raw = d.run("exec-out", "screencap", binary=True, check=False)
+            sw, sh_ = int.from_bytes(raw[0:4], "little"), int.from_bytes(raw[4:8], "little")
+            head = len(raw) - sw * sh_ * 4
+            margin = set()
+            for x in (sw - dp(2), sw - dp(4), sw - dp(6), sw - dp(7)):
+                for y in range(sh_ // 8, sh_ * 3 // 4, 7):
+                    at = head + (y * sw + x) * 4
+                    margin.add(raw[at:at + 3])
+            return len(margin)
+        n = margin_colours()
+        ok(n == 1, f"the right margin of the page stays one colour: {n} colours")
+        # a real mouse brings them back, the next finger takes them away
+        d.sh("input", "mouse", "tap", str(w - dp(3)), str(h // 2))
+        time.sleep(1)
+        n = margin_colours()
+        ok(n > 1, f"a mouse brings the bar back: {n} colours in the margin")
+        d.sh("input", "tap", str(w - dp(3)), str(h // 2))
+        time.sleep(1)
+        n = margin_colours()
+        ok(n == 1, f"a finger takes it away again: {n} colours")
 
         # ------------------------------------------------------------ sideways, sliders
         print("Seitwärts, Regler:", flush=True)

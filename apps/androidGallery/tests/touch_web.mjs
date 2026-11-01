@@ -112,6 +112,17 @@ try {
   ok(held===await page.evaluate(()=>document.querySelector('#a11y').innerHTML),'a touch stops it');
   await touch('touchEnd',[]);
 
+  // the edge of the screen is the page's too
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+  await settle('Klick mich');
+  await swipe([409,600],[409,500],{n:12,ms:16,rest:200});
+  ok(Math.abs(y0-(await settle('Klick mich')).y-100)<=1,'a swipe at the very edge of the screen rolls the page');
+
   // back to the start; the slider: sideways it drags, a vertical swipe on it rolls the page
   for(let i=0;i<8;i++) await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
   const s0=await settle('Klick mich');
@@ -128,6 +139,24 @@ try {
   await swipe([206,sliderY],[206,sliderY-120],{n:12,ms:16,rest:200});
   ok(await text('Wert: ')===value,'a vertical swipe on it leaves the value');
   ok(Math.abs(y0-(await settle('Klick mich')).y-120)<=1,'and rolls the page');
+  await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
+
+  // a second finger takes nothing from the first; when the first lifts, the pan goes on with it
+  const a0=(await settle('Klick mich')).y;
+  await page.evaluate(()=>{document.querySelector('#screen').addEventListener('pointerdown',e=>{if(e.isPrimary)window.__first=e.pointerId;},true);});
+  await touch('touchStart',[{id:0,x:206,y:600}]);
+  await touch('touchMove',[{id:0,x:206,y:560}]);await sleep(30);
+  await touch('touchMove',[{id:0,x:206,y:520}]);await sleep(30);
+  await touch('touchStart',[{id:0,x:206,y:520},{id:1,x:300,y:700}]);await sleep(30);
+  await touch('touchMove',[{id:0,x:206,y:500},{id:1,x:300,y:400}]);await sleep(60);
+  ok(Math.abs(a0-(await box('Klick mich')).y-100)<=1,'a second finger moves nothing');
+  // (the emulation lifts only all fingers at once: the first one's pointerup by hand)
+  await page.evaluate(()=>document.querySelector('#screen').dispatchEvent(new PointerEvent('pointerup',{pointerId:window.__first,pointerType:'touch',isPrimary:true,clientX:206,clientY:500,bubbles:true})));
+  await sleep(30);
+  await touch('touchMove',[{id:1,x:300,y:380}]);await sleep(60);
+  ok(Math.abs(a0-(await box('Klick mich')).y-120)<=1,'the first one lifted: the pan goes on with the other one');
+  await sleep(200);
+  await touch('touchEnd',[]);
   await swipe([206,200],[206,800],{n:10,ms:10,rest:60});
 
   // the keyboard comes with a text field

@@ -1310,7 +1310,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         }
         // deadline in ms since start: animations (16 ms), timers, auto close
         let mut dl = if ui.agent_enabled() { ui.now_ms.wrapping_add(30) } else { u32::MAX };
-        if ui.animating {
+        if ui.animating || ui.touch_busy() {
             dl = ui.now_ms.wrapping_add(16);
         }
         let t = ui.timer_due_peek();

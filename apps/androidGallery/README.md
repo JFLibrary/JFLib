@@ -22,7 +22,7 @@ für den Finger angeordnet (eine Spalte, 44 DIP):
 | Menüs & Auswahl | Menüleiste mit Untermenüs und zuletzt geöffneten Dateien, Auswahlliste, Kalender, Aufklapp-, Teil- und Befehlsknöpfe, Kontextmenü, Hinweise | [`pg_menus.rs`](pg_menus.rs) |
 | Texteingabe | Textfelder, Kennwort, Zahlenfelder, mehrzeilig, Formular im Raster, Umbruch und Kürzung | [`pg_text.rs`](pg_text.rs) |
 | Listen & Bäume | 200 Einträge virtualisiert, Zeilen zum Ziehen mit Griff, Baum mit Checkboxen, Zeichenfläche mit `canvas_damage` | [`pg_lists.rs`](pg_lists.rs) |
-| Container | Tabs, Expander, Hinweisleisten, kurze Meldungen, waagerechtes Rollen, Rollleiste (nur mit der Maus) | [`pg_boxes.rs`](pg_boxes.rs) |
+| Container | Tabs, Expander, Hinweisleisten, kurze Meldungen, waagerechtes Rollen, Rollleiste (nur mit der Maus), Regler mit `ui.touch_take` (nur mit dem Finger) | [`pg_boxes.rs`](pg_boxes.rs) |
 | Werte & Farben | Dezimalregler, Eigenschaftszeilen, Winkel, Verschieben, Farbspuren, Farbrad, Farbwähler | [`pg_colors.rs`](pg_colors.rs) |
 | Fenster & Dialoge | Werkzeugfenster, verschachtelte modale Dialogfenster, Seitendialog, Popups aus einem Fenster, Statusleiste | [`pg_windows.rs`](pg_windows.rs) |
 | Randfälle | Bedienelemente in den Ecken: ihre Menüs, Listen und der Kalender bleiben auf dem Bildschirm | [`pg_edge.rs`](pg_edge.rs) |

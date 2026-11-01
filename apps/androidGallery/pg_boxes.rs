@@ -13,6 +13,9 @@ const ID_IB_RESET: u32 = 5030;
 const ID_TOAST: u32 = 5031;
 const ID_HSCROLL: u32 = 5040;
 const ID_SBAR: u32 = 5041;
+const ID_HOLD: u32 = 5042;
+const ID_DECLINE: u32 = 5043;
+const RANGE: Range = Range::new(0, 100, 1, 0);
 const ID_CHIP0: u32 = 5050; // .. 5069
 const TAB_NAMES: [&str; 3] = ["Aufklappen", "Hinweise", "Rollen"];
 const IB_TITLES: [&str; 4] = ["Hinweis", "Gespeichert", "Achtung", "Fehler"];
@@ -31,6 +34,8 @@ pub struct Boxes {
     closed: u32,
     sbar: i32,
     chips: i32,
+    hold: i32,
+    decline: i32,
 }
 
 impl Boxes {
@@ -69,11 +74,21 @@ impl Boxes {
                 }
                 ui.scroll_end();
                 ui.text(TS_BODY, &format!("Zuletzt: Knopf {}", self.chips));
-                // (a finger gets no scroll bars: the library's own rule, nothing to show here)
                 if !ui.touch_mode() {
                     ui.next_size(SIZE_FILL, 0);
                     ui.scrollbar(ID_SBAR, &mut self.sbar, 1000, 250, false);
                     ui.text(TS_BODY, &format!("Rollleiste: {}", self.sbar));
+                } else {
+                    // (a finger gets no scroll bars) what a widget may ask of a finger: ui.touch_take
+                    ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Erst nach langem Drücken, zwei Finger gehören ihm:");
+                    ui.next_size(SIZE_FILL, 40);
+                    ui.slider(ID_HOLD, &mut self.hold, &RANGE);
+                    ui.touch_take(TF_H | TF_HOLD | TF_TWO);
+                    ui.text(TS_BODY, &format!("Finger darauf: {}", ui.touch_fingers().len()));
+                    ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Nimmt nur Tippen:");
+                    ui.next_size(SIZE_FILL, 40);
+                    ui.slider(ID_DECLINE, &mut self.decline, &RANGE);
+                    ui.touch_take(TF_DECLINE);
                 }
             }
             _ => {

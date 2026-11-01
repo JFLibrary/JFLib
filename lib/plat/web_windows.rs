@@ -50,6 +50,10 @@ struct Display {
     pointer: (i32, i32),
     /// where the pointer last went down
     press: (i32, i32),
+    /// the fingers down (bit per id) and the one that came first: it alone moves windows; while one
+    /// is down they all go to the window the first one touched
+    fingers: u32,
+    lead: u8,
     drag: Option<(i32, i32, i32, [i32; 4], u32)>,
 }
 static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
@@ -67,6 +71,8 @@ static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
     cursor: CUR_ARROW,
     pointer: (0, 0),
     press: (0, 0),
+    fingers: 0,
+    lead: 0,
     drag: None,
 });
 
@@ -671,11 +677,28 @@ pub(super) fn event(mut event: Event) -> bool {
             }
         }
         E_MOVE | E_DOWN | E_UP | E_WHEEL => {
-            d.pointer = (event.x, event.y);
-            if event.typ == E_DOWN {
+            let finger = event.typ != E_WHEEL && (event.data >> PD_TYPE_SHIFT) & 3 == PTR_TOUCH;
+            let lead = if finger {
+                let bit = 1u32 << (event.btn & 31);
+                if event.typ == E_DOWN {
+                    if d.fingers == 0 {
+                        d.lead = event.btn;
+                    }
+                    d.fingers |= bit;
+                } else if event.typ == E_UP {
+                    d.fingers &= !bit;
+                }
+                d.lead == event.btn
+            } else {
+                true
+            };
+            if lead {
+                d.pointer = (event.x, event.y);
+            }
+            if lead && event.typ == E_DOWN {
                 d.press = d.pointer;
             }
-            if let Some((id, sx, sy, rect, edges)) = d.drag {
+            if let Some((id, sx, sy, rect, edges)) = d.drag.filter(|_| lead) {
                 if event.typ == E_MOVE {
                     let area = [d.width, d.height];
                     if let Some(w) = window_mut(&mut d, id) {
@@ -751,11 +774,11 @@ pub(super) fn event(mut event: Event) -> bool {
                     })
                     .map_or(d.active, |(i, _)| i as i32)
             });
-            if event.typ == E_DOWN {
+            if event.typ == E_DOWN && lead {
                 d.capture = Some(target);
                 d.active = target;
             }
-            if event.typ == E_UP {
+            if event.typ == E_UP && (!finger || d.fingers == 0) {
                 d.capture = None;
             }
             if let Some(w) = window(&d, target) {

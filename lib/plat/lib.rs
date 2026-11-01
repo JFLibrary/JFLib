@@ -168,12 +168,14 @@ pub fn back_trap(on: bool) {
     let _ = on;
 }
 
-/// (ui touch.rs) the host says at the start that its pointer is a finger (a phone's browser:
-/// `pointer: coarse`; on Android it is known): no scroll bars from the first frame on
+/// (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
+/// `pointer: coarse`): no scroll bars from the first frame on; the next pointer event decides again
 pub fn touch_primary() -> bool {
     #[cfg(target_arch = "wasm32")]
     return web::touch_primary();
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(target_os = "android")]
+    return true;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     false
 }
 

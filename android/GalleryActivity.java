@@ -40,8 +40,9 @@ public final class GalleryActivity extends Activity {
     static native void nativeEvent(int type, int button, int mods, int x, int y, int data);
     private static native void nativeText(byte[] text);
     private static native boolean nativeIme();
-    // the raw finger: pan, fling, tap and long press are decided in Rust (lib/ui/touch.rs)
-    private static native void nativeFinger(int type, int button, int x, int y, long time, boolean last);
+    // a raw finger, phase 0 down, 1 move, 2 up, 3 cancel: pan, fling, tap and long press are decided
+    // in Rust (lib/ui/touch.rs)
+    private static native void nativeFinger(int phase, int id, int x, int y, long time, boolean last);
     // the gesture that just ended reached a widget (a tap, a drag), it did not only scroll
     private static native boolean nativeFingerReached();
     // the accessibility tree (GalleryAccessibility): mirror on / off, its updates, an action
@@ -191,7 +192,7 @@ public final class GalleryActivity extends Activity {
         private Bitmap frame;
         private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final Rect dest = new Rect();
-        private int dpi, pointerId = -1;
+        private int dpi, fingers; // (fingers: a bit per pointer id that is down)
         private float renderScale = 1;
         private boolean resumed, newSurface, mouseDown;
         private int mouseButton = 1;
@@ -293,12 +294,14 @@ public final class GalleryActivity extends Activity {
         private void pointer(int type, float x, float y) {
             nativeEvent(type, 0, 0, Math.round(x * renderScale), Math.round(y * renderScale), 0);
         }
-        private void finger(int type, int button, float x, float y, long time, boolean last) {
-            nativeFinger(type, button, Math.round(x * renderScale), Math.round(y * renderScale), time, last);
+        private void finger(int phase, int id, float x, float y, long time, boolean last) {
+            nativeFinger(phase, id, Math.round(x * renderScale), Math.round(y * renderScale), time, last);
         }
         private void cancelGesture() {
-            if (pointerId >= 0) nativeFinger(3, 0, 0, 0, android.os.SystemClock.uptimeMillis(), true);
-            pointerId = -1;
+            long now = android.os.SystemClock.uptimeMillis();
+            for (int id = 0; fingers >>> id != 0; id++)
+                if ((fingers >>> id & 1) != 0) nativeFinger(3, id, 0, 0, now, true);
+            fingers = 0;
         }
         // a real mouse (DeX, USB): an ordinary pointer, no gestures; the scroll bars come back
         private boolean mouse(MotionEvent event) {
@@ -331,29 +334,43 @@ public final class GalleryActivity extends Activity {
         }
         @Override public boolean onTouchEvent(MotionEvent event) {
             if (event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE || mouseDown) return mouse(event);
-            int action = event.getActionMasked();
-            if (action == MotionEvent.ACTION_DOWN) {
-                if (connection != null) connection.finishComposingText();
-                requestFocus();
-                pointerId = event.getPointerId(0);
-                finger(2, 1, event.getX(), event.getY(), event.getEventTime(), true);
-                requestFrame();
-                return true;
-            }
-            int index = pointerId >= 0 ? event.findPointerIndex(pointerId) : -1;
-            if (action == MotionEvent.ACTION_CANCEL || index < 0) { cancelGesture(); return true; }
-            if (action == MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.getActionIndex()) == pointerId) {
-                cancelGesture(); return true;
-            }
-            if (action == MotionEvent.ACTION_MOVE) {
-                // every sample of the batch with its own time: the velocity needs them
-                for (int h = 0, n = event.getHistorySize(); h < n; h++)
-                    finger(1, 0, event.getHistoricalX(index, h), event.getHistoricalY(index, h), event.getHistoricalEventTime(h), false);
-                finger(1, 0, event.getX(index), event.getY(index), event.getEventTime(), true);
-            } else if (action == MotionEvent.ACTION_UP) {
-                finger(3, 1, event.getX(index), event.getY(index), event.getEventTime(), true);
-                if (nativeFingerReached()) afterGesture();
-                pointerId = -1;
+            int action = event.getActionMasked(), index = event.getActionIndex();
+            long time = event.getEventTime();
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    if (connection != null) connection.finishComposingText();
+                    requestFocus();
+                    cancelGesture(); // (a finger that never lifted)
+                    // fall through
+                case MotionEvent.ACTION_POINTER_DOWN: {
+                    int id = event.getPointerId(index);
+                    fingers |= 1 << id;
+                    finger(0, id, event.getX(index), event.getY(index), time, true);
+                    break;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    // every finger, every sample of the batch with its own time: the velocity needs them
+                    int pointers = event.getPointerCount();
+                    for (int h = 0, n = event.getHistorySize(); h < n; h++)
+                        for (int p = 0; p < pointers; p++)
+                            finger(1, event.getPointerId(p), event.getHistoricalX(p, h), event.getHistoricalY(p, h), event.getHistoricalEventTime(h), false);
+                    for (int p = 0; p < pointers; p++)
+                        finger(1, event.getPointerId(p), event.getX(p), event.getY(p), time, p == pointers - 1);
+                    break;
+                }
+                case MotionEvent.ACTION_POINTER_UP:
+                case MotionEvent.ACTION_UP: {
+                    int id = event.getPointerId(index);
+                    fingers &= ~(1 << id);
+                    finger(2, id, event.getX(index), event.getY(index), time, true);
+                    if (action == MotionEvent.ACTION_UP && nativeFingerReached()) afterGesture();
+                    break;
+                }
+                case MotionEvent.ACTION_CANCEL:
+                    cancelGesture();
+                    break;
+                default:
+                    break;
             }
             requestFrame();
             return true;

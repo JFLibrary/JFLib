@@ -22,8 +22,9 @@
 //                   sample every 8 ms), then it lifts: with its speed (a fling starts; `wait`
 //                   runs it), with hold after resting 100 ms (no fling)
 //   flick S DX DY [MS]   a quick swipe from S by DX, DY (DIP) in MS ms (default 60)
-//   finger down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
-//                   down across other commands; cancel: the system took it
+//   finger [N] down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
+//                   down across other commands; N: the finger's id (default 0), for a second one;
+//                   cancel: the system took it
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
@@ -189,6 +190,8 @@ pub(crate) struct S {
     sc_x: i32,
     sc_y: i32,
     sc_pdata: u32,
+    /// the id of the next raw finger event (`finger N ...`)
+    finger_id: u32,
     warn_mark: u32,
     sc_scope: i32,
     /// the agent session of `agent call` (auto_perm.rs)
@@ -216,6 +219,7 @@ impl Default for S {
             sc_x: 0,
             sc_y: 0,
             sc_pdata: 0,
+            finger_id: 0,
             warn_mark: 0,
             sc_scope: -1, // `window` scope: window id, -1 = any
             agent: Default::default(),
@@ -446,7 +450,7 @@ fn json_escape(out: &mut Vec<u8>, src: &[u8], cap: usize) {
     }
 }
 
-const WFLAG_NAMES: [&str; 9] = ["tool", "dialog", "modal", "resizable", "noclose", "sysframe", "noactivate", "autoheight", "keys"];
+const WFLAG_NAMES: [&str; 10] = ["tool", "dialog", "modal", "resizable", "noclose", "sysframe", "noactivate", "autoheight", "keys", "touchhold"];
 
 // copy_px(dst, src, x, y): gfx_blit_copy -- src at (x, y) of dst, clipped, no blending
 fn blit_copy(dst: &mut Surface, src: &Surface, x: i32, y: i32) {
@@ -1301,9 +1305,9 @@ impl Ui {
 
     fn inject(&mut self, app: &mut dyn App, typ: u8, btn: u32, x: i32, y: i32, data: u32) {
         let w = if matches!(typ, plat::E_KEY_DOWN | plat::E_KEY_UP | plat::E_TEXT) { self.m.win.active } else { self.sc.sc_win };
-        // a finger carries the time of its sample (plat::PD_TIME_SHIFT)
+        // a finger: its id in the button (plat::finger_event), the sample is new
         let finger = matches!(typ, plat::E_MOVE | plat::E_DOWN | plat::E_UP) && (data >> plat::PD_TYPE_SHIFT) & 3 == PTR_TOUCH;
-        let data = if finger { data & plat::PD_PRESSURE | PTR_TOUCH << plat::PD_TYPE_SHIFT | (self.now_ms & plat::PD_TIME_MASK) << plat::PD_TIME_SHIFT } else { data };
+        let btn = if finger { self.sc.finger_id } else { btn };
         let ev = Event {
             typ,
             btn: btn as u8,
@@ -1532,12 +1536,19 @@ impl Ui {
 
     // finger down S | move S | up | cancel
     fn sc_finger(&mut self, app: &mut dyn App, a: &[u8]) {
+        if a.first().is_some_and(|c| c.is_ascii_digit()) {
+            let (n, r) = parse_int(a);
+            self.sc.finger_id = n as u32;
+            self.sc_finger(app, skip_ws(r));
+            self.sc.finger_id = 0;
+            return;
+        }
         if word_eq(a, "up").is_some() || word_eq(a, "cancel").is_some() {
             let (x, y) = (self.sc.sc_x, self.sc.sc_y);
             let cancel = word_eq(a, "cancel").is_some();
             self.sc.sel_win = self.sc.sc_win;
             if cancel {
-                self.inject(app, plat::E_UP, 0, x, y, PTR_TOUCH << plat::PD_TYPE_SHIFT);
+                self.inject(app, plat::E_UP, 0, x, y, PTR_TOUCH << plat::PD_TYPE_SHIFT | plat::PD_CANCEL);
             } else {
                 self.finger_at(app, plat::E_UP, x, y);
             }

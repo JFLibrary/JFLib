@@ -4989,11 +4989,24 @@ On Android, `plat::back_trap(on)` makes the back key an Esc for the app (a page 
 
 ## 37. The finger
 
-One gesture recogniser for every host ([`lib/ui/touch.rs`](../lib/ui/touch.rs)): the Android host and
-the browser only forward the raw finger with the time of each sample, so a script on the virtual
-clock tests the same code on any platform. A pointer event is a finger when its data says `PTR_TOUCH`
-(browser: `pointerType` touch; Android: every tool but a mouse). Windows and Linux report no fingers
-yet: there only scripts drive it.
+One gesture recogniser for every host ([`lib/ui/touch.rs`](../lib/ui/touch.rs), no platform in it, the
+fling's physics included): hosts only forward raw fingers, so a script on the virtual clock tests the
+same code on any platform. On Android every tool but a mouse is a finger, in the browser `pointerType`
+touch. Windows and Linux report no fingers yet: there only scripts drive it.
+
+**A new host** calls one function for every finger, in the order they happen:
+
+```rust
+plat::finger(win, plat::FingerPhase::Down, id, x, y, age_ms);   // also Move, Up, Cancel
+```
+
+`win` as for every pointer event, `x`, `y` in px of that window, `id` the host's number of this finger
+while it is down (a second finger has another one), `age_ms` how old the sample is now (0 if unknown; the
+velocity needs it). A finger that goes away without an Up gets a `Cancel`. The system's mouse emulation of
+those fingers must be off: a mouse event ends the finger mode (no scroll bars). `plat::touch_primary()`
+says whether the main pointer is a finger at the start. Where the windows live in one surface (browser,
+Android) the host calls the export `jfgui_finger(phase, id, x, y, age_ms)` instead, then `jfgui_input`. The
+runtime's loop on Windows and Linux already keeps its clock running for a finger (`touch_busy`).
 
 What a finger does:
 
@@ -5005,7 +5018,8 @@ What a finger does:
 | Lifts with speed (50 to 8000 DIP/s; least squares over the last 100 ms, none if it rested 40 ms) | the fling: along `OverScroller`'s curve and friction, handing over along the same views, ends at the last one's limit |
 | Touches during a fling | stops it; no click, and if it moves on it rolls again |
 | Rests 100 ms | the widget hovers (a tooltip can follow); after 400 ms the right button (so `ui.context_menu` works), and on Android the system's long-press feedback; if it then moves, the same decision as above |
-| Second finger, the system takes it | the gesture is cancelled: a press is released outside everything, no fling |
+| A second finger | takes nothing from the first: while nothing is decided it is no tap and no long press any more; when the first one lifts, a pan goes on with the other one, a press ends, the rest does nothing until the last one lifts |
+| The system takes it (`Cancel`) | a press is released outside everything, no click, no fling |
 
 On Android the slop, the velocities and the long-press time are the device's (`ViewConfiguration`).
 
@@ -5018,6 +5032,21 @@ gets the press when the finger comes down, without a slop. A horizontal slider i
 therefore drags sideways, and a vertical swipe starting on it rolls the page. `ui.touch_drag()` after
 a widget marks its rectangle for a part without a hit box of its own (the handle inside a list's row,
 `apps/androidGallery/pg_lists.rs`); apps otherwise call nothing.
+
+A widget can decide differently: `ui.touch_take(flags)` after it, every frame, replaces what its hit
+boxes say (the page "Container" of `apps/androidGallery` shows it):
+
+| Flag | The widget wants |
+| --- | --- |
+| `TF_H`, `TF_V`, `TF_BOTH` | a finger moving along this axis (both: the press comes with the touch) |
+| `TF_SLOP` | with `TF_BOTH`: the press only once the finger moved (a canvas waits for a second finger) |
+| `TF_HOLD` | only after resting for the long-press time, then the press comes and the drag starts (no right button); until then the finger rolls what is around it; a tap still clicks |
+| `TF_TWO` | a second finger is its own: no press, no click, a pass whenever a finger moves; `ui.touch_fingers()` has them (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for its own pan and zoom |
+| `TF_DECLINE` | no drag at all, a tap still clicks: the finger rolls what is around it or does nothing |
+| `0` | nothing special: the finger rolls what is around it, with nothing to roll it drags the widget |
+
+`WF_TOUCH_HOLD` asks the same of a window's title bar (`TF_HOLD`: a tool panel that only moves after a
+press and hold).
 
 What can be rolled: `ui.scroll_begin`, lists, data views, `ui.vlist_begin`, `ui.md_view`, the text
 views and editors, the console (row by row). `SC_NOWHEEL` views are not. A widget of your own with its

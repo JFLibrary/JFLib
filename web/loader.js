@@ -113,18 +113,14 @@ function activate(on) {
   }
 }
 controlButton.onclick=()=>activate(!enabled);
-// at: a finger's sample time on the page's clock (the worker puts it into the data: lib/ui/touch.rs)
-function event(type,button=0,x=0,y=0,data=0,mods=0,hover=false,at=0) { if(started) send({type:"event",event:[type,button,mods,0,Math.round(x),Math.round(y),data>>>0],hover,at}); }
+function event(type,button=0,x=0,y=0,data=0,mods=0,hover=false) { if(started) send({type:"event",event:[type,button,mods,0,Math.round(x),Math.round(y),data>>>0],hover}); }
 const mods=e=>(e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0)|(e.getModifierState?.("AltGraph")?16:0);
 const pos=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];};
 const button=e=>[1,3,2,4,5][e.button]||1;
-// a finger's samples carry their time: pan, fling and tap are decided in lib/ui/touch.rs
-const fingerAt=e=>e.pointerType==="touch" ? performance.timeOrigin+e.timeStamp : 0;
 const pen=e=>{
   const type=e.pointerType==="pen"?(e.button===5?2:1):e.pointerType==="touch"?3:0;
   if(!type)return 0;
   const pressure=Math.max(1,Math.min(65535,Math.round((e.pressure??1)*65535)));
-  if(type===3) return pressure|(3<<16);
   const tilt=value=>Math.max(-63,Math.min(63,Math.round(value||0)))&127;
   return pressure|(type<<16)|(tilt(e.tiltX)<<18)|(tilt(e.tiltY)<<25);
 };
@@ -134,15 +130,44 @@ if(shadow) Object.defineProperty(window,"jfguiA11y",{value:shadow}); // read-onl
 // a phone: #input keeps the keys, but the system's keyboard only opens for the app's text fields
 const coarse=matchMedia("(pointer: coarse)").matches;
 if(coarse) input.inputMode="none";
-canvas.onpointerdown=e=>{if(!e.isPrimary)return;e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);event(2,button(e),...pos(e),pen(e),mods(e),false,fingerAt(e));};
-canvas.onpointermove=e=>{
-  if(!e.isPrimary)return;
-  const samples=e.buttons ? e.getCoalescedEvents?.() : null;
-  for(const sample of samples?.length ? samples : [e]) event(1,0,...pos(sample),pen(sample),mods(e),!e.buttons,fingerAt(sample));
+// Fingers: every touch pointer as it is, with a small id and the time of its sample (phase 0 down, 1
+// move, 2 up, 3 cancel): pan, fling and tap are decided in lib/ui/touch.rs
+const fingers=new Map();
+function finger(phase,e) {
+  if(!started) return;
+  let id=fingers.get(e.pointerId);
+  if(phase===0) {
+    // (a new first finger: what never lifted is cancelled)
+    if(e.isPrimary) for(const [k,v] of fingers) {send({type:"finger",finger:[3,v,0,0],at:performance.timeOrigin+e.timeStamp});fingers.delete(k);}
+    const used=new Set(fingers.values());
+    for(id=0;used.has(id);id++);
+    fingers.set(e.pointerId,id);
+  }
+  if(id===undefined) return;
+  const [x,y]=pos(e);
+  send({type:"finger",finger:[phase,id,Math.round(x),Math.round(y)],at:performance.timeOrigin+e.timeStamp});
+  if(phase>=2) fingers.delete(e.pointerId);
+}
+canvas.onpointerdown=e=>{
+  const touch=e.pointerType==="touch";
+  if(!e.isPrimary && !touch)return;
+  e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);
+  if(touch) finger(0,e); else event(2,button(e),...pos(e),pen(e),mods(e));
 };
-canvas.onpointerup=e=>{if(!e.isPrimary)return;event(3,button(e),...pos(e),pen(e),mods(e),false,fingerAt(e));if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);};
-canvas.onpointercancel=e=>e.pointerType==="touch" ? event(3,0,...pos(e),pen(e),mods(e),false,fingerAt(e)) : event(3,1,...pos(e),0,mods(e));
-canvas.onpointerleave=()=>event(12);
+canvas.onpointermove=e=>{
+  const touch=e.pointerType==="touch";
+  if(!e.isPrimary && !touch)return;
+  const samples=e.buttons ? e.getCoalescedEvents?.() : null;
+  for(const sample of samples?.length ? samples : [e]) {if(touch) finger(1,sample); else event(1,0,...pos(sample),pen(sample),mods(e),!e.buttons);}
+};
+canvas.onpointerup=e=>{
+  const touch=e.pointerType==="touch";
+  if(!e.isPrimary && !touch)return;
+  if(touch) finger(2,e); else event(3,button(e),...pos(e),pen(e),mods(e));
+  if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+};
+canvas.onpointercancel=e=>{if(e.pointerType==="touch") finger(3,e); else event(3,1,...pos(e),0,mods(e));};
+canvas.onpointerleave=e=>{if(e.pointerType!=="touch")event(12);};
 canvas.oncontextmenu=e=>e.preventDefault();
 canvas.onwheel=e=>{e.preventDefault();const factor=e.deltaMode===1?30:e.deltaMode===2?canvas.clientHeight:1;const dy=Math.max(-32768,Math.min(32767,Math.round(-e.deltaY*factor))),dx=Math.max(-32768,Math.min(32767,Math.round(e.deltaX*factor)));event(4,0,...pos(e),(dy&65535)|((dx&65535)<<16),mods(e));};
 const keys={Backspace:8,Tab:9,Enter:13,Shift:16,Control:17,Alt:18,Pause:19,CapsLock:20,Escape:27,' ':32,PageUp:33,PageDown:34,End:35,Home:36,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,Insert:45,Delete:46,Meta:91};

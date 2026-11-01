@@ -6,31 +6,41 @@
 //   touch_apply()                   run_passes: what the finger and the fling moved, into the views
 //   pan_view(...) / pan_take(id)    a view with its own position rolls by finger (vlist, md_view,
 //                                   text views, the console)
-//   touch_mode() -> the pointer is a finger (no scroll bars)   touch_drag()   touch_grab(axes)
+//   touch_mode() -> the pointer is a finger (no scroll bars)   touch_drag()
+//   touch_take(TF_*) a widget takes the finger or declines it   touch_fingers() -> what is down
 //
-// A finger comes from the Android host (GalleryActivity.java, bridge.c), the browser's pointer
-// events (web/loader.js) and scripts (swipe, flick, tap, finger, `pointer touch`: auto.rs), each
-// with the time of the sample (plat::PD_TIME_SHIFT).  Only this file sees it raw.  It lives in Rust
-// so that all of them behave the same and scripts test it on the virtual clock.
+// A host only forwards raw fingers: plat::finger(win, phase, id, x, y, age_ms), or jfgui_finger where
+// the windows live in one surface (the Android host: GalleryActivity.java, bridge.c; the browser's
+// pointer events: web/loader.js); scripts: swipe, flick, tap, finger, `pointer touch` (auto.rs).  Only
+// this file sees them raw.  It knows no platform: all of them behave the same and scripts test it on
+// the virtual clock.
+//
+// Every finger is in a table (touch_fingers).  The first one down drives the gesture.  A second one
+// takes nothing from it: while nothing is decided it is no tap any more (no click, no long press);
+// when the first one lifts, a pan goes on with the other one, a press ends, the rest waits for the
+// last finger to lift.  A widget with TF_TWO gets the second finger for itself: no press, and a pass
+// whenever a finger moves, for its own pan and zoom.
 //
 // The first decision waits until the finger left the slop (ViewConfiguration: 8 DIP) or lifted:
 //   - lifted: a tap, press and release at once (no flash when a scroll starts instead);
 //   - the widget under the down point takes this direction (grabs: a slider its axis, a colour
 //     wheel, the handle of a row, a window's title bar every direction -- those get the press at
-//     the touch itself, no slop): press and moves go to the widget like a mouse's;
+//     the touch itself, no slop, unless TF_SLOP or TF_HOLD): press and moves go to the widget like
+//     a mouse's;
 //   - a scroll view around the down point can move along the dominant axis: the pan.  The chain
 //     of views is fixed there (from the hit boxes of the last pass), innermost first: each moves
 //     as far as it can, the rest goes to the next.  The axis is locked (a view that scrolls both
 //     ways stays free unless the finger starts along an axis: rails);
-//   - nothing to roll: press and moves go to the widget after all.
+//   - nothing to roll: press and moves go to the widget after all (TF_DECLINE, TF_HOLD: nothing).
 // The pan moves the positions with no smoothing, by the finger's pixels; the slop's travel is
-// caught up on the next 16 DIP (half a pixel per finger pixel): no jump, nothing lost.  Lifted
+// caught up on the next 16 DIP (half a pixel per finger pixel) or when it lifts: no jump, nothing
+// lost.  Lifted
 // with speed (least squares over the last 100 ms, as Android's VelocityTracker; 50..8000 DIP/s)
 // the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
 // and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
 // tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
-// host give feedback); if it moves after that, the same decision.  After the finger left, the
-// hover goes.
+// host give feedback; TF_HOLD: the left button, the drag starts); if it moves after that, the same
+// decision.  After the finger left, the hover goes.
 //
 // With a finger (and at the start on Android, and in a phone's browser) there are no scroll bars:
 // no pixels and no hit box in sbar_core, the room they would have stays, so nothing jumps; a mouse
@@ -48,9 +58,13 @@ use super::Ui;
 use plat::Event;
 
 /// the axes of a grab or a view
-pub(crate) const AX_V: u8 = 1;
-pub(crate) const AX_H: u8 = 2;
-pub(crate) const AX_ALL: u8 = 3;
+pub(crate) const AX_V: u8 = TF_V as u8;
+pub(crate) const AX_H: u8 = TF_H as u8;
+pub(crate) const AX_ALL: u8 = TF_BOTH as u8;
+const G_HOLD: u8 = TF_HOLD as u8;
+const G_TWO: u8 = TF_TWO as u8;
+const G_SLOP: u8 = TF_SLOP as u8;
+const G_DECLINE: u8 = TF_DECLINE as u8;
 
 // ViewConfiguration's defaults (GalleryActivity overrides them with the device's: jfgui_TOUCH)
 const SLOP_DIP: i32 = 8;
@@ -73,8 +87,9 @@ const FRICTION: f64 = 0.015;
 const DECEL: f64 = 2.358_201_815_154_572;
 const INFLEXION: f64 = 0.35;
 const G_INCH: f64 = 9.80665 * 39.37 * 0.84;
-/// a raw E_UP of button 0: the finger was cancelled (the system took it, a second one went)
-pub(crate) const CANCEL_BTN: u8 = 0;
+/// with a finger a window's title bar is at least this high, its close button this wide (DIP)
+pub(crate) const TITLE_DIP: i32 = 40;
+pub(crate) const CAPTION_DIP: i32 = 44;
 /// where a cancelled press is released: outside everything, so it cannot click
 const OUTSIDE: i32 = -10000;
 
@@ -115,11 +130,31 @@ struct Fling {
     done: [f64; 2],
 }
 
+/// a finger that is down (ui.touch_fingers): px of the window, logical in a mirrored one
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Finger {
+    /// the host's number for it, while it is down
+    pub id: u8,
+    pub x: i32,
+    pub y: i32,
+    /// where it came down
+    pub down_x: i32,
+    pub down_y: i32,
+    /// its last sample (ms, as Ui::now)
+    pub time_ms: u32,
+    win: u8,
+}
+
 /// shared state (Ui::m.touch)
 pub(crate) struct S {
     /// the pointer is a finger
     pub(crate) on: bool,
     mode: Mode,
+    /// the fingers down in the order they came, the one that drives the gesture
+    fingers: Vec<Finger>,
+    primary: u8,
+    /// what the widget under the down point takes (TF_*)
+    grab: u8,
     win: u32,
     /// raw px of the window (before the mirror of a right-to-left window)
     down: [i32; 2],
@@ -162,8 +197,11 @@ pub(crate) struct S {
 impl Default for S {
     fn default() -> Self {
         S {
-            on: cfg!(target_os = "android") || plat::touch_primary(),
+            on: plat::touch_primary(),
             mode: Mode::Idle,
+            fingers: Vec::new(),
+            primary: 0,
+            grab: 0,
             win: 0,
             down: [0; 2],
             cur: [0; 2],
@@ -284,6 +322,32 @@ impl Ui {
         }
     }
 
+    /// ui_touch_take(flags): what the last widget (all hit boxes in its rectangle) wants of a finger,
+    /// TF_*, instead of what its hit boxes say by themselves.  Call it after the widget, every frame
+    pub fn touch_take(&mut self, flags: u32) {
+        let c = &mut self.wp.ctx;
+        let [x, y, w, h] = c.last_rect;
+        let k = c.uiclip;
+        let r = [x.max(k[0]), y.max(k[1]), (x + w).min(k[2]), (y + h).min(k[3])];
+        let cur = c.hit_cur;
+        for (i, hit) in c.hits[cur].iter_mut().rev().enumerate() {
+            if i != 0 && !(hit.x0 >= r[0] && hit.y0 >= r[1] && hit.x1 <= r[2] && hit.y1 <= r[3]) {
+                break;
+            }
+            hit.grab = flags as u8;
+        }
+    }
+
+    /// ui_touch_fingers: the fingers down on the live window, the first one first (a widget with
+    /// TF_TWO gets a pass whenever one moves)
+    pub fn touch_fingers(&self) -> Vec<Finger> {
+        let win = self.uiw_cur as u8;
+        let fb = self.wp.rt.fb.w.wrapping_sub(1);
+        let rtl = self.rtl;
+        let m = |x: i32| if rtl { fb.wrapping_sub(x) } else { x };
+        self.m.touch.fingers.iter().filter(|f| f.win == win).map(|f| Finger { x: m(f.x), down_x: m(f.down_x), ..*f }).collect()
+    }
+
     /// the widget that just called behave takes the finger along these axes (AX_*)
     pub(crate) fn touch_grab(&mut self, axes: u8) {
         let c = &mut self.wp.ctx;
@@ -378,11 +442,9 @@ impl Ui {
         t.out.push_back(Event { typ, btn, mods, win, x, y, data });
     }
 
-    // the sample's time from its 14 bits: at most 16 s before the clock
+    // the sample's time on the UI's clock: as old as the host said when it pushed it
     fn touch_time(&self, ev: &Event) -> u32 {
-        let now = self.now_ms;
-        let d = now.wrapping_sub(ev.data >> plat::PD_TIME_SHIFT) & plat::PD_TIME_MASK;
-        if d > plat::PD_TIME_MASK / 2 { now } else { now.wrapping_sub(d) }
+        self.now_ms.wrapping_sub((ev.data >> plat::PD_AGE_SHIFT) & plat::PD_AGE_MASK)
     }
 
     fn touch_sample(&mut self, t: u32, x: i32, y: i32) {
@@ -404,18 +466,82 @@ impl Ui {
     pub(crate) fn touch_input(&mut self, ev: &Event) {
         self.touch_conf();
         let t = self.touch_time(ev);
+        let id = ev.btn;
+        let s = &mut self.m.touch;
         match ev.typ {
-            plat::E_DOWN => self.touch_down(ev, t),
+            plat::E_DOWN => {
+                s.fingers.retain(|f| f.id != id); // (it never lifted)
+                let first = s.fingers.is_empty();
+                s.fingers.push(Finger { id, x: ev.x, y: ev.y, down_x: ev.x, down_y: ev.y, time_ms: t, win: ev.win });
+                if first {
+                    s.primary = id;
+                    self.touch_down(ev, t);
+                } else {
+                    self.touch_second();
+                }
+            }
             plat::E_MOVE => {
-                if self.m.touch.mode != Mode::Idle && ev.win as u32 == self.m.touch.win {
+                let Some(f) = s.fingers.iter_mut().find(|f| f.id == id) else { return };
+                f.x = ev.x;
+                f.y = ev.y;
+                f.time_ms = t;
+                if s.grab & G_TWO != 0 {
+                    s.repaint = true;
+                }
+                if id == s.primary && s.mode != Mode::Idle && ev.win as u32 == s.win {
                     self.touch_move(ev, t);
                 }
             }
             _ => {
-                if self.m.touch.mode != Mode::Idle {
-                    self.touch_up(ev, t);
+                let Some(k) = s.fingers.iter().position(|f| f.id == id) else { return };
+                s.fingers.remove(k);
+                if s.grab & G_TWO != 0 {
+                    s.repaint = true;
+                }
+                if id != s.primary {
+                    return;
+                }
+                match s.fingers.first().copied() {
+                    Some(next) => self.touch_handover(ev, next),
+                    None if s.mode != Mode::Idle => self.touch_up(ev, t),
+                    None => {}
                 }
             }
+        }
+    }
+
+    // a second finger came down
+    fn touch_second(&mut self) {
+        let s = &mut self.m.touch;
+        if s.grab & G_TWO != 0 {
+            s.repaint = true;
+            if s.mode == Mode::Wait {
+                s.mode = Mode::Gone; // the two are the widget's: no press, no click
+            }
+        } else if s.mode == Mode::Wait {
+            s.no_click = true; // two fingers are no tap and no long press
+        }
+    }
+
+    // the first finger lifted, another one is still down
+    fn touch_handover(&mut self, ev: &Event, next: Finger) {
+        let cancel = ev.data & plat::PD_CANCEL != 0;
+        let s = &mut self.m.touch;
+        s.primary = next.id;
+        match s.mode {
+            Mode::Pan => {
+                // the pan goes on with the other one, from where it is
+                s.cur = [next.x, next.y];
+                s.n = 0;
+                self.touch_sample(next.time_ms, next.x, next.y);
+            }
+            Mode::Widget => {
+                s.mode = Mode::Gone;
+                let (x, y) = if cancel { (OUTSIDE, OUTSIDE) } else { (ev.x, ev.y) };
+                self.touch_out(plat::E_UP, BTN_LEFT as u8, x, y);
+            }
+            Mode::Wait => s.mode = Mode::Gone,
+            _ => {}
         }
     }
 
@@ -424,9 +550,14 @@ impl Ui {
         if win as usize >= WIN_MAX || (win != 0 && !self.uiw_drawable(win)) {
             return;
         }
+        // (the last finger never lifted: its press ends here)
+        if self.m.touch.mode == Mode::Widget {
+            self.touch_out(plat::E_UP, BTN_LEFT as u8, OUTSIDE, OUTSIDE);
+        }
         let stopped = self.m.touch.fling.take().is_some();
         let s = &mut self.m.touch;
         s.mode = Mode::Wait;
+        s.grab = 0;
         s.win = win;
         s.down = [ev.x, ev.y];
         s.cur = s.down;
@@ -443,13 +574,14 @@ impl Ui {
         s.n = 0;
         self.touch_sample(t, ev.x, ev.y);
         plat::touch_reached(false);
+        self.uiw_use(win);
+        let (_, grab) = self.touch_under();
+        self.m.touch.grab = grab;
         if stopped {
             return;
         }
         // a widget that takes every direction has the finger from the start
-        self.uiw_use(win);
-        let (_, grab) = self.touch_under();
-        if grab == AX_ALL {
+        if grab & AX_ALL == AX_ALL && grab & (G_HOLD | G_SLOP | G_DECLINE) == 0 {
             self.touch_press();
         }
     }
@@ -527,7 +659,8 @@ impl Ui {
         }
         let (adx, ady) = (dx.wrapping_abs(), dy.wrapping_abs());
         let axis = if adx > ady { AX_H } else { AX_V };
-        if grab & axis != 0 {
+        let waits = grab & (G_HOLD | G_DECLINE) != 0; // no drag now: what is around it, or nothing
+        if grab & axis != 0 && !waits {
             self.touch_press();
             return;
         }
@@ -561,16 +694,28 @@ impl Ui {
         }
         self.m.touch.chain = chain;
         if can & axis == 0 {
-            self.touch_press();
+            if waits {
+                self.m.touch.mode = Mode::Gone;
+            } else {
+                self.touch_press();
+            }
             return;
         }
         // rails: a finger along an axis stays on it
         let free = both && adx.min(ady).wrapping_mul(2) >= adx.max(ady);
         let hovered = self.m.touch.hovered;
+        let slop = self.dp(self.m.touch.conf[0]);
         let s = &mut self.m.touch;
         s.mode = Mode::Pan;
         s.axes = if free { AX_ALL } else { axis };
-        s.catchup = [if s.axes & AX_H != 0 { dx } else { 0 }, if s.axes & AX_V != 0 { dy } else { 0 }];
+        // what lies beyond the slop moves now (a slow frame's long first step), the slop is caught up
+        for (k, d, ax) in [(0, dx, AX_H), (1, dy, AX_V)] {
+            if s.axes & ax != 0 {
+                let c = d.clamp(-slop, slop);
+                s.catchup[k] = c;
+                s.pend[k] = s.pend[k].wrapping_add(d.wrapping_sub(c));
+            }
+        }
         if hovered {
             let (x, y) = (-1, -1);
             self.touch_out(plat::E_LEAVE, 0, x, y);
@@ -594,7 +739,7 @@ impl Ui {
     }
 
     fn touch_up(&mut self, ev: &Event, t: u32) {
-        let cancel = ev.btn == CANCEL_BTN;
+        let cancel = ev.data & plat::PD_CANCEL != 0;
         let mode = self.m.touch.mode;
         self.m.touch.mode = Mode::Idle;
         let [cx, cy] = self.m.touch.cur;
@@ -622,7 +767,14 @@ impl Ui {
             Mode::Pan if !cancel => {
                 self.uiw_use(self.m.touch.win);
                 self.touch_fling(t);
+                // no fling: the rest of the slop's way now, nothing is lost
+                let s = &mut self.m.touch;
+                if s.fling.is_none() {
+                    s.pend[0] = s.pend[0].wrapping_add(core::mem::take(&mut s.catchup[0]));
+                    s.pend[1] = s.pend[1].wrapping_add(core::mem::take(&mut s.catchup[1]));
+                }
             }
+            Mode::Gone if self.m.touch.hovered => self.m.touch.leave_at = Some(t.wrapping_add(LEAVE_MS)),
             _ => {}
         }
     }
@@ -726,7 +878,13 @@ impl Ui {
             }
             if held >= self.m.touch.conf[3] as u32 {
                 self.uiw_use(self.m.touch.win);
-                let (hit, _) = self.touch_under();
+                let (hit, grab) = self.touch_under();
+                if grab & G_HOLD != 0 {
+                    // it wanted a press and hold: its drag starts here
+                    plat::touch_long_press();
+                    self.touch_press();
+                    return;
+                }
                 let c = &self.wp.ctx;
                 let id = hit.map_or(0, |i| c.hits[c.hit_cur ^ 1][i].id);
                 self.m.touch.long_id = id;
