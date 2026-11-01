@@ -16,6 +16,7 @@
 //   f function control   e selection control   l loop control (+ args)
 //   m memory access (+ args)   I image operands (+ id args)   x extended instruction number
 //   w switch targets: (literal, id) pairs
+//   o an opcode (OpSpecConstantOp) followed by the operands of that opcode's grammar
 #![allow(non_upper_case_globals)]
 
 pub const MAGIC: u32 = 0x0723_0203;
@@ -85,6 +86,7 @@ ops! {
     SpecConstantFalse = 49, R_TY, "";
     SpecConstant = 50, R_TY, "v";
     SpecConstantComposite = 51, R_TY, "i*";
+    SpecConstantOp = 52, R_TY, "o";
     Function = 54, R_TY, "fi";
     FunctionParameter = 55, R_TY, "";
     FunctionEnd = 56, R_NONE, "";
@@ -288,7 +290,8 @@ Cap, CAPS {
     GeometryStreams = 54, StorageImageReadWithoutFormat = 55, StorageImageWriteWithoutFormat = 56,
     MultiViewport = 57, GroupNonUniform = 61, GroupNonUniformVote = 62, GroupNonUniformArithmetic = 63,
     GroupNonUniformBallot = 64, GroupNonUniformShuffle = 65, ShaderLayer = 69, ShaderViewportIndex = 70,
-    DrawParameters = 4427, StorageBuffer16BitAccess = 4433, MultiView = 4439,
+    DrawParameters = 4427, StorageBuffer16BitAccess = 4433, UniformAndStorageBuffer16BitAccess = 4434,
+    StoragePushConstant16 = 4435, StorageInputOutput16 = 4436, MultiView = 4439,
     StorageBuffer8BitAccess = 4448, ShaderNonUniform = 5301, RuntimeDescriptorArray = 5302,
     VulkanMemoryModel = 5345, PhysicalStorageBufferAddresses = 5347, DemoteToHelperInvocation = 5379,
     MeshShadingEXT = 5283,

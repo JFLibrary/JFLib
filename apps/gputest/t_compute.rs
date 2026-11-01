@@ -31,7 +31,7 @@ impl Fill {
         )?;
         let layout = t.res(dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 12 }), "fill layout")?;
         let pipe = t.res(
-            dev.create_compute_pipeline(&ComputePipelineDesc { layout: &layout, shader: ShaderStage { module: &m, entry: "main" } }),
+            dev.create_compute_pipeline(&ComputePipelineDesc { layout: &layout, shader: ShaderStage::new(&m, "main") }),
             "fill pipeline",
         )?;
         Some(Fill { bgl, pipe })
@@ -286,7 +286,7 @@ pub fn bindless(t: &mut T) {
                                                                     stages: Stages::COMPUTE }]), "layout") else { return };
     let Some(pl) = t.res(dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[table.layout(), &obgl], push_constants: 0 }),
                          "pipeline layout") else { return };
-    let Some(pipe) = t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &pl, shader: ShaderStage { module: &m, entry: "main" } }),
+    let Some(pipe) = t.res(dev.create_compute_pipeline(&ComputePipelineDesc { layout: &pl, shader: ShaderStage::new(&m, "main") }),
                            "pipeline") else { return };
     let Some(obuf) = storage(t, dev, 64, BufferUsage::NONE) else { return };
     let Some(rb) = readback(t, dev, 64) else { return };

@@ -1,5 +1,6 @@
 // basics -- golden bytes of a tiny module, the builder, the disassembler (golden files of the
-// benchmark shaders), the layout helper, determinism, and --write
+// benchmark shaders), the layout helper, determinism, and --write; samples() lists the
+// modules of shader::samples (specialization constants, textures) the other groups check
 
 use alloc::format;
 use alloc::string::String;
@@ -9,6 +10,42 @@ use shader::bench::{self, Shader};
 use shader::{dis, layout, op, parse, Bi, Cap, Dim, Fmt, Id, Mode, Model, Module, Rule, Sc};
 
 use crate::T;
+
+/// every module of shader::samples by name (both levels where they differ)
+pub fn samples() -> Vec<(String, Vec<u32>)> {
+    use shader::samples::{self as s, SampleDim, Texel};
+    let mut v: Vec<(String, Vec<u32>)> = Vec::new();
+    for minor in [3u32, 6] {
+        let sfx = if minor == 3 { "" } else { "_16" };
+        v.push((format!("spec_fill{}", sfx), s::spec_fill(minor)));
+    }
+    v.push((String::from("vs_fullscreen"), s::vs_fullscreen(3)));
+    v.push((String::from("fs_sample"), s::fs_sample(3)));
+    v.push((String::from("fs_compare"), s::fs_compare(3)));
+    for (k, kn) in [(Texel::Float, "f"), (Texel::Uint, "u"), (Texel::Sint, "i")] {
+        v.push((format!("cs_fetch_{}", kn), s::cs_fetch(3, k, false, false)));
+    }
+    v.push((String::from("cs_fetch_f_array"), s::cs_fetch(3, Texel::Float, true, false)));
+    v.push((String::from("cs_fetch_depth"), s::cs_fetch(3, Texel::Float, false, true)));
+    for (d, dn) in [(SampleDim::D2, "2d"), (SampleDim::D2Array, "2d_array"), (SampleDim::Cube, "cube"),
+                    (SampleDim::CubeArray, "cube_array")] {
+        v.push((format!("cs_sample_{}", dn), s::cs_sample(3, d)));
+    }
+    for (f, fname) in STORAGE_FORMATS {
+        v.push((format!("cs_storage_write_{}", fname), s::cs_storage_write(3, f)));
+        v.push((format!("cs_storage_read_{}", fname), s::cs_storage_read(3, f)));
+    }
+    for (f, fname) in [(Fmt::R32f, "r32f"), (Fmt::R32ui, "r32ui"), (Fmt::R32i, "r32i")] {
+        v.push((format!("cs_storage_rw_{}", fname), s::cs_storage_rw(3, f)));
+    }
+    v.push((String::from("cs_query"), s::cs_query(3)));
+    v.push((String::from("cs_bindless_sample_16"), s::cs_bindless_sample()));
+    v
+}
+
+/// the storage formats gputest and shadertest try
+pub const STORAGE_FORMATS: [(Fmt, &str); 8] = [(Fmt::Rgba8, "rgba8"), (Fmt::Rgba16f, "rgba16f"), (Fmt::R32f, "r32f"),
+    (Fmt::Rgba32f, "rgba32f"), (Fmt::R32ui, "r32ui"), (Fmt::Rgba32ui, "rgba32ui"), (Fmt::R32i, "r32i"), (Fmt::Rgba32i, "rgba32i")];
 
 /// the tiny module: an empty GLCompute entry point
 pub fn tiny() -> Vec<u32> {
@@ -421,5 +458,9 @@ pub fn write_all(dir: &str) -> i32 {
         ok &= write(dir, &format!("bad_{}.spv", c.name), &shader::to_bytes(&c.words));
     }
     ok &= write(dir, "tiny.spv", &shader::to_bytes(&tiny()));
+    for (name, w) in samples() {
+        ok &= write(dir, &format!("{}.spv", name), &shader::to_bytes(&w));
+        ok &= write(dir, &format!("{}.spvasm", name), dis::disassemble(&w).unwrap_or_default().as_bytes());
+    }
     if ok { 0 } else { 1 }
 }

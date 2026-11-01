@@ -41,7 +41,7 @@ PC1: sleep 30 &
 PC1: jobs
 expect PC1 output contains "[2]+  Running                 sleep 30 &"
 PC1: ps
-expect PC1 output contains "    1 root     0:00 init"
+expect PC1 output contains "    1 root     ?        0:00 init"
 run 1s
 PC1: kill %2
 expect PC1 output contains "[2]+  Terminated              sleep 30"

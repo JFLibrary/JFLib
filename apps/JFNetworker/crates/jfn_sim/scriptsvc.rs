@@ -4,7 +4,8 @@
 //
 //   config (JSON; all but the source may be left out; the config without "source" is the
 //   script's `config`, so {"port": 7000} gives config.port):
-//     {"source": "…" or ["line", …], "ns_per_op": 5, "slice": 100000, "queue": 1000,
+//     {"source": "…" or ["line", …] | "file": "/root/app/server.jfs", "ns_per_op": 5,
+//      "slice": 100000, "queue": 1000,
 //      "stop_on_error": false, "limits": {"fuel": 10000000, "heap_kb": 16384, "depth": 500,
 //      "stack": 100000}, "disk": {"latency_us": 100, "mbps": 500, "iops": 50000,
 //      "capacity_mb": 1024}}   (disk: the device's disk, as for kv)
@@ -33,6 +34,27 @@
 //                        cli/shrun.rs runs the service as a console program)
 //   ScriptService::new_file(path, source, cfg, &config)   the program of the device's file
 //                        `path`: its relative imports start in the file's directory (`jfs FILE`)
+//   ScriptService::file()   the file a service runs ("file" of its definition), None for one
+//                        with its source in the definition
+//   ScriptService::release(os)   ends the program and closes what it opened (UDP ports,
+//                        listeners, the HTTP server, connections): a process that runs several
+//                        programs one after another (`jfs --test`, cli/jfstest.rs)
+//   ScriptService::hosted()   a program another service runs (cli/jfstest.rs): an error that
+//                        ends it closes what it opened instead of stopping that service
+//   Engine::script_problems   the problems of services from files: the file is missing or does
+//                        not compile (problems.rs, ProblemKind::ScriptFile)
+//
+// Services from files (IDE1): {"file": PATH, ...} instead of "source" names a file of the
+// device (absolute, or relative to /root as for the shell).  The service reads it whenever it
+// starts -- the start with the device, a start after a stop, a restart -- and compiles it with
+// the path as its name (script::compile_named), so its relative imports start in the file's
+// directory and its errors name the file.  Saving the file changes nothing in a running
+// program; the next start takes the saved text.  A file that is missing, no UTF-8 text or does
+// not compile ends the start as an error of the service (ScriptErr with the file, its line and
+// column when it has a place; during "start"): the status line, `script errors`, the log and
+// the trace say so, and the service stays failed until it is started again.  The config keeps
+// "file", so config.file names it as for `jfs FILE`.  "source" and "file" together are
+// refused.
 //
 // The host API (the names of script::GLOBALS; times in milliseconds, int or float):
 //   log(x, ..), log.debug|info|warn|error(..)   a line in the device's log, tagged with the
@@ -387,6 +409,19 @@ struct Def {
     conf: String,
     /// the device's disk: latency, bytes per second, accesses per second, capacity
     disk: Option<(Ns, u64, u64, u64)>,
+    /// the file of the device the program comes from at each start (None: the source of the
+    /// definition)
+    file: Option<String>,
+}
+
+/// why a file of the device cannot be read (import, a service from a file)
+fn fs_why(e: FsErr) -> String {
+    match e {
+        FsErr::NotFound | FsErr::NotDir => String::from("die Datei gibt es nicht"),
+        FsErr::IsDir => String::from("das ist ein Verzeichnis"),
+        FsErr::BadName => String::from("der Pfad ist ungültig"),
+        e => String::from(e.errno_text()),
+    }
 }
 
 // ---------------------------------------------------------------- the running program
@@ -647,6 +682,8 @@ pub struct ScriptService {
     book: Book,
     /// the virtual time of its last event (metrics() without a time)
     seen: Ns,
+    /// run by another service: an error that ends the program does not stop that one
+    hosted: bool,
 }
 
 // ---------------------------------------------------------------- helpers
@@ -1361,14 +1398,8 @@ impl script::Host for Api<'_, '_> {
     /// import(path): a file of the device; the program waits for the disk's read (CPU time of
     /// the callback)
     fn load(&mut self, cx: &mut Cx, path: &str) -> Result<String, String> {
-        let why = |e: FsErr| match e {
-            FsErr::NotFound | FsErr::NotDir => String::from("die Datei gibt es nicht"),
-            FsErr::IsDir => String::from("das ist ein Verzeichnis"),
-            FsErr::BadName => String::from("der Pfad ist ungültig"),
-            e => String::from(e.errno_text()),
-        };
-        let p = self.os.file_norm(path).map_err(why)?;
-        let data = self.os.file_read(&p).map_err(why)?;
+        let p = self.os.file_norm(path).map_err(fs_why)?;
+        let data = self.os.file_read(&p).map_err(fs_why)?;
         let now = self.os.now();
         let wait = self.os.disk_read(data.len() as u64).saturating_sub(now);
         cx.charge(wait.saturating_mul(1000) / self.def.cfg.ps_per_op.max(1));
@@ -2244,7 +2275,7 @@ impl Run {
 
 impl ScriptService {
     fn from_parts(source: String, prog: Program, cfg: ScriptCfg, conf: String, disk: Option<(Ns, u64, u64, u64)>) -> ScriptService {
-        ScriptService::of_def(Def { source, prog, cfg, conf, disk })
+        ScriptService::of_def(Def { source, prog, cfg, conf, disk, file: None })
     }
 
     fn of_def(def: Def) -> ScriptService {
@@ -2264,7 +2295,7 @@ impl ScriptService {
             err_mark: 0,
             breaks: Vec::new(),
         };
-        ScriptService { def: Arc::new(def), run: None, book, seen: 0 }
+        ScriptService { def: Arc::new(def), run: None, book, seen: 0, hosted: false }
     }
 
     /// a script of `source` with the settings `cfg` and the script's `config` (a JSON object);
@@ -2283,8 +2314,19 @@ impl ScriptService {
         Ok(ScriptService::from_parts(String::from(source), prog, cfg, conf, None))
     }
 
+    /// the source of the program (of a service from a file: the text it read at its last
+    /// start, "" before the first)
     pub fn source(&self) -> &str {
         &self.def.source
+    }
+    /// the same program run by another service (see the module comment)
+    pub fn hosted(mut self) -> ScriptService {
+        self.hosted = true;
+        self
+    }
+    /// the file it runs, as its definition names it (None: the source is in the definition)
+    pub fn file(&self) -> Option<&str> {
+        self.def.file.as_deref()
     }
     pub fn cfg(&self) -> &ScriptCfg {
         &self.def.cfg
@@ -2393,6 +2435,70 @@ impl ScriptService {
         &self.book.breaks
     }
 
+    /// ends the program and closes what it opened -- UDP ports, listeners, the HTTP server and
+    /// its connections, the script's connections and those of its requests -- as a stop does
+    /// through the OS; for a process that runs programs one after another (cli/jfstest.rs).
+    /// The record (errors, output, numbers) stays
+    pub fn release(&mut self, os: &mut OsApi) {
+        if let Some(run) = self.run.take() {
+            for port in run.udps.keys() {
+                os.close(*port);
+            }
+            for l in run.listeners.values() {
+                os.tcp_close(l.sock);
+            }
+            for c in run.conns.values() {
+                if let (Some(s), false) = (c.sock, c.released) {
+                    os.tcp_abort(s);
+                }
+            }
+            if let Some(mut s) = run.serve {
+                s.close(os);
+            }
+            let mut a = run.agent;
+            a.abort_all(os);
+        }
+        if self.book.state == ScriptState::Running {
+            self.book.state = ScriptState::Stopped;
+        }
+    }
+
+    /// a service from a file: the file's program for this start (see the module comment);
+    /// Err(file, line, column, message) when it cannot be read or does not compile
+    fn load_file(&mut self, os: &OsApi) -> Result<(), (String, u32, u32, String)> {
+        let Some(f) = self.def.file.clone() else {
+            return Ok(());
+        };
+        let path = os.file_norm(&f).map_err(|e| (f.clone(), 0, 0, format!("{}: {}", f, fs_why(e))))?;
+        let data = os.file_read(&path).map_err(|e| (path.clone(), 0, 0, format!("{}: {}", path, fs_why(e))))?;
+        let text = String::from_utf8(data).map_err(|_| (path.clone(), 0, 0, format!("{}: die Datei ist kein UTF-8-Text", path)))?;
+        let prog = script::compile_named(&path, &text).map_err(|d| match d.first() {
+            Some(x) if d.len() > 1 => (path.clone(), x.line, x.col, format!("{} (und {} weitere Fehler)", x.msg, d.len() - 1)),
+            Some(x) => (path.clone(), x.line, x.col, x.msg.clone()),
+            None => (path.clone(), 0, 0, format!("{}: das Skript lässt sich nicht übersetzen", path)),
+        })?;
+        let d = &self.def;
+        self.def = Arc::new(Def { source: text, prog, cfg: d.cfg, conf: d.conf.clone(), disk: d.disk, file: d.file.clone() });
+        Ok(())
+    }
+
+    /// the start failed before the program ran (its file): the error is kept, logged and
+    /// noted, the service ends
+    fn fail_start(&mut self, os: &mut OsApi, (file, line, col, msg): (String, u32, u32, String)) {
+        let at = os.now();
+        let name = self.book.name.clone();
+        let text = if line > 0 { format!("Fehler in {}, Zeile {}, Spalte {} (start): {}", file, line, col, msg) } else { format!("Fehler (start): {}", msg) };
+        os.log(SEV_ERR, &name, &text);
+        let note = if line > 0 { format!("{}: {}", file, msg) } else { msg.clone() };
+        os.note(Note::ScriptError { svc: name, line, col, msg: note });
+        self.book.stats.errors += 1;
+        if self.book.errors.len() >= ERRORS_KEEP {
+            self.book.errors.pop_front();
+        }
+        self.book.errors.push_back(ScriptErr { at, kind: ErrorKind::Host, file, line, col, msg, trace: Vec::new(), during: "start" });
+        self.stop_for_good(os);
+    }
+
     /// the breakpoints of the record into the running VM
     fn apply_breaks(&mut self) {
         let Some(vm) = self.run.as_deref_mut().and_then(|r| r.vm.as_mut()) else {
@@ -2465,9 +2571,18 @@ impl ScriptService {
 
     /// the program ends for good (an error): it cleans up, the OS stops it
     fn end(&mut self, os: &mut OsApi) {
-        self.run = None;
+        self.stop_for_good(os);
+    }
+
+    /// failed: the OS stops the service (a hosted program closes what it opened instead)
+    fn stop_for_good(&mut self, os: &mut OsApi) {
+        if self.hosted {
+            self.release(os);
+        } else {
+            self.run = None;
+            os.halt();
+        }
         self.book.state = ScriptState::Failed;
-        os.halt();
     }
 
     /// after every call: the CPU, then the timer key
@@ -2499,6 +2614,11 @@ impl Service for ScriptService {
         self.book.err_mark = self.book.stats.errors;
         if let Some((lat, bps, iops, cap)) = self.def.disk {
             os.disk_setup(lat, bps, iops, cap);
+        }
+        // a service from a file reads it at every start (a restart takes what was saved)
+        if let Err(e) = self.load_file(os) {
+            self.fail_start(os, e);
+            return;
         }
         let a = os.rand() as u64;
         let b = os.rand() as u64;
@@ -2536,7 +2656,9 @@ impl Service for ScriptService {
         // the program's heap and stacks, its pending work (the code is shared)
         let vm = self.run.as_ref().and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes() as usize + 4096);
         let breaks: usize = self.book.breaks.iter().map(|b| 48 + b.0.len() + b.2.as_ref().map_or(0, |c| c.len())).sum();
-        4096 + vm + breaks + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
+        // (a service from a file: the text it read, its path)
+        let file = self.def.file.as_ref().map_or(0, |f| f.len() + self.def.source.len());
+        4096 + vm + breaks + file + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -2593,6 +2715,8 @@ impl Service for ScriptService {
             return if p.file.is_empty() { msg!("angehalten in Zeile {}, Spalte {}", p.line, p.col) } else { msg!("angehalten in {}, Zeile {}, Spalte {}", p.file, p.line, p.col) };
         }
         match (self.book.state, self.book.errors.back()) {
+            // (the file of a service from a file could not be read: the message names it)
+            (ScriptState::Failed, Some(e)) if e.line == 0 && !e.file.is_empty() => msg!("beendet nach einem Fehler: {}", e.msg.clone()),
             (ScriptState::Failed, Some(e)) if !e.file.is_empty() => msg!("beendet nach einem Fehler in {}, Zeile {}, Spalte {}: {}", e.file.clone(), e.line, e.col, e.msg.clone()),
             (ScriptState::Failed, Some(e)) => msg!("beendet nach einem Fehler in Zeile {}, Spalte {}: {}", e.line, e.col, e.msg.clone()),
             (ScriptState::Failed, None) => msg!("beendet nach einem Fehler"),
@@ -2640,6 +2764,19 @@ pub fn from_def_msg(c: &Json) -> Result<Box<dyn Service>, Msg> {
 /// what a definition makes: the source, the program, the settings, the script's config and
 /// the disk; the refusal as a message
 fn def_of(c: &Json) -> Result<Def, Msg> {
+    // a service from a file of the device: the program comes at each start (load_file)
+    if let Some(f) = c.get("file") {
+        let file = match f.as_str().map(str::trim) {
+            Some(p) if !p.is_empty() => String::from(p),
+            _ => return Err(msg!("\u{201e}file\u{201c} ist der Pfad einer Datei des Geräts.")),
+        };
+        if c.get("source").is_some() {
+            return Err(msg!("Ein Skript hat \u{201e}source\u{201c} oder \u{201e}file\u{201c}, nicht beides."));
+        }
+        let cfg = cfg_of(c)?;
+        let prog = script::compile("").map_err(|_| msg!("Das Skript lässt sich nicht übersetzen."))?;
+        return Ok(Def { source: String::new(), prog, cfg, conf: conf_of(c), disk: crate::disk::setup_of(c), file: Some(file) });
+    }
     let lines = || msg!("\u{201e}source\u{201c} ist ein Text oder eine Liste von Zeilen.");
     let source = match c.get("source") {
         Some(Json::String(s)) => s.clone(),
@@ -2668,15 +2805,18 @@ fn def_of(c: &Json) -> Result<Def, Msg> {
             });
         }
     };
-    // the script's config: the definition without its source
+    Ok(Def { source, prog, cfg, conf: conf_of(c), disk: crate::disk::setup_of(c), file: None })
+}
+
+/// the script's config: the definition without its source (a file's path stays: config.file)
+fn conf_of(c: &Json) -> String {
     let mut conf = Json::Object(Vec::new());
     for (k, v) in c.as_object().unwrap_or(&[]) {
         if k != "source" {
             conf.insert(k, v.clone());
         }
     }
-    let conf = agent_core::json::stringify(&conf).unwrap_or_else(|_| String::from("{}"));
-    Ok(Def { source, prog, cfg, conf, disk: crate::disk::setup_of(c) })
+    agent_core::json::stringify(&conf).unwrap_or_else(|_| String::from("{}"))
 }
 
 /// the settings of a definition
@@ -2748,6 +2888,30 @@ impl Engine {
             self.os_push(ni, Job::Start(id));
         }
         Ok(())
+    }
+
+    /// the problems of services from files: a file that is missing (or no text) and one that
+    /// does not compile (its first error), for problems.rs
+    pub(crate) fn script_problems(&self, out: &mut Vec<crate::problems::Problem>) {
+        use crate::problems::{Problem, ProblemKind, Severity};
+        for dev in self.devices() {
+            let Some(ni) = self.node_index(dev) else { continue };
+            let Some(os) = self.os(ni) else { continue };
+            let name = self.node(dev).map(|n| n.name.clone()).unwrap_or_default();
+            for s in os.svcs.iter().filter(|s| !s.console) {
+                let Some(file) = s.svc.as_ref().and_then(|x| x.as_any().downcast_ref::<ScriptService>()).and_then(|x| x.file()) else { continue };
+                let path = os.files.norm(file).unwrap_or_else(|_| String::from(file));
+                let text = os.files.read(&path).ok().and_then(|b| core::str::from_utf8(b).ok());
+                let m = match text {
+                    None => msg!("Skript {} auf {}: die Datei {} gibt es nicht.", s.name.clone(), name.clone(), path.clone()),
+                    Some(t) => match script::check(t).into_iter().find(|d| d.error) {
+                        Some(d) => msg!("Skript {} auf {}: {}, Zeile {}, Spalte {}: {}", s.name.clone(), name.clone(), path.clone(), d.line, d.col, d.msg),
+                        None => continue,
+                    },
+                };
+                out.push(Problem { kind: ProblemKind::ScriptFile, severity: Severity::Error, dev, port: None, link: None, others: Vec::new(), text: m.text(), msg: m });
+            }
+        }
     }
 
     /// Action::ScriptDebug: the debugger of script `name` (ScriptService::debug)

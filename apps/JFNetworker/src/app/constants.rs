@@ -327,13 +327,15 @@ pub(crate) const ID_SVC_EDIT_APPLY: u32 = 0xC910;
 pub(crate) const ID_SVC_EDIT_CANCEL: u32 = 0xC911;
 // ---- the script editor (U7: commands 340 .. 379, widgets 0xD000 .. 0xDFFF, timers 0x160 ..
 // 0x16F; no dock panel: P_SCRIPT = 11 stays free)
-/// the selected host's device window on its Skripte tab (the context menu of a device)
+/// the selected host's device window on its desktop with the IDE in front (the context menu of a
+/// device, "IDE …"; devwin/desktop.rs open_ide)
 pub(crate) const CMD_SCRIPTS: u32 = 340;
 /// the check of the edited scripts while typing (at most every devwin::scripts::CHECK_MS)
 pub(crate) const TIMER_SCRIPT_CHECK: u32 = 0x160;
 /// the Skripte tab of device window k: ID_SCRIPTS0 + 0x400 k .. + 0x3FF (devwin/scripts.rs:
 /// + 0x20 the code editor, + 0x30 the output, + 0x40 the errors (rows + 1 + i), + 0x100 the
 /// list of scripts (rows + 1 + i))
+#[allow(dead_code)] // (IDE1: free since the IDE took the Skripte tab's place)
 pub(crate) const ID_SCRIPTS0: u32 = 0xD000;
 // ---- U6a: the lab in the window -- the Metriken panel, the badges and sparklines of the
 // canvas, faults in the inspector (commands 260 .. 299, widgets 0xB000 .. 0xBFFF, timers
@@ -589,4 +591,29 @@ pub(crate) const ID_MIB0: u32 = 0x0001_1000;
 /// Name umbenennen and its flyout, + 1 the new name, + 2 Umbenennen, + 3 Abbrechen, + 4
 /// Formatieren, + 5 Gliederung on / off, + 8 the split of the editor and the outline, + 0x40 the
 /// outline (rows + 1 + i))
+#[allow(dead_code)] // (IDE1: free since the IDE took the Skripte tab's place)
 pub(crate) const ID_SCRIPTLS0: u32 = 0x0001_4000;
+
+// ---- V2: the desktop of a host's device window (commands 750 .. 779, widgets 0x0001_6000 ..
+// 0x0001_7FFF, timers 0x1AC .. 0x1AF unused)
+/// F11: the active device window into full screen and back (else the main window)
+pub(crate) const CMD_DESK_FULL: u32 = 750;
+/// the desktop of device window k: ID_DESK0 + 0x1000 k .. + 0xFFF (devwin/desktop.rs: + 0 the
+/// window area, + 1 Start and its menu, + 3 Vollbild, + 0x10 + p the start menu's rows, + 0x20
+/// the icons' group, + 0x30 + p the icons, + 0x40 the background; + 0x100 the Texteditor,
+/// + 0x200 the Dateimanager, + 0x400 the Systemmonitor, + 0x600 Einstellungen, + 0x700 IDE,
+/// + 0x710 Terminal, + 0x720 the MIB-Browser's note)
+pub(crate) const ID_DESK0: u32 = 0x0001_6000;
+// ---- X1e: command-line sessions (commands 820 .. 839, widgets 0x0001_A000 .. 0x0001_A7FF,
+// timers 0x1B4 .. 0x1B7; the timers are not used)
+/// "Neue Sitzung": a further session of the shown console's device as a tab of its own
+pub(crate) const CMD_TERM_SESSION: u32 = 820;
+/// the consoles of further sessions: slot k takes ID_SES0 + 8 k .. + 7 (+ 1: its input line)
+pub(crate) const ID_SES0: u32 = 0x0001_A000;
+pub(crate) const SES_SLOTS: u32 = 192;
+// ---- IDE1: the IDE of a host (commands 780 .. 819, widgets 0x0001_8000 .. 0x0001_9FFF,
+// timers 0x1B0 .. 0x1B3; none of the commands and timers is used yet)
+/// the IDE in device window k: ID_IDE0 + 0x1000 k .. + 0xFFF (workspace/ide/mod.rs lists the
+/// parts)
+pub(crate) const ID_IDE0: u32 = 0x0001_8000;
+// (the IDE's check while typing keeps TIMER_SCRIPT_CHECK of the Skripte tab it replaces)

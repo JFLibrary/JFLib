@@ -12,6 +12,8 @@
 //   Engine::ios_debug(ni, hop, note)    one decision as debug lines; the packet comes
 //                                       from the recorded frame (Trace::hop)
 //
+// The console shows every message and debugging line, another session (a vty line, a local
+// terminal) only with "terminal monitor" (cli/ses.rs log_out).
 // Every message and debugging line also goes to the user interface's log as Report::Log
 // (the severity of the code, 7 for debugging); the device's own log keeps only what its
 // services log (os.rs), as "debug stays local" in tests/svctest wants it.
@@ -99,7 +101,8 @@ impl Engine {
     /// gets it with the severity of its code
     pub(crate) fn ios_log(&mut self, ni: usize, msg: &str) {
         let line = format!("{}{}\n", ios_stamp(self.now), msg);
-        self.out(ni, &line);
+        // the console, and the sessions with "terminal monitor" (cli/ses.rs)
+        self.log_out(ni, &line);
         let (tag, text) = msg.split_once(": ").unwrap_or(("", msg));
         let sev = tag.split('-').nth(1).and_then(|s| s.parse::<u8>().ok()).unwrap_or(6).min(7);
         self.log_report(ni, sev, tag, text);
@@ -265,7 +268,7 @@ impl Engine {
             }
             out.push('\n');
         }
-        self.out(ni, &out);
+        self.log_out(ni, &out);
         // the user interface's log: one debugging line each ("ICMP", "ARP" as their source)
         for l in text.lines().filter(|l| !l.starts_with(' ')) {
             let (tag, rest) = l.split_once(": ").unwrap_or(("debug", l));

@@ -11,6 +11,9 @@
 //   val::validate(words)      the structural checks (val module comment lists the rules)
 //   bench                     the benchmark shaders (move, cull, cull_reset, vs_instanced,
 //                             vs_single, fs_lambert), their data contract and CPU references
+//   reflect                   entry points, specialization constants and their values once a
+//                             pipeline sets some (OpSpecConstantOp evaluated), workgroup sizes
+//   samples                   small shaders for the tests: specialization constants, textures
 //   spv                       opcodes, enums and their names; parse: words -> instructions
 //   to_bytes / from_bytes     words <-> the bytes of a .spv file
 #![no_std]
@@ -23,6 +26,8 @@ pub mod dis;
 pub mod layout;
 mod module;
 pub mod parse;
+pub mod reflect;
+pub mod samples;
 pub mod spv;
 pub mod val;
 

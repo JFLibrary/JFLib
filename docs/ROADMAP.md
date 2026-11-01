@@ -1575,7 +1575,49 @@ Fensterrand hinaus.
   Sichtbarkeit, eine zweite Queue für Compute neben dem Zeichnen, Instanzlisten je Mesh statt
   Befehlen je Objekt. Es fehlen in `lib/gpu`: eine zweite Queue, Abfragen der
   Pipeline-Statistik.
-- **P2** · *fehlt* · G2: Shader-Compiler WGSL → SPIR-V mit Fehlermeldungen mit Zeile.
+- **P2** · *erledigt* (2026-11-01) · G2a: WGSL-Frontend `lib/wgsl` ([WGSL.md](WGSL.md)): Lexer,
+  Parser und Prüfung nach der W3C-Spezifikation (alle Literalformen, Template-Listen nach dem
+  Algorithmus der Spezifikation, die volle Grammatik mit Fehlererholung und Tiefengrenzen;
+  Deklarationen in beliebiger Reihenfolge, alle Typen, abstrakte Zahlen und Überladungen,
+  Konstantenauswertung exakt mit i64 / f64 und einmaligem Runden, Overrides, alle eingebauten
+  Funktionen außer Subgroups und buffer_view, Adressräume, Layouts, Attribute, Einstiegspunkte,
+  Verhalten von Anweisungen). Fehlermeldungen auf Deutsch mit Zeile und Spalte. Ergebnis ist ein
+  voll typisiertes IR für das Backend. Die sechs Shader der Messszene liegen als WGSL in
+  `lib/wgsl/bench`. `wgsltest`: 870 Prüfungen je Plattform, darunter 560 000 zufällige
+  Mutationen ohne Absturz in getrennten Läufen. Ein Shader mit 27 000 Zeilen braucht 135 ms
+  (Release). Gegen Chrome 156 stichprobenweise gleich bis auf fünf Fälle, in denen Chrome
+  großzügiger ist als die Spezifikation; dort gilt die Spezifikation. Es fehlen die
+  Uniformitätsanalyse (G2d), Subgroups, buffer_view und Prüfungen, die von Override-Werten oder
+  dem Bind-Group-Layout abhängen.
+- **P2** · *erledigt* (2026-11-01) · G2b: Unterbau für den Compiler. Spezialisierungskonstanten
+  in `lib/shader` (auch für die Arbeitsgruppengröße: auf Basis über das `WorkgroupSize`-Built-in,
+  auf Voll über `LocalSizeId`), `shader::reflect` (Einstiegspunkte, Konstanten und ihre Werte),
+  Pipeline-Konstanten in `lib/gpu` (umgerechnet wie in WebGPU, gegen Einstiegspunkte und
+  Grenzen geprüft). Texturen in Shadern erstmals auf der GPU getestet (Laden, Abtasten mit und
+  ohne Filter, Speichertexturen, Tiefenvergleich, Arrays, Würfel, Größenabfragen, Bindless):
+  exakt bzw. Fehler unter 1e-5. Das Vergleichswerkzeug `tools/wgsl_ref.mjs` holt Tints Urteil
+  über Chrome (headless, echte GPU), die Sammlung `tools/wgsl_corpus` hat 494 eigene Shader
+  samt Tints Urteil. Es fehlen: `Rgba32Sint` in `lib/gpu`, Konstanten nach Namen.
+- **P2** · *erledigt* (2026-11-01) · G2c: Backend IR → SPIR-V in `lib/wgsl` (`wgsl::compile`,
+  ein Modul je Einstiegspunkt, Basis und Voll). Alles, was das Frontend annimmt, außer den
+  Lücken unten: alle Adressräume und Layouts, alle eingebauten Funktionen samt Texturen und
+  Atomics, `discard` (Voll über Demote, Basis wie Tint), die Laufzeitregeln von WGSL (Division
+  durch 0, Shifts, sättigende Umwandlung) und Robustheit (Indizes und Texturkoordinaten
+  geklemmt). Overrides werden Spezialisierungskonstanten. `Output::constants` rechnet sie samt
+  abgeleiteter Ausdrücke auf der CPU aus und nimmt Namen oder `@id`, mit den Fehlern von
+  WebGPU. Dazu kommen die Pipeline-Prüfungen von WebGPU (`check_pipeline`, `check_interface`).
+  672 Module (322 Quellen, beide Stufen) bestehen `shader::val` und `spirv-val`. Gegen Tint
+  stimmen 478 von 494 Dateien der Sammlung; die 16 übrigen sind 11 Fälle der
+  Uniformitätsanalyse, 4 Subgroups und `01f`. Auf der GPU gleichen 13 469 Ergebnisse dem
+  Konstantenauswerter, gegen Chrome 156 ohne Unterschied. Die Messszene mit WGSL-Shadern ergibt
+  dieselben Bilder wie mit SPIR-V und ist gleich schnell (1,62 ms statt 1,63 ms bei 1 Mio.
+  Würfeln in 1080p). Die Robustheit kostet in `move` 0,007 ms (2,8 %). Die sechs Shader
+  übersetzen in 1,3 ms (Release). Es fehlen: Pipeline-Fehler von Override-Ausdrücken in
+  Funktionen, die Prüfung der Puffergröße beim Binden, `layout: 'auto'`, std140-Zerlegung für
+  `matCx2` (braucht `uniformBufferStandardLayout`), Dual-Source-Blending in den Pipelines von
+  `lib/gpu`, mehrere Ebenen bei `texture_external`.
+- **P2** · *fehlt* · G2d: Uniformitätsanalyse, Rest der Abweichungen zu Tint, Fehlermeldungen
+  feilen.
 - **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
   Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
   und Diagramm.

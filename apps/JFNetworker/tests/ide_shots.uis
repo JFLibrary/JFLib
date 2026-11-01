@@ -1,0 +1,68 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ide.jfnet
+# the shot matrix of the IDE (IDE1) on SRV1 of fixtures/ide.jfnet: web stopped at a breakpoint in
+# server.jfs (the execution line, the Debugger pane with the call stack and the variables), the
+# Explorer beside it; light and dark at 100 and 150 %, the device window as it opens (normal)
+# and filling the screen (maximised), then a small window (the side bar and the lower area give
+# way, the menus keep everything) -- build/jfnetworker/ide_shots_<size>_<theme>_<scale>.png.
+# Ids: 26624 the device window, 98816 the editor.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+wait 300
+dblclick listitem:"app"
+wait 600
+dblclick listitem:"server.jfs"
+wait 300
+key ctrl+home
+key down down down down down down
+key f9
+rclick listitem:"PC1"
+move 700,300
+click menuitem:"Konsole öffnen"
+wait 200
+type "curl -s http://10.0.0.1/abc\n"
+wait 500
+expect #98328 enabled
+activate 26624
+wait 100
+# normal: the size the window opens with
+shot build/jfnetworker/ide_shots_normal_light_100.png window 26624
+theme dark
+shot build/jfnetworker/ide_shots_normal_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/ide_shots_normal_dark_150.png window 26624
+theme light
+shot build/jfnetworker/ide_shots_normal_light_150.png window 26624
+scale 100 window 26624
+# maximised: the whole screen
+movewin 26624 0 0
+resizewin 26624 1280 900
+wait 100
+shot build/jfnetworker/ide_shots_max_light_100.png window 26624
+theme dark
+shot build/jfnetworker/ide_shots_max_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/ide_shots_max_dark_150.png window 26624
+theme light
+shot build/jfnetworker/ide_shots_max_light_150.png window 26624
+scale 100 window 26624
+# small: no side bar, no lower area; the stop still shows in the editor
+resizewin 26624 500 330
+wait 100
+expect #98816 exists
+expect tab:"Explorer" missing
+shot build/jfnetworker/ide_shots_small_light_100.png window 26624
+theme contrast
+shot build/jfnetworker/ide_shots_small_contrast_100.png window 26624
+theme light
+# high contrast at the normal size
+resizewin 26624 1100 760
+wait 100
+theme contrast
+shot build/jfnetworker/ide_shots_normal_contrast_100.png window 26624
+theme light
+expect_nowarn

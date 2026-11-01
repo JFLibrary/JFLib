@@ -383,6 +383,9 @@ pub const LAYER_SETTING_TYPE_BOOL32_EXT: u32 = 0;
 pub const F10_FULL_DRAW_INDEX_UINT32: usize = 1;
 pub const F10_IMAGE_CUBE_ARRAY: usize = 2;
 pub const F10_INDEPENDENT_BLEND: usize = 3;
+pub const F10_GEOMETRY_SHADER: usize = 4;
+pub const F10_SAMPLE_RATE_SHADING: usize = 6;
+pub const F10_DUAL_SRC_BLEND: usize = 7;
 pub const F10_MULTI_DRAW_INDIRECT: usize = 9;
 pub const F10_DRAW_INDIRECT_FIRST_INSTANCE: usize = 10;
 pub const F10_DEPTH_CLAMP: usize = 11;
@@ -391,16 +394,21 @@ pub const F10_SAMPLER_ANISOTROPY: usize = 19;
 pub const F10_TEXTURE_COMPRESSION_BC: usize = 22;
 pub const F10_VERTEX_PIPELINE_STORES_AND_ATOMICS: usize = 25;
 pub const F10_FRAGMENT_STORES_AND_ATOMICS: usize = 26;
+pub const F10_SHADER_STORAGE_IMAGE_EXTENDED_FORMATS: usize = 29;
+pub const F10_SHADER_STORAGE_IMAGE_READ_WITHOUT_FORMAT: usize = 31;
 pub const F10_SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT: usize = 32;
 pub const F10_SHADER_UNIFORM_BUFFER_ARRAY_DYNAMIC_INDEXING: usize = 33;
 pub const F10_SHADER_SAMPLED_IMAGE_ARRAY_DYNAMIC_INDEXING: usize = 34;
 pub const F10_SHADER_STORAGE_BUFFER_ARRAY_DYNAMIC_INDEXING: usize = 35;
 pub const F10_SHADER_STORAGE_IMAGE_ARRAY_DYNAMIC_INDEXING: usize = 36;
+pub const F10_SHADER_CLIP_DISTANCE: usize = 37;
 pub const F10_SHADER_FLOAT64: usize = 39;
 pub const F10_SHADER_INT64: usize = 40;
 pub const F10_SHADER_INT16: usize = 41;
 pub const F10_COUNT: usize = 55;
 pub const F11_STORAGE_BUFFER_16BIT_ACCESS: usize = 0;
+pub const F11_UNIFORM_AND_STORAGE_BUFFER_16BIT_ACCESS: usize = 1;
+pub const F11_STORAGE_PUSH_CONSTANT16: usize = 2;
 pub const F11_SHADER_DRAW_PARAMETERS: usize = 11;
 pub const F11_COUNT: usize = 12;
 pub const F12_DRAW_INDIRECT_COUNT: usize = 1;
@@ -418,12 +426,14 @@ pub const F12_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING: usize = 26;
 pub const F12_DESCRIPTOR_BINDING_PARTIALLY_BOUND: usize = 27;
 pub const F12_RUNTIME_DESCRIPTOR_ARRAY: usize = 29;
 pub const F12_SCALAR_BLOCK_LAYOUT: usize = 31;
+pub const F12_UNIFORM_BUFFER_STANDARD_LAYOUT: usize = 33;
 pub const F12_HOST_QUERY_RESET: usize = 36;
 pub const F12_TIMELINE_SEMAPHORE: usize = 37;
 pub const F12_BUFFER_DEVICE_ADDRESS: usize = 38;
 pub const F12_VULKAN_MEMORY_MODEL: usize = 41;
 pub const F12_VULKAN_MEMORY_MODEL_DEVICE_SCOPE: usize = 42;
 pub const F12_COUNT: usize = 47;
+pub const F13_SHADER_DEMOTE_TO_HELPER_INVOCATION: usize = 5;
 pub const F13_SYNCHRONIZATION2: usize = 9;
 pub const F13_DYNAMIC_RENDERING: usize = 12;
 pub const F13_MAINTENANCE4: usize = 14;
@@ -686,6 +696,11 @@ vk_structs! {
         pub dst_array_element: u32, pub descriptor_count: u32, pub descriptor_type: u32,
         pub p_image_info: *const DescriptorImageInfo, pub p_buffer_info: *const DescriptorBufferInfo,
         pub p_texel_buffer_view: *const Handle,
+    }
+    pub struct SpecializationMapEntry { pub constant_id: u32, pub offset: u32, pub size: usize }
+    pub struct SpecializationInfo {
+        pub map_entry_count: u32, pub p_map_entries: *const SpecializationMapEntry, pub data_size: usize,
+        pub p_data: *const c_void,
     }
     pub struct PipelineShaderStageCreateInfo {
         pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub stage: u32, pub module: Handle,
@@ -1123,6 +1138,8 @@ mod layout {
     check!(DescriptorImageInfo, 24, sampler = 0, image_view = 8, image_layout = 16);
     check!(DescriptorBufferInfo, 24, buffer = 0, offset = 8, range = 16);
     check!(WriteDescriptorSet, 64, s_type = 0, p_next = 8, dst_set = 16, dst_binding = 24, dst_array_element = 28, descriptor_count = 32, descriptor_type = 36, p_image_info = 40, p_buffer_info = 48, p_texel_buffer_view = 56);
+    check!(SpecializationMapEntry, 16, constant_id = 0, offset = 4, size = 8);
+    check!(SpecializationInfo, 32, map_entry_count = 0, p_map_entries = 8, data_size = 16, p_data = 24);
     check!(PipelineShaderStageCreateInfo, 48, s_type = 0, p_next = 8, flags = 16, stage = 20, module = 24, p_name = 32, p_specialization_info = 40);
     check!(ComputePipelineCreateInfo, 96, s_type = 0, p_next = 8, flags = 16, stage = 24, layout = 72, base_pipeline_handle = 80, base_pipeline_index = 88);
     check!(VertexInputBindingDescription, 12, binding = 0, stride = 4, input_rate = 8);

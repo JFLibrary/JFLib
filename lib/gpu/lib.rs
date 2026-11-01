@@ -17,7 +17,8 @@
 //   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
 //                                                   width(), height(), format(), mips(), layers()
 //   device.create_sampler(&SamplerDesc)             Sampler
-//   ShaderModule::from_spirv(&device, &[u32])       SPIR-V words (1.3 on Vulkan 1.1, up to 1.6)
+//   ShaderModule::from_spirv(&device, &[u32])       SPIR-V words (1.3 on Vulkan 1.1, up to 1.6);
+//                                                   entry_points(), constants() (its overrides)
 //   device.create_bind_group_layout(&[Binding])     BindGroupLayout
 //   device.create_pipeline_layout(&PipelineLayoutDesc)   PipelineLayout
 //   device.create_bind_group(&BindGroupDesc)        BindGroup
@@ -25,6 +26,9 @@
 //                                                   set_sampler / set_buffer / set_storage_texture
 //   device.create_compute_pipeline(&ComputePipelineDesc)  ComputePipeline
 //   device.create_render_pipeline(&RenderPipelineDesc)    RenderPipeline
+//                    each ShaderStage with its pipeline constants (WGSL override, SPIR-V
+//                    SpecId): &[Constant { id, value: f64 }], converted to the override's type
+//                    as WebGPU does; the workgroup size checked against the limits
 //   device.create_timestamps(n)                     Timestamps: read_ms(first, n) (since the
 //                                                   device's first read), read_ticks
 //   device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
@@ -240,6 +244,19 @@ pub struct Features {
     pub shader_i8: bool,
     /// 16 / 8 bit values in storage buffers
     pub storage_16bit: bool,
+    /// 16-bit values in uniform buffers and push constants too (WGSL f16 there)
+    pub uniform_16bit: bool,
+    pub push_constant_16bit: bool,
+    /// uniform buffers in the storage layout (uniformBufferStandardLayout: a WGSL uniform
+    /// buffer whose layout is not std140, e.g. mat2x2f)
+    pub uniform_standard_layout: bool,
+    /// OpDemoteToHelperInvocation (lib/wgsl's discard at the level Voll)
+    pub demote: bool,
+    /// WGSL @builtin(clip_distances), @builtin(primitive_index) (geometryShader),
+    /// @interpolate(.., sample) / @builtin(sample_index) (sampleRateShading)
+    pub clip_distances: bool,
+    pub primitive_index: bool,
+    pub sample_shading: bool,
     pub storage_8bit: bool,
     /// BC1 .. BC7 compressed textures
     pub texture_bc: bool,
@@ -680,11 +697,33 @@ pub struct BindlessDesc {
     pub storage_textures: u32,
 }
 
-/// a shader entry point
+/// a pipeline-overridable constant: WGSL `@id(id) override`, SPIR-V `SpecId id`.  The value
+/// is an f64 as in WebGPU's `GPUProgrammableStage.constants` and is converted to the
+/// override's type the way WebGPU converts it: bool true unless 0 or NaN; i32 / u32 (and the
+/// other integers) truncated toward 0, Invalid when not finite or out of range; f32 / f16 /
+/// f64 rounded to nearest, Invalid when not finite or out of range.  An id the module does not
+/// declare, or the same id twice, is Invalid (Vulkan would ignore it; WebGPU does not).
+/// Overrides the pipeline leaves out keep the module's default.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Constant {
+    pub id: u32,
+    pub value: f64,
+}
+
+/// a shader entry point and its pipeline constants
 #[derive(Clone, Copy)]
 pub struct ShaderStage<'a> {
     pub module: &'a ShaderModule,
     pub entry: &'a str,
+    /// pipeline-overridable constants of this stage (empty: the module's defaults)
+    pub constants: &'a [Constant],
+}
+
+impl<'a> ShaderStage<'a> {
+    /// an entry point without pipeline constants
+    pub const fn new(module: &'a ShaderModule, entry: &'a str) -> ShaderStage<'a> {
+        ShaderStage { module, entry, constants: &[] }
+    }
 }
 
 /// Device::create_compute_pipeline

@@ -3,12 +3,13 @@
 # Schnittstellen, Konfiguration (forms that type their commands on the device's console and
 # land in its startup configuration: one undo step, which restarts the device with the old
 # one), Dienste (switched at once and through undo without a restart), CLI (the console of the
-# Terminal tab: the tab points there meanwhile), and a host's desktop (IP-Konfiguration,
-# Eingabeaufforderung, Texteditor, Webbrowser).  Shots light, dark and 150 %.
+# Terminal tab: the tab points there meanwhile), and a host's desktop, where its window opens
+# (programs in windows: IP-Konfiguration, Terminal, Texteditor, Webbrowser).  Shots light, dark
+# and 150 %.
 # Ids: the window 26624, its tabs 26625; Konfiguration: name 26657 (+1 Übernehmen), interface
 # 26659, address 26660, description 26661, up 26662, Übernehmen 26665, gateway 26666, new route
 # 26668 / 26669 (+1 Hinzufügen), the first route's remove button 26672; Dienste: the switches
-# 26721 + i; Desktop: IP-Konfiguration gateway 26774 (+1 Übernehmen), the editor 26784 (+1
+# 26721 + i; Desktop: IP-Konfiguration gateway 26774 (+1 Übernehmen), the editor 90368 (+1
 # Speichern), the browser's address 26800 (+1 Öffnen).
 size 1280 900
 theme light
@@ -115,10 +116,10 @@ close window 26624
 # PC1's desktop: the IP configuration types shell commands
 dblclick listitem:"PC1" shift
 expect window 26624 open
-click tab:"Desktop"
-expect button:"IP-Konfiguration" exists
+expect tab:"Desktop" selected
+expect listitem:"IP-Konfiguration" exists
 shot build/jfnetworker/device_window_desktop.png window 26624
-click button:"IP-Konfiguration"
+dblclick listitem:"IP-Konfiguration"
 expect #26772 text "10.0.1.10"
 expect #26773 text "255.255.255.0"
 expect #26774 text "10.0.1.1"
@@ -127,30 +128,26 @@ key ctrl+a
 type "10.0.1.254"
 click #26775
 expect #26774 text "10.0.1.254"
-click button:"Desktop"
-click button:"Eingabeaufforderung"
+dblclick listitem:"Terminal"
 expect text:"root@PC1:~# ip addr flush dev eth0" exists
 expect text:"root@PC1:~# ip addr add 10.0.1.10/24 dev eth0" exists
 expect text:"root@PC1:~# ip route del default" exists
 expect text:"root@PC1:~# ip route add default via 10.0.1.254" exists
 # the editor keeps notes with the project
-click button:"Desktop"
-click button:"Texteditor"
+dblclick listitem:"Texteditor"
 expect text:"gesichert" exists
-click #26784
+click #90368
 type "Labor-PC am Rand des Netzes"
 expect text:"geändert" exists
-click #26785
+click #90369
 expect text:"gesichert" exists
 # the browser says where it would go
-click button:"Desktop"
-click button:"Webbrowser"
+dblclick listitem:"Webbrowser"
 click #26800
 key ctrl+a
 type "http://10.0.2.10/index.html\n"
 expect text:"Ziel: 10.0.2.10, Port 80, Pfad /index.html" exists
-# dark and 150 %
-click button:"Desktop"
+# dark and 150 % (IP-Konfiguration in front again: its taskbar button)
 click button:"IP-Konfiguration"
 theme dark
 shot build/jfnetworker/device_window_dark.png window 26624

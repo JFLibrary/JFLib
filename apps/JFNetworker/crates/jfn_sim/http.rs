@@ -422,6 +422,17 @@ impl Serve {
         self.ready.clear();
         self.wheel.clear();
     }
+    /// closes the listening socket and aborts the connections, then forgets everything (an
+    /// owner whose program ends while the service goes on: ScriptService::release)
+    pub fn close(&mut self, os: &mut OsApi) {
+        if let Some(l) = self.listener {
+            os.tcp_close(l);
+        }
+        for s in self.conns.keys() {
+            os.tcp_abort(*s);
+        }
+        self.stop();
+    }
     pub fn listening(&self) -> bool {
         self.listener.is_some()
     }
@@ -1106,6 +1117,14 @@ impl Agent {
     }
 
     /// closes the kept-alive connections that wait for nothing
+    /// aborts every connection and forgets every request (ScriptService::release)
+    pub fn abort_all(&mut self, os: &mut OsApi) {
+        for s in self.conns.keys() {
+            os.tcp_abort(*s);
+        }
+        self.reset();
+    }
+
     pub fn close_idle(&mut self, os: &mut OsApi) {
         let idle: Vec<u32> = self.conns.iter().filter(|(_, c)| c.state == CState::Open && c.inflight.is_empty() && c.queue.is_empty()).map(|(s, _)| *s).collect();
         for s in idle {

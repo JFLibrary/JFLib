@@ -209,6 +209,9 @@ pub enum Requester {
     Vty(u16),
     /// "test aaa group radius": the outcome is printed, no session changes
     Test,
+    /// a local session of the device by its id (cli/ses.rs: a terminal the app opened; it logs
+    /// in as line con 0 says)
+    Local(u32),
 }
 
 /// what a single authentication method decided

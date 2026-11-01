@@ -111,6 +111,8 @@ CRATES = [
      "swapchains (Vulkan on Windows)", "full"),
     ("shader", "SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders",
      "full"),
+    ("wgsl", "the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the "
+     "SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL", "full"),
     ("plat", "the platform layer: process, files, threads, windows (Windows and Linux)", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),

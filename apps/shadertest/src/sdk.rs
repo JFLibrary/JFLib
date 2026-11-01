@@ -2,7 +2,8 @@
 // test-time aid only: lib/shader never needs them).  spirv-val (Vulkan 1.1 environment for
 // SPIR-V 1.3, Vulkan 1.3 for 1.6) must accept every module shadertest builds and reject the
 // broken modules of broken::cases() it is expected to reject; spirv-dis' text of the
-// benchmark shaders is compared with dis::disassemble (differences are reported, not failed).
+// benchmark and sample shaders is compared with dis::disassemble (differences are reported,
+// not failed).
 // Without the tools the group reports that it skipped.
 
 use alloc::format;
@@ -142,6 +143,8 @@ pub fn run(t: &mut T) {
     good.push((String::from("doc_example"), crate::basics::doc_example()));
     good.push((String::from("frag_features"), crate::basics::frag_features(3)));
     good.push((String::from("frag_features_16"), crate::basics::frag_features(6)));
+    let samples = crate::basics::samples();
+    good.extend(samples.iter().cloned());
     for (name, w) in &good {
         match validate(&val, name, w) {
             Ok((ok, msg)) => {
@@ -207,4 +210,25 @@ pub fn run(t: &mut T) {
         }
     }
     crate::out(&format!("   sdk: dis::disassemble = spirv-dis for {} of 12 shader modules\n", same));
+    // the samples (written above by the spirv-val pass)
+    let mut same = 0;
+    for (name, w) in &samples {
+        let path = plat::fs::join(OUT, &format!("{}.spv", name));
+        let theirs = match tool(&dis, &[&path]) {
+            Ok((0, o, _)) => o,
+            other => {
+                t.check(&format!("spirv-dis {}: {:?}", name, other.map(|x| x.0)), false);
+                continue;
+            }
+        };
+        let ours = shader::dis::disassemble(w).unwrap_or_default();
+        if ours == theirs {
+            same += 1;
+        } else {
+            let k = ours.lines().zip(theirs.lines()).position(|(a, b)| a != b).unwrap_or(0);
+            crate::out(&format!("   dis {}: line {} ours {:?}, theirs {:?}\n", name, k + 1, ours.lines().nth(k).unwrap_or(""),
+                                theirs.lines().nth(k).unwrap_or("")));
+        }
+    }
+    crate::out(&format!("   sdk: dis::disassemble = spirv-dis for {} of {} sample modules\n", same, samples.len()));
 }

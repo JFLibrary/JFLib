@@ -3,8 +3,11 @@
 //
 //   SCHEMA                     Ansicht: Raster zeigen, Rasterweite, Am Raster einrasten,
 //                              Minimap; Simulation: Tempo beim Start, Bewegung; Allgemein:
-//                              Sprache, automatisch speichern (Sekunden, 0 aus); the recent
-//                              files live in the same file outside the schema
+//                              Sprache, automatisch speichern (Sekunden, 0 aus); Desktop (the
+//                              hosts' desktops, V2): Hintergrund, Größe der Symbole, Uhr der
+//                              Taskleiste; the recent files live in the same file outside the
+//                              schema
+//   DESK_*_COUNT, desk_names(k)   the desktop's choices for its Einstellungen program
 //   Prefs::open(headless)      the user's file; headless runs (--script, --shot) keep them in
 //                              memory only (Settings::new), so tests never read or write them
 //   prefs.pull() / push()      the typed fields from the settings / into them (the toggles of
@@ -46,8 +49,36 @@ const AUTOSAVE: Key<i64> = Key::int("files.autosave", 120, 0, 3600)
     .step(30)
     .help("Eine Kopie ungespeicherter Änderungen für einen Absturz; 0 schaltet es aus.");
 
-static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d])
-    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien")]);
+// the desktop of hosts (V2, workspace/devwin/desktop.rs): the look of the user's desktops, no
+// setting of a simulated device
+const DESK_BGS: [(&str, &str); 6] = [("slate", "Schiefer"), ("sage", "Salbei"), ("sand", "Sand"), ("night", "Nachtblau"), ("dots", "Punktraster"), ("net", "Netz")];
+const DESK_BG: Key<usize> = Key::choice("desk.background", 0, &DESK_BGS)
+    .label("Hintergrund")
+    .help("Der Hintergrund der Desktops aller Hosts; im Hochkontrast eine ruhige Fläche.");
+const DESK_ICONS: [(&str, &str); 3] = [("small", "Klein"), ("medium", "Mittelgroß"), ("large", "Groß")];
+const DESK_ICON: Key<usize> = Key::choice("desk.icons", 1, &DESK_ICONS).label("Größe der Symbole");
+const DESK_CLOCKS: [(&str, &str); 3] = [("hm", "Stunden und Minuten"), ("hms", "Mit Sekunden"), ("date", "Mit Datum")];
+const DESK_CLOCK: Key<usize> = Key::choice("desk.clock", 0, &DESK_CLOCKS)
+    .label("Uhr der Taskleiste")
+    .help("Sie zeigt die Uhr des Geräts in der Simulation.");
+
+static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d, DESK_BG.d, DESK_ICON.d, DESK_CLOCK.d])
+    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien"), ("desk", "Desktop")]);
+
+/// the backgrounds, icon sizes and clocks of the desktop (DESK_BGS, DESK_ICONS, DESK_CLOCKS)
+pub(crate) const DESK_BG_COUNT: usize = DESK_BGS.len();
+pub(crate) const DESK_ICON_COUNT: usize = DESK_ICONS.len();
+pub(crate) const DESK_CLOCK_COUNT: usize = DESK_CLOCKS.len();
+
+/// the names of the desktop's choices (for its Einstellungen program; i18n through t())
+pub(crate) fn desk_names(which: usize) -> Vec<&'static str> {
+    let list: &[(&str, &str)] = match which {
+        0 => &DESK_BGS,
+        1 => &DESK_ICONS,
+        _ => &DESK_CLOCKS,
+    };
+    list.iter().map(|x| x.1).collect()
+}
 
 /// the motion setting: as the system, reduced, full
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,6 +112,11 @@ pub(crate) struct Prefs {
     pub lang: Lang,
     /// seconds between autosaves (0: off)
     pub autosave_s: u32,
+    /// the desktop of hosts: the background, the icons' size, the clock (indices into
+    /// DESK_BGS, DESK_ICONS, DESK_CLOCKS)
+    pub desk_bg: usize,
+    pub desk_icons: usize,
+    pub desk_clock: usize,
     /// they belong to the user's file (not a headless run)
     pub kept: bool,
 }
@@ -98,6 +134,9 @@ impl Prefs {
             motion: Motion::System,
             lang: Lang::System,
             autosave_s: 120,
+            desk_bg: 0,
+            desk_icons: 1,
+            desk_clock: 0,
             kept: false,
         };
         p.pull();
@@ -134,14 +173,22 @@ impl Prefs {
             _ => Lang::System,
         };
         self.autosave_s = s.get(&AUTOSAVE) as u32;
+        self.desk_bg = s.get(&DESK_BG);
+        self.desk_icons = s.get(&DESK_ICON);
+        self.desk_clock = s.get(&DESK_CLOCK);
     }
 
-    /// the toggles of the Ansicht menu into the settings
+    /// the toggles of the Ansicht menu and the desktop's Einstellungen program into the
+    /// settings
     pub(crate) fn push(&mut self) {
         let (g, sn, m) = (self.grid, self.snap, self.minimap);
         self.s.set(&GRID, g);
         self.s.set(&SNAP, sn);
         self.s.set(&MINIMAP, m);
+        let (b, i, c) = (self.desk_bg, self.desk_icons, self.desk_clock);
+        self.s.set(&DESK_BG, b);
+        self.s.set(&DESK_ICON, i);
+        self.s.set(&DESK_CLOCK, c);
     }
 
     /// the language and the motion for the window (at the start and after the dialog)

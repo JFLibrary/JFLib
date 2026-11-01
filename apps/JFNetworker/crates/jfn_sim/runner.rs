@@ -163,6 +163,8 @@ fn drain(d: &mut Inline, r: &mut Rep) {
                 };
                 r.line(t, "--", &text);
             }
+            // a scenario types at the consoles only (telnet sessions print on the client's)
+            Report::SesOut { .. } | Report::SesPrompt { .. } | Report::SesClosed { .. } => {}
         }
     }
 }
@@ -267,8 +269,12 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                         ok = false;
                     }
                 } else {
-                    if !d.eng.cli_busy(id) {
-                        let echo = format!("{}{}\n", d.eng.cli_prompt(id), cmd);
+                    // a program that reads the console (telnet, nc) has its line echoed after
+                    // what it printed (cli/ses.rs: cli_reads)
+                    let reads = d.eng.cli_reads(id);
+                    if !d.eng.cli_busy(id) || reads {
+                        let prompt = if reads { String::new() } else { d.eng.cli_prompt(id) };
+                        let echo = format!("{}{}\n", prompt, cmd);
                         r.console(id, now, &echo);
                     }
                     r.since.insert(id, String::new());

@@ -1,13 +1,15 @@
 // broken -- the validator: it accepts every benchmark shader (both levels) and the builder's
-// feature modules, and rejects one deliberately broken module per rule (cases(), also written
-// by --write and run through spirv-val by the sdk group)
+// feature modules, and rejects deliberately broken modules, at least one per rule (cases(),
+// also written by --write and run through spirv-val by the sdk group): among them the rules of
+// specialization constants (OpSpecConstantOp operations, SpecId, LocalSizeId, the
+// WorkgroupSize built-in) and of image instructions (queries, Dref, coordinates, fetch)
 
 use alloc::format;
 use alloc::vec::Vec;
 
 use shader::bench::{self, Shader};
 use shader::val::{validate, Rule};
-use shader::{op, parse, Bi, Dec, Mode, Model, Module, Sc};
+use shader::{op, parse, Bi, Cap, Dec, Dim, Fmt, Id, Mode, Model, Module, Sc};
 
 use crate::T;
 
@@ -86,6 +88,29 @@ fn fragment(minor: u32, body: impl FnOnce(&mut Module)) -> Vec<u32> {
     m.entry_point(Model::Fragment, main, "main");
     m.exec_mode(main, Mode::OriginUpperLeft, &[]);
     m.finish()
+}
+
+/// a GLCompute module whose workgroup size is LocalSizeId of size(m)
+fn compute_id(minor: u32, size: impl FnOnce(&mut Module) -> [Id; 3]) -> Vec<u32> {
+    let mut m = Module::new(minor);
+    let void = m.ty_void();
+    let s = size(&mut m);
+    let (main, _) = m.begin_function(void, &[]);
+    m.ret();
+    m.end_function();
+    m.entry_point(Model::GLCompute, main, "main");
+    m.local_size_id(main, s);
+    m.finish()
+}
+
+/// a texture (UniformConstant) of the image type and a sampler at bindings 0 and 1 -> their ids
+fn tex_and_sampler(m: &mut Module, dim: Dim, depth: u32, arrayed: u32, usage: u32, fmt: Fmt) -> (Id, Id) {
+    let f = m.ty_f32();
+    let img = m.ty_image(f, dim, depth, arrayed, 0, usage, fmt);
+    let t = m.resource(img, 0, 0);
+    let st = m.ty_sampler();
+    let s = m.resource(st, 0, 1);
+    (t, s)
 }
 
 fn edit(w: Vec<u32>, f: impl FnOnce(&mut Words)) -> Vec<u32> {
@@ -306,6 +331,150 @@ pub fn cases() -> Vec<Case> {
     // Version: OpTerminateInvocation in a SPIR-V 1.3 module
     v.push(c("version_terminate", Rule::Version, fragment(3, |m| {
         m.emit(op::TerminateInvocation, None, &[]);
+    }), true));
+
+    // specialization constants
+    v.push(c("spec_op_float", Rule::Type, compute(3, |m| {
+        let f = m.ty_f32();
+        let a = m.spec_f32(0, 1.0);
+        let one = m.const_f32(1.0);
+        m.spec_op(f, op::FAdd, &[a, one], &[]);
+    }), true));
+    v.push(c("spec_op_operand", Rule::Type, compute(3, |m| {
+        let u = m.ty_u32();
+        let a = m.spec_u32(0, 1);
+        let b = m.spec_op(u, op::IAdd, &[a, a], &[]);
+        // the operation's own type rules: a bool result of IAdd
+        let bt = m.ty_bool();
+        m.spec_op(bt, op::IAdd, &[a, b], &[]);
+    }), true));
+    v.push(c("spec_id_on_constant", Rule::Decoration, compute(3, |m| {
+        let k = m.const_u32(5);
+        m.decorate(k, Dec::SpecId, &[0]);
+    }), true));
+    v.push(c("spec_id_twice", Rule::Decoration, compute(3, |m| {
+        m.spec_u32(7, 1);
+        m.spec_u32(7, 2);
+    }), false));
+    v.push(c("decoration_workgroup_size_vec2", Rule::Decoration, compute(3, |m| {
+        let u = m.ty_u32();
+        let uv2 = m.ty_vec(u, 2);
+        let one = m.const_u32(1);
+        let k = m.const_composite(uv2, &[one, one]);
+        m.decorate(k, Dec::BuiltIn, &[Bi::WorkgroupSize as u32]);
+    }), true));
+    v.push(c("mode_local_size_id_zero", Rule::ExecMode, compute_id(6, |m| {
+        let (z, one) = (m.const_u32(0), m.const_u32(1));
+        [z, one, one]
+    }), true));
+    v.push(c("mode_local_size_id_float", Rule::ExecMode, compute_id(6, |m| {
+        let x = m.spec_f32(0, 1.0);
+        let one = m.const_u32(1);
+        [x, one, one]
+    }), false));
+    v.push(c("mode_local_size_in_mode_id", Rule::ExecMode, {
+        let mut m = Module::new(6);
+        let void = m.ty_void();
+        let one = m.const_u32(1);
+        let (main, _) = m.begin_function(void, &[]);
+        m.ret();
+        m.end_function();
+        m.entry_point(Model::GLCompute, main, "main");
+        m.exec_mode_id(main, Mode::LocalSize, &[one, one, one]);
+        m.finish()
+    }, true));
+    v.push(c("version_mode_id", Rule::Version, {
+        let mut w = compute_id(3, |m| {
+            let one = m.const_u32(1);
+            [one, one, one]
+        });
+        w[1] = 0x0001_0100;
+        w
+    }, true));
+    v.push(c("version_spec_uconvert", Rule::Version, compute(3, |m| {
+        let s = m.ty_int(16, false);
+        let a = m.spec_u32(0, 1);
+        m.spec_op(s, op::UConvert, &[a], &[]);
+    }), true));
+
+    // images
+    v.push(c("type_query_lod_storage", Rule::Type, compute(3, |m| {
+        let (u, f) = (m.ty_u32(), m.ty_f32());
+        let uv2 = m.ty_vec(u, 2);
+        let img = m.ty_image(f, Dim::D2, 0, 0, 0, 2, Fmt::R32f);
+        let v = m.resource(img, 0, 0);
+        let t = m.load(v);
+        let z = m.const_i32(0);
+        m.image_size_lod(uv2, t, z);
+    }), true));
+    v.push(c("type_query_size_sampled", Rule::Type, compute(3, |m| {
+        let u = m.ty_u32();
+        let uv2 = m.ty_vec(u, 2);
+        let (t, _) = tex_and_sampler(m, Dim::D2, 0, 0, 1, Fmt::Unknown);
+        let t = m.load(t);
+        m.image_size(uv2, t);
+    }), true));
+    v.push(c("type_query_levels_vector", Rule::Type, compute(3, |m| {
+        let u = m.ty_u32();
+        let uv2 = m.ty_vec(u, 2);
+        let (t, _) = tex_and_sampler(m, Dim::D2, 0, 0, 1, Fmt::Unknown);
+        let t = m.load(t);
+        m.image_levels(uv2, t);
+    }), true));
+    v.push(c("type_query_size_components", Rule::Type, compute(3, |m| {
+        let u = m.ty_u32();
+        let uv2 = m.ty_vec(u, 2);
+        let (t, _) = tex_and_sampler(m, Dim::D2, 0, 1, 1, Fmt::Unknown);
+        let t = m.load(t);
+        let z = m.const_i32(0);
+        m.image_size_lod(uv2, t, z);
+    }), true));
+    v.push(c("type_fetch_cube", Rule::Type, compute(3, |m| {
+        let i = m.ty_i32();
+        let iv3 = m.ty_vec(i, 3);
+        let (t, _) = tex_and_sampler(m, Dim::Cube, 0, 0, 1, Fmt::Unknown);
+        let t = m.load(t);
+        let z = m.const_i32(0);
+        let c = m.const_composite(iv3, &[z, z, z]);
+        m.fetch(t, c, z);
+    }), true));
+    v.push(c("type_coord_short", Rule::Type, compute(3, |m| {
+        let (t, s) = tex_and_sampler(m, Dim::D2, 0, 1, 1, Fmt::Unknown);
+        let (t, s) = (m.load(t), m.load(s));
+        let si = m.sampled_image(t, s);
+        let uv = m.const_vec_f32(&[0.5, 0.5]);
+        let z = m.const_f32(0.0);
+        m.sample_lod(si, uv, z);
+    }), true));
+    v.push(c("type_dref_vector", Rule::Type, fragment(3, |m| {
+        let (t, s) = tex_and_sampler(m, Dim::D2, 1, 0, 1, Fmt::Unknown);
+        let (t, s) = (m.load(t), m.load(s));
+        let si = m.sampled_image(t, s);
+        let uv = m.const_vec_f32(&[0.5, 0.5]);
+        m.sample_dref(si, uv, uv);
+    }), true));
+    v.push(c("version_descriptor_array", Rule::Version, edit(compute(3, |m| {
+        let f = m.ty_f32();
+        let img = m.ty_image(f, Dim::D2, 0, 0, 0, 1, Fmt::Unknown);
+        let arr = m.ty_runtime_array(img, None);
+        let v = m.resource(arr, 0, 0);
+        let z = m.const_u32(0);
+        let p = m.access(v, &[z]);
+        m.load(p);
+    }), |x| {
+        let k = x.find(op::Extension, |_| true);
+        x.ins.remove(k);
+    }), true));
+    v.push(c("capability_nonuniform", Rule::Capability, edit(compute(6, |m| {
+        let u = m.ty_u32();
+        let k = m.const_u32(3);
+        let l = m.local(u, Some(k));
+        let x = m.load(l);
+        let y = m.iadd(x, k);
+        m.nonuniform(y);
+    }), |x| {
+        let k = x.find(op::Capability, |o| o[0] == Cap::ShaderNonUniform as u32);
+        x.ins.remove(k);
     }), true));
     v
 }

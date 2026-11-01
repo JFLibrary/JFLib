@@ -1,5 +1,5 @@
 #!args --verify-dirty --open apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet
-# the MIB-Browser in MON's Desktop (devwin/mib.rs) on fixtures/snmp_monitor.jfnet: the tile, the
+# the MIB-Browser in MON's desktop (devwin/mib.rs, its window there) on fixtures/snmp_monitor.jfnet: the tile, the
 # tree of mib-2 with system open, an object's card (name, OID, syntax, access), Get of sysName
 # against R1, Walk of system, Set of sysLocation with the community R1's access list lets MON
 # use, ifTable opened from the keyboard and GetNext of ifDescr.2; every request runs as a
@@ -10,9 +10,9 @@ size 1280 900
 theme light
 dblclick listitem:"MON" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"MIB-Browser"
-expect text:"Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts." exists
+expect tab:"Desktop" selected
+dblclick listitem:"MIB-Browser"
+expect text:"Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle im Terminal des Geräts." exists
 click #69633
 type "10.0.10.1"
 click listitem:"sysName"

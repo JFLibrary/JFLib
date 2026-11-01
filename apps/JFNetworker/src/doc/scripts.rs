@@ -22,7 +22,8 @@
 //   run(doc, dev, name, on) / restart(doc, dev, name)   the simulator only, as the shell's
 //                                     "script start|stop|restart": whether the script starts
 //                                     with the device stays the project's (the Dienste tab)
-//   TEMPLATES / template(k, t)        the templates of "Neu" (our own words): an empty script,
+//   TEMPLATES / template(k, t)        the templates of the IDE's "Neues Skript" (new .jfs files;
+//                                     our own words): an empty script,
 //                                     a UDP echo, an HTTP server, a client that polls, a
 //                                     key-value store on the disk; comments and texts through
 //                                     the catalogue `t`
@@ -306,7 +307,7 @@ pub(crate) fn template(k: usize, t: &dyn Fn(&'static str) -> &'static str) -> Ve
         ],
         _ => alloc::vec![
             c(t("Ein Skript reagiert auf Ereignisse: net.udp, net.listen, http.serve, timer.every …")),
-            c(t("Strg+S übernimmt es ins Projekt und in den laufenden Simulator.")),
+            c(t("Strg+S speichert es, F5 führt es als Dienst aus.")),
             format!("log(\"{}\")", t("Skript gestartet")),
         ],
     }

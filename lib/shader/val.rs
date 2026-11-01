@@ -15,13 +15,18 @@
 //               only inside their function
 //   IdKind      ids of the right kind: result types are types, labels are labels, operands
 //               are values, callees are functions, extended sets are imports
-//   Type        types well formed (vector / matrix shapes, array lengths, runtime arrays
-//               last) and type agreement of the instructions shader emits: arithmetic,
-//               comparisons, logic, select, conversions, access chains, load / store,
-//               composites, shuffles, products, GLSL.std.450, atomics, barriers, images,
-//               derivatives, calls, phis, returns, constants, variables
+//   Type        types well formed (vector / matrix shapes, array lengths -- constants or
+//               specialization constants --, runtime arrays last) and type agreement of the
+//               instructions shader emits: arithmetic, comparisons, logic, select,
+//               conversions, access chains, load / store, composites, shuffles, products,
+//               GLSL.std.450, atomics, barriers, images (coordinate sizes, Dref, the image
+//               kinds each query takes), derivatives, calls, phis, returns, constants,
+//               specialization constants (OpSpecConstantOp: an operation SPIR-V allows for
+//               Shader, constant operands, its operation's type rules), variables
 //   Decoration  decoration targets of the right kind (Offset on struct members, ArrayStride
-//               on arrays, Block on structs, Location on Input / Output ...), member indices
+//               on arrays, Block on structs, Location on Input / Output, SpecId on scalar
+//               specialization constants and each value once, BuiltIn on a constant only as
+//               a uvec3 WorkgroupSize ...), member indices
 //   Storage     variables: storage class of the pointer, Function variables first in the
 //               entry block, Vulkan's resource rules (Block structs in Uniform /
 //               StorageBuffer / PushConstant, DescriptorSet + Binding on resources, Location
@@ -40,15 +45,18 @@
 //   Interface   OpEntryPoint: a void function without parameters, the interface lists only
 //               globals, before 1.4 only Input / Output ones, from 1.4 each at most once; it
 //               contains every global the call tree uses (1.4+) or every Input / Output one
-//   ExecMode    LocalSize for GLCompute, OriginUpperLeft (and no OriginLowerLeft) for
+//   ExecMode    LocalSize (or LocalSizeId with 32-bit integer constant operands, or the
+//               WorkgroupSize built-in) for GLCompute, id modes only in OpExecutionModeId,
+//               OriginUpperLeft (and no OriginLowerLeft) for
 //               Fragment, modes for the right models, DepthReplacing when FragDepth is
 //               written, fragment-only instructions (discard, demote, derivatives,
 //               implicit-LOD sampling) only under Fragment entry points, Workgroup
 //               variables only under GLCompute
 //   Capability  the capabilities types, instructions, built-ins, images and models need
 //   Version     instructions and extensions of the module's SPIR-V version (TerminateInvocation
-//               and DemoteToHelperInvocation before 1.6, CopyLogical and composite Select
-//               before 1.4)
+//               and DemoteToHelperInvocation before 1.6, CopyLogical, composite Select and
+//               UConvert in OpSpecConstantOp before 1.4, OpExecutionModeId before 1.2,
+//               descriptor indexing before 1.5)
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -140,6 +148,14 @@ struct V<'a> {
     mdecs: BTreeMap<(u32, u32), Vec<(u32, Vec<u32>)>>,
     funcs: Vec<FnInfo>,
     need: BTreeMap<u32, usize>,
+    opt: Options,
+}
+
+/// what the device allows beyond Vulkan's defaults (validate_with)
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    /// uniformBufferStandardLayout: uniform blocks laid out like storage blocks (std430)
+    pub uniform_standard_layout: bool,
 }
 
 impl Types for V<'_> {
@@ -470,9 +486,11 @@ impl<'a> V<'a> {
                     let e_ok = is_ty(self, elem) && !matches!(self.t(elem.0), Some(Ty::Void | Ty::RuntimeArray { .. }));
                     self.want(k, e_ok, "the element type must be a sized type");
                     let l = self.consts.get(&len.0).copied();
-                    if self.kind(len.0) != Some(K::Const) || l.is_none() {
-                        self.want(k, false, "the length must be a 32-bit integer constant");
-                    } else {
+                    let spec = self.defs.get(&len.0).is_some_and(|d| matches!(self.ins[d.inst].op, op::SpecConstant | op::SpecConstantOp));
+                    let int = self.vty.get(&len.0).is_some_and(|&t| matches!(self.t(t), Some(Ty::Int { .. })));
+                    if self.kind(len.0) != Some(K::Const) || !(l.is_some() || spec && int) {
+                        self.want(k, false, "the length must be a 32-bit integer constant or an integer specialization constant");
+                    } else if l.is_some() {
                         self.want(k, l != Some(0), "the length must be at least 1");
                     }
                 }
@@ -520,6 +538,7 @@ impl<'a> V<'a> {
     // ---------------------------------------------------------------- decorations
 
     fn decorations(&mut self) {
+        let mut spec_ids: BTreeMap<u32, u32> = BTreeMap::new();
         for k in 0..self.ins.len() {
             let i = self.ins[k];
             match i.op {
@@ -546,7 +565,32 @@ impl<'a> V<'a> {
                             let sc = self.vty.get(&target).and_then(|&t| self.sc_of_ptr(t)).map(|p| p.0);
                             kd == Some(K::Global) && matches!(sc, Some(0 | 2 | 12))
                         }
-                        x if x == Dec::BuiltIn as u32 => is_var || kd == Some(K::Const),
+                        x if x == Dec::BuiltIn as u32 => {
+                            let wg = args.first() == Some(&(Bi::WorkgroupSize as u32));
+                            if kd == Some(K::Const) || wg {
+                                // Vulkan: only WorkgroupSize decorates a constant, a uvec3 of 32-bit ints
+                                let t = self.vty.get(&target).copied().unwrap_or(0);
+                                wg && kd == Some(K::Const) && self.sv(t).is_some_and(|s| s.k == 'i' && s.n == 3 && s.width == 32)
+                            } else {
+                                is_var
+                            }
+                        }
+                        x if x == Dec::SpecId as u32 => {
+                            let def = self.defs.get(&target).map(|d| self.ins[d.inst].op);
+                            if let (Some(&v), true) = (args.first(), def.is_some()) {
+                                if let Some(other) = spec_ids.insert(v, target) {
+                                    self.err(Rule::Decoration, k, format!("SpecId {} on both %{} and %{}", v, other, target));
+                                }
+                            }
+                            matches!(def, Some(op::SpecConstant | op::SpecConstantTrue | op::SpecConstantFalse))
+                        }
+                        x if x == Dec::NonUniform as u32 => {
+                            self.need_cap(Cap::ShaderNonUniform, k);
+                            if self.minor < 5 && !self.exts.contains("SPV_EXT_descriptor_indexing") {
+                                self.err(Rule::Version, k, String::from("NonUniform needs SPIR-V 1.5 or SPV_EXT_descriptor_indexing"));
+                            }
+                            kd == Some(K::Value) || is_var
+                        }
                         x if x == Dec::NoContraction as u32 => kd == Some(K::Value),
                         x if x == Dec::NonWritable as u32 || x == Dec::NonReadable as u32 || x == Dec::Restrict as u32
                             || x == Dec::Aliased as u32 || x == Dec::Coherent as u32 || x == Dec::Volatile as u32 => {
@@ -673,6 +717,12 @@ impl<'a> V<'a> {
     }
 
     fn vulkan_var(&mut self, k: usize, v: u32, sc: u32, pointee: u32) {
+        if matches!(sc, 0 | 2 | 12) && matches!(self.t(pointee), Some(Ty::RuntimeArray { .. })) {
+            self.need_cap(Cap::RuntimeDescriptorArray, k);
+            if self.minor < 5 && !self.exts.contains("SPV_EXT_descriptor_indexing") {
+                self.err(Rule::Version, k, String::from("a runtime array of resources needs SPIR-V 1.5 or SPV_EXT_descriptor_indexing"));
+            }
+        }
         let set = has_dec(self.decs.get(&v), Dec::DescriptorSet).is_some();
         let bind = has_dec(self.decs.get(&v), Dec::Binding).is_some();
         let mut inner = pointee;
@@ -695,7 +745,7 @@ impl<'a> V<'a> {
                 if !matches!(self.t(inner), Some(Ty::Struct { .. })) || !(block || (sc == 2 && bblock && self.minor < 4)) {
                     self.err(Rule::Storage, k, format!("{} variables must point to a struct decorated Block", s));
                 } else {
-                    let rule = if sc == 2 && !bblock { Lay::Std140 } else { Lay::Std430 };
+                    let rule = if sc == 2 && !bblock && !self.opt.uniform_standard_layout { Lay::Std140 } else { Lay::Std430 };
                     let size = self.block_layout(k, inner, rule, true);
                     if sc == 9 && size > 128 {
                         self.err(Rule::BlockLayout, k, format!("the push-constant block has {} bytes (at most 128)", size));
@@ -986,6 +1036,34 @@ impl<'a> V<'a> {
         }
     }
 
+    /// the coordinate components an image of type t needs (dimensions + array layer)
+    fn coord_size(&self, t: u32) -> u32 {
+        match self.t(t) {
+            Some(Ty::Image { dim, arrayed, .. }) => {
+                (match dim {
+                    0 | 5 => 1,
+                    2 | 3 => 3,
+                    _ => 2,
+                }) + arrayed
+            }
+            _ => 0,
+        }
+    }
+
+    /// the components OpImageQuerySize(Lod) gives for an image of type t
+    fn size_comps(&self, t: u32) -> u32 {
+        match self.t(t) {
+            Some(Ty::Image { dim, arrayed, .. }) => {
+                (match dim {
+                    0 | 5 => 1,
+                    2 => 3,
+                    _ => 2,
+                }) + arrayed
+            }
+            _ => 0,
+        }
+    }
+
     fn check_image(&mut self, k: usize, i: &Inst) {
         let o = i.ops;
         let Some(&img) = o.first() else { return };
@@ -1009,6 +1087,11 @@ impl<'a> V<'a> {
             return;
         };
         let texel = |v: &V, t: u32| v.scalar(t) == st && v.sv(t).is_some_and(|s| s.n == 4 || s.n == 1);
+        let need = self.coord_size(image);
+        let have = self.sv(coord).map_or(0, |s| s.n);
+        if i.op != op::ImageWrite && i.op != op::ImageRead && dim != 6 {
+            self.want(k, have >= need, "the coordinate has fewer components than the image needs");
+        }
         match i.op {
             op::ImageSampleImplicitLod | op::ImageSampleExplicitLod | op::ImageGather => {
                 self.want(k, self.is_sv(coord, 'f'), "the coordinate must be float");
@@ -1020,8 +1103,20 @@ impl<'a> V<'a> {
             }
             op::ImageSampleDrefImplicitLod | op::ImageSampleDrefExplicitLod | op::ImageDrefGather => {
                 self.want(k, self.is_sv(coord, 'f'), "the coordinate must be float");
+                let dref = o.get(2).map_or(0, |&c| self.val(k, c));
+                self.want(k, self.sv(dref).is_some_and(|s| s.k == 'f' && s.n == 1 && s.width == 32), "Dref must be a 32-bit float scalar");
+                if i.op == op::ImageDrefGather {
+                    self.want(k, self.sv(i.ty).is_some_and(|s| s.n == 4) && self.scalar(i.ty) == st, "the result must be a vec4 of the sampled type");
+                } else {
+                    self.want(k, self.sv(i.ty).is_some_and(|s| s.k == 'f' && s.n == 1) && i.ty == st, "the result must be the sampled float scalar");
+                }
+                if i.op == op::ImageSampleDrefExplicitLod {
+                    let m = o.get(3).copied().unwrap_or(0);
+                    self.want(k, m & (spv::img::Lod | spv::img::Grad) != 0, "explicit LOD needs the Lod or Grad operand");
+                }
             }
             op::ImageFetch => {
+                self.want(k, dim != 3, "OpImageFetch does not take a Cube image");
                 self.want(k, usage == 1, "OpImageFetch needs a sampled image type (Sampled 1)");
                 self.want(k, self.is_sv(coord, 'i'), "the coordinate must be integer");
                 self.want(k, texel(self, i.ty) && self.sv(i.ty).is_some_and(|s| s.n == 4), "the result must be a vec4 of the sampled type");
@@ -1049,6 +1144,12 @@ impl<'a> V<'a> {
 
     fn check_inst(&mut self, k: usize, f: usize) {
         let i = self.ins[k];
+        self.check_op(k, f, i);
+    }
+
+    /// the type rules of instruction i (at k, in function f; NOFN for the operation of an
+    /// OpSpecConstantOp, which is never one of the opcodes that need the function)
+    fn check_op(&mut self, k: usize, f: usize, i: Inst<'a>) {
         let o = i.ops;
         let ty = i.ty;
         let g = |n: usize| o.get(n).copied().unwrap_or(0);
@@ -1266,6 +1367,35 @@ impl<'a> V<'a> {
                 self.need_cap(Cap::ImageQuery, k);
                 let a = self.val(k, g(0));
                 self.want(k, self.image_ty(a).is_some() && self.is_sv(ty, 'i'), "an image in, integers out");
+                if let Some(Ty::Image { dim, ms, usage, .. }) = self.t(a).cloned() {
+                    let n = self.sv(ty).map_or(0, |s| s.n);
+                    match i.op {
+                        op::ImageQuerySizeLod => {
+                            self.want(k, matches!(dim, 0..=3) && ms == 0, "OpImageQuerySizeLod needs a 1D, 2D, 3D or Cube image without MS");
+                            self.want(k, usage == 1, "OpImageQuerySizeLod needs a sampled image (Vulkan: Sampled 1)");
+                            let l = self.val(k, g(1));
+                            self.want(k, self.sv(l).is_some_and(|s| s.k == 'i' && s.n == 1), "the level of detail must be an integer scalar");
+                            self.want(k, n == self.size_comps(a), "the result has one component per dimension (and the layers)");
+                        }
+                        op::ImageQuerySize => {
+                            self.want(k, matches!(dim, 4 | 5) || ms == 1 || usage == 0 || usage == 2,
+                                      "OpImageQuerySize needs a storage, multisampled, Rect or Buffer image (OpImageQuerySizeLod for sampled ones)");
+                            self.want(k, n == self.size_comps(a), "the result has one component per dimension (and the layers)");
+                        }
+                        op::ImageQueryLevels => {
+                            self.want(k, matches!(dim, 0..=3) && ms == 0 && usage == 1, "OpImageQueryLevels needs a sampled 1D, 2D, 3D or Cube image without MS");
+                            self.want(k, n == 1, "the result must be an integer scalar");
+                        }
+                        _ => {
+                            self.want(k, ms == 1, "OpImageQuerySamples needs a multisampled image");
+                            self.want(k, n == 1, "the result must be an integer scalar");
+                        }
+                    }
+                }
+            }
+            op::QuantizeToF16 => {
+                let a = self.val(k, g(0));
+                self.want(k, self.sv(ty).is_some_and(|s| s.k == 'f' && s.width == 32) && a == ty, "a 32-bit float operand of the result type");
             }
             o2 if (op::DPdx..=op::FwidthCoarse).contains(&o2) => {
                 let a = self.val(k, g(0));
@@ -1363,14 +1493,55 @@ impl<'a> V<'a> {
                 self.want(k, w.is_some(), "the type must be an integer or float scalar");
                 self.want(k, w.is_none_or(|w| w == i.ops.len()), "the value has the wrong number of words");
             }
-            op::ConstantTrue | op::ConstantFalse => self.want(k, matches!(self.t(i.ty), Some(Ty::Bool)), "the type must be bool"),
-            op::ConstantComposite => self.check_construct(k, i.ty, i.ops, true),
+            op::SpecConstant => {
+                let w = match self.t(i.ty) {
+                    Some(Ty::Int { width, .. } | Ty::Float { width }) => Some(width.div_ceil(32) as usize),
+                    _ => None,
+                };
+                self.want(k, w.is_some(), "the type must be an integer or float scalar");
+                self.want(k, w.is_none_or(|w| w == i.ops.len()), "the default has the wrong number of words");
+            }
+            op::ConstantTrue | op::ConstantFalse | op::SpecConstantTrue | op::SpecConstantFalse => {
+                self.want(k, matches!(self.t(i.ty), Some(Ty::Bool)), "the type must be bool")
+            }
+            op::ConstantComposite | op::SpecConstantComposite => self.check_construct(k, i.ty, i.ops, true),
+            op::SpecConstantOp => self.check_spec_op(k),
             op::ConstantNull => {
                 let ok = !matches!(self.t(i.ty), None | Some(Ty::Void | Ty::Function { .. } | Ty::RuntimeArray { .. }));
                 self.want(k, ok, "no null value of this type")
             }
             _ => {}
         }
+    }
+
+    /// OpSpecConstantOp: an operation SPIR-V allows under Shader, on constants, with its
+    /// operation's type rules
+    fn check_spec_op(&mut self, k: usize) {
+        let i = self.ins[k];
+        let Some(&opc) = i.ops.first() else { return };
+        let opc = opc as u16;
+        let allowed = matches!(opc, op::SConvert | op::UConvert | op::FConvert | op::QuantizeToF16 | op::SNegate | op::Not
+            | op::IAdd | op::ISub | op::IMul | op::UDiv | op::SDiv | op::UMod | op::SRem | op::SMod | op::ShiftRightLogical
+            | op::ShiftRightArithmetic | op::ShiftLeftLogical | op::BitwiseOr | op::BitwiseXor | op::BitwiseAnd
+            | op::VectorShuffle | op::CompositeExtract | op::CompositeInsert | op::LogicalOr | op::LogicalAnd | op::LogicalNot
+            | op::LogicalEqual | op::LogicalNotEqual | op::Select | op::IEqual | op::INotEqual | op::ULessThan | op::SLessThan
+            | op::UGreaterThan | op::SGreaterThan | op::ULessThanEqual | op::SLessThanEqual | op::UGreaterThanEqual
+            | op::SGreaterThanEqual);
+        if !allowed {
+            let n = spv::op_info(opc).map_or("?", |x| x.name);
+            self.err(Rule::Type, k, format!("OpSpecConstantOp: Op{} is no operation SPIR-V allows here under Shader", n));
+            return;
+        }
+        if opc == op::UConvert && self.minor < 4 {
+            self.err(Rule::Version, k, String::from("OpSpecConstantOp UConvert needs SPIR-V 1.4"));
+        }
+        let inner = Inst { op: opc, ty: i.ty, res: i.res, ops: &i.ops[1..], at: i.at, info: spv::op_info(opc) };
+        for id in parse::ids(&inner) {
+            if self.kind(id) != Some(K::Const) {
+                self.err(Rule::Type, k, format!("OpSpecConstantOp: the operand %{} is no constant", id));
+            }
+        }
+        self.check_op(k, NOFN, inner);
     }
 
     fn functions(&mut self) {
@@ -1675,10 +1846,30 @@ impl<'a> V<'a> {
                 if (frag && model != Model::Fragment as u32) || (comp && !matches!(model, 5 | 6 | 5364 | 5365)) {
                     self.err(Rule::ExecMode, mk, format!("execution mode {} does not fit the entry point's model", mname));
                 }
+                let id_mode = matches!(m, 37..=39); // SubgroupsPerWorkgroupId, LocalSizeId, LocalSizeHintId
+                let is_id = self.ins[mk].op == op::ExecutionModeId;
+                if id_mode != is_id {
+                    self.err(Rule::ExecMode, mk, format!("execution mode {} belongs in {}", mname,
+                                                         if id_mode { "OpExecutionModeId" } else { "OpExecutionMode" }));
+                }
+                if is_id && self.minor < 2 {
+                    self.err(Rule::Version, mk, String::from("OpExecutionModeId needs SPIR-V 1.2"));
+                }
                 if m == Mode::LocalSize as u32 {
                     let a = &self.ins[mk].ops[2..];
                     if a.len() != 3 || a.contains(&0) {
                         self.err(Rule::ExecMode, mk, String::from("LocalSize needs three sizes of at least 1"));
+                    }
+                }
+                if m == Mode::LocalSizeId as u32 && is_id {
+                    let a: Vec<u32> = self.ins[mk].ops[2..].to_vec();
+                    let ok = a.len() == 3 && a.iter().all(|&x| {
+                        let t = self.vty.get(&x).copied().unwrap_or(0);
+                        self.kind(x) == Some(K::Const) && self.sv(t).is_some_and(|s| s.k == 'i' && s.n == 1 && s.width == 32)
+                            && self.consts.get(&x).is_none_or(|&v| v >= 1)
+                    });
+                    if !ok {
+                        self.err(Rule::ExecMode, mk, String::from("LocalSizeId needs three 32-bit integer constants (or specialization constants), plain ones at least 1"));
                     }
                 }
             }
@@ -1733,6 +1924,11 @@ impl<'a> V<'a> {
 
 /// check a module (the rules of the module comment) -> Ok or every error found
 pub fn validate(words: &[u32]) -> Result<(), Vec<Error>> {
+    validate_with(words, &Options::default())
+}
+
+/// validate with device options (a uniform buffer in the storage layout)
+pub fn validate_with(words: &[u32], opt: &Options) -> Result<(), Vec<Error>> {
     let e = |msg: &str| Err(alloc::vec![Error { rule: Rule::Header, at: 0, msg: String::from(msg) }]);
     if words.len() < 5 {
         return e("fewer than 5 words");
@@ -1766,6 +1962,7 @@ pub fn validate(words: &[u32]) -> Result<(), Vec<Error>> {
         mdecs: BTreeMap::new(),
         funcs: Vec::new(),
         need: BTreeMap::new(),
+        opt: *opt,
     };
     for k in 0..v.ins.len() {
         let r = v.ins[k].res;

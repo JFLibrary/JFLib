@@ -1,17 +1,19 @@
 // shadertest -- self-checks of lib/shader without a GPU: golden bytes of a tiny module, the
 // builder (deduplication, capabilities, interfaces per version), the disassembly of every
 // benchmark shader against apps/shadertest/golden, the validator (it accepts every benchmark
-// shader and rejects one broken module per rule), determinism, the std140 / std430 layout
-// helper, the CPU references of move and cull, an interpreter that runs the benchmark
-// shaders' SPIR-V on the CPU and compares them with those references, and -- when the Vulkan
-// SDK is installed -- spirv-val and spirv-dis as references (skipped with a note otherwise).
+// and sample shader and rejects one broken module per rule), determinism, the std140 / std430
+// layout helper, the CPU references of move and cull, specialization constants
+// (shader::reflect, the samples), an interpreter that runs the benchmark shaders' and
+// spec_fill's SPIR-V on the CPU and compares them with their references, and -- when the
+// Vulkan SDK is installed -- spirv-val and spirv-dis as references (skipped with a note
+// otherwise).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py test shadertest
 //   build/win/shadertest.exe [--check] [--only GROUP]
 //   build/win/shadertest.exe --write DIR      the shaders (.spv for SPIR-V 1.3, _16.spv for
-//                                             1.6), their disassembly (.spvasm, the golden
-//                                             files) and the broken modules (bad_*.spv)
+//                                             1.6), the samples, their disassembly (.spvasm,
+//                                             the golden files) and the broken modules (bad_*.spv)
 //   build/win/shadertest.exe --sdk DIR        the folder with spirv-val / spirv-dis (default:
 //                                             %VULKAN_SDK%\Bin, the newest C:\VulkanSDK\*\Bin,
 //                                             then PATH)
@@ -29,6 +31,7 @@ mod broken;
 mod interp;
 mod refs;
 mod sdk;
+mod spec;
 
 /// the result collector of a check group
 pub struct T {
@@ -65,13 +68,14 @@ fn run() -> i32 {
         return basics::write_all(&dir);
     }
     let only = plat::arg_value("--only").map(String::from);
-    let groups: [(&'static str, fn(&mut T)); 9] = [
+    let groups: [(&'static str, fn(&mut T)); 10] = [
         ("golden", basics::golden),
         ("builder", basics::builder),
         ("dis", basics::dis),
         ("layout", basics::layout),
         ("validate", broken::run),
         ("refs", refs::run),
+        ("spec", spec::run),
         ("interp", interp::run),
         ("determinism", basics::determinism),
         ("sdk", sdk::run),

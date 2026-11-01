@@ -18,6 +18,7 @@
 //   Engine::sh_job_ended / sh_go     cli_job_done: the command's console job ended, the line goes
 //                                    on; sh_interrupted (Ctrl+C), sh_abort (boot), sh_power_off
 //   jobs, fg, wait, kill, ps, sleep, jfs   the commands of processes
+//   jfs --test FILE ...              the test functions of files (cli/jfstest.rs, IDE1)
 //   JfsProc                          `jfs FILE [ARGS]`: a script of the device's files run as a
 //                                    console program (the ScriptService of scriptsvc.rs and its
 //                                    host: print to the terminal, log to the journal, net, http,
@@ -37,12 +38,15 @@
 // prints them).  A job's console job sits in its BgJob; while the engine works on it (an event
 // of its ping, its program's output or exit, a timer) it is swapped into CliDev::job and
 // EngineCli::sh_ctx names the job, so the console jobs of print.rs, tools.rs and the others
-// work unchanged; their wake-ups carry BG_WAKE | job number in Ev::Cli.
+// work unchanged; their wake-ups carry BG_WAKE | job number in Ev::Cli (Ev::Ses in another
+// session than the console: cli/ses.rs).
 //
 // PIDs: a process that runs as a service (a console program, jfs) is 100 + its service id, as
 // top and ss -p show it; a background job that is none gets a service id of its own
-// (Os::take_id).  ps lists init (1), the shell (100), the running services and the background
-// jobs; kill ends a background job (TERM 143, KILL 137, INT 130, HUP 129), services are not
+// (Os::take_id).  ps lists init (1), the shell (100; the shells of further sessions have PIDs of
+// their own: cli/ses.rs), the running services and the background jobs of every session, with
+// their terminal (TTY: tty1 for the console, pts/N, "?" for init and services); kill ends a
+// background job (TERM 143, KILL 137, INT 130, HUP 129), services are not
 // processes the shell may end.  A device switched off loses its shell: jobs, line, history.
 
 use alloc::boxed::Box;
@@ -55,7 +59,7 @@ use super::print::JobOut;
 use super::sh::{self, AndOr, Conn, ROp, Redir, Shell, Var, SHELL_PID};
 use super::CliJob;
 use crate::jobs::JobKind;
-use crate::kernel::{Engine, Ev, Ns};
+use crate::kernel::{Engine, Ns};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
 use crate::scriptsvc::{ScriptCfg, ScriptService, ScriptState};
 
@@ -956,6 +960,11 @@ impl Engine {
 
     /// OsApi::print / print_err: a console program's output goes where its job's goes
     pub(crate) fn prog_print(&mut self, ni: usize, svc: u32, text: &str, err: bool) {
+        // a program of another session prints there (cli/ses.rs)
+        if let Some(s) = self.ses_of_prog(ni, svc) {
+            self.in_ses(ni, s, |e| e.prog_print(ni, svc, text, err));
+            return;
+        }
         let saved = self.cli.sh_ctx;
         if let Some(no) = self.sh_bg_of_svc(ni, svc) {
             self.cli.sh_ctx = Some((ni, no));
@@ -970,8 +979,13 @@ impl Engine {
 
     /// OsApi::exit: the console (or the background job) of the program goes on at `at`
     pub(crate) fn prog_wake(&mut self, ni: usize, svc: u32, at: Ns) {
+        // a program of another session wakes that session (cli/ses.rs)
+        if let Some(s) = self.ses_of_prog(ni, svc) {
+            self.in_ses(ni, s, |e| e.prog_wake(ni, svc, at));
+            return;
+        }
         match self.sh_bg_of_svc(ni, svc) {
-            Some(no) => self.schedule(at, Ev::Cli { node: ni, epoch: BG_WAKE | no }),
+            Some(no) => self.cli_sched(ni, at, BG_WAKE | no),
             None => self.cli_wake_at(ni, at),
         }
     }
@@ -1123,60 +1137,19 @@ impl Engine {
         }
     }
 
-    /// ps [aux | -ef ...]: every process of the device (the options are taken as they come)
+    /// ps [aux | -ef ...]: every process of the device with its terminal (the options are taken
+    /// as they come; the rows are Engine::processes', procs.rs: init, the shell of every session,
+    /// the running services and the background jobs of every session)
     pub(crate) fn sh_ps(&mut self, ni: usize, _args: &[&str]) -> Result<(), String> {
-        let mut rows: Vec<(u32, u64, String)> = alloc::vec![(1, 0, String::from("init")), (SHELL_PID, 0, String::from("-sh"))];
-        let jobs: Vec<(u32, Option<u32>, String)> = self
-            .sh(ni)
-            .map(|s| {
-                s.bg.iter()
-                    .filter(|j| j.ended.is_none())
-                    .map(|j| {
-                        let svc = match j.cj {
-                            Some(CliJob { out: JobOut::Proc { svc, .. }, .. }) => Some(svc),
-                            _ => None,
-                        };
-                        (j.pid, svc, j.text.clone())
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut shown: Vec<u32> = Vec::new();
-        if let Some(os) = self.os(ni) {
-            for s in os.svcs.iter().filter(|s| s.running) {
-                let pid = 100 + s.id;
-                let name = match jobs.iter().find(|j| j.1 == Some(s.id)) {
-                    Some(j) => {
-                        shown.push(j.0);
-                        j.2.clone()
-                    }
-                    None => s.name.clone(),
-                };
-                let cpu = s.svc.as_ref().map_or(0, |x| {
-                    if let Some(sc) = x.as_any().downcast_ref::<ScriptService>() {
-                        sc.busy_ns()
-                    } else if let Some(p) = x.as_any().downcast_ref::<JfsProc>() {
-                        p.inner.busy_ns()
-                    } else if let Some(h) = x.as_any().downcast_ref::<crate::httpsvc::HttpServer>() {
-                        h.busy_ns
-                    } else {
-                        0
-                    }
-                });
-                rows.push((pid, cpu, name));
-            }
-        }
-        for (pid, svc, text) in &jobs {
-            if !shown.contains(pid) && svc.is_none_or(|s| !rows.iter().any(|r| r.0 == 100 + s)) {
-                rows.push((*pid, 0, text.clone()));
-            }
-        }
+        let dev = self.dev_of(ni);
+        let here = self.ses_here(ni).map_or_else(|| String::from("tty1"), |i| i.line.clone());
+        let mut rows: Vec<(u32, String, u64, String)> = self.processes(dev).into_iter().map(|p| (p.pid, p.tty, p.cpu_ns, p.cmd)).collect();
         let me = rows.iter().map(|r| r.0).max().unwrap_or(SHELL_PID) + 1;
-        rows.push((me, 0, String::from("ps")));
+        rows.push((me, here, 0, String::from("ps")));
         rows.sort_by_key(|r| r.0);
-        let mut s = String::from("  PID USER     TIME COMMAND\n");
-        for (pid, cpu, cmd) in rows {
-            s.push_str(&format!("{:>5} {:<8} {:>4} {}\n", pid, "root", cpu_time(cpu), cmd));
+        let mut s = String::from("  PID USER     TTY      TIME COMMAND\n");
+        for (pid, tty, cpu, cmd) in rows {
+            s.push_str(&format!("{:>5} {:<8} {:<8} {:>4} {}\n", pid, "root", tty, cpu_time(cpu), cmd));
         }
         self.out(ni, &s);
         Ok(())
@@ -1221,6 +1194,10 @@ impl Engine {
         if file == "-h" || file == "--help" {
             self.out(ni, &super::man::usage("jfs"));
             return Ok(());
+        }
+        // the tests of files (cli/jfstest.rs)
+        if file == "--test" {
+            return self.sh_jfs_test(ni, &args[1..]);
         }
         let abs = self.sh_abs(ni, file);
         let data = match self.sh_read(ni, &abs) {
