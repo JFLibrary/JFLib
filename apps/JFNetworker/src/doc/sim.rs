@@ -3,7 +3,12 @@
 // and the engine's reports arrive
 //
 //   Sim::new(&project)            an engine for the project (Engine::from_project; when the
-//                                 engine refuses a part it runs without it, `errors` says why)
+//                                 engine refuses a part it runs without it, `errors` says why);
+//                                 the faults its lab starts with go in as inputs (AK2), so the
+//                                 recording replays them
+//   again(&project, &born)        Simulation zurücksetzen: the same, but a start fault of a cable
+//                                 only where the cable is one of `born`, the project's when it
+//                                 loaded (a cable the learner put in since is not pulled again)
 //   start()                       realtime from now on the task clock (a script run's virtual
 //                                 clock: tests repeat exactly)
 //   sync(&project)                the engine follows the project: what differs from what it
@@ -346,6 +351,16 @@ pub(crate) struct Sim {
 impl Sim {
     /// an engine for the project, paused until start()
     pub(crate) fn new(p: &Project) -> Sim {
+        Sim::build(p, None)
+    }
+
+    /// Simulation zurücksetzen: the same; the faults the lab starts with come back, on the cables of
+    /// `born` only
+    pub(crate) fn again(p: &Project, born: &[u32]) -> Sim {
+        Sim::build(p, Some(born))
+    }
+
+    fn build(p: &Project, born: Option<&[u32]>) -> Sim {
         let (eng, whole) = match Engine::from_project(p) {
             Ok(e) => (e, true),
             Err(_) => {
@@ -398,6 +413,16 @@ impl Sim {
         }
         // keyframes and inputs from here on (K1)
         s.drv.rewind_on(Budget::default());
+        // the faults the lab starts with (AK2); what cannot be resolved is the lab's issue (Lab::issues)
+        for a in jfn_sim::runner::start_actions(p, &s.drv.eng).0 {
+            let fresh = match &a {
+                Action::Fault { fault: jfn_sim::Fault::Unplug { link } | jfn_sim::Fault::Impair { link, .. }, .. } => born.is_some_and(|b| !b.contains(link)),
+                _ => false,
+            };
+            if !fresh {
+                let _ = s.drv.send(Cmd::Apply(a), plat::task::now_us());
+            }
+        }
         s.note_told();
         s.snapshot();
         s

@@ -110,19 +110,22 @@ pub(crate) struct Doc {
     pub sim: Sim,
     /// the faults of the lab the window injected or healed (faults.rs)
     pub runs: faults::Runs,
+    /// the cables the project had when it loaded (Sim::again)
+    pub born: alloc::vec::Vec<u32>,
 }
 
 impl Doc {
     pub(crate) fn new() -> Doc {
         let proj = Project::new("", 1);
         let sim = Sim::new(&proj);
-        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, origin: None, rev: 1, sim, runs: faults::Runs::default() }
+        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, origin: None, rev: 1, sim, runs: faults::Runs::default(), born: alloc::vec::Vec::new() }
     }
 
     /// a project from a file (or a new one): a fresh history and engine, saved; the engine
     /// starts with Net::after_load
     pub(crate) fn replace(&mut self, proj: Project, path: Option<String>) {
         self.sim = Sim::new(&proj);
+        self.born = proj.links.iter().map(|l| l.id).collect();
         self.proj = proj;
         self.hist = History::new(UNDO_LIMIT);
         self.runs = faults::Runs::default();

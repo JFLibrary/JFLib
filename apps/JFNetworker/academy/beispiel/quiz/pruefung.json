@@ -1,0 +1,147 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Das erste Netz",
+    "Your first network"
+  ],
+  "pass": 70,
+  "minutes": 5,
+  "attempts": 3,
+  "shuffle": true,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Wofür braucht ein PC ein **Default-Gateway**?",
+        "What does a PC need a **default gateway** for?"
+      ],
+      "explain": [
+        "Pakete in fremde Netze schickt der PC an sein Gateway, meist einen Router.",
+        "The PC sends packets for other networks to its gateway, usually a router."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Um Pakete in andere Netze zu schicken",
+            "To send packets to other networks"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Um Rahmen im eigenen Netz zuzustellen",
+            "To deliver frames in its own network"
+          ],
+          "explain": [
+            "Im eigenen Netz kommt der PC ohne Gateway aus.",
+            "In its own network the PC needs no gateway."
+          ]
+        },
+        {
+          "text": [
+            "Um seine MAC-Adresse zu bekommen",
+            "To get its MAC address"
+          ],
+          "explain": [
+            "Die MAC-Adresse gehört zur Netzwerkkarte.",
+            "The MAC address belongs to the network card."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Was gehört zu den Aufgaben eines Routers?",
+        "Which of these are a router's tasks?"
+      ],
+      "explain": [
+        "Ein Router verbindet Netze und entscheidet nach Ziel-IP-Adressen. Rahmen im selben Netz stellt der Switch zu.",
+        "A router joins networks and decides by destination IP addresses. Frames within one network are the switch's work."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Netze miteinander verbinden",
+            "Joining networks"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Pakete nach der Ziel-IP-Adresse weiterleiten",
+            "Forwarding packets by their destination IP address"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Rahmen innerhalb eines Netzes nach MAC-Adressen verteilen",
+            "Sending frames within one network by MAC addresses"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "Wie lautet die Netzmaske zu `/24` in Punktschreibweise?",
+        "What is the netmask of `/24` in dotted notation?"
+      ],
+      "explain": [
+        "24 gesetzte Bits ergeben `255.255.255.0`.",
+        "24 bits set make `255.255.255.0`."
+      ],
+      "accept": [
+        "255\\.255\\.255\\.0"
+      ]
+    },
+    {
+      "kind": "number",
+      "points": 1,
+      "stem": [
+        "Wie viele Adressen für Hosts hat ein `/26`-Netz?",
+        "How many addresses for hosts does a `/26` network have?"
+      ],
+      "explain": [
+        "6 Bits bleiben für Hosts: 64 Adressen, ohne Netz- und Broadcast-Adresse 62.",
+        "6 bits remain for hosts: 64 addresses, without the network and broadcast addresses 62."
+      ],
+      "value": 62
+    },
+    {
+      "kind": "order",
+      "points": 1,
+      "stem": [
+        "Ein Paket geht von PC1 über Switch und Router zum Server. Bringen Sie die Stationen in ihre Reihenfolge.",
+        "A packet travels from PC1 through a switch and a router to the server. Put the stations in order."
+      ],
+      "explain": [
+        "Der Switch liegt im Netz von PC1, der Router führt ins Netz des Servers.",
+        "The switch lies in PC1's network, the router leads into the server's network."
+      ],
+      "order": [
+        [
+          "PC1",
+          "PC1"
+        ],
+        [
+          "Switch",
+          "Switch"
+        ],
+        [
+          "Router",
+          "Router"
+        ],
+        [
+          "Server",
+          "Server"
+        ]
+      ]
+    }
+  ]
+}

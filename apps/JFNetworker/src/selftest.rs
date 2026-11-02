@@ -83,6 +83,8 @@
 // the Test part against packets sent for real, the steps of console::run_lines_running).
 // academytest.rs: the Akademie (group academy: jfn_model::academy, the progress in its file, step order
 // and state, what the page reads, every course below --academy-dir).
+// quiztest.rs: quizzes, tests and fault hunts (group quiz: jfn_model::quiz, a lab's start faults and locks,
+// a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
 
 use alloc::format;
 use alloc::string::String;
@@ -196,9 +198,11 @@ mod hardwaretest;
 mod fwguitest;
 #[path = "academytest.rs"]
 mod academytest;
+#[path = "quiztest.rs"]
+mod quiztest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 61] = [
+    let groups: [(&'static str, fn(&mut T)); 62] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -260,6 +264,7 @@ pub fn run() -> i32 {
         ("hardware", hardwaretest::run),
         ("fwgui", fwguitest::run),
         ("academy", academytest::run),
+        ("quiz", quiztest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

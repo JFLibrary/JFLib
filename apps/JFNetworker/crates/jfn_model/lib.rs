@@ -34,6 +34,8 @@
 //             they were, its place, scale, opacity and lock; the limits; sniff
 //   academy   Course, Unit, Step, StepKind, Index, Progress (AK1): the courses of the Akademie as
 //             files, what is wrong with one, what a learner has done
+//   quiz      Quiz, Question, Reply, Attempt, Score (AK2): the quizzes and tests of the Akademie as files,
+//             what is wrong with one, how a reply is graded, an attempt's order and time
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -57,6 +59,7 @@ pub mod group;
 pub mod background;
 pub mod unit;
 pub mod academy;
+pub mod quiz;
 
 pub use cable::{cable_fits, cable_kind, CableColor, CableGrade, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};

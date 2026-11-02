@@ -759,3 +759,29 @@ pub(crate) const ID_AK_BAR_NEXT: u32 = 0x0002_1032;
 /// the cards of the list of courses (+ i), the steps of a course (+ its place in the course)
 pub(crate) const ID_AK_CARD: u32 = 0x0002_1100;
 pub(crate) const ID_AK_STEP: u32 = 0x0002_1400;
+// ---- AK2: quizzes, tests and fault hunts (commands 1016 .. 1019 and 1050 .. 1059, widgets 0x0002_3800 ..
+// 0x0002_3FFF, timers 0x1D0 .. 0x1D3; 1050 .. 1059 and 0x1D1 .. 0x1D3 are not used)
+/// a test's next attempt; the answer to handing it in; practice from the start; a fault hunt from its file
+pub(crate) const CMD_QZ_START: u32 = 1016;
+pub(crate) const CMD_QZ_HAND_IN: u32 = 1017;
+pub(crate) const CMD_QZ_AGAIN: u32 = 1018;
+pub(crate) const CMD_AK_RETRY: u32 = 1019;
+/// a test's countdown
+pub(crate) const TIMER_QUIZ: u32 = 0x1D0;
+/// the page's scroll view, Test beginnen / Neuer Versuch, Abgeben, its question, Alle Fragen von vorn, the bar
+/// of the points; Neu beginnen on a fault hunt's bar
+pub(crate) const ID_QZ_SCROLL: u32 = 0x0002_3800;
+pub(crate) const ID_QZ_START: u32 = 0x0002_3801;
+pub(crate) const ID_QZ_HAND: u32 = 0x0002_3802;
+pub(crate) const ID_QZ_ASK: u32 = 0x0002_3803;
+pub(crate) const ID_QZ_AGAIN: u32 = 0x0002_3804;
+pub(crate) const ID_QZ_PROGRESS: u32 = 0x0002_3805;
+pub(crate) const ID_AK_BAR_RETRY: u32 = 0x0002_3806;
+/// a diagnosis in the Aufgabe panel (+ its place among them): the list of devices and cables, Auf der
+/// Zeichenfläche wählen
+pub(crate) const ID_DG_LIST: u32 = 0x0002_3810;
+pub(crate) const ID_DG_PICK: u32 = 0x0002_3820;
+/// the widgets of a quiz's questions: + the question's place in the file * QZ_SLOTS + a slot (quiz.rs); room
+/// for jfn_model::quiz::QUESTIONS_MAX questions of ANSWERS_MAX answers
+pub(crate) const ID_QZ_Q: u32 = 0x0002_3900;
+pub(crate) const QZ_SLOTS: u32 = 28;

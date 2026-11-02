@@ -4,13 +4,15 @@
 //   frame(n, ui)     the page in the place of toolbar, dock and status bar, once per frame; it hosts the
 //                    recovery bar and the files' info bar, as the start page does
 //   bar(n, ui)       over the canvas while the project is a course's lab: step and course, Zurück zum
-//                    Kurs, Weiter im Kurs (accented once every goal is reached)
+//                    Kurs, Weiter im Kurs (accented once every goal is reached, a fault hunt once it
+//                    passed); Neu beginnen on a fault hunt that was handed in
 //   dialog(n, ui)    "Fortschritt zurücksetzen?"
 //
 // Screen readers and scripts: a step is a button named by its title and its state ("Titel, erledigt"),
 // the progress a progress bar, the lesson a document named by the step.  One Tab stop per step; Enter
-// opens it.  A step the program cannot open yet is a disabled row with its reason, no button that does
-// nothing.  Plain on purpose: text, one accent, one column as wide as reading is comfortable.
+// opens it.  A step the program cannot open yet or that is still locked is a disabled row with its reason, no
+// button that does nothing; a step with a result names it.  Plain on purpose: text, one accent, one column as
+// wide as reading is comfortable.  The page of a quiz or a test is quiz.rs's.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -52,6 +54,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         View::Home => home(n, ui),
         View::Course => course(n, ui),
         View::Lesson(i) => lesson(n, ui, i),
+        View::Quiz(i) => super::quiz::frame(n, ui, i),
     }
     ui.box_end();
     ui.focus_pane_end();
@@ -72,7 +75,7 @@ fn take_focus(n: &mut Net, ui: &mut Ui, want: u32) {
 // the back button: where it leads
 fn back_label(n: &Net) -> &'static str {
     match n.academy.view {
-        View::Lesson(_) => t("Kursübersicht"),
+        View::Lesson(_) | View::Quiz(_) => t("Kursübersicht"),
         View::Course if n.academy.via_home => t("Alle Kurse"),
         _ if n.shell.start => t("Startseite"),
         _ if n.academy.lab.is_some() => t("Zurück zum Labor"),
@@ -80,7 +83,7 @@ fn back_label(n: &Net) -> &'static str {
     }
 }
 
-fn back_button(n: &Net, ui: &mut Ui) {
+pub(super) fn back_button(n: &Net, ui: &mut Ui) {
     ui.next_flags(ST_SUBTLE);
     ui.next_icon(IC_BACK);
     if ui.button(ID_AK_BACK, back_label(n)) & EV_ACT != 0 {
@@ -90,7 +93,7 @@ fn back_button(n: &Net, ui: &mut Ui) {
 }
 
 // a scrolling column for the list and the outline: closed by column_end
-fn column_begin(ui: &mut Ui, id: u32) {
+pub(super) fn column_begin(ui: &mut Ui, id: u32) {
     ui.next_size(-1, -1);
     ui.scroll_begin(id, SC_V | pad(24));
     let w = ui.px2dip(ui.box_rect()[2]).clamp(1, PAGE_W);
@@ -100,7 +103,7 @@ fn column_begin(ui: &mut Ui, id: u32) {
     ui.box_begin(0, BOX_V, SECTION_GAP);
 }
 
-fn column_end(ui: &mut Ui) {
+pub(super) fn column_end(ui: &mut Ui) {
     ui.box_end();
     ui.box_end();
     ui.scroll_end();
@@ -205,6 +208,7 @@ fn course(n: &mut Net, ui: &mut Ui) {
     ui.box_end();
     // the units and their steps
     let states = a.progress.states(c, &e.id);
+    let best = |s: &Step| a.progress.best_of(&e.id, &s.id);
     let mut k = 0usize;
     for u in &c.units {
         ui.next_size(-1, 0);
@@ -214,7 +218,7 @@ fn course(n: &mut Net, ui: &mut Ui) {
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V | BOX_CARD | pad(4), 2);
         for s in &u.steps {
-            step_row(ui, s, k, states.get(k).copied().unwrap_or(StepState::Open), en);
+            step_row(ui, s, k, states.get(k).copied().unwrap_or(StepState::Open), best(s), en);
             k += 1;
         }
         ui.box_end();
@@ -234,30 +238,45 @@ fn course(n: &mut Net, ui: &mut Ui) {
 }
 
 // a step of the outline: its state as a mark, one Tab stop that opens it
-fn step_row(ui: &mut Ui, s: &Step, k: usize, state: StepState, en: bool) {
+fn step_row(ui: &mut Ui, s: &Step, k: usize, state: StepState, best: Option<u32>, en: bool) {
     let title = s.title.get(en);
     let (kind, icon) = kind_of(s);
-    let (cp, tok, aside, name) = match state {
+    let (cp, tok, aside, mut name) = match state {
         StepState::Done => (IC_CHECK_CIRCLE_FILL, T_OK, t("Erledigt"), tf("{}, erledigt", &[title])),
         StepState::Current => (IC_CIRCLE_RING, T_ACCENT_TEXT, t("Als Nächstes"), tf("{}, als Nächstes", &[title])),
         StepState::Open => (IC_CIRCLE_RING, T_TEXT3, "", String::from(title)),
         StepState::NotYet => (IC_CIRCLE_RING, T_TEXT_DISABLED, "", tf("{}, noch nicht verfügbar", &[title])),
+        StepState::Locked => (IC_CIRCLE_RING, T_TEXT_DISABLED, "", tf("{}, gesperrt", &[title])),
+    };
+    // the best result beside its state
+    let shown = best.map(|b| tf("{} %", &[&b.to_string()]));
+    if let Some(b) = best {
+        name = tf("{}, bestes Ergebnis {} %", &[&name, &b.to_string()]);
+    }
+    let aside = match &shown {
+        Some(b) if aside.is_empty() => b.clone(),
+        Some(b) => format!("{} · {}", b, aside),
+        None => String::from(aside),
     };
     ui.next_size(-1, 0);
     ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
     ui.spacer(4);
     mark(ui, cp, tok, 18);
     let mut flags = ST_SUBTLE;
-    if state == StepState::NotYet {
+    if matches!(state, StepState::NotYet | StepState::Locked) {
         flags |= ST_DISABLED;
     }
     if state == StepState::Current {
         flags |= ST_CHECKED;
     }
-    let badge = (state == StepState::NotYet).then(|| (BADGE_NEUTRAL, t("Noch nicht verfügbar")));
+    let badge = match state {
+        StepState::NotYet => Some((BADGE_NEUTRAL, t("Noch nicht verfügbar"))),
+        StepState::Locked => Some((BADGE_NEUTRAL, t("Noch gesperrt"))),
+        _ => None,
+    };
     ui.next_size(-1, 0);
     ui.next_flags(flags);
-    let d = CardDesc { title, icon, text: kind, one_line: true, aside, badge, ..CardDesc::default() };
+    let d = CardDesc { title, icon, text: kind, one_line: true, aside: &aside, badge, ..CardDesc::default() };
     if ui.action_card(ID_AK_STEP + k as u32, &name, &d) & EV_ACT != 0 {
         ui.cmd_run(CMD_AK_STEP, k as u32);
     }
@@ -279,7 +298,7 @@ fn lesson(n: &mut Net, ui: &mut Ui, i: usize) {
     let a = &n.academy;
     let Some(c) = a.course() else { return };
     let Some(s) = c.step_at(i) else { return };
-    let (prev, next) = (c.prev_ready(i), c.next_ready(i));
+    let (prev, next) = (c.prev_ready(i), a.next_after(i));
     let total = c.steps().count();
     let prev_title = prev.and_then(|k| c.step_at(k)).map(|x| String::from(x.title.get(en)));
     let next_title = next.and_then(|k| c.step_at(k)).map(|x| String::from(x.title.get(en)));
@@ -372,7 +391,11 @@ pub(crate) fn bar(n: &mut Net, ui: &mut Ui) {
     let en = tr::en();
     let Some(c) = a.entries.get(l.course).and_then(|e| e.course.as_ref()) else { return };
     let Some(s) = c.step_at(l.step) else { return };
-    let done = n.task.run.as_ref().is_some_and(|r| r.done());
+    // a fault hunt counts when it is handed in
+    let hunt = s.kind() == Some(StepKind::Fault);
+    let handed = n.task.assess.as_ref().and_then(|r| r.end.as_ref().and(r.score.as_ref())).map(|x| x.percent());
+    let pass = n.doc.proj.lab.as_ref().map_or(100, |l| l.pass_percent());
+    let done = if hunt { handed.is_some_and(|p| p >= pass) } else { n.task.run.as_ref().is_some_and(|r| r.done()) };
     // beside wide panels in a small window the buttons keep their icons and their names
     let narrow = ui.px2dip(ui.box_rect()[2]) < BAR_W;
     ui.focus_pane_begin(ID_AK_BAR);
@@ -387,7 +410,21 @@ pub(crate) fn bar(n: &mut Net, ui: &mut Ui) {
     ui.tooltip(&names);
     if done {
         mark(ui, IC_CHECK_CIRCLE_FILL, T_OK, 16);
-        ui.tooltip(t("Alle Ziele erreicht"));
+        ui.tooltip(if hunt { t("Bestanden") } else { t("Alle Ziele erreicht") });
+    }
+    if hunt && handed.is_some() {
+        let again = t("Neu beginnen");
+        let ev = if narrow {
+            ui.icon_button(ID_AK_BAR_RETRY, IC_REFRESH, again)
+        } else {
+            ui.next_flags(ST_SUBTLE | ST_COMPACT);
+            ui.next_icon(IC_REFRESH);
+            ui.button(ID_AK_BAR_RETRY, again)
+        };
+        if ev & EV_ACT != 0 {
+            ui.cmd_run(CMD_AK_RETRY, 0);
+        }
+        ui.tooltip(t("Diese Fehlersuche noch einmal aus ihrer Datei laden"));
     }
     let back = t("Zurück zum Kurs");
     let ev = if narrow {
@@ -412,14 +449,15 @@ pub(crate) fn bar(n: &mut Net, ui: &mut Ui) {
     if ev & EV_ACT != 0 {
         ui.cmd_run(CMD_AK_BAR_NEXT, 0);
     }
-    ui.tooltip(if done { t("Der nächste Schritt des Kurses") } else { t("Der nächste Schritt des Kurses; dieses Labor bleibt offen") });
+    ui.tooltip(if done { t("Der nächste Schritt des Kurses") } else if hunt { t("Der nächste Schritt des Kurses; diese Fehlersuche bleibt offen") } else { t("Der nächste Schritt des Kurses; dieses Labor bleibt offen") });
     ui.spacer(4);
     ui.box_end();
     ui.focus_pane_end();
 }
 
-/// "Fortschritt zurücksetzen?"
+/// "Fortschritt zurücksetzen?", "Test abgeben?"
 pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
+    super::quiz::dialog(n, ui);
     let open = n.academy.ask_reset.clone();
     if ui.dialog_begin(ID_AK_RESET_DLG, t("Fortschritt zurücksetzen?"), &open) {
         let a = &n.academy;
