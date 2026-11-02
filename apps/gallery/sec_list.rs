@@ -10,6 +10,7 @@ use alloc::string::String;
 use core::cell::Cell;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 use crate::{cap, Gal};
 
@@ -51,7 +52,8 @@ const ID_LIST_FLY: u32 = 7900; // flyout at the pointer: a list without a select
 const ID_LIST_FLY_L: u32 = 7910; // its list, rows 7911 .. 7922
 
 const TAB_NAMES: [&str; 3] = ["Liste", "Erweitert", "Dialog"];
-const IB_TITLES: [&str; 4] = ["Hinweis", "Gespeichert", "Achtung", "Fehler"];
+const IB_TITLES: [&str; 4] = ["Hinweis", "Gespeichert", "Achtung", "Fehler"]; // i18n
+// i18n
 const IB_MSGS: [&str; 4] = [
     "Eine neue Version ist verfügbar.",
     "Das Bild wurde gespeichert.",
@@ -194,21 +196,21 @@ pub(crate) fn page_end(g: &mut Gal, ui: &mut Ui) {
 /// bars, and a dialog launcher (Gal::dlg_open / dlg_result) with horizontal scrolling
 pub(crate) fn containers(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.list;
-    ui.text(TS_SUBTITLE, "Container");
-    ui.tabs(ID_TABS, &mut s.tab, &TAB_NAMES);
+    ui.text(TS_SUBTITLE, t("Container"));
+    ui.tabs(ID_TABS, &mut s.tab, &list(&TAB_NAMES));
     match s.tab {
         1 => {
             // ---- tab 1: expander and closable info bars
-            if ui.expander_begin(ID_EXP, "Erweiterte Einstellungen", &mut s.exp_open) != 0 {
-                ui.checkbox(ID_EXP_CB, "Automatisch speichern", &mut s.exp_cb);
-                ui.text(TS_CAPTION | TX_SECONDARY, "Der Inhalt erscheint, wenn der Expander offen ist.");
+            if ui.expander_begin(ID_EXP, t("Erweiterte Einstellungen"), &mut s.exp_open) != 0 {
+                ui.checkbox(ID_EXP_CB, t("Automatisch speichern"), &mut s.exp_cb);
+                ui.text(TS_CAPTION | TX_SECONDARY, t("Der Inhalt erscheint, wenn der Expander offen ist."));
             }
             ui.expander_end();
             for i in 0..4u32 {
                 if s.ib_closed & (1 << i) != 0 {
                     continue;
                 }
-                let ev = ui.infobar(ID_IB0 + i * 2, i, IB_TITLES[i as usize], IB_MSGS[i as usize]);
+                let ev = ui.infobar(ID_IB0 + i * 2, i, t(IB_TITLES[i as usize]), t(IB_MSGS[i as usize]));
                 if ev & EV_ACT != 0 {
                     s.ib_closed |= 1 << i;
                 }
@@ -217,16 +219,16 @@ pub(crate) fn containers(g: &mut Gal, ui: &mut Ui) {
         2 => {
             // ---- tab 2: dialog launcher, horizontal scroll view, standalone scroll bar
             ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-            if ui.button(ID_DLG_BTN, "Dialog öffnen") & EV_ACT != 0 {
+            if ui.button(ID_DLG_BTN, t("Dialog öffnen")) & EV_ACT != 0 {
                 g.dlg_open.set(1); // (ui-win: a Shared open flag)
             }
-            let t = cap(format!("Ergebnis: {}", g.dlg_result), 96);
-            ui.text(TS_BODY, &t);
+            let line = cap(tf("Ergebnis: {}", &[&format!("{}", g.dlg_result)]), 96);
+            ui.text(TS_BODY, &line);
             ui.box_end();
             ui.scroll_begin(ID_HSCROLL, SC_H | BOX_CARD | PAD_8);
             for i in 0..20u32 {
-                let t = cap(format!("Knopf {}", i + 1), 32);
-                ui.button(ID_CHIP0 + i, &t);
+                let line = cap(tf("Knopf {}", &[&format!("{}", i + 1)]), 32);
+                ui.button(ID_CHIP0 + i, &line);
                 ui.spacer(8);
             }
             ui.scroll_end();
@@ -238,14 +240,14 @@ pub(crate) fn containers(g: &mut Gal, ui: &mut Ui) {
             ui.next_size(0, 240);
             let (first, end) = ui.list_begin(ID_LIST, &mut g.list_sel, 200, 0);
             for i in first..end {
-                let t = cap(format!("Eintrag {}", i + 1), 32);
-                if ui.list_item(i, &t) & EV_DOUBLE != 0 {
+                let line = cap(tf("Eintrag {}", &[&format!("{}", i + 1)]), 32);
+                if ui.list_item(i, &line) & EV_DOUBLE != 0 {
                     s.list_dbl += 1;
                 }
             }
             ui.list_end(&mut g.list_sel);
-            let t = cap(format!("Auswahl: {}   Doppelklicks: {}", g.list_sel, s.list_dbl), 96);
-            ui.text(TS_BODY | TX_SECONDARY, &t);
+            let line = cap(tf("Auswahl: {}   Doppelklicks: {}", &[&format!("{}", g.list_sel), &format!("{}", s.list_dbl)]), 96);
+            ui.text(TS_BODY | TX_SECONDARY, &line);
         }
     }
 }
@@ -255,27 +257,27 @@ pub(crate) fn containers(g: &mut Gal, ui: &mut Ui) {
 /// (Gal::win_val_open)
 pub(crate) fn values(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.list;
-    ui.text(TS_SUBTITLE, "Werte & Farben");
+    ui.text(TS_SUBTITLE, t("Werte & Farben"));
     // ---- decimal slider + number box on the same value
     ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
     ui.next_size(240, 0);
     ui.slider_f(ID_VAL_SF, &mut s.val_f, &RF_VAL);
     ui.number_box_f(ID_VAL_NBF, &mut s.val_f, &RF_VAL);
-    let t = ui.fmt_f64(s.val_f, 2);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
+    let line = ui.fmt_f64(s.val_f, 2);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
     ui.box_end();
     // ---- property rows (paint.net effect dialogs)
     ui.next_size(420, 0);
     ui.box_begin(0, BOX_V, 12);
-    ui.prop_slider(ID_VAL_PROP, "Radius", &mut s.prop_i, &RANGE_PROP, 25);
-    ui.prop_slider_f(ID_VAL_PROPF, "Härte", &mut s.prop_f, &RF_PROP, Some(C_PROP_DEF));
+    ui.prop_slider(ID_VAL_PROP, t("Radius"), &mut s.prop_i, &RANGE_PROP, 25);
+    ui.prop_slider_f(ID_VAL_PROPF, t("Härte"), &mut s.prop_f, &RF_PROP, Some(C_PROP_DEF));
     ui.box_end();
     // ---- angle dial and pan control
     ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
     ui.angle(ID_VAL_ANG, &mut g.ang, 0);
-    let t = ui.fmt_f64(g.ang, 2);
+    let line = ui.fmt_f64(g.ang, 2);
     ui.next_size(56, 0);
-    ui.text(TS_BODY | TX_RIGHT, &t);
+    ui.text(TS_BODY | TX_RIGHT, &line);
     ui.pan(ID_VAL_PAN, &mut s.pan_x, &mut s.pan_y, None, 0, 0);
     ui.box_end();
     // ---- colour tracks
@@ -283,7 +285,7 @@ pub(crate) fn values(g: &mut Gal, ui: &mut Ui) {
     // ---- tool window with value widgets
     ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
     let mut v = g.win_val_open.get(); // (ui-win: a Shared open flag)
-    ui.toggle_button(ID_VAL_WINBTN, "Werte-Fenster", &mut v);
+    ui.toggle_button(ID_VAL_WINBTN, t("Werte-Fenster"), &mut v);
     g.win_val_open.set(v);
     ui.box_end();
 }
@@ -320,7 +322,7 @@ fn tracks(s: &mut S, ui: &mut Ui) {
     // a right click (or the menu key while it has the focus) opens a menu with menu_popup:
     // at the pointer, for the keyboard at the swatch
     if ui.swatch(ID_VAL_SW, s.trk_argb, false) & EV_RCLICK != 0 {
-        ui.menu_popup(&crate::sec_popup::M_CTX);
+        ui.menu_popup(i18n::menu(&crate::sec_popup::M_CTX));
     }
     ui.box_end();
 }
@@ -398,8 +400,8 @@ pub(crate) fn wheel(g: &mut Gal, ui: &mut Ui) {
 /// marching-ants canvas (ants_draw, canvas_damage)
 pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.list;
-    ui.text(TS_SUBTITLE, "Listen");
-    ui.text(TS_BODY | TX_SECONDARY, "Zeilen lassen sich ziehen; das Häkchen schaltet die Sichtbarkeit.");
+    ui.text(TS_SUBTITLE, t("Listen"));
+    ui.text(TS_BODY | TX_SECONDARY, t("Zeilen lassen sich ziehen; das Häkchen schaltet die Sichtbarkeit."));
     ui.box_begin(0, BOX_H, 24);
     ui.next_size(280, 200);
     let (first, end) = ui.list_begin(ID_RLIST, &mut s.rl_sel, RL_N as i32, 40 | LF_REORDER);
@@ -410,9 +412,9 @@ pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
         ui.next_size(24, 24);
         ui.next_flags(ST_NOFOCUS); // a picture: no Tab stop
         ui.swatch(ID_RL_CB + 20 + it as u32, RL_COLORS[it], false);
-        let t = cap(format!("Ebene {}", it + 1), 32);
+        let line = cap(tf("Ebene {}", &[&format!("{}", it + 1)]), 32);
         ui.next_size(-1, 0);
-        ui.text(TS_BODY | TX_ELLIPSIS, &t);
+        ui.text(TS_BODY | TX_ELLIPSIS, &line);
         ui.checkbox(ID_RL_CB + it as u32, "", &mut s.rl_vis[it]);
         ui.list_item_end();
     }
@@ -436,17 +438,17 @@ pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
         s.rl_moves += 1;
     }
     // the order as text: "Reihenfolge: 1 2 3 ..."
-    let mut t = String::from("Reihenfolge: ");
+    let mut order = String::new();
     for (k, &o) in s.rl_order.iter().enumerate() {
         if k > 0 {
-            t.push(' ');
+            order.push(' ');
         }
-        t.push_str(&format!("{}", o as u32 + 1));
+        order.push_str(&format!("{}", o as u32 + 1));
     }
     ui.box_begin(0, BOX_V, 8);
-    ui.text(TS_BODY, &t);
-    let t = cap(format!("Auswahl: {}   Verschoben: {}   Zuletzt: {}", s.rl_sel, s.rl_moves, g.recent_last), 96);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
+    ui.text(TS_BODY, &tf("Reihenfolge: {}", &[&order]));
+    let line = cap(tf("Auswahl: {}   Verschoben: {}   Zuletzt: {}", &[&format!("{}", s.rl_sel), &format!("{}", s.rl_moves), &g.recent_last]), 96);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
     // marching ants: redrawn through canvas_damage only (the version stays)
     ui.next_size(200, 64);
     let d: DrawRef = s.ants.clone();
@@ -471,13 +473,13 @@ pub(crate) fn list_flyout(g: &mut Gal, ui: &mut Ui) {
     if ui.flyout_begin(ID_LIST_FLY, FL_POINT) {
         ui.next_size(260, 0);
         ui.box_begin(0, BOX_V | pad(8), 8);
-        ui.text(TS_BODY_STRONG, "Liste im Flyout");
+        ui.text(TS_BODY_STRONG, t("Liste im Flyout"));
         ui.next_size(240, 6 * 28);
         let mut sel = s.fly_sel;
         let (first, end) = ui.list_begin(ID_LIST_FLY_L, &mut sel, 12, 28);
         for i in first..end {
-            let t = cap(format!("Zeile {}", i + 1), 32);
-            ui.list_item(i, &t);
+            let line = cap(tf("Zeile {}", &[&format!("{}", i + 1)]), 32);
+            ui.list_item(i, &line);
         }
         ui.list_end(&mut sel);
         if !s.fly_none {

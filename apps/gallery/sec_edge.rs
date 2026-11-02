@@ -10,6 +10,7 @@
 use alloc::format;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 use crate::{cap, Gal};
 
@@ -21,7 +22,7 @@ const ID_EDGE_DATE: u32 = 7811; // date picker next to it
 const ID_EDGE_TIP: u32 = 7812; // button at the bottom right: tooltip and context menu
 const ID_EDGE_CTX0: u32 = 7820; // context menu rows 7820 .. 7825
 const ID_EDGE_LEFT: u32 = 7813; // button at the top left: a wide tooltip
-const ROWS: [&str; 6] = ["Ausschneiden", "Kopieren", "Einfügen", "Duplizieren", "Umbenennen", "Löschen"];
+const ROWS: [&str; 6] = ["Ausschneiden", "Kopieren", "Einfügen", "Duplizieren", "Umbenennen", "Löschen"]; // i18n
 const COMBO: [&str; 12] = [
     "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
@@ -68,16 +69,16 @@ pub(crate) fn frame(g: &mut Gal, ui: &mut Ui) {
     ui.box_begin(0, BOX_V | PAD_12, 8);
     // top: a button at the left edge, the last choice, the drop-down at the right edge
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.button(ID_EDGE_LEFT, "Links");
-    ui.tooltip("Ein breiter Tooltip am linken Rand des Hauptfensters");
+    ui.button(ID_EDGE_LEFT, t("Links"));
+    ui.tooltip(t("Ein breiter Tooltip am linken Rand des Hauptfensters"));
     ui.next_size(-1, 0);
-    let t = cap(format!("Zuletzt: {}", if s.last.is_empty() { "–" } else { &s.last }), 64);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
-    ui.dropdown_button(ID_EDGE_MENU, "Menü");
+    let line = cap(tf("Zuletzt: {}", &[if s.last.is_empty() { "–" } else { &s.last }]), 64);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
+    ui.dropdown_button(ID_EDGE_MENU, t("Menü"));
     if ui.flyout_begin(ID_EDGE_MENU, FL_BELOW | FL_ALIGN_END) {
         for (k, row) in ROWS.iter().enumerate() {
-            if ui.menu_item(ID_EDGE_ROW + k as u32, row) & EV_ACT != 0 {
-                s.last = alloc::string::String::from(*row);
+            if ui.menu_item(ID_EDGE_ROW + k as u32, t(*row)) & EV_ACT != 0 {
+                s.last = alloc::string::String::from(t(*row));
             }
         }
     }
@@ -90,8 +91,8 @@ pub(crate) fn frame(g: &mut Gal, ui: &mut Ui) {
         s.open = false;
         ui.popup_open(ID_EDGE_COMBO);
     }
-    if ui.combobox(ID_EDGE_COMBO, &mut s.combo, &COMBO) & EV_ACT != 0 {
-        s.last = alloc::string::String::from(COMBO[s.combo as usize]);
+    if ui.combobox(ID_EDGE_COMBO, &mut s.combo, &list(&COMBO)) & EV_ACT != 0 {
+        s.last = alloc::string::String::from(t(COMBO[s.combo as usize]));
     }
     let (mut y, mut m, mut d) = s.date;
     if ui.date_picker(ID_EDGE_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
@@ -99,9 +100,9 @@ pub(crate) fn frame(g: &mut Gal, ui: &mut Ui) {
     }
     s.date = (y, m, d);
     ui.spacer(-1);
-    ui.button(ID_EDGE_TIP, "Hinweis");
-    ui.tooltip("Ein Tooltip am unteren rechten Rand des Hauptfensters");
-    ui.context_menu(&M_CTX);
+    ui.button(ID_EDGE_TIP, t("Hinweis"));
+    ui.tooltip(t("Ein Tooltip am unteren rechten Rand des Hauptfensters"));
+    ui.context_menu(i18n::menu(&M_CTX));
     ui.box_end();
     ui.box_end();
 }
@@ -112,8 +113,8 @@ pub(crate) fn cmd(g: &mut Gal, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
     match id {
         CMD_EDGES => s.on = !s.on,
         _ if (ID_EDGE_CTX0..ID_EDGE_CTX0 + 6).contains(&id) => {
-            let names = ["Öffnen", "Umbenennen", "Eigenschaften", "Nach vorne", "Nach hinten", "Ganz nach hinten"];
-            s.last = alloc::string::String::from(names[(id - ID_EDGE_CTX0) as usize]);
+            let names = ["Öffnen", "Umbenennen", "Eigenschaften", "Nach vorne", "Nach hinten", "Ganz nach hinten"]; // i18n
+            s.last = alloc::string::String::from(t(names[(id - ID_EDGE_CTX0) as usize]));
         }
         _ => return false,
     }

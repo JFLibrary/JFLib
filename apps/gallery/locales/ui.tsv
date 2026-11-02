@@ -1,0 +1,232 @@
+de	en
+JFLib Galerie	JFLib Gallery
+Die Steuerelemente von JFLib auf einer Seite zum Ausprobieren.	The controls of JFLib on one page, ready to try.
+&Neu	&New
+Ö&ffnen…	&Open…
+&Speichern	&Save
+Speichern &unter…	Save &As…
+&Beenden	E&xit
+&Rückgängig	&Undo
+&Wiederholen	&Redo
+&Ausschneiden	Cu&t
+&Kopieren	&Copy
+E&infügen	&Paste
+Alles aus&wählen	Select &All
+&Raster	&Grid
+&Statusleiste	&Status Bar
+Ver&größern	Zoom &In
+Ver&kleinern	Zoom &Out
+&100 %	&100%
+&Hell	&Light
+&Dunkel	&Dark
+Liste &leeren	&Clear List
+Eigenschaften	Properties
+Kleiner	Smaller
+Größer	Larger
+Plus (Ziffernblock)	Plus (numeric keypad)
+Fünf (Ziffernblock)	Five (numeric keypad)
+&Datei	&File
+&Bearbeiten	&Edit
+&Ansicht	&View
+&Zuletzt geöffnet	&Recent Files
+&Zoom	&Zoom
+&Design	&Theme
+Keine Dateien	No files
+&Eigenschaften	&Properties
+Stift	Pen
+Pinsel	Brush
+Radierer	Eraser
+Füllen	Fill
+Farbauswahl	Color picker
+Lupe	Zoom
+Schaltflächen	Buttons
+Standard	Standard
+Akzent	Accent
+Deaktiviert	Disabled
+Speichern	Save
+Umschalten	Toggle
+Mit Icon	With icon
+Auswahl	Selection
+Unbestimmt	Indeterminate
+Rot	Red
+Grün	Green
+Blau	Blue
+WLAN	Wi-Fi
+Bereiche	Ranges
+Wert: {} %   Klicks: {}	Value: {}%   Clicks: {}
+Karte	Card
+Karten gruppieren Inhalte auf einer leicht abgesetzten Fläche.	Cards group content on a slightly raised surface.
+Design:	Theme:
+Hell / Dunkel	Light / Dark
+Eine sehr lange Beschreibung, die nicht in die Breite passt	A very long description that does not fit the width
+Pinsel: Klicken und ziehen, um mit der Primärfarbe zu malen.	Brush: click and drag to paint with the primary color.
+Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe.	Color brush: click and drag to paint with the primary color, right-click for the secondary color.
+„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?	“Untitled.png” has unsaved changes. Do you want to save the changes before closing the image?
+Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile.	Pneumonoultramicroscopicsilicovolcanoconiosis does not fit on any line.
+Erste Zeile	First line
+Zweite Zeile, länger als die Karte breit ist	Second line, longer than the card is wide
+Das Bild wird zusammengefasst gespeichert; die Ebenen im Dokument bleiben erhalten.	The image is saved flattened; the layers in the document are kept.
+Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt.	This note is longer than two lines and is therefore cut at the end with an ellipsis.
+Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss.	This paragraph is as wide as the page: in a narrow window it needs more lines than in a wide one, and the height of the page follows without the app measuring anything.
+Ordner build: noch nicht geöffnet	Folder build: not opened yet
+Text	Text
+Kurzer Text	Short text
+Raster	Grid
+Name	Name
+Vorname Nachname	First name Last name
+Wählen …	Choose …
+Beschreibung	Description
+Worum es geht	What it is about
+Optionen	Options
+Teilen	Share
+Archivieren	Archive
+Umbruch, Zahlen, Ordner	Wrapping, numbers, folders
+danach	after
+Ordner öffnen	Open folder
+Ordner build: Ergebnis {}	Folder build: result {}
+Kreis	Circle
+Quadrat	Square
+Dreieck	Triangle
+Stern	Star
+Sechseck	Hexagon
+Fein	Fine
+Mittel	Medium
+Breit	Wide
+Menüs & Auswahl	Menus & selection
+Stärke	Weight
+Schließen	Close
+Einfügen	Paste
+Als Text einfügen	Paste as text
+Als Bild einfügen	Paste as image
+Rechtsklick hier	Right-click here
+Letzter Befehl: {}   Form: {}   Stärke: {}   Zoom: {} %	Last command: {}   Shape: {}   Weight: {}   Zoom: {}%
+Werkzeug:	Tool:
+Befehlszustände: {}	Command states: {}
+Eigenschaften (F4)	Properties (F4)
+Zeile	Line
+Ein langer Absatz, der am Rand des Textfelds umgebrochen wird, damit alles sichtbar bleibt.	A long paragraph that wraps at the edge of the text box so that everything stays visible.
+Zweiter Absatz.	Second paragraph.
+Texteingabe	Text input
+Name eingeben	Enter a name
+Kennwort	Password
+Eingabe: {}   (übernommen: {}, Zahl: {})	Input: {}   (committed: {}, number: {})
+Mehrzeilig	Multi-line
+Umbruch	Wrapped
+Übernommen: {}	Committed: {}
+Zahl:	Number:
+Wert {}, Übernahmen {}	Value {}, commits {}
+Ausschneiden	Cut
+Kopieren	Copy
+Duplizieren	Duplicate
+Umbenennen	Rename
+Löschen	Delete
+Januar	January
+Februar	February
+März	March
+April	April
+Mai	May
+Juni	June
+Juli	July
+August	August
+September	September
+Oktober	October
+November	November
+Dezember	December
+Nach vorne	Bring forward
+Nach hinten	Send backward
+Ganz nach hinten	Send to back
+Öffnen	Open
+Anordnen	Arrange
+Links	Left
+Ein breiter Tooltip am linken Rand des Hauptfensters	A wide tooltip at the left edge of the main window
+Zuletzt: {}	Last: {}
+Menü	Menu
+Hinweis	Note
+Ein Tooltip am unteren rechten Rand des Hauptfensters	A tooltip at the bottom right edge of the main window
+Neu	New
+Drucken	Print
+Drehen	Rotate
+Spiegeln	Flip
+Zuschneiden	Crop
+Normal	Normal
+Multiplizieren	Multiply
+Additiv	Additive
+Farbig nachbelichten	Color burn
+Farbig abwedeln	Color dodge
+Reflektieren	Reflect
+Leuchten	Glow
+Überlagern	Overlay
+Differenz	Difference
+Negation	Negation
+Aufhellen	Lighten
+Abdunkeln	Darken
+Bildschirm	Screen
+Xor	Xor
+Hartes Licht	Hard light
+Weiches Licht	Soft light
+Farbton	Hue
+Sättigung	Saturation
+Farbe	Color
+Luminanz	Luminosity
+Rund	Round
+Eckig	Square
+Weich	Soft
+Hart	Hard
+Fenster	Windows
+Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand.	Tool and dialog windows are windows of their own, with their own state.
+Werkzeugfenster	Tool window
+Dialogfenster…	Dialog window…
+Pinselgröße: {}   Name: {}   Form: {}   Dialog: {}	Brush size: {}   Name: {}   Shape: {}   Dialog: {}
+Bereit	Ready
+200 Einträge	200 items
+Auswahl: {}	Selected: {}
+Änderungen speichern?	Save changes?
+Möchten Sie die Änderungen an „Unbenannt“ speichern?	Do you want to save the changes to “Untitled”?
+Ungespeicherte Änderungen gehen sonst verloren.	Unsaved changes are lost otherwise.
+Abbrechen	Cancel
+Werkzeuge	Tools
+Größe: {} px	Size: {} px
+Name des Pinsels	Brush name
+Zurücksetzen	Reset
+Setzt Größe und Form zurück	Resets size and shape
+Standard (Kopie)	Standard (copy)
+Bild bearbeiten	Edit image
+Die Änderung wird auf das ganze Bild angewendet.	The change is applied to the whole image.
+Kanten glätten	Smooth edges
+Weitere Optionen…	More options…
+Weitere Optionen	More options
+Farbprofil einbetten	Embed color profile
+Profilname	Profile name
+Werte	Values
+Winkel	Angle
+Ein Tooltip, der über den unteren Rand des Fensters hinausragt	A tooltip that extends past the bottom edge of the window
+Liste	List
+Erweitert	Advanced
+Dialog	Dialog
+Gespeichert	Saved
+Achtung	Warning
+Fehler	Error
+Eine neue Version ist verfügbar.	A new version is available.
+Das Bild wurde gespeichert.	The image was saved.
+Der Akku ist fast leer.	The battery is almost empty.
+Die Datei konnte nicht geöffnet werden.	The file could not be opened.
+Container	Containers
+Erweiterte Einstellungen	Advanced settings
+Automatisch speichern	Save automatically
+Der Inhalt erscheint, wenn der Expander offen ist.	The content appears when the expander is open.
+Dialog öffnen	Open dialog
+Ergebnis: {}	Result: {}
+Knopf {}	Button {}
+Eintrag {}	Item {}
+Auswahl: {}   Doppelklicks: {}	Selected: {}   Double clicks: {}
+Werte & Farben	Values & colors
+Radius	Radius
+Härte	Hardness
+Werte-Fenster	Values window
+Listen	Lists
+Zeilen lassen sich ziehen; das Häkchen schaltet die Sichtbarkeit.	Rows can be dragged; the check mark switches visibility.
+Ebene {}	Layer {}
+Reihenfolge: {}	Order: {}
+Auswahl: {}   Verschoben: {}   Zuletzt: {}	Selected: {}   Moved: {}   Last: {}
+Liste im Flyout	List in a flyout
+Zeile {}	Line {}

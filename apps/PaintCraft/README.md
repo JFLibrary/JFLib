@@ -268,6 +268,7 @@ painting in every version of that plugin is not covered by the automated tests.
 
 Choose **Settings > User interface > Language**, or launch with
 `--language de`, `--language en` or `--language fr`. The selection is saved.
+`--lang` and `jfgui_LANG` choose it as in every JFLib app.
 English and French cover menus and many common controls; untranslated labels,
 status/error messages, shared dialogs and third-party plugin UIs may remain in
 their original language. See [text behavior and tests](docs/TEXT.md).

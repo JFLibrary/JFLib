@@ -43,7 +43,8 @@ Texts of the sources (*.rs below the app; files named *test.rs are left out)
   list(&TABLE)            the literals of `static|const TABLE: [&str; N] = [..]` in that file
   Command::new(ID, "…", ..), Mi::Menu("…", ..), Mi::Sub("…", ..), Mi::Item(ID, "…", ..),
   Mi::List(ID, N, "…")    command and menu labels, when the app translates its tables (a
-                          `label: t(c.label)` / `=> Mi::Item(id, t(label), icon)` of its own)
+                          `label: t(c.label)` / `=> Mi::Item(id, t(label), icon)` of its own,
+                          i18n::menu, i18n::commands or AppDesc::translated)
   // i18n                 on a line of its own: every literal of the block below it (up to a
                           less indented or empty line, or a line ending in "];")
   // i18n: name title     the same, only the literals after "name:" or "title:"
@@ -84,8 +85,8 @@ LABELS = [
     re.compile(r"\bMi::Item\(\s*[^,\"();]+,\s*$"),
     re.compile(r"\bMi::List\(\s*[^,\"();]+,\s*[^,\"();]+,\s*$"),
 ]
-TRANSLATES_MENUS = re.compile(r"=>\s*Mi::(?:Item|Menu|Sub|List)\([^;]*?[\w:]+\(\s*label\b")
-TRANSLATES_CMDS = re.compile(r"\blabel\s*[:=]\s*[\w:]+\(\s*\w+\.label\b")
+TRANSLATES_MENUS = re.compile(r"=>\s*Mi::(?:Item|Menu|Sub|List)\([^;]*?[\w:]+\(\s*label\b|\bi18n::menu\s*\(|\.translated\(\)")
+TRANSLATES_CMDS = re.compile(r"\blabel\s*[:=]\s*[\w:]+\(\s*\w+\.label\b|\bi18n::commands\s*\(|\.translated\(\)")
 FIELD = re.compile(r"\b(\w+)\s*:\s*$")
 LIST_CALL = re.compile(r"(?<![\w.])(?:\w+::)*\blist\s*\(\s*&\s*([A-Z_][A-Z0-9_]*)\s*\)")
 

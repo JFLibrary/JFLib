@@ -79,7 +79,7 @@ const ID_RESET: u32 = 101;
 const CMD_RESET: u32 = 1;
 
 const DESC: AppDesc = AppDesc {
-    title: "jfgui Template",
+    title: "JFLib Template",
     flags: AF_RESIZABLE,
     w: 480,
     h: 320,
@@ -1916,8 +1916,13 @@ page). The library's own texts (file dialog, shortcut names, date picker, tree, 
 bar) follow the catalogue's language: German, English, French, Spanish, Italian, Dutch,
 Polish, Arabic and Hebrew (`i18n::library_languages()`), every other language gets English.
 An app without a catalogue stays German; one whose texts are language-neutral can install a
-catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`, as
-`datagallery` does) to let the library follow the user.
+catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`) to let the
+library follow the user. `Catalog::with_library_languages()` adds the library's languages to a
+catalogue: there the library's texts follow the user and Arabic and Hebrew mirror the window,
+while the app's own texts show their English column (the demos, `apps/gallery`). A static
+command table and menus follow with `DESC.translated()` (title, command labels, menu bar) and
+`i18n::menu(table)` (a context menu); write
+`ui::main!({ i18n::set_catalog(..); ui::launch(&DESC.translated(), ..) })`.
 
 **Checking the catalogues**: `python build_rs.py i18n` ([`tools/i18n_check.py`](../tools/i18n_check.py))
 extracts the translatable texts of every app with a catalogue (`apps/NAME/**/locales/*.tsv`)
