@@ -620,6 +620,8 @@ impl Wl {
         }
         self.wp[i].frame_wait = true;
         self.wp[i].frame_t0 = now;
+        #[cfg(jfgui_glibc)]
+        self.gpu_feedback(r.surf, now);
         self.w.send(r.surf, &SURFACE_COMMIT, &[]);
         self.w.flush();
         let first = !self.win[i].mapped;

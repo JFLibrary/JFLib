@@ -183,13 +183,67 @@ pub fn gpu_wait(deadline_us: u64) {
 
 // ------------------------------------------------------------------ test aids, as on Windows
 
+pub const WT_PIXEL: u32 = 1;
+pub const WT_REDRAW: u32 = 2;
+pub const WT_MOVE: u32 = 3;
+pub const WT_DPI: u32 = 4;
+pub const WT_POPUP_RECT: u32 = 7;
 pub const WT_NOANIM: u32 = 16;
 pub const WT_FROM_POINT: u32 = 17;
+pub const WT_SHOW: u32 = 18;
 
-/// (tests) WT_NOANIM: nothing to turn off; WT_FROM_POINT: nobody tells a client what lies on top of
-/// its window: it counts as ours
-pub fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64 {
-    1
+/// (tests)
+///   WT_PIXEL      the colour the window system holds at client pixel a[0], a[1] of window w: X11
+///                 GetImage, Wayland the last shared memory buffer; -1: no way to know (Wayland on
+///                 GPU buffers: a client cannot read a window back)
+///   WT_MOVE       a[0], a[1], a[2], a[3]: the window's rectangle; win_set_rect reports nothing back
+///                 here, the event a size change has on Windows comes from this aid
+///   WT_DPI        a[0]: the dpi as if the compositor preferred that scale (Wayland with a viewport,
+///                 else -1: X11 has one dpi for the display and no second size)
+///   WT_SHOW       a[0] = 7 minimised, 4 back: X11 through the window manager; Wayland can minimise, but
+///                 no client can undo that: 4 does what the compositor's next activation does here
+///   WT_POPUP_RECT popup slot w is shown: 1, else -1
+///   WT_NOANIM, WT_FROM_POINT  nothing to turn off; nobody tells a client what lies on top of its
+///                 window: it counts as ours
+pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
+    match op {
+        WT_PIXEL => match disp_backend() {
+            BK_WAYLAND => match super::wl::gpuw::gpu_test_shm(w) {
+                Some((iw, ih, px)) if a[0] >= 0 && a[1] >= 0 && a[0] < iw && a[1] < ih => {
+                    let o = (a[1] as usize * iw as usize + a[0] as usize) * 4;
+                    px[o] as i64 | (px[o + 1] as i64) << 8 | (px[o + 2] as i64) << 16
+                }
+                _ => -1,
+            },
+            BK_X11 => super::x11::gpux::gpu_test_pixel(w, a[0], a[1]),
+            _ => -1,
+        },
+        WT_MOVE => {
+            crate::win_set_rect(w, a[0], a[1], a[2], a[3]);
+            crate::evq_push(crate::Event { typ: crate::E_RESIZE, x: a[2], y: a[3], win: w as u8, ..crate::Event::default() });
+            1
+        }
+        WT_DPI => match disp_backend() {
+            BK_WAYLAND => super::wl::gpuw::gpu_test_dpi(w, a[0]),
+            _ => -1,
+        },
+        WT_SHOW => {
+            if a[0] == 7 {
+                crate::win_cmd(w, crate::WCMD_MINIMIZE);
+            } else if disp_backend() == BK_WAYLAND {
+                super::wl::gpuw::gpu_test_unminimize(w);
+            } else {
+                crate::win_cmd(w, crate::WCMD_RESTORE);
+            }
+            1
+        }
+        WT_POPUP_RECT => match disp_backend() {
+            BK_WAYLAND => super::wl::gpuw::gpu_test_popup(w),
+            BK_X11 => super::x11::gpux::gpu_test_popup(w),
+            _ => -1,
+        },
+        _ => 1,
+    }
 }
 
 /// (tests) what the window system holds for window w: (w, h, rows of w * 4 bytes): X11 reads it
@@ -204,4 +258,37 @@ pub fn win_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)> {
 /// (tests) a part of the screen: no client on Linux can read it without asking the user
 pub fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>> {
     None
+}
+
+/// (tests) nothing to send to: Windows' messages
+pub fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize {
+    0
+}
+
+/// (tests) (CPU time of this process so far in us, its resident bytes, its anonymous resident bytes)
+pub fn win_test_usage() -> (u64, u64, u64) {
+    let mut ts = [0i64; 2];
+    // SAFETY: CLOCK_PROCESS_CPUTIME_ID into a timespec.
+    unsafe { rt::os::syscall3(228, 2, ts.as_mut_ptr() as usize, 0) };
+    let cpu = ts[0] as u64 * 1_000_000 + ts[1] as u64 / 1000;
+    let (mut rss, mut anon) = (0, 0);
+    if let Some(b) = super::sys::read_file_raw("/proc/self/status") {
+        for ln in b.split(|&c| c == b'\n') {
+            let val = |n: &[u8]| {
+                ln.strip_prefix(n).map_or(0u64, |r| r.iter().filter(|c| c.is_ascii_digit()).fold(0, |v, c| v * 10 + (c - b'0') as u64) * 1024)
+            };
+            rss = rss.max(val(b"VmRSS:"));
+            anon = anon.max(val(b"RssAnon:"));
+        }
+    }
+    (cpu, rss as u64, anon as u64)
+}
+
+/// (bench: jfgui_WL_FEEDBACK=1 on Wayland) the commits since the last call and when each reached the
+/// screen (wp_presentation): (time of the commit, time on the screen; 0: discarded), time_us
+pub fn gpu_test_presented() -> Vec<(u64, u64)> {
+    match disp_backend() {
+        BK_WAYLAND => super::wl::gpuw::gpu_test_presented(),
+        _ => Vec::new(),
+    }
 }

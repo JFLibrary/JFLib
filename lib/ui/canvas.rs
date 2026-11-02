@@ -76,7 +76,7 @@ pub struct CanvasDesc {
 }
 
 /// a canvas of the frame: its command
-#[cfg_attr(not(windows), allow(dead_code))] // (read by gpu_out.rs)
+#[cfg_attr(not(any(windows, jfgui_glibc)), allow(dead_code))] // (read by gpu_out.rs)
 pub(crate) struct Rec {
     pub(crate) layer: u8,
     pub(crate) index: u32,
@@ -86,7 +86,7 @@ pub(crate) struct Rec {
 /// the canvases recorded in the live window's frame
 #[derive(Default)]
 pub(crate) struct W {
-    #[cfg_attr(not(windows), allow(dead_code))] // (read by gpu_out.rs)
+    #[cfg_attr(not(any(windows, jfgui_glibc)), allow(dead_code))] // (read by gpu_out.rs)
     pub(crate) recs: Vec<Rec>,
 }
 

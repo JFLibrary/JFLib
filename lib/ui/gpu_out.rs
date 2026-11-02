@@ -167,7 +167,9 @@ const STABLE_US: u64 = 100_000;
 const RETRY_US: u64 = 2_000;
 /// while a job runs the loop looks this often (us)
 const JOB_US: u64 = 8_000;
-const WORKER_STACK: usize = 2 << 20;
+/// (a driver compiles shaders on this thread; on Linux a stack has exactly this size, on Windows
+/// this is what is committed at the start: docs/GPU.md "Linux")
+const WORKER_STACK: usize = if cfg!(windows) { 2 << 20 } else { 8 << 20 };
 /// the first wait before a new device (ms), its longest
 const RETRY_FIRST_MS: u64 = 2_000;
 const RETRY_MAX_MS: u64 = 300_000;
@@ -221,6 +223,8 @@ const K_MAX: f64 = 1.9;
 const PHASE_TOL: f64 = 1.0 / 64.0;
 /// the scales kept per canvas
 const LEVELS_MAX: usize = 6;
+/// (scripts) a window shows once more, 4 ms between the tries: longer than a display takes to answer
+const SHOW_TRIES: u32 = 300;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
 /// wgsl::compile makes of it, --gen-shaders writes them again)
@@ -471,6 +475,7 @@ struct Win {
     full: bool,    // the texture lacks pixels: the whole frame goes up next
     undef: bool,   // the texture is new (Layout::Undefined)
     pending: bool, // the texture holds pixels that were not presented
+    apart_before: bool, // the last frame had layers, images or canvases apart
     last_present: u64,
     job: u32,      // the job in flight
     size: (i32, i32),
@@ -866,6 +871,9 @@ fn upload(w: &mut Win, core: &Core, fb: &Surface, rects: Option<&[[i32; 4]]>, tr
     let bytes: u64 = rs.iter().map(|r| r[2].max(0) as u64 * r[3].max(0) as u64 * 4).sum();
     w.out.upload_bytes += bytes;
     w.out.upload_base += bytes;
+    if let Some(sc) = &w.sc {
+        sc.damage(if rects.is_some() && before == Layout::Sampled { Some(rs) } else { None });
+    }
     if bytes > BIG_UPLOAD {
         *trim_at = plat::time_us() + TRIM_US;
     }
@@ -965,6 +973,7 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
     w.out.frames += 1;
     if let Some(rb) = &w.rb {
         core.dev.wait(id, 5_000_000_000)?;
+        sc.flush()?;
         let n = fb.w as usize * fb.h as usize * 4;
         w.rb_px.resize(n, 0);
         rb.read(0, &mut w.rb_px[..n])?;
@@ -1225,6 +1234,13 @@ impl Ui {
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
         let soon = t0 < w.last_present + MIN_PRESENT_US && !s.script;
+        // (what changes on the screen is known without layers, images and canvases)
+        let apart = w.sp.drawn || w.sp.active || !w.sp.quads.is_empty();
+        if apart || core::mem::replace(&mut w.apart_before, apart) {
+            if let Some(sc) = &w.sc {
+                sc.damage(None);
+            }
+        }
         // (a frame drawn layer by layer has uploaded its parts)
         let up = if core::mem::take(&mut w.sp.drawn) { Ok(()) } else { upload(w, core, fb, rects, &mut s.trim_at) };
         let r = up.and_then(|_| if soon { Ok(Shown::Wait) } else { show(w, core, fb) });
@@ -1271,6 +1287,7 @@ impl Ui {
             full: true,
             undef: true,
             pending: false,
+            apart_before: false,
             last_present: 0,
             job: 0,
             size: (0, 0),
@@ -1472,7 +1489,13 @@ impl Ui {
                 w.stable_at = t0;
                 again = true;
             } else {
-                match upload(w, core, fb, None, &mut s.trim_at).and_then(|_| show(w, core, fb)) {
+                let ready = w.sc.as_mut().map_or(Ok(true), |sc| sc.prepare());
+                let shown = match ready {
+                    Ok(true) => upload(w, core, fb, None, &mut s.trim_at).and_then(|_| show(w, core, fb)),
+                    Ok(false) => Ok(Shown::Wait), // (Linux: the display has not answered for the images yet)
+                    Err(e) => Err(e),
+                };
+                match shown {
                     Ok(Shown::Done) => {
                         plat::win_gpu_child_show(w.pw, true);
                         plat::win_release_kept(w.pw);
@@ -1521,6 +1544,14 @@ impl Ui {
             }
         }
         for i in 0..n {
+            let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
+            // (Linux: a frame the GPU has finished goes to the window)
+            if matches!(w.stage, Stage::Gpu | Stage::Switch) && w.sc.as_ref().is_some_and(|sc| sc.busy()) {
+                if let Some(Err(e)) = w.sc.as_ref().map(|sc| sc.flush()) {
+                    self.gp_failed(i, e);
+                    continue;
+                }
+            }
             let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
             match w.stage {
                 Stage::Switch => self.gp_switch(i),
@@ -1623,7 +1654,10 @@ impl Ui {
             let Some(w) = s.wins[i].as_mut() else { continue };
             let old = w.sc.take();
             let surf = match w.surf.take() {
-                Some(x) => x,
+                Some(x) => {
+                    x.track_size(); // (Linux: a worker may not ask the window system)
+                    x
+                }
                 None => match gpu::Surface::native(&inst, nw, pw) {
                     Ok(x) => x,
                     Err(_) => {
@@ -1681,9 +1715,15 @@ impl Ui {
                 d = d.min(w.sp.linger_at);
             }
             let minimised = plat::win_state(w.pw) & plat::WST_MINIMIZED != 0;
+            // (Linux: a frame on its way, a display that has not answered yet)
+            let on_way = w.sc.as_ref().is_some_and(|sc| sc.busy());
             match w.stage {
                 Stage::Switch if !minimised => d = d.min(now + RETRY_US),
-                Stage::Gpu if w.pending && !minimised => d = d.min((w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000))),
+                Stage::Gpu if on_way => d = d.min(now + RETRY_US.min(1000)),
+                Stage::Gpu if w.pending && !minimised => {
+                    let retry = (w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000));
+                    d = d.min(w.sc.as_ref().map_or(retry, |sc| sc.next_look(retry)));
+                }
                 Stage::Cpu if ready && !minimised && !moving && w.fail_at != u64::MAX => {
                     // (a size the frame has not reached yet: its event is on the way)
                     let settle = if plat::win_size(w.pw) == w.size { 1000 } else { 16_000 };
@@ -2724,7 +2764,9 @@ impl Ui {
         let mut pw = s.script_pw[i];
         if pw < 0 {
             let off = 40 + 48 * i as i32;
-            pw = plat::win_create("gpu output test", 320, 240, plat::PWF_SYSFRAME | plat::PWF_RESIZABLE, plat::PW_NOOWNER, off, off);
+            // (Linux: one window without an owner, the first)
+            let owner = if cfg!(windows) { plat::PW_NOOWNER } else { s.script_pw.iter().copied().find(|&p| p >= 0).unwrap_or(plat::PW_NOOWNER) };
+            pw = plat::win_create("gpu output test", 320, 240, plat::PWF_SYSFRAME | plat::PWF_RESIZABLE, owner, off, off);
             if pw < 0 {
                 return -1;
             }
@@ -2970,9 +3012,9 @@ impl Ui {
         if let (Dev::Ready(core), Some(Some(w)), Some(fb)) = (&s.dev, s.wins.get_mut(i), fb) {
             (w_px, h_px) = (fb.w, fb.h);
             w.rb_keep = Some(Vec::new());
-            for _ in 0..50 {
+            for _ in 0..SHOW_TRIES {
                 match show(w, core, fb) {
-                    Ok(Shown::Wait) => { plat::wait(plat::time_us() + 4_000); }
+                    Ok(Shown::Wait) => plat::gpu_wait(plat::time_us() + 4_000),
                     _ => break,
                 }
             }
@@ -3017,10 +3059,10 @@ impl Ui {
                 }
                 any = true;
                 let frames = w.out.verified;
-                for _ in 0..50 {
+                for _ in 0..SHOW_TRIES {
                     match show(w, core, fb) {
                         Ok(Shown::Wait) => {
-                            plat::wait(plat::time_us() + 4_000); // no image free now
+                            plat::gpu_wait(plat::time_us() + 4_000); // no image free now
                         }
                         Ok(_) => break,
                         Err(e) => {
@@ -3068,13 +3110,18 @@ impl Ui {
         }
         let Some(fb) = self.uiw_parts(i as u32).map(|p| &p.rt.fb) else { return };
         let (w, h) = (fb.w, fb.h);
-        let px = if screen {
+        let px = if screen && cfg!(windows) {
             plat::win_get_rect(pw).and_then(|r| plat::win_test_screen(r[0], r[1], w, h))
         } else {
             plat::win_test_image(pw).filter(|x| x.0 == w && x.1 == h).map(|x| x.2)
         };
         let Some(px) = px else {
-            self.fail(b"no picture");
+            if cfg!(windows) {
+                self.fail(b"no picture");
+            } else {
+                // (a Wayland client cannot read a window back; X11: the system keeps it at another size)
+                plat::write_stdout(b"note: gpu expect screen: no way to read the window back here (no result)\n");
+            }
             return;
         };
         let mut bad = 0u64;

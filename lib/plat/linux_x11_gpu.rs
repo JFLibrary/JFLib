@@ -479,6 +479,14 @@ impl X11 {
         }
     }
 
+    /// (tests) the colour the server holds at a pixel of the window
+    pub(super) fn gpu_test_pixel(&mut self, w: i32, x: i32, y: i32) -> i64 {
+        match self.image_of(w, [x, y, 1, 1]) {
+            Ok(s) if s.px.len() >= 3 => s.px[0] as i64 | (s.px[1] as i64) << 8 | (s.px[2] as i64) << 16,
+            _ => -1,
+        }
+    }
+
     /// (tests) what the server holds for the window
     pub(super) fn gpu_test_image(&mut self, w: i32) -> Option<(i32, i32, Vec<u8>)> {
         let i = self.rec(w)?;

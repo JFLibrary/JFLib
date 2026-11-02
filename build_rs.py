@@ -181,9 +181,10 @@ LIBS = {
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
-# what a library crate needs on one target only: G3a, the UI's output through the GPU (the other
-# targets do not link Vulkan code: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"]}
+# what a library crate needs on one target only: G3a, G4b, the UI's output through the GPU (Windows;
+# Linux in the build against glibc, section "glibc"; the other targets and the static Linux build do
+# not link Vulkan code: lib/ui/gpu_out_off.rs)
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -1059,7 +1060,7 @@ class Builder:
         independent ones in parallel (once per run: the app builds that run in parallel find
         them ready)"""
         with self.lib_lock:
-            libs = all_libs(self.target)
+            libs = all_libs("linux-glibc" if self.glibc else self.target)
             need = set()
 
             def add(n):

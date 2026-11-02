@@ -193,6 +193,9 @@ pub struct Swapchain {
     dmg_known: Cell<bool>,
     /// the last try_acquire found the display not ready
     waiting: Cell<bool>,
+    /// the first frame after prepare does not wait for the display's answer to the CPU path's last
+    /// frame: with a moving window there always is one on its way
+    first: Cell<bool>,
 }
 
 fn present_mode_of(m: PresentMode) -> PresentMode {
@@ -346,6 +349,7 @@ impl Device {
             dmg_full: Cell::new(false),
             dmg_known: Cell::new(false),
             waiting: Cell::new(false),
+            first: Cell::new(false),
         };
         sc.build()?;
         Ok(sc)
@@ -600,6 +604,7 @@ impl Swapchain {
                 _ => {}
             }
         }
+        self.first.set(true);
         Ok(true)
     }
 
@@ -628,7 +633,7 @@ impl Swapchain {
         }
         self.register()?;
         self.waiting.set(true);
-        if self.flush()? || !plat::gpu_can_show(window) {
+        if self.flush()? || (!self.first.get() && !plat::gpu_can_show(window)) {
             return Ok(TryAcquire::NotReady);
         }
         let n = self.images.len() as u32;
@@ -642,6 +647,7 @@ impl Swapchain {
                     self.next.set((k + 1) % n);
                     self.outstanding.set(true);
                     self.waiting.set(false);
+                    self.first.set(false);
                     return Ok(TryAcquire::Frame(Frame { image: k, generation: self.generation, size: self.extent }));
                 }
                 _ => {}

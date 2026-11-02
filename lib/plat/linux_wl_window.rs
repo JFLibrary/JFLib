@@ -980,6 +980,11 @@ pub(crate) fn wlh_global(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         }
         return;
     }
+    #[cfg(jfgui_glibc)]
+    if iface == b"wp_presentation" {
+        wl.gpu_feedback_setup(name, ver); // (a bench says when a frame reached the screen)
+        return;
+    }
     if iface == b"wl_output" {
         let Some(k) = wl.outs.iter().position(|o| o.id == 0) else { return };
         let v = ver.min(4);

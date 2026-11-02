@@ -66,6 +66,19 @@ static IFACE_PARAMS: Iface = Iface {
     evs: &[Ev { sig: "created:n", h: Some(wlh_params_created) }, Ev { sig: "failed:", h: Some(wlh_params_failed) }],
 };
 
+const PRESENTATION_FEEDBACK: Req = Req { op: 1, sig: "feedback:on", destroy: false };
+
+static IFACE_PRESENTATION: Iface = Iface { name: "wp_presentation", evs: &[Ev { sig: "clock_id:u", h: None }] };
+
+static IFACE_PRESENTATION_FB: Iface = Iface {
+    name: "wp_presentation_feedback",
+    evs: &[
+        Ev { sig: "sync_output:o", h: None },
+        Ev { sig: "presented:uuuuuuu", h: Some(wlh_presented) },
+        Ev { sig: "discarded:", h: Some(wlh_discarded) },
+    ],
+};
+
 static IFACE_GPU_BUFFER: Iface = Iface { name: "wl_buffer", evs: &[Ev { sig: "release:", h: Some(wlh_gpu_release) }] };
 
 /// the compositor's side, one per connection
@@ -84,6 +97,9 @@ pub(crate) struct Dm {
     next: u32,
     /// the loop in wait() goes back to its caller
     pub wake: bool,
+    /// (bench) wp_presentation, what it said
+    pres: u32,
+    presented: Vec<(u64, u64)>,
 }
 
 struct Buf {
@@ -313,6 +329,48 @@ impl Wl {
         if wp.frame_wait { (wp.frame_t0 + FRAME_SAFETY).min(now + RELEASE_LOOK * 10) } else { now + RELEASE_LOOK }
     }
 
+    /// (test aid) as if the compositor preferred the scale of this dpi
+    pub(crate) fn gpu_test_dpi(&mut self, w: i32, dpi: i32) -> i64 {
+        let Some(i) = self.rec(w) else { return -1 };
+        if self.win[i].vp == 0 {
+            return -1;
+        }
+        self.win[i].frac_pref = (dpi as u32 * 120).div_ceil(96);
+        self.update_scale(w);
+        1
+    }
+
+    /// (test aid) what the compositor's next activation does: the state goes
+    pub(crate) fn gpu_test_unminimize(&mut self, w: i32) {
+        if let Some(i) = self.rec(w) {
+            self.win[i].state &= !crate::WST_MINIMIZED;
+        }
+    }
+
+    /// (test aid) popup slot `slot` has a surface: 1, else -1
+    pub(crate) fn gpu_test_popup(&self, slot: i32) -> i64 {
+        if self.popup_shown(slot) { 1 } else { -1 }
+    }
+
+    /// (bench) wp_presentation: bound when the variable says so
+    pub(crate) fn gpu_feedback_setup(&mut self, name: u32, ver: u32) {
+        if self.dm.pres == 0 && crate::env("jfgui_WL_FEEDBACK").is_some() {
+            self.dm.pres = self.w.send(self.g.reg, &REGISTRY_BIND, &[A::U(name), A::B(&IFACE_PRESENTATION, ver.min(1))]);
+        }
+    }
+
+    /// (bench) a commit of window i follows: when does it reach the screen
+    pub(crate) fn gpu_feedback(&mut self, surf: u32, now: u64) {
+        if self.dm.pres != 0 {
+            let fb = self.w.send(self.dm.pres, &PRESENTATION_FEEDBACK, &[A::O(surf), A::N(&IFACE_PRESENTATION_FB)]);
+            self.w.set_udata(fb, now);
+        }
+    }
+
+    pub(crate) fn gpu_test_presented(&mut self) -> Vec<(u64, u64)> {
+        core::mem::take(&mut self.dm.presented)
+    }
+
     /// the socket, whatever the event queue holds
     pub(crate) fn gpu_pump(&mut self, ms: i32) {
         self.dispatch();
@@ -437,4 +495,14 @@ pub(crate) fn frame_done(wl: &mut Wl, i: usize) {
     if core::mem::take(&mut wl.wp[i].gpu.want) {
         wl.dm.wake = true;
     }
+}
+
+/// (bench) wp_presentation_feedback: on the screen (the clock is CLOCK_MONOTONIC, as time_us)
+fn wlh_presented(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    let sec = (a.u(0) as u64) << 32 | a.u(1) as u64;
+    wl.dm.presented.push((u, sec * 1_000_000 + a.u(2) as u64 / 1000));
+}
+
+fn wlh_discarded(wl: &mut Wl, _id: u32, _a: &Args, u: u64) {
+    wl.dm.presented.push((u, 0));
 }

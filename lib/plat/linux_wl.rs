@@ -354,4 +354,24 @@ pub(crate) mod gpuw {
     pub(crate) fn gpu_pump(ms: i32) {
         with(|wl| wl.gpu_pump(ms))
     }
+
+    pub(crate) fn gpu_test_shm(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+        with(|wl| if wl.rec(w).is_some_and(|i| !wl.wp[i].gpu.active) { wl.test_presented(w) } else { None })
+    }
+
+    pub(crate) fn gpu_test_dpi(w: i32, dpi: i32) -> i64 {
+        with(|wl| wl.gpu_test_dpi(w, dpi))
+    }
+
+    pub(crate) fn gpu_test_unminimize(w: i32) {
+        with(|wl| wl.gpu_test_unminimize(w))
+    }
+
+    pub(crate) fn gpu_test_popup(slot: i32) -> i64 {
+        with(|wl| wl.gpu_test_popup(slot))
+    }
+
+    pub(crate) fn gpu_test_presented() -> alloc::vec::Vec<(u64, u64)> {
+        with(|wl| wl.gpu_test_presented())
+    }
 }

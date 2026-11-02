@@ -1173,4 +1173,12 @@ pub(crate) mod gpux {
     pub(crate) fn gpu_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)> {
         with_x(|s| s.gpu_test_image(w))
     }
+
+    pub(crate) fn gpu_test_pixel(w: i32, x: i32, y: i32) -> i64 {
+        with_x(|s| s.gpu_test_pixel(w, x, y))
+    }
+
+    pub(crate) fn gpu_test_popup(slot: i32) -> i64 {
+        with_x(|s| if s.xq.get(slot as usize).is_some_and(|q| q.mapped) { 1 } else { -1 })
+    }
 }

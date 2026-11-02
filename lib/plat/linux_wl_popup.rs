@@ -533,3 +533,11 @@ pub(crate) fn wlh_pop_done(wl: &mut Wl, _id: u32, _a: &Args, u: u64) {
 pub(crate) fn wlh_pop_release(wl: &mut Wl, _id: u32, _a: &Args, u: u64) {
     wl.wq[(u as usize >> 1) & (WQ_MAX - 1)].busy[u as usize & 1] = false;
 }
+
+#[cfg(jfgui_glibc)]
+impl Wl {
+    /// (test aid) popup slot `slot` has a surface
+    pub(crate) fn popup_shown(&self, slot: i32) -> bool {
+        self.wq.get(slot as usize).is_some_and(|q| q.surf != 0)
+    }
+}
