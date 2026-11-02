@@ -307,6 +307,7 @@ fn same_device(adapter: &Adapter, caps: &plat::GpuCaps) -> bool {
 /// (Adapter::can_present) a device of this adapter can show images on the surface
 pub(crate) fn can_present(adapter: &Adapter, surface: &Surface) -> bool {
     adapter.exts.dmabuf
+        && adapter.info.kind != AdapterKind::Cpu
         && same_device(adapter, &surface.0.caps)
         && pick_format(&adapter.inst, adapter.pd, &surface.0.caps, false, false).is_some()
 }
@@ -315,8 +316,8 @@ impl Device {
     pub fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain> {
         let sh = &self.sh;
         sh.check()?;
-        if !sh.dmabuf {
-            return Err(GpuError::Unsupported("images for a window (VK_EXT_image_drm_format_modifier)"));
+        if !sh.features.swapchain {
+            return Err(GpuError::Unsupported("images for a window (VK_EXT_image_drm_format_modifier, not on a CPU adapter)"));
         }
         let (fourcc, vk_format, format, mods) = pick_format(&sh.inst, sh.pd, &surface.0.caps, desc.srgb, desc.copy_src)
             .ok_or(GpuError::Unsupported("a format the display and the device share"))?;

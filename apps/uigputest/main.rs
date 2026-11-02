@@ -56,6 +56,14 @@
 //   uigputest --bench idle|caret      a window with nothing to do / with a blinking caret, until
 //                             --auto-close: frames and uploads on stdout (the process's counters
 //                             are read from outside)
+//     nodmabuf  jfgui_GPU_DMABUF=0 (Linux): the display takes no GPU buffers: the CPU path for good,
+//               no message
+//     refused   jfgui_GPU_DMABUF=refuse (Linux): the display refuses the buffers (as zwp_linux_buffer_
+//               params_v1.failed or an X error would): the CPU path for good, the picture stays
+//   uigputest --bench stages [--n N]  (Linux) one window: a whole page, a small patch, a popup opened
+//                             and closed, a canvas panned, at 60 frames per second, N frames each:
+//                             per frame the CPU time of this process and the GPU time (fdinfo),
+//                             with jfgui_BENCH_KWIN=PID also the compositor's; memory.  jfgui_GPU=0|1
 //   uigputest --bench layers [--n N]  one window of 1920 x 1080 over a full page: a popup, a tooltip,
 //                             a dialog dragged, a big image, N frames each; per scene and frame
 //                             the median and p95 of render, present, bytes uploaded and pixels of
@@ -2098,6 +2106,15 @@ impl App for Test {
                 "images" => self.t_images(ui),
                 "imgplain" => self.t_imgplain(ui),
                 "canvas" => self.t_canvas(ui),
+                "nodmabuf" | "refused" => {
+                    if cfg!(windows) {
+                        out("SKIP: Linux only");
+                        self.done = true;
+                        ui.quit();
+                    } else {
+                        self.t_cpu_only(ui, true);
+                    }
+                }
                 "canvasplain" => self.t_canvas_plain(ui),
                 "canvasoff" => self.t_canvas_off(ui),
                 _ => {
@@ -2372,6 +2389,145 @@ fn report(name: &str, v: &mut [Sample]) {
     let (um, up) = stat(v, |s| s.up);
     let (bm, bp) = stat(v, |s| s.base);
     out(&format!("RESULT {name:<16} n={:<4} render {rm:>6} us (p95 {rp:>6})  present {pm:>6} us (p95 {pp:>6})  upload {um:>9} B (p95 {up:>9})  base px {bm:>8} (p95 {bp:>8})  worst frame {worst} us", v.len()));
+}
+
+/// (Linux) the GPU's time for a process (ns of the render engine) and what the driver has of its
+/// memory (KiB), from its DRM file descriptors (each client once); 0: no number (a compositor with
+/// file capabilities does not show them, kwin_wayland on Fedora)
+#[cfg(not(windows))]
+fn fdinfo(pid: &str) -> (u64, u64) {
+    let (mut ns, mut kib) = (0u64, 0u64);
+    let mut clients: Vec<u64> = Vec::new();
+    for k in 0..256 {
+        let Some(b) = plat::read_file(&format!("/proc/{pid}/fdinfo/{k}")) else { continue };
+        let text = String::from_utf8_lossy(&b);
+        let num = |key: &str| text.lines().find(|l| l.starts_with(key)).and_then(|l| l.split_whitespace().nth(1)).and_then(|v| v.parse::<u64>().ok());
+        let Some(id) = num("drm-client-id:") else { continue };
+        if !clients.contains(&id) {
+            clients.push(id);
+            ns += num("drm-engine-render:").unwrap_or(0);
+            kib += num("drm-total-system0:").unwrap_or(0);
+        }
+    }
+    (ns, kib)
+}
+
+/// (Linux) the CPU time of a process in us (utime + stime of /proc/PID/stat, 10 ms steps)
+#[cfg(not(windows))]
+fn proc_cpu(pid: &str) -> u64 {
+    let Some(b) = plat::read_file(&format!("/proc/{pid}/stat")) else { return 0 };
+    let s = String::from_utf8_lossy(&b);
+    let rest = s.rsplit(')').next().unwrap_or("");
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    let t = |k: usize| f.get(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    (t(11) + t(12)) * 10_000
+}
+
+#[cfg(not(windows))]
+struct StageApp {
+    t: Test,
+    stage: usize,
+    frame: usize,
+    n: usize,
+    wait: u32,
+    started: bool,
+    last: u64,
+    kwin: String,
+    mark: [u64; 7],
+}
+
+#[cfg(not(windows))]
+const STAGE_NAMES: [&str; 4] = ["page", "patch", "popup", "pan"];
+
+#[cfg(not(windows))]
+impl StageApp {
+    fn marks(&self, ui: &Ui) -> [u64; 7] {
+        let (gn, _) = fdinfo("self");
+        let (kn, _) = if self.kwin.is_empty() { (0, 0) } else { fdinfo(&self.kwin) };
+        let o = ui.gpu_output(0);
+        [plat::time_us(), plat::win_test_usage().0, gn, if self.kwin.is_empty() { 0 } else { proc_cpu(&self.kwin) }, kn, o.frames + o.cpu_frames, o.upload_bytes]
+    }
+
+    fn step(&mut self, k: usize) {
+        let sc = &mut self.t.sc;
+        match self.stage {
+            0 => sc.page = k as u32,
+            1 => self.t.patch = 0xFF00_0000 | (k as u32).wrapping_mul(0x0101_17),
+            2 => {
+                sc.panel = [320, 420];
+                sc.mask = if k % 2 == 0 { 2 } else { 0 };
+            }
+            _ => {
+                if let Some(c) = sc.canvas.as_mut() {
+                    c.view.ox = 20.0 + (k % 200) as f64;
+                    c.view.oy = 20.0 + (k % 97) as f64;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl App for StageApp {
+    fn frame(&mut self, ui: &mut Ui) {
+        let o = ui.gpu_output(0);
+        if !self.started {
+            self.t.sc.page_on = true;
+            if o.on || o.never || plat::env("jfgui_GPU").as_deref() == Some("0") {
+                self.wait += 1;
+                if self.wait > 60 {
+                    self.started = true;
+                    self.mark = self.marks(ui);
+                    self.last = plat::time_us();
+                    out(&format!("path: on={} {} ({}), window {}x{}, reserved {} MiB", o.on, o.adapter, o.present_mode, ui.fb().w, ui.fb().h, o.reserved >> 20));
+                }
+            }
+            self.t.frame(ui);
+            ui.timer(1, 8);
+            return;
+        }
+        let now = plat::time_us();
+        if self.stage < STAGE_NAMES.len() && now >= self.last + 16_666 {
+            self.last = now;
+            if self.frame == self.n {
+                let m = self.marks(ui);
+                let d = |i: usize| m[i].saturating_sub(self.mark[i]) as f64 / self.n as f64;
+                out(&format!("RESULT {:<6} n={} ms/frame: wall {:.2}, CPU {:.3}, GPU {:.3}, compositor CPU {:.3}, compositor GPU {:.3}; frames shown {:.0}, upload {:.0} B/frame",
+                    STAGE_NAMES[self.stage], self.n, d(0) / 1000.0, d(1) / 1000.0, d(2) / 1e6, d(3) / 1000.0, d(4) / 1e6, d(5) * self.n as f64, d(6)));
+                self.stage += 1;
+                self.frame = 0;
+                self.t.sc = Scene { page_on: true, ..Scene::default() };
+                if self.stage == 3 {
+                    self.t.sc.page_on = false;
+                    self.t.sc.canvas = Some(TestCanvas { view: CanvasView { scale: 1.0, ox: 20.0, oy: 20.0 }, ver: 1, over: false, mode: CanvasGpu::Zoom });
+                }
+                self.mark = self.marks(ui);
+            } else {
+                self.step(self.frame);
+                self.frame += 1;
+            }
+        }
+        if self.stage >= STAGE_NAMES.len() {
+            let u = plat::win_test_usage();
+            let (_, kib) = fdinfo("self");
+            out(&format!("MEM rss {} KiB, anon {} KiB, GPU driver total {} KiB, reserved {} KiB", u.1 >> 10, u.2 >> 10, kib, o.reserved >> 10));
+            ui.quit();
+        }
+        self.t.frame(ui);
+        ui.timer(1, 8);
+    }
+
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        self.t.command(ui, id, arg)
+    }
+}
+
+#[cfg(not(windows))]
+fn stage_bench(n: usize) -> i32 {
+    let mut app = StageApp { t: new_test("bench"), stage: 0, frame: 0, n, wait: 0, started: false, last: 0, kwin: plat::env("jfgui_BENCH_KWIN").unwrap_or_default(), mark: [0; 7] };
+    app.t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), key: AtomicBool::new(false), press: rt::sync::SpinLock::new(Vec::new()), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
+    let d = AppDesc { w: 1280, h: 800, flags: AF_RESIZABLE, ..DESC };
+    ui::run_window(&d, &mut app, &style::STYLE)
 }
 
 fn layer_bench(n: usize) -> i32 {
@@ -2931,6 +3087,10 @@ fn run() -> i32 {
         if b == "layers" {
             return layer_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(200));
         }
+        #[cfg(not(windows))]
+        if b == "stages" {
+            return stage_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(120));
+        }
         out("--bench latency|idle|caret|layers");
         return 2;
     }
@@ -2956,6 +3116,12 @@ fn run() -> i32 {
     match test.as_str() {
         "noloader" => {
             plat::setenv("jfgui_GPU_DLL", Some("missing-vulkan-loader.dll"));
+        }
+        "nodmabuf" => {
+            plat::setenv("jfgui_GPU_DMABUF", Some("0"));
+        }
+        "refused" => {
+            plat::setenv("jfgui_GPU_DMABUF", Some("refuse"));
         }
         "canvas" | "canvasplain" => {
             plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));

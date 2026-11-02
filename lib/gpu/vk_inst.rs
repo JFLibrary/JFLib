@@ -739,7 +739,7 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         fragment_stores: b10(vk::F10_FRAGMENT_STORES_AND_ATOMICS),
         storage_write_without_format: b10(vk::F10_SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT),
         buffer_address: v12 && b12(vk::F12_BUFFER_DEVICE_ADDRESS),
-        swapchain: exts.swapchain || exts.dmabuf,
+        swapchain: exts.swapchain || (exts.dmabuf && props.device_type != vk::PHYSICAL_DEVICE_TYPE_CPU),
         mesh_shader: ext(b"VK_EXT_mesh_shader\0"),
         ray_query: ext(b"VK_KHR_ray_query\0") && ext(b"VK_KHR_acceleration_structure\0"),
         ray_pipeline: ext(b"VK_KHR_ray_tracing_pipeline\0") && ext(b"VK_KHR_acceleration_structure\0"),

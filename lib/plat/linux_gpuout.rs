@@ -84,6 +84,9 @@ pub struct NativeWindow {
 }
 
 pub fn win_gpu_child(w: i32) -> Option<NativeWindow> {
+    if crate::env("jfgui_GPU_DMABUF").as_deref() == Some("0") {
+        return None; // (tests: a display without them)
+    }
     let caps = match disp_backend() {
         BK_WAYLAND => super::wl::gpuw::gpu_caps(),
         BK_X11 => super::x11::gpux::gpu_caps(w),
@@ -113,6 +116,10 @@ pub fn win_remote_session() -> bool {
 }
 
 pub fn gpu_buf_new(w: i32, d: &GpuBufDesc) -> u32 {
+    if crate::env("jfgui_GPU_DMABUF").as_deref() == Some("refuse") {
+        close_planes(d); // (tests: a display that refuses them)
+        return 0;
+    }
     match disp_backend() {
         BK_WAYLAND => super::wl::gpuw::gpu_buf_new(w, d),
         BK_X11 => super::x11::gpux::gpu_buf_new(w, d),

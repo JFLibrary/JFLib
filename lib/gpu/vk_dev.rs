@@ -144,9 +144,7 @@ pub(crate) struct Shared {
     pub ts_mask: u64,
     #[cfg_attr(jfgui_glibc, allow(dead_code))] // (vk_swap.rs)
     pub swapchain: bool,
-    /// images for a window as dma-bufs (vk_dmabuf.rs)
-    #[cfg_attr(not(jfgui_glibc), allow(dead_code))]
-    pub dmabuf: bool,
+    /// images for a window go to VK_QUEUE_FAMILY_FOREIGN_EXT (vk_dmabuf.rs)
     #[cfg_attr(not(jfgui_glibc), allow(dead_code))]
     pub queue_foreign: bool,
     /// the first timestamp tick read on the device: Timestamps::read_ms counts from it
@@ -431,7 +429,6 @@ impl Adapter {
             raw: self.raw,
             ts_mask,
             swapchain,
-            dmabuf,
             queue_foreign,
             ts_base: AtomicU64::new(0),
             host_query_reset: v12 && e12[vk::F12_HOST_QUERY_RESET] != 0,

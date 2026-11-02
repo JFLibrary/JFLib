@@ -1,5 +1,5 @@
-// gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows only for now):
-// every frame takes the platform's path, no Vulkan code is linked
+// gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows and Linux programs
+// against glibc): every frame takes the platform's path, no Vulkan code is linked
 
 use super::{App, GpuOutput, Ui};
 
@@ -56,22 +56,22 @@ impl Ui {
         GpuOutput { never: true, ..GpuOutput::default() }
     }
 
-    /// (test aid) on Windows: the device behaves as lost from now on
+    /// (test aid) where the GPU shows windows: the device behaves as lost from now on
     pub fn gpu_test_lose(&mut self) {}
 
-    /// on Windows: the pixels of the GPU's images into the framebuffer
+    /// where the GPU shows windows: the pixels of the GPU's images into the framebuffer
     pub fn gpu_settle(&mut self) {}
 
-    /// (test aid) on Windows: the bytes image textures may take
+    /// (test aid) where the GPU shows windows: the bytes image textures may take
     pub fn gpu_test_image_budget(&mut self, _bytes: u64) {}
 
-    /// (test aid) on Windows: the bytes canvas tiles may take
+    /// (test aid) where the GPU shows windows: the bytes canvas tiles may take
     pub fn gpu_test_canvas_budget(&mut self, _bytes: u64) {}
 
-    /// (test aid) on Windows: the tiles go this long (ms) after the last move
+    /// (test aid) where the GPU shows windows: the tiles go this long (ms) after the last move
     pub fn gpu_test_canvas_unused(&mut self, _ms: u64) {}
 
-    /// on Windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+    /// where the GPU shows windows: every canvas whose view comes from tiles goes back to the CPU's picture now
     pub fn gpu_canvas_settle(&mut self) {}
 
     // the script command `gpu` (gpu_out.rs): a SKIP once

@@ -47,6 +47,7 @@ const PRESENT_MASK_IDLE: u32 = 4;
 const XFIXES_QUERY_VERSION: u32 = 0;
 const XFIXES_CREATE_REGION: u32 = 5;
 const XFIXES_SET_REGION: u32 = 11;
+const XFIXES_DESTROY_REGION: u32 = 10;
 const XR_FREE_PIXMAP: u32 = 54;
 const XR_COPY_AREA: u32 = 62;
 
@@ -273,11 +274,16 @@ impl X11 {
         self.flush();
     }
 
-    /// the window is destroyed: its pixmaps go (the region and the event selection with the connection)
+    /// the window is destroyed: its pixmaps and its region go
     pub(super) fn gpu_free_all(&mut self, i: usize) {
         for b in core::mem::take(&mut self.xp[i].gpu.bufs) {
             let (o, _) = self.req(XR_FREE_PIXMAP, 8);
             wr32(&mut self.out, o, b.pixmap);
+        }
+        let region = self.xp[i].gpu.region;
+        if region != 0 {
+            let (o, _) = self.req(self.g.xfixes_op | XFIXES_DESTROY_REGION << 8, 8);
+            wr32(&mut self.out, o, region);
         }
         self.xp[i].gpu = XpGpu::default();
     }
@@ -367,6 +373,9 @@ impl X11 {
         self.g.serial = self.g.serial.wrapping_add(1);
         let serial = self.g.serial;
         self.xp[i].gpu.serial = serial;
+        if self.debug {
+            eprint(&alloc::format!("x11: PresentPixmap {pixmap:x}, serial {serial}, update {update:x}, {} rects at {} us\n", rects.len(), now));
+        }
         let xid = self.xw[i].win;
         let (o, _) = self.req(self.g.present_op | PRESENT_PIXMAP << 8, 72);
         let b = &mut self.out;
@@ -458,6 +467,9 @@ impl X11 {
         let i = self.find(rd32(b, 16));
         if i < 0 {
             return;
+        }
+        if self.debug {
+            eprint(&alloc::format!("x11: Present event {} (mode {}), serial {}, value {:x} at {} us\n", rd16(b, 8), b[11], rd32(b, 20), rd32(b, 24), crate::time_us()));
         }
         let g = &mut self.xp[i as usize].gpu;
         match rd16(b, 8) {

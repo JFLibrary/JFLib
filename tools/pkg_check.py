@@ -598,6 +598,14 @@ def meta_checks(d):
           and any(n.startswith("recent") for n in n5), "flatpak: recent: the host's recently-used.xbel once, with a note")
     files = pkg_linux.flatpak_files(job)
     man, _ = pkg_linux.flatpak_manifest(job, files)
+    # a program against glibc (a UI, build_rs.py section "glibc"): the GPU, and the packages name glibc
+    check("--device=dri" not in man["finish-args"], "flatpak: a static program does not ask for the GPU")
+    job.glibc = True
+    man_g, _ = pkg_linux.flatpak_manifest(job, files)
+    check(man_g["finish-args"].count("--device=dri") == 1, "flatpak: a program against glibc: --device=dri")
+    spec_g = pkg_linux.rpm_spec(job, "t.tar.gz", pkg_linux.rpm_tree(job))
+    check("Requires:       glibc\n" in spec_g and "vulkan-loader" in spec_g, "rpm: a program against glibc names glibc, recommends Vulkan")
+    job.glibc = False
     check(man["id"] == "org.jflib.Fixture" and man["command"] == "jf-fixture" and man["runtime"] == "org.freedesktop.Platform"
           and man["sdk"] == "org.freedesktop.Sdk" and man["finish-args"] == want
           and "lib/jf-fixture/jf-fixture" in files and "share/applications/org.jflib.Fixture.desktop" in files
