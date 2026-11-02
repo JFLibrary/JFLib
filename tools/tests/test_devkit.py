@@ -515,5 +515,16 @@ class IncrementalCache(Temp):
             self.assertEqual(self.check(), (True, ""))
 
 
+class AndroidManifest(unittest.TestCase):
+    """an APK must not require Vulkan: the phones without it have the Bitmap path (tools/android.py)"""
+    def test_vulkan_not_required(self):
+        import android as tool
+        need = '<uses-feature android:name="android.hardware.vulkan.level" />'
+        optional = '<uses-feature android:name="android.hardware.vulkan.version" android:required="false" />'
+        self.assertIn("requires Vulkan", tool.manifest_gaps(None, need))
+        self.assertIsNone(tool.manifest_gaps(None, optional))
+        self.assertIsNone(tool.manifest_gaps(None, '<uses-feature android:name="android.hardware.touchscreen" />'))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

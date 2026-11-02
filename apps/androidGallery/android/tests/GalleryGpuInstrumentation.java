@@ -12,7 +12,7 @@
  *   images    the page "Bild & Leinwand": a canvas pans from tiles, a big image becomes a texture
  *   nogpu     jfgui_GPU_DLL names no library: the CPU path, the resolution the Bitmap path has, it works
  *   off       jfgui_GPU=0: no SurfaceView, the same resolution
- *   bench     numbers, one round (-e gpu 0|1 -e res cap|full): idle CPU and wake-ups, memory, a full frame,
+ *   bench     numbers, one round (-e gpu 0|1 -e res cap|full, -e landscape 1): idle CPU and wake-ups, memory, a full frame,
  *             a small change to the screen, a finger's scroll, and with -e page images a canvas pan; what
  *             reached the screen and when: dumpsys SurfaceFlinger --frametimeline.  No checks.
  * The result has the counters and "skip".
@@ -585,6 +585,7 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
             float sc = w / (float)view.getWidth();
             int bx = Math.round((box.left + 40 - at[0]) * sc), by = Math.round((box.centerY() - at[1]) * sc);
             runOnMainSync(() -> GalleryActivity.nativeEvent(1, 0, 0, bx, by, 0));
+            long smallPresent0 = num(status(), "present_us");
             long[] small = new long[40], smallAt = new long[40];
             for (int i = 0; i < small.length; i++) {
                 final int k = i;
@@ -599,6 +600,7 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
                 });
                 SystemClock.sleep(120);
             }
+            r.putLong("small_present_us", (num(status(), "present_us") - smallPresent0) / small.length);
             wall(r, "small", small);
             toScreen(r, "small", smallAt, ui);
             // ---- a finger's scroll: as a MotionEvent would bring it, one move per vsync
@@ -682,7 +684,8 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
                 case "images": intent = start("jfgui_GPU", "1", "jfgui_GPU_VERIFY", "1", "jfgui_PAGE", "images", "jfgui_GPU_TRACE", "1"); break;
                 case "nogpu": intent = start("jfgui_GPU", "1", "jfgui_GPU_DLL", "/data/local/tmp/no-such-vulkan.so"); break;
                 case "off": intent = start("jfgui_GPU", "0"); break;
-                case "bench": intent = start("jfgui_GPU", args.getString("gpu", "1"), "jfgui_GPU_RES", args.getString("res", "full"), "jfgui_PAGE", args.getString("page", "")); break;
+                case "bench": intent = start("jfgui_GPU", args.getString("gpu", "1"), "jfgui_GPU_RES", args.getString("res", "full"), "jfgui_PAGE", args.getString("page", ""),
+                                             "jfgui_TEST_LANDSCAPE", args.getString("landscape", "0")); break;
                 default: throw new AssertionError("no phase " + phase);
             }
             activity = startActivitySync(intent);
