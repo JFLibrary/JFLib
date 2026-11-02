@@ -9,6 +9,7 @@ use alloc::format;
 use alloc::string::String;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 use crate::{cap, Gal};
 
@@ -43,6 +44,7 @@ const ID_DLG: u32 = 7430; // the content dialog (containers section)
 
 const RANGE_WIN_SIZE: Range = Range::new(1, 100, 1, 0);
 const RF_ANG: RangeF = RangeF::new(-180.0, 180.0, 0.0, 2, 0);
+// i18n
 const POP_ROWS: [&str; 12] = [
     "Neu", "Öffnen", "Speichern", "Drucken", "Kopieren", "Einfügen", "Ausschneiden", "Löschen", "Drehen", "Spiegeln",
     "Zuschneiden", "Schließen",
@@ -52,7 +54,7 @@ const POP_COMBO: [&str; 20] = [
     "Überlagern", "Differenz", "Negation", "Aufhellen", "Abdunkeln", "Bildschirm", "Xor", "Hartes Licht",
     "Weiches Licht", "Farbton", "Sättigung", "Farbe", "Luminanz",
 ];
-const WIN_SHAPES: [&str; 4] = ["Rund", "Eckig", "Weich", "Hart"];
+const WIN_SHAPES: [&str; 4] = ["Rund", "Eckig", "Weich", "Hart"]; // i18n
 
 /// the section's state
 pub(crate) struct S {
@@ -110,19 +112,19 @@ impl Default for S {
 /// gal_win_section: "Fenster" on the page -- open the windows, show their values
 pub(crate) fn win_section(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.win;
-    ui.text(TS_SUBTITLE, "Fenster");
-    ui.text(TS_BODY | TX_SECONDARY, "Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand.");
+    ui.text(TS_SUBTITLE, t("Fenster"));
+    ui.text(TS_BODY | TX_SECONDARY, t("Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand."));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
     ui.next_icon(IC_SETTINGS);
     let mut v = s.tool_open.get();
-    ui.toggle_button(ID_WIN_TOOLBTN, "Werkzeugfenster", &mut v);
+    ui.toggle_button(ID_WIN_TOOLBTN, t("Werkzeugfenster"), &mut v);
     s.tool_open.set(v);
-    if ui.button(ID_WIN_DLGBTN, "Dialogfenster…") & EV_ACT != 0 {
+    if ui.button(ID_WIN_DLGBTN, t("Dialogfenster…")) & EV_ACT != 0 {
         s.dlg_open.set(1);
     }
-    let shape = WIN_SHAPES.get(s.combo as usize).copied().unwrap_or("");
+    let shape = t(WIN_SHAPES.get(s.combo as usize).copied().unwrap_or(""));
     let line = cap(
-        format!("Pinselgröße: {}   Name: {}   Form: {}   Dialog: {}", s.size, s.text, shape, s.result),
+        tf("Pinselgröße: {}   Name: {}   Form: {}   Dialog: {}", &[&format!("{}", s.size), &s.text, shape, &format!("{}", s.result)]),
         192,
     );
     ui.text(TS_BODY, &line);
@@ -132,22 +134,22 @@ pub(crate) fn win_section(g: &mut Gal, ui: &mut Ui) {
 /// gal_statusbar: status bar at the bottom of the window ("Auswahl: %d" of Gal::list_sel)
 pub(crate) fn statusbar(g: &mut Gal, ui: &mut Ui) {
     ui.statusbar_begin();
-    ui.text(TS_CAPTION, "Bereit");
+    ui.text(TS_CAPTION, t("Bereit"));
     ui.separator();
-    ui.text(TS_CAPTION, "200 Einträge");
+    ui.text(TS_CAPTION, t("200 Einträge"));
     ui.separator();
-    let t = cap(format!("Auswahl: {}", g.list_sel), 64);
-    ui.text(TS_CAPTION, &t);
+    let line = cap(tf("Auswahl: {}", &[&format!("{}", g.list_sel)]), 64);
+    ui.text(TS_CAPTION, &line);
     ui.statusbar_end();
 }
 
 /// gal_dialog: the content dialog (Gal::dlg_open / dlg_result; always called, emits nothing
 /// while closed)
 pub(crate) fn dialog(g: &mut Gal, ui: &mut Ui) {
-    if ui.dialog_begin(ID_DLG, "Änderungen speichern?", &g.dlg_open) {
-        ui.text(TS_BODY, "Möchten Sie die Änderungen an „Unbenannt“ speichern?");
-        ui.text(TS_BODY | TX_SECONDARY, "Ungespeicherte Änderungen gehen sonst verloren.");
-        let r = ui.dialog_buttons(Some("Speichern"), None, Some("Abbrechen"));
+    if ui.dialog_begin(ID_DLG, t("Änderungen speichern?"), &g.dlg_open) {
+        ui.text(TS_BODY, t("Möchten Sie die Änderungen an „Unbenannt“ speichern?"));
+        ui.text(TS_BODY | TX_SECONDARY, t("Ungespeicherte Änderungen gehen sonst verloren."));
+        let r = ui.dialog_buttons(Some(t("Speichern")), None, Some(t("Abbrechen")));
         if r != 0 {
             g.dlg_result = r as i32;
         }
@@ -160,45 +162,45 @@ pub(crate) fn dialog(g: &mut Gal, ui: &mut Ui) {
 pub(crate) fn windows(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.win;
     // ---- tool window: its height follows the content
-    if ui.window_begin(ID_WIN_TOOL, "Werkzeuge", Some(&s.tool_open), WF_TOOL | WF_AUTOHEIGHT, Some(&s.tool_rect)) {
+    if ui.window_begin(ID_WIN_TOOL, t("Werkzeuge"), Some(&s.tool_open), WF_TOOL | WF_AUTOHEIGHT, Some(&s.tool_rect)) {
         ui.box_begin(0, BOX_V | PAD_12, 8);
-        ui.text(TS_BODY_STRONG, "Pinsel");
+        ui.text(TS_BODY_STRONG, t("Pinsel"));
         ui.slider(ID_WIN_SLIDER, &mut s.size, &RANGE_WIN_SIZE);
-        let t = cap(format!("Größe: {} px", s.size), 64);
-        ui.text(TS_CAPTION | TX_SECONDARY, &t);
-        ui.textbox(ID_WIN_TEXT, Some("Name des Pinsels"), &mut s.text, 48);
-        ui.combobox(ID_WIN_COMBO, &mut s.combo, &WIN_SHAPES);
-        if ui.button(ID_WIN_RESET, "Zurücksetzen") & EV_ACT != 0 {
+        let line = cap(tf("Größe: {} px", &[&format!("{}", s.size)]), 64);
+        ui.text(TS_CAPTION | TX_SECONDARY, &line);
+        ui.textbox(ID_WIN_TEXT, Some(t("Name des Pinsels")), &mut s.text, 48);
+        ui.combobox(ID_WIN_COMBO, &mut s.combo, &list(&WIN_SHAPES));
+        if ui.button(ID_WIN_RESET, t("Zurücksetzen")) & EV_ACT != 0 {
             s.size = 20;
             s.combo = 0;
         }
-        ui.tooltip("Setzt Größe und Form zurück");
+        ui.tooltip(t("Setzt Größe und Form zurück"));
         if s.dup {
-            ui.button(ID_BTN, "Standard (Kopie)"); // the same id as a main window button
+            ui.button(ID_BTN, t("Standard (Kopie)")); // the same id as a main window button
         }
         ui.box_end();
     }
     ui.window_end();
 
     // ---- modal dialog window with a footer; it can open a nested dialog window
-    if ui.window_begin(ID_WIN_DLG, "Bild bearbeiten", Some(&s.dlg_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&s.dlg_rect)) {
-        ui.text(TS_BODY | TX_WRAP, "Die Änderung wird auf das ganze Bild angewendet.");
-        ui.checkbox(ID_WIN_DLG_CB, "Kanten glätten", &mut s.dlg_cb);
-        if ui.button(ID_WIN_MORE, "Weitere Optionen…") & EV_ACT != 0 {
+    if ui.window_begin(ID_WIN_DLG, t("Bild bearbeiten"), Some(&s.dlg_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&s.dlg_rect)) {
+        ui.text(TS_BODY | TX_WRAP, t("Die Änderung wird auf das ganze Bild angewendet."));
+        ui.checkbox(ID_WIN_DLG_CB, t("Kanten glätten"), &mut s.dlg_cb);
+        if ui.button(ID_WIN_MORE, t("Weitere Optionen…")) & EV_ACT != 0 {
             s.nested_open.set(1);
         }
-        if ui.window_begin(ID_WIN_NESTED, "Weitere Optionen", Some(&s.nested_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&s.nest_rect)) {
-            ui.checkbox(ID_WIN_NEST_CB, "Farbprofil einbetten", &mut s.nest_cb);
+        if ui.window_begin(ID_WIN_NESTED, t("Weitere Optionen"), Some(&s.nested_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&s.nest_rect)) {
+            ui.checkbox(ID_WIN_NEST_CB, t("Farbprofil einbetten"), &mut s.nest_cb);
             // (U3) a single-line text box in a dialog without a primary button: Enter commits
-            if ui.textbox(ID_WIN_NEST_TB, Some("Profilname"), &mut s.nest_text, 32) & EV_COMMIT != 0 {
+            if ui.textbox(ID_WIN_NEST_TB, Some(t("Profilname")), &mut s.nest_text, 32) & EV_COMMIT != 0 {
                 s.nest_commits += 1;
             }
-            let t = cap(format!("Übernommen: {}", s.nest_commits), 64);
-            ui.text(TS_CAPTION | TX_SECONDARY, &t);
-            ui.dialog_buttons(None, None, Some("Schließen"));
+            let line = cap(tf("Übernommen: {}", &[&format!("{}", s.nest_commits)]), 64);
+            ui.text(TS_CAPTION | TX_SECONDARY, &line);
+            ui.dialog_buttons(None, None, Some(t("Schließen")));
         }
         ui.window_end();
-        let r = ui.dialog_buttons(Some("OK"), None, Some("Abbrechen"));
+        let r = ui.dialog_buttons(Some("OK"), None, Some(t("Abbrechen")));
         if r != 0 {
             s.result = r as i32;
         }
@@ -209,9 +211,9 @@ pub(crate) fn windows(g: &mut Gal, ui: &mut Ui) {
 /// gal_val_window: tool window "Werte": a property row and an angle dial (Gal::win_val_open,
 /// Gal::ang)
 pub(crate) fn val_window(g: &mut Gal, ui: &mut Ui) {
-    if ui.window_begin(ID_WIN_VAL, "Werte", Some(&g.win_val_open), WF_TOOL | WF_AUTOHEIGHT, Some(&g.win.val_rect)) {
+    if ui.window_begin(ID_WIN_VAL, t("Werte"), Some(&g.win_val_open), WF_TOOL | WF_AUTOHEIGHT, Some(&g.win.val_rect)) {
         ui.box_begin(0, BOX_V | PAD_12, 8);
-        ui.prop_slider_f(ID_WIN_VAL_PROP, "Winkel", &mut g.ang, &RF_ANG, Some(0.0));
+        ui.prop_slider_f(ID_WIN_VAL_PROP, t("Winkel"), &mut g.ang, &RF_ANG, Some(0.0));
         ui.angle(ID_WIN_VAL_ANG, &mut g.ang, 0);
         ui.box_end();
     }
@@ -230,22 +232,22 @@ pub(crate) fn pop_window(g: &mut Gal, ui: &mut Ui) {
     }
     if ui.window_begin(ID_WIN_POP, "Popups", Some(&s.pop_open), WF_TOOL, Some(&s.pop_rect)) {
         ui.box_begin(0, BOX_V | PAD_12, 8);
-        ui.dropdown_button(ID_WIN_POP_MENU, "Menü");
+        ui.dropdown_button(ID_WIN_POP_MENU, t("Menü"));
         if ui.flyout_begin(ID_WIN_POP_MENU, 0) {
             for (k, row) in POP_ROWS.iter().enumerate() {
-                if ui.menu_item(ID_WIN_POP_ITEM + k as u32, row) & EV_ACT != 0 {
+                if ui.menu_item(ID_WIN_POP_ITEM + k as u32, t(*row)) & EV_ACT != 0 {
                     s.pop_last = k as i32 + 1; // row + 1 (0 = none yet)
                 }
             }
         }
         ui.flyout_end();
-        ui.combobox(ID_WIN_POP_COMBO, &mut s.pop_sel, &POP_COMBO);
-        ui.button(ID_WIN_POP_TIP, "Hinweis");
-        ui.tooltip("Ein Tooltip, der über den unteren Rand des Fensters hinausragt");
+        ui.combobox(ID_WIN_POP_COMBO, &mut s.pop_sel, &list(&POP_COMBO));
+        ui.button(ID_WIN_POP_TIP, t("Hinweis"));
+        ui.tooltip(t("Ein Tooltip, der über den unteren Rand des Fensters hinausragt"));
         // the last menu row chosen
-        let last = if s.pop_last == 0 { "–" } else { POP_ROWS[(s.pop_last - 1) as usize] };
-        let t = cap(format!("Zuletzt: {}", last), 64);
-        ui.text(TS_CAPTION | TX_SECONDARY, &t);
+        let last = if s.pop_last == 0 { "–" } else { t(POP_ROWS[(s.pop_last - 1) as usize]) };
+        let line = cap(tf("Zuletzt: {}", &[last]), 64);
+        ui.text(TS_CAPTION | TX_SECONDARY, &line);
         ui.box_end();
     }
     ui.window_end();

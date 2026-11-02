@@ -716,7 +716,7 @@ def check_csd(a):
         env = {"jfgui_CSD": "1"}
         if layout:
             env["jfgui_BUTTON_LAYOUT"] = layout
-        app = App(exe, ["--log-events", "--size", "900x600", "--auto-close", "90000"], backend, "jfgui Galerie", env=env,
+        app = App(exe, ["--log-events", "--size", "900x600", "--auto-close", "90000"], backend, "JFLib Galerie", env=env,
                   log=f"build/x11check_csd_{backend}_{tag}.log")
 
         def end():
@@ -1184,7 +1184,7 @@ def check_windows(a):
     old_tool = {w[0] for w in wslcap.windows_with_title("Werkzeuge")}
     old_dlg = {w[0] for w in wslcap.windows_with_title("Bild bearbeiten")}
     app = App(exe, ["--size", "1000x800", "--anim", "off", "--theme", "light", "--log-events"], backend,
-              "jfgui Galerie", env=env, log=f"build/x11check_windows_{backend}.log")
+              "JFLib Galerie", env=env, log=f"build/x11check_windows_{backend}.log")
     hwnd = app.window()
     if not check(hwnd is not None, f"{backend}: main window appears"):
         app.kill()
@@ -1255,7 +1255,7 @@ def rail_click(hwnd, x, y, tries_ms=10000):
 def run_windows(a, backend, app, hwnd, notches, b_tool, b_dlg, w_tool, cancel, tool_png, dlg_png,
                 old_tool, old_dlg):
     time.sleep(1.5)
-    avoid_cursor(hwnd, "jfgui Galerie", backend)
+    avoid_cursor(hwnd, "JFLib Galerie", backend)
     org = content_origin(app, hwnd, backend)
     if not check(org is not None, f"{backend}: position of the main window's client area", str(org)):
         return
@@ -1289,7 +1289,7 @@ def run_windows(a, backend, app, hwnd, notches, b_tool, b_dlg, w_tool, cancel, t
         wslcap.write_png(os.path.join(a.out_dir, f"x11check_windows_{backend}_main.png"), *wslcap.capture(hwnd, False)[:3])
         return
     time.sleep(1.5)                             # WSLg shows new RAIL windows late
-    main_x = xprops("jfgui Galerie", "Werkzeuge") if backend == "x11" else {}
+    main_x = xprops("JFLib Galerie", "Werkzeuge") if backend == "x11" else {}
     avoid_cursor(tool, "Werkzeuge", backend)
     w, h, px, _ = wait_content(tool)
     wslcap.write_png(os.path.join(a.out_dir, f"x11check_windows_{backend}_tool.png"), w, h, px)
@@ -1299,7 +1299,7 @@ def run_windows(a, backend, app, hwnd, notches, b_tool, b_dlg, w_tool, cancel, t
     print(f"RAIL: main {r}, tool {(tr.left, tr.top, tr.right, tr.bottom)}, "
           f"owner {user32.GetWindow(tool, 4)}, ex-style {hex(user32.GetWindowLongW(tool, -20) & 0xFFFFFFFF)}")
     if backend == "x11":
-        m, t = main_x.get("jfgui Galerie"), main_x.get("Werkzeuge")
+        m, t = main_x.get("JFLib Galerie"), main_x.get("Werkzeuge")
         if check(bool(m and t), "x11: the X client finds both windows", str(list(main_x))):
             check(t["transient_for"] == [m["id"]], "x11: WM_TRANSIENT_FOR = the main window",
                   f"{t['transient_for']} vs {m['id']}")
@@ -1338,11 +1338,11 @@ def run_windows(a, backend, app, hwnd, notches, b_tool, b_dlg, w_tool, cancel, t
                   f"{ev[-1] if ev else 'no E_WINPOS'} / X {t2.get('root')}")
             # a docked tool window (centre inside the main client area) follows the main window
             # (by the distance the window manager really moved it)
-            m1 = xprops("jfgui Galerie").get("jfgui Galerie", {})
-            xprops("jfgui Galerie", "wmmove=60,45")
+            m1 = xprops("JFLib Galerie").get("JFLib Galerie", {})
+            xprops("JFLib Galerie", "wmmove=60,45")
             time.sleep(1.5)
-            both = xprops("jfgui Galerie", "Werkzeuge")
-            m2, t3 = both.get("jfgui Galerie", {}), both.get("Werkzeuge", {})
+            both = xprops("JFLib Galerie", "Werkzeuge")
+            m2, t3 = both.get("JFLib Galerie", {}), both.get("Werkzeuge", {})
             ok = bool(m1.get("root") and m2.get("root") and t2.get("root") and t3.get("root"))
             mdx = m2["root"][0] - m1["root"][0] if ok else 0
             mdy = m2["root"][1] - m1["root"][1] if ok else 0
@@ -1381,8 +1381,8 @@ def run_windows(a, backend, app, hwnd, notches, b_tool, b_dlg, w_tool, cancel, t
     time.sleep(1.0)
     avoid_cursor(dlg, "Bild bearbeiten", backend)
     if backend == "x11":
-        d = xprops("jfgui Galerie", "Bild bearbeiten")
-        m, t = d.get("jfgui Galerie"), d.get("Bild bearbeiten")
+        d = xprops("JFLib Galerie", "Bild bearbeiten")
+        m, t = d.get("JFLib Galerie"), d.get("Bild bearbeiten")
         if check(bool(m and t), "x11: the X client finds the dialog"):
             check(t["transient_for"] == [m["id"]] and t["type"][:1] == ["_NET_WM_WINDOW_TYPE_DIALOG"]
                   and ("_NET_WM_STATE_MODAL" in t["state"] or (not t["state"] and d.get("_wm", "").startswith("Weston"))),
@@ -1466,7 +1466,7 @@ def run_popups(a, exe, refs, toolwin):
     old_sub = {w[0] for w in wslcap.windows_with_title("sub-surface")}
     app = App(exe, ["--size", "1000x800", "--anim", "off", "--theme", "light", "--log-events",
                     "--popups-window", "--auto-close", "90000"], backend,
-              "jfgui Galerie", env=env, log=f"build/x11check_popups_{name}.log")
+              "JFLib Galerie", env=env, log=f"build/x11check_popups_{name}.log")
     try:
         hwnd = app.window()
         if toolwin == "child":
@@ -1477,7 +1477,7 @@ def run_popups(a, exe, refs, toolwin):
                 return
             sub = rail_by_title("sub-surface", old_sub, 10)
             time.sleep(1.5)
-            avoid_cursor(hwnd, "jfgui Galerie", backend)
+            avoid_cursor(hwnd, "JFLib Galerie", backend)
             r = app.rect()
             if sub and user32.GetWindow(sub, 4) == hwnd:
                 w, h, px, _ = wait_content(sub)
@@ -1608,13 +1608,13 @@ def check_edges(a):
     env = {"jfgui_WLDEBUG": "1"} if backend == "wayland" else {}
     app = App(exe, ["--size", "600x360", "--anim", "off", "--theme", "light", "--log-events",
                     "--popup-edges", "--auto-close", "90000"], backend,
-              "jfgui Galerie", env=env, log=f"build/x11check_edges_{backend}.log")
+              "JFLib Galerie", env=env, log=f"build/x11check_edges_{backend}.log")
     try:
         hwnd = app.window()
         if not check(hwnd is not None, f"{backend}: the main window appears"):
             return
         time.sleep(1.5)
-        avoid_cursor(hwnd, "jfgui Galerie", backend)
+        avoid_cursor(hwnd, "JFLib Galerie", backend)
         off = content_origin(app, hwnd, backend)
         if off is None:
             w, h, px, _ = wait_content(hwnd)
@@ -1665,7 +1665,7 @@ def check_edges(a):
         # window moved up first, so that the monitor has room below it)
         if backend == "x11":
             vt = user32.GetSystemMetrics(77)
-            xprops("jfgui Galerie", f"wmmove=0,{vt + 40 - r[1]}")
+            xprops("JFLib Galerie", f"wmmove=0,{vt + 40 - r[1]}")
             time.sleep(1.5)
             r = app.rect()
             off = content_origin(app, hwnd, backend) or off

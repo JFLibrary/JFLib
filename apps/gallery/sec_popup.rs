@@ -11,6 +11,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 use crate::{cap, Gal, TOOL_ICONS, TOOL_NAMES};
 
@@ -113,7 +114,7 @@ static M_THEME: [Mi; 2] = [Mi::Cmd(CMD_LIGHT), Mi::Cmd(CMD_DARK)];
 static M_RECENT: [Mi; 3] = [Mi::List(CMD_RECENT0, 8, "Keine Dateien"), Mi::Sep, Mi::Cmd(CMD_RECENT_CLEAR)];
 pub(crate) static M_CTX: [Mi; 5] = [Mi::Cmd(CMD_CUT), Mi::Cmd(CMD_COPY), Mi::Cmd(CMD_PASTE), Mi::Sep, Mi::Item(ID_CTX_INFO, "&Eigenschaften", IC_INFO)];
 const PM_SHAPES: [&str; 5] = ["Kreis", "Quadrat", "Dreieck", "Stern", "Sechseck"];
-const PM_WIDTH_NAMES: [&str; 3] = ["Fein", "Mittel", "Breit"];
+const PM_WIDTH_NAMES: [&str; 3] = ["Fein", "Mittel", "Breit"]; // i18n
 
 /// the section's state (g_pm_*, g_recent*, g_cst_ok, g_f4_count)
 pub(crate) struct S {
@@ -176,40 +177,40 @@ pub(crate) fn menubar_top(g: &mut Gal, ui: &mut Ui) {
 /// gal_menus: "Menüs & Auswahl" -- combo box, drop-down and split buttons with flyouts,
 /// command buttons with tooltips, a context menu and a status line
 pub(crate) fn menus(g: &mut Gal, ui: &mut Ui) {
-    ui.text(TS_SUBTITLE, "Menüs & Auswahl");
+    ui.text(TS_SUBTITLE, t("Menüs & Auswahl"));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     // combo box
-    ui.combobox(ID_COMBO, &mut g.pop.shape, &PM_SHAPES);
+    ui.combobox(ID_COMBO, &mut g.pop.shape, &list(&PM_SHAPES));
     // drop-down button with a menu-like flyout
-    ui.dropdown_button(ID_DROP, "Stärke");
+    ui.dropdown_button(ID_DROP, t("Stärke"));
     if ui.flyout_begin(ID_DROP, FL_BELOW) {
         for i in 0..3 {
             if g.pop.width == i {
                 ui.next_flags(ST_CHECKED);
             }
-            if ui.menu_item(ID_DROP_ITEM + i as u32, PM_WIDTH_NAMES[i as usize]) & EV_ACT != 0 {
+            if ui.menu_item(ID_DROP_ITEM + i as u32, t(PM_WIDTH_NAMES[i as usize])) & EV_ACT != 0 {
                 g.pop.width = i;
             }
         }
         ui.menu_sep();
-        if ui.button(ID_DROP_CLOSE, "Schließen") & EV_ACT != 0 {
+        if ui.button(ID_DROP_CLOSE, t("Schließen")) & EV_ACT != 0 {
             ui.popup_close();
         }
     }
     ui.flyout_end();
     // split button: the main part pastes, the chevron offers variants
     ui.next_icon(IC_PASTE);
-    if ui.split_button(ID_SPLIT, "Einfügen") & EV_ACT != 0 {
+    if ui.split_button(ID_SPLIT, t("Einfügen")) & EV_ACT != 0 {
         ui.cmd_run(CMD_PASTE, 0);
     }
     if ui.flyout_begin(ID_SPLIT, FL_BELOW) {
         ui.menu_cmd(CMD_PASTE);
-        if ui.menu_item(ID_SPLIT_TEXT, "Als Text einfügen") & EV_ACT != 0 {
-            set_last(g, "Als Text einfügen");
+        if ui.menu_item(ID_SPLIT_TEXT, t("Als Text einfügen")) & EV_ACT != 0 {
+            set_last(g, t("Als Text einfügen"));
         }
         ui.next_icon(IC_PHOTO);
-        if ui.menu_item(ID_SPLIT_IMAGE, "Als Bild einfügen") & EV_ACT != 0 {
-            set_last(g, "Als Bild einfügen");
+        if ui.menu_item(ID_SPLIT_IMAGE, t("Als Bild einfügen")) & EV_ACT != 0 {
+            set_last(g, t("Als Bild einfügen"));
         }
     }
     ui.flyout_end();
@@ -221,16 +222,13 @@ pub(crate) fn menus(g: &mut Gal, ui: &mut Ui) {
 
     // a context menu on a button, and the status line
     ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
-    ui.button(ID_CTX, "Rechtsklick hier");
-    ui.context_menu(&M_CTX);
+    ui.button(ID_CTX, t("Rechtsklick hier"));
+    ui.context_menu(i18n::menu(&M_CTX));
     let p = &g.pop;
     let s = cap(
-        format!(
+        tf(
             "Letzter Befehl: {}   Form: {}   Stärke: {}   Zoom: {} %",
-            p.last,
-            strlist_at(&PM_SHAPES, p.shape),
-            PM_WIDTH_NAMES[p.width as usize],
-            p.zoom
+            &[&p.last, t(strlist_at(&PM_SHAPES, p.shape)), t(PM_WIDTH_NAMES[p.width as usize]), &format!("{}", p.zoom)],
         ),
         192,
     );
@@ -242,23 +240,23 @@ pub(crate) fn menus(g: &mut Gal, ui: &mut Ui) {
 /// has checked rows with icons (check column + icon column); command state count
 pub(crate) fn toolrow(g: &mut Gal, ui: &mut Ui) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.text(TS_BODY, "Werkzeug:");
+    ui.text(TS_BODY, t("Werkzeug:"));
     ui.next_icon(TOOL_ICONS[g.tool as usize]);
     ui.next_flags(ST_SUBTLE | ST_ICON_ONLY);
-    ui.dropdown_button(ID_TOOLDROP, TOOL_NAMES[g.tool as usize]);
+    ui.dropdown_button(ID_TOOLDROP, t(TOOL_NAMES[g.tool as usize]));
     if ui.flyout_begin(ID_TOOLDROP, FL_BELOW) {
         for i in 0..6 {
             if g.tool == i as i32 {
                 ui.next_flags(ST_CHECKED);
             }
             ui.next_icon(TOOL_ICONS[i]);
-            if ui.menu_item(ID_TOOLITEM + i as u32, TOOL_NAMES[i]) & EV_ACT != 0 {
+            if ui.menu_item(ID_TOOLITEM + i as u32, t(TOOL_NAMES[i])) & EV_ACT != 0 {
                 g.tool = i as i32;
             }
         }
     }
     ui.flyout_end();
-    let s = cap(format!("Befehlszustände: {}", g.pop.cst_ok), 64);
+    let s = cap(tf("Befehlszustände: {}", &[&format!("{}", g.pop.cst_ok)]), 64);
     ui.text(TS_BODY | TX_SECONDARY, &s);
     ui.box_end();
 }
@@ -266,7 +264,7 @@ pub(crate) fn toolrow(g: &mut Gal, ui: &mut Ui) {
 /// gal_menu_cmd(id, arg) -> handled: the menu commands CMD_NEW .. CMD_LAST, ID_CTX_INFO
 pub(crate) fn menu_cmd(g: &mut Gal, ui: &mut Ui, id: u32, _arg: u32) -> bool {
     if id == ID_CTX_INFO {
-        set_last(g, "Eigenschaften");
+        set_last(g, t("Eigenschaften"));
         return true;
     }
     if !(CMD_NEW..CMD_LAST).contains(&id) {
@@ -341,7 +339,7 @@ pub(crate) fn u1_cmd(g: &mut Gal, ui: &mut Ui, id: u32, _arg: u32) -> bool {
         }
         CMD_TOOLS_F4 => {
             g.pop.f4_count += 1;
-            set_last(g, "Eigenschaften (F4)");
+            set_last(g, t("Eigenschaften (F4)"));
         }
         _ => return false,
     }

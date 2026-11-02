@@ -226,6 +226,9 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
 
 - **`const NONE: AppDesc = AppDesc { title: "", flags: 0, w: 0, h: 0, min_w: 0, min_ ...`**
   every field empty / zero
+- **`fn translated(&self) -> AppDesc`**
+  a copy in the UI language (after i18n::set_catalog): the title, the command table's and
+  the menu bar's labels
 
 - **`trait App`**
   the app's callbacks (APP_DESC on_init, on_frame, on_command)
@@ -3267,11 +3270,17 @@ i18n -- languages, translation catalogues, regional formats and messages
                                       the current language (the source when missing)
   month_name(m) / month_short(m) / weekday_short(d)   calendar names of the UI language
                                       (m 1..12, d 0 = Mon)
+  Catalog::with_library_languages()   also offer the languages of the library's own texts;
+                                      the app's texts show their English column in them
   set_catalog(catalog) / t(s)         the app's catalogue for the whole process: t(s) is the
-                                      text in the current language (German source when
-                                      missing).  Unless set_language came first, the column
-                                      is negotiated with the user's languages
+                                      text in the current language (the library's text, then
+                                      the English column, then the German source when the
+                                      cell is missing).  Unless set_language came first, the
+                                      column is negotiated with the user's languages
+  commands(table) / menu(table)       a static command table or menu in the current language
+                                      (a copy made once per table and language)
   fill(text, args)                    "{}" placeholders replaced in order
+  tf(s, args) / list(&TABLE)          t with its "{}" filled; a table of texts through t
   msg(text, args)                     named / numbered placeholders, plurals, select,
                                       numbers and dates in the user's format (i18n_msg.rs)
   locale(), Locale, fmt_*, plural     regional formats and plural rules (i18n_locale.rs)
@@ -3347,6 +3356,11 @@ LANG_EN: u32 = 1
 - **`fn from_tsv(text: &'static str) -> Catalog`**
   parse a TSV catalogue (first line: the language codes); "\\n" and "\\t" escapes in the
   cells are not interpreted
+- **`fn with_library_languages(mut self) -> Catalog`**
+  also offer the languages of the library's own texts (library_languages): there the
+  library's texts follow the user and Arabic and Hebrew mirror the window, while the app's
+  own texts show their English column.  The browser bundle has no font for Arabic and
+  Hebrew: there they stay out, the user gets English instead of empty boxes
 - **`fn languages(&self) -> &[String]`**
   the language codes of the columns ("de", "en", ...)
 - **`fn tr<'a>(&'a self, s: &'a str) -> &'a str`**
@@ -3361,7 +3375,19 @@ LANG_EN: u32 = 1
 
 - **`fn t(s: &'static str) -> &'static str`**
   the app's text in the current language: the installed catalogue, then the library's own
-  texts, then the German source
+  texts, then the catalogue's English column, then the German source
+
+- **`fn commands(src: &'static [Command]) -> &'static [Command]`**
+  a command table (static, German) in the current language, made once per table and language
+
+- **`fn menu(src: &'static [Mi]) -> &'static [Mi]`**
+  a menu (static, German) in the current language, made once per menu and language
+
+- **`fn tf(s: &'static str, args: &[&str]) -> String`**
+  the app's text in the current language with its "{}" placeholders filled in order
+
+- **`fn list(items: &[&'static str]) -> Vec<&'static str>`**
+  a table of the app's texts in the current language (combo boxes, tabs)
 
 - **`fn fill(text: &str, args: &[&str]) -> String`**
   replace the "{}" placeholders of a text in order

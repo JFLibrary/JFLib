@@ -48,8 +48,9 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, list, Catalog};
 
-const DESC: AppDesc = AppDesc { title: "jfgui Editoren", flags: AF_RESIZABLE, w: 1000, h: 680, min_w: 480, min_h: 360, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "JFLib Editoren", flags: AF_RESIZABLE, w: 1000, h: 680, min_w: 480, min_h: 360, ..AppDesc::NONE }; // i18n
 
 static MONO: &[u8] = include_bytes!("../../lib/doc_view/assets/DejaVuSansMono.ttf");
 static MONO_B: &[u8] = include_bytes!("../../lib/doc_view/assets/DejaVuSansMono-Bold.ttf");
@@ -89,6 +90,7 @@ const CMD_FOLD_ALL: u32 = 910;
 const CMD_UNFOLD_ALL: u32 = 911;
 const CMD_BIG_JFS: u32 = 912;
 
+const TABS: [&str; 2] = ["Rich-Text", "Code"];
 const LANGS: [&str; 7] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text", "JFS"];
 const JFS: i32 = 6;
 
@@ -168,41 +170,41 @@ pub fn sample_rich() -> RichDoc {
     let serif = Fmt { font: String::from("DejaVu Serif"), ..Fmt::default() };
     let hl = Fmt { bg: 0xFFFFF27A, ..Fmt::default() };
     RichDoc::from_paras(alloc::vec![
-        Para::new().with("Fertiges Rich-Text-Widget", Fmt::default()).attrs(RA_LEFT, LS_NONE, 0, PS_H1),
+        Para::new().with(t("Fertiges Rich-Text-Widget"), Fmt::default()).attrs(RA_LEFT, LS_NONE, 0, PS_H1),
         Para::new()
-            .with("Ein Absatz mit ", Fmt::default())
-            .with("fett", Fmt::bold())
+            .with(t("Ein Absatz mit "), Fmt::default())
+            .with(t("fett"), Fmt::bold())
             .with(", ", Fmt::default())
-            .with("kursiv", Fmt::italic())
+            .with(t("kursiv"), Fmt::italic())
             .with(", ", Fmt::default())
-            .with("unterstrichen", Fmt::flags(RF_UNDER))
+            .with(t("unterstrichen"), Fmt::flags(RF_UNDER))
             .with(", ", Fmt::default())
-            .with("durchgestrichen", Fmt::flags(RF_STRIKE))
+            .with(t("durchgestrichen"), Fmt::flags(RF_STRIKE))
             .with(", ", Fmt::default())
-            .with("rot", red)
+            .with(t("rot"), red)
             .with(", ", Fmt::default())
-            .with("groß", big)
+            .with(t("groß"), big)
             .with(", ", Fmt::default())
-            .with("Serifen", serif)
+            .with(t("Serifen"), serif)
             .with(", ", Fmt::default())
-            .with("markiert", hl)
-            .with(" und einem ", Fmt::default())
-            .with("Link", Fmt::link("https://example.org/jflib"))
+            .with(t("markiert"), hl)
+            .with(t(" und einem "), Fmt::default())
+            .with(t("Link"), Fmt::link("https://example.org/jflib"))
             .with(".", Fmt::default()),
-        Para::new().with("Listen", Fmt::default()).attrs(RA_LEFT, LS_NONE, 0, PS_H2),
-        Para::plain("Erster Punkt").attrs(RA_LEFT, LS_BULLET, 0, PS_NORMAL),
-        Para::plain("Zweiter Punkt mit Unterpunkt").attrs(RA_LEFT, LS_BULLET, 0, PS_NORMAL),
-        Para::plain("Unterpunkt").attrs(RA_LEFT, LS_BULLET, 1, PS_NORMAL),
-        Para::plain("Schritt eins").attrs(RA_LEFT, LS_NUMBER, 0, PS_NORMAL),
-        Para::plain("Schritt zwei").attrs(RA_LEFT, LS_NUMBER, 0, PS_NORMAL),
-        Para::plain("Teilschritt").attrs(RA_LEFT, LS_NUMBER, 1, PS_NORMAL),
-        Para::plain("Ein Zitat steht eingerückt mit einem Balken davor.").attrs(RA_LEFT, LS_NONE, 0, PS_QUOTE),
-        Para::plain("Zentrierter Absatz").attrs(RA_CENTER, LS_NONE, 0, PS_NORMAL),
+        Para::new().with(t("Listen"), Fmt::default()).attrs(RA_LEFT, LS_NONE, 0, PS_H2),
+        Para::plain(t("Erster Punkt")).attrs(RA_LEFT, LS_BULLET, 0, PS_NORMAL),
+        Para::plain(t("Zweiter Punkt mit Unterpunkt")).attrs(RA_LEFT, LS_BULLET, 0, PS_NORMAL),
+        Para::plain(t("Unterpunkt")).attrs(RA_LEFT, LS_BULLET, 1, PS_NORMAL),
+        Para::plain(t("Schritt eins")).attrs(RA_LEFT, LS_NUMBER, 0, PS_NORMAL),
+        Para::plain(t("Schritt zwei")).attrs(RA_LEFT, LS_NUMBER, 0, PS_NORMAL),
+        Para::plain(t("Teilschritt")).attrs(RA_LEFT, LS_NUMBER, 1, PS_NORMAL),
+        Para::plain(t("Ein Zitat steht eingerückt mit einem Balken davor.")).attrs(RA_LEFT, LS_NONE, 0, PS_QUOTE),
+        Para::plain(t("Zentrierter Absatz")).attrs(RA_CENTER, LS_NONE, 0, PS_NORMAL),
         Para::plain(
-            "Blocksatz verteilt den Platz einer Zeile auf ihre Leerzeichen, so dass beide Ränder gerade sind; die letzte Zeile des Absatzes bleibt linksbündig, wie es sich gehört."
+            t("Blocksatz verteilt den Platz einer Zeile auf ihre Leerzeichen, so dass beide Ränder gerade sind; die letzte Zeile des Absatzes bleibt linksbündig, wie es sich gehört.")
         )
         .attrs(RA_JUSTIFY, LS_NONE, 0, PS_NORMAL),
-        Para::plain("Rechtsbündig").attrs(RA_RIGHT, LS_NONE, 0, PS_NORMAL),
+        Para::plain(t("Rechtsbündig")).attrs(RA_RIGHT, LS_NONE, 0, PS_NORMAL),
     ])
 }
 
@@ -339,8 +341,37 @@ pirnt(greet("Welt"))
 break
 "#;
 
+/// the same script with English texts (the English UI)
+const JFS_SAMPLE_EN: &str = r#"// JFS: a request counter for a virtual host (lib/script)
+let hits = 0
+let names = ["web", "db"]
+
+fn greet(name) {
+    let n = len(name)
+    return "Hello ${name}, ${n} characters: ${ {k: n}.k }\n"
+}
+
+/* the handler counts the requests
+   and answers in JSON */
+fn handle(req) {
+    hits += 1
+    if req.path == "/count" && hits > 0x10 {
+        return {status: 200, body: "${hits} calls \u{2713}"}
+    }
+    for i in 0..3 { log("i=${i}") }
+    let big = 1_000_000 + 0b1010 + 1.5e-3
+    return nil ?? greet("you")
+}
+
+// TODO: limits per client
+let hits = 1
+pirnt(greet("world"))
+break
+"#;
+
 fn sample_code(lang: i32) -> &'static str {
-    [RUST_SAMPLE, JSON_SAMPLE, INI_SAMPLE, TOML_SAMPLE, MD_SAMPLE, TEXT_SAMPLE, JFS_SAMPLE][lang.clamp(0, 6) as usize]
+    let jfs = if i18n::language_code() == "de" { JFS_SAMPLE } else { JFS_SAMPLE_EN };
+    [RUST_SAMPLE, JSON_SAMPLE, INI_SAMPLE, TOML_SAMPLE, MD_SAMPLE, TEXT_SAMPLE, jfs][lang.clamp(0, 6) as usize]
 }
 
 fn highlighter(lang: i32) -> Highlighter {
@@ -365,10 +396,10 @@ pub fn check_code(doc: &CodeDoc, jfs: bool) -> Vec<Diag> {
             d.push(Diag::new(x.line as usize, x.col as usize, x.end_col as usize, sev, &x.msg));
         }
     }
-    for (l, t) in doc.lines().iter().enumerate() {
-        if let Some(b) = t.find("TODO") {
-            let c = t[..b].chars().count() + 1;
-            d.push(Diag::new(l + 1, c, c + 4, DIAG_INFO, "Offene Aufgabe"));
+    for (l, line) in doc.lines().iter().enumerate() {
+        if let Some(b) = line.find("TODO") {
+            let c = line[..b].chars().count() + 1;
+            d.push(Diag::new(l + 1, c, c + 4, DIAG_INFO, t("Offene Aufgabe")));
         }
     }
     d
@@ -559,7 +590,7 @@ impl EdTest {
                 CodeEv::Rename(p) => match script::ls::rename(&src, self.code.flat(p) as u32, "neu") {
                     Ok(edits) => {
                         let te: Vec<TextEdit> = edits.iter().map(|x| TextEdit::new(self.code.unflat(x.start as usize), self.code.unflat(x.end as usize), &x.text)).collect();
-                        self.code.apply_edits(&te, "Umbenennen");
+                        self.code.apply_edits(&te, t("Umbenennen"));
                         self.last_ev = format!("rename {}", te.len());
                     }
                     Err(m) => self.last_ev = format!("rename refused: {}", m),
@@ -568,7 +599,7 @@ impl EdTest {
                     let unit = self.code.indent_unit();
                     match script::fmt::format_with(&src, &unit) {
                         Ok(f) => {
-                            let did = self.code.replace_text(&f, "Formatieren");
+                            let did = self.code.replace_text(&f, t("Formatieren"));
                             self.last_ev = format!("format {}", if did { "changed" } else { "same" });
                         }
                         Err(d) => self.last_ev = format!("format refused {}", d.len()),
@@ -618,28 +649,28 @@ impl EdTest {
     fn rich_tab(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_SAMPLE, "Beispiel") & EV_ACT != 0 {
+        if ui.button(ID_SAMPLE, t("Beispiel")) & EV_ACT != 0 {
             self.rich = sample_rich();
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_CLEAR, "Leeren") & EV_ACT != 0 {
+        if ui.button(ID_CLEAR, t("Leeren")) & EV_ACT != 0 {
             self.rich = RichDoc::new();
             ui.focus(ID_RICH);
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_JSON, "JSON hin und zurück") & EV_ACT != 0 {
+        if ui.button(ID_JSON, t("JSON hin und zurück")) & EV_ACT != 0 {
             if let Some(mut d) = RichDoc::from_json(&self.rich.to_json()) {
                 d.set_selection(self.rich.selection());
                 self.rich = d;
             }
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_HTML, "HTML hin und zurück") & EV_ACT != 0 {
+        if ui.button(ID_HTML, t("HTML hin und zurück")) & EV_ACT != 0 {
             let mut d = RichDoc::from_html(&self.rich.to_html());
             d.set_selection(self.rich.selection());
             self.rich = d;
         }
-        ui.checkbox(ID_RO, "Nur lesen", &mut self.ro);
+        ui.checkbox(ID_RO, t("Nur lesen"), &mut self.ro);
         ui.box_end();
         if self.ro == 0 {
             ui.richtext_toolbar(ID_TOOL, ID_RICH, &mut self.rich, RTB_ALL);
@@ -678,25 +709,25 @@ impl EdTest {
         }
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_BIG, "100 000 Zeilen") & EV_ACT != 0 {
+        if ui.button(ID_BIG, t("100 000 Zeilen")) & EV_ACT != 0 {
             self.lang = 0;
             self.code = big_code(100_000);
             self.diag_row = self.live != 0;
             self.folds_rev = None;
         }
-        if ui.checkbox(ID_TABS_W, "Tabweite 8", &mut self.tabs8) & EV_ACT != 0 {
+        if ui.checkbox(ID_TABS_W, t("Tabweite 8"), &mut self.tabs8) & EV_ACT != 0 {
             self.code.tab_width = if self.tabs8 != 0 { 8 } else { 4 };
         }
-        if ui.checkbox(ID_USE_TABS, "Tabs", &mut self.use_tabs) & EV_ACT != 0 {
+        if ui.checkbox(ID_USE_TABS, t("Tabs"), &mut self.use_tabs) & EV_ACT != 0 {
             self.code.use_tabs = self.use_tabs != 0;
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_CHECK, "Prüfen") & EV_ACT != 0 {
+        if ui.button(ID_CHECK, t("Prüfen")) & EV_ACT != 0 {
             let d = check_code(&self.code, self.lang == JFS);
             self.code.set_diagnostics(&d);
             self.diag_row = true;
         }
-        if ui.checkbox(ID_LIVE, "Beim Tippen", &mut self.live) & EV_ACT != 0 && self.live != 0 {
+        if ui.checkbox(ID_LIVE, t("Beim Tippen"), &mut self.live) & EV_ACT != 0 && self.live != 0 {
             self.diag_row = true;
         }
         ui.box_end();
@@ -752,17 +783,17 @@ impl EdTest {
     fn test_diags(&mut self, cmd: u32) {
         let d = match cmd {
             CMD_DIAGS => alloc::vec![
-                Diag::span(2, 18, 5, 4, DIAG_ERROR, "Ein Teil über vier Zeilen"),
-                Diag::new(1, 200, 0, DIAG_WARNING, "Ein Punkt am Zeilenende"),
-                Diag::new(6, 1, 4, DIAG_INFO, "Ein Hinweis"),
-                Diag::new(6, 3, 7, DIAG_WARNING, "Eine Warnung darüber"),
+                Diag::span(2, 18, 5, 4, DIAG_ERROR, t("Ein Teil über vier Zeilen")),
+                Diag::new(1, 200, 0, DIAG_WARNING, t("Ein Punkt am Zeilenende")),
+                Diag::new(6, 1, 4, DIAG_INFO, t("Ein Hinweis")),
+                Diag::new(6, 3, 7, DIAG_WARNING, t("Eine Warnung darüber")),
             ],
             CMD_BIG_DIAGS => {
                 let mut v = Vec::new();
-                for (l, t) in self.code.lines().iter().enumerate().step_by(7) {
-                    if let Some(b) = t.find("compute") {
-                        let c = t[..b].chars().count() + 1;
-                        v.push(Diag::new(l + 1, c, c + 7, (l / 7 % 3) as u8, "compute: eine Meldung"));
+                for (l, line) in self.code.lines().iter().enumerate().step_by(7) {
+                    if let Some(b) = line.find("compute") {
+                        let c = line[..b].chars().count() + 1;
+                        v.push(Diag::new(l + 1, c, c + 7, (l / 7 % 3) as u8, t("compute: eine Meldung")));
                     }
                 }
                 v
@@ -802,17 +833,17 @@ impl App for EdTest {
         ui.box_begin(0, BOX_V | pad(12), 8);
         let old = self.tab;
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.tabs(ID_TABS, &mut self.tab, &["Rich-Text", "Code"]);
+        ui.tabs(ID_TABS, &mut self.tab, &list(&TABS));
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
         // an IME composition as IBus / Wayland report it (the editors draw it at the caret)
         ui.next_flags(ST_NOFOCUS);
-        if ui.button(ID_IME, "IME-Vorschau") & EV_ACT != 0 {
+        if ui.button(ID_IME, t("IME-Vorschau")) & EV_ACT != 0 {
             self.ime = !self.ime;
-            if self.ime { plat::ime_preedit_set(0, "Vorschau", 3) } else { plat::ime_preedit_set(0, "", 0) }
+            if self.ime { plat::ime_preedit_set(0, t("Vorschau"), 3) } else { plat::ime_preedit_set(0, "", 0) }
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.box_end();
@@ -900,7 +931,8 @@ fn editortest() -> i32 {
     if plat::arg_value("--test").as_deref() == Some("model") {
         return model::run();
     }
-    ui::launch(&DESC, EdTest::new(), &style::STYLE)
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), EdTest::new(), &style::STYLE)
 }
 
 ui::main!(editortest());

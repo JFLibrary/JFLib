@@ -123,6 +123,12 @@
 // stop_on_error, ends the service (OsApi::halt).  Stop and power off end the program and its
 // memory; the disk keeps what it stored, the numbers stay.
 //
+// On a device with hardware (res.rs) every slice takes its turn on a core with the device's other
+// work, and the time of an instruction follows the speed of the cores: ns_per_op is at a reference
+// core.  A turn that comes later shifts the callback's CPU time as the debugger's Continue does, so
+// its effects keep their order and only happen later.  "mem_mb", "conn_kb", "data_mb" and its heap
+// are what it holds.
+//
 // Metrics: the script's own first, then calls, errors, fuel, busy_us, queued, max_queued,
 // dropped, rejected, timers, conns, heap_kb.
 //
@@ -214,11 +220,13 @@ pub struct ScriptCfg {
     pub stop_on_error: bool,
     /// it runs for a unit (units.rs): it ends when nothing is left to do, print goes to the log
     pub unit: bool,
+    /// what it holds besides its heap (res.rs)
+    pub mem: crate::res::SvcMem,
 }
 
 impl Default for ScriptCfg {
     fn default() -> ScriptCfg {
-        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false, unit: false }
+        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false, unit: false, mem: crate::res::SvcMem::default() }
     }
 }
 
@@ -546,6 +554,8 @@ struct Inv {
     req: Option<u64>,
     then: Then,
     top: bool,
+    /// the CPU time of an instruction on this device (res.rs: the cores' speed)
+    ps: u64,
 }
 
 /// a callback to start
@@ -685,6 +695,8 @@ struct Run {
     disk: BTreeMap<u64, DiskOp>,
     /// the debugger stopped the callback on the CPU (Status::Paused): the moment of its CPU time
     paused: Option<Ns>,
+    /// the turn on a core the next slice waits for (res.rs): when, which core
+    turn: Option<(Ns, usize)>,
 }
 
 /// a script as a service
@@ -986,7 +998,6 @@ fn reply_from(vm: &mut Vm, v: Value) -> Option<Reply> {
 struct Api<'a, 'b> {
     run: &'a mut Run,
     book: &'a mut Book,
-    def: &'a Def,
     os: &'a mut OsApi<'b>,
     inv: Inv,
 }
@@ -994,7 +1005,7 @@ struct Api<'a, 'b> {
 impl Api<'_, '_> {
     /// the moment of CPU time the script is at
     fn at(&self, cx: &Cx) -> Ns {
-        self.inv.start.saturating_add(cpu(cx.fuel(), self.def.cfg.ps_per_op))
+        self.inv.start.saturating_add(cpu(cx.fuel(), self.inv.ps))
     }
     fn effect(&mut self, cx: &Cx, e: Effect) {
         let t = self.at(cx);
@@ -1454,7 +1465,7 @@ impl script::Host for Api<'_, '_> {
         let data = self.os.file_read(&p).map_err(fs_why)?;
         let now = self.os.now();
         let wait = self.os.disk_read(data.len() as u64).saturating_sub(now);
-        cx.charge(wait.saturating_mul(1000) / self.def.cfg.ps_per_op.max(1));
+        cx.charge(wait.saturating_mul(1000) / self.inv.ps.max(1));
         String::from_utf8(data).map_err(|_| String::from("die Datei ist kein UTF-8-Text"))
     }
 }
@@ -1468,6 +1479,7 @@ impl Run {
             rng,
             queue: VecDeque::new(),
             inv: None,
+            turn: None,
             busy_until: 0,
             halting: false,
             effects: VecDeque::new(),
@@ -1659,6 +1671,9 @@ impl Run {
                 return false;
             }
             if self.inv.is_some() {
+                if !self.take_turn(os) {
+                    return false;
+                }
                 self.slice(book, def, os);
                 continue;
             }
@@ -1667,6 +1682,31 @@ impl Run {
             };
             self.dispatch(book, def, os, p, cause);
         }
+    }
+
+    /// a device with hardware: the next slice waits for its turn on a core (res.rs).  True when it
+    /// may run now; its callback's CPU time then goes on from here, as after the debugger's stop
+    fn take_turn(&mut self, os: &mut OsApi) -> bool {
+        let now = os.now();
+        if self.turn.is_none() {
+            let Some(t) = os.cpu_turn() else {
+                return true;
+            };
+            self.turn = Some(t);
+        }
+        let Some((at, _)) = self.turn else {
+            return true;
+        };
+        if at > now {
+            self.busy_until = at;
+            return false;
+        }
+        let used = self.vm.as_ref().map_or(0, |v| v.call_fuel());
+        if let Some(inv) = self.inv.as_mut() {
+            let was = inv.start.saturating_add(cpu(used, inv.ps));
+            inv.start = inv.start.saturating_add(now.saturating_sub(was));
+        }
+        true
     }
 
     /// the service's timer key at the next deadline: the CPU, the effects, timers, the disk
@@ -2188,7 +2228,7 @@ impl Run {
         if let Some(p) = c.unpin {
             vm.unpin(p);
         }
-        self.inv = Some(Inv { start: now, cause, during: c.during, req: c.req, then: c.then, top: c.top });
+        self.inv = Some(Inv { start: now, cause, during: c.during, req: c.req, then: c.then, top: c.top, ps: os.cpu_ps(def.cfg.ps_per_op) });
     }
 
     /// one slice of the callback on the CPU
@@ -2201,8 +2241,9 @@ impl Run {
             return;
         };
         let from = os.now();
+        let turn = self.turn.take();
         let st = {
-            let mut api = Api { run: &mut *self, book: &mut *book, def, os: &mut *os, inv };
+            let mut api = Api { run: &mut *self, book: &mut *book, os: &mut *os, inv };
             vm.run(&mut api, def.cfg.slice)
         };
         let out = vm.take_output();
@@ -2216,7 +2257,7 @@ impl Run {
             }
         }
         // a slice takes 1 ns at least (time goes on), a callback too
-        let at = inv.start.saturating_add(cpu(vm.call_fuel(), def.cfg.ps_per_op));
+        let at = inv.start.saturating_add(cpu(vm.call_fuel(), inv.ps));
         let end = match st {
             Status::Yielded => at.max(from + 1),
             Status::Paused(_) => at.max(from),
@@ -2226,6 +2267,10 @@ impl Run {
         book.stats.busy_ns += end - from;
         book.busy.add(from, end);
         self.busy_until = end;
+        // what the slice took on its core (res.rs)
+        if let Some((_, core)) = turn {
+            os.cpu_charge(core, end - from);
+        }
         let answer = match &st {
             Status::Done(v) if inv.req.is_some() => reply_from(&mut vm, *v),
             _ => None,
@@ -2724,6 +2769,12 @@ impl Service for ScriptService {
         // the log lines and notes of the running program carry the new name
         self.book.name = String::from(name);
     }
+    fn mem(&self) -> u64 {
+        let run = self.run.as_ref();
+        let heap = run.and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes());
+        let conns = run.map_or(0, |r| r.conns.len() + r.serve.as_ref().map_or(0, |s| s.conns()));
+        self.def.cfg.mem.bytes(conns as u64, heap as u64)
+    }
     fn footprint(&self) -> usize {
         // the program's heap and stacks, its pending work (the code is shared)
         let vm = self.run.as_ref().and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes() as usize + 4096);
@@ -2911,6 +2962,7 @@ fn cfg_of(c: &Json) -> Result<ScriptCfg, Msg> {
         cfg.stop_on_error = b;
     }
     cfg.unit = c.get("unit").is_some();
+    cfg.mem = crate::res::SvcMem::of(c, 8, 64);
     if let Some(l) = c.get("limits") {
         let n = |k: &str| l.get(k).and_then(|v| v.as_u64());
         if let Some(f) = n("fuel") {

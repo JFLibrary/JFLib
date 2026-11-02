@@ -10,7 +10,9 @@
 //                  "method": "GET", "status": 200, "body": "Hallo von {host}\n",
 //                  "type": "text/plain", "size": 0, "chunk": 0, "time_ms": 0, "jitter_ms": 0,
 //                  "error_rate": 0, "error_status": 500, "headers": {"Cache-Control": "no-store"},
-//                  "backend": "kv"}], "kv": {"nodes": ["10.0.2.21"], "port": 7000, "rf": 2, ...}}
+//                  "backend": "kv", "cpu_ms": 0, "serial_us": 0}], "kv": {"nodes": ["10.0.2.21"], "port": 7000,
+//                  "rf": 2, ...}, "cpu_ms": 0.02, "serial_us": 0, "usl": {"sigma": 0, "kappa": 0}, "mem_mb": 32,
+//                  "conn_kb": 64, "data_mb": 0}
 //                  With "tls" (tlssim.rs: {"names": [...], "issuer": "lab" | "self", "org": "..", "days":
 //                  365, "age_days": 0, "starts_in_days": 0}) it speaks TLS; its port is then 443 unless
 //                  "port" says otherwise, and metrics add tls_handshakes and tls_failed
@@ -39,6 +41,14 @@
 // route's, else the server's) answers a request with error_status after its time.  Without
 // routes and without "root" the server answers every path with "Hallo von {host}".
 //
+// On a device with hardware (res.rs) a request's "cpu_ms" (the route's, else the server's: 20 µs at
+// a reference core) comes first and waits for a core, in pieces of res::QUANTUM when it is long;
+// time_ms stays waiting that takes no CPU, so its number keeps its meaning.  "serial_us" is a
+// critical section after the CPU: one request at a time holds the server's lock, at the speed of
+// the device's cores, with or without hardware.  "usl" is the factor of the Universal Scalability
+// Law on its cost, "mem_mb", "conn_kb", "data_mb" what it holds in memory.  Without hardware
+// cpu_ms costs nothing.
+//
 // Static files: "root" names a folder of the device.  A GET or HEAD that no route of its method
 // takes is answered from the files below it: the path percent-decoded and without dot segments
 // (it cannot climb out of the folder), a folder's index.html, a folder without its "/" redirected
@@ -59,6 +69,8 @@
 // the mix picks method and path by weight; paths and bodies may name {seq} (the number of
 // the request, from 0), {rand:N} (0 to N-1) and {hot:N} (four of five requests among the
 // first fifth of 0 to N-1: a few keys get most of the load).  It stops after duration_ms or `requests`.
+// A request that cannot even start (no route, ARP gave up) fails at once; what follows comes 100 ms
+// later, so that a target that reboots gets its load back.
 //
 // Metrics (Service::metrics_at; latencies in µs over the five-minute window):
 //   http-server  requests, responses, status_2xx..5xx, errors (injected), rejected (503 when
@@ -372,6 +384,9 @@ pub struct HttpRoute {
     pub headers: Headers,
     /// what it asks before it answers
     pub backend: RouteBackend,
+    /// its CPU work at a reference core and its critical section (None: the server's; res.rs)
+    pub cpu: Option<Ns>,
+    pub serial: Option<Ns>,
 }
 
 /// what a route asks before it answers
@@ -387,7 +402,7 @@ pub enum RouteBackend {
 
 impl HttpRoute {
     pub fn new(path: &str, body: &str) -> HttpRoute {
-        HttpRoute { path: String::from(path), method: String::from("GET"), status: 200, body: String::from(body), ctype: String::from("text/plain"), size: 0, chunk: 0, time: None, jitter: None, error_ppm: None, error_status: None, headers: Headers::new(), backend: RouteBackend::None }
+        HttpRoute { path: String::from(path), method: String::from("GET"), status: 200, body: String::from(body), ctype: String::from("text/plain"), size: 0, chunk: 0, time: None, jitter: None, error_ppm: None, error_status: None, headers: Headers::new(), backend: RouteBackend::None, cpu: None, serial: None }
     }
     /// the part of a path after the route's prefix ("/item/*" and "/item/42": "42"); an exact
     /// route gives the last segment
@@ -421,6 +436,16 @@ struct Work {
     started: Ns,
     /// the backend it asks after its time, and the rest of its path
     call: Option<(RouteBackend, String)>,
+    /// the CPU work it has left, its critical section still to come (res.rs)
+    cpu: Ns,
+    serial: Ns,
+}
+
+/// what a request asks of the CPU and the server's lock (res.rs)
+#[derive(Clone, Copy, Debug, Default)]
+struct Costs {
+    cpu: Ns,
+    serial: Ns,
 }
 
 /// the web server
@@ -462,6 +487,14 @@ pub struct HttpServer {
     pub backend_errors: u64,
     /// its certificate: it speaks TLS (tlssim.rs)
     pub tls: Option<crate::tlssim::TlsSpec>,
+    /// the CPU work of a request and its critical section unless its route says otherwise, the
+    /// factor on its cost, what it holds (res.rs)
+    pub cpu: Ns,
+    pub serial: Ns,
+    pub usl: crate::res::Usl,
+    pub mem: crate::res::SvcMem,
+    /// its lock is free then
+    lock_free: Ns,
 }
 
 impl HttpServer {
@@ -494,6 +527,11 @@ impl HttpServer {
             backend_calls: 0,
             backend_errors: 0,
             tls: None,
+            cpu: 20 * crate::kernel::US,
+            serial: 0,
+            usl: crate::res::Usl::default(),
+            mem: crate::res::SvcMem::default(),
+            lock_free: 0,
         }
     }
     /// the settings of its connections (port, keep-alive, limits, Server header)
@@ -547,18 +585,19 @@ impl HttpServer {
         self.wheel.arm(os);
     }
 
-    /// the answer of the routes, the time it takes and the backend it asks
-    fn route(&mut self, os: &mut OsApi, r: &ReqIn) -> (Reply, Ns, Option<(RouteBackend, String)>) {
+    /// the answer of the routes, the time it takes, the backend it asks, what it costs
+    fn route(&mut self, os: &mut OsApi, r: &ReqIn) -> (Reply, Ns, Option<(RouteBackend, String)>, Costs) {
+        let costs = Costs { cpu: self.cpu, serial: self.serial };
         let path = r.head.path();
         let m = r.head.method.as_str();
         let hit = self.routes.iter().position(|x| x.path_matches(path) && x.method_matches(m));
         let Some(i) = hit else {
             if let Some((rep, disk)) = self.file_answer(os, r) {
-                return (rep, self.time + jitter_of(&mut self.rng, self.jitter) + disk, None);
+                return (rep, self.time + jitter_of(&mut self.rng, self.jitter) + disk, None, costs);
             }
             let allowed: Vec<String> = self.routes.iter().filter(|x| x.path_matches(path)).map(|x| if x.method.is_empty() || x.method == "*" { String::from("*") } else { x.method.to_ascii_uppercase() }).collect();
             if allowed.is_empty() {
-                return (Reply::status_page(404), self.time + jitter_of(&mut self.rng, self.jitter), None);
+                return (Reply::status_page(404), self.time + jitter_of(&mut self.rng, self.jitter), None, costs);
             }
             let mut list: Vec<String> = Vec::new();
             for a in allowed {
@@ -571,16 +610,17 @@ impl HttpServer {
             }
             let mut rep = Reply::status_page(405);
             rep.headers.add("Allow", &list.join(", "));
-            return (rep, self.time + jitter_of(&mut self.rng, self.jitter), None);
+            return (rep, self.time + jitter_of(&mut self.rng, self.jitter), None, costs);
         };
         let rt = self.routes[i].clone();
+        let costs = Costs { cpu: rt.cpu.unwrap_or(costs.cpu), serial: rt.serial.unwrap_or(costs.serial) };
         let time = rt.time.unwrap_or(self.time) + jitter_of(&mut self.rng, rt.jitter.unwrap_or(self.jitter));
         let ppm = rt.error_ppm.unwrap_or(self.error_ppm);
         if ppm > 0 && self.rng.chance_ppm(ppm) {
             let st = rt.error_status.unwrap_or(self.error_status);
             self.injected += 1;
             os.note(Note::HttpInjected { status: st });
-            return (Reply::status_page(st), time, None);
+            return (Reply::status_page(st), time, None, costs);
         }
         let call = match &rt.backend {
             RouteBackend::None => None,
@@ -599,7 +639,7 @@ impl HttpServer {
         for (k, v) in &rt.headers.0 {
             h.add(k, v);
         }
-        (Reply { status: rt.status, headers: h, body, chunk: rt.chunk, close: false }, time, call)
+        (Reply { status: rt.status, headers: h, body, chunk: rt.chunk, close: false }, time, call, costs)
     }
 
     /// the answer of the static files ("root") and how long the disk takes for it; None when
@@ -643,8 +683,9 @@ impl HttpServer {
         let now = os.now();
         os.note(Note::HttpRequest { method: r.head.method.clone(), path: String::from(r.head.path()) });
         self.per.add(now, 0, 1);
-        let (reply, time, call) = self.route(os, &r);
-        let w = Work { req: r, reply, time, started: now, call };
+        let (reply, time, call, costs) = self.route(os, &r);
+        let cpu = if os.metered() { costs.cpu } else { 0 };
+        let w = Work { req: r, reply, time, started: now, call, cpu, serial: costs.serial };
         if self.workers > 0 && self.busy() >= self.workers {
             if self.queue_max > 0 && self.queue.len() as u32 >= self.queue_max {
                 self.rejected += 1;
@@ -670,8 +711,22 @@ impl HttpServer {
         }
         w.started = now;
         let id = w.req.id;
-        self.wheel.add(now + w.time, id);
+        let at = if w.cpu > 0 || w.serial > 0 { self.step(os, &mut w) } else { now + w.time };
+        self.wheel.add(at, id);
         self.work.insert(id, w);
+    }
+
+    /// the next part of a request's work (res.rs), when it is done: a piece of its CPU work, then
+    /// its critical section; the last part ends with the request's own time on top
+    fn step(&mut self, os: &mut OsApi, w: &mut Work) -> Ns {
+        let now = os.now();
+        if w.cpu > 0 {
+            let at = os.cpu_slice_usl(&mut w.cpu, self.usl);
+            return if w.cpu > 0 || w.serial > 0 { at } else { at + w.time };
+        }
+        let hold = os.cpu_ps(core::mem::take(&mut w.serial));
+        self.lock_free = self.lock_free.max(now) + hold;
+        self.lock_free + w.time
     }
 
     fn answer(&mut self, os: &mut OsApi, r: ReqIn, rep: Reply) {
@@ -692,9 +747,16 @@ impl HttpServer {
         self.wheel.fired();
         let now = os.now();
         for (_, id) in self.wheel.due(now) {
-            let Some(w) = self.work.remove(&id) else {
+            let Some(mut w) = self.work.remove(&id) else {
                 continue;
             };
+            // more of its work to do on the CPU or under the lock
+            if w.cpu > 0 || w.serial > 0 {
+                let at = self.step(os, &mut w);
+                self.wheel.add(at, id);
+                self.work.insert(id, w);
+                continue;
+            }
             let busy = now - w.started;
             self.busy_ns += busy;
             self.per.add(now, 3, busy);
@@ -850,6 +912,7 @@ impl Service for HttpServer {
         self.queue.clear();
         self.wheel.clear();
         self.calls.clear();
+        self.lock_free = 0;
         if let Some(up) = self.upstream.as_mut() {
             up.reset();
         }
@@ -960,6 +1023,9 @@ impl Service for HttpServer {
     }
     fn footprint(&self) -> usize {
         1024 + self.serve.tls_bytes()
+    }
+    fn mem(&self) -> u64 {
+        self.mem.bytes(self.serve.conns() as u64, 0)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -1164,6 +1230,8 @@ enum LTimer {
     User(u32),
     Arrival,
     Stop,
+    /// what the agent ended while it was asked comes out (come_back)
+    Done,
 }
 
 /// what a virtual user does
@@ -1209,6 +1277,8 @@ pub struct HttpLoad {
     turn: usize,
     /// the user of each request in flight, and what each user does
     busy_users: BTreeMap<u64, u32>,
+    /// LTimer::Done is on its way
+    redo: bool,
     ustate: Vec<UState>,
     /// the open loop's schedule: a segment from seg_t whose rate goes from seg_r0 to seg_r1
     /// over seg_ramp (then stays), how far its arrivals got (expected arrivals since seg_t, in
@@ -1260,6 +1330,7 @@ impl HttpLoad {
             stopped: false,
             turn: 0,
             busy_users: BTreeMap::new(),
+            redo: false,
             ustate: Vec::new(),
             seg_t: 0,
             seg_r0: 0,
@@ -1466,11 +1537,29 @@ impl HttpLoad {
         }
     }
 
+    /// a request that cannot even start (no route, ARP gave up) fails in the call that makes it:
+    /// what the agent ended so comes out 100 ms later, not in that call and not never (a closed
+    /// loop's users would wait for an event that does not come, a target that reboots would stay
+    /// without load)
+    fn come_back(&mut self, os: &mut OsApi) {
+        if self.agent.has_done() && !self.redo {
+            self.redo = true;
+            let at = os.now() + 100 * MS;
+            self.wheel.add(at, LTimer::Done);
+        }
+    }
+
     fn timers(&mut self, os: &mut OsApi) {
         self.wheel.fired();
         let now = os.now();
         for (_, t) in self.wheel.due(now) {
             match t {
+                LTimer::Done => {
+                    self.redo = false;
+                    for d in self.agent.take_done() {
+                        self.finished(os, d);
+                    }
+                }
                 LTimer::Start => self.begin(os),
                 LTimer::User(u) => {
                     if let Some(st) = self.ustate.get_mut(u as usize) {
@@ -1494,6 +1583,7 @@ impl HttpLoad {
                 }
             }
         }
+        self.come_back(os);
         self.wheel.arm(os);
     }
 
@@ -1647,6 +1737,7 @@ impl Service for HttpLoad {
             for d in self.agent.take_done() {
                 self.finished(os, d);
             }
+            self.come_back(os);
             self.wheel.arm(os);
         }
     }
@@ -1655,6 +1746,7 @@ impl Service for HttpLoad {
         self.wheel.clear();
         self.busy_users.clear();
         self.stopped = true;
+        self.redo = false;
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -1754,6 +1846,10 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
             s.jitter = ms("jitter_ms", 0);
             s.error_ppm = c.get("error_rate").and_then(rate_ppm).unwrap_or(0);
             s.error_status = num("error_status", 500).clamp(100, 599) as u16;
+            s.cpu = c.get("cpu_ms").and_then(|v| decimal(v, MS)).unwrap_or(s.cpu);
+            s.serial = c.get("serial_us").and_then(|v| decimal(v, crate::kernel::US)).unwrap_or(0);
+            s.usl = crate::res::Usl::of(c);
+            s.mem = crate::res::SvcMem::of(c, 32, 64);
             {
                 let cfg = s.cfg_mut();
                 cfg.keepalive = ms("keepalive_ms", 75_000);
@@ -1780,6 +1876,8 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
                 rt.jitter = r.get("jitter_ms").and_then(|v| decimal(v, MS));
                 rt.error_ppm = r.get("error_rate").and_then(rate_ppm);
                 rt.error_status = rn("error_status").map(|x| x.clamp(100, 599) as u16);
+                rt.cpu = r.get("cpu_ms").and_then(|v| decimal(v, MS));
+                rt.serial = r.get("serial_us").and_then(|v| decimal(v, crate::kernel::US));
                 rt.headers = headers_of(r.get("headers"));
                 rt.backend = match rs("backend").as_deref() {
                     None | Some("") | Some("none") => RouteBackend::None,

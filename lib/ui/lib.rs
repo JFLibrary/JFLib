@@ -320,6 +320,12 @@ impl AppDesc {
     /// every field empty / zero
     pub const NONE: AppDesc =
         AppDesc { title: "", flags: 0, w: 0, h: 0, min_w: 0, min_h: 0, accent: 0, cmds: &[], menubar: &[] };
+
+    /// a copy in the UI language (after i18n::set_catalog): the title, the command table's and
+    /// the menu bar's labels
+    pub fn translated(&self) -> AppDesc {
+        AppDesc { title: i18n::t(self.title), cmds: i18n::commands(self.cmds), menubar: i18n::menu(self.menubar), ..*self }
+    }
 }
 
 /// the app's callbacks (APP_DESC on_init, on_frame, on_command)

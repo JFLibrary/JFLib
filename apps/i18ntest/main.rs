@@ -25,6 +25,7 @@ use alloc::vec::Vec;
 
 use datetime::Civil;
 use plat::a11y::Role;
+use ui::{Command, Mi};
 use ui::i18n::{
     self, Arg, COLL_IDENTICAL, COLL_PRIMARY, COLL_SECONDARY, Catalog, Collator, DATE_LONG, DATE_SHORT, LANG_DE, LANG_EN, Locale, Plural, msg,
     plural, plural_int,
@@ -154,6 +155,24 @@ fn languages(t: &mut T) {
     t.check("Hebrew is RTL", i18n::rtl_language() && i18n::language_code() == "he");
     i18n::set_language(LANG_DE);
     t.check("German is LTR", !i18n::rtl_language());
+    // the library's languages added to a catalogue: the app's texts show the English column
+    i18n::set_catalog(Catalog::from_tsv("de\ten\nÖffnen?\tOpen?\nAbbrechen\tDrop\nZeile\tRow\n").with_library_languages());
+    i18n::set_language_code("ar");
+    t.check("with_library_languages: mirrored", i18n::rtl_language() && i18n::language_code() == "ar");
+    t.eq("a language without a cell: English", i18n::t("Öffnen?"), "Open?");
+    t.eq("... but the library's own text first", i18n::t("Abbrechen"), i18n::tr("Abbrechen"));
+    t.eq("no cell anywhere: the source", i18n::t("Ohne Zeile"), "Ohne Zeile");
+    i18n::set_language_code("en");
+    t.eq("the app's cell before the library's", i18n::t("Abbrechen"), "Drop");
+    static SUB: [Mi; 1] = [Mi::Item(2, "Zeile", 0)];
+    static MENU: [Mi; 2] = [Mi::Sub("Öffnen?", &SUB), Mi::Sep];
+    static CMDS: [Command; 1] = [Command::new(1, "Zeile", 0, 0, 0, 0)];
+    let m = i18n::menu(&MENU);
+    t.check("menu: a copy in the language", matches!(m[0], Mi::Sub("Open?", [Mi::Item(2, "Row", 0)])));
+    t.check("menu: made once", core::ptr::eq(m, i18n::menu(&MENU)));
+    t.eq("commands: the label", i18n::commands(&CMDS)[0].label, "Row");
+    i18n::set_language(LANG_DE);
+    t.check("menu: German is the table", core::ptr::eq(i18n::menu(&MENU), &MENU[..]));
     // jfgui_LANG: languages and format
     plat::setenv("jfgui_LANG", Some("fr-CA:en"));
     i18n::use_system();

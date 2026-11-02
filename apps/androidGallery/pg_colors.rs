@@ -3,6 +3,7 @@
 // track, the colour picker with alpha and fields (apps/gallery/sec_list.rs: gal_values, gal_wheel).
 
 use ui::*;
+use ui::i18n::{t, tf};
 
 const ID_SF: u32 = 6000;
 const ID_NBF: u32 = 6001;
@@ -76,34 +77,34 @@ impl Default for Colors {
 
 impl Colors {
     pub fn page(&mut self, ui: &mut Ui) {
-        ui.text(TS_BODY_STRONG, "Dezimalwerte");
+        ui.text(TS_BODY_STRONG, t("Dezimalwerte"));
         ui.next_size(SIZE_FILL, 40);
         ui.slider_f(ID_SF, &mut self.val_f, &RF_VAL);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
         ui.next_size(SIZE_FILL, 44);
         ui.number_box_f(ID_NBF, &mut self.val_f, &RF_VAL);
-        let t = ui.fmt_f64(self.val_f, 2);
+        let val = ui.fmt_f64(self.val_f, 2);
         ui.next_size(64, 0);
-        ui.text(TS_BODY | TX_RIGHT | TX_SECONDARY, &t);
+        ui.text(TS_BODY | TX_RIGHT | TX_SECONDARY, &val);
         ui.box_end();
 
-        ui.text(TS_BODY_STRONG, "Eigenschaften");
-        ui.prop_slider(ID_PROP, "Radius", &mut self.prop_i, &RANGE_PROP, 25);
-        ui.prop_slider_f(ID_PROPF, "Härte", &mut self.prop_f, &RF_PROP, Some(1.5));
+        ui.text(TS_BODY_STRONG, t("Eigenschaften"));
+        ui.prop_slider(ID_PROP, t("Radius"), &mut self.prop_i, &RANGE_PROP, 25);
+        ui.prop_slider_f(ID_PROPF, t("Härte"), &mut self.prop_f, &RF_PROP, Some(1.5));
 
-        ui.text(TS_BODY_STRONG, "Winkel und Verschieben");
+        ui.text(TS_BODY_STRONG, t("Winkel und Verschieben"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         ui.angle(ID_ANG, &mut self.ang, 0);
-        let t = ui.fmt_f64(self.ang, 2);
+        let ang = ui.fmt_f64(self.ang, 2);
         ui.next_size(56, 0);
-        ui.text(TS_BODY | TX_RIGHT, &t);
+        ui.text(TS_BODY | TX_RIGHT, &ang);
         ui.pan(ID_PAN, &mut self.pan_x, &mut self.pan_y, None, 0, 0);
         ui.box_end();
 
-        ui.text(TS_BODY_STRONG, "Farbspuren");
+        ui.text(TS_BODY_STRONG, t("Farbspuren"));
         self.tracks(ui);
 
-        ui.text(TS_BODY_STRONG, "Farbrad");
+        ui.text(TS_BODY_STRONG, t("Farbrad"));
         ui.box_begin(0, BOX_H | BOX_XSTART, 16);
         self.tk_wv.stops[1] = hsv_to_rgb(self.whsv[0], self.whsv[1], 1000);
         ui.color_wheel(ID_WHEEL, &mut self.whsv, CW_HSV);
@@ -114,7 +115,7 @@ impl Colors {
         self.whsv[2] = v as u32;
         ui.box_end();
 
-        ui.text(TS_BODY_STRONG, "Farbwähler");
+        ui.text(TS_BODY_STRONG, t("Farbwähler"));
         ui.color_picker_ex(ID_PICKER, &mut self.pick, CP_ALPHA | CP_FIELDS);
     }
 
@@ -147,13 +148,13 @@ impl Colors {
         }
         ui.next_size(48, 48);
         if ui.swatch(ID_SW, self.argb, false) & EV_ACT != 0 {
-            ui.menu_popup(&M_SWATCH);
+            ui.menu_popup(i18n::menu(&M_SWATCH));
         }
-        ui.context_menu(&M_SWATCH);
+        ui.context_menu(i18n::menu(&M_SWATCH));
         ui.box_end();
         ui.box_end();
         let kept = if self.kept == 0 { alloc::string::String::from("–") } else { alloc::format!("#{:08X}", self.kept) };
-        ui.text(TS_BODY | TX_SECONDARY, &alloc::format!("Gemerkt: {kept}"));
+        ui.text(TS_BODY | TX_SECONDARY, &tf("Gemerkt: {}", &[&kept]));
     }
 
     fn hsv_changed(&mut self) {

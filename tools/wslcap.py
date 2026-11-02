@@ -4,7 +4,7 @@
 WSLg shows Wayland toplevels as RDP RAIL windows owned by msrdc.exe whose
 title is the xdg_toplevel title, so the window is found by title.
 
-  python tools/wslcap.py --title "jfgui Template" --out build/cap_linux.png \
+  python tools/wslcap.py --title "JFLib Template" --out build/cap_linux.png \
          [--delay 1.5] [--close-ms 4000] [--screen] -- build/linux/template [app args]
 
 The app gets --auto-close CLOSE_MS.  --screen copies the window area from the

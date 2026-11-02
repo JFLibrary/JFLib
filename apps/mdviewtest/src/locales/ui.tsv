@@ -1,0 +1,52 @@
+de	en
+JFLib Markdown	JFLib Markdown
+Markdown	Markdown
+HTML	HTML
+Hebräisch	Hebrew
+Liste	List
+<p>Absatz {}: {}.</p>	<p>Paragraph {}: {}.</p>
+Zeilen	rows
+haben	have
+verschiedene	different
+Höhen	heights
+in	in
+einer	a
+virtuellen	virtual
+Abschnitt {}	Section {}
+Absatz {} mit **fettem** Text, *Betonung* und einem [Link](https://example.org/{}): {}.	Paragraph {} with **bold** text, *emphasis* and a [link](https://example.org/{}): {}.
+Punkt {}	Item {}
+Neu {}	New {}
+Zeile {}	Row {}
+Hilfe	Help
+Formular	Form
+Skript	Script
+Gestaltet	Styled
+Hoher Kontrast	High contrast
+Rechts nach links	Right to left
+Links öffnen	Open links
+Link: {}	Link: {}
+Senden: {}	Submitted: {}
+Neuer Eintrag	New entry
+Vorname	First name
+Zweiter Link	Second link
+Seite geändert	Page changed
+Eingefügt {}	Inserted {}
+Seite <i>fertig</i>	Page <i>done</i>
+Schritt	Step
+Schritt: {}	Step: {}
+Fokus: {}	Focus: {}
+Auswahl: {} Zeichen	Selection: {} characters
+Klick: {}	Click: {}
+Bilder liefern	Supply images
+Feld: {}	Field: {}
+Bilder: {}	Images: {}
+Zeiger: {}	Pointer: {}
+Beispiel	Sample
+Langes Dokument	Long document
+Zwischenablage	Clipboard
+Text: {}	Text: {}
+HTML: {}	HTML: {}
+Oben einfügen	Insert at top
+Zu Zeile 50000	Go to row 50000
+Auswahl: {} · oben: {} +{}	Selection: {} · top: {} +{}
+Aufgeklappt: diese Zeile zeigt mehr Text und wird dadurch höher; die Zeilen darunter rücken nach.	Expanded: this row shows more text and so gets taller; the rows below move down.

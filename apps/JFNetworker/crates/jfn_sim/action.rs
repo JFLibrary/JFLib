@@ -90,6 +90,9 @@
 //   ScriptDebug                                        the debugger of a script service: stop,
 //                                                      go on, steps, breakpoints in virtual time
 //                                                      (scriptsvc.rs, DebugOp)
+//   Resize / Metered                                   other hardware for a device, with a reboot
+//                                                      or live; the project's "Hardware simulieren"
+//                                                      (res.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -312,6 +315,12 @@ pub enum Action {
     Supplicant { dev: u32, conf: String },
     /// the E-Mail program's next step with its IMAP server (mailc.rs)
     MailImap { dev: u32, op: crate::mailc::ImapOp },
+    /// other hardware for a device (None: its model's in a metered project, else none): with a
+    /// downtime it reboots (res::RESIZE_DOWN by default), with none the running system takes it
+    /// (res.rs)
+    Resize { dev: u32, hw: Option<jfn_model::catalog::Hw>, downtime: u64 },
+    /// "Hardware simulieren" of the project (Project::metered, res.rs)
+    Metered { on: bool },
 }
 
 /// why an action was refused (German text through Display)
@@ -696,6 +705,12 @@ impl Engine {
             Action::Wlan { dev, wlan } => self.wlan_set(dev, wlan),
             Action::Scale { dip_per_m } => self.wlan_set_scale(dip_per_m),
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
+            // the hardware of a device (res.rs)
+            Action::Resize { dev, hw, downtime } => self.res_resize(dev, hw, downtime),
+            Action::Metered { on } => {
+                self.res_metered(on);
+                Ok(())
+            }
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
             Action::MailImap { dev, op } => self.mail_job(dev, crate::mailc::MailJob::Imap(op)),
@@ -987,6 +1002,8 @@ impl Engine {
         self.nodes.push(Some(node));
         let ni = self.nodes.len() - 1;
         self.dev_idx.insert(d.id, ni);
+        // its hardware, before its disk is used (res.rs)
+        self.res_boot(ni, d.hw.as_ref(), m.id);
         // its files (files.rs), before the services that serve them
         if let Some(os) = self.os_mut(ni) {
             os.files.load(&d.files);

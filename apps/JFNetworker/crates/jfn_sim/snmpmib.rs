@@ -45,7 +45,7 @@ use crate::node::PortCounters;
 pub const ENTERPRISE: [u32; 7] = [1, 3, 6, 1, 4, 1, 32473];
 
 /// the leaf of each model below 1.3.6.1.4.1.32473.1 (a new model gets the next free number)
-pub const MODEL_LEAVES: [(&str, u32); 44] = [
+pub const MODEL_LEAVES: [(&str, u32); 49] = [
     ("pc", 1),
     ("laptop", 2),
     ("smartphone", 3),
@@ -90,6 +90,11 @@ pub const MODEL_LEAVES: [(&str, u32); 44] = [
     ("jf-ap7", 42),
     ("cable-modem", 43),
     ("dsl-modem", 44),
+    ("server-s", 45),
+    ("server-m", 46),
+    ("server-l", 47),
+    ("server-xl", 48),
+    ("nas", 49),
 ];
 
 /// sysObjectID of a model (an unknown one: .1.0)

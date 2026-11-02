@@ -63,7 +63,7 @@ def main():
         sys.exit(f"{PKG} is not installed")
     uid = m.group(1)
     print(f"{PKG}: uid {uid}")
-    run("shell", "am", "start", "-W", "-n", ACTIVITY, "--es", "jfgui_SELFTEST", "audio")
+    run("shell", "am", "start", "-W", "-n", ACTIVITY, "--es", "jfgui_LANG", "de", "--es", "jfgui_SELFTEST", "audio")
     failures = 0
     # the stream plays from about 0.5 s to 5 s after the start (with a pause after 0.8 s)
     player = track = False

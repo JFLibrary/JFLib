@@ -356,7 +356,7 @@ def run_app(rs):
     onto its text target (the UI's hook answers XdndStatus per target), a button's drag leaving
     the window to us, a fruit dragged out and back onto a basket (the app's own kind returns)"""
     x = X()
-    env = dict(os.environ, jfgui_BACKEND="x11", jfgui_DNDTEST_PRINT="1")
+    env = dict(os.environ, jfgui_BACKEND="x11", jfgui_DNDTEST_PRINT="1", jfgui_LANG="de")
     p = subprocess.Popen([str(Path(rs) / "linux" / "dndtest"), "--auto-close", "60000", "--theme", "light"], cwd=ROOT,
                          env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     lines = []
@@ -382,7 +382,7 @@ def run_app(rs):
     try:
         win = 0
         for _ in range(100):
-            win = find_window(x, "jfgui Drag & Drop")
+            win = find_window(x, "JFLib Drag & Drop")
             if win:
                 break
             time.sleep(0.1)
@@ -426,7 +426,7 @@ def run_app(rs):
         pointer(x, win, 5, 1300, 660, 0x100, 0, 1300 - wx, 660 - wy)
         drop = x.event(is_client(x, "XdndDrop"))
         got = convert(x, me, utf8, longs(drop)[2]) if drop else None
-        check("app: its text arrived", got == "Hallo aus jfgui".encode(), got)
+        check("app: its text arrived", got == "Hallo aus JFLib".encode(), got)
         if drop:
             x.client(src, src, x.atom("XdndFinished"), [me, 1, copy])
         check("app: DS_END with copy", until("Ende: Text ziehen kopieren"), lines[-3:])

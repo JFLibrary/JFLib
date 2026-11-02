@@ -31,6 +31,7 @@ public final class GalleryInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             Intent intent = new Intent(getTargetContext(), GalleryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.putExtra("jfgui_LANG", "de"); // debug builds: the texts these checks look for
             Activity activity = startActivitySync(intent);
             waitForIdleSync();
             final Throwable[] failure = new Throwable[1];

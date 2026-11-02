@@ -115,7 +115,7 @@ static STYLE_ICONS: [u32; 4] = [IC_BOLD, IC_ITALIC, IC_UNDERLINE, IC_STRIKETHROU
 static SIZE_TAB: [u16; NSIZES] = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72, 84, 96, 108, 144, 192, 216, 288];
 const S_SZDEC_TIP: &str = "Kleinere Schrift\nMit Strg in Fünferschritten";
 const S_SZINC_TIP: &str = "Größere Schrift\nMit Strg in Fünferschritten";
-const S_HINT_LIVE: &str = "Am Anfasser lässt sich der Text verschieben. Mit gedrückter Strg-Taste verschwinden Anfasser und Schreibmarke.";
+const S_HINT_LIVE: &str = "Am Anfasser lässt sich der Text verschieben. Mit gedrückter Strg-Taste verschwinden Anfasser und Schreibmarke."; // i18n
 
 /// a layout line (LN_*)
 #[derive(Clone, Copy, Default)]

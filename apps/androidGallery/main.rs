@@ -12,6 +12,7 @@
 extern crate alloc;
 use alloc::{format, string::String};
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
 mod files;
 mod nav;
@@ -30,7 +31,8 @@ mod system;
 use nav::Page;
 
 const DESC: AppDesc = AppDesc {
-    title: "jfgui Pocket Gallery", w: 390, h: 780, min_w: 280, min_h: 240,
+    title: "JFLib Pocket Gallery", // i18n
+    w: 390, h: 780, min_w: 280, min_h: 240,
     flags: AF_RESIZABLE | AF_LIGHT, cmds: &pg_menus::CMDS, ..AppDesc::NONE
 };
 const ID_HOME: u32 = 10; // the start page's scroll view
@@ -140,31 +142,31 @@ impl App for Gallery {
         ui.box_begin(0, BOX_H, 8);
         ui.next_size(SIZE_FILL, 0);
         ui.box_begin(0, BOX_V, 12);
-        ui.text(TS_CAPTION | TX_SECONDARY, "jfgui  /  POCKET GALLERY");
-        ui.text(TS_TITLE, "Kleine Widgets.");
-        ui.text(TS_TITLE, "Echte Library.");
+        ui.text(TS_CAPTION | TX_SECONDARY, "JFLib  /  POCKET GALLERY");
+        ui.text(TS_TITLE, t("Kleine Widgets."));
+        ui.text(TS_TITLE, t("Echte Library."));
         ui.box_end();
         if let Some(to) = nav::menu(ui, Page::Home, false) {
             self.next = Some(to);
         }
         ui.box_end();
         ui.text(TS_BODY | TX_WRAP | TX_SECONDARY,
-            "Tippen, ziehen, ausprobieren. Dieselben Rust-Widgets auf dem Smartphone.");
+            t("Tippen, ziehen, ausprobieren. Dieselben Rust-Widgets auf dem Smartphone."));
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "01  Interaktion");
-        ui.text(TS_BODY, &format!("Klicks: {}", self.clicks));
+        ui.heading(2, TS_SUBTITLE, t("01  Interaktion"));
+        ui.text(TS_BODY, &tf("Klicks: {}", &[&format!("{}", self.clicks)]));
         ui.box_begin(0, BOX_H, 8);
         ui.next_size(SIZE_FILL, 44);
-        if ui.accent_button(100, "Klick mich") & EV_ACT != 0 { self.clicks += 1; }
+        if ui.accent_button(100, t("Klick mich")) & EV_ACT != 0 { self.clicks += 1; }
         ui.next_size(0, 44);
-        if ui.button(101, "Reset") & EV_ACT != 0 { self.clicks = 0; self.value = 40; }
+        if ui.button(101, t("Reset")) & EV_ACT != 0 { self.clicks = 0; self.value = 40; }
         ui.box_end();
         ui.next_size(0, 40);
-        ui.checkbox(110, "Option aktivieren", &mut self.checked);
+        ui.checkbox(110, t("Option aktivieren"), &mut self.checked);
         ui.next_size(0, 40);
-        ui.switch(120, "Regler aktiv", &mut self.enabled);
-        ui.text(TS_BODY, &format!("Wert: {} %", self.value));
+        ui.switch(120, t("Regler aktiv"), &mut self.enabled);
+        ui.text(TS_BODY, &tf("Wert: {} %", &[&format!("{}", self.value)]));
         ui.next_size(SIZE_FILL, 40);
         if self.enabled == 0 { ui.next_flags(ST_DISABLED); }
         ui.slider(130, &mut self.value, &RANGE);
@@ -172,7 +174,7 @@ impl App for Gallery {
         ui.box_end();
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "02  Farben & Design");
+        ui.heading(2, TS_SUBTITLE, t("02  Farben & Design"));
         ui.box_begin(0, BOX_H, 8);
         for (i, color) in COLORS.iter().enumerate() {
             ui.next_size(40, 40);
@@ -183,15 +185,15 @@ impl App for Gallery {
         }
         ui.box_end();
         ui.next_size(SIZE_FILL, 44);
-        if ui.button(210, if ui.theme_dark() { "Helles Design" } else { "Dunkles Design" }) & EV_ACT != 0 {
+        if ui.button(210, if ui.theme_dark() { t("Helles Design") } else { t("Dunkles Design") }) & EV_ACT != 0 {
             ui.theme_set(if ui.theme_dark() { 0 } else { 1 });
         }
         ui.box_end();
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "03  Texteingabe");
+        ui.heading(2, TS_SUBTITLE, t("03  Texteingabe"));
         ui.next_size(SIZE_FILL, 44);
-        ui.textbox(300, Some("Dein Name"), &mut self.name, 128);
+        ui.textbox(300, Some(t("Dein Name")), &mut self.name, 128);
         // Android's IME reduces the content viewport. Keep the focused editor above it;
         // the same behavior is useful when a desktop preview is resized vertically.
         if reveal_editor && ui.focused() == 300 {
@@ -203,8 +205,8 @@ impl App for Gallery {
             }
         }
         ui.text(TS_BODY | TX_WRAP, &if self.name.is_empty() {
-            String::from("Hallo Android!")
-        } else { format!("Hallo {}!", self.name) });
+            String::from(t("Hallo Android!"))
+        } else { tf("Hallo {}!", &[&self.name]) });
         ui.box_end();
 
         self.files.card(ui);
@@ -214,9 +216,9 @@ impl App for Gallery {
             self.next = Some(to);
         }
         let platform = if cfg!(target_arch = "aarch64") { "ARM64 / arm64-v8a" }
-            else if cfg!(target_os = "android") { "x86_64 / Emulator" } else { "Desktop-Vorschau" };
+            else if cfg!(target_os = "android") { "x86_64 / Emulator" } else { t("Desktop-Vorschau") };
         ui.text(TS_CAPTION | TX_SECONDARY, platform);
-        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, "Nativer Rust-Code · eigener Renderer · nach oben wischen");
+        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, t("Nativer Rust-Code · eigener Renderer · nach oben wischen"));
         ui.box_end();
         ui.scroll_end();
         if self.home_restore > 0 {
@@ -260,4 +262,7 @@ impl App for Gallery {
         self.system.command(ui, id, arg)
     }
 }
-ui::main!(ui::launch(&DESC, Gallery::default(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Gallery::default(), &style::STYLE)
+});

@@ -1,5 +1,6 @@
 // faults -- fault injection in the inspector (the lab): for a device (power off, a service
-// stopped, a slower disk), for a cable (pulled; more delay, loss, a lower rate), for a
+// stopped, a slower disk; with hardware a slower CPU and a memory hog: noisy neighbours), for a
+// cable (pulled; more delay, loss, a lower rate), for a
 // selection (a partition of its devices against the rest of the network), each with an
 // optional duration; the active faults with "Wiederherstellen", and "Alle wiederherstellen"
 //
@@ -51,6 +52,9 @@ pub(crate) struct Bufs {
     rate: String,
     /// the service chosen for "Stoppen": (device, index)
     svc: (u32, i32),
+    /// a device with hardware: the CPU's factor, the memory hog's GiB
+    cpu_x: String,
+    mem_gb: String,
     /// why the last injection was refused, and what it was for (device or cable)
     err: String,
     err_for: u32,
@@ -60,6 +64,7 @@ pub(crate) struct Bufs {
 pub(crate) fn concerns(f: &Fault, devs: &[u32], links: &[u32]) -> bool {
     match f {
         Fault::Power { dev } | Fault::Stop { dev, .. } | Fault::SlowDisk { dev, .. } => devs.contains(dev),
+        Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } | Fault::Resize { dev } => devs.contains(dev),
         Fault::Unplug { link } | Fault::Impair { link, .. } => links.contains(link),
         Fault::Partition { a, b } => a.iter().chain(b.iter()).any(|d| devs.contains(d)),
     }
@@ -142,6 +147,7 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
         .map(|s| (s.name.clone(), tf("{} {}", &[crate::workspace::metrics::kind_name(s.kind), &s.name]), s.running))
         .collect();
     let disk = eng.disk_of(id).is_some();
+    let hw = eng.res_of(id).is_some();
     let powered = !d.off && n.doc.sim.live_view().devices.iter().find(|x| x.dev == id).is_none_or(|x| x.power);
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     head(n, ui, t("Fehler einspielen"));
@@ -200,6 +206,46 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
                 (Some(e), Some(x)) if e > 0 || x != 1000 => inject(n, ui, id, Fault::SlowDisk { dev: id, extra: e, factor_pm: x as u32 }),
                 _ => {
                     refused(n, id, "Die Disk braucht mehr Zeit je Zugriff (ms) oder einen Faktor für die Übertragung (größer als 0, nicht 1), z. B. 10 und 3.");
+                    ui.repass();
+                }
+            }
+        }
+    }
+    // a device with hardware: a slower CPU, a memory hog (res.rs)
+    if hw {
+        let b = &mut n.inspector.flt;
+        field_begin(ui, t("CPU \u{d7}"));
+        ui.next_size(-1, 0);
+        ui.textbox(ID_FLT_CPU_X, Some("3"), &mut b.cpu_x, 12);
+        ui.box_end();
+        ui.box_begin(0, BOX_H | BOX_END, 8);
+        let go = ui.button(ID_FLT_CPU, t("Bremsen")) & EV_ACT != 0;
+        ui.tooltip(t("Alle Rechenzeit des Geräts dauert so viel länger: ein lauter Nachbar auf demselben Rechner."));
+        ui.box_end();
+        if go {
+            match parse_decimal(&n.inspector.flt.cpu_x, 1000, 1_000_000_000).filter(|&v| v > 0) {
+                Some(x) => inject(n, ui, id, Fault::SlowCpu { dev: id, factor_pm: x as u32 }),
+                None => {
+                    refused(n, id, "Der Faktor ist eine Zahl größer als 0, z. B. 3.");
+                    ui.repass();
+                }
+            }
+        }
+        let b = &mut n.inspector.flt;
+        field_begin(ui, t("Belegt"));
+        ui.next_size(-1, 0);
+        ui.textbox(ID_FLT_MEM_GB, Some("8"), &mut b.mem_gb, 12);
+        ui.text(TS_BODY | TX_SECONDARY, "GiB");
+        ui.box_end();
+        ui.box_begin(0, BOX_H | BOX_END, 8);
+        let go = ui.button(ID_FLT_MEM, t("Belegen")) & EV_ACT != 0;
+        ui.tooltip(t("Etwas anderes hält so viel Speicher: über den RAM hinaus wird alles langsamer, über den Swap hinaus endet der größte Dienst."));
+        ui.box_end();
+        if go {
+            match super::hardware::mib_of_gib(&n.inspector.flt.mem_gb).filter(|&v| v > 0) {
+                Some(mb) => inject(n, ui, id, Fault::MemHog { dev: id, bytes: mb << 20 }),
+                None => {
+                    refused(n, id, "Der Speicher ist eine Zahl von GiB größer als 0, z. B. 8.");
                     ui.repass();
                 }
             }

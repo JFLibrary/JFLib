@@ -56,7 +56,12 @@ fn cpu_text(ns: u64) -> String {
 
 /// a second's CPU time (ns) as thousandths of the device's CPUs (top's %Cpu(s))
 pub(crate) fn cpu_percent(ns: u64) -> u64 {
-    (ns as u128 * 1000 / (SEC as u128 * jfn_sim::cli::tools::CPUS as u128)) as u64
+    cpu_share(ns, jfn_sim::cli::tools::CPUS)
+}
+
+// the same on `cpus` CPUs (a device with hardware has its cores)
+fn cpu_share(ns: u64, cpus: u64) -> u64 {
+    (ns as u128 * 1000 / (SEC as u128 * cpus.max(1) as u128)) as u64
 }
 
 /// "12,5 %" of thousandths
@@ -186,9 +191,10 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         _ => {
             let cpu = n.doc.sim.state().cpu_secs(dev, SPAN);
             let heap = heap_kb(n, dev);
-            let cv: Vec<f32> = cpu.iter().map(|&x| cpu_percent(x) as f32 / 10.0).collect();
+            let cpus = jfn_sim::cli::tools::cpus_of(n.doc.sim.state(), dev);
+            let cv: Vec<f32> = cpu.iter().map(|&x| cpu_share(x, cpus) as f32 / 10.0).collect();
             let hv: Vec<f32> = heap.iter().map(|x| x.1 as f32).collect();
-            let now_cpu = cpu.last().map_or(0, |&x| cpu_percent(x));
+            let now_cpu = cpu.last().map_or(0, |&x| cpu_share(x, cpus));
             let now_heap = heap.last().map_or(0, |x| x.1);
             let card = |ui: &mut Ui, title: &str, value: &str, note: &str, cid: u32, vals: &[f32]| {
                 ui.next_size(-1, 0);
@@ -210,7 +216,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
                 ui.text(TS_CAPTION | TX_TERTIARY | TX_WRAP, note);
                 ui.box_end();
             };
-            card(ui, t("CPU-Last"), &permille(now_cpu), &tf("Die letzte Minute; {} CPUs wie bei top.", &[&jfn_sim::cli::tools::CPUS.to_string()]), id + 0x10, &cv);
+            card(ui, t("CPU-Last"), &permille(now_cpu), &tf("Die letzte Minute; {} CPUs wie bei top.", &[&cpus.to_string()]), id + 0x10, &cv);
             card(ui, t("Arbeitsspeicher der Skripte"), &tf("{} KiB", &[&now_heap.to_string()]), t("Die Heaps der Skript-Dienste, eine Messung je Sekunde."), id + 0x11, &hv);
         }
     }

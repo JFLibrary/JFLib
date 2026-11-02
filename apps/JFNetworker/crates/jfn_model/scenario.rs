@@ -29,8 +29,14 @@
 //   fault stop WEB2 web                          service stopped, a slow disk (delay per
 //   fault disk KV1 delay 20ms factor 10          access, transfer time times factor), a
 //   fault partition KV1 KV2 | KV3                partition (one side alone: against all others)
+//   fault cpu SRV1 factor 3                      the CPU of a device with hardware takes that much
+//   fault mem SRV1 12G                           longer; something holds that much of its memory
 //   heal 2 | heal all | heal power KV2 | heal link R1 Gi0/1 | heal impair R1 Gi0/1 |
-//   heal stop WEB2 web | heal disk KV1 | heal partition
+//   heal stop WEB2 web | heal disk KV1 | heal partition | heal cpu SRV1 | heal mem SRV1
+//   resize SRV1 model server-l                   other hardware for a device: a model's figures
+//   resize SRV1 cores 8 speed 1.5 ram 32G        and / or single ones (speed: of the reference
+//     [swap 4G] [disk nvme] [disk_gb 960]        core), a reboot of 30 s unless [down 10s] or
+//     [down 10s] [live]                          [live] (no reboot) say otherwise
 //   expect LB1 svc lb metric requests >= 99.5 over 5s       a metric's time series over a span
 //   expect LB1 svc lb metric max p99_us < 5000 between 14s and 19s   (jfn_sim series.rs): the
 //                                                samples of the last 5 s, or those taken after
@@ -109,6 +115,21 @@ pub enum StepKind {
     CableLen { dev: String, port: String, m: u32 },
     /// a rolling deployment ("deploy ..."; the names are resolved when it runs)
     Deploy(DeployStep),
+    /// other hardware for a device ("resize DEV ..."); the downtime when it says one (0: live)
+    Resize { dev: String, hw: HwSpec, down: Option<u64> },
+}
+
+/// what "resize" says of the hardware: a model's figures and single ones on top; what it does not
+/// name stays as the device has it
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HwSpec {
+    pub model: Option<String>,
+    pub cores: Option<u32>,
+    pub speed_pm: Option<u32>,
+    pub ram_mb: Option<u64>,
+    pub swap_mb: Option<u64>,
+    pub disk: Option<crate::catalog::DiskClass>,
+    pub disk_gb: Option<u64>,
 }
 
 /// a deployment of a scenario: the devices by name, a group or a list
@@ -141,6 +162,10 @@ pub enum FaultSpec {
     Disk { dev: String, delay_ns: u64, factor_pm: u32 },
     /// the devices of `a` and of `b` no longer hear each other (b empty: all others)
     Partition { a: Vec<String>, b: Vec<String> },
+    /// the CPU of a device with hardware: its costs in per mille
+    Cpu { dev: String, factor_pm: u32 },
+    /// something holds that many bytes of its memory
+    Mem { dev: String, bytes: u64 },
 }
 
 /// what "heal" heals
@@ -421,7 +446,7 @@ fn words(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move", "place", "cable", "deploy"];
+const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move", "place", "cable", "deploy", "resize"];
 
 /// parses a scenario; all syntax errors are collected
 pub fn parse(text: &str) -> Result<Scenario, Vec<ScnErr>> {
@@ -512,6 +537,7 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
         }
         ["cable", dev, port, "length", m] => StepKind::CableLen { dev: String::from(*dev), port: String::from(*port), m: metres(m)? },
         ["deploy", src, hosts, rest @ ..] => StepKind::Deploy(parse_deploy(src, hosts, rest)?),
+        ["resize", dev, rest @ ..] => parse_resize(dev, rest)?,
         [k, ..] => return Err(format!("Unbekannter Schritt \u{201e}{}\u{201c}.", k)),
         [] => return Ok(None),
     };
@@ -592,6 +618,73 @@ fn parse_deploy(src: &str, hosts: &str, w: &[&str]) -> Result<DeployStep, String
     Ok(d)
 }
 
+/// "16G", "512M", "64k", "4096" -> bytes (a power of 1024; an optional "iB" or "B")
+pub fn parse_size(s: &str) -> Option<u64> {
+    let s = s.trim();
+    let s = s.strip_suffix("iB").or_else(|| s.strip_suffix('B')).unwrap_or(s);
+    let (num, unit) = match s.chars().last()? {
+        'k' | 'K' => (&s[..s.len() - 1], 1u64 << 10),
+        'M' => (&s[..s.len() - 1], 1 << 20),
+        'G' => (&s[..s.len() - 1], 1 << 30),
+        'T' => (&s[..s.len() - 1], 1 << 40),
+        _ => (s, 1),
+    };
+    scaled(num, unit)
+}
+
+/// the words of a resize after its device
+fn parse_resize(dev: &str, w: &[&str]) -> Result<StepKind, String> {
+    let (mut hw, mut down) = (HwSpec::default(), None);
+    let mb = |k: &str, s: &str| parse_size(s).map(|b| b >> 20).ok_or_else(|| format!("\u{201e}{} {}\u{201c} versteht resize nicht.", k, s));
+    let mut r = w;
+    loop {
+        r = match r {
+            [] => break,
+            ["live", t @ ..] => {
+                down = Some(0);
+                t
+            }
+            ["down", x, t @ ..] => {
+                down = Some(parse_duration(x).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zeitangabe (z. B. 250ms, 1.5s).", x))?);
+                t
+            }
+            ["model", m, t @ ..] => {
+                hw.model = Some(String::from(*m));
+                t
+            }
+            ["cores", n, t @ ..] => {
+                hw.cores = Some(n.parse::<u32>().ok().filter(|&c| c > 0).ok_or_else(|| format!("\u{201e}cores {}\u{201c} versteht resize nicht.", n))?);
+                t
+            }
+            ["speed", x, t @ ..] => {
+                hw.speed_pm = Some(scaled(x, 1000).filter(|&v| v > 0 && v <= u32::MAX as u64).ok_or_else(|| format!("\u{201e}speed {}\u{201c} versteht resize nicht.", x))? as u32);
+                t
+            }
+            ["ram", x, t @ ..] => {
+                hw.ram_mb = Some(mb("ram", x)?);
+                t
+            }
+            ["swap", x, t @ ..] => {
+                hw.swap_mb = Some(mb("swap", x)?);
+                t
+            }
+            ["disk", x, t @ ..] => {
+                hw.disk = Some(crate::catalog::DiskClass::parse(x).ok_or_else(|| format!("\u{201e}disk {}\u{201c} versteht resize nicht (sata, nvme, nvme-fast, hdd).", x))?);
+                t
+            }
+            ["disk_gb", x, t @ ..] => {
+                hw.disk_gb = Some(x.parse::<u64>().map_err(|_| format!("\u{201e}disk_gb {}\u{201c} versteht resize nicht.", x))?);
+                t
+            }
+            [k, ..] => return Err(format!("\u{201e}{}\u{201c} versteht resize nicht.", k)),
+        };
+    }
+    if hw == HwSpec::default() {
+        return Err(String::from("resize braucht \u{201e}model NAME\u{201c} oder Werte wie \u{201e}cores 8\u{201c}, \u{201e}ram 32G\u{201c}."));
+    }
+    Ok(StepKind::Resize { dev: String::from(dev), hw, down })
+}
+
 /// the words after "fault" (without "for DURATION")
 fn parse_fault(w: &[&str]) -> Result<FaultSpec, String> {
     let s = |x: &&str| String::from(*x);
@@ -615,6 +708,8 @@ fn parse_fault(w: &[&str]) -> Result<FaultSpec, String> {
             }
             FaultSpec::Disk { dev: s(dev), delay_ns, factor_pm }
         }
+        ["cpu", dev, "factor", x] => FaultSpec::Cpu { dev: s(dev), factor_pm: scaled(x, 1000).filter(|&f| f > 0 && f <= u32::MAX as u64).ok_or_else(|| format!("\u{201e}factor {}\u{201c} versteht fault cpu nicht.", x))? as u32 },
+        ["mem", dev, x] => FaultSpec::Mem { dev: s(dev), bytes: parse_size(x).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Größe (z. B. 512M, 12G).", x))? },
         ["partition", rest @ ..] if !rest.is_empty() => {
             let (a, b) = match rest.iter().position(|x| *x == "|") {
                 Some(i) => (&rest[..i], &rest[i + 1..]),
@@ -625,7 +720,7 @@ fn parse_fault(w: &[&str]) -> Result<FaultSpec, String> {
             }
             FaultSpec::Partition { a: a.iter().map(s).collect(), b: b.iter().map(s).collect() }
         }
-        _ => return Err(format!("Diesen Fehler kenne ich nicht: fault {} (link, impair, power, stop, disk, partition).", w.join(" "))),
+        _ => return Err(format!("Diesen Fehler kenne ich nicht: fault {} (link, impair, power, stop, disk, partition, cpu, mem).", w.join(" "))),
     })
 }
 
@@ -640,8 +735,10 @@ fn parse_heal(w: &[&str]) -> Result<HealSpec, String> {
         ["power", dev] => HealSpec::Like(FaultSpec::Power { dev: s(dev) }),
         ["stop", dev, svc] => HealSpec::Like(FaultSpec::Stop { dev: s(dev), svc: s(svc) }),
         ["disk", dev] => HealSpec::Like(FaultSpec::Disk { dev: s(dev), delay_ns: 0, factor_pm: 1000 }),
+        ["cpu", dev] => HealSpec::Like(FaultSpec::Cpu { dev: s(dev), factor_pm: 1000 }),
+        ["mem", dev] => HealSpec::Like(FaultSpec::Mem { dev: s(dev), bytes: 0 }),
         ["partition"] => HealSpec::Like(FaultSpec::Partition { a: Vec::new(), b: Vec::new() }),
-        _ => return Err(format!("Was soll geheilt werden? heal {} (all, NUMMER, link, impair, power, stop, disk, partition).", w.join(" "))),
+        _ => return Err(format!("Was soll geheilt werden? heal {} (all, NUMMER, link, impair, power, stop, disk, partition, cpu, mem).", w.join(" "))),
     })
 }
 
