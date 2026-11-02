@@ -1205,6 +1205,7 @@ impl Ui {
         let cur = c.hit_cur;
         c.hits[cur].clear();
         self.wp.chrome.cap_n = 0; // the caption buttons' boxes of this pass (chrome.rs)
+        self.wp.chrome.tb_rect = None;
         let c = &mut self.wp.ctx;
         c.zones[cur].clear();
         c.pans[cur].clear();

@@ -174,7 +174,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
-- [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`
+- [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
@@ -3735,7 +3735,7 @@ caption buttons, the chrome of secondary windows, edge grips       [src/ui/ui_ch
   edge_grips()   resize handles for frameless windows on Linux (the runtime calls it;
        also for resizable secondary windows with the library frame); the caption buttons
        win over them where they are
-  titlebar_begin(title, icon) / titlebar_end()
+  titlebar_begin(title, icon) / titlebar_end() / titlebar_open()
        custom title bar row (style: SM_TB_H, SM_TB_H_LARGE with next_flags(ST_LARGE)):
        icon + title, then the caller's widgets; empty parts are an HB_DRAG region, the end
        adds the caption buttons (HB_MIN / HB_MAX / HB_CLOSE; with SM_CAP_LEFT the begin puts
@@ -3783,6 +3783,11 @@ close +3); status bar 0xFFFF7410, 0xFFFF7411; edge grips 0xFFFF7430..
 - **`fn titlebar_end(&mut self)`**
   ui_titlebar_end: caption buttons at the right end (unless the style puts them at the
   left: SM_CAP_LEFT)
+- **`fn titlebar_open(&self) -> Option<([i32; 4], bool)>`**
+  The title bar being built, between `titlebar_begin` and `titlebar_end` (None elsewhere
+  and on an overlay, which paints no bar): its rectangle (px) and whether the window is
+  active.  For a style whose bar has the same colours in every theme (classic): a widget
+  drawn right on it cannot use the theme's T_TEXT.
 
 ### File dialog
 
