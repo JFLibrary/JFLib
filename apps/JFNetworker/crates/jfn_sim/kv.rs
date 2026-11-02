@@ -175,6 +175,8 @@ enum KTimer {
     Io(u64),
     /// a coordinated request runs out of time
     Timeout(u64),
+    /// a request's CPU work is done (res.rs)
+    Gate(u64),
 }
 
 /// a request this node coordinates or a part of one
@@ -269,6 +271,12 @@ pub struct KvNode {
     serve: Serve,
     agent: Agent,
     wheel: Wheel<KTimer>,
+    /// a request's CPU work, the requests that wait for it, what it holds besides its data and
+    /// the bytes of its data (res.rs: asked after every call, so not added up each time)
+    pub cpu: Ns,
+    gate: crate::res::CpuGate<ReqIn>,
+    pub mem: crate::res::SvcMem,
+    held: u64,
     ops: BTreeMap<u64, Op>,
     ios: BTreeMap<u64, Io>,
     next: u64,
@@ -314,6 +322,10 @@ impl KvNode {
             serve: Serve::new(cfg, K_SERVE),
             agent: Agent::new(K_AGENT),
             wheel: Wheel::new(K_OWN),
+            cpu: 30 * crate::kernel::US,
+            gate: crate::res::CpuGate::default(),
+            mem: crate::res::SvcMem::default(),
+            held: 0,
             ops: BTreeMap::new(),
             ios: BTreeMap::new(),
             next: 0,
@@ -603,6 +615,7 @@ impl KvNode {
                 os.disk_free(corr.unsigned_abs());
             }
             self.clock = self.clock.max(e.ver.n);
+            self.held = self.held.saturating_add_signed(actual);
             self.data.insert(String::from(key), e);
         } else if reserved > 0 {
             os.disk_free(reserved as u64);
@@ -975,6 +988,11 @@ impl KvNode {
                 KTimer::Beat => self.beat(os),
                 KTimer::Io(io) => self.io_done(os, io),
                 KTimer::Timeout(id) => self.timed_out(os, id),
+                KTimer::Gate(id) => {
+                    if let Some(r) = self.gate.take(id) {
+                        self.request(os, r);
+                    }
+                }
             }
         }
         self.wheel.arm(os);
@@ -1096,7 +1114,14 @@ impl Service for KvNode {
         }
         if self.serve.on(&ev, os) {
             for r in self.serve.take() {
-                self.request(os, r);
+                // its CPU work first (res.rs)
+                let (now, at) = (os.now(), os.cpu(self.cpu));
+                if at > now {
+                    let id = self.gate.hold(r);
+                    self.wheel.add(at, KTimer::Gate(id));
+                } else {
+                    self.request(os, r);
+                }
             }
         } else if self.agent.on(&ev, os) {
             for d in self.agent.take_done() {
@@ -1104,6 +1129,9 @@ impl Service for KvNode {
             }
         }
         self.wheel.arm(os);
+    }
+    fn mem(&self) -> u64 {
+        self.mem.bytes(self.serve.conns() as u64, self.held)
     }
     fn stop(&mut self, os: &mut OsApi) {
         // writes the disk had not finished are lost
@@ -1117,6 +1145,7 @@ impl Service for KvNode {
         self.serve.stop();
         self.agent.reset();
         self.wheel.clear();
+        self.gate.clear();
         self.ops.clear();
         self.by_agent.clear();
     }
@@ -1213,6 +1242,8 @@ pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
         p @ 1..=65535 => p as u16,
         p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
+    k.cpu = c.get("cpu_us").and_then(|v| decimal(v, crate::kernel::US)).unwrap_or(k.cpu);
+    k.mem = crate::res::SvcMem::of(c, 64, 64);
     k.vnodes = num("vnodes", 16).clamp(1, 1000) as u32;
     k.rf = (num("rf", 2) as usize).clamp(1, k.nodes.len());
     k.w = num("w", 0).min(k.rf as u64) as u8;

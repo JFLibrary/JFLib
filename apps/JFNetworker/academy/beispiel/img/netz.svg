@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="200" viewBox="0 0 560 200">
+  <title>Zwei PCs an einem Switch</title>
+  <rect x="1" y="1" width="558" height="198" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <!-- the cables -->
+  <path d="M120 74 L120 136 L220 136" fill="none" stroke="#3A6EA5" stroke-width="4"/>
+  <path d="M440 74 L440 136 L340 136" fill="none" stroke="#3A6EA5" stroke-width="4"/>
+  <!-- PC1 -->
+  <rect x="80" y="26" width="80" height="48" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="88" y="34" width="64" height="32" fill="#CFE0F1"/>
+  <rect x="104" y="74" width="32" height="8" fill="#44515E"/>
+  <!-- PC2 -->
+  <rect x="400" y="26" width="80" height="48" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="408" y="34" width="64" height="32" fill="#CFE0F1"/>
+  <rect x="424" y="74" width="32" height="8" fill="#44515E"/>
+  <!-- the switch with its ports -->
+  <rect x="210" y="118" width="140" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="224" y="130" width="12" height="12" fill="#3A6EA5"/>
+  <rect x="244" y="130" width="12" height="12" fill="#C4CBD3"/>
+  <rect x="264" y="130" width="12" height="12" fill="#C4CBD3"/>
+  <rect x="284" y="130" width="12" height="12" fill="#C4CBD3"/>
+  <rect x="304" y="130" width="12" height="12" fill="#C4CBD3"/>
+  <rect x="324" y="130" width="12" height="12" fill="#3A6EA5"/>
+</svg>

@@ -58,6 +58,7 @@
 //   fault    fault injection with marks on the timeline: cables pulled or worse, power off,
 //            services stopped, slow disks, partitions; each one heals exactly what it did
 //   lab      the actions of the lab and the views of its services for the user interface
+//   res      the hardware of a device: CPU cores with a run queue, RAM with swap (SA1)
 //   units    services as units on Linux hosts: unit files, enable, restart policies
 //   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
@@ -299,6 +300,7 @@ pub mod dot1xtrace;
 pub mod dot1x;
 pub mod supp;
 pub mod imapd;
+pub mod res;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -330,6 +332,7 @@ pub use os::ConsoleEv;
 pub use http::{Agent, AgentEv, Reply, Serve, ServeCfg, Url};
 pub use httpsvc::{HttpClient, HttpLoad, HttpRoute, HttpServer, LoadMode, LoadView, ServerView};
 pub use pdu::{PduProto, PduSender, PduSpec};
+pub use res::{Res, ResView, Usl};
 pub use disk::Disk;
 pub use fault::{Fault, FaultMark, LinkOver};
 pub use lb::{Algo, BackendView, Lb, LbMode, LbOp, LbView};

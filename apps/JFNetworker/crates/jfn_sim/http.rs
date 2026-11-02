@@ -1181,6 +1181,10 @@ impl Agent {
     pub fn take_done(&mut self) -> Vec<Done> {
         core::mem::take(&mut self.done)
     }
+    /// requests ended that take_done has not given yet
+    pub fn has_done(&self) -> bool {
+        !self.done.is_empty()
+    }
     /// the steps since the last call (when it traces)
     pub fn take_events(&mut self) -> Vec<AgentEv> {
         core::mem::take(&mut self.events)

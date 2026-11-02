@@ -539,6 +539,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         b += os.resolver.cache.len() * 128 + os.resolver.lookups.len() * 256 + os.resolver.latency.bytes() + 1024;
         // its units and deployments (units.rs, deploy.rs)
         b += os.units.footprint();
+        // its CPU and memory (res.rs)
+        b += os.res.as_ref().map_or(0, |r| r.footprint());
         // the files on the device (each copy holds their bytes; the system image has none)
         b += os.files.len() * 96 + (os.files.used() - os.files.image.as_ref().map_or(0, |i| i.1)) as usize;
     }
@@ -584,6 +586,7 @@ pub fn digest(e: &Engine) -> u64 {
         }
     }
     let _ = write!(w, "|{:?}|{:?} {:?}|{:?} {:?}|{} {}", e.links, e.dev_idx, e.link_idx, e.jobs, e.next_job, e.seed, e.strict_mdix);
+    let _ = write!(w, "|{}", e.metered);
     let _ = write!(w, "|{} {:?}|{:?}|{:?}|{:?}|", e.cli.debug, e.cli.jobs, e.faults, e.series, e.wlan);
     let _ = e.trace.counters(&mut w);
     w.0

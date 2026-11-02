@@ -292,7 +292,12 @@ fn tile(n: &mut Net, ui: &mut Ui, i: usize) {
     let s = ui.last_state();
     ui.last_set(r, s | if armed { SS_CHECKED as u32 } else { 0 });
     ui.sem(K_BUTTON, id, Some(t(m.name)), 0);
-    ui.tooltip(&if m.groups.is_empty() { String::from(t(m.title)) } else { tf("{} · Ports: {}", &[t(m.title), &crate::app::tr::msg(&m.summary_msg())]) });
+    let mut tip = if m.groups.is_empty() { String::from(t(m.title)) } else { tf("{} · Ports: {}", &[t(m.title), &crate::app::tr::msg(&m.summary_msg())]) };
+    // its hardware in a project that simulates it (res.rs): our assumption, and it says so
+    if let Some(hw) = jfn_model::catalog::hw_of(m.id) {
+        tip = tf("{} · Annahme: {}", &[&tip, &crate::app::tr::msg(&hw.summary_msg())]);
+    }
+    ui.tooltip(&tip);
     if ev & EV_ACT != 0 {
         if ui.released() & (1 << BTN_LEFT) == 0 {
             tools::place_centre(n, ui, i); // Enter / Space

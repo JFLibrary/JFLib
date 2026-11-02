@@ -1,0 +1,77 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/nat_pat.jfnet
+# the shot matrix of the Firewall tab (F1): Regeln with the form open, NAT, Test with its answer, each
+# light and dark at 100 and 150 %, and narrow (build/f1/shots/fw_<view>_<theme>_<scale>.png).
+# Ids as in firewall_panel.uis.
+size 1280 900
+theme light
+wait 500
+dblclick listitem:"R1" shift
+expect window 26624 open
+resizewin 26624 900 840
+click tab:"Firewall"
+click #131088
+click listitem:"110 (erweitert, 2 Regeln)"
+click #132097
+click #131098
+click #131105
+click listitem:"tcp"
+click #131110
+key ctrl+a
+type "198.51.100.10"
+click #131111
+click listitem:"eq (gleich)"
+click #131112
+type "443"
+wait 100
+move 640,860
+shot build/f1/shots/fw_rules_light_100.png window 26624
+theme dark
+shot build/f1/shots/fw_rules_dark_100.png window 26624
+scale 150 window 26624
+shot build/f1/shots/fw_rules_dark_150.png window 26624
+theme light
+shot build/f1/shots/fw_rules_light_150.png window 26624
+scale 100 window 26624
+# ---- narrow: the rule as one line, fields that break
+resizewin 26624 440 760
+shot build/f1/shots/fw_rules_light_narrow.png window 26624
+theme dark
+shot build/f1/shots/fw_rules_dark_narrow.png window 26624
+theme light
+click #131121
+resizewin 26624 900 840
+# ---- NAT
+click tab:"NAT"
+wait 100
+shot build/f1/shots/fw_nat_light_100.png window 26624
+theme dark
+shot build/f1/shots/fw_nat_dark_100.png window 26624
+scale 150 window 26624
+shot build/f1/shots/fw_nat_dark_150.png window 26624
+theme light
+shot build/f1/shots/fw_nat_light_150.png window 26624
+scale 100 window 26624
+resizewin 26624 440 760
+shot build/f1/shots/fw_nat_light_narrow.png window 26624
+resizewin 26624 900 840
+# ---- Test
+click tab:"Test"
+click #131171
+type "192.168.1.11"
+click #131172
+type "198.51.100.10"
+click #131174
+type "www"
+click #131177
+expect text:"Wird verworfen" exists
+wait 100
+shot build/f1/shots/fw_test_light_100.png window 26624
+theme dark
+shot build/f1/shots/fw_test_dark_100.png window 26624
+scale 150 window 26624
+shot build/f1/shots/fw_test_dark_150.png window 26624
+theme light
+shot build/f1/shots/fw_test_light_150.png window 26624
+scale 100 window 26624
+resizewin 26624 440 760
+shot build/f1/shots/fw_test_light_narrow.png window 26624

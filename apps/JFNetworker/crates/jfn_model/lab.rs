@@ -381,6 +381,7 @@ impl Target {
     pub fn project(&self, base: &Project) -> Project {
         let mut p = Project::new(&base.title, base.seed);
         p.strict_mdix = base.strict_mdix;
+        p.metered = base.metered;
         p.devices = self.devices.clone();
         p.links = self.links.clone();
         p.next_id = p.max_id() + 1;

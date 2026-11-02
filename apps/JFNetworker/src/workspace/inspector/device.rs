@@ -22,6 +22,9 @@
 //
 // Last, the physical view's part (P1, workspace/phys/props.rs): where the device stands, a list
 // of places to move it to, its rack unit, the optic of each optics cage.
+//
+// A host with hardware has its card after its cables (hardware.rs: its CPU, RAM and disk, a resize);
+// a host without says how to give it some at the very end, so nothing moves in a project without.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -312,10 +315,18 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
             ui.text(TS_CAPTION | TX_SECONDARY, &tf("… und {} weitere", &[&(nb.len() - 24).to_string()]));
         }
     }
+    // its CPU, RAM and disk (hardware.rs)
+    let hw = n.doc.proj.metered || n.doc.proj.device(id).is_some_and(|d| d.hw.is_some());
+    if hw {
+        super::hardware::device(n, ui, id);
+    }
     // faults of the lab: power, a service, the disk (faults.rs)
     super::faults::device(n, ui, id);
-    // where it stands, its optics (the physical view, last: workspace/phys/props.rs)
+    // where it stands, its optics (the physical view: workspace/phys/props.rs)
     crate::workspace::phys::props::device(n, ui, id);
+    if !hw {
+        super::hardware::device(n, ui, id);
+    }
 }
 
 // the name: Enter or the button applies, Esc puts it back

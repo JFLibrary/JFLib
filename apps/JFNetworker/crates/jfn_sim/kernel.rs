@@ -84,6 +84,9 @@ pub struct Engine {
     pub(crate) seed: u64,
     /// copper links with the wrong cable stay down (no auto-MDI-X)
     pub strict_mdix: bool,
+    /// the project simulates hardware: devices without figures of their own get their model's
+    /// (Project::metered, res.rs)
+    pub metered: bool,
     events_done: u64,
     pub(crate) jobs: BTreeMap<crate::jobs::JobId, crate::jobs::Job>,
     pub(crate) next_job: crate::jobs::JobId,
@@ -116,6 +119,7 @@ impl Engine {
             trace: Trace::new(),
             seed,
             strict_mdix: false,
+            metered: false,
             events_done: 0,
             jobs: BTreeMap::new(),
             next_job: 0,

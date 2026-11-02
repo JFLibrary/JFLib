@@ -1,0 +1,109 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/hw_basic.jfnet
+# the hardware of a device in the window (inspector/hardware.rs, metrics.rs) on
+# tests/fixtures/hw_basic.jfnet: "Hardware simulieren" on the project's page with its line and one undo
+# step; a host's card with the figures of its model marked as assumptions; a preset; a refused figure;
+# a resize with its reboot and its mark, one live; undo; a device with figures of its own; the fault card's
+# slower CPU and memory hog; the Hardware row of the Metriken panel with its tiles and charts.  The
+# numbers are those of this run on the virtual clock.
+# Ids: the switch 139264; the card: own 139265, preset 139266, cores 139267, speed 139268, RAM 139269,
+# swap 139270, disk 139271, its kind 139272, live 139273, the model's figures 139274, apply 139275; the
+# faults: factor 139280, slow down 139281, GiB 139282, occupy 139283; the Metriken tree 47104
+size 1280 2600
+theme light
+# ---- the project's page: on (the file says so), its line, one undo step
+expect #139264 checked
+expect text:"Server und Hosts bekommen CPU und RAM ihres Modells: Dienste warten auf freie Kerne, zu wenig Speicher bremst sie. Aus: Rechenzeit kostet nichts, wie bisher." exists
+click #139264
+wait 100
+expect #139264 unchecked
+key ctrl+z
+wait 100
+expect #139264 checked
+key ctrl+y
+wait 100
+expect #139264 unchecked
+key ctrl+z
+wait 3000
+# ---- WEB1: the figures of its model, assumptions, and that it says so
+click listitem:"WEB1"
+wait 100
+expect text:"Hardware" exists
+expect text:"Annahmen für dieses Modell, keine Messwerte eines echten Geräts." exists
+expect #139267 text "4"
+expect #139268 text "110"
+expect #139269 text "16"
+expect #139270 text "2"
+expect #139271 text "480"
+expect text:"Das Gerät startet dafür neu und fällt 30 s aus; was auf der Disk liegt, bleibt." exists
+expect #139274 missing
+# a figure that cannot be: refused, nothing changes
+click #139267
+key ctrl+a
+type "0"
+click #139275
+wait 100
+expect text:"Die Zahl der Kerne geht von 1 bis 1024." exists
+# ---- a resize: a reboot, its mark, one undo step
+click #139267
+key ctrl+a
+type "8"
+click #139275
+wait 100
+expect text:"Eigene Angaben." exists
+expect #139267 text "8"
+expect #139274 exists
+expect text:"Fehler 1: WEB1 startet für neue Hardware neu" exists
+key ctrl+z
+wait 100
+expect text:"Annahmen für dieses Modell, keine Messwerte eines echten Geräts." exists
+expect #139267 text "4"
+key ctrl+y
+wait 100
+expect #139267 text "8"
+# ---- live: no new mark, no reboot; it says so before it happens
+click #139273
+wait 100
+expect text:"Die neuen Werte gelten sofort, ohne Neustart." exists
+click #139267
+key ctrl+a
+type "16"
+click #139275
+wait 100
+expect #139267 text "16"
+# ---- back to the model's figures
+click #139274
+wait 100
+expect text:"Annahmen für dieses Modell, keine Messwerte eines echten Geräts." exists
+expect #139267 text "4"
+# ---- WEB2 has its own figures, from the start
+click listitem:"WEB2"
+wait 100
+expect text:"Eigene Angaben." exists
+expect #139267 text "1"
+expect #139269 text "1"
+# ---- the faults of a device with hardware
+click #139280
+type "3"
+click #139281
+wait 100
+expect text:"Fehler 2: CPU von WEB2 langsam: Rechenzeit ×3" exists
+click #139282
+type "0"
+click #139283
+wait 100
+expect text:"Der Speicher ist eine Zahl von GiB größer als 0, z. B. 8." exists
+click #139282
+key ctrl+a
+type "0,5"
+click #139283
+wait 100
+expect text:"Fehler 3: Speicherfresser auf WEB2: 512 MiB" exists
+# ---- the Metriken panel: a row of its own, after the services
+wait 4000
+key ctrl+shift+m
+wait 100
+click #47113
+wait 100
+expect text:"WEB2 · Hardware" exists
+expect text:"1 Kern, 1 GiB RAM, Festplatte 500 GiB" exists
+shot build/jfnetworker/hardware_panel.png

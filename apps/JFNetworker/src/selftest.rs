@@ -7,7 +7,7 @@
 // build on (log reports, saved configurations through undo and redo); campustest.rs the
 // campus of the acceptance (tests/fixtures/campus.jfnet); uitest.rs what U5 adds around the
 // window (contrast, settings, autosave, the English catalogue).  Prints "FAIL group: name"
-// lines and a summary; exit code 1 on a failure.
+// lines and a summary; exit code 1 on a failure.  "--only=GROUP" runs one group alone.
 //
 // msgtest.rs: the texts of model and simulator as messages (jfn_model::msg) and their English.
 // scripttest.rs: scripts as services in the hosts (group script, jfn_sim::scriptsvc).
@@ -77,6 +77,12 @@
 // of doc/edits.rs, the scene of canvas/paint.rs).
 // startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
+// queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
+// fwguitest.rs: the Firewall tab (group fwgui: what its forms type, rows back from the engine, moves,
+// the Test part against packets sent for real, the steps of console::run_lines_running).
+// academytest.rs: the Akademie (group academy: jfn_model::academy, the progress in its file, step order
+// and state, what the page reads, every course below --academy-dir).
 
 use alloc::format;
 use alloc::string::String;
@@ -184,9 +190,15 @@ mod webdevtest;
 mod modelstest;
 #[path = "startpagetest.rs"]
 mod startpagetest;
+#[path = "hardwaretest.rs"]
+mod hardwaretest;
+#[path = "fwguitest.rs"]
+mod fwguitest;
+#[path = "academytest.rs"]
+mod academytest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 58] = [
+    let groups: [(&'static str, fn(&mut T)); 61] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -245,9 +257,17 @@ pub fn run() -> i32 {
         ("cables", cablestest::run),
         ("labels", labelstest::run),
         ("startpage", startpagetest::run),
+        ("hardware", hardwaretest::run),
+        ("fwgui", fwguitest::run),
+        ("academy", academytest::run),
     ];
     let (mut total, mut failed) = (0, 0);
+    let args = plat::args();
+    let only = args.iter().find_map(|a| a.strip_prefix("--only="));
     for (name, f) in groups {
+        if only.is_some_and(|o| o != name) {
+            continue;
+        }
         let mut t = T { group: name, ok: 0, failed: 0 };
         f(&mut t);
         plat::write_stdout(format!("{:<10} {} ok, {} failed\n", name, t.ok, t.failed).as_bytes());

@@ -28,6 +28,9 @@
 // waiting work ...: groups) over the span chosen (30 s, 1 min, 5 min).  Values read as the
 // charts write them (LcUnit: latencies in ms or µs, data in kB or MB).
 //
+// A device with hardware (SA1, jfn_sim's res.rs) has a row of its own after its services, "Hardware":
+// tiles and charts of its CPU, run queue, memory and disk (the series named HOST).
+//
 // Time: real time follows the newest samples; the simulation mode ends the charts at the
 // moment it shows (also a view of the past), and the tiles cover the 5 s before it
 // (Engine::kpi_between).  The faults that overlap a chart (Engine::chart_marks) are shaded
@@ -77,6 +80,10 @@ pub(crate) enum Show {
     Num,
     /// latencies (the series are µs, the chart reads ms / µs)
     Lat,
+    /// a share (the series is per mille, the chart reads percent)
+    Pct,
+    /// bytes (and bytes per second)
+    Bytes,
 }
 
 impl Show {
@@ -84,6 +91,8 @@ impl Show {
         match self {
             Show::Num => LcUnit::Num(""),
             Show::Lat => LcUnit::Secs,
+            Show::Pct => LcUnit::Num("%"),
+            Show::Bytes => LcUnit::Si("B"),
         }
     }
 }
@@ -188,6 +197,14 @@ static G_POP3: [Group; 3] = [
     Group { title: "In Arbeit", show: Show::Num, names: &["active"] },
 ];
 
+// i18n: title
+static G_HOST: [Group; 4] = [
+    Group { title: "CPU", show: Show::Pct, names: &["cpu_pm"] },
+    Group { title: "Warteschlange", show: Show::Num, names: &["runq", "running"] },
+    Group { title: "Speicher", show: Show::Bytes, names: &["mem_bytes", "swap_bytes"] },
+    Group { title: "Disk", show: Show::Bytes, names: &["disk_bytes"] },
+];
+
 static G_IMAP: [Group; 3] = [
     Group { title: "Durchsatz", show: Show::Num, names: &["fetched", "stored", "expunged", "appended", "logins"] },
     Group { title: "Fehler|Diagramm", show: Show::Num, names: &["failed_logins"] },
@@ -210,6 +227,7 @@ pub(crate) fn groups(kind: &str) -> &'static [Group] {
         "smtp-server" => &G_SMTP,
         "pop3-server" => &G_POP3,
         "imap-server" => &G_IMAP,
+        "host" => &G_HOST,
         _ => &G_OTHER,
     }
 }
@@ -301,6 +319,12 @@ pub(crate) fn series_label(name: &str) -> String {
         Some(l) => String::from(t(l.label)),
         None if name == "busy_us" => String::from(t("Rechenzeit (µs/s)")),
         None if name == "dropped" => String::from(t("Verworfen/s")),
+        None if name == "cpu_pm" => String::from(t("Auslastung")),
+        None if name == "runq" => String::from(t("Wartende Aufgaben")),
+        None if name == "running" => String::from(t("Belegte Kerne")),
+        None if name == "mem_bytes" => String::from(t("Im RAM")),
+        None if name == "swap_bytes" => String::from(t("Im Swap")),
+        None if name == "disk_bytes" => String::from(t("Disk/s")),
         None => String::from(name),
     }
 }
@@ -336,8 +360,14 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "radius-server" => t("RADIUS-Server"),
         "telnetd" => t("Telnet-Server"),
         "sshd" => t("SSH-Server"),
+        "host" => t("Hardware"),
         _ => kind,
     }
+}
+
+/// a row of the tree, the head of the charts: "Loadbalancer lb"; a device's hardware has no name
+fn svc_label(kind: &str, name: &str) -> String {
+    if kind == "host" { String::from(kind_name(kind)) } else { tf("{} {}", &[kind_name(kind), name]) }
 }
 
 /// what the requests of a kind of service are called on its first tile
@@ -488,6 +518,12 @@ fn by_device(n: &Net) -> Vec<(u32, Vec<SvcBrief>)> {
     for s in n.doc.sim.state().service_list() {
         all.entry(s.dev).or_default().push(s);
     }
+    // a device with hardware: a row of its own after its services
+    for d in &n.doc.proj.devices {
+        if n.doc.sim.state().res_of(d.id).is_some() {
+            all.entry(d.id).or_default().push(SvcBrief { dev: d.id, name: String::from(jfn_sim::res::HOST), kind: "host", enabled: true, running: true });
+        }
+    }
     n.doc.proj.devices.iter().filter_map(|d| all.remove(&d.id).map(|v| (d.id, v))).collect()
 }
 
@@ -555,11 +591,13 @@ fn tree(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     let mut items: Vec<(u64, u16, bool, String, String, u32, usize)> = Vec::new();
     for (d, v) in devs {
         let name = n.doc.proj.device(*d).map_or_else(|| format!("{}", d), |x| x.name.clone());
-        let count = if v.len() == 1 { String::from(t("1 Dienst")) } else { tf("{} Dienste", &[&v.len().to_string()]) };
+        // (its hardware is no service)
+        let k = v.iter().filter(|s| s.kind != "host").count();
+        let count = if k == 1 { String::from(t("1 Dienst")) } else { tf("{} Dienste", &[&k.to_string()]) };
         items.push((dev_key(*d), 0, true, name, count, *d, 0));
         if n.metrics.tree.expanded.contains(&dev_key(*d)) {
             for (k, s) in v.iter().enumerate() {
-                items.push((svc_key(*d, k), 1, false, tf("{} {}", &[kind_name(s.kind), &s.name]), String::from(svc_state(&off, s).0), *d, k));
+                items.push((svc_key(*d, k), 1, false, svc_label(s.kind, &s.name), String::from(svc_state(&off, s).0), *d, k));
             }
         }
         if items.len() >= ROWS_MAX {
@@ -627,7 +665,8 @@ fn refresh(n: &mut Net) {
         let lat = matches!(v.kind, jfn_sim::SeriesKind::Lat(_)) && v.name.ends_with("_us");
         let mut b = SeriesBuf::new(v.points.len().max(1));
         for &(t, x) in &v.points {
-            b.push(t as f64, if lat { x as f64 * 1e-6 } else { x as f64 });
+            // (cpu_pm reads as percent)
+            b.push(t as f64, if lat { x as f64 * 1e-6 } else if v.name == "cpu_pm" { x as f64 / 10.0 } else { x as f64 });
         }
         series.push((v.name, b));
     }
@@ -652,6 +691,31 @@ fn refresh(n: &mut Net) {
     n.metrics.data = Some(Data { key, series, kpi, share, marks });
 }
 
+// the tiles of a device's hardware at moment `to`: its CPU over the last seconds, how many wait, its
+// memory
+fn host_tiles(e: &jfn_sim::Engine, dev: u32, to: Ns, sep: u32) -> Vec<(String, String)> {
+    let from = to.saturating_sub(KPI_SPAN);
+    let val = |name: &str| e.series_value(dev, jfn_sim::res::HOST, name, jfn_sim::series::Agg::Natural, from, to).ok().map(|v| v.milli as f64 / 1000.0);
+    let num = |v: f64| LcUnit::Num("").text(v, sep);
+    let mut out = Vec::new();
+    if let Some(v) = val("cpu_pm") {
+        out.push((String::from(t("CPU")), LcUnit::Num("%").text(v / 10.0, sep)));
+    }
+    if let Some(v) = val("runq") {
+        out.push((String::from(t("Wartend")), num(v)));
+    }
+    if let Some(v) = val("mem_bytes") {
+        out.push((String::from(t("Im RAM")), jfn_sim::disk::size_text(v as u64)));
+    }
+    if let Some(v) = val("swap_bytes").filter(|&v| v > 0.0) {
+        out.push((String::from(t("Im Swap")), jfn_sim::disk::size_text(v as u64)));
+    }
+    if let Some(r) = e.res_of(dev) {
+        out.push((String::from(t("Kerne")), num(r.hw.cores as f64)));
+    }
+    out
+}
+
 // the chosen service: head, tiles, charts
 fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     refresh(n);
@@ -666,7 +730,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     let dname = n.doc.proj.device(dev).map_or_else(|| format!("{}", dev), |d| d.name.clone());
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.status_dot(badge);
-    ui.text(TS_BODY_STRONG, &format!("{} · {} {}", dname, kind_name(brief.kind), brief.name));
+    ui.text(TS_BODY_STRONG, &format!("{} · {}", dname, svc_label(brief.kind, &brief.name)));
     ui.text(TS_BODY | TX_SECONDARY, state);
     ui.spacer(-1);
     ui.text(TS_CAPTION | TX_SECONDARY, t("Zeitraum"));
@@ -679,7 +743,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     }
     ui.box_end();
     // its status line; the span of the tiles
-    let status = n.doc.sim.state().services(dev).into_iter().find(|s| s.name == svc).map(|s| s.status_msg);
+    let status = n.doc.sim.state().services(dev).into_iter().find(|s| s.name == svc).map(|s| s.status_msg).or_else(|| n.doc.sim.state().res_of(dev).filter(|_| brief.kind == "host").map(jfn_sim::res::status_msg));
     ui.box_begin(0, BOX_H, 8);
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &status.filter(|m| !m.is_empty()).map(|m| crate::app::tr::msg(&m)).unwrap_or_default());
@@ -692,7 +756,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
         return;
     };
     // the tiles over the last seconds
-    let tiles = data.kpi.as_ref().map(|k| kpi_tiles(k, data.share, sep)).unwrap_or_default();
+    let tiles = if brief.kind == "host" { host_tiles(n.doc.sim.state(), dev, shown_at(n).unwrap_or_else(|| n.doc.sim.state().series_times().last().copied().unwrap_or(0)), sep) } else { data.kpi.as_ref().map(|k| kpi_tiles(k, data.share, sep)).unwrap_or_default() };
     if tiles.is_empty() {
         ui.next_size(-1, 0);
         ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Noch keine Messwerte: der Simulator nimmt jede Sekunde einen Punkt jeder Zahl."));

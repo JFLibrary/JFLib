@@ -1601,3 +1601,65 @@ DSL-Modem (RJ11, 1G LAN)	DSL modem (RJ11, 1G LAN)
 Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.	Category {} does not fit {}; the limits without a category apply.
 {}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.	{} cable on {} does not carry {}; the link stays down.
 {}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.	{} cable between {} and {} does not carry {}; the link stays down.
+
+# SA1: the hardware of a device (catalog.rs, fault.rs, trace.rs)
+Rack-Server S	Rack server S
+Rack-Server S (2× 10GBASE-T, 1G Management)	Rack server S (2× 10GBASE-T, 1G management)
+Rack-Server M	Rack server M
+Rack-Server M (2× 25G SFP28, 1G Management)	Rack server M (2× 25G SFP28, 1G management)
+Rack-Server L	Rack server L
+Rack-Server L (2× 25G SFP28, 1G Management)	Rack server L (2× 25G SFP28, 1G management)
+Rack-Server XL	Rack server XL
+Rack-Server XL (2× 100G QSFP28, 1G Management)	Rack server XL (2× 100G QSFP28, 1G management)
+NAS	NAS
+NAS mit Festplatten (2× 10GBASE-T)	NAS with hard disks (2× 10GBASE-T)
+SATA-SSD	SATA SSD
+NVMe-SSD	NVMe SSD
+schnelle NVMe-SSD	fast NVMe SSD
+{} GiB	{} GiB
+{} MiB	{} MiB
+1 Kern	1 core
+{} Kerne	{} cores
+{}, {} RAM, {} {} GiB	{}, {} RAM, {} {} GiB
+{} mit {} % Tempo, {} RAM, {} {} GiB	{} at {} % speed, {} RAM, {} {} GiB
+CPU von {} langsam: Rechenzeit ×{}	CPU of {} slow: CPU time ×{}
+CPU von {} langsam: Rechenzeit ×{},{}	CPU of {} slow: CPU time ×{}.{}
+Speicherfresser auf {}: {}	Memory hog on {}: {}
+{} startet für neue Hardware neu	{} restarts for new hardware
+{} hat keine simulierte Hardware.	{} has no simulated hardware.
+Der Faktor einer langsamen CPU muss größer als 0 sein.	The factor of a slow CPU must be greater than 0.
+Speicher voll: Dienst {} mit {} beendet	Memory full: service {} with {} killed
+Der Pfad ist leer.	The path is empty.
+Der Pfad „{}“ ist absolut; erlaubt sind nur Pfade im Ordner des Kurses.	The path “{}” is absolute; only paths inside the course's folder are allowed.
+Der Pfad „{}“ führt mit „..“ aus dem Ordner des Kurses.	The path “{}” leads out of the course's folder with “..”.
+Der Pfad „{}“ ist zu lang oder enthält andere Zeichen als Buchstaben, Ziffern und - _ . /	The path “{}” is too long or holds characters other than letters, digits and - _ . /
+Der Pfad „{}“ hat einen leeren oder unzulässigen Teil.	The path “{}” has an empty or invalid part.
+Schritt {}: {}	Step {}: {}
+Schritt {}: die Datei hat keine Aufgabe.	Step {}: the file has no task.
+Schritt {}: das Labor hat keine Ziele, an denen sich sein Ende erkennen lässt.	Step {}: the lab has no goals that would show when it is finished.
+Die Datei enthält keinen Kurs.	The file holds no course.
+Das ist keine Kursdatei.	This is not a course file.
+Der Kurs hat keinen Titel.	The course has no title.
+Der Kurs hat keine Schritte.	The course has no steps.
+Der Kurs hat mehr als {} Schritte.	The course has more than {} steps.
+Der Kurs hat keine Versionsnummer (course_version).	The course has no version number (course_version).
+„{}“ hat keinen englischen Text.	“{}” has no English text.
+Einheit {} hat keinen Titel.	Unit {} has no title.
+Die Kennung {} kommt doppelt vor.	The id {} appears twice.
+Schritt {}: die Lektion {} fehlt in jeder Sprache.	Step {}: the lesson {} is missing in every language.
+Schritt {}: die Lektion {} fehlt im Ordner {}; es erscheint die andere Sprache.	Step {}: the lesson {} is missing in the folder {}; the other language shows.
+Schritt {}: die Datei {} fehlt.	Step {}: the file {} is missing.
+Schritt {}: das Bild {} fehlt.	Step {}: the picture {} is missing.
+Schritt {}: den Schritt {} gibt es nicht.	Step {}: there is no step {}.
+Schritt {}: {} ist kein Labor.	Step {}: {} is not a lab.
+Schritt {}: der Link „{}“ führt nirgendwohin; es gibt step:, lab:, http: und https:.	Step {}: the link “{}” leads nowhere; there are step:, lab:, http: and https:.
+Die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	The id “{}” may hold only small letters, digits, - and _.
+Die Datei {} fehlt oder lässt sich nicht lesen.	The file {} is missing or cannot be read.
+Schritt {}: die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	Step {}: the id “{}” may hold only small letters, digits, - and _.
+Schritt {} hat keinen Titel.	Step {} has no title.
+Schritt {}: die Art „{}“ gibt es nicht (lesson, lab, quiz, fault, exam).	Step {}: there is no kind “{}” (lesson, lab, quiz, fault, exam).
+Schritt {}: die Datei {} endet nicht auf {}.	Step {}: the file {} does not end in {}.
+Die Datei enthält keine Kursliste.	The file holds no list of courses.
+Das ist keine Kursliste.	This is not a list of courses.
+Kurs {}: {}	Course {}: {}
+Kurs {}: die Prüfsumme von {} ist kein SHA-256.	Course {}: the checksum of {} is no SHA-256.
