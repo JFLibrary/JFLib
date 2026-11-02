@@ -442,6 +442,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 | `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
+| `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
+| `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
+| `firewall_en.uis`, `firewall_shots.uis` | der Reiter auf Englisch; die Bilder hell, dunkel, schmal, 100 und 150 % (`build/f1/shots/fw_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
 Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -526,7 +529,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | | [`crates/jfn_sim/series.rs`](crates/jfn_sim/series.rs) | Zeitreihen auf virtueller Zeit: jede Zahl jedes Dienstes und der Verkehr der Kabel jede Sekunde, KPIs, Shard-Last, Fehler als Markierungen, Werte über Zeiträume für Szenarien, CSV (siehe [Metriken und Zeitreihen](#metriken-und-zeitreihen)) |
 | Runner | [`crates/jfn_run`](crates/jfn_run/lib.rs), [`sim/main.rs`](sim/main.rs) | `jfn-sim` und `--scenario` der GUI-Exe: Dateien lesen, Bericht, pcapng, Zeitreihen als CSV, Vergleich mit Golden-Dateien |
 | App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen, Einstellungen ([`prefs.rs`](src/app/prefs.rs): Schema über `base::settings`), Sprachen ([`tr.rs`](src/app/tr.rs): Katalog, übersetzte Befehle und Menüs) |
-| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop), die Dialoge der Einstellungen und der Tastenkürzel ([`settings.rs`](src/workspace/settings.rs)) |
+| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Firewall, Dienste, CLI, Desktop), die Dialoge der Einstellungen und der Tastenkürzel ([`settings.rs`](src/workspace/settings.rs)) |
 | | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)), Sicherungen und ihre Wiederherstellung ([`autosave.rs`](src/doc/autosave.rs)) |
 | | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
 | | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/uitest.rs`](src/uitest.rs), [`src/campustest.rs`](src/campustest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, des Labors, dem, worauf die Konsolen bauen, der Oberfläche ohne Fenster (Kontrast, Einstellungen, Sicherungen, Katalog), des Campus und der synthetischen Projekte (`--selftest`) |
@@ -560,6 +563,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Firewall-Reiter | [`src/workspace/devwin/firewall.rs`](src/workspace/devwin/firewall.rs), [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs) (`Acls::probe`), [`src/doc/console.rs`](src/doc/console.rs) (`run_lines_running`), [`src/fwguitest.rs`](src/fwguitest.rs) | Regeln, NAT und Test im Gerätefenster als Formulare über den Befehlen, sein Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 
 ### Gerätekatalog
@@ -601,8 +605,9 @@ Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interfa
 Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu dazukam, verhält sich so:
 
 - **Die Firewalls sind heute Router mit Access-Listen und NAT.** Ohne Liste lassen sie alles durch,
-  auch was von außen beginnt; ihre Titel sagen das. Zonen und zustandsbehaftetes Filtern kommen mit
-  Meilenstein F2.
+  auch was von außen beginnt; ihre Titel sagen das. Listen und NAT lassen sich im Reiter Firewall des
+  Gerätefensters pflegen (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)). Zonen und
+  zustandsbehaftetes Filtern kommen mit Meilenstein F2.
 - **PoE ist bisher nur eine Angabe am Port** (PoE+, PoE++, PoE-gespeist): Es gibt kein Leistungsbudget.
 - **Der Repeater** wiederholt jeden Rahmen an den anderen Port und verlängert so eine Kupferstrecke.
   Die Grenze gilt je Kabel: zweimal 90 m gehen, zweimal 120 m nicht.
@@ -745,7 +750,9 @@ Muster; der Simulator sieht sie nicht, den Zustand zeigen weiter die LEDs.
   DHCP, Standardroute und statische Routen; sie tippen die passenden Befehle in die Konsole –
   `interface …`, `ip address …`, `ip route …` bzw. `ip addr add …`, `ip route add default via
   …` – und werden ein Rückgängig-Schritt in der Startkonfiguration; „Laufende Konfiguration
-  sichern“), Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
+  sichern“), Firewall (bei IOS-artigen Geräten, die routen: Zugriffslisten, was welche Schnittstelle
+  schützt, NAT, welche Regel ein Paket trifft; siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)),
+  Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
   Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
@@ -2424,7 +2431,46 @@ ein L2-Switch an seinem VLAN-Interface.
   die erlauben oder verwerfen, neue, übersetzte und abgelaufene Übersetzungen, Pakete ohne
   Übersetzung oder Regel, ein erschöpfter Pool, wartende und verworfene Fragmente.
 - **Für Programme:** `Action::Acl`, `AccessGroup`, `AclCounters` und `Nat` (auch die Befehle
-  gehen über sie), `Engine::access_lists`, `access_groups`, `nat` und `nat_translations`.
+  gehen über sie), `Engine::access_lists`, `access_groups`, `nat` und `nat_translations`;
+  `Acls::probe` fragt eine Schnittstelle, was ihre Liste zu einem Paket sagt, ohne etwas zu zählen.
+
+**Im Fenster: der Reiter Firewall** ([`devwin/firewall.rs`](src/workspace/devwin/firewall.rs)). Das
+Gerätefenster von Firewalls, Routern und L3-Switches pflegt Listen und NAT in Formularen. Sie sind
+eine Oberfläche über den Befehlen: Jeder Schritt läuft sichtbar in der Konsole, wird zusammen mit der
+laufenden Konfiguration zur Startkonfiguration und ist ein Rückgängig-Schritt; was der Reiter zeigt,
+liest er aus der Engine, eine in der Konsole getippte Regel steht also sofort da. Das Verhalten der
+Engine ändert er nicht.
+
+- **Regeln:** oben, was welche Schnittstelle schützt (eine Liste je Richtung, ein Punkt sagt, ob sie
+  wirkt), darunter eine Liste mit Position, Aktion, Protokoll, Quelle, Ziel, Port, Log, Treffern und
+  Bemerkung und dem impliziten deny als letzter Zeile. Der Text über dem Raster sagt, was die Liste
+  gerade bedeutet: ungebunden oder ohne Regeln passiert alles. Neu, Bearbeiten, Duplizieren, nach oben,
+  nach unten, Löschen, Listen anlegen und löschen, Zähler löschen. Das Formular kennt die Protokolle
+  mit Namen, Adressen als `any`, `10.0.0.5`, `10.0.0.0/24` oder mit Wildcard-Bits, Port-Operatoren,
+  `established`, ICMP-Nachrichten, `log` und eine Bemerkung; eine Regel, die es nicht fassen kann (eine
+  Protokollnummer, ICMP-Typ und -Code ohne Namen), steht als ihre Zeile im Raster und lässt sich als
+  Zeile bearbeiten, die eine Konsole zur Probe liest.
+- **Verschieben** tippt, was auch die Befehlszeile täte: `no 30`, `15 permit …` (davor `ip access-list
+  resequence`, wenn die Nummern nicht 10, 20, … sind). Nur die verschobene Regel beginnt wieder bei 0
+  Treffern, die anderen behalten ihre. Eine Regel geht mit den Bemerkungen direkt über ihr. Weil eine
+  Bemerkung nur am Ende einer Liste hinzukommt, muss für eine Bemerkung mitten in der Liste (und wenn
+  beim Tausch beide Regeln Bemerkungen haben) neu getippt werden, was folgt: Dann beginnen auch diese
+  Regeln bei 0. Beim Löschen einer Regel gehen die Bemerkungen über ihr mit.
+- **NAT:** die Seite jeder Schnittstelle, Pools, dynamische Regeln mit PAT, statische Übersetzungen und
+  Port-Weiterleitungen, darunter die laufenden Übersetzungen mit einer Schaltfläche zum Löschen.
+- **Test:** Schnittstelle, Richtung, Quelle, Ziel, Protokoll, Port geben die Liste, die Regel, die
+  trifft, und das Ergebnis, auch das implizite deny, ohne ein Paket zu senden. Die Antwort kommt aus
+  `Acls::probe`, derselben Funktion, nach der die Engine filtert; ausgehende Listen sehen das Paket
+  nach NAT, dort zählt also die übersetzte Quelle.
+- **Befehle:** unter allen Teilen die Zeilen, die der letzte Schritt getippt hat.
+
+Unmögliches lehnt der Reiter mit dem Grund ab: ein Gerät, das nicht routet (mit einer Schaltfläche, die
+Routing einschaltet), eine Adresse, die keine ist, eine Netzmaske statt Wildcard-Bits, eine Regel, die es
+schon gibt, eine Liste, die noch filtert oder aus der NAT auswählt, ein Pool, den eine Regel liest. Während
+die Ansicht in der Vergangenheit steht, und auf einem Gerät ohne Strom, lässt sich nur lesen. Rückgängig
+startet das Gerät mit der alten Konfiguration neu, also beginnen danach alle Zähler und Übersetzungen
+bei 0. Was in der Konsole getippt und noch nicht gesichert war, sichert der nächste Schritt des Reiters
+mit: Sonst könnte er diese Regeln nicht verschieben oder löschen.
 
 Noch offen: Hairpinning (ein innerer Host erreicht einen anderen über dessen globale Adresse;
 RFC 4787 verlangt es, das klassische Vorbild kann es nicht), `ip nat outside source`,

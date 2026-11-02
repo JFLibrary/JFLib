@@ -20,6 +20,10 @@
 //                                    engine runs it, its output follows
 //   run_lines(n, dev, label, lines)  a form's command lines: typed on the console and into the
 //                                    startup configuration, one undo step
+//   run_lines_running(n, dev, label, lines)   the same for forms that show what the device runs
+//                                    (the Firewall tab): the startup configuration becomes the
+//                                    running one with the lines, what was typed and not saved
+//                                    included, so a rule typed on the console can be moved
 //   save_running(n, dev)             the running configuration becomes the startup one (IOS:
 //                                    "copy running-config startup-config" on the console)
 //   resumed(n, t)                    "Von hier fortsetzen" at moment t: every console says so
@@ -993,7 +997,7 @@ fn reply_complete(c: &mut Console, line: &str, head: &str, tail: &str, new: Opti
 
 // what the device said to a line is a complaint: IOS "% ..." lines (not the time-stamped
 // console messages), anything on a shell (its commands print nothing when they work)
-fn refused(ios: bool, out: &str) -> Option<String> {
+pub(crate) fn refused(ios: bool, out: &str) -> Option<String> {
     let out = out.trim_end_matches('\n');
     if ios {
         out.lines().find(|l| l.starts_with('%')).map(String::from)
@@ -1005,7 +1009,7 @@ fn refused(ios: bool, out: &str) -> Option<String> {
 }
 
 // the output of the scratch engine's console since the last look
-fn scratch_out(e: &mut Engine, dev: u32) -> String {
+pub(crate) fn scratch_out(e: &mut Engine, dev: u32) -> String {
     let mut s = String::new();
     for r in e.take_reports() {
         if let Report::CliOut { dev: d, bytes, .. } = r
@@ -1051,12 +1055,26 @@ fn with_lines(seed: u64, d: &Device, ios: bool, lines: &[String]) -> Result<Stri
 /// new startup configuration.  Err: why nothing changed (a line the device refuses, a command
 /// still running on the console)
 pub(crate) fn run_lines(n: &mut Net, dev: u32, label: &str, lines: &[String]) -> Result<(), String> {
+    run_from(n, dev, label, lines, false)
+}
+
+/// run_lines for a form that shows what the device runs: the lines are checked on, and the new
+/// startup configuration made from, the running configuration of a device with power -- a list
+/// typed on the console and not saved yet is there to change, and the step saves it too
+pub(crate) fn run_lines_running(n: &mut Net, dev: u32, label: &str, lines: &[String]) -> Result<(), String> {
+    run_from(n, dev, label, lines, true)
+}
+
+fn run_from(n: &mut Net, dev: u32, label: &str, lines: &[String], running: bool) -> Result<(), String> {
     let d = n.doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     if !has_cli(&n.doc.proj, dev) {
         return Err(tf("{} hat keine Befehlszeile.", &[&d.name]));
     }
     let ios = ios_of(&n.doc.proj, dev);
-    let text = with_lines(n.doc.proj.seed, &d, ios, lines)?;
+    let base = if running && !d.off { Device { startup_config: n.doc.sim.engine().running_config(dev), ..d.clone() } } else { d.clone() };
+    let text = with_lines(n.doc.proj.seed, &base, ios, lines)?;
+    // lines that only run a command ("do clear ...") leave the configuration as it is written
+    let text = if lines.iter().all(|l| l.starts_with("do ")) { d.startup_config.clone() } else { text };
     if d.off {
         if let Some(e) = edits::device_edit(&n.doc.proj, dev, label, |x| x.startup_config = text) {
             n.doc.apply(e);
