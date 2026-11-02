@@ -1,4 +1,4 @@
-// linux_thread -- Linux threads (clone + futex), semaphores, the wake-up of the UI thread,
+// linux_thread -- Linux threads (clone + futex; linked against glibc: pthread_create, at the end of this file), semaphores, the wake-up of the UI thread,
 // system information, the date                       [src/plat/linux/lx_thread.s, plat_linux.s]
 //
 // A thread's stack is an mmap with a PROT_NONE guard page below it; the thread record sits
@@ -15,8 +15,8 @@ use rt::os::*;
 use crate::{Date, E_WAKE, Event};
 
 const SYS_MPROTECT: usize = 10;
-const SYS_CLONE: usize = 56;
-const SYS_EXIT: usize = 60;
+#[cfg(not(jfgui_glibc))] const SYS_CLONE: usize = 56;
+#[cfg(not(jfgui_glibc))] const SYS_EXIT: usize = 60;
 const SYS_SYSINFO: usize = 99;
 const SYS_FUTEX: usize = 202;
 const SYS_SCHED_GETAFFINITY: usize = 204;
@@ -40,7 +40,7 @@ const THREAD_STACK_MAX: usize = 0x1000_0000; // 256 MB
 type Start = Box<dyn FnOnce() + Send + 'static>;
 
 /// the thread record at the top of the stack mapping (64 bytes)
-#[repr(C)]
+#[repr(C)] #[cfg_attr(jfgui_glibc, allow(dead_code))]
 struct ThreadRec {
     tid: AtomicU32, // set by clone, cleared by the kernel when the thread ends
     _pad: u32,
@@ -52,7 +52,7 @@ struct ThreadRec {
 
 // clone(flags, stack = rec, &rec.tid, &rec.tid): the child starts on its own stack (rsp = rec,
 // 16-aligned) with the record in r9 and calls thread_main(rec)
-core::arch::global_asm!(
+#[cfg(not(jfgui_glibc))] core::arch::global_asm!(
     ".globl jfgui_rs_clone",
     "jfgui_rs_clone:",
     "    mov r9, rsi",
@@ -73,11 +73,11 @@ core::arch::global_asm!(
     nr = const SYS_CLONE,
 );
 
-unsafe extern "C" {
+#[cfg(not(jfgui_glibc))] unsafe extern "C" {
     fn jfgui_rs_clone(flags: usize, rec: *mut u8) -> isize;
 }
 
-extern "C" fn thread_main(rec: *mut ThreadRec) -> ! {
+#[cfg(not(jfgui_glibc))] extern "C" fn thread_main(rec: *mut ThreadRec) -> ! {
     // SAFETY: the alternate signal stack thread_spawn reserved in this thread's mapping (the
     // kernel gives a new thread none); rec is the record thread_spawn wrote, its closure is
     // taken over once.
@@ -101,7 +101,7 @@ unsafe impl Send for Thread {}
 /// run f on a new thread with stack bytes of stack (0 = 1 MB)  [plat_thread_create]
 pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
     let size = if stack == 0 { THREAD_STACK_DEF } else { stack.min(THREAD_STACK_MAX) };
-    let size = ((size + 4095) & !4095) + 2 * GUARD_SIZE + ALT_SIZE;
+    let size = ((size + 4095) & !4095) + 2 * GUARD_SIZE + ALT_SIZE; #[cfg(jfgui_glibc)] let size = size + TLS_ROOM;
     // SAFETY: a fresh anonymous mapping (PROT_READ | PROT_WRITE; MAP_PRIVATE | MAP_ANONYMOUS |
     // MAP_NORESERVE | MAP_STACK): from the bottom a guard page, the alternate signal stack,
     // a guard page, the stack.
@@ -128,7 +128,7 @@ pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
     }
 }
 
-impl Thread {
+#[cfg(not(jfgui_glibc))] impl Thread {
     /// wait until the thread has ended, then free its stack  [plat_thread_join]
     pub fn join(self) {
         // SAFETY: the record stays mapped until the munmap below, which runs after the
@@ -354,4 +354,66 @@ pub fn date() -> (Date, bool) {
         wday: ((days + 4) % 7) as u16,
     };
     (d, true)
+}
+
+// ---------------------------------------------------------------- threads of the glibc build
+//
+// (build_rs.py section "glibc", linux_glibc.rs) Drivers assume every calling thread is a glibc
+// thread: thread-local storage, a thread control block.  So pthread_create makes the thread, on
+// the mapping thread_spawn made: glibc takes its control block and the static TLS from the top of
+// the stack, which TLS_ROOM pays for (about 5 KB with libc alone; libraries opened later take
+// dynamic TLS, which glibc allocates elsewhere), so the stack that is left is the size asked for.
+// The record stays above it; _rsv[0] holds the pthread_t.  pthread_join is what makes the munmap
+// safe; glibc caches no stack of ours.
+
+#[cfg(jfgui_glibc)]
+const TLS_ROOM: usize = 16384;
+
+#[cfg(jfgui_glibc)]
+extern "C" fn thread_main(rec: *mut u8) -> *mut u8 {
+    let rec = rec as *mut ThreadRec;
+    // SAFETY: as in the other thread_main: the alternate signal stack thread_spawn reserved, the
+    // closure taken over once.
+    let f = unsafe {
+        let ss = [(*rec).base + GUARD_SIZE, 0, ALT_SIZE];
+        syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
+        Box::from_raw((*rec).start)
+    };
+    f();
+    core::ptr::null_mut()
+}
+
+/// thread_spawn's call: start the thread on rec's mapping -> < 0 when it did not start
+#[cfg(jfgui_glibc)]
+unsafe fn jfgui_rs_clone(_flags: usize, rec: *mut u8) -> isize {
+    use super::glibc::*;
+    let r = rec as *mut ThreadRec;
+    let mut attr = PthreadAttr([0; 56]);
+    // SAFETY: attr is a pthread_attr_t for the time of the call; the stack lies between the upper
+    // guard page and the record, thread_spawn wrote the record before this call.
+    unsafe {
+        let lo = (*r).base + 2 * GUARD_SIZE + ALT_SIZE;
+        if pthread_attr_init(&mut attr) != 0 {
+            return -1;
+        }
+        let e = pthread_attr_setstack(&mut attr, lo as *mut u8, rec as usize - lo);
+        let e = if e != 0 { e } else { pthread_create(&mut (*r)._rsv[0], &attr, thread_main, rec) };
+        pthread_attr_destroy(&mut attr);
+        if e != 0 { -1 } else { 0 }
+    }
+}
+
+#[cfg(jfgui_glibc)]
+impl Thread {
+    /// wait until the thread has ended, then free its stack  [plat_thread_join]
+    pub fn join(self) {
+        // SAFETY: the thread was created joinable and only this call joins it; after that nothing
+        // uses its mapping any more.
+        unsafe {
+            let rec = &*self.0;
+            super::glibc::pthread_join(rec._rsv[0], core::ptr::null_mut());
+            let (base, size) = (rec.base, rec.size);
+            syscall3(SYS_MUNMAP, base, size, 0);
+        }
+    }
 }
