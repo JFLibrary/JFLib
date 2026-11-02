@@ -38,6 +38,10 @@ use crate::vk_ffi as vk;
 use crate::vk_res::{PipeInner, copy_region, subresources};
 use crate::*;
 
+/// what an image handed to the window is in: Linux has no VK_KHR_swapchain, vk_dmabuf.rs hands
+/// dma-bufs over in GENERAL
+const LAYOUT_PRESENT: u32 = if cfg!(jfgui_glibc) { vk::IMAGE_LAYOUT_GENERAL } else { vk::IMAGE_LAYOUT_PRESENT_SRC_KHR };
+
 /// (vk layout, stages, access) of a layout as the source of a barrier
 fn src_of(l: Layout) -> (u32, u32, u32) {
     let shaders = vk::PIPELINE_STAGE_VERTEX_SHADER_BIT | vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT | vk::PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -53,7 +57,7 @@ fn src_of(l: Layout) -> (u32, u32, u32) {
                                 vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
         Layout::DepthTarget => (vk::IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, tests, vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
         Layout::DepthRead => (vk::IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, tests | shaders, 0),
-        Layout::Present => (vk::IMAGE_LAYOUT_PRESENT_SRC_KHR, acquire, 0),
+        Layout::Present => (LAYOUT_PRESENT, acquire, 0),
     }
 }
 
@@ -74,7 +78,7 @@ fn dst_of(l: Layout) -> (u32, u32, u32) {
                                 vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
         Layout::DepthRead => (vk::IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, tests | shaders,
                               vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | vk::ACCESS_SHADER_READ_BIT),
-        Layout::Present => (vk::IMAGE_LAYOUT_PRESENT_SRC_KHR, vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0),
+        Layout::Present => (LAYOUT_PRESENT, vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0),
     }
 }
 

@@ -441,6 +441,11 @@ pub(crate) struct Exts {
     pub depth_stencil_resolve_khr: bool,
     pub create_renderpass2_khr: bool,
     pub driver_properties_khr: bool,
+    /// images exported as dma-bufs with a DRM format modifier (Linux, vk_dmabuf.rs)
+    pub dmabuf: bool,
+    pub queue_foreign: bool,
+    #[cfg_attr(not(jfgui_glibc), allow(dead_code))]
+    pub physical_drm: bool,
 }
 
 /// a GPU of the system
@@ -480,6 +485,13 @@ impl Adapter {
         if self.voll { Level::Voll } else { Level::Basis }
     }
     /// a device of this adapter can show images on the surface
+    #[cfg(jfgui_glibc)]
+    pub fn can_present(&self, surface: &crate::Surface) -> bool {
+        crate::vk_swap::can_present(self, surface)
+    }
+
+    /// a device of this adapter can show images on the surface
+    #[cfg(not(jfgui_glibc))]
     pub fn can_present(&self, surface: &crate::Surface) -> bool {
         let Some(support) = self.inst.f.get_physical_device_surface_support_khr else { return false };
         if !self.exts.swapchain {
@@ -544,6 +556,12 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         depth_stencil_resolve_khr: ext(b"VK_KHR_depth_stencil_resolve\0"),
         create_renderpass2_khr: ext(b"VK_KHR_create_renderpass2\0"),
         driver_properties_khr: ext(b"VK_KHR_driver_properties\0"),
+        dmabuf: cfg!(jfgui_glibc)
+            && ext(b"VK_KHR_external_memory_fd\0")
+            && ext(b"VK_EXT_external_memory_dma_buf\0")
+            && ext(b"VK_EXT_image_drm_format_modifier\0"),
+        queue_foreign: ext(b"VK_EXT_queue_family_foreign\0"),
+        physical_drm: ext(b"VK_EXT_physical_device_drm\0"),
     };
     // properties: base, driver, subgroups, descriptor indexing
     let mut dip: vk::PhysicalDeviceDescriptorIndexingProperties = vk::Zero::zero();
@@ -721,7 +739,7 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         fragment_stores: b10(vk::F10_FRAGMENT_STORES_AND_ATOMICS),
         storage_write_without_format: b10(vk::F10_SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT),
         buffer_address: v12 && b12(vk::F12_BUFFER_DEVICE_ADDRESS),
-        swapchain: exts.swapchain,
+        swapchain: exts.swapchain || exts.dmabuf,
         mesh_shader: ext(b"VK_EXT_mesh_shader\0"),
         ray_query: ext(b"VK_KHR_ray_query\0") && ext(b"VK_KHR_acceleration_structure\0"),
         ray_pipeline: ext(b"VK_KHR_ray_tracing_pipeline\0") && ext(b"VK_KHR_acceleration_structure\0"),

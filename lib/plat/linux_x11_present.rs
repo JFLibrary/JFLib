@@ -91,7 +91,7 @@ impl Xp {
         if self.over { self.bx } else { self.pr[j] }
     }
 
-    fn drop_pending(&mut self) {
+    pub(super) fn drop_pending(&mut self) {
         self.pend = false;
         self.pr.clear();
         self.over = false;
@@ -112,6 +112,8 @@ impl X11 {
         if self.mode == 0 {
             self.shm_decide();
         }
+        #[cfg(jfgui_glibc)]
+        self.xp[i].gpu.leave();
         let shm = self.mode > 0;
         let xp = &mut self.xp[i];
         let (fw, fh) = (f.w.max(0), f.h.max(0));
@@ -176,6 +178,11 @@ impl X11 {
     pub(super) fn present_service(&mut self, now: u64) -> u64 {
         let mut next = u64::MAX;
         for i in 0..PW_MAX {
+            #[cfg(jfgui_glibc)]
+            if self.xp[i].gpu.active {
+                next = next.min(self.gpu_service(i, now));
+                continue;
+            }
             let xp = &mut self.xp[i];
             if xp.rpt != 0 {
                 // a full repaint after a map
@@ -215,6 +222,10 @@ impl X11 {
     pub(super) fn expose(&mut self, b: &[u8]) {
         let i = self.find(rd32(b, 4));
         if i < 0 {
+            return;
+        }
+        #[cfg(jfgui_glibc)]
+        if self.gpu_expose(i as usize, rd16(b, 8) as i32, rd16(b, 10) as i32, rd16(b, 12) as i32, rd16(b, 14) as i32) {
             return;
         }
         let xp = &mut self.xp[i as usize];
@@ -267,6 +278,8 @@ impl X11 {
     /// x11_present_free(i): the window is destroyed -- detach and unmap its segments
     pub(super) fn present_free(&mut self, i: usize) {
         let i = i & (PW_MAX - 1);
+        #[cfg(jfgui_glibc)]
+        self.gpu_free_all(i);
         self.slot_free(i, 0);
         self.slot_free(i, 1);
         let xp = &mut self.xp[i];

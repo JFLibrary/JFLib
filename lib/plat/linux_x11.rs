@@ -44,6 +44,9 @@ use crate::{CUR_COUNT, CUR_USER_MAX, Display, Frame, PW_MAX, PPW_MAX};
 mod clip;
 #[path = "linux_x11_dnd.rs"]
 mod dnd;
+#[cfg(jfgui_glibc)]
+#[path = "linux_x11_gpu.rs"]
+mod gpu;
 #[path = "linux_x11_input.rs"]
 mod input;
 #[path = "linux_x11_misc.rs"]
@@ -238,6 +241,7 @@ const SYS_SHMCTL: usize = 31;
 const SYS_GETPID: usize = 39;
 const SYS_SOCKET: usize = 41;
 const SYS_CONNECT: usize = 42;
+#[cfg(not(jfgui_glibc))]
 const SYS_RECVFROM: usize = 45;
 const SYS_SENDMSG: usize = 46;
 const SYS_UNAME: usize = 63;
@@ -337,6 +341,8 @@ struct Xp {
     newest: usize,        // the segment of the last put (2: none)
     rpt: u64,             // time of the next full repaint (0 none)
     rptn: i32,            // repaints left
+    #[cfg(jfgui_glibc)]
+    gpu: gpu::XpGpu,      // GPU buffers instead of these (linux_x11_gpu.rs)
 }
 
 /// an INCR transfer to another client  [x11_clip.s XF_*]
@@ -527,6 +533,8 @@ struct X11 {
     sc_pick: screen::Pick,
     sc_changed: bool,
     sc_xt_op: u32,
+    #[cfg(jfgui_glibc)]
+    g: gpu::XGpu,         // DRI3, Present (linux_x11_gpu.rs)
 }
 
 impl X11 {
@@ -603,6 +611,8 @@ impl X11 {
                 newest: 2,
                 rpt: 0,
                 rptn: 0,
+                #[cfg(jfgui_glibc)]
+                gpu: Default::default(),
             }),
             mode: 0,
             attaching: false,
@@ -695,6 +705,8 @@ impl X11 {
             sc_pick: screen::Pick::default(),
             sc_changed: false,
             sc_xt_op: 0,
+            #[cfg(jfgui_glibc)]
+            g: Default::default(),
         }
     }
 }
@@ -1116,5 +1128,49 @@ pub mod x11s {
             let root = s.root;
             s.get_property(root, *atom, 0, 0, X11_PROP_CHUNK, false)
         })
+    }
+}
+
+// ------------------------------------------------------------------ GPU buffers (linux_gpuout.rs)
+
+#[cfg(jfgui_glibc)]
+pub(crate) mod gpux {
+    use super::with_x;
+    use alloc::vec::Vec;
+
+    pub(crate) fn gpu_caps(w: i32) -> Option<crate::GpuCaps> {
+        with_x(|s| s.gpu_caps(w))
+    }
+
+    pub(crate) fn gpu_buf_new(w: i32, d: &crate::GpuBufDesc) -> u32 {
+        with_x(|s| s.gpu_buf_new(w, d))
+    }
+
+    pub(crate) fn gpu_buf_state(w: i32, h: u32) -> u32 {
+        with_x(|s| s.gpu_buf_state(w, h))
+    }
+
+    pub(crate) fn gpu_buf_free(w: i32, h: u32) {
+        with_x(|s| s.gpu_buf_free(w, h))
+    }
+
+    pub(crate) fn gpu_can_show(w: i32) -> bool {
+        with_x(|s| s.gpu_can_show(w))
+    }
+
+    pub(crate) fn gpu_show(w: i32, h: u32, rects: Option<&[[i32; 4]]>) {
+        with_x(|s| s.gpu_show(w, h, rects))
+    }
+
+    pub(crate) fn gpu_next_look(w: i32) -> u64 {
+        with_x(|s| s.gpu_next_look(w))
+    }
+
+    pub(crate) fn gpu_pump(ms: i32) {
+        with_x(|s| s.gpu_pump(ms))
+    }
+
+    pub(crate) fn gpu_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)> {
+        with_x(|s| s.gpu_test_image(w))
     }
 }

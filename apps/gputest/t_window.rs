@@ -91,6 +91,16 @@ pub fn stats(v: &[f64]) -> (f64, f64, f64) {
     (mean, s[s.len() / 2], s[(s.len() * 99 / 100).min(s.len() - 1)])
 }
 
+#[cfg(not(windows))]
+fn platform_wayland() -> bool {
+    plat::disp_backend() == plat::BK_WAYLAND
+}
+
+#[cfg(windows)]
+fn platform_wayland() -> bool {
+    false
+}
+
 pub fn open_window(t: &mut T) -> Option<i32> {
     let w = plat::win_create("gputest", 320, 240, PWF_SYSFRAME | PWF_RESIZABLE, PW_NOOWNER, PW_DEFAULT, PW_DEFAULT);
     if !t.ok(w >= 0, "plat window") {
@@ -163,18 +173,6 @@ fn window_checks(t: &mut T, g: &crate::Gpu, w: i32) -> Option<()> {
     let (ww, wh) = plat::win_size(w);
     t.ok(p.is_some() && sc.size() == (400, 300) && (ww, wh) == (400, 300),
          &format!("resize to 400x300: swapchain {:?}, window {ww}x{wh}", sc.size()));
-    // minimise / restore
-    plat::win_cmd(w, WCMD_MINIMIZE);
-    let min = pump_until(2000, || plat::win_state(w) & WST_MINIMIZED != 0);
-    t.ok(min, "window minimised");
-    let r = sc.acquire();
-    t.ok(matches!(r, Ok(None)), "minimised: acquire = Ok(None)");
-    drop(r);
-    plat::win_cmd(w, WCMD_RESTORE);
-    let back = pump_until(2000, || plat::win_state(w) & WST_MINIMIZED == 0);
-    pump(100);
-    let p = t.res(frame(dev, &mut sc, Some(&scene), clear, None), "frame after restore")?;
-    t.ok(back && p.is_some(), "restored: frames again");
     // the other present modes (measurements; FIFO when the surface lacks one)
     for mode in [PresentMode::Immediate, PresentMode::Mailbox] {
         sc.set_present_mode(mode);
@@ -186,6 +184,24 @@ fn window_checks(t: &mut T, g: &crate::Gpu, w: i32) -> Option<()> {
         if mode == PresentMode::Immediate && sc.present_mode() == mode && fifo > 4.0 {
             t.ok(mean < fifo, "IMMEDIATE faster than FIFO");
         }
+    }
+    // minimise / restore
+    plat::win_cmd(w, WCMD_MINIMIZE);
+    let min = pump_until(2000, || plat::win_state(w) & WST_MINIMIZED != 0);
+    t.ok(min, "window minimised");
+    let r = sc.acquire();
+    t.ok(matches!(r, Ok(None)), "minimised: acquire = Ok(None)");
+    drop(r);
+    plat::win_cmd(w, WCMD_RESTORE);
+    let wayland = cfg!(not(windows)) && platform_wayland();
+    let back = pump_until(if wayland { 200 } else { 2000 }, || plat::win_state(w) & WST_MINIMIZED == 0);
+    pump(100);
+    let p = t.res(frame(dev, &mut sc, Some(&scene), clear, None), "frame after restore")?;
+    // (a Wayland client cannot undo a minimise: the compositor shows the window again, nobody says so)
+    if back || !wayland {
+        t.ok(back && p.is_some(), "restored: frames again");
+    } else {
+        out("  note: Wayland: the window stays minimised until somebody activates it");
     }
     t.res(dev.wait_idle(), "wait_idle")?;
     Some(())
