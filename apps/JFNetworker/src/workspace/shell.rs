@@ -19,7 +19,9 @@
 // services with KPI tiles and charts of their time series.  Aufgabe erstellen (right, A1:
 // workspace/author.rs) makes an assessment from the project; the question before handing one
 // in is workspace/assess.rs's dialog.  The physical view (P1, workspace/phys) takes the dock's
-// centre while it is shown; the toolbar's switch Logisch | Physisch follows the view group.
+// centre while it is shown; the toolbar's switch Logisch | Physisch follows the view group.  The start
+// page (ST1, workspace/startpage.rs) takes the place of toolbar, dock and status bar while it is on;
+// the menu bar, the dialogs and the timers stay.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -39,6 +41,9 @@ use crate::workspace::{canvas, inspector, palette, sim};
 pub(crate) struct Shell {
     pub dock: DockState,
     pub about: Shared<i32>,
+    /// the start page shows (workspace/startpage.rs) and what it keeps
+    pub start: bool,
+    pub page: crate::workspace::startpage::Page,
     /// the window title last set
     title: String,
     /// the chosen row of the problems list
@@ -47,7 +52,7 @@ pub(crate) struct Shell {
 
 impl Shell {
     pub(crate) fn new() -> Shell {
-        Shell { dock: DockState::new(), about: Shared::new(0), title: String::new(), prob_sel: -1 }
+        Shell { dock: DockState::new(), about: Shared::new(0), start: false, page: crate::workspace::startpage::Page::new(), title: String::new(), prob_sel: -1 }
     }
 }
 
@@ -69,6 +74,12 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | BOX_FIXED, 0);
     ui.menubar(None);
+    if n.shell.start {
+        crate::workspace::startpage::frame(n, ui);
+        ui.box_end();
+        dialogs(n, ui);
+        return;
+    }
     toolbar(n, ui);
     let panels = [
         DockPanel::new(P_DEVICES, t("Geräte"), JN_DEVICES).at(DOCK_LEFT, 0),
@@ -111,9 +122,15 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.dock_end(&mut n.shell.dock);
     statusbar(n, ui);
     ui.box_end();
+    dialogs(n, ui);
+}
+
+// the dialogs and the timers, every frame (below the start page too)
+fn dialogs(n: &mut Net, ui: &mut Ui) {
     file::dialogs(n, ui);
     about(n, ui);
     crate::workspace::settings::dialog(n, ui);
+    crate::workspace::startpage::info_dialog(n, ui);
     crate::workspace::settings::shortcuts(n, ui);
     crate::doc::autosave::frame(n, ui);
     sim::pdu::dialog(n, ui);
@@ -128,7 +145,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
 
 // "JFNetworker – Büro.jfnet" with a dot while there are unsaved changes
 fn title(n: &mut Net, ui: &mut Ui) {
-    let s = format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" });
+    let s = if n.shell.start { String::from("JFNetworker") } else { format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" }) };
     if s != n.shell.title {
         ui.set_title(&s);
         n.shell.title = s;
@@ -192,7 +209,7 @@ fn statusbar(n: &mut Net, ui: &mut Ui) {
     if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note) {
         ui.text(TS_CAPTION | TX_TERTIARY, t("Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet"));
     }
-    if n.canvas.tool == Tool::Connect {
+    if matches!(n.canvas.tool, Tool::Connect(_)) {
         match n.canvas.kb_from.and_then(|d| n.doc.proj.device(d)) {
             Some(a) => ui.text(TS_CAPTION | TX_TERTIARY, &tf("Ende A: {} – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab", &[&a.name])),
             None => ui.text(TS_CAPTION | TX_TERTIARY, t("Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet")),

@@ -71,6 +71,7 @@ pub use diagram::{
     DPT_USED, DR_BEZIER, DR_ORTHO, DR_STRAIGHT,
 };
 pub use diagram::{dg_toggle_rect, DN_FRAME, DN_OUTLINE, DN_RESIZE, DN_STEP, DN_TOGGLE}; // frames, groups, a backdrop (G1)
+pub use diagram::DN_HITMIN; // a small text stays selectable at low zoom
 mod dirty;
 mod dnd;
 // (ROADMAP §6) the editors with a text model of their own: the shared core, rich text, code
@@ -248,7 +249,7 @@ pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{
     DockPanel, DockState, DOCK_BOTTOM, DOCK_CENTER, DOCK_FLOAT, DOCK_FLOAT_MAX, DOCK_LEFT, DOCK_MK_BOTTOM, DOCK_MK_CENTER, DOCK_MK_LEFT,
-    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT,
+    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT, DOCK_HOLD_MS, DOCK_TAB_HOLD,
 };
 // the taskbar button's progress and jump list tasks (ui.taskbar_progress / taskbar_tasks)
 pub use plat::taskbar::{JumpTask, TaskbarProgress};
@@ -646,3 +647,6 @@ pub use code_assist::{
 };
 pub use code_doc::{TextEdit, BP_COND, BP_DISABLED, BP_ON};
 pub use code_edit::{CE_BREAKPOINTS, CE_FOLDS};
+// (ST1) a card or list row that does one thing (action_card.rs)
+mod action_card;
+pub use action_card::CardDesc;

@@ -68,6 +68,15 @@
 // part of radiusd and wlan, cli/dot1x.rs).
 // imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
 // mailc.rs and cli/mail.rs).
+// modelstest.rs: the device models of wave 17 at work (group models: the ports of each, a ping
+// through each new switch, routing, a serial line, ACLs and NAT on the firewalls, the repeater,
+// the bridge, the access point).
+// cablestest.rs: the choice of cables (group cables: jfn_model::cable, phys::reach_graded, the
+// engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
+// labelstest.rs: the slim labels of the canvas (group labels: a note's style in the file, the steps
+// of doc/edits.rs, the scene of canvas/paint.rs).
+// startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
+// setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
 
 use alloc::format;
 use alloc::string::String;
@@ -133,6 +142,8 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "cablestest.rs"]
+mod cablestest;
 #[path = "mailtest.rs"]
 mod mailtest;
 #[path = "groupstest.rs"]
@@ -165,11 +176,17 @@ mod pagescripttest;
 mod dot1xtest;
 #[path = "imaptest.rs"]
 mod imaptest;
+#[path = "labelstest.rs"]
+mod labelstest;
 #[path = "webdevtest.rs"]
 mod webdevtest;
+#[path = "modelstest.rs"]
+mod modelstest;
+#[path = "startpagetest.rs"]
+mod startpagetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 54] = [
+    let groups: [(&'static str, fn(&mut T)); 58] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -224,6 +241,10 @@ pub fn run() -> i32 {
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),
         ("imap", imaptest::run),
+        ("models", modelstest::run),
+        ("cables", cablestest::run),
+        ("labels", labelstest::run),
+        ("startpage", startpagetest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

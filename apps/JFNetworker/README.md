@@ -7,12 +7,14 @@ Simulationsmodus Schritt für Schritt mit Paketansicht, und später Dienste, mit
 horizontal skalierte Systeme aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches,
 Queues, Lastgeneratoren, eigene Skripte).
 
-**Stand (2026-11-01): Alle Phasen des Fahrplans sind fertig** (siehe [Fahrplan](#fahrplan)).
+**Stand (2026-11-02): Die Phasen 1 bis 6 sind fertig, Phase 7 läuft** (siehe [Fahrplan](#fahrplan)).
 
-- **Topologie-Editor:** 26 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
-  per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem Kabeltyp (Kupfer,
-  gekreuzt, Glasfaser, seriell, Konsole, Funk, WAN), Kabel mit LEDs, Wegpunkten und Verlauf,
-  Notizen, Rückgängig für alles, Projekte als `.jfnet`.
+- **Topologie-Editor:** 44 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
+  per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem oder vorher gewähltem
+  Kabeltyp (Kupfer gerade und gekreuzt, Glasfaser Multimode und Singlemode, seriell mit
+  gewähltem Ende, Konsole, Funk, WAN, Telefon, Koax, DAC, AOC; Kategorien Cat5e bis Cat8 und OM3
+  bis OS2), Kabel mit LEDs, Wegpunkten, Verlauf und Farbe, Notizen, Rückgängig für alles, Projekte
+  als `.jfnet`.
 - **Simulator im Editor:** läuft in Echtzeit mit und folgt jeder Änderung. Switching mit VLANs,
   IPv4 mit ARP, Routing (auch L3-Switches), ICMP, Ping und Traceroute, UDP und TCP (RFC 9293),
   DHCP mit Relay, DNS, Syslog, NTP, HTTP mit Lastgenerator; die Probleme-Liste zeigt doppelte
@@ -188,6 +190,17 @@ Queues, Lastgeneratoren, eigene Skripte).
 
 ## Bedienung
 
+- **Startseite:** das Fenster öffnet ohne Projekt auf der Startseite: **Neu** (ein leeres Projekt und
+  fünf Vorlagen als Karten: Heimnetz, Büro mit VLANs, Campus, Rechenzentrum mit Leaf-Spine, Webdienst
+  hinter Loadbalancer; jede ein laufendes Netz ohne Datei, Speichern fragt nach einem Namen),
+  **Zuletzt** (die letzten Projekte mit Ordner und Änderungszeit, Öffnen …; eine fehlende Datei ist
+  markiert und lässt sich aus der Liste nehmen, eine Datei außerhalb dessen, was das Programm lesen
+  darf, öffnet den Dateidialog an ihrer Stelle) und **Lernen** (die Labore und Aufgaben mit
+  Bewertung). Tab läuft durch die Karten, Eingabe öffnet; die Leiste einer automatischen Sicherung
+  steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
+  ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
+- **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
+  Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
   dann auf die Fläche klicken (Umschalt: mehrere), oder per Tastatur: Strg+1 springt in die
   Gerätesuche, Tab zu den Kacheln einer Kategorie, die Pfeiltasten wählen, Eingabe setzt das
@@ -195,8 +208,19 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Verbinden (C):** von Gerät zu Gerät ziehen oder beide anklicken; per Tastatur Strg+9 (die
   Topologie), Tab zum ersten Gerät, Eingabe, Tab zum zweiten, Eingabe – die Port-Auswahl öffnet
   sich unter dem zweiten Gerät, Eingabe verbindet das beste Paar. Umschalt verbindet sofort.
+- **Kabel zuerst wählen:** der Bereich „Kabel“ oben in der Palette: Strg+1, Tab zum Bereich
+  (Eingabe klappt ihn auf), Tab zu den Kacheln, die Pfeiltasten wählen, Eingabe setzt das Werkzeug
+  Verbinden mit dieser Art; es bleibt bis Esc oder zu einem anderen Werkzeug, die Statusleiste
+  nennt die Art.
 - **Konsole:** Doppelklick oder Eingabe auf einem Gerät öffnet seine Konsole im Terminal-Bereich
   (Strg+3), mit Umschalt das Gerätefenster.
+- **Beschriftung:** Doppelklick auf eine freie Stelle der Zeichenfläche (oder T: in der Mitte der
+  Ansicht) öffnet dort ein schmales Eingabefeld. Eingabe oder ein Klick daneben übernimmt den Text
+  (ein Schritt zum Rückgängigmachen), Umschalt+Eingabe beginnt eine neue Zeile, Esc verwirft; leer
+  wird nichts gespeichert. Die Beschriftung ist nur Text, ohne Karte, in der Textfarbe des Themes;
+  ein Rahmen zeigt sich beim Überfahren und wenn sie gewählt ist. Doppelklick oder F2 ändern sie an
+  Ort und Stelle, sie verschiebt, löscht und speichert sich wie eine Notiz. Das Werkzeug N legt
+  weiter die große Notiz an.
 - **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
   vor, Umschalt+F7 zurück; das Werkzeug P sendet eine einfache PDU (Quelle, dann Ziel – auch mit
   Tab und Eingabe). In der Vergangenheit zeigen die Geräte ihren Zustand von damals, „Von hier
@@ -208,7 +232,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Hauptfenster) in den Vollbildmodus und zurück.
 - **Einstellungen** (Werkzeuge › Einstellungen, Strg+,): Raster und Rasterweite, Einrasten,
   Minimap, Tempo beim Start, Bewegung (wie das System, reduziert, voll), Sprache (wie das
-  System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus). Sie liegen in
+  System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus), Startseite beim Start
+  anzeigen. Sie liegen in
   `config://settings.ini`.
 - **Automatische Sicherung:** ungespeicherte Änderungen landen alle 120 s (einstellbar) und
   sofort beim Ruhezustand oder Abmelden in `data://autosave/`; nach einem Absturz bietet die
@@ -220,7 +245,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   SW1 Gi1/0/1, Kupfer, gerade, aktiv“), die Leinwand heißt „Topologie“; die Farben der
   Pakete und Kabel halten in beiden Themes und im Hochkontrast mindestens 3:1 gegen die Fläche
   (Selbsttest). Die meisten Kabelarten unterscheiden sich auch in der Linie (gekreuzt
-  gestrichelt, Konsole und Funk gepunktet, seriell mit Blitz, WAN doppelt), Pakete nennen
+  gestrichelt, Singlemode Strich-Punkt, Konsole und Funk gepunktet, seriell mit Blitz, WAN doppelt,
+  Telefon Strich-Punkt-Punkt, Koax als Röhre, DAC mit Querstrichen, AOC dick gestrichelt), Pakete nennen
   Inhalt und Weg für Screenreader und in der Ereignisliste; „reduzierte Bewegung“ lässt Pakete
   springen statt gleiten.
 
@@ -231,6 +257,7 @@ python build_rs.py app JFNetworker
 build/win/JFNetworker.exe                                   # der Editor
 build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/campus.jfnet
 build/win/JFNetworker.exe --lang en                         # auf Englisch
+build/win/JFNetworker.exe --script apps/JFNetworker/tests/start_page.uis --start-page  # Skripte sehen die Startseite nur so
 build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell, Simulator, Oberfläche
 build/win/JFNetworker.exe --selftest --pcap-out DIR         # dazu die Mitschnitte der Prüfungen
 build/win/JFNetworker.exe --script apps/JFNetworker/tests/place.uis --verify-dirty
@@ -257,14 +284,26 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `scen_*.uis` | die Golden-Szenarien (siehe [Szenarien](#szenarien-scn)), byte-gleich auf Windows und Linux |
 | `shell.uis` | Bereiche, Menüs, Ansicht, Info |
 | `catalog.uis`, `place.uis`, `edit.uis`, `links.uis`, `undo.uis` | Palette und Suche, Platzieren, Verschieben, Rahmenauswahl, Löschen, Umbenennen, Notizen, Kabel beim Löschen und Wiederherstellen, Rückgängig auf allen Wegen |
+| `labels.uis` | Beschriftungen (siehe [Bedienung](#bedienung)): Doppelklick und Text, Eingabe als ein Schritt, Esc lässt nichts zurück, ein Klick daneben übernimmt, leer wird nichts gespeichert, Umschalt+Eingabe, Ändern an Ort und Stelle mit Doppelklick und F2, Eigenschaften, Verschieben, Löschen, Rückgängig und Wiederholen, Speichern und Laden, T in der Mitte der Ansicht, eine Notiz daneben bleibt, eine Rahmenauswahl und andere Werkzeuge beginnen keine, kleine Beschriftungen bleiben bei niedrigem Zoom wählbar |
+| `labels_rtl.uis` | Beschriftungen im gespiegelten Fenster: das Feld unter dem Zeiger, die Beschriftung, wo geklickt wurde, ein Klick daneben übernimmt |
+| `label_shots.uis` | die Bilder der Beschriftungen (neben Geräten, Kabel und Notiz; gewählt und überfahren; das Eingabefeld) hell, dunkel und im Hochkontrast mit 100 und 150 %, gezoomt |
+| `model.uis`, Gruppe `labels` | das Modell der Beschriftungen: der Stil im Datei-Hin-und-Zurück, alte Dateien und unbekannte Werte bleiben Notizen, Anlegen samt Text als ein Schritt, Text und Größe gemeinsam, Rückgängig von Verschieben und Löschen, die Szene (Größe, Trefferfläche, Namen) |
 | `file.uis`, `file_reopen.uis` | Speichern unter `build/jfn_test.jfnet`, die Rückfrage, Öffnen, zuletzt geöffnete Dateien (`file_reopen.uis` läuft nach `file.uis`) |
 | `connect.uis`, `cable_types.uis`, `waypoints.uis`, `inspector.uis`, `engine.uis` | Verbinden und Port-Auswahl, jede Kabelart, Wegpunkte, die Eigenschaften, LEDs und Befunde des Simulators |
+| `cable_palette.uis` | das Kabel zuerst wählen: der Bereich „Kabel“ und die Suche, die Grenzen im Tooltip, Verbinden mit der gewählten Art, nur passende Paare, Glas in RJ45 mit Grund abgelehnt, falsches Kupfer unter „Auto-MDI-X aus“ mit seinem Fehler, ein Rückgängig-Schritt je Änderung, das Popover hält die Art beim Portwechsel, Kategorie und Farbe im Inspektor, das Kontextmenü, die Tastatur, Esc |
+| `cable_shots.uis` | die Bilder aller Kabelarten (`fixtures/cable_kinds.jfnet`), hell und dunkel, 100 und 150 % |
+| `model.uis`, Gruppe `cables` | die Kabelwahl (siehe [Kabel](#kabel)): jede Art auf jedem Paar von Medien, wo sie passt und wo nicht, die Grenzen je Kategorie, die Modems und der Koax-Port des Smart-TV, eine Datei von vor H2 (`fixtures/cables_v1.jfnet`) mit denselben Arten und Link-Zuständen, Speichern und Laden mit Kategorien und Farben, die Engine (`Action::CableGrade`, `Action::StrictMdix`, Note, Problem), `show interfaces`, die Rangfolge und die Gründe für eine gewählte Art, die Liste des Popovers, Kontrast der Farben; das Szenario zweimal |
+| `scen_cable_grades.uis` | Golden-Szenario (`fixtures/cable_grades.jfnet`): Cat5e an 10G unten, Cat6 über 55 m unten, Cat6a bis 100 m, DAC über 7 m unten, das DCE-Ende serieller Kabel in `show interfaces` |
 | `terminal_ios.uis`, `terminal_linux.uis`, `device_window.uis`, `log.uis` | die Konsolen, Gerätefenster mit Formularen und Desktop, das Protokoll |
 | `simulation.uis`, `events.uis`, `packet.uis`, `pdu.uis` | Schritte, Ereignisse und Zeitleiste, Paket-Tab, PDUs und pcapng-Export |
 | `a11y.uis` | alles ohne Maus: Kabel und Geräte als Einträge, Tab über Geräte und Kabel, Platzieren aus der Palette, Verbinden per Eingabe, Konsole, Simulation mit F5/F7 und der PDU per Eingabe, die Tastenkürzel |
 | `settings.uis` | den Einstellungsdialog: Raster, Einrasten, Minimap, Tempo, Sprache (das Fenster auf Englisch und zurück), Bewegung, Sicherungsintervall |
 | `autosave.uis`, `autosave_recover.uis`, `autosave_reopen.uis` | eine Kopie nach dem Intervall und beim Ruhezustand, die Kopie überlebt das Sitzungsende; die nächste Sitzung stellt sie wieder her und hält sie, bis sie eine eigene hat (ein zweiter Absturz verliert nichts); Beenden mit „Verwerfen“ nimmt die Kopien mit (die drei laufen in dieser Reihenfolge) |
 | `english.uis` | das Fenster mit `--lang en`: Menüs, Bereiche, Eigenschaften, Simulationsmodus, Dialoge |
+| `start_page.uis` | die Startseite (`--start-page`; `--recent=` gibt dem Lauf seine zuletzt geöffneten Dateien, ein Pfad allein ist erlaubt, mit `\|` verbundene sind es nicht): erster Fokus und Eingabe, was ohne Projekt abgeschaltet ist, das leere Projekt, eine Vorlage, Speichern fragt nach ihrem Namen, Datei › Startseite mit der Rückfrage, die Zeilen von Zuletzt (öffnen, fehlend und entfernen, nicht lesbar: der Dateidialog), eine Fehlermeldung auf der Seite, Labor und Aufgabe, Tab und Umschalt+Tab durch die Karten, Projektinfo mit Rückgängig, die Einstellung |
+| `start_page_crash.uis`, `start_page_later.uis`, `start_page_recover.uis` | die Wiederherstellung auf der Startseite (in dieser Reihenfolge): eine Sitzung endet mit ungespeicherten Änderungen, die nächste zeigt die Leiste über der Seite mit der Tastatur auf „Wiederherstellen“, „Später“ lässt die Seite stehen und die Kopie liegen, die dritte stellt sie wieder her; danach wieder die Seite ohne Angebot |
+| `start_page_en.uis`, `start_page_shots.uis` | die Seite auf Englisch mit einer geöffneten Vorlage; die Bilder hell und dunkel mit 100 und 150 %, im kleinsten Fenster (auch gescrollt), breit, mit Fokus und Hover, die Vorlage Campus und der Dialog Projektinfo (`build/jfnetworker/start_page_*.png`) |
+| `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
 | `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
 | `campus.uis`, `scen_campus.uis` | die Abnahme von Phase 1 (unten) |
@@ -401,6 +440,8 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `mail_imap.uis` | das Programm E-Mail mit einem IMAP-Konto auf `fixtures/imap_mail.jfnet`: Kontotyp, Ordner und Nachrichten vom Server, Lesen setzt \Seen, Markieren, Löschen in den Papierkorb, ein neuer Ordner und sein Löschen, eine gesendete Nachricht landet in Gesendet |
 | `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
+| `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
+| `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
 Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -519,25 +560,108 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 
 ### Gerätekatalog
 
 Herstellerneutrale, moderne Modelle: PC (2.5G), Laptop, Smartphone und Tablet (WLAN 802.11ax mit 6 GHz),
-Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Access-Switch 24× 1G PoE+ mit
-4× 10G SFP+, L3-Switches (1G und 10GBASE-T mit 100G QSFP28), Edge- und Core-Router (bis 100G,
-serielle WAN-Ports), Heimrouter mit WLAN, Hub; Next-Generation-Firewall; WLAN-Access-Point (802.11ax, 6 GHz),
-Modem/ONT, Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache, Message Queue,
-Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
+Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Rack- und Tisch-Switches, Filial-,
+Edge- und Core-Router (bis 100G, serielle WAN-Ports), L3-Switches (1G und 10GBASE-T mit 100G QSFP28,
+Leaf und Spine), Heimrouter mit WLAN, Hub, Repeater, Bridge; Firewalls; WLAN-Access-Points (802.11ax
+und 802.11be, 6 GHz), Modem/ONT, Kabelmodem (Koax), DSL-Modem (RJ11), Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache,
+Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
 (`GigabitEthernet1/0/1`, Abkürzungen wie `gi1/0/1` gehen überall), Hosts Linux-Namen (`eth0`,
 `wlan0`).
+
+| Modell | Art | Ports |
+|---|---|---|
+| JF-S8 | Tisch-Switch, unmanaged: keine Befehlszeile, keine Adresse | 8× 1G (`port0` bis `port7`) |
+| JF-S8P | Kompakt-Switch auf dem Tisch | 8× 1G PoE+, 2× 10G SFP+, Konsole |
+| JF-S24 | Access-Switch | 24× 1G, 4× 10G SFP+, Konsole |
+| JF-S24P | Access-Switch | 24× 1G PoE+, 4× 10G SFP+, Konsole |
+| JF-S48P | Access-Switch | 48× 1G PoE+, 4× 10G SFP+, Konsole |
+| JF-S24M | Multi-Gigabit-Switch | 24× 2.5G PoE++, 4× 25G SFP28, Konsole |
+| JF-S24L3 | L3-Switch | 24× 1G, 4× 10G SFP+, Konsole |
+| JF-S48X | L3-Switch im Rechenzentrum | 48× 10GBASE-T, 6× 100G QSFP28, Konsole |
+| JF-S48Y | L3-Switch, Leaf | 48× 25G SFP28, 8× 100G QSFP28, Konsole |
+| JF-S32C | L3-Switch, Spine | 32× 100G QSFP28, Konsole |
+| JF-R2 | Filial-Router | 2× 1G, 2× Seriell, Konsole |
+| JF-R4 | Edge-Router | 4× 1G, 2× 10G SFP+, 2× Seriell, Konsole |
+| JF-R8 | Core-Router | 1× 1G, 8× 10G SFP+, 2× 100G QSFP28, Konsole |
+| Heimrouter | Router mit WLAN und NAT, Linux-Befehlszeile | 1G WAN, 4× 1G LAN, Funk |
+| Hub | Schicht 1, ohne Befehlszeile | 8× 100M (`port0` bis `port7`) |
+| Repeater | Schicht 1 wie der Hub, ohne Befehlszeile | 2× 1G (`port0`, `port1`) |
+| Bridge | Schicht 2, lernt Adressen, ohne Befehlszeile | 2× 1G (`port0`, `port1`) |
+| JF-FW | Firewall | 8× 1G, 2× 10G SFP+, Konsole |
+| JF-FW2 | kleine Firewall auf dem Tisch | 1× 1G WAN (`Gi0/0`), 4× 1G LAN (`Gi0/1` bis `Gi0/4`), Konsole |
+| JF-FW8 | Firewall im Rechenzentrum | 8× 10G SFP+, 4× 100G QSFP28, Konsole |
+| JF-AP6E | Access Point 802.11ax | 1× 2.5G (PoE-gespeist), 3× Funk, Konsole |
+| JF-AP7 | Access Point 802.11be | 1× 5G (PoE-gespeist), 3× Funk, Konsole |
+
+Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu dazukam, verhält sich so:
+
+- **Die Firewalls sind heute Router mit Access-Listen und NAT.** Ohne Liste lassen sie alles durch,
+  auch was von außen beginnt; ihre Titel sagen das. Zonen und zustandsbehaftetes Filtern kommen mit
+  Meilenstein F2.
+- **PoE ist bisher nur eine Angabe am Port** (PoE+, PoE++, PoE-gespeist): Es gibt kein Leistungsbudget.
+- **Der Repeater** wiederholt jeden Rahmen an den anderen Port und verlängert so eine Kupferstrecke.
+  Die Grenze gilt je Kabel: zweimal 90 m gehen, zweimal 120 m nicht.
+- **Die Bridge** lernt die Adressen ihrer beiden Seiten und lässt einen Rahmen, dessen Ziel auf derselben
+  Seite liegt, nicht hinüber.
+- **JF-AP7** sendet auf 2,4, 5 und 6 GHz mit den Raten von 802.11be (1,3, 5,7 und 11,5 Gbit/s). Die
+  Stationen im Katalog sprechen 802.11ax, also begrenzt ihr Funkteil die Rate (ein Laptop bleibt bei
+  höchstens 2,4 Gbit/s).
 
 ### Kabel
 
 `cable_kind` nennt das richtige Kabel für zwei Ports: Kupfer gerade oder gekreuzt (nach MDI /
 MDI-X; mit Auto-MDI-X funktionieren beide), Glasfaser für SFP/SFP+/SFP28 untereinander und
 QSFP28 mit QSFP28, seriell, Konsolenkabel (Konsole an USB), Funk (WLAN-Gerät an Access Point)
-und WAN-Leitungen. Beim schnellen Verbinden wählt `suggest_ports` das Portpaar: Funk, wenn ein
+und WAN-Leitungen, Telefonkabel (RJ11 an RJ11 oder an den WAN-Port des Providers) und
+Koaxialkabel (Koax an Koax oder an den WAN-Port). Beim schnellen Verbinden wählt `suggest_ports` das Portpaar: Funk, wenn ein
 Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinsten Portnummern.
+
+Dazu kann der Nutzer selbst wählen, und `cable_fits` prüft, ob es steckt:
+
+| Art (`cable` in der Datei) | passt in | Grenze |
+|---|---|---|
+| Kupfer gerade und gekreuzt (`copper`, `copper-cross`) | RJ45 | nach Kategorie, ohne Kategorie wie bisher |
+| Glasfaser Multimode und Singlemode (`fiber-mm`, `fiber-sm`) | SFP, SFP+, SFP28 untereinander, QSFP28 mit QSFP28 | nach Optik und Kategorie |
+| Seriell (`serial`), erstes Ende DCE oder DTE (`serial-dce`, `serial-dte`) | seriell | V.35 nach Takt |
+| Konsole (`console`), Funk (`wireless`), WAN (`wan`) | Konsole und USB, WLAN und Access Point, WAN | RS-232 15 m, keine, keine |
+| Telefon (`phone`) | RJ11, WAN | 1000 m (VDSL2) |
+| Koax (`coax`) | Koax, WAN | 500 m (RG-6) |
+| DAC (`dac`) | SFP+, SFP28 untereinander, QSFP28 mit QSFP28 | 7 m, ohne Optik |
+| AOC (`aoc`) | wie DAC | 100 m, ohne Optik |
+
+Ein falsches Kupferkabel steckt, unter „Auto-MDI-X aus“ (Projektinspektor, `strict_mdix`, ein
+Rückgängig-Schritt) bleibt die Leitung dann unten und das Problem nennt das richtige Kabel; Glas
+in RJ45 steckt nicht. Ein gewähltes serielles Ende ändert nur, was man sieht: den Punkt und
+„DCE“ an diesem Ende auf der Zeichenfläche und die Zeile `Serial cable end: DCE` oder `DTE` in
+`show interfaces`. Einen Befehl `clock rate` kennt die Engine nicht, und kein Ende liefert einen
+Takt; das unveränderte `serial` älterer Dateien nennt kein Ende.
+
+Die **Kategorie** (`grade` in der Datei) ist ein Feld des Kabels statt weiterer Arten; ohne sie
+gelten die Grenzen wie bisher:
+
+| Kategorie | bis 5G | 10G | 25G, 40G |
+|---|---|---|---|
+| Cat5e | 100 m | trägt es nicht | trägt es nicht |
+| Cat6 | 100 m | 55 m | trägt es nicht |
+| Cat6a, Cat7 | 100 m | 100 m | trägt es nicht |
+| Cat8 | 100 m | 100 m | 30 m |
+
+| Kategorie | Optik | 1G | 10G | 25G | 40G | 100G |
+|---|---|---|---|---|---|---|
+| OM3 (wie ohne Kategorie) | SR | 550 m | 300 m | 70 m | 100 m | 70 m |
+| OM4 | SR | 550 m | 400 m | 100 m | 150 m | 100 m |
+| OS2 (wie ohne Kategorie) | LR | 5 km | 10 km | 10 km | 10 km | 10 km |
+
+Trägt eine Kategorie die Speed nicht, bleibt die Leitung unten wie bei einem zu langen Kabel, mit
+Notiz, Logzeile und Problem (`ProblemKind::CableGrade`); eine Kategorie, die nicht zur Art passt,
+zählt nicht und wird in `check()` gewarnt. Die **Farbe** (`color`, Blau, Türkis, Violett, Pink,
+Braun, Schiefer; Vorgabe: die der Art) ist nur fürs Auge und ersetzt die Farbe der Art, nicht ihr
+Muster; der Simulator sieht sie nicht, den Zustand zeigen weiter die LEDs.
 
 ### Im Editor: Verbinden, Kabel, Inspektor
 
@@ -548,14 +672,27 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   Gegenstelle, Ports ohne Partner mit dem Grund; das beste Paar ist gewählt, darunter das Kabel
   („Automatisch: Kupfer, gerade“ oder ein anderes, das passt); Enter verbindet. Umschalt beim
   Loslassen oder ein Zug von Port-Punkt zu Port-Punkt (beim Überfahren erscheint je
-  Portgruppe der nächste freie Port als Punkt am Rand) verbindet sofort.
+  Portgruppe der nächste freie Port als Punkt am Rand) verbindet sofort. Das Popover hält die
+  gewählte Art, nicht ihren Platz in der Liste: passt sie zu einem anderen Portpaar nicht, gilt
+  dort „Automatisch“, und zurück ist sie wieder da.
+- **Kabel zuerst wählen** (Bereich „Kabel“ der Palette): „Automatisch“ und eine Kachel je Art mit
+  einem Stück dieses Kabels; der Tooltip nennt die Grenzen, die Suche findet die Arten. Die Wahl
+  setzt das Werkzeug Verbinden mit dieser Art (die Statusleiste nennt sie), bis Esc oder zu einem
+  anderen Werkzeug; ein zweiter Klick auf die Kachel geht zurück zu Auswahl. Das Ziel ist dann nur
+  in Akzentfarbe umrandet, wenn die Art dort passt, und die Port-Auswahl zeigt nur die Ports, in
+  die sie steckt, und bietet nur passende Paare an; was gar nicht passt, bleibt rot mit dem Grund
+  im Tooltip („Glasfaser, Multimode passt nicht in einen RJ45-Port.“), beim Loslassen kommt die
+  Warnung mit dem Grund, keine Port-Auswahl. „Automatisch“ verhält sich wie ohne Wahl.
 - **Kabel** laufen vom Rand des einen Geräts zum Rand des anderen, gerade, rechtwinklig oder
   als Kurve durch ihre Wegpunkte, und zeigen ihre Art nicht nur über die Farbe: Kupfer
-  durchgezogen, gekreuzt gestrichelt, Glasfaser orange, seriell mit Zickzack, Konsole
-  gepunktet, Funk dünn gepunktet, WAN doppelt. 12 Einheiten vor jedem Ende sitzt die LED des
+  durchgezogen, gekreuzt gestrichelt, Glasfaser orange (Multimode durchgezogen, Singlemode
+  Strich-Punkt), seriell mit Zickzack (ein gewähltes Ende: ein Punkt vor dem DCE-Ende, „DCE“ am
+  Portnamen), Konsole gepunktet, Funk dünn gepunktet, WAN doppelt, Telefon violett
+  Strich-Punkt-Punkt, Koax als Röhre, DAC mit Querstrichen, AOC dick gestrichelt; eine gewählte
+  Farbe ersetzt nur die Farbe der Art. 12 Einheiten vor jedem Ende sitzt die LED des
   Ports aus dem Simulator (grün aktiv, rot unten, grau ohne Strom, bernstein für blockierend
   und lernend); ab 100 % stehen die Portnamen daneben. Der Tooltip nennt Ports, Art, Speed,
-  Zustand und Pakete pro Sekunde. Ein gewähltes Kabel hat „+“-Griffe in der Mitte seiner
+  Zustand, Pakete pro Sekunde, Kategorie und Grenze. Ein gewähltes Kabel hat „+“-Griffe in der Mitte seiner
   Abschnitte (ziehen fügt einen Wegpunkt ein, Doppelklick auf einen Wegpunkt entfernt ihn),
   das Kontextmenü wechselt Verlauf und Kabeltyp und trennt; Entf oder das × neben einem
   überfahrenen Kabel trennt es. Alles ist rückgängig zu machen.
@@ -637,9 +774,13 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
 [Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`. Die physische
 Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
 `optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
-und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
+und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher. Ein Kabel kann
+`grade` (seine Kategorie, siehe [Kabel](#kabel)) und `color` (eine Farbe fürs Auge) haben; was
+eine Datei nicht sagt, bleibt, wie es war.
 Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild))
 stehen in `groups` (`[]` ohne) und `background` (`null` ohne); auch sie fehlen älteren Dateien.
+`description` sagt, worum es geht, `author`, wer es gemacht hat (Datei › Projektinfo); älteren
+Dateien fehlt `author`, dann bleibt er leer.
 
 ```json
 {
@@ -2114,7 +2255,7 @@ die Aufgabe der Abschnitt `assess` des Labors (siehe [`lab.rs`](crates/jfn_model
 
 `feedback` ist `items`, `score` oder `end`, `time_limit_s` 0 ohne Grenze. `what` ist
 `hostname`, `address`, `state`, `vlan`, `mode`, `route`, `service` (mit `svc` und dem Pfad
-`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart), `config`
+`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart, `serial` nimmt auch beide gewählten Enden), `config`
 (Zeilen, die eines Blocks eingerückt) oder `check` (`checks`: Erwartungen, die zugleich
 gelten); `cmp` ist `norm` (Vorgabe), `exact` oder `any` (dann ist `value` eine Liste). Was auf
 seinem Vorgabewert steht, fehlt in der Datei; ohne `points` zählt ein Kriterium 1. Ein Labor
@@ -3060,7 +3201,7 @@ Pläne (|Δx| + |Δy| in den Koordinaten aller Standorte), 3,5 m je Etage (zwisc
 hinunter ins Erdgeschoss und wieder hinauf) und hinunter zum anderen Ende, dazu 10 % Reserve.
 Die Internet-Wolke hat keinen Ort (3 m), Funk keine Länge.
 
-**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3),
+**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3; ein Kabel mit Kategorie: siehe [Kabel](#kabel)),
 für die Speed, mit der das Kabel läuft (die kleinere beider Ports und seiner Einstellung):
 
 | Medium | Speed | Norm | Grenze |
@@ -3122,7 +3263,7 @@ Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_
 `set_place`, `place_device`, `set_len`, `set_optic`), `catalog::form`, `rack_units`, `Optic`,
 `Action::CableLen { link, len_m }`, `Action::Optic { dev, port, optic }`,
 `Engine::cable_phys(link)`, `link_idx_up(link)`, `Note::Phys(PhysNote)`,
-`ProblemKind::CableTooLong` und `OpticMismatch`. Geprüft wird das in der Selbsttest-Gruppe
+`ProblemKind::CableTooLong`, `OpticMismatch` und `CableGrade`. Geprüft wird das in der Selbsttest-Gruppe
 `phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
 Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
 
@@ -4040,6 +4181,7 @@ Geste).
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) ✓ · B4 CSS-Teilmenge, Cookies, HTTPS mit echtem TLS 1.3 im Simulator, Entwickleransicht ✓ (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 | 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
+| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche · F2 Zonen und Stateful · AK1 bis AK4 Akademie (Kurse, Tests und Fehlersuche, Installieren, Inhalte) · SA1 bis SA7 Architektur-Labor (Ressourcen, Sweeps, Experimente, Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

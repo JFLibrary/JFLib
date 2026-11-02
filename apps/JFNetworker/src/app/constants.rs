@@ -51,7 +51,8 @@ pub(crate) const CMD_ROUTE_CURVE: u32 = 92;
 pub(crate) const CMD_DISCONNECT: u32 = 93;
 /// switch the selected devices on or off
 pub(crate) const CMD_POWER: u32 = 94;
-/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k]
+/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k] for the first
+/// CABLE_KINDS0, the others from CMD_CABLE_MORE (cable_cmd)
 pub(crate) const CMD_CABLE0: u32 = 100;
 
 // ---- timers (App::command(UIC_TIMER, id))
@@ -646,3 +647,51 @@ pub(crate) const TIMER_PAGE: u32 = 0x1C8;
 // timers 0x1CC .. 0x1CF; the commands and timers are not used)
 /// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
 pub(crate) const ID_DEV0: u32 = 0x0001_E800;
+// ---- H2: the choice of cables (commands 970 .. 989, widgets 0x0001_F000 .. 0x0001_F3FF, no timers)
+/// the kinds CMD_CABLE0 has room for; CMD_CABLE_MORE + k is CableKind::ALL[CABLE_KINDS0 + k]
+pub(crate) const CABLE_KINDS0: usize = 8;
+pub(crate) const CMD_CABLE_MORE: u32 = 970;
+/// the command that gives the selected cables CableKind::ALL[k]
+pub(crate) const fn cable_cmd(k: usize) -> u32 {
+    if k < CABLE_KINDS0 { CMD_CABLE0 + 1 + k as u32 } else { CMD_CABLE_MORE + (k - CABLE_KINDS0) as u32 }
+}
+/// the palette's Kabel part: its expander, its tiles as one Tab stop, the tiles (+ 0
+/// "Automatisch", + 1 + k CableKind::ALL[k])
+pub(crate) const ID_CABLE_PART: u32 = 0x0001_F000;
+pub(crate) const ID_CABLE_GROUP: u32 = 0x0001_F001;
+pub(crate) const ID_CABLE_TILE: u32 = 0x0001_F010;
+/// the inspector of a cable: its category and colour; of the project: "Auto-MDI-X aus"
+pub(crate) const ID_INS_GRADE: u32 = 0x0001_F040;
+pub(crate) const ID_INS_CABLE_COLOR: u32 = 0x0001_F041;
+pub(crate) const ID_PROJ_MDIX: u32 = 0x0001_F042;
+// ---- H3: labels on the canvas (commands 990 .. 999, widgets 0x0001_F400 .. 0x0001_F4FF; no timers)
+/// Beschriftung einfügen: the input at the middle of the view (T)
+pub(crate) const CMD_LABEL: u32 = 990;
+/// the input of a label on the canvas (canvas/labels.rs)
+pub(crate) const ID_LABEL_BOX: u32 = 0x0001_F400;
+// ---- ST1: the start page (commands 1000 .. 1019, widgets 0x0001_F800 .. 0x0001_FFFF, timers 0x1D0 ..
+// 0x1D3; the timers are not used)
+/// Datei › Startseite (asks about unsaved changes first), Datei › Projektinfo …
+pub(crate) const CMD_START_PAGE: u32 = 1000;
+pub(crate) const CMD_PROJECT_INFO: u32 = 1001;
+/// the page chose a template (arg: its index in startpage::TEMPLATES), a lab or assessment (arg: its
+/// index in the page's list); a missing recent file leaves the list (arg: its index)
+pub(crate) const CMD_SP_TEMPLATE: u32 = 1002;
+pub(crate) const CMD_SP_LEARN: u32 = 1003;
+pub(crate) const CMD_SP_FORGET: u32 = 1004;
+/// the page as a pane, its scroll view, "Öffnen …"
+pub(crate) const ID_SP_PANE: u32 = 0x0001_F800;
+pub(crate) const ID_SP_SCROLL: u32 = 0x0001_F801;
+pub(crate) const ID_SP_OPEN: u32 = 0x0001_F802;
+/// the cards of Neu: + 0 the empty project, + 1 + k template k
+pub(crate) const ID_SP_NEW: u32 = 0x0001_F810;
+/// the rows of Zuletzt (+ i) and the buttons that take a missing file off the list (+ i)
+pub(crate) const ID_SP_RECENT: u32 = 0x0001_F820;
+pub(crate) const ID_SP_FORGET: u32 = 0x0001_F830;
+/// the Projektinfo dialog, its description (a text box of many lines: + 1 .. 3 are its own), its author
+pub(crate) const ID_SP_INFO: u32 = 0x0001_F840;
+pub(crate) const ID_SP_INFO_DESC: u32 = 0x0001_F844;
+pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
+/// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
+/// the courses of AK1 can follow)
+pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;

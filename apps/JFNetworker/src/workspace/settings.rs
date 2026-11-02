@@ -88,11 +88,12 @@ fn key_rows(list: &[(&'static str, &'static str)]) -> Vec<Row> {
 }
 
 // i18n
-const CANVAS_KEYS: [(&str, &str); 9] = [
+const CANVAS_KEYS: [(&str, &str); 10] = [
     ("Tab / Umschalt+Tab", "Geräte und Notizen, dann die Kabel nacheinander wählen"),
     ("Pfeiltasten", "die Auswahl um einen Rasterschritt verschieben (Umschalt: zehn, Alt: einen Punkt); ohne Auswahl die Ansicht"),
     ("Eingabe", "Konsole des Geräts öffnen; Kabel: seine Eigenschaften; mit Verbinden: Ende A, dann B"),
     ("Umschalt+Doppelklick", "Gerätefenster öffnen"),
+    ("Doppelklick auf freie Fläche", "Beschriftung dort schreiben (Eingabe übernimmt, Umschalt+Eingabe: neue Zeile, Esc verwirft)"),
     ("Strg+Plus / Strg+Minus", "vergrößern / verkleinern"),
     ("Leertaste + Ziehen", "die Ansicht verschieben"),
     ("Umschalt+F10 / Menütaste", "Kontextmenü des gewählten Geräts oder Kabels"),
@@ -151,7 +152,7 @@ pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
     if ui.dialog_begin(ID_KEYS_DLG, t("Tastenkürzel"), &open) {
         let sections: [(&'static str, Vec<Row>); 11] = [
             (t("Datei und Bearbeiten"), cmd_rows(ui, &[CMD_NEW, CMD_OPEN, CMD_SAVE, CMD_SAVE_AS, CMD_QUIT, CMD_UNDO, CMD_REDO, CMD_DELETE, CMD_SELECT_ALL, CMD_RENAME, CMD_GROUP, CMD_UNGROUP])),
-            (t("Werkzeuge"), cmd_rows(ui, &[CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE, CMD_TOOL_PDU, CMD_SETTINGS])),
+            (t("Werkzeuge"), cmd_rows(ui, &[CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE, CMD_LABEL, CMD_TOOL_PDU, CMD_SETTINGS])),
             (t("Ansicht"), cmd_rows(ui, &[CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_FIT, CMD_VIEW_LOGICAL, CMD_VIEW_PHYS, CMD_PHYS_UP, CMD_PHYS_BACK])),
             (t("Bereiche"), cmd_rows(ui, &[CMD_FOCUS_CANVAS, CMD_PANEL0, CMD_PANEL0 + 1, CMD_PANEL0 + 2, CMD_PANEL0 + 3, CMD_PANEL0 + 4, CMD_PANEL0 + 5, CMD_PANEL0 + 6, CMD_PANEL0 + 7, CMD_METRICS])),
             (t("Simulation"), cmd_rows(ui, &[CMD_SIM_MODE, CMD_SIM_REALTIME, CMD_SIM_PLAY, CMD_SIM_STEP, CMD_SIM_BACK])),

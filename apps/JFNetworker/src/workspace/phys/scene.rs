@@ -141,6 +141,8 @@ pub(crate) struct SItem {
 pub(crate) struct SCable {
     pub link: Option<u32>,
     pub cable: CableKind,
+    /// the colour the user gave it (several cables: none)
+    pub color: jfn_model::CableColor,
     pub label: String,
     /// where along the line its label sits (parallel cables stagger theirs)
     pub at: f32,
@@ -246,6 +248,8 @@ pub(crate) struct CableFacts {
     pub reach: Option<jfn_model::Reach>,
     pub too_long: bool,
     pub optics: Option<phys::OpticFault>,
+    /// its category does not carry the speed it runs at (the name of the standard)
+    pub slow: Option<&'static str>,
 }
 
 pub(crate) fn facts(p: &Project, tree: &Tree, l: &jfn_model::Link) -> CableFacts {
@@ -254,7 +258,8 @@ pub(crate) fn facts(p: &Project, tree: &Tree, l: &jfn_model::Link) -> CableFacts
     let oa = p.resolve_port(&l.a).ok().and_then(|s| s.optic);
     let ob = p.resolve_port(&l.b).ok().and_then(|s| s.optic);
     let optics = phys::optic_fault(l.cable, oa, ob);
-    CableFacts { len, reach, too_long: reach.is_some_and(|r| len.m > r.max_m), optics }
+    let slow = reach.filter(|r| !r.carries()).map(|r| r.std);
+    CableFacts { len, reach, too_long: slow.is_none() && reach.is_some_and(|r| len.m > r.max_m), optics, slow }
 }
 
 impl Scene {
@@ -624,7 +629,7 @@ impl Scene {
                 let cable = list.first().and_then(|x| p.link(x.0)).map_or(CableKind::CopperStraight, |l| l.cable);
                 self.cidx.insert(sum_key(k + 1), self.cables.len());
                 self.edges.push(DEdge { key: sum_key(k + 1), a, b, route: DR_STRAIGHT, wps: 0..0 });
-                self.cables.push(SCable { link: None, cable, label, at: 0.5, bad: bad > 0, down: false, sem });
+                self.cables.push(SCable { link: None, cable, color: jfn_model::CableColor::Plain, label, at: 0.5, bad: bad > 0, down: false, sem });
             }
             return;
         }
@@ -655,7 +660,7 @@ impl Scene {
             ports.entry(a).or_default().push(DPort { key: pa, at: [ra[2] * 0.5 + o[0], ra[3] * 0.5 + o[1]], flags: DPT_HIDDEN | DPT_USED });
             ports.entry(b).or_default().push(DPort { key: pb, at: [rb[2] * 0.5 + o[0], rb[3] * 0.5 + o[1]], flags: DPT_HIDDEN | DPT_USED });
             edges.push(DEdge { key: id as u64, a: pa, b: pb, route: DR_STRAIGHT, wps: 0..0 });
-            let bad = f.too_long || f.optics.is_some();
+            let bad = f.too_long || f.optics.is_some() || f.slow.is_some();
             let mut label = len_text(f.len);
             if f.too_long
                 && let Some(r) = f.reach
@@ -663,6 +668,8 @@ impl Scene {
                 label = tf("{} – zu lang, erlaubt {} m", &[&label, &r.max_m.to_string()]);
             } else if f.optics.is_some() {
                 label = tf("{} – Optik passt nicht", &[&label]);
+            } else if f.slow.is_some() {
+                label = tf("{} – Kategorie reicht nicht", &[&label]);
             }
             let limit = match f.reach {
                 Some(r) => tf("erlaubt {} m ({})", &[&r.max_m.to_string(), r.std]),
@@ -673,8 +680,10 @@ impl Scene {
                 sem = tf("{}, zu lang", &[&sem]);
             } else if f.optics.is_some() {
                 sem = tf("{}, Optik passt nicht", &[&sem]);
+            } else if f.slow.is_some() {
+                sem = tf("{}, Kategorie reicht nicht", &[&sem]);
             }
-            self.cables.push(SCable { link: Some(id), cable: l.cable, label, at, bad, down: l.down, sem });
+            self.cables.push(SCable { link: Some(id), cable: l.cable, color: l.color, label, at, bad, down: l.down, sem });
             if bad {
                 for k in [a, b] {
                     if let Some(&i) = self.idx.get(&k) {

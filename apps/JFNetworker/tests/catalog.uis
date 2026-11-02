@@ -3,7 +3,7 @@
 # the expanders, the search over names and descriptions, the tooltip with title and ports
 theme light
 expect button:"Endgeräte (9)" open
-expect button:"Netzwerk (7)" open
+expect button:"Netzwerk (17)" open
 expect button:"Notizen (1)" open
 expect button:"PC" exists
 expect button:"Laptop" exists
@@ -24,10 +24,10 @@ expect button:"Hub" exists
 # the closed categories open on a click
 expect button:"JF-FW" missing
 click button:"Endgeräte (9)"
-click button:"Netzwerk (7)"
-click button:"Sicherheit (1)"
+click button:"Netzwerk (17)"
+click button:"Sicherheit (3)"
 expect button:"JF-FW" exists
-click button:"WLAN und WAN (3)"
+click button:"WLAN und WAN (6)"
 expect button:"JF-AP6E" exists
 expect button:"Modem/ONT" exists
 expect button:"Internet" exists
@@ -47,11 +47,11 @@ shot build/jfnetworker/catalog_open.png
 # the tooltip: description and ports
 move button:"JF-FW"
 wait 900
-expect text:"Next-Generation-Firewall 8× 1G, 2× 10G SFP+ · Ports: 8× 1G, 2× 10G SFP+, Konsole" exists
+expect text:"Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+ · Ports: 8× 1G, 2× 10G SFP+, Konsole" exists
 # the search: names and descriptions, every category with a hit open
 click #16385
 type "router"
-expect button:"Netzwerk (3)" open
+expect button:"Netzwerk (4)" open
 expect button:"JF-R4" exists
 expect button:"JF-R8" exists
 expect button:"Heimrouter" exists
@@ -72,5 +72,5 @@ key backspace
 expect button:"Endgeräte (9)" exists
 expect button:"PC" missing
 expect button:"JF-S24P" missing
-expect button:"Sicherheit (1)" open
+expect button:"Sicherheit (3)" open
 expect_nowarn

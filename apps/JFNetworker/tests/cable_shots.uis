@@ -1,0 +1,17 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/cable_kinds.jfnet
+# the look of every kind of cable (canvas/paint.rs: stroke_cable; the palette's tiles draw the same
+# pieces): copper straight and crossover, multimode solid and single-mode dash-dot, serial with a
+# zigzag, its chosen ends with a dot and "DCE" at the port, console, radio, WAN, telephone, coax,
+# DAC, AOC; some with a category or a colour.  Light and dark, 100 and 150 %.
+theme light
+click button:"Kabel (14)"
+expect text:"28 Geräte · 14 Kabel" exists
+shot build/jfnetworker/cable_kinds_light.png
+theme dark
+shot build/jfnetworker/cable_kinds_dark.png
+scale 150
+shot build/jfnetworker/cable_kinds_dark_150.png
+theme light
+shot build/jfnetworker/cable_kinds_light_150.png
+scale 100
+expect_nowarn

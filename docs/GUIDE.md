@@ -1549,7 +1549,7 @@ in DIP):
 | Command | Effect |
 |---|---|
 | `click S [l\|r]`, `rclick S`, `dblclick S`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer |
-| `drag S1 S2 [steps] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons |
+| `drag S1 S2 [steps] [hold MS] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons; `hold MS`: the button rests MS ms before the first move, on the virtual clock like `wait` (a dock tab asks for it) |
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
 | `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events (`touch`: they are a finger, §37) |
 | `tap S`, `longpress S [MS]` | a finger: down and up at S; resting MS ms (default 600) in between |
@@ -1770,6 +1770,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `command_bar(id, &[CmdItem]) -> Option<u32>` | primary and secondary commands; what does not fit goes into an overflow menu |
 | `split_begin(id, pos, vertical)`, `split_next`, `split_end(&mut pos)` | two panes with a draggable splitter (master / detail) |
 | `page_header`, `breadcrumb`, `key_value`, `empty_state`, `link` | page titles, paths, label / value rows, empty pages with a call to action, text links |
+| `action_card(id, name, &CardDesc)` | a card or list row that does one thing when chosen (a template on a start page, a recent file): title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area with the app's drawing; `next_size` its width, `ST_SUBTLE` a list row, `ST_CHECKED`, `ST_DISABLED`; one Tab stop, a button record named `name`; in a row of cards all take the row's height ([`ui/action_card.rs`](../lib/ui/action_card.rs)) |
 | `segmented(id, &mut sel, items)` | segmented control (filters, schedule kinds) |
 | `wizard_steps(id, steps, current, states)` | the step list of a full-page wizard |
 | `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last |
@@ -1814,13 +1815,20 @@ self.dock.focus(P_PROPS);
   and should never change (the saved layout names them); panels the app no longer describes
   are kept in the layout but not shown.
 * Each group has a tab strip with a menu (float / dock to a side / collapse / hide), a
-  collapse and a hide button. Dragging a tab, or the empty part of a strip (the whole group),
-  shows drop markers at the three edges of the area and on the group under the pointer (as a
-  tab, before, after); a release over a strip inserts the tab there, anywhere else -- also
-  outside the window -- the panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 ..
-  ID + DOCK_FLOAT_MAX`, six at most). A floating window's tabs drag back onto the markers, its
-  pin button or a double click docks it where it came from, its close button hides its
-  panels. Esc cancels a drag. Painters: `StyleShell::dock_*` (stock ones from the tokens).
+  collapse and a hide button. A press on a tab, or on the empty part of a strip (the whole
+  group), can drag only after the button was held for `DOCK_HOLD_MS` (300 ms), so that a slip
+  of the hand during a click neither moves nor floats a panel: from then on the tab shows it
+  (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`; on a strip
+  every tab of the group), and the drag starts when the pointer moves past the usual threshold
+  from where it is at that moment. Movement during the hold cancels nothing and never counts (a
+  slip or a tremor starts nothing), a release without a drag is a click if it is over the tab;
+  clicks, double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
+  three edges of the area and on the group under the pointer (as a tab, before, after); a
+  release over a strip inserts the tab there, anywhere else -- also outside the window -- the
+  panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 .. ID + DOCK_FLOAT_MAX`, six at
+  most). A floating window's tabs drag back onto the markers, its pin button or a double click
+  docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
+  (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
   `dock_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
@@ -1829,9 +1837,12 @@ self.dock.focus(P_PROPS);
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
-* Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`); a floating window is `window 501`, and
-  `window any` + `drag tab:"…" X,Y` drags its tab onto a marker of the main window.
+* Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`). A plain `drag` lasts 128 ms and never gets
+  past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
+  (a `move` during the hold does not count towards the drag).
+  A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
+  tab onto a marker of the main window.
   PaintCraft keeps its own placement of floating palettes inside the main window
   (`apps/PaintCraft/src/workspace/panels/dock.rs`), a different model.
 
@@ -3057,6 +3068,16 @@ for ev in evs {
   (`DEv::Click` at a snapped point). Middle drag, Space + drag and the wheel pan, Ctrl + wheel
   zooms at the pointer; arrows nudge, Del, Ctrl+A, Esc, Tab, Enter, Ctrl + plus / minus / 0
   work while the canvas has the focus.
+* A double click on a node, port or edge is `DEv::Activate`, one on the background with
+  `DG_SELECT` (no Shift, no Ctrl) `DEv::DoubleClick { at }` with the world point of the second
+  press, not snapped: no marquee and no second `Click` follow it, and a press that became a drag
+  (a marquee) or a key between the clicks makes none. The time is the theme's
+  `double_click_ms`. `DN_HITMIN` gives a small node, a line of text say, a hit box of at least
+  16 x 16 DIP around it, so it stays selectable at low zoom. To type right on the canvas, place a `ui.textbox_presented` over it
+  with `ui.next_rect_px` (in a mirrored window its logical x is `ui.rtl_map(x + w - 1, r[0], r[2])`,
+  the canvas is not mirrored) and give the keyboard back with `ui.focus_quiet(id)` after a pointer
+  gesture: it is
+  `ui.focus` without the focus ring. JFNetworker's labels do this (`canvas/labels.rs`).
 * Painting: the `DgPaint` runs at render time with a `DgFrame` (`vp`: world <-> px, `clip`: the
   world part to paint, `geo.routes`: the polyline of every edge, the theme's colours and fonts,
   `moving`). Cull with `f.visible(rect)` / `f.route_visible(route,

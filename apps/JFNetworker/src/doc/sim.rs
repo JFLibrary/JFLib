@@ -9,7 +9,8 @@
 //   sync(&project)                the engine follows the project: what differs from what it
 //                                 was told becomes Actions -- devices come and go (a removed one
 //                                 keeps its running configuration for an undo), names, power;
-//                                 cables come and go, kind, plug, speed, delay, jitter, loss; a
+//                                 cables come and go, kind, category, plug, speed, delay, jitter,
+//                                 loss; the project's "Auto-MDI-X aus" (Action::StrictMdix); a
 //                                 device whose model, configuration or services changed starts
 //                                 again with them (keeping the project's name whatever its
 //                                 configuration's "hostname" says)
@@ -139,12 +140,14 @@ struct MLink {
     down: bool,
     /// the length the project resolves (by hand or from the places; phys.rs)
     len_m: u32,
+    /// its category (phys.rs)
+    grade: jfn_model::CableGrade,
 }
 
 impl MLink {
     /// a link as the engine runs it: its resolved length and the delay that follows (phys.rs)
     fn of(l: &Link, len_m: u32, delay_ns: u64) -> MLink {
-        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down, len_m }
+        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down, len_m, grade: l.grade }
     }
 }
 
@@ -155,6 +158,7 @@ struct Told {
     links: BTreeMap<u32, MLink>,
     stash: BTreeMap<u32, String>,
     scale: u32,
+    strict: bool,
 }
 
 /// a snapshot of an engine for the canvas and the inspector
@@ -315,6 +319,8 @@ pub(crate) struct Sim {
     dirty: bool,
     /// the task clock at the last snapshot (µs)
     shot_at: u64,
+    /// "Auto-MDI-X aus" as the engine was told (Project::strict_mdix)
+    strict: bool,
     /// the scale the engine was told (Project::dip_per_m)
     scale: u32,
     /// the WLAN associations of the last snapshot, a key that changes with them
@@ -355,6 +361,7 @@ impl Sim {
             soon: true,
             dirty: false,
             shot_at: 0,
+            strict: p.strict_mdix,
             scale: if whole { p.dip_per_m } else { 0 },
             wlan: Rc::new(Vec::new()),
             wlan_key: 0,
@@ -496,6 +503,10 @@ impl Sim {
         if self.scale != p.dip_per_m && self.act(Action::Scale { dip_per_m: p.dip_per_m }).is_ok() {
             self.scale = p.dip_per_m;
         }
+        // "Auto-MDI-X aus"
+        if self.strict != p.strict_mdix && self.act(Action::StrictMdix { on: p.strict_mdix }).is_ok() {
+            self.strict = p.strict_mdix;
+        }
         // new links; kind, plug and quality; the lengths and delays of the places (phys.rs)
         let tree = jfn_model::Tree::of(p);
         for l in &p.links {
@@ -535,6 +546,9 @@ impl Sim {
             }
             if m.len_m != len && self.act(Action::CableLen { link: l.id, len_m: len }).is_ok() {
                 now.len_m = len;
+            }
+            if m.grade != l.grade && self.act(Action::CableGrade { link: l.id, grade: l.grade }).is_ok() {
+                now.grade = l.grade;
             }
             self.links.insert(l.id, now);
         }
@@ -939,6 +953,7 @@ impl Sim {
             self.links = t.links.clone();
             self.stash = t.stash.clone();
             self.scale = t.scale;
+            self.strict = t.strict;
         }
         self.reports.clear();
         self.rates.clear();
@@ -1013,7 +1028,7 @@ impl Sim {
 
     // what the engine was told, when it changed (resume goes back to it)
     fn note_told(&mut self) {
-        if self.told.last().is_some_and(|(_, t)| t.devs == self.devs && t.links == self.links && t.stash == self.stash && t.scale == self.scale) {
+        if self.told.last().is_some_and(|(_, t)| t.devs == self.devs && t.links == self.links && t.stash == self.stash && t.scale == self.scale && t.strict == self.strict) {
             return;
         }
         let k = self.drv.pos().inputs;
@@ -1022,6 +1037,6 @@ impl Sim {
         if let Some(i) = self.told.iter().rposition(|(n, _)| *n <= first) {
             self.told.drain(..i);
         }
-        self.told.push((k, Rc::new(Told { devs: self.devs.clone(), links: self.links.clone(), stash: self.stash.clone(), scale: self.scale })));
+        self.told.push((k, Rc::new(Told { devs: self.devs.clone(), links: self.links.clone(), stash: self.stash.clone(), scale: self.scale, strict: self.strict })));
     }
 }

@@ -66,7 +66,7 @@ IoT-Sensor (WLAN 2,4 GHz)	IoT sensor (WLAN 2.4 GHz)
 IP-Kamera	IP camera
 IP-Kamera (1G, PoE)	IP camera (1G, PoE)
 Smart-TV	Smart TV
-Smart-TV (1G, WLAN)	Smart TV (1G, WLAN)
+Smart-TV (1G, WLAN, Koax)	Smart TV (1G, WLAN, coax)
 JF-S24P	JF-S24P
 Access-Switch 24× 1G PoE+, 4× 10G SFP+	Access switch 24× 1G PoE+, 4× 10G SFP+
 JF-S24L3	JF-S24L3
@@ -82,7 +82,7 @@ Heimrouter mit WLAN 802.11ax (1G WAN, 4× 1G LAN)	Home router with WLAN 802.11ax
 Hub	Hub
 Hub 8× 100M (Lehrgerät: jedes Paket an alle)	Hub 8× 100M (for teaching: every frame to every port)
 JF-FW	JF-FW
-Next-Generation-Firewall 8× 1G, 2× 10G SFP+	Next-generation firewall 8× 1G, 2× 10G SFP+
+Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+	Firewall (router with ACLs and NAT) 8× 1G, 2× 10G SFP+
 JF-AP6E	JF-AP6E
 WLAN-Access-Point 802.11ax (6 GHz, 2.5G, PoE-gespeist)	WLAN access point 802.11ax (6 GHz, 2.5G, PoE-powered)
 Modem/ONT	Modem/ONT
@@ -1543,3 +1543,61 @@ selbst signiert	self-signed
 unbekannter Aussteller	unknown issuer
 falscher Name	wrong name
 ohne Fehler	no fault
+{} PoE++	{} PoE++
+JF-S8	JF-S8
+Tisch-Switch 8× 1G, unmanaged (ohne Befehlszeile)	Desktop switch 8× 1G, unmanaged (no command line)
+JF-S8P	JF-S8P
+Kompakt-Switch 8× 1G PoE+, 2× 10G SFP+	Compact switch 8× 1G PoE+, 2× 10G SFP+
+JF-S24	JF-S24
+Access-Switch 24× 1G, 4× 10G SFP+	Access switch 24× 1G, 4× 10G SFP+
+JF-S48P	JF-S48P
+Access-Switch 48× 1G PoE+, 4× 10G SFP+	Access switch 48× 1G PoE+, 4× 10G SFP+
+JF-S24M	JF-S24M
+Multi-Gigabit-Switch 24× 2.5G PoE++, 4× 25G SFP28	Multi-gigabit switch 24× 2.5G PoE++, 4× 25G SFP28
+JF-S48Y	JF-S48Y
+Leaf-Switch (L3) 48× 25G SFP28, 8× 100G QSFP28	Leaf switch (L3) 48× 25G SFP28, 8× 100G QSFP28
+JF-S32C	JF-S32C
+Spine-Switch (L3) 32× 100G QSFP28	Spine switch (L3) 32× 100G QSFP28
+JF-R2	JF-R2
+Filial-Router 2× 1G, 2× Seriell	Branch router 2× 1G, 2× serial
+Repeater	Repeater
+Repeater 2× 1G (Schicht 1: verlängert eine Kupferstrecke)	Repeater 2× 1G (layer 1: extends a copper run)
+Bridge	Bridge
+Bridge 2× 1G (Schicht 2: lernt Adressen, ohne Befehlszeile)	Bridge 2× 1G (layer 2: learns addresses, no command line)
+JF-FW2	JF-FW2
+Kleine Firewall (Router mit ACLs und NAT) 1G WAN, 4× 1G LAN	Small firewall (router with ACLs and NAT) 1G WAN, 4× 1G LAN
+JF-FW8	JF-FW8
+Rechenzentrums-Firewall (Router mit ACLs und NAT) 8× 10G SFP+, 4× 100G QSFP28	Data center firewall (router with ACLs and NAT) 8× 10G SFP+, 4× 100G QSFP28
+JF-AP7	JF-AP7
+WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist)	WLAN access point 802.11be (6 GHz, 5G, PoE-powered)
+Farbe der Kabelart	Color of the cable kind
+Türkis	Teal
+Pink	Pink
+Braun	Brown
+Seriell, erstes Ende DCE	Serial, first end DCE
+Seriell, erstes Ende DTE	Serial, first end DTE
+Telefonkabel (RJ11)	Telephone cable (RJ11)
+Koaxialkabel	Coaxial cable
+Direktkabel (DAC)	Direct attach cable (DAC)
+Aktives Glasfaserkabel (AOC)	Active optical cable (AOC)
+Multimode	Multimode
+Singlemode	Single-mode
+Seriell DCE	Serial DCE
+Seriell DTE	Serial DTE
+Telefon	Telephone
+Koax	Coax
+DAC	DAC
+AOC	AOC
+keine Längengrenze	no length limit
+{} m bei {}	{} m at {}
+nicht bei {}	not at {}
+RJ11	RJ11
+{}× RJ11	{}× RJ11
+{}× Koax	{}× coax
+Kabelmodem	Cable modem
+Kabelmodem (Koax, 1G LAN)	Cable modem (coax, 1G LAN)
+DSL-Modem	DSL modem
+DSL-Modem (RJ11, 1G LAN)	DSL modem (RJ11, 1G LAN)
+Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.	Category {} does not fit {}; the limits without a category apply.
+{}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.	{} cable on {} does not carry {}; the link stays down.
+{}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.	{} cable between {} and {} does not carry {}; the link stays down.

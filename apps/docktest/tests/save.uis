@@ -12,7 +12,7 @@ expect text:"group 2 1 0 15 15" exists
 expect text:"hidden 16 1 1 4294967295 40 80 280 320 1 1" exists
 # change everything, then load the saved layout
 drag 263,300 323,300
-drag tab:"Eigenschaften" 30,312
+drag tab:"Eigenschaften" 30,312 hold 320
 click button:"Einklappen: Ausgabe"
 dblclick tab:"Gliederung"
 expect window 501 open

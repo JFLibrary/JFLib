@@ -244,7 +244,8 @@ pub trait StyleShell {
         crate::stock::dock_header(ui, sp)
     }
     /// a tab of a dock group: label, icon, ev, value 1 = the shown panel, value2 1 = the focus
-    /// is in the group; size -> (w, h), the core takes w (a tab is as high as the strip)
+    /// is in the group, flags DOCK_TAB_HOLD = held long enough to be dragged (show it through
+    /// the tokens); size -> (w, h), the core takes w (a tab is as high as the strip)
     fn dock_tab_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32) {
         crate::stock::dock_tab_size(ui, sp)
     }

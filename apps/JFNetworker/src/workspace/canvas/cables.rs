@@ -5,7 +5,8 @@
 //   states(n, ui)                    enabled / checked of the cable and power commands
 //   set_route(n, route)              Gerade / Rechtwinklig / Kurve for the selected cables
 //   set_kind(n, kind)                the kind of the selected cables (None: "Automatisch", the
-//                                    right one for the ports); kinds that do not plug in are off
+//                                    right one for the ports); kinds that do not plug in are off;
+//                                    a category the new kind cannot have goes
 //   disconnect_selection(n)          Trennen: the selected cables go
 //   toggle_power(n) / set_power(n, devs, on)   the selected devices on (when one is off) or
 //                                    off; given devices on or off
@@ -74,7 +75,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_CABLE0, flag(none, CF_DISABLED) | flag(all(&|l| !l.cable_fixed), CF_CHECKED));
     for (k, &kind) in CableKind::ALL.iter().enumerate() {
         let ok = !none && links.iter().all(|&id| fits(p, id, kind));
-        ui.cmd_state(CMD_CABLE0 + 1 + k as u32, flag(!ok, CF_DISABLED) | flag(all(&|l| l.cable_fixed && l.cable == kind), CF_CHECKED));
+        ui.cmd_state(cable_cmd(k), flag(!ok, CF_DISABLED) | flag(all(&|l| l.cable_fixed && l.cable == kind), CF_CHECKED));
     }
     let devs = sel_devices(n);
     let on = !devs.is_empty() && devs.iter().all(|&d| p.device(d).is_some_and(|d| !d.off));
@@ -123,6 +124,9 @@ pub(crate) fn set_kind(n: &mut Net, kind: Option<CableKind>) {
             edits::link_edit(p, id, label, |l| {
                 l.cable = k;
                 l.cable_fixed = fixed;
+                if !l.grade.fits(k) {
+                    l.grade = jfn_model::CableGrade::Unset;
+                }
             })
         })
         .collect();
@@ -409,7 +413,16 @@ pub(crate) fn tooltip(c: &super::Canvas, doc: &crate::doc::Doc, ui: &mut Ui) {
             let sim = &doc.sim;
             let state = state_text(l.down, sim.led(l.id));
             let pps = sim.rate(l.id);
-            let text = tf("{} · {} · {} · {} · {} Pakete/s", &[&ends_text(p, l), t(l.cable.title()), &crate::app::tr::speed(l.kbps), state, &pps.to_string()]);
+            let mut text = tf("{} · {} · {} · {} · {} Pakete/s", &[&ends_text(p, l), t(l.cable.title()), &crate::app::tr::speed(l.kbps), state, &pps.to_string()]);
+            // the category and the limit at its speed, once it has one
+            if l.grade != jfn_model::CableGrade::Unset {
+                text = format!("{} · {}", text, l.grade.name());
+            }
+            match jfn_model::phys::link_reach(p, l) {
+                Some(r) if r.carries() => text = tf("{} · Grenze {} m ({})", &[&text, &r.max_m.to_string(), r.std]),
+                Some(r) => text = format!("{} · {}", text, tf("trägt {} nicht", &[r.std])),
+                None => {}
+            }
             ui.tooltip_part(&text, key);
         }
         DHit::Port(key) => {

@@ -12,6 +12,7 @@ expect text:"Größen: 320/280/200" exists
 expect tab:"Dateien" rect 866 48 90 32
 # the Eigenschaften (at the left) onto the marker of the left side, which shows at the right
 down tab:"Eigenschaften"
+wait 320
 move 400,200
 move 930,312
 expect button:"Rechts andocken" hover
@@ -25,7 +26,7 @@ expect menuitem:"Links andocken" exists
 expect menuitem:"Rechts andocken" exists
 key esc
 # floated in the mirror
-drag tab:"Ausgabe" 300,200
+drag tab:"Ausgabe" 300,200 hold 320
 expect window 501 open
 expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: [Ausgabe] | V: Verlauf" exists
 expect window 501 rect 37 156 314 200

@@ -1750,3 +1750,66 @@ HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or
 Secure geht nur über https	Secure works only over https
 SameSite=None braucht Secure	SameSite=None needs Secure
 Zertifikat abgelehnt	Certificate refused
+Seriell, erstes Ende D&CE	Serial, first end D&CE
+Seriell, erstes Ende D&TE	Serial, first end D&TE
+Te&lefonkabel (RJ11)	Te&lephone cable (RJ11)
+Koa&xialkabel	Coa&xial cable
+&Direktkabel (DAC)	&Direct attach cable (DAC)
+Akti&ves Glasfaserkabel (AOC)	Acti&ve optical cable (AOC)
+{} · Grenze {} m ({})	{} · limit {} m ({})
+{} verbindet keine freien Ports von {} und {}.	{} joins no free ports of {} and {}.
+Dieses Kabel passt hier nicht	This cable does not fit here
+Verbinden: {}	Connect: {}
+Ohne Angabe	Not stated
+Kategorie	Category
+Kabelfarbe	Cable color
+Nur zum Unterscheiden: den Zustand zeigen die LEDs.	Only to tell cables apart: the LEDs show the state.
+Auto-MDI-X aus	Auto-MDI-X off
+Aus: ein falsches Kupferkabel hält die Leitung unten, wie an einem Port ohne Auto-MDI-X.	Off: a wrong copper cable holds the link down, as on a port without auto-MDI-X.
+Kabel: {}	Cable: {}
+Automatisch: das richtige Kabel für die beiden Ports	Automatic: the right cable for the two ports
+trägt {} nicht	does not carry {}
+{}-Kabel trägt {} nicht. Die Leitung bleibt aus.	{} cable does not carry {}. The link stays down.
+{} – Kategorie reicht nicht	{} – category too low
+{}, Kategorie reicht nicht	{}, category too low
+# ---- H3: labels on the canvas (canvas/labels.rs, the command table)
+Beschriftung einfügen	Insert label
+Beschriftung	Label
+Beschriftung: {}	Label: {}
+Text der Beschriftung	Text of the label
+Doppelklick auf freie Fläche	Double click on free space
+Beschriftung dort schreiben (Eingabe übernimmt, Umschalt+Eingabe: neue Zeile, Esc verwirft)	Write a label there (Enter takes it, Shift+Enter: new line, Esc discards)
+# the start page and the project's info (workspace/startpage.rs, ST1)
+S&tartseite	S&tart page
+Projekt&info …	Project &info …
+Beim Start anzeigen	Show at startup
+Ohne diese Seite beginnt das Programm mit einem leeren Projekt.	Without this page the program begins with an empty project.
+Startseite	Start page
+Heimnetz	Home network
+Heimrouter mit WLAN und DHCP, dazu PC, Drucker, Laptop und Smartphone.	A home router with Wi-Fi and DHCP, with a PC, a printer, a laptop and a smartphone.
+Büro mit VLANs	Office with VLANs
+VLANs für Büro, Technik und Server, ein Router am Trunk, DHCP und DNS.	VLANs for office, engineering and servers, a router on the trunk, DHCP and DNS.
+Campus	Campus
+Zwei Gebäude mit L3-Switches, OSPF zum Router, DHCP über Relays, DNS.	Two buildings with L3 switches, OSPF to the router, DHCP through relays, DNS.
+Rechenzentrum (Leaf-Spine)	Data centre (leaf-spine)
+Zwei Spines, vier Leafs, acht Server; geroutet mit OSPF über gleich gute Wege.	Two spines, four leaves, eight servers; routed with OSPF over equally good paths.
+Webdienst hinter Loadbalancer	Web service behind a load balancer
+Ein Loadbalancer verteilt die Anfragen auf drei Webserver und prüft sie.	A load balancer shares the requests among three web servers and checks them.
+Heute {}	Today {}
+Gestern {}	Yesterday {}
+Netzwerke entwerfen, simulieren und verstehen.	Design, simulate and understand networks.
+Leeres Projekt	Empty project
+Eine leere Zeichenfläche: Geräte aus der Palette ziehen und verbinden.	An empty canvas: drag devices from the palette and connect them.
+Vorlage: {}	Template: {}
+Zuletzt	Recent
+Hier erscheinen die Projekte, die Sie öffnen und speichern.	The projects you open and save appear here.
+{}, nicht gefunden	{}, not found
+Nicht gefunden	Not found
+Aus der Liste entfernen	Remove from the list
+Lernen	Learn
+Labore: ein Netz, Ziele, die der Simulator prüft, und Hinweise.	Labs: a network, goals the simulator checks, and hints.
+Aufgaben mit Bewertung: das Netz aufbauen und Punkte bekommen.	Graded assessments: build the network and earn points.
+Projektinfo	Project info
+Worum es in diesem Projekt geht	What this project is about
+Autor	Author
+Ihr Name	Your name

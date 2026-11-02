@@ -1,0 +1,102 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the shots of labels (canvas/labels.rs, H3): text only next to devices, a cable and a sticker,
+# light, dark and high contrast at 100 and 150 %, with the input open, selected and hovered
+# (build/jfnetworker/label_shots_<what>_<theme>_<scale>.png; look at them).
+size 1280 800
+theme light
+# a label over the cable, one on free space, two lines, and a sticker to compare
+dblclick 715,440
+type "Uplink 1 Gbit/s"
+key enter
+wait 600
+dblclick 420,500
+type "Büro Erdgeschoss"
+key enter
+wait 600
+dblclick 840,520
+type "Zweite Etage"
+key shift+enter
+type "Raum 2.14"
+key enter
+key n
+click 380,130
+type "Eine Notiz bleibt die große Karte."
+click button:"Übernehmen"
+click 900,560
+move 640,700
+expect listitem:"Beschriftung: Uplink 1 Gbit/s" exists
+expect listitem:"Beschriftung: Büro Erdgeschoss" exists
+expect listitem:"Beschriftung: Zweite Etage" exists
+expect listitem:"Notiz: Eine Notiz bleibt die große Karte." exists
+# ---- as they lie
+shot build/jfnetworker/label_shots_plain_light_100.png
+theme dark
+shot build/jfnetworker/label_shots_plain_dark_100.png
+theme contrast
+shot build/jfnetworker/label_shots_plain_contrast_100.png
+scale 150
+move 960,1050
+shot build/jfnetworker/label_shots_plain_contrast_150.png
+theme dark
+shot build/jfnetworker/label_shots_plain_dark_150.png
+theme light
+shot build/jfnetworker/label_shots_plain_light_150.png
+scale 100
+move 640,700
+# ---- selected and hovered
+click listitem:"Beschriftung: Büro Erdgeschoss"
+move listitem:"Beschriftung: Zweite Etage"
+shot build/jfnetworker/label_shots_sel_light_100.png
+theme dark
+shot build/jfnetworker/label_shots_sel_dark_100.png
+theme contrast
+shot build/jfnetworker/label_shots_sel_contrast_100.png
+theme light
+scale 150
+shot build/jfnetworker/label_shots_sel_light_150.png
+scale 100
+wait 600
+click 900,560
+wait 600
+# ---- the input: a new one and in place
+dblclick 600,180
+type "Neue Besch"
+shot build/jfnetworker/label_shots_input_light_100.png
+theme dark
+shot build/jfnetworker/label_shots_input_dark_100.png
+theme contrast
+shot build/jfnetworker/label_shots_input_contrast_100.png
+theme light
+scale 150
+shot build/jfnetworker/label_shots_input_light_150.png
+scale 100
+key esc
+wait 600
+dblclick listitem:"Beschriftung: Zweite Etage"
+shot build/jfnetworker/label_shots_edit_light_100.png
+key esc
+# ---- zoomed: 200 %, 50 %, 25 % (a bar instead of the text), the input stays readable
+click 900,560
+cmd 20
+cmd 20
+cmd 20
+shot build/jfnetworker/label_shots_zoom_200.png
+wait 600
+dblclick 300,200
+type "Zoom 200"
+shot build/jfnetworker/label_shots_input_zoom_200.png
+key esc
+cmd 22
+cmd 21
+cmd 21
+cmd 21
+shot build/jfnetworker/label_shots_zoom_50.png
+wait 600
+dblclick 300,200
+type "Zoom 50"
+shot build/jfnetworker/label_shots_input_zoom_50.png
+key esc
+cmd 21
+cmd 21
+shot build/jfnetworker/label_shots_zoom_25.png
+expect_nowarn

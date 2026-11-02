@@ -6,7 +6,9 @@
 //                           settings (prefs.rs) with the language (tr.rs), --open FILE, the
 //                           recovery of an autosaved project (doc/autosave.rs);
 //                           --gen-topology N (a synthetic project without a file) and
-//                           --traffic K (K pings at once) for tests
+//                           --traffic K (K pings at once) for tests; the start page when nothing
+//                           was opened (workspace/startpage.rs; headless runs: --start-page, their
+//                           recent files from --recent=A|B)
 //   after_load()            a new or loaded project: canvas, inspector, consoles, log and
 //                           device windows start over, the simulator runs in real time
 //   save_prefs(ui)          settings, recent files and the dock layout (UIC_EXIT)
@@ -143,12 +145,15 @@ impl Net {
         if let Some(k) = num("--traffic") {
             self.doc.sim.with_engine("traffic", move |e| e.ping_many(k));
         }
+        // the start page: after_load above took it down, a file that did not open leaves its message
+        crate::workspace::startpage::startup(self, ui, &args);
         true
     }
 
     /// a new or loaded project: no selection, its view, fresh edit buffers, the simulator
     /// running in real time
     pub(crate) fn after_load(&mut self) {
+        self.shell.start = false;
         self.canvas.reset(&self.doc.proj);
         self.phys.reset(&self.doc.proj);
         self.inspector.reset();

@@ -107,6 +107,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Cookies as RFC 6265 reads them, without I/O and a clock (`netpkt::cookie`: `SetCookie::parse`, `parse_date`, `Jar`, SameSite from RFC 6265bis as far as a small browser needs it)
 - **netpkt:** TLS 1.3 without I/O and a clock (`netpkt::tls`: a `Core` for both sides, TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519, a seed gives the same bytes) and certificates of a private PKI (`netpkt::x509`); `decode` dissects TLS records
 - **ui:** Style sheets from outside for the document view: `MdDoc::sheet_links`, `MdDoc::set_sheet` (a text counts where its `<link>` stands), `MdDoc::style_of` (what the cascade gives an element)
+- **JFNetworker:** More devices in the catalog, all manufacturer-neutral with fixed ports: JF-S8 (unmanaged, no command line), JF-S8P, JF-S24, JF-S48P, JF-S24M (2.5G, PoE++), the leaf and spine L3 switches JF-S48Y and JF-S32C, the branch router JF-R2, the firewalls JF-FW2 and JF-FW8, the access point JF-AP7 (802.11be), a repeater and a bridge without a command line, symbols for the small boxes
+- **JFNetworker:** Choosing a cable first: a Kabel part in the palette (Automatisch and a tile per kind) sets the Verbinden tool with that kind, the port choice offers only pairs it fits and what cannot fit is refused with its reason at the target. New kinds appended (serial with a chosen DCE or DTE end, telephone, coax, DAC, AOC), Media::Rj11 and Media::Coax with a cable modem and a DSL modem, a category (Cat5e .. Cat8, OM3, OM4, OS2) and a colour on the link, the project setting Auto-MDI-X aus; old files load unchanged, the golden reports stay as they are
+- **ui:** A double click on the background of ui.diagram (DEv::DoubleClick with the world point of the second press), DN_HITMIN for small nodes that stay selectable at low zoom, ui.focus_quiet (the keyboard focus without the ring after a pointer gesture)
+- **ui:** A card or list row that does one thing when it is chosen: ui.action_card with CardDesc (title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area), for start pages and the like
 
 ### Changed
 
@@ -127,6 +131,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** netpkt::decode::Proto has the new variants Smtp (TCP ports 25 and 587) and Pop3 (port 110), both with the bit P_MAIL (1 << 28); a match over every protocol needs arms for them
 - **ui:** ui::DEv has the new variants Toggle (a collapse button of a DN_TOGGLE node) and Resize (the handle of a DN_RESIZE node), ui::DHit Toggle and Resize; a match over every event or hit needs arms for them
 - **script:** script::Diagnostic, Error and TraceLine carry the file of their position (file), Status has the variant Paused, Host has load (with a default); exhaustive matches on Status and struct literals of Error and Diagnostic need the new parts; messages of single files are unchanged
+- **ui:** A dock tab, or the empty part of a dock's tab strip, can drag only after the button was held for 300 ms (`DOCK_HOLD_MS`): a click that slips no longer moves or floats a panel. At 300 ms the tab shows it (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`), movement before that does not count, Esc ends the hold; clicks, double clicks, the menu and the splitters need none. Scripts: `drag ... hold MS` (or `wait` after `down`)
+- **JFNetworker:** The title of JF-FW says what a firewall does today, a router with access lists and NAT; zones and stateful filtering come with milestone F2
 
 ### Fixed
 

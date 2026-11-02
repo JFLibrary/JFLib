@@ -16,7 +16,9 @@
 //                                    automatic from the places of its ends (the rule below)
 //   delay_ns(p, &tree, link)         the delay the simulator runs a cable with
 //   reach(kind, kbps, optic)         the longest cable of a medium at a speed (Reach: metres and
-//                                    the name of the standard); link_reach(p, link) for a cable
+//                                    the name of the standard); reach_graded(kind, grade, ..):
+//                                    the same for a cable of a category (Reach::carries: it
+//                                    carries that speed at all); link_reach(p, link) for a cable
 //                                    of the project; optic_fault(kind, a, b): optics that do not
 //                                    fit each other or the fibre
 //   issues(p)                        what does not fit: places, spots, rack units
@@ -68,7 +70,7 @@ use alloc::vec::Vec;
 
 use agent_core::{record, wire_enum};
 
-use crate::cable::{self, CableKind};
+use crate::cable::{self, CableGrade, CableKind};
 use crate::catalog::{self, Form, Optic};
 use crate::msg::Msg;
 use crate::msg;
@@ -487,7 +489,7 @@ pub fn placed(d: &Device) -> bool {
 /// the delay the simulator runs a cable with: 5 ns per metre for copper and fibre whose delay
 /// is the default of its kind and whose length comes from the plan, else its own
 pub fn delay_ns(p: &Project, t: &Tree, l: &Link) -> u64 {
-    if !(l.cable.is_copper() || l.cable.is_fiber()) || l.delay_ns != cable::default_delay_ns(l.cable) {
+    if !l.cable.delay_follows_length() || l.delay_ns != cable::default_delay_ns(l.cable) {
         return l.delay_ns;
     }
     let both = [l.a.dev, l.b.dev].iter().all(|&d| p.device(d).is_some_and(placed));
@@ -503,6 +505,13 @@ pub struct Reach {
     pub max_m: u32,
     /// the standard that sets it ("1000BASE-T", "10GBASE-SR", "RS-232", "V.35")
     pub std: &'static str,
+}
+
+impl Reach {
+    /// the cable carries that speed at all (a category below it: no)
+    pub fn carries(&self) -> bool {
+        self.max_m > 0
+    }
 }
 
 /// the reach of a medium: the cable kind at a speed (kbit/s) with the optics of its ends (fibre;
@@ -533,7 +542,7 @@ pub fn reach(kind: CableKind, kbps: u32, optic: Option<Optic>) -> Option<Reach> 
             (Optic::Lr, _) => r(10_000, "100GBASE-LR4"),
         },
         CableKind::Console => r(15, "RS-232"),
-        CableKind::Serial => match kbps {
+        CableKind::Serial | CableKind::SerialDce | CableKind::SerialDte => match kbps {
             0..=2 => r(1250, "V.35"),
             3..=4 => r(625, "V.35"),
             5..=9 => r(312, "V.35"),
@@ -543,7 +552,48 @@ pub fn reach(kind: CableKind, kbps: u32, optic: Option<Optic>) -> Option<Reach> 
             _ => r(15, "V.35"),
         },
         CableKind::Wireless | CableKind::Wan => None,
+        CableKind::Phone => r(1_000, "VDSL2"),
+        CableKind::Coax => r(500, "RG-6"),
+        CableKind::Dac => match kbps {
+            0..=10_000_000 => r(7, "SFP+ DAC"),
+            10_000_001..=25_000_000 => r(7, "SFP28 DAC"),
+            _ => r(7, "QSFP28 DAC"),
+        },
+        CableKind::Aoc => match kbps {
+            0..=10_000_000 => r(100, "SFP+ AOC"),
+            10_000_001..=25_000_000 => r(100, "SFP28 AOC"),
+            _ => r(100, "QSFP28 AOC"),
+        },
     }
+}
+
+/// reach() for a cable of a category: what the category allows at the speed, max_m 0 when it does
+/// not carry that speed (Cat5e and 10GBASE-T); Unset, or a category its kind cannot have, is
+/// reach() as it is.  OM3 and OS2 are what reach() assumes already.
+pub fn reach_graded(kind: CableKind, grade: CableGrade, kbps: u32, optic: Option<Optic>) -> Option<Reach> {
+    let base = reach(kind, kbps, optic)?;
+    if !grade.fits(kind) {
+        return Some(base);
+    }
+    let max_m = match grade {
+        CableGrade::Unset | CableGrade::Om3 | CableGrade::Os2 => base.max_m,
+        CableGrade::Cat5e => if kbps <= 5_000_000 { 100 } else { 0 },
+        CableGrade::Cat6 => match kbps {
+            0..=5_000_000 => 100,
+            5_000_001..=10_000_000 => 55,
+            _ => 0,
+        },
+        CableGrade::Cat6a | CableGrade::Cat7 => if kbps <= 10_000_000 { 100 } else { 0 },
+        CableGrade::Cat8 => if kbps <= 10_000_000 { 100 } else { 30 },
+        CableGrade::Om4 => match (optic.unwrap_or(Optic::Sr), kbps) {
+            (Optic::Sr, 1_000_001..=10_000_000) => 400,
+            (Optic::Sr, 10_000_001..=25_000_000) => 100,
+            (Optic::Sr, 25_000_001..=40_000_000) => 150,
+            (Optic::Sr, 40_000_001..) => 100,
+            _ => base.max_m,
+        },
+    };
+    Some(Reach { max_m, std: base.std })
 }
 
 /// why the optics of a fibre cannot carry
@@ -585,7 +635,7 @@ pub fn link_kbps(p: &Project, l: &Link) -> u32 {
 /// the reach of a cable of the project (its speed, the optic of end a)
 pub fn link_reach(p: &Project, l: &Link) -> Option<Reach> {
     let optic = p.resolve_port(&l.a).ok().and_then(|s| s.optic);
-    reach(l.cable, link_kbps(p, l), optic)
+    reach_graded(l.cable, l.grade, link_kbps(p, l), optic)
 }
 
 /// what does not fit: (an error, the device, the message) -- places in no fitting place, ids

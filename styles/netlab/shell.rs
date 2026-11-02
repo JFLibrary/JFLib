@@ -12,7 +12,7 @@
 
 use ui::consts::*;
 use ui::theme::color_mix;
-use ui::{kind_colors, Sp, Stock, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DTB_ICONS};
+use ui::{kind_colors, Sp, Stock, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_TAB_HOLD, DTB_ICONS};
 
 use crate::common::{baseline, card, fill_rrect, framed, select_colors, shadow, text, R_CTRL, R_DIALOG, R_FLYOUT};
 
@@ -329,7 +329,11 @@ impl StyleShell for Shell {
         let r = sp.rect();
         let h = ui.hair();
         let sel = sp.value != 0;
-        if sel {
+        if sp.flags & DOCK_TAB_HOLD != 0 {
+            // held long enough to be dragged: the selection on the whole tab
+            let (f, s) = select_colors(ui, ui.color(if sel { T_LAYER } else { T_BG }), false);
+            framed(ui, r[0], r[1], r[2], r[3], 0, f, s);
+        } else if sel {
             // the shown tab: the panel colour over the strip's bottom line, framed on three
             // sides; while the group has the focus its top edge is a 2 DIP accent bar
             let f = ui.color(T_LAYER) | 0xFF00_0000;

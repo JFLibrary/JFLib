@@ -55,9 +55,9 @@ pub mod group;
 pub mod background;
 pub mod unit;
 
-pub use cable::{cable_fits, cable_kind, CableKind, Why};
+pub use cable::{cable_fits, cable_kind, CableColor, CableGrade, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
-pub use project::{Device, Issue, Link, Note, PortRef, ProjErr, Project, ServiceDef};
+pub use project::{Device, Issue, Link, Note, NoteStyle, PortRef, ProjErr, Project, ServiceDef};
 pub use scenario::Scenario;
 pub use msg::Msg;
 pub use lab::{Goal, Lab, Text};

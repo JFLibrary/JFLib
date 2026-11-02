@@ -1,0 +1,15 @@
+#!args --verify-dirty --start-page --autosave-dir build/jfn_start_autosave
+# Später on the start page (after start_page_crash.uis): the bar goes, the page stays and works, the
+# copy stays for the next start (start_page_recover.uis).  Id: 41508 Wiederherstellen (0xA224).
+shot build/jfn_start_autosave/later.png
+theme light
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" exists
+expect #41508 focused
+click button:"Später"
+expect "Ungespeicherte Änderungen" missing
+expect button:"Leeres Projekt" exists
+expect tab:"Geräte" missing
+key tab
+click button:"Vorlage: Heimnetz"
+expect text:"7 Geräte · 4 Kabel" exists
+expect_nowarn

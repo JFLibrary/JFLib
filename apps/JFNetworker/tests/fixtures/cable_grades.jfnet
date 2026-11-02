@@ -1,0 +1,28 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Kategorien und Enden",
+  "description": "Für das Golden-Szenario cable_grades: Kupfer- und Glasfaserkategorien gegen ihre Grenzen, Seriell mit gewähltem Ende, DAC und AOC",
+  "seed": 23,
+  "next_id": 60,
+  "devices": [
+    { "id": 1, "name": "DC1", "model": "jf-s48x", "x": -200, "y": -100 },
+    { "id": 2, "name": "DC2", "model": "jf-s48x", "x": 200, "y": -100 },
+    { "id": 3, "name": "R1", "model": "jf-r4", "x": -200, "y": 40 },
+    { "id": 4, "name": "R2", "model": "jf-r4", "x": 200, "y": 40 },
+    { "id": 5, "name": "SW1", "model": "jf-s24p", "x": -200, "y": 180 },
+    { "id": 6, "name": "SW2", "model": "jf-s24p", "x": 200, "y": 180 }
+  ],
+  "links": [
+    { "id": 20, "a": { "dev": 1, "port": "TenGigabitEthernet1/0/1" }, "b": { "dev": 2, "port": "TenGigabitEthernet1/0/1" }, "cable": "copper-cross", "kbps": 10000000, "delay_ns": 50, "grade": "cat5e" },
+    { "id": 21, "a": { "dev": 1, "port": "TenGigabitEthernet1/0/2" }, "b": { "dev": 2, "port": "TenGigabitEthernet1/0/2" }, "cable": "copper-cross", "kbps": 10000000, "delay_ns": 50, "grade": "cat6", "len_m": 60 },
+    { "id": 22, "a": { "dev": 1, "port": "TenGigabitEthernet1/0/3" }, "b": { "dev": 2, "port": "TenGigabitEthernet1/0/3" }, "cable": "copper-cross", "kbps": 10000000, "delay_ns": 50, "grade": "cat6a", "len_m": 60 },
+    { "id": 23, "a": { "dev": 3, "port": "Serial0/2/0" }, "b": { "dev": 4, "port": "Serial0/2/0" }, "cable": "serial-dce", "cable_fixed": true, "kbps": 2048, "delay_ns": 2000000 },
+    { "id": 24, "a": { "dev": 3, "port": "Serial0/2/1" }, "b": { "dev": 4, "port": "Serial0/2/1" }, "cable": "serial-dte", "cable_fixed": true, "kbps": 2048, "delay_ns": 2000000 },
+    { "id": 25, "a": { "dev": 5, "port": "TenGigabitEthernet1/1/1" }, "b": { "dev": 6, "port": "TenGigabitEthernet1/1/1" }, "cable": "dac", "cable_fixed": true, "kbps": 10000000, "delay_ns": 15 },
+    { "id": 26, "a": { "dev": 5, "port": "TenGigabitEthernet1/1/2" }, "b": { "dev": 6, "port": "TenGigabitEthernet1/1/2" }, "cable": "aoc", "cable_fixed": true, "kbps": 10000000, "delay_ns": 50 },
+    { "id": 27, "a": { "dev": 5, "port": "TenGigabitEthernet1/1/3" }, "b": { "dev": 6, "port": "TenGigabitEthernet1/1/3" }, "cable": "fiber-mm", "kbps": 10000000, "delay_ns": 500, "grade": "om4", "len_m": 380 }
+  ],
+  "notes": [],
+  "layout": { "zoom_pm": 1000, "cx": 0, "cy": 0, "grid": 20 }
+}

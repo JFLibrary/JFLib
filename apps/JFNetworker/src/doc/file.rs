@@ -9,6 +9,8 @@
 //                                           file, named after the lab's file until it is saved,
 //                                           its title the lab's in the window's language
 //   open_generated(n, ui, count)            jfn_model::synth's synthetic project, without a file
+//   After::Start / After::Template(k)       back to the start page; a template of the app
+//                                           (workspace/startpage.rs): open_lab of its file
 //   dialogs(n, ui)                          the file dialog and the question, once per frame
 //   chosen(n, ui, save) / answer(n, ui, save)   the commands those dialogs queue
 //
@@ -43,6 +45,10 @@ pub(crate) enum After {
     Quit,
     /// a lab of the app (app://labs/…, workspace/task.rs): a project without a file
     Lab(String),
+    /// the start page (workspace/startpage.rs): the project goes, an empty one waits below the page
+    Start,
+    /// template k of the app (workspace/startpage.rs): a project without a file
+    Template(usize),
 }
 
 /// the state of the file dialog, the question and the recent files
@@ -191,6 +197,11 @@ fn run(n: &mut Net, ui: &mut Ui, after: After) {
         After::Lab(p) => {
             open_lab(n, ui, &p);
         }
+        After::Start => {
+            run(n, ui, After::New);
+            crate::workspace::startpage::show(n);
+        }
+        After::Template(k) => crate::workspace::startpage::open_template(n, ui, k),
     }
     ui.repass();
 }
@@ -261,7 +272,7 @@ pub(crate) fn save_to(n: &mut Net, ui: &mut Ui, path: &str) -> bool {
 }
 
 /// a path relative to the working folder made absolute ('/' separators; VFS paths stay)
-fn absolute(path: &str) -> String {
+pub(crate) fn absolute(path: &str) -> String {
     let p = path.replace('\\', "/");
     let b = p.as_bytes();
     if p.starts_with('/') || p.contains("://") || (b.len() > 1 && b[1] == b':') {
