@@ -26,6 +26,7 @@ use alloc::sync::Arc;
 
 use plat::audio::{self, Config, Stream};
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
 const ID_WAVE: u32 = 96; // .. + 1
 const ID_FREQ: u32 = 101;
@@ -49,7 +50,7 @@ static M_FILE: [Mi; 1] = [Mi::Cmd(CMD_QUIT)];
 static MENUBAR: [Mi; 1] = [Mi::Menu("&Datei", &M_FILE)];
 
 const DESC: AppDesc = AppDesc {
-    title: "Audio-Test",
+    title: "Audio-Test", // i18n
     flags: AF_RESIZABLE,
     w: 720,
     h: 640,
@@ -62,6 +63,7 @@ const DESC: AppDesc = AppDesc {
 
 const RG_FREQ: Range = Range::new(100, 2000, 10, 0);
 const RG_VOL: Range = Range::new(0, 100, 1, 0);
+// i18n
 const SOUNDS: [(u32, &str); 6] = [
     (audio::SOUND_DEFAULT, "Standard"),
     (audio::SOUND_INFO, "Information"),
@@ -114,7 +116,7 @@ impl Audiotest {
 
     fn toggle(&mut self, ui: &mut Ui) {
         if self.stream.take().is_some() {
-            self.note = String::from("Ton angehalten.");
+            self.note = String::from(t("Ton angehalten."));
             return;
         }
         self.sync_gen();
@@ -125,30 +127,27 @@ impl Audiotest {
                 self.note.clear();
                 ui.timer(TIMER_STATUS, 200);
             }
-            Err(e) => self.note = format!("Kein Ton: {e}"),
+            Err(e) => self.note = tf("Kein Ton: {}", &[&format!("{e}")]),
         }
     }
 
     fn status(&self) -> String {
         match &self.stream {
-            None => String::from("Aus"),
+            None => String::from(t("Aus")),
             Some(s) => {
                 let state = match s.state() {
-                    audio::State::Starting => "Startet",
-                    audio::State::Playing => "Spielt",
-                    audio::State::Paused => "Pausiert",
-                    audio::State::Stopped => "Gestoppt",
-                    audio::State::Ended => "Zu Ende",
-                    audio::State::Blocked => "Wartet auf einen Klick (Browser)",
-                    audio::State::Lost => "Kein Gerät",
+                    audio::State::Starting => t("Startet"),
+                    audio::State::Playing => t("Spielt"),
+                    audio::State::Paused => t("Pausiert"),
+                    audio::State::Stopped => t("Gestoppt"),
+                    audio::State::Ended => t("Zu Ende"),
+                    audio::State::Blocked => t("Wartet auf einen Klick (Browser)"),
+                    audio::State::Lost => t("Kein Gerät"),
                 };
                 let dev = s.device();
-                format!(
-                    "{state} · Gerät: {} · Latenz: {:.1} ms · Aussetzer: {} · Gerätewechsel: {}",
-                    if dev.is_empty() { "?" } else { &dev },
-                    s.latency_ms(),
-                    s.underruns(),
-                    s.device_changes()
+                tf(
+                    "{} · Gerät: {} · Latenz: {} ms · Aussetzer: {} · Gerätewechsel: {}",
+                    &[state, if dev.is_empty() { "?" } else { &dev }, &format!("{:.1}", s.latency_ms()), &format!("{}", s.underruns()), &format!("{}", s.device_changes())],
                 )
             }
         }
@@ -156,8 +155,8 @@ impl Audiotest {
 
     fn play_result(&mut self, what: &str, r: Result<audio::Voice, audio::AudioError>) {
         self.note = match r {
-            Ok(_) => format!("{what} wird abgespielt."),
-            Err(e) => format!("{what}: {e}"),
+            Ok(_) => tf("{} wird abgespielt.", &[what]),
+            Err(e) => tf("{}: {}", &[what, &format!("{e}")]),
         };
     }
 }
@@ -167,11 +166,11 @@ impl App for Audiotest {
         if !self.started {
             self.started = true;
             if selftest::SelfTest::wanted() {
-                let mut t = selftest::SelfTest::new();
-                if let Some(ms) = t.step() {
+                let mut st = selftest::SelfTest::new();
+                if let Some(ms) = st.step() {
                     ui.timer(selftest::TIMER, ms);
                 }
-                self.selftest = Some(t);
+                self.selftest = Some(st);
             }
         }
         ui.set_sounds(self.sounds_on != 0);
@@ -179,24 +178,24 @@ impl App for Audiotest {
         ui.next_size(0, -1);
         ui.scroll_begin(ID_PAGE, SC_V);
         ui.box_begin(0, BOX_V | pad(20), 14);
-        ui.heading(1, TS_TITLE, "Audio-Test");
-        if let Some(t) = &self.selftest {
-            ui.text(TS_CAPTION | TX_SECONDARY, &t.status());
+        ui.heading(1, TS_TITLE, t("Audio-Test"));
+        if let Some(st) = &self.selftest {
+            ui.text(TS_CAPTION | TX_SECONDARY, &st.status());
         }
 
         // the tone generator
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 10);
-        ui.heading(2, TS_SUBTITLE, "Ton-Generator");
+        ui.heading(2, TS_SUBTITLE, t("Ton-Generator"));
         ui.box_begin(0, BOX_H | BOX_WRAP, 12);
-        let mut changed = ui.radio(ID_WAVE, "Sinus", &mut self.wave, tone::WAVE_SINE as i32) & EV_ACT != 0;
-        changed |= ui.radio(ID_WAVE + 1, "Rechteck", &mut self.wave, tone::WAVE_SQUARE as i32) & EV_ACT != 0;
+        let mut changed = ui.radio(ID_WAVE, t("Sinus"), &mut self.wave, tone::WAVE_SINE as i32) & EV_ACT != 0;
+        changed |= ui.radio(ID_WAVE + 1, t("Rechteck"), &mut self.wave, tone::WAVE_SQUARE as i32) & EV_ACT != 0;
         ui.box_end();
-        changed |= ui.prop_slider(ID_FREQ, "Frequenz (Hz)", &mut self.freq, &RG_FREQ, 440) & (EV_ACT | EV_COMMIT) != 0;
-        changed |= ui.prop_slider(ID_VOL, "Lautstärke (%)", &mut self.vol, &RG_VOL, 20) & (EV_ACT | EV_COMMIT) != 0;
+        changed |= ui.prop_slider(ID_FREQ, t("Frequenz (Hz)"), &mut self.freq, &RG_FREQ, 440) & (EV_ACT | EV_COMMIT) != 0;
+        changed |= ui.prop_slider(ID_VOL, t("Lautstärke (%)"), &mut self.vol, &RG_VOL, 20) & (EV_ACT | EV_COMMIT) != 0;
         if changed {
             self.sync_gen();
         }
-        let label = if self.stream.is_some() { "Anhalten" } else { "Abspielen" };
+        let label = if self.stream.is_some() { t("Anhalten") } else { t("Abspielen") };
         if ui.accent_button(ID_PLAY, label) & EV_ACT != 0 {
             self.toggle(ui);
         }
@@ -205,17 +204,17 @@ impl App for Audiotest {
 
         // a sound once
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 10);
-        ui.heading(2, TS_SUBTITLE, "Klang abspielen");
+        ui.heading(2, TS_SUBTITLE, t("Klang abspielen"));
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
-        if ui.button(ID_CHIME, "Glocke (WAV)") & EV_ACT != 0 {
+        if ui.button(ID_CHIME, t("Glocke (WAV)")) & EV_ACT != 0 {
             let r = audio::play_file("app://klang.wav");
-            self.play_result("Glocke", r);
+            self.play_result(t("Glocke"), r);
         }
-        if ui.button(ID_CHIME_OGG, "Glocke (Ogg Vorbis)") & EV_ACT != 0 {
+        if ui.button(ID_CHIME_OGG, t("Glocke (Ogg Vorbis)")) & EV_ACT != 0 {
             let r = audio::play_file("app://klang.oga");
-            self.play_result("Glocke (Vorbis)", r);
+            self.play_result(t("Glocke (Vorbis)"), r);
         }
-        if ui.button(ID_OPEN, "Datei öffnen …") & EV_ACT != 0 {
+        if ui.button(ID_OPEN, t("Datei öffnen …")) & EV_ACT != 0 {
             self.fd.set(1);
         }
         ui.box_end();
@@ -226,19 +225,20 @@ impl App for Audiotest {
 
         // the system's sounds
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 10);
-        ui.heading(2, TS_SUBTITLE, "Systemklänge");
+        ui.heading(2, TS_SUBTITLE, t("Systemklänge"));
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
-        for (i, (kind, label)) in SOUNDS.iter().enumerate() {
+        for (i, (kind, name)) in SOUNDS.iter().enumerate() {
+            let label = t(name);
             if ui.button(ID_SOUNDS + i as u32, label) & EV_ACT != 0 {
-                self.sound_note = if ui.beep(*kind) { String::new() } else { format!("„{label}“: kein Klang (aus oder keiner zugeordnet).") };
+                self.sound_note = if ui.beep(*kind) { String::new() } else { tf("„{}“: kein Klang (aus oder keiner zugeordnet).", &[label]) };
             }
         }
         ui.box_end();
         if !self.sound_note.is_empty() {
             ui.text(TS_BODY | TX_WRAP, &self.sound_note);
         }
-        ui.switch(ID_SOUNDS_ON, "Klänge an", &mut self.sounds_on);
-        if ui.button(ID_DIALOG, "Warnung im Dialog") & EV_ACT != 0 {
+        ui.switch(ID_SOUNDS_ON, t("Klänge an"), &mut self.sounds_on);
+        if ui.button(ID_DIALOG, t("Warnung im Dialog")) & EV_ACT != 0 {
             self.dlg.set(1);
         }
         ui.box_end();
@@ -246,14 +246,14 @@ impl App for Audiotest {
         ui.scroll_end();
 
         let dlg = self.dlg.clone();
-        if ui.dialog_begin(ID_DLG, "Achtung", &dlg) {
+        if ui.dialog_begin(ID_DLG, t("Achtung"), &dlg) {
             ui.dialog_sound(audio::SOUND_WARNING);
-            ui.text(TS_BODY | TX_WRAP, "Dieser Dialog spielt beim Öffnen den Warnklang des Systems (wo Meldungen das tun).");
+            ui.text(TS_BODY | TX_WRAP, t("Dieser Dialog spielt beim Öffnen den Warnklang des Systems (wo Meldungen das tun)."));
             ui.dialog_buttons(Some("OK"), None, None);
         }
         ui.dialog_end();
         let fd = self.fd.clone();
-        if ui.filedlg(ID_FD, FD_OPEN, &fd, &mut self.path, 4096, &["wav=WAV-Klang", "ogg=Ogg Vorbis", "oga=Ogg-Audio"]) & EV_ACT != 0 {
+        if ui.filedlg(ID_FD, FD_OPEN, &fd, &mut self.path, 4096, &[t("wav=WAV-Klang"), "ogg=Ogg Vorbis", t("oga=Ogg-Audio")]) & EV_ACT != 0 {
             let r = audio::play_file(&self.path.clone());
             let name = String::from(plat::display_name(&self.path));
             self.play_result(&name, r);
@@ -279,11 +279,14 @@ impl App for Audiotest {
     }
 }
 
-ui::main!(audiotest());
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    audiotest()
+});
 
 fn audiotest() -> i32 {
     if let Some(name) = plat::arg_value("--test") {
         return tests::run(&name);
     }
-    ui::launch(&DESC, Audiotest::default(), &style::STYLE)
+    ui::launch(&DESC.translated(), Audiotest::default(), &style::STYLE)
 }

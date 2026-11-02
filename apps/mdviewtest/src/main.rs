@@ -54,6 +54,7 @@
 
 extern crate alloc;
 
+mod sample_en;
 mod unit;
 
 use alloc::collections::BTreeSet;
@@ -62,10 +63,13 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, list, Catalog};
+use sample_en::*;
 
 static MONO: &[u8] = include_bytes!("../../../lib/doc_view/assets/DejaVuSansMono.ttf");
 
-const DESC: AppDesc = AppDesc { title: "jfgui Markdown", flags: AF_RESIZABLE, w: 1000, h: 720, min_w: 480, min_h: 360, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "JFLib Markdown", flags: AF_RESIZABLE, w: 1000, h: 720, min_w: 480, min_h: 360, ..AppDesc::NONE }; // i18n
+const TABS: [&str; 4] = ["Markdown", "HTML", "Hebräisch", "Liste"];
 
 const ID_TABS: u32 = wid("tabs");
 const ID_HC: u32 = wid("contrast");
@@ -267,12 +271,18 @@ pub(crate) const SAMPLE_DOM: &str = r#"<h2 id="kopf">Seite mit Skript</h2>
 <div id="kasten"></div>
 "#;
 
+/// the sample in the UI language: the German text as it is, else the English copy
+fn pick(de: &'static str, en: &'static str) -> &'static str {
+    if i18n::language_code() == "de" { de } else { en }
+}
+
 /// the page of --page dom: SAMPLE_DOM with 30 paragraphs in #kasten
 pub(crate) fn dom_html() -> String {
-    let mut s = String::from(SAMPLE_DOM);
+    let mut s = String::from(pick(SAMPLE_DOM, SAMPLE_DOM_EN));
     let mut ps = String::new();
     for k in 1..=30 {
-        ps.push_str(&format!("<p>Absatz {}: {}.</p>\n", k, row_text(k)));
+        ps.push_str(&tf("<p>Absatz {}: {}.</p>", &[&format!("{}", k), &row_text(k)]));
+        ps.push('\n');
     }
     s = s.replace("<div id=\"kasten\"></div>", &format!("<div id=\"kasten\">\n{}</div>", ps));
     s
@@ -280,14 +290,18 @@ pub(crate) fn dom_html() -> String {
 
 // the text of row key k: 2 .. 33 words
 fn row_text(k: u32) -> String {
+    // i18n
     const W: [&str; 8] = ["Zeilen", "haben", "verschiedene", "Höhen", "in", "einer", "virtuellen", "Liste"];
     let n = 2 + (k.wrapping_mul(2_654_435_761) >> 27) as usize;
+    let de = i18n::language_code() == "de";
     let mut s = String::new();
     for i in 0..n {
         if i > 0 {
             s.push(' ');
         }
-        s.push_str(W[(k as usize + i * 3) % 8]);
+        // ("Liste" is also the tab's text: the English word is set in lower case)
+        let w = W[(k as usize + i * 3) % 8];
+        s.push_str(&if de { String::from(w) } else { t(w).to_lowercase() });
     }
     s
 }
@@ -297,9 +311,13 @@ fn row_text(k: u32) -> String {
 fn long_doc() -> String {
     let mut s = String::new();
     for i in 0..10_000u32 {
+        let n = format!("{}", i);
         s.push_str(&format!(
-            "## Abschnitt {}\n\nAbsatz {} mit **fettem** Text, *Betonung* und einem [Link](https://example.org/{}): {}.\n\n- Punkt {}a\n- Punkt {}b\n\n",
-            i, i, i, row_text(i), i, i
+            "## {}\n\n{}\n\n- {}a\n- {}b\n\n",
+            tf("Abschnitt {}", &[&n]),
+            tf("Absatz {} mit **fettem** Text, *Betonung* und einem [Link](https://example.org/{}): {}.", &[&n, &n, &row_text(i)]),
+            tf("Punkt {}", &[&n]),
+            tf("Punkt {}", &[&n])
         ));
     }
     // hard cases for the layout at the end: a code line of 100 000 characters without a
@@ -317,7 +335,7 @@ fn long_doc() -> String {
 }
 
 fn row_title(k: u32) -> String {
-    if k >= ROWS { format!("Neu {}", k - ROWS + 1) } else { format!("Zeile {}", k) }
+    if k >= ROWS { tf("Neu {}", &[&format!("{}", k - ROWS + 1)]) } else { tf("Zeile {}", &[&format!("{}", k)]) }
 }
 
 struct MdTest {
@@ -361,24 +379,24 @@ impl MdTest {
     fn new() -> MdTest {
         let mut md = MdViewState::new();
         md.base = String::from("app://");
-        md.label = String::from("Hilfe");
+        md.label = String::from(t("Hilfe"));
         let mut html = MdViewState::new();
         html.base = String::from("app://");
         let mut he = MdViewState::new();
         he.label = String::from("עברית");
         let mut form = MdViewState::new();
         form.base = String::from("app://");
-        form.label = String::from("Formular");
+        form.label = String::from(t("Formular"));
         form.images = MI_ASK;
         let page_dom = plat::arg_value("--page").as_deref() == Some("dom");
         let mut dom = MdViewState::new();
-        dom.label = String::from("Skript");
+        dom.label = String::from(t("Skript"));
         if page_dom {
             dom.set_html(&dom_html());
         }
         let page_css = plat::arg_value("--page").as_deref() == Some("css");
         let mut css = MdViewState::new();
-        css.label = String::from("Gestaltet");
+        css.label = String::from(t("Gestaltet"));
         MdTest {
             tab: 0,
             hc: 0,
@@ -416,16 +434,16 @@ impl MdTest {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+        if ui.checkbox(ID_RTL, t("Rechts nach links"), &mut self.rtl) & EV_ACT != 0 {
             ui.set_rtl(Some(self.rtl != 0));
         }
         ui.box_end();
         ui.next_size(-1, -1);
-        let ev = ui.html_view(ID_CSS, &mut self.css, SAMPLE_CSS, 0);
+        let ev = ui.html_view(ID_CSS, &mut self.css, pick(SAMPLE_CSS, SAMPLE_CSS_EN), 0);
         if let Some(l) = ev.link {
             self.link = l;
         }
@@ -434,8 +452,8 @@ impl MdTest {
             self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
         }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.text(TS_BODY, &format!("Link: {}", if self.link.is_empty() { "-" } else { &self.link }));
-        ui.text(TS_BODY, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
+        ui.text(TS_BODY, &tf("Link: {}", &[if self.link.is_empty() { "-" } else { self.link.as_str() }]));
+        ui.text(TS_BODY, &tf("Senden: {}", &[if self.sent.is_empty() { "-" } else { self.sent.as_str() }]));
         ui.box_end();
     }
 
@@ -453,8 +471,8 @@ impl MdTest {
                 // a list item at the top of the list
                 if let Some(l) = d.by_id("liste") {
                     let li = d.create_element("li");
-                    let t = d.create_text("Neuer Eintrag");
-                    d.insert(li, None, t);
+                    let tx = d.create_text(t("Neuer Eintrag"));
+                    d.insert(li, None, tx);
                     let first = d.children(l).into_iter().find(|&c| d.tag(c) == "li");
                     d.insert(l, first, li);
                 }
@@ -464,7 +482,7 @@ impl MdTest {
                 if let Some(z) = d.by_id("zeile") {
                     let f = d.create_element("input");
                     d.set_attr(f, "name", "vorname");
-                    d.set_attr(f, "placeholder", "Vorname");
+                    d.set_attr(f, "placeholder", t("Vorname"));
                     d.set_attr(f, "size", "10");
                     let first = d.children(z).first().copied();
                     d.insert(z, first, f);
@@ -480,7 +498,7 @@ impl MdTest {
             5 => {
                 if let Some(a) = d.by_id("link") {
                     d.set_attr(a, "href", "https://example.org/zwei");
-                    d.set_text(a, "Zweiter Link");
+                    d.set_text(a, t("Zweiter Link"));
                     d.add_class(a, "neu");
                 }
             }
@@ -489,7 +507,7 @@ impl MdTest {
                     d.free(li);
                 }
                 if let Some(h) = d.by_id("kopf") {
-                    d.set_text(h, "Seite geändert");
+                    d.set_text(h, t("Seite geändert"));
                 }
             }
             7 => {
@@ -497,8 +515,8 @@ impl MdTest {
                 if let Some(b) = d.by_id("kasten") {
                     for i in (1..=3).rev() {
                         let p = d.create_element("p");
-                        let t = d.create_text(&format!("Eingefügt {}", i));
-                        d.insert(p, None, t);
+                        let tx = d.create_text(&tf("Eingefügt {}", &[&format!("{}", i)]));
+                        d.insert(p, None, tx);
                         let first = d.children(b).first().copied();
                         d.insert(b, first, p);
                     }
@@ -506,7 +524,7 @@ impl MdTest {
             }
             8 => {
                 if let Some(h) = d.by_id("kopf") {
-                    d.set_inner_html(h, "Seite <i>fertig</i>");
+                    d.set_inner_html(h, t("Seite <i>fertig</i>"));
                 }
             }
             _ => {}
@@ -520,16 +538,16 @@ impl MdTest {
             self.dom_step();
         }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        if ui.button(ID_STEP, "Schritt") & EV_ACT != 0 {
+        if ui.button(ID_STEP, t("Schritt")) & EV_ACT != 0 {
             self.dom_step();
         }
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+        if ui.checkbox(ID_RTL, t("Rechts nach links"), &mut self.rtl) & EV_ACT != 0 {
             ui.set_rtl(Some(self.rtl != 0));
         }
         ui.box_end();
@@ -546,18 +564,18 @@ impl MdTest {
         let st = &self.dom;
         let focus = st.focused_field().and_then(|i| st.doc().fields().get(i)).map_or(String::from("-"), |f| f.name.clone());
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.text(TS_BODY, &format!("Schritt: {}", self.step));
-        ui.text(TS_BODY, &format!("Fokus: {}", focus));
-        ui.text(TS_BODY, &format!("Auswahl: {} Zeichen", st.selected_text().chars().count()));
-        ui.text(TS_BODY, &format!("Klick: {}", if self.clicked.is_empty() { "-" } else { &self.clicked }));
+        ui.text(TS_BODY, &tf("Schritt: {}", &[&format!("{}", self.step)]));
+        ui.text(TS_BODY, &tf("Fokus: {}", &[&focus]));
+        ui.text(TS_BODY, &tf("Auswahl: {} Zeichen", &[&format!("{}", st.selected_text().chars().count())]));
+        ui.text(TS_BODY, &tf("Klick: {}", &[if self.clicked.is_empty() { "-" } else { self.clicked.as_str() }]));
         ui.box_end();
-        ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
+        ui.text(TS_CAPTION | TX_WRAP, &tf("Senden: {}", &[if self.sent.is_empty() { "-" } else { self.sent.as_str() }]));
     }
 
     // --page form: the form page, what it reported, the app as the image source
     fn form_page(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        if ui.button(ID_SUPPLY, "Bilder liefern") & EV_ACT != 0 {
+        if ui.button(ID_SUPPLY, t("Bilder liefern")) & EV_ACT != 0 {
             // two from app://, the third one fails
             for a in core::mem::take(&mut self.waiting) {
                 let file = a.rsplit('/').next().unwrap_or("");
@@ -567,16 +585,16 @@ impl MdTest {
         }
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+        if ui.checkbox(ID_RTL, t("Rechts nach links"), &mut self.rtl) & EV_ACT != 0 {
             ui.set_rtl(Some(self.rtl != 0));
         }
         ui.box_end();
         ui.next_size(-1, -1);
-        let ev = ui.html_view(ID_FORM, &mut self.form, SAMPLE_FORM, 0);
+        let ev = ui.html_view(ID_FORM, &mut self.form, pick(SAMPLE_FORM, SAMPLE_FORM_EN), 0);
         let name = |st: &MdViewState, i: Option<usize>| i.and_then(|i| st.doc().fields().get(i)).map_or(String::from("-"), |f| f.name.clone());
         if ev.field.is_some() {
             self.field = name(&self.form, ev.field);
@@ -590,11 +608,11 @@ impl MdTest {
             self.waiting.push(a);
         }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.text(TS_BODY, &format!("Feld: {}", if self.field.is_empty() { "-" } else { &self.field }));
-        ui.text(TS_BODY, &format!("Fokus: {}", name(&self.form, self.form.focused_field())));
+        ui.text(TS_BODY, &tf("Feld: {}", &[if self.field.is_empty() { "-" } else { self.field.as_str() }]));
+        ui.text(TS_BODY, &tf("Fokus: {}", &[&name(&self.form, self.form.focused_field())]));
         ui.box_end();
-        ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
-        ui.text(TS_CAPTION | TX_WRAP, &format!("Bilder: {}", self.asked.join(", ")));
+        ui.text(TS_CAPTION | TX_WRAP, &tf("Senden: {}", &[if self.sent.is_empty() { "-" } else { self.sent.as_str() }]));
+        ui.text(TS_CAPTION | TX_WRAP, &tf("Bilder: {}", &[&self.asked.join(", ")]));
     }
 
     // which: 0 Markdown, 1 HTML, 2 Hebrew
@@ -602,9 +620,9 @@ impl MdTest {
         let flags = if self.open != 0 { MV_OPEN_LINKS } else { 0 };
         ui.next_size(-1, -1);
         let ev = match which {
-            1 => ui.html_view(ID_HTML, &mut self.html, SAMPLE_HTML, flags),
+            1 => ui.html_view(ID_HTML, &mut self.html, pick(SAMPLE_HTML, SAMPLE_HTML_EN), flags),
             2 => ui.markdown_view(ID_HE, &mut self.he, SAMPLE_HE, flags),
-            _ => ui.markdown_view(ID_MD, &mut self.md, self.long.as_deref().unwrap_or(SAMPLE_MD), flags),
+            _ => ui.markdown_view(ID_MD, &mut self.md, self.long.as_deref().unwrap_or(pick(SAMPLE_MD, SAMPLE_MD_EN)), flags),
         };
         if let Some(l) = ev.link {
             self.link = l;
@@ -621,32 +639,32 @@ impl MdTest {
         }
         let n = self.sel.1;
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.text(TS_BODY, &format!("Link: {}", self.link));
-        ui.text(TS_BODY, &format!("Zeiger: {}", if self.hover.is_empty() { "-" } else { &self.hover }));
-        ui.text(TS_BODY, &format!("Auswahl: {} Zeichen", n));
+        ui.text(TS_BODY, &tf("Link: {}", &[&self.link]));
+        ui.text(TS_BODY, &tf("Zeiger: {}", &[if self.hover.is_empty() { "-" } else { self.hover.as_str() }]));
+        ui.text(TS_BODY, &tf("Auswahl: {} Zeichen", &[&format!("{}", n)]));
         ui.spacer(-1);
-        if which == 0 && ui.button(ID_LONG, if self.long.is_some() { "Beispiel" } else { "Langes Dokument" }) & EV_ACT != 0 {
+        if which == 0 && ui.button(ID_LONG, if self.long.is_some() { t("Beispiel") } else { t("Langes Dokument") }) & EV_ACT != 0 {
             self.long = if self.long.is_some() { None } else { Some(long_doc()) };
         }
-        if ui.button(ID_CLIP, "Zwischenablage") & EV_ACT != 0 {
+        if ui.button(ID_CLIP, t("Zwischenablage")) & EV_ACT != 0 {
             let get = |ui: &mut Ui, f: u32| ui.clip_get(f).map(|d| String::from_utf8_lossy(&d).replace('\n', "⏎").replace('\t', "⇥")).unwrap_or_default();
             self.clip = (get(ui, CLIP_TEXT), get(ui, CLIP_HTML));
         }
         ui.box_end();
         let cut = |s: &str| s.chars().take(120).collect::<String>();
-        ui.text(TS_CAPTION | TX_WRAP, &format!("Text: {}", cut(&self.clip.0)));
-        ui.text(TS_CAPTION | TX_WRAP, &format!("HTML: {}", cut(&self.clip.1)));
+        ui.text(TS_CAPTION | TX_WRAP, &tf("Text: {}", &[&cut(&self.clip.0)]));
+        ui.text(TS_CAPTION | TX_WRAP, &tf("HTML: {}", &[&cut(&self.clip.1)]));
     }
 
     fn list(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        if ui.button(ID_INSERT, "Oben einfügen") & EV_ACT != 0 {
+        if ui.button(ID_INSERT, t("Oben einfügen")) & EV_ACT != 0 {
             let keys: Vec<u32> = (0..5).map(|i| ROWS + self.added + i).collect();
             self.added += 5;
             self.rows.splice(0..0, keys);
             self.vl.insert(0, 5);
         }
-        if ui.button(ID_JUMP, "Zu Zeile 50000") & EV_ACT != 0 {
+        if ui.button(ID_JUMP, t("Zu Zeile 50000")) & EV_ACT != 0 {
             if let Some(i) = self.rows.iter().position(|&k| k == 50_000) {
                 self.vl.sel = i as i32;
                 self.vl.reveal(i);
@@ -654,7 +672,7 @@ impl MdTest {
         }
         let (top, off) = self.vl.first_visible();
         let sel = if self.vl.sel >= 0 { row_title(self.rows[self.vl.sel as usize]) } else { String::from("-") };
-        ui.text(TS_BODY, &format!("Auswahl: {} · oben: {} +{}", sel, row_title(self.rows.get(top).copied().unwrap_or(0)), off));
+        ui.text(TS_BODY, &tf("Auswahl: {} · oben: {} +{}", &[&sel, &row_title(self.rows.get(top).copied().unwrap_or(0)), &format!("{}", off)]));
         ui.box_end();
         ui.next_size(-1, -1);
         let (first, end) = ui.vlist_begin(ID_LIST, &mut self.vl, self.rows.len());
@@ -664,7 +682,7 @@ impl MdTest {
             ui.text(TS_BODY_STRONG, &row_title(k));
             ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, &row_text(k));
             if self.opened.contains(&k) {
-                ui.text(TS_CAPTION | TX_WRAP, "Aufgeklappt: diese Zeile zeigt mehr Text und wird dadurch höher; die Zeilen darunter rücken nach.");
+                ui.text(TS_CAPTION | TX_WRAP, t("Aufgeklappt: diese Zeile zeigt mehr Text und wird dadurch höher; die Zeilen darunter rücken nach."));
             }
             ui.vlist_item_end();
         }
@@ -710,18 +728,18 @@ impl App for MdTest {
             return;
         }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.tabs(ID_TABS, &mut self.tab, &["Markdown", "HTML", "Hebräisch", "Liste"]);
+        ui.tabs(ID_TABS, &mut self.tab, &list(&TABS));
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+        if ui.checkbox(ID_RTL, t("Rechts nach links"), &mut self.rtl) & EV_ACT != 0 {
             ui.set_rtl(Some(self.rtl != 0));
         }
         ui.next_flags(ST_NOFOCUS);
-        ui.checkbox(ID_OPEN, "Links öffnen", &mut self.open);
+        ui.checkbox(ID_OPEN, t("Links öffnen"), &mut self.open);
         ui.box_end();
         match self.tab {
             0..=2 => self.doc(ui, self.tab),
@@ -735,7 +753,10 @@ fn mdviewtest() -> i32 {
     if plat::arg_value("--test").as_deref() == Some("unit") {
         return unit::run();
     }
-    ui::launch(&DESC, MdTest::new(), &style::STYLE)
+    ui::launch(&DESC.translated(), MdTest::new(), &style::STYLE)
 }
 
-ui::main!(mdviewtest());
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    mdviewtest()
+});

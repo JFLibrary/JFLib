@@ -1,1 +1,1 @@
-"""Shared implementation of the native jfguiLib Build Manager."""
+"""Shared implementation of the native JFLib Build Manager."""

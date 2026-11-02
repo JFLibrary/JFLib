@@ -15,6 +15,7 @@ use core::cell::Cell;
 
 use plat::sensors::{self as ps, Attitude, FixSource, LocationState, LocationWatch, SensorState, SensorWatch, SENSOR_ACCEL, SENSOR_GRAVITY, SENSOR_GYRO, SENSOR_MAGNET, SENSOR_ROTATION};
 use ui::*;
+use ui::i18n::{t, tf};
 
 use crate::nav::Page;
 
@@ -38,22 +39,33 @@ const fn mask_of(page: Page) -> u32 {
     }
 }
 
-const SENSORS: [(u32, &str, &str, &str); 5] = [
-    (SENSOR_ACCEL, "Beschleunigung", "m/s²", "accel"),
-    (SENSOR_GRAVITY, "Schwerkraft", "m/s²", "gravity"),
-    (SENSOR_GYRO, "Drehrate", "rad/s", "gyro"),
-    (SENSOR_MAGNET, "Magnetfeld", "µT", "magnet"),
-    (SENSOR_ROTATION, "Drehlage", "", "rot"),
+// (the sensor, its unit, its key in the self-test's state file)
+const SENSORS: [(u32, &str, &str); 5] = [
+    (SENSOR_ACCEL, "m/s²", "accel"),
+    (SENSOR_GRAVITY, "m/s²", "gravity"),
+    (SENSOR_GYRO, "rad/s", "gyro"),
+    (SENSOR_MAGNET, "µT", "magnet"),
+    (SENSOR_ROTATION, "", "rot"),
 ];
+
+fn sensor_name(bit: u32) -> &'static str {
+    match bit {
+        SENSOR_ACCEL => t("Beschleunigung"),
+        SENSOR_GRAVITY => t("Schwerkraft"),
+        SENSOR_GYRO => t("Drehrate"),
+        SENSOR_MAGNET => t("Magnetfeld"),
+        _ => t("Drehlage"),
+    }
+}
 
 fn state_text(s: SensorState) -> &'static str {
     match s {
-        SensorState::Off => "aus",
-        SensorState::Waiting => "wartet auf Daten",
-        SensorState::Running => "läuft",
-        SensorState::Paused => "pausiert",
-        SensorState::Denied => "nicht erlaubt",
-        SensorState::Unavailable => "nicht verfügbar",
+        SensorState::Off => t("aus"),
+        SensorState::Waiting => t("wartet auf Daten"),
+        SensorState::Running => t("läuft"),
+        SensorState::Paused => t("pausiert"),
+        SensorState::Denied => t("nicht erlaubt"),
+        SensorState::Unavailable => t("nicht verfügbar"),
     }
 }
 
@@ -351,9 +363,9 @@ impl Draw for CompassDraw {
             let inner = rad * if long { 0.84 } else if d % 3 == 0 { 0.88 } else { 0.91 };
             line(g, at(deg, inner), at(deg, rad * 0.96), if long { t * 3.0 } else { t }, s.look.line());
         }
-        for (deg, name) in [(0.0, "N"), (90.0, "O"), (180.0, "S"), (270.0, "W")] {
+        for (deg, name) in [(0.0, "N"), (90.0, "O"), (180.0, "S"), (270.0, "W")] { // i18n
             let p = at(deg, rad * 0.7);
-            label(g, name, p.0, p.1, rad * 0.16, if deg == 0.0 { 0xFFD13438 } else { s.look.text() });
+            label(g, i18n::t(name), p.0, p.1, rad * 0.16, if deg == 0.0 { 0xFFD13438 } else { s.look.text() });
         }
         if known {
             // north's needle
@@ -372,7 +384,7 @@ impl Draw for CompassDraw {
 
 // ---------------------------------------------------------------- the pages
 
-const COMPASS_POINTS: [&str; 8] = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+const COMPASS_POINTS: [&str; 8] = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"]; // i18n
 
 pub struct Sensors {
     page: Page,
@@ -467,7 +479,7 @@ impl Sensors {
 
     fn rows(&self, ui: &mut Ui, mask: u32) {
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_12, 6);
-        for (bit, name, unit, _) in SENSORS {
+        for (bit, unit, _) in SENSORS {
             if mask & bit == 0 {
                 continue;
             }
@@ -483,7 +495,7 @@ impl Sensors {
                 Some(r) => format!("{} {} {} {unit}", num(ui, r.v[0] as f64, 2), num(ui, r.v[1] as f64, 2), num(ui, r.v[2] as f64, 2)),
                 None => String::new(),
             };
-            ui.text(TS_BODY | TX_WRAP, &format!("{name}: {}", state_text(st)));
+            ui.text(TS_BODY | TX_WRAP, &format!("{}: {}", sensor_name(bit), state_text(st)));
             if !values.is_empty() {
                 ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, &values);
             }
@@ -505,11 +517,11 @@ impl Sensors {
             }
         }
         if denied {
-            ui.infobar(ID_LEVEL + 100, IB_ERROR, "Nicht erlaubt", "Die App darf die Bewegungssensoren nicht lesen.");
+            ui.infobar(ID_LEVEL + 100, IB_ERROR, t("Nicht erlaubt"), t("Die App darf die Bewegungssensoren nicht lesen."));
         } else if all_gone {
-            ui.infobar(ID_LEVEL + 100, IB_WARNING, "Nicht verfügbar", "Dieses Gerät hat keine passenden Sensoren.");
+            ui.infobar(ID_LEVEL + 100, IB_WARNING, t("Nicht verfügbar"), t("Dieses Gerät hat keine passenden Sensoren."));
         } else if paused {
-            ui.text(TS_BODY | TX_SECONDARY, "Pausiert, solange die App im Hintergrund ist.");
+            ui.text(TS_BODY | TX_SECONDARY, t("Pausiert, solange die App im Hintergrund ist."));
         }
     }
 
@@ -530,12 +542,12 @@ impl Sensors {
         Self::missing(ui, mask_of(Page::Level));
         match a {
             Some(a) => {
-                let verdict = if s.ok { "Waagerecht" } else if s.edge { "Auf der Kante" } else { "Geneigt" };
+                let verdict = if s.ok { t("Waagerecht") } else if s.edge { t("Auf der Kante") } else { t("Geneigt") };
                 ui.text(TS_SUBTITLE, verdict);
                 let (dx, dy) = (num(ui, a.side as f64, 1), num(ui, a.pitch as f64, 1));
-                ui.text(TS_BODY | TX_WRAP, &format!("Quer: {dx}°   Längs: {dy}°"));
+                ui.text(TS_BODY | TX_WRAP, &tf("Quer: {}°   Längs: {}°", &[&dx, &dy]));
             }
-            None => ui.text(TS_SUBTITLE, "Keine Daten"),
+            None => ui.text(TS_SUBTITLE, t("Keine Daten")),
         }
         self.rows(ui, mask_of(Page::Level));
         self.save(ui);
@@ -554,12 +566,12 @@ impl Sensors {
         Self::missing(ui, mask_of(Page::Attitude));
         match a {
             Some(a) => {
-                ui.text(TS_BODY | TX_WRAP, &format!("Nicken: {}°", num(ui, a.pitch as f64, 1)));
-                ui.text(TS_BODY | TX_WRAP, &format!("Rollen: {}°", num(ui, a.roll as f64, 1)));
-                let yaw = a.heading.map_or(String::from("keine Angabe"), |y| format!("{}°{}", num(ui, y as f64, 1), if a.absolute { "" } else { " (relativ)" }));
-                ui.text(TS_BODY | TX_WRAP, &format!("Gieren: {yaw}"));
+                ui.text(TS_BODY | TX_WRAP, &tf("Nicken: {}°", &[&num(ui, a.pitch as f64, 1)]));
+                ui.text(TS_BODY | TX_WRAP, &tf("Rollen: {}°", &[&num(ui, a.roll as f64, 1)]));
+                let yaw = a.heading.map_or(String::from(t("keine Angabe")), |y| format!("{}°{}", num(ui, y as f64, 1), if a.absolute { String::new() } else { format!(" ({})", t("relativ")) }));
+                ui.text(TS_BODY | TX_WRAP, &tf("Gieren: {}", &[&yaw]));
             }
-            None => ui.text(TS_SUBTITLE, "Keine Daten"),
+            None => ui.text(TS_SUBTITLE, t("Keine Daten")),
         }
         self.rows(ui, mask_of(Page::Attitude));
         self.save(ui);
@@ -577,17 +589,17 @@ impl Sensors {
         Self::missing(ui, mask_of(Page::Compass));
         match heading {
             Some(h) => {
-                let point = COMPASS_POINTS[((h + 22.5) / 45.0) as usize % 8];
+                let point = t(COMPASS_POINTS[((h + 22.5) / 45.0) as usize % 8]);
                 ui.text(TS_SUBTITLE, &format!("{}° {point}", num(ui, h as f64, 0)));
                 if !a.is_some_and(|a| a.absolute) {
-                    ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Relativ zum Start: ohne Magnetfeld kein Norden.");
+                    ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Relativ zum Start: ohne Magnetfeld kein Norden."));
                 }
             }
-            None => ui.text(TS_SUBTITLE, "Keine Richtung"),
+            None => ui.text(TS_SUBTITLE, t("Keine Richtung")),
         }
         // Android: 0 = "unreliable", the magnetometer asks for the figure eight
         if ps::read(SENSOR_MAGNET).is_some_and(|r| r.accuracy == 0) {
-            ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Ungenau: das Telefon in einer Acht bewegen.");
+            ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Ungenau: das Telefon in einer Acht bewegen."));
         }
         self.rows(ui, mask_of(Page::Compass));
         self.save(ui);
@@ -596,21 +608,21 @@ impl Sensors {
     pub fn gps(&mut self, ui: &mut Ui) {
         ui.next_size(0, 44);
         let was = self.loc_on;
-        ui.switch(ID_LOC, "Standort verwenden", &mut self.loc_on);
+        ui.switch(ID_LOC, t("Standort verwenden"), &mut self.loc_on);
         if self.loc_on != was {
             self.location = (self.loc_on != 0).then(ps::location_watch);
         }
         let st = ps::location_state();
         let (text, hint) = match st {
-            LocationState::Off => ("aus", ""),
-            LocationState::Searching => ("sucht", "Draußen geht es schneller."),
-            LocationState::Fix => ("Position da", ""),
-            LocationState::Paused => ("pausiert", "Pausiert, solange die App im Hintergrund ist."),
-            LocationState::Denied => ("nicht erlaubt", "Die App darf den Standort nicht abfragen: in den Einstellungen des Systems erlauben und den Schalter neu setzen."),
-            LocationState::Disabled => ("Standort des Systems ist aus", "In den Einstellungen des Systems einschalten."),
-            LocationState::Unavailable => ("nicht verfügbar", "Dieses Gerät hat keinen Standortdienst."),
+            LocationState::Off => (t("aus"), ""),
+            LocationState::Searching => (t("sucht"), t("Draußen geht es schneller.")),
+            LocationState::Fix => (t("Position da"), ""),
+            LocationState::Paused => (t("pausiert"), t("Pausiert, solange die App im Hintergrund ist.")),
+            LocationState::Denied => (t("nicht erlaubt"), t("Die App darf den Standort nicht abfragen: in den Einstellungen des Systems erlauben und den Schalter neu setzen.")),
+            LocationState::Disabled => (t("Standort des Systems ist aus"), t("In den Einstellungen des Systems einschalten.")),
+            LocationState::Unavailable => (t("nicht verfügbar"), t("Dieses Gerät hat keinen Standortdienst.")),
         };
-        ui.text(TS_SUBTITLE, &format!("Standort: {text}"));
+        ui.text(TS_SUBTITLE, &tf("Standort: {}", &[text]));
         if !hint.is_empty() {
             ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, hint);
         }
@@ -626,21 +638,21 @@ impl Sensors {
         let age = fix.map_or(dash(), |f| format!("{} s", f.age_ms() / 1000));
         let source = fix.map_or(dash(), |f| {
             String::from(match f.source {
-                FixSource::Gps => "Satelliten",
-                FixSource::Network => "Netzwerk",
-                FixSource::Other => "keine Angabe",
+                FixSource::Gps => t("Satelliten"),
+                FixSource::Network => t("Netzwerk"),
+                FixSource::Other => t("keine Angabe"),
             })
         });
-        ui.text(TS_BODY, &format!("Breite: {lat}"));
-        ui.text(TS_BODY, &format!("Länge: {lon}"));
-        ui.text(TS_BODY, &format!("Genauigkeit: {acc}"));
-        ui.text(TS_BODY, &format!("Höhe: {alt}"));
-        ui.text(TS_BODY, &format!("Tempo: {speed}"));
-        ui.text(TS_BODY, &format!("Richtung: {bearing}"));
-        ui.text(TS_BODY, &format!("Alter: {age}"));
-        ui.text(TS_BODY, &format!("Quelle: {source}"));
+        ui.text(TS_BODY, &tf("Breite: {}", &[&lat]));
+        ui.text(TS_BODY, &tf("Länge: {}", &[&lon]));
+        ui.text(TS_BODY, &tf("Genauigkeit: {}", &[&acc]));
+        ui.text(TS_BODY, &tf("Höhe: {}", &[&alt]));
+        ui.text(TS_BODY, &tf("Tempo: {}", &[&speed]));
+        ui.text(TS_BODY, &tf("Richtung: {}", &[&bearing]));
+        ui.text(TS_BODY, &tf("Alter: {}", &[&age]));
+        ui.text(TS_BODY, &tf("Quelle: {}", &[&source]));
         ui.box_end();
-        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, "Keine Karte, kein Netzwerkzugriff der App: nur die Werte des Systems.");
+        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, t("Keine Karte, kein Netzwerkzugriff der App: nur die Werte des Systems."));
         if fix.is_some() {
             ui.timer(TIMER_AGE, 1000); // the age goes on
         }
@@ -653,7 +665,7 @@ impl Sensors {
             return;
         }
         let mut key = format!("selftest=sensors\npage={:?}\nsuspend={}\nloc.on={}\n", self.page, self.suspend, self.loc_on);
-        for (bit, _, _, name) in SENSORS {
+        for (bit, _, name) in SENSORS {
             key.push_str(&format!("{name}.state={}\n", state_key(ps::state(bit))));
         }
         let loc = ps::location_state();
@@ -672,7 +684,7 @@ impl Sensors {
         }
         let mut text = key.clone();
         text.push_str(&format!("uic_sensor={}\nuic_location={}\n", self.uic_sensor, self.uic_location));
-        for (bit, _, _, name) in SENSORS {
+        for (bit, _, name) in SENSORS {
             if let Some(r) = ps::read(bit) {
                 text.push_str(&format!("{name}={} {} {} {}\n{name}.accuracy={}\n", r.v[0], r.v[1], r.v[2], r.v[3], r.accuracy));
             }

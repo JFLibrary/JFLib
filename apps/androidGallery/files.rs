@@ -11,6 +11,7 @@
 
 use alloc::{format, string::String, vec::Vec};
 use ui::*;
+use ui::i18n::{t, tf};
 
 const NOTE: &str = "config://note.txt";
 const STARTS: &str = "data://starts.txt";
@@ -53,9 +54,9 @@ fn describe(path: &str) -> String {
         Some(s) if s.kind == 2 => {
             let mut n = 0;
             plat::dir_list(path, &mut |_, _, _| n += 1);
-            format!("{name} · Ordner, {n} Einträge")
+            tf("{} · Ordner, {} Einträge", &[&name, &format!("{}", n)])
         }
-        Some(s) => format!("{name} · {} Bytes", s.size),
+        Some(s) => tf("{} · {} Bytes", &[&name, &format!("{}", s.size)]),
         None => name,
     }
 }
@@ -71,22 +72,22 @@ impl Files {
     // a chosen file read into the note
     fn open_path(&mut self, ui: &mut Ui, path: &str, what: &str) {
         self.info = match text_of(path) {
-            Some(t) => {
-                self.note = t.chars().take(400).collect();
+            Some(text) => {
+                self.note = text.chars().take(400).collect();
                 ui.recent_add(path);
                 format!("{what}: {}", describe(path))
             }
-            None => format!("Nicht lesbar: {}", plat::display_name(path)),
+            None => tf("Nicht lesbar: {}", &[&plat::display_name(path)]),
         };
     }
 
     // the first file of the recent list again (the browser: after a reload it may ask first)
     fn reopen(&mut self, ui: &mut Ui, path: &str) {
         match ui.recent_open(path) {
-            RecentOpen::Ready => self.open_path(ui, path, "Wieder geöffnet"),
-            RecentOpen::Asking => self.info = String::from("Wird wieder geöffnet …"),
+            RecentOpen::Ready => self.open_path(ui, path, t("Wieder geöffnet")),
+            RecentOpen::Asking => self.info = String::from(t("Wird wieder geöffnet …")),
             RecentOpen::Missing => {
-                self.info = format!("Nicht mehr da: {}", plat::display_name(path));
+                self.info = tf("Nicht mehr da: {}", &[&plat::display_name(path)]);
                 ui.recent_remove(path);
             }
         }
@@ -96,9 +97,9 @@ impl Files {
     pub fn reopened(&mut self, ui: &mut Ui, ok: bool) {
         let Some(path) = ui.recent_reopened() else { return };
         if ok {
-            self.open_path(ui, &path, "Wieder geöffnet");
+            self.open_path(ui, &path, t("Wieder geöffnet"));
         } else {
-            self.info = format!("Nicht wieder geöffnet (abgelehnt oder nicht mehr da): {}", plat::display_name(&path));
+            self.info = tf("Nicht wieder geöffnet (abgelehnt oder nicht mehr da): {}", &[&plat::display_name(&path)]);
         }
         ui.invalidate();
     }
@@ -126,11 +127,11 @@ impl Files {
             t.step(ui);
         }
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "04  Dateien & Zwischenablage");
+        ui.heading(2, TS_SUBTITLE, t("04  Dateien & Zwischenablage"));
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
-        for (id, label, mode) in [(400, "Öffnen…", FD_OPEN), (401, "Speichern…", FD_SAVE), (402, "Ordner…", FD_FOLDER)] {
+        for (id, label, mode) in [(400, "Öffnen…", FD_OPEN), (401, "Speichern…", FD_SAVE), (402, "Ordner…", FD_FOLDER)] { // i18n
             ui.next_size(0, 44);
-            if ui.button(id, label) & EV_ACT != 0 {
+            if ui.button(id, t(label)) & EV_ACT != 0 {
                 self.mode = mode;
                 self.path = if mode == FD_SAVE { String::from("Notiz.txt") } else { String::new() };
                 self.open.set(1);
@@ -141,46 +142,46 @@ impl Files {
             self.chosen = self.path.clone();
             let chosen = self.chosen.clone();
             match self.mode {
-                FD_OPEN => self.open_path(ui, &chosen, "Geöffnet"),
+                FD_OPEN => self.open_path(ui, &chosen, t("Geöffnet")),
                 // the browser: a file of the user's own is written back to it at once
                 FD_SAVE if plat::write_file(&chosen, self.note.as_bytes()) => {
                     ui.recent_add(&chosen);
-                    self.info = format!("Gespeichert: {}", describe(&chosen));
+                    self.info = tf("Gespeichert: {}", &[&describe(&chosen)]);
                 }
-                FD_SAVE => self.info = format!("Nicht gespeichert: {}", plat::display_name(&chosen)),
-                _ => self.info = format!("Ordner: {}", describe(&chosen)),
+                FD_SAVE => self.info = tf("Nicht gespeichert: {}", &[&plat::display_name(&chosen)]),
+                _ => self.info = tf("Ordner: {}", &[&describe(&chosen)]),
             }
         }
-        ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, if self.info.is_empty() { "Noch keine Datei gewählt." } else { &self.info });
+        ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, if self.info.is_empty() { t("Noch keine Datei gewählt.") } else { &self.info });
         if let Some(last) = ui.recent_files().into_iter().next() {
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("Zuletzt: {}", plat::display_name(&last)));
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("Zuletzt: {}", &[&plat::display_name(&last)]));
             ui.next_size(0, 44);
-            if ui.button(403, "Zuletzt öffnen") & EV_ACT != 0 {
+            if ui.button(403, t("Zuletzt öffnen")) & EV_ACT != 0 {
                 self.reopen(ui, &last);
             }
             ui.box_end();
         }
-        ui.text(TS_BODY, "Notiz (bleibt nach dem Neustart):");
+        ui.text(TS_BODY, t("Notiz (bleibt nach dem Neustart):"));
         ui.next_size(SIZE_FILL, 44);
-        ui.textbox(410, Some("Etwas notieren"), &mut self.note, 400);
+        ui.textbox(410, Some(t("Etwas notieren")), &mut self.note, 400);
         if self.note != self.saved && !ui.headless() && plat::write_file(NOTE, self.note.as_bytes()) {
             self.saved = self.note.clone();
         }
         ui.box_begin(0, BOX_H, 8);
         ui.next_size(0, 44);
-        if ui.button(420, "Kopieren") & EV_ACT != 0 {
+        if ui.button(420, t("Kopieren")) & EV_ACT != 0 {
             ui.clip_set(CLIP_TEXT, self.note.as_bytes());
         }
         ui.next_size(0, 44);
-        if ui.button(421, "Einfügen") & EV_ACT != 0 {
+        if ui.button(421, t("Einfügen")) & EV_ACT != 0 {
             if let Some(t) = ui.clip_get(CLIP_TEXT).and_then(|b| String::from_utf8(b).ok()) {
                 self.note = t.chars().take(400).collect();
             }
         }
         ui.box_end();
         if self.starts > 0 {
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("App-Starts: {}", self.starts));
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("App-Starts: {}", &[&format!("{}", self.starts)]));
         }
         if let Some(t) = &self.test {
             ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, &t.status());

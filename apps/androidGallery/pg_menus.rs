@@ -9,6 +9,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 const ID_COMBO: u32 = 2001;
 const ID_DROP: u32 = 2002;
@@ -80,9 +81,9 @@ static M_RECENT: [Mi; 3] = [Mi::List(CMD_RECENT0, 8, "Keine Dateien"), Mi::Sep, 
 static M_CTX: [Mi; 5] = [Mi::Cmd(CMD_CUT), Mi::Cmd(CMD_COPY), Mi::Cmd(CMD_PASTE), Mi::Sep, Mi::Item(ID_CTX_INFO, "&Eigenschaften", IC_INFO)];
 
 const SHAPES: [&str; 5] = ["Kreis", "Quadrat", "Dreieck", "Stern", "Sechseck"];
-const WIDTHS: [&str; 3] = ["Fein", "Mittel", "Breit"];
+const WIDTHS: [&str; 3] = ["Fein", "Mittel", "Breit"]; // i18n
 const TOOL_ICONS: [u32; 6] = [IC_PENCIL, IC_BRUSH, IC_ERASER, IC_DROP, IC_EYEDROPPER, IC_ZOOM];
-const TOOL_NAMES: [&str; 6] = ["Stift", "Pinsel", "Radierer", "Füllen", "Farbauswahl", "Lupe"];
+const TOOL_NAMES: [&str; 6] = ["Stift", "Pinsel", "Radierer", "Füllen", "Farbauswahl", "Lupe"]; // i18n
 
 pub struct Menus {
     shape: i32,
@@ -105,7 +106,7 @@ impl Default for Menus {
             tool: 1,
             date: (2026, 11, 1),
             last: String::from("–"),
-            recent: alloc::vec![String::from("urlaub.png"), String::from("katze.jpg")],
+            recent: alloc::vec![String::from(t("urlaub.png")), String::from(t("katze.jpg"))],
         }
     }
 }
@@ -119,13 +120,13 @@ impl Menus {
         ui.cmd_state(CMD_DARK, if dark { CF_CHECKED } else { 0 });
         ui.cmd_state(CMD_ZOOM100, if self.zoom == 100 { CF_DISABLED } else { 0 });
         ui.menu_list(CMD_RECENT0, &self.recent);
-        ui.menubar(Some(&MENUBAR));
+        ui.menubar(Some(i18n::menu(&MENUBAR)));
     }
 
     pub fn page(&mut self, ui: &mut Ui) {
-        ui.text(TS_BODY_STRONG, "Auswahlliste und Kalender");
+        ui.text(TS_BODY_STRONG, t("Auswahlliste und Kalender"));
         ui.next_size(SIZE_FILL, 44);
-        ui.combobox(ID_COMBO, &mut self.shape, &SHAPES);
+        ui.combobox(ID_COMBO, &mut self.shape, &list(&SHAPES));
         let (mut y, mut m, mut d) = self.date;
         ui.next_size(SIZE_FILL, 44);
         if ui.date_picker(ID_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
@@ -133,47 +134,47 @@ impl Menus {
         }
         self.date = (y, m, d);
 
-        ui.text(TS_BODY_STRONG, "Aufklappen");
+        ui.text(TS_BODY_STRONG, t("Aufklappen"));
         ui.next_size(SIZE_FILL, 44);
-        ui.dropdown_button(ID_DROP, "Stärke");
+        ui.dropdown_button(ID_DROP, t("Stärke"));
         if ui.flyout_begin(ID_DROP, FL_BELOW | FL_MINW) {
             for i in 0..3 {
                 if self.width == i {
                     ui.next_flags(ST_CHECKED);
                 }
                 ui.next_size(SIZE_FILL, 44);
-                if ui.menu_item(ID_DROP_ITEM + i as u32, WIDTHS[i as usize]) & EV_ACT != 0 {
+                if ui.menu_item(ID_DROP_ITEM + i as u32, t(WIDTHS[i as usize])) & EV_ACT != 0 {
                     self.width = i;
                 }
             }
             ui.menu_sep();
             ui.next_size(SIZE_FILL, 44);
-            if ui.button(ID_DROP_CLOSE, "Schließen") & EV_ACT != 0 {
+            if ui.button(ID_DROP_CLOSE, t("Schließen")) & EV_ACT != 0 {
                 ui.popup_close();
             }
         }
         ui.flyout_end();
         ui.next_size(SIZE_FILL, 44);
         ui.next_icon(IC_PASTE);
-        if ui.split_button(ID_SPLIT, "Einfügen") & EV_ACT != 0 {
+        if ui.split_button(ID_SPLIT, t("Einfügen")) & EV_ACT != 0 {
             ui.cmd_run(CMD_PASTE, 0);
         }
         if ui.flyout_begin(ID_SPLIT, FL_BELOW | FL_MINW) {
             ui.next_size(SIZE_FILL, 44);
             ui.menu_cmd(CMD_PASTE);
             ui.next_size(SIZE_FILL, 44);
-            if ui.menu_item(ID_SPLIT_TEXT, "Als Text einfügen") & EV_ACT != 0 {
-                self.last = String::from("Als Text einfügen");
+            if ui.menu_item(ID_SPLIT_TEXT, t("Als Text einfügen")) & EV_ACT != 0 {
+                self.last = String::from(t("Als Text einfügen"));
             }
             ui.next_size(SIZE_FILL, 44);
             ui.next_icon(IC_PHOTO);
-            if ui.menu_item(ID_SPLIT_IMAGE, "Als Bild einfügen") & EV_ACT != 0 {
-                self.last = String::from("Als Bild einfügen");
+            if ui.menu_item(ID_SPLIT_IMAGE, t("Als Bild einfügen")) & EV_ACT != 0 {
+                self.last = String::from(t("Als Bild einfügen"));
             }
         }
         ui.flyout_end();
 
-        ui.text(TS_BODY_STRONG, "Befehle");
+        ui.text(TS_BODY_STRONG, t("Befehle"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_size(48, 44);
         ui.cmd_button(CMD_SAVE, ST_SUBTLE | ST_ICON_ONLY);
@@ -183,24 +184,24 @@ impl Menus {
         ui.cmd_button(CMD_UNDO, 0);
         ui.box_end();
 
-        ui.text(TS_BODY_STRONG, "Kontextmenü");
+        ui.text(TS_BODY_STRONG, t("Kontextmenü"));
         ui.next_size(SIZE_FILL, 44);
-        ui.button(ID_CTX, "Hier lange drücken");
-        ui.context_menu(&M_CTX);
+        ui.button(ID_CTX, t("Hier lange drücken"));
+        ui.context_menu(i18n::menu(&M_CTX));
         ui.next_size(SIZE_FILL, 44);
-        if ui.button(ID_POPUP, "Menü an dieser Stelle") & EV_ACT != 0 {
-            ui.menu_popup(&M_CTX);
+        if ui.button(ID_POPUP, t("Menü an dieser Stelle")) & EV_ACT != 0 {
+            ui.menu_popup(i18n::menu(&M_CTX));
         }
         ui.next_size(SIZE_FILL, 44);
-        ui.button(ID_TIP, "Mit Hinweis (Maus oder Stift)");
-        ui.tooltip("Hinweise erscheinen, wenn der Zeiger über dem Element bleibt");
+        ui.button(ID_TIP, t("Mit Hinweis (Maus oder Stift)"));
+        ui.tooltip(t("Hinweise erscheinen, wenn der Zeiger über dem Element bleibt"));
 
-        ui.text(TS_BODY_STRONG, "Werkzeug");
+        ui.text(TS_BODY_STRONG, t("Werkzeug"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_size(64, 44);
         ui.next_icon(TOOL_ICONS[self.tool as usize]);
         ui.next_flags(ST_SUBTLE | ST_ICON_ONLY);
-        ui.dropdown_button(ID_TOOLDROP, TOOL_NAMES[self.tool as usize]);
+        ui.dropdown_button(ID_TOOLDROP, t(TOOL_NAMES[self.tool as usize]));
         if ui.flyout_begin(ID_TOOLDROP, FL_BELOW) {
             for i in 0..6 {
                 if self.tool == i as i32 {
@@ -208,20 +209,20 @@ impl Menus {
                 }
                 ui.next_size(200, 44);
                 ui.next_icon(TOOL_ICONS[i]);
-                if ui.menu_item(ID_TOOLITEM + i as u32, TOOL_NAMES[i]) & EV_ACT != 0 {
+                if ui.menu_item(ID_TOOLITEM + i as u32, t(TOOL_NAMES[i])) & EV_ACT != 0 {
                     self.tool = i as i32;
                 }
             }
         }
         ui.flyout_end();
-        ui.text(TS_BODY, TOOL_NAMES[self.tool as usize]);
+        ui.text(TS_BODY, t(TOOL_NAMES[self.tool as usize]));
         ui.box_end();
 
         ui.text(
             TS_BODY | TX_WRAP | TX_SECONDARY,
-            &format!(
+            &tf(
                 "Letzter Befehl: {}   Form: {}   Stärke: {}   Zoom: {} %",
-                self.last, SHAPES[self.shape as usize], WIDTHS[self.width as usize], self.zoom
+                &[&self.last, t(SHAPES[self.shape as usize]), t(WIDTHS[self.width as usize]), &format!("{}", self.zoom)],
             ),
         );
     }
@@ -229,7 +230,7 @@ impl Menus {
     /// the commands of the table and the rows of the menus -> handled; goes_back: "Seite verlassen"
     pub fn command(&mut self, ui: &mut Ui, id: u32, goes_back: &mut bool) -> bool {
         if id == ID_CTX_INFO {
-            self.last = String::from("Eigenschaften");
+            self.last = String::from(t("Eigenschaften"));
             return true;
         }
         if (CMD_RECENT0..CMD_RECENT0 + 8).contains(&id) {

@@ -11,6 +11,7 @@
 use alloc::{format, string::String};
 use plat::{INHIBIT_IDLE, Inhibit, SysSettings};
 use ui::*;
+use ui::i18n::{t, tf};
 
 const STATE: &str = "data://system-state.txt";
 const ID_SYSTHEME: u32 = 600;
@@ -58,7 +59,7 @@ impl System {
         }
         let s = self.settings(ui);
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "06  System");
+        ui.heading(2, TS_SUBTITLE, t("06  System"));
         if self.selftest && ui.now() != self.scroll_at {
             // the card at the top of the screen, or as far as the page goes (android_system.py
             // taps its widgets); once a frame, also later: the scroll view has to learn its
@@ -74,58 +75,59 @@ impl System {
         }
         ui.next_size(0, 40);
         let was = self.follow;
-        ui.switch(ID_SYSTHEME, "Design des Systems", &mut self.follow);
+        ui.switch(ID_SYSTHEME, t("Design des Systems"), &mut self.follow);
         if self.follow != was {
             ui.theme_set(if self.follow != 0 { 2 } else { 0 });
         }
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
         ui.next_size(0, 44);
-        if ui.button(ID_NOTIFY, "Benachrichtigung") & EV_ACT != 0 {
+        if ui.button(ID_NOTIFY, t("Benachrichtigung")) & EV_ACT != 0 {
             self.notes += 1;
-            let id = ui.notify("jfgui Galerie", &format!("Benachrichtigung Nummer {}", self.notes), None);
+            let id = ui.notify(t("JFLib Galerie"), &tf("Benachrichtigung Nummer {}", &[&format!("{}", self.notes)]), None);
             self.shown = id;
         }
         ui.box_end();
         ui.next_size(0, 40);
         let was = self.keep;
-        ui.switch(ID_KEEPON, "Bildschirm anlassen", &mut self.keep);
+        ui.switch(ID_KEEPON, t("Bildschirm anlassen"), &mut self.keep);
         if self.keep != was {
-            self.held = if self.keep != 0 { plat::inhibit("jfgui Galerie: Bildschirm an", INHIBIT_IDLE) } else { None };
+            self.held = if self.keep != 0 { plat::inhibit(t("JFLib Galerie: Bildschirm an"), INHIBIT_IDLE) } else { None };
             self.keep_failed = self.keep != 0 && self.held.is_none();
             if self.keep_failed {
                 self.keep = 0;
             }
         }
-        let yn = |b: bool| if b { "ja" } else { "nein" };
+        let yn = |b: bool| if b { t("ja") } else { t("nein") };
         let sys_dark = match s.dark {
-            Some(true) => "dunkel",
-            Some(false) => "hell",
-            None => "keine Angabe",
+            Some(true) => t("dunkel"),
+            Some(false) => t("hell"),
+            None => t("keine Angabe"),
         };
-        ui.text(TS_BODY | TX_WRAP, &format!("Design: {} (System: {sys_dark})", if ui.theme_dark() { "dunkel" } else { "hell" }));
+        ui.text(TS_BODY | TX_WRAP, &tf("Design: {} (System: {})", &[if ui.theme_dark() { t("dunkel") } else { t("hell") }, sys_dark]));
         let hc = if !ui.high_contrast() {
-            "normal"
+            t("normal")
         } else if s.contrast_colors.is_some() {
-            "hoch (Systemfarben)"
+            t("hoch (Systemfarben)")
         } else {
-            "hoch"
+            t("hoch")
         };
-        ui.text(TS_BODY | TX_WRAP, &format!("Kontrast: {hc}  Bewegung: {}", if ui.anim_off() { "reduziert" } else { "normal" }));
-        let accent = s.accent.map_or(String::from("keiner"), |a| format!("#{a:06X}"));
-        ui.text(TS_BODY | TX_WRAP, &format!("Text: {} %  Akzent: {accent}", ui.text_scale()));
-        ui.text(TS_BODY | TX_WRAP, &format!("Einstellungen: {} Änderungen (zuletzt {:#x}), Design {}", self.settings, self.bits, self.themes));
+        ui.text(TS_BODY | TX_WRAP, &tf("Kontrast: {}  Bewegung: {}", &[hc, if ui.anim_off() { t("reduziert") } else { t("normal") }]));
+        let accent = s.accent.map_or(String::from(t("keiner")), |a| format!("#{a:06X}"));
+        ui.text(TS_BODY | TX_WRAP, &tf("Text: {} %  Akzent: {}", &[&format!("{}", ui.text_scale()), &accent]));
+        ui.text(TS_BODY | TX_WRAP, &tf("Einstellungen: {} Änderungen (zuletzt {}), Design {}", &[&format!("{}", self.settings), &format!("{:#x}", self.bits), &format!("{}", self.themes)]));
         let note = match (self.notes, self.shown) {
-            (0, _) => String::from("noch keine"),
-            (_, 0) => String::from("nicht gezeigt"),
-            (_, id) if self.clicked == id => format!("#{id} geklickt"),
-            (_, id) if self.gone == id => format!("#{id} weg"),
-            (_, id) => format!("#{id} gezeigt"),
+            (0, _) => String::from(t("noch keine")),
+            (_, 0) => String::from(t("nicht gezeigt")),
+            (_, id) if self.clicked == id => format!("#{id} {}", t("geklickt")),
+            (_, id) if self.gone == id => format!("#{id} {}", t("weg")),
+            (_, id) => format!("#{id} {}", t("gezeigt")),
         };
-        ui.text(TS_BODY | TX_WRAP, &format!("Benachrichtigung: {note}"));
+        ui.text(TS_BODY | TX_WRAP, &tf("Benachrichtigung: {}", &[&note]));
         let on = plat::inhibited() & INHIBIT_IDLE != 0;
-        ui.text(TS_BODY | TX_WRAP, &format!("Bildschirm an: {}{}", yn(on), if self.keep_failed { " (nicht möglich)" } else { "" }));
-        ui.text(TS_BODY | TX_WRAP, &format!("Lebenszyklus: aktiv {}, {}, Hintergrund {}×, zurück {}×", yn(self.active),
-            if self.suspend == 2 { "im Hintergrund" } else { "im Vordergrund" }, self.background, self.foreground));
+        let tail = if self.keep_failed { format!(" ({})", t("nicht möglich")) } else { String::new() };
+        ui.text(TS_BODY | TX_WRAP, &tf("Bildschirm an: {}{}", &[yn(on), &tail]));
+        ui.text(TS_BODY | TX_WRAP, &tf("Lebenszyklus: aktiv {}, {}, Hintergrund {}×, zurück {}×", &[yn(self.active),
+            if self.suspend == 2 { t("im Hintergrund") } else { t("im Vordergrund") }, &format!("{}", self.background), &format!("{}", self.foreground)]));
         ui.box_end();
         self.save(ui);
     }

@@ -8,6 +8,7 @@
 use alloc::{format, string::String, vec::Vec};
 use plat::secret::{SECRET_MAX, SECRET_NAME_MAX, SecretError, secret_available, secret_delete, secret_get, secret_get_checked, secret_set};
 use ui::*;
+use ui::i18n::{t, tf};
 
 const SERVICE: &str = "galerie";
 const ACCOUNT: &str = "demo";
@@ -35,26 +36,26 @@ impl Secrets {
             }
         }
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.heading(2, TS_SUBTITLE, "05  Sicherer Speicher");
+        ui.heading(2, TS_SUBTITLE, t("05  Sicherer Speicher"));
         ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, if self.available {
-            "Der Wert liegt verschlüsselt im Geheimnisspeicher des Systems."
+            t("Der Wert liegt verschlüsselt im Geheimnisspeicher des Systems.")
         } else {
-            "Kein sicherer Speicher verfügbar."
+            t("Kein sicherer Speicher verfügbar.")
         });
         ui.next_size(SIZE_FILL, 44);
-        ui.textbox(500, Some("Geheimnis"), &mut self.value, 8192);
+        ui.textbox(500, Some(t("Geheimnis")), &mut self.value, 8192);
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
-        for (id, label) in [(510, "Sichern"), (511, "Laden"), (512, "Löschen")] {
+        for (id, label) in [(510, "Sichern"), (511, "Laden"), (512, "Löschen")] { // i18n
             ui.next_size(0, 44);
             if !self.available {
                 ui.next_flags(ST_DISABLED);
             }
-            if ui.button(id, label) & EV_ACT != 0 {
+            if ui.button(id, t(label)) & EV_ACT != 0 {
                 self.act(id);
             }
         }
         ui.box_end();
-        ui.text(TS_BODY | TX_WRAP, if self.info.is_empty() { "Noch nichts gesichert." } else { &self.info });
+        ui.text(TS_BODY | TX_WRAP, if self.info.is_empty() { t("Noch nichts gesichert.") } else { &self.info });
         if let Some(t) = &self.test {
             ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, &t.status());
         }
@@ -67,22 +68,22 @@ impl Secrets {
                 Ok(()) => {
                     let n = self.value.len();
                     self.value.clear();
-                    format!("Gesichert ({n} Bytes).")
+                    tf("Gesichert ({} Bytes).", &[&format!("{}", n)])
                 }
-                Err(e) => format!("Nicht gesichert: {e}"),
+                Err(e) => tf("Nicht gesichert: {}", &[&format!("{e}")]),
             },
             511 => match secret_get_checked(SERVICE, ACCOUNT) {
                 Ok(Some(v)) => {
                     self.value = String::from_utf8_lossy(&v).into_owned();
-                    format!("Geladen ({} Bytes).", v.len())
+                    tf("Geladen ({} Bytes).", &[&format!("{}", v.len())])
                 }
-                Ok(None) => String::from("Kein Geheimnis gesichert."),
-                Err(e) => format!("Nicht geladen: {e}"),
+                Ok(None) => String::from(t("Kein Geheimnis gesichert.")),
+                Err(e) => tf("Nicht geladen: {}", &[&format!("{e}")]),
             },
             _ => match secret_delete(SERVICE, ACCOUNT) {
-                Ok(true) => String::from("Gelöscht."),
-                Ok(false) => String::from("Es war keines gesichert."),
-                Err(e) => format!("Nicht gelöscht: {e}"),
+                Ok(true) => String::from(t("Gelöscht.")),
+                Ok(false) => String::from(t("Es war keines gesichert.")),
+                Err(e) => tf("Nicht gelöscht: {}", &[&format!("{e}")]),
             },
         };
     }

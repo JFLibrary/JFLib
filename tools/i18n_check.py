@@ -25,8 +25,8 @@ What is reported
                  different translations, a translation whose placeholders or plural forms
                  differ from its source, a message template its formatter cannot fill
 --check (build_rs.py test) fails only for errors, and for missing or untranslated texts of the
-targets whose catalogues are complete (COMPLETE: BackupCraft, JFNetworker, the library); the
-other gaps (PaintCraft's) are counted, they do not fail.
+targets whose catalogues are complete (COMPLETE: all of them today, the library too); the other
+gaps are counted, they do not fail.
 
 --update adds the missing texts to the app's catalogue (with several: the one whose texts come
 from the same folder of the app, src/ or crates/) at the end, in source order, below the comment
@@ -43,7 +43,8 @@ Texts of the sources (*.rs below the app; files named *test.rs are left out)
   list(&TABLE)            the literals of `static|const TABLE: [&str; N] = [..]` in that file
   Command::new(ID, "…", ..), Mi::Menu("…", ..), Mi::Sub("…", ..), Mi::Item(ID, "…", ..),
   Mi::List(ID, N, "…")    command and menu labels, when the app translates its tables (a
-                          `label: t(c.label)` / `=> Mi::Item(id, t(label), icon)` of its own)
+                          `label: t(c.label)` / `=> Mi::Item(id, t(label), icon)` of its own,
+                          i18n::menu, i18n::commands or AppDesc::translated)
   // i18n                 on a line of its own: every literal of the block below it (up to a
                           less indented or empty line, or a line ending in "];")
   // i18n: name title     the same, only the literals after "name:" or "title:"
@@ -84,8 +85,8 @@ LABELS = [
     re.compile(r"\bMi::Item\(\s*[^,\"();]+,\s*$"),
     re.compile(r"\bMi::List\(\s*[^,\"();]+,\s*[^,\"();]+,\s*$"),
 ]
-TRANSLATES_MENUS = re.compile(r"=>\s*Mi::(?:Item|Menu|Sub|List)\([^;]*?[\w:]+\(\s*label\b")
-TRANSLATES_CMDS = re.compile(r"\blabel\s*[:=]\s*[\w:]+\(\s*\w+\.label\b")
+TRANSLATES_MENUS = re.compile(r"=>\s*Mi::(?:Item|Menu|Sub|List)\([^;]*?[\w:]+\(\s*label\b|\bi18n::menu\s*\(|\.translated\(\)")
+TRANSLATES_CMDS = re.compile(r"\blabel\s*[:=]\s*[\w:]+\(\s*\w+\.label\b|\bi18n::commands\s*\(|\.translated\(\)")
 FIELD = re.compile(r"\b(\w+)\s*:\s*$")
 LIST_CALL = re.compile(r"(?<![\w.])(?:\w+::)*\blist\s*\(\s*&\s*([A-Z_][A-Z0-9_]*)\s*\)")
 
@@ -101,9 +102,10 @@ PLURALS = {
     "iw": {"one", "two", "other"},
 }
 CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
-# complete today (2026-10-22): in --check a missing or untranslated text is an error there too,
+# complete today (2026-11-02): in --check a missing or untranslated text is an error there too,
 # so they stay complete; the other apps' gaps are reported only
-COMPLETE = ("BackupCraft", "JFNetworker", "lib")
+COMPLETE = ("BackupCraft", "JFNetworker", "PaintCraft", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
+            "editortest", "fontpicktest", "gallery", "mdviewtest", "prefstest", "spelltest", "svgtest", "template", "lib")
 
 
 def plural_categories(lang):

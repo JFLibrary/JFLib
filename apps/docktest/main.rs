@@ -24,6 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
 const ID_DOCK: u32 = 500; // floating windows: 501 ..
 const ID_SAVE: u32 = 101;
@@ -52,16 +53,23 @@ static CMDS: [Command; 6] = [
     Command::new(CMD_FOCUS0 + 5, "Verlauf", 0, MOD_CTRL, b'6' as u32, 0),
 ];
 
-const DESC: AppDesc = AppDesc { title: "jfgui Docking", flags: AF_RESIZABLE, w: 960, h: 640, cmds: &CMDS, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc {
+    title: "JFLib Docking", // i18n
+    flags: AF_RESIZABLE,
+    w: 960,
+    h: 640,
+    cmds: &CMDS,
+    ..AppDesc::NONE
+};
 
 fn title(p: u32) -> &'static str {
     match p {
-        P_FILES => "Dateien",
-        P_OUTLINE => "Gliederung",
-        P_PROPS => "Eigenschaften",
-        P_OUTPUT => "Ausgabe",
-        P_SEARCH => "Suche",
-        P_HISTORY => "Verlauf",
+        P_FILES => t("Dateien"), // i18n
+        P_OUTLINE => t("Gliederung"), // i18n
+        P_PROPS => t("Eigenschaften"), // i18n
+        P_OUTPUT => t("Ausgabe"), // i18n
+        P_SEARCH => t("Suche"), // i18n
+        P_HISTORY => t("Verlauf"), // i18n
         _ => "?",
     }
 }
@@ -85,15 +93,15 @@ impl Dock {
             v.join("+")
         };
         let mut parts: Vec<String> = Vec::new();
-        for (s, name) in [(DOCK_LEFT, "L"), (DOCK_RIGHT, "R"), (DOCK_BOTTOM, "U")] {
+        for (s, name) in [(DOCK_LEFT, t("L")), (DOCK_RIGHT, t("R")), (DOCK_BOTTOM, t("U"))] {
             let gs: Vec<String> = d.groups(s).iter().map(group).collect();
-            let zu = if d.collapsed(s) && !gs.is_empty() { "(zu)" } else { "" };
+            let zu = if d.collapsed(s) && !gs.is_empty() { t("(zu)") } else { "" };
             parts.push(format!("{}{}: {}", name, zu, if gs.is_empty() { String::from("-") } else { gs.join(", ") }));
         }
         let fs: Vec<String> = d.floats().iter().map(group).collect();
-        parts.push(format!("F: {}", if fs.is_empty() { String::from("-") } else { fs.join(", ") }));
+        parts.push(format!("{}: {}", t("F"), if fs.is_empty() { String::from("-") } else { fs.join(", ") }));
         let hs: Vec<&str> = d.hidden_panels().iter().map(|&p| title(p)).collect();
-        parts.push(format!("V: {}", if hs.is_empty() { String::from("-") } else { hs.join("+") }));
+        parts.push(format!("{}: {}", t("V"), if hs.is_empty() { String::from("-") } else { hs.join("+") }));
         parts.join(" | ")
     }
 
@@ -101,10 +109,10 @@ impl Dock {
         ui.box_begin(0, BOX_V | PAD_12, 8);
         match p {
             DOCK_CENTER => {
-                ui.text(TS_SUBTITLE, "Dokument");
-                ui.text(TS_BODY | TX_SECONDARY, &format!("Klick: {}", if self.clicked.is_empty() { "-" } else { &self.clicked }));
+                ui.text(TS_SUBTITLE, t("Dokument"));
+                ui.text(TS_BODY | TX_SECONDARY, &tf("Klick: {}", &[if self.clicked.is_empty() { "-" } else { self.clicked.as_str() }]));
                 if self.saved.is_empty() {
-                    ui.text(TS_CAPTION | TX_SECONDARY, "Kein Layout gespeichert");
+                    ui.text(TS_CAPTION | TX_SECONDARY, t("Kein Layout gespeichert"));
                 } else {
                     for l in self.saved.clone().lines() {
                         ui.text(TS_CAPTION, l);
@@ -113,33 +121,33 @@ impl Dock {
             }
             P_FILES => {
                 for k in 0..3 {
-                    let name = format!("Datei {}", k + 1);
+                    let name = tf("Datei {}", &[&format!("{}", k + 1)]);
                     if ui.button(ID_FILE0 + k, &name) & EV_ACT != 0 {
                         self.clicked = name;
                     }
                 }
             }
             P_OUTLINE => {
-                ui.text(TS_BODY, "1 Einleitung");
-                ui.text(TS_BODY, "2 Hauptteil");
-                ui.text(TS_BODY, "3 Schluss");
+                ui.text(TS_BODY, t("1 Einleitung"));
+                ui.text(TS_BODY, t("2 Hauptteil"));
+                ui.text(TS_BODY, t("3 Schluss"));
             }
             P_PROPS => {
-                ui.text(TS_BODY, "Breite: 960");
-                if ui.button(ID_PROP, "Eigenschaft") & EV_ACT != 0 {
-                    self.clicked = String::from("Eigenschaft");
+                ui.text(TS_BODY, t("Breite: 960"));
+                if ui.button(ID_PROP, t("Eigenschaft")) & EV_ACT != 0 {
+                    self.clicked = String::from(t("Eigenschaft"));
                 }
             }
             P_OUTPUT => {
-                ui.text(TS_BODY, "Bereit.");
+                ui.text(TS_BODY, t("Bereit."));
             }
             P_SEARCH => {
-                if ui.button(ID_SEARCH_GO, "Suchen") & EV_ACT != 0 {
-                    self.clicked = String::from("Suchen");
+                if ui.button(ID_SEARCH_GO, t("Suchen")) & EV_ACT != 0 {
+                    self.clicked = String::from(t("Suchen"));
                 }
             }
             P_HISTORY => {
-                ui.text(TS_BODY, "Geöffnet");
+                ui.text(TS_BODY, t("Geöffnet"));
             }
             _ => {}
         }
@@ -165,32 +173,32 @@ impl App for Dock {
         ui.next_size(SIZE_FILL, SIZE_FILL);
         ui.box_begin(0, BOX_V, 0);
         ui.box_begin(0, BOX_H | BOX_XCENTER | PAD_8, 8);
-        if ui.button(ID_SAVE, "Speichern") & EV_ACT != 0 {
+        if ui.button(ID_SAVE, t("Speichern")) & EV_ACT != 0 {
             self.saved = self.dock.save();
             if let Some(f) = &self.file {
                 plat::write_file(f, self.saved.as_bytes());
             }
         }
-        if ui.button(ID_LOAD, "Laden") & EV_ACT != 0 {
+        if ui.button(ID_LOAD, t("Laden")) & EV_ACT != 0 {
             if let Some(d) = DockState::load(&self.saved) {
                 self.dock = d;
             }
         }
-        if ui.button(ID_RESET, "Zurücksetzen") & EV_ACT != 0 {
+        if ui.button(ID_RESET, t("Zurücksetzen")) & EV_ACT != 0 {
             self.dock.reset();
         }
         let mut on = self.dock.visible(P_HISTORY) as i32;
-        if ui.toggle_button(ID_HISTORY, "Verlauf", &mut on) & EV_ACT != 0 {
+        if ui.toggle_button(ID_HISTORY, t("Verlauf"), &mut on) & EV_ACT != 0 {
             self.dock.toggle(P_HISTORY);
         }
         ui.box_end();
         let panels = [
-            DockPanel::new(P_FILES, "Dateien", IC_FOLDER).at(DOCK_LEFT, 0),
-            DockPanel::new(P_OUTLINE, "Gliederung", IC_BULLETED_LIST).at(DOCK_LEFT, 0),
-            DockPanel::new(P_PROPS, "Eigenschaften", IC_SETTINGS).at(DOCK_RIGHT, 0),
-            DockPanel::new(P_OUTPUT, "Ausgabe", IC_DOCUMENT).at(DOCK_BOTTOM, 0).flags(DP_NOCLOSE),
-            DockPanel::new(P_SEARCH, "Suche", IC_SEARCH).at(DOCK_BOTTOM, 1),
-            DockPanel::new(P_HISTORY, "Verlauf", IC_HISTORY).at(DOCK_RIGHT, 1).flags(DP_HIDDEN),
+            DockPanel::new(P_FILES, title(P_FILES), IC_FOLDER).at(DOCK_LEFT, 0),
+            DockPanel::new(P_OUTLINE, title(P_OUTLINE), IC_BULLETED_LIST).at(DOCK_LEFT, 0),
+            DockPanel::new(P_PROPS, title(P_PROPS), IC_SETTINGS).at(DOCK_RIGHT, 0),
+            DockPanel::new(P_OUTPUT, title(P_OUTPUT), IC_DOCUMENT).at(DOCK_BOTTOM, 0).flags(DP_NOCLOSE),
+            DockPanel::new(P_SEARCH, title(P_SEARCH), IC_SEARCH).at(DOCK_BOTTOM, 1),
+            DockPanel::new(P_HISTORY, title(P_HISTORY), IC_HISTORY).at(DOCK_RIGHT, 1).flags(DP_HIDDEN),
         ];
         ui.next_size(SIZE_FILL, SIZE_FILL);
         ui.dock_begin(ID_DOCK, &mut self.dock, &panels);
@@ -205,8 +213,8 @@ impl App for Dock {
         ui.box_end();
         let d = &self.dock;
         ui.box_begin(0, BOX_H | pad(8), 16);
-        ui.text(TS_CAPTION, &format!("Größen: {}/{}/{}", d.size(DOCK_LEFT), d.size(DOCK_RIGHT), d.size(DOCK_BOTTOM)));
-        ui.text(TS_CAPTION, &format!("Änderungen: {}", self.changes));
+        ui.text(TS_CAPTION, &tf("Größen: {}/{}/{}", &[&format!("{}", d.size(DOCK_LEFT)), &format!("{}", d.size(DOCK_RIGHT)), &format!("{}", d.size(DOCK_BOTTOM))]));
+        ui.text(TS_CAPTION, &tf("Änderungen: {}", &[&format!("{}", self.changes)]));
         ui.box_end();
         ui.box_end();
     }
@@ -220,4 +228,7 @@ impl App for Dock {
     }
 }
 
-ui::main!(ui::launch(&DESC, Dock::default(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Dock::default(), &style::STYLE)
+});

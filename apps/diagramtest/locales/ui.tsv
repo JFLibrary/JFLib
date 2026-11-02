@@ -1,0 +1,45 @@
+de	en
+Diagramm-Test	Diagram test
+Auswahl	Select
+Hand	Hand
+Platzieren	Place
+Verbinden	Connect
+Gerade	Straight
+Kurve	Curved
+Rechtwinklig	Orthogonal
+Fläche	Area
+Gelöscht: {}	Deleted: {}
+Verschoben: {}	Moved: {}
+schnell	quick
+Verbunden: {}-{}{}	Connected: {}-{}{}
+Verbinden mit {}	Connecting to {}
+Verbinden …	Connecting …
+Verbinden abgebrochen	Connecting canceled
+Wegpunkt {}: {},{}	Waypoint {}: {},{}
+Wegpunkt {} entfernt	Waypoint {} removed
+Platziert: {}	Placed: {}
+Doppelklick: {},{}	Double click: {},{}
+Aktiviert: {}	Activated: {}
+Umgeschaltet: {}	Toggled: {}
+Größe: {}x{}	Size: {}x{}
+Hintergrund	Background
+Kontext: {}	Context: {}
+Auswahl: {}	Selection: {}
+Zoom: {} %	Zoom: {} %
+Mitte: {},{}	Center: {},{}
+Knoten: {}	Nodes: {}
+Kanten: {}	Edges: {}
+Fokus: {}	Focus: {}
+Rahmen: {},{} {}x{}	Frame: {},{} {}x{}
+Fläche: {},{} {}x{}	Area: {},{} {}x{}
+Position: {},{}	Position: {},{}
+Wegpunkte: {}	Waypoints: {}
+Gruppe: {}	Group: {}
+aufgeklappt	expanded
+zugeklappt	collapsed
+Ereignis: {}	Event: {}
+Knoten hinzufügen	Add node
+Hinzugefügt: {}	Added: {}
+Löschen	Delete
+Einpassen	Fit
+Am Raster ausrichten	Snap to grid

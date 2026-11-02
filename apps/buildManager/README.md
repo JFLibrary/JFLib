@@ -1,4 +1,4 @@
-# jfguiLib Build Manager
+# JFLib Build Manager
 
 Native, German-language build workspace for Windows and Linux, using RustLib's WinUI style.
 The UI is a `no_std` Rust app; the Python standard-library service reuses `build_rs.py`,

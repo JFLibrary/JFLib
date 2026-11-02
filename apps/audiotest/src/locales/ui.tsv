@@ -1,0 +1,43 @@
+de	en
+&Beenden	&Quit
+&Datei	&File
+Audio-Test	Audio Test
+Standard	Default
+Information	Information
+Warnung	Warning
+Fehler	Error
+Frage	Question
+Benachrichtigung	Notification
+Ton angehalten.	Tone stopped.
+Kein Ton: {}	No tone: {}
+Aus	Off
+Startet	Starting
+Spielt	Playing
+Pausiert	Paused
+Gestoppt	Stopped
+Zu Ende	Finished
+Wartet auf einen Klick (Browser)	Waiting for a click (browser)
+Kein Gerät	No device
+{} · Gerät: {} · Latenz: {} ms · Aussetzer: {} · Gerätewechsel: {}	{} · Device: {} · Latency: {} ms · Underruns: {} · Device changes: {}
+{} wird abgespielt.	{} is playing.
+Ton-Generator	Tone generator
+Sinus	Sine
+Rechteck	Square
+Frequenz (Hz)	Frequency (Hz)
+Lautstärke (%)	Volume (%)
+Abspielen	Play
+Anhalten	Stop
+Klang abspielen	Play a sound
+Glocke (WAV)	Bell (WAV)
+Glocke	Bell
+Glocke (Ogg Vorbis)	Bell (Ogg Vorbis)
+Glocke (Vorbis)	Bell (Vorbis)
+Datei öffnen …	Open file…
+Systemklänge	System sounds
+„{}“: kein Klang (aus oder keiner zugeordnet).	“{}”: no sound (off or none assigned).
+Klänge an	Sounds on
+Warnung im Dialog	Warning in a dialog
+Achtung	Attention
+Dieser Dialog spielt beim Öffnen den Warnklang des Systems (wo Meldungen das tun).	When it opens, this dialog plays the system's warning sound (where messages do).
+wav=WAV-Klang	wav=WAV sound
+oga=Ogg-Audio	oga=Ogg audio

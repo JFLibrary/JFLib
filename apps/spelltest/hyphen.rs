@@ -9,10 +9,11 @@ use alloc::format;
 use alloc::string::String;
 
 use ui::*;
+use ui::i18n::{t, tf};
 
 pub const ID_BOX: u32 = 201;
 
-pub const DESC: AppDesc = AppDesc { title: "jfgui Silbentrennung", flags: AF_RESIZABLE, w: 520, h: 640, min_w: 300, min_h: 300, ..AppDesc::NONE };
+pub const DESC: AppDesc = AppDesc { title: "JFLib Silbentrennung", flags: AF_RESIZABLE, w: 520, h: 640, min_w: 300, min_h: 300, ..AppDesc::NONE }; // i18n
 
 const BODY: &str = "Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung.";
 /// soft hyphens (U+00AD) only
@@ -38,22 +39,22 @@ impl App for Hy {
 
     fn frame(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | pad(16), 8);
-        ui.text(TS_SUBTITLE, "Silbentrennung");
+        ui.text(TS_SUBTITLE, t("Silbentrennung"));
         let w = 210;
         ui.next_size(w, 0);
-        ui.text(TS_BODY | TX_WRAP | TX_HYPHENATE, &format!("Mit: {}", BODY));
+        ui.text(TS_BODY | TX_WRAP | TX_HYPHENATE, &tf("Mit: {}", &[BODY]));
         ui.next_size(w, 0);
-        ui.text(TS_BODY | TX_WRAP, &format!("Ohne: {}", BODY));
+        ui.text(TS_BODY | TX_WRAP, &tf("Ohne: {}", &[BODY]));
         ui.next_hyph_language("en");
         ui.next_size(w, 0);
-        ui.text(TS_BODY | TX_WRAP | TX_HYPHENATE, &format!("Englisch: {}", BODY));
+        ui.text(TS_BODY | TX_WRAP | TX_HYPHENATE, &tf("Englisch: {}", &[BODY]));
         ui.next_size(w, 0);
         ui.text(TS_BODY | TX_WRAP, SOFT);
         ui.next_size(w, 132);
         ui.textbox(ID_BOX, None, &mut self.text, 1024 | TB_MULTI | TB_WRAP | TB_HYPHENATE);
         let status = match ui.hyphenator("") {
-            Some(h) => format!("Muster: {} + {}", h.patterns().0, h.patterns().1),
-            None => String::from("Muster: keine"),
+            Some(h) => tf("Muster: {} + {}", &[&format!("{}", h.patterns().0), &format!("{}", h.patterns().1)]),
+            None => String::from(t("Muster: keine")),
         };
         ui.text(TS_CAPTION, &status);
         ui.box_end();

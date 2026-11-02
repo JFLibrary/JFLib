@@ -6,6 +6,7 @@ use alloc::format;
 use alloc::string::String;
 
 use ui::*;
+use ui::i18n::{list, t, tf};
 
 const ID_TOOLBTN: u32 = 7000;
 const ID_DLGBTN: u32 = 7001;
@@ -36,6 +37,7 @@ const ID_DLG: u32 = 7600;
 const RANGE_SIZE: Range = Range::new(1, 100, 1, 0);
 const RF_ANG: RangeF = RangeF::new(-180.0, 180.0, 0.0, 2, 0);
 const SHAPES: [&str; 4] = ["Rund", "Eckig", "Weich", "Hart"];
+// i18n
 const POP_ROWS: [&str; 12] = [
     "Neu", "Öffnen", "Speichern", "Drucken", "Kopieren", "Einfügen", "Ausschneiden", "Löschen", "Drehen", "Spiegeln", "Zuschneiden",
     "Schließen",
@@ -104,125 +106,125 @@ impl Default for Windows {
 
 impl Windows {
     pub fn page(&mut self, ui: &mut Ui) {
-        ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand.");
+        ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand."));
         ui.next_size(SIZE_FILL, 44);
         ui.next_icon(IC_SETTINGS);
         let mut v = self.tool_open.get();
-        ui.toggle_button(ID_TOOLBTN, "Werkzeugfenster", &mut v);
+        ui.toggle_button(ID_TOOLBTN, t("Werkzeugfenster"), &mut v);
         self.tool_open.set(v);
         ui.next_size(SIZE_FILL, 44);
         let mut v = self.val_open.get();
-        ui.toggle_button(ID_VALBTN, "Werte-Fenster", &mut v);
+        ui.toggle_button(ID_VALBTN, t("Werte-Fenster"), &mut v);
         self.val_open.set(v);
         ui.next_size(SIZE_FILL, 44);
         let mut v = self.pop_open.get();
-        ui.toggle_button(ID_POPBTN, "Popups aus dem Fenster", &mut v);
+        ui.toggle_button(ID_POPBTN, t("Popups aus dem Fenster"), &mut v);
         self.pop_open.set(v);
         ui.next_size(SIZE_FILL, 44);
-        if ui.button(ID_DLGBTN, "Dialogfenster…") & EV_ACT != 0 {
+        if ui.button(ID_DLGBTN, t("Dialogfenster…")) & EV_ACT != 0 {
             self.dlg_open.set(1);
         }
         ui.next_size(SIZE_FILL, 44);
-        if ui.button(ID_CONTENTBTN, "Dialog auf der Seite…") & EV_ACT != 0 {
+        if ui.button(ID_CONTENTBTN, t("Dialog auf der Seite…")) & EV_ACT != 0 {
             self.content_open.set(1);
         }
-        let shape = SHAPES.get(self.combo as usize).copied().unwrap_or("");
-        ui.text(TS_BODY | TX_WRAP, &format!("Pinselgröße: {}   Name: {}   Form: {}", self.size, self.text, shape));
-        ui.text(TS_BODY | TX_WRAP, &format!("Dialog: {}   Seitendialog: {}", self.result, self.content_result));
+        let shape = SHAPES.get(self.combo as usize).copied().map_or("", t);
+        ui.text(TS_BODY | TX_WRAP, &tf("Pinselgröße: {}   Name: {}   Form: {}", &[&format!("{}", self.size), &self.text, shape]));
+        ui.text(TS_BODY | TX_WRAP, &tf("Dialog: {}   Seitendialog: {}", &[&format!("{}", self.result), &format!("{}", self.content_result)]));
     }
 
     /// after the scrolling page: the status bar, the dialog, the windows
     pub fn windows(&mut self, ui: &mut Ui) {
         ui.statusbar_begin();
-        ui.text(TS_CAPTION, "Bereit");
+        ui.text(TS_CAPTION, t("Bereit"));
         ui.separator();
-        ui.text(TS_CAPTION, &format!("Winkel: {}", ui.fmt_f64(self.ang, 0)));
+        ui.text(TS_CAPTION, &tf("Winkel: {}", &[&ui.fmt_f64(self.ang, 0)]));
         ui.statusbar_end();
 
-        if ui.dialog_begin(ID_DLG, "Änderungen speichern?", &self.content_open) {
-            ui.text(TS_BODY | TX_WRAP, "Möchten Sie die Änderungen an „Unbenannt“ speichern?");
-            ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, "Ungespeicherte Änderungen gehen sonst verloren.");
-            let r = ui.dialog_buttons(Some("Speichern"), None, Some("Abbrechen"));
+        if ui.dialog_begin(ID_DLG, t("Änderungen speichern?"), &self.content_open) {
+            ui.text(TS_BODY | TX_WRAP, t("Möchten Sie die Änderungen an „Unbenannt“ speichern?"));
+            ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Ungespeicherte Änderungen gehen sonst verloren."));
+            let r = ui.dialog_buttons(Some(t("Speichern")), None, Some(t("Abbrechen")));
             if r != 0 {
                 self.content_result = r as i32;
             }
         }
         ui.dialog_end();
 
-        if ui.window_begin(ID_WIN_TOOL, "Werkzeuge", Some(&self.tool_open), WF_TOOL | WF_AUTOHEIGHT, Some(&self.tool_rect)) {
+        if ui.window_begin(ID_WIN_TOOL, t("Werkzeuge"), Some(&self.tool_open), WF_TOOL | WF_AUTOHEIGHT, Some(&self.tool_rect)) {
             ui.box_begin(0, BOX_V | PAD_12, 8);
-            ui.text(TS_BODY_STRONG, "Pinsel");
+            ui.text(TS_BODY_STRONG, t("Pinsel"));
             ui.next_size(SIZE_FILL, 40);
             ui.slider(ID_WIN_SLIDER, &mut self.size, &RANGE_SIZE);
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("Größe: {} px", self.size));
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("Größe: {} px", &[&format!("{}", self.size)]));
             ui.next_size(SIZE_FILL, 44);
-            ui.textbox(ID_WIN_TEXT, Some("Name des Pinsels"), &mut self.text, 48);
+            ui.textbox(ID_WIN_TEXT, Some(t("Name des Pinsels")), &mut self.text, 48);
             ui.next_size(SIZE_FILL, 44);
-            ui.combobox(ID_WIN_COMBO, &mut self.combo, &SHAPES);
+            ui.combobox(ID_WIN_COMBO, &mut self.combo, &list(&SHAPES));
             ui.next_size(SIZE_FILL, 44);
-            if ui.button(ID_WIN_RESET, "Zurücksetzen") & EV_ACT != 0 {
+            if ui.button(ID_WIN_RESET, t("Zurücksetzen")) & EV_ACT != 0 {
                 self.size = 20;
                 self.combo = 0;
             }
-            ui.tooltip("Setzt Größe und Form zurück");
+            ui.tooltip(t("Setzt Größe und Form zurück"));
             ui.box_end();
         }
         ui.window_end();
 
-        if ui.window_begin(ID_WIN_DLG, "Bild bearbeiten", Some(&self.dlg_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&self.dlg_rect)) {
-            ui.text(TS_BODY | TX_WRAP, "Die Änderung wird auf das ganze Bild angewendet.");
+        if ui.window_begin(ID_WIN_DLG, t("Bild bearbeiten"), Some(&self.dlg_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&self.dlg_rect)) {
+            ui.text(TS_BODY | TX_WRAP, t("Die Änderung wird auf das ganze Bild angewendet."));
             ui.next_size(0, 40);
-            ui.checkbox(ID_WIN_DLG_CB, "Kanten glätten", &mut self.dlg_cb);
+            ui.checkbox(ID_WIN_DLG_CB, t("Kanten glätten"), &mut self.dlg_cb);
             ui.next_size(SIZE_FILL, 44);
-            if ui.button(ID_WIN_MORE, "Weitere Optionen…") & EV_ACT != 0 {
+            if ui.button(ID_WIN_MORE, t("Weitere Optionen…")) & EV_ACT != 0 {
                 self.nested_open.set(1);
             }
-            if ui.window_begin(ID_WIN_NESTED, "Weitere Optionen", Some(&self.nested_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&self.nest_rect)) {
+            if ui.window_begin(ID_WIN_NESTED, t("Weitere Optionen"), Some(&self.nested_open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&self.nest_rect)) {
                 ui.next_size(0, 40);
-                ui.checkbox(ID_WIN_NEST_CB, "Farbprofil einbetten", &mut self.nest_cb);
+                ui.checkbox(ID_WIN_NEST_CB, t("Farbprofil einbetten"), &mut self.nest_cb);
                 ui.next_size(SIZE_FILL, 44);
-                if ui.textbox(ID_WIN_NEST_TB, Some("Profilname"), &mut self.nest_text, 32) & EV_COMMIT != 0 {
+                if ui.textbox(ID_WIN_NEST_TB, Some(t("Profilname")), &mut self.nest_text, 32) & EV_COMMIT != 0 {
                     self.nest_commits += 1;
                 }
-                ui.text(TS_CAPTION | TX_SECONDARY, &format!("Übernommen: {}", self.nest_commits));
-                ui.dialog_buttons(None, None, Some("Schließen"));
+                ui.text(TS_CAPTION | TX_SECONDARY, &tf("Übernommen: {}", &[&format!("{}", self.nest_commits)]));
+                ui.dialog_buttons(None, None, Some(t("Schließen")));
             }
             ui.window_end();
-            let r = ui.dialog_buttons(Some("OK"), None, Some("Abbrechen"));
+            let r = ui.dialog_buttons(Some("OK"), None, Some(t("Abbrechen")));
             if r != 0 {
                 self.result = r as i32;
             }
         }
         ui.window_end();
 
-        if ui.window_begin(ID_WIN_VAL, "Werte", Some(&self.val_open), WF_TOOL | WF_AUTOHEIGHT, Some(&self.val_rect)) {
+        if ui.window_begin(ID_WIN_VAL, t("Werte"), Some(&self.val_open), WF_TOOL | WF_AUTOHEIGHT, Some(&self.val_rect)) {
             ui.box_begin(0, BOX_V | PAD_12, 8);
-            ui.prop_slider_f(ID_WIN_VAL_PROP, "Winkel", &mut self.ang, &RF_ANG, Some(0.0));
+            ui.prop_slider_f(ID_WIN_VAL_PROP, t("Winkel"), &mut self.ang, &RF_ANG, Some(0.0));
             ui.angle(ID_WIN_VAL_ANG, &mut self.ang, 0);
             ui.box_end();
         }
         ui.window_end();
 
-        if ui.window_begin(ID_WIN_POP, "Popups", Some(&self.pop_open), WF_TOOL, Some(&self.pop_rect)) {
+        if ui.window_begin(ID_WIN_POP, t("Popups"), Some(&self.pop_open), WF_TOOL, Some(&self.pop_rect)) {
             ui.box_begin(0, BOX_V | PAD_12, 8);
             ui.next_size(SIZE_FILL, 44);
-            ui.dropdown_button(ID_WIN_POP_MENU, "Menü");
+            ui.dropdown_button(ID_WIN_POP_MENU, t("Menü"));
             if ui.flyout_begin(ID_WIN_POP_MENU, 0) {
                 for (k, row) in POP_ROWS.iter().enumerate() {
                     ui.next_size(200, 44);
-                    if ui.menu_item(ID_WIN_POP_ITEM + k as u32, row) & EV_ACT != 0 {
+                    if ui.menu_item(ID_WIN_POP_ITEM + k as u32, t(row)) & EV_ACT != 0 {
                         self.pop_last = k as i32 + 1;
                     }
                 }
             }
             ui.flyout_end();
             ui.next_size(SIZE_FILL, 44);
-            ui.combobox(ID_WIN_POP_COMBO, &mut self.pop_sel, &POP_COMBO);
+            ui.combobox(ID_WIN_POP_COMBO, &mut self.pop_sel, &list(&POP_COMBO));
             ui.next_size(SIZE_FILL, 44);
-            ui.button(ID_WIN_POP_TIP, "Hinweis");
-            ui.tooltip("Ein Tooltip, der über den unteren Rand des Fensters hinausragt");
-            let last = if self.pop_last == 0 { "–" } else { POP_ROWS[(self.pop_last - 1) as usize] };
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("Zuletzt: {last}"));
+            ui.button(ID_WIN_POP_TIP, t("Hinweis"));
+            ui.tooltip(t("Ein Tooltip, der über den unteren Rand des Fensters hinausragt"));
+            let last = if self.pop_last == 0 { "–" } else { t(POP_ROWS[(self.pop_last - 1) as usize]) };
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("Zuletzt: {}", &[last]));
             ui.box_end();
         }
         ui.window_end();
