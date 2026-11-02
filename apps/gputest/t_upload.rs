@@ -288,6 +288,14 @@ fn swap_on(t: &mut T, g: &Gpu, dev: &Device, w: i32) -> Option<()> {
         }
     }
     t.ok(got, "a frame after the rebuild");
+    // the swapchain and its surface go with an upload still open: the swapchain first, at once;
+    // the buffer stays until the upload has run (validate.uis)
+    let buf = t.res(dev.create_buffer(&BufferDesc { size: 16, usage: BufferUsage::STORAGE, memory: MemoryKind::Device }), "a buffer")?;
+    t.res(dev.queue().write_buffer(&buf, 0, &[0u32; 4]), "an upload left open")?;
+    drop(sc);
+    drop(surf);
+    drop(buf);
+    t.res(dev.queue().flush(), "the upload")?;
     plat::win_gpu_child_show(w, false);
     pump(10);
     Some(())

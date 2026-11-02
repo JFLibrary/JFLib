@@ -1681,8 +1681,19 @@ Fensterrand hinaus.
   und Leinwände nutzen den Weg erst mit G3c. `Ui::fb()` kann dabei Pixel solcher Bilder auslassen,
   `Ui::gpu_settle()` holt sie nach. Nicht getestet: ein echter Treiber-Reset, andere GPUs, ein
   Bildcache über zwei Fenster, ein echtes Bild in RTL.
-- **P2** · *fehlt* · G3c: Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel,
-  JFNetworker, Bildbetrachter und Diagramm.
+- **P2** · *erledigt* (2026-11-02) · G3c: Leinwand-API `ui.canvas_gpu` mit Kacheln von 256 Pixeln
+  ([`lib/ui/canvas.rs`](../lib/ui/canvas.rs), [GPU.md](GPU.md#leinwände)), genutzt von `image_view`,
+  `diagram` (damit JFNetworker), Kritzel und PaintCraft. Verschieben zeichnet in 0,6–2 ms statt 6–30
+  ms, unter 1 ms aber nur dort, wo nichts über der Leinwand gezeichnet wird; das Zoomen im Diagramm
+  dauert 0,6 statt 13 ms. Im Ruhezustand ist das Bild Byte für Byte das des CPU-Wegs: 180 ms nach der
+  letzten Bewegung zeichnet die CPU einmal neu, was 3–31 ms kostet. Während des Zoomens sind Diagramm
+  und Bildansicht bis dahin etwas weicher, Kritzel und PaintCraft zoomen auf der CPU (6 ms) und
+  weichen nie ab. `jfgui_GPU_CANVAS_CPU`, `_PAN` und `_ZOOM` schalten je Leinwand um. Auf der CPU
+  bleiben PaintCraft mit Pixelraster, Auswahl oder Werkzeug-Overlay, RTL-Fenster sowie Diagramme,
+  Zeitleisten und Terminal, die andere `Cmd::Custom` nutzen. Die GPU belegt je nach Leinwand 50–146
+  MiB statt 16–23 MiB, bis die Kacheln 30 s nach der letzten Bewegung gehen. Nicht getestet: ein
+  echter Treiber-Reset, Remote Desktop, andere GPUs, ein großes JFNetworker-Modell, Linux und Web nur
+  gebaut, Android nicht.
 - **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
   Auflösungsgrenze), Browser (WebGPU).
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
