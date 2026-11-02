@@ -77,6 +77,8 @@
 // of doc/edits.rs, the scene of canvas/paint.rs).
 // startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// academytest.rs: the Akademie (group academy: jfn_model::academy, the progress in its file, step order
+// and state, what the page reads, every course below --academy-dir).
 
 use alloc::format;
 use alloc::string::String;
@@ -184,9 +186,11 @@ mod webdevtest;
 mod modelstest;
 #[path = "startpagetest.rs"]
 mod startpagetest;
+#[path = "academytest.rs"]
+mod academytest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 58] = [
+    let groups: [(&'static str, fn(&mut T)); 59] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -245,6 +249,7 @@ pub fn run() -> i32 {
         ("cables", cablestest::run),
         ("labels", labelstest::run),
         ("startpage", startpagetest::run),
+        ("academy", academytest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

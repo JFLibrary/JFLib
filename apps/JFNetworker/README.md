@@ -199,6 +199,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Bewertung). Tab läuft durch die Karten, Eingabe öffnet; die Leiste einer automatischen Sicherung
   steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
   ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
+- **Akademie** (Startseite › Lernen oder Datei › Akademie …): Kurse aus Dateien mit Lektionen zum Lesen
+  und Laboren im Simulator, ihr Fortschritt bleibt erhalten (siehe [Akademie](#akademie)).
 - **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
   Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
@@ -266,6 +268,8 @@ build/win/JFNetworker.exe --gen-topology 500 --traffic 300  # synthetischer Camp
 build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lan_router.jfnet --scenario apps/JFNetworker/tests/scen/lan_router.scn
 build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lab_shards.jfnet --scenario apps/JFNetworker/tests/scen/lab_metrics.scn --series build/lab.csv
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
+build/win/jfn-sim.exe course apps/JFNetworker/academy/beispiel   # ein Kurs: seine Datei, Lektionen, Bilder, Links, Labore
+build/win/JFNetworker.exe --academy-dir apps/JFNetworker/academy # die Kurse aus diesem Ordner statt aus data://academy
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
 build/win/jfn-sim.exe rewind apps/JFNetworker/tests/fixtures/lab_window.jfnet 60   # Keyframes und Zeit zum Zurückspulen
@@ -303,6 +307,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `start_page.uis` | die Startseite (`--start-page`; `--recent=` gibt dem Lauf seine zuletzt geöffneten Dateien, ein Pfad allein ist erlaubt, mit `\|` verbundene sind es nicht): erster Fokus und Eingabe, was ohne Projekt abgeschaltet ist, das leere Projekt, eine Vorlage, Speichern fragt nach ihrem Namen, Datei › Startseite mit der Rückfrage, die Zeilen von Zuletzt (öffnen, fehlend und entfernen, nicht lesbar: der Dateidialog), eine Fehlermeldung auf der Seite, Labor und Aufgabe, Tab und Umschalt+Tab durch die Karten, Projektinfo mit Rückgängig, die Einstellung |
 | `start_page_crash.uis`, `start_page_later.uis`, `start_page_recover.uis` | die Wiederherstellung auf der Startseite (in dieser Reihenfolge): eine Sitzung endet mit ungespeicherten Änderungen, die nächste zeigt die Leiste über der Seite mit der Tastatur auf „Wiederherstellen“, „Später“ lässt die Seite stehen und die Kopie liegen, die dritte stellt sie wieder her; danach wieder die Seite ohne Angebot |
 | `start_page_en.uis`, `start_page_shots.uis` | die Seite auf Englisch mit einer geöffneten Vorlage; die Bilder hell und dunkel mit 100 und 150 %, im kleinsten Fenster (auch gescrollt), breit, mit Fokus und Hover, die Vorlage Campus und der Dialog Projektinfo (`build/jfnetworker/start_page_*.png`) |
+| `academy_course.uis` | die Akademie mit dem Beispielkurs (`--academy-dir apps/JFNetworker/academy`, der Fortschritt bleibt im Speicher): die Karte auf der Startseite, Gliederung mit Zuständen und Fortschritt, Lektionen mit Bild, ein Link, Weiter und Vorheriger Schritt, das Labor mit seinen Zielen und der Leiste, hin und zurück ohne neues Laden, Weitergehen ohne Abschluss, Abschließen, die Frage nach ungespeicherten Änderungen, Fortschritt zurücksetzen, Datei › Akademie, die Sprache mitten in einer Lektion, die Tastatur |
+| `academy_files.uis` | Kurse, die nicht in Ordnung sind (`tests/fixtures/academy`): ein Pfad hinaus und eine unbekannte Art, eine Version aus der Zukunft, ein Ordner ohne `course.json`, jeder mit seiner genauen Meldung und ohne Folgen für die anderen; eine Lektion in nur einer Sprache mit dem Hinweis; abgelehnte Links, Bilder außerhalb des Kurses; Quiz, Fehlersuche und Prüfung als „noch nicht verfügbar“ |
+| `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `model.uis`, Gruppe `academy` | das Format (ein guter Kurs und eine gute Kursliste, neuere Version, falsches Format, Pfade, die hinausführen, eine Lektion in einer Sprache, eine unbekannte Art, was eine Lektion verlinkt), der Fortschritt (hin und zurück, kaputte Datei, neue Kursversion), Reihenfolge und Zustände, wo ein Lauf sucht, was die Seite liest und was sie ablehnt; jeder Kurs unter `--academy-dir` (darum nennt `model.uis` den Ordner): seine Dateien in beiden Sprachen, seine Labore mit dem, was `jfn-sim check` findet, ungelöst und gelöst, die Namensregel |
 | `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
 | `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
@@ -560,6 +568,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs) | Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 
 ### Gerätekatalog
@@ -4110,6 +4119,110 @@ Für Programme: `Action::Supplicant { dev, conf }`, `Engine::dot1x_sessions(dev)
 wird in der Selbsttest-Gruppe `dot1x` ([`src/dot1xtest.rs`](src/dot1xtest.rs)), in der coretest-Gruppe
 `eap` (Codecs und die Vektoren einer unabhängigen Python-Referenz von EAP-PWD), mit
 `scen_dot1x_imap.uis` und den Fensterskripten `dot1x_panel.uis` und `dot1x_shots.uis`.
+
+### Akademie
+
+Die Akademie bringt Kurse: Lektionen zum Lesen, dann Üben im Simulator mit Aufgabe und Prüfungen. Sie steht
+auf der Startseite unter Lernen als eigene Gruppe über den Laboren und im Menü unter Datei › Akademie …
+(die Liste der Kurse). Kurse sind reine Dateien und nicht Teil des Programms: installierte liegen in
+`data://academy/` (unter Windows `%LOCALAPPDATA%\JFNetworker\academy`), zum Schreiben und Testen nennt
+`--academy-dir PATH` einen Ordner. Der Name des Bereichs ist „Akademie“; Texte und Bilder eines Kurses
+sind eigene Worte und eigene Zeichnungen.
+
+Ein Kurs hat eine **Gliederung** mit Einheiten und Schritten, jeder mit seinem Zustand (erledigt, als
+Nächstes, offen), dazu Fortschritt, Stufe und Dauer; „Weiter“ führt zum ersten offenen Schritt. Eine
+**Lektion** erscheint in der Sprache des Fensters; fehlt sie dort, steht die andere da, mit einem Hinweis.
+Sie gilt als erledigt, wenn es mit „Weiter“ von ihr weitergeht. Ein **Labor** öffnet als Projekt ohne Datei mit
+dem Bereich Aufgabe, wie jedes Labor; eine schmale Leiste über der Zeichenfläche nennt Schritt und Kurs, mit
+„Zurück zum Kurs“ und „Weiter im Kurs“. Sind alle Ziele erreicht, ist der Schritt erledigt; wer vorher
+weitergeht, lässt ihn offen. Solange kein anderes Labor öffnet, bleibt das Projekt unter der Seite, wie es
+ist; erst ein anderes fragt nach ungespeicherten Änderungen. Wie die Startseite tritt die Seite an die
+Stelle von Werkzeugleiste, Dock und Statusleiste, Dialoge und Timer laufen weiter. Tastatur: Tab durch die
+Schritte, Eingabe öffnet, Esc oder Alt+Links zurück.
+
+**Der Ordner eines Kurses:**
+
+```
+academy/index.json              die Kursliste zum Installieren (wird erzeugt; das Programm liest bisher die Ordner)
+academy/progress.json           der Fortschritt (schreibt das Programm)
+academy/<kurs>/course.json      der Kurs; der Ordnername ist seine Kennung
+academy/<kurs>/de/*.md          die Lektionen auf Deutsch
+academy/<kurs>/en/*.md          die Lektionen auf Englisch (jede neue Sprache ein Ordner mit ihrem Kürzel)
+academy/<kurs>/labs/*.jfnet     die Labore
+academy/<kurs>/img/*            die Bilder (png, jpg, gif, bmp, svg)
+```
+
+**`course.json`:**
+
+```json
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": ["Beispielkurs: das erste Netz", "Sample course: your first network"],
+  "summary": ["Was ein Netz ist …", "What a network is …"],
+  "level": "beginner",
+  "minutes": 15,
+  "units": [
+    { "title": ["Grundlagen", "The basics"],
+      "steps": [
+        { "id": "netz", "kind": "lesson", "title": ["Was ist ein Netz?", "What is a network?"], "file": "01-netz.md" },
+        { "id": "erstes-netz", "kind": "lab", "title": ["PC2 braucht eine Adresse", "PC2 needs an address"], "file": "labs/erstes-netz.jfnet" }
+      ] }
+  ]
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `format`, `version` | `"jfn-course"` und die Version des Formats; eine neuere lehnt das Programm mit einer Meldung ab |
+| `course_version` | die Version des Inhalts (in `index.json` das `version` des Kurses) |
+| `title`, `summary` | Text in beiden Sprachen: `["Deutsch", "English"]` oder `{"de": …, "en": …}` |
+| `level` | `beginner`, `intermediate` oder `advanced` |
+| `minutes` | die ungefähre Dauer |
+| `units[].title`, `units[].steps` | eine Einheit: ihr Titel, ihre Schritte; die Reihenfolge ist die des Kurses |
+| `steps[].id` | kleine Buchstaben, Ziffern, `-`, `_`; eindeutig im Kurs. An ihr hängt der Fortschritt: sie bleibt über neue Versionen des Kurses |
+| `steps[].kind` | `lesson` und `lab` gehen heute; `quiz`, `fault` und `exam` kennt das Format, die Gliederung zeigt sie als „noch nicht verfügbar“; alles andere ist ein Fehler |
+| `steps[].file` | eine Lektion: der Name in den Sprachordnern (`01-netz.md`, auf `.md`); ein Labor: der Pfad im Kursordner (`labs/x.jfnet`) |
+
+Fehlende Felder nehmen ihren Standardwert an, unbekannte werden übersprungen. **Pfade** sind relativ und
+bleiben im Kursordner: kein `..`, kein `/` am Anfang, kein Laufwerk, keine Adresse, nur Buchstaben, Ziffern und
+`- _ . /`, kein Teil mit einem Punkt am Anfang oder Ende. Ein Kurs, der das nicht einhält, bekommt eine Karte
+mit seinen Meldungen und schadet keinem anderen.
+
+**Eine Lektion** ist Markdown. Jede gibt es auf Deutsch und auf Englisch. Bilder stehen relativ zum Kursordner
+(`![Was das Bild zeigt](img/netz.svg)`; der Text in den Klammern ist der Name für Screenreader), das Programm
+liest nur Bilder aus diesem Ordner; ein SVG trägt seinen eigenen hellen Hintergrund, damit es auch im dunklen
+Thema lesbar bleibt. Links: `[Text](step:ID)` führt zu einem Schritt des Kurses, `[Text](lab:ID)` zu einem
+Labor; Links ins Web lehnt die Ansicht vorerst mit einer Meldung ab.
+
+**Ein Labor** ist eine `.jfnet`-Datei mit `lab` und mindestens einem Ziel (siehe
+[Labore und Aufgaben](#labore-und-aufgaben)), Titel, Einleitung, Ziele und Hinweise in beiden Sprachen. Die Ziele
+prüft der Simulator, sobald eine Sekunde virtueller Zeit vergangen ist, das Projekt sich geändert hat oder, in
+einem Netz ohne anstehende Ereignisse, eine Konsole wieder ihren Prompt zeigt.
+
+**`index.json`** ist die Liste, aus der später installiert wird: `format` `"jfn-academy"`, `version`, `courses` mit
+`id`, `title`, `summary`, `level`, `minutes`, `version` (des Inhalts) und `files` (`path`, `size`, `sha256`). Damit
+die Prüfsummen stimmen, hält `.gitattributes` die Bytes unter `apps/JFNetworker/academy/` unverändert.
+
+**`progress.json`** schreibt das Programm sofort beim Erledigen: `format` `"jfn-progress"`, `version`, `courses`, je
+Kurs `steps`, je Schritt `state` (`open`, `done`), `when` (Sekunden seit 1970), `best` (das beste Ergebnis eines
+Tests, später). Eine kaputte oder fehlende Datei bedeutet „noch nichts erledigt“, nie einen Absturz. Sie steht nie in
+der Projektdatei und ist kein Rückgängig-Schritt; „Fortschritt zurücksetzen“ auf der Seite eines Kurses
+fragt vorher. Einträge von Schritten, die ein neuer Kurs nicht mehr hat, bleiben stehen, falls sie wiederkommen. Mit
+`--academy-dir` liegt die Datei in jenem Ordner, ein Lauf ohne Fenster hält sie im Speicher und sieht ohne den
+Schalter gar keine Kurse: Tests berühren die Daten des Benutzers nicht.
+
+**So entsteht ein Kurs:** einen Ordner wie [`academy/beispiel`](academy/beispiel) anlegen, mit
+`jfn-sim course ORDNER` prüfen (Datei, Lektionen in jeder Sprache, Bilder, Links, Labore mit dem, was `jfn-sim
+check` findet; Rückgabe 1, wenn etwas den Kurs verhindert), mit `JFNetworker --academy-dir OBERORDNER` ansehen. Der
+Selbsttest prüft jeden Kurs unter `apps/JFNetworker/academy/`.
+
+Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `safe_path`, `image_file`, `lesson_refs`,
+`link_to`, `lab_issues`), `jfn_run::check_course`, `workspace/academy` (`Academy`, `store::place`, `store::list`).
+
+Noch offen: Quiz, Tests und Fehlersuche (AK2), Installieren aus dem Netz mit Index und Prüfsummen (AK3),
+die Kurse selbst (AK4).
 
 ## Performance
 

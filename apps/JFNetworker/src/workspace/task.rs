@@ -6,10 +6,15 @@
 //   loaded(n)                    a new or loaded project: its lab's goals start over, a lab
 //                                brings the panel forward (a tab beside Eigenschaften; the
 //                                right side at least 340 DIP wide)
+//   front(n, ui)                 right after dock_begin: the same for a lab that came before the
+//                                dock's first frame (from the start page or the Akademie), when the
+//                                dock did not know the panel yet
 //   tick(n)                      every frame: the goals are judged (jfn_sim::goal::LabRun) when
 //                                a second of virtual time has passed since the last time, and
 //                                after a change of the project (at most every 250 ms); a fresh
-//                                engine (Simulation zurücksetzen) starts them over
+//                                engine (Simulation zurücksetzen) starts them over; in a network
+//                                with nothing scheduled the clock stands still, so a console
+//                                coming back with its prompt counts then (doc/console.rs: `console`)
 //   check(n)                     "Prüfen" (F9): judged now, and from then on every open goal
 //                                shows what each of its checks found
 //   hint(n)                      the next hint: of the first open goal that has one left, else
@@ -93,11 +98,15 @@ pub(crate) struct Task {
     pub timer_armed: bool,
     /// the project's revision when its lab was last compared with this one's
     pub lab_rev: u32,
+    /// the panel comes forward as soon as the dock knows it
+    pub want_front: bool,
+    /// a console came back with its prompt since the last judgement
+    pub console: bool,
 }
 
 impl Task {
     pub(crate) fn new() -> Task {
-        Task { lab: None, run: None, explain: false, goal_hints: Vec::new(), hints: 0, intro: 1, rev: 0, at_us: 0, force: false, dlg: Shared::new(0), labs: Vec::new(), lab_sel: 0, assess: None, timer_armed: false, lab_rev: 0 }
+        Task { lab: None, run: None, explain: false, goal_hints: Vec::new(), hints: 0, intro: 1, rev: 0, at_us: 0, force: false, dlg: Shared::new(0), labs: Vec::new(), lab_sel: 0, assess: None, timer_armed: false, lab_rev: 0, want_front: false, console: false }
     }
 
     // another lab (or none): everything starts over
@@ -154,9 +163,18 @@ pub(crate) fn loaded(n: &mut Net) {
     crate::workspace::assess::loaded(n);
     if has {
         n.shell.dock.show(P_TASK);
+        n.task.want_front = !n.shell.dock.visible(P_TASK);
         if n.shell.dock.size(DOCK_RIGHT) < TASK_W {
             n.shell.dock.set_size(DOCK_RIGHT, TASK_W);
         }
+    }
+}
+
+/// right after dock_begin: a lab that came before the dock's first frame brings its panel forward now
+pub(crate) fn front(n: &mut Net, ui: &mut Ui) {
+    if core::mem::take(&mut n.task.want_front) {
+        n.shell.dock.show(P_TASK);
+        ui.repass();
     }
 }
 
@@ -187,11 +205,13 @@ pub(crate) fn tick(n: &mut Net) {
     }
     let wall = plat::task::now_us();
     let edited = n.doc.rev != task.rev && wall >= task.at_us + EDIT_US;
-    let due = task.force || edited || run.at.is_none_or(|a| now >= a + SEC);
+    let settled = task.console && eng.next_time().is_none();
+    let due = task.force || edited || settled || run.at.is_none_or(|a| now >= a + SEC);
     if !due {
         return;
     }
     task.force = false;
+    task.console = false;
     task.rev = n.doc.rev;
     task.at_us = wall;
     let cons = &n.cons;
@@ -303,8 +323,8 @@ fn time_text(ns: u64) -> String {
     tr::msg(&jfn_model::msg::dur(ns.min(i64::MAX as u64) as i64))
 }
 
-// an icon in a colour of the theme, at the top of its row (beside the first line of a text)
-fn mark(ui: &mut Ui, cp: u32, tok: u32, size: i32) {
+/// an icon in a colour of the theme, at the top of its row (beside the first line of a text)
+pub(crate) fn mark(ui: &mut Ui, cp: u32, tok: u32, size: i32) {
     let s = ui.dp(size);
     let r = ui.place(s, s);
     let c = ui.color(tok);

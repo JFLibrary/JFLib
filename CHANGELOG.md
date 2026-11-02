@@ -111,6 +111,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFNetworker:** Choosing a cable first: a Kabel part in the palette (Automatisch and a tile per kind) sets the Verbinden tool with that kind, the port choice offers only pairs it fits and what cannot fit is refused with its reason at the target. New kinds appended (serial with a chosen DCE or DTE end, telephone, coax, DAC, AOC), Media::Rj11 and Media::Coax with a cable modem and a DSL modem, a category (Cat5e .. Cat8, OM3, OM4, OS2) and a colour on the link, the project setting Auto-MDI-X aus; old files load unchanged, the golden reports stay as they are
 - **ui:** A double click on the background of ui.diagram (DEv::DoubleClick with the world point of the second press), DN_HITMIN for small nodes that stay selectable at low zoom, ui.focus_quiet (the keyboard focus without the ring after a pointer gesture)
 - **ui:** A card or list row that does one thing when it is chosen: ui.action_card with CardDesc (title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area), for start pages and the like
+- **JFNetworker:** The Akademie's first part: courses as files (`course.json`, lessons in `de/` and `en/`, labs, pictures; `index.json` and its checksums defined for later), every path checked to stay in the course's folder, a bad course gives its message and hurts nothing else; the list of courses, an outline with states and progress, lessons, a lab step with a bar over the canvas, progress in `data://academy/progress.json` with a reset; `--academy-dir`, `jfn-sim course`, a sample course in `apps/JFNetworker/academy`
 
 ### Changed
 
@@ -176,6 +177,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **tools:** A development build no longer leaves a broken incremental cache behind when rustc is killed during ThinLTO: rustc overwrites the last good session's keys through a hard link, its next run then kept stale objects and exited 0, and every app linking that crate failed with undefined symbol anon.*.llvm.*; build_rs.py now detects the killed session and discards the crate's cache before compiling
 - **text:** Generic families (monospace, sans-serif) no longer resolve to a font without Latin letters: Fedora puts Noto Sans Arabic first in them, and hex views, terminals and code then showed proportional text in tall rows. FontDb marks such faces (FDFF_NOLATIN, font cache version 4) and takes them last, except for emoji and math.
 - **text:** FontConf puts the <default> and append_last families of a family further in the list at the end of the whole list, as fontconfig does: on Fedora monospace no longer continued with the sans-serif families before the monospace ones.
+- **JFNetworker:** A lab opened from the start page before the dock's first frame now brings its Aufgabe panel forward; in a lab whose network has nothing scheduled the goals are judged when a console shows its prompt again
 
 ### Security
 

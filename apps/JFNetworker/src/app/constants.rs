@@ -695,3 +695,42 @@ pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
 /// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
 /// the courses of AK1 can follow)
 pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;
+// ---- AK1: the Akademie (commands 1005 .. 1019, widgets 0x0002_1000 .. 0x0002_1FFF, the rest of the block
+// of ID_SP_LEARN for the start page; the timers 0x1D0 .. 0x1D3 are not used)
+/// Datei › Akademie …; back (Esc, Alt+Left, the button of a page); a course from the start page and from the
+/// list of courses (arg: its index in the list); a step (arg: its place in the course); the next open step;
+/// a lesson's Vorheriger Schritt and Weiter; the lab's bar; the answer to resetting the progress
+pub(crate) const CMD_ACADEMY: u32 = 1005;
+pub(crate) const CMD_AK_BACK: u32 = 1006;
+pub(crate) const CMD_SP_COURSE: u32 = 1007;
+pub(crate) const CMD_AK_COURSE: u32 = 1008;
+pub(crate) const CMD_AK_STEP: u32 = 1009;
+pub(crate) const CMD_AK_CONTINUE: u32 = 1010;
+pub(crate) const CMD_AK_PREV: u32 = 1011;
+pub(crate) const CMD_AK_NEXT: u32 = 1012;
+pub(crate) const CMD_AK_BAR_BACK: u32 = 1013;
+pub(crate) const CMD_AK_BAR_NEXT: u32 = 1014;
+pub(crate) const CMD_AK_RESET: u32 = 1015;
+/// the cards of the courses on the start page (+ i)
+pub(crate) const ID_SP_COURSE: u32 = 0x0001_FC00;
+/// the page as a pane, its scroll view, back, "Weiter", the progress, the reset and its dialog
+pub(crate) const ID_AK_PANE: u32 = 0x0002_1000;
+pub(crate) const ID_AK_SCROLL: u32 = 0x0002_1001;
+pub(crate) const ID_AK_BACK: u32 = 0x0002_1002;
+pub(crate) const ID_AK_CONTINUE: u32 = 0x0002_1003;
+pub(crate) const ID_AK_PROGRESS: u32 = 0x0002_1004;
+pub(crate) const ID_AK_RESET: u32 = 0x0002_1005;
+pub(crate) const ID_AK_HOME_SCROLL: u32 = 0x0002_1006;
+pub(crate) const ID_AK_RESET_DLG: u32 = 0x0002_1010;
+/// a lesson: the document, Vorheriger Schritt, Weiter, the note about the other language
+pub(crate) const ID_AK_LESSON: u32 = 0x0002_1020;
+pub(crate) const ID_AK_PREV: u32 = 0x0002_1021;
+pub(crate) const ID_AK_NEXT: u32 = 0x0002_1022;
+pub(crate) const ID_AK_NOTE: u32 = 0x0002_1023;
+/// the bar over the canvas in a course's lab: a pane, Zurück zum Kurs, Weiter im Kurs
+pub(crate) const ID_AK_BAR: u32 = 0x0002_1030;
+pub(crate) const ID_AK_BAR_BACK: u32 = 0x0002_1031;
+pub(crate) const ID_AK_BAR_NEXT: u32 = 0x0002_1032;
+/// the cards of the list of courses (+ i), the steps of a course (+ its place in the course)
+pub(crate) const ID_AK_CARD: u32 = 0x0002_1100;
+pub(crate) const ID_AK_STEP: u32 = 0x0002_1400;
