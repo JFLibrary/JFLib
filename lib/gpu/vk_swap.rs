@@ -1,7 +1,9 @@
 // vk_swap -- window surfaces and swapchains
 //
 //   Surface::new(&instance, window) -> Result<Surface>   a plat window (Windows: its HWND and
-//        HINSTANCE through plat::win_native, VK_KHR_win32_surface); other targets: Unsupported
+//        HINSTANCE through plat::win_native, VK_KHR_win32_surface; Android: the ANativeWindow of
+//        plat::win_gpu_child, VK_KHR_android_surface, NotReady while there is none); other targets:
+//        Unsupported
 //   device.create_swapchain(&surface, &SwapchainDesc) -> Result<Swapchain>
 //        B8G8R8A8 (or R8G8B8A8) UNORM / SRGB, sRGB non-linear colour space; the present mode of
 //        the desc or jfgui_GPU_PRESENT=fifo|mailbox|immediate, FIFO when the surface lacks it;
@@ -34,6 +36,11 @@
 // again).
 // The window must not be presented by the CPU (plat::win_present) at the same time: a plat
 // window that never presents keeps nothing of its own to paint (win_api.rs WM_PAINT).
+//
+// Android: the image stays upright (VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) and the compositor turns
+// it; the surface's currentTransform would ask us to draw it turned, with every rectangle turned as
+// well.  The system then says SUBOPTIMAL at every present while the display is turned, which means
+// nothing here: a new size is seen in window_size (a surface there never says OUT_OF_DATE for it).
 
 use alloc::sync::Arc;
 use alloc::vec;
@@ -75,11 +82,39 @@ impl Surface {
             let nw = plat::win_native(window).ok_or(GpuError::Invalid("no such window"))?;
             Surface::native(instance, nw, window)
         }
-        #[cfg(not(windows))]
+        #[cfg(target_os = "android")]
+        {
+            let nw = plat::win_gpu_child(window).ok_or(GpuError::NotReady)?;
+            Surface::native(instance, nw, window)
+        }
+        #[cfg(not(any(windows, target_os = "android")))]
         {
             let _ = (instance, window);
             Err(GpuError::Unsupported("window surfaces on this target"))
         }
+    }
+
+    /// the surface of a window given by its handles (the ANativeWindow of plat::win_gpu_child)
+    /// whose size and state are those of plat window `window`
+    #[cfg(target_os = "android")]
+    pub fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface> {
+        let sh = &instance.sh;
+        if !sh.surface {
+            return Err(GpuError::Unsupported("window surfaces"));
+        }
+        let create = sh.f.create_android_surface_khr.ok_or(GpuError::Unsupported("VK_KHR_android_surface"))?;
+        let ci = vk::AndroidSurfaceCreateInfoKHR {
+            s_type: vk::STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+            window: nw.window,
+            ..vk::Zero::zero()
+        };
+        let mut h = 0;
+        // SAFETY: a live ANativeWindow; the surface takes a reference of its own.
+        let r = unsafe { create(sh.inst, &ci, core::ptr::null(), &mut h) };
+        if r != vk::SUCCESS {
+            return Err(crate::vk_inst::err(r));
+        }
+        Ok(Surface(Arc::new(SurfShared { inst: sh.clone(), h, window })))
     }
 
     /// the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
@@ -160,6 +195,10 @@ pub struct Swapchain {
     stale: Cell<bool>,
     outstanding: Cell<bool>,
 }
+
+/// Android: SUBOPTIMAL only says the display is turned and the compositor turns the image (the file's
+/// header)
+const TURNED_IS_FINE: bool = cfg!(target_os = "android");
 
 fn present_mode_vk(m: PresentMode) -> u32 {
     match m {
@@ -337,7 +376,11 @@ impl Swapchain {
             image_array_layers: 1,
             image_usage: usage,
             image_sharing_mode: vk::SHARING_MODE_EXCLUSIVE,
-            pre_transform: caps.current_transform,
+            pre_transform: if cfg!(target_os = "android") && caps.supported_transforms & vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR != 0 {
+                vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR // (the file's header)
+            } else {
+                caps.current_transform
+            },
             composite_alpha: alpha,
             present_mode: present_mode_vk(self.mode),
             clipped: 1,
@@ -419,7 +462,7 @@ impl Swapchain {
         let r = unsafe { acq(self.sh.dev, self.h, 0, self.acquire[k as usize], 0, &mut image) };
         match r {
             vk::SUCCESS | vk::SUBOPTIMAL_KHR => {
-                if r == vk::SUBOPTIMAL_KHR {
+                if r == vk::SUBOPTIMAL_KHR && !TURNED_IS_FINE {
                     self.stale.set(true);
                 }
                 self.outstanding.set(true);
@@ -469,7 +512,7 @@ impl Swapchain {
             let r = unsafe { acq(self.sh.dev, self.h, 10_000_000_000, self.acquire[k as usize], 0, &mut image) };
             match r {
                 vk::SUCCESS | vk::SUBOPTIMAL_KHR => {
-                    if r == vk::SUBOPTIMAL_KHR {
+                    if r == vk::SUBOPTIMAL_KHR && !TURNED_IS_FINE {
                         self.stale.set(true);
                     }
                     self.outstanding.set(true);
@@ -535,6 +578,7 @@ impl Swapchain {
         let r = sh.with_queue(|q| unsafe { qp(q, &pi) });
         match r {
             vk::SUCCESS => {}
+            vk::SUBOPTIMAL_KHR if TURNED_IS_FINE => {}
             vk::SUBOPTIMAL_KHR | vk::ERROR_OUT_OF_DATE_KHR => self.stale.set(true),
             _ => sh.vk(r)?,
         }
@@ -605,23 +649,23 @@ impl Drop for Swapchain {
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "android"))]
 fn window_size(w: i32) -> (u32, u32) {
     let (x, y) = plat::win_size(w);
     (x.max(0) as u32, y.max(0) as u32)
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "android"))]
 fn window_minimised(w: i32) -> bool {
     plat::win_state(w) & plat::WST_MINIMIZED != 0
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "android")))]
 fn window_size(_w: i32) -> (u32, u32) {
     (0, 0)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "android")))]
 fn window_minimised(_w: i32) -> bool {
     true
 }

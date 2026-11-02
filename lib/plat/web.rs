@@ -60,6 +60,11 @@ pub(crate) use system_host::sys_settings_host;
 pub(crate) mod sensors_host;
 pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 #[cfg(target_os = "android")]
+#[path = "android_gpu.rs"]
+mod android_gpu;
+#[cfg(target_os = "android")]
+pub use android_gpu::*;
+#[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;
 #[cfg(target_os = "android")]
@@ -209,6 +214,8 @@ pub trait WebApplication {
     fn control(&mut self, line: &[u8]) -> Option<String>;
     /// Synchronize runtime visibility and command state when the host changes activation.
     fn set_control_enabled(&mut self, _enabled: bool) {}
+    /// (Android) the surface of the GPU output went away -> a frame waits for the host's canvas.
+    fn surface_gone(&mut self) -> bool { false }
 }
 struct AppSlot(UnsafeCell<Option<Box<dyn WebApplication>>>);
 // SAFETY: a WASM instance belongs to one worker, an Android instance to the Java UI thread;
@@ -236,6 +243,12 @@ fn with_app<R>(f: impl FnOnce(&mut dyn WebApplication) -> R) -> Option<R> {
         *APP.0.get() = Some(app);
     }
     Some(result)
+}
+
+/// (Android) the surface of the GPU output went away; nothing of it is used after this returns.
+#[cfg(target_os = "android")]
+fn surface_gone() -> bool {
+    with_app(|app| app.surface_gone()).unwrap_or(false)
 }
 
 pub(crate) fn notice(kind: u32, data: &[u8]) {
@@ -466,13 +479,20 @@ pub fn mem_total() -> u64 {
 }
 /// Cooperative yield is achieved by returning from the current runtime step.
 pub fn thread_yield() {}
-/// Browser thread handle placeholder; spawning native threads is unsupported.
+/// Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
+/// output's jobs have threads of their own, android_gpu.rs).
 #[cfg(not(web_threads))]
-pub struct Thread;
+pub struct Thread {
+    #[cfg(target_os = "android")]
+    handle: usize,
+}
 #[cfg(not(web_threads))]
 impl Thread {
-    /// No thread was started.
-    pub fn join(self) {}
+    /// Wait for it (no thread was started in the browser).
+    pub fn join(self) {
+        #[cfg(target_os = "android")]
+        android_gpu::thread_join(self.handle);
+    }
 }
 /// Reject native thread creation. Use Job for cooperative background work.
 #[cfg(not(web_threads))]

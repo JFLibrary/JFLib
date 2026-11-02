@@ -91,12 +91,12 @@ pub fn stats(v: &[f64]) -> (f64, f64, f64) {
     (mean, s[s.len() / 2], s[(s.len() * 99 / 100).min(s.len() - 1)])
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn platform_wayland() -> bool {
     plat::disp_backend() == plat::BK_WAYLAND
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 fn platform_wayland() -> bool {
     false
 }
@@ -119,7 +119,7 @@ fn near(a: [u8; 4], b: [u8; 4]) -> bool {
 pub fn window(t: &mut T) {
     let Some(g) = setup(t) else { return };
     let dev = &g.dev;
-    if !dev.features().swapchain {
+    if !crate::windows(dev) {
         out("SKIP: no swapchains on this device");
         return;
     }

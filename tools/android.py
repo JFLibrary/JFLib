@@ -2,6 +2,8 @@
 
 The shared Java/JNI host presents the library's pixels and forwards input. Apps opt in
 with `android` in TARGETS and supply android/AndroidManifest.xml and android/res/.
+A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest) is a
+plain executable for `adb shell` instead (build_exe, android/exe_main.c).
 """
 from pathlib import Path
 import hashlib
@@ -134,6 +136,50 @@ def manifest_gaps(perms, manifest):
     return None
 
 
+def native_link_flags():
+    """what every native link of this target has: only what is used, 16 KiB pages, no text relocations"""
+    return ['-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
+            '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now']
+
+
+def build_exe(builder, name, root, crates, run):
+    """a program without a UI -> <out>/android/NAME-<abi>: `adb push` it to /data/local/tmp and run it
+    from `adb shell` (the driver of a GPU needs no app for that); no APK, no Java"""
+    error = sys.modules[builder.__class__.__module__].BuildError
+    try:
+        sdk, ndk, llvm, sdkbuild, platform, java, suffix = sdk_tools()
+    except RuntimeError as exc:
+        raise error(str(exc)) from exc
+    work = builder.dir / 'apps' / name
+    work.mkdir(parents=True, exist_ok=True)
+    output = builder.android_output / f'{name}-{builder.android_abi}'
+    perms, assets, boot = builder.boot_inputs(name)
+    digest = hashlib.sha256(builder.src_hash(root, crates, extra=boot).encode())
+    for path in (Path(__file__), ROOT / 'build_rs.py', ROOT / 'android' / 'exe_main.c'):
+        digest.update(path.read_bytes())
+    digest.update(f'{ndk}'.encode())
+    stamp = work / 'exe.sha256'
+    fingerprint = digest.hexdigest()
+    if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
+        return output
+    archive = work / f'lib{name}.a'
+    cmd = ['rustc'] + builder.flags() + ['--crate-type', 'staticlib', '--crate-name', name.lower()]
+    if builder.release:
+        cmd += ['-C', 'lto=fat']
+    for crate in crates:
+        cmd += ['--extern', f'{crate}={builder.rlib(crate)}']
+    boot_args, env = builder.boot_args(name, perms, assets)
+    cmd += boot_args + ['-o', archive, root]
+    run(cmd, env=env)
+    triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
+    run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}', f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2',
+         '-fPIE', '-pie', '-Wall', '-Wextra', '-Werror', ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(),
+         '-llog', '-ldl', '-lm', '-o', output])
+    run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', output])
+    stamp.write_text(fingerprint)
+    return output
+
+
 def build_apk(builder, name, style, variant, root, crates, run, notices):
     """notices: {relative Path: source} (build_rs.app_notices), packed below assets/"""
     # Import the same error type as the active build entry point, including __main__.
@@ -193,9 +239,8 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}',
          f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2', '-fPIC', '-fvisibility=hidden',
          '-Wall', '-Wextra', '-Werror', '-shared', ROOT / 'android' / 'bridge.c', ROOT / 'android' / 'audio.c',
-         ROOT / 'android' / 'system.c', archive,
-         '-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
-         '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now', '-llog', '-ljnigraphics', '-laaudio', '-ldl', '-lm', '-o', native])
+         ROOT / 'android' / 'system.c', archive, *native_link_flags(),
+         '-llog', '-ljnigraphics', '-landroid', '-laaudio', '-ldl', '-lm', '-o', native])
     run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', native])
     try:
         verify_elf(native, builder.android_abi)

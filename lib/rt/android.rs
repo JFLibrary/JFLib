@@ -1,7 +1,7 @@
 // Android runtime: Bionic allocation and logging for the native, host-driven UI.
 // New platform adapter; no assembly reference. Allocation never assumes a page size.
 
-use core::{alloc::{GlobalAlloc, Layout}, ffi::{c_int, c_void}};
+use core::{alloc::{GlobalAlloc, Layout}, ffi::{c_int, c_void}, sync::atomic::{AtomicBool, Ordering}};
 
 #[link(name = "c")]
 unsafe extern "C" {
@@ -11,6 +11,7 @@ unsafe extern "C" {
     fn munmap(address: *mut c_void, size: usize) -> c_int;
     fn sched_yield() -> c_int;
     fn _exit(code: c_int) -> !;
+    fn write(fd: c_int, bytes: *const c_void, count: usize) -> isize;
 }
 #[link(name = "log")]
 unsafe extern "C" {
@@ -62,7 +63,19 @@ pub fn exit(code: i32) -> ! {
     // SAFETY: terminates only the calling process.
     unsafe { _exit(code) }
 }
+// a program without a UI, run from `adb shell` (android/exe_main.c): stdout and stderr
+static CONSOLE: AtomicBool = AtomicBool::new(false);
+/// (android/exe_main.c) the output goes to stdout and stderr, not to logcat
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_console() {
+    CONSOLE.store(true, Ordering::Relaxed);
+}
 fn log(bytes: &[u8], priority: i32) {
+    if CONSOLE.load(Ordering::Relaxed) {
+        // SAFETY: bytes is readable for its length; only the descriptors of the process.
+        unsafe { write(if priority == 6 { 2 } else { 1 }, bytes.as_ptr().cast(), bytes.len()) };
+        return;
+    }
     for chunk in bytes.chunks(1000) {
         let mut text = [0u8; 1001];
         text[..chunk.len()].copy_from_slice(chunk);

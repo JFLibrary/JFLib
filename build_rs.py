@@ -184,10 +184,10 @@ LIBS = {
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
-# what a library crate needs on one target only: G3a, G4b, the UI's output through the GPU (Windows;
-# Linux in the build against glibc, section "glibc"; the other targets and the static Linux build do
+# what a library crate needs on one target only: G3a, G4b, G4c, the UI's output through the GPU (Windows;
+# Linux in the build against glibc, section "glibc"; Android; the browser and the static Linux build do
 # not link Vulkan code: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"]}
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"], ("ui", "android"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -1139,12 +1139,14 @@ class Builder:
         crates = app_crates(name)
         extra = app_styles(name)                       # further styles to switch to at run time
         # a program of the glibc build without a UI does not build the UI for a style it never names
-        styled = not self.glibc or "ui" in crates
+        styled = (not self.glibc and self.target != "android") or "ui" in crates
         deps = crates + (sorted({scrate, *extra}) if styled else [])
         self.build_libs(deps)
         root = entrypoint(RS / "apps" / name, "app")
         if self.target == "android":
-            from tools.android import build_apk
+            from tools.android import build_apk, build_exe
+            if "ui" not in crates:                     # a plain executable for `adb shell` (apps/gputest)
+                return build_exe(self, name, root, crates + extra, run_cmd)
             return build_apk(self, name, style, variant, root, crates + extra, run_cmd,
                              app_notices([style] + [c[len("style_"):] for c in extra]))
         lto = self.profile["lto"] if self.release and self.profile else "fat"      # r13-measure
