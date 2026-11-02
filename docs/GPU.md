@@ -671,6 +671,8 @@ drei Läufe je Variante, gezeigt die Spanne der Läufe. Der Rechner ist geteilt 
 | Leinwand verschieben: CPU / GPU / Compositor | 1,19–1,49 / 0 / 1,17–1,42 ms | 0,68–0,95 / 1,96 / 0,58–0,92 ms | einfacher Inhalt; teure Inhalte gewinnen mehr |
 | Größe gallery, Release | statisch 4 472 664 Byte | glibc mit GPU 4 787 544 Byte (+314 880) | |
 
+Unter X11 (Xwayland desselben KWin, je 3 Läufe) ist es dasselbe Bild: ganze Seite CPU 6,1–8,2 gegen 6,1–6,3 ms, kleiner Fleck 0,91–1,18 gegen 1,26–1,48 ms, GPU 2,64 und 1,71 ms; RSS 17–21 gegen 55 MiB.
+
 Was das heißt: Eine schwache GPU reicht, 1,7 bis 2,6 ms je Bild bei diesem Fenster. Die CPU des Programms ist gleich oder kleiner, die des Compositors kleiner (er muss nichts kopieren). Im Leerlauf kostet der Weg nichts. Der Preis ist
 Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB im Treiber, und der Commit kommt um die GPU-Zeit später; auf dem Bildschirm bleibt davon wenig. Empfehlung: an, wie unter Windows (`DEFAULT_ON_LINUX` in `gpu_out.rs`, eine Zeile), solange kein Treiber anderes zeigt.
 

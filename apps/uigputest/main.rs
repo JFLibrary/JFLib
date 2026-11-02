@@ -2626,6 +2626,7 @@ struct Bench {
     /// Linux: the press, for the next frame (a thread cannot post to a window there)
     key: AtomicBool,
     /// Linux: when the presses were made
+    #[cfg_attr(windows, allow(dead_code))]
     press: rt::sync::SpinLock<Vec<u64>>,
 }
 
