@@ -26,6 +26,7 @@ für den Finger angeordnet (eine Spalte, 44 DIP):
 | Werte & Farben | Dezimalregler, Eigenschaftszeilen, Winkel, Verschieben, Farbspuren, Farbrad, Farbwähler | [`pg_colors.rs`](pg_colors.rs) |
 | Fenster & Dialoge | Werkzeugfenster, verschachtelte modale Dialogfenster, Seitendialog, Popups aus einem Fenster, Statusleiste | [`pg_windows.rs`](pg_windows.rs) |
 | Randfälle | Bedienelemente in den Ecken: ihre Menüs, Listen und der Kalender bleiben auf dem Bildschirm | [`pg_edge.rs`](pg_edge.rs) |
+| Bild & Leinwand | Bildansicht (Kacheln auf der GPU beim Verschieben und Zoomen), großes deckendes Bild (Textur) | [`pg_image.rs`](pg_image.rs) |
 | Wasserwaage, Handylage, Kompass, GPS | die Sensoren und der Standort des Geräts (`plat::sensors`), unten | [`pg_sensors.rs`](pg_sensors.rs) |
 
 Die App braucht `POST_NOTIFICATIONS` (gefragt bei der ersten Benachrichtigung), `WAKE_LOCK`
@@ -86,6 +87,9 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
   Fenster ohne Popup direkt aus dessen Pixeln, ohne Komposition) in ein Android-Bitmap. Die schmale Java-Hülle
   kümmert sich um Lebenszyklus, Insets, Touch, Hardwaretastatur und IME-Eingabe.
   Widgets, Layout, Schriften und Rendering kommen vollständig aus der Rust-Library.
+- Seit 02.11.2026 zeigen Geräte mit Vulkan 1.1 die Bilder über eine Swapchain auf einem `SurfaceView` über
+  der View, in der vollen Auflösung des Bildschirms; ohne Vulkan bleibt alles beim Folgenden, in der alten
+  Auflösung, ohne Meldung ([GPU.md „Ausgabe unter Android“](../../docs/GPU.md)). Das Manifest verlangt kein Vulkan.
 - Die Java-Hülle zeichnet nur geänderte Bitmaps. JNI sperrt und kopiert ausschließlich
   bei gemeldeten Änderungen; im Leerlauf plant die Library den nächsten Timer statt
   ständig GPU-Uploads auszulösen. Neue Eingaben wecken den Frame-Callback sofort.
@@ -120,6 +124,20 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
   eigenen Dialog über die virtuellen Dateien. Geprüft mit `tests/files_web.mjs`.
 - **Zwischenablage**: Text und HTML über den `ClipboardManager`; Bilder als PNG über den
   Provider `GalleryFiles` (im Manifest, Authority `org.jflib.gallery.jfgui.files`).
+
+## Die GPU prüfen (seit 02.11.2026)
+
+```powershell
+python apps/androidGallery/tests/android_gpu.py --serial S [--apk APK]
+```
+
+Prüft den Weg über die Swapchain (dargestellte Bilder zurückgelesen, der Bildschirm mit beiden Wegen verglichen,
+Menüs, Tastatur, Drehen, weg und zurück, verlorenes Gerät, Werkzeugfenster, Leerlauf), die Seite „Bild & Leinwand“, den
+Rückfall ohne Vulkan und einen Treiber, der das Programm beendet. Ohne brauchbare GPU `SKIP` für diese Teile. Auf einem Telefon mit einer
+Galerie, die Daten hat, neben ihr: `jfgui_ANDROID_PACKAGE=org.jflib.gallery.g4c python -u build_rs.py app androidGallery --target android` und `--package org.jflib.gallery.g4c`.
+Emulator: `-gpu host` (Vulkan 1.3); `-gpu swiftshader_indirect` zeigt den Rückfall. `apps/gputest/tests/android.py` führt `gputest` aus (`adb shell`).
+Messen: `adb shell am instrument -w -r -e phase bench -e gpu 1 -e res full org.jflib.gallery/.GalleryGpuInstrumentation`
+(`-e res cap`, `-e gpu 0`, `-e page images`, `-e landscape 1`).
 
 ## Grenzen dieses Prototyps
 

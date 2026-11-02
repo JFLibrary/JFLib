@@ -6,6 +6,7 @@
  */
 #include <jni.h>
 #include <android/bitmap.h>
+#include <android/native_window_jni.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -33,6 +34,10 @@ extern uintptr_t jfgui_a11y_data(void);
 extern uintptr_t jfgui_reply(uint32_t length);
 extern uint32_t jfgui_file_result(uint32_t id, int32_t status, uint32_t length);
 extern void jfgui_content_changed(void);
+extern uint32_t jfgui_gpu_surface(uintptr_t window);
+extern uint64_t jfgui_present_frames(void);
+extern uint32_t jfgui_gpu_test(uint32_t op);
+extern uintptr_t jfgui_response(void);
 
 static JNIEnv *target_env;
 static jobject target_bitmap;
@@ -184,6 +189,7 @@ JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeRender(
     target_bitmap = bitmap;
     presented = 0;
     int result = 0;
+    uint64_t frames = started ? jfgui_present_frames() : 0;
     if (!started) {
         (void)jfgui_buffer(0);
         result = jfgui_start((int32_t)target_info.width, (int32_t)target_info.height, dpi, 0);
@@ -199,6 +205,8 @@ JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeRender(
         last_height = (int)target_info.height;
         last_dpi = dpi;
         jfgui_tick(time_ms());
+        /* 2: a frame went through the GPU, the Bitmap rests (GalleryActivity draws nothing new) */
+        if (!presented && jfgui_present_frames() != frames) presented = 2;
     }
     target_bitmap = NULL;
     target_env = NULL;
@@ -361,6 +369,34 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryHost_nativeResult(
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryHost_nativeChanged(JNIEnv *env, jclass cls) {
     (void)env; (void)cls;
     jfgui_content_changed();
+}
+/* The SurfaceView's surface (GalleryActivity, lib/plat/android_gpu.rs), null when it went: Rust gives
+ * up its swapchain before this returns; this file holds one reference while Rust knows the window.
+ * -> a frame waits to go to the Bitmap. */
+static ANativeWindow *gpu_window;
+JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeGpuSurface(
+        JNIEnv *env, jclass cls, jobject surface) {
+    (void)cls;
+    ANativeWindow *window = surface ? ANativeWindow_fromSurface(env, surface) : NULL;
+    if (window == gpu_window) {
+        if (window) ANativeWindow_release(window);
+        return JNI_FALSE;
+    }
+    uint32_t waits = gpu_window ? jfgui_gpu_surface(0) : 0;
+    if (gpu_window) ANativeWindow_release(gpu_window);
+    gpu_window = window;
+    if (window) (void)jfgui_gpu_surface((uintptr_t)window);
+    return waits ? JNI_TRUE : JNI_FALSE;
+}
+/* (tests) the GPU output's counters; op 1 loses the device, 2 settles, 3 asks for a full frame
+ * (GalleryGpuInstrumentation) */
+JNIEXPORT jbyteArray JNICALL Java_org_jflib_gallery_GalleryActivity_nativeGpuTest(JNIEnv *env, jclass cls, jint op) {
+    (void)cls;
+    if (!started) return NULL;
+    uint32_t length = jfgui_gpu_test((uint32_t)op);
+    jbyteArray out = (*env)->NewByteArray(env, (jsize)length);
+    if (out && length) (*env)->SetByteArrayRegion(env, out, 0, (jsize)length, (const jbyte *)jfgui_response());
+    return out;
 }
 JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeIme(
         JNIEnv *env, jclass cls) {

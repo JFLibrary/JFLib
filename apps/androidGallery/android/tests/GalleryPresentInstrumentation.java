@@ -37,6 +37,7 @@ public final class GalleryPresentInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             Intent intent = new Intent(getTargetContext(), GalleryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.putExtra("jfgui_GPU", "0"); // the Bitmap's path; through the GPU: GalleryGpuInstrumentation
             Activity activity = startActivitySync(intent);
             waitForIdleSync();
             final Throwable[] failure = new Throwable[1];

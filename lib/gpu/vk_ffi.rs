@@ -1,5 +1,5 @@
 // vk_ffi -- the Vulkan declarations of lib/gpu's backend, written by hand from vulkan_core.h
-// and vulkan_win32.h: only the handles, constants, structures and commands the backend uses.
+// , vulkan_win32.h and vulkan_android.h: only the handles, constants, structures and commands the backend uses.
 //
 //   constants      the C names without "VK_" (STRUCTURE_TYPE_BUFFER_CREATE_INFO, FORMAT_D32_SFLOAT)
 //   structures     the C names without "Vk", fields in snake_case (s_type, p_next, ...);
@@ -137,6 +137,7 @@ pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES: u32 = 53;
 pub const STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR: u32 = 1000001000;
 pub const STRUCTURE_TYPE_PRESENT_INFO_KHR: u32 = 1000001001;
 pub const STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR: u32 = 1000009000;
+pub const STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR: u32 = 1000008000;
 pub const STRUCTURE_TYPE_RENDERING_INFO: u32 = 1000044000;
 pub const STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO: u32 = 1000044001;
 pub const STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO: u32 = 1000044002;
@@ -927,6 +928,9 @@ vk_structs! {
     pub struct Win32SurfaceCreateInfoKHR {
         pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub hinstance: isize, pub hwnd: isize,
     }
+    pub struct AndroidSurfaceCreateInfoKHR {
+        pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub window: usize,
+    }
     pub struct SurfaceCapabilitiesKHR {
         pub min_image_count: u32, pub max_image_count: u32, pub current_extent: Extent2D,
         pub min_image_extent: Extent2D, pub max_image_extent: Extent2D,
@@ -1043,6 +1047,8 @@ fn_table! {
             (PhysicalDevice, Handle, *mut u32, *mut u32) -> VkResult;
         create_win32_surface_khr opt [b"vkCreateWin32SurfaceKHR\0"]
             (Instance, *const Win32SurfaceCreateInfoKHR, A, *mut Handle) -> VkResult;
+        create_android_surface_khr opt [b"vkCreateAndroidSurfaceKHR\0"]
+            (Instance, *const AndroidSurfaceCreateInfoKHR, A, *mut Handle) -> VkResult;
         create_debug_utils_messenger_ext opt [b"vkCreateDebugUtilsMessengerEXT\0"]
             (Instance, *const DebugUtilsMessengerCreateInfoEXT, A, *mut Handle) -> VkResult;
         destroy_debug_utils_messenger_ext opt [b"vkDestroyDebugUtilsMessengerEXT\0"] (Instance, Handle, A);
@@ -1256,6 +1262,7 @@ mod layout {
     check!(SemaphoreWaitInfo, 40, s_type = 0, p_next = 8, flags = 16, semaphore_count = 20, p_semaphores = 24, p_values = 32);
     check!(SubmitInfo, 72, s_type = 0, p_next = 8, wait_semaphore_count = 16, p_wait_semaphores = 24, p_wait_dst_stage_mask = 32, command_buffer_count = 40, p_command_buffers = 48, signal_semaphore_count = 56, p_signal_semaphores = 64);
     check!(Win32SurfaceCreateInfoKHR, 40, s_type = 0, p_next = 8, flags = 16, hinstance = 24, hwnd = 32);
+    check!(AndroidSurfaceCreateInfoKHR, 32, s_type = 0, p_next = 8, flags = 16, window = 24);
     check!(SurfaceCapabilitiesKHR, 52, min_image_count = 0, max_image_count = 4, current_extent = 8, min_image_extent = 16, max_image_extent = 24, max_image_array_layers = 32, supported_transforms = 36, current_transform = 40, supported_composite_alpha = 44, supported_usage_flags = 48);
     check!(SurfaceFormatKHR, 8, format = 0, color_space = 4);
     check!(SwapchainCreateInfoKHR, 104, s_type = 0, p_next = 8, flags = 16, surface = 24, min_image_count = 32, image_format = 36, image_color_space = 40, image_extent = 44, image_array_layers = 52, image_usage = 56, image_sharing_mode = 60, queue_family_index_count = 64, p_queue_family_indices = 72, pre_transform = 80, composite_alpha = 84, present_mode = 88, clipped = 92, old_swapchain = 96);

@@ -1,5 +1,5 @@
-// gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc:
-// docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux")
+// gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc;
+// Android: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android")
 //
 // The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 // it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -38,6 +38,15 @@
 // then), the compositor gets the frame's rectangles (damage), a worker may not ask the window system
 // (Surface::track_size).  What cannot be read back is said by the tests: no client reads a Wayland
 // window, Xwayland's GetImage of a flipped window lags one frame.
+//
+// Android: the same code again.  The host's View with its Bitmap is the CPU path and stays below; the
+// swapchain lives on a SurfaceView above it (plat android_gpu.rs), the analogue of Windows' child
+// window: the surface exists while the View is visible, shows nothing until its first present and
+// then covers the Bitmap.  Going back: the frame to the Bitmap, the SurfaceView away, and with it the
+// surface and swapchain (win_gpu_child_show).  The system can also take the surface (the activity
+// stops): gp_surface_gone, before the host's callback returns.  win_gpu_child says None for a while
+// (the surface is on its way, a tool window or popup shows on the canvas below): win_gpu_child_later,
+// the host wakes the loop.
 //
 // Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 // and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -91,9 +100,11 @@
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 // usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
-// silently.
+// silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
+// runs: a driver that killed the program does not get a third chance).
 //
-// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX), jfgui_GPU_VERIFY=1 (every presented
+// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX; Android: GalleryActivity
+// always sets it, GPU_DEFAULT there), jfgui_GPU_VERIFY=1 (every presented
 // image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 // jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -496,6 +507,7 @@ struct Win {
     apart_before: bool, // the last frame had layers, images or canvases apart
     last_present: u64,
     job: u32,      // the job in flight
+    lost: bool,    // (Android) the surface went while the job built on it
     size: (i32, i32),
     stable_at: u64,
     fail_at: u64,  // no new swapchain before this time
@@ -584,6 +596,7 @@ pub(crate) struct S {
     tile_evicted: u64,
     canvas_settles: u64,
     canvas_free_at: u64,
+    said_ok: bool, // plat::gpu_out_state
     tile_marked: u64, // `gpu expect fills`
     diff_marked: u64, // `gpu expect nodiff`
 }
@@ -633,6 +646,7 @@ impl Default for S {
             tile_evicted: 0,
             canvas_settles: 0,
             canvas_free_at: 0,
+            said_ok: false,
             tile_marked: 0,
             diff_marked: 0,
         }
@@ -647,7 +661,7 @@ fn wanted() -> bool {
     let on = match plat::env("jfgui_GPU").as_deref() {
         Some("0") | Some("off") => false,
         Some("1") | Some("on") => true,
-        _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX },
+        _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX }, // (Android: the host says)
     };
     on && !plat::win_remote_session()
 }
@@ -791,7 +805,7 @@ impl S {
         let j = jobs.clone();
         // (jfgui_GPU_WORKER_KB: to see what a driver needs, docs/GPU.md "Linux")
         let stack = plat::env("jfgui_GPU_WORKER_KB").and_then(|v| v.parse::<usize>().ok()).map_or(WORKER_STACK, |k| k << 10);
-        let t = plat::thread_spawn(stack, Box::new(move || {
+        let t = plat::gpu_thread_spawn(stack, Box::new(move || {
             let d = f();
             j.done.lock().push(d);
             j.running.fetch_sub(1, Ordering::AcqRel);
@@ -835,6 +849,10 @@ fn build_window(dev: &Device, bgl: &BindGroupLayout, surf: gpu::Surface, old: Op
 /// instance, the adapter for this window, device, pipeline, the first swapchain
 fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, desc: SwapchainDesc, trace: bool) -> gpu::Result<(Core, Built)> {
     let t0 = plat::time_us();
+    #[cfg(target_os = "android")]
+    if env_on("jfgui_GPU_TEST_DIE") {
+        rt::os::exit(3); // (android_gpu.py: a driver that kills the program)
+    }
     let inst = Instance::new()?;
     let t1 = plat::time_us();
     let surf = gpu::Surface::native(&inst, nw, pw)?;
@@ -1313,6 +1331,7 @@ impl Ui {
             apart_before: false,
             last_present: 0,
             job: 0,
+            lost: false,
             size: (0, 0),
             stable_at: now,
             fail_at: 0,
@@ -1431,11 +1450,16 @@ impl Ui {
                                 | GpuError::NotReady => {
                                     s.dev = Dev::Retry(plat::time_us() + s.retry_ms * 1000);
                                     s.retry_ms = (s.retry_ms * 2).min(RETRY_MAX_MS);
+                                    plat::gpu_out_state(plat::GPU_STATE_UNKNOWN);
                                 }
-                                _ => s.dev = Dev::Never(format!("{e}")), // no Vulkan, no usable adapter: the CPU path for good
+                                _ => {
+                                    s.dev = Dev::Never(format!("{e}")); // no Vulkan, no usable adapter: the CPU path for good
+                                    plat::gpu_out_state(plat::GPU_STATE_NEVER);
+                                }
                             }
                             if let Some(w) = s.win(win) {
                                 w.stage = Stage::Cpu;
+                                w.lost = false;
                                 w.out.error = Some(format!("{e}"));
                             }
                         }
@@ -1454,9 +1478,12 @@ impl Ui {
                             s.note(&format!("window {win}: no swapchain: {e}"));
                             if let Some(w) = s.win(win) {
                                 w.stage = Stage::Cpu;
-                                w.out.error = Some(format!("{e}"));
-                                w.fail_ms = (w.fail_ms * 2).clamp(RETRY_FIRST_MS, RETRY_MAX_MS);
-                                w.fail_at = now + w.fail_ms * 1000;
+                                w.stable_at = now;
+                                if !core::mem::take(&mut w.lost) {
+                                    w.out.error = Some(format!("{e}"));
+                                    w.fail_ms = (w.fail_ms * 2).clamp(RETRY_FIRST_MS, RETRY_MAX_MS);
+                                    w.fail_at = now + w.fail_ms * 1000;
+                                }
                             }
                         }
                     }
@@ -1478,6 +1505,10 @@ impl Ui {
         let Dev::Ready(core) = &s.dev else { return };
         let (dev, format) = (core.dev.clone(), core.format);
         let Some(w) = s.win(i) else { return };
+        if core::mem::take(&mut w.lost) {
+            w.stage = Stage::Cpu; // (Android: the surface it was built on went meanwhile)
+            return;
+        }
         if b.sc.format() != format {
             w.stage = Stage::Cpu;
             w.fail_at = u64::MAX;
@@ -1507,8 +1538,8 @@ impl Ui {
         let mut again = false;
         let fb = self.uiw_parts(i as u32).map(|p| &p.rt.fb);
         if let (Dev::Ready(core), Some(Some(w)), Some(fb)) = (&s.dev, s.wins.get_mut(i), fb) {
-            if w.tex.as_ref().is_none_or(|t| (t.w, t.h) != (fb.w, fb.h)) {
-                w.stage = Stage::Cpu; // the size changed meanwhile
+            if w.tex.as_ref().is_none_or(|t| (t.w, t.h) != (fb.w, fb.h)) || !plat::win_gpu_child_alone(w.pw) {
+                w.stage = Stage::Cpu; // the size changed meanwhile (Android: something else shows now)
                 w.stable_at = t0;
                 again = true;
             } else {
@@ -1525,6 +1556,9 @@ impl Ui {
                         w.stage = Stage::Gpu;
                         w.out.switches += 1;
                         w.out.error = None;
+                        if !core::mem::replace(&mut s.said_ok, true) {
+                            plat::gpu_out_state(plat::GPU_STATE_OK);
+                        }
                     }
                     Ok(Shown::Wait) => w.pending = true,
                     Ok(Shown::NoArea) | Ok(Shown::Stale) => {
@@ -1578,6 +1612,8 @@ impl Ui {
             let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
             match w.stage {
                 Stage::Switch => self.gp_switch(i),
+                // (Android: a tool window or popup is composed on the canvas, below the surface)
+                Stage::Gpu if !plat::win_gpu_child_alone(w.pw) => self.gp_leave(i, "something else shows"),
                 Stage::Gpu if w.pending && plat::time_us() >= w.last_present + MIN_PRESENT_US => self.gp_retry(i),
                 _ => {}
             }
@@ -1637,7 +1673,9 @@ impl Ui {
                 return;
             };
             let Some(nw) = plat::win_gpu_child(pw) else {
-                s.dev = Dev::Never(String::from("no child window"));
+                if !plat::win_gpu_child_later(pw) {
+                    s.dev = Dev::Never(String::from("no child window"));
+                }
                 return;
             };
             let display = plat::win_display_adapter(pw);
@@ -1646,6 +1684,7 @@ impl Ui {
             s.next_job += 1;
             let trace = s.trace;
             s.note("start: instance, device, swapchain on a worker");
+            plat::gpu_out_state(plat::GPU_STATE_TRYING);
             let ok = s.spawn(move || Done::Device { job, win: i, r: build_device(nw, pw, display, desc, trace) });
             if ok {
                 s.dev = Dev::Starting(job);
@@ -1716,7 +1755,7 @@ impl Ui {
             d = now + JOB_US;
         }
         match s.dev {
-            Dev::None if s.wins.iter().flatten().next().is_some() => d = now,
+            Dev::None if s.wins.iter().flatten().next().is_some_and(|w| !plat::win_gpu_child_later(w.pw)) => d = now,
             Dev::Retry(at) => d = d.min(at),
             _ => {}
         }
@@ -1747,7 +1786,7 @@ impl Ui {
                     let retry = (w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000));
                     d = d.min(w.sc.as_ref().map_or(retry, |sc| sc.next_look(retry)));
                 }
-                Stage::Cpu if ready && !minimised && !moving && w.fail_at != u64::MAX => {
+                Stage::Cpu if ready && !minimised && !moving && w.fail_at != u64::MAX && !plat::win_gpu_child_later(w.pw) => {
                     // (a size the frame has not reached yet: its event is on the way)
                     let settle = if plat::win_size(w.pw) == w.size { 1000 } else { 16_000 };
                     d = d.min((w.stable_at + STABLE_US).max(w.fail_at).max(now + settle));
@@ -1756,6 +1795,38 @@ impl Ui {
             }
         }
         if d == u64::MAX { None } else { Some(d) }
+    }
+
+    /// (Android) the system took the surface (the activity stopped; or the output's own hide, then
+    /// nothing is on it any more): every window back to the CPU path, its swapchain gone before the
+    /// host's callback returns -> a frame waits to reach the host's Bitmap (the View may be seen
+    /// again before the next frame)
+    #[cfg(target_os = "android")]
+    pub(crate) fn gp_surface_gone(&mut self) -> bool {
+        if !self.m.gout.want {
+            return false;
+        }
+        let mut waits = false;
+        for i in 0..self.m.gout.wins.len() {
+            let Some(stage) = self.m.gout.wins[i].as_ref().map(|w| w.stage) else { continue };
+            if stage == Stage::Gpu {
+                self.gp_leave(i, "the surface went");
+                waits = true;
+            }
+            let Some(w) = self.m.gout.win(i) else { continue };
+            if stage == Stage::Job {
+                w.lost = true; // (what it built goes when it ends)
+            } else {
+                w.stage = Stage::Cpu;
+            }
+            w.sc = None;
+            w.surf = None;
+            w.tex = None;
+            w.rb = None;
+            w.pending = false;
+            w.sp.reset();
+        }
+        waits
     }
 
     /// wait for the jobs (the message loop pumps: a driver may send messages to the window while

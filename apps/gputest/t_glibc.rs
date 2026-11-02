@@ -15,14 +15,23 @@
 
 use alloc::format;
 use alloc::string::String;
+#[cfg(not(target_os = "android"))]
 use alloc::vec::Vec;
 
 use gpu::*;
 
 use crate::T;
 
+/// (Android: this program has no plat::process; the paths in this process are checked)
+#[cfg(target_os = "android")]
+fn child(_: &mut T, _: &[&str], _: &[(&str, Option<&str>)]) -> Option<(i32, String, String)> {
+    crate::out("  note: no child processes on this target");
+    None
+}
+
 /// this program again with args and env -> (exit code, stdout, stderr); None: it did not start or
 /// did not end within 60 s
+#[cfg(not(target_os = "android"))]
 fn child(t: &mut T, args: &[&str], env: &[(&str, Option<&str>)]) -> Option<(i32, String, String)> {
     let exe = plat::current_exe().unwrap_or_default();
     let cmd = plat::process::Command { program: &exe, args, cwd: None, env };

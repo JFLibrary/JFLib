@@ -68,10 +68,12 @@
 //
 // Without Vulkan or a usable GPU every test prints "SKIP" and passes (the error paths are
 // tested with jfgui_GPU_DLL); on Linux the tests that need a window do, for now (G4b: no surfaces
-// there, Features::swapchain is false).  Exit code 1 when a check failed.  build_rs.py test gputest runs
-// tests/*.uis (the script itself is ignored: --script).  The window is a plain plat window
-// with its own event loop that is never given to plat::win_present, so the CPU presentation
-// never paints over the swapchain (plat::win_native, win_api.rs).
+// there, Features::swapchain is false), and on Android (G4c), where this is a plain executable for
+// `adb shell` without an app and so without a surface (windows(); tests/android.py runs it,
+// apps/androidGallery/tests/android_gpu.py has the swapchain).  Exit code 1 when a check failed.
+// build_rs.py test gputest runs tests/*.uis (the script itself is ignored: --script).  The window is a
+// plain plat window with its own event loop that is never given to plat::win_present, so the CPU
+// presentation never paints over the swapchain (plat::win_native, win_api.rs).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -148,6 +150,11 @@ pub struct Gpu {
     pub inst: Instance,
     pub adapter: Adapter,
     pub dev: Device,
+}
+
+/// this program can show something on this device
+pub fn windows(dev: &Device) -> bool {
+    dev.features().swapchain && !cfg!(target_os = "android")
 }
 
 /// the GPU for a test; None (SKIP, not a failure) without Vulkan or a usable GPU
@@ -233,7 +240,17 @@ fn info(t: &mut T) {
             n.missing.map_or(String::new(), |m| format!(", unusable: needs {m}"))
         ));
     }
-    let Some(a) = t.res(inst.adapter(), "adapter") else { return };
+    let a = match inst.adapter() {
+        Ok(a) => a,
+        Err(e @ (GpuError::NoAdapter | GpuError::Unsupported(_))) => {
+            out(&format!("SKIP: {e}")); // (a phone's old driver, the emulator's SwiftShader)
+            return;
+        }
+        Err(e) => {
+            t.fail(&format!("adapter: {e}"));
+            return;
+        }
+    };
     let t1 = plat::time_us();
     let Some(dev) = t.res(a.create_device(&DeviceDesc::DEFAULT), "create_device") else { return };
     out(&format!("device: {:.1} ms, {} at level {:?}", ms_since(t1), dev.info().name, dev.level()));

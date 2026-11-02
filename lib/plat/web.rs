@@ -60,6 +60,11 @@ pub(crate) use system_host::sys_settings_host;
 pub(crate) mod sensors_host;
 pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 #[cfg(target_os = "android")]
+#[path = "android_gpu.rs"]
+mod android_gpu;
+#[cfg(target_os = "android")]
+pub use android_gpu::*;
+#[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;
 #[cfg(target_os = "android")]
@@ -209,6 +214,10 @@ pub trait WebApplication {
     fn control(&mut self, line: &[u8]) -> Option<String>;
     /// Synchronize runtime visibility and command state when the host changes activation.
     fn set_control_enabled(&mut self, _enabled: bool) {}
+    /// (Android) the surface of the GPU output went away -> a frame waits for the host's canvas.
+    fn surface_gone(&mut self) -> bool { false }
+    /// (Android, tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
+    fn gpu_test(&mut self, _op: u32) -> Option<String> { None }
 }
 struct AppSlot(UnsafeCell<Option<Box<dyn WebApplication>>>);
 // SAFETY: a WASM instance belongs to one worker, an Android instance to the Java UI thread;
@@ -236,6 +245,12 @@ fn with_app<R>(f: impl FnOnce(&mut dyn WebApplication) -> R) -> Option<R> {
         *APP.0.get() = Some(app);
     }
     Some(result)
+}
+
+/// (Android) the surface of the GPU output went away; nothing of it is used after this returns.
+#[cfg(target_os = "android")]
+fn surface_gone() -> bool {
+    with_app(|app| app.surface_gone()).unwrap_or(false)
 }
 
 pub(crate) fn notice(kind: u32, data: &[u8]) {
@@ -466,13 +481,20 @@ pub fn mem_total() -> u64 {
 }
 /// Cooperative yield is achieved by returning from the current runtime step.
 pub fn thread_yield() {}
-/// Browser thread handle placeholder; spawning native threads is unsupported.
+/// Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
+/// output's jobs have threads of their own, android_gpu.rs).
 #[cfg(not(web_threads))]
-pub struct Thread;
+pub struct Thread {
+    #[cfg(target_os = "android")]
+    handle: usize,
+}
 #[cfg(not(web_threads))]
 impl Thread {
-    /// No thread was started.
-    pub fn join(self) {}
+    /// Wait for it (no thread was started in the browser).
+    pub fn join(self) {
+        #[cfg(target_os = "android")]
+        android_gpu::thread_join(self.handle);
+    }
 }
 /// Reject native thread creation. Use Job for cooperative background work.
 #[cfg(not(web_threads))]
@@ -842,6 +864,22 @@ pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) 
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_present_us() -> f64 {
     crate::present_time().1 as f64
+}
+/// (Android) frames shown so far, through the platform or the GPU (present_time).
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_present_frames() -> u64 {
+    crate::present_time().0
+}
+/// (Android, tests) the GPU output: its counters as a line (GalleryGpuInstrumentation); op: 1 lose
+/// the device, 2 settle, 3 the next frame draws everything.  -> the length, the bytes in the
+/// response buffer.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_gpu_test(op: u32) -> u32 {
+    let text = with_app(|app| app.gpu_test(op)).flatten().unwrap_or_default();
+    *OUTBOX.lock() = text.into_bytes();
+    OUTBOX.lock().len() as u32
 }
 /// Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 #[unsafe(no_mangle)]

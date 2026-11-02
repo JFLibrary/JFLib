@@ -5,15 +5,15 @@
 //                                      System32 only; a path from jfgui_GPU_DLL from its own
 //                                      folder), then vkGetInstanceProcAddr.  Linux, in a program
 //                                      linked against glibc (build_rs.py section "glibc"): dlopen
-//                                      (name "libvulkan.so.1" as ld.so searches it, or a path)
+//                                      (name "libvulkan.so.1" as ld.so searches it, or a path).
+//                                      Android: dlopen too, name "libvulkan.so" (plat android_gpu.rs)
 //   lib.gipa(instance, name) -> Pfn    vkGetInstanceProcAddr
 //
 // The program does not import the library: it starts on machines without Vulkan and gets
 // GpuError::NoLoader there.  plat's plugin loader (win_lib.rs) maps DLLs without resolving
 // their imports, which the Vulkan loader needs -- this is a normal LoadLibrary.  Error dialogs
 // for missing DLLs are suppressed for the call (SetThreadErrorMode).  Other targets, and a static
-// Linux program, which has no libc for a driver to run on: NoLoader (Android: libvulkan.so still
-// to come).
+// Linux program, which has no libc for a driver to run on: NoLoader.
 
 use crate::vk_ffi as vk;
 use crate::{GpuError, Result};
@@ -21,11 +21,17 @@ use crate::{GpuError, Result};
 type Gipa = unsafe extern "system" fn(vk::Instance, *const u8) -> vk::Pfn;
 
 /// the Vulkan loader's name (jfgui_GPU_DLL replaces it)
-pub(crate) const LOADER: &str = if cfg!(windows) { "vulkan-1.dll" } else { "libvulkan.so.1" };
+pub(crate) const LOADER: &str = if cfg!(windows) {
+    "vulkan-1.dll"
+} else if cfg!(target_os = "android") {
+    "libvulkan.so"
+} else {
+    "libvulkan.so.1"
+};
 
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) struct Lib {
-    #[cfg(any(windows, jfgui_glibc))]
+    #[cfg(any(windows, jfgui_glibc, target_os = "android"))]
     module: isize,
     gipa: Gipa,
 }
@@ -100,7 +106,7 @@ impl Drop for Lib {
     }
 }
 
-#[cfg(jfgui_glibc)]
+#[cfg(any(jfgui_glibc, target_os = "android"))]
 impl Lib {
     pub fn open(name: &str) -> Result<Lib> {
         let module = plat::dl_open(name).ok_or(GpuError::NoLoader)?;
@@ -115,7 +121,7 @@ impl Lib {
     }
 }
 
-#[cfg(jfgui_glibc)]
+#[cfg(any(jfgui_glibc, target_os = "android"))]
 impl Drop for Lib {
     fn drop(&mut self) {
         // the instance that used the loader is destroyed before (InstShared field order)
@@ -123,7 +129,7 @@ impl Drop for Lib {
     }
 }
 
-#[cfg(not(any(windows, jfgui_glibc)))]
+#[cfg(not(any(windows, jfgui_glibc, target_os = "android")))]
 impl Lib {
     pub fn open(_name: &str) -> Result<Lib> {
         Err(GpuError::NoLoader)
