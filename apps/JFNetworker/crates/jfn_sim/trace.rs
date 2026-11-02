@@ -3,6 +3,8 @@
 //
 //   Trace::hops() / hop(id) / hops_after(id)      frames in send order; ids are consecutive
 //   Trace::events() / events_of(hop)              decisions in time order
+//   Trace::set_quiet()                            keeps none of them from now on, only their
+//                                                 numbers (a sweep: experiment.rs)
 //   Note::describe(port, iface) -> German text     "MAC 02:4a:.. an Gi1/0/1 gelernt (VLAN 1)"
 //   Note::message(port, iface) -> Msg             the same as a template with arguments, for
 //                                                 the app's catalogue (jfn_model::msg)
@@ -1390,6 +1392,8 @@ pub struct Trace {
     max_flight: Ns,
     /// frames that waited in a queue, with their batch (they leave later than their batch)
     late: VecDeque<(HopId, u64)>,
+    /// keeps no frames and no decisions, only their numbers (set_quiet: a sweep, experiment.rs)
+    quiet: bool,
 }
 
 impl Default for Trace {
@@ -1413,11 +1417,26 @@ impl Trace {
             outside: true,
             max_flight: 0,
             late: VecDeque::new(),
+            quiet: false,
         }
+    }
+    /// keeps no frames and no decisions from now on, and forgets those it has: no figure of a run
+    /// depends on them, only what reads the recording back (expect hops, a capture, the simulation
+    /// mode) sees nothing (experiment.rs)
+    pub fn set_quiet(&mut self) {
+        self.quiet = true;
+        self.clear();
+    }
+    /// it keeps nothing (a frame's protocols need not be worked out for it)
+    pub(crate) fn is_quiet(&self) -> bool {
+        self.quiet
     }
     pub(crate) fn push_hop(&mut self, mut h: Hop) -> HopId {
         h.id = self.next_hop;
         self.next_hop += 1;
+        if self.quiet {
+            return h.id;
+        }
         if self.hops.len() >= self.max_hops {
             self.hops.pop_front();
         }
@@ -1436,6 +1455,9 @@ impl Trace {
     pub(crate) fn push_event(&mut self, mut e: DevEvent) {
         e.seq = self.next_ev;
         self.next_ev += 1;
+        if self.quiet {
+            return;
+        }
         e.batch = self.stamp(e.t);
         if self.events.len() >= self.max_events {
             self.events.pop_front();
@@ -1798,6 +1820,7 @@ impl Trace {
             outside: self.outside,
             max_flight: self.max_flight,
             late: self.late.iter().filter(|l| l.0 >= first).copied().collect(),
+            quiet: self.quiet,
         }
     }
 

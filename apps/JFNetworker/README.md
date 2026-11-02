@@ -457,6 +457,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `scen_hw_basic.uis` | das Golden-Szenario Hardware Byte für Byte (`fixtures/hw_basic.jfnet`): Sättigung, Resize mit Ausfall und im Betrieb, langsame CPU, Speicherfresser, OOM, `top`, `free`, `lscpu` |
 | `hardware_panel.uis` | „Hardware simulieren“ mit seinem Rückgängig-Schritt, die Hardware-Karte eines Hosts (Annahmen, Eigene Angaben, Ablehnung, Resize mit Marke, im Betrieb), die neuen Fehler, die Zeile im Metriken-Panel |
 | `hardware_shots.uis` | die Bilder dazu hell und dunkel, 100 und 150 % |
+| `model.uis`, Gruppe `sweep` | Experimente: die Datei und jede Meldung einer falschen Achse; was jede Achse am Projekt ändert; ein Klon gegen einen frischen Start auf jeder Stufe; CSV, Tabelle und Details bei 1, 3 und 8 Threads und zwischen zwei Läufen gleich; das Knie, Durchsatz, CPU, Sperre, Platte und Kabel gegen die Formeln; der leise Mitschnitt ändert keine Zahl; `Service::reconfigure` jedes Dienstes unter Last ohne Neustart; das Fenster startet nur neu, wenn es muss; die neuen Schritte; die Wiederholung aus Keyframes |
+| `scen_live_changes.uis` | das Golden-Szenario Änderungen unter Last Byte für Byte (`fixtures/live_changes.jfnet`): Rate, Nutzer, Backends, Gewicht, Verfahren, Leeren, Einstellungen eines Webservers, KV, Cache |
+| `sweep_small.uis` | ein kurzer Sweep ohne Fenster durch das GUI-Programm: seine Tabelle Byte für Byte (`experiments/sweep_small.jfnex`, `.report`) auf zwei Threads |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 | `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
 | `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
@@ -478,7 +481,8 @@ TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `fil
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
 `phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
 und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`), `hw_basic.jfnet` (ein Lastgenerator, zwei Webserver,
-Hardware simuliert; `hw_basic.scn` und die `hardware_*.uis`) und die Netze
+Hardware simuliert; `hw_basic.scn` und die `hardware_*.uis`), `live_changes.jfnet` (Lastgenerator, Load Balancer, Webserver, Cache, KV; `live_changes.scn`), in
+`tests/experiments` das Projekt und die Experimente der Studie (`scale_up_vs_out.jfnet`, `.jfnex`, `sweep_small.jfnex`) und die Netze
 der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
@@ -588,6 +592,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_model/quiz.rs`](crates/jfn_model/quiz.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`, `quiz.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs), [`src/quiztest.rs`](src/quiztest.rs) | Quiz und Tests als Dateien, ihre Bewertung und ihre Seite; Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 | Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
+| Experimente | [`crates/jfn_model/experiment.rs`](crates/jfn_model/experiment.rs), [`crates/jfn_sim/experiment.rs`](crates/jfn_sim/experiment.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`run_sweep`), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs) (`Prices`), [`src/sweeptest.rs`](src/sweeptest.rs) |
 
 ### Gerätekatalog
 
@@ -4403,6 +4408,142 @@ Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::M
 
 Hardware selbst kostet wenig: Gegenüber demselben Lauf ohne Hardware, aber mit 1 ms Wartezeit (`time_ms`), sind es ohne neue Ereignisse rund 3 %. In `lab_shards`
 kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ihrer Rechenzeit halten.
+### Experimente: Parameter-Sweeps
+
+Ein Experiment vergleicht Konfigurationen eines Projekts unter steigender Last: mehr Kerne gegen mehr Server, ein anderer
+Algorithmus, mehr Worker. Es läuft kopflos und mit voller Geschwindigkeit, nie in Echtzeit, und sein Ergebnis ist Byte für Byte gleich,
+egal auf wie vielen Threads und auf welchem Rechner. Eine Oberfläche dafür kommt mit dem nächsten Schritt; heute läuft es so:
+
+```bash
+jfn-sim sweep tests/experiments/scale_up_vs_out.jfnex tests/experiments/scale_up_vs_out.jfnet --threads 4 --csv ergebnis.csv
+```
+
+Das Projekt steht mit auf der Befehlszeile, denn das Programm liest nur Dateien, die dort genannt sind. Ein Projekt kann seine Experimente
+auch selbst tragen (Abschnitt `experiments`, ohne dass sich an Dateien ohne Experimente etwas ändert), dann reicht
+`jfn-sim sweep PROJEKT [--name N]`. `--detail F` schreibt je Lauf eine Zeile für jeden Host, jedes Kabel und jeden Dienst, `--report F` die Tabelle,
+`--golden F` vergleicht sie mit einer gespeicherten, `--timing` nennt auf stderr, wie lange es gedauert hat. Die GUI-Fassung heißt
+`JFNetworker PROJEKT --sweep DATEI ...` und läuft ohne Fenster.
+
+**Die Datei** (`.jfnex`, JSON):
+
+```json
+{
+  "format": "jfnex", "version": 1,
+  "title": "Ein Server wächst oder mehrere kleine",
+  "project": "scale_up_vs_out.jfnet",
+  "load": {"dev": "GEN", "svc": "load", "rps": [400, 800, 1600, 2400, 3200, 4800, 6400]},
+  "timing": {"warmup_s": 5, "settle_s": 5, "measure_s": 20, "seeds": [11]},
+  "slo": {"p99_ms": 200, "errors_pct": 1},
+  "series": [
+    {"name": "größer", "axes": [
+      {"kind": "backends", "name": "Hosts", "dev": "LB", "svc": "lb", "pool": ["WEB1", "WEB2"], "counts": [1]},
+      {"kind": "hw", "name": "Server", "dev": "WEB1", "values": [{"cores": 2, "speed": 1.1, "ram_gb": 16}, {"preset": "server-xl"}]}
+    ]},
+    {"name": "mehr", "axes": [
+      {"kind": "backends", "name": "Hosts", "dev": "LB", "svc": "lb", "pool": ["WEB1", "WEB2"], "counts": [1, 2]}
+    ]}
+  ]
+}
+```
+
+| Teil | Bedeutung |
+|---|---|
+| `load` | der Lastgenerator (`http-load`) und seine Stufen, streng steigend: `rps` (offene Last) oder `users` (geschlossene Last); `warm`: die Stufe des Warmlaufs (sonst die erste). Was den Lauf beenden würde (`duration_ms`, `requests`, `ramp_ms`), gilt im Experiment nicht |
+| `timing` | in ganzen Sekunden virtueller Zeit: `warmup_s` einmal je Konfiguration und Seed, je Stufe `settle_s` Übergang und `measure_s` Messung (zusammen höchstens 280 s); `seeds` (leer: der Seed des Projekts) |
+| `slo` | Grenzen: `p50_ms`, `p95_ms`, `p99_ms`, `p999_ms`, `errors_pct`; Dezimalzahlen sind erlaubt, ohne Angabe gilt keine Grenze |
+| `axes`, `series` | `axes` hat jede Konfiguration; jede Reihe in `series` ist eine Familie mit eigenen Achsen. Innerhalb einer Reihe wird jede Achse mit jeder kombiniert |
+| Achse `hw` | `dev` oder `group`, `values`: `preset` (ein Modell aus dem Katalog), `cores`, `speed` (Tempo gegen den Referenzkern), `ram_gb`, `swap_gb`, `disk`, `disk_gb`, einzeln auf dem, was das Gerät hat |
+| Achse `config` | `dev` oder `group`, `path`: Art oder Name eines Dienstes und die Einstellung, etwa `http-server.workers`, `lb.algorithm`, `web.routes.0.cpu_ms`, `values` |
+| Achse `backends` | `dev`, `svc` (ein `lb`), `counts`, dazu `pool` (die ersten N Hosts stehen dahinter, die anderen sind aus und kosten nichts) oder `template` (N Kopien eines Geräts mit den nächsten Adressen an den nächsten freien Ports seines Switchs) |
+| `prices`, `cost_exclude` | Euro je Stunde statt der angenommenen Preise, nach Name (`core`, `big`, `huge`, `ram_gb`, `hdd_gb`, `sata_gb`, `nvme_gb`, `nvme_fast_gb`, `host`, `switch`, `router`); Geräte, die nicht mitzählen |
+
+Was nicht passt, sagt `jfn-sim sweep` vor dem ersten Lauf, mit Achse und Grund: „Reihe mehr, Achse 1: Ein Dienst der Art http-server kennt „worker“ nicht
+(es gibt: port, root, workers, ...)“.
+
+**Wie gemessen wird.** Jede Konfiguration wird einmal je Seed gestartet und warmgefahren. Für jede Stufe gibt es dann eine Kopie des warmen
+Zustands: Der Generator bekommt die Stufe, nach dem Übergang läuft die Messung. So beginnt jede Stufe vom selben Punkt, und ihre Reihenfolge hinterlässt keine
+Spur. Die Aufzeichnung der Rahmen ist dabei aus (eine Prüfung im Selbsttest zeigt, dass das keine Zahl ändert).
+
+**Das Ergebnis lesen.** Eine Zeile je Konfiguration und Stufe, Seeds zusammengefasst:
+
+| Spalte | Bedeutung |
+|---|---|
+| `offered_rps`, `achieved_rps` | was die Stufe verlangt, was ohne Fehler beantwortet wurde. Geschlossene Last: was die Nutzer geschickt haben |
+| `p50_us` bis `p999_us`, `mean_us`, `max_us` | Latenz der Antworten am Generator, ab dem Zeitpunkt, an dem die Anfrage fällig war (keine koordinierte Auslassung); die Eimer der Histogramme sind etwa 3,1 % breit. `p99_min_us`, `p99_max_us`: die Streuung über die Seeds |
+| `err_pct`, `timeouts` | Fehlerantworten und Abbrüche. Eine abgelaufene Anfrage hat keine Latenz: p99 immer zusammen mit den Fehlern lesen |
+| `slo_ok`, `knee` | die Stufe hält das SLO; `knee` ist die höchste Stufe, bis zu der alle Stufen es halten |
+| `cpu_max_pct`, `cpu_dev`, `runq_mean`, `cpu_wait_us` | das Gerät mit der vollsten CPU (Mittel seiner Kerne), seine Warteschlange und die mittlere Wartezeit auf einen Kern |
+| `mem_max_mib`, `swap_max_mib`, `pageins`, `oom_kills` | Speicher, bis zur Grenze belegt |
+| `disk_max_pct`, `disk_dev`, `disk_wait_max_us`, `disk_backlog_max_us` | die Platte: wie lange ihr Kanal belegt war, die längste Wartezeit auf ihn, der größte Rückstau an einer vollen Sekunde |
+| `link_max_pct`, `link` | das vollste Kabel in seiner volleren Richtung (Rahmen ohne Präambel und Lücke) |
+| `lock_max_pct`, `lock` | die am längsten gehaltene Sperre eines Webservers (`serial_us`): sie begrenzt, ohne dass die CPU voll ist |
+| `bottleneck` | das meistgenutzte von allem; „-“ unter 50 % |
+| `cost_eur_h_assumed`, `cost_eur_per_1000_assumed` | die Kosten aller eingeschalteten Geräte außer dem Generator, je Stunde und je 1000 beantwortete Anfragen. **Das sind Annahmen:** runde Zahlen von uns (`catalog::Prices`), kein Angebot und kein Marktpreis. Ein Kern kostet bis 16 gleich viel, danach mehr; ein Host kostet eine Grundgebühr, gleich wie groß er ist |
+| `status` | `ok`, `speicher` (die Stufe hielt mehr als 1 GiB und endete vorzeitig), `fehler` |
+
+**Beispiel: größer oder mehr?** `tests/experiments/scale_up_vs_out.jfnex`, ein Server mit 2 bis 32 Kernen gegen 1 bis 8 kleine Hosts hinter demselben `lb`, alle mit derselben
+Datenbank. Jede Anfrage kostet 4 ms Rechenzeit am Referenzkern (USL σ 0,01 und κ 0,0002), eine Sperre von 180 µs im Webserver und eine von 170 µs in der Datenbank. Das ist **die Ausgabe
+des Modells mit seinen Annahmen**, keine Messung an echten Servern:
+
+```text
+Zusammenfassung
+Konfiguration                   €/h    Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+größer 2 Kerne 110 % 16 GiB   1.696   400/s    544.350        0.001157  CPU WEB1
+größer 4 Kerne 110 % 16 GiB   1.762   800/s   1065.500        0.000600  CPU WEB1
+größer 8 Kerne 100 % 32 GiB   1.934  1600/s   1849.950        0.000332  CPU WEB1
+größer 16 Kerne 95 % 64 GiB   2.278  2400/s   3171.950        0.000261  CPU WEB1
+größer 32 Kerne 90 % 128 GiB  3.158  3200/s   4773.300        0.000271  CPU WEB1
+mehr Hosts 1                  1.762   800/s   1065.500        0.000600  CPU WEB1
+mehr Hosts 2                  2.026  1600/s   2130.950        0.000348  CPU WEB1
+mehr Hosts 4                  2.554  3200/s   4261.900        0.000219  CPU WEB1
+mehr Hosts 8                  3.610  4800/s   5882.350        0.000207  Sperre DB db
+```
+
+Was daran ehrlich ist: Der große Server wird je Kern immer schlechter, weil seine Kerne sich gegenseitig bremsen und langsamer takten: 2 Kerne schaffen 544/s, 32 Kerne 4773/s, also 8,8-mal so viel statt 16-mal. Mehr kleine Hosts wachsen zunächst
+fast linear, bis die gemeinsame Datenbank mit ihrer Sperre bei rund 5900/s begrenzt. Die Kosten kreuzen sich: Für 1600/s und 2400/s ist der eine größere Server billiger (eine Grundgebühr statt mehrerer), ab 3200/s der Stapel kleiner Hosts, weil Kerne über 16 mehr kosten; für 4800/s reicht ein einzelner Server im Modell gar nicht mehr.
+
+**Änderungen ohne Neustart.** `Service::reconfigure` nimmt eine neue Konfiguration an, während der Dienst läuft: Zähler, Verbindungen und laufende Arbeit bleiben, was als Nächstes kommt, geht nach
+den neuen Werten. Das können `http-server`, `http-load`, `lb`, `cache` und `worker`. Der JSON-Editor im Fenster versucht es zuerst und startet das Gerät nur noch neu, wenn es nicht geht
+(ein anderer Port, ein anderer Modus der Last, die Backends der Routen; andere Dienste immer). Im Szenario laufen dieselben Änderungen unter Last, und das Zurückspulen spielt sie wieder ein:
+
+```text
+load set GEN load rps 300            die Rate eines laufenden Generators, oder: users 40
+lb add LB lb web3 10.0.0.13 [port 80] [weight 2]
+lb drain|remove|enable LB lb web3    ein Backend leert sich, geht, kommt zurück
+lb weight LB lb web3 3               sein Gewicht
+lb algo LB lb least-conn             das Verfahren
+kv set KV1 kv consistency eventual [w 1] [r 1]
+svc set WEB1 web workers 8 [time_ms 2.5]   Einstellungen nach ihrem Pfad in der Konfiguration
+cache clear CACHE cache
+```
+
+**Was es nicht modelliert:** alles aus dem Abschnitt Hardware (keine CPU je Rahmen, keine NUMA-, Cache- oder Hyper-Thread-Effekte außer `usl`). Dazu: Ein Generator verlangt offene Last, kennt aber keine
+Grenzen des Clients. Ein Server arbeitet Anfragen ab, deren Client längst aufgegeben hat, was unter Überlast die Leistung bis auf 0 drücken kann; das ist echtes Verhalten des Modells, und mit kurzen Timeouts kommt
+es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Ports wegen TIME-WAIT aus, ebenfalls wie im Leben. Die Datenbank im Beispiel ist ein Webserver mit Sperre, kein SQL (das kommt mit SA4). Ein SLO sagt
+etwas über die gewählten Stufen: Das Knie liegt nie zwischen zwei Stufen, und eine Messung von 20 s sieht keine seltenen Ereignisse.
+
+Für Programme: `jfn_model::experiment::{Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level}`, `Experiment::{from_text, problems, configs, levels}`, `jfn_sim::experiment::{Plan, Sweep, Point, ConfigOut, Fig}` mit `Plan::{new, warm, measure, run_level, run_all, collect}` und `Sweep::{table, csv, detail_csv}`,
+`jfn_run::run_sweep(&plan, threads)`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
+
+**Tempo:** Windows, Entwicklungs-Build, 12 logische Kerne, Rechner von anderen Läufen belegt. Die Studie oben (9 Konfigurationen, 7 Stufen, je 25 s, bis 6400/s, rund 2,1 Millionen gemessene Antworten und 98 Millionen gemessene Ereignisse):
+
+| Threads | Laufzeit | CPU-Zeit | höchster Speicher | Antworten je Wandsekunde |
+|---|---|---|---|---|
+| 1 | 553 s | 450 s | 291 MiB | 3900 |
+| 4 | 316 s | 512 s | 598 MiB | 6800 |
+
+CSV und Tabelle beider Läufe sind Byte für Byte gleich. Vier Threads brachten auf dem belegten Rechner das 1,75-Fache, weil ihnen im Schnitt nur 1,6 Kerne blieben; die CPU-Zeit stieg dabei nur um 14 %. Der Speicher wächst nicht mit den Stufen: Es liegen höchstens so viele warme Zustände vor, wie es Threads gibt, und ein Klon geht mit seiner Stufe. Der leise Mitschnitt spart bei einem kleinen Sweep 10 % Zeit und zwei Drittel des Speichers (23 s gegen 25 s, 56 MiB gegen 189 MiB), ohne eine Zahl zu ändern. Ein Gerät mit 32 Kernen kostet gegenüber einem mit 8 Kernen bei gleicher Last keine messbare Zeit mehr (höchstens rund 10 %, im Rauschen).
+
+Was beim Messen auffiel und behoben ist, jeweils bei gleichem Bericht (ein Szenario, das Beste von drei Läufen):
+
+| Fall | vorher | nachher |
+|---|---|---|
+| eine Verbindung je Anfrage, TIME-WAIT auf beiden Seiten, 400/s, 30 s | 88,6 s | 1,3 s |
+| Generator mit `max_conns` unter Überlast, 2000/s, 10 s | 451,7 s | 0,8 s |
+| 4000 offene Verbindungen, 10 s | 18,7 s | 1,0 s |
+
+Das Gerät fragte bei jedem Segment alle Verbindungen nach ihrer nächsten Frist, der Generator durchsuchte für jede Anfrage seine Verbindungen und die wartenden Anfragen. Der Allokator der Bibliothek hatte eine Sperre für alle kleinen Blöcke; ein Teil-Sweep brauchte deshalb auf 4 Threads so lange wie auf einem und auf 8 fast doppelt so lange (22 s, 22 s, 37 s, jetzt 22 s, 8 bis 11 s, 8 bis 10 s).
+
 ### Akademie
 
 Die Akademie bringt Kurse: Lektionen zum Lesen, Üben im Simulator mit Aufgabe und Prüfungen, Quiz und Tests

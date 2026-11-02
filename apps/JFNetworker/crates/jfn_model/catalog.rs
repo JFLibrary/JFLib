@@ -9,6 +9,7 @@
 //   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s" (speed_msg: as a Msg)
 //   Optic / form(m) / rack_units(m)   the transceiver of an optics cage (PortSpec::optic), how
 //                                 a model stands in the physical view, its height in a rack (P1)
+//   Prices (ASSUMED, of_hw, of_device)   what devices cost per hour, assumptions for an experiment
 //   Hw / DiskClass / hw_of(id) / hw_presets()   the hardware of a device for the simulator's
 //                                 res.rs (SA1): cores, speed, RAM, swap, disk; a table beside the
 //                                 models
@@ -1284,4 +1285,84 @@ pub fn hw_of(id: &str) -> Option<Hw> {
 /// the models with figures, smallest server first: the choices of the window's hardware page
 pub fn hw_presets() -> impl Iterator<Item = &'static Model> {
     ["server-s", "server-tower", "server-1u", "server-m", "server-l", "server-xl", "nas", "pc", "laptop", "load-balancer", "database", "cache", "queue", "container-host"].into_iter().filter_map(model)
+}
+
+// ---------------------------------------------------------------- what a device costs (SA2)
+//
+// Prices: euros per hour, as round figures of our own, near what rented servers cost in 2026 and not
+// the offer of any provider: an experiment's results say so wherever they show them.  A core costs
+// the same up to 16 cores, more beyond that and more again beyond 32 (machines of that size are rarer
+// and dearer per core); a host costs a fee of its own whatever its size (housing, power, operating
+// it), which is what makes many small machines dearer than one of the same sum.  An experiment may
+// name other figures (Experiment::prices).
+
+/// euros per hour in millionths (assumptions, see above)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Prices {
+    /// a core at the reference speed; its price goes with its speed
+    pub core: u64,
+    /// the factor on cores beyond 16 and beyond 32, in millionths
+    pub big: u64,
+    pub huge: u64,
+    /// a GiB of RAM
+    pub ram_gb: u64,
+    /// a GiB of disk by its kind
+    pub hdd_gb: u64,
+    pub sata_gb: u64,
+    pub nvme_gb: u64,
+    pub nvme_fast_gb: u64,
+    /// the fee of a host whatever its size
+    pub host: u64,
+    /// a switch, a router or firewall
+    pub switch: u64,
+    pub router: u64,
+}
+
+impl Prices {
+    /// the figures of an experiment that names none
+    pub const ASSUMED: Prices = Prices { core: 30_000, big: 1_500_000, huge: 2_000_000, ram_gb: 4_000, hdd_gb: 40, sata_gb: 100, nvme_gb: 200, nvme_fast_gb: 400, host: 20_000, switch: 10_000, router: 30_000 };
+    /// the names an experiment may give figures for
+    pub const KEYS: &'static [&'static str] = &["core", "big", "huge", "ram_gb", "hdd_gb", "sata_gb", "nvme_gb", "nvme_fast_gb", "host", "switch", "router"];
+    /// one figure by its name
+    pub fn set(&mut self, key: &str, v: u64) {
+        match key {
+            "core" => self.core = v,
+            "big" => self.big = v,
+            "huge" => self.huge = v,
+            "ram_gb" => self.ram_gb = v,
+            "hdd_gb" => self.hdd_gb = v,
+            "sata_gb" => self.sata_gb = v,
+            "nvme_gb" => self.nvme_gb = v,
+            "nvme_fast_gb" => self.nvme_fast_gb = v,
+            "host" => self.host = v,
+            "switch" => self.switch = v,
+            "router" => self.router = v,
+            _ => {}
+        }
+    }
+    /// what hardware of these figures costs per hour (millionths of a euro)
+    pub fn of_hw(&self, hw: &Hw) -> u64 {
+        let c = hw.cores as u64;
+        // the cores in thousandths of a core at the reference price
+        let cores = c.min(16) * 1000 + c.clamp(16, 32).saturating_sub(16) * self.big / 1000 + c.saturating_sub(32) * self.huge / 1000;
+        let per_gb = match hw.disk {
+            DiskClass::Hdd => self.hdd_gb,
+            DiskClass::Sata => self.sata_gb,
+            DiskClass::Nvme => self.nvme_gb,
+            DiskClass::NvmeFast => self.nvme_fast_gb,
+        };
+        self.core * cores / 1000 * hw.speed_pm as u64 / 1000 + self.ram_gb * hw.ram_mb / 1024 + per_gb * hw.disk_gb + self.host
+    }
+    /// what a device of this model costs per hour, with its own figures or else its model's; a
+    /// load generator, a client or a cloud has no price
+    pub fn of_device(&self, model_id: &str, hw: Option<&Hw>) -> u64 {
+        match hw.cloned().or_else(|| hw_of(model_id)) {
+            Some(h) => self.of_hw(&h),
+            None => match model(model_id).map(|m| m.kind) {
+                Some(DeviceKind::Switch | DeviceKind::L3Switch) => self.switch,
+                Some(DeviceKind::Router | DeviceKind::Firewall) => self.router,
+                _ => 0,
+            },
+        }
+    }
 }

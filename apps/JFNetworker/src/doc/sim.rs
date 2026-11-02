@@ -42,6 +42,8 @@
 //                                 its files too (Action::Files, before the services: a script
 //                                 that starts from a file reads it; also in sync: files never
 //                                 restart a device)
+//   sync                          a service's new config goes in without a restart where it can
+//                                 (live_steps, Service::reconfigure); else the device restarts
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
@@ -218,6 +220,29 @@ struct Past {
     gone: bool,
     /// the present's snapshot while the past one is shown
     live: Option<Shot>,
+}
+
+/// the actions that give a running device's services their new settings without a restart
+/// (Service::reconfigure), None when one of them cannot: the same services, some of them with another
+/// config or switched; `can` asks the engine for a service's new config
+pub(crate) fn live_steps(dev: u32, old: &[ServiceDef], new: &[ServiceDef], can: &dyn Fn(&ServiceDef) -> bool) -> Option<Vec<Action>> {
+    if old.len() != new.len() {
+        return None;
+    }
+    let mut acts = Vec::new();
+    for b in new {
+        let a = old.iter().find(|a| a.name == b.name && a.kind == b.kind)?;
+        if a.config != b.config {
+            if !can(b) {
+                return None;
+            }
+            acts.push(Action::ServiceConfig { dev, svc: b.name.clone(), config: b.config.clone() });
+        }
+        if a.disabled != b.disabled {
+            acts.push(Action::ServiceRun { dev, name: b.name.clone(), on: !b.disabled });
+        }
+    }
+    Some(acts)
 }
 
 /// a project's link with the length and delay its places give it (what Action::Connect takes)
@@ -479,6 +504,19 @@ impl Sim {
         // "Hardware simulieren" (first: a new device takes it)
         if self.metered != p.metered && self.act(Action::Metered { on: p.metered }).is_ok() {
             self.metered = p.metered;
+        }
+        // a service's new settings, if it can take them while it runs (Service::reconfigure)
+        let changed: Vec<u32> = self.devs.iter().filter(|(id, m)| p.device(**id).is_some_and(|d| m.services != d.services && m.model == d.model && m.startup == d.startup_config)).map(|(id, _)| *id).collect();
+        for id in changed {
+            let (Some(d), Some(m)) = (p.device(id), self.devs.get(&id)) else { continue };
+            let eng = &self.drv.eng;
+            let Some(steps) = live_steps(id, &m.services, &d.services, &|b: &ServiceDef| eng.can_reconfigure(id, &b.name, &b.config)) else { continue };
+            for a in steps {
+                let _ = self.act(a);
+            }
+            if let Some(m) = self.devs.get_mut(&id) {
+                m.services = d.services.clone();
+            }
         }
         // devices that are gone, or start again with another model, configuration or services
         let out: Vec<(u32, bool)> = self

@@ -66,6 +66,16 @@
 //     [health active|tcp PORT|http PORT PATH [STATUS]]  list of hosts: the files, the unit,
 //     [wait 2s] [timeout 10s] [rollback]         its check, the wait before the next host,
 //                                                what a failure does (default: it stops)
+//   load set GEN load rps 200 | users 40         changes under load (SA2; rewinding replays them):
+//   lb add LB1 lb web3 10.0.2.13 [port 80]       the rate of a running load generator or its users;
+//     [weight 2]                                 a backend of a load balancer that comes, drains,
+//   lb drain|remove|enable LB1 lb web3           goes, is taken back; its weight or algorithm;
+//   lb weight LB1 lb web3 3                      the consistency and quorums of a KV node;
+//   lb algo LB1 lb least-conn                    settings of a service by their config's paths,
+//   kv set KV1 kv consistency eventual [w 1]     taken without a restart (Service::reconfigure, a
+//     [r 1]                                      step's line says why one cannot); a cache forgets
+//   svc set WEB1 web workers 8 [time_ms 2.5]     what it holds
+//   cache clear CACHE1 cache
 //   expect WEB1 unit web active|inactive|failed|enabled|disabled   a unit of a host (A2)
 //   expect DEV1 deploy done|running|failed|rolledback|aborted      its newest deployment
 //
@@ -120,6 +130,28 @@ pub enum StepKind {
     Deploy(DeployStep),
     /// other hardware for a device ("resize DEV ..."); the downtime when it says one (0: live)
     Resize { dev: String, hw: HwSpec, down: Option<u64> },
+    /// the load of a running generator ("load set DEV SVC rps R | users U"); thousandths of a
+    /// request per second
+    LoadSet { dev: String, svc: String, rate_m: Option<u64>, users: Option<u32> },
+    /// a change of a running load balancer ("lb add|drain|remove|enable|weight|algo DEV SVC ...")
+    Lb { dev: String, svc: String, op: LbStep },
+    /// the consistency and quorums of a KV node ("kv set DEV SVC ...")
+    KvSet { dev: String, svc: String, consistency: Option<String>, w: Option<u8>, r: Option<u8> },
+    /// settings of a service taken without a restart ("svc set DEV SVC PATH VALUE ...")
+    SvcSet { dev: String, svc: String, sets: Vec<(String, String)> },
+    /// a cache forgets what it holds ("cache clear DEV SVC")
+    CacheClear { dev: String, svc: String },
+}
+
+/// what "lb" does
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LbStep {
+    Add { name: String, addr: String, port: u16, weight: u32 },
+    Drain(String),
+    Remove(String),
+    Enable(String),
+    Weight(String, u32),
+    Algo(String),
 }
 
 /// what "resize" says of the hardware: a model's figures and single ones on top; what it does not
@@ -335,7 +367,7 @@ pub struct ScnErr {
 }
 
 /// a decimal number with an optional fraction, scaled by `unit`: ("1.5", 1000) -> 1500
-fn scaled(num: &str, unit: u64) -> Option<u64> {
+pub(crate) fn scaled(num: &str, unit: u64) -> Option<u64> {
     let (int, frac) = match num.split_once('.') {
         Some((i, f)) => (i, f),
         None => (num, ""),
@@ -538,6 +570,28 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
         ["cable", dev, port, "length", m] => StepKind::CableLen { dev: String::from(*dev), port: String::from(*port), m: metres(m)? },
         ["deploy", src, hosts, rest @ ..] => StepKind::Deploy(parse_deploy(src, hosts, rest)?),
         ["resize", dev, rest @ ..] => parse_resize(dev, rest)?,
+        ["load", "set", dev, svc, what, v] => {
+            let (dev, svc) = (String::from(*dev), String::from(*svc));
+            match *what {
+                "rps" => StepKind::LoadSet { dev, svc, rate_m: Some(scaled(v, 1000).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Rate.", v))?), users: None },
+                "users" => StepKind::LoadSet { dev, svc, rate_m: None, users: Some(v.parse().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Zahl.", v))?) },
+                w => return Err(format!("\u{201e}{}\u{201c} versteht load set nicht (rps, users).", w)),
+            }
+        }
+        ["lb", "add", dev, svc, name, addr, rest @ ..] => parse_lb_add(dev, svc, name, addr, rest)?,
+        ["lb", "drain", dev, svc, name] => StepKind::Lb { dev: String::from(*dev), svc: String::from(*svc), op: LbStep::Drain(String::from(*name)) },
+        ["lb", "remove", dev, svc, name] => StepKind::Lb { dev: String::from(*dev), svc: String::from(*svc), op: LbStep::Remove(String::from(*name)) },
+        ["lb", "enable", dev, svc, name] => StepKind::Lb { dev: String::from(*dev), svc: String::from(*svc), op: LbStep::Enable(String::from(*name)) },
+        ["lb", "weight", dev, svc, name, w] => StepKind::Lb { dev: String::from(*dev), svc: String::from(*svc), op: LbStep::Weight(String::from(*name), w.parse().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Zahl.", w))?) },
+        ["lb", "algo", dev, svc, algo] => StepKind::Lb { dev: String::from(*dev), svc: String::from(*svc), op: LbStep::Algo(String::from(*algo)) },
+        ["kv", "set", dev, svc, rest @ ..] => parse_kv_set(dev, svc, rest)?,
+        ["svc", "set", dev, svc, rest @ ..] => {
+            if rest.is_empty() || rest.len() % 2 != 0 {
+                return Err(String::from("svc set braucht Paare wie \u{201e}workers 8\u{201c}."));
+            }
+            StepKind::SvcSet { dev: String::from(*dev), svc: String::from(*svc), sets: rest.chunks(2).map(|p| (String::from(p[0]), String::from(p[1]))).collect() }
+        }
+        ["cache", "clear", dev, svc] => StepKind::CacheClear { dev: String::from(*dev), svc: String::from(*svc) },
         [k, ..] => return Err(format!("Unbekannter Schritt \u{201e}{}\u{201c}.", k)),
         [] => return Ok(None),
     };
@@ -722,6 +776,45 @@ impl FaultSpec {
             _ => None,
         }
     }
+}
+
+/// the words of "lb add" after its address
+fn parse_lb_add(dev: &str, svc: &str, name: &str, addr: &str, w: &[&str]) -> Result<StepKind, String> {
+    let (mut port, mut weight) = (80u16, 1u32);
+    let mut r = w;
+    loop {
+        r = match r {
+            [] => break,
+            ["port", x, t @ ..] => {
+                port = x.parse().map_err(|_| format!("\u{201e}{}\u{201c} ist kein Port.", x))?;
+                t
+            }
+            ["weight", x, t @ ..] => {
+                weight = x.parse().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Zahl.", x))?;
+                t
+            }
+            [k, ..] => return Err(format!("\u{201e}{}\u{201c} versteht lb add nicht (port, weight).", k)),
+        };
+    }
+    Ok(StepKind::Lb { dev: String::from(dev), svc: String::from(svc), op: LbStep::Add { name: String::from(name), addr: String::from(addr), port, weight } })
+}
+
+/// the words of "kv set" after its service
+fn parse_kv_set(dev: &str, svc: &str, w: &[&str]) -> Result<StepKind, String> {
+    if w.is_empty() || w.len() % 2 != 0 {
+        return Err(String::from("kv set braucht Paare wie \u{201e}consistency eventual\u{201c}, \u{201e}w 2\u{201c}, \u{201e}r 1\u{201c}."));
+    }
+    let (mut consistency, mut wq, mut rq) = (None, None, None);
+    for p in w.chunks(2) {
+        let bad = || format!("\u{201e}{} {}\u{201c} versteht kv set nicht.", p[0], p[1]);
+        match p[0] {
+            "consistency" => consistency = Some(String::from(p[1])),
+            "w" => wq = Some(p[1].parse::<u8>().map_err(|_| bad())?),
+            "r" => rq = Some(p[1].parse::<u8>().map_err(|_| bad())?),
+            _ => return Err(bad()),
+        }
+    }
+    Ok(StepKind::KvSet { dev: String::from(dev), svc: String::from(svc), consistency, w: wq, r: rq })
 }
 
 /// the words after "fault" (without "for DURATION")

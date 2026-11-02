@@ -1,0 +1,95 @@
+{
+  "format": "jfnex",
+  "version": 1,
+  "name": "sweep_small",
+  "title": "Der kurze Lauf der Testsuite",
+  "project": "scale_up_vs_out.jfnet",
+  "load": {
+    "dev": "GEN",
+    "svc": "load",
+    "rps": [
+      100,
+      400,
+      1600
+    ]
+  },
+  "timing": {
+    "warmup_s": 2,
+    "settle_s": 1,
+    "measure_s": 2,
+    "seeds": [
+      11,
+      12
+    ]
+  },
+  "slo": {
+    "p99_ms": 200,
+    "errors_pct": 1
+  },
+  "series": [
+    {
+      "name": "größer",
+      "axes": [
+        {
+          "kind": "backends",
+          "name": "Hosts",
+          "dev": "LB",
+          "svc": "lb",
+          "pool": [
+            "WEB1",
+            "WEB2",
+            "WEB3",
+            "WEB4",
+            "WEB5",
+            "WEB6",
+            "WEB7",
+            "WEB8"
+          ],
+          "counts": [
+            1
+          ]
+        },
+        {
+          "kind": "hw",
+          "name": "Server",
+          "dev": "WEB1",
+          "values": [
+            {
+              "cores": 2,
+              "speed": 1.1,
+              "ram_gb": 16
+            },
+            {
+              "preset": "server-m"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mehr",
+      "axes": [
+        {
+          "kind": "backends",
+          "name": "Hosts",
+          "dev": "LB",
+          "svc": "lb",
+          "pool": [
+            "WEB1",
+            "WEB2",
+            "WEB3",
+            "WEB4",
+            "WEB5",
+            "WEB6",
+            "WEB7",
+            "WEB8"
+          ],
+          "counts": [
+            2,
+            4
+          ]
+        }
+      ]
+    }
+  ]
+}

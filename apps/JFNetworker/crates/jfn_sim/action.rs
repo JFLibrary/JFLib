@@ -94,6 +94,8 @@
 //   Resize / Metered                                   other hardware for a device, with a reboot
 //                                                      or live; the project's "Hardware simulieren"
 //                                                      (res.rs)
+//   ServiceConfig                                      a service takes a new config while it runs
+//                                                      (Service::reconfigure: lab.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -324,6 +326,9 @@ pub enum Action {
     Resize { dev: u32, hw: Option<jfn_model::catalog::Hw>, downtime: u64 },
     /// "Hardware simulieren" of the project (Project::metered, res.rs)
     Metered { on: bool },
+    /// a service takes its whole config anew without a restart (Service::reconfigure; refused with
+    /// the reason when it cannot, and then nothing has changed)
+    ServiceConfig { dev: u32, svc: String, config: agent_core::jmap::Value },
 }
 
 /// why an action was refused (German text through Display)

@@ -2,11 +2,20 @@
 // the files, run, write the report and the capture
 //
 //   gui_args(&args) -> Option<i32>   the GUI program's early exit: "--scenario S [PROJECT]
-//                                    [--pcap F] [--report F] [--golden F] [--series F]" runs
-//                                    and ends
+//                                    [--pcap F] [--report F] [--golden F] [--series F]" or "--sweep
+//                                    FILE [PROJECT] [...]" runs and ends
 //   main(&args) -> i32               jfn-sim: run PROJECT [--scenario S] [--pcap F] [--report F]
 //                                    [--golden F] [--series F] | check PROJECT | course DIR |
-//                                    decode HEX | gen N [--out F]
+//                                    decode HEX | gen N [--out F] | sweep FILE [PROJECT]
+//                                    [--threads N] [--csv F] [--detail F] [--report F] [--golden F]
+//                                    [--name N] [--timing]
+//   sweep(&args) -> i32              jfn-sim sweep (SA2): an experiment (a .jfnex file with its project,
+//                                    or a project with its section) at full speed: the table goes to
+//                                    stdout, the same bytes for any number of threads
+//   run_sweep(&plan, threads) -> Sweep   jfn_sim's experiment on worker threads: a queue of boots and
+//                                    of levels, levels first, so that at most as many warm engines
+//                                    are held as there are threads; results by their place, so
+//                                    the order the threads finish in leaves no trace
 //   check_project(&project) -> (lines, errors)   what `check` finds, without printing it
 //   check_course(dir) -> (lines, errors)   jfn-sim course: a course's folder (jfn_model::academy):
 //                                    the file, its lessons in every language with their pictures and
@@ -30,12 +39,19 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
+use alloc::collections::VecDeque;
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use jfn_model::experiment::Experiment;
 use jfn_model::project::Project;
 use jfn_model::scenario::{self, Scenario, Step, StepKind};
+use jfn_sim::experiment::{Fig, Plan, Status, Sweep};
+use jfn_sim::Engine;
+use plat::sync::Mutex;
 
 /// what a run is given
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -79,7 +95,7 @@ pub fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--report" => o.report = Some(value()?),
             "--golden" => o.golden = Some(value()?),
             "--series" => o.series = Some(value()?),
-            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" => {
+            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" | "--sweep" | "--threads" | "--csv" | "--detail" | "--name" => {
                 value()?;
             }
             k if k.starts_with('-') => {}
@@ -116,6 +132,9 @@ fn load(path: &str) -> Result<Project, String> {
 
 /// the GUI program's early exit for headless scenario runs
 pub fn gui_args(args: &[String]) -> Option<i32> {
+    if args.iter().any(|a| a == "--sweep" || a.starts_with("--sweep=")) {
+        return Some(sweep(args.get(1..).unwrap_or(&[])));
+    }
     if !args.iter().any(|a| a == "--scenario" || a.starts_with("--scenario=")) {
         return None;
     }
@@ -371,7 +390,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n  jfn-sim sweep DATEI [PROJEKT] [--threads N] [--csv F] [--detail F] [--report F] [--golden F] [--name N] [--timing]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -400,6 +419,7 @@ pub fn main(args: &[String]) -> i32 {
         Some("decode") if args.len() > 2 => decode(&args[2..].join(" ")),
         Some("gen") => generate(&args[2..]),
         Some("rewind") => rewind(&args[2..]),
+        Some("sweep") => sweep(&args[2..]),
         Some("help" | "--help" | "-h") => {
             say(USAGE);
             0
@@ -487,4 +507,272 @@ pub fn rewind(args: &[String]) -> i32 {
         say(&format!("Wiederherstellen: {} / {} / {} ms (min / Median / max)\n", ms(*a), ms(took[took.len() / 2]), ms(*b)));
     }
     0
+}
+
+// ---------------------------------------------------------------- parameter sweeps (SA2)
+
+/// a worker's stack
+const SWEEP_STACK: usize = 4 << 20;
+
+/// a warm engine with what is left of its levels: Clone needs no lock, but an Engine is Send only
+type WarmEngine = Arc<Mutex<Engine>>;
+
+/// what the workers take from
+struct SweepQueue {
+    /// the next boot (config * seeds + seed)
+    next_boot: usize,
+    /// levels ready to run: (warm engine, config, seed, level)
+    levels: VecDeque<(WarmEngine, usize, usize, usize)>,
+    /// boots under way: their levels will come
+    booting: usize,
+}
+
+struct SweepWork {
+    plan: Plan,
+    queue: Mutex<SweepQueue>,
+    figs: Mutex<Vec<Option<Fig>>>,
+}
+
+/// takes work until there is none: levels before boots, which bounds the warm engines held
+fn sweep_worker(w: &SweepWork) {
+    let (seeds, levels) = (w.plan.seeds.len(), w.plan.levels.len());
+    let boots = w.plan.cfgs.len() * seeds;
+    loop {
+        let (level, boot) = {
+            let mut q = w.queue.lock();
+            match q.levels.pop_front() {
+                Some(l) => (Some(l), None),
+                None if q.next_boot < boots => {
+                    q.next_boot += 1;
+                    q.booting += 1;
+                    (None, Some(q.next_boot - 1))
+                }
+                None if q.booting > 0 => (None, None),
+                None => return,
+            }
+        };
+        match (level, boot) {
+            (Some((warm, c, s, l)), _) => {
+                let mut e = warm.lock().clone();
+                drop(warm);
+                let f = w.plan.run_level(&mut e, l);
+                drop(e);
+                w.figs.lock()[w.plan.index(c, s, l)] = Some(f);
+            }
+            (None, Some(b)) => {
+                let (c, s) = (b / seeds, b % seeds);
+                match w.plan.warm(c, s) {
+                    Ok(e) => {
+                        let warm: WarmEngine = Arc::new(Mutex::new(e));
+                        let mut q = w.queue.lock();
+                        for l in 0..levels {
+                            q.levels.push_back((warm.clone(), c, s, l));
+                        }
+                        q.booting -= 1;
+                    }
+                    Err(_) => {
+                        let mut figs = w.figs.lock();
+                        for l in 0..levels {
+                            figs[w.plan.index(c, s, l)] = Some(Fig { status: Status::Failed, ..Fig::default() });
+                        }
+                        drop(figs);
+                        w.queue.lock().booting -= 1;
+                    }
+                }
+            }
+            // the others boot: their levels come
+            _ => plat::thread_yield(),
+        }
+    }
+}
+
+/// the sweep on `threads` threads (this one among them; where no thread starts, on those that did)
+pub fn run_sweep(plan: &Plan, threads: usize) -> Sweep {
+    let work = Arc::new(SweepWork { plan: plan.clone(), queue: Mutex::new(SweepQueue { next_boot: 0, levels: VecDeque::new(), booting: 0 }), figs: Mutex::new(alloc::vec![None; plan.runs()]) });
+    let mut handles = Vec::new();
+    for _ in 1..threads.max(1) {
+        let w = work.clone();
+        if let Some(h) = plat::thread_spawn(SWEEP_STACK, Box::new(move || sweep_worker(&w))) {
+            handles.push(h);
+        }
+    }
+    sweep_worker(&work);
+    for h in handles {
+        h.join();
+    }
+    let figs = core::mem::take(&mut *work.figs.lock());
+    plan.collect(figs)
+}
+
+/// what a sweep is given
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct SweepOpts {
+    file: Option<String>,
+    project: Option<String>,
+    name: Option<String>,
+    threads: Option<usize>,
+    csv: Option<String>,
+    detail: Option<String>,
+    report: Option<String>,
+    golden: Option<String>,
+    timing: bool,
+    /// with the recording on: only to see what the quiet trace saves
+    loud: bool,
+}
+
+fn sweep_opts(args: &[String]) -> Result<SweepOpts, String> {
+    let mut o = SweepOpts::default();
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        let (key, inline) = match a.split_once('=') {
+            Some((k, v)) if k.starts_with("--") => (k, Some(String::from(v))),
+            _ => (a, None),
+        };
+        let mut value = || -> Result<String, String> {
+            if let Some(v) = inline.clone() {
+                return Ok(v);
+            }
+            i += 1;
+            args.get(i).cloned().ok_or_else(|| format!("{} braucht einen Wert.", key))
+        };
+        match key {
+            "--sweep" => o.file = Some(value()?),
+            "--threads" => {
+                let v = value()?;
+                o.threads = Some(v.parse::<usize>().ok().filter(|&n| n > 0).ok_or_else(|| format!("--threads braucht eine Zahl, nicht {}.", v))?);
+            }
+            "--csv" => o.csv = Some(value()?),
+            "--detail" => o.detail = Some(value()?),
+            "--report" => o.report = Some(value()?),
+            "--golden" => o.golden = Some(value()?),
+            "--name" => o.name = Some(value()?),
+            "--timing" => o.timing = true,
+            "--loud" => o.loud = true,
+            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" => {
+                value()?;
+            }
+            k if k.starts_with('-') => {}
+            p => {
+                if o.file.is_none() && p.ends_with(".jfnex") {
+                    o.file = Some(String::from(p));
+                } else if o.project.is_none() {
+                    o.project = Some(String::from(p));
+                } else {
+                    return Err(format!("Was soll {} sein? Es gibt schon {}.", p, o.project.as_deref().unwrap_or("")));
+                }
+            }
+        }
+        i += 1;
+    }
+    // a project alone: its own section
+    if o.file.is_none() {
+        o.file = o.project.take();
+    }
+    Ok(o)
+}
+
+/// the experiment and its project: a .jfnex file names its project, relative to itself (a project on
+/// the command line goes first); a project file holds them in its section (--name picks one)
+fn sweep_input(o: &SweepOpts) -> Result<(Experiment, Project, String), String> {
+    let Some(file) = o.file.as_deref() else {
+        return Err(String::from("Keine Experiment-Datei angegeben."));
+    };
+    if file.ends_with(".jfnex") {
+        let x = Experiment::from_text(&read_text(file)?).map_err(|e| format!("{}: {}", file, e))?;
+        let path = match o.project.as_deref() {
+            Some(p) => String::from(p),
+            None if x.project.is_empty() => return Err(format!("{}: es nennt kein Projekt (\u{201e}project\u{201c}).", file)),
+            None => {
+                let base = base_name(file);
+                let dir = &file[..file.len() - base.len()];
+                format!("{}{}", dir, x.project)
+            }
+        };
+        // (what is not named on the command line stays closed to a program with PERMISSIONS)
+        let p = load(&path).map_err(|e| format!("{}\nDas Projekt gehört auf die Befehlszeile: jfn-sim sweep {} {}", e, file, path))?;
+        return Ok((x, p, String::from(base_name(file))));
+    }
+    let p = load(file)?;
+    let x = match o.name.as_deref() {
+        Some(n) => p.experiments.iter().find(|x| x.name.eq_ignore_ascii_case(n)).ok_or_else(|| format!("{}: ein Experiment \u{201e}{}\u{201c} gibt es nicht.", file, n))?,
+        None => match &p.experiments[..] {
+            [x] => x,
+            [] => return Err(format!("{}: das Projekt enthält kein Experiment.", file)),
+            _ => return Err(format!("{}: das Projekt enthält mehrere Experimente; --name wählt eines.", file)),
+        },
+    };
+    let x = x.clone();
+    Ok((x, p, String::from(base_name(file))))
+}
+
+/// jfn-sim sweep, the GUI program's --sweep
+pub fn sweep(args: &[String]) -> i32 {
+    let o = match sweep_opts(args) {
+        Ok(o) => o,
+        Err(e) => {
+            complain(&format!("{}\n", e));
+            return 2;
+        }
+    };
+    let (exp, proj, name) = match sweep_input(&o) {
+        Ok(x) => x,
+        Err(e) => {
+            complain(&format!("{}\n", e));
+            return 2;
+        }
+    };
+    let mut plan = match Plan::new(&exp, &proj, &name) {
+        Ok(p) => p,
+        Err(found) => {
+            for m in found {
+                complain(&format!("{}: {}\n", name, m));
+            }
+            return 2;
+        }
+    };
+    plan.quiet = !o.loud;
+    let threads = o.threads.unwrap_or_else(|| plat::cpu_count().max(1) as usize);
+    let t0 = plat::time_us();
+    let out = run_sweep(&plan, threads);
+    let wall = plat::time_us() - t0;
+    let table = out.table();
+    say(&table);
+    if o.timing {
+        let events: u64 = out.details.iter().map(|f| f.events).sum();
+        let answers: u64 = out.details.iter().map(|f| f.responses).sum();
+        let ms = wall.max(1) / 1000;
+        complain(&format!("{} Läufe, {} Threads: {} ms, {} Ereignisse gemessen ({} je Sekunde), {} Antworten gemessen ({} je Sekunde)\n", plan.runs(), threads, ms, events, events * 1_000_000 / wall.max(1), answers, answers * 1_000_000 / wall.max(1)));
+    }
+    let mut code = 0;
+    for (f, text) in [(o.report.as_deref(), Some(&table)), (o.csv.as_deref(), None), (o.detail.as_deref(), None)] {
+        let Some(f) = f else { continue };
+        let body = match text {
+            Some(t) => t.clone(),
+            None if o.csv.as_deref() == Some(f) => out.csv(),
+            None => out.detail_csv(),
+        };
+        if !plat::write_file(f, body.as_bytes()) {
+            complain(&format!("{} lässt sich nicht schreiben.\n", f));
+            code = 2;
+        }
+    }
+    if let Some(g) = o.golden.as_deref() {
+        match read_text(g) {
+            Ok(want) => {
+                let want = want.replace("\r\n", "\n");
+                if want != table {
+                    let (wl, gl): (Vec<&str>, Vec<&str>) = (want.lines().collect(), table.lines().collect());
+                    let i = wl.iter().zip(gl.iter()).position(|(a, b)| a != b).unwrap_or(wl.len().min(gl.len()));
+                    complain(&format!("FAIL sweep: die Tabelle weicht von {} ab (Zeile {}):\n- {}\n+ {}\n", g, i + 1, wl.get(i).unwrap_or(&""), gl.get(i).unwrap_or(&"")));
+                    code = code.max(1);
+                }
+            }
+            Err(e) => {
+                complain(&format!("{}\n", e));
+                code = 2;
+            }
+        }
+    }
+    code
 }
