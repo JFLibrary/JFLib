@@ -22,7 +22,10 @@
 //   agent keep                    remember the revision the last reply reported
 //   agent write ACTION [JSON]     agent call with that revision as expectedRevision
 //   agent expect same | moved     the last reply's revision against the remembered one
-//   agent id S                    the widget's id, $id in the JSON of the calls after it
+//   agent id S                    the widget's id and window, $id and $window in the JSON of the
+//                                 calls after it
+//   agent expect reason WORD [ID] the details.reason of the last call's refusal, the id of
+//                                 what lies over the widget (details.by)
 
 use alloc::format;
 use alloc::string::String;
@@ -40,6 +43,7 @@ pub(crate) struct S {
     calls: u64,
     kept: Option<u64>,
     id: u32,
+    window: u32,
 }
 
 impl Ui {
@@ -129,7 +133,7 @@ impl Ui {
                 let rest = rest.trim();
                 let (action, input) = rest.split_once(' ').unwrap_or((rest, "{}"));
                 let input = if input.trim().is_empty() { "{}" } else { input.trim() };
-                let input = input.replace("$id", &format!("{}", self.sc.agent.id));
+                let input = input.replace("$id", &format!("{}", self.sc.agent.id)).replace("$window", &format!("{}", self.sc.agent.window));
                 let expected = match self.sc.agent.kept {
                     Some(revision) if verb == "write" => format!(",\"expectedRevision\":{}", revision),
                     _ => String::new(),
@@ -152,9 +156,24 @@ impl Ui {
                 }
             }
             "id" => match self.resolve(rest.trim().as_bytes()).0 {
-                Some(s) => self.sc.agent.id = self.sel_rec(s).id,
+                Some(s) => {
+                    let rec = self.sel_rec(s);
+                    self.sc.agent.id = rec.id;
+                    self.sc.agent.window = rec.win as u32;
+                }
                 None => self.sel_fail(),
             },
+            "expect" if rest.trim().starts_with("reason ") => {
+                let reply = self.sc.agent.reply.clone().unwrap_or_default();
+                let v = agent_core::json::parse(reply.trim().as_bytes()).ok();
+                let details = v.as_ref().and_then(|v| v.get("error")).and_then(|e| e.get("data")).and_then(|d| d.get("details"));
+                let reason = details.and_then(|d| d.get("reason")).and_then(agent_core::Value::as_str).unwrap_or("?");
+                let by = details.and_then(|d| d.get("by")).and_then(|b| b.get("id")).and_then(agent_core::Value::as_u64).map_or(String::new(), |id| format!(" {id}"));
+                let want = rest.trim().strip_prefix("reason ").unwrap_or("").trim();
+                if !(want == reason || want == format!("{reason}{by}")) {
+                    self.fail(format!("reason {}{} ({})", reason, by, reply.trim()).as_bytes());
+                }
+            }
             "expect" if matches!(rest.trim(), "same" | "moved") => {
                 let (now, kept) = (self.sc_agent_revision(), self.sc.agent.kept);
                 if (now == kept) != (rest.trim() == "same") {
@@ -177,7 +196,7 @@ impl Ui {
                     self.fail(format!("{} ({})", got, reply.trim()).as_bytes());
                 }
             }
-            _ => self.fail(b"agent on|off|call|write ACTION [JSON]|keep|id S|expect ok|error CODE|same|moved"),
+            _ => self.fail(b"agent on|off|call|write ACTION [JSON]|keep|id S|expect ok|error CODE|reason WORD [ID]|same|moved"),
         }
     }
 

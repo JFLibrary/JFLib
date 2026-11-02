@@ -2,7 +2,8 @@
 //   [apps/gallery/src/main.s: the page scroll view of gal_frame, gal_containers, gal_values,
 //    gal_tracks, gal_hsv_changed, gal_rgb_changed, gal_track_build, gal_wheel, gal_lists,
 //    ants_draw, the CMD_ANTS / CMD_DEC_SEP parts of gal_u1_cmd]; the list flyout of test hook
-//   9061 (Rust only: apps/gallery/tests/listfly.uis)
+//   9061 (Rust only: apps/gallery/tests/listfly.uis); what a click from outside cannot reach:
+//   test hook 9062 (Rust only: apps/gallery/tests/agent_click.uis)
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -47,6 +48,13 @@ const RL_N: usize = 12;
 const CMD_ANTS: u32 = 9053; // test hook: advance the marching ants (damage only)
 const CMD_DEC_SEP: u32 = 9060; // test hook: decimal separator ',' <-> '.'
 const CMD_LIST_FLY: u32 = 9061; // test hook: the list flyout (arg 1: no row can be chosen)
+const CMD_HIT_CASES: u32 = 9062; // test hook: what a click from outside cannot reach
+const ID_HIT_SHOWN: u32 = 7930; // the button a clipping box shows
+const ID_HIT_CUT: u32 = 7931; // the button it cuts off
+const ID_HIT_UNDER: u32 = 7932; // a button with a lid over it
+const ID_HIT_LID: u32 = 7933;
+const ID_HIT_HALF: u32 = 7934; // a button with a bar over its middle
+const ID_HIT_BAR: u32 = 7935;
 const ID_LIST_FLY: u32 = 7900; // flyout at the pointer: a list without a selection
 const ID_LIST_FLY_L: u32 = 7910; // its list, rows 7911 .. 7922
 
@@ -134,6 +142,9 @@ pub(crate) struct S {
     fly_open: u32,
     fly_none: bool,
     fly_sel: i32,
+    /// test hook 9062: shown, clicks that arrived
+    hit_cases: bool,
+    hit_clicks: i32,
 }
 
 impl Default for S {
@@ -172,6 +183,8 @@ impl Default for S {
             fly_open: 0,
             fly_none: false,
             fly_sel: -1,
+            hit_cases: false,
+            hit_clicks: 0,
         }
     }
 }
@@ -455,6 +468,34 @@ pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
     ui.box_end();
 }
 
+/// test hook 9062 (apps/gallery/tests/agent_click.uis): a box that clips and does not scroll,
+/// a button under a lid of the same layer, one with only its middle covered
+pub(crate) fn hit_cases(g: &mut Gal, ui: &mut Ui) {
+    let s = &mut g.list;
+    if !s.hit_cases {
+        return;
+    }
+    let mut hit = |ui: &mut Ui, id: u32, label: &str| {
+        if ui.button(id, label) & EV_ACT != 0 {
+            s.hit_clicks += 1;
+        }
+    };
+    ui.next_size(200, 32);
+    ui.box_begin(0, BOX_V | BOX_CLIP, 0);
+    hit(ui, ID_HIT_SHOWN, "Im Ausschnitt");
+    hit(ui, ID_HIT_CUT, "Abgeschnitten");
+    ui.box_end();
+    hit(ui, ID_HIT_UNDER, "Zugedeckt");
+    let r = ui.last_rect();
+    ui.hit_rect(ID_HIT_LID, r[0], r[1], r[2], r[3], 0);
+    ui.sem(K_BOX, ID_HIT_LID, Some("Deckel"), 0);
+    hit(ui, ID_HIT_HALF, "Halb bedeckt");
+    let r = ui.last_rect();
+    ui.hit_rect(ID_HIT_BAR, r[0], r[1] + r[3] / 3, r[2], r[3] / 3, 0);
+    let t = cap(format!("Treffer: {}", s.hit_clicks), 32);
+    ui.text(TS_CAPTION, &t);
+}
+
 /// the list flyout of test hook 9061 (after the page, like an app's popover): a list without
 /// a selection gets the keyboard focus in the flyout's first frame and keeps -1 (the focus
 /// alone selects nothing).  Arg 1: no row can be chosen, the app puts -1 back (JFNetworker's
@@ -504,6 +545,10 @@ pub(crate) fn u1_cmd(g: &mut Gal, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_DEC_SEP => {
             let c = ui.decimal_sep() ^ (44 ^ 46); // ',' <-> '.'
             ui.set_decimal_sep(c);
+            true
+        }
+        CMD_HIT_CASES => {
+            g.list.hit_cases = !g.list.hit_cases;
             true
         }
         CMD_LIST_FLY => {

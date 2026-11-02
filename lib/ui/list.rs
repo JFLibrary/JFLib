@@ -380,8 +380,13 @@ impl Ui {
         if f == 0 || !self.wp.ctx.focus_visible || f == e.id {
             return;
         }
-        // the focused widget's semantic record among ours (last match)
-        let Some(r) = self.sems.get(e.sem0..).and_then(|v| v.iter().rev().find(|r| r.id == f)).map(|r| self.phys_rect(r.rect)) else {
+        self.scr_show(e, f);
+    }
+
+    // scr_show(entry, id): scroll widget id into view, when it is in this view
+    fn scr_show(&mut self, e: &Scr, id: u32) {
+        // its semantic record among ours (last match)
+        let Some(r) = self.sems.get(e.sem0..).and_then(|v| v.iter().rev().find(|r| r.id == id)).map(|r| self.phys_rect(r.rect)) else {
             return;
         };
         let axes = scr_axes(e.flags);
@@ -516,6 +521,9 @@ impl Ui {
         }
         self.box_end();
         self.scr_follow(&e);
+        if let Some(id) = self.agent_reveal() {
+            self.scr_show(&e, id); // a click from outside (agent.rs)
+        }
         if self.scr_settle(&e) {
             self.repass(); // the content shrank under the position
         }

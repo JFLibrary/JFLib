@@ -6,6 +6,8 @@
 rsonly clip_rich.uis # Rich clipboard alternative representations have no assembly counterpart.
 rsonly listfly.uis # Test hook 9061 (a list flyout focused at once) has no assembly counterpart.
 rsonly agent_revision.uis # Agent control has no assembly counterpart.
+rsonly agent_click.uis # Agent control has no assembly counterpart.
+rsonly agent_click_rtl.uis # Agent control has no assembly counterpart.
 rsonly inspect.uis # The live inspector (ROADMAP §12) has no assembly counterpart.
 rsonly inspect_rtl.uis # The live inspector (ROADMAP §12) has no assembly counterpart.
 rsonly csd_titlebar.uis # The system title bar settings, `system env` and `expect wm` have no assembly counterpart.

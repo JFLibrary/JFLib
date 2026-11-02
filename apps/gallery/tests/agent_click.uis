@@ -1,0 +1,176 @@
+# agent control: ui.click only reports a click its press reaches (lib/ui/agent.rs;
+# docs/AGENT_WEB.md).  The press meets the hit test, not the widget's rectangle: clipped boxes,
+# what lies over it, popups, modal layers, other windows.
+size 800 580
+theme light
+agent on
+# ---- the middle of the text box lies on the status bar, a few pixels of it show above: the page
+# scrolls it into view, as for the keyboard focus, and the click and the text arrive
+expect #700 rect 24 548 240 32
+agent id #700
+agent call ui.state
+agent keep
+agent write ui.click {"id":$id}
+agent expect ok
+expect #700 focused
+expect #700 rect 24 508 240 32
+agent keep
+agent write ui.type {"text":"Hallo"}
+agent expect ok
+expect #700 text "Hallo"
+agent keep
+# ---- far outside the page's view
+agent id #8707
+agent write ui.click {"id":$id}
+agent expect ok
+expect #8707 rect 447 508 41 32
+size 1000 1450
+# ---- what the page can show: nothing scrolls, the press lands, it counts once
+cmd 9062
+expect "Im Ausschnitt" exists
+expect text:"Treffer: 0" exists
+agent call ui.state
+agent keep
+agent id #7930
+agent write ui.click {"id":$id}
+agent expect ok
+expect text:"Treffer: 1" exists
+agent keep
+# ---- cut off by a box that clips and cannot scroll: refused, no press
+agent id #7931
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason clipped
+expect text:"Treffer: 1" exists
+agent call ui.state
+agent expect same
+# ---- a lid on the same layer: the rectangle is there, the press would be the lid's
+agent id #7932
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason covered 7933
+expect text:"Treffer: 1" exists
+agent call ui.state
+agent expect same
+# ---- only its middle covered: the press goes to what shows of it
+agent id #7934
+agent write ui.click {"id":$id}
+agent expect ok
+expect text:"Treffer: 2" exists
+agent keep
+cmd 9062
+agent call ui.state
+agent keep
+# ---- no hit box of its own, no id at all (nothing scrolls for it), disabled
+agent id #1
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason no_input
+agent write ui.click {"id":0}
+agent expect error unavailable
+agent expect reason no_input
+agent id "Deaktiviert"
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason disabled
+# ---- a row lies in the middle of a list: part of the list
+agent id #7100
+agent write ui.click {"id":$id}
+agent expect ok
+expect #7104 selected
+agent keep
+# ---- an open popup: it would take the press and close, the widget under it gets nothing
+agent id "Stärke"
+agent write ui.click {"id":$id}
+agent expect ok
+expect "Stärke" open
+agent keep
+agent id "Standard"
+expect text:"Wert: 40 %   Klicks: 0" exists
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason popup
+expect "Stärke" open
+expect text:"Wert: 40 %   Klicks: 0" exists
+# ... its rows take the press
+agent id button:"Schließen"
+agent write ui.click {"id":$id}
+agent expect ok
+expect button:"Schließen" missing
+agent keep
+# ---- a dialog on the page: the page under it is blocked
+agent id "Dialog"
+agent write ui.click {"id":$id}
+agent expect ok
+agent keep
+agent id "Dialog öffnen"
+agent write ui.click {"id":$id}
+agent expect ok
+agent keep
+agent id "Standard"
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason modal
+key esc
+agent call ui.state
+agent keep
+# ---- a second window: its own hit list, its own window number
+agent id "Werkzeugfenster"
+agent write ui.click {"id":$id}
+agent expect ok
+expect window 7600 open
+agent keep
+agent id #7601
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect #7601 value 51
+agent keep
+# ---- a modal window: every other window is blocked
+agent id "Dialogfenster…"
+agent write ui.click {"id":$id}
+agent expect ok
+expect window 7620 open
+agent keep
+agent id "Standard"
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason modal
+agent id #7621
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect #7621 checked
+agent keep
+agent id "Abbrechen"
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect window 7620 closed
+agent keep
+agent id "Werkzeugfenster"
+agent write ui.click {"id":$id}
+agent expect ok
+expect window 7600 closed
+agent keep
+# ---- a popup of a second window, its rows beyond the window's edges
+cmd 9104
+agent call ui.state
+agent keep
+agent id #7762
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect #7762 open
+agent keep
+agent id listitem:"Luminanz"
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect #7762 value 19
+agent keep
+# ... a small window cuts the rest of its content off
+resizewin 7760 240 70
+agent call ui.state
+agent keep
+agent id #7763
+agent write ui.click {"id":$id,"window":$window}
+agent expect error unavailable
+agent expect reason clipped
+agent off
+expect_nowarn

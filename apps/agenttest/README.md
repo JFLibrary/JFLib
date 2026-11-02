@@ -36,7 +36,8 @@ Run the same Python scripts under Linux with `--exe build/agent-core/linux/agent
 `--bin-dir build/agent-core/linux`. The GUI test briefly starts real Gallery/Kritzel windows
 with automatic shutdown, verifies that normal app launches expose no control endpoint,
 checks CLI discovery, widget inspection, PNG resources, clicks and typing in Gallery with
-the revision read last (one connection and the CLI), and Kritzel resize/fill/undo. It uses
+the revision read last (one connection and the CLI), clicks in a window too small for the page,
+under an open popup and in a second window, and Kritzel resize/fill/undo. It uses
 only new in-memory documents. Windows launches request hidden windows; set
 `jfgui_TEST_NOACTIVATE=1` on a desktop in use.
 

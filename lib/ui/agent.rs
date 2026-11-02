@@ -5,6 +5,7 @@ use core::cell::Cell;
 use agent_core::{Access, ActionContext, ActionError, ActionResult, ActionSpec, Dispatcher, ErrorCode, Host, Resource, Value};
 use agent_core::schema::{Property, Schema, OBJECT, STRING, U64};
 use crate::{App, Ui, Runtime, Sem, consts::*};
+use crate::ctx::hit_find_list;
 use plat::policy::{AgentRule, Verdict};
 
 #[derive(Default)]
@@ -15,6 +16,7 @@ pub(crate) struct State {
     images: Vec<(String, Vec<u8>)>,
     controls: Revision, // App::action_revision's stand-in: what an action depends on
     shown: Revision,    // uiRevision: everything ui.state reports
+    reveal: Option<(u8, u32)>, // (window, id): the scroll views bring this widget into view
     #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     server: Option<agent_io::ipc::Server>,
 }
@@ -60,7 +62,7 @@ static ACTIONS: [ActionSpec; 7] = [
     ActionSpec::read("ui.state", "Inspect window, focus, commands, capabilities and paginated widgets").schemas(&OBJECT, &OBJECT),
     ActionSpec::write("ui.command", "Execute an existing enabled numeric command").schemas(&COMMAND, &OBJECT),
     ActionSpec { revision_required: false, ..ActionSpec::write("ui.focus", "Focus an enabled widget by its semantic identifier").schemas(&NODE, &OBJECT) },
-    ActionSpec::write("ui.click", "Activate an enabled widget through its real input handler").schemas(&NODE, &OBJECT),
+    ActionSpec::write("ui.click", "Press an enabled widget through its real input handler, scrolled into view; refused when the press would not reach it").schemas(&NODE, &OBJECT),
     ActionSpec::write("ui.type", "Type Unicode text into the currently focused control").schemas(&TEXT, &OBJECT),
     ActionSpec::write("ui.key", "Deliver a virtual key and modifiers through the normal accelerator/input path").schemas(&KEY, &OBJECT),
     ActionSpec::read("ui.render", "Render a PNG and return a separately readable resource"),
@@ -86,9 +88,34 @@ impl<'a> UiHost<'a> {
         let window = number(input, "window", 0)?;
         let node = self.ui.sems.iter().rev().find(|s| s.id == id && s.win as u32 == window)
             .ok_or_else(|| error(ErrorCode::NotFound, "Widget does not exist in the requested window"))?;
-        if node.state & SS_DISABLED != 0 { return Err(error(ErrorCode::Unavailable, "Widget is disabled")); }
-        if (node.layer as u32) < self.ui.modal_active() { return Err(error(ErrorCode::Unavailable, "A modal dialog blocks this widget")); }
+        if node.state & SS_DISABLED != 0 { return Err(Miss::new("disabled", "Widget is disabled", node, None, 0).error(self.ui)); }
+        if (self.ui.m.win.inert >> (window & 31)) & 1 != 0 { return Err(Miss::new("modal", "A modal window blocks this window", node, None, 0).error(self.ui)); }
+        let modal = self.ui.uiw_parts(window).map_or(0, |p| p.ctx.modal_prev);
+        if (node.layer as u32) < modal { return Err(Miss::new("modal", "A modal dialog blocks this widget", node, None, 0).error(self.ui)); }
         Ok(node.clone())
+    }
+    // The widget ui.click presses and the point.  A widget that does not show is brought into view
+    // by the scroll views around it, as for the keyboard focus: no action of this interface scrolls.
+    fn click_target(&mut self, input: &Value) -> Result<(Sem, (i32, i32)), ActionError> {
+        let node = self.node(input)?;
+        let window = node.win as u32;
+        if node.rect[2] <= 0 || node.rect[3] <= 0 { return Err(Miss::new("clipped", "Widget has no visible hit rectangle", &node, None, 0).error(self.ui)); }
+        if (window != 0 && !self.ui.uiw_drawable(window)) || (!self.ui.headless && self.ui.uiw_pw(window) < 0) {
+            return Err(Miss::new("window", "The widget's window is not shown", &node, None, 0).error(self.ui));
+        }
+        match self.ui.agent_aim(&node, false) {
+            Ok(point) => return Ok((node, point)),
+            Err(miss) if miss.reason == "popup" || node.id == 0 => return Err(miss.error(self.ui)),
+            Err(_) => {}
+        }
+        self.ui.agent.reveal = Some((node.win, node.id));
+        self.ui.run_passes(self.app);
+        self.ui.agent.reveal = None;
+        let node = self.node(input)?;
+        match self.ui.agent_aim(&node, true) {
+            Ok(point) => Ok((node, point)),
+            Err(miss) => Err(miss.error(self.ui)),
+        }
     }
     // after an action; a change it made need not show in the controls (the app's own state)
     fn settle(&mut self, action: &ActionSpec) {
@@ -202,9 +229,10 @@ impl Host for UiHost<'_> {
                 Value::object([("focused", Value::u64(node.id as u64))])
             }
             "ui.click" => {
-                let node = self.node(input)?;
-                if node.rect[2] <= 0 || node.rect[3] <= 0 { return Err(error(ErrorCode::Unavailable, "Widget has no visible hit rectangle")); }
-                let event = plat::Event { win: node.win, x: node.rect[0] + node.rect[2] / 2, y: node.rect[1] + node.rect[3] / 2, btn: plat::BTN_LEFT, ..Default::default() };
+                let (node, (x, y)) = self.click_target(input)?;
+                // the event queue speaks of platform windows, a headless run has none
+                let win = if self.ui.headless { node.win } else { self.ui.uiw_pw(node.win as u32) as u8 };
+                let event = plat::Event { win, x, y, btn: plat::BTN_LEFT, ..Default::default() };
                 for typ in [plat::E_MOVE, plat::E_DOWN, plat::E_UP] { self.event(plat::Event { typ, ..event }); }
                 Value::object([("activated", Value::u64(node.id as u64))])
             }
@@ -296,11 +324,90 @@ impl Host for UiHost<'_> {
     }
 }
 fn error(code: ErrorCode, text: &str) -> ActionError { ActionError::new(code, text) }
+
+// Why a widget cannot be used from outside: details.reason of the refusal, the point looked at
+// and the id of what a press there meets (0: nothing with an id).
+struct Miss {
+    reason: &'static str,
+    text: &'static str,
+    id: u32,
+    win: u8,
+    rect: [i32; 4],
+    point: Option<(i32, i32)>,
+    by: u32,
+}
+impl Miss {
+    fn new(reason: &'static str, text: &'static str, node: &Sem, point: Option<(i32, i32)>, by: u32) -> Self {
+        Self { reason, text, id: node.id, win: node.win, rect: node.rect, point, by }
+    }
+    fn error(self, ui: &Ui) -> ActionError {
+        let by = ui.sems.iter().rev().find(|s| self.by != 0 && s.id == self.by && s.win == self.win).map_or(Value::Null, |s| Value::object([
+            ("id", Value::u64(s.id as u64)), ("kind", Value::u64(s.kind as u64)),
+            ("label", s.label.as_ref().map_or(Value::Null, |l| Value::string(l.clone()))),
+        ]));
+        let numbers = |v: &[i32]| Value::Array(v.iter().map(|n| Value::i64(*n as i64)).collect());
+        error(ErrorCode::Unavailable, self.text).with_details(Value::object([
+            ("reason", Value::string(self.reason)), ("id", Value::u64(self.id as u64)), ("window", Value::u64(self.win as u64)),
+            ("rect", numbers(&self.rect)), ("point", self.point.map_or(Value::Null, |(x, y)| numbers(&[x, y]))), ("by", by),
+        ]))
+    }
+}
 fn number(input: &Value, key: &str, default: u32) -> Result<u32, ActionError> {
     input.get(key).map_or(Ok(default), |v| v.as_u64().and_then(|v| u32::try_from(v).ok()).ok_or_else(|| error(ErrorCode::InvalidInput, "Integer is outside the supported range")))
 }
 
 impl Ui {
+    // Where a press reaches the widget, in window px, by the hit test the press itself will meet:
+    // the last pass of its window with clipped boxes, layers, the catcher under popups and the
+    // modal layer, not the record's rectangle.  The middle of the record, also on a canvas that
+    // hit tests what it draws (the nodes of a diagram have no box); with `parts` also what shows
+    // of its boxes (a row half under a bar, a link over two lines), then a part of it in the
+    // middle (a row over its list).
+    fn agent_aim(&self, node: &Sem, parts: bool) -> Result<(i32, i32), Miss> {
+        let Some(p) = self.uiw_parts(node.win as u32) else { return Err(Miss::new("window", "The widget's window is not shown", node, None, 0)); };
+        let (list, modal) = (&p.ctx.hits[p.ctx.hit_cur ^ 1], p.ctx.modal_prev);
+        // hit boxes are logical: a right-to-left window mirrors x, as it does with the press
+        let flip = |x: i32| if self.rtl { p.rt.fb.w - 1 - x } else { x };
+        let top = |x: i32, y: i32| hit_find_list(list, modal, x, y).0;
+        let middle = (flip(node.rect[0] + node.rect[2] / 2), node.rect[1] + node.rect[3] / 2);
+        let on_middle = top(middle.0, middle.1);
+        let under = self.sems.iter().rev().find(|s| on_middle != 0 && s.id == on_middle && s.win == node.win && s.layer == node.layer);
+        let own = || list.iter().filter(|h| node.id != 0 && h.id == node.id);
+        let shown = || own().filter(|h| h.x0 < h.x1 && h.y0 < h.y1);
+        if node.id != 0 && (on_middle == node.id || (own().next().is_none() && under.is_some_and(|s| s.kind == K_CANVAS))) {
+            return Ok((flip(middle.0), middle.1));
+        }
+        if parts && node.id != 0 {
+            // five by five points of each box, its middle first
+            let inside = shown().find_map(|h| core::iter::once(12).chain(0..25).find_map(|k: i32| {
+                let (x, y) = (h.x0 + (h.x1 - h.x0) * (2 * (k % 5) + 1) / 10, h.y0 + (h.y1 - h.y0) * (2 * (k / 5) + 1) / 10);
+                (top(x, y) == node.id).then_some((flip(x), y))
+            }));
+            if let Some(point) = inside { return Ok(point); }
+            let r = node.rect;
+            if under.is_some_and(|s| s.rect != r && s.rect[0] >= r[0] && s.rect[1] >= r[1] && s.rect[0] + s.rect[2] <= r[0] + r[2] && s.rect[1] + s.rect[3] <= r[1] + r[3]) {
+                return Ok((flip(middle.0), middle.1));
+            }
+        }
+        // what lies there; the middle of what shows of it, when the record's middle is elsewhere
+        let at = shown().next().map_or(middle, |h| (h.x0 + (h.x1 - h.x0) / 2, h.y0 + (h.y1 - h.y0) / 2));
+        let by = top(at.0, at.1);
+        let point = Some((flip(at.0), at.1));
+        if by == crate::popup::CATCH_ID {
+            return Err(Miss::new("popup", "An open popup takes this click and closes", node, point, 0));
+        }
+        if own().next().is_none() {
+            return Err(Miss::new("no_input", "This widget has no hit box of its own", node, point, by));
+        }
+        if shown().next().is_none() {
+            return Err(Miss::new("clipped", "The widget is outside the visible area", node, point, by));
+        }
+        Err(Miss::new("covered", "Something else lies over this widget", node, point, by))
+    }
+    /// (scr_close) the widget a click asked for, when it is one of the window being built
+    pub(crate) fn agent_reveal(&self) -> Option<u32> {
+        self.agent.reveal.filter(|r| r.0 as u32 == self.uiw_cur).map(|r| r.1)
+    }
     /// Whether external control was explicitly activated. No endpoint opens by reading this.
     pub fn agent_enabled(&self) -> bool { self.agent.enabled }
     /// Whether the active control session has received a client request.

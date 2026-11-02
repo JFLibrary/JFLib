@@ -1,0 +1,57 @@
+#!args --rtl
+# agent_click.uis right to left: rectangles and the press are physical (mirrored), the hit boxes
+# the press meets are logical.
+size 800 580
+theme light
+agent on
+# ---- the middle of the text box lies on the status bar: scrolled into view, the click arrives
+expect #700 rect 536 548 240 32
+agent id #700
+agent call ui.state
+agent keep
+agent write ui.click {"id":$id}
+agent expect ok
+expect #700 focused
+expect #700 rect 536 508 240 32
+agent keep
+agent write ui.type {"text":"Hallo"}
+agent expect ok
+expect #700 text "Hallo"
+size 1000 1450
+# ---- a hit, what a box cuts off, a lid, a bar over the middle
+cmd 9062
+agent call ui.state
+agent keep
+agent id #7930
+agent write ui.click {"id":$id}
+agent expect ok
+expect text:"Treffer: 1" exists
+agent keep
+agent id #7931
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason clipped
+agent id #7932
+agent write ui.click {"id":$id}
+agent expect error unavailable
+agent expect reason covered 7933
+agent id #7934
+agent write ui.click {"id":$id}
+agent expect ok
+expect text:"Treffer: 2" exists
+agent keep
+cmd 9062
+agent call ui.state
+agent keep
+# ---- a second window, mirrored by itself
+agent id "Werkzeugfenster"
+agent write ui.click {"id":$id}
+agent expect ok
+expect window 7600 open
+agent keep
+agent id #7602
+agent write ui.click {"id":$id,"window":$window}
+agent expect ok
+expect #7602 focused
+agent off
+expect_nowarn
