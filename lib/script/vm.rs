@@ -337,6 +337,8 @@ pub struct Vm {
     pub(crate) consts: Vec<Value>,
     /// the type names as permanent strings
     tnames: [Value; 9],
+    /// limit_text()
+    limit: Value,
     /// heap objects below this index are the permanent constants
     permanent: u32,
     /// constants below this index are the program's (permanent); the modules' are roots
@@ -398,6 +400,7 @@ impl Vm {
             });
         }
         let tnames = TYPES.map(|t| Value::Str(heap.insert(Obj::Str(StrObj::new(t)))));
+        let limit = Value::Str(heap.insert(Obj::Str(StrObj::new("Speichergrenze erreicht"))));
         let permanent = heap.objs.len() as u32;
         heap.bytes = 0;
         let natives = code.hosts.iter().map(|h| (Arc::from(h.name.as_str()), builtin_of(&h.name))).collect();
@@ -413,6 +416,7 @@ impl Vm {
             frames: vec![Frame { proto: 0, closure: None, base: 1, pc: 0 }],
             consts,
             tnames,
+            limit,
             permanent,
             natives,
             pins: Vec::new(),
@@ -692,6 +696,12 @@ impl Vm {
             Value::Map(r) if self.valid(m) => self.heap.map(r).iter().map(|e| (e.key, e.val)).collect(),
             _ => Vec::new(),
         }
+    }
+
+    /// "Speichergrenze erreicht" as a permanent str: what a host can still give a callback when
+    /// the heap has no room for anything else; it takes none and is always valid
+    pub fn limit_text(&self) -> Value {
+        self.limit
     }
 
     /// a new str (valid until the next run unless the script keeps it or it is pinned)

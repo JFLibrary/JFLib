@@ -569,11 +569,13 @@ struct Call {
     /// a pin the call makes unnecessary (one-shot callbacks)
     unpin: Option<Pin>,
     top: bool,
+    /// its results did not fit the heap: the error to report when it starts (results())
+    lost: Option<script::Error>,
 }
 
 impl Call {
     fn new(f: Value, args: Vec<Value>, during: &'static str) -> Call {
-        Call { f, args, during, req: None, then: Then::Nothing, unpin: None, top: false }
+        Call { f, args, during, req: None, then: Then::Nothing, unpin: None, top: false, lost: None }
     }
 }
 
@@ -989,6 +991,25 @@ fn reply_from(vm: &mut Vm, v: Value) -> Option<Reply> {
             r
         }),
         _ => None,
+    }
+}
+
+/// a value of the disk as the script sees it: only the heap's limit stops it (nil for a text that
+/// is no JSON)
+fn stored(vm: &mut Vm, t: &str) -> Result<Value, script::Error> {
+    match vm.json_decode(t) {
+        Err(e) if e.kind == ErrorKind::Heap => Err(e),
+        r => Ok(r.unwrap_or(Value::Nil)),
+    }
+}
+
+/// the arguments of a one-shot callback and what to report: results that do not fit the heap
+/// reach it as an err, the limit's text (something may wait for this callback, a request's res
+/// that nothing else can answer)
+fn results(vm: &Vm, made: Result<Vec<Value>, script::Error>) -> (Vec<Value>, Option<script::Error>) {
+    match made {
+        Ok(a) => (a, None),
+        Err(e) => (vec![vm.limit_text()], Some(e)),
     }
 }
 
@@ -1981,7 +2002,13 @@ impl Run {
         };
         let req = if let Pending::Http(r) = &p { Some(r.id) } else { None };
         match self.prepare(os, p, cause) {
-            Ok(Some(c)) => self.begin(book, def, os, c, cause),
+            Ok(Some(mut c)) => {
+                if let Some(e) = c.lost.take() {
+                    let now = os.now();
+                    self.fail(book, e, during, now, cause, def.cfg.stop_on_error);
+                }
+                self.begin(book, def, os, c, cause);
+            }
             Ok(None) => {}
             Err(e) => {
                 let now = os.now();
@@ -2031,6 +2058,7 @@ impl Run {
                 x.accept_queued = false;
                 let x = *x;
                 let mut fresh = Vec::new();
+                let mut lost = None;
                 while let Some(s) = os.tcp_accept(x.sock) {
                     let row = os.tcp_info(s);
                     let remote = row.as_ref().map_or((IpAddr::V4(Ipv4::UNSPECIFIED), 0), |r| r.remote);
@@ -2038,7 +2066,15 @@ impl Run {
                     self.next += 1;
                     let id = self.next;
                     let peer = format!("{}", remote.0);
-                    let m = vm_map(vm, &[("kind", F::S("tcp")), ("id", F::I(id as i64)), ("peer", F::S(&peer)), ("peer_port", F::I(remote.1 as i64)), ("port", F::I(local as i64))])?;
+                    let m = match vm_map(vm, &[("kind", F::S("tcp")), ("id", F::I(id as i64)), ("peer", F::S(&peer)), ("peer_port", F::I(remote.1 as i64)), ("port", F::I(local as i64))]) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            // no room for its handle: nothing could ever close it
+                            os.tcp_close(s);
+                            lost = Some(e);
+                            continue;
+                        }
+                    };
                     let handle = vm.pin(m);
                     let hv = vm.pinned(x.handlers);
                     let handlers = vm.pin(hv);
@@ -2055,6 +2091,9 @@ impl Run {
                 }
                 for id in fresh.into_iter().rev() {
                     self.queue.push_front((Pending::Accepted(id), cause));
+                }
+                if let Some(e) = lost {
+                    return Err(e);
                 }
                 None
             }
@@ -2082,7 +2121,15 @@ impl Run {
                 if d.is_empty() {
                     return Ok(None);
                 }
-                self.data_call(c, d)?
+                let call = self.data_call(c, d);
+                if call.is_err() {
+                    // what did not fit is gone: the stream cannot go on with a hole
+                    if let Some(x) = self.conns.get_mut(&c) {
+                        x.closed = true;
+                    }
+                    self.effects.push_back((os.now(), cause, Effect::Abort(c)));
+                }
+                call?
             }
             Pending::Ended(c, why) => {
                 let Some(x) = self.conns.get_mut(&c) else {
@@ -2106,7 +2153,8 @@ impl Run {
                     Why::Local | Why::Aborted | Why::Failed => Then::Forget(c),
                 };
                 let (handle, handlers) = (x.handle, x.handlers);
-                let w = vm.new_str(why.word())?;
+                // (no room for the word: nil; the callback and what follows it still happen)
+                let w = vm.new_str(why.word()).unwrap_or(Value::Nil);
                 Some(Call { then, ..Call::new(handler(vm, handlers, "close"), vec![vm.pinned(handle), w], "close") })
             }
             Pending::Http(r) => {
@@ -2130,11 +2178,12 @@ impl Run {
                 let Some(cb) = self.requests.remove(&id) else {
                     return Ok(None);
                 };
-                let (err, resp) = match &d.result {
-                    Ok(r) => (Value::Nil, resp_map(vm, r)?),
-                    Err(f) => (vm.new_str(&f.text())?, Value::Nil),
+                let made = match &d.result {
+                    Ok(r) => resp_map(vm, r).map(|m| vec![Value::Nil, m]),
+                    Err(f) => vm.new_str(&f.text()).map(|t| vec![t, Value::Nil]),
                 };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), vec![err, resp], "request") })
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "request") })
             }
             Pending::Dns(l) => {
                 let Some(id) = self.by_lookup.remove(&l) else {
@@ -2143,19 +2192,21 @@ impl Run {
                 let Some(cb) = self.resolves.remove(&id) else {
                     return Ok(None);
                 };
-                let (err, addrs) = match os.lookup(l).and_then(|x| x.result.clone()) {
+                let looked = os.lookup(l).and_then(|x| x.result.clone());
+                let made: Result<Vec<Value>, script::Error> = (|| match looked {
                     Some(Ok(a)) => {
                         // both families in the order to try them (getaddrinfo)
                         let mut items = Vec::with_capacity(a.sorted.len());
                         for x in &a.sorted {
                             items.push(vm.new_str(&format!("{}", x))?);
                         }
-                        (Value::Nil, vm.new_list(items)?)
+                        Ok(vec![Value::Nil, vm.new_list(items)?])
                     }
-                    Some(Err(e)) => (vm.new_str(e.text())?, Value::Nil),
-                    None => (vm.new_str("keine Antwort")?, Value::Nil),
-                };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), vec![err, addrs], "dns") })
+                    Some(Err(e)) => Ok(vec![vm.new_str(e.text())?, Value::Nil]),
+                    None => Ok(vec![vm.new_str("keine Antwort")?, Value::Nil]),
+                })();
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "dns") })
             }
             Pending::Disk(id) => {
                 let Some(op) = self.disk.remove(&id) else {
@@ -2164,28 +2215,29 @@ impl Run {
                 let Some(cb) = op.cb else {
                     return Ok(None);
                 };
-                let args = match op.out {
-                    DiskOut::Full => vec![vm.new_str("Die Disk ist voll.")?],
+                let made: Result<Vec<Value>, script::Error> = (|| match op.out {
+                    DiskOut::Full => Ok(vec![vm.new_str("Die Disk ist voll.")?]),
                     DiskOut::Value(v) => {
                         let v = match v {
-                            Some(t) => vm.json_decode(&t).unwrap_or(Value::Nil),
+                            Some(t) => stored(vm, &t)?,
                             None => Value::Nil,
                         };
-                        vec![Value::Nil, v]
+                        Ok(vec![Value::Nil, v])
                     }
-                    DiskOut::Had(b) => vec![Value::Nil, Value::Bool(b)],
+                    DiskOut::Had(b) => Ok(vec![Value::Nil, Value::Bool(b)]),
                     DiskOut::Items(items) => {
                         let m = vm.new_map()?;
                         for (k, t) in items {
                             let k = vm.new_str(&k)?;
-                            let v = vm.json_decode(&t).unwrap_or(Value::Nil);
+                            let v = stored(vm, &t)?;
                             vm.map_set(m, k, v)?;
                         }
-                        vec![Value::Nil, m]
+                        Ok(vec![Value::Nil, m])
                     }
-                    DiskOut::Nothing => vec![Value::Nil],
-                };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), args, "disk") })
+                    DiskOut::Nothing => Ok(vec![Value::Nil]),
+                })();
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "disk") })
             }
         })
     }

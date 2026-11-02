@@ -32359,6 +32359,9 @@ drives exec one instruction at a time (exec_debug) and checks between them where
   m.key
 - **`fn map_entries(&self, m: Value) -> Vec<(Value, Value)>`**
   the entries of a map in order
+- **`fn limit_text(&self) -> Value`**
+  "Speichergrenze erreicht" as a permanent str: what a host can still give a callback when
+  the heap has no room for anything else; it takes none and is always valid
 - **`fn new_str(&mut self, s: &str) -> Result<Value, Error>`**
   a new str (valid until the next run unless the script keeps it or it is pinned)
 - **`fn new_bytes(&mut self, b: &[u8]) -> Result<Value, Error>`**

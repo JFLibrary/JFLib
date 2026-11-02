@@ -998,7 +998,9 @@ fn host_garbage(t: &mut T) {
         }
     };
     t.eq("a full heap gives the limit's error", (made, end), (1558, ErrorKind::Heap));
+    t.eq("its text needs no room", vm.str(vm.limit_text()), Some("Speichergrenze erreicht"));
     vm.collect();
+    t.check("and stays valid", vm.valid(vm.limit_text()));
     t.check("and is free again after collect()", vm.new_str("x").is_ok());
 }
 

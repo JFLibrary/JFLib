@@ -1807,7 +1807,11 @@ Konfiguration sieht das Skript als `config` (`config.port`):
   starten kann (kein Platz mehr für die Anfrage), antwortet 500. Die Speichergrenze trifft nur,
   was das Skript wirklich hält: Die Speicherbereinigung räumt auch weg, was der Dienst selbst
   für Rückrufe anlegt (`req`, Daten, Antworten). `heap_kb` pendelt deshalb unter Dauerlast
-  zwischen dem Gehaltenen und mindestens 256 KiB, ohne zu wachsen.
+  zwischen dem Gehaltenen und mindestens 256 KiB, ohne zu wachsen. Ist der Speicher wirklich
+  voll, bekommen Rückrufe von `http.request`, `dns.resolve` und `disk` den Text
+  „Speichergrenze erreicht“ als `err`, damit ein wartendes `res` noch antworten kann. Eine neue
+  Verbindung wird geschlossen, eine mit Daten, die nicht mehr passen, abgebrochen; `close` kommt
+  auch dann, notfalls mit `nil` statt des Grundes.
   Stoppen und Strom aus beenden das Programm samt Speicher; was es auf die Disk legte, bleibt.
 - **Determinismus:** keine Uhr außer der virtuellen, Zufall aus einem eigenen Strom je Dienst
   (vom Gerät und Seed abgeleitet), Gleitkomma in Software: gleiche Projekte ergeben auf jedem
