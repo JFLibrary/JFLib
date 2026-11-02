@@ -866,7 +866,7 @@ pub(crate) fn tool_hint(p: &Pn) -> String {
         None => cmd_label(p, CMD_TOOL0 + t as u32),
     };
     let hint = desc.map(|d| d.hint).filter(|h| !h.is_empty()).unwrap_or(HELP_TAB[t as usize]);
-    fmt_cap(format!("{}: {}", name, hint), HINT_CAP)
+    fmt_cap(format!("{}: {}", name, crate::preferences::localization::tr(hint)), HINT_CAP)
 }
 
 // ui_cmd_label(id): the label of a command without the mnemonic marks ("&&" = "&")
@@ -1161,12 +1161,12 @@ pub(crate) fn opt_fill(p: &mut Pn, ui: &mut Ui) -> bool {
     let cur = if p.tool.cfg.fill < FS_COUNT as u32 { p.tool.cfg.fill } else { 0 };
     let mut chosen = cur;
     ui.next_flags(ST_SUBTLE);
-    ui.dropdown_button(ID_OPT_FILL, FILL_NAMES[cur as usize]);
+    ui.dropdown_button(ID_OPT_FILL, crate::preferences::localization::tr(FILL_NAMES[cur as usize]));
     if ui.flyout_begin(ID_OPT_FILL, FL_BELOW) {
         if cur == FS_SOLID as u32 {
             ui.next_flags(ST_CHECKED);
         }
-        if ui.menu_item(ID_OPT_FILL + 1, FILL_NAMES[0]) & EV_ACT != 0 {
+        if ui.menu_item(ID_OPT_FILL + 1, crate::preferences::localization::tr(FILL_NAMES[0])) & EV_ACT != 0 {
             chosen = FS_SOLID as u32;
         }
         ui.menu_sep();
@@ -1181,7 +1181,7 @@ pub(crate) fn opt_fill(p: &mut Pn, ui: &mut Ui) -> bool {
                     ui.next_flags(ST_CHECKED);
                 }
                 ui.next_size(FILL_COL_W, 0);
-                if ui.menu_item(ID_OPT_FILL + 2 + h, FILL_NAMES[fs as usize]) & EV_ACT != 0 {
+                if ui.menu_item(ID_OPT_FILL + 2 + h, crate::preferences::localization::tr(FILL_NAMES[fs as usize])) & EV_ACT != 0 {
                     chosen = fs;
                 }
                 h += 1;
@@ -1752,6 +1752,7 @@ pub(crate) fn t1_diag_frame(p: &mut Pn, ui: &mut Ui) {
 // ================================================================== data
 
 /// fill styles: Volltonfarbe + System.Drawing HatchStyle 0..52 (own German names)
+// i18n
 pub(crate) static FILL_NAMES: [&str; 54] = [
     "Volltonfarbe",
     "Horizontal",
@@ -1810,6 +1811,7 @@ pub(crate) static FILL_NAMES: [&str; 54] = [
 ];
 
 /// status bar help texts per tool (TOOL_* order)
+// i18n
 static HELP_TAB: [&str; 19] = [
     "Rechteckige Auswahl mit gedrückter Maustaste aufziehen. Mit Umschalt wird sie quadratisch.",
     "Ziehen bewegt den ausgewählten Inhalt, die Anfasser skalieren ihn. Mit der rechten Maustaste gezogen dreht er sich.",
