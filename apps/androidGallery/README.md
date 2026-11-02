@@ -26,6 +26,7 @@ für den Finger angeordnet (eine Spalte, 44 DIP):
 | Werte & Farben | Dezimalregler, Eigenschaftszeilen, Winkel, Verschieben, Farbspuren, Farbrad, Farbwähler | [`pg_colors.rs`](pg_colors.rs) |
 | Fenster & Dialoge | Werkzeugfenster, verschachtelte modale Dialogfenster, Seitendialog, Popups aus einem Fenster, Statusleiste | [`pg_windows.rs`](pg_windows.rs) |
 | Randfälle | Bedienelemente in den Ecken: ihre Menüs, Listen und der Kalender bleiben auf dem Bildschirm | [`pg_edge.rs`](pg_edge.rs) |
+| Bild & Leinwand | Bildansicht (Kacheln auf der GPU beim Verschieben und Zoomen), großes deckendes Bild (Textur) | [`pg_image.rs`](pg_image.rs) |
 | Wasserwaage, Handylage, Kompass, GPS | die Sensoren und der Standort des Geräts (`plat::sensors`), unten | [`pg_sensors.rs`](pg_sensors.rs) |
 
 Die App braucht `POST_NOTIFICATIONS` (gefragt bei der ersten Benachrichtigung), `WAKE_LOCK`

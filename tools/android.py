@@ -4,10 +4,13 @@ The shared Java/JNI host presents the library's pixels and forwards input. Apps 
 with `android` in TARGETS and supply android/AndroidManifest.xml and android/res/.
 A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest) is a
 plain executable for `adb shell` instead (build_exe, android/exe_main.c).
+jfgui_ANDROID_PACKAGE=NAME (test builds): the APK under another package, beside what is installed
+on a phone, which it leaves alone (other debug keys, the user's data there).
 """
 from pathlib import Path
 import hashlib
 import os
+import re
 import shutil
 import struct
 import sys
@@ -136,6 +139,21 @@ def manifest_gaps(perms, manifest):
     return None
 
 
+def manifest_for(manifest, work):
+    """the manifest to link: the app's, under another package with jfgui_ANDROID_PACKAGE"""
+    package = os.environ.get('jfgui_ANDROID_PACKAGE')
+    if not package:
+        return manifest
+    text = manifest.read_text(encoding='utf-8')
+    old = re.search(r'package="([^"]+)"', text).group(1)
+    text = text.replace('android:name=".', f'android:name="{old}.').replace(f'package="{old}"', f'package="{package}"')
+    text = text.replace(f'android:targetPackage="{old}"', f'android:targetPackage="{package}"')
+    text = text.replace(f'android:authorities="{old}.', f'android:authorities="{package}.')
+    out = work / 'AndroidManifest.xml'
+    out.write_text(text, encoding='utf-8')
+    return out
+
+
 def native_link_flags():
     """what every native link of this target has: only what is used, 16 KiB pages, no text relocations"""
     return ['-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
@@ -219,6 +237,7 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
         digest.update(relative.as_posix().encode() + b'\0' + path.read_bytes())
     digest.update(f'{ndk}:{sdkbuild}:{platform}:{java}'.encode())
     digest.update((f'release:{keystore}:{alias}' if release else 'debug').encode())
+    digest.update(os.environ.get('jfgui_ANDROID_PACKAGE', '').encode())
     stamp = work / 'apk.sha256'
     fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
@@ -264,7 +283,7 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     resources = work / 'compiled-res.zip'
     run([sdkbuild / ('aapt2' + suffix), 'compile', '--dir', app / 'android' / 'res', '-o', resources])
     unsigned = work / 'unsigned.apk'
-    run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest,
+    run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest_for(manifest, work),
          '-R', resources, '--min-sdk-version', str(MIN_API), '--target-sdk-version', '35', '--auto-add-overlay'])
     with zipfile.ZipFile(unsigned, 'a') as apk:
         apk.write(dex / 'classes.dex', 'classes.dex', compress_type=zipfile.ZIP_DEFLATED)

@@ -17,6 +17,7 @@ pub enum Page {
     Colors,
     Windows,
     Edge,
+    Images,
     Level,
     Attitude,
     Compass,
@@ -32,7 +33,7 @@ pub struct PageInfo {
 }
 
 // i18n: title
-pub const PAGES: [PageInfo; 12] = [
+pub const PAGES: [PageInfo; 13] = [
     PageInfo { page: Page::Buttons, title: "Schaltflächen", icon: IC_POINTER, name: "buttons" },
     PageInfo { page: Page::Menus, title: "Menüs & Auswahl", icon: IC_BULLETED_LIST, name: "menus" },
     PageInfo { page: Page::Texts, title: "Texteingabe", icon: IC_TEXT_BOX, name: "texts" },
@@ -41,17 +42,18 @@ pub const PAGES: [PageInfo; 12] = [
     PageInfo { page: Page::Colors, title: "Werte & Farben", icon: IC_COLOR, name: "colors" },
     PageInfo { page: Page::Windows, title: "Fenster & Dialoge", icon: IC_OPEN_IN_NEW_WINDOW, name: "windows" },
     PageInfo { page: Page::Edge, title: "Randfälle", icon: IC_WARNING, name: "edge" },
+    PageInfo { page: Page::Images, title: "Bild & Leinwand", icon: IC_VIEW_ALL, name: "images" },
     PageInfo { page: Page::Level, title: "Wasserwaage", icon: IC_CIRCLE_RING, name: "level" },
     PageInfo { page: Page::Attitude, title: "Handylage", icon: IC_ROTATE, name: "attitude" },
     PageInfo { page: Page::Compass, title: "Kompass", icon: IC_GLOBE, name: "compass" },
     PageInfo { page: Page::Gps, title: "GPS", icon: IC_HOME, name: "gps" },
 ];
 
-const FIRST_SENSOR_PAGE: usize = 8;
+const FIRST_SENSOR_PAGE: usize = 9;
 const ID_MENU: u32 = 900;
-const ID_MENU_ROW: u32 = 910; // .. 921
+const ID_MENU_ROW: u32 = 910; // .. 923
 const ID_BACK: u32 = 930;
-const ID_CARD_ROW: u32 = 940; // .. 951
+const ID_CARD_ROW: u32 = 940; // .. 952
 
 pub fn title(page: Page) -> &'static str {
     PAGES.iter().find(|p| p.page == page).map_or("", |p| t(p.title))
