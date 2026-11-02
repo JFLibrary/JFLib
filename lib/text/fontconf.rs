@@ -18,7 +18,8 @@
 //                                    system-ui, emoji, math (also fontconfig's sans and mono)
 //
 // FontDb::resolve(&conf, family, lang, weight, italic) (fontdb.rs) finds the first installed
-// candidate; for a name nothing installed matches, the candidates of sans-serif.
+// candidate with Latin letters (without any, the first installed one); for a name nothing
+// installed matches, the candidates of sans-serif.
 //
 // Rules, fontconfig's semantics in short: an alias for F puts its <prefer> families right
 // before F (so a later alias's prefer list follows an earlier one), its <accept> families
@@ -27,7 +28,8 @@
 // (eq) and they hold; its family edits prepend (before F), prepend_first, append (after F),
 // append_last or assign (in place of F).  Other matches (charset, spacing, prgname, target
 // font: hinting) are skipped.  The families in the list that have rules of their own are
-// expanded in place (4 levels).  Layers: the files' rules first, the built-in ones after them;
+// expanded in place (4 levels), only their <default> and append_last families go to the end
+// of the whole list.  Layers: the files' rules first, the built-in ones after them;
 // names compare ASCII-case-insensitively, each once.  Languages: "ja" matches ja and ja-JP;
 // zh-Hans / zh-CN / zh-SG / plain zh also match zh-cn, zh-Hant / zh-TW zh-tw, zh-HK / zh-MO
 // zh-hk and zh-tw.  <include> follows files and folders (*.conf in name order) relative to
@@ -260,7 +262,7 @@ impl FontConf {
         for (k, layer) in [&self.files, &self.builtin].into_iter().enumerate() {
             // the first layer decides whether the name itself stays (assign removes it)
             let mut memo = Memo { done: Vec::new(), steps: 0 };
-            for f in expand(layer, family, &langs, 0, &mut memo) {
+            for f in expand_list(layer, family, &langs, &mut memo) {
                 if !out.iter().any(|o| same(o, &f)) && (k == 0 || !same(&f, family)) {
                     out.push(f);
                 }
@@ -281,14 +283,41 @@ impl FontConf {
 // the list for one family in one layer (see the module header)
 // expansions already done (name, depth) and the steps spent: a crafted config cannot blow up the recursion
 struct Memo {
-    done: Vec<(String, u32, Vec<String>)>,
+    done: Vec<(String, u32, (Vec<String>, Vec<String>))>,
     steps: u32,
 }
 
 const STEPS_MAX: u32 = 2000;
 
-fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut Memo) -> Vec<String> {
+fn expand_list(rules: &[Rule], family: &str, langs: &[String], memo: &mut Memo) -> Vec<String> {
+    let (mut out, mut last) = expand(rules, family, langs, 0, memo);
+    let mut i = 0;
+    while i < last.len() {
+        let f = last[i].clone();
+        i += 1;
+        if out.iter().any(|o| same(o, &f)) {
+            continue;
+        }
+        if !same(&f, family) && memo.steps < STEPS_MAX && rules.iter().any(|r| r.family().is_some_and(|x| same(x, &f))) {
+            memo.steps += 1;
+            let (parts, more) = expand(rules, &f, langs, 1, memo);
+            for x in parts {
+                if !out.iter().any(|o| same(o, &x)) {
+                    out.push(x);
+                }
+            }
+            last.extend(more);
+        } else {
+            out.push(f);
+        }
+    }
+    out
+}
+
+// -> (the list, what goes to the end of the whole list)
+fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut Memo) -> (Vec<String>, Vec<String>) {
     let mut list: Vec<String> = alloc::vec![String::from(family)];
+    let mut last: Vec<String> = Vec::new();
     let mut fpos = Some(0usize);
     for r in rules {
         let Some(p) = fpos else { break };
@@ -300,7 +329,7 @@ fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut
                 insert(&mut list, p, prefer);
                 let p = p + prefer.len();
                 insert(&mut list, p + 1, accept);
-                list.extend(default.iter().cloned());
+                last.extend(default.iter().cloned());
                 fpos = Some(p);
             }
             Rule::Lang { lang, mode, families, .. } => {
@@ -317,7 +346,7 @@ fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut
                         fpos = Some(p + families.len());
                     }
                     LR_APPEND => insert(&mut list, p + 1, families),
-                    LR_APPEND_LAST => list.extend(families.iter().cloned()),
+                    LR_APPEND_LAST => last.extend(families.iter().cloned()),
                     _ => {
                         list.remove(p);
                         insert(&mut list, p, families);
@@ -331,7 +360,7 @@ fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut
     let mut out: Vec<String> = Vec::new();
     for f in list {
         let own = depth < DEPTH_MAX && !same(&f, family) && rules.iter().any(|r| r.family().is_some_and(|x| same(x, &f)));
-        let parts = if own && memo.steps < STEPS_MAX {
+        let (parts, more) = if own && memo.steps < STEPS_MAX {
             let key = f.trim().to_ascii_lowercase();
             if let Some(d) = memo.done.iter().find(|d| d.1 == depth + 1 && d.0 == key) {
                 d.2.clone()
@@ -342,15 +371,16 @@ fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut
                 r
             }
         } else {
-            alloc::vec![f]
+            (alloc::vec![f], Vec::new())
         };
         for x in parts {
             if !out.iter().any(|o| same(o, &x)) {
                 out.push(x);
             }
         }
+        last.extend(more);
     }
-    out
+    (out, last)
 }
 
 fn insert(list: &mut Vec<String>, at: usize, items: &[String]) {

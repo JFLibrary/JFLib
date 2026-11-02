@@ -49,7 +49,7 @@ use alloc::vec::Vec;
 use gfx::{Dc, Surface, FMT_A8, FMT_PARGB, FMT_XRGB};
 use rt::fx::cvt;
 use text::fontconf::{is_generic, FontConf};
-use text::fontdb::{FontDb, FDB_RESCAN, FDFF_CFF, FDFF_CFF2, FDFF_VAR};
+use text::fontdb::{FontDb, FDB_RESCAN, FDFF_CFF, FDFF_CFF2, FDFF_NOLATIN, FDFF_VAR};
 use text::{GcRef, Text, FM_FLAGS, FMF_BOLD, FMF_CFF, FMF_ITALIC, FMF_OBLIQUE, FMF_SYN, FMF_VAR, FN_FAMILY, FN_FULL, FN_STYLE,
            FN_TYPO_FAMILY, FN_TYPO_STYLE, FONT_ICON, FONT_REG, FS_SHARP, FS_SYN_BOLD, FS_SYN_ITALIC, SUBPIXEL_BGR,
            SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
@@ -809,6 +809,33 @@ impl Ft {
         let n = c.parse("<fontconfig><match><test name=\"lang\"><string>ko</string></test><edit name=\"family\" mode=\"append_last\"><string>KR</string></edit></match><alias><family>serif</family><prefer><family>S</family>", "");
         let l = c.candidates("serif", "ko");
         self.st_check(n == 2 && l == ["S", "serif", "KR"], &format!("selftest: fontconf parse {n} {l:?}\n"));
+        // Fedora's files in their order: a family's default goes behind the whole list
+        let mut c = FontConf::new();
+        c.parse("<fontconfig><match><test name=\"family\"><string>monospace</string></test><edit name=\"family\" mode=\"prepend\"><string>Script</string></edit></match>\
+            <alias><family>Script</family><default><family>sans-serif</family></default></alias>\
+            <match><test name=\"family\"><string>monospace</string></test><edit name=\"family\" mode=\"prepend\"><string>Mono</string></edit></match>\
+            <alias><family>sans-serif</family><prefer><family>Sans</family></prefer></alias></fontconfig>", "");
+        let l = c.candidates("monospace", "");
+        self.st_check(l == ["Script", "Mono", "monospace", "Sans", "sans-serif"], &format!("selftest: fontconf default at the end {l:?}\n"));
+        // Fedora's rules put a font of another script first in monospace and sans-serif
+        let mut db = FontDb::new();
+        db.scan_dirs(&["lib/doc_view/assets", "apps/fonttest/tests/fixtures"], FDB_RESCAN);
+        let flags = |db: &FontDb, f: &str| db.find(f, 400, false).and_then(|x| db.face(x.0)).map(|x| x.flags & FDFF_NOLATIN != 0);
+        let (mini, mono) = (flags(&db, "jfgui Mini"), flags(&db, "DejaVu Sans Mono"));
+        self.st_check(mini == Some(true) && mono == Some(false), &format!("selftest: fontdb FDFF_NOLATIN {mini:?} {mono:?}\n"));
+        let mut c = FontConf::new();
+        let rule = |g: &str, f: &str| format!("<match><test name=\"family\"><string>{g}</string></test><edit name=\"family\" mode=\"prepend\"><string>{f}</string></edit></match>");
+        let mut rules = String::from("<fontconfig>");
+        for (g, f) in [("monospace", "jfgui Mini"), ("monospace", "DejaVu Sans Mono"), ("emoji", "jfgui Mini"), ("emoji", "DejaVu Sans Mono"), ("cursive", "jfgui Mini")] {
+            rules.push_str(&rule(g, f));
+        }
+        rules.push_str("</fontconfig>");
+        c.parse(&rules, "");
+        let mut found = Vec::new();
+        for f in ["monospace", "emoji", "jfgui Mini", "cursive"] {
+            found.push(db.resolve(&c, f, "de", 400, false).map(|r| r.2).unwrap_or_default());
+        }
+        self.st_check(found == ["DejaVu Sans Mono", "jfgui Mini", "jfgui Mini", "jfgui Mini"], &format!("selftest: fontdb resolve, no Latin {found:?}\n"));
     }
 
     // text s in font / size on white (A8: on 0) in colour c, drawn with a subpixel order into
