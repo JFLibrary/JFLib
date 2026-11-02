@@ -64,7 +64,7 @@ try{
     const browser=await pw[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try{
       for(const variant of Object.keys(roots).reverse())for(const app of ['template','gallery','Kritzel','PaintCraft','jfWord']){
-        const context=await browser.newContext({viewport:{width:1280,height:838}}),page=await context.newPage(),errors=[];
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:1280,height:838}}),page=await context.newPage(),errors=[];
         page.on('pageerror',e=>errors.push(String(e)));
         await page.addInitScript(instruments);
         try{
@@ -99,7 +99,7 @@ try{
         finally{await context.close();}
       }
       for(const app of ['Kritzel','PaintCraft']){
-        const context=await browser.newContext({viewport:{width:640,height:838},deviceScaleFactor:2}),page=await context.newPage();
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:640,height:838},deviceScaleFactor:2}),page=await context.newPage();
         await page.addInitScript(instruments);
         try{
           await page.goto(`${base}/after/${app}/?agent=1`);await page.waitForFunction(()=>window.__ready);await settle(page);

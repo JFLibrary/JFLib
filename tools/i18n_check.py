@@ -25,8 +25,8 @@ What is reported
                  different translations, a translation whose placeholders or plural forms
                  differ from its source, a message template its formatter cannot fill
 --check (build_rs.py test) fails only for errors, and for missing or untranslated texts of the
-targets whose catalogues are complete (COMPLETE: BackupCraft, JFNetworker, the library); the
-other gaps (PaintCraft's) are counted, they do not fail.
+targets whose catalogues are complete (COMPLETE: all of them today, the library too); the other
+gaps are counted, they do not fail.
 
 --update adds the missing texts to the app's catalogue (with several: the one whose texts come
 from the same folder of the app, src/ or crates/) at the end, in source order, below the comment
@@ -102,9 +102,10 @@ PLURALS = {
     "iw": {"one", "two", "other"},
 }
 CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
-# complete today (2026-10-22): in --check a missing or untranslated text is an error there too,
+# complete today (2026-11-02): in --check a missing or untranslated text is an error there too,
 # so they stay complete; the other apps' gaps are reported only
-COMPLETE = ("BackupCraft", "JFNetworker", "lib")
+COMPLETE = ("BackupCraft", "JFNetworker", "PaintCraft", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
+            "editortest", "fontpicktest", "gallery", "mdviewtest", "prefstest", "spelltest", "svgtest", "template", "lib")
 
 
 def plural_categories(lang):

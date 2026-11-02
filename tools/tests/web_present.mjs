@@ -161,7 +161,7 @@ if(!args.includes('--no-browsers')){
       const browser=await pw[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
       try{
         for(const scale of [1,2]){
-          const context=await browser.newContext({viewport:{width:960,height:640},deviceScaleFactor:scale});
+          const context=await browser.newContext({locale:'de-DE',viewport:{width:960,height:640},deviceScaleFactor:scale});
           const page=await context.newPage(),errors=[];
           page.on('pageerror',e=>errors.push(String(e)));
           try{
