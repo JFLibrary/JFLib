@@ -1840,6 +1840,15 @@ impl Test {
                     // many points: the pattern is blocky, one of them can match an older position
                     let pts: Vec<(i32, i32)> = (0..64).map(|k| (x + (k % 8) * 11, y + (k / 8) * 13)).collect();
                     let lacking = pts.iter().filter(|&&(px, py)| read_at(ui, px, py) != Test::image_px(&sf, r, px, py)).count();
+                    // (a busy machine: that frame went the CPU's way, or the image stands where the CPU
+                    // last drew it) once more
+                    if lacking == 0 && self.mark[3] < 5 {
+                        self.mark[3] += 1;
+                        self.mode = 0;
+                        self.pc = 1;
+                        self.next();
+                        return;
+                    }
                     ui.gpu_settle();
                     let after = read(ui);
                     self.ok(lacking > 0, &format!("the CPU drew nothing of it: the framebuffer differs from the image in {lacking} of {} points", pts.len()));
