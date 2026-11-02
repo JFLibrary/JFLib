@@ -611,6 +611,14 @@ fn render_op(path: &mut Path, ras: &mut Raster, s: &mut DocSel, poly: &Poly, mod
     s.keep.as_mut().unwrap().combine(s.tmp.as_ref().unwrap(), mode)
 }
 
+/// sel_outline_redraw(doc) -- the marching ants of doc appear or disappear (tmove_hides_outline)
+pub(crate) fn sel_outline_redraw(p: &mut Pn, ui: &mut Ui, doc: DocId) {
+    if p.doc.get(doc).is_some() {
+        sel_damage_outline(p, doc);
+        sel_flush(p, ui);
+    }
+}
+
 // sel_damage_outline(doc) -- redraw the marching ants (edge by edge for small outlines)
 fn sel_damage_outline(p: &mut Pn, doc: DocId) {
     let s = &p.doc.d(doc).sel;
@@ -1328,7 +1336,7 @@ fn ov_screen(q: [f32; 2], ox: f64, oy: f64, z: f64) -> (i32, i32) {
 /// 1 px black / white dashes directly in the framebuffer, clipped to the gfx clip
 fn sel_overlay(p: &mut Pn, g: &mut Gfx, _ctx: usize, doc: DocId, _cr: [i32; 4]) {
     let Some(d) = p.doc.get(doc) else { return };
-    if !d.sel.state {
+    if !d.sel.state || crate::tools::move_pixels::tmove_hides_outline(p, doc) {
         return;
     }
     let Some(o) = d.sel.outl.as_ref() else { return };
