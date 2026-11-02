@@ -275,3 +275,58 @@ expect #9980 value 0
 cmd 980 6881380         # (100, 105)
 expect #9980 value 255
 key ctrl+z
+
+# ------------------------------------------------------------ a tool chosen in the Werkzeuge window
+# The click hands the keys back: the arrows move the selection, they do not walk the buttons.
+cmd 750
+drag 250,158 350,258
+expect #9981 text "10,10,110,110"
+click #4003
+expect #4003 checked
+key right
+expect #9984 text "1,0,100,100,0"
+key right
+expect #9984 text "2,0,100,100,0"
+key esc
+click #4001
+expect #4001 checked
+key down
+expect #9984 text "0,1,100,100,0"
+key esc
+
+# ------------------------------------------------------------ the outline while the object moves
+# Records: #9984 value live 1 | frame 2 | drag 4 * DR_* | outline hidden 32.
+# Pixel verschieben: a drag inside the frame hides the marching ants and the frame.
+down 270,178
+move 280,178
+expect #9984 value 39
+expect #9981 text "20,10,120,110"
+up 280,178
+expect #9984 value 3
+key esc
+# ... an arrow key for a moment
+key right
+expect #9984 value 35
+key right
+expect #9984 value 35
+wait 700
+expect #9984 value 3
+key esc
+expect #9984 value 2
+# ... a handle or a rotation keeps them: they are what the drag aims with
+down 350,208
+move 360,208
+expect #9984 value 11
+up 360,208
+expect #9984 value 3
+key esc
+# Auswahl verschieben: the outline is the object, it stays
+cmd 753
+down 270,178
+move 280,178
+expect #9984 value 7
+up 280,178
+expect #9984 value 3
+key right
+expect #9984 value 3
+key esc
