@@ -11874,7 +11874,8 @@ fontconf -- generic families, substitutes and choices per language: a light font
                                    system-ui, emoji, math (also fontconfig's sans and mono)
 
 FontDb::resolve(&conf, family, lang, weight, italic) (fontdb.rs) finds the first installed
-candidate; for a name nothing installed matches, the candidates of sans-serif.
+candidate with Latin letters (without any, the first installed one); for a name nothing
+installed matches, the candidates of sans-serif.
 
 Rules, fontconfig's semantics in short: an alias for F puts its <prefer> families right
 before F (so a later alias's prefer list follows an earlier one), its <accept> families
@@ -11883,7 +11884,8 @@ right after F (a later list before an earlier one), its <default> families at th
 (eq) and they hold; its family edits prepend (before F), prepend_first, append (after F),
 append_last or assign (in place of F).  Other matches (charset, spacing, prgname, target
 font: hinting) are skipped.  The families in the list that have rules of their own are
-expanded in place (4 levels).  Layers: the files' rules first, the built-in ones after them;
+expanded in place (4 levels), only their <default> and append_last families go to the end
+of the whole list.  Layers: the files' rules first, the built-in ones after them;
 names compare ASCII-case-insensitively, each once.  Languages: "ja" matches ja and ja-JP;
 zh-Hans / zh-CN / zh-SG / plain zh also match zh-cn, zh-Hant / zh-TW zh-tw, zh-HK / zh-MO
 zh-hk and zh-tw.  <include> follows files and folders (*.conf in name order) relative to
@@ -11971,13 +11973,13 @@ match styles, cache the result                                      [src/text/fo
   save_cache(path) / load_cache(path) -> 0 / -1
 
 Families group faces by the legacy family name (name ID 1); names prefer German, then
-English.  Cache file (little endian): "FDB1", u32 version 3, u32 files, u32 faces, u32
+English.  Cache file (little endian): "FDB1", u32 version 4, u32 files, u32 faces, u32
 pool bytes, u64 FNV-1a hash of everything after the 28-byte header; files {u32 path, u32
 size, u32 first face, u32 faces}; faces {u32 file, u32 face index, u16 weight, u16 flags,
 u32 family, u32 style, u32 full, u32 typo family, u32 0}; pool of NUL-terminated UTF-8
 strings (offsets above point into it).  Entries are validated by path and file size.
 Version 3: CFF2 faces count (a version 2 cache lists CFF2-only files without faces, so it
-is not read).
+is not read).  Version 4: FDFF_NOLATIN.
 ```
 
 ```rust
@@ -11991,6 +11993,8 @@ FDFF_VAR: u16 = 32
 FDFF_SYMBOL: u16 = 64
 /// CFF2 outlines (FDFF_CFF is set as well)
 FDFF_CFF2: u16 = 128
+/// the cmap lacks A or a: a font for another script (see FontDb::resolve)
+FDFF_NOLATIN: u16 = 256
 ```
 
 - **`struct FdFace`**
@@ -12037,7 +12041,10 @@ FDFF_CFF2: u16 = 128
 - **`fn resolve(&self, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> Option<(usize, u32, String)>`**
   the first installed candidate of conf for family in lang (generic families,
   substitutes, the language's choices), else sans-serif's -> (face index, FS_SYN_\* flags,
-  the family name found)
+  the family name found).  A substitute without Latin letters (FDFF_NOLATIN) only counts
+  when nothing else fits, except for emoji and math: fontconfig ranks the language above
+  such a rule's family, and Fedora's rules put Noto Sans Arabic first in sans-serif and
+  monospace.  Another script's characters come from fallback.rs
 - **`fn load_resolved(&mut self, text: &mut Text, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> (i32, String)`**
   resolve and load -> (font id / ERR_\*, the family found)
 - **`fn load(&mut self, text: &mut Text, family: &str, weight: u32, italic: bool) -> i32`**

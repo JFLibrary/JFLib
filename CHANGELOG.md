@@ -168,6 +168,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
 - **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
 - **tools:** A development build no longer leaves a broken incremental cache behind when rustc is killed during ThinLTO: rustc overwrites the last good session's keys through a hard link, its next run then kept stale objects and exited 0, and every app linking that crate failed with undefined symbol anon.*.llvm.*; build_rs.py now detects the killed session and discards the crate's cache before compiling
+- **text:** Generic families (monospace, sans-serif) no longer resolve to a font without Latin letters: Fedora puts Noto Sans Arabic first in them, and hex views, terminals and code then showed proportional text in tall rows. FontDb marks such faces (FDFF_NOLATIN, font cache version 4) and takes them last, except for emoji and math.
+- **text:** FontConf puts the <default> and append_last families of a family further in the list at the end of the whole list, as fontconfig does: on Fedora monospace no longer continued with the sans-serif families before the monospace ones.
 
 ### Security
 
