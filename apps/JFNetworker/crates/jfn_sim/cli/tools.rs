@@ -1916,8 +1916,14 @@ fn f1(m: u64) -> String {
 
 const TOP_HELP: &str = "Usage: top [-b] [-n ITERATIONS] [-d SECONDS]\n  -b  batch mode: the screens one after the other, no clearing\n  -n  stop after this many screens\n  -d  seconds between two screens (3 if not given)\nThe overview shows the services of the device; Ctrl+C ends it.\n";
 
-/// CPUs a device counts for top (and the desktop's Systemmonitor)
+/// CPUs a device without hardware counts for top (and the desktop's Systemmonitor); one with
+/// hardware has its cores (res.rs, cpus_of)
 pub const CPUS: u64 = 4;
+
+/// the CPUs a device counts for top and the Systemmonitor
+pub fn cpus_of(e: &Engine, dev: u32) -> u64 {
+    e.res_of(dev).map_or(CPUS, |r| r.hw.cores as u64)
+}
 
 // ---------------------------------------------------------------- the commands
 
@@ -2306,6 +2312,30 @@ impl Engine {
         Ok(())
     }
 
+    /// "free" on a device with hardware (res.rs): RAM and swap as the services hold them
+    pub(crate) fn sh_free(&mut self, ni: usize) -> Result<(), String> {
+        let Some(r) = self.os(ni).and_then(|o| o.res.as_deref()) else {
+            return Ok(());
+        };
+        let mib = |b: u64| b >> 20;
+        let used = r.used().min(r.ram());
+        let mut s = format!("{:<6}{:>10}{:>10}{:>10}\n", "MiB", "total", "used", "free");
+        s.push_str(&format!("{:<6}{:>10}{:>10}{:>10}\n", "Mem:", mib(r.ram()), mib(used), mib(r.ram() - used)));
+        s.push_str(&format!("{:<6}{:>10}{:>10}{:>10}\n", "Swap:", mib(r.swap()), mib(r.over()), mib(r.swap().saturating_sub(r.over()))));
+        self.out(ni, &s);
+        Ok(())
+    }
+
+    /// "lscpu" on a device with hardware (res.rs): the figures it was given
+    pub(crate) fn sh_lscpu(&mut self, ni: usize) -> Result<(), String> {
+        let Some(r) = self.os(ni).and_then(|o| o.res.as_deref()) else {
+            return Ok(());
+        };
+        let s = format!("CPU(s):        {}\nModel name:    simulated core ({}.{} x the reference core)\nThread(s):     1 per core\n", r.hw.cores, r.hw.speed_pm / 1000, r.hw.speed_pm % 1000 / 100);
+        self.out(ni, &s);
+        Ok(())
+    }
+
     /// the next screen of top (the console woke)
     pub(crate) fn top_tick(&mut self, ni: usize) {
         let Some(mut cj) = self.cdev(ni).and_then(|c| c.job.clone()) else {
@@ -2350,7 +2380,24 @@ impl Engine {
         let servers: Vec<(u32, &crate::httpsvc::HttpServer)> = ids.iter().filter_map(|s| self.service::<crate::httpsvc::HttpServer>(dev, &s.1).map(|h| (s.0, h))).collect();
         // the scripts' CPU time (scriptsvc.rs)
         let scripts: Vec<(u32, &crate::scriptsvc::ScriptService)> = ids.iter().filter_map(|s| self.service::<crate::scriptsvc::ScriptService>(dev, &s.1).map(|x| (s.0, x))).collect();
+        let res = self.res_of(dev);
+        // a device with hardware: the cores busy and the jobs waiting, over its series (res.rs)
+        let host_load = |w: u64| -> u64 {
+            let (run, q) = (self.series_one(dev, crate::res::HOST, "running"), self.series_one(dev, crate::res::HOST, "runq"));
+            let from = now.saturating_sub(w * SEC);
+            let sum = |s: Option<crate::series::SeriesView>| -> (i64, i64) {
+                s.map_or((0, 0), |v| {
+                    let p: Vec<i64> = v.points.iter().filter(|x| x.0 > from).map(|x| x.1).collect();
+                    (p.iter().sum(), p.len() as i64)
+                })
+            };
+            let ((a, n), (b, _)) = (sum(run), sum(q));
+            if n == 0 { 0 } else { ((a + b) * 1000 / n) as u64 }
+        };
         let load = |w: u64| -> u64 {
+            if res.is_some() {
+                return host_load(w);
+            }
             let sum: u64 = servers.iter().map(|(_, h)| {
                 let (b, q) = h.load(now, w);
                 b + q
@@ -2365,7 +2412,14 @@ impl Engine {
             if !run {
                 continue;
             }
+            let on_hw = res.map(|r| {
+                // (the whole seconds before now: the current one has only begun)
+                let b = r.svc_recent(*id, now.saturating_sub(SEC), dsecs);
+                busy_total += b;
+                ((b as u128 * 100_000 / (dsecs as u128 * SEC as u128)) as u64, r.svc_busy(*id), if b > 0 { 'R' } else { 'S' })
+            });
             let (cpu_m, time, st) = match servers.iter().find(|s| s.0 == *id) {
+                _ if on_hw.is_some() => on_hw.unwrap_or((0, 0, 'S')),
                 Some((_, h)) => {
                     let (b, _) = h.load(now, dsecs);
                     busy_total += b;
@@ -2389,10 +2443,16 @@ impl Engine {
         let me = 100 + ids.iter().map(|s| s.0).max().unwrap_or(0) + 1;
         rows.push((me, 'R', 0, 0, String::from("top")));
         rows.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(&b.0)));
-        let us = (busy_total as u128 * 100_000 / (dsecs as u128 * SEC as u128 * CPUS as u128)) as u64;
+        let us = (busy_total as u128 * 100_000 / (dsecs as u128 * SEC as u128 * cpus_of(self, dev) as u128)).min(100_000) as u64;
         let mut s = format!("top - {:02}:{:02}:{:02} up {},  1 user,  load average: {}, {}, {}\n", secs / 3600, (secs / 60) % 60, secs % 60, uptime, f2(load(60)), f2(load(300)), f2(load(900)));
         s.push_str(&format!("Tasks: {:3} total, {:3} running, {:3} sleeping,   0 stopped,   0 zombie\n", rows.len(), running, rows.len() - running));
-        s.push_str(&format!("%Cpu(s):{:>5} us,  0.0 sy,  0.0 ni,{:>5} id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st \n\n", f1(us), f1(100_000u64.saturating_sub(us))));
+        s.push_str(&format!("%Cpu(s):{:>5} us,  0.0 sy,  0.0 ni,{:>5} id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st \n", f1(us), f1(100_000u64.saturating_sub(us))));
+        if let Some(r) = res {
+            let (total, used) = (r.ram() >> 20, r.used().min(r.ram()) >> 20);
+            s.push_str(&format!("MiB Mem : {:8} total, {:8} free, {:8} used\n", total, total - used, used));
+            s.push_str(&format!("MiB Swap: {:8} total, {:8} free, {:8} used\n", r.swap() >> 20, r.swap().saturating_sub(r.over()) >> 20, r.over() >> 20));
+        }
+        s.push('\n');
         s.push_str("    PID USER      PR  NI S  %CPU     TIME+ COMMAND\n");
         for (pid, st, cpu, time, name) in rows {
             s.push_str(&format!("{:7} {:<8} {:>3} {:>3} {} {:>5} {:>9} {}\n", pid, "root", 20, 0, st, f1(cpu), time_plus(time), name));

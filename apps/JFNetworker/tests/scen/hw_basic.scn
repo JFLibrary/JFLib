@@ -1,0 +1,51 @@
+# Hardware eines Geräts: GEN schickt 32 Benutzer ohne Denkpause an WEB1 und 60 Anfragen pro
+# Sekunde an WEB2. Jede Anfrage kostet 10 ms Rechenzeit am Referenzkern, in Stücken von 4 ms. WEB1 ist
+# ein Rack-Server S: vier Kerne mit 110 % Tempo schaffen also 4 * 1,1 / 10 ms = 440 Anfragen pro Sekunde,
+# egal wie viele warten (die 32 Benutzer laufen im Gleichschritt, in 3 s schwankt die Zahl um eine Runde: 2 %). WEB2 hat eigene Werte: einen Kern und 1 GiB RAM, in dem sein Dienst mit 932 MiB gerade passt.
+#
+# zuerst der Normalfall: die Kerne sind voll, der Durchsatz ist die Formel
+at 5s expect WEB1 svc web metric requests >= 430 over 3s
+expect WEB1 svc web metric requests <= 450 over 3s
+expect WEB1 svc _host metric cpu_pm >= 990 over 3s
+expect WEB1 svc _host metric min runq >= 20 over 3s
+expect WEB1 svc _host metric cores == 4
+expect WEB1 svc _host metric swap_bytes == 0
+# WEB2 läuft bei 60 % Auslastung: im Mittel 60 Anfragen pro Sekunde, ein Kern halb belegt
+expect WEB2 svc web metric requests >= 50 over 3s
+expect WEB2 svc _host metric cpu_pm >= 500 over 3s
+expect WEB2 svc _host metric cpu_pm <= 700 over 3s
+WEB1: lscpu
+WEB1: free
+WEB1: top -b -n 1
+run 100ms
+expect WEB1 output contains "web"
+# ein größerer Server: acht Kerne mit 100 %, 800 Anfragen pro Sekunde; 2 s fällt er dafür aus
+at 8s resize WEB1 model server-m down 2s
+at 9s expect WEB1 svc web metric max requests == 0 between 8s and 9s
+at 14s expect WEB1 svc _host metric cores == 8
+expect WEB1 svc web metric requests >= 780 over 3s
+expect WEB1 svc web metric requests <= 820 over 3s
+# ein lauter Nachbar: alle Rechenzeit dauert doppelt so lange, 400 Anfragen pro Sekunde
+at 15s fault cpu WEB1 factor 2 for 4s
+at 19s expect WEB1 svc web metric requests >= 385 between 16s and 19s
+expect WEB1 svc web metric requests <= 415 between 16s and 19s
+# im Betrieb mehr Tempo: ohne Ausfall, kein Neustart
+at 20s resize WEB1 speed 2 live
+at 24s expect WEB1 svc web metric requests >= 1560 over 3s
+expect WEB1 svc web metric requests <= 1640 over 3s
+expect WEB1 svc web metric min requests >= 1500 between 20s and 24s
+# der Speicher von WEB2: ein Speicherfresser von 512 MiB schiebt ein Viertel seiner 1,4 GiB in den
+# Swap; alles rechnet langsamer, Seiten kommen von der langsamen Platte, die Warteschlange wächst
+at 25s fault mem WEB2 512M for 3s
+at 28s expect WEB2 svc _host metric swap_bytes > 0 between 26s and 28s
+expect WEB2 svc _host metric disk_bytes > 0 between 26s and 28s
+expect WEB2 svc _host metric pageins > 0 between 26s and 28s
+expect WEB2 svc _host metric runq > 5 between 26s and 28s
+# er ist weg: die Warteschlange läuft leer, die Platte hat nichts mehr zu tun
+at 36s expect WEB2 svc _host metric max disk_bytes == 0 over 3s
+expect WEB2 svc _host metric swap_bytes == 0 over 3s
+# noch einmal, jetzt zu viel für RAM und Swap: der größte Dienst endet, Status 137
+at 37s fault mem WEB2 2G for 1s
+at 39s expect WEB2 svc _host metric oom_kills == 1
+expect WEB2 svc web metric requests == 0 over 1s
+print "fertig"

@@ -17,6 +17,12 @@
 //   Fault::Partition { a, b }      devices of one side drop the IPv4 packets of devices of the
 //                                  other side (b empty: every device outside a), as a firewall
 //                                  rule on each of them would
+//   Fault::SlowCpu { dev, .. }     the costs of the device's CPU in per mille (res.rs): a noisy
+//                                  neighbour or a thermal limit
+//   Fault::MemHog { dev, bytes }   something holds that much of its memory (res.rs): beyond the
+//                                  RAM everything gets slower, beyond the swap services are killed
+//   Fault::Resize { dev }          the reboot of Action::Resize: the device is off as under a power
+//                                  fault, the mark is the downtime on the timeline (res.rs)
 //
 // The faults do not overwrite settings: a cable's own values stay as they are and the faults
 // lie on top of them (link.rs asks link_over, l3.rs asks partition_drop), the disk keeps its
@@ -63,6 +69,12 @@ pub enum Fault {
     SlowDisk { dev: u32, extra: Ns, factor_pm: u32 },
     /// devices of `a` and of `b` no longer hear each other (b empty: every device not in a)
     Partition { a: Vec<u32>, b: Vec<u32> },
+    /// the CPU of the device (res.rs): its costs in per mille (3000: three times as long)
+    SlowCpu { dev: u32, factor_pm: u32 },
+    /// something holds that many bytes of the device's memory (res.rs)
+    MemHog { dev: u32, bytes: u64 },
+    /// the device reboots for other hardware (Action::Resize, res.rs)
+    Resize { dev: u32 },
 }
 
 impl Fault {
@@ -75,6 +87,9 @@ impl Fault {
             Fault::Stop { .. } => "stop",
             Fault::SlowDisk { .. } => "disk",
             Fault::Partition { .. } => "partition",
+            Fault::SlowCpu { .. } => "cpu",
+            Fault::MemHog { .. } => "mem",
+            Fault::Resize { .. } => "resize",
         }
     }
 }
@@ -224,6 +239,9 @@ impl Engine {
                     format!("Partition: {} | {}", self.names(a), self.names(b))
                 }
             }
+            Fault::SlowCpu { dev, factor_pm } => format!("CPU von {} langsam: Rechenzeit \u{d7}{}", self.fault_dev_name(*dev), pm_text(*factor_pm)),
+            Fault::MemHog { dev, bytes } => format!("Speicherfresser auf {}: {}", self.fault_dev_name(*dev), crate::disk::size_text(*bytes)),
+            Fault::Resize { dev } => format!("{} startet für neue Hardware neu", self.fault_dev_name(*dev)),
         }
     }
 
@@ -276,6 +294,16 @@ impl Engine {
                     msg!("Partition: {} | {}", self.names(a), self.names(b))
                 }
             }
+            Fault::SlowCpu { dev, factor_pm } => {
+                let pm = *factor_pm;
+                if pm % 1000 == 0 {
+                    msg!("CPU von {} langsam: Rechenzeit \u{d7}{}", self.fault_dev_name(*dev), pm / 1000)
+                } else {
+                    msg!("CPU von {} langsam: Rechenzeit \u{d7}{},{}", self.fault_dev_name(*dev), pm / 1000, (pm % 1000) / 100)
+                }
+            }
+            Fault::MemHog { dev, bytes } => msg!("Speicherfresser auf {}: {}", self.fault_dev_name(*dev), crate::disk::size_text(*bytes)),
+            Fault::Resize { dev } => msg!("{} startet für neue Hardware neu", self.fault_dev_name(*dev)),
         }
     }
 
@@ -289,6 +317,7 @@ impl Engine {
                 .map(|l| self.dev_of(l.ends[0].0))
                 .unwrap_or(0),
             Fault::Power { dev } | Fault::Stop { dev, .. } | Fault::SlowDisk { dev, .. } => *dev,
+            Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } | Fault::Resize { dev } => *dev,
             Fault::Partition { a, .. } => a.first().copied().unwrap_or(0),
         }
     }
@@ -340,6 +369,26 @@ impl Engine {
         }
     }
 
+    /// what the active faults do to a device's CPU and memory (res.rs)
+    fn rehw(&mut self, dev: u32) {
+        let (mut pm, mut hog) = (1000u64, 0u64);
+        for m in self.faults.marks.iter().filter(|m| m.active()) {
+            match &m.fault {
+                Fault::SlowCpu { dev: d, factor_pm } if *d == dev => pm = (pm * *factor_pm as u64 / 1000).clamp(1, 1_000_000_000),
+                Fault::MemHog { dev: d, bytes } if *d == dev => hog = hog.saturating_add(*bytes),
+                _ => {}
+            }
+        }
+        let Some(ni) = self.node_index(dev) else {
+            return;
+        };
+        if let Some(r) = self.os_mut(ni).and_then(|o| o.res.as_deref_mut()) {
+            r.slow_pm = pm.min(u32::MAX as u64) as u32;
+            r.hog = hog;
+        }
+        self.res_check(ni);
+    }
+
     fn check_fault(&self, f: &Fault) -> Result<(), ActErr> {
         let dev_ok = |d: u32| if self.node_index(d).is_some() { Ok(()) } else { Err(ActErr::UnknownDevice(d)) };
         match f {
@@ -363,6 +412,16 @@ impl Engine {
                     return Err(ActErr::Refused(msg!("Der Faktor einer langsamen Disk muss größer als 0 sein.")));
                 }
             }
+            Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } => {
+                let ni = self.node_index(*dev).ok_or(ActErr::UnknownDevice(*dev))?;
+                if self.os(ni).ok_or(ActErr::NoIp(*dev))?.res.is_none() {
+                    return Err(ActErr::Refused(msg!("{} hat keine simulierte Hardware.", self.fault_dev_name(*dev))));
+                }
+                if matches!(f, Fault::SlowCpu { factor_pm: 0, .. }) {
+                    return Err(ActErr::Refused(msg!("Der Faktor einer langsamen CPU muss größer als 0 sein.")));
+                }
+            }
+            Fault::Resize { dev } => dev_ok(*dev)?,
             Fault::Partition { a, b } => {
                 if a.is_empty() {
                     return Err(ActErr::Refused(msg!("Eine Partition braucht auf einer Seite mindestens ein Gerät.")));
@@ -409,7 +468,7 @@ impl Engine {
         self.note(dev, None, Note::FaultStart { id, what });
         match &f {
             Fault::Unplug { link } | Fault::Impair { link, .. } => self.relink(*link),
-            Fault::Power { dev } => {
+            Fault::Power { dev } | Fault::Resize { dev } => {
                 let on = self.node(*dev).is_some_and(|n| n.power);
                 let e = self.faults.power.entry(*dev).or_insert((0, on));
                 e.0 += 1;
@@ -427,6 +486,7 @@ impl Engine {
                 }
             }
             Fault::SlowDisk { dev, .. } => self.redisk(*dev),
+            Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } => self.rehw(*dev),
             Fault::Partition { a, b } => self.faults.parts.push((id, a.clone(), b.clone())),
         }
         if let Some(t) = until {
@@ -449,7 +509,7 @@ impl Engine {
         self.note(dev, None, Note::FaultEnd { id, what });
         match f {
             Fault::Unplug { link } | Fault::Impair { link, .. } => self.relink(link),
-            Fault::Power { dev } => {
+            Fault::Power { dev } | Fault::Resize { dev } => {
                 let left = match self.faults.power.get_mut(&dev) {
                     Some(e) => {
                         e.0 = e.0.saturating_sub(1);
@@ -481,6 +541,7 @@ impl Engine {
                 }
             }
             Fault::SlowDisk { dev, .. } => self.redisk(dev),
+            Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } => self.rehw(dev),
             Fault::Partition { .. } => self.faults.parts.retain(|p| p.0 != id),
         }
         Ok(())

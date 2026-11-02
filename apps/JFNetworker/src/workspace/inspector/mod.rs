@@ -26,10 +26,14 @@
 // group.rs (G1): a group (name, colour, state, members, Zuklappen, Gruppierung aufheben), the
 // background picture (canvas/backdrop.rs's card, also on the project's page), "Gruppieren"
 // with several things.
+//
+// hardware.rs (SA1): a host's CPU, RAM and disk with presets and a resize; "Hardware simulieren" on
+// the project's page.
 
 mod cable;
 pub(crate) mod device;
 pub(crate) mod faults;
+pub(crate) mod hardware;
 pub(crate) mod wlan;
 pub(crate) mod group;
 
@@ -81,6 +85,8 @@ pub(crate) struct Inspector {
     flt: faults::Bufs,
     /// the WLAN fields (wlan.rs)
     wl: wlan::Bufs,
+    /// the fields of the hardware card (hardware.rs)
+    hw: hardware::Bufs,
 }
 
 impl Inspector {
@@ -286,6 +292,8 @@ fn project(n: &mut Net, ui: &mut Ui) {
     }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Aus: ein falsches Kupferkabel hält die Leitung unten, wie an einem Port ohne Auto-MDI-X."));
+    // CPU and RAM of the devices (hardware.rs, one undo step)
+    hardware::project(n, ui);
     // the lab's active faults (faults.rs)
     faults::project(n, ui);
     // the scale of the WLAN ranges, once there is a radio (wlan.rs)

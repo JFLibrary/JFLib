@@ -1,0 +1,27 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": ["Beispielkurs: das erste Netz", "Sample course: your first network"],
+  "summary": [
+    "Was ein Netz ist, wozu Adressen dienen, und ein erstes Labor im Simulator.",
+    "What a network is, what addresses are for, and a first lab in the simulator."
+  ],
+  "level": "beginner",
+  "minutes": 15,
+  "units": [
+    {
+      "title": ["Grundlagen", "The basics"],
+      "steps": [
+        { "id": "netz", "kind": "lesson", "title": ["Was ist ein Netz?", "What is a network?"], "file": "01-netz.md" },
+        { "id": "adressen", "kind": "lesson", "title": ["Adressen", "Addresses"], "file": "02-adressen.md" }
+      ]
+    },
+    {
+      "title": ["Übung", "Practice"],
+      "steps": [
+        { "id": "erstes-netz", "kind": "lab", "title": ["PC2 braucht eine Adresse", "PC2 needs an address"], "file": "labs/erstes-netz.jfnet" }
+      ]
+    }
+  ]
+}

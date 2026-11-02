@@ -11,7 +11,7 @@
 // positions and scale.  Every cable starts with the length the project gives it (by hand or
 // from its places, jfn_model::phys::length) and the delay that follows from that
 // (phys::delay_ns: an older project keeps its delays); too long, it stays down (phys.rs).  A host
-// with a supplicant's file runs it (supp.rs).
+// with a supplicant's file runs it (supp.rs).  A device with hardware gets it first (res.rs).
 
 use jfn_model::Project;
 
@@ -22,6 +22,7 @@ impl Engine {
     pub fn from_project(p: &Project) -> Result<Engine, ActErr> {
         let mut e = Engine::new(p.seed);
         e.strict_mdix = p.strict_mdix;
+        e.metered = p.metered;
         e.wlan.dip_per_m = p.dip_per_m;
         for d in &p.devices {
             e.add_node(d)?;

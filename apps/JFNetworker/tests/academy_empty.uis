@@ -1,0 +1,30 @@
+#!args --verify-dirty --start-page
+# the Akademie without courses (a headless run without --academy-dir looks at no folder): no group on the
+# start page, the list of courses says so and has no button that does nothing; Esc goes back.  Ids: 135170
+# back, 1005 Datei › Akademie, 1006 back, 129040 the page's first card.
+size 1280 800
+theme light
+expect text:"Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator." missing
+expect button:"Campus: ein VLAN für die Studierenden" exists
+cmd 1005
+expect text:"Akademie" exists
+expect text:"Noch keine Kurse" exists
+expect text:"Hier erscheinen die Kurse, die in der Akademie installiert sind." exists
+expect #135170 focused
+expect button:"Startseite" exists
+shot build/jfnetworker/academy_empty.png
+key esc
+expect button:"Leeres Projekt" exists
+expect #129040 focused
+# over a project: Ctrl+Z reaches nothing below the page, back returns to the project
+click button:"Vorlage: Heimnetz"
+click listitem:"PC1"
+key right
+key esc
+cmd 1005
+expect button:"Zurück zum Projekt" exists
+key ctrl+z
+key alt+left
+expect tab:"Geräte" exists
+expect text:"geändert" exists
+expect_nowarn

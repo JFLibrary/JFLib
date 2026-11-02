@@ -11,6 +11,8 @@
 //   open_generated(n, ui, count)            jfn_model::synth's synthetic project, without a file
 //   After::Start / After::Template(k)       back to the start page; a template of the app
 //                                           (workspace/startpage.rs): open_lab of its file
+//   After::CourseLab(course, step)          a lab step of a course (workspace/academy): open_lab of
+//                                           its file, and the bar over the canvas
 //   dialogs(n, ui)                          the file dialog and the question, once per frame
 //   chosen(n, ui, save) / answer(n, ui, save)   the commands those dialogs queue
 //
@@ -49,6 +51,8 @@ pub(crate) enum After {
     Start,
     /// template k of the app (workspace/startpage.rs): a project without a file
     Template(usize),
+    /// a lab step of a course of the Akademie, by their ids (workspace/academy)
+    CourseLab(String, String),
 }
 
 /// the state of the file dialog, the question and the recent files
@@ -202,6 +206,7 @@ fn run(n: &mut Net, ui: &mut Ui, after: After) {
             crate::workspace::startpage::show(n);
         }
         After::Template(k) => crate::workspace::startpage::open_template(n, ui, k),
+        After::CourseLab(course, step) => crate::workspace::academy::open_lab(n, ui, &course, &step),
     }
     ui.repass();
 }

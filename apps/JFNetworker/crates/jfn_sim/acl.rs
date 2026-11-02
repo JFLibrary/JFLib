@@ -10,6 +10,9 @@
 //                                    deny at the end (seq 0)
 //   Acls { lists, bound }            the lists of a device by name ("10", "101", "WEB") and
 //                                    which list an interface uses in which direction
+//   Acls::probe(iface, out, &Flow) -> Probe   what the interface's list says about a packet,
+//                                    counting nothing: the answer Engine::acl_pass acts on (the
+//                                    Firewall tab's Test asks the same function)
 //   AclOp                            what Action::Acl does: create, add (at a sequence number
 //                                    or after the last), remove a line by number or content,
 //                                    remove the list, resequence
@@ -573,6 +576,18 @@ pub enum AclOp {
     Resequence { start: u32, step: u32 },
 }
 
+/// what the list of an interface says about a packet (Acls::probe)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Probe {
+    /// no list is bound to the interface in this direction: the packet passes
+    NoList,
+    /// the list bound there has no rules or does not exist: the packet passes
+    Empty(String),
+    /// the list decides; `line` is the index of the deciding line (verdict.seq 0, line None: the
+    /// implicit deny at the end)
+    Decided { list: String, verdict: Verdict, line: Option<usize> },
+}
+
 /// the access lists of a device and where they are used
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Acls {
@@ -642,6 +657,19 @@ impl Acls {
             }
         }
     }
+    /// what the list bound to an interface says about a flow, without counting anything
+    pub fn probe(&self, iface: u16, out: bool, f: &Flow) -> Probe {
+        let Some(name) = self.bound.get(&(iface, out)) else {
+            return Probe::NoList;
+        };
+        match self.lists.get(name).filter(|l| l.has_rules()) {
+            Some(l) => {
+                let (verdict, line) = l.check(f);
+                Probe::Decided { list: name.clone(), verdict, line }
+            }
+            None => Probe::Empty(name.clone()),
+        }
+    }
     /// an interface went away: its lists are no longer bound
     pub fn unbind(&mut self, iface: u16) {
         self.bound.retain(|(i, _), _| *i != iface);
@@ -668,16 +696,18 @@ impl Engine {
         let Some(st) = self.stack_mut(ni) else {
             return true;
         };
-        let Some(name) = st.acls.bound.get(&(iface, out)).cloned() else {
+        if !st.acls.bound.contains_key(&(iface, out)) {
             return true;
-        };
+        }
         let Some(flow) = Flow::of(pkt) else {
             return true;
         };
-        let Some(list) = st.acls.lists.get_mut(&name).filter(|l| l.has_rules()) else {
+        let Probe::Decided { list: name, verdict: v, line: at } = st.acls.probe(iface, out, &flow) else {
             return true;
         };
-        let (v, at) = list.check(&flow);
+        let Some(list) = st.acls.lists.get_mut(&name) else {
+            return true;
+        };
         let mut log: Option<(Ace, u64)> = None;
         if let Some(i) = at {
             let l = &mut list.lines[i];
