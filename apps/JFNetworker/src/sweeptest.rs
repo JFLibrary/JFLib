@@ -3,7 +3,7 @@
 // a bad axis; what each axis does to a copy of the project; a clone against a fresh boot at each level;
 // the bytes at 1 and N threads and between two runs; the knee and the figures against closed forms;
 // the quiet trace; Service::reconfigure of each service under load; the steps of a scenario and their
-// replay from keyframes
+// replay from keyframes; lib/rt's heaps under threads, as a sweep leans on them
 //
 // The closed forms:
 //
@@ -117,6 +117,7 @@ pub(crate) fn run(t: &mut T) {
     window(t);
     steps(t);
     replay(t);
+    allocator(t);
 }
 
 // ---------------------------------------------------------------- the file and what it asks
@@ -880,4 +881,49 @@ fn replay(t: &mut T) {
         r.finish()
     });
     t.check("a moment between them", mid.is_some_and(|p| p.pos.t <= 3500 * MS && p.eng.service::<jfn_sim::httpsvc::HttpServer>(wd, "web").is_some_and(|h| h.time == 0)));
+}
+
+// ---------------------------------------------------------------- the heap under the threads
+
+/// lib/rt's heaps by thread: what one thread frees comes back to another that allocates, or a thread
+/// that only frees would let the memory grow without limit (blocks of a size that fit 64 KB chunks)
+fn allocator(t: &mut T) {
+    const N: usize = 200_000;
+    let mut seen: alloc::collections::BTreeSet<usize> = alloc::collections::BTreeSet::new();
+    let (mut again, mut rounds) = (0, 0);
+    for _ in 0..4 {
+        let blocks: Vec<alloc::boxed::Box<[u8; 64]>> = (0..N).map(|i| alloc::boxed::Box::new([(i % 251) as u8; 64])).collect();
+        again = blocks.iter().filter(|b| seen.contains(&(b.as_ptr() as usize))).count();
+        seen.extend(blocks.iter().map(|b| b.as_ptr() as usize));
+        t.check("the blocks hold what was put there", blocks.iter().enumerate().all(|(i, b)| b.iter().all(|x| *x == (i % 251) as u8)));
+        // another thread frees them all
+        match plat::thread_spawn(1 << 20, alloc::boxed::Box::new(move || drop(blocks))) {
+            Some(h) => h.join(),
+            None => return,
+        }
+        rounds += 1;
+    }
+    t.eq("four rounds", rounds, 4);
+    // after the first round nearly all come back; new chunks only for what a heap holds at the moment
+    check_near(t, "what another thread freed comes back", again as f64, N as f64, 0.05);
+    t.check(&format!("the memory stays what one round needs ({} blocks seen)", seen.len()), seen.len() < N + N / 4);
+    // many at once, each its own sizes
+    let mut hs = Vec::new();
+    for k in 1..=6usize {
+        hs.push(plat::thread_spawn(1 << 20, alloc::boxed::Box::new(move || {
+            for r in 0..2000usize {
+                let v: Vec<Vec<u8>> = (0..50).map(|i| vec![(k + i) as u8; 8 + (i * k * 37 + r) % 3000]).collect();
+                for (i, x) in v.iter().enumerate() {
+                    assert!(x.iter().all(|b| *b == (k + i) as u8));
+                }
+            }
+        })));
+    }
+    let n = hs.len();
+    let mut joined = 0;
+    for h in hs.into_iter().flatten() {
+        h.join();
+        joined += 1;
+    }
+    t.eq("threads with sizes of their own: all ended", joined, n);
 }
