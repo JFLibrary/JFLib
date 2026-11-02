@@ -866,6 +866,7 @@ pub extern "C" fn jfgui_present_us() -> f64 {
     crate::present_time().1 as f64
 }
 /// (Android) frames shown so far, through the platform or the GPU (present_time).
+#[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_present_frames() -> u64 {
     crate::present_time().0

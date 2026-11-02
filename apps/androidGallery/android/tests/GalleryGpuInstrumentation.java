@@ -12,6 +12,9 @@
  *   images    the page "Bild & Leinwand": a canvas pans from tiles, a big image becomes a texture
  *   nogpu     jfgui_GPU_DLL names no library: the CPU path, the resolution the Bitmap path has, it works
  *   off       jfgui_GPU=0: no SurfaceView, the same resolution
+ *   bench     numbers, one round (-e gpu 0|1 -e res cap|full): idle CPU and wake-ups, memory, a full frame,
+ *             a small change to the screen, a finger's scroll, and with -e page images a canvas pan; what
+ *             reached the screen and when: dumpsys SurfaceFlinger --frametimeline.  No checks.
  * The result has the counters and "skip".
  */
 package org.jflib.gallery;
@@ -37,12 +40,14 @@ import java.util.function.Supplier;
 public final class GalleryGpuInstrumentation extends Instrumentation {
     private int checks;
     private String phase;
+    private Bundle args;
     private Activity activity;
     private View view;
 
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         phase = arguments != null ? arguments.getString("phase", "path") : "path";
+        args = arguments != null ? arguments : new Bundle();
         start();
     }
     private void check(boolean condition, String what) {
@@ -375,6 +380,269 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
         stream(result, status());
     }
 
+    // ---- the phase "bench"
+    private static String shellOutput(UiAutomation ui, String command) throws Exception {
+        android.os.ParcelFileDescriptor fd = ui.executeShellCommand(command);
+        StringBuilder b = new StringBuilder();
+        try (java.io.FileInputStream in = new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)) {
+            byte[] buf = new byte[65536];
+            for (int n; (n = in.read(buf)) > 0; ) b.append(new String(buf, 0, n, StandardCharsets.UTF_8));
+        }
+        return b.toString();
+    }
+    // what the compositor did with this app's buffers: their present times (ns, CLOCK_MONOTONIC as
+    // System.nanoTime), rows { 0, present, 0 } in order.  dumpsys SurfaceFlinger --latency answers nothing on
+    // Android 16; --frametimeline counts from its first frame, and a frame's token ties that to the clock: a
+    // frame of the View (invalidate) has the token and the intended vsync in dumpsys gfxinfo framestats
+    private long[][] latency(UiAutomation ui, long[] period) throws Exception {
+        String pkg = getTargetContext().getPackageName();
+        runOnMainSync(view::invalidate);
+        SystemClock.sleep(120);
+        HashMap<Long, Long> vsync = new HashMap<>();
+        boolean head = false;
+        for (String line : shellOutput(ui, "dumpsys gfxinfo " + pkg + " framestats").split("\n")) {
+            if (line.startsWith("Flags,")) { head = true; continue; }
+            if (!head) continue;
+            if (line.startsWith("---")) { head = false; continue; }
+            String[] f = line.split(",");
+            if (f.length > 2) { try { vsync.put(Long.parseLong(f[1]), Long.parseLong(f[2])); } catch (NumberFormatException e) { } }
+        }
+        long base = Long.MIN_VALUE;
+        java.util.ArrayList<Double> shown = new java.util.ArrayList<>();
+        String layer = null;
+        long token = 0;
+        boolean buffer = false;
+        double expected = 0;
+        for (String raw : shellOutput(ui, "dumpsys SurfaceFlinger --frametimeline -all").split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith("Vsync Period:") && period[0] == 0) period[0] = (long)(Double.parseDouble(line.substring(13).trim()) * 1e6);
+            if (line.startsWith("Layer - ")) { layer = line; token = 0; buffer = false; continue; }
+            if (layer == null) continue;
+            if (line.startsWith("Token:")) { try { token = Long.parseLong(line.substring(6).trim()); } catch (NumberFormatException e) { } }
+            else if (line.startsWith("Is Buffer?:")) buffer = line.endsWith("1");
+            else if (line.startsWith("Expected") || line.startsWith("Actual")) {
+                String[] f = line.split("\\|");
+                if (f.length < 4) continue;
+                boolean mine = layer.contains(pkg) && !layer.contains("Background for") && !layer.contains("Bounds for") && !layer.contains("ActivityRecord") && !layer.contains("Splash");
+                if (line.startsWith("Expected")) {
+                    expected = real(f[1]);
+                    if (expected < 0) continue;
+                    Long v = vsync.get(token);
+                    if (mine && v != null && base == Long.MIN_VALUE) base = v - (long)(expected * 1e6);
+                } else if (mine && buffer) {
+                    double present = real(f[3]);
+                    if (present > 0) shown.add(present);
+                }
+            } else if (line.startsWith("---")) layer = null;
+        }
+        if (base == Long.MIN_VALUE) return new long[0][];
+        java.util.Collections.sort(shown);
+        long[][] rows = new long[shown.size()][];
+        for (int i = 0; i < rows.length; i++) rows[i] = new long[] { 0, base + (long)(shown.get(i) * 1e6), 0 };
+        return rows;
+    }
+    private static double real(String v) {
+        try { return Double.parseDouble(v.trim()); } catch (NumberFormatException e) { return -1; } // ("N/A")
+    }
+    private static long pct(long[] v, int p) {
+        long[] s = v.clone();
+        java.util.Arrays.sort(s);
+        return s.length == 0 ? -1 : s[Math.min(s.length - 1, s.length * p / 100)];
+    }
+    private static String ms(long ns) { return String.format(java.util.Locale.ROOT, "%.2f", ns / 1e6); }
+    // input at times[i] -> the first frame on the screen after it
+    private void toScreen(Bundle r, String name, long[] times, UiAutomation ui) throws Exception {
+        long[] period = new long[1];
+        long[][] rows = latency(ui, period);
+        long[] d = new long[times.length];
+        int n = 0;
+        for (long t : times) {
+            long first = Long.MAX_VALUE;
+            for (long[] row : rows) if (row[1] >= t && row[1] < first) first = row[1];
+            if (first != Long.MAX_VALUE) d[n++] = first - t;
+        }
+        d = java.util.Arrays.copyOf(d, n);
+        r.putString(name + "_screen_p50", ms(pct(d, 50)));
+        r.putString(name + "_screen_p95", ms(pct(d, 95)));
+        r.putInt(name + "_screen_n", n);
+        r.putString("refresh_ms", ms(period[0]));
+    }
+    private void render(int[] status, long[] took, int i) throws Exception {
+        Bitmap frame = (Bitmap)field(view, "frame");
+        int dpi = (Integer)field(view, "dpi");
+        long t0 = System.nanoTime();
+        status[0] = GalleryActivity.nativeRender(frame, dpi, false);
+        took[i] = System.nanoTime() - t0;
+        if (status[0] == 1) view.invalidate();
+    }
+    private void wall(Bundle r, String name, long[] took) {
+        r.putString(name + "_ui_p50", ms(pct(took, 50)));
+        r.putString(name + "_ui_p95", ms(pct(took, 95)));
+    }
+    // one call per vsync, n of them (the frames the host would have)
+    private interface Step { void at(int i) throws Exception; }
+    private void perVsync(int n, Step step) throws Exception {
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        Throwable[] failed = new Throwable[1];
+        runOnMainSync(() -> {
+            android.view.Choreographer c = android.view.Choreographer.getInstance();
+            c.postFrameCallback(new android.view.Choreographer.FrameCallback() {
+                int i;
+                @Override public void doFrame(long time) {
+                    try { step.at(i); } catch (Throwable e) { failed[0] = e; done.countDown(); return; }
+                    if (++i < n) c.postFrameCallback(this); else done.countDown();
+                }
+            });
+        });
+        done.await();
+        if (failed[0] != null) throw new AssertionError(failed[0]);
+    }
+    private void jank(Bundle r, String name, UiAutomation ui, long since) throws Exception {
+        long[] period = new long[1];
+        long[][] rows = latency(ui, period);
+        java.util.ArrayList<Long> at = new java.util.ArrayList<>();
+        for (long[] row : rows) if (row[1] >= since) at.add(row[1]);
+        java.util.Collections.sort(at);
+        long[] gaps = new long[Math.max(0, at.size() - 1)];
+        int late = 0;
+        for (int i = 0; i + 1 < at.size(); i++) {
+            gaps[i] = at.get(i + 1) - at.get(i);
+            if (gaps[i] > period[0] * 3 / 2) late++;
+        }
+        r.putInt(name + "_shown", at.size());
+        r.putInt(name + "_late", late);
+        r.putString(name + "_gap_p50", ms(pct(gaps, 50)));
+        r.putString(name + "_gap_p95", ms(pct(gaps, 95)));
+    }
+    private static long[] selfStat() throws Exception {
+        String[] f = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("/proc/self/stat")), StandardCharsets.UTF_8).split(" ");
+        return new long[] { Long.parseLong(f[13]), Long.parseLong(f[14]) };
+    }
+    // voluntary + involuntary context switches: the whole process, the UI thread
+    private static long[] switches() throws Exception {
+        long all = 0, main = 0;
+        java.io.File[] tasks = new java.io.File("/proc/self/task").listFiles();
+        String pid = new java.io.File("/proc/self").getCanonicalFile().getName();
+        for (java.io.File t : tasks) {
+            long n = 0;
+            try {
+                for (String line : new String(java.nio.file.Files.readAllBytes(new java.io.File(t, "status").toPath()), StandardCharsets.UTF_8).split("\n"))
+                    if (line.contains("ctxt_switches")) n += Long.parseLong(line.substring(line.indexOf(':') + 1).trim());
+            } catch (java.io.IOException e) { continue; }
+            all += n;
+            if (t.getName().equals(pid)) main = n;
+        }
+        return new long[] { all, main, tasks.length };
+    }
+    private void bench(Bundle r, UiAutomation ui, Bundle args) throws Exception {
+        boolean gpu = "1".equals(args.getString("gpu", "1"));
+        boolean images = "images".equals(args.getString("page", ""));
+        if (gpu && !until(30000, () -> { HashMap<String, String> s = status(); return num(s, "on") == 1 || num(s, "never") == 1; })) throw new AssertionError("no verdict");
+        if (gpu && num(status(), "never") == 1) { r.putInt("skip", 1); return; }
+        SystemClock.sleep(1500);
+        int w = ((Bitmap)field(view, "frame")).getWidth(), h = ((Bitmap)field(view, "frame")).getHeight();
+        r.putString("frame", w + "x" + h);
+        if (!images) {
+            // ---- idle: nothing asked of it for 10 s
+            HashMap<String, String> s0 = status();
+            long[] c0 = selfStat(), x0 = switches();
+            SystemClock.sleep(10000);
+            long[] c1 = selfStat(), x1 = switches();
+            HashMap<String, String> s1 = status();
+            r.putLong("idle_cpu_ms", (c1[0] + c1[1] - c0[0] - c0[1]) * 10);
+            r.putLong("idle_switches", x1[0] - x0[0]);
+            r.putLong("idle_switches_ui", x1[1] - x0[1]);
+            r.putLong("idle_frames", num(s1, "frames") + num(s1, "cpu_frames") - num(s0, "frames") - num(s0, "cpu_frames"));
+            r.putLong("threads", x1[2]);
+            // ---- memory
+            android.os.Debug.MemoryInfo mem = new android.os.Debug.MemoryInfo();
+            android.os.Debug.getMemoryInfo(mem);
+            r.putString("pss_kb", mem.getMemoryStat("summary.total-pss"));
+            r.putString("native_kb", mem.getMemoryStat("summary.native-heap"));
+            r.putString("graphics_kb", mem.getMemoryStat("summary.graphics"));
+            r.putLong("reserved_kb", num(s1, "reserved") / 1024);
+            // ---- a full frame: what the UI thread pays, what reaches the screen
+            long[] full = new long[30], fullAt = new long[30];
+            int[] st = new int[1];
+            for (int i = 0; i < full.length; i++) {
+                final int k = i;
+                runOnMainSync(() -> {
+                    try {
+                        GalleryActivity.nativeGpuTest(3);
+                        fullAt[k] = System.nanoTime();
+                        render(st, full, k);
+                    } catch (Exception e) { throw new AssertionError(e); }
+                });
+                SystemClock.sleep(60);
+            }
+            wall(r, "full", full);
+            toScreen(r, "full", fullAt, ui);
+            // ---- a small change: the check box, press and release (as a mouse: no touch injected)
+            android.graphics.Rect box = new android.graphics.Rect();
+            node(ui, "Option aktivieren").getBoundsInScreen(box);
+            int[] at = new int[2];
+            runOnMainSync(() -> view.getLocationOnScreen(at));
+            float sc = w / (float)view.getWidth();
+            int bx = Math.round((box.left + 40 - at[0]) * sc), by = Math.round((box.centerY() - at[1]) * sc);
+            runOnMainSync(() -> GalleryActivity.nativeEvent(1, 0, 0, bx, by, 0));
+            long[] small = new long[40], smallAt = new long[40];
+            for (int i = 0; i < small.length; i++) {
+                final int k = i;
+                runOnMainSync(() -> GalleryActivity.nativeEvent(2, 1, 0, bx, by, 0));
+                SystemClock.sleep(30);
+                runOnMainSync(() -> {
+                    try {
+                        smallAt[k] = System.nanoTime();
+                        GalleryActivity.nativeEvent(3, 1, 0, bx, by, 0);
+                        render(st, small, k);
+                    } catch (Exception e) { throw new AssertionError(e); }
+                });
+                SystemClock.sleep(120);
+            }
+            wall(r, "small", small);
+            toScreen(r, "small", smallAt, ui);
+            // ---- a finger's scroll: as a MotionEvent would bring it, one move per vsync
+            float density = view.getResources().getDisplayMetrics().density;
+            int fx = w / 8, fy0 = h - (int)(40 * density * sc), step = Math.max(1, h / 160);
+            long[] took = new long[120];
+            long t0 = System.nanoTime();
+            runOnMainSync(() -> GalleryActivity.nativeFinger(0, 0, fx, fy0, SystemClock.uptimeMillis(), true));
+            SystemClock.sleep(40);
+            perVsync(took.length, i -> {
+                GalleryActivity.nativeFinger(1, 0, fx, fy0 - (i + 1) * step, SystemClock.uptimeMillis(), true);
+                render(st, took, i);
+            });
+            long t1 = System.nanoTime();
+            runOnMainSync(() -> GalleryActivity.nativeFinger(3, 0, 0, 0, SystemClock.uptimeMillis(), true));
+            wall(r, "scroll", took);
+            r.putString("scroll_ms_per_frame", ms((t1 - t0) / took.length));
+            jank(r, "scroll", ui, t0);
+        } else {
+            // ---- a canvas: a left drag over the image view, one move per vsync
+            int[] st = new int[1];
+            float density = view.getResources().getDisplayMetrics().density;
+            float sc = w / (float)view.getWidth();
+            int x = w * 3 / 4, y = (int)(240 * density * sc);
+            long[] took = new long[120];
+            long t0 = System.nanoTime();
+            runOnMainSync(() -> { GalleryActivity.nativeEvent(1, 0, 0, x, y, 0); GalleryActivity.nativeEvent(2, 1, 0, x, y, 0); });
+            SystemClock.sleep(40);
+            perVsync(took.length, i -> {
+                GalleryActivity.nativeEvent(1, 0, 0, x - (i + 1) * 2, y - (i + 1), 0);
+                render(st, took, i);
+            });
+            long t1 = System.nanoTime();
+            runOnMainSync(() -> GalleryActivity.nativeEvent(3, 1, 0, x - 240, y - 120, 0));
+            wall(r, "pan", took);
+            r.putString("pan_ms_per_frame", ms((t1 - t0) / took.length));
+            jank(r, "pan", ui, t0);
+            HashMap<String, String> s = status();
+            r.putString("canvas_frames", s.get("canvas_frames"));
+            r.putString("canvas_tiles", s.get("canvas_tiles"));
+            r.putString("reserved_after_pan_kb", String.valueOf(num(s, "reserved") / 1024));
+        }
+    }
+
     // ---- the phases without the output
     private void cpuPath(Bundle result, boolean surfaceExpected) throws Exception {
         if (surfaceExpected) check(until(30000, () -> num(status(), "never") == 1), "no loader: the CPU path for good: " + status());
@@ -414,6 +682,7 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
                 case "images": intent = start("jfgui_GPU", "1", "jfgui_GPU_VERIFY", "1", "jfgui_PAGE", "images", "jfgui_GPU_TRACE", "1"); break;
                 case "nogpu": intent = start("jfgui_GPU", "1", "jfgui_GPU_DLL", "/data/local/tmp/no-such-vulkan.so"); break;
                 case "off": intent = start("jfgui_GPU", "0"); break;
+                case "bench": intent = start("jfgui_GPU", args.getString("gpu", "1"), "jfgui_GPU_RES", args.getString("res", "full"), "jfgui_PAGE", args.getString("page", "")); break;
                 default: throw new AssertionError("no phase " + phase);
             }
             activity = startActivitySync(intent);
@@ -423,6 +692,7 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
                 case "path": path(result, ui); break;
                 case "images": images(result); break;
                 case "nogpu": cpuPath(result, true); break;
+                case "bench": bench(result, ui, args); break;
                 default: cpuPath(result, false); break;
             }
             result.putInt("checks", checks);

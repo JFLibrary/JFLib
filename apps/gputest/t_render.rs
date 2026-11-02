@@ -165,7 +165,7 @@ pub fn indirect(t: &mut T) {
     let Some(g) = setup(t) else { return };
     let dev = &g.dev;
     let voll = dev.features().draw_indirect_count;
-    // the argument writer: 16 words from push constants
+    // the argument writer: a word per dispatch, from push constants
     let Some(m) = t.res(ShaderModule::from_spirv(dev, CS_ARGS), "args shader") else { return };
     let Some(abgl) = t.res(dev.create_bind_group_layout(&[Binding { binding: 0, kind: BindingKind::StorageBuffer,
                                                                     stages: Stages::COMPUTE }]), "layout") else { return };
@@ -189,8 +189,11 @@ pub fn indirect(t: &mut T) {
     e.fill_buffer(&buf, 0, bytes, GUARD);
     e.set_compute_pipeline(&apipe);
     e.set_bind_group(0, &abg);
-    e.push_constants(0, &words);
-    e.dispatch(1, 1, 1);
+    for (i, w) in words.iter().enumerate() {
+        e.push_constants(0, &[i as u32, *w]);
+        e.dispatch(1, 1, 1);
+        e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
+    }
     e.barrier(Access::COMPUTE_WRITE | Access::COPY_WRITE, Access::INDIRECT | Access::COMPUTE_WRITE);
     e.set_compute_pipeline(&fp.pipe);
     e.set_bind_group(0, &fbg);

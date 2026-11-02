@@ -1576,6 +1576,19 @@ def run_tests(builders, out, quick):
         total += n
         fails += f
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else ""))
+    # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
+    # with `app androidGallery|gputest --target android`; nobody's phone is touched without it
+    serial = os.environ.get("jfgui_TEST_ANDROID")
+    if serial:
+        for script in ("apps/gputest/tests/android.py", "apps/androidGallery/tests/android_gpu.py"):
+            r = subprocess.run([sys.executable, str(RS / script), "--serial", serial], cwd=ROOT, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+            total += 1
+            if r.returncode:
+                fails.append(script)
+                print(f"FAIL {script}\n" + (r.stdout + r.stderr).strip())
+    else:
+        print("note: the GPU tests on Android need jfgui_TEST_ANDROID=SERIAL (apps/gputest/tests/android.py, apps/androidGallery/tests/android_gpu.py)")
     # docs/API.md generated from the Rust doc comments must be current (R13); --api: the API
     # changes since the last release, for information (docs/VERSIONING.md)
     r = subprocess.run([sys.executable, str(RS / "tools" / "gendoc.py"), "--check", "--api"], cwd=ROOT,

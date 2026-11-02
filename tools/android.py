@@ -126,6 +126,11 @@ def manifest_gaps(perms, manifest):
     would refuse it without a word) -> the message, or None.  Only the location needs a line:
     motion sensors have no permission, and the other rules have no Android permission behind them
     or ask for theirs elsewhere"""
+    # the UI runs without Vulkan (GalleryActivity, docs/GPU.md "Ausgabe unter Android"): the store must
+    # not hide the app from phones without it
+    for tag in re.findall(r'<uses-feature[^>]*android\.hardware\.vulkan[^>]*>', manifest):
+        if 'android:required="false"' not in tag:
+            return f'AndroidManifest.xml requires Vulkan ({tag}): the app must start without it (android:required="false").'
     if perms is None:
         return None
     keys = set()
