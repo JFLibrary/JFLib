@@ -69,8 +69,12 @@ pub(crate) enum Garbage {
     Set(vk::Handle, vk::Handle),
     Pool(vk::Handle),
     Query(vk::Handle),
+    #[cfg_attr(jfgui_glibc, allow(dead_code))] // (vk_swap.rs)
     Semaphore(vk::Handle),
+    #[cfg_attr(jfgui_glibc, allow(dead_code))]
     Swapchain(vk::Handle),
+    #[cfg_attr(not(jfgui_glibc), allow(dead_code))] // (vk_dmabuf.rs: an image's dedicated allocation)
+    Memory(vk::Handle),
 }
 
 /// a command pool with its one command buffer
@@ -138,7 +142,11 @@ pub(crate) struct Shared {
     pub level: Level,
     pub raw: vk::PhysicalDeviceLimits,
     pub ts_mask: u64,
+    #[cfg_attr(jfgui_glibc, allow(dead_code))] // (vk_swap.rs)
     pub swapchain: bool,
+    /// images for a window go to VK_QUEUE_FAMILY_FOREIGN_EXT (vk_dmabuf.rs)
+    #[cfg_attr(not(jfgui_glibc), allow(dead_code))]
+    pub queue_foreign: bool,
     /// the first timestamp tick read on the device: Timestamps::read_ms counts from it
     pub ts_base: AtomicU64,
     /// vkResetQueryPool from the host (hostQueryReset enabled)
@@ -311,6 +319,19 @@ impl Adapter {
         if swapchain {
             names.push(b"VK_KHR_swapchain\0".as_ptr());
         }
+        let dmabuf = self.exts.dmabuf;
+        if dmabuf {
+            names.push(b"VK_KHR_external_memory_fd\0".as_ptr());
+            names.push(b"VK_EXT_external_memory_dma_buf\0".as_ptr());
+            names.push(b"VK_EXT_image_drm_format_modifier\0".as_ptr());
+            if !v12 {
+                names.push(b"VK_KHR_image_format_list\0".as_ptr());
+            }
+        }
+        let queue_foreign = dmabuf && self.exts.queue_foreign;
+        if queue_foreign {
+            names.push(b"VK_EXT_queue_family_foreign\0".as_ptr());
+        }
         let prio = 1.0f32;
         let qi = vk::DeviceQueueCreateInfo {
             s_type: vk::STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -408,6 +429,7 @@ impl Adapter {
             raw: self.raw,
             ts_mask,
             swapchain,
+            queue_foreign,
             ts_base: AtomicU64::new(0),
             host_query_reset: v12 && e12[vk::F12_HOST_QUERY_RESET] != 0,
             maintenance4: v13 && e13[vk::F13_MAINTENANCE4] != 0,
@@ -448,6 +470,7 @@ impl Shared {
     }
 
     /// run f with the queue held (vkQueuePresentKHR and vkQueueSubmit need it alone)
+    #[cfg_attr(jfgui_glibc, allow(dead_code))]
     pub fn with_queue<R>(&self, f: impl FnOnce(vk::Queue) -> R) -> R {
         let _q = self.qlock.lock();
         f(self.queue)
@@ -455,6 +478,7 @@ impl Shared {
 
     /// wait until the queue has finished everything, presents included (vkQueueWaitIdle;
     /// also on a lost device, where it returns at once)
+    #[cfg_attr(jfgui_glibc, allow(dead_code))]
     pub fn queue_idle(&self) -> Result<()> {
         // the value is read while the queue is held: nothing is submitted until the wait ends
         // SAFETY: the queue is held while the driver waits on it.
@@ -537,6 +561,7 @@ impl Shared {
                         ds(d, h, n);
                     }
                 }
+                Garbage::Memory(h) => (f.free_memory)(d, h, n),
             }
         }
     }

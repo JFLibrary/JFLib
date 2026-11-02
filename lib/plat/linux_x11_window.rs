@@ -1044,6 +1044,10 @@ impl X11 {
                     if b[1] != 0 && b[1] as u32 == self.xi_op {
                         self.xi_event(b);
                     }
+                    #[cfg(jfgui_glibc)]
+                    if b[1] != 0 && b[1] as u32 == self.gpu_present_op() {
+                        self.gpu_event(b);
+                    }
                 } else if t as u32 == self.shm_ev && self.shm_op != 0 {
                     self.shm_done(b);
                 } else if t as u32 == self.xkb_ev && self.xkb_op != 0 && b[1] <= 1 {
@@ -1075,6 +1079,11 @@ impl X11 {
             }
             if self.want != 0 {
                 continue;
+            }
+            // (linux_x11_gpu.rs) a frame that waited for the server may go on
+            #[cfg(jfgui_glibc)]
+            if core::mem::take(&mut self.g.wake) {
+                return 0;
             }
             let ms: i32;
             if deadline == 0 || (deadline != u64::MAX && now >= deadline) {

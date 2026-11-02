@@ -22,6 +22,7 @@
 //                                                                             [wl_clip.s]
 //   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
 //   linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
+//   linux_wl_gpu.rs      zwp_linux_dmabuf_v1: the GPU's buffers on a surface (programs against glibc)
 //
 // State: the assembly's globals are one record (Wl) owned by this module, created on the
 // first use (the synthetic tests use it without a connection).  Every entry point (the
@@ -58,6 +59,9 @@ mod input;
 mod popup;
 #[path = "linux_wl_present.rs"]
 mod present;
+#[cfg(jfgui_glibc)]
+#[path = "linux_wl_gpu.rs"]
+mod gpu;
 #[path = "linux_wl_proto.rs"]
 mod proto;
 #[path = "linux_wl_tablet.rs"]
@@ -85,6 +89,8 @@ pub(crate) struct Wl {
     pub ime: ime::Ime,
     pub drag: child::Drag, // a child window moved / resized by the library
     pub act: act::Act,     // xdg-activation (linux_wl_act.rs)
+    #[cfg(jfgui_glibc)]
+    pub dm: gpu::Dm,       // zwp_linux_dmabuf_v1 (linux_wl_gpu.rs)
 }
 
 impl Wl {
@@ -103,6 +109,8 @@ impl Wl {
             ime: Default::default(),
             drag: Default::default(),
             act: Default::default(),
+            #[cfg(jfgui_glibc)]
+            dm: Default::default(),
         }
     }
 }
@@ -308,4 +316,63 @@ pub fn wl_test_protoerr() {
         let s = wl.win[0].surf;
         wl.w.send(s, &proto::SURFACE_ATTACH, &[wire::A::O(1000), wire::A::I(0), wire::A::I(0)]);
     })
+}
+
+// ------------------------------------------------------------------ GPU buffers (linux_gpuout.rs)
+
+#[cfg(jfgui_glibc)]
+pub(crate) mod gpuw {
+    use super::with;
+
+    pub(crate) fn gpu_caps() -> Option<crate::GpuCaps> {
+        with(|wl| wl.gpu_caps())
+    }
+
+    pub(crate) fn gpu_buf_new(w: i32, d: &crate::GpuBufDesc) -> u32 {
+        with(|wl| wl.gpu_buf_new(w, d))
+    }
+
+    pub(crate) fn gpu_buf_state(w: i32, h: u32) -> u32 {
+        with(|wl| wl.gpu_buf_state(w, h))
+    }
+
+    pub(crate) fn gpu_buf_free(w: i32, h: u32) {
+        with(|wl| wl.gpu_buf_free(w, h))
+    }
+
+    pub(crate) fn gpu_can_show(w: i32) -> bool {
+        with(|wl| wl.gpu_can_show(w))
+    }
+
+    pub(crate) fn gpu_show(w: i32, h: u32, rects: Option<&[[i32; 4]]>) {
+        with(|wl| wl.gpu_show(w, h, rects))
+    }
+
+    pub(crate) fn gpu_next_look(w: i32) -> u64 {
+        with(|wl| wl.gpu_next_look(w))
+    }
+
+    pub(crate) fn gpu_pump(ms: i32) {
+        with(|wl| wl.gpu_pump(ms))
+    }
+
+    pub(crate) fn gpu_test_shm(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+        with(|wl| if wl.rec(w).is_some_and(|i| !wl.wp[i].gpu.active) { wl.test_presented(w) } else { None })
+    }
+
+    pub(crate) fn gpu_test_dpi(w: i32, dpi: i32) -> i64 {
+        with(|wl| wl.gpu_test_dpi(w, dpi))
+    }
+
+    pub(crate) fn gpu_test_unminimize(w: i32) {
+        with(|wl| wl.gpu_test_unminimize(w))
+    }
+
+    pub(crate) fn gpu_test_popup(slot: i32) -> i64 {
+        with(|wl| wl.gpu_test_popup(slot))
+    }
+
+    pub(crate) fn gpu_test_presented() -> alloc::vec::Vec<(u64, u64)> {
+        with(|wl| wl.gpu_test_presented())
+    }
 }

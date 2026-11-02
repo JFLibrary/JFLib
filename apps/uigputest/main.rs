@@ -5,7 +5,10 @@
 //                             shown without activation, no real input; a line per check, exit
 //                             code 1 when one fails.  Without a usable GPU: SKIP, passed.  A check of
 //                             the screen where another window lies on top of ours is a note, no
-//                             result.
+//                             result.  Linux (the build against glibc): what the window system holds
+//                             instead of the screen (X11 GetImage); a Wayland client cannot read a
+//                             window back, those checks are notes and every presented image is still
+//                             read back from the GPU; the modal size loop is Windows' alone
 //     switch    the first frames on the CPU path, then the swapchain; the screen never shows
 //               anything else than the picture meanwhile; a small change uploads little; every
 //               presented image equals the framebuffer
@@ -53,6 +56,14 @@
 //   uigputest --bench idle|caret      a window with nothing to do / with a blinking caret, until
 //                             --auto-close: frames and uploads on stdout (the process's counters
 //                             are read from outside)
+//     nodmabuf  jfgui_GPU_DMABUF=0 (Linux): the display takes no GPU buffers: the CPU path for good,
+//               no message
+//     refused   jfgui_GPU_DMABUF=refuse (Linux): the display refuses the buffers (as zwp_linux_buffer_
+//               params_v1.failed or an X error would): the CPU path for good, the picture stays
+//   uigputest --bench stages [--n N]  (Linux) one window: a whole page, a small patch, a popup opened
+//                             and closed, a canvas panned, at 60 frames per second, N frames each:
+//                             per frame the CPU time of this process and the GPU time (fdinfo),
+//                             with jfgui_BENCH_KWIN=PID also the compositor's; memory.  jfgui_GPU=0|1
 //   uigputest --bench layers [--n N]  one window of 1920 x 1080 over a full page: a popup, a tooltip,
 //                             a dialog dragged, a big image, N frames each; per scene and frame
 //                             the median and p95 of render, present, bytes uploaded and pixels of
@@ -80,7 +91,9 @@ use ui::*;
 const DESC: AppDesc = AppDesc { title: "uigputest", flags: AF_RESIZABLE, w: 640, h: 480, min_w: 200, min_h: 150, ..AppDesc::NONE };
 
 const BANDS: [u32; 6] = [0xFF20_3040, 0xFF40_6080, 0xFF80_4020, 0xFF10_7050, 0xFF70_1060, 0xFF50_5050];
+#[cfg(windows)]
 const WM_KEYDOWN: u32 = 0x0100;
+#[cfg(windows)]
 const WM_KEYUP: u32 = 0x0101;
 const WM_ENTERSIZEMOVE: u32 = 0x0231;
 const WM_EXITSIZEMOVE: u32 = 0x0232;
@@ -95,6 +108,17 @@ fn out(s: &str) {
 
 fn screen_px(x: i32, y: i32) -> u32 {
     plat::win_test_screen(x, y, 1, 1).map_or(0xDEAD_0000, |v| v[0] as u32 | (v[1] as u32) << 8 | (v[2] as u32) << 16)
+}
+
+/// the colour shown at client pixel x, y of window 0: Windows the composed screen, Linux what the
+/// window system holds; None: no way to know
+fn shown_px(x: i32, y: i32) -> Option<u32> {
+    if cfg!(windows) {
+        plat::win_get_rect(0).map(|r| screen_px(r[0] + x, r[1] + y))
+    } else {
+        let p = plat::win_test(plat::WT_PIXEL, 0, [x, y, 0, 0]);
+        if p < 0 { None } else { Some(p as u32) }
+    }
 }
 
 /// a thread watches points of the screen: everything but the expected colours counts
@@ -339,6 +363,12 @@ impl Test {
     }
 
     /// a strip of the window on the screen, below the patch: it shows the bands, or else
+    #[cfg(not(windows))]
+    fn watch_start(&mut self, _ui: &Ui) {
+        out("note: nothing watches the screen here: a thread may not ask the window system");
+    }
+
+    #[cfg(windows)]
     fn watch_start(&mut self, ui: &Ui) {
         let Some(r) = plat::win_get_rect(0) else { return };
         let fb = ui.fb();
@@ -383,15 +413,19 @@ impl Test {
 
     /// the screen at the patch shows c by now (a window covering ours: a note)
     fn screen_check(&mut self, ui: &Ui, what: &str) {
-        let Some(r) = plat::win_get_rect(0) else { return };
+        let Some(mut got) = shown_px(150, 120) else {
+            out(&format!("note: {what}: no way to read the window back here (no result)"));
+            return;
+        };
         let want = self.expected(ui, 150, 120);
         // what was presented reaches the screen with the next compositions; a busy machine takes
         // longer
         let t0 = plat::time_us();
-        let mut got = screen_px(r[0] + 150, r[1] + 120);
         while got != want && plat::time_us() < t0 + 1_500_000 {
             plat::sleep_ms(4);
-            got = screen_px(r[0] + 150, r[1] + 120);
+            // (Linux: the commit comes from the window loop, this frame waits for nobody)
+            plat::gpu_wait(plat::time_us());
+            got = shown_px(150, 120).unwrap_or(got);
         }
         if got != want && plat::win_test(plat::WT_FROM_POINT, 0, [150, 120, 0, 0]) != 1 {
             out(&format!("note: {what}: another window lies on top of ours (no result)"));
@@ -514,6 +548,14 @@ impl Test {
                 }
             }
             4 => {
+                if !cfg!(windows) {
+                    // (no modal size loop here)
+                    self.patch = 0xFF30_D020;
+                    self.pc = 11;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
+                    return;
+                }
                 // the modal size loop: every frame through the CPU path, the swapchain after it
                 plat::win_test_send(0, WM_ENTERSIZEMOVE, 0, 0);
                 self.mark[0] = 0;
@@ -556,6 +598,9 @@ impl Test {
             0 => {
                 if self.wait_on(ui, 15_000) == Some(true) {
                     plat::win_test(plat::WT_SHOW, 0, [SW_SHOWMINNOACTIVE, 0, 0, 0]);
+                    if !cfg!(windows) {
+                        out("note: Wayland: nobody can undo a minimise; `back` comes from a test aid there, the frame then waits for the compositor up to 1 s");
+                    }
                     self.next();
                 }
             }
@@ -610,7 +655,12 @@ impl Test {
             0 => {
                 if self.wait_on(ui, 15_000) == Some(true) {
                     self.mark[0] = ui.fb().w as u64;
-                    plat::win_test(plat::WT_DPI, 0, [144, 0, 0, 0]);
+                    if plat::win_test(plat::WT_DPI, 0, [144, 0, 0, 0]) < 0 {
+                        out("SKIP: no second scale for a window here");
+                        self.done = true;
+                        ui.quit();
+                        return;
+                    }
                     self.next();
                 }
             }
@@ -1795,8 +1845,7 @@ impl Test {
                     self.ok(lacking > 0, &format!("the CPU drew nothing of it: the framebuffer differs from the image in {lacking} of {} points", pts.len()));
                     self.ok(after == want, &format!("settled: {after:06x}"));
                     // on the screen it is the image's pixel
-                    if let Some(w) = plat::win_get_rect(0) {
-                        let got = screen_px(w[0] + x, w[1] + y);
+                    if let Some(got) = shown_px(x, y) {
                         if got != want && plat::win_test(plat::WT_FROM_POINT, 0, [x, y, 0, 0]) != 1 {
                             out("note: the screen: another window lies on top of ours (no result)");
                         } else {
@@ -1832,8 +1881,7 @@ impl Test {
                     let sf = self.sc.imgs[0].0.clone();
                     let (x, y) = (r[0] + 200, r[1] + 200);
                     let want = Test::image_px(&sf, r, x, y);
-                    if let Some(w) = plat::win_get_rect(0) {
-                        let got = screen_px(w[0] + x, w[1] + y);
+                    if let Some(got) = shown_px(x, y) {
                         if got != want && plat::win_test(plat::WT_FROM_POINT, 0, [x, y, 0, 0]) != 1 {
                             out("note: the screen: another window lies on top of ours (no result)");
                         } else {
@@ -1852,13 +1900,15 @@ impl Test {
         match self.pc {
             0 => {
                 if self.wait_on(ui, 15_000) == Some(true) {
-                    let Some(r) = plat::win_get_rect(0) else { return };
-                    let lp = |x: i32, y: i32| ((x as u32 & 0xFFFF) | (y as u32) << 16) as i32 as isize;
-                    let top = plat::win_test_send(0, WM_NCHITTEST, 0, lp(r[0] + 200, r[1] + 1));
-                    let mid = plat::win_test_send(0, WM_NCHITTEST, 0, lp(r[0] + 200, r[1] + 200));
-                    self.ok(top == 12, &format!("the resize band at the top: HTTOP ({top})"));
-                    self.ok(mid == 1, &format!("the middle: HTCLIENT ({mid})"));
-                    self.finds_window(200, 1, "the band's point finds the window, not the child");
+                    let r = plat::win_get_rect(0).unwrap_or([0; 4]);
+                    if cfg!(windows) {
+                        let lp = |x: i32, y: i32| ((x as u32 & 0xFFFF) | (y as u32) << 16) as i32 as isize;
+                        let top = plat::win_test_send(0, WM_NCHITTEST, 0, lp(r[0] + 200, r[1] + 1));
+                        let mid = plat::win_test_send(0, WM_NCHITTEST, 0, lp(r[0] + 200, r[1] + 200));
+                        self.ok(top == 12, &format!("the resize band at the top: HTTOP ({top})"));
+                        self.ok(mid == 1, &format!("the middle: HTCLIENT ({mid})"));
+                        self.finds_window(200, 1, "the band's point finds the window, not the child");
+                    }
                     self.screen_check(ui, "the library's frame");
                     plat::win_test(plat::WT_MOVE, 0, [r[0], r[1], 700, 500]);
                     self.next();
@@ -1970,7 +2020,8 @@ impl Test {
 
 impl App for Test {
     fn frame(&mut self, ui: &mut Ui) {
-        if ui.key(VK_F9) {
+        let pressed = self.bench.as_ref().is_some_and(|b| b.key.swap(false, Ordering::Relaxed));
+        if ui.key(VK_F9) || pressed {
             self.patch = self.patch ^ 0x00FF_FFFF;
             if let Some(b) = &self.bench {
                 if b.full {
@@ -2055,6 +2106,15 @@ impl App for Test {
                 "images" => self.t_images(ui),
                 "imgplain" => self.t_imgplain(ui),
                 "canvas" => self.t_canvas(ui),
+                "nodmabuf" | "refused" => {
+                    if cfg!(windows) {
+                        out("SKIP: Linux only");
+                        self.done = true;
+                        ui.quit();
+                    } else {
+                        self.t_cpu_only(ui, true);
+                    }
+                }
                 "canvasplain" => self.t_canvas_plain(ui),
                 "canvasoff" => self.t_canvas_off(ui),
                 _ => {
@@ -2331,6 +2391,145 @@ fn report(name: &str, v: &mut [Sample]) {
     out(&format!("RESULT {name:<16} n={:<4} render {rm:>6} us (p95 {rp:>6})  present {pm:>6} us (p95 {pp:>6})  upload {um:>9} B (p95 {up:>9})  base px {bm:>8} (p95 {bp:>8})  worst frame {worst} us", v.len()));
 }
 
+/// (Linux) the GPU's time for a process (ns of the render engine) and what the driver has of its
+/// memory (KiB), from its DRM file descriptors (each client once); 0: no number (a compositor with
+/// file capabilities does not show them, kwin_wayland on Fedora)
+#[cfg(not(windows))]
+fn fdinfo(pid: &str) -> (u64, u64) {
+    let (mut ns, mut kib) = (0u64, 0u64);
+    let mut clients: Vec<u64> = Vec::new();
+    for k in 0..256 {
+        let Some(b) = plat::read_file(&format!("/proc/{pid}/fdinfo/{k}")) else { continue };
+        let text = String::from_utf8_lossy(&b);
+        let num = |key: &str| text.lines().find(|l| l.starts_with(key)).and_then(|l| l.split_whitespace().nth(1)).and_then(|v| v.parse::<u64>().ok());
+        let Some(id) = num("drm-client-id:") else { continue };
+        if !clients.contains(&id) {
+            clients.push(id);
+            ns += num("drm-engine-render:").unwrap_or(0);
+            kib += num("drm-total-system0:").unwrap_or(0);
+        }
+    }
+    (ns, kib)
+}
+
+/// (Linux) the CPU time of a process in us (utime + stime of /proc/PID/stat, 10 ms steps)
+#[cfg(not(windows))]
+fn proc_cpu(pid: &str) -> u64 {
+    let Some(b) = plat::read_file(&format!("/proc/{pid}/stat")) else { return 0 };
+    let s = String::from_utf8_lossy(&b);
+    let rest = s.rsplit(')').next().unwrap_or("");
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    let t = |k: usize| f.get(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    (t(11) + t(12)) * 10_000
+}
+
+#[cfg(not(windows))]
+struct StageApp {
+    t: Test,
+    stage: usize,
+    frame: usize,
+    n: usize,
+    wait: u32,
+    started: bool,
+    last: u64,
+    kwin: String,
+    mark: [u64; 7],
+}
+
+#[cfg(not(windows))]
+const STAGE_NAMES: [&str; 4] = ["page", "patch", "popup", "pan"];
+
+#[cfg(not(windows))]
+impl StageApp {
+    fn marks(&self, ui: &Ui) -> [u64; 7] {
+        let (gn, _) = fdinfo("self");
+        let (kn, _) = if self.kwin.is_empty() { (0, 0) } else { fdinfo(&self.kwin) };
+        let o = ui.gpu_output(0);
+        [plat::time_us(), plat::win_test_usage().0, gn, if self.kwin.is_empty() { 0 } else { proc_cpu(&self.kwin) }, kn, o.frames + o.cpu_frames, o.upload_bytes]
+    }
+
+    fn step(&mut self, k: usize) {
+        let sc = &mut self.t.sc;
+        match self.stage {
+            0 => sc.page = k as u32,
+            1 => self.t.patch = 0xFF00_0000 | (k as u32).wrapping_mul(0x0101_17),
+            2 => {
+                sc.panel = [320, 420];
+                sc.mask = if k % 2 == 0 { 2 } else { 0 };
+            }
+            _ => {
+                if let Some(c) = sc.canvas.as_mut() {
+                    c.view.ox = 20.0 + (k % 200) as f64;
+                    c.view.oy = 20.0 + (k % 97) as f64;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl App for StageApp {
+    fn frame(&mut self, ui: &mut Ui) {
+        let o = ui.gpu_output(0);
+        if !self.started {
+            self.t.sc.page_on = true;
+            if o.on || o.never || plat::env("jfgui_GPU").as_deref() == Some("0") {
+                self.wait += 1;
+                if self.wait > 60 {
+                    self.started = true;
+                    self.mark = self.marks(ui);
+                    self.last = plat::time_us();
+                    out(&format!("path: on={} {} ({}), window {}x{}, reserved {} MiB", o.on, o.adapter, o.present_mode, ui.fb().w, ui.fb().h, o.reserved >> 20));
+                }
+            }
+            self.t.frame(ui);
+            ui.timer(1, 8);
+            return;
+        }
+        let now = plat::time_us();
+        if self.stage < STAGE_NAMES.len() && now >= self.last + 16_666 {
+            self.last = now;
+            if self.frame == self.n {
+                let m = self.marks(ui);
+                let d = |i: usize| m[i].saturating_sub(self.mark[i]) as f64 / self.n as f64;
+                out(&format!("RESULT {:<6} n={} ms/frame: wall {:.2}, CPU {:.3}, GPU {:.3}, compositor CPU {:.3}, compositor GPU {:.3}; frames shown {:.0}, upload {:.0} B/frame",
+                    STAGE_NAMES[self.stage], self.n, d(0) / 1000.0, d(1) / 1000.0, d(2) / 1e6, d(3) / 1000.0, d(4) / 1e6, d(5) * self.n as f64, d(6)));
+                self.stage += 1;
+                self.frame = 0;
+                self.t.sc = Scene { page_on: true, ..Scene::default() };
+                if self.stage == 3 {
+                    self.t.sc.page_on = false;
+                    self.t.sc.canvas = Some(TestCanvas { view: CanvasView { scale: 1.0, ox: 20.0, oy: 20.0 }, ver: 1, over: false, mode: CanvasGpu::Zoom });
+                }
+                self.mark = self.marks(ui);
+            } else {
+                self.step(self.frame);
+                self.frame += 1;
+            }
+        }
+        if self.stage >= STAGE_NAMES.len() {
+            let u = plat::win_test_usage();
+            let (_, kib) = fdinfo("self");
+            out(&format!("MEM rss {} KiB, anon {} KiB, GPU driver total {} KiB, reserved {} KiB", u.1 >> 10, u.2 >> 10, kib, o.reserved >> 10));
+            ui.quit();
+        }
+        self.t.frame(ui);
+        ui.timer(1, 8);
+    }
+
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        self.t.command(ui, id, arg)
+    }
+}
+
+#[cfg(not(windows))]
+fn stage_bench(n: usize) -> i32 {
+    let mut app = StageApp { t: new_test("bench"), stage: 0, frame: 0, n, wait: 0, started: false, last: 0, kwin: plat::env("jfgui_BENCH_KWIN").unwrap_or_default(), mark: [0; 7] };
+    app.t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), key: AtomicBool::new(false), press: rt::sync::SpinLock::new(Vec::new()), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
+    let d = AppDesc { w: 1280, h: 800, flags: AF_RESIZABLE, ..DESC };
+    ui::run_window(&d, &mut app, &style::STYLE)
+}
+
 fn layer_bench(n: usize) -> i32 {
     let big = pattern(4000, 3000, FMT_XRGB, 255);
     let stages = alloc::vec![
@@ -2410,7 +2609,7 @@ fn layer_bench(n: usize) -> i32 {
         big: Some(big),
         mem: String::new(),
     };
-    app.t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
+    app.t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), key: AtomicBool::new(false), press: rt::sync::SpinLock::new(Vec::new()), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
     let d = AppDesc { w: 1920, h: 1000, flags: AF_RESIZABLE, ..DESC };
     ui::run_window(&d, &mut app, &style::STYLE)
 }
@@ -2424,6 +2623,31 @@ struct Bench {
     hwnd: AtomicU64,
     x: AtomicU32,
     y: AtomicU32,
+    /// Linux: the press, for the next frame (a thread cannot post to a window there)
+    key: AtomicBool,
+    /// Linux: when the presses were made
+    #[cfg_attr(windows, allow(dead_code))]
+    press: rt::sync::SpinLock<Vec<u64>>,
+}
+
+/// a key press (the window's key message on Windows)
+#[cfg(windows)]
+fn bench_press(_b: &Bench, hwnd: isize, down: bool) {
+    if down {
+        plat::win_test_post(hwnd, WM_KEYDOWN, VK_F9 as usize, 0x0001_0001);
+    } else {
+        plat::win_test_post(hwnd, WM_KEYUP, VK_F9 as usize, 0xC001_0001u32 as isize);
+    }
+}
+
+/// a key press: the window loop's next frame takes it (the wake-up costs what an event costs)
+#[cfg(not(windows))]
+fn bench_press(b: &Bench, _hwnd: isize, down: bool) {
+    if down {
+        b.key.store(true, Ordering::Relaxed);
+        b.press.lock().push(plat::time_us());
+        plat::wake();
+    }
 }
 
 /// the thread: a key press, the present, the screen; `burst`: the next press as soon as the
@@ -2433,6 +2657,7 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
         plat::sleep_ms(5);
     }
     plat::sleep_ms(if plat::env("jfgui_GPU").as_deref() != Some("0") { 2500 } else { 500 });
+    plat::present_time(); // (from here on the numbers count)
     let hwnd = b.hwnd.load(Ordering::Relaxed) as isize;
     let (x, y) = (b.x.load(Ordering::Relaxed) as i32, b.y.load(Ordering::Relaxed) as i32);
     let (mut to_present, mut to_screen) = (Vec::new(), Vec::new());
@@ -2463,12 +2688,12 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
             let frames = plat::present_time().0;
             let t0 = plat::time_us();
             issued[k + 1].store(t0, Ordering::Relaxed);
-            plat::win_test_post(hwnd, WM_KEYDOWN, VK_F9 as usize, 0x0001_0001);
+            bench_press(&b, hwnd, true);
             while plat::time_us() < t0 + 500_000 && plat::present_time().0 == frames {
                 plat::thread_yield();
             }
             to_present.push(plat::time_us() - t0);
-            plat::win_test_post(hwnd, WM_KEYUP, VK_F9 as usize, 0xC001_0001u32 as isize);
+            bench_press(&b, hwnd, false);
         }
         done.store(true, Ordering::Relaxed);
         if let Some(t) = th {
@@ -2480,7 +2705,7 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
         let before = screen_px(x, y);
         let frames = plat::present_time().0;
         let t0 = plat::time_us();
-        plat::win_test_post(hwnd, WM_KEYDOWN, VK_F9 as usize, 0x0001_0001);
+        bench_press(&b, hwnd, true);
         // the present returned
         let mut t1 = t0;
         while plat::time_us() < t0 + 500_000 {
@@ -2491,16 +2716,18 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
             plat::thread_yield();
         }
         to_present.push(t1 - t0);
-        plat::win_test_post(hwnd, WM_KEYUP, VK_F9 as usize, 0xC001_0001u32 as isize);
-        // the screen changed
+        bench_press(&b, hwnd, false);
+        // the screen changed (Linux: the window loop asks the compositor, LatencyApp)
         let mut t2 = t0;
-        while plat::time_us() < t0 + 500_000 {
+        while cfg!(windows) && plat::time_us() < t0 + 500_000 {
             if screen_px(x, y) != before {
                 t2 = plat::time_us();
                 break;
             }
         }
-        to_screen.push(t2.saturating_sub(t0));
+        if cfg!(windows) {
+            to_screen.push(t2.saturating_sub(t0));
+        }
         seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
         plat::sleep_ms(15 + (seed >> 28));
     }
@@ -2520,6 +2747,37 @@ fn bench_thread(b: Arc<Bench>, n: usize, burst: bool) {
     b.stop.store(true, Ordering::Relaxed);
 }
 
+/// Linux, Wayland with jfgui_WL_FEEDBACK=1: press -> commit and press -> on the screen, from what the
+/// compositor said (wp_presentation)
+#[cfg(not(windows))]
+fn presented_report(b: &Bench) {
+    let (presses, commits) = (b.press.lock().clone(), plat::gpu_test_presented());
+    let (mut to_commit, mut to_screen) = (Vec::new(), Vec::new());
+    let discarded = commits.iter().filter(|c| c.1 == 0).count();
+    for (k, &t) in presses.iter().enumerate() {
+        // what shows this press first: the first commit after it, on the screen
+        let end = presses.get(k + 1).copied().unwrap_or(u64::MAX);
+        if let Some(c) = commits.iter().find(|c| c.0 >= t && c.0 < end) {
+            to_commit.push(c.0 - t);
+        }
+        if let Some(c) = commits.iter().find(|c| c.0 >= t && c.1 != 0) {
+            to_screen.push(c.1.saturating_sub(t));
+        }
+    }
+    let stat = |v: &mut Vec<u64>| -> (f64, f64, f64) {
+        if v.is_empty() {
+            return (0.0, 0.0, 0.0);
+        }
+        v.sort_unstable();
+        (v[v.len() / 2] as f64 / 1000.0, v[v.len() * 95 / 100] as f64 / 1000.0, v[v.len() - 1] as f64 / 1000.0)
+    };
+    let (cm, cp, cx) = stat(&mut to_commit);
+    let (sm, sp, sx) = stat(&mut to_screen);
+    plat::write_stdout(format!(
+        "PRESENTED presses={} commits={} discarded={discarded} commit_median={cm:.3} commit_p95={cp:.3} commit_max={cx:.3} screen_median={sm:.2} screen_p95={sp:.2} screen_max={sx:.2}\n",
+        presses.len(), commits.len()).as_bytes());
+}
+
 struct LatencyApp {
     t: Test,
     b: Arc<Bench>,
@@ -2529,13 +2787,18 @@ impl App for LatencyApp {
     fn frame(&mut self, ui: &mut Ui) {
         self.t.frame(ui);
         if self.b.hwnd.load(Ordering::Relaxed) == 0 {
+            #[cfg(windows)]
             if let (Some(n), Some(r)) = (plat::win_native(0), plat::win_get_rect(0)) {
                 self.b.x.store((r[0] + 150) as u32, Ordering::Relaxed);
                 self.b.y.store((r[1] + 120) as u32, Ordering::Relaxed);
                 self.b.hwnd.store(n.hwnd as u64, Ordering::Relaxed);
             }
+            #[cfg(not(windows))]
+            self.b.hwnd.store(1, Ordering::Relaxed);
         }
         if self.b.stop.load(Ordering::Relaxed) {
+            #[cfg(not(windows))]
+            presented_report(&self.b);
             let o = ui.gpu_output(0);
             plat::write_stdout(format!("path: on={} frames={} cpu_frames={} mode={} adapter={}\n", o.on, o.frames, o.cpu_frames, o.present_mode, o.adapter).as_bytes());
             ui.quit();
@@ -2662,8 +2925,15 @@ fn t_adapter() -> i32 {
     (fails != 0) as i32
 }
 
+#[cfg(not(windows))]
+fn t_hwnd() -> i32 {
+    out("SKIP: Windows only: the same wl_surface or X window takes shared memory and GPU buffers in turn here");
+    0
+}
+
 /// what the screen does with GDI and a swapchain on one window, and with a child that holds the
 /// swapchain (printed: it may differ between drivers)
+#[cfg(windows)]
 fn t_hwnd() -> i32 {
     use gpu::*;
     let pump = |ms: u64| {
@@ -2798,7 +3068,7 @@ fn run() -> i32 {
             let full = val("--scene").as_deref() == Some("full");
             let n: usize = val("--n").and_then(|v| v.parse().ok()).unwrap_or(200);
             let burst = args.iter().any(|a| a == "--burst");
-            let bench = Arc::new(Bench { full, burst, stop: AtomicBool::new(false), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) });
+            let bench = Arc::new(Bench { full, burst, stop: AtomicBool::new(false), key: AtomicBool::new(false), press: rt::sync::SpinLock::new(Vec::new()), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) });
             let mut t = new_test("bench");
             t.bench = Some(bench.clone());
             let b2 = bench.clone();
@@ -2810,13 +3080,17 @@ fn run() -> i32 {
         }
         if b == "idle" || b == "caret" {
             let mut t = new_test("bench");
-            t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
+            t.bench = Some(Arc::new(Bench { full: false, burst: false, stop: AtomicBool::new(false), key: AtomicBool::new(false), press: rt::sync::SpinLock::new(Vec::new()), hwnd: AtomicU64::new(0), x: AtomicU32::new(0), y: AtomicU32::new(0) }));
             t.caret = b == "caret";
             let d = AppDesc { w: 1280, h: 800, ..DESC };
             return ui::run_window(&d, &mut t, &style::STYLE);
         }
         if b == "layers" {
             return layer_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(200));
+        }
+        #[cfg(not(windows))]
+        if b == "stages" {
+            return stage_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(120));
         }
         out("--bench latency|idle|caret|layers");
         return 2;
@@ -2843,6 +3117,12 @@ fn run() -> i32 {
     match test.as_str() {
         "noloader" => {
             plat::setenv("jfgui_GPU_DLL", Some("missing-vulkan-loader.dll"));
+        }
+        "nodmabuf" => {
+            plat::setenv("jfgui_GPU_DMABUF", Some("0"));
+        }
+        "refused" => {
+            plat::setenv("jfgui_GPU_DMABUF", Some("refuse"));
         }
         "canvas" | "canvasplain" => {
             plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));

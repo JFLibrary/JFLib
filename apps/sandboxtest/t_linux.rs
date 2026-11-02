@@ -141,3 +141,56 @@ fn exec_blocked() -> bool {
     let code = (status >> 8) & 0xff;
     exited && code == 42
 }
+
+/// a program against glibc: what a GPU driver needs under the sandbox (the loader's and the
+/// driver's files, the render node), then the driver itself: a device, a buffer through the GPU.
+/// Without a driver a SKIP.  The windows' output needs nothing more (lib/ui/gpu_out.rs)
+#[cfg(jfgui_glibc)]
+pub fn gpu_checks(t: &mut T) {
+    for dir in ["/usr/share/vulkan/icd.d", "/usr/lib", "/usr/lib64", "/etc/vulkan"] {
+        let r = open(dir, O_RDONLY | O_DIRECTORY);
+        t.check(r != EACCES, &alloc::format!("sandboxtest: a driver can read {dir} ({r})"));
+    }
+    let r = open("/dev/dri/renderD128", O_RDWR);
+    // (a node only its group may open, WSL: nobody's fault here; the sandbox would refuse the same way)
+    let mut st = [0u64; 18];
+    let path = z("/dev/dri/renderD128");
+    // SAFETY: a NUL-terminated path, room for struct stat (st_mode at 24).
+    let open_to_all = unsafe { syscall3(4, path.as_ptr() as usize, st.as_mut_ptr() as usize, 0) } == 0 && st[3] & 0o006 == 0o006;
+    if open_to_all {
+        t.check(r != EACCES, &alloc::format!("sandboxtest: a driver can open the render node ({r})"));
+    } else {
+        t.skip("sandboxtest: the render node: no node for everybody here");
+    }
+    let inst = match gpu::Instance::new() {
+        Ok(i) => i,
+        Err(e) => {
+            t.skip(&alloc::format!("sandboxtest: the GPU under the sandbox: {e}"));
+            return;
+        }
+    };
+    let adapter = match inst.adapter() {
+        Ok(a) => a,
+        Err(e) => {
+            t.skip(&alloc::format!("sandboxtest: the GPU under the sandbox: {e}"));
+            return;
+        }
+    };
+    let name = adapter.info().name.clone();
+    let run = || -> gpu::Result<u32> {
+        let dev = adapter.create_device(&gpu::DeviceDesc::DEFAULT)?;
+        let a = dev.create_buffer(&gpu::BufferDesc { size: 4096, usage: gpu::BufferUsage::NONE, memory: gpu::MemoryKind::Upload })?;
+        let b = dev.create_buffer(&gpu::BufferDesc { size: 4096, usage: gpu::BufferUsage::NONE, memory: gpu::MemoryKind::Readback })?;
+        a.write(0, &[0x1234_5678u32])?;
+        let mut e = dev.encoder()?;
+        e.copy_buffer(&a, 0, &b, 0, 4096);
+        e.barrier(gpu::Access::COPY_WRITE, gpu::Access::HOST_READ);
+        let id = dev.queue().submit([e.finish()?])?;
+        dev.wait(id, 5_000_000_000)?;
+        let mut out = [0u32; 1];
+        b.read(0, &mut out)?;
+        Ok(out[0])
+    };
+    let r = run();
+    t.check(matches!(r, Ok(0x1234_5678)), &alloc::format!("sandboxtest: {name} works under the sandbox: {r:x?}"));
+}

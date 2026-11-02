@@ -3,7 +3,8 @@
 Stand 2026-10-30, Branch `linux-wayland-fixes` (Commits `1069f11`, `e0f2cd4`); ergänzt am
 2026-10-31 um das, was seitdem auf `main` kam (Abschnitt 7), und um die Übergabe an eine
 Sitzung auf dem Linux-Rechner (Abschnitt 8); am 2026-11-01 um den Lauf auf Fedora KDE (1a); am
-2026-11-02 um `lib/gpu` ohne Fenster auf demselben Rechner (1b). Die
+2026-11-02 um `lib/gpu` ohne Fenster auf demselben Rechner (1b) und um die Ausgabe der UI über die GPU
+(1c). Die
 Linux-Überarbeitung lief zuerst nur in einer Cloud-Umgebung (headless GNOME 46, sway, Weston,
 Xvfb mit openbox), dann auf dem KDE-Rechner (Plasma 6.6.6, Wayland, ein Monitor eDP-1 mit
 125 %, Layout de, keine Eingabemethode). Dieser Plan hält fest, was dort geprüft ist und was
@@ -57,8 +58,8 @@ G4560T, 7,6 GB RAM, Intel HD 610 mit Mesa 26.0.3. Zweig `linux-tests-minipc-2026
   HarfBuzz: 1171 Glyphen, 0 Abweichungen, größte Distanz 0,00049 Einheiten. Laden 8,8 ms,
   65 535 Konturen × 3 in 760 ms, 2000 Glyphen bei 16 px in 15,7 ms, Speicher beim Rendern 34 MiB.
   Schriftdialog mit Regler für die Strichstärke geöffnet, Text in einer Instanz nicht verglichen.
-- **GPU**: `gallery` enthält keinen Vulkan-Code. `jfgui_GPU=1`, `=0` und ohne Schalter liefern
-  dasselbe Bild. `lib/gpu` selbst: Abschnitt 1b.
+- **GPU**: `gallery` enthielt damals keinen Vulkan-Code. `jfgui_GPU=1`, `=0` und ohne Schalter lieferten
+  dasselbe Bild. `lib/gpu` selbst: Abschnitt 1b, die Ausgabe: Abschnitt 1c.
 - **Dekorationen**: KWin zeichnet den Rahmen, mit `jfgui_CSD=1` die App; je eine Titelleiste im Bild.
 - **Fenster**: Maximieren und Minimieren vom Desktop, gleiche Größe danach.
 - **Vollbild** (`desktest`): F11 und Knopf, aus maximiert und zurück, vom Desktop aus gesteuert (die
@@ -110,7 +111,7 @@ Rechner). Ein Testlauf mit `--agent` braucht also keine geratene Revision mehr.
 
 Derselbe Rechner, Mesa 26.0.3, glibc 2.43; `gputest` gegen glibc gelinkt, auf Windows gebaut und mit
 `scp` kopiert. Keine Fenster, die Fenstertests melden `SKIP`. Einzelheiten, Funde und Zahlen stehen
-in [GPU.md](GPU.md) „Linux“. `uigputest` bleibt bis G4b nur für Windows.
+in [GPU.md](GPU.md) „Linux“. `uigputest` war damals nur für Windows (seitdem: 1c).
 
 - **HD Graphics 610**: `gputest --test all` bestanden, in 7–13 s, mit `glibc` (Start, Threads, Ende,
   Abstürze) und `noloader`. Messszene: 100 000 Würfel in 1080p 108 Bilder/s, 1 Mio. 14 Bilder/s.
@@ -120,6 +121,25 @@ in [GPU.md](GPU.md) „Linux“. `uigputest` bleibt bis G4b nur für Windows.
 - **Nicht da**: `VK_LAYER_KHRONOS_validation`, also keine Validierung. `vulkaninfo` und `gdb` sind da.
 - **Hinweis**: Treiber schreiben ihren Shader-Cache nach `~/.cache/mesa_shader_cache`; für Läufe in
   einem eigenen Ordner `MESA_SHADER_CACHE_DIR` setzen.
+
+---
+
+## 1c. Ausgabe der UI über die GPU auf Fedora 44 (2026-11-02, G4b)
+
+Derselbe Rechner: Intel HD 610, Mesa 26.0.3, KWin 6.6 Wayland, Xwayland; auf Windows gebaut, mit `scp` kopiert. Zahlen,
+Funde und Empfehlung: [GPU.md](GPU.md) „Ausgabe unter Linux“.
+
+**Wie getestet.** Fast alles auf einem eigenen KWin ohne Bildschirm: `kwin_wayland --virtual --xwayland --socket NAME` mit eigenem
+`XDG_RUNTIME_DIR`, `XDG_CONFIG_HOME` und `dbus-run-session`, kein Fenster auf irgendeinem Bildschirm, echte GPU, dmabuf, Xwayland. Mit
+`KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` nimmt `spectacle -b -n -f` darin den ganzen (leeren) Bildschirm auf; so lässt sich auch unter Wayland
+der zusammengesetzte Bildschirm gegen `shot` vergleichen. Sparsam auf dem echten Desktop: je einmal `uigputest --test switch|windows|layers` und `gallery/tests/gpu_output.uis` für Wayland und X11, Latenz einige Fenster.
+
+- **Bestanden, Wayland und X11, eigener KWin**: `gputest --test window`; alle Tests von `uigputest` (`switch`, `resize`, `minimize`, `dpi` (nur Wayland, X11: SKIP), `windows`, `off`, `noloader`, `nodmabuf`, `refused`, `lose`, `idle`, `csd`, `shaders`, `adapter`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`; `monitors` SKIP, ein Monitor); `gallery/tests/gpu_output.uis`, `gpu_layers.uis`, `gpu_layers_rtl.uis`. Jedes gezeigte Bild aus der GPU zurückgelesen: keins anders.
+- **Bildschirm gegen Framebuffer**, `spectacle` auf dem eigenen KWin: 0 Pixel anders, mit Menü, nach dem Schließen, nach Teil-Updates; Wayland und X11, Wayland auch bei Maßstab 1,5.
+- **Echter Desktop**: wie oben bestanden, Wayland und X11.
+- **Sandbox**: `sandboxtest` (`sandbox strict`): HD 610 arbeitet darunter.
+- **Offen**: GNOME und andere Compositors, NVIDIA und AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
+- **Hinweis**: `GetImage` eines geflippten Fensters unter Xwayland liefert das Bild davor; die Komposition zeigt das letzte. KWins eigene GPU-Zeit ist nicht lesbar (Datei-Capability, `fdinfo` gesperrt).
 
 ---
 

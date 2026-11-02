@@ -139,13 +139,14 @@ mod hotreload;
 mod hyph;
 pub mod i18n;
 mod ids;
-// the output through a swapchain: Windows, its windows only (docs/GPU.md "Ausgabe der UI")
-#[cfg(windows)]
+// the output through a swapchain: Windows and Linux programs against glibc, their windows only
+// (docs/GPU.md "Ausgabe der UI"); static Linux programs, the browser and Android link no Vulkan
+#[cfg(any(windows, jfgui_glibc))]
 mod gpu_out;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, jfgui_glibc)))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
-#[cfg(windows)]
+#[cfg(any(windows, jfgui_glibc))]
 pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;

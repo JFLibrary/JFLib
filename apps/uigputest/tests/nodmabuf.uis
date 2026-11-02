@@ -1,0 +1,3 @@
+#!args --test nodmabuf
+# (Linux) the display takes no GPU buffers (jfgui_GPU_DMABUF=0): the CPU path for good, no message;
+# on Windows a SKIP

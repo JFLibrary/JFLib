@@ -211,4 +211,4 @@ pub fn sleep_ms(ms: u32) {
 #[path = "linux_glibc.rs"]
 mod glibc;
 #[cfg(jfgui_glibc)]
-pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, exit, glibc_thread_ids, glibc_version};
+pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, exit, glibc_thread_ids, glibc_version}; #[cfg(jfgui_glibc)] #[path = "linux_gpuout.rs"] pub(crate) mod gpuout; #[cfg(jfgui_glibc)] pub use gpuout::*;

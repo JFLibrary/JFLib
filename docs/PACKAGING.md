@@ -294,7 +294,9 @@ icons, `usr/share/metainfo/<app id>.appdata.xml` (AppStream) and the MIME packag
 Built in the Linux file system (modes: 0755 for programs and folders, 0644 else), packed by
 `mksquashfs -comp zstd -all-root` (reproducible with `SOURCE_DATE_EPOCH`) and put behind the
 runtime.  With `appimagetool` in PATH that tool makes the image instead, with the same runtime
-(`--runtime-file`); that path is not tested here.
+(`--runtime-file`); that path is not tested here.  A program with a UI uses the glibc and the Vulkan driver of the
+system it runs on (an AppImage brings neither, a driver has to match the system's kernel anyway);
+`tools/package.py APP --static` makes one for systems without glibc, without the GPU.
 
 **The runtime** is [`apps/appimagert`](../apps/appimagert/src/main.rs), a static Linux program
 of JFLib without libc (about 200 KB, built with `--profile size`); `package.py` makes it an
@@ -344,7 +346,11 @@ RPM systems).  There is no install-time question: every style is an alternative 
 `/usr/bin/<deb>` (`default_linux` with priority 50), `sudo update-alternatives --config <deb>`
 switches; `%preun` removes them (and the BINS links, the units) on removal, not on an upgrade.
 Desktop database, icon cache and MIME database are left to the file triggers of Fedora / openSUSE.
-`AutoReqProv: no` (the programs are static), no debuginfo, no strip, `ExclusiveArch: x86_64`.
+`AutoReqProv: no`, no debuginfo, no strip, `ExclusiveArch: x86_64`.  A program with a UI links against
+glibc and nothing else (GPU.md "Linux"), so the spec says `Requires: glibc` and `Recommends: vulkan-loader,
+mesa-vulkan-drivers`, the `.deb` `Depends: libc6` and `Recommends: libvulkan1, mesa-vulkan-drivers`.
+Command-line programs are static and need nothing, and `tools/package.py APP --static` packages a program
+with a UI the same way (no GPU, for systems without glibc).
 The Version takes `~` for `-` (`1.2.3-beta` -> `1.2.3~beta`).
 
 Not tested here: `rpmbuild` is not installed in the test system (Ubuntu, no root), so only the
@@ -361,8 +367,8 @@ prebuilt files in `flatpak/files/` (a `dir` source; the programs installed with 
 `/app/bin/<deb>` a link to `/app/lib/<deb>/<deb>`, `share/` copied): the program of
 `default_linux`, its modules, further programs and notices, `<app id>.desktop` (with
 `StartupWMClass`), the icons, `<app id>.metainfo.xml` and the MIME package.  Runtime
-`org.freedesktop.Platform//26.08` (PACKAGE `flatpak_runtime=`), SDK to match; the static program
-uses nothing of it.  flatpak-builder exports the build into a temporary repository and
+`org.freedesktop.Platform//26.08` (PACKAGE `flatpak_runtime=`), SDK to match; a static program
+uses nothing of it, one with a UI its glibc and Vulkan driver, and gets `--device=dri`.  flatpak-builder exports the build into a temporary repository and
 `flatpak build-bundle` writes `<app id>.flatpak` (`flatpak install --user <file>` installs it).
 The export goes into the repository `flatpak/repo`, which stays: every run adds a commit (copied
 into the Linux file system for the build and back), so publishing it (or syncing it to the

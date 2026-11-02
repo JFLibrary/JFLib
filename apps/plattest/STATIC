@@ -1,0 +1,1 @@
+# the platform's tests run in the static build: what --static gives (build_rs.py section "glibc")

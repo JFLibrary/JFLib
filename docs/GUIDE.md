@@ -140,7 +140,8 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
 | `apps/NAME/tests/*.uis` | test scripts (`apps/NAME/tests/*.uis` for scripts that only the Rust build has) |
 | `apps/NAME/STYLE` | one word: the app's style (default `winui`) |
 | `apps/NAME/TARGETS` | e.g. `win linux web`: explicit supported targets; owned GUI apps default to native plus web, native CLI probes to Windows/Linux |
-| `apps/NAME/GLIBC` | on Linux this program links dynamically against glibc instead of being static: it uses the GPU, and every Linux GPU driver is a glibc library (`gputest`; GPU.md "Linux") |
+| `apps/NAME/GLIBC` | on Linux this program links dynamically against glibc even without `ui`: it uses the GPU, and every Linux GPU driver is a glibc library (`gputest`; a program that names `ui` does so anyway; GPU.md "Linux") |
+| `apps/NAME/STATIC` | on Linux this program stays static although it names `ui`: no GPU, shared memory only (`plattest`, `linuxtest`; `build_rs.py ... --static` does that for one run, for systems without glibc such as Alpine) |
 | `apps/NAME/res/app.ico`, `app_{48,128,256}.png` | exe icon, Linux icons (`tools/mkicon.py`) |
 | `apps/NAME/PACKAGE` | packaging metadata (PACKAGING.md); `version=` is the app's own version (`rt::app_version!()`, VERSIONING.md) |
 | `apps/NAME/PERMISSIONS`, `BINS`, `assets/` | what it may do (PERMISSIONS.md), further programs (section 16), files built in as `app://` (VFS.md) |
@@ -173,8 +174,9 @@ Every app crate gets every library crate (`ui`, `gfx`, `text`, `plat`, `base`, `
 are incremental (about 1.5 s after an edit in `ui`). Use `--out build/<name>` when several
 agents build at the same time.
 
-**Platforms need no app code.** The same source builds a Windows exe and a static Linux ELF (with
-a file `apps/NAME/GLIBC`: a Linux ELF linked against glibc and nothing else, for the GPU drivers).
+**Platforms need no app code.** The same source builds a Windows exe and a Linux ELF: static for
+command-line programs, linked against glibc and nothing else for programs with a UI (the GPU drivers
+are glibc libraries; without a GPU they draw as before; `--static` makes them static, for systems without glibc).
 On Linux the library picks the display backend at start-up: Wayland when `WAYLAND_DISPLAY` is
 set, else X11 via `DISPLAY` (`jfgui_BACKEND=x11|wayland` forces one). Apps call only `ui`,
 `gfx`, `img_core`, `text`, `fx` and the neutral `plat` helpers (files, clock, threads). The only
@@ -1533,7 +1535,7 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=0`
-  (nothing of the GPU anywhere; on Windows the windows show their frames through a swapchain by default;
+  (nothing of the GPU anywhere; on Windows and Linux the windows show their frames through the GPU by default;
   GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
   `jfgui_GPU_TRACE=1` prints its stages, `jfgui_GPU_LAYERS=0` keeps one texture per window,
   `jfgui_GPU_IMAGES=0` keeps images on the CPU, `jfgui_GPU_IMAGE_MB=n` their budget), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
@@ -1595,7 +1597,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
-| `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
+| `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu hold MS`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, Linux with the GPU; else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `hold`: real time passes, the windows stay as they are (a look from outside). `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note; X11: what the server holds; Wayland: a note, no client can read a window); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
@@ -1670,9 +1672,10 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
-* **Presenting through the GPU** (Windows, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
-  UI"): the first frames, every frame of a resize and every window after a failure go the way below;
-  otherwise the rectangles go into a texture and a swapchain on a child window shows it, without
+* **Presenting through the GPU** (Windows and Linux, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
+  UI", "Ausgabe unter Linux"): the first frames, every frame of a resize and every window after a failure go the way below;
+  otherwise the rectangles go into a texture and a swapchain shows it (Windows: on a child window; Linux: dma-bufs on the
+  window itself, through JFLib's own Wayland and X11 code, no libwayland or libxcb), without
   ever waiting for the display. The layers above the base have textures of their own: a popup that
   closes or moves costs nothing of what lies below it. Big opaque `draw_image`s that keep being
   redrawn become textures; `Ui::fb()` may lack their pixels then, `Ui::gpu_settle()` draws them (GPU.md "Ebenen und
