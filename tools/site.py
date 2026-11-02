@@ -1,34 +1,41 @@
 #!/usr/bin/env python3
-"""site.py -- the static website of JFLib: a landing page, the docs and the API reference
+"""site.py -- the docs of the JFLib website: guides, API reference, changelog and roadmap
 
-    python build_rs.py site [--out DIR]     write the site (default build/site/; open index.html)
-    python build_rs.py site --check         build it into a temporary folder below build/ and check it
+    python build_rs.py site [--out DIR]     write the docs (default build/site/; open index.html)
+    python build_rs.py site --check         build them into a temporary folder below build/ and check them
     python tools/site.py [--out DIR] [--check] [--summary]
                                             the same without build_rs.py (--summary: one line,
                                             as `build_rs.py test` prints it)
 
-What the site holds (the table DOCS below sets the pages, their titles, groups and languages):
-  * index.html: the landing page, read from README.md's sections (the introduction, "The
-    library", "Feature tour", "Platforms", the quick starts of "Building apps with Python",
-    "Documentation", "License"); when one of them is missing the build stops.
-  * one page per Markdown file of DOCS at its path with .html (docs/STYLES.md ->
-    docs/STYLES.html; README.md -> README.html).  German pages say so above their text.
-  * docs/GUIDE.md: docs/GUIDE.html (introduction and contents) and one page per "## N." section,
-    docs/guide/NN-title.html.
-  * docs/API.md (tools/gendoc.py): docs/API.html (its contents) and one page per crate,
-    docs/api/CRATE.html; a crate with more than API_PAGE_LIMIT bytes of Markdown gets one page
-    per ### section (docs/api/CRATE--SECTION.html), such a section above the limit one per ####
-    file.  Every item gets an anchor: #fn.run, #struct.Ui, #Ui.text (a method of `impl Ui`).
+The website around the docs, jflib.org, is a repository of its own (JFLibrary/jflibWebsite) with
+its start page, features and apps made by hand; its build puts this output into its folder docs/.
+Top bar, footer, colours and type follow that website (src/layout.html, src/site.css there).
+
+What the output holds (the table DOCS below sets the pages, their titles, groups and languages):
+  * index.html: the docs' start page, made from DOCS.
+  * one page per Markdown file of DOCS at its path with .html, without a leading docs/ (site_path:
+    docs/STYLES.md -> STYLES.html; README.md -> README.html).  German pages say so above their text.
+  * docs/GUIDE.md: GUIDE.html (introduction and contents) and one page per "## N." section,
+    guide/NN-title.html.
+  * docs/API.md (tools/gendoc.py): API.html (its contents) and one page per crate, api/CRATE.html;
+    a crate with more than API_PAGE_LIMIT bytes of Markdown gets one page per ### section
+    (api/CRATE--SECTION.html), such a section above the limit one per #### file.  Every item gets
+    an anchor: #fn.run, #struct.Ui, #Ui.text (a method of `impl Ui`).
   * assets/: site.css, site.js, favicon.svg and search-index.js (page titles, headings and API
     items as JSON, loaded when the search field is first used; a script, so that the search also
-    works from file://).  The images the pages show are copied to their repository paths.
-Every page has the top bar (search, light / dark toggle stored in localStorage, else the
-system's prefers-color-scheme), the navigation at the side (a drawer at phone width), "on this
-page" headings on wide screens, previous / next links, a <title> and a description.  No
-external fonts, scripts or styles.
+    works from file://).  The images the pages show are copied along (site_path of their path).
+Every page has the website's top bar with the search and the light / dark toggle (stored in
+localStorage under the website's key, else the system's prefers-color-scheme) and its footer.  The
+pages other than index.html have the navigation at the side (a drawer at phone width), "on this
+page" headings on wide screens, previous / next links, a <title> and a description.  No external
+fonts, scripts or styles.
+
+One folder above the output is the website: top bar and footer link to its pages, the style sheet
+loads its fonts (WEBSITE_FILES).  Built on its own the docs fall back to the system's fonts, and
+those links lead nowhere.
 
 Links: the GitHub heading anchors (the slug rule of gendoc and GitHub) keep working on the split
-pages; a link to a .md file of the site goes to its page and anchor; any other file or folder of
+pages; a link to a .md file of the output goes to its page and anchor; any other file or folder of
 the repository goes to GitHub (REPO/blob/main/PATH, folders /tree/main/; #L12 line anchors as
 ?plain=1#L12); external links stay.  A link that leaves the repository is shown as text.
 
@@ -42,11 +49,13 @@ shown as text.  Code blocks get colours for rust, sh / powershell, json and js.
 --check (`build_rs.py test` runs it): the converter's own cases; then a build into a temporary
 folder (or --out) and: every page of DOCS, every guide section and every crate has its page;
 every internal link and anchor resolves, also every entry of the search index; every image,
-script and stylesheet exists; links to
-repository files point at files that exist (with the exact case), their #anchors at headings
-there; the HTML nests correctly (html.parser); every page has a <title>, a description and a
-language; no absolute local path (the checkout, the home folder, the output folder) is in the
-output; a second build gives the same bytes.  Exit code 1 on any failure.
+script and stylesheet exists, none comes from another host; links to repository files point at
+files that exist (with the exact case), their #anchors at headings there; what leaves the output
+folder is one of WEBSITE_FILES from the right depth, and every page links to all WEBSITE_PAGES
+(the website itself is not there: its files are not looked at); the HTML nests correctly
+(html.parser); every page has a <title>, a description and a language; no absolute local path
+(the checkout, the home folder, the output folder) is in the output; a second build gives the
+same bytes.  Exit code 1 on any failure.
 
 The output folder is emptied first, but only when it is empty or holds a site of this tool (the
 marker file .jflib-site); nothing is written outside it.  Python standard library only.
@@ -78,38 +87,54 @@ IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp")
 NOT_IN_REPO = ("build",)                # git-ignored: a link there is broken on GitHub
 
 # ---------------------------------------------------------------- configuration
-# (source, title in the navigation, group, language of the text); GUIDE.md and API.md are split
+# (source, title in the navigation, group, language of the text, its line on the start page);
+# GUIDE.md and API.md are split
 DOCS = [
-    ("README.md", "README", "Start", "en"),
-    ("docs/GUIDE.md", "Developer guide", "Guide", "en"),
-    ("docs/API.md", "API reference", "Reference", "en"),
-    ("docs/STYLES.md", "Styles", "Reference", "en"),
-    ("docs/VFS.md", "Virtual files and assets", "Reference", "en"),
-    ("docs/PERMISSIONS.md", "Permissions", "Reference", "en"),
-    ("docs/SECRETS.md", "Secrets", "Reference", "en"),
-    ("docs/PACKAGING.md", "Packaging", "Reference", "en"),
-    ("docs/VERSIONING.md", "Versions", "Reference", "en"),
-    ("docs/UPDATES.md", "Updates", "Reference", "en"),
-    ("docs/AGENT_WEB.md", "Web and agent control", "Reference", "de"),
-    ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de"),
-    ("docs/GPU.md", "GPU layer", "Reference", "de"),
-    ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de"),
-    ("docs/WGSL.md", "WGSL compiler", "Reference", "de"),
-    ("apps/Kritzel/README.md", "Kritzel", "Apps", "en"),
-    ("apps/PaintCraft/README.md", "PaintCraft", "Apps", "en"),
-    ("plugins/README.md", "PaintCraft plugins", "Apps", "en"),
-    ("apps/jfWord/README.md", "jfWord", "Apps", "de"),
-    ("apps/buildManager/README.md", "Build Manager", "Apps", "en"),
-    ("apps/BackupCraft/README.md", "BackupCraft", "Apps", "en"),
-    ("apps/JFNetworker/README.md", "JFNetworker", "Apps", "de"),
-    ("apps/androidGallery/README.md", "Android Gallery", "Apps", "de"),
-    ("styles/jfoffice/README.md", "jfOffice style", "Apps", "de"),
-    ("CHANGELOG.md", "Changelog", "Project", "en"),
-    ("docs/ROADMAP.md", "Roadmap", "Project", "de"),
-    ("THIRD_PARTY_NOTICES.md", "Third-party notices", "Project", "en"),
+    ("README.md", "README", "Start", "en", "Prerequisites, quick starts, and how the repository is laid out"),
+    ("docs/GUIDE.md", "Developer guide", "Guide", "en",
+     "App model, layout, widgets, menus, dialogs, files, and scripted tests"),
+    ("docs/API.md", "API reference", "Reference", "en", "Every public function and type of the library, crate by crate"),
+    ("docs/STYLES.md", "Styles", "Reference", "en", "Appearance, style interfaces, and assets"),
+    ("docs/VFS.md", "Virtual files and assets", "Reference", "en",
+     "app://, config://, data://, cache://, mem://, mounts, and bundled assets"),
+    ("docs/PERMISSIONS.md", "Permissions", "Reference", "en", "The manifest of files, programs, URLs and devices an app may use"),
+    ("docs/SECRETS.md", "Secrets", "Reference", "en", "Passwords, tokens, and keys in the system's secret store"),
+    ("docs/PACKAGING.md", "Packaging", "Reference", "en", "Windows installers, Debian packages, AppImage, Flatpak, MSIX, RPM, and icons"),
+    ("docs/VERSIONING.md", "Versions", "Reference", "en", "The library's version, its public API and SemVer rules, deprecations and releases"),
+    ("docs/UPDATES.md", "Updates", "Reference", "en", "Signed updates, applied at the next start and rolled back when they fail"),
+    ("docs/AGENT_WEB.md", "Web and agent control", "Reference", "de", "The browser host and the explicit CLI, JSON and MCP interfaces"),
+    ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de", "SIMD and parallel jobs in the browser"),
+    ("docs/GPU.md", "GPU layer", "Reference", "de", "Direct access to the graphics card: compute, rendering, swapchains"),
+    ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
+    ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),
+    ("apps/Kritzel/README.md", "Kritzel", "Apps", "en", "A small drawing and image-editing app"),
+    ("apps/PaintCraft/README.md", "PaintCraft", "Apps", "en", "A raster graphics editor with layers, effects and plugins"),
+    ("plugins/README.md", "PaintCraft plugins", "Apps", "en", "Native plugins and plugin builds"),
+    ("apps/jfWord/README.md", "jfWord", "Apps", "de", "Document editing and current feature coverage"),
+    ("apps/buildManager/README.md", "Build Manager", "Apps", "en", "Profiles, queue, tests, launching, and releases"),
+    ("apps/BackupCraft/README.md", "BackupCraft", "Apps", "en", "Server, agents, console and bcctl: setup, architecture, security model, tests"),
+    ("apps/JFNetworker/README.md", "JFNetworker", "Apps", "de", "A network simulator and lab for distributed systems"),
+    ("apps/androidGallery/README.md", "Android Gallery", "Apps", "de", "APKs, Android prerequisites, input, and port status"),
+    ("styles/jfoffice/README.md", "jfOffice style", "Apps", "de", "The style of the office apps"),
+    ("CHANGELOG.md", "Changelog", "Project", "en", "What changed in each release of the library"),
+    ("docs/ROADMAP.md", "Roadmap", "Project", "de", "What the library still lacks, with priorities"),
+    ("THIRD_PARTY_NOTICES.md", "Third-party notices", "Project", "en",
+     "Ported code, Unicode data, fonts, and artwork with their copyright holders and licenses"),
 ]
 GROUPS = ["Start", "Guide", "Reference", "Apps", "Project"]
 LANGUAGES = {"de": "German"}
+# the coloured tiles of the start page, the way in for most readers
+TILES = [("docs/GUIDE.md", "b-indigo"), ("docs/API.md", "b-blue"), ("CHANGELOG.md", "b-orange"), ("docs/ROADMAP.md", "b-green")]
+# the website, one folder above the output: the only files that pages and style sheet reach there
+WEBSITE_PAGES = ("index.html", "features.html", "apps.html", "legal.html", "privacy.html")
+FONTS = (("Atkinson Hyperlegible Next", "400 700", "atkinson"), ("Bricolage Grotesque", "700 800", "bricolage"),
+         ("JetBrains Mono", "400 600", "jetbrains"))
+FONT_PARTS = (("latin", "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, "
+                        "U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"),
+              ("latin-ext", "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, "
+                            "U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, "
+                            "U+2C60-2C7F, U+A720-A7FF"))
+WEBSITE_FILES = frozenset(WEBSITE_PAGES + tuple("fonts/%s-%s.woff2" % (f[2], p[0]) for f in FONTS for p in FONT_PARTS))
 
 
 class SiteError(Exception):
@@ -731,6 +756,15 @@ def relpath(page, target):
     return "../" * (len(a) - k) + "/".join(b[k:])
 
 
+def site_path(rel):
+    """where a file of the repository lands in the output: the website has the output in its docs/ folder"""
+    return rel[5:] if rel.startswith("docs/") else rel
+
+
+def lang_badge(lang):
+    return '<span class="lang" title="%s">%s</span>' % (LANGUAGES[lang], lang) if lang in LANGUAGES else ""
+
+
 # ---------------------------------------------------------------- pages
 class Doc:
     """one Markdown file: blocks with GitHub anchors on every heading"""
@@ -831,7 +865,7 @@ class Site:
         self.out = Path(out).resolve()
         self.docs = {}              # src -> Doc
         self.top = []               # the pages of DOCS (with their kids)
-        self.pages = []             # every page in reading order (not the landing page)
+        self.pages = []             # every page in reading order (not the start page)
         self.anchors = {}           # src -> {anchor: page path}
         self.main = {}              # src -> its first page
         self.images = {}            # repository path of every image shown -> (width, height)
@@ -841,11 +875,11 @@ class Site:
 
     # ---- reading and splitting
     def load(self):
-        for src, title, group, lang in DOCS:
+        for src, title, group, lang, _ in DOCS:
             if not (ROOT / src).is_file():
                 raise SiteError(f"{src} (in the DOCS table of tools/site.py) does not exist")
             d = self.docs[src] = Doc(src, title, group, lang)
-            base = src[:-3]
+            base = site_path(src[:-3])
             if src == "docs/GUIDE.md":
                 self.top.append(self.split_guide(d, base))
             elif src == "docs/API.md":
@@ -984,7 +1018,7 @@ class Site:
             return None
         if kind == "file" and target.lower().endswith(IMAGE_TYPES):
             self.add_image(target)
-            return relpath(page, target)
+            return relpath(page, site_path(target))
         if frag and kind == "file" and target.endswith(".md") and not LINE_ANCHOR.fullmatch(frag) \
                 and frag not in md_anchors(target):
             self.errors.append(f"{src}: the link {url}: {target} has no heading #{frag}")
@@ -998,7 +1032,7 @@ class Site:
             self.errors.append(f"{src}: the image {url} is missing ({target})")
             return None
         w, h = self.add_image(target)
-        return relpath(page, target), w, h
+        return relpath(page, site_path(target)), w, h
 
     def add_image(self, target):
         if target not in self.images:
@@ -1018,119 +1052,35 @@ class Site:
             fallback = "JFLib %s: %s" % (chain[0], " – ".join(chain[1:])) if p.parent else "JFLib: " + p.doc.title
             p.desc = describe(p.blocks, fallback)
 
-    def landing(self):
-        """index.html from README.md's sections"""
-        d = self.docs["README.md"]
-        inl = Inline(Ctx(self, d.src, "index.html"))
-        head, secs = split_at(d.blocks, 2)
-        sec = {s[0]["plain"]: s[1:] for s in secs}
-        need = ["The library", "Feature tour", "Platforms", "Building apps with Python", "Documentation", "License"]
-        missing = [n for n in need if n not in sec]
-        if missing:
-            raise SiteError("README.md: the landing page reads the sections " + ", ".join(missing))
-        title = next((b["plain"] for b in head if b["t"] == "h" and b["level"] == 1), "JFLib")
-        tagline, intro, shot = "", [], None
-        for b in head:
-            if b["t"] != "p":
-                continue
-            t = b["text"].strip()
-            urls = re.findall(r"\]\(([^)\s]+)\)", t)
-            m = re.fullmatch(r"!\[([^\]]*)\]\(([^)\s]+)\)", t)
-            if m:
-                shot = shot or m
-            elif urls and all(u.startswith("#") for u in urls):
-                continue                                    # the README's jump links
-            elif not tagline and t.startswith("**") and t.endswith("**"):
-                tagline = t[2:-2]
-            else:
-                intro.append("<p>%s</p>" % inl(t))
-        if not tagline or not shot:
-            raise SiteError("README.md: the landing page needs the bold tagline and the first screenshot")
-        img = self.image(d.src, "index.html", shot.group(2))
-        hero = '<img src="%s" alt="%s" width="%s" height="%s" fetchpriority="high">' % (
-            attr(img[0]), attr(shot.group(1)), img[1], img[2]) if img else ""
-        guide, api = relpath("index.html", self.main["docs/GUIDE.md"]), relpath("index.html", self.main["docs/API.md"])
-        parts = ['<section class="hero"><div class="hero-text"><h1>%s</h1><p class="tagline">%s</p>%s'
-                 '<p class="cta"><a class="btn primary" href="%s">Developer guide</a><a class="btn" href="%s">'
-                 'API reference</a><a class="btn" href="%s">GitHub</a></p></div><figure class="shot">%s</figure>'
-                 '</section>' % (esc(title), inl(tagline), "".join(intro), guide, api, REPO, hero)]
-        # the library: lead, a card per feature, the note after the list
-        lib = sec["The library"]
-        lst = next((b for b in lib if b["t"] == "list"), None)
-        if lst is None:
-            raise SiteError("README.md: 'The library' has no feature list")
-        cards = []
-        for it in lst["items"]:
-            t = it["blocks"][0]["text"] if it["blocks"] and it["blocks"][0]["t"] == "p" else ""
-            m = re.match(r"\*\*(.+?)\*\*:?\s*(.*)", t, re.S)
-            if m:
-                cards.append('<div class="card"><h3>%s</h3><p>%s</p></div>' % (inl(m.group(1).rstrip(":")), inl(m.group(2))))
-        k = lib.index(lst)
-        parts.append('<section class="band" id="library"><h2>The library</h2>%s<div class="cards">%s</div>%s</section>' % (
-            "".join('<p class="lead">%s</p>' % inl(b["text"]) for b in lib[:k] if b["t"] == "p"), "".join(cards),
-            "".join('<p class="small">%s</p>' % inl(b["text"]) for b in lib[k + 1:] if b["t"] == "p")))
-        # the feature tour: per table two figures and the paragraph after it
-        tour = sec["Feature tour"]
-        rows = []
-        for k, b in enumerate(tour):
-            if b["t"] != "table" or not b["rows"]:
-                continue
-            figs = "".join('<figure>%s<figcaption>%s</figcaption></figure>' % (inl(c), inl(h))
-                           for h, c in zip(b["head"], b["rows"][0]))
-            nxt = tour[k + 1] if k + 1 < len(tour) and tour[k + 1]["t"] == "p" else None
-            rows.append('<div class="tour">%s</div>%s' % (figs, '<p class="tour-text">%s</p>' % inl(nxt["text"]) if nxt else ""))
-        first = next((b for b in tour if b["t"] == "p"), None)
-        if not rows:
-            raise SiteError("README.md: 'Feature tour' has no tables of screenshots")
-        parts.append('<section class="band" id="tour"><h2>Feature tour</h2>%s%s</section>' % (
-            '<p class="lead">%s</p>' % inl(first["text"]) if first else "", "".join(rows)))
-        # platforms
-        parts.append('<section class="band" id="platforms"><h2>Platforms</h2>%s</section>' % render(sec["Platforms"], inl))
-        # quick start
-        _, sub = split_at(sec["Building apps with Python"], 3)
-        sub = {s[0]["plain"]: s[1:] for s in sub}
-        code = {}
-        for name in ("Windows quick start", "Linux quick start", "Start your own app"):
-            blocks = sub.get(name, [])
-            c = next((b for b in blocks if b["t"] == "code"), None)
-            if c is None:
-                raise SiteError(f"README.md: the landing page needs the code of '{name}'")
-            code[name] = (c, [b for b in blocks[blocks.index(c) + 1:] if b["t"] == "p"][:1])
-        win, lin, own = code["Windows quick start"], code["Linux quick start"], code["Start your own app"]
-        prereq = self.href(d.src, "index.html", "#prerequisites")
-        parts.append('<section class="band" id="quick-start"><h2>Quick start</h2><p class="lead">Python 3, Rust '
-                     'through rustup and LLVM / LLD are all it takes (<a href="%s">prerequisites</a>).</p>'
-                     '<div class="qs"><div><h3>Windows</h3>%s</div><div><h3>Linux</h3>%s</div></div>'
-                     '<h3>Start your own app</h3>%s%s</section>' % (
-                         attr(prereq), render([win[0]], inl), render([lin[0]], inl), render([own[0]], inl),
-                         render(own[1], inl)))
-        # documentation
-        table = next((b for b in sec["Documentation"] if b["t"] == "table"), None)
-        if table is None:
-            raise SiteError("README.md: 'Documentation' has no table")
-        docs = []
-        for r in table["rows"]:
-            m = re.fullmatch(r"\[(.+?)\]\((.+?)\)", r[0])
-            if m:
-                h = self.href(d.src, "index.html", m.group(2))
-                docs.append('<a class="card" href="%s"><h3>%s</h3><p>%s</p></a>' % (
-                    attr(h or REPO), inl(m.group(1), links=False), inl(r[1], links=False)))
-        parts.append('<section class="band" id="docs"><h2>Documentation</h2><div class="cards">%s</div></section>'
-                     % "".join(docs))
-        lic = next((b for b in sec["License"] if b["t"] == "p"), None)
-        if lic:
-            parts.append('<section class="band license"><h2>License</h2><p>%s</p></section>' % inl(lic["text"]))
-        home = Page("index.html", "Home", d, [])
-        home.body = "\n".join(parts)
-        home.desc = " ".join(plain(tagline).split())
-        home.title = "%s – %s" % ("JFLib", home.desc.rstrip("."))
+    def home(self):
+        """index.html: the way into the docs, from the table DOCS"""
+        entries = {e[0]: e for e in DOCS}
+        tiles = []
+        for src, cls in TILES:
+            _, title, _, lang, text = entries[src]
+            tiles.append('<a class="%s" href="%s"><b>%s%s</b><span>%s</span></a>' % (
+                cls, attr(self.main[src]), esc(title), lang_badge(lang), esc(text)))
+        tiled = {src for src, _ in TILES}
+
+        def caps(rows):
+            return '<div class="caps">%s</div>' % "".join(
+                '<a class="cap" href="%s"><b>%s%s</b><span>%s</span></a>' % (
+                    attr(self.main[src]), esc(title), lang_badge(lang), esc(text))
+                for src, title, _, lang, text in rows if src not in tiled)
+        home = Page("index.html", "Docs", None, [])
+        home.body = ('<section class="page-hero"><div class="wrap"><h1>The JFLib <em>docs.</em></h1><p class="lede">How to '
+                     'build apps with JFLib, and every function and type of the library. For what it can do, without '
+                     'code, go to the <a href="../features.html">features</a>.</p><div class="tiles">%s</div></div></section>\n'
+                     '<section class="hub"><div class="wrap"><h2>Guides and references</h2>%s<h2>Apps</h2>%s</div></section>'
+                     % ("".join(tiles), caps(e for e in DOCS if e[2] != "Apps"), caps(e for e in DOCS if e[2] == "Apps")))
+        home.desc = "The documentation of JFLib: developer guide, API reference, changelog and roadmap."
+        home.title = "JFLib Docs"
         return home
 
     # ---- output
     def write(self):
         prepare(self.out)
-        home = self.landing()
-        self.put("index.html", self.page_html(home))
+        self.put("index.html", self.page_html(self.home()))
         for p in self.pages:
             self.put(p.path, self.page_html(p))
         self.put("assets/site.css", site_css())
@@ -1138,13 +1088,15 @@ class Site:
         self.put("assets/favicon.svg", FAVICON)
         self.put("assets/search-index.js", self.search_index())
         for img in sorted(self.images):
-            self.put(img, (ROOT / img).read_bytes())
-        self.put(MARKER, "A website written by tools/site.py; the next run replaces this folder.\n")
+            self.put(site_path(img), (ROOT / img).read_bytes())
+        self.put(MARKER, "The docs written by tools/site.py; the next run replaces this folder.\n")
 
     def put(self, rel, data):
         p = (self.out / rel).resolve()
         if self.out not in p.parents:
             raise SiteError(f"refusing to write {rel} outside the output folder")
+        if rel in self.files:
+            raise SiteError(f"two files of the repository land at {rel}")
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
         self.files.append(rel)
@@ -1152,7 +1104,7 @@ class Site:
     def search_index(self):
         """{pages: [[path, title]], entries: [[text, kind, page, anchor]]}; an item's anchor is 0 when it
         follows from its name (Type::name -> Type.name, else kind.name), as site.js derives it"""
-        pages, entries = [["index.html", "Home"]], [["Home", "page", 0, ""]]
+        pages, entries = [["index.html", "Docs"]], [["Docs", "page", 0, ""]]
         for i, p in enumerate(self.pages, 1):
             pages.append([p.path, p.full_title()])
             entries.append([p.nav, "page", i, ""])
@@ -1168,8 +1120,7 @@ class Site:
 
         def item(p, label=None):
             a = ' aria-current="page"' if p is page else ""
-            lang = p.doc.lang if not p.parent else ""
-            badge = '<span class="lang" title="%s">%s</span>' % (LANGUAGES[lang], lang) if lang in LANGUAGES else ""
+            badge = lang_badge(p.doc.lang) if not p.parent else ""
             h = '<li><a href="%s"%s>%s%s</a>' % (attr(relpath(page.path, p.path)), a, esc(label or p.nav), badge)
             if p.kids and id(p) in cur:
                 h += "<ul>%s</ul>" % "".join(item(k) for k in p.kids)
@@ -1178,18 +1129,21 @@ class Site:
         for g in GROUPS:
             lis = [item(p) for p in self.top if p.doc.group == g]
             if g == "Start":
-                a = ' aria-current="page"' if page.path == "index.html" else ""
-                lis.insert(0, '<li><a href="%s"%s>Home</a></li>' % (attr(relpath(page.path, "index.html")), a))
+                lis.insert(0, '<li><a href="%s">Overview</a></li>' % attr(relpath(page.path, "index.html")))
             out.append('<p class="grp">%s</p><ul>%s</ul>' % (g, "".join(lis)))
         out.append("</nav>")
         return "\n".join(out)
 
     def page_html(self, p):
         root = "../" * p.path.count("/")
-        home = p.path == "index.html"
-        title = getattr(p, "title", None) or p.full_title() + " · JFLib"
-        main = []
-        if not home:
+        home = p.doc is None
+        if home:
+            title, button, content = p.title, "", '<main id="jf-main">\n%s\n</main>' % p.body
+        else:
+            title = p.full_title() + " · JFLib"
+            button = ('<button class="icon-btn" id="jf-menu" type="button" aria-label="Navigation" aria-expanded="false" '
+                      'aria-controls="jf-nav">%s</button>\n    ' % ICONS["menu"])
+            main = []
             crumbs = p.chain()[1:][::-1]
             if crumbs:
                 main.append('<nav class="crumbs" aria-label="Breadcrumb">%s</nav>' % " › ".join(
@@ -1208,22 +1162,19 @@ class Site:
                         cls, attr(relpath(p.path, q.path)), word, esc(q.nav)))
             if pager:
                 main.append('<nav class="pager" aria-label="Previous and next page">%s</nav>' % "".join(pager))
-            main.append('<footer class="foot"><p>Source: <a href="%s">%s</a> in the JFLib repository. %s</p></footer>'
-                        % (attr(github(p.doc.src)), esc(p.doc.src), LICENSE_LINE))
-        else:
-            main.append('<div class="landing">%s</div>' % p.body)
-            main.append('<footer class="foot wide"><p>%s Generated from the repository by '
-                        '<code>tools/site.py</code>.</p></footer>' % LICENSE_LINE)
-        toc = ""
-        heads = [h for h in p.heads if h[0] <= 3]
-        if len(heads) >= 2:
-            toc = '<aside class="toc" aria-label="On this page"><p>On this page</p><ul>%s</ul></aside>' % "".join(
-                '<li class="l%d"><a href="#%s">%s</a></li>' % (lv, attr(a), esc(t)) for lv, a, t in heads)
+            main.append('<p class="source">Source: <a href="%s">%s</a> in the JFLib repository.</p>'
+                        % (attr(github(p.doc.src)), esc(p.doc.src)))
+            toc = ""
+            heads = [h for h in p.heads if h[0] <= 3]
+            if len(heads) >= 2:
+                toc = '<aside class="toc" aria-label="On this page"><p>On this page</p><ul>%s</ul></aside>' % "".join(
+                    '<li class="l%d"><a href="#%s">%s</a></li>' % (lv, attr(a), esc(t)) for lv, a, t in heads)
+            content = ('<div class="layout%s">\n%s\n<div class="scrim" id="jf-scrim"></div>\n<main id="jf-main" class="main">\n'
+                       '%s\n</main>\n%s\n</div>' % (" has-toc" if toc else "", self.sidebar(p), "\n".join(main), toc))
         return PAGE.format(
-            title=esc(title), desc=attr(p.desc), root=root, body_class="home" if home else "doc-page",
-            layout="layout has-toc" if toc else "layout", sidebar=self.sidebar(p), main="\n".join(main), toc=toc,
-            guide=attr(relpath(p.path, self.main["docs/GUIDE.md"])), api=attr(relpath(p.path, self.main["docs/API.md"])),
-            home=attr(relpath(p.path, "index.html")), repo=REPO, icons=ICONS)
+            title=esc(title), desc=attr(p.desc), root=root, current="page" if home else "true", menu_button=button,
+            content=content, notices=attr(relpath(p.path, self.main["THIRD_PARTY_NOTICES.md"])), license=LICENSE_LINE,
+            repo=REPO, icons=ICONS)
 
 
 def prepare(out):
@@ -1253,33 +1204,31 @@ def build(out):
 
 
 # ---------------------------------------------------------------- the look
+# Top bar, footer, colours and type are the website's (src/layout.html and src/site.css of
+# jflibWebsite); what changes there changes here.
 LICENSE_LINE = ('JFLib is dual-licensed under the <a href="%s">MIT License</a> or the <a href="%s">Apache License '
                 '2.0</a>.' % (github("LICENSE-MIT"), github("LICENSE-APACHE")))
 THEME_BOOT = ('try{var t=localStorage.getItem("jflib-theme");if(t==="dark"||t==="light")'
               'document.documentElement.setAttribute("data-theme",t)}catch(e){}')
 ICONS = {
-    "logo": '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/>'
-            '<text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#fff" '
-            'font-family="system-ui,sans-serif">JF</text></svg>',
+    "mark": '<svg viewBox="0 0 100 100" style="color:var(--square)"><rect width="100" height="100" rx="20" '
+            'fill="currentColor"/></svg><svg viewBox="0 0 100 100" style="color:var(--circle)"><circle cx="50" cy="50" '
+            'r="50" fill="currentColor"/></svg><svg viewBox="0 0 100 100" style="color:var(--star)"><polygon points='
+            '"50,2 63,36 100,38 71,60 81,97 50,75 19,97 29,60 0,38 37,36" fill="currentColor"/></svg>',
     "search": '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10.7 11.8a6 6 0 1 1 1.1-1.1'
               'l3 3a.8.8 0 1 1-1.1 1.1zM11.5 7a4.5 4.5 0 1 0-9 0 4.5 4.5 0 0 0 9 0"/></svg>',
     "menu": '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 2.8a.8.8 0 0 1 .8-.8h12.4a.8.8'
             ' 0 0 1 0 1.5H1.8A.8.8 0 0 1 1 2.8m0 5a.8.8 0 0 1 .8-.8h12.4a.8.8 0 0 1 0 1.5H1.8A.8.8 0 0 1 1 7.8m.8 4.2'
             'h12.4a.8.8 0 0 1 0 1.5H1.8a.8.8 0 0 1 0-1.5"/></svg>',
-    "moon": '<svg class="i-moon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.2.6a.7.7 0 0 1'
-            ' .1.8 6 6 0 0 0 8.3 8.3.7.7 0 0 1 .9 1A7.6 7.6 0 1 1 5.3.5a.7.7 0 0 1 .9.1"/></svg>',
-    "sun": '<svg class="i-sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.2" fill="currentColor"/>'
-           '<path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 .9v1.6M8 13.5v1.6M.9 8h1.6M13.5'
-           ' 8h1.6M3 3l1.1 1.1M11.9 11.9 13 13M3 13l1.1-1.1M11.9 4.1 13 3"/></svg>',
 }
-FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" '
-           'fill="#0a64d1"/><text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#fff" '
-           'font-family="system-ui,sans-serif">JF</text></svg>\n')
+FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="1" y="1" width="20" height="20" rx="4" '
+           'fill="#00A2E8"/><circle cx="23" cy="10" r="8" fill="#22B14C"/><polygon points="16,11 19.4,20.2 29,20.6 '
+           '21.4,26.4 24.2,31.2 16,27 7.8,31.2 10.6,26.4 3,20.6 12.6,20.2" fill="#FF7F27"/></svg>\n')
 PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
 <meta name="description" content="{desc}">
 <meta name="color-scheme" content="light dark">
@@ -1287,141 +1236,168 @@ PAGE = """<!doctype html>
 <link rel="stylesheet" href="{root}assets/site.css">
 <script>""" + THEME_BOOT.replace("{", "{{").replace("}", "}}") + """</script>
 </head>
-<body class="{body_class}" data-root="{root}">
+<body data-root="{root}">
 <a class="skip" href="#jf-main">Skip to the content</a>
 <header class="topbar">
-<button class="iconbtn" id="jf-menu" type="button" aria-label="Navigation" aria-expanded="false" aria-controls="jf-nav">{icons[menu]}</button>
-<a class="brand" href="{home}">{icons[logo]}<span>JFLib</span></a>
-<nav class="toplinks" aria-label="Main"><a href="{guide}">Guide</a><a href="{api}">API</a><a href="{repo}">GitHub</a></nav>
-<div class="search" role="search">{icons[search]}<input id="jf-q" type="search" placeholder="Search the docs" aria-label="Search titles, headings and API items" autocomplete="off" spellcheck="false"><ul id="jf-results" class="results" hidden></ul></div>
-<button class="iconbtn" id="jf-theme" type="button" aria-label="Dark theme" aria-pressed="false">{icons[moon]}{icons[sun]}</button>
+  <div class="wrap">
+    <a class="brand" href="{root}../index.html" aria-label="JFLib home"><span class="mark" aria-hidden="true">{icons[mark]}</span>JFLib</a>
+    <nav class="menu" aria-label="Main">
+      <a href="{root}../features.html">Features</a>
+      <a href="{root}../apps.html">Apps</a>
+      <a href="{root}index.html" aria-current="{current}">Docs</a>
+      <a href="{repo}">GitHub</a>
+    </nav>
+    {menu_button}<div class="search" role="search">{icons[search]}<input id="jf-q" type="search" placeholder="Search the docs" aria-label="Search titles, headings and API items" autocomplete="off" spellcheck="false"><ul id="jf-results" class="results" hidden></ul></div>
+    <button class="icon-btn" id="jf-theme" type="button" aria-label="Switch between light and dark">◐</button>
+  </div>
 </header>
-<div class="{layout}">
-{sidebar}
-<div class="scrim" id="jf-scrim"></div>
-<main id="jf-main" class="main">
-{main}
-</main>
-{toc}
-</div>
+{content}
+<footer class="foot">
+  <div class="wrap">
+    <span>{license} <a href="{notices}">Third-party notices</a> · <a href="{root}../legal.html">Legal notice</a> · <a href="{root}../privacy.html">Privacy</a></span>
+  </div>
+</footer>
 <script src="{root}assets/site.js"></script>
 </body>
 </html>
 """
 LIGHT = {
-    "bg": "#ffffff", "fg": "#1c2128", "muted": "#58626d", "border": "#d8dee4", "soft": "#f3f5f7", "side": "#f7f8fa",
-    "bar": "rgba(255,255,255,.9)", "hover": "#e8ecf0", "link": "#0a5fc2", "accent": "#0a64d1", "accent-strong": "#0550ae",
-    "accent-soft": "#e2edfb", "on-accent": "#ffffff", "code-bg": "#f6f8fa", "icode": "rgba(129,139,152,.17)",
-    "zebra": "#fafbfc", "card": "#ffffff", "mark": "#fff2bf", "scrim": "rgba(15,20,25,.35)",
-    "shadow": "0 1px 2px rgba(27,31,36,.06), 0 8px 24px rgba(27,31,36,.12)",
-    "k": "#cf222e", "s": "#0a3069", "c": "#6e7781", "n": "#0550ae", "m": "#8250df", "a": "#116329", "t": "#953800",
-    "l": "#8250df",
+    "canvas": "#F3F4F7", "surface": "#FFFFFF", "ink": "#12131A", "muted": "#555968", "line": "#D6D8E1",
+    "grid": "rgba(18,19,26,.05)", "grid-major": "rgba(18,19,26,.085)", "link": "#2D36B8",
+    "square": "#00A2E8", "circle": "#22B14C", "star": "#FF7F27", "brand": "#3F48CC",
+    "band-indigo": "#3F48CC", "on-indigo": "#FFFFFF", "soft-indigo": "rgba(255,255,255,.82)",
+    "band-blue": "#00A2E8", "on-blue": "#07121B", "soft-blue": "rgba(7,18,27,.82)",
+    "band-orange": "#FF7F27", "on-orange": "#1A0C03", "soft-orange": "rgba(26,12,3,.82)",
+    "band-green": "#22B14C", "on-green": "#06140B", "soft-green": "rgba(6,20,11,.84)",
+    "band-ink": "#12131A", "on-ink": "#F3F4F7", "soft-ink": "#B4B7C6",
+    "code-bg": "#14151D", "code-fg": "#E8E9F0", "code-dim": "#8D90A3", "code-add": "#7BE29A", "code-del": "#FF9C8F",
+    "code-str": "#FFB37A", "code-kw": "#8FB4FF", "code-attr": "#C7A6FF",
+    "shadow": "0 1px 3px rgba(12,14,34,.24),0 24px 56px rgba(12,14,34,.32)", "scrim": "rgba(8,9,20,.62)",
+    "display": '"Bricolage Grotesque","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif',
+    "body": '"Atkinson Hyperlegible Next","Segoe UI",system-ui,-apple-system,sans-serif',
+    "mono": '"JetBrains Mono","Cascadia Mono",ui-monospace,Consolas,monospace',
+    # only the docs have these
+    "icode": "rgba(18,19,26,.07)", "zebra": "#F9FAFC", "mark": "#FFF2BF",
 }
 DARK = {
-    "bg": "#0e1116", "fg": "#e2e6eb", "muted": "#9ba6b2", "border": "#2b323b", "soft": "#161b22", "side": "#11151b",
-    "bar": "rgba(14,17,22,.9)", "hover": "#1d242d", "link": "#58a6ff", "accent": "#1f6feb", "accent-strong": "#8cc0ff",
-    "accent-soft": "#14273f", "on-accent": "#ffffff", "code-bg": "#151a21", "icode": "rgba(110,118,129,.32)",
-    "zebra": "#12171d", "card": "#141920", "mark": "#3b3315", "scrim": "rgba(0,0,0,.55)",
-    "shadow": "0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.5)",
-    "k": "#ff7b72", "s": "#a5d6ff", "c": "#8b949e", "n": "#79c0ff", "m": "#d2a8ff", "a": "#7ee787", "t": "#ffa657",
-    "l": "#d2a8ff",
+    "canvas": "#15161C", "surface": "#1E1F27", "ink": "#F1F2F6", "muted": "#A6A9B8", "line": "#34363F",
+    "grid": "rgba(255,255,255,.035)", "grid-major": "rgba(255,255,255,.06)", "link": "#A4ABFF", "brand": "#A4ABFF",
+    "band-indigo": "#2E34A6", "band-blue": "#0A6E9E", "on-blue": "#FFFFFF", "soft-blue": "rgba(255,255,255,.86)",
+    "band-orange": "#B84F0E", "on-orange": "#FFFFFF", "soft-orange": "rgba(255,255,255,.88)",
+    "band-green": "#157A35", "on-green": "#FFFFFF", "soft-green": "rgba(255,255,255,.88)",
+    "band-ink": "#0A0B10", "scrim": "rgba(0,0,0,.7)",
+    "icode": "rgba(255,255,255,.1)", "zebra": "#23242D", "mark": "#3B3315",
 }
-DRAWER = ("position:fixed;z-index:35;top:56px;left:0;bottom:0;width:min(86vw,320px);height:auto;align-self:normal;"
-          "transform:translateX(-105%);transition:transform .18s ease;box-shadow:var(--shadow);visibility:hidden")
 CSS = r"""*,*::before,*::after{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-padding-top:72px}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","Noto Sans","Liberation Sans",Arial,sans-serif}
-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
-code,pre{font-family:ui-monospace,"Cascadia Mono","Cascadia Code",SFMono-Regular,Menlo,Consolas,"Liberation Mono","DejaVu Sans Mono",monospace}
-.skip{position:absolute;left:-9999px;top:8px;z-index:99;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px}.skip:focus{left:8px}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;height:56px;padding:0 20px;background:var(--bar);border-bottom:1px solid var(--border);-webkit-backdrop-filter:saturate(1.4) blur(8px);backdrop-filter:saturate(1.4) blur(8px)}
-.brand{display:flex;align-items:center;gap:10px;color:var(--fg);font-weight:700;font-size:17px}.brand:hover{text-decoration:none}.brand svg{width:28px;height:28px;flex:none}
-.toplinks{display:flex;gap:2px;margin-left:12px}.toplinks a{padding:6px 10px;border-radius:6px;color:var(--muted);font-size:14px}.toplinks a:hover{color:var(--fg);background:var(--soft);text-decoration:none}
-.search{position:relative;flex:1;max-width:440px;margin-left:auto}
+html{--bar:53px;-webkit-text-size-adjust:100%;scroll-padding-top:calc(var(--bar) + 16px)}
+body{margin:0;background:var(--surface);color:var(--ink);font:400 1.0625rem/1.55 var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--link)}
+h1,h2,h3,h4{font-family:var(--display);font-weight:800;letter-spacing:-.018em;text-wrap:balance}
+code,pre{font-family:var(--mono);font-variant-ligatures:none}
+:focus-visible{outline:3px solid var(--star);outline-offset:2px}
+.wrap{max-width:1240px;margin-inline:auto;padding-inline:16px}
+.skip{position:absolute;left:-9999px;top:8px;z-index:99;padding:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:4px}.skip:focus{left:8px}
+.topbar{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:6px;min-height:52px}
+.brand{display:inline-flex;align-items:center;gap:10px;margin-right:14px;color:var(--ink);font:800 1.2rem/1 var(--display);text-decoration:none}
+.mark{display:inline-flex;gap:3px}.mark svg{width:13px;height:13px}
+.menu{display:flex;flex:1;min-width:0;gap:2px;overflow-x:auto;scrollbar-width:none}
+.menu a{padding:6px 11px;border-radius:4px;color:var(--ink);font-size:.9375rem;text-decoration:none;white-space:nowrap}
+.menu a:hover{background:var(--canvas)}.menu a[aria-current]{font-weight:700;background:var(--canvas)}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;padding:0;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:1rem;line-height:1}.icon-btn svg{width:18px;height:18px}
+#jf-menu{display:none}
+.search{position:relative;flex:0 1 260px;min-width:0}
 .search svg{position:absolute;left:10px;top:10px;width:16px;height:16px;color:var(--muted);pointer-events:none}
-.search input{width:100%;height:36px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:8px;background:var(--soft);color:var(--fg);font:inherit;font-size:14px;-webkit-appearance:none;appearance:none}
-.search input:focus{outline:2px solid var(--accent);outline-offset:-1px;background:var(--bg)}
-.results{position:absolute;top:44px;left:0;right:0;max-height:min(70vh,560px);overflow:auto;margin:0;padding:6px;list-style:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
-.results a{display:block;padding:6px 10px;border-radius:6px;color:var(--fg);line-height:1.35}.results a:hover,.results .sel a{background:var(--accent-soft);text-decoration:none}
-.results small{display:block;color:var(--muted);font-size:12px}.results .none{padding:8px 10px;color:var(--muted);font-size:14px}
-.iconbtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;padding:0;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--fg);cursor:pointer}.iconbtn:hover{background:var(--soft)}.iconbtn svg{width:18px;height:18px}
-#jf-menu{display:none}.i-sun{display:none}
-.layout{display:grid;grid-template-columns:280px minmax(0,1fr)}
-.sidebar{position:sticky;top:56px;align-self:start;height:calc(100vh - 56px);overflow-y:auto;padding:12px 14px 40px;border-right:1px solid var(--border);background:var(--side);font-size:14px}
-.sidebar .grp{margin:18px 10px 6px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
-.sidebar ul{margin:0;padding:0;list-style:none}.sidebar ul ul{margin:2px 0 6px 12px;padding-left:8px;border-left:1px solid var(--border)}
-.sidebar a{display:block;padding:4px 10px;border-radius:6px;color:var(--fg);line-height:1.4;overflow-wrap:anywhere}.sidebar a:hover{background:var(--hover);text-decoration:none}
-.sidebar a[aria-current]{background:var(--accent-soft);color:var(--accent-strong);font-weight:600}
-.lang{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:11px;font-weight:400;line-height:16px;vertical-align:1px}
+.search input{width:100%;height:36px;padding:0 12px 0 34px;color:var(--ink);background:var(--canvas);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:.9375rem;-webkit-appearance:none;appearance:none}
+.results{position:absolute;top:44px;right:0;width:min(460px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;margin:0;padding:6px;list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow)}
+.results a{display:block;padding:6px 10px;border-radius:4px;color:var(--ink);line-height:1.35;text-decoration:none}.results a:hover,.results .sel a{background:var(--canvas)}
+.results small{display:block;color:var(--muted);font-size:.75rem}.results .none{padding:8px 10px;color:var(--muted);font-size:.875rem}
+.foot{padding-block:34px;color:var(--soft-ink);background:var(--band-ink);font-size:.9375rem}.foot a{color:var(--on-ink);white-space:nowrap}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1240px;margin-inline:auto}
+.sidebar{position:sticky;top:var(--bar);align-self:start;height:calc(100vh - var(--bar));overflow-y:auto;scrollbar-width:thin;padding:12px 12px 40px 8px;border-right:1px solid var(--line);font-size:.9375rem}
+.sidebar .grp{margin:18px 8px 6px;color:var(--muted);font:600 .8125rem/1.4 var(--mono)}.sidebar .grp:first-child{margin-top:6px}
+.sidebar ul{margin:0;padding:0;list-style:none}.sidebar ul ul{margin:2px 0 6px 10px;padding-left:6px;border-left:1px solid var(--line)}
+.sidebar a{display:block;padding:4px 8px;border-radius:4px;color:var(--ink);line-height:1.35;overflow-wrap:anywhere;text-decoration:none}.sidebar a:hover{background:var(--canvas)}
+.sidebar a[aria-current]{font-weight:700;background:var(--canvas)}
+.lang{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid currentColor;border-radius:3px;font:400 .6875rem/16px var(--mono);letter-spacing:0;vertical-align:1px;opacity:.8}
 .scrim{display:none}
-.main{min-width:0;padding:36px 56px 72px}
-.doc{max-width:860px;margin:0 auto;overflow-wrap:break-word}
+.main{min-width:0;padding:34px clamp(16px,4vw,48px) 64px}
+.doc,.crumbs,.note,.pager,.source{max-width:800px;margin-inline:auto}
+.doc{overflow-wrap:break-word}
 .toc{display:none}
-@media (min-width:1300px){.layout.has-toc{grid-template-columns:280px minmax(0,1fr) 250px}.toc{display:block;position:sticky;top:56px;align-self:start;max-height:calc(100vh - 56px);overflow-y:auto;padding:40px 20px 40px 0;font-size:13px}}
-.toc p{margin:0 0 8px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
-.toc ul{margin:0;padding:0;list-style:none}.toc a{display:block;padding:3px 0 3px 10px;border-left:2px solid var(--border);color:var(--muted);line-height:1.35}.toc .l3 a{padding-left:22px}.toc a:hover{color:var(--fg);border-color:var(--muted);text-decoration:none}
-.doc h1{margin:0 0 20px;font-size:2.05rem;line-height:1.2;letter-spacing:-.01em}
-.doc h2{margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:1.5rem;line-height:1.3}
-.doc h3{margin:32px 0 10px;font-size:1.2rem;line-height:1.35}.doc h4{margin:26px 0 8px;font-size:1.05rem}.doc h5,.doc h6{margin:22px 0 8px;font-size:1rem}
-.doc h2.sub{font-size:1.2rem}
-.hl{margin-left:8px;color:var(--muted);font-weight:400;opacity:0}.hl:hover{text-decoration:none}:is(h1,h2,h3,h4,h5,h6):hover>.hl,.hl:focus{opacity:1}
+.toc p{margin:0 0 8px;color:var(--muted);font:600 .8125rem/1.4 var(--mono)}
+.toc ul{margin:0;padding:0;list-style:none}.toc a{display:block;padding:3px 0 3px 10px;border-left:2px solid var(--line);color:var(--muted);line-height:1.35;text-decoration:none}.toc .l3 a{padding-left:22px}.toc a:hover{color:var(--ink);border-color:var(--ink)}
+@media (min-width:1180px){.layout.has-toc{grid-template-columns:250px minmax(0,1fr) 220px}.toc{display:block;position:sticky;top:var(--bar);align-self:start;max-height:calc(100vh - var(--bar));overflow-y:auto;scrollbar-width:thin;padding:36px 16px 40px 0;font-size:.8125rem}}
+.doc h1{margin:0 0 20px;font-size:clamp(2.1rem,4vw,3rem);line-height:1.05;letter-spacing:-.024em}
+.doc h2{margin:44px 0 12px;font-size:clamp(1.6rem,2.6vw,2rem);line-height:1.1}
+.doc h3{margin:32px 0 10px;font-size:1.375rem;line-height:1.15}
+.doc h4{margin:26px 0 8px;font-size:1.125rem;line-height:1.2}
+.doc h5,.doc h6{margin:22px 0 8px;font:700 1rem/1.3 var(--body)}
+.doc h2.sub{font-size:1.375rem}
+.hl{margin-left:8px;color:var(--muted);font-weight:400;opacity:0;text-decoration:none}:is(h1,h2,h3,h4,h5,h6):hover>.hl,.hl:focus{opacity:1}
 .doc p,.doc ul,.doc ol,.doc pre,.doc .table,.doc blockquote{margin:0 0 16px}
 .doc ul,.doc ol{padding-left:26px}.doc li{margin:3px 0}.doc li>ul,.doc li>ol{margin:4px 0}.doc li>p{margin:0 0 8px}.doc li>pre{margin:8px 0}
-.doc :not(pre)>code{padding:.12em .38em;border-radius:5px;background:var(--icode);font-size:.86em}
-pre.code{overflow-x:auto;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--code-bg);font-size:13.5px;line-height:1.55;tab-size:4}
+.doc :not(pre)>code{padding:.1em .34em;border-radius:3px;background:var(--icode);font-size:.86em}
+pre.code{overflow-x:auto;padding:14px 16px;color:var(--code-fg);background:var(--code-bg);border-radius:8px;font-size:.875rem;line-height:1.6;tab-size:4}
 pre.code code{font-size:inherit}
-.k{color:var(--k)}.s{color:var(--s)}.c{color:var(--c);font-style:italic}.n{color:var(--n)}.m{color:var(--m)}.a{color:var(--a)}.t{color:var(--t)}.l{color:var(--l)}
-.table{overflow-x:auto}table{border-collapse:collapse;font-size:15px}th,td{padding:7px 12px;border:1px solid var(--border);text-align:left;vertical-align:top}th{background:var(--soft);font-weight:600}tbody tr:nth-child(2n) td{background:var(--zebra)}
+.k{color:var(--code-kw)}.s{color:var(--code-str)}.c{color:var(--code-dim)}.n{color:var(--code-del)}.m,.a,.l{color:var(--code-attr)}.t{color:var(--code-add)}
+.table{overflow-x:auto}table{border-collapse:collapse;font-size:.9375rem}th,td{padding:7px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--canvas);font-weight:700}tbody tr:nth-child(2n) td{background:var(--zebra)}
 .doc img{max-width:100%;height:auto;border-radius:6px}
-hr{margin:32px 0;border:0;border-top:1px solid var(--border)}
-blockquote{margin-left:0;padding:2px 16px;border-left:4px solid var(--border);color:var(--muted)}
-.doc :is(h1,h2,h3,h4,li):target,.api ul.items>li:target{background:var(--mark);border-radius:6px}
-.crumbs{margin:0 auto 14px;max-width:860px;color:var(--muted);font-size:14px}.crumbs a{color:var(--muted)}
-.note{max-width:860px;margin:0 auto 22px;padding:10px 14px;border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;background:var(--soft);font-size:15px}
-.note code{font-size:.86em}
+hr{margin:32px 0;border:0;border-top:1px solid var(--line)}
+blockquote{margin-left:0;padding:2px 16px;border-left:4px solid var(--line);color:var(--muted)}
+.doc :is(h1,h2,h3,h4,li):target,.api ul.items>li:target{background:var(--mark);border-radius:4px}
+.crumbs{margin-bottom:14px;color:var(--muted);font-size:.875rem}.crumbs a{color:var(--muted)}
+.note{margin-bottom:22px;padding:10px 14px;border-left:4px solid var(--star);border-radius:4px;background:var(--canvas);font-size:.9375rem}.note code{font-size:.86em}
 .subpages{columns:2 220px;column-gap:28px}.subpages li{break-inside:avoid}
 .api ul.items{padding-left:0;list-style:none}
-.api ul.items>li{margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--card)}
+.api ul.items>li{margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);border-radius:6px}
 .api ul.items>li>strong:first-child,.api ul.items>li>p:first-child>strong:first-child{display:block;margin-bottom:2px}
 .api ul.items>li>strong:first-child>code,.api ul.items>li>p:first-child>strong:first-child>code{padding:0;background:none;font-size:.9em;font-weight:600}
-.api ul.items ul{margin-top:6px;font-size:15px}
-.pager{display:flex;gap:16px;max-width:860px;margin:48px auto 0}.pager a{flex:1;display:block;min-width:0;padding:12px 16px;border:1px solid var(--border);border-radius:10px;color:var(--fg);overflow-wrap:anywhere}.pager a:hover{border-color:var(--accent);text-decoration:none}.pager span{display:block;color:var(--muted);font-size:12px}.pager .next{margin-left:auto;text-align:right}
-.foot{max-width:860px;margin:40px auto 0;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}.foot.wide{max-width:1240px;margin:24px auto 40px;padding:18px 32px 0}
-.home .main{padding:0}.home .layout{display:block}.home #jf-menu{display:inline-flex}.home .sidebar{%(drawer)s}
-.nav-open .sidebar{transform:none;visibility:visible}.nav-open .scrim{display:block;position:fixed;inset:56px 0 0;z-index:30;background:var(--scrim)}
-.landing h2{margin:0 0 12px;font-size:1.75rem;line-height:1.25}.landing h3{margin:0 0 6px;font-size:1.05rem}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:48px;align-items:center;max-width:1240px;margin:0 auto;padding:56px 32px 32px}
-.hero h1{margin:0 0 10px;font-size:clamp(2.4rem,5vw,3.5rem);line-height:1.1;letter-spacing:-.02em}
-.tagline{margin:0 0 14px;font-size:1.3rem;font-weight:600;line-height:1.45}.hero-text p{color:var(--muted)}.hero-text .tagline{color:var(--fg)}
-.cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.btn{display:inline-block;padding:9px 18px;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-weight:600}.btn:hover{border-color:var(--accent);text-decoration:none}.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.shot{margin:0}.shot img{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
-.band{max-width:1240px;margin:0 auto;padding:36px 32px}.landing :not(pre)>code{padding:.12em .38em;border-radius:5px;background:var(--icode);font-size:.86em}.hero-text code{white-space:nowrap}
-.lead{max-width:780px;margin:0 0 8px;color:var(--muted);font-size:1.05rem}.small{color:var(--muted);font-size:14px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin:22px 0}
-.card{padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--card)}.card p{margin:0;color:var(--muted);font-size:15px}
-a.card{display:block;color:var(--fg)}a.card:hover{border-color:var(--accent);text-decoration:none}a.card h3{color:var(--link)}
-.tour{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:26px 0 10px}.tour figure{margin:0}.tour img{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:10px}
-figcaption{margin-top:8px;font-size:15px;font-weight:600}.tour-text{max-width:900px;margin:0 0 24px;color:var(--muted)}
-.qs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:18px 0 24px}.qs pre{margin:0}
-.hero>*,.tour>*,.qs>*,.cards>*{min-width:0}
-.landing .table{overflow-x:auto;margin:16px 0}.landing pre.code{margin:0 0 14px}
-@media (max-width:959px){#jf-menu{display:inline-flex}.toplinks{display:none}.layout{display:block}.sidebar{%(drawer)s}.main{padding:22px 16px 56px}.topbar{gap:8px;padding:0 12px}.brand span{display:none}}
-@media (max-width:820px){.hero,.tour,.qs{grid-template-columns:1fr}.hero{gap:24px;padding:28px 16px 12px}.band{padding:26px 16px}.foot.wide{padding:18px 16px 0}.doc h1{font-size:1.7rem}.doc h2{font-size:1.3rem}}
+.api ul.items ul{margin-top:6px;font-size:.9375rem}
+.pager{display:flex;gap:14px;margin-top:48px}.pager a{flex:1;display:block;min-width:0;padding:12px 16px;border:1px solid var(--line);border-radius:6px;color:var(--ink);overflow-wrap:anywhere;text-decoration:none}.pager a:hover{border-color:var(--ink)}.pager span{display:block;color:var(--muted);font-size:.75rem}.pager .next{margin-left:auto;text-align:right}
+.source{margin-top:32px;color:var(--muted);font-size:.875rem}.source a{color:inherit}
+.page-hero{padding-block:clamp(40px,6vw,84px) clamp(28px,4vw,48px);background-color:var(--canvas);background-image:linear-gradient(var(--grid-major) 1px,transparent 1px),linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:100px 100px,100px 100px,20px 20px,20px 20px}
+.page-hero h1{margin:0;font-size:clamp(2.7rem,6.2vw,5.4rem);line-height:.98;letter-spacing:-.028em}.page-hero h1 em{font-style:normal;color:var(--brand)}
+.page-hero .lede{margin:18px 0 0;max-width:56ch;font-size:clamp(1.0625rem,1.5vw,1.25rem);line-height:1.5}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:clamp(28px,4vw,44px)}
+.tiles a{display:grid;align-content:start;gap:10px;min-width:0;padding:18px 16px 22px;border-radius:6px;text-decoration:none}.tiles a:hover{filter:brightness(1.08)}
+.tiles b{font:800 clamp(1.45rem,2.3vw,2rem)/1.1 var(--display);letter-spacing:-.018em}.tiles a>span{font-size:.9688rem;line-height:1.4}
+.b-indigo{color:var(--on-indigo);background:var(--band-indigo)}.b-indigo>span{color:var(--soft-indigo)}
+.b-blue{color:var(--on-blue);background:var(--band-blue)}.b-blue>span{color:var(--soft-blue)}
+.b-orange{color:var(--on-orange);background:var(--band-orange)}.b-orange>span{color:var(--soft-orange)}
+.b-green{color:var(--on-green);background:var(--band-green)}.b-green>span{color:var(--soft-green)}
+.hub{padding-block:clamp(30px,4.5vw,60px) clamp(40px,6vw,80px)}
+.hub h2{margin:clamp(36px,5vw,60px) 0 18px;font-size:clamp(1.8rem,3.4vw,2.6rem);line-height:1.05}.hub h2:first-child{margin-top:0}
+.caps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 clamp(20px,3vw,44px);border-top:2px solid var(--ink)}
+.cap{display:block;min-width:0;padding-block:15px 16px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none}.cap:hover b{color:var(--link)}
+.cap b{display:block;margin-bottom:5px;font:800 1.1875rem/1.2 var(--display);letter-spacing:-.012em}.cap>span{color:var(--muted);font-size:.9688rem;line-height:1.45}
+@media (max-width:900px){
+html{--bar:97px}
+.topbar .wrap{flex-wrap:wrap;gap:4px 6px;padding-block:8px}.topbar .wrap::after{content:"";order:1;flex-basis:100%}
+#jf-menu{display:inline-flex;order:2}.search{order:3;flex:1}
+.layout{display:block}
+.sidebar{position:fixed;z-index:35;top:var(--bar);left:0;bottom:0;width:min(86vw,320px);height:auto;background:var(--surface);transform:translateX(-105%);transition:transform .18s ease;box-shadow:var(--shadow);visibility:hidden}
+.nav-open .sidebar{transform:none;visibility:visible}.nav-open .scrim{display:block;position:fixed;inset:var(--bar) 0 0;z-index:30;background:var(--scrim)}
+.main{padding-top:22px}
+.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.caps{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){.brand{margin-right:4px}.menu a{padding:6px 7px}}
+@media (max-width:560px){.tiles,.caps{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:480px){.brand{gap:6px;font-size:1.05rem}.mark svg{width:10px;height:10px}.menu a{padding:6px 5px;font-size:.875rem}}
 @media (prefers-reduced-motion:reduce){.sidebar{transition:none}}
 """
 
 
 def site_css():
-    def vars_(pal):
-        return ";".join("--%s:%s" % kv for kv in pal.items()) + ";color-scheme:%s" % ("dark" if pal is DARK else "light")
-    dark_rules = "{%s}%%s .i-moon{display:none}%%s .i-sun{display:inline}" % vars_(DARK)
-    return (":root{%s}\n" % vars_(LIGHT)
-            + "@media (prefers-color-scheme:dark){:root:not([data-theme=light])%s}\n"
-            % (dark_rules % (":root:not([data-theme=light])", ":root:not([data-theme=light])"))
-            + ":root[data-theme=dark]%s\n" % (dark_rules % (":root[data-theme=dark]", ":root[data-theme=dark]"))
-            + CSS.replace("%(drawer)s", DRAWER))
+    def vars_(pal, scheme):
+        return ";".join("--%s:%s" % kv for kv in pal.items()) + ";color-scheme:" + scheme
+    faces = "".join('@font-face{font-family:"%s";font-style:normal;font-weight:%s;font-display:swap;src:url(../../fonts/%s-%s'
+                    '.woff2) format("woff2");unicode-range:%s}\n' % (name, weight, stem, part, ranges)
+                    for name, weight, stem in FONTS for part, ranges in FONT_PARTS)
+    return (faces + ":root{%s}\n" % vars_(LIGHT, "light")
+            + "@media (prefers-color-scheme:dark){:root:not([data-theme=light]){%s}}\n" % vars_(DARK, "dark")
+            + ":root[data-theme=dark]{%s}\n" % vars_(DARK, "dark")
+            + CSS)
 
 
 SITE_JS = r"""(function () {
@@ -1448,11 +1424,13 @@ SITE_JS = r"""(function () {
   sync();
   // the navigation as a drawer on narrow screens
   var mb = d.getElementById("jf-menu");
-  function nav(open) { d.body.classList.toggle("nav-open", open); mb.setAttribute("aria-expanded", String(open)); }
-  mb.addEventListener("click", function () { nav(!d.body.classList.contains("nav-open")); });
-  d.getElementById("jf-scrim").addEventListener("click", function () { nav(false); });
-  var side = d.getElementById("jf-nav"), here = side.querySelector("a[aria-current]");
-  if (here && here.offsetTop > side.clientHeight * 0.6) side.scrollTop = here.offsetTop - side.clientHeight / 3;
+  function nav(open) { d.body.classList.toggle("nav-open", open); if (mb) mb.setAttribute("aria-expanded", String(open)); }
+  if (mb) {
+    mb.addEventListener("click", function () { nav(!d.body.classList.contains("nav-open")); });
+    d.getElementById("jf-scrim").addEventListener("click", function () { nav(false); });
+    var side = d.getElementById("jf-nav"), here = side.querySelector("a[aria-current]");
+    if (here && here.offsetTop > side.clientHeight * 0.6) side.scrollTop = here.offsetTop - side.clientHeight / 3;
+  }
   // search over page titles, headings and API items (assets/search-index.js, loaded on first use)
   var q = d.getElementById("jf-q"), box = d.getElementById("jf-results"), data = null, hits = [], sel = -1;
   function load() {
@@ -1537,7 +1515,7 @@ class Scan(HTMLParser):
         elif tag in ("img", "script") and "src" in a:
             self.refs.append((tag, a["src"], line))
         elif tag == "link" and "href" in a:
-            self.refs.append(("link", a["href"], line))
+            self.refs.append(("style", a["href"], line))
         if tag == "html":
             self.lang = a.get("lang")
         elif tag == "meta" and a.get("name") == "description":
@@ -1587,16 +1565,22 @@ def local_paths(out):
     return sorted(found, key=len, reverse=True)
 
 
+def website_file(page, url):
+    """does this link of the page at `page` reach one of WEBSITE_FILES, one folder above the output?"""
+    target = posixpath.normpath(posixpath.join(posixpath.dirname(page), unquote(url)))
+    return target.startswith("../") and target[3:] in WEBSITE_FILES
+
+
 def check_site(site):
     out, fails = site.out, []
     files = {p.relative_to(out).as_posix(): p for p in out.rglob("*") if p.is_file()}
     want = ["index.html"] + [p.path for p in site.pages]
-    want += [src[:-3] + ".html" for src, *_ in DOCS]
+    want += [site_path(src[:-3]) + ".html" for src, *_ in DOCS]
     guide = site.docs["docs/GUIDE.md"]
     n_guide = sum(1 for b in guide.blocks if b["t"] == "h" and b["level"] == 2)
     n_api = sum(1 for b in site.docs["docs/API.md"].blocks if b["t"] == "h" and b["level"] == 2 and b["plain"] != "Contents")
-    got_guide = sum(1 for p in site.pages if p.path.startswith("docs/guide/"))
-    got_api = sum(1 for p in site.pages if p.path.startswith("docs/api/") and p.parent and not p.parent.parent)
+    got_guide = sum(1 for p in site.pages if p.path.startswith("guide/"))
+    got_api = sum(1 for p in site.pages if p.path.startswith("api/") and p.parent and not p.parent.parent)
     if got_guide != n_guide or n_guide < 10:
         fails.append(f"docs/GUIDE.md has {n_guide} sections, the site {got_guide} pages of them")
     if got_api != n_api or n_api < 10:
@@ -1620,20 +1604,31 @@ def check_site(site):
             fails.append(f"{f}: no lang")
         dup = sorted({i for i in s.ids if s.ids.count(i) > 1}) if len(s.ids) != len(ids[f]) else []
         fails += [f"{f}: the id {i} is used twice" for i in dup]
+        website = set()
         for kind, url, line in s.refs:
             if EXTERNAL.match(url):
+                if kind in ("style", "script"):
+                    fails.append(f"{f}:{line}: {url} loads from another host")
                 continue
             nref += 1
             path, _, frag = url.partition("#")
             target = posixpath.normpath(posixpath.join(posixpath.dirname(f), unquote(path))) if path else f
             if target == ".." or target.startswith("../"):
-                fails.append(f"{f}:{line}: {url} leaves the site")
+                if kind == "link" and not frag and website_file(f, path):
+                    website.add(target[3:])
+                else:
+                    fails.append(f"{f}:{line}: {url} leaves the docs and is no file of the website")
             elif target not in files:
                 fails.append(f"{f}:{line}: {url}: {target} does not exist")
             elif kind == "img" and not files[target].stat().st_size:
                 fails.append(f"{f}:{line}: the image {target} is empty")
             elif frag and target.endswith(".html") and unquote(frag) not in ids[target]:
                 fails.append(f"{f}:{line}: {url}: no #{unquote(frag)} in {target}")
+        fails += [f"{f}: no link to {w} of the website" for w in WEBSITE_PAGES if w not in website]
+    css = files.get("assets/site.css")
+    for url in re.findall(r"url\(([^)]*)\)", css.read_bytes().decode("utf-8") if css else ""):
+        if not website_file("assets/site.css", url) and posixpath.normpath("assets/" + url) not in files:
+            fails.append(f"assets/site.css: {url} is neither in the output nor a file of the website")
     idx = files.get("assets/search-index.js")
     if idx:
         t = idx.read_bytes().decode("utf-8")
@@ -1689,8 +1684,21 @@ CASES = [
 ]
 
 
+# (the page, a link on it, does it reach a file of the website?)
+WEBSITE_CASES = [
+    ("index.html", "../features.html", True),
+    ("guide/01-rules.html", "../../features.html", True),
+    ("assets/site.css", "../../fonts/atkinson-latin.woff2", True),
+    ("guide/01-rules.html", "../features.html", False),         # one level short: inside the output
+    ("index.html", "../../features.html", False),               # one level too far
+    ("index.html", "../secret.html", False),
+    ("index.html", "../fonts/other.woff2", False),
+]
+
+
 def selftest():
-    fails = []
+    fails = [f"website_file: {page} {url}: not {want}" for page, url, want in WEBSITE_CASES
+             if website_file(page, url) != want]
     for md, want in CASES:
         blocks = parse_blocks(md.split("\n"))[0]
         for b in walk(blocks):
@@ -1771,7 +1779,7 @@ def main(argv=None):
             s.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
-    ap = argparse.ArgumentParser(description="the static website of JFLib: landing page, docs, API reference")
+    ap = argparse.ArgumentParser(description="the docs of the JFLib website: guides, API reference, changelog, roadmap")
     ap.add_argument("--out", help="output folder (default build/site; --check: a temporary folder)")
     ap.add_argument("--check", action="store_true", help="build and check links, anchors, images, HTML, determinism")
     ap.add_argument("--summary", action="store_true", help="--check: one line on success (build_rs.py test)")
