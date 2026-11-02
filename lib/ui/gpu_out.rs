@@ -2959,6 +2959,13 @@ impl Ui {
         self.render();
         self.present();
         let i = self.gp_scoped();
+        // (a window manager that keeps the window smaller than the frame, larger than the screen: the
+        // window stays on the CPU path; a note, as for a window on top of ours)
+        let needs_gpu = ["gpu", "apart", "tiles", "layers", "images"].iter().any(|w| word_eq(r, w).is_some());
+        if needs_gpu && self.m.gout.win(i).is_some_and(|w| w.stage != Stage::Gpu && kept_at_other_size(w)) {
+            plat::write_stdout(format!("note: gpu expect {}: the system keeps the window at another size (no result)\n", String::from_utf8_lossy(r).trim_end()).as_bytes());
+            return;
+        }
         if word_eq(r, "gpu").is_some() || word_eq(r, "cpu").is_some() {
             let want_gpu = word_eq(r, "gpu").is_some();
             let on = self.gpu_output(i as u32).on;

@@ -18,6 +18,7 @@
 //   linux_x11_wire.rs     connection, authentication, setup, requests, replies, errors
 //   linux_x11_window.rs   window records, hints, WM messages, DPI, state, events, wait
 //   linux_x11_present.rs  MIT-SHM (memfd / SysV) or PutImage, per window
+//   linux_x11_gpu.rs      DRI3 and Present: the GPU's buffers on a window (programs against glibc)
 //   linux_x11_input.rs    core keyboard / pointer input, keysyms, the core keymap (built into
 //                         the key table of linux_xkb.rs: xkb_begin / xkb_set_key / xkb_key)
 //   linux_x11_xi.rs       XInput 2 pens

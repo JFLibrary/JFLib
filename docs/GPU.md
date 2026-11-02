@@ -1046,7 +1046,7 @@ gibt `Err(NoLoader)`. Kommandozeilen- und Serverprogramme bleiben statisch ohne 
 `Features::swapchain` ist auf einem CPU-Adapter `false`, die Fenstertests von `gputest` melden dort `SKIP`.
 
 **Welche Programme.** Ein Programm, das `ui` nennt, wird gegen glibc gelinkt, auch `gui`-Programme einer App in `BINS`;
-`cli`-Programme und alles ohne `ui` bleiben statisch und Byte für Byte, wie sie waren (`wgsltest`, `coretest`, `jfs`, `appimagert` geprüft).
+`cli`-Programme und alles ohne `ui` bleiben statisch und im Release-Build Byte für Byte, wie sie waren (`wgsltest`, `jfs`, `appimagert` geprüft; ein Entwicklungs-Build wie `coretest` kann um Füllbytes abweichen, weil `plat` sich anders in Codegen-Einheiten teilt: dieselben Funktionen in derselben Größe).
 Eine Datei `apps/NAME/GLIBC` erzwingt glibc (`gputest`, `uigputest`), eine Datei `apps/NAME/STATIC` hält eine App statisch
 (`plattest`, `linuxtest`: sie testen weiter, was `--static` ergibt). `build_rs.py ... --static` und `tools/package.py --static`
 bauen die UI-Programme dieses Laufs statisch: kein Vulkan-Code, nur Shared Memory, für Systeme ohne glibc wie Alpine. Module und Plugins

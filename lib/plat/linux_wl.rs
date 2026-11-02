@@ -22,6 +22,7 @@
 //                                                                             [wl_clip.s]
 //   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
 //   linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
+//   linux_wl_gpu.rs      zwp_linux_dmabuf_v1: the GPU's buffers on a surface (programs against glibc)
 //
 // State: the assembly's globals are one record (Wl) owned by this module, created on the
 // first use (the synthetic tests use it without a connection).  Every entry point (the
