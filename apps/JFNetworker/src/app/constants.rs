@@ -759,3 +759,8 @@ pub(crate) const ID_AK_BAR_NEXT: u32 = 0x0002_1032;
 /// the cards of the list of courses (+ i), the steps of a course (+ its place in the course)
 pub(crate) const ID_AK_CARD: u32 = 0x0002_1100;
 pub(crate) const ID_AK_STEP: u32 = 0x0002_1400;
+
+// ---------------------------------------------------------------- F2: the zone firewall
+/// the parts Zonen and Sitzungen of the Firewall tab: ID_FW2 + 0x400 k (window k), the layout in the
+/// head of fwzones.rs; together 0x0002_3000..0x0002_37FF
+pub const ID_FW2: u32 = 0x0002_3000;

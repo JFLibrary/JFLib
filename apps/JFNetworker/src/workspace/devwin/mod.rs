@@ -56,6 +56,7 @@
 
 pub(crate) mod config;
 pub(crate) mod firewall;
+pub(crate) mod fwzones;
 pub(crate) mod desktop;
 pub(crate) mod services;
 pub(crate) mod svcedit;

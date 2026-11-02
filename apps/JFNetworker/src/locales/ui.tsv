@@ -2070,3 +2070,90 @@ Fortschritt zurücksetzen?	Reset progress?
 Alles, was Sie in „{}“ erledigt haben, gilt dann wieder als offen. Das lässt sich nicht rückgängig machen.	Everything you have done in “{}” then counts as open again. This cannot be undone.
 Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator.	Academy: courses with lessons to read and labs in the simulator.
 Zurücksetzen	Reset
+# ---- F2: Zonen and Sitzungen of the Firewall tab (workspace/devwin/fwzones.rs)
+Sitzungen	Sessions
+Zonen	Zones
+Zonen: passiert	Zones: it passes
+Zonen: wird verworfen	Zones: it is dropped
+Die Zonen sehen ein Paket vor der Übersetzung der Quelle: fragen Sie nach der inneren Quelle an der Schnittstelle, auf der es ankommt.	The zones see a packet before its source is translated: ask for the inside source on the interface where it arrives.
+inspect (mit Sitzung, Antworten kommen zurück)	inspect (with a session, answers come back)
+pass (nur dieses Paket)	pass (this packet only)
+drop (still verwerfen)	drop (silently)
+reject (verwerfen und Absender informieren)	reject (drop and tell the sender)
+{} braucht einen Namen aus einem Wort.	{} needs a name of one word.
+Eine Zone	A zone
+Die Zone {} gibt es schon.	Zone {} already exists.
+Zone {} hat noch Schnittstellen: erst sie einer anderen Zone geben.	Zone {} still has interfaces: give them another zone first.
+Zone {} steht noch im Zonenpaar {}: erst das Paar entfernen.	Zone {} is still part of zone pair {}: remove the pair first.
+Eine Klasse	A class
+Richtlinie {} benutzt die Klasse {}: erst die Regel dort entfernen.	Policy {} uses class {}: remove the rule there first.
+Eine Richtlinie	A policy
+Das Zonenpaar {} benutzt die Richtlinie {}: erst das Paar ändern.	Zone pair {} uses policy {}: change the pair first.
+Ein Zonenpaar	A zone pair
+Ein Zonenpaar verbindet zwei verschiedene Zonen.	A zone pair joins two different zones.
+Der Name self gehört dem Gerät selbst.	The name self belongs to the device itself.
+Von {} nach {} gibt es schon das Zonenpaar {}.	From {} to {} there already is zone pair {}.
+gesperrt	closed
+Keine der beiden Schnittstellen hat eine Zone: das Paket passiert.	Neither interface has a zone: the packet passes.
+Es bleibt in Zone {}: das Paket passiert.	It stays in zone {}: the packet passes.
+Von {} nach {}: das Gerät selbst, keine Richtlinie sagt etwas anderes, das Paket passiert.	From {} to {}: the device itself, no policy says otherwise, the packet passes.
+Zwischen Zone {} und einer Schnittstelle ohne Zone: wird still verworfen.	Between zone {} and an interface without a zone: dropped silently.
+Keine Regel zwischen den Zonen {} und {}: wird still verworfen.	No rule between the zones {} and {}: dropped silently.
+Bestehende Verbindung: Sitzung {} in {}, das Paket passiert.	Existing connection: session {} in {}, the packet passes.
+Bestehende Verbindung: Rückweg von Sitzung {} in {}, das Paket passiert.	Existing connection: the way back of session {} in {}, the packet passes.
+ICMP-Fehler zu Sitzung {} in {}: das Paket passiert.	ICMP error about session {} in {}: the packet passes.
+{}, Klasse {}: inspect, aber das Paket beginnt keine Verbindung und gehört zu keiner Sitzung, wird still verworfen.	{}, class {}: inspect, but the packet begins no connection and belongs to no session, dropped silently.
+{}, Klasse {}: schon {} halboffene Sitzungen, wird still verworfen.	{}, class {}: already {} half-open sessions, dropped silently.
+{}, Richtlinie {}, Klasse {}: inspect, das Paket passiert und beginnt eine Sitzung.	{}, policy {}, class {}: inspect, the packet passes and begins a session.
+{}, Richtlinie {}, Klasse {}: pass, das Paket passiert, eine Antwort braucht eine eigene Regel.	{}, policy {}, class {}: pass, the packet passes, an answer needs a rule of its own.
+{}, Richtlinie {}, Klasse {}: wird still verworfen.	{}, policy {}, class {}: dropped silently.
+{}, Richtlinie {}, Klasse {}: wird verworfen, der Absender bekommt „administratively prohibited“.	{}, policy {}, class {}: dropped, the sender gets “administratively prohibited”.
+oder	or
+und	and
+keine Bedingung: trifft nichts	no condition: matches nothing
+drop (keine Aktion genannt)	drop (no action named)
+Zonen auf {} ändern	Change the zones on {}
+Wer darf mit wem sprechen?	Who may talk to whom?
+Noch hat keine Schnittstelle eine Zone: das Gerät arbeitet als Router, nur Zugriffslisten filtern. Sobald eine Schnittstelle in einer Zone ist, gilt: zwischen zwei Zonen wird verworfen, was keine Richtlinie erlaubt.	No interface has a zone yet: the device works as a router and only access lists filter. Once an interface is in a zone, the rule is: between two zones, what no policy allows is dropped.
+von \ nach	from \ to
+Von {} nach {}: {}	From {} to {}: {}
+Grün: frei. Gelb: eine Richtlinie entscheidet. Rot: nichts kommt durch. Antworten auf das, was „inspect“ durchließ, kommen immer zurück. self ist das Gerät selbst.	Green: free. Yellow: a policy decides. Red: nothing gets through. Answers to what “inspect” let through always come back. self is the device itself.
+Zonen und Schnittstellen	Zones and interfaces
+keine Schnittstelle	no interface
+Zone {} entfernen	Remove zone {}
+z. B. INNEN	e.g. INSIDE
+Zone anlegen	Create zone
+keine Zone	no zone
+Klassen: welcher Verkehr?	Classes: which traffic?
+Klasse {} entfernen	Remove class {}
+Bedingung {} aus Klasse {} entfernen	Remove condition {} from class {}
+Zugriffsliste	Access list
+Name der Klasse	Name of the class
+eine Bedingung genügt (match-any)	one condition is enough (match-any)
+Klasse anlegen oder ergänzen	Create or extend class
+Es gibt noch keine Zugriffsliste: erst eine anlegen (Regeln).	There is no access list yet: create one first (Rules).
+Richtlinien: was geschieht damit?	Policies: what happens to it?
+Richtlinie {} entfernen	Remove policy {}
+Pakete	Packets
+Klasse {} aus Richtlinie {} entfernen	Remove class {} from policy {}
+Name der Richtlinie	Name of the policy
+protokollieren (log)	log it (log)
+Regel setzen	Set rule
+Zonenpaare: in welche Richtung?	Zone pairs: in which direction?
+keine Richtlinie	no policy
+Zonenpaar {} entfernen	Remove zone pair {}
+Name, frei lassen	Name, may stay empty
+von	from
+nach	to
+Paar anlegen	Create pair
+Jeder Schritt läuft in der Konsole und wird zusammen mit der laufenden Konfiguration zur Startkonfiguration. Eine Klasse nennt Protokolle nur beim Namen: „http“ heißt TCP-Port 80, in die Daten schaut die Firewall nicht.	Each step runs on the console and becomes the startup configuration together with the running configuration. A class names protocols by name only: “http” means TCP port 80, the firewall does not look into the data.
+Nr.	No.
+Paar	Pair
+Klasse	Class
+Firewall auf {}	Firewall on {}
+Laufende Sitzungen	Running sessions
+Sitzungen löschen	Clear sessions
+Sitzungen jetzt: {}, halboffen: {} (höchstens {}). Begonnen: {}, abgelaufen: {}, durch RST beendet: {}. Verworfen ohne Regel: {}, ohne Verbindungsbeginn: {}, über der Grenze: {}.	Sessions now: {}, half-open: {} (at most {}). Begun: {}, timed out: {}, ended by RST: {}. Dropped without a rule: {}, beginning nothing: {}, over the limit: {}.
+Gerade läuft keine Sitzung. Eine Sitzung beginnt, wenn eine Klasse mit „inspect“ das erste Paket einer Verbindung durchlässt.	No session is running. A session begins when a class with “inspect” lets the first packet of a connection through.
+Die ersten {} von {}; alle zeigt „show policy-map type inspect zone-pair sessions“.	The first {} of {}; “show policy-map type inspect zone-pair sessions” shows all.
+Sitzung {}: {} {} nach {}, {}	Session {}: {} {} to {}, {}
