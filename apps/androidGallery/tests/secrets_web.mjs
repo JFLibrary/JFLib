@@ -67,7 +67,7 @@ try {
   for(const engine of engines) {
     const browser=await launchWasm(pw[engine],{...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed')});
     try {
-      const context=await browser.newContext({viewport:{width:420,height:900}});
+      const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
       const page=await context.newPage();
       const errors=[];
       page.on('pageerror',e=>errors.push(String(e)));
@@ -176,7 +176,7 @@ try {
       ok(errors.length===0,`${engine}: no page errors: ${errors.join('; ')}`);
 
       // no secure context (a page over plain http from another host): no store, nothing written
-      const insecure=await browser.newContext({viewport:{width:420,height:900}});
+      const insecure=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
       const p2=await insecure.newPage();
       await p2.addInitScript(()=>Object.defineProperty(window,'isSecureContext',{value:false}));
       await p2.goto(base);

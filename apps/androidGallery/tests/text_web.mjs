@@ -57,7 +57,7 @@ try {
   for(const engine of engines) {
     const browser=await launchWasm(pw[engine],{...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed')});
     try {
-      const page=await browser.newPage({viewport:{width:420,height:900}});
+      const page=await browser.newPage({locale:'de-DE',viewport:{width:420,height:900}});
       const errors=[];
       page.on('pageerror',e=>errors.push(String(e)));
       page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});

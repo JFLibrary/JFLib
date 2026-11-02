@@ -14,7 +14,7 @@
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
-    <application android:label="jfgui Gallery" android:icon="@drawable/ic_launcher"
+    <application android:label="JFLib Gallery" android:icon="@drawable/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="false"
         android:supportsRtl="true">
