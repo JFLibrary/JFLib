@@ -132,6 +132,11 @@ pub fn window(t: &mut T) {
 fn window_checks(t: &mut T, g: &crate::Gpu, w: i32) -> Option<()> {
     let dev = &g.dev;
     let surf = t.res(Surface::new(&g.inst, w), "Surface::new")?;
+    // (Linux: no display in this session, or it runs on another GPU)
+    if cfg!(not(windows)) && !g.adapter.can_present(&surf) {
+        out("SKIP: this adapter cannot show on the window's display");
+        return None;
+    }
     let t0 = plat::time_us();
     let desc = SwapchainDesc { present: PresentMode::Fifo, copy_src: true, ..SwapchainDesc::DEFAULT };
     let mut sc = t.res(dev.create_swapchain(&surf, &desc), "create_swapchain")?;

@@ -242,6 +242,11 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
         crate::t_window::pump(200);
         let r = (|| {
             let surf = t.res(Surface::new(&g.inst, w), "Surface::new")?;
+            // (Linux: no display in this session, or it runs on another GPU)
+            if cfg!(not(windows)) && !g.adapter.can_present(&surf) {
+                out("SKIP: this adapter cannot show on the window's display");
+                return None;
+            }
             let desc = SwapchainDesc { present, frames_in_flight: k as u32, ..SwapchainDesc::DEFAULT };
             let mut sc = t.res(dev.create_swapchain(&surf, &desc), "create_swapchain")?;
             let s = Scene::new(t, dev, c.n, sc.format(), k, c.shaders)?;

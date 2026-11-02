@@ -138,7 +138,8 @@ der zusammengesetzte Bildschirm gegen `shot` vergleichen. Sparsam auf dem echten
 - **Bildschirm gegen Framebuffer**, `spectacle` auf dem eigenen KWin: 0 Pixel anders, mit Menü, nach dem Schließen, nach Teil-Updates; Wayland und X11, Wayland auch bei Maßstab 1,5.
 - **Echter Desktop**: wie oben bestanden, Wayland und X11.
 - **Sandbox**: `sandboxtest` (`sandbox strict`): HD 610 arbeitet darunter.
-- **Offen**: GNOME und andere Compositors, NVIDIA und AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
+- **Laptop mit zwei GPUs**: ThinkPad mit Iris Xe und NVIDIA T500, [GPU.md](GPU.md) „Ausgabe unter Linux“: wählt auf dem echten Desktop die Intel-GPU; auf einem eigenen KWin auf der NVIDIA bestehen die GPU-Tests auch mit dem proprietären Treiber.
+- **Offen**: GNOME und andere Compositors, AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
 - **Hinweis**: `GetImage` eines geflippten Fensters unter Xwayland liefert das Bild davor; die Komposition zeigt das letzte. KWins eigene GPU-Zeit ist nicht lesbar (Datei-Capability, `fdinfo` gesperrt).
 
 ---

@@ -676,7 +676,14 @@ Unter X11 (Xwayland desselben KWin, je 3 Läufe) ist es dasselbe Bild: ganze Sei
 Was das heißt: Eine schwache GPU reicht, 1,7 bis 2,6 ms je Bild bei diesem Fenster. Die CPU des Programms ist gleich oder kleiner, die des Compositors kleiner (er muss nichts kopieren). Im Leerlauf kostet der Weg nichts. Der Preis ist
 Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB im Treiber, und der Commit kommt um die GPU-Zeit später; auf dem Bildschirm bleibt davon wenig. Empfehlung: an, wie unter Windows (`DEFAULT_ON_LINUX` in `gpu_out.rs`, eine Zeile), solange kein Treiber anderes zeigt.
 
-**Nicht getestet:** NVIDIA und AMD, GNOME und andere Compositors, X11 ohne Xwayland, zwei GPUs, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
+**Gegenprobe auf einem Laptop mit zwei GPUs** (ThinkPad P14s Gen 2i, Ubuntu 26.04, Intel Iris Xe mit Mesa 26.0.8, NVIDIA T500 mit dem proprietären Treiber 595.99). Der echte Desktop läuft auf der Intel-GPU, und die UI wählt sie von selbst, unter Wayland und X11 (`uigputest --test switch`: 23 gezeigte Bilder zurückgelesen, keins anders). Eine erzwungene NVIDIA (`jfgui_GPU_ADAPTER=NVIDIA`) zeigt dort nichts: Die Bilder laufen nur auf der GPU, auf der der Compositor läuft, das Fenster bleibt auf dem CPU-Pfad. Bilder von einer GPU zur anderen (PRIME) sind nicht gebaut. Auf einem eigenen KWin ohne Bildschirm, der selbst auf der NVIDIA lief, bestehen `gputest --test all`, die GPU-Tests von `uigputest` und die Skripte `gpu_output`, `gpu_layers` und `gpu_layers_rtl` der Galerie, unter Wayland und X11: Der proprietäre Treiber kommt mit dmabuf zurecht. Ob das Auflisten der Adapter eine schlafende zweite GPU weckt, bleibt offen: Die T500 schläft auf diesem Rechner nie.
+
+| Messszene, 1080p, Entwicklungs-Build, je drei Läufe | 10 000 Würfel | 100 000 | 1 Mio. |
+| --- | ---: | ---: | ---: |
+| Intel Iris Xe (TGL GT2) | 0,53 ms | 2,48 ms | 19,4 ms |
+| NVIDIA T500 | 0,68 ms | 1,70 ms | 8,4 ms |
+
+**Nicht getestet:** AMD, GNOME und andere Compositors, X11 ohne Xwayland, eine zweite GPU, die schläft, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
 
 ### Was fehlt
 
