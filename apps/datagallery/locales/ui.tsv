@@ -1,0 +1,201 @@
+de	en
+Daten & Shell	Data & Shell
+Archiv	Archive
+Offsite	Offsite
+Primär (NAS)	Primary (NAS)
+Manuell	Manual
+Monatlich	Monthly
+Stündlich	Hourly
+Täglich	Daily
+Wöchentlich	Weekly
+Aufbewahrung	Retention
+Name	Name
+Zeitplan	Schedule
+Ziel	Target
+Quelle	Source
+Zusammenfassung	Summary
+Protokoll	Log
+Restore-Points	Restore points
+100 000 Punkte	100,000 points
+500 Punkte	500 points
+Link getrennt	Link down
+Latenz +40 ms	Latency +40 ms
+Paketverlust 5 %	Packet loss 5%
+Manuell: Latenz	Manual: latency
+Datei	File
+Dateiserver – täglich	File server – daily
+Heute 02:00	Today 02:00
+Heute 01:30	Today 01:30
+SQL-Cluster Logs	SQL cluster logs
+Agent	Agent
+Gestern 23:00	Yesterday 23:00
+Mailserver	Mail server
+Entwicklung VM-Images	Development VM images
+Gestern 22:15	Yesterday 22:15
+Image	Image
+Heute 03:10	Today 03:10
+Webserver Konfiguration	Web server configuration
+Buchhaltung Archiv	Accounting archive
+Nie	Never
+Laptop-Flotte Dokumente	Laptop fleet documents
+Läuft …	Running…
+Kopie	Copy
+01.10. 04:00	10/01 04:00
+Monatsabschluss	Month-end close
+Domänencontroller	Domain controller
+Heute 02:30	Today 02:30
+Erfolgreich	Successful
+Warnung	Warning
+Fehlgeschlagen	Failed
+Läuft	Running
+Nie gelaufen	Never run
+Alle Dateien wurden gesichert und geprüft.	All files were backed up and verified.
+Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut.	Two log files were locked during the backup and skipped; the next run will try them again.
+Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut.	The repository was not reachable. Check the connection and start the job again.
+Die Sicherung läuft gerade.	The backup is running right now.
+Der Job ist noch nie gelaufen.	The job has never run.
+Navigation umschalten	Toggle navigation
+Übersicht	Overview
+Sicherungsjobs	Backup jobs
+Wiederherstellung	Restore
+Server & Agenten	Servers & agents
+Repositories	Repositories
+Zugangsdaten	Credentials
+Replikation	Replication
+bald	soon
+Monitoring	Monitoring
+Simulation	Simulation
+Metriken	Metrics
+Einstellungen	Settings
+Start	Start
+Schutz	Protection
+Infrastruktur	Infrastructure
+Betrieb	Operations
+Labor	Lab
+Geschützte Objekte	Protected objects
++6 diese Woche	+6 this week
+Erfolgreich (24 h)	Successful (24 h)
+von 40 Sitzungen	of 40 sessions
+1 neu seit gestern	1 new since yesterday
+Speicherbelegung	Storage usage
+71 %	71%
+14,2 von 20 TB	14.2 of 20 TB
+Sitzungen der letzten 14 Tage	Sessions of the last 14 days
+29.9	9/29
+30.9	9/30
+1.10	10/1
+2.10	10/2
+3.10	10/3
+4.10	10/4
+5.10	10/5
+6.10	10/6
+7.10	10/7
+8.10	10/8
+9.10	10/9
+10.10	10/10
+11.10	10/11
+12.10	10/12
+Fehler	Errors
+Repository-Belegung	Repository usage
+Dateien	Files
+Images	Images
+Agenten	Agents
+Frei	Free
+belegt	used
+Typ	Type
+Status	Status
+Letzter Lauf	Last run
+Größe	Size
+Job öffnen	Open job
+1,2 TB	1.2 TB
+D:\Daten	D:\Data
+Buchhaltung	Accounting
+84 GB	84 GB
+Projekte	Projects
+640 GB	640 GB
+Angebot_2026.docx	Quote_2026.docx
+2,1 MB	2.1 MB
+312 GB	312 GB
+Plan.xlsx	Plan.xlsx
+640 KB	640 KB
+Temp	Temp
+12 GB	12 GB
+E:\Medien	E:\Media
+3,4 TB	3.4 TB
+D:\Daten\Projekte	D:\Data\Projects
+Steuerelemente	Controls
+Abbrechen	Cancel
+Job starten	Start job
+Deaktiviert	Disabled
+Aktualisieren	Refresh
+Export	Export
+Verschlüsseln	Encrypt
+Aktiviert	Enabled
+Inkrementell	Incremental
+Vollständig	Full
+Pfad	Path
+Jobs, Server, Restore-Points suchen	Search jobs, servers, restore points
+Verbindung wird hergestellt …	Connecting…
+Details	Details
+Hinweis	Note
+Neuer Sicherungsjob	New backup job
+Zurück	Back
+Fertigstellen	Finish
+Weiter	Next
+Repository fast voll	Repository almost full
+Archiv: 93 % belegt	Archive: 93% full
+Ereignisse eines Netzwerk-Laufs auf der Zeitleiste, ein Paket als Hex-Ansicht	Events of a network run on the timeline, a packet as a hex view
+Zeitleiste	Timeline
+TCP, ICMP und ARP über 12 s, rot: verworfen	TCP, ICMP and ARP over 12 s, red: dropped
+Ansicht {} – {} s	View {} – {} s
+Bereich {} – {} s	Range {} – {} s
+Bereich –	Range –
+Live folgen	Follow live
+Ganze Spanne	Whole span
+ICMP-Echo-Anfrage 192.168.1.10 → 192.168.1.1, 98 Bytes	ICMP echo request 192.168.1.10 → 192.168.1.1, 98 bytes
+Auswahl: {} (1 Byte)	Selection: {} (1 byte)
+Auswahl: {}–{} ({} Bytes)	Selection: {}–{} ({} bytes)
+Auswahl: –	Selection: –
+Feld: {}	Field: {}
+Zeiger: {}	Pointer: {}
+Zeiger: –	Pointer: –
+Kopierte Bytes hier einfügen	Paste copied bytes here
+Ein simulierter Dienst, alle 0,5 s gemessen; alle 2 min werden Fehler injiziert	A simulated service, measured every 0.5 s; a fault is injected every 2 min
+Anfragen	Requests
+davon fehlerhaft {}	of which failed {}
+Latenz p95	Latency p95
+Fehlerquote	Error rate
+Ziel: unter 2 %	Target: under 2%
+Datenrate	Data rate
+gesendet	sent
+Fehler injizieren	Inject fault
+Zeiger: {} bei {}	Pointer: {} at {}
+Budget 2 %	Budget 2%
+Gesendet	Sent
+Signal	Signal
+Tiefe	Depth
+Latenz	Latency
+p50, p95 und p99 je halbe Sekunde	p50, p95 and p99 per half second
+Anteil fehlerhafter Antworten	Share of failed responses
+Durchsatz	Throughput
+Anfragen und Fehler pro Sekunde	Requests and errors per second
+gesendete Bytes pro Sekunde	Bytes sent per second
+Rohsignal	Raw signal
+1 kHz, je Pixelspalte Minimum und Maximum	1 kHz, minimum and maximum per pixel column
+jeder 200. Messpunkt, 5 Hz	Every 200th sample, 5 Hz
+Antwortzeit nach Last	Response time by load
+x: gleichzeitige Clients	x: concurrent clients
+Warteschlange	Queue
+noch nicht gemessen	not measured yet
+9 Jobs · 2 benötigen Aufmerksamkeit · nächster Lauf heute 22:00	9 jobs · 2 need attention · next run today 22:00
+Toast zeigen	Show toast
+Job gestartet	Job started
+„Dateiserver – täglich“ läuft jetzt (Vorgang 7f3a).	“File server – daily” is running now (operation 7f3a).
+Neuer Job	New job
+Jetzt starten	Run now
+Stoppen	Stop
+Bearbeiten	Edit
+Löschen	Delete
+Exportieren	Export
+Befehl	Command
+Befehl {} ausgeführt	Command {} executed

@@ -24,9 +24,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, list, Catalog};
 
 const DESC: AppDesc = AppDesc {
-    title: "Daten & Shell",
+    title: "Daten & Shell", // i18n
     flags: AF_RESIZABLE,
     w: 1440,
     h: 960,
@@ -35,8 +36,12 @@ const DESC: AppDesc = AppDesc {
     ..AppDesc::NONE
 };
 
-// a catalogue without rows: the languages of the library's texts (i18n::library_languages)
-const LANGUAGES: &str = "de\ten\tfr\tes\tit\tnl\tpl\tar\the\n";
+// tables shown as lists (list(&TABLE)); the repositories also name the donut's meters
+const REPOS: [&str; 3] = ["Primär (NAS)", "Offsite", "Archiv"];
+const SCHEDULES: [&str; 5] = ["Manuell", "Stündlich", "Täglich", "Wöchentlich", "Monatlich"];
+const STEPS: [&str; 6] = ["Name", "Quelle", "Ziel", "Aufbewahrung", "Zeitplan", "Zusammenfassung"];
+const TREE_TABS: [&str; 3] = ["Quelle", "Restore-Points", "Protokoll"];
+const POINT_COUNTS: [&str; 2] = ["500 Punkte", "100 000 Punkte"];
 
 const ID_NAV: u32 = 100;
 const ID_NAV_TOGGLE: u32 = 101;
@@ -114,6 +119,7 @@ const CMD_MET_PUMP: u32 = 9203;
 const MET_SPANS: [f64; 3] = [30.0, 60.0, 120.0];
 // the faults of the 120 s cycle: start, end (s in the cycle; equal: a line), label,
 // critical (else a warning)
+// i18n
 const FAULTS: [(f64, f64, &str, bool); 3] = [
     (70.0, 82.0, "Link getrennt", true),
     (95.0, 95.0, "Latenz +40 ms", false),
@@ -357,7 +363,7 @@ impl Lab {
     fn inject(&mut self) {
         let t = self.now();
         self.manual = Some((t, t + 10.0));
-        self.marks.push((t, t + 10.0, "Manuell: Latenz", false));
+        self.marks.push((t, t + 10.0, "Manuell: Latenz", false)); // i18n
     }
 }
 
@@ -387,6 +393,7 @@ struct Job {
     size: u64,
 }
 
+// i18n
 const JOBS: [Job; 9] = [
     Job { name: "Dateiserver – täglich", kind: "Datei", status: BADGE_OK, last: "Heute 02:00", size: 182_000_000_000 },
     Job { name: "SQL-Cluster Logs", kind: "Datei", status: BADGE_WARN, last: "Heute 01:30", size: 21_400_000_000 },
@@ -401,22 +408,22 @@ const JOBS: [Job; 9] = [
 
 fn status_name(s: u32) -> &'static str {
     match s {
-        BADGE_OK => "Erfolgreich",
-        BADGE_WARN => "Warnung",
-        BADGE_CRIT => "Fehlgeschlagen",
-        BADGE_INFO => "Läuft",
-        _ => "Nie gelaufen",
+        BADGE_OK => t("Erfolgreich"),
+        BADGE_WARN => t("Warnung"),
+        BADGE_CRIT => t("Fehlgeschlagen"),
+        BADGE_INFO => t("Läuft"),
+        _ => t("Nie gelaufen"),
     }
 }
 
 // what the status means for the job (the details card)
 fn status_note(s: u32) -> &'static str {
     match s {
-        BADGE_OK => "Alle Dateien wurden gesichert und geprüft.",
-        BADGE_WARN => "Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut.",
-        BADGE_CRIT => "Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut.",
-        BADGE_INFO => "Die Sicherung läuft gerade.",
-        _ => "Der Job ist noch nie gelaufen.",
+        BADGE_OK => t("Alle Dateien wurden gesichert und geprüft."),
+        BADGE_WARN => t("Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut."),
+        BADGE_CRIT => t("Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut."),
+        BADGE_INFO => t("Die Sicherung läuft gerade."),
+        _ => t("Der Job ist noch nie gelaufen."),
     }
 }
 
@@ -486,7 +493,7 @@ impl Default for Gal {
             check: 1,
             sw: 1,
             radio: 1,
-            text: String::from("D:\\Daten\\Projekte"),
+            text: String::from(t("D:\\Daten\\Projekte")),
             search: String::new(),
             combo: 1,
             slider: 60,
@@ -506,16 +513,16 @@ impl Default for Gal {
 impl Gal {
     fn sort(&mut self) {
         let (col, desc) = self.grid.sort.unwrap_or((0, false));
-        // texts in the user's collation, numbers in them by value
+        // texts in the user's collation (as shown), numbers in them by value
         let coll = i18n::collator().numeric(true);
         self.order.sort_by(|&a, &b| {
             let (x, y) = (&JOBS[a], &JOBS[b]);
             let o = match col {
-                1 => coll.compare(x.kind, y.kind),
+                1 => coll.compare(t(x.kind), t(y.kind)),
                 2 => x.status.cmp(&y.status),
-                3 => coll.compare(x.last, y.last),
+                3 => coll.compare(t(x.last), t(y.last)),
                 4 => x.size.cmp(&y.size),
-                _ => coll.compare(x.name, y.name),
+                _ => coll.compare(t(x.name), t(y.name)),
             };
             if desc { o.reverse() } else { o }
         });
@@ -525,11 +532,12 @@ impl Gal {
         ui.next_size(if self.nav.compact { 56 } else { 248 }, -1);
         ui.nav_begin(ID_NAV, &mut self.nav);
         ui.box_begin(0, BOX_H | BOX_XCENTER | pad(4), 8);
-        ui.nav_toggle(ID_NAV_TOGGLE, "Navigation umschalten", &mut self.nav);
+        ui.nav_toggle(ID_NAV_TOGGLE, t("Navigation umschalten"), &mut self.nav);
         if !self.nav.compact {
             ui.text(TS_BODY_STRONG, "BackupCraft");
         }
         ui.box_end();
+        // i18n
         let items: [(u32, &str, u32, Option<&str>); 11] = [
             (0, "Übersicht", IC_HOME, None),
             (1, "Sicherungsjobs", IC_HISTORY, Some("2")),
@@ -545,17 +553,17 @@ impl Gal {
         ];
         for (k, (i, label, icon, badge)) in items.iter().enumerate() {
             match k {
-                0 => ui.nav_section("Start"),
-                1 => ui.nav_section("Schutz"),
-                3 => ui.nav_section("Infrastruktur"),
-                6 => ui.nav_section("Betrieb"),
-                8 => ui.nav_section("Labor"),
+                0 => ui.nav_section(t("Start")),
+                1 => ui.nav_section(t("Schutz")),
+                3 => ui.nav_section(t("Infrastruktur")),
+                6 => ui.nav_section(t("Betrieb")),
+                8 => ui.nav_section(t("Labor")),
                 _ => {}
             }
             if *i == 8 {
                 ui.nav_footer();
             }
-            if ui.nav_item(ID_NAV_ITEM + i, *icon, label, self.page == *i, *badge) & EV_ACT != 0 {
+            if ui.nav_item(ID_NAV_ITEM + i, *icon, t(label), self.page == *i, badge.map(t)) & EV_ACT != 0 {
                 self.page = *i;
             }
         }
@@ -564,6 +572,7 @@ impl Gal {
 
     fn kpis(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_H, 12);
+        // i18n
         let cards: [(&str, &str, &str, u32, [f32; 10]); 4] = [
             ("Geschützte Objekte", "248", "+6 diese Woche", 0, [230.0, 232.0, 233.0, 236.0, 238.0, 238.0, 241.0, 243.0, 246.0, 248.0]),
             ("Erfolgreich (24 h)", "37", "von 40 Sitzungen", 0xFF2B9348, [30.0, 34.0, 31.0, 36.0, 35.0, 38.0, 36.0, 39.0, 37.0, 37.0]),
@@ -573,14 +582,14 @@ impl Gal {
         for (i, (title, value, sub, color, spark)) in cards.iter().enumerate() {
             ui.next_size(-1, 0);
             ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 4);
-            ui.text(TS_CAPTION | TX_SECONDARY, title);
+            ui.text(TS_CAPTION | TX_SECONDARY, t(title));
             ui.box_begin(0, BOX_H | BOX_XEND, 8);
-            ui.text(TS_TITLE, value);
+            ui.text(TS_TITLE, t(value));
             ui.spacer(-1);
             ui.next_size(96, 34);
             ui.sparkline(ID_SPARK + i as u32, spark, *color);
             ui.box_end();
-            ui.text(TS_CAPTION | TX_TERTIARY, sub);
+            ui.text(TS_CAPTION | TX_TERTIARY, t(sub));
             ui.box_end();
         }
         ui.box_end();
@@ -591,37 +600,39 @@ impl Gal {
         ui.next_size(-2, 0);
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.text(TS_BODY_STRONG, "Sitzungen der letzten 14 Tage");
+        ui.text(TS_BODY_STRONG, t("Sitzungen der letzten 14 Tage"));
         ui.spacer(-1);
-        ui.legend(&[("Erfolgreich", 0xFF2B9348), ("Warnung", 0xFFE07B00), ("Fehler", 0xFFD9383C)]);
+        ui.legend(&[(t("Erfolgreich"), 0xFF2B9348), (t("Warnung"), 0xFFE07B00), (t("Fehler"), 0xFFD9383C)]);
         ui.box_end();
-        let labels = ["29.9", "30.9", "1.10", "2.10", "3.10", "4.10", "5.10", "6.10", "7.10", "8.10", "9.10", "10.10", "11.10", "12.10"];
+        // i18n
+        let days = ["29.9", "30.9", "1.10", "2.10", "3.10", "4.10", "5.10", "6.10", "7.10", "8.10", "9.10", "10.10", "11.10", "12.10"];
+        let labels = days.map(t);
         let ok = [31.0, 33.0, 30.0, 35.0, 34.0, 36.0, 28.0, 30.0, 37.0, 35.0, 38.0, 36.0, 37.0, 33.0];
         let warn = [2.0, 1.0, 3.0, 1.0, 2.0, 0.0, 1.0, 2.0, 1.0, 3.0, 1.0, 2.0, 1.0, 1.0];
         let fail = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 2.0, 1.0];
         ui.next_size(-1, 190);
         ui.bar_chart(ID_BARS, &labels, &[
-            BarSeries { label: "Erfolgreich", values: &ok, color: 0xFF2B9348 },
-            BarSeries { label: "Warnung", values: &warn, color: 0xFFE07B00 },
-            BarSeries { label: "Fehler", values: &fail, color: 0xFFD9383C },
+            BarSeries { label: t("Erfolgreich"), values: &ok, color: 0xFF2B9348 },
+            BarSeries { label: t("Warnung"), values: &warn, color: 0xFFE07B00 },
+            BarSeries { label: t("Fehler"), values: &fail, color: 0xFFD9383C },
         ], true);
         ui.box_end();
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
-        ui.text(TS_BODY_STRONG | TX_ELLIPSIS, "Repository-Belegung");
+        ui.text(TS_BODY_STRONG | TX_ELLIPSIS, t("Repository-Belegung"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         ui.next_size(150, 150);
         ui.donut(ID_DONUT, &[
-            DonutSlice { label: "Dateien", value: 8.4, color: 0 },
-            DonutSlice { label: "Images", value: 4.1, color: 0 },
-            DonutSlice { label: "Agenten", value: 1.7, color: 0 },
-            DonutSlice { label: "Frei", value: 5.8, color: 0x50808890 },
-        ], "71 %", "belegt");
+            DonutSlice { label: t("Dateien"), value: 8.4, color: 0 },
+            DonutSlice { label: t("Images"), value: 4.1, color: 0 },
+            DonutSlice { label: t("Agenten"), value: 1.7, color: 0 },
+            DonutSlice { label: t("Frei"), value: 5.8, color: 0x50808890 },
+        ], t("71 %"), t("belegt"));
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V, 6);
         // the labels share the room the donut leaves (large text: cut with "…")
-        for (name, v, c) in [("Primär (NAS)", 71, BADGE_WARN), ("Offsite", 38, BADGE_OK), ("Archiv", 93, BADGE_CRIT)] {
-            ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, name);
+        for (name, v, c) in [(REPOS[0], 71, BADGE_WARN), (REPOS[1], 38, BADGE_OK), (REPOS[2], 93, BADGE_CRIT)] {
+            ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, t(name));
             ui.next_size(-1, 8);
             ui.meter(ID_METER + v as u32, v, 100, c);
         }
@@ -633,22 +644,22 @@ impl Gal {
 
     fn grid(&mut self, ui: &mut Ui) {
         let cols = [
-            GridCol::new("Name", 220).flags(GC_FILL),
-            GridCol::new("Typ", 90),
-            GridCol::new("Status", 140),
-            GridCol::new("Letzter Lauf", 120),
-            GridCol::new("Größe", 90).flags(GC_RIGHT),
+            GridCol::new(t("Name"), 220).flags(GC_FILL),
+            GridCol::new(t("Typ"), 90),
+            GridCol::new(t("Status"), 140),
+            GridCol::new(t("Letzter Lauf"), 120),
+            GridCol::new(t("Größe"), 90).flags(GC_RIGHT),
         ];
         let keys: Vec<u64> = self.order.iter().map(|&i| i as u64).collect();
         let (first, end) = ui.grid_begin(ID_GRID, &mut self.grid, &cols, &keys);
         for i in first..end {
             let j = &JOBS[self.order[i as usize]];
             ui.grid_row(&mut self.grid, i);
-            ui.grid_text(&self.grid, 0, j.name);
-            ui.grid_text_ts(&self.grid, 1, TS_BODY | TX_SECONDARY, j.kind);
+            ui.grid_text(&self.grid, 0, t(j.name));
+            ui.grid_text_ts(&self.grid, 1, TS_BODY | TX_SECONDARY, t(j.kind));
             ui.grid_cell(&self.grid, 2);
             ui.badge(j.status, status_name(j.status));
-            ui.grid_text_ts(&self.grid, 3, TS_BODY | TX_SECONDARY, j.last);
+            ui.grid_text_ts(&self.grid, 3, TS_BODY | TX_SECONDARY, t(j.last));
             ui.grid_text(&self.grid, 4, &size_text(j.size));
         }
         let ev = ui.grid_end(&mut self.grid);
@@ -656,12 +667,13 @@ impl Gal {
             self.sort();
         }
         if ev.ev & EV_DOUBLE != 0 && ev.row >= 0 {
-            let name = JOBS[self.order[ev.row as usize]].name;
-            ui.toast(IB_INFO, "Job öffnen", name, 0);
+            let name = t(JOBS[self.order[ev.row as usize]].name);
+            ui.toast(IB_INFO, t("Job öffnen"), name, 0);
         }
     }
 
     fn tree(&mut self, ui: &mut Ui) {
+        // i18n
         let all: [(u64, u16, bool, u32, &str, Option<&str>, usize); 8] = [
             (1, 0, true, IC_FOLDER, "D:\\Daten", Some("1,2 TB"), 0),
             (2, 1, true, IC_FOLDER, "Buchhaltung", Some("84 GB"), 1),
@@ -681,7 +693,7 @@ impl Gal {
                 }
                 hidden_below = None;
             }
-            rows.push(TreeRow { key: *key, depth: *depth, has_children: *kids, check: Some(self.checks[*ci]), icon: *icon, label, detail: *detail });
+            rows.push(TreeRow { key: *key, depth: *depth, has_children: *kids, check: Some(self.checks[*ci]), icon: *icon, label: t(label), detail: detail.map(t) });
             if *kids && !self.tree.expanded.contains(key) {
                 hidden_below = Some(*depth);
             }
@@ -696,32 +708,32 @@ impl Gal {
 
     fn controls(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 12);
-        ui.text(TS_BODY_STRONG, "Steuerelemente");
+        ui.text(TS_BODY_STRONG, t("Steuerelemente"));
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 8);
-        ui.button(ID_BTN, "Abbrechen");
-        ui.accent_button(ID_ACCENT, "Job starten");
+        ui.button(ID_BTN, t("Abbrechen"));
+        ui.accent_button(ID_ACCENT, t("Job starten"));
         ui.next_flags(ST_DISABLED);
-        ui.button(ID_DIS, "Deaktiviert");
+        ui.button(ID_DIS, t("Deaktiviert"));
         ui.next_icon(IC_REFRESH);
         ui.next_flags(ST_SUBTLE);
-        ui.button(ID_BTN + 3, "Aktualisieren");
+        ui.button(ID_BTN + 3, t("Aktualisieren"));
         ui.next_icon(IC_DOWNLOAD);
-        ui.button(ID_BTN + 4, "Export");
+        ui.button(ID_BTN + 4, t("Export"));
         ui.box_end();
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 16);
-        ui.checkbox(ID_CHECK, "Verschlüsseln", &mut self.check);
-        ui.switch(ID_SWITCH, "Aktiviert", &mut self.sw);
-        ui.radio(ID_RADIO, "Inkrementell", &mut self.radio, 1);
-        ui.radio(ID_RADIO + 1, "Vollständig", &mut self.radio, 2);
+        ui.checkbox(ID_CHECK, t("Verschlüsseln"), &mut self.check);
+        ui.switch(ID_SWITCH, t("Aktiviert"), &mut self.sw);
+        ui.radio(ID_RADIO, t("Inkrementell"), &mut self.radio, 1);
+        ui.radio(ID_RADIO + 1, t("Vollständig"), &mut self.radio, 2);
         ui.box_end();
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_size(-1, 0);
-        ui.textbox(ID_TEXT, Some("Pfad"), &mut self.text, 256);
+        ui.textbox(ID_TEXT, Some(t("Pfad")), &mut self.text, 256);
         ui.next_size(160, 0);
-        ui.combobox(ID_COMBO, &mut self.combo, &["Primär (NAS)", "Offsite", "Archiv"]);
+        ui.combobox(ID_COMBO, &mut self.combo, &list(&REPOS));
         ui.box_end();
         ui.next_size(-1, 0);
-        ui.textbox_icon(ID_SEARCH, IC_SEARCH, Some("Jobs, Server, Restore-Points suchen"), &mut self.search, 128);
+        ui.textbox_icon(ID_SEARCH, IC_SEARCH, Some(t("Jobs, Server, Restore-Points suchen")), &mut self.search, 128);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
         ui.next_size(-1, 0);
         ui.slider(ID_SLIDER, &mut self.slider, &Range::new(0, 100, 1, 0));
@@ -733,11 +745,11 @@ impl Gal {
         // new row (the label wraps at large text)
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 12);
         ui.spinner(ID_SLIDER + 2, 20);
-        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, "Verbindung wird hergestellt …");
+        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Verbindung wird hergestellt …"));
         ui.next_size(160, 0);
         ui.progress_indeterminate(ID_SLIDER + 3);
         ui.box_end();
-        ui.segmented(ID_SEG, &mut self.seg, &["Manuell", "Stündlich", "Täglich", "Wöchentlich", "Monatlich"]);
+        ui.segmented(ID_SEG, &mut self.seg, &list(&SCHEDULES));
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 16);
         ui.time_box(ID_TIME, &mut self.hour, &mut self.minute);
         ui.weekday_toggles(ID_DAYS, &mut self.days);
@@ -747,11 +759,11 @@ impl Gal {
         if ui.date_picker(ID_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
             self.date = (y, m, d);
         }
-        ui.badge(BADGE_OK, "Erfolgreich");
-        ui.badge(BADGE_WARN, "Warnung");
-        ui.badge(BADGE_CRIT, "Fehlgeschlagen");
-        ui.badge(BADGE_INFO, "Läuft");
-        ui.badge(BADGE_NEUTRAL, "Nie");
+        ui.badge(BADGE_OK, t("Erfolgreich"));
+        ui.badge(BADGE_WARN, t("Warnung"));
+        ui.badge(BADGE_CRIT, t("Fehlgeschlagen"));
+        ui.badge(BADGE_INFO, t("Läuft"));
+        ui.badge(BADGE_NEUTRAL, t("Nie"));
         ui.box_end();
         ui.box_end();
     }
@@ -761,10 +773,10 @@ impl Gal {
         let Some(&k) = self.grid.sel.iter().next() else { return };
         let j = &JOBS[k as usize];
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 12);
-        ui.text(TS_BODY_STRONG, "Details");
+        ui.text(TS_BODY_STRONG, t("Details"));
         ui.gridbox_begin(ID_DETAILS, &[92, -1], 0, 6);
         let size = size_text(j.size);
-        for (key, value) in [("Name", j.name), ("Typ", j.kind), ("Status", status_name(j.status)), ("Hinweis", status_note(j.status)), ("Größe", size.as_str())] {
+        for (key, value) in [(t("Name"), t(j.name)), (t("Typ"), t(j.kind)), (t("Status"), status_name(j.status)), (t("Hinweis"), status_note(j.status)), (t("Größe"), size.as_str())] {
             ui.text(TS_BODY | TX_SECONDARY, key);
             ui.text(TS_BODY | TX_WRAP, value);
         }
@@ -774,27 +786,27 @@ impl Gal {
 
     fn side(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
-        ui.text(TS_BODY_STRONG, "Neuer Sicherungsjob");
-        let steps = ["Name", "Quelle", "Ziel", "Aufbewahrung", "Zeitplan", "Zusammenfassung"];
+        ui.text(TS_BODY_STRONG, t("Neuer Sicherungsjob"));
+        let steps = list(&STEPS);
         if let Some(s) = ui.wizard_steps(ID_WIZ, &steps, self.step, &[]) {
             self.step = s;
         }
         ui.box_begin(0, BOX_H, 8);
         ui.next_flags(if self.step == 0 { ST_DISABLED } else { 0 });
-        if ui.button(ID_WIZ_BACK, "Zurück") & EV_ACT != 0 && self.step > 0 {
+        if ui.button(ID_WIZ_BACK, t("Zurück")) & EV_ACT != 0 && self.step > 0 {
             self.step -= 1;
         }
         ui.spacer(-1);
-        if ui.accent_button(ID_WIZ_NEXT, if self.step + 1 == steps.len() { "Fertigstellen" } else { "Weiter" }) & EV_ACT != 0
+        if ui.accent_button(ID_WIZ_NEXT, if self.step + 1 == steps.len() { t("Fertigstellen") } else { t("Weiter") }) & EV_ACT != 0
             && self.step + 1 < steps.len()
         {
             self.step += 1;
         }
         ui.box_end();
         ui.box_end();
-        ui.infobar(ID_WIZ_INFO, IB_WARNING, "Repository fast voll", "Archiv: 93 % belegt");
+        ui.infobar(ID_WIZ_INFO, IB_WARNING, t("Repository fast voll"), t("Archiv: 93 % belegt"));
         ui.box_begin(0, BOX_V | BOX_CARD | pad(8), 4);
-        ui.tabs(ID_TABS, &mut self.tab, &["Quelle", "Restore-Points", "Protokoll"]);
+        ui.tabs(ID_TABS, &mut self.tab, &list(&TREE_TABS));
         ui.next_size(-1, 280);
         self.tree(ui);
         ui.box_end();
@@ -802,30 +814,30 @@ impl Gal {
 
     // the simulation page: the timeline ("Zeitleiste") and the hex view ("Hex")
     fn simulation(&mut self, ui: &mut Ui) {
-        ui.breadcrumb(ID_CRUMB, &["BackupCraft", "Labor", "Simulation"]);
-        ui.page_header("Simulation", "Ereignisse eines Netzwerk-Laufs auf der Zeitleiste, ein Paket als Hex-Ansicht");
+        ui.breadcrumb(ID_CRUMB, &["BackupCraft", t("Labor"), t("Simulation")]);
+        ui.page_header(t("Simulation"), t("Ereignisse eines Netzwerk-Laufs auf der Zeitleiste, ein Paket als Hex-Ansicht"));
         ui.next_size(-1, -1);
         ui.scroll_begin(ID_SIM, SC_V | pad(2));
         ui.box_begin(0, BOX_V, 14);
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 10);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
-        ui.text(TS_BODY_STRONG, "Zeitleiste");
-        ui.text(TS_CAPTION | TX_SECONDARY, "TCP, ICMP und ARP über 12 s, rot: verworfen");
+        ui.text(TS_BODY_STRONG, t("Zeitleiste"));
+        ui.text(TS_CAPTION | TX_SECONDARY, t("TCP, ICMP und ARP über 12 s, rot: verworfen"));
         ui.spacer(-1);
-        let t = format!("t = {} s", ui.fmt_f64(self.tl.t, 3));
-        ui.text(TS_BODY, &t);
-        let v = format!("Ansicht {} – {} s", ui.fmt_f64(self.tl.view.0, 3), ui.fmt_f64(self.tl.view.1, 3));
+        let tt = format!("t = {} s", ui.fmt_f64(self.tl.t, 3));
+        ui.text(TS_BODY, &tt);
+        let v = tf("Ansicht {} – {} s", &[&ui.fmt_f64(self.tl.view.0, 3), &ui.fmt_f64(self.tl.view.1, 3)]);
         ui.text(TS_BODY | TX_SECONDARY, &v);
         let r = match self.tl.sel {
-            Some((a, b)) => format!("Bereich {} – {} s", ui.fmt_f64(a, 3), ui.fmt_f64(b, 3)),
-            None => String::from("Bereich –"),
+            Some((a, b)) => tf("Bereich {} – {} s", &[&ui.fmt_f64(a, 3), &ui.fmt_f64(b, 3)]),
+            None => String::from(t("Bereich –")),
         };
         ui.text(TS_BODY | TX_SECONDARY, &r);
         let mut follow = self.tl.follow as i32;
-        if ui.checkbox(ID_TL_FOLLOW, "Live folgen", &mut follow) & EV_ACT != 0 {
+        if ui.checkbox(ID_TL_FOLLOW, t("Live folgen"), &mut follow) & EV_ACT != 0 {
             self.tl.follow = follow != 0;
         }
-        if ui.button(ID_TL_FIT, "Ganze Spanne") & EV_ACT != 0 {
+        if ui.button(ID_TL_FIT, t("Ganze Spanne")) & EV_ACT != 0 {
             self.tl.fit();
         }
         ui.box_end();
@@ -842,7 +854,7 @@ impl Gal {
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 10);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         ui.text(TS_BODY_STRONG, "Hex");
-        ui.text(TS_CAPTION | TX_SECONDARY, "ICMP-Echo-Anfrage 192.168.1.10 → 192.168.1.1, 98 Bytes");
+        ui.text(TS_CAPTION | TX_SECONDARY, t("ICMP-Echo-Anfrage 192.168.1.10 → 192.168.1.1, 98 Bytes"));
         ui.spacer(-1);
         ui.legend(&[(layer_name(1), MARKS[0].color), (layer_name(2), MARKS[1].color), (layer_name(3), MARKS[2].color)]);
         ui.box_end();
@@ -853,17 +865,17 @@ impl Gal {
         }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         let sel = match self.hex.sel {
-            Some((s, 1)) => format!("Auswahl: 0x{:04X} (1 Byte)", s),
-            Some((s, l)) => format!("Auswahl: 0x{:04X}–0x{:04X} ({} Bytes)", s, s + l - 1, l),
-            None => String::from("Auswahl: –"),
+            Some((s, 1)) => tf("Auswahl: {} (1 Byte)", &[&format!("0x{:04X}", s)]),
+            Some((s, l)) => tf("Auswahl: {}–{} ({} Bytes)", &[&format!("0x{:04X}", s), &format!("0x{:04X}", s + l - 1), &format!("{}", l)]),
+            None => String::from(t("Auswahl: –")),
         };
         ui.text(TS_BODY, &sel);
-        ui.text(TS_BODY | TX_SECONDARY, &format!("Feld: {}", self.layer.map_or("–", layer_name)));
-        let at = ev.hover.map_or(String::from("Zeiger: –"), |b| format!("Zeiger: 0x{:04X}", b));
+        ui.text(TS_BODY | TX_SECONDARY, &tf("Feld: {}", &[self.layer.map_or("–", layer_name)]));
+        let at = ev.hover.map_or(String::from(t("Zeiger: –")), |b| tf("Zeiger: {}", &[&format!("0x{:04X}", b)]));
         ui.text(TS_BODY | TX_SECONDARY, &at);
         ui.spacer(-1);
         ui.next_size(300, 0);
-        ui.textbox(ID_HEX_PASTE, Some("Kopierte Bytes hier einfügen"), &mut self.paste, 512);
+        ui.textbox(ID_HEX_PASTE, Some(t("Kopierte Bytes hier einfügen")), &mut self.paste, 512);
         ui.box_end();
         ui.box_end();
         ui.box_end();
@@ -881,8 +893,8 @@ impl Gal {
         if self.lab.pump {
             self.lab.sample();
         }
-        ui.breadcrumb(ID_CRUMB, &["BackupCraft", "Labor", "Metriken"]);
-        ui.page_header("Metriken", "Ein simulierter Dienst, alle 0,5 s gemessen; alle 2 min werden Fehler injiziert");
+        ui.breadcrumb(ID_CRUMB, &["BackupCraft", t("Labor"), t("Metriken")]);
+        ui.page_header(t("Metriken"), t("Ein simulierter Dienst, alle 0,5 s gemessen; alle 2 min werden Fehler injiziert"));
         ui.next_size(-1, -1);
         ui.scroll_begin(ID_MET, SC_V | pad(2));
         ui.box_begin(0, BOX_V, 14);
@@ -890,10 +902,10 @@ impl Gal {
         let last = |s: &SeriesBuf| s.last().map_or(f64::NAN, |p| p.1);
         let lab = &self.lab;
         let kpis = [
-            ("Anfragen", LcUnit::Num("req/s").text(last(&lab.rps), sep), format!("davon fehlerhaft {}", LcUnit::Num("req/s").text(last(&lab.errs), sep))),
-            ("Latenz p95", LcUnit::Secs.text(last(&lab.p95), sep), format!("p99 {}", LcUnit::Secs.text(last(&lab.p99), sep))),
-            ("Fehlerquote", LcUnit::Num("%").text(last(&lab.err_pct), sep), String::from("Ziel: unter 2 %")),
-            ("Datenrate", LcUnit::Si("B/s").text(last(&lab.net), sep), String::from("gesendet")),
+            (t("Anfragen"), LcUnit::Num("req/s").text(last(&lab.rps), sep), tf("davon fehlerhaft {}", &[&LcUnit::Num("req/s").text(last(&lab.errs), sep)])),
+            (t("Latenz p95"), LcUnit::Secs.text(last(&lab.p95), sep), format!("p99 {}", LcUnit::Secs.text(last(&lab.p99), sep))),
+            (t("Fehlerquote"), LcUnit::Num("%").text(last(&lab.err_pct), sep), String::from(t("Ziel: unter 2 %"))),
+            (t("Datenrate"), LcUnit::Si("B/s").text(last(&lab.net), sep), String::from(t("gesendet"))),
         ];
         ui.box_begin(0, BOX_H, 12);
         for (title, value, sub) in kpis.iter() {
@@ -909,7 +921,7 @@ impl Gal {
         let span = MET_SPANS[self.lab.span.clamp(0, 2) as usize];
         ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
         let mut follow = self.lab.follow;
-        if ui.checkbox(ID_MET_FOLLOW, "Live folgen", &mut follow) & EV_ACT != 0 {
+        if ui.checkbox(ID_MET_FOLLOW, t("Live folgen"), &mut follow) & EV_ACT != 0 {
             self.lab.follow = follow;
             let probe = [LcSeries::new("", &self.lab.p50)];
             self.lab.view = LineChart::new(&probe).follow(span).view();
@@ -920,14 +932,14 @@ impl Gal {
             let s = MET_SPANS[sel.clamp(0, 2) as usize];
             self.lab.view = (self.lab.view.1 - s, self.lab.view.1);
         }
-        if ui.button(ID_MET_FAULT, "Fehler injizieren") & EV_ACT != 0 {
+        if ui.button(ID_MET_FAULT, t("Fehler injizieren")) & EV_ACT != 0 {
             self.lab.inject();
         }
         ui.spacer(-1);
         let names = ["p50", "p95", "p99"];
         let at = match self.lab.hover {
-            Some((i, t)) => format!("Zeiger: {} bei {}", names[i.min(2)], lc_time_text(t, 1, false, sep)),
-            None => String::from("Zeiger: –"),
+            Some((i, ts)) => tf("Zeiger: {} bei {}", &[names[i.min(2)], &lc_time_text(ts, 1, false, sep)]),
+            None => String::from(t("Zeiger: –")),
         };
         ui.text(TS_BODY | TX_SECONDARY, &at);
         ui.box_end();
@@ -938,7 +950,7 @@ impl Gal {
         let marks: Vec<LcMarker> = lab
             .marks
             .iter()
-            .map(|&(a, b, label, c)| (if b > a { LcMarker::range(a, b, label) } else { LcMarker::line(a, label) }).color(if c { crit } else { warn }))
+            .map(|&(a, b, label, c)| (if b > a { LcMarker::range(a, b, t(label)) } else { LcMarker::line(a, t(label)) }).color(if c { crit } else { warn }))
             .collect();
         let lat = [
             LcSeries::new("p50", &lab.p50).unit(LcUnit::Secs),
@@ -947,57 +959,57 @@ impl Gal {
         ];
         let slo = [LcThreshold::new(0.25, "SLO 250 ms")];
         let rps = [
-            LcSeries::new("Anfragen", &lab.rps).area().unit(LcUnit::Num("req/s")),
-            LcSeries::new("Fehler", &lab.errs).pal(4).unit(LcUnit::Num("req/s")),
+            LcSeries::new(t("Anfragen"), &lab.rps).area().unit(LcUnit::Num("req/s")),
+            LcSeries::new(t("Fehler"), &lab.errs).pal(4).unit(LcUnit::Num("req/s")),
         ];
-        let err = [LcSeries::new("Fehlerquote", &lab.err_pct).pal(4).area().unit(LcUnit::Num("%"))];
-        let budget = [LcThreshold::new(2.0, "Budget 2 %").color(warn)];
-        let net = [LcSeries::new("Gesendet", &lab.net).pal(1).area().unit(LcUnit::Si("B/s"))];
-        let raw = [LcSeries::new("Signal", if lab.points == 0 { &lab.raw_lo } else { &lab.raw }).pal(2)];
+        let err = [LcSeries::new(t("Fehlerquote"), &lab.err_pct).pal(4).area().unit(LcUnit::Num("%"))];
+        let budget = [LcThreshold::new(2.0, t("Budget 2 %")).color(warn)];
+        let net = [LcSeries::new(t("Gesendet"), &lab.net).pal(1).area().unit(LcUnit::Si("B/s"))];
+        let raw = [LcSeries::new(t("Signal"), if lab.points == 0 { &lab.raw_lo } else { &lab.raw }).pal(2)];
         let load = [
             LcSeries::new("p50", &lab.load50).unit(LcUnit::Secs),
             LcSeries::new("p99", &lab.load99).pal(2).unit(LcUnit::Secs),
         ];
-        let queue = [LcSeries::new("Tiefe", &lab.queue)];
+        let queue = [LcSeries::new(t("Tiefe"), &lab.queue)];
         ui.box_begin(0, BOX_H, 14);
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V, 14);
-        let c = LineChart::new(&lat).name("Latenz").y_range(0.0, f64::NAN).markers(&marks).thresholds(&slo);
-        let hover = chart_card(ui, "Latenz", "p50, p95 und p99 je halbe Sekunde", ID_LC_LAT, &timed(c, follow, span, view));
-        let c = LineChart::new(&err).name("Fehlerquote").y_range(0.0, f64::NAN).markers(&marks).thresholds(&budget);
-        chart_card(ui, "Fehlerquote", "Anteil fehlerhafter Antworten", ID_LC_ERR, &timed(c, follow, span, view));
+        let c = LineChart::new(&lat).name(t("Latenz")).y_range(0.0, f64::NAN).markers(&marks).thresholds(&slo);
+        let hover = chart_card(ui, t("Latenz"), t("p50, p95 und p99 je halbe Sekunde"), ID_LC_LAT, &timed(c, follow, span, view));
+        let c = LineChart::new(&err).name(t("Fehlerquote")).y_range(0.0, f64::NAN).markers(&marks).thresholds(&budget);
+        chart_card(ui, t("Fehlerquote"), t("Anteil fehlerhafter Antworten"), ID_LC_ERR, &timed(c, follow, span, view));
         ui.box_end();
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V, 14);
-        let c = LineChart::new(&rps).name("Durchsatz").y_range(0.0, f64::NAN).markers(&marks);
-        chart_card(ui, "Durchsatz", "Anfragen und Fehler pro Sekunde", ID_LC_RPS, &timed(c, follow, span, view));
+        let c = LineChart::new(&rps).name(t("Durchsatz")).y_range(0.0, f64::NAN).markers(&marks);
+        chart_card(ui, t("Durchsatz"), t("Anfragen und Fehler pro Sekunde"), ID_LC_RPS, &timed(c, follow, span, view));
         // the bytes are on a clock in nanoseconds (LX_NANOS): so are its markers and its view
         let marks_ns: Vec<LcMarker> = marks.iter().map(|m| LcMarker { t0: m.t0 * 1e9, t1: m.t1 * 1e9, ..*m }).collect();
-        let c = LineChart::new(&net).name("Datenrate").x_axis(LX_NANOS).y_range(0.0, f64::NAN).markers(&marks_ns);
+        let c = LineChart::new(&net).name(t("Datenrate")).x_axis(LX_NANOS).y_range(0.0, f64::NAN).markers(&marks_ns);
         let view_ns = (view.0 * 1e9, view.1 * 1e9);
-        chart_card(ui, "Datenrate", "gesendete Bytes pro Sekunde", ID_LC_NET, &timed(c, follow, span * 1e9, view_ns));
+        chart_card(ui, t("Datenrate"), t("gesendete Bytes pro Sekunde"), ID_LC_NET, &timed(c, follow, span * 1e9, view_ns));
         ui.box_end();
         ui.box_end();
         // the signal: the same 100 s in 500 or 100 000 points (as columns: as fast)
         ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.text(TS_BODY_STRONG, "Rohsignal");
-        let note = if lab.points == 0 { "jeder 200. Messpunkt, 5 Hz" } else { "1 kHz, je Pixelspalte Minimum und Maximum" };
+        ui.text(TS_BODY_STRONG, t("Rohsignal"));
+        let note = if lab.points == 0 { t("jeder 200. Messpunkt, 5 Hz") } else { t("1 kHz, je Pixelspalte Minimum und Maximum") };
         ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, note);
         ui.spacer(-1);
         let mut points = lab.points;
-        let changed = ui.segmented(ID_MET_POINTS, &mut points, &["500 Punkte", "100 000 Punkte"]) & EV_ACT != 0;
+        let changed = ui.segmented(ID_MET_POINTS, &mut points, &list(&POINT_COUNTS)) & EV_ACT != 0;
         ui.box_end();
         ui.next_size(-1, 220);
-        ui.line_chart(ID_LC_RAW, &LineChart::new(&raw).name("Rohsignal").follow(100.0));
+        ui.line_chart(ID_LC_RAW, &LineChart::new(&raw).name(t("Rohsignal")).follow(100.0));
         ui.box_end();
         ui.box_begin(0, BOX_H, 14);
         ui.next_size(-1, 0);
-        let c = LineChart::new(&load).name("Antwortzeit nach Last").x_axis(LX_NUM).y_range(0.0, f64::NAN);
-        chart_card(ui, "Antwortzeit nach Last", "x: gleichzeitige Clients", ID_LC_LOAD, &c);
+        let c = LineChart::new(&load).name(t("Antwortzeit nach Last")).x_axis(LX_NUM).y_range(0.0, f64::NAN);
+        chart_card(ui, t("Antwortzeit nach Last"), t("x: gleichzeitige Clients"), ID_LC_LOAD, &c);
         ui.next_size(-1, 0);
-        let c = LineChart::new(&queue).name("Warteschlange");
-        chart_card(ui, "Warteschlange", "noch nicht gemessen", ID_LC_QUEUE, &c);
+        let c = LineChart::new(&queue).name(t("Warteschlange"));
+        chart_card(ui, t("Warteschlange"), t("noch nicht gemessen"), ID_LC_QUEUE, &c);
         ui.box_end();
         self.lab.hover = hover;
         if changed {
@@ -1010,27 +1022,27 @@ impl Gal {
     // the jobs page (every other navigation item)
     fn jobs(&mut self, ui: &mut Ui) {
         // header: breadcrumb, title, command bar
-        ui.breadcrumb(ID_CRUMB, &["BackupCraft", "Schutz", "Sicherungsjobs"]);
+        ui.breadcrumb(ID_CRUMB, &["BackupCraft", t("Schutz"), t("Sicherungsjobs")]);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
-        ui.page_header("Sicherungsjobs", "9 Jobs · 2 benötigen Aufmerksamkeit · nächster Lauf heute 22:00");
+        ui.page_header(t("Sicherungsjobs"), t("9 Jobs · 2 benötigen Aufmerksamkeit · nächster Lauf heute 22:00"));
         ui.spacer(-1);
         ui.next_flags(ST_SUBTLE);
-        if ui.button(ID_TOAST, "Toast zeigen") & EV_ACT != 0 {
-            ui.toast(IB_SUCCESS, "Job gestartet", "„Dateiserver – täglich“ läuft jetzt (Vorgang 7f3a).", 0);
+        if ui.button(ID_TOAST, t("Toast zeigen")) & EV_ACT != 0 {
+            ui.toast(IB_SUCCESS, t("Job gestartet"), t("„Dateiserver – täglich“ läuft jetzt (Vorgang 7f3a)."), 0);
         }
         ui.box_end();
         let sel = !self.grid.sel.is_empty();
         let clicked = ui.command_bar(ID_CMDBAR, &[
-            CmdItem::new(ID_CMD_NEW, IC_ADD, "Neuer Job").flags(ST_ACCENT),
-            CmdItem::new(ID_CMD_RUN, IC_PLAY, "Jetzt starten").enabled(sel).flags(CBI_SEP),
-            CmdItem::new(ID_CMD_STOP, IC_STOP, "Stoppen").enabled(false),
-            CmdItem::new(ID_CMD_EDIT, IC_EDIT, "Bearbeiten").enabled(sel),
-            CmdItem::new(ID_CMD_DELETE, IC_DELETE, "Löschen").enabled(sel),
-            CmdItem::new(ID_CMD_EXPORT, IC_DOWNLOAD, "Exportieren"),
-            CmdItem::new(ID_CMD_REFRESH, IC_REFRESH, "Aktualisieren").flags(CBI_END),
+            CmdItem::new(ID_CMD_NEW, IC_ADD, t("Neuer Job")).flags(ST_ACCENT),
+            CmdItem::new(ID_CMD_RUN, IC_PLAY, t("Jetzt starten")).enabled(sel).flags(CBI_SEP),
+            CmdItem::new(ID_CMD_STOP, IC_STOP, t("Stoppen")).enabled(false),
+            CmdItem::new(ID_CMD_EDIT, IC_EDIT, t("Bearbeiten")).enabled(sel),
+            CmdItem::new(ID_CMD_DELETE, IC_DELETE, t("Löschen")).enabled(sel),
+            CmdItem::new(ID_CMD_EXPORT, IC_DOWNLOAD, t("Exportieren")),
+            CmdItem::new(ID_CMD_REFRESH, IC_REFRESH, t("Aktualisieren")).flags(CBI_END),
         ]);
         if let Some(c) = clicked {
-            ui.toast(IB_INFO, "Befehl", &format!("Befehl {} ausgeführt", c), 0);
+            ui.toast(IB_INFO, t("Befehl"), &tf("Befehl {} ausgeführt", &[&format!("{}", c)]), 0);
         }
         self.kpis(ui);
         ui.next_size(-1, -1);
@@ -1061,9 +1073,6 @@ impl Gal {
 
 impl App for Gal {
     fn init(&mut self, _ui: &mut Ui) -> bool {
-        // the library's parts (date picker, weekdays, tree, command bar) speak the user's
-        // language when the library has it; the gallery's own texts stay German
-        i18n::set_catalog(i18n::Catalog::from_tsv(LANGUAGES));
         self.sort();
         true
     }
@@ -1113,4 +1122,7 @@ impl App for Gal {
     }
 }
 
-ui::main!(ui::launch(&DESC, Gal::default(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Gal::default(), &style::STYLE)
+});

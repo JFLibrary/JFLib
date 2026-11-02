@@ -6,9 +6,10 @@ wait 50
 expect "ن" exists
 expect "Aufklappen" missing
 # the side panel's wrapping button row (BOX_WRAP) is mirrored too: its second row starts at
-# the right edge (#30823: "Aktualisieren")
-expect "Abbrechen" rect 238 1196 90 32
-expect #30823 rect 202 1236 126 32
+# the right edge (#30823: "Refresh", the gallery's own English text; the Cancel button shows the
+# library's Arabic)
+expect "إلغاء" rect 274 1196 54 32
+expect #30823 rect 235 1236 93 32
 click "12/10/2026"
 wait 20
 expect text:"أكتوبر 2026" exists

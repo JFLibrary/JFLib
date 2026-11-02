@@ -1,10 +1,10 @@
 #!args --lang fr-FR
 # the library's texts in the user's language (--lang, i18n::tr): weekday toggles, the date
 # picker (French format and month names, its buttons), the tree's chevrons; the gallery's
-# own texts stay German (its catalogue only names the languages)
+# own texts are English there (its catalogue has German and English only)
 size 1440 1800
 wait 50
-expect "Sicherungsjobs" exists
+expect "Backup jobs" exists
 expect "lu" exists
 expect "di" exists
 expect "Aufklappen" missing

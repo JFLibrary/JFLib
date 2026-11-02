@@ -11,7 +11,8 @@
 // window.  The targets #301..#305 take text, HTML, URLs, an image, files; outside them the
 // window takes files and text (drop_accept) as UIC_DROP.  Three buttons drag content that only
 // other programs take: a text, a PNG (with a BMP copy for DIB targets) and a temporary file.
-// Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP".
+// Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP".  German is the
+// source language, locales/ui.tsv has the English texts.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -24,11 +25,18 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
-const DESC: AppDesc = AppDesc { title: "jfgui Drag & Drop", flags: AF_RESIZABLE, w: 760, h: 560, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc {
+    title: "JFLib Drag & Drop", // i18n
+    flags: AF_RESIZABLE,
+    w: 760,
+    h: 560,
+    ..AppDesc::NONE
+};
 
 const DT_FRUIT: u32 = DT_USER0; // the app's own kind: a fruit (bytes: its index)
-const FRUITS: [&str; 3] = ["Apfel", "Birne", "Kirsche"];
+const FRUITS: [&str; 3] = ["Apfel", "Birne", "Kirsche"]; // i18n
 const ID_FRUIT0: u32 = 101;
 const ID_SHELF: u32 = 200;
 const ID_BASKET_A: u32 = 201;
@@ -37,7 +45,7 @@ const ID_T_TEXT: u32 = 301; // .. 305: text, HTML, URL, image, files
 const ID_OUT_TEXT: u32 = 401;
 const ID_OUT_IMAGE: u32 = 402;
 const ID_OUT_FILE: u32 = 403;
-const TARGET_NAMES: [&str; 5] = ["Text", "HTML", "URL", "Bild", "Dateien"];
+const TARGET_NAMES: [&str; 5] = ["Text", "HTML", "URL", "Bild", "Dateien"]; // i18n
 const TARGET_TYPES: [u32; 5] = [DT_TEXT, DT_HTML, DT_URL, DT_IMAGE, DT_FILES];
 
 struct Dnd {
@@ -76,18 +84,18 @@ impl Default for Dnd {
 
 fn effect_name(e: u32) -> &'static str {
     match e {
-        DE_COPY => "kopieren",
-        DE_MOVE => "verschieben",
-        DE_LINK => "verknüpfen",
-        _ => "keine",
+        DE_COPY => t("kopieren"),
+        DE_MOVE => t("verschieben"),
+        DE_LINK => t("verknüpfen"),
+        _ => t("keine"),
     }
 }
 
-fn kinds(t: u32) -> String {
+fn kinds(ty: u32) -> String {
     let mut v: Vec<&str> = Vec::new();
-    for (k, n) in [(DT_FILES, "Dateien"), (DT_TEXT, "Text"), (DT_URL, "URL"), (DT_HTML, "HTML"), (DT_IMAGE, "Bild"), (DT_FRUIT, "Frucht")] {
-        if t & k != 0 {
-            v.push(n);
+    for (k, n) in [(DT_FILES, "Dateien"), (DT_TEXT, "Text"), (DT_URL, "URL"), (DT_HTML, "HTML"), (DT_IMAGE, "Bild"), (DT_FRUIT, "Frucht")] { // i18n
+        if ty & k != 0 {
+            v.push(t(n));
         }
     }
     if v.is_empty() { String::from("-") } else { v.join("+") }
@@ -103,7 +111,7 @@ fn image_info(b: &[u8]) -> String {
     if b.len() >= 26 && b.starts_with(b"BM") {
         return format!("BMP {}x{}", le(18), (le(22) as i32).unsigned_abs());
     }
-    format!("? {} Bytes", b.len())
+    tf("? {} Bytes", &[&format!("{}", b.len())])
 }
 
 // a 4 x 3 PNG (red, green, blue, white columns) and the same image as BMP
@@ -129,17 +137,17 @@ impl Dnd {
     // a fruit as a draggable card
     fn fruit(&mut self, ui: &mut Ui, i: usize) {
         let id = ID_FRUIT0 + i as u32;
-        let ev = ui.button(id, FRUITS[i]);
+        let ev = ui.button(id, t(FRUITS[i]));
         match ui.drag_source(id, ev) {
             DS_START => {
                 let mut d = DragData::of_app(DT_FRUIT, &[i as u8]);
-                d.text = Some(String::from(FRUITS[i]));
+                d.text = Some(String::from(t(FRUITS[i])));
                 d.effects = DE_MOVE | DE_COPY;
                 ui.drag_set(d);
             }
             DS_END => {
                 self.ends += 1;
-                self.ended = format!("{} {} ({})", FRUITS[i], effect_name(ui.drag_effect()), self.ends);
+                self.ended = format!("{} {} ({})", t(FRUITS[i]), effect_name(ui.drag_effect()), self.ends);
             }
             _ => {}
         }
@@ -156,9 +164,9 @@ impl Dnd {
                 if d.app & DT_FRUIT != 0 {
                     let i = d.bytes.first().copied().unwrap_or(0) as usize % FRUITS.len();
                     self.moving = Some((i, k));
-                    self.dropped = format!("{} -> {} ({})", FRUITS[i], title, effect_name(ui.drop_effect()));
+                    self.dropped = format!("{} -> {} ({})", t(FRUITS[i]), title, effect_name(ui.drop_effect()));
                 } else {
-                    self.dropped = format!("Text {:?} -> {}", d.text.as_deref().unwrap_or(""), title);
+                    self.dropped = tf("Text {} -> {}", &[&format!("{:?}", d.text.as_deref().unwrap_or("")), title]);
                 }
             }
             _ => {}
@@ -180,7 +188,7 @@ impl Dnd {
         ui.next_size(132, 90);
         ui.box_begin(id, BOX_V | BOX_CARD | PAD_8, 4);
         match ui.drop_target(id, TARGET_TYPES[k]) {
-            DS_HOVER => self.over = format!("{}-Ziel", TARGET_NAMES[k]),
+            DS_HOVER => self.over = tf("{}-Ziel", &[t(TARGET_NAMES[k])]),
             DS_DROP => {
                 let d = ui.drop_data();
                 self.got[k] = match k {
@@ -188,15 +196,15 @@ impl Dnd {
                     1 => d.html.clone().unwrap_or_default(),
                     2 => d.urls.join(" "),
                     3 => d.image.as_deref().map(image_info).unwrap_or_default(),
-                    _ => format!("{} Datei(en): {}", d.files.len(), d.files.first().map(|f| f.rsplit(['/', '\\']).next().unwrap_or(f)).unwrap_or("")),
+                    _ => tf("{} Datei(en): {}", &[&format!("{}", d.files.len()), d.files.first().map(|f| f.rsplit(['/', '\\']).next().unwrap_or(f)).unwrap_or("")]),
                 };
-                self.dropped = format!("{} -> {}-Ziel ({})", kinds(d.types()), TARGET_NAMES[k], effect_name(ui.drop_effect()));
+                self.dropped = tf("{} -> {}-Ziel ({})", &[&kinds(d.types()), t(TARGET_NAMES[k]), effect_name(ui.drop_effect())]);
             }
             _ => {}
         }
-        ui.text(TS_BODY_STRONG, &format!("{}-Ziel", TARGET_NAMES[k]));
+        ui.text(TS_BODY_STRONG, &tf("{}-Ziel", &[t(TARGET_NAMES[k])]));
         let g = self.got[k].clone();
-        ui.text(TS_CAPTION | TX_ELLIPSIS, &format!("{}: {}", TARGET_NAMES[k], if g.is_empty() { "-" } else { &g }));
+        ui.text(TS_CAPTION | TX_ELLIPSIS, &format!("{}: {}", t(TARGET_NAMES[k]), if g.is_empty() { "-" } else { &g }));
         ui.box_end();
     }
 
@@ -206,16 +214,16 @@ impl Dnd {
         match ui.drag_source(id, ev) {
             DS_START => {
                 let d = match id {
-                    ID_OUT_TEXT => DragData { text: Some(String::from("Hallo aus jfgui")), ..DragData::default() },
+                    ID_OUT_TEXT => DragData { text: Some(String::from(t("Hallo aus JFLib"))), ..DragData::default() },
                     ID_OUT_IMAGE => {
                         let (png, bmp) = sample_image();
-                        DragData { image: Some(png), bmp: Some(bmp), label: String::from("Bild 4x3"), ..DragData::default() }
+                        DragData { image: Some(png), bmp: Some(bmp), label: String::from(t("Bild 4x3")), ..DragData::default() }
                     }
                     _ => {
                         // a file written for the drag (the app's temporary folder)
                         let dir = plat::temp_dir().unwrap_or_else(|| String::from("."));
-                        let path = format!("{}/jfgui-dndtest.txt", dir.trim_end_matches(['/', '\\']));
-                        plat::write_file(&path, b"jfgui drag and drop\n");
+                        let path = format!("{}/jflib-dndtest.txt", dir.trim_end_matches(['/', '\\']));
+                        plat::write_file(&path, b"JFLib drag and drop\n");
                         DragData { files: vec![path], ..DragData::default() }
                     }
                 };
@@ -239,11 +247,11 @@ impl App for Dnd {
     fn frame(&mut self, ui: &mut Ui) {
         self.over = String::from("-");
         ui.box_begin(0, BOX_V | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "Drag & Drop");
+        ui.text(TS_SUBTITLE, t("Drag & Drop"));
         ui.box_begin(0, BOX_H, 10);
-        self.place(ui, ID_SHELF, 0, "Regal", DT_FRUIT);
-        self.place(ui, ID_BASKET_A, 1, "Korb A", DT_FRUIT | DT_TEXT);
-        self.place(ui, ID_BASKET_B, 2, "Korb B", DT_FRUIT);
+        self.place(ui, ID_SHELF, 0, t("Regal"), DT_FRUIT);
+        self.place(ui, ID_BASKET_A, 1, t("Korb A"), DT_FRUIT | DT_TEXT);
+        self.place(ui, ID_BASKET_B, 2, t("Korb B"), DT_FRUIT);
         ui.box_end();
         ui.box_begin(0, BOX_H, 8);
         for k in 0..5 {
@@ -251,15 +259,15 @@ impl App for Dnd {
         }
         ui.box_end();
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        self.out_button(ui, ID_OUT_TEXT, "Text ziehen");
-        self.out_button(ui, ID_OUT_IMAGE, "Bild ziehen");
-        self.out_button(ui, ID_OUT_FILE, "Datei ziehen");
+        self.out_button(ui, ID_OUT_TEXT, t("Text ziehen"));
+        self.out_button(ui, ID_OUT_IMAGE, t("Bild ziehen"));
+        self.out_button(ui, ID_OUT_FILE, t("Datei ziehen"));
         ui.box_end();
-        let (t, x, y) = ui.drag_over();
-        let over = if t == 0 { String::from("-") } else { format!("{} bei {},{}", kinds(t), x, y) };
-        ui.text(TS_BODY, &format!("Ziehen: {}  Über: {}", over, self.over));
-        ui.text(TS_BODY, &format!("Abgelegt: {}", self.dropped));
-        ui.text(TS_BODY, &format!("Ende: {}", self.ended));
+        let (ty, x, y) = ui.drag_over();
+        let over = if ty == 0 { String::from("-") } else { tf("{} bei {},{}", &[&kinds(ty), &format!("{}", x), &format!("{}", y)]) };
+        ui.text(TS_BODY, &tf("Ziehen: {}  Über: {}", &[&over, &self.over]));
+        ui.text(TS_BODY, &tf("Abgelegt: {}", &[&self.dropped]));
+        ui.text(TS_BODY, &tf("Ende: {}", &[&self.ended]));
         ui.text(TS_BODY, &format!("UIC_DROP: {}", self.uic));
         ui.box_end();
         // the pass drew the fruit at its old place already: move it now, build again
@@ -281,12 +289,12 @@ impl App for Dnd {
             UIC_DROP => {
                 let d = ui.drop_data();
                 let what = if !d.files.is_empty() {
-                    format!("{} Datei(en)", ui.drop_count())
+                    tf("{} Datei(en)", &[&format!("{}", ui.drop_count())])
                 } else {
-                    format!("Text {:?}", d.text.as_deref().unwrap_or(""))
+                    tf("Text {}", &[&format!("{:?}", d.text.as_deref().unwrap_or(""))])
                 };
                 let (x, y) = ui.drop_pos();
-                self.uic = format!("{} bei {},{} (Fenster {})", what, x, y, arg);
+                self.uic = tf("{} bei {},{} (Fenster {})", &[&what, &format!("{}", x), &format!("{}", y), &format!("{}", arg)]);
             }
             UIC_DRAG_END => {} // the sources report through DS_END
             _ => return false,
@@ -295,4 +303,7 @@ impl App for Dnd {
     }
 }
 
-ui::main!(ui::launch(&DESC, Dnd::default(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Dnd::default(), &style::STYLE)
+});
