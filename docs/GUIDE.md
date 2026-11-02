@@ -1919,7 +1919,8 @@ An app without a catalogue stays German; one whose texts are language-neutral ca
 catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`) to let the
 library follow the user. `Catalog::with_library_languages()` adds the library's languages to a
 catalogue: there the library's texts follow the user and Arabic and Hebrew mirror the window,
-while the app's own texts show their English column (the demos, `apps/gallery`). A static
+while the app's own texts show their English column (the demos, `apps/gallery`). In the browser
+Arabic and Hebrew stay out: the bundle has no font for them, those users get English. A static
 command table and menus follow with `DESC.translated()` (title, command labels, menu bar) and
 `i18n::menu(table)` (a context menu); write
 `ui::main!({ i18n::set_catalog(..); ui::launch(&DESC.translated(), ..) })`.

@@ -138,6 +138,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A dock tab, or the empty part of a dock's tab strip, can drag only after the button was held for 300 ms (`DOCK_HOLD_MS`): a click that slips no longer moves or floats a panel. At 300 ms the tab shows it (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`), movement before that does not count, Esc ends the hold; clicks, double clicks, the menu and the splitters need none. Scripts: `drag ... hold MS` (or `wait` after `down`)
 - **JFNetworker:** The title of JF-FW says what a firewall does today, a router with access lists and NAT; zones and stateful filtering come with milestone F2
 - **build:** The demos (gallery, datagallery, editortest, docktest, dndtest, diagramtest, svgtest, spelltest, fontpicktest, template, androidGallery, mdviewtest, audiotest, prefstest) have English catalogues and no old names in their texts; they follow the user's language in a window, headless runs stay German, and tools that drive real windows, browsers or phones pin German
+- **build:** The browser host's own texts (its bar, its status line) follow the browser's language, and it hands the page's language list to the worker, so a test's emulated locale reaches the app; Arabic and Hebrew stay out of `with_library_languages` in the browser, whose bundle has no font for them
 
 ### Fixed
 

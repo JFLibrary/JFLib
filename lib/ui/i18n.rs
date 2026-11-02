@@ -987,10 +987,12 @@ impl Catalog {
 
     /// also offer the languages of the library's own texts (library_languages): there the
     /// library's texts follow the user and Arabic and Hebrew mirror the window, while the app's
-    /// own texts show their English column
+    /// own texts show their English column.  The browser bundle has no font for Arabic and
+    /// Hebrew: there they stay out, the user gets English instead of empty boxes
     pub fn with_library_languages(mut self) -> Catalog {
         for l in LIB_LANGS {
-            if !self.langs.iter().any(|c| c == l) {
+            let no_font = cfg!(target_arch = "wasm32") && matches!(l, "ar" | "he");
+            if !no_font && !self.langs.iter().any(|c| c == l) {
                 self.langs.push(String::from(l));
             }
         }

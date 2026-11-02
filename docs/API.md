@@ -3342,7 +3342,8 @@ LANG_EN: u32 = 1
 - **`fn with_library_languages(mut self) -> Catalog`**
   also offer the languages of the library's own texts (library_languages): there the
   library's texts follow the user and Arabic and Hebrew mirror the window, while the app's
-  own texts show their English column
+  own texts show their English column.  The browser bundle has no font for Arabic and
+  Hebrew: there they stay out, the user gets English instead of empty boxes
 - **`fn languages(&self) -> &[String]`**
   the language codes of the columns ("de", "en", ...)
 - **`fn tr<'a>(&'a self, s: &'a str) -> &'a str`**
