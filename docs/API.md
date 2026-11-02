@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -17908,9 +17908,10 @@ FXW_NEDGE: i32 = 7
 
 ```text
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows
-(vulkan-1.dll loaded at run time; vk_*.rs).  Planned: Vulkan on Linux and Android, WebGPU
-in the browser, Metal; they provide the same types and methods.
+and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
+Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
+vk_*.rs; on Linux no windows yet).  Planned: Android, WebGPU in the browser, Metal; they provide
+the same types and methods.
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -17997,7 +17998,8 @@ COLOR_TARGETS_MAX: usize = 8
 - **`enum GpuError`**
   what went wrong
   - `Disabled` -- the GPU is switched off (jfgui_GPU=0)
-  - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll, or jfgui_GPU_DLL names a missing file)
+  - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
+    missing file, or a Linux program not linked against glibc)
   - `NoAdapter` -- no usable GPU (or jfgui_GPU_ADAPTER matched none)
   - `Unsupported(&'static str)` -- the adapter or this backend lacks something (a feature, a format, the level)
   - `Invalid(&'static str)` -- a call the API does not allow (sizes, alignments, states, order)
@@ -18767,8 +18769,8 @@ Source: [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs)
 vk_inst -- Vulkan instance and adapters
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>
-       jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL or vulkan-1.dll
-       (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
+       jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL, vulkan-1.dll or
+       libvulkan.so.1 (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
        Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
        present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
   instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
@@ -22160,7 +22162,9 @@ four crates that may contain `unsafe` (rt, simd, plat, plugin); nothing unsafe l
 
 ### `plat` crate root
 
-Re-exports: `rt::os::{exit, write_stderr, write_stdout}`
+Re-exports: `rt::os::exit`
+
+Re-exports: `rt::os::{write_stderr, write_stdout}`
 
 Re-exports: `rt::{VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -27662,7 +27666,7 @@ handler (win_crash.rs).
 Source: [`lib/plat/linux.rs`](../lib/plat/linux.rs)
 
 ```text
-linux -- Linux platform: raw syscalls, no libc        [src/plat/linux/plat_linux.s, lx_sys.s]
+linux -- Linux platform: raw syscalls, no libc (the build for GPU drivers: linux_glibc.rs)        [src/plat/linux/plat_linux.s, lx_sys.s]
 
 _start reads argc / argv / envp from the initial stack, calls the app's jfgui_main and
 exits with its result.  Files and paths: linux_sys.rs; threads, wake-up, system
@@ -28364,7 +28368,7 @@ pread / pwrite, so several threads may use one File at the same time.
 Source: [`lib/plat/linux_thread.rs`](../lib/plat/linux_thread.rs)
 
 ```text
-linux_thread -- Linux threads (clone + futex), semaphores, the wake-up of the UI thread,
+linux_thread -- Linux threads (clone + futex; linked against glibc: pthread_create, at the end of this file), semaphores, the wake-up of the UI thread,
 system information, the date                       [src/plat/linux/lx_thread.s, plat_linux.s]
 
 A thread's stack is an mmap with a PROT_NONE guard page below it; the thread record sits
@@ -28414,6 +28418,11 @@ socket, wait_events polls it alone (headless).
 
 - **`fn date() -> (Date, bool)`**
   the date and time in UTC (no time zone database); the flag is true (UTC)  [plat_date]
+
+**`impl Thread`**
+
+- **`fn join(self)`**
+  wait until the thread has ended, then free its stack  [plat_thread_join]
 
 ### `plat/linux_print.rs` (Linux)
 
@@ -28470,6 +28479,67 @@ the assembly's checks); lib_sym reads the protected image like the assembly.
 
 - **`fn lib_sym(h: &Lib, name: &str) -> usize`**
   the address of the defined dynamic symbol name, or 0  [plat_lib_sym]
+
+### `plat/linux_glibc.rs` (Linux)
+
+Source: [`lib/plat/linux_glibc.rs`](../lib/plat/linux_glibc.rs)
+
+```text
+linux_glibc -- a program linked against glibc (--cfg jfgui_glibc; build_rs.py section "glibc",
+docs/GPU.md "Linux"): every Linux GPU driver is a glibc library
+
+  _start, glibc_main          the process start through __libc_start_main (ld.so has set up the
+                              main thread's TLS and run libc's initialisers by then), then what
+                              linux_entry does in a static program
+  exit(code)                  plat::exit: glibc's exit (atexit handlers, the destructors of the
+                              loaded libraries, stdio); so does returning from the program's main.
+                              Crash reports end in rt::os::exit as everywhere: exit_group, no
+                              destructor runs inside a signal handler
+  at_exit(f)                  f at that normal end, before the handlers registered earlier
+  dl_open / dl_sym / dl_close / dl_error    the system's dynamic linker (lib/gpu: libvulkan.so.1);
+                              plugins keep their own loader (linux_elfload.rs: they import nothing)
+  glibc_version()             the running libc ("2.43")
+  glibc_thread_ids()          the calling thread's FS base, pthread_self, &errno (gputest --test glibc)
+
+Threads: linux_thread.rs, its last part: pthread_create on the same mapping as in a static
+program.  Everything else of plat stays raw system calls next to glibc, which is fine: they do
+not touch errno or glibc's state.  The fault handlers (linux_crash.rs, linux_guard.rs) use
+rt_sigaction directly and leave glibc's two internal signals alone.  A driver's own threads have
+no alternate signal stack, the report runs on their stack; Mesa's block every signal but SIGSEGV
+and SIGSYS, so another fault there (SIGILL in llvmpipe's JIT code) ends the process at once, by the
+kernel, without a report.  The allocator (rt::mem) has its own mappings and takes no TLS, so a
+driver's thread may call back into it (debug messages); a child after a raw fork only makes system
+calls until its exec.  plat::setenv changes JFLib's list, which plat::env and child processes see;
+a driver's getenv reads the start environment.
+```
+
+- **`fn exit(code: i32) -> !`**
+  end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
+  from any thread, not from a signal handler
+
+- **`fn at_exit(f: fn())`**
+  run f at the normal end of the process (plat::exit, or the program's main returns), not after
+  a crash; before the handlers registered earlier
+
+- **`fn dl_open(name: &str) -> Option<usize>`**
+  open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
+  and run its initialisers -> its handle
+
+- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+  the address of a symbol of a library from dl_open (0: none); name ends in NUL
+
+- **`fn dl_close(handle: usize)`**
+  close a library from dl_open
+
+- **`fn dl_error() -> String`**
+  why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
+
+- **`fn glibc_version() -> String`**
+  the version of the running glibc ("2.43")
+
+- **`fn glibc_thread_ids() -> (usize, usize, usize)`**
+  the calling thread's FS base, pthread_self() and the address of errno: its thread control block
+  and thread-local storage (a raw clone would have 0 and the creator's)
 
 ### `plat/web.rs`
 

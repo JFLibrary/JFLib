@@ -6,17 +6,19 @@ Vulkan und WebGPU (Instanz, Adapter, Gerät, Warteschlange, Ressourcen, Pipeline
 Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird pro Ziel beim
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
-Stand (G1a): Vulkan unter Windows. `vulkan-1.dll` wird zur Laufzeit geladen, das Programm
-startet also auch auf Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
-Vulkan unter Linux und Android, WebGPU im Browser, später Metal -- mit denselben Typen und
-Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows zeigt die GPU das Ergebnis
+Stand: Vulkan unter Windows und, noch ohne Fenster, unter Linux (G4a, [Linux](#linux)).
+`vulkan-1.dll` bzw. `libvulkan.so.1` wird zur Laufzeit geladen, das Programm startet also auch auf
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: Android, WebGPU im Browser,
+später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
+Windows zeigt die GPU das Ergebnis
 (G3a, [Ausgabe der UI](#ausgabe-der-ui), `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
 und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
 | Teil | Wo |
 | --- | --- |
 | Öffentliche Typen: Beschreibungen, Formate, Fehler, Features, Limits, `Pod` | [`lib/gpu/lib.rs`](../lib/gpu/lib.rs) |
-| Instanz, Adapter, Validierung | [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs), Laden der DLL: [`vk_load.rs`](../lib/gpu/vk_load.rs) |
+| Instanz, Adapter, Validierung | [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs), Laden der Bibliothek: [`vk_load.rs`](../lib/gpu/vk_load.rs) |
+| Programme gegen glibc (Linux) | `build_rs.py` Abschnitt „glibc“, [`lib/plat/linux_glibc.rs`](../lib/plat/linux_glibc.rs), [Linux](#linux) |
 | Gerät, Warteschlange, Zeitleiste, verzögertes Freigeben, Uploads | [`lib/gpu/vk_dev.rs`](../lib/gpu/vk_dev.rs) |
 | Speicher-Unterverteilung | [`lib/gpu/vk_mem.rs`](../lib/gpu/vk_mem.rs) |
 | Puffer, Texturen, Sampler, Shader, Bindungen, Bindless, Pipelines, Zeitstempel | [`lib/gpu/vk_res.rs`](../lib/gpu/vk_res.rs) |
@@ -626,7 +628,7 @@ Größe, Release, gegen den Stand davor: gallery Windows 4 153 856 → 4 201 984
 | `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128) |
 | `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
-| `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) |
+| `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
 | `jfgui_GPU_PRESENT=fifo\|mailbox\|immediate` | Darstellungsmodus jeder neuen Swapchain |
 | `jfgui_GPU_VALIDATE=1` | Khronos-Validierungsschicht mit Synchronisationsprüfung, wenn installiert |
@@ -660,8 +662,8 @@ für Messungen den Configurator ausschalten.
 
 ## Tests
 
-`python -u build_rs.py test gputest` (nur Windows: `apps/gputest/TARGETS`) führt
-`apps/gputest/tests/*.uis` aus:
+`python -u build_rs.py test gputest` führt `apps/gputest/tests/*.uis` aus, unter Windows und Linux
+(dort gegen glibc, ohne die Fenstertests: [Linux](#linux)):
 
 | Skript | Prüft |
 | --- | --- |
@@ -681,13 +683,16 @@ für Messungen den Configurator ausschalten.
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
 | `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung) |
+| `glibc.uis` | (Linux, gegen glibc gelinkt; sonst `SKIP`) Argumente und Umgebung; Hauptthread und jeder `plat`-Thread mit eigenem Kontrollblock und TLS (FS-Basis = `pthread_self`, eigenes `errno`, eigener `dlerror`-Text); der verlangte Stapel; 300 Threads hinterlassen keine Abbildung; Vulkan auf einem `plat`-Thread von 2 MiB. In Kindprozessen: `exit` von glibc aus `main` und von einem Thread, auch mit laufenden Threads und einem noch offenen Gerät; Absturz auf dem Haupt- und einem `plat`-Thread, Stapelüberlauf und Panik mit Bericht, Code 3 und ohne `at_exit` |
+| `noloader.uis` | `jfgui_GPU_DLL` nennt eine fehlende Datei (Name, Pfad) oder eine Bibliothek, die kein Vulkan-Loader ist: `Err(NoLoader)`; ein Programm ohne Loader startet, `--info` meldet `SKIP`, Code 0 |
 
 Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
 `gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
 
 **Texturen in Shadern** (`gputest --test textures`, [`t_texture.rs`](../apps/gputest/t_texture.rs);
 die Shader sind `shader::samples`, vor dem Hochladen von `shader::val` geprüft). Exakt heißt:
-gleich der CPU-Referenz Bit für Bit (unorm-Texel als `k / 255` in f32).
+gleich der CPU-Referenz Bit für Bit; ein rgba8unorm-Kanal darf von `k / 255` in f32 eine Stelle
+abweichen (die RTX tut es nie, Mesa manchmal: [Linux](#linux)), der Test zählt das.
 
 | Teil | was | Ergebnis auf der RTX 2070 SUPER |
 | --- | --- | --- |
@@ -937,11 +942,152 @@ Die übersetzten Shader sind so schnell wie die handgeschriebenen (`move` sogar 
 die Robustheit kostet in `move` 0,007 ms (+2,8 %), sonst nichts Messbares. Der Einzel-Pfad ist
 CPU-gebunden (100 000 Draws je Bild); seine Bildzeiten schwanken mit der Last des Rechners.
 
+## Linux
+
+Alle GPU-Treiber unter Linux sind glibc-Bibliotheken, ein Prozess ohne glibc kann keinen laden.
+Ein Programm für die GPU wird deshalb dynamisch gegen glibc gelinkt und gegen nichts sonst;
+`libvulkan.so.1` kommt zur Laufzeit per `dlopen`, ohne die Datei startet es und `Instance::new`
+gibt `Err(NoLoader)`. Kommandozeilen- und Serverprogramme bleiben statisch ohne libc
+([ROADMAP.md](ROADMAP.md) §8). Ein statisches Programm, das `gpu` linkt, bekommt immer `NoLoader`.
+
+**Stand (G4a):** Instanz, Adapter, Geräte, Speicher, Puffer, Texturen, Rechnen und Zeichnen, alles
+ohne Fenster. `Features::swapchain` ist `false`, `Surface::new` gibt `Unsupported`, die Fenstertests
+von `gputest` melden `SKIP`. Die Ausgabe über dmabuf und `gpu_out` unter Linux kommen mit G4b,
+bis dahin linkt `ui` dort keinen Vulkan-Code und die UI-Apps bleiben statisch.
+
+**Bauen.** Eine Datei `apps/NAME/GLIBC` wählt den Modus je App (bisher `gputest`; `wgsltest` braucht
+keine GPU und bleibt statisch). `build_rs.py`, Abschnitt „glibc“:
+
+- Jede Crate bekommt `--cfg jfgui_glibc` und liegt in `build/linux/.glibc`, das Programm wie jedes
+  andere in `build/linux`. Nennt es `ui` nicht, wird kein Stil gebaut (`gputest`: 7 Crates).
+- Zum Linken ist nichts zu installieren. `Builder.glibc_stubs` schreibt aus der Tabelle `GLIBC_STUBS`
+  drei Attrappen `libpthread.so.0`, `libdl.so.2` und `libc.so.6`: eine Funktion `ret` unter jedem
+  Namen (`rustc --emit=obj`), dann `ld.lld -shared` mit einem Versionsskript. Sie nennen dem Linker
+  nur Namen und Versionen; zur Laufzeit gelten die Bibliotheken des Systems.
+- Das Programm hat eine feste Adresse wie die statischen (`ET_EXEC`, die `.map` gilt weiter), den
+  Interpreter `/lib64/ld-linux-x86-64.so.2`, `DT_NEEDED` auf die drei Dateien, bindet beim Start
+  (`BIND_NOW`), importiert nur Funktionen und exportiert nichts: `memcpy` aus `rt` ersetzt nie die
+  der Treiber.
+- Alle 15 Importe tragen die Version `GLIBC_2.2.5`, die älteste, die x86-64 hat. Bis glibc 2.33
+  stehen die Funktionen so in `libdl` und `libpthread`. Seit 2.34 stehen sie in `libc`, dort bleibt
+  diese Version als Kompatibilitätssymbol, und `libdl` und `libpthread` bleiben als leere Dateien.
+  Dieselbe Datei startet also auf beiden Seiten; von den Symbolen her auf jeder glibc für x86-64, eine
+  Grenze setzen eher die Treiber (Vulkan 1.1 gibt es ab etwa RHEL 7, glibc 2.17). **Geprüft** ist
+  bisher nur die neue Seite (2.39, 2.43); auf den Linux-Umgebungen hier liegt keine ältere glibc
+  ([LINUX_TESTPLAN.md](LINUX_TESTPLAN.md) Abschnitt 5).
+
+**Was in `lib/plat` anders ist** ([`linux_glibc.rs`](../lib/plat/linux_glibc.rs), das Ende von
+[`linux_thread.rs`](../lib/plat/linux_thread.rs)):
+
+| Teil | statisch | gegen glibc |
+| --- | --- | --- |
+| Start | `_start` ruft `jfgui_main`, dann `exit_group` | `_start` ruft `__libc_start_main` (TLS und Initialisierung hat `ld.so` schon erledigt), die gibt den Rückgabewert an `exit` |
+| Threads | roher `clone` ohne TLS | `pthread_create` auf derselben Abbildung (Schutzseite, Signalstapel, Schutzseite, Stapel); oben 16 KiB mehr für Kontrollblock und statischen TLS, der Stapel bleibt so groß wie verlangt; `pthread_join`, dann `munmap` |
+| `plat::exit`, Rückkehr aus `main` | `exit_group` | `exit`: `plat::at_exit`, Destruktoren der Treiber, stdio |
+| Absturz, Panik (`rt::os::exit`) | `exit_group` | `exit_group`, kein Destruktor im Signal-Handler |
+| `dl_open`, `dl_sym`, `dl_close`, `dl_error`, `glibc_version` | gibt es nicht | das `dlopen` des Systems |
+
+`rt` bleibt gleich. Signale setzt `plat` weiter mit `rt_sigaction` direkt, ohne die zwei internen von
+glibc zu berühren; der Allokator (`rt::mem`, eigene Abbildungen, kein TLS, auch von Treiber-Threads
+aufrufbar) und `fork` (das Kind macht bis `exec` nur Systemaufrufe) bleiben, wie sie sind. Die
+Threads eines Treibers haben keinen Signalstapel: Dort läuft der Bericht auf ihrem Stapel. Mesa sperrt
+auf seinen Threads alle Signale außer SIGSEGV und SIGSYS; ein SIGILL dort beendet den Prozess also
+sofort durch den Kernel, ohne Bericht, ein SIGSEGV kommt an. `plat::setenv` ändert die Liste von JFLib,
+die `plat::env` und Kindprozesse sehen; das `getenv` eines Treibers liest die Umgebung vom Start.
+
+Statische Programme sind dabei Byte für Byte gleich geblieben (`plattest`, `gallery` im
+Entwicklungs-Build, `wgsltest` im Release-Build, gegen den Stand davor). Deshalb stehen die
+`cfg`-Attribute in `linux.rs` und `linux_thread.rs` in derselben Zeile wie das Element: die
+Zeilennummern der Panik-Stellen sind Bytes im Programm.
+
+Größe von `gputest`: Release statisch 2 569 872, gegen glibc 2 599 296 Byte (+29 424),
+Entwicklungs-Build 2 782 232 und 2 817 944 (+35 712). Darin steckt der Test `glibc`, den nur dieser
+Build hat (rund 12 KB); Dynamik-Tabellen und PLT sind knapp 2 KB.
+
+**Tests.** `gputest --test glibc` (Start, Threads, Ende) und `--test noloader`, siehe
+[Tests](#tests). Dabei läuft auch Vulkan auf einem `plat`-Thread mit 2 MiB Stapel, der Größe des
+Arbeits-Threads von `gpu_out`. Einmal von Hand in WSL: Das Programm in einem `bwrap` mit nichts als
+`ld.so` und den drei Bibliotheken startet, `--info` meldet `SKIP`, `--test glibc` besteht.
+
+| Umgebung | Treiber | Ergebnis |
+| --- | --- | --- |
+| WSL Ubuntu 24.04, glibc 2.39, Ryzen 5 3600 | llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 256 Bit | alles bestanden, Fenstertests `SKIP` |
+| Fedora 44, glibc 2.43, Pentium G4560T | Intel HD Graphics 610 (KBL GT1), anv, Mesa 26.0.3, Vulkan 1.4.335 | alles bestanden, Fenstertests `SKIP`, in 7–13 s |
+| Fedora 44, derselbe Rechner | llvmpipe, Mesa 26.0.3, LLVM 22.1, 128 Bit | Treiberfehler, unten; bestanden nur `copies`, `upload`, `bindless`, `noloader` |
+| WSL mit `GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128` | llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 128 Bit | alles bis in `wgsl`, dort nach `modf` ein Absturz in `libLLVM` (`InstCombine`) |
+
+Die Validierungsschicht ist auf beiden Rechnern nicht installiert, unter Linux lief also noch keine
+Validierung (`validate.uis` läuft dort ohne sie).
+
+**Was die erste fremde GPU und llvmpipe gefunden haben:**
+
+- *Ein `Device`-Puffer ließ sich auf einem CPU-Adapter schreiben.* Dort ist aller Speicher
+  abbildbar, `Buffer::write` prüfte nur, ob eine Adresse da ist; ein Programm liefe auf llvmpipe und
+  scheiterte auf der nächsten GPU. Jetzt zählt die Art des Puffers, auf jedem Adapter `Invalid`.
+- *Der Ring wuchs auf llvmpipe um 10 MiB.* 2000 Übergaben ohne Warten: Ein CPU-Gerät liegt
+  Hunderte zurück, und was sie lesen, kann nicht zurück in den Ring. Das ist richtig; der Test hat
+  nachgestellt, was die UI nicht tut. Er hält jetzt drei Bilder in Flug wie eine Swapchain, die Grenze
+  von 2 MiB bleibt und gilt überall.
+- *`k / 255` ist nicht auf jeder GPU korrekt gerundet.* Mesa landet bei manchen `k` eine Stelle
+  daneben, was Vulkan erlaubt: llvmpipe überall (513 von 1364 Werten beim Laden und Abtasten, 281 von
+  768 bei Speichertexturen), Intel nur bei Speichertexturen (281 von 768), die RTX nie. `gputest`
+  erlaubt das nur bei rgba8unorm und zählt es; alle anderen Formate bleiben exakt.
+- *Intel spült f16-Denormale auf 0.* WGSL erlaubt das, `Tol::Halves` kannte die Regel nur für f32.
+- *llvmpipe auf Fedora 44 ist auf diesem Prozessor unbrauchbar* (Mesa 26.0.3 mit LLVM 22.1, Pentium
+  ohne AVX und BMI): Abstürze in `libLLVM` beim Übersetzen (`simplifyMaskedScatter`,
+  `SimplifyDemandedVectorElts`), falsche Ergebnisse (`i32 +` gibt für 1 + 1 die 0), `SIGILL` in
+  gejittetem Code (`andn` auf einem Prozessor ohne BMI1). Dieselben SPIR-V-Module laufen auf der
+  HD 610, der RTX 2070 und auf llvmpipe mit LLVM 20 und AVX2; es liegt am Treiber. Die UI nimmt ohnehin
+  keinen CPU-Adapter (`adapters_low_power`), `instance.adapter()` nimmt ihn als letzten.
+- *Nichts gefunden* bei den Speichertypen einer integrierten GPU (`vk_mem.rs` trifft dort den
+  richtigen Typ, Uploads und Rücklesen stimmen), bei den Grenzen (Uniform-Ausrichtung 64, Speicher 4,
+  Bindung bis 4095 MiB) und bei der wechselnden Subgroup-Größe (8 bis 32, gesehen 8, 16 und 32; die
+  Referenz der Subgroup-Tests kennt sie). Alle 13 469 Ergebnisse des WGSL-Tests stimmen.
+
+**Die HD 610 in Zahlen.** Release-Build, ohne Fenster, Mesa 26.0.3; je Variante drei Läufe,
+abwechselnd, auf dem geteilten Rechner (Last um 1, Firefox lief mit). Median, in Klammern die
+Spanne über die Läufe. Zeiten in ms. 300 Bilder nach 60 zum Aufwärmen, bei 1 Mio. und 100k einzeln
+weniger.
+
+| N | Modus, Ziel | CPU Med. | GPU move / cull / draw | GPU gesamt (Spanne) | Bildzeit Med. (p99) | Bilder/s | Dreiecke/s |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10k | indirekt, 1080p | 0,21 | 0,08 / 0,10 / 2,23 | 2,42 (2,37–2,43) | 2,51 (3,82) | 382 | 0,03 G |
+| 100k | indirekt, 720p | 0,20 | 0,53 / 0,92 / 6,43 | 7,95 (7,93–7,97) | 7,95 (8,88) | 127 | 0,08 G |
+| 100k | indirekt, 1080p | 0,20 | 0,52 / 0,93 / 7,46 | 9,19 (9,16–9,19) | 9,29 (10,3) | 108 | 0,07 G |
+| 100k | indirekt, 1080p, WGSL | 0,19 | 0,51 / 0,85 / 7,57 | 9,19 (9,13–9,20) | 9,30 (10,4) | 108 | 0,07 G |
+| 1M | indirekt, 720p | 0,34 | 5,21 / 10,2 / 53,6 | 68,8 (68,7–68,9) | 70,0 (71,3) | 14 | 0,09 G |
+| 1M | indirekt, 1080p | 0,30 | 5,40 / 9,91 / 54,9 | 70,2 (69,8–70,3) | 70,5 (72,2) | 14 | 0,09 G |
+| 10k | einzeln, 1080p | 4,89 | 0,06 / – / 3,55 | 3,63 (3,58–3,64) | 4,89 (6,07) | 205 | 0,03 G |
+| 100k | einzeln, 1080p | 32,9 | 0,48 / – / 29,1 | 29,6 (29,5–29,6) | 32,9 (40,7) | 30 | 0,04 G |
+
+Was eine schwache GPU also tut: 100 000 bewegte Würfel in 1080p bei 108 Bildern/s, gerechnet rund
+200 000 bei 60 Bildern/s. Die RTX 2070 SUPER ([Messszene](#messszene)) ist bei 1 Mio. Würfeln gut 40-mal
+schneller (70 ms gegen 1,65 ms), bei 100 000 Würfeln 32-mal. Engpass ist die Geometrie, rund 90 Mio.
+Dreiecke/s gegen 3,5 Mrd.; `move` ist 21-mal langsamer, `draw` 44-mal, `cull` 75-mal (es liest die
+ganzen Objektdaten, vermutlich die Speicherbandbreite). Die Pixel kosten wenig: 1080p gegen 720p bei
+100 000 Würfeln 1,2 ms. Ein Zeichenbefehl je Objekt kostet die CPU 330–490 ns und bremst hier auch die
+GPU (29,1 statt 7,46 ms bei 100 000). WGSL und SPIR-V sind gleich schnell. Für die UI ist das reichlich:
+ein ganzes Bild 1080p hochladen 2,5–3,4 ms, kleine Uploads 41 µs, eine Million Elemente rechnen und
+zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 ms). Zeiten mit Darstellung folgen
+mit G4b.
+
+**Was G4b hierauf aufbaut.** `TARGET_DEPS` um `("ui", "linux")` und eine `GLIBC`-Datei je UI-App (die
+UI-Crates entstehen dann ein zweites Mal in `.glibc`). Weitere Programme einer App (`BINS`) und
+Module baut der statische Builder (`self.base`), für `gui`-Programme fehlt die Entscheidung. Für den
+statischen Weg (Alpine) braucht es einen Schalter im Build, die `GLIBC`-Datei gewinnt sonst immer.
+In `lib/gpu`: `surface` in `vk_inst.rs` ist `cfg!(windows)`, `window_size` und `window_minimised` in
+`vk_swap.rs` sind unter Linux Platzhalter, `VK_KHR_external_memory_fd`, `VK_EXT_external_memory_dma_buf`
+und `VK_EXT_image_drm_format_modifier` werden noch nicht aktiviert. Zu prüfen: `gpu_out` nimmt 2 MiB
+Stapel, der unter Linux wirklich so groß ist (unter Windows ist das nur die Commit-Größe); das
+Übersetzen im Treiber auf einem solchen Thread ist nur mit kleinen Shadern geprüft. Eine App mit
+`sandbox`-Zeile sieht ohne Regeln für `/usr/lib*`, `/usr/share/vulkan` und `/dev/dri` keinen Treiber.
+Die Pakete (`tools/package.py`) müssen glibc als Abhängigkeit nennen und `--device=dri`.
+
 ## Bekannte Lücken
 
-- Nur Windows. Linux und Android brauchen einen Weg zu `libvulkan.so` (JFLib lädt unter Linux
-  ohne libc) und ihre Fensterflächen; das Backend übersetzt dort, `Instance::new` gibt
-  `NoLoader`.
+- Unter Linux keine Fenster (G4b), unter Android noch kein Weg zu `libvulkan.so` (G4c); das Backend
+  übersetzt dort, `Instance::new` gibt `NoLoader`. Unter Linux lief noch keine Validierung und
+  noch keine ältere glibc als 2.39 ([Linux](#linux)).
 - Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
   `move` und `cull` neben dem Zeichnen laufen lassen).
 - Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.
