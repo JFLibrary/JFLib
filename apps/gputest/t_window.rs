@@ -106,7 +106,8 @@ pub fn open_window(t: &mut T) -> Option<i32> {
     if !t.ok(w >= 0, "plat window") {
         return None;
     }
-    plat::win_show(w, PWS_SHOW);
+    // (a test on a desktop in use leaves the keyboard where it is)
+    plat::win_show(w, if plat::env("jfgui_TEST_NOACTIVATE").is_some() { plat::PWS_SHOWNA } else { PWS_SHOW });
     pump(150);
     Some(w)
 }

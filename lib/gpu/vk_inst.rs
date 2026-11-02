@@ -579,6 +579,8 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
     unsafe { (f.get_physical_device_properties2)(pd, &mut p2) };
     let api = p2.properties.api_version;
     let v12 = api >= vk::API_VERSION_1_2;
+    // (VK_EXT_image_drm_format_modifier needs it, core since 1.2)
+    exts.dmabuf = exts.dmabuf && (v12 || ext(b"VK_KHR_image_format_list\0"));
     let has_drv = v12 || exts.driver_properties_khr;
     if api >= vk::API_VERSION_1_3 {
         dip.p_next = &mut size_ctl as *mut _ as *mut c_void;

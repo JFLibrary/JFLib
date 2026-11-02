@@ -61,13 +61,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
-  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs)
+  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -8407,12 +8407,13 @@ ID_HASH_BASE: u32 = 0x0800_0000
 - **`fn id_scope<R>(&mut self, n: u32, f: impl FnOnce(&mut Ui) -> R) -> R`**
   id_push(n), f(ui), id_pop()
 
-#### `ui/gpu_out.rs` (Windows)
+#### `ui/gpu_out.rs`
 
 Source: [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs)
 
 ```text
-gpu_out -- UI windows on the screen through a swapchain (Windows; docs/GPU.md "Ausgabe der UI")
+gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc:
+docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux")
 
 The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -8440,6 +8441,17 @@ starts after the first frame, so the first frame never waits for them.
 
 The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
 window GDI stays invisible there, also after the swapchain is gone.
+
+Linux: the same code.  A Swapchain there is a set of dma-bufs lib/gpu makes itself (vk_dmabuf.rs,
+no VkSurface: that would want libwayland or libxcb), plat attaches them with its own protocol code
+(linux_gpuout.rs); shared memory and dma-bufs take turns on one wl_surface or X window, so there is
+no child and win_gpu_child only says what the display accepts.  The differences this code sees: a
+frame reaches the window after the GPU has finished it (flush, busy: the loop looks every ms while
+one is on its way), the next one starts when the display has answered the last (next_look: no
+polling, the answer ends the wait; the frame stays in the texture and its newest state is drawn
+then), the compositor gets the frame's rectangles (damage), a worker may not ask the window system
+(Surface::track_size).  What cannot be read back is said by the tests: no client reads a Wayland
+window, Xwayland's GetImage of a flipped window lags one frame.
 
 Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -8492,9 +8504,10 @@ drawn when a view moves over it.  Nothing of it exists before the first move, an
 
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
-usable adapter or surface: the CPU path for good, silently.
+usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
+silently.
 
-Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
+Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -8504,8 +8517,8 @@ tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
 jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
-Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
-without a GPU, it prints a SKIP once and does nothing):
+Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
+Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
   gpu on [fast]          a real window per UI window (shown without activation) with
                          the output, every presented image compared with the framebuffer (fast:
                          not compared, for measurements), a render after every input edge; waits
@@ -8518,8 +8531,9 @@ without a GPU, it prints a SKIP once and does nothing):
                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-                         top of ours is a note, not a failure)
-  gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
+                         top of ours is a note, not a failure); X11: what the server holds for the
+                         window; Wayland: a note, no client can read it
+  gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
   gpu expect upload N    at most N bytes uploaded since the last check
   gpu expect base N      at most N bytes of them to the base texture since the last check
   gpu expect raster N    at most N pixels of the base layer drawn since the last check
@@ -8535,6 +8549,7 @@ without a GPU, it prints a SKIP once and does nothing):
   gpu shot FILE          the image the window presents now (read back: also what a gesture's
                          tiles show; `shot` writes the framebuffer)
   gpu lose               the device behaves as lost from now on (Device::test_lose)
+  gpu hold MS            real time passes, the windows stay as they are (a look from outside)
   gpu print              the counters
 ```
 
@@ -8561,8 +8576,8 @@ without a GPU, it prints a SKIP once and does nothing):
 Source: [`lib/ui/gpu_out_off.rs`](../lib/ui/gpu_out_off.rs)
 
 ```text
-gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows only for now):
-every frame takes the platform's path, no Vulkan code is linked
+gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows and Linux programs
+against glibc): every frame takes the platform's path, no Vulkan code is linked
 ```
 
 **`impl Ui`**
@@ -8570,17 +8585,17 @@ every frame takes the platform's path, no Vulkan code is linked
 - **`fn gpu_output(&self, _win: u32) -> GpuOutput`**
   what window `win` (a UI window index, 0 = main) shows through: here the platform's path
 - **`fn gpu_test_lose(&mut self)`**
-  (test aid) on Windows: the device behaves as lost from now on
+  (test aid) where the GPU shows windows: the device behaves as lost from now on
 - **`fn gpu_settle(&mut self)`**
-  on Windows: the pixels of the GPU's images into the framebuffer
+  where the GPU shows windows: the pixels of the GPU's images into the framebuffer
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
-  (test aid) on Windows: the bytes image textures may take
+  (test aid) where the GPU shows windows: the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
-  (test aid) on Windows: the bytes canvas tiles may take
+  (test aid) where the GPU shows windows: the bytes canvas tiles may take
 - **`fn gpu_test_canvas_unused(&mut self, _ms: u64)`**
-  (test aid) on Windows: the tiles go this long (ms) after the last move
+  (test aid) where the GPU shows windows: the tiles go this long (ms) after the last move
 - **`fn gpu_canvas_settle(&mut self)`**
-  on Windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+  where the GPU shows windows: every canvas whose view comes from tiles goes back to the CPU's picture now
 
 #### `ui/canvas.rs`
 
@@ -17936,7 +17951,7 @@ FXW_NEDGE: i32 = 7
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
 and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
 Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
-vk_*.rs; on Linux no windows yet).  Planned: Android, WebGPU in the browser, Metal; they provide
+vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: Android, WebGPU in the browser, Metal; they provide
 the same types and methods.
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
@@ -17973,11 +17988,15 @@ the same types and methods.
   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
   queue.write_buffer / write_texture / write_texture_rects / write_texture_rects_at (staged in
                    a ring, before the next submit), read_buffer (waits)
-  Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
-  Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
+  Surface::new(&instance, plat_window)            a plat window (Windows: HWND; Linux: what its
+                                                  display accepts, plat::win_gpu_child)
+  Surface::native(&instance, handles, plat_window)  a window given by its handles (a child);
+                   track_size(): the size for a rebuild on a worker (Linux)
   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
                    view(&frame), texture(&frame), present(frame, [cmd, ..]), resize(),
-                   try_acquire() (never waits or rebuilds), rebuild()
+                   try_acquire() (never waits or rebuilds), rebuild(), and for the same code on
+                   every target flush(), busy(), next_look(retry) (a frame reaches a Linux window
+                   after the GPU has finished it: vk_dmabuf.rs), damage(rects)
 
 Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
 with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
@@ -18865,6 +18884,8 @@ messages, info level and up).
   the highest level a device of this adapter supports
 - **`fn can_present(&self, surface: &crate::Surface) -> bool`**
   a device of this adapter can show images on the surface
+- **`fn can_present(&self, surface: &crate::Surface) -> bool`**
+  a device of this adapter can show images on the surface
 
 ### `gpu/vk_res.rs`
 
@@ -19095,35 +19116,21 @@ The window must not be presented by the CPU (plat::win_present) at the same time
 window that never presents keeps nothing of its own to paint (win_api.rs WM_PAINT).
 ```
 
-- **`struct Surface(pub(crate) Arc<SurfShared>)`**
-  a window as a target for swapchains
-
 **`impl Surface`**
 
+- **`fn track_size(&self)`**
+  (Linux: the window's size for a rebuild on a worker; here the driver knows it)
 - **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
   the surface of plat window `window` (an index of plat::win_create)
 - **`fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
   the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
   whose size and state are those of plat window `window`
 
-- **`struct Frame`**
-  an acquired swapchain image (present it with Swapchain::present)
-
-- **`enum TryAcquire`**
-  what Swapchain::try_acquire found
-  - `Frame(Frame)`
-  - `NotReady` -- no image is free yet, or the frame slot's previous submission still runs: try again later
-  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
-  - `NoArea` -- the window is minimised or has no area
-
 **`impl Frame`**
 
 - **`fn index(&self) -> u32`**
   the image's index in the swapchain
 - **`fn size(&self) -> (u32, u32)`**
-
-- **`struct Swapchain`**
-  the images a window shows, presented in turn
 
 **`impl Device`**
 
@@ -19144,6 +19151,16 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
   the frame's image (copies: SwapchainDesc::copy_src)
 - **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, frame: Frame, cmds: I) -> Result<SubmitId>`**
   submit the frame's commands (they leave the image in Layout::Present) and show it
+- **`fn prepare(&mut self) -> Result<bool>`**
+  (Linux: the display has answered for the images; here nothing to wait for)
+- **`fn flush(&self) -> Result<bool>`**
+  (Linux: a frame reaches the window after the GPU finished it; here present has done that)
+- **`fn busy(&self) -> bool`**
+  (Linux: a frame is on its way to the window; here never)
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again: retry (the caller's time)
+- **`fn damage(&self, _rects: Option<&[[i32; 4]]>)`**
+  (Linux: what the next image changes, for the compositor; here the whole image counts)
 - **`fn resize(&mut self)`**
   rebuild at the next acquire (the window's size is also checked at every acquire)
 - **`fn set_present_mode(&mut self, m: PresentMode)`**
@@ -19153,6 +19170,127 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
 - **`fn size(&self) -> (u32, u32)`**
   the images' size (0, 0 while the window has no area)
 - **`fn image_count(&self) -> usize`**
+
+### `gpu/vk_dmabuf.rs`
+
+Source: [`lib/gpu/vk_dmabuf.rs`](../lib/gpu/vk_dmabuf.rs)
+
+```text
+vk_dmabuf -- the swapchain of a Linux program: images without a VkSurface (programs against glibc;
+docs/GPU.md "Ausgabe unter Linux")
+
+Vulkan's Wayland surface wants a pointer from libwayland-client, the X11 one from libxcb.  JFLib
+speaks both protocols itself and has neither.  So the GPU draws into images of its own, exported as
+dma-bufs, and plat hands them to the window (lib/plat/linux_gpuout.rs).  For the caller this is the
+same as vk_swap.rs: Surface, create_swapchain, try_acquire, view, present, rebuild.
+
+  Surface::native(&instance, plat::win_gpu_child(w), w)   what the display of window w accepts
+  surface.track_size()              (the window loop's thread) the window's size for a rebuild on a
+                                    worker: only that thread may ask plat
+  device.create_swapchain(&surface, &SwapchainDesc)       any thread
+       min_images images (0: 3), XRGB8888 (else XBGR8888, ARGB8888, ABGR8888) as B8G8R8A8 /
+       R8G8B8A8, single-plane modifiers the device can export and the display accepts: the driver
+       picks (VkImageDrmFormatModifierListCreateInfoEXT), a dedicated allocation, dma-buf
+  sc.try_acquire()                  never waits, never rebuilds; registers the images with plat at
+       its first call; looks at the frame before (flush); then NotReady while one is on its way or
+       the display has not answered the last commit (the frame stays in the caller's texture and
+       its newest state is drawn then: nothing queues up) or no image is free
+  sc.present(frame, [cmd, ..])      submits; the image goes to the window when the GPU has finished
+  sc.flush() -> still on its way    that look at the timeline: the frame goes to the window (the
+       window loop calls it, a frame is rarely done before present returns)
+  sc.busy()                         a frame is on its way: flush soon
+  sc.next_look(retry)               when a frame that found NotReady should try again
+  sc.damage(rects)                  what the next presented image changes against the last one (None:
+       all; without any call: all).  What the compositor has to draw again, nothing else
+  sc.acquire()                      waits (pumping the display, events stay queued) and rebuilds
+  sc.rebuild()                      any thread, without waiting: the old images die with the frames
+       that use them
+
+Why the image can never be wrong on the screen: linux_gpuout.rs.  Here: an image goes to plat only
+after its submission reached the timeline; an image is drawn into only when plat says FREE and a
+poll of its dma-buf for POLLOUT says no fence of another reader is left.  Queue ownership goes to
+VK_QUEUE_FAMILY_FOREIGN_EXT at the end of every frame and comes back at the start of the next.
+Compression (modifiers with more than one plane) is left out: the window system does not gain
+enough from it for the checks each driver wants at the hand-over.
+
+Threads: plat's display calls only on the thread of the window loop (linux_disp.rs).  So a worker's
+rebuild and any drop only note the buffers that go (RETIRED), try_acquire and flush free them.
+```
+
+- **`struct Surface(pub(crate) Arc<SurfShared>)`**
+  a window as a target for swapchains
+
+**`impl Surface`**
+
+- **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
+  the surface of plat window `window`
+- **`fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the surface from what plat::win_gpu_child said about plat window `window` (any thread)
+- **`fn track_size(&self)`**
+  (the window loop's thread) the window's size now: what a rebuild on a worker makes
+
+- **`struct Frame`**
+  an acquired image (present it with Swapchain::present)
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no image is free yet, or the display has not answered the last frame: try again later
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window is minimised or has no area
+
+**`impl Frame`**
+
+- **`fn index(&self) -> u32`**
+  the image's index in the swapchain
+- **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  the images a window shows, presented in turn
+
+**`impl Device`**
+
+- **`fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain>`**
+
+**`impl Swapchain`**
+
+- **`fn rebuild(&mut self) -> Result<()>`**
+  the images for the size the window has now, without waiting (any thread)
+- **`fn flush(&self) -> Result<bool>`**
+  the frame on its way: finished by the GPU -> it goes to the window; -> still on its way
+- **`fn busy(&self) -> bool`**
+  a frame is on its way to the window: flush soon
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again: soon when the GPU is drawing; when the
+  display's answer is overdue if it has not given it (the answer itself ends the wait earlier);
+  else retry, the caller's time
+- **`fn prepare(&mut self) -> Result<bool>`**
+  the images to the display, its answer there (the window loop's thread)
+- **`fn damage(&self, rects: Option<&[[i32; 4]]>)`**
+  what the next presented image changes against the last one: rectangles x, y, w, h (None: all)
+- **`fn try_acquire(&mut self) -> Result<TryAcquire>`**
+  the next image to draw into, without waiting and without rebuilding (see TryAcquire)
+- **`fn acquire(&mut self) -> Result<Option<Frame>>`**
+  the next image to draw into, rebuilt when stale; waits (the display is pumped, events stay
+  queued); None while the window is minimised or has no area
+- **`fn view(&self, frame: &Frame) -> &TextureView`**
+  the frame's image as a render target (Undefined at the start, Present at the end)
+- **`fn texture(&self, frame: &Frame) -> &Texture`**
+  the frame's image (copies: SwapchainDesc::copy_src)
+- **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, frame: Frame, cmds: I) -> Result<SubmitId>`**
+  submit the frame's commands (they leave the image in Layout::Present); it goes to the window
+  when the GPU has finished it (flush)
+- **`fn resize(&mut self)`**
+  rebuild at the next acquire (the window's size is also checked at every acquire)
+- **`fn set_present_mode(&mut self, m: PresentMode)`**
+  another present mode from the next acquire on
+- **`fn present_mode(&self) -> PresentMode`**
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  the images' size (0, 0 while the window has no area)
+- **`fn image_count(&self) -> usize`**
+- **`fn drm_format(&self) -> (u32, u64)`**
+  the images' DRM format and modifier (tests, traces)
 
 ## shader
 
@@ -27010,6 +27148,7 @@ win_gpuout -- the child window a window's GPU output draws on (lib/ui's presente
   win_in_sizemove()                    the modal move / size loop runs
   win_display_adapter(w) -> (vendor id, device id)   the GPU that drives the window's monitor
   win_remote_session()                 this is a Remote Desktop session
+  gpu_wait(deadline_us)                pump the messages until then (Linux: linux_gpuout.rs)
 
 Why a child: once a swapchain has presented on a window, what GDI draws on that window stays
 invisible, also after the swapchain and its surface are destroyed (measured: DWM keeps showing
@@ -27039,8 +27178,10 @@ the focus.  It is destroyed together with its parent.
   (gpu) window w's copy for WM_PAINT is not needed while the child shows the window (the next
   win_present makes a new one)
 
-- **`fn win_in_sizemove() -> bool`**
+- **`fn gpu_wait(deadline_us: u64)`**
   the modal move / size loop of a window runs (the program's own loop waits for its end)
+
+- **`fn win_in_sizemove() -> bool`**
 
 - **`fn win_remote_session() -> bool`**
   this program runs in a Remote Desktop session (the GPU output stays off)
@@ -28566,6 +28707,159 @@ a driver's getenv reads the start environment.
 - **`fn glibc_thread_ids() -> (usize, usize, usize)`**
   the calling thread's FS base, pthread_self() and the address of errno: its thread control block
   and thread-local storage (a raw clone would have 0 and the creator's)
+
+### `plat/linux_gpuout.rs` (Linux)
+
+Source: [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs)
+
+```text
+linux_gpuout -- what lib/gpu's images need from the window system: dmabuf buffers on a window,
+through JFLib's own Wayland and X11 code (programs against glibc only; docs/GPU.md "Ausgabe unter
+Linux").  No libwayland, no libxcb: Vulkan's surfaces would want a pointer from them, so the GPU
+draws into images of its own and this code hands them to the window.
+
+  win_gpu_child(w) -> NativeWindow   what the display accepts for window w (format + modifier
+                                     pairs, its render device) and the window's size: None = the
+                                     CPU path.  The name is the Windows presenter's, whose child
+                                     window this stands for; a Linux window needs no child: one
+                                     wl_surface or X window takes shared memory and dmabufs in turn
+  win_gpu_child_show, win_release_kept, win_in_sizemove, win_display_adapter, win_remote_session
+                                     nothing to do or know here
+  gpu_buf_new(w, &GpuBufDesc) -> handle     a buffer of window w from its planes (takes the fds);
+                                     0: refused.  On Wayland its answer comes later: PENDING first
+  gpu_buf_state(w, handle) -> GPU_BUF_*     FREE: nobody reads it, it is not the one on the window
+  gpu_buf_free(w, handle)            the buffer goes (also while it is on the window: what it shows
+                                     stays, as long as nobody writes the memory)
+  gpu_can_show(w) -> bool            a new frame is welcome now: the last commit has been answered
+                                     (the frame callback, PresentCompleteNotify; 1 s at most)
+  gpu_show(w, handle, rects)         the buffer, finished by the GPU, goes on the window (at once, or
+                                     as soon as the window can take it); rects: what changed against
+                                     the last one, None = all.  From now on window w shows through
+                                     buffers, until the next win_present.
+  gpu_next_look(w) -> time_us        when a frame that cannot go on yet should look again; the wait
+                                     returns earlier when the answer comes
+  gpu_wait(deadline_us)              pump the display until the deadline, also with events queued
+                                     (they stay queued; a plain wait would not read the socket)
+
+Only the thread of the window loop calls these (the backends are single-threaded: linux_disp.rs).
+
+No wrong frame can show:
+  * a buffer goes to the window only after the GPU has finished it (lib/gpu: Swapchain::flush
+    looks at the timeline without waiting).  So nothing depends on implicit sync: at the attach no
+    fence is pending on the buffer, on any compositor, kernel or driver.
+  * a buffer is drawn into only after the compositor gave it back (wl_buffer.release,
+    PresentIdleNotify) and no read of it is pending on its dma-buf (poll POLLOUT: the compositor's
+    GPU may still be reading it when the release arrives), and never while it is the newest.
+  * win_present ends the buffers' turn: a frame still on its way is dropped, shared memory shows
+    the whole frame.
+Test aids: win_test_image(w) reads what the window system holds where it can (X11: GetImage).
+```
+
+```rust
+/// a buffer's state (gpu_buf_state)
+GPU_BUF_PENDING: u32 = 0
+GPU_BUF_FREE: u32 = 1
+GPU_BUF_BUSY: u32 = 2
+GPU_BUF_FAILED: u32 = 3
+```
+
+- **`struct GpuCaps`**
+  what a display accepts as buffers
+  - `device: Option<u64>` -- the device it renders with (dev_t of a node of the DRM device), when it says so
+  - `formats: Vec<(u32, u64)>` -- DRM fourcc and modifier
+
+- **`struct GpuPlane`**
+  a plane of a buffer: a dma-buf (owned: closed once sent), its offset and row pitch
+  - `fd: i32`
+  - `offset: u32`
+  - `stride: u32`
+
+- **`struct GpuBufDesc`**
+  a buffer of memory the GPU drew into
+  - `w: i32`
+  - `h: i32`
+  - `fourcc: u32`
+  - `modifier: u64`
+  - `planes: Vec<GpuPlane>`
+
+- **`struct NativeWindow`**
+  the Linux form of the handles lib/gpu gets for a window (Windows: HWND, HINSTANCE)
+  - `caps: GpuCaps`
+  - `size: (i32, i32)`
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+
+- **`fn win_gpu_child_show(_w: i32, _show: bool)`**
+
+- **`fn win_release_kept(_w: i32)`**
+
+- **`fn win_in_sizemove() -> bool`**
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  the GPU that drives the window's monitor: not known here, the display's device decides (GpuCaps)
+
+- **`fn win_remote_session() -> bool`**
+
+- **`fn gpu_buf_new(w: i32, d: &GpuBufDesc) -> u32`**
+
+- **`fn gpu_buf_state(w: i32, h: u32) -> u32`**
+
+- **`fn gpu_buf_free(w: i32, h: u32)`**
+
+- **`fn gpu_can_show(w: i32) -> bool`**
+
+- **`fn gpu_show(w: i32, h: u32, rects: Option<&[[i32; 4]]>)`**
+
+- **`fn gpu_next_look(w: i32) -> u64`**
+
+- **`fn gpu_wait(deadline_us: u64)`**
+
+*test aids, as on Windows*
+
+```rust
+WT_PIXEL: u32 = 1
+WT_REDRAW: u32 = 2
+WT_MOVE: u32 = 3
+WT_DPI: u32 = 4
+WT_POPUP_RECT: u32 = 7
+WT_NOANIM: u32 = 16
+WT_FROM_POINT: u32 = 17
+WT_SHOW: u32 = 18
+```
+
+- **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
+  (tests)
+  ```text
+  WT_PIXEL      the colour the window system holds at client pixel a[0], a[1] of window w: X11
+                GetImage, Wayland the last shared memory buffer; -1: no way to know (Wayland on
+                GPU buffers: a client cannot read a window back)
+  WT_MOVE       a[0], a[1], a[2], a[3]: the window's rectangle; win_set_rect reports nothing back
+                here, the event a size change has on Windows comes from this aid
+  WT_DPI        a[0]: the dpi as if the compositor preferred that scale (Wayland with a viewport,
+                else -1: X11 has one dpi for the display and no second size)
+  WT_SHOW       a[0] = 7 minimised, 4 back: X11 through the window manager; Wayland can minimise, but
+                no client can undo that: 4 does what the compositor's next activation does here
+  WT_POPUP_RECT popup slot w is shown: 1, else -1
+  WT_NOANIM, WT_FROM_POINT  nothing to turn off; nobody tells a client what lies on top of its
+                window: it counts as ours
+  ```
+
+- **`fn win_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) what the window system holds for window w: (w, h, rows of w \* 4 bytes): X11 reads it
+  back (GetImage; also a buffer on the window), Wayland has no way to: None
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
+  (tests) a part of the screen: no client on Linux can read it without asking the user
+
+- **`fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize`**
+  (tests) nothing to send to: Windows' messages
+
+- **`fn win_test_usage() -> (u64, u64, u64)`**
+  (tests) (CPU time of this process so far in us, its resident bytes, its anonymous resident bytes)
+
+- **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
+  (bench: jfgui_WL_FEEDBACK=1 on Wayland) the commits since the last call and when each reached the
+  screen (wp_presentation): (time of the commit, time on the screen; 0: discarded), time_us
 
 ### `plat/web.rs`
 
