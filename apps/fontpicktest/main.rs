@@ -23,11 +23,13 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
-const DESC: AppDesc = AppDesc { title: "jfgui Schriften", flags: AF_RESIZABLE, w: 720, h: 620, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "JFLib Schriften", flags: AF_RESIZABLE, w: 720, h: 620, ..AppDesc::NONE }; // i18n
 
 const PICKER: u32 = wid("picker");
 const DIALOG: u32 = wid("dialog");
+const SUBPIXEL: [&str; 5] = ["keine", "RGB", "BGR", "VRGB", "VBGR"]; // i18n
 const GENERICS: [&str; 5] = ["sans-serif", "serif", "monospace", "Helvetica", "Unbekannt"];
 
 struct Fonts {
@@ -52,7 +54,7 @@ impl Fonts {
 }
 
 fn describe(s: &FontSel) -> String {
-    let mut d = format!("{} {} {} {}", s.family, s.weight, if s.italic { "kursiv" } else { "normal" }, s.size);
+    let mut d = format!("{} {} {} {}", s.family, s.weight, if s.italic { t("kursiv") } else { t("normal") }, s.size);
     // a variable family's axis values (tag=value)
     for (t, v) in &s.axes {
         d.push_str(&format!(" {}={}", String::from_utf8_lossy(t).trim_end(), v));
@@ -63,34 +65,35 @@ fn describe(s: &FontSel) -> String {
 impl App for Fonts {
     fn frame(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | pad(16), 8);
-        ui.text(TS_SUBTITLE, "Schriften");
+        ui.text(TS_SUBTITLE, t("Schriften"));
         if ui.font_picker(PICKER, &mut self.sel) & EV_ACT != 0 {
             ui.repass();
         }
-        ui.text(TS_BODY, &format!("Auswahl: {}", describe(&self.sel)));
+        ui.text(TS_BODY, &tf("Auswahl: {}", &[&describe(&self.sel)]));
         let sel = self.sel.clone();
         let found = ui.font_resolved(&sel);
-        ui.text(TS_BODY, &format!("Geladen: {}", found));
+        ui.text(TS_BODY, &tf("Geladen: {}", &[&found]));
         ui.next_size(-1, 64);
         ui.box_begin(0, BOX_V | BOX_CARD | BOX_CLIP | BOX_CENTER | pad(12), 0);
         match ui.font_load(&sel) {
-            Some(f) => ui.text_in_font(f, sel.size, "Franz jagt im Taxi quer durch Bayern"),
-            None => ui.text(TS_BODY, "keine Schrift"),
+            Some(f) => ui.text_in_font(f, sel.size, t("Franz jagt im Taxi quer durch Bayern")),
+            None => ui.text(TS_BODY, t("keine Schrift")),
         }
         ui.box_end();
-        if ui.button(ui.id("open"), "Schriftart…") & EV_ACT != 0 {
+        if ui.button(ui.id("open"), t("Schriftart…")) & EV_ACT != 0 {
             self.dlg_open.set(1);
         }
         // the generic families and a substitute on this system's rules
         for g in GENERICS {
+            let g = if g == "Unbekannt" { t("Unbekannt") } else { g };
             let f = ui.font_resolved(&FontSel::new(g, 11.0));
             ui.text(TS_CAPTION, &format!("{} → {}", g, f));
         }
         let ja: Vec<String> = ui.font_conf().candidates("sans-serif", "ja").into_iter().take(2).collect();
         ui.text(TS_CAPTION, &format!("ja: {}", ja.join(", ")));
-        ui.text(TS_CAPTION, &format!("Glättung: {}  Dialog: {}", if ui.text.antialias() { "an" } else { "aus" }, self.accepted));
-        let order = ["keine", "RGB", "BGR", "VRGB", "VBGR"].get(ui.text.subpixel() as usize).copied().unwrap_or("?");
-        ui.text(TS_CAPTION, &format!("Subpixel: {}", order));
+        ui.text(TS_CAPTION, &tf("Glättung: {}  Dialog: {}", &[if ui.text.antialias() { t("an") } else { t("aus") }, &format!("{}", self.accepted)]));
+        let order = SUBPIXEL.get(ui.text.subpixel() as usize).map_or("?", |&o| t(o));
+        ui.text(TS_CAPTION, &tf("Subpixel: {}", &[order]));
         ui.box_end();
         if ui.font_dialog(DIALOG, &self.dlg_open, &mut self.sel) & EV_ACT != 0 {
             self.accepted += 1;
@@ -98,4 +101,7 @@ impl App for Fonts {
     }
 }
 
-ui::main!(ui::launch(&DESC, Fonts::new(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Fonts::new(), &style::STYLE)
+});
