@@ -96,10 +96,12 @@ G4560T, 7,6 GB RAM, Intel HD 610 mit Mesa 26.0.3. Zweig `linux-tests-minipc-2026
 8. RPM installieren und starten; AppImage (`squashfs-tools` fehlt); Flatpak: `flatpak-builder` zieht
    hier ein KDE-Update mit, das an einem Dateikonflikt zwischen `kf6-kmime` und `kmime` scheitert.
 
-**Gefunden, nicht behoben**: `--agent` an echten Fenstern. Die Revision ist der Bildzähler
-(`lib/ui/agent.rs`), jede Anfrage zeichnet selbst ein Bild, ändernde Aufrufe scheitern daher oft mit
-„The application state changed after it was inspected“. In diesem Lauf klappte es erst mit einer
-geratenen Revision. Fehlt `expectedRevision`, lehnt die App den Aufruf ganz ab.
+**Gefunden und behoben**: `--agent` an echten Fenstern. Die Revision war der Bildzähler
+(`lib/ui/agent.rs`), jede Anfrage zeichnet selbst ein Bild, ändernde Aufrufe scheiterten daher mit
+„The application state changed after it was inspected“. Jetzt bewegt sie sich nur, wenn sich die
+Bedienelemente ändern oder eine Agentenaktion etwas geändert hat
+(`apps/gallery/tests/agent_revision.uis`, `apps/agenttest/tests/gui_ipc_check.py`, auch auf diesem
+Rechner). Ein Testlauf mit `--agent` braucht also keine geratene Revision mehr.
 
 ---
 
