@@ -276,8 +276,10 @@ public final class GalleryGpuInstrumentation extends Instrumentation {
                 result.putLong("screen_differs_turned", badTurned);
                 check(badTurned == 0, "turned: the composed screen shows the framebuffer: " + badTurned + " pixels differ");
             }
-            runOnMainSync(() -> activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
-            check(until(10000, () -> view.getWidth() == wBefore && status().get("fb").equals(view.getWidth() + "x" + view.getHeight()) && onGpu()), "turned back: the swapchain again");
+            // (not UNSPECIFIED: how a phone lies would decide; the wish ends with the activity)
+            runOnMainSync(() -> activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
+            boolean back = until(10000, () -> view.getWidth() == wBefore && status().get("fb").equals(view.getWidth() + "x" + view.getHeight()) && onGpu());
+            check(back, "turned back: the swapchain again (view " + view.getWidth() + " of " + wBefore + ", " + status().get("fb") + ", on " + status().get("on") + ")");
         }
         // ---- the activity goes away and comes back: the surface goes and comes
         noBadFrames("before going away");
