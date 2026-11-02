@@ -168,6 +168,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
 - **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
 - **tools:** A development build no longer leaves a broken incremental cache behind when rustc is killed during ThinLTO: rustc overwrites the last good session's keys through a hard link, its next run then kept stale objects and exited 0, and every app linking that crate failed with undefined symbol anon.*.llvm.*; build_rs.py now detects the killed session and discards the crate's cache before compiling
+- **ui:** Agent control on real windows: without App::action_revision the revision no longer counts frames, it moves when the controls change or an agent's change ran, so ui.click, ui.type and ui.key work with the revision read last (--agent); uiRevision and sinceUiRevision likewise
 
 ### Security
 

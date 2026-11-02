@@ -232,7 +232,10 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `fn actions(&self) -> &'static [agent_core::ActionSpec]`
     Optional domain actions, in addition to the universal UI action catalogue.
   - `fn action_revision(&self) -> Option<u64>`
-    Domain revision; None uses the UI runtime's monotonically increasing frame revision.
+    Domain revision. None uses the UI runtime's own: it moves with the controls (their set,
+    labels, values and states, the focus, an open modal dialog, the title, enabled commands)
+    and with every agent call that changes something, not with frames or the pointer, and it
+    knows nothing of a change the user makes to the app's data.
   - `fn action_available(&self, _spec: &agent_core::ActionSpec) -> Result<(), agent_core::ActionError>`
     Dynamic domain constraints such as read-only files or an absent selection.
   - `fn action(&mut self, _ui: &mut Ui, _spec: &agent_core::ActionSpec, _input: &agent_core::Value, _context: &agent_core::ActionContext) -> Result<agent_core::ActionResult, agent_core::ActionError>`
@@ -3995,7 +3998,8 @@ Windows (ID = the app's window id, 0 / main = the main window):
 Permissions and agent control (auto_perm.rs):
   perm answer once|always|deny|never|dialog|none   perm timeout MS   perm store FILE|none
   perm reload   perm wait [MS]   perm reset   perm expect open|none|RULE ANSWER
-  agent on|off   agent call ACTION [JSON]   agent expect ok|error CODE
+  agent on|off   agent call|write ACTION [JSON]   agent keep   agent id S
+  agent expect ok|error CODE|same|moved
 The live inspector (inspect.rs):
   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look

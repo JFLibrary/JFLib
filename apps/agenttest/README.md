@@ -35,8 +35,10 @@ python apps/agenttest/tests/gui_ipc_check.py --bin-dir build/agent-core/win
 Run the same Python scripts under Linux with `--exe build/agent-core/linux/agenttest` and
 `--bin-dir build/agent-core/linux`. The GUI test briefly starts real Gallery/Kritzel windows
 with automatic shutdown, verifies that normal app launches expose no control endpoint,
-checks CLI discovery, widget inspection, PNG resources, and Kritzel resize/fill/undo. It
-uses only new in-memory documents. Windows launches request hidden windows.
+checks CLI discovery, widget inspection, PNG resources, clicks and typing in Gallery with
+the revision read last (one connection and the CLI), and Kritzel resize/fill/undo. It uses
+only new in-memory documents. Windows launches request hidden windows; set
+`jfgui_TEST_NOACTIVATE=1` on a desktop in use.
 
 `bridge_check.py` starts an ephemeral loopback listener and emulates the browser side to
 exercise token/origin checks, request correlation, bounded queues, timeout/disconnect

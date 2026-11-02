@@ -1,6 +1,7 @@
 // Universal application automation through the existing input, command and render paths.
 // Domain semantics remain in App::actions/action; no screen-coordinate inference is used.
 use alloc::{format, string::String, vec::Vec};
+use core::cell::Cell;
 use agent_core::{Access, ActionContext, ActionError, ActionResult, ActionSpec, Dispatcher, ErrorCode, Host, Resource, Value};
 use agent_core::schema::{Property, Schema, OBJECT, STRING, U64};
 use crate::{App, Ui, Runtime, Sem, consts::*};
@@ -12,9 +13,33 @@ pub(crate) struct State {
     connected: bool,
     render_id: u64,
     images: Vec<(String, Vec<u8>)>,
+    controls: Revision, // App::action_revision's stand-in: what an action depends on
+    shown: Revision,    // uiRevision: everything ui.state reports
     #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     server: Option<agent_io::ipc::Server>,
 }
+
+// A number for a state known by its hash: moves when the hash read differs from the last one.  A
+// window draws for every request and for the user's pointer, so its frames say nothing about a
+// change.
+#[derive(Default)]
+struct Revision {
+    hash: Cell<u64>,
+    count: Cell<u64>,
+}
+impl Revision {
+    fn read(&self, hash: u64) -> u64 {
+        if hash != self.hash.get() {
+            self.hash.set(hash);
+            self.bump();
+        }
+        self.count.get()
+    }
+    fn bump(&self) { self.count.set(self.count.get() + 1); }
+}
+
+/// the title bar's button for external control: its label says whether a client is connected
+pub(crate) const ID_BADGE: u32 = 0xFFFF_7440;
 
 static NODE: Schema = Schema::Object { properties: &[
     Property { name: "id", schema: &U64, required: true },
@@ -65,14 +90,41 @@ impl<'a> UiHost<'a> {
         if (node.layer as u32) < self.ui.modal_active() { return Err(error(ErrorCode::Unavailable, "A modal dialog blocks this widget")); }
         Ok(node.clone())
     }
-    fn settle(&mut self) {
+    // after an action; a change it made need not show in the controls (the app's own state)
+    fn settle(&mut self, action: &ActionSpec) {
+        if action.mutation { self.ui.agent.controls.bump(); }
         self.ui.run_passes(self.app);
         self.ui.render();
     }
+    // What ui.state reports, as a hash.  controls: only what an action depends on: not where a
+    // widget is (ui.click finds it anew), not the pointer over it, not what merely shows (texts,
+    // images, a running progress bar).  A client coming or going is no change of the app.
+    fn state_hash(&self, controls: bool) -> u64 {
+        let ui = &*self.ui;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(ui.title().as_bytes());
+        bytes.extend_from_slice(&ui.focused().to_le_bytes());
+        bytes.extend_from_slice(&ui.modal_active().to_le_bytes());
+        bytes.extend(ui.desc.cmds.iter().map(|c| (ui.cmd_flags(c.id) & CF_DISABLED != 0) as u8));
+        for s in ui.sems.iter().filter(|s| s.id != ID_BADGE) {
+            if controls && matches!(s.kind, K_BOX | K_TEXT | K_PROGRESS | K_ICON | K_IMAGE | K_HEADING) { continue; }
+            let state = if controls { s.state & !(SS_HOVER | SS_PRESSED) } else { s.state };
+            bytes.extend_from_slice(&s.id.to_le_bytes());
+            bytes.extend_from_slice(&s.kind.to_le_bytes());
+            bytes.extend_from_slice(&state.to_le_bytes());
+            bytes.extend_from_slice(&s.value.to_le_bytes());
+            bytes.extend_from_slice(&[s.win, s.layer]);
+            bytes.extend_from_slice(s.label.as_deref().unwrap_or("").as_bytes());
+            bytes.push(0);
+            if !controls { s.rect.iter().for_each(|v| bytes.extend_from_slice(&v.to_le_bytes())); }
+        }
+        base::hashring::hash64(&bytes)
+    }
+    fn ui_revision(&self) -> u64 { self.ui.agent.shown.read(self.state_hash(false)) }
 }
 impl Host for UiHost<'_> {
     fn actions(&self) -> &[ActionSpec] { &self.specs }
-    fn revision(&self) -> u64 { self.app.action_revision().unwrap_or(self.ui.frame as u64) }
+    fn revision(&self) -> u64 { self.app.action_revision().unwrap_or_else(|| self.ui.agent.controls.read(self.state_hash(true))) }
     fn capabilities(&self) -> u64 { plat::capabilities().available }
     fn availability(&self, action: &ActionSpec) -> Result<(), ActionError> {
         if let Some(reason) = plat::capabilities().unavailable_reason(action.capabilities) {
@@ -135,7 +187,7 @@ impl Host for UiHost<'_> {
                         Access::Confirm => self.confirm(&spec, &Value::object([]))?,
                     }
                     let result = self.app.action(self.ui, &spec, &Value::object([]), context)?;
-                    self.settle();
+                    self.settle(action);
                     return Ok(ActionResult { revision: self.revision(), ..result });
                 }
                 self.ui.desc.cmds.iter().find(|c| c.id == id)
@@ -170,7 +222,7 @@ impl Host for UiHost<'_> {
                 Value::object([("accepted", Value::Bool(true))])
             }
             "ui.render" => {
-                self.settle();
+                self.settle(action);
                 let image = self.ui.fb();
                 let bytes = img_png::encode(&image.px, image.w as usize, image.h as usize, image.stride as usize, false);
                 if bytes.len() > 16 * 1024 * 1024 { return Err(error(ErrorCode::LimitExceeded, "Rendered PNG exceeds 16 MiB")); }
@@ -185,11 +237,11 @@ impl Host for UiHost<'_> {
             }
             _ => {
                 let result = self.app.action(self.ui, action, input, context)?;
-                self.settle();
+                self.settle(action);
                 return Ok(ActionResult { revision: self.revision(), ..result });
             }
         };
-        self.settle();
+        self.settle(action);
         Ok(ActionResult::completed(value, self.revision()))
     }
     fn inspect(&self, query: &Value) -> Result<Value, ActionError> {
@@ -197,7 +249,8 @@ impl Host for UiHost<'_> {
             return self.app.action_inspect(query);
         }
         let revision = self.revision();
-        if query.get("sinceUiRevision").and_then(Value::as_u64) == Some(self.ui.frame as u64) {
+        let ui_revision = self.ui_revision();
+        if query.get("sinceUiRevision").and_then(Value::as_u64) == Some(ui_revision) {
             return Ok(Value::object([("revision", Value::u64(revision)), ("unchanged", Value::Bool(true))]));
         }
         let offset = query.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
@@ -212,7 +265,7 @@ impl Host for UiHost<'_> {
         ])).collect();
         let commands = self.ui.desc.cmds.iter().map(|c| Value::object([("id", Value::u64(c.id as u64)), ("label", Value::string(c.label)), ("enabled", Value::Bool(self.ui.cmd_flags(c.id) & CF_DISABLED == 0))])).collect();
         Ok(Value::object([
-            ("revision", Value::u64(revision)), ("uiRevision", Value::u64(self.ui.frame as u64)),
+            ("revision", Value::u64(revision)), ("uiRevision", Value::u64(ui_revision)),
             ("title", Value::string(self.ui.title())), ("focus", Value::u64(self.ui.focused() as u64)),
             ("modal", Value::u64(self.ui.modal_active() as u64)), ("capabilities", Value::u64(self.capabilities())),
             ("control", Value::object([("enabled", Value::Bool(self.ui.agent.enabled)), ("connected", Value::Bool(self.ui.agent.connected))])),
