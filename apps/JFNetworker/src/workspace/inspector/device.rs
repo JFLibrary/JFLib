@@ -22,6 +22,8 @@
 //
 // Last, the physical view's part (P1, workspace/phys/props.rs): where the device stands, a list
 // of places to move it to, its rack unit, the optic of each optics cage.
+//
+// A host gets its hardware after its cables (hardware.rs: its CPU, RAM and disk, a resize).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -312,6 +314,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
             ui.text(TS_CAPTION | TX_SECONDARY, &tf("… und {} weitere", &[&(nb.len() - 24).to_string()]));
         }
     }
+    // its CPU, RAM and disk (hardware.rs)
+    super::hardware::device(n, ui, id);
     // faults of the lab: power, a service, the disk (faults.rs)
     super::faults::device(n, ui, id);
     // where it stands, its optics (the physical view, last: workspace/phys/props.rs)

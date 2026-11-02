@@ -1,0 +1,59 @@
+# JFNetworker-Szenario hw_basic.scn: „Hardware: ein Webserver unter Last“, 3 Geräte, 2 Verbindungen, Seed 23
+   5.000000000  ok      expect WEB1 svc web metric requests >= 430 over 3s (446.666)
+   5.000000000  ok      expect WEB1 svc web metric requests <= 450 over 3s (446.666)
+   5.000000000  ok      expect WEB1 svc _host metric cpu_pm >= 990 over 3s (1000)
+   5.000000000  ok      expect WEB1 svc _host metric min runq >= 20 over 3s (28)
+   5.000000000  ok      expect WEB1 svc _host metric cores == 4 (4)
+   5.000000000  ok      expect WEB1 svc _host metric swap_bytes == 0 (0)
+   5.000000000  ok      expect WEB2 svc web metric requests >= 50 over 3s (62.333)
+   5.000000000  ok      expect WEB2 svc _host metric cpu_pm >= 500 over 3s (629.333)
+   5.000000000  ok      expect WEB2 svc _host metric cpu_pm <= 700 over 3s (629.333)
+   5.000000000  WEB1    root@WEB1:~# lscpu
+   5.000000000  WEB1    CPU(s):        4
+   5.000000000  WEB1    Model name:    simulated core (1.1 x the reference core)
+   5.000000000  WEB1    Thread(s):     1 per core
+   5.000000000  WEB1    root@WEB1:~# free
+   5.000000000  WEB1    MiB        total      used      free
+   5.000000000  WEB1    Mem:       16384       258     16126
+   5.000000000  WEB1    Swap:       2048         0      2048
+   5.000000000  WEB1    root@WEB1:~# top -b -n 1
+   5.000000000  WEB1    top - 00:00:05 up 0 min,  1 user,  load average: 25.60, 25.60, 25.60
+   5.000000000  WEB1    Tasks:   3 total,   2 running,   1 sleeping,   0 stopped,   0 zombie
+   5.000000000  WEB1    %Cpu(s):100.0 us,  0.0 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+   5.000000000  WEB1    MiB Mem :    16384 total,    16126 free,      258 used
+   5.000000000  WEB1    MiB Swap:     2048 total,     2048 free,        0 used
+   5.000000000  WEB1    
+   5.000000000  WEB1        PID USER      PR  NI S  %CPU     TIME+ COMMAND
+   5.000000000  WEB1        101 root      20   0 R 400.0   0:16.10 web
+   5.000000000  WEB1          1 root      20   0 S   0.0   0:00.00 init
+   5.000000000  WEB1        102 root      20   0 R   0.0   0:00.00 top
+   5.000000000  --      run 100ms
+   5.100000000  ok      expect WEB1 output contains "web"
+   8.000000000  --      resize WEB1: 8 Kerne, 32 GiB RAM, NVMe-SSD 960 GiB, 2s Neustart
+   9.000000000  ok      expect WEB1 svc web metric max requests == 0 between 8s and 9s (0)
+  10.000000000  --      Fehler 1 behoben: WEB1 startet für neue Hardware neu
+  14.000000000  ok      expect WEB1 svc _host metric cores == 8 (8)
+  14.000000000  ok      expect WEB1 svc web metric requests >= 780 over 3s (800)
+  14.000000000  ok      expect WEB1 svc web metric requests <= 820 over 3s (800)
+  15.000000000  --      fault 2: CPU von WEB1 langsam: Rechenzeit ×2 (für 4s)
+  19.000000000  --      Fehler 2 behoben: CPU von WEB1 langsam: Rechenzeit ×2
+  19.000000000  ok      expect WEB1 svc web metric requests >= 385 between 16s and 19s (400)
+  19.000000000  ok      expect WEB1 svc web metric requests <= 415 between 16s and 19s (400)
+  20.000000000  --      resize WEB1: 8 Kerne mit 200 % Tempo, 32 GiB RAM, NVMe-SSD 960 GiB, im Betrieb
+  24.000000000  ok      expect WEB1 svc web metric requests >= 1560 over 3s (1600)
+  24.000000000  ok      expect WEB1 svc web metric requests <= 1640 over 3s (1600)
+  24.000000000  ok      expect WEB1 svc web metric min requests >= 1500 between 20s and 24s (1568)
+  25.000000000  --      fault 3: Speicherfresser auf WEB2: 512 MiB (für 3s)
+  28.000000000  --      Fehler 3 behoben: Speicherfresser auf WEB2: 512 MiB
+  28.000000000  ok      expect WEB2 svc _host metric swap_bytes > 0 between 26s and 28s (449642496)
+  28.000000000  ok      expect WEB2 svc _host metric disk_bytes > 0 between 26s and 28s (39161856)
+  28.000000000  ok      expect WEB2 svc _host metric pageins > 0 between 26s and 28s (9561)
+  28.000000000  ok      expect WEB2 svc _host metric runq > 5 between 26s and 28s (140)
+  36.000000000  ok      expect WEB2 svc _host metric max disk_bytes == 0 over 3s (0)
+  36.000000000  ok      expect WEB2 svc _host metric swap_bytes == 0 over 3s (0)
+  37.000000000  --      fault 4: Speicherfresser auf WEB2: 2 GiB (für 1s)
+  38.000000000  --      Fehler 4 behoben: Speicherfresser auf WEB2: 2 GiB
+  39.000000000  ok      expect WEB2 svc _host metric oom_kills == 1 (1)
+  39.000000000  ok      expect WEB2 svc web metric requests == 0 over 1s (0)
+  39.000000000  --      fertig
+# 27 von 27 Erwartungen erfüllt

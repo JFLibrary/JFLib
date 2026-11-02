@@ -1,0 +1,144 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Hardware: ein Webserver unter Last",
+  "description": "GEN erzeugt Last, WEB1 und WEB2 rechnen. Das Projekt simuliert Hardware: WEB1 hat die Werte seines Modells, WEB2 eigene. Jede Anfrage kostet 10 ms Rechenzeit am Referenzkern.",
+  "seed": 23,
+  "next_id": 10,
+  "strict_mdix": false,
+  "metered": true,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 40,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\nip addr add 10.0.2.10/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load1",
+          "disabled": false,
+          "config": {
+            "targets": ["http://10.0.1.11/"],
+            "mode": "closed",
+            "users": 32,
+            "delay_ms": 1000,
+            "timeout_ms": 500,
+            "connect_timeout_ms": 500
+          }
+        },
+        {
+          "kind": "http-load",
+          "name": "load2",
+          "disabled": false,
+          "config": {
+            "targets": ["http://10.0.2.12/"],
+            "mode": "open",
+            "rps": 60,
+            "arrival": "poisson",
+            "delay_ms": 1000,
+            "timeout_ms": 2000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "WEB1",
+      "model": "server-s",
+      "x": 300,
+      "y": 40,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.1.11/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "cpu_ms": 10,
+            "max_requests": 0,
+            "mem_mb": 256,
+            "routes": [{"path": "*", "method": "", "body": "Hallo von {host}\n"}]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "WEB2",
+      "model": "server-tower",
+      "x": 300,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname WEB2\nip addr add 10.0.2.12/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "cpu_ms": 10,
+            "max_requests": 0,
+            "data_mb": 900,
+            "routes": [{"path": "*", "method": "", "body": "Hallo von {host}\n"}]
+          }
+        }
+      ],
+      "comment": "",
+      "hw": {
+        "cores": 1,
+        "speed_pm": 1000,
+        "ram_mb": 1024,
+        "swap_mb": 1024,
+        "disk": "hdd",
+        "disk_gb": 500
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": 4,
+      "a": {"dev": 1, "port": "eth0"},
+      "b": {"dev": 2, "port": "eth1"},
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 5,
+      "a": {"dev": 1, "port": "eth1"},
+      "b": {"dev": 3, "port": "eth1"},
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

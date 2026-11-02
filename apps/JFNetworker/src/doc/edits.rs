@@ -10,6 +10,8 @@
 //                                              applied when it is allowed
 //   note_text(p, id, text) / title(p, text)    the text of a note, the project's title
 //   strict_mdix(p, on) -> edit                 "Auto-MDI-X aus" of the project (not applied yet)
+//   metered(p, on) / device_hw(p, dev, hw) -> edit   "Hardware simulieren" of the project, a device's
+//                                              own figures (SA1; not applied yet)
 //   label_edit(p, id, text, w, h) -> edit      the text and the box of a label (not applied yet)
 //   connect(p, a, b, cable) -> Result<(id, edit)>   a new link (jfn_model's cable rules: None
 //                                              takes the right cable), applied
@@ -401,6 +403,62 @@ pub(crate) fn strict_mdix(p: &Project, on: bool) -> Option<Box<dyn Edit<Project>
         return None;
     }
     Some(Box::new(StrictMdix { to: on }))
+}
+
+struct Metered {
+    to: bool,
+}
+
+impl Edit<Project> for Metered {
+    fn apply(&mut self, p: &mut Project) {
+        p.metered = self.to;
+    }
+    fn revert(&mut self, p: &mut Project) {
+        p.metered = !self.to;
+    }
+    fn label(&self) -> &str {
+        "Hardware simulieren ändern"
+    }
+}
+
+/// "Hardware simulieren" on or off -> the undo step (not applied yet), None when it is so already
+pub(crate) fn metered(p: &Project, on: bool) -> Option<Box<dyn Edit<Project>>> {
+    if p.metered == on {
+        return None;
+    }
+    Some(Box::new(Metered { to: on }))
+}
+
+struct DeviceHw {
+    dev: u32,
+    from: Option<jfn_model::catalog::Hw>,
+    to: Option<jfn_model::catalog::Hw>,
+}
+
+impl Edit<Project> for DeviceHw {
+    fn apply(&mut self, p: &mut Project) {
+        if let Some(d) = p.device_mut(self.dev) {
+            d.hw = self.to.clone();
+        }
+    }
+    fn revert(&mut self, p: &mut Project) {
+        if let Some(d) = p.device_mut(self.dev) {
+            d.hw = self.from.clone();
+        }
+    }
+    fn label(&self) -> &str {
+        "Hardware ändern"
+    }
+}
+
+/// a device's own figures (None: its model's) -> the undo step (not applied yet), None when it has
+/// them already
+pub(crate) fn device_hw(p: &Project, dev: u32, hw: Option<jfn_model::catalog::Hw>) -> Option<Box<dyn Edit<Project>>> {
+    let d = p.device(dev)?;
+    if d.hw == hw {
+        return None;
+    }
+    Some(Box::new(DeviceHw { dev, from: d.hw.clone(), to: hw }))
 }
 
 struct Info {

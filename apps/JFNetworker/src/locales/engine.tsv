@@ -1601,3 +1601,31 @@ DSL-Modem (RJ11, 1G LAN)	DSL modem (RJ11, 1G LAN)
 Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.	Category {} does not fit {}; the limits without a category apply.
 {}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.	{} cable on {} does not carry {}; the link stays down.
 {}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.	{} cable between {} and {} does not carry {}; the link stays down.
+
+# SA1: the hardware of a device (catalog.rs, fault.rs, trace.rs)
+Rack-Server S	Rack server S
+Rack-Server S (2× 10GBASE-T, 1G Management)	Rack server S (2× 10GBASE-T, 1G management)
+Rack-Server M	Rack server M
+Rack-Server M (2× 25G SFP28, 1G Management)	Rack server M (2× 25G SFP28, 1G management)
+Rack-Server L	Rack server L
+Rack-Server L (2× 25G SFP28, 1G Management)	Rack server L (2× 25G SFP28, 1G management)
+Rack-Server XL	Rack server XL
+Rack-Server XL (2× 100G QSFP28, 1G Management)	Rack server XL (2× 100G QSFP28, 1G management)
+NAS	NAS
+NAS mit Festplatten (2× 10GBASE-T)	NAS with hard disks (2× 10GBASE-T)
+SATA-SSD	SATA SSD
+NVMe-SSD	NVMe SSD
+schnelle NVMe-SSD	fast NVMe SSD
+{} GiB	{} GiB
+{} MiB	{} MiB
+1 Kern	1 core
+{} Kerne	{} cores
+{}, {} RAM, {} {} GiB	{}, {} RAM, {} {} GiB
+{} mit {} % Tempo, {} RAM, {} {} GiB	{} at {} % speed, {} RAM, {} {} GiB
+CPU von {} langsam: Rechenzeit ×{}	CPU of {} slow: CPU time ×{}
+CPU von {} langsam: Rechenzeit ×{},{}	CPU of {} slow: CPU time ×{}.{}
+Speicherfresser auf {}: {}	Memory hog on {}: {}
+{} startet für neue Hardware neu	{} restarts for new hardware
+{} hat keine simulierte Hardware.	{} has no simulated hardware.
+Der Faktor einer langsamen CPU muss größer als 0 sein.	The factor of a slow CPU must be greater than 0.
+Speicher voll: Dienst {} mit {} beendet	Memory full: service {} with {} killed

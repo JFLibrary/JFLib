@@ -695,3 +695,24 @@ pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
 /// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
 /// the courses of AK1 can follow)
 pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;
+// ---- SA1: the hardware of a device (commands 1040 .. 1049, widgets 0x0002_2000 .. 0x0002_23FF, timers
+// 0x1D4 .. 0x1D7; the commands and timers are not used)
+/// "Hardware simulieren" on the project's page
+pub(crate) const ID_PROJ_METERED: u32 = 0x0002_2000;
+/// the hardware card of a device (inspector/hardware.rs)
+pub(crate) const ID_HW_OWN: u32 = 0x0002_2001;
+pub(crate) const ID_HW_PRESET: u32 = 0x0002_2002;
+pub(crate) const ID_HW_CORES: u32 = 0x0002_2003;
+pub(crate) const ID_HW_SPEED: u32 = 0x0002_2004;
+pub(crate) const ID_HW_RAM: u32 = 0x0002_2005;
+pub(crate) const ID_HW_SWAP: u32 = 0x0002_2006;
+pub(crate) const ID_HW_DISK_GB: u32 = 0x0002_2007;
+pub(crate) const ID_HW_DISK: u32 = 0x0002_2008;
+pub(crate) const ID_HW_LIVE: u32 = 0x0002_2009;
+pub(crate) const ID_HW_RESET: u32 = 0x0002_200A;
+pub(crate) const ID_HW_APPLY: u32 = 0x0002_200B;
+/// the fault card of a device with hardware: a slower CPU, a memory hog (inspector/faults.rs)
+pub(crate) const ID_FLT_CPU_X: u32 = 0x0002_2010;
+pub(crate) const ID_FLT_CPU: u32 = 0x0002_2011;
+pub(crate) const ID_FLT_MEM_GB: u32 = 0x0002_2012;
+pub(crate) const ID_FLT_MEM: u32 = 0x0002_2013;

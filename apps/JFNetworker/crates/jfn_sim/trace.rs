@@ -494,6 +494,8 @@ pub enum Note {
     Ssh(crate::sshtrace::SshNote),
     /// a decision of TLS: tlssim.rs
     Tls(crate::tlssim::TlsNote),
+    /// the memory of the device is full: this service is killed (res.rs)
+    OomKill { svc: String, bytes: u64 },
     /// a decision of 802.1X (dot1xtrace.rs)
     Dot1x(crate::dot1xtrace::DNote),
 }
@@ -626,6 +628,7 @@ impl Note {
             Note::Unit { .. } | Note::Deploy { .. } => 7,
             Note::Ssh(_) => 7,
             Note::Tls(_) => 7,
+            Note::OomKill { .. } => 3,
             Note::Dot1x(_) => 2,
             _ => 2,
         }
@@ -1218,6 +1221,7 @@ impl Note {
             Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
             Note::Ssh(n) => n.message(),
             Note::Tls(n) => n.message(),
+            Note::OomKill { svc, bytes } => msg!("Speicher voll: Dienst {} mit {} beendet", svc, crate::disk::size_text(*bytes)),
             Note::Dot1x(n) => n.message(),
         }
     }
@@ -1692,6 +1696,7 @@ impl Note {
             Note::Aaa(n) => n.mask(),
             Note::Ssh(n) => n.mask(),
             Note::Tls(n) => n.mask(),
+            Note::OomKill { .. } => 0,
             Note::Dot1x(n) => n.mask(),
             _ => 0,
         }

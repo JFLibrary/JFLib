@@ -15,7 +15,9 @@
 // every access that starts while it lasts.  Capacity is counted per service (a removed service
 // gives its bytes back); a write that does not fit fails, the service answers it as full.
 // Power off keeps what is stored, as a disk does: accesses that had not finished are the
-// services' business (they lose what they had not stored yet).
+// services' business (they lose what they had not stored yet).  A device with hardware has the
+// numbers of its disk's class and its size (res.rs), and a service's own "disk" still has the last
+// word when it starts; page-ins of its memory are accesses like any other.
 
 use alloc::collections::BTreeMap;
 

@@ -30,15 +30,19 @@
 // "deploy ..." starts a rolling deployment (A2, deploy.rs): the hosts are a group of the
 // project or names with commas, its log lines follow in the report with their times
 // ("deploy N: ...") after the run they fell into.
+// "resize DEV ..." gives a device other hardware (Action::Resize, res.rs): the figures it names on
+// what the device has (a model's where it names one); its line says what it has now; with a
+// downtime the reboot is a fault whose end gets its line like any other.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use jfn_model::catalog::{self, Hw};
 use jfn_model::ifname;
 use jfn_model::project::Project;
-use jfn_model::scenario::{Expect, FaultSpec, HealSpec, Scenario, StepKind};
+use jfn_model::scenario::{Expect, FaultSpec, HealSpec, HwSpec, Scenario, StepKind};
 use netpkt::pcapng::{Writer, LINKTYPE_ETHERNET};
 
 use crate::action::Action;
@@ -195,7 +199,38 @@ fn fault_of(p: &Project, e: &Engine, f: &FaultSpec) -> Result<Fault, String> {
         FaultSpec::Stop { dev: d, svc } => Fault::Stop { dev: dev(d)?, svc: svc.clone() },
         FaultSpec::Disk { dev: d, delay_ns, factor_pm } => Fault::SlowDisk { dev: dev(d)?, extra: *delay_ns, factor_pm: *factor_pm },
         FaultSpec::Partition { a, b } => Fault::Partition { a: devs(a)?, b: devs(b)? },
+        FaultSpec::Cpu { dev: d, factor_pm } => Fault::SlowCpu { dev: dev(d)?, factor_pm: *factor_pm },
+        FaultSpec::Mem { dev: d, bytes } => Fault::MemHog { dev: dev(d)?, bytes: *bytes },
     })
+}
+
+/// the hardware a "resize" step means on a device: what it has now (or its model's), a model's
+/// figures it names, the single ones it names
+fn hw_step(e: &Engine, id: u32, spec: &HwSpec) -> Result<Hw, String> {
+    let model = e.node(id).map_or("", |n| n.model.id);
+    let mut hw = match &spec.model {
+        Some(m) => catalog::hw_of(m).ok_or_else(|| format!("das Modell {} hat keine Hardware-Angaben", m))?,
+        None => e.res_of(id).map(|r| r.hw.clone()).or_else(|| catalog::hw_of(model)).unwrap_or(Hw { cores: 1, speed_pm: 1000, ram_mb: 1024, ..Hw::default() }),
+    };
+    if let Some(v) = spec.cores {
+        hw.cores = v;
+    }
+    if let Some(v) = spec.speed_pm {
+        hw.speed_pm = v;
+    }
+    if let Some(v) = spec.ram_mb {
+        hw.ram_mb = v;
+    }
+    if let Some(v) = spec.swap_mb {
+        hw.swap_mb = v;
+    }
+    if let Some(v) = spec.disk {
+        hw.disk = v;
+    }
+    if let Some(v) = spec.disk_gb {
+        hw.disk_gb = v;
+    }
+    Ok(hw.sane())
 }
 
 /// the same kind of fault on the same target
@@ -207,6 +242,8 @@ fn same_target(a: &Fault, b: &Fault) -> bool {
         (Fault::Stop { dev: x, svc: s }, Fault::Stop { dev: y, svc: t }) => x == y && s.eq_ignore_ascii_case(t),
         (Fault::SlowDisk { dev: x, .. }, Fault::SlowDisk { dev: y, .. }) => x == y,
         (Fault::Partition { .. }, Fault::Partition { .. }) => true,
+        (Fault::SlowCpu { dev: x, .. }, Fault::SlowCpu { dev: y, .. }) => x == y,
+        (Fault::MemHog { dev: x, .. }, Fault::MemHog { dev: y, .. }) => x == y,
         _ => false,
     }
 }
@@ -443,6 +480,22 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                     }
                     Err(e) => {
                         r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e.msg().text()));
+                        ok = false;
+                    }
+                }
+            }
+            // other hardware for a device (res.rs)
+            StepKind::Resize { dev, hw, down } => {
+                let res = dev_of(dev, &d).ok_or_else(|| format!("das Gerät {} gibt es nicht", dev)).and_then(|id| {
+                    let hw = hw_step(&d.eng, id, hw)?;
+                    let downtime = down.unwrap_or(crate::res::RESIZE_DOWN);
+                    let text = format!("resize {}: {}, {}", dev, hw.summary_msg().text(), if downtime == 0 { String::from("im Betrieb") } else { format!("{} Neustart", self::dur(downtime)) });
+                    d.send(Cmd::Apply(Action::Resize { dev: id, hw: Some(hw), downtime }), 0).map_err(|e| format!("{}", e)).map(|_| text)
+                });
+                match res {
+                    Ok(text) => r.line(now, "--", &text),
+                    Err(e) => {
+                        r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e));
                         ok = false;
                     }
                 }
