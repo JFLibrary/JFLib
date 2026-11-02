@@ -77,6 +77,8 @@
 // of doc/edits.rs, the scene of canvas/paint.rs).
 // startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// sweeptest.rs: parameter sweeps (group sweep: jfn_model::experiment, jfn_sim::experiment, jfn_run's
+// threads, Service::reconfigure, the scenario's steps for changes under load).
 // hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
 // queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
 // fwguitest.rs: the Firewall tab (group fwgui: what its forms type, rows back from the engine, moves,
@@ -196,9 +198,11 @@ mod hardwaretest;
 mod fwguitest;
 #[path = "academytest.rs"]
 mod academytest;
+#[path = "sweeptest.rs"]
+mod sweeptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 61] = [
+    let groups: [(&'static str, fn(&mut T)); 62] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -260,6 +264,7 @@ pub fn run() -> i32 {
         ("hardware", hardwaretest::run),
         ("fwgui", fwguitest::run),
         ("academy", academytest::run),
+        ("sweep", sweeptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

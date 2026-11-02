@@ -1,0 +1,59 @@
+# Änderungen unter Last: GEN schickt 100 Anfragen pro Sekunde an LB, LB verteilt sie auf WEB1 und WEB2;
+# zwei Nutzer fragen über den Cache WEB3. Alles hier ändert laufende Dienste: kein Dienst startet neu,
+# die Zähler laufen durch, und das Zurückspulen spielt jede Änderung wieder ein.
+#
+# der Ausgangszustand: je 50 Anfragen pro Sekunde auf WEB1 und WEB2, zwei Nutzer holen aus dem Cache
+at 4s expect LB svc lb metric requests >= 90 over 2s
+expect WEB1 svc web metric requests >= 40 over 2s
+expect WEB3 svc web metric requests == 1
+expect CACHE svc cache metric hits > 0
+# die Rate des Generators: 300 pro Sekunde ab jetzt
+load set GEN load rps 300
+at 7s expect GEN svc load metric sent >= 295 over 2s
+expect GEN svc load metric sent <= 320 over 2s
+expect WEB1 svc web metric requests >= 130 over 2s
+# mehr Nutzer im geschlossenen Betrieb
+load set GEN users users 8
+at 9s expect CACHE svc cache metric requests >= 70 over 1s
+# ein Backend kommt dazu: WEB3 bekommt seinen Teil, sobald die Prüfung durch ist
+lb add LB lb web3 10.0.0.13
+at 12s expect WEB3 svc web metric requests >= 80 over 2s
+expect WEB1 svc web metric requests >= 80 over 2s
+expect WEB1 svc web metric requests <= 120 over 2s
+# der Algorithmus: gewichtet, WEB2 bekommt das Dreifache von WEB1
+lb algo LB lb weighted
+lb weight LB lb web2 3
+at 15s expect WEB2 svc web metric requests >= 120 over 2s
+expect WEB1 svc web metric requests <= 80 over 2s
+# ein Backend leert sich und ist danach aus dem Spiel; die Antworten laufen weiter
+lb algo LB lb round-robin
+lb drain LB lb web1
+at 18s expect WEB1 svc web metric max requests <= 1 over 2s
+expect LB svc lb metric errors == 0
+expect GEN svc load metric errors == 0
+lb enable LB lb web1
+at 21s expect WEB1 svc web metric requests >= 80 over 2s
+# Einstellungen eines Webservers, ohne Neustart: ein Worker mit 10 ms schafft 100 pro Sekunde, WEB2
+# ist damit überlastet; die Warteschlange wächst sofort
+svc set WEB2 web workers 1
+svc set WEB2 web time_ms 10
+at 24s expect WEB2 svc web metric queued > 0
+expect WEB2 svc web metric requests >= 90 over 2s
+expect WEB2 svc web metric responses <= 110 over 2s
+# und zurück; er arbeitet die Warteschlange ab
+svc set WEB2 web workers 0
+svc set WEB2 web time_ms 2
+at 26s expect WEB2 svc web metric queued == 0
+print "der KV-Speicher"
+kv set KV1 kv consistency eventual w 1 r 1
+KV1: kvctl
+# ein Cache vergisst, was er hält, und holt es sich neu
+cache clear CACHE cache
+at 27s expect WEB3 svc web metric requests >= 1
+expect CACHE svc cache metric misses >= 2
+# die letzte Rate
+load set GEN load rps 50
+at 30s expect GEN svc load metric sent <= 60 over 2s
+expect LB svc lb metric status_5xx == 0
+LB: lbctl
+print "fertig"

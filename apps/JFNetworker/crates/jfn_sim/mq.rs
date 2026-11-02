@@ -835,6 +835,30 @@ impl Service for Worker {
     fn mem(&self) -> u64 {
         self.mem.bytes(self.agent.conns() as u64, 0)
     }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), jfn_model::msg::Msg> {
+        let fresh = from_def_msg("worker", c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<Worker>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "worker"));
+        };
+        if self.queue != f.queue || self.topic != f.topic {
+            return Err(msg!("Warteschlange und Thema eines Workers ändern sich nur mit einem Neustart."));
+        }
+        self.cpu = f.cpu;
+        self.mem = f.mem;
+        self.jitter = f.jitter;
+        self.wait = f.wait;
+        self.idle = f.idle;
+        self.timeout = f.timeout;
+        match os {
+            Some(os) => self.set(os, Some(f.concurrency), Some(f.time), Some(f.error_ppm)),
+            None => {
+                self.concurrency = f.concurrency;
+                self.time = f.time;
+                self.error_ppm = f.error_ppm;
+            }
+        }
+        Ok(())
+    }
     fn stop(&mut self, _os: &mut OsApi) {
         // the messages it worked on stay unacknowledged: the queue hands them out again
         self.agent.reset();

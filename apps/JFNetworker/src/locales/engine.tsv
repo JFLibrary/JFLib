@@ -1663,3 +1663,73 @@ Die Datei enthält keine Kursliste.	The file holds no list of courses.
 Das ist keine Kursliste.	This is not a list of courses.
 Kurs {}: {}	Course {}: {}
 Kurs {}: die Prüfsumme von {} ist kein SHA-256.	Course {}: the checksum of {} is no SHA-256.
+Im Pfad fehlt ein Teil: {}	A part of the path is missing: {}
+Im Pfad gibt es kein Element {}.	The path has no element {}.
+„{}“ liegt nicht in einem Objekt.	“{}” does not lie in an object.
+Hardware steht als Objekt da, etwa mit „preset“ oder „cores“.	Hardware is an object, for instance with “preset” or “cores”.
+„{}“ gibt es bei Hardware nicht (preset, cores, speed, ram_gb, swap_gb, disk, disk_gb).	Hardware has no “{}” (preset, cores, speed, ram_gb, swap_gb, disk, disk_gb).
+Das Modell „{}“ hat keine Hardware-Angaben.	The model “{}” has no hardware figures.
+„cores“ ist eine Zahl von 1 bis 1024.	“cores” is a number from 1 to 1024.
+„speed“ ist das Tempo eines Kerns gegen den Referenzkern, etwa 1.5.	“speed” is the speed of a core against the reference core, for instance 1.5.
+„ram_gb“ ist eine Größe in GiB.	“ram_gb” is a size in GiB.
+„swap_gb“ ist eine Größe in GiB.	“swap_gb” is a size in GiB.
+Die Plattenart „{}“ gibt es nicht (sata, nvme, nvme-fast, hdd).	There is no kind of disk “{}” (sata, nvme, nvme-fast, hdd).
+„disk_gb“ ist eine Größe in GiB.	“disk_gb” is a size in GiB.
+Diesen Wert gibt es nicht.	There is no such value.
+Der Pfad „{}“ nennt einen Dienst und seine Einstellung, etwa http-server.workers.	The path “{}” names a service and its setting, for instance http-server.workers.
+{} hat keinen Dienst „{}“.	{} has no service “{}”.
+Das Gerät „{}“ gibt es nicht.	There is no device “{}”.
+{} hat keine IPv4-Adresse.	{} has no IPv4 address.
+{} hängt an {} Kabeln; eine Vorlage hängt an genau einem.	{} hangs on {} cables; a template hangs on exactly one.
+Für die Kopie {} gibt es keine Adresse mehr nach {}.	For copy {} there is no address left after {}.
+Die Adresse {} der Kopie {} hat schon ein anderes Gerät.	Another device already has the address {} of copy {}.
+Das Modell des Geräts {} gibt es nicht.	The model of device {} does not exist.
+Am Gerät {} ist für die Kopie {} kein Port mehr frei.	Device {} has no free port left for copy {}.
+Es fehlt „dev“ oder „group“.	“dev” or “group” is missing.
+Die Gruppe „{}“ gibt es nicht.	There is no group “{}”.
+Die Gruppe „{}“ hat keine Geräte.	The group “{}” has no devices.
+„values“ ist leer.	“values” is empty.
+Die Art „{}“ gibt es nicht (hw, config, backends).	There is no kind “{}” (hw, config, backends).
+{} hat keinen Dienst „{}“ (es gibt: {}).	{} has no service “{}” (there are: {}).
+Ein Dienst der Art {} kennt „{}“ nicht (es gibt: {}).	A service of kind {} does not know “{}” (there are: {}).
+Der Dienst „{}“ ist kein Load Balancer, sondern {}.	The service “{}” is no load balancer but {}.
+„counts“ ist leer.	“counts” is empty.
+Ein Load Balancer braucht mindestens ein Backend; 0 geht nicht.	A load balancer needs at least one backend; 0 will not do.
+Es fehlt „pool“ oder „template“.	“pool” or “template” is missing.
+„pool“ und „template“ schließen sich aus.	“pool” and “template” exclude each other.
+„counts“ verlangt {} Backends, der Pool hat {}.	“counts” asks for {} backends, the pool has {}.
+Die Datei enthält kein Experiment.	The file holds no experiment.
+Das ist keine Experiment-Datei.	This is no experiment file.
+Last: es fehlt „rps“ oder „users“.	Load: “rps” or “users” is missing.
+Last: „rps“ und „users“ schließen sich aus.	Load: “rps” and “users” exclude each other.
+Last: eine Stufe ist 0.	Load: a level is 0.
+Last: die Stufen müssen streng steigen, das Knie gilt sonst nichts.	Load: the levels must rise strictly, or the knee means nothing.
+Last: das Gerät „{}“ gibt es nicht.	Load: there is no device “{}”.
+Last: {} hat keinen Dienst „{}“.	Load: {} has no service “{}”.
+Last: der Dienst „{}“ ist kein Lastgenerator (http-load), sondern {}.	Load: the service “{}” is no load generator (http-load) but {}.
+Zeit: „measure_s“ fehlt.	Time: “measure_s” is missing.
+Zeit: Übergang und Messung zusammen höchstens {} s; so lange halten die Dienste ihre Latenzen.	Time: settling and measuring take {} s at most together; that is how long the services keep their latencies.
+Zeit: ein Seed steht zweimal da; er ergäbe denselben Lauf.	Time: a seed is there twice; it would give the same run.
+SLO: „{}“ ist keine Zahl.	SLO: “{}” is no number.
+Preise: „{}“ gibt es nicht (es gibt: {}).	Prices: there is no “{}” (there are: {}).
+Preise: „{}“ ist keine Zahl (Euro je Stunde).	Prices: “{}” is no number (euros per hour).
+Kosten: das Gerät „{}“ gibt es nicht.	Cost: there is no device “{}”.
+Achse {}: {}	Axis {}: {}
+Eine Reihe hat keinen Namen.	A series has no name.
+Die Reihe „{}“ steht zweimal da.	The series “{}” is there twice.
+Reihe {}, Achse {}: {}	Series {}, axis {}: {}
+Das wären {} Läufe; höchstens {} gehen.	That would be {} runs; {} at most will do.
+Port und Backend eines Caches ändern sich nur mit einem Neustart.	The port and backend of a cache change only with a restart.
+Das Projekt läuft nicht: {}	The project does not run: {}
+Konfiguration {}: {}	Configuration {}: {}
+{}, Dienst {}: {}	{}, service {}: {}
+Port und Warteschlange der Verbindungen ändern sich nur mit einem Neustart.	The port and the queue of connections change only with a restart.
+Das Zertifikat ändert sich nur mit einem Neustart.	The certificate changes only with a restart.
+Die Backends der Routen ändern sich nur mit einem Neustart.	The backends of the routes change only with a restart.
+Offene und geschlossene Last wechseln nur mit einem Neustart.	Open and closed load change over only with a restart.
+Die Dauer eines Laufs ändert sich nur mit einem Neustart.	The duration of a run changes only with a restart.
+Modus und Port eines Load Balancers ändern sich nur mit einem Neustart.	The mode and port of a load balancer change only with a restart.
+Die Art der Prüfungen ändert sich nur mit einem Neustart.	The kind of checks changes only with a restart.
+Das Backend {} hat eine andere Adresse: es braucht einen anderen Namen.	The backend {} has another address: it needs another name.
+Warteschlange und Thema eines Workers ändern sich nur mit einem Neustart.	The queue and topic of a worker change only with a restart.
+Dieser Dienst ändert seine Einstellungen nur mit einem Neustart.	This service changes its settings only with a restart.

@@ -7,6 +7,7 @@
 //   jfn-sim decode HEX
 //   jfn-sim gen N [--out F]   a synthetic campus of N devices (jfn_model::synth)
 //   jfn-sim rewind P [S] [--traffic K]   keyframes of a run and restore times (K1)
+//   jfn-sim sweep F [--threads N] [--csv C]   an experiment at full speed (SA2)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]

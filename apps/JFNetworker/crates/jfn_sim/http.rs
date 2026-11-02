@@ -34,7 +34,7 @@
 // catalogue (Fail::text() is its German text).
 
 use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -1055,6 +1055,14 @@ struct CConn {
     secured: Option<Ns>,
 }
 
+/// what a request that waits for a connection asks for
+#[derive(Clone, Debug, PartialEq)]
+struct WaitFor {
+    key: (IpAddr, u16),
+    tls_req: Option<(String, TlsReq)>,
+    reuse: bool,
+}
+
 #[derive(Clone, Debug)]
 struct AReq {
     req: Req,
@@ -1120,8 +1128,17 @@ pub struct Agent {
     pub family: Family,
     reqs: BTreeMap<u64, AReq>,
     conns: BTreeMap<u32, CConn>,
+    /// how many of the connections go to each address and port (max_per_host)
+    per_host: BTreeMap<(IpAddr, u16), usize>,
+    /// the connections that may be idle: a connection gets idle only when it opens or answers, so
+    /// every idle one is here and a request need not look through the busy ones (thousands, under
+    /// overload); what is no longer idle goes when it is looked at
+    maybe_idle: BTreeSet<u32>,
     lookups: BTreeMap<u32, Vec<u64>>,
     waiting: VecDeque<u64>,
+    /// what the requests in `waiting` ask for, while it is all the same (pump)
+    wait_for: Option<WaitFor>,
+    wait_mixed: bool,
     wheel: Wheel<ATimer>,
     next: u64,
     next_conn: u32,
@@ -1143,7 +1160,11 @@ impl Agent {
             reqs: BTreeMap::new(),
             conns: BTreeMap::new(),
             lookups: BTreeMap::new(),
+            per_host: BTreeMap::new(),
+            maybe_idle: BTreeSet::new(),
             waiting: VecDeque::new(),
+            wait_for: None,
+            wait_mixed: false,
             wheel: Wheel::new(key),
             next: 0,
             next_conn: 0,
@@ -1156,8 +1177,12 @@ impl Agent {
     pub fn reset(&mut self) {
         self.reqs.clear();
         self.conns.clear();
+        self.per_host.clear();
+        self.maybe_idle.clear();
         self.lookups.clear();
         self.waiting.clear();
+        self.wait_for = None;
+        self.wait_mixed = false;
         self.wheel.clear();
         self.done.clear();
         self.events.clear();
@@ -1364,7 +1389,7 @@ impl Agent {
         let tls_req = r.tls.clone();
         if reuse {
             let pipe = self.pipeline.max(1);
-            let pick = self.conns.iter().find(|(_, c)| c.key == key && c.tls_req == tls_req && c.state == CState::Open && c.reusable && c.queue.is_empty() && c.inflight.len() < pipe && (c.inflight.is_empty() || pipe > 1)).map(|(s, _)| *s);
+            let pick = if pipe > 1 { self.conns.iter().find(|(_, c)| c.key == key && c.tls_req == tls_req && c.state == CState::Open && c.reusable && c.queue.is_empty() && c.inflight.len() < pipe).map(|(s, _)| *s) } else { self.idle_conn(key, &tls_req) };
             // with pipelining a connection being set up takes more requests
             let setting_up = if pipe > 1 { self.conns.iter().find(|(_, c)| c.key == key && c.tls_req == tls_req && c.state == CState::Connecting && c.reusable && c.queue.len() < pipe).map(|(s, _)| *s) } else { None };
             if pick.is_none()
@@ -1402,9 +1427,15 @@ impl Agent {
                 return;
             }
         }
-        if self.max_per_host > 0 && self.conns.values().filter(|c| c.key == key).count() >= self.max_per_host {
+        if self.max_per_host > 0 && self.per_host.get(&key).copied().unwrap_or(0) >= self.max_per_host {
             if !self.waiting.contains(&id) {
                 self.waiting.push_back(id);
+                let want = WaitFor { key, tls_req, reuse };
+                match &self.wait_for {
+                    None => self.wait_for = Some(want),
+                    Some(w) if *w == want => {}
+                    Some(_) => self.wait_mixed = true,
+                }
             }
             return;
         }
@@ -1422,6 +1453,7 @@ impl Agent {
                 parser.max_body = u64::MAX;
                 let mut q = VecDeque::new();
                 q.push_back(id);
+                *self.per_host.entry(key).or_insert(0) += 1;
                 self.conns.insert(s, CConn { no, key, state: CState::Connecting, parser, queue: q, inflight: VecDeque::new(), out: Vec::new(), reusable: reuse, got: false, used: 0, timer, local, tls: None, tls_req, wire: Vec::new(), info: None, secured: None });
                 if let Some(r) = self.reqs.get_mut(&id) {
                     r.sock = Some(s);
@@ -1461,6 +1493,7 @@ impl Agent {
             return;
         };
         c.state = if c.tls_req.is_some() { CState::Securing } else { CState::Open };
+        self.maybe_idle.insert(sock);
         if let Some(t) = c.timer.take() {
             self.wheel.cancel(t);
         }
@@ -1533,6 +1566,7 @@ impl Agent {
                         return (Vec::new(), true);
                     };
                     c.state = CState::Open;
+                    self.maybe_idle.insert(sock);
                     c.info = Some(info.clone());
                     c.secured = Some(now);
                     let ids: Vec<u64> = c.queue.drain(..).collect();
@@ -1554,7 +1588,7 @@ impl Agent {
                         os.note(Note::Tls(TlsNote::Failed { peer, alert: String::from(tls::alert_name(f.alert)), ours: f.ours }));
                     }
                     // the alert goes out, then the connection ends; what is on it fails
-                    let Some(mut c) = self.conns.remove(&sock) else {
+                    let Some(mut c) = self.take_conn(sock) else {
                         return (Vec::new(), true);
                     };
                     if let Some(t) = c.timer.take() {
@@ -1659,7 +1693,7 @@ impl Agent {
         let connecting = self.conns.get(&sock).is_some_and(|c| c.state == CState::Connecting);
         if connecting {
             // the connection was never set up
-            let Some(c) = self.conns.remove(&sock) else {
+            let Some(c) = self.take_conn(sock) else {
                 return;
             };
             if let Some(t) = c.timer {
@@ -1799,6 +1833,7 @@ impl Agent {
     /// a connection that answered everything: idle, or the next pipelined request
     fn after_answer(&mut self, os: &mut OsApi, sock: u32) {
         let now = os.now();
+        self.maybe_idle.insert(sock);
         let Some(c) = self.conns.get_mut(&sock) else {
             return;
         };
@@ -1811,7 +1846,7 @@ impl Agent {
     /// (once, when it got no byte and the connection was reused or the request was not the
     /// first on it) or fails
     fn lose_conn(&mut self, os: &mut OsApi, sock: u32, eof: bool, end: Option<TcpEnd>) {
-        let Some(c) = self.conns.remove(&sock) else {
+        let Some(c) = self.take_conn(sock) else {
             return;
         };
         if let Some(t) = c.timer {
@@ -1872,7 +1907,9 @@ impl Agent {
         }
     }
 
-    /// requests that waited for a connection
+    /// requests that waited for a connection, in their order; where they all ask for the same and
+    /// the first finds none, nor would the others: the first stays where it was (thousands wait, under
+    /// overload, and every answer comes here)
     fn pump(&mut self, os: &mut OsApi) {
         let n = self.waiting.len();
         for _ in 0..n {
@@ -1880,7 +1917,37 @@ impl Agent {
                 break;
             };
             self.dispatch(os, id);
+            if !self.wait_mixed && self.waiting.back() == Some(&id) {
+                self.waiting.pop_back();
+                self.waiting.push_front(id);
+                break;
+            }
         }
+        if self.waiting.is_empty() {
+            self.wait_for = None;
+            self.wait_mixed = false;
+        }
+    }
+
+    /// the first idle connection for this host and these TLS settings
+    fn idle_conn(&mut self, key: (IpAddr, u16), tls_req: &Option<(String, TlsReq)>) -> Option<u32> {
+        let mut stale = Vec::new();
+        let mut found = None;
+        for &s in &self.maybe_idle {
+            match self.conns.get(&s) {
+                Some(c) if c.state == CState::Open && c.reusable && c.queue.is_empty() && c.inflight.is_empty() => {
+                    if c.key == key && c.tls_req == *tls_req {
+                        found = Some(s);
+                        break;
+                    }
+                }
+                _ => stale.push(s),
+            }
+        }
+        for s in stale {
+            self.maybe_idle.remove(&s);
+        }
+        found
     }
 
     fn timer(&mut self, os: &mut OsApi) {
@@ -1904,7 +1971,7 @@ impl Agent {
                     if c.state != CState::Connecting {
                         continue;
                     }
-                    let Some(c) = self.conns.remove(&s) else {
+                    let Some(c) = self.take_conn(s) else {
                         continue;
                     };
                     os.tcp_close(s);
@@ -1948,8 +2015,20 @@ impl Agent {
         }
     }
 
+    /// a connection leaves the table
+    fn take_conn(&mut self, s: u32) -> Option<CConn> {
+        let c = self.conns.remove(&s)?;
+        if let Some(n) = self.per_host.get_mut(&c.key) {
+            *n -= 1;
+            if *n == 0 {
+                self.per_host.remove(&c.key);
+            }
+        }
+        Some(c)
+    }
+
     fn drop_conn(&mut self, os: &mut OsApi, s: u32) {
-        if let Some(mut c) = self.conns.remove(&s) {
+        if let Some(mut c) = self.take_conn(s) {
             if let Some(t) = c.timer {
                 self.wheel.cancel(t);
             }

@@ -34,6 +34,8 @@
 //             they were, its place, scale, opacity and lock; the limits; sniff
 //   academy   Course, Unit, Step, StepKind, Index, Progress (AK1): the courses of the Akademie as
 //             files, what is wrong with one, what a learner has done
+//   experiment  Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level (SA2): a parameter sweep
+//             as a .jfnex file or a project's section; jfn_sim's experiment.rs runs it
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -57,6 +59,7 @@ pub mod group;
 pub mod background;
 pub mod unit;
 pub mod academy;
+pub mod experiment;
 
 pub use cable::{cable_fits, cable_kind, CableColor, CableGrade, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
@@ -70,3 +73,4 @@ pub use catalog::{Form, Optic};
 pub use phys::{Len, Place, PlaceKind, Reach, Spot, Tree};
 pub use group::{Group, GroupColor, GroupErr, Groups};
 pub use background::{Background, BgErr};
+pub use experiment::{Axis, Experiment, Level};

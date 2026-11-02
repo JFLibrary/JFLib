@@ -59,6 +59,8 @@
 //            services stopped, slow disks, partitions; each one heals exactly what it did
 //   lab      the actions of the lab and the views of its services for the user interface
 //   res      the hardware of a device: CPU cores with a run queue, RAM with swap (SA1)
+//   experiment  a parameter sweep (SA2): configurations and load levels from one warm state, on
+//            clones of the engine at full speed; results, knee, cost, CSV
 //   units    services as units on Linux hosts: unit files, enable, restart policies
 //   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
@@ -301,6 +303,7 @@ pub mod dot1x;
 pub mod supp;
 pub mod imapd;
 pub mod res;
+pub mod experiment;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -333,6 +336,7 @@ pub use http::{Agent, AgentEv, Reply, Serve, ServeCfg, Url};
 pub use httpsvc::{HttpClient, HttpLoad, HttpRoute, HttpServer, LoadMode, LoadView, ServerView};
 pub use pdu::{PduProto, PduSender, PduSpec};
 pub use res::{Res, ResView, Usl};
+pub use experiment::{ConfigOut, DevFig, Fig, LinkFig, Plan, Point, Status, SvcFig, Sweep, MEM_LIMIT};
 pub use disk::Disk;
 pub use fault::{Fault, FaultMark, LinkOver};
 pub use lb::{Algo, BackendView, Lb, LbMode, LbOp, LbView};
