@@ -135,7 +135,8 @@
 // Permissions and agent control (auto_perm.rs):
 //   perm answer once|always|deny|never|dialog|none   perm timeout MS   perm store FILE|none
 //   perm reload   perm wait [MS]   perm reset   perm expect open|none|RULE ANSWER
-//   agent on|off   agent call ACTION [JSON]   agent expect ok|error CODE
+//   agent on|off   agent call|write ACTION [JSON]   agent keep   agent id S
+//   agent expect ok|error CODE|same|moved
 // The live inspector (inspect.rs):
 //   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
 //   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look
@@ -958,7 +959,7 @@ impl Ui {
     }
 
     // the record of a resolved selector (a point: the zero record)
-    fn sel_rec(&self, s: Sel) -> Sem {
+    pub(crate) fn sel_rec(&self, s: Sel) -> Sem {
         match s {
             Sel::Rec(i) => self.sems[i].clone(),
             Sel::Point => Sem::default(),

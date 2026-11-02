@@ -554,7 +554,7 @@ impl Ui {
         }
         if self.agent_enabled() && !overlay {
             self.next_size(82, 24);
-            if self.button(0xFFFF_7440, if self.agent_connected() { "Agent ●" } else { "Agent ○" }) & EV_ACT != 0 {
+            if self.button(super::agent::ID_BADGE, if self.agent_connected() { "Agent ●" } else { "Agent ○" }) & EV_ACT != 0 {
                 self.set_agent_enabled(false);
             }
             self.tooltip(if self.agent_connected() { "Agent verbunden · Zum Abschalten klicken" } else { "Agentensteuerung aktiv · Zum Abschalten klicken" });
@@ -578,7 +578,7 @@ impl Ui {
             self.spacer(-1);
             if self.agent_enabled() {
                 self.next_size(82, 24);
-                if self.button(0xFFFF_7440, if self.agent_connected() { "Agent ●" } else { "Agent ○" }) & EV_ACT != 0 {
+                if self.button(super::agent::ID_BADGE, if self.agent_connected() { "Agent ●" } else { "Agent ○" }) & EV_ACT != 0 {
                     self.set_agent_enabled(false);
                 }
                 self.tooltip(if self.agent_connected() { "Agent verbunden · Zum Abschalten klicken" } else { "Agentensteuerung aktiv · Zum Abschalten klicken" });

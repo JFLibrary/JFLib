@@ -323,7 +323,10 @@ impl AppDesc {
 pub trait App {
     /// Optional domain actions, in addition to the universal UI action catalogue.
     fn actions(&self) -> &'static [agent_core::ActionSpec] { &[] }
-    /// Domain revision; None uses the UI runtime's monotonically increasing frame revision.
+    /// Domain revision. None uses the UI runtime's own: it moves with the controls (their set,
+    /// labels, values and states, the focus, an open modal dialog, the title, enabled commands)
+    /// and with every agent call that changes something, not with frames or the pointer, and it
+    /// knows nothing of a change the user makes to the app's data.
     fn action_revision(&self) -> Option<u64> { None }
     /// Dynamic domain constraints such as read-only files or an absent selection.
     fn action_available(&self, _spec: &agent_core::ActionSpec) -> Result<(), agent_core::ActionError> { Ok(()) }

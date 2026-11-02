@@ -30,8 +30,12 @@ agent call ui.key {"key":32}
 agent expect error unavailable
 perm expect open
 click "Einmal erlauben"
+# an app without action_revision: its change moves the revision although no control shows it
+agent call ui.state
+agent keep
 agent call doc.save
 agent expect ok
+agent expect moved
 agent call doc.save
 agent expect ok
 expect text:"Agent: 2 gespeichert" exists

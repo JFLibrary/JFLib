@@ -43,7 +43,9 @@ Availability failures contain a concrete machine-readable code and explanation.
 - Mutating `ActionSpec::write` actions require `expectedRevision` externally. The check
   happens before calling the host. A stale request has no mutation side effects.
 - The host owns revision advancement, undo history and domain state. Returned revisions
-  are always read from the host, never trusted from a result constructor.
+  are always read from the host, never trusted from a result constructor. A revision must
+  move only with a change of state: a client can act on the one it read last. `lib/ui`
+  therefore does not count frames (docs/AGENT_WEB.md, "Aktionsvertrag und Protokolle").
 - Ordered non-atomic batches report each attempted result. They stop on error by default;
   callers may request continuation. A call's expected revision refers to its execution time.
 - Atomic batches preflight all actions/schemas/capabilities/revisions and transaction
