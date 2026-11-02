@@ -56,9 +56,12 @@ Output folders (--out overrides): build/<target> for development builds, build/r
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
 other).  The assembly reference builds into legacy/build (legacy/build.py).
 
-Linux programs are one static file without libc.  An app with a file apps/NAME/GLIBC links
-dynamically against glibc instead (section "glibc"; its libraries in <out>/linux/.glibc, the
-program itself next to the others in <out>/linux).
+Linux: command-line and server programs are one static file without libc.  A program that names
+ui links dynamically against glibc and nothing else (section "glibc"; every GPU driver is a glibc
+library; its libraries in <out>/linux/.glibc, the program itself next to the others in <out>/linux):
+also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  An app with a file
+apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
+systems without glibc, such as Alpine).
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
 crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
@@ -181,9 +184,10 @@ LIBS = {
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
-# what a library crate needs on one target only: G3a, the UI's output through the GPU (the other
-# targets do not link Vulkan code: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"]}
+# what a library crate needs on one target only: G3a, G4b, the UI's output through the GPU (Windows;
+# Linux in the build against glibc, section "glibc"; the other targets and the static Linux build do
+# not link Vulkan code: lib/ui/gpu_out_off.rs)
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -871,9 +875,12 @@ PROFILES = {
 
 # ---------------------------------------------------------------- glibc
 # Every Linux GPU driver is a glibc library, so a program that uses the GPU needs glibc in its
-# process (docs/GPU.md "Linux").  An app with a file apps/NAME/GLIBC is built that way: dynamically
-# linked against glibc and nothing else, every crate with --cfg jfgui_glibc (lib/plat/linux_glibc.rs:
-# the process start, pthread threads, exit, dlopen).  Everything else stays static without libc.
+# process (docs/GPU.md "Linux").  A program that names ui (its windows go through the GPU, lib/ui/
+# gpu_out.rs) or an app with a file apps/NAME/GLIBC is built that way: dynamically linked against
+# glibc and nothing else, every crate with --cfg jfgui_glibc (lib/plat/linux_glibc.rs: the process
+# start, pthread threads, exit, dlopen).  Everything else stays static without libc, and so does
+# an app with a file apps/NAME/STATIC or any UI program under --static (gpu_out_off.rs: no Vulkan
+# code; its windows through shared memory only; for systems without glibc).
 #
 # Nothing has to be installed for it: Builder.glibc_stubs writes the three libraries to link against
 # from GLIBC_STUBS (one function "ret" per name, rustc --emit=obj, then ld.lld -shared with a version
@@ -892,9 +899,24 @@ GLIBC_STUBS = {                                     # in the order a C program n
 }
 
 
+STATIC_UI = False          # --static
+
+
+def set_static_ui(on):
+    """--static: the UI programs of this run are linked static (no GPU)"""
+    global STATIC_UI
+    STATIC_UI = on
+
+
 def app_glibc(name):
-    """the app is linked against glibc on Linux (apps/NAME/GLIBC)"""
-    return (ROOT / "apps" / name / "GLIBC").is_file()
+    """the app is linked against glibc on Linux: apps/NAME/GLIBC; a program that names ui unless
+    apps/NAME/STATIC or --static says otherwise"""
+    d = ROOT / "apps" / name
+    if (d / "GLIBC").is_file():
+        return True
+    if STATIC_UI or (d / "STATIC").is_file():
+        return False
+    return entrypoint(d, "app", False) is not None and "ui" in app_crates(name)
 
 
 def glibc_stub_text():
@@ -1059,7 +1081,7 @@ class Builder:
         independent ones in parallel (once per run: the app builds that run in parallel find
         them ready)"""
         with self.lib_lock:
-            libs = all_libs(self.target)
+            libs = all_libs("linux-glibc" if self.glibc else self.target)
             need = set()
 
             def add(n):
@@ -1251,15 +1273,18 @@ class Builder:
 
     def build_bin(self, app, name, root, kind):
         """app-bins: one executable of apps/APP/BINS -> <dir>/NAME[.exe] (cli: no style, console
-        subsystem; gui: the app's style)"""
+        subsystem; gui: the app's style; on Linux against glibc like the app's GUI, section "glibc")"""
+        if self.target == "linux" and not self.glibc and kind == "gui" and app_glibc(app):
+            return self.glibc_twin().build_bin(app, name, root, kind)
         crates = source_crates(root)
         style = app_style(app) if kind == "gui" else None
         deps = crates + ([f"style_{style}"] if style else [])
         self.build_libs(deps)
-        exe = self.dir / bin_file(name, self.target)
+        exe = self.public / bin_file(name, self.target)
         key = f"bin_{app}_{name}"
         perms, assets, boot = self.boot_inputs(app, name)   # permissions, vfs: as the app's exe
-        digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot)
+        digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot
+                               + (" " + glibc_stub_text() if self.glibc else ""))
         if self.up_to_date(key, digest, exe):
             return exe
         cmd = ["rustc"] + self.flags() + ["--crate-type", "bin", "--crate-name", name.replace("-", "_").lower(),
@@ -1280,6 +1305,8 @@ class Builder:
         if pdb.exists():
             pdb.unlink()
         self.stamp(key, digest)
+        if self.target == "linux":                        # section "glibc": the other build's file is gone
+            ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
         return exe
 
     def app_res(self, name):
@@ -2256,6 +2283,8 @@ def main():
     ap.add_argument("--web-mode", choices=["auto", "scalar", "simd", "threads"], default="auto",
                     help="browser bundle: auto builds scalar, SIMD128 and shared-memory worker variants")
     ap.add_argument("--release", action="store_true")
+    ap.add_argument("--static", action="store_true",
+                    help="Linux: the UI programs static, without the GPU (section glibc; for systems without glibc)")
     ap.add_argument("--profile", choices=sorted(PROFILES),   # r13-measure: implies --release
                     help="release variant: size (z for UI crates, 2 for compute + app, LTO) or o2 (2, no LTO)")
     ap.add_argument("--out", help="output folder (default build; --release: build/release; --profile P: build/P)")
@@ -2279,6 +2308,7 @@ def main():
     ap.add_argument("--update", action="store_true", help="i18n: add the missing texts to the app's catalogue (untranslated)")
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
+    set_static_ui(a.static)                         # section "glibc"
     if a.cmd == "ide":
         write_ide()
         return 0

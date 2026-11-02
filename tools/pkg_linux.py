@@ -402,6 +402,7 @@ def rpm_spec(job, tarball, files):
         + f"Source0:        {tarball}\n"
         "ExclusiveArch:  x86_64\n"
         "AutoReqProv:    no\n"
+        + ("Requires:       glibc\nRecommends:     vulkan-loader, mesa-vulkan-drivers\n" if job.glibc else "") +
         f"Requires(post): {alt}\n"
         f"Requires(preun): {alt}\n\n"
         f"%description\n{desc}\n\n"
@@ -573,6 +574,8 @@ def flatpak_manifest(job, files):
     meta, pkg = job.meta, job.pkg
     aid = app_id(meta, job.app)
     extra = meta.get("flatpak_args", "").split()
+    if job.glibc and "--device=dri" not in extra and "--device=all" not in extra:
+        extra.append("--device=dri")   # the windows go through the GPU (docs/GPU.md "Ausgabe unter Linux")
     args, notes = finish_args(job.perms, extra)
     cmds = []
     for path, (_, mode) in sorted(files.items()):

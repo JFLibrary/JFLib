@@ -58,6 +58,8 @@ fn sandboxtest() -> i32 {
     t.check(plat::policy::active(), "sandboxtest: the manifest is installed");
     let st = sandbox::status();
     t.check(st.level == 2, "sandboxtest: sandbox strict is active");
+    #[cfg(jfgui_glibc)]
+    t_linux::gpu_checks(&mut t);
     plat::write_stdout(
         format!(
             "sandbox: level={} landlock_abi={} landlock_fs={} landlock_net={} seccomp={} exec_denied={} win_mitigations={} win_dynamic_code={}\n",

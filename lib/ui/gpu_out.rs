@@ -1,4 +1,5 @@
-// gpu_out -- UI windows on the screen through a swapchain (Windows; docs/GPU.md "Ausgabe der UI")
+// gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc:
+// docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux")
 //
 // The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 // it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -26,6 +27,17 @@
 //
 // The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
 // window GDI stays invisible there, also after the swapchain is gone.
+//
+// Linux: the same code.  A Swapchain there is a set of dma-bufs lib/gpu makes itself (vk_dmabuf.rs,
+// no VkSurface: that would want libwayland or libxcb), plat attaches them with its own protocol code
+// (linux_gpuout.rs); shared memory and dma-bufs take turns on one wl_surface or X window, so there is
+// no child and win_gpu_child only says what the display accepts.  The differences this code sees: a
+// frame reaches the window after the GPU has finished it (flush, busy: the loop looks every ms while
+// one is on its way), the next one starts when the display has answered the last (next_look: no
+// polling, the answer ends the wait; the frame stays in the texture and its newest state is drawn
+// then), the compositor gets the frame's rectangles (damage), a worker may not ask the window system
+// (Surface::track_size).  What cannot be read back is said by the tests: no client reads a Wayland
+// window, Xwayland's GetImage of a flipped window lags one frame.
 //
 // Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 // and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -78,9 +90,10 @@
 //
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
-// usable adapter or surface: the CPU path for good, silently.
+// usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
+// silently.
 //
-// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
+// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX), jfgui_GPU_VERIFY=1 (every presented
 // image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 // jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -90,8 +103,8 @@
 // jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
-// Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
-// without a GPU, it prints a SKIP once and does nothing):
+// Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
+// Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
 //   gpu on [fast]          a real window per UI window (shown without activation) with
 //                          the output, every presented image compared with the framebuffer (fast:
 //                          not compared, for measurements), a render after every input edge; waits
@@ -104,8 +117,9 @@
 //                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
 //                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
 //   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-//                          top of ours is a note, not a failure)
-//   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
+//                          top of ours is a note, not a failure); X11: what the server holds for the
+//                          window; Wayland: a note, no client can read it
+//   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
 //   gpu expect upload N    at most N bytes uploaded since the last check
 //   gpu expect base N      at most N bytes of them to the base texture since the last check
 //   gpu expect raster N    at most N pixels of the base layer drawn since the last check
@@ -121,6 +135,7 @@
 //   gpu shot FILE          the image the window presents now (read back: also what a gesture's
 //                          tiles show; `shot` writes the framebuffer)
 //   gpu lose               the device behaves as lost from now on (Device::test_lose)
+//   gpu hold MS            real time passes, the windows stay as they are (a look from outside)
 //   gpu print              the counters
 
 use alloc::boxed::Box;
@@ -153,6 +168,9 @@ use text::Text;
 /// the output without jfgui_GPU in the environment: on, jfgui_GPU=0 turns it off (docs/GPU.md
 /// "Ausgabe der UI" says what it costs)
 const DEFAULT_ON: bool = true;
+/// the same on Linux, measured apart: a weak GPU may answer differently (docs/GPU.md "Ausgabe unter
+/// Linux"); this line decides
+const DEFAULT_ON_LINUX: bool = true;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md
 /// "Ausgabe der UI")
@@ -167,7 +185,9 @@ const STABLE_US: u64 = 100_000;
 const RETRY_US: u64 = 2_000;
 /// while a job runs the loop looks this often (us)
 const JOB_US: u64 = 8_000;
-const WORKER_STACK: usize = 2 << 20;
+/// (a driver compiles shaders on this thread; on Linux a stack has exactly this size, on Windows
+/// this is what is committed at the start: docs/GPU.md "Linux")
+const WORKER_STACK: usize = if cfg!(windows) { 2 << 20 } else { 8 << 20 };
 /// the first wait before a new device (ms), its longest
 const RETRY_FIRST_MS: u64 = 2_000;
 const RETRY_MAX_MS: u64 = 300_000;
@@ -221,6 +241,8 @@ const K_MAX: f64 = 1.9;
 const PHASE_TOL: f64 = 1.0 / 64.0;
 /// the scales kept per canvas
 const LEVELS_MAX: usize = 6;
+/// (scripts) a window shows once more, 4 ms between the tries: longer than a display takes to answer
+const SHOW_TRIES: u32 = 300;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
 /// wgsl::compile makes of it, --gen-shaders writes them again)
@@ -471,6 +493,7 @@ struct Win {
     full: bool,    // the texture lacks pixels: the whole frame goes up next
     undef: bool,   // the texture is new (Layout::Undefined)
     pending: bool, // the texture holds pixels that were not presented
+    apart_before: bool, // the last frame had layers, images or canvases apart
     last_present: u64,
     job: u32,      // the job in flight
     size: (i32, i32),
@@ -534,6 +557,7 @@ pub(crate) struct S {
     trim_at: u64,
     t0: u64,
     script_pw: [i32; super::consts::WIN_MAX],
+    script_asked: [(i32, i32); super::consts::WIN_MAX],
     layers_on: bool,
     images_on: bool,
     images: Vec<Image>,
@@ -582,6 +606,7 @@ impl Default for S {
             trim_at: 0,
             t0: 0,
             script_pw: [-1; super::consts::WIN_MAX],
+            script_asked: [(0, 0); super::consts::WIN_MAX],
             layers_on: false,
             images_on: false,
             images: Vec::new(),
@@ -622,7 +647,7 @@ fn wanted() -> bool {
     let on = match plat::env("jfgui_GPU").as_deref() {
         Some("0") | Some("off") => false,
         Some("1") | Some("on") => true,
-        _ => DEFAULT_ON,
+        _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX },
     };
     on && !plat::win_remote_session()
 }
@@ -764,7 +789,9 @@ impl S {
         let jobs = self.jobs.clone();
         jobs.running.fetch_add(1, Ordering::AcqRel);
         let j = jobs.clone();
-        let t = plat::thread_spawn(WORKER_STACK, Box::new(move || {
+        // (jfgui_GPU_WORKER_KB: to see what a driver needs, docs/GPU.md "Linux")
+        let stack = plat::env("jfgui_GPU_WORKER_KB").and_then(|v| v.parse::<usize>().ok()).map_or(WORKER_STACK, |k| k << 10);
+        let t = plat::thread_spawn(stack, Box::new(move || {
             let d = f();
             j.done.lock().push(d);
             j.running.fetch_sub(1, Ordering::AcqRel);
@@ -866,6 +893,9 @@ fn upload(w: &mut Win, core: &Core, fb: &Surface, rects: Option<&[[i32; 4]]>, tr
     let bytes: u64 = rs.iter().map(|r| r[2].max(0) as u64 * r[3].max(0) as u64 * 4).sum();
     w.out.upload_bytes += bytes;
     w.out.upload_base += bytes;
+    if let Some(sc) = &w.sc {
+        sc.damage(if rects.is_some() && before == Layout::Sampled { Some(rs) } else { None });
+    }
     if bytes > BIG_UPLOAD {
         *trim_at = plat::time_us() + TRIM_US;
     }
@@ -965,6 +995,7 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
     w.out.frames += 1;
     if let Some(rb) = &w.rb {
         core.dev.wait(id, 5_000_000_000)?;
+        sc.flush()?;
         let n = fb.w as usize * fb.h as usize * 4;
         w.rb_px.resize(n, 0);
         rb.read(0, &mut w.rb_px[..n])?;
@@ -1225,6 +1256,14 @@ impl Ui {
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
         let soon = t0 < w.last_present + MIN_PRESENT_US && !s.script;
+        // (what changes on the screen is known without layers, images and canvases)
+        let apart = w.sp.drawn || w.sp.active || !w.sp.quads.is_empty();
+        let before = core::mem::replace(&mut w.apart_before, apart);
+        if apart || before {
+            if let Some(sc) = &w.sc {
+                sc.damage(None);
+            }
+        }
         // (a frame drawn layer by layer has uploaded its parts)
         let up = if core::mem::take(&mut w.sp.drawn) { Ok(()) } else { upload(w, core, fb, rects, &mut s.trim_at) };
         let r = up.and_then(|_| if soon { Ok(Shown::Wait) } else { show(w, core, fb) });
@@ -1271,6 +1310,7 @@ impl Ui {
             full: true,
             undef: true,
             pending: false,
+            apart_before: false,
             last_present: 0,
             job: 0,
             size: (0, 0),
@@ -1472,7 +1512,13 @@ impl Ui {
                 w.stable_at = t0;
                 again = true;
             } else {
-                match upload(w, core, fb, None, &mut s.trim_at).and_then(|_| show(w, core, fb)) {
+                let ready = w.sc.as_mut().map_or(Ok(true), |sc| sc.prepare());
+                let shown = match ready {
+                    Ok(true) => upload(w, core, fb, None, &mut s.trim_at).and_then(|_| show(w, core, fb)),
+                    Ok(false) => Ok(Shown::Wait), // (Linux: the display has not answered for the images yet)
+                    Err(e) => Err(e),
+                };
+                match shown {
                     Ok(Shown::Done) => {
                         plat::win_gpu_child_show(w.pw, true);
                         plat::win_release_kept(w.pw);
@@ -1521,6 +1567,14 @@ impl Ui {
             }
         }
         for i in 0..n {
+            let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
+            // (Linux: a frame the GPU has finished goes to the window)
+            if matches!(w.stage, Stage::Gpu | Stage::Switch) && w.sc.as_ref().is_some_and(|sc| sc.busy()) {
+                if let Some(Err(e)) = w.sc.as_ref().map(|sc| sc.flush()) {
+                    self.gp_failed(i, e);
+                    continue;
+                }
+            }
             let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
             match w.stage {
                 Stage::Switch => self.gp_switch(i),
@@ -1623,7 +1677,10 @@ impl Ui {
             let Some(w) = s.wins[i].as_mut() else { continue };
             let old = w.sc.take();
             let surf = match w.surf.take() {
-                Some(x) => x,
+                Some(x) => {
+                    x.track_size(); // (Linux: a worker may not ask the window system)
+                    x
+                }
                 None => match gpu::Surface::native(&inst, nw, pw) {
                     Ok(x) => x,
                     Err(_) => {
@@ -1681,9 +1738,15 @@ impl Ui {
                 d = d.min(w.sp.linger_at);
             }
             let minimised = plat::win_state(w.pw) & plat::WST_MINIMIZED != 0;
+            // (Linux: a frame on its way, a display that has not answered yet)
+            let on_way = w.sc.as_ref().is_some_and(|sc| sc.busy());
             match w.stage {
                 Stage::Switch if !minimised => d = d.min(now + RETRY_US),
-                Stage::Gpu if w.pending && !minimised => d = d.min((w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000))),
+                Stage::Gpu if on_way => d = d.min(now + RETRY_US.min(1000)),
+                Stage::Gpu if w.pending && !minimised => {
+                    let retry = (w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000));
+                    d = d.min(w.sc.as_ref().map_or(retry, |sc| sc.next_look(retry)));
+                }
                 Stage::Cpu if ready && !minimised && !moving && w.fail_at != u64::MAX => {
                     // (a size the frame has not reached yet: its event is on the way)
                     let settle = if plat::win_size(w.pw) == w.size { 1000 } else { 16_000 };
@@ -2724,7 +2787,9 @@ impl Ui {
         let mut pw = s.script_pw[i];
         if pw < 0 {
             let off = 40 + 48 * i as i32;
-            pw = plat::win_create("gpu output test", 320, 240, plat::PWF_SYSFRAME | plat::PWF_RESIZABLE, plat::PW_NOOWNER, off, off);
+            // (Linux: one window without an owner, the first)
+            let owner = if cfg!(windows) { plat::PW_NOOWNER } else { s.script_pw.iter().copied().find(|&p| p >= 0).unwrap_or(plat::PW_NOOWNER) };
+            pw = plat::win_create("gpu output test", 320, 240, plat::PWF_SYSFRAME | plat::PWF_RESIZABLE, owner, off, off);
             if pw < 0 {
                 return -1;
             }
@@ -2732,7 +2797,9 @@ impl Ui {
             plat::win_test(plat::WT_NOANIM, pw, [0; 4]);
             plat::win_show(pw, plat::PWS_SHOWNA);
         }
-        if plat::win_size(pw) != (fw, fh) {
+        // (asked once: a window manager that keeps it at another size says so again each time)
+        if plat::win_size(pw) != (fw, fh) && s.script_asked[i] != (fw, fh) {
+            s.script_asked[i] = (fw, fh);
             plat::win_set_rect(pw, plat::PW_KEEP, plat::PW_KEEP, fw, fh);
         }
         script_pump();
@@ -2866,6 +2933,16 @@ impl Ui {
             }
             return;
         }
+        if word_eq(a, "hold").is_some() {
+            let (t, _) = super::runtime::parse_int(next_word(a));
+            let dl = plat::time_us() + t.max(0) as u64 * 1000;
+            while plat::time_us() < dl {
+                script_pump();
+                self.gp_tick();
+                plat::gpu_wait(plat::time_us() + 10_000);
+            }
+            return;
+        }
         if word_eq(a, "print").is_some() {
             let o = self.gpu_output(self.gp_scoped() as u32);
             plat::write_stdout(format!("gpu: {o:?}\n").as_bytes());
@@ -2882,6 +2959,13 @@ impl Ui {
         self.render();
         self.present();
         let i = self.gp_scoped();
+        // (a window manager that keeps the window smaller than the frame, larger than the screen: the
+        // window stays on the CPU path; a note, as for a window on top of ours)
+        let needs_gpu = ["gpu", "apart", "tiles", "layers", "images"].iter().any(|w| word_eq(r, w).is_some());
+        if needs_gpu && self.m.gout.win(i).is_some_and(|w| w.stage != Stage::Gpu && kept_at_other_size(w)) {
+            plat::write_stdout(format!("note: gpu expect {}: the system keeps the window at another size (no result)\n", String::from_utf8_lossy(r).trim_end()).as_bytes());
+            return;
+        }
         if word_eq(r, "gpu").is_some() || word_eq(r, "cpu").is_some() {
             let want_gpu = word_eq(r, "gpu").is_some();
             let on = self.gpu_output(i as u32).on;
@@ -2970,9 +3054,9 @@ impl Ui {
         if let (Dev::Ready(core), Some(Some(w)), Some(fb)) = (&s.dev, s.wins.get_mut(i), fb) {
             (w_px, h_px) = (fb.w, fb.h);
             w.rb_keep = Some(Vec::new());
-            for _ in 0..50 {
+            for _ in 0..SHOW_TRIES {
                 match show(w, core, fb) {
-                    Ok(Shown::Wait) => { plat::wait(plat::time_us() + 4_000); }
+                    Ok(Shown::Wait) => plat::gpu_wait(plat::time_us() + 4_000),
                     _ => break,
                 }
             }
@@ -3017,10 +3101,10 @@ impl Ui {
                 }
                 any = true;
                 let frames = w.out.verified;
-                for _ in 0..50 {
+                for _ in 0..SHOW_TRIES {
                     match show(w, core, fb) {
                         Ok(Shown::Wait) => {
-                            plat::wait(plat::time_us() + 4_000); // no image free now
+                            plat::gpu_wait(plat::time_us() + 4_000); // no image free now
                         }
                         Ok(_) => break,
                         Err(e) => {
@@ -3061,20 +3145,52 @@ impl Ui {
             self.fail(b"no window");
             return;
         }
+        // (Linux: Xwayland's GetImage on a window flipped to a buffer reads the buffer before the last
+        // one, seen on KWin 6.6 while its own composition shows the last: one more frame of the same
+        // content; a Wayland client reads nothing anyway)
+        if !cfg!(windows) && screen {
+            let mut s = core::mem::take(&mut self.m.gout);
+            let fb = self.uiw_parts(i as u32).map(|p| &p.rt.fb);
+            if let (Dev::Ready(core), Some(Some(w)), Some(fb)) = (&s.dev, s.wins.get_mut(i), fb) {
+                for _ in 0..SHOW_TRIES {
+                    if w.stage != Stage::Gpu || !matches!(show(w, core, fb), Ok(Shown::Wait)) {
+                        break;
+                    }
+                    plat::gpu_wait(plat::time_us() + 4_000);
+                }
+            }
+            self.m.gout = s;
+        }
+        // (Linux: a frame waits for the display's answer to the last one, or for the GPU)
+        for _ in 0..SHOW_TRIES {
+            let open = self.m.gout.wins.get(i).and_then(|w| w.as_ref()).is_some_and(|w| w.pending || w.sc.as_ref().is_some_and(|sc| sc.busy()));
+            if !open {
+                break;
+            }
+            script_pump();
+            self.gp_tick();
+            plat::gpu_wait(plat::time_us() + 4_000);
+        }
         // what was presented reaches the screen with the next compositions
         for _ in 0..12 {
             script_pump();
-            plat::wait(plat::time_us() + 8_000);
+            self.gp_tick();
+            plat::gpu_wait(plat::time_us() + 8_000);
         }
         let Some(fb) = self.uiw_parts(i as u32).map(|p| &p.rt.fb) else { return };
         let (w, h) = (fb.w, fb.h);
-        let px = if screen {
+        let px = if screen && cfg!(windows) {
             plat::win_get_rect(pw).and_then(|r| plat::win_test_screen(r[0], r[1], w, h))
         } else {
             plat::win_test_image(pw).filter(|x| x.0 == w && x.1 == h).map(|x| x.2)
         };
         let Some(px) = px else {
-            self.fail(b"no picture");
+            if cfg!(windows) {
+                self.fail(b"no picture");
+            } else {
+                // (a Wayland client cannot read a window back; X11: the system keeps it at another size)
+                plat::write_stdout(b"note: gpu expect screen: no way to read the window back here (no result)\n");
+            }
             return;
         };
         let mut bad = 0u64;

@@ -73,6 +73,28 @@ pub const ERROR_NATIVE_WINDOW_IN_USE_KHR: VkResult = -1000000001;
 pub const SUBOPTIMAL_KHR: VkResult = 1000001003;
 pub const ERROR_OUT_OF_DATE_KHR: VkResult = -1000001004;
 
+// ---------------------------------------------------------------- dmabuf (vk_dmabuf.rs)
+pub const STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO: u32 = 1000072001;
+pub const STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO: u32 = 1000072002;
+pub const STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR: u32 = 1000074002;
+pub const STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO: u32 = 1000127001;
+pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO: u32 = 1000071000;
+pub const STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES: u32 = 1000071001;
+pub const STRUCTURE_TYPE_FORMAT_PROPERTIES_2: u32 = 1000059002;
+pub const STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2: u32 = 1000059003;
+pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2: u32 = 1000059004;
+pub const STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT: u32 = 1000158000;
+pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT: u32 = 1000158002;
+pub const STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_LIST_CREATE_INFO_EXT: u32 = 1000158003;
+pub const STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT: u32 = 1000158005;
+pub const STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT: u32 = 1000353000;
+pub const IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT: u32 = 1000158000;
+pub const EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT: u32 = 0x200;
+pub const EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT: u32 = 2;
+pub const IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT: u32 = 0x80;
+pub const QUEUE_FAMILY_EXTERNAL: u32 = !1;
+pub const QUEUE_FAMILY_FOREIGN_EXT: u32 = !2;
+
 // ---------------------------------------------------------------- VkStructureType
 pub const STRUCTURE_TYPE_APPLICATION_INFO: u32 = 0;
 pub const STRUCTURE_TYPE_INSTANCE_CREATE_INFO: u32 = 1;
@@ -622,6 +644,43 @@ vk_structs! {
     pub struct FormatProperties {
         pub linear_tiling_features: u32, pub optimal_tiling_features: u32, pub buffer_features: u32,
     }
+    pub struct ExternalMemoryImageCreateInfo { pub s_type: u32, pub p_next: *const c_void, pub handle_types: u32 }
+    pub struct ExportMemoryAllocateInfo { pub s_type: u32, pub p_next: *const c_void, pub handle_types: u32 }
+    pub struct MemoryDedicatedAllocateInfo { pub s_type: u32, pub p_next: *const c_void, pub image: Handle, pub buffer: Handle }
+    pub struct MemoryGetFdInfoKHR { pub s_type: u32, pub p_next: *const c_void, pub memory: Handle, pub handle_type: u32 }
+    pub struct DrmFormatModifierPropertiesEXT { pub modifier: u64, pub plane_count: u32, pub tiling_features: u32 }
+    pub struct DrmFormatModifierPropertiesListEXT {
+        pub s_type: u32, pub p_next: *mut c_void, pub count: u32, pub p_properties: *mut DrmFormatModifierPropertiesEXT,
+    }
+    pub struct FormatProperties2 { pub s_type: u32, pub p_next: *mut c_void, pub format_properties: FormatProperties }
+    pub struct ImageDrmFormatModifierListCreateInfoEXT {
+        pub s_type: u32, pub p_next: *const c_void, pub count: u32, pub p_modifiers: *const u64,
+    }
+    pub struct ImageDrmFormatModifierPropertiesEXT { pub s_type: u32, pub p_next: *mut c_void, pub modifier: u64 }
+    pub struct ImageSubresource { pub aspect_mask: u32, pub mip_level: u32, pub array_layer: u32 }
+    pub struct SubresourceLayout { pub offset: u64, pub size: u64, pub row_pitch: u64, pub array_pitch: u64, pub depth_pitch: u64 }
+    pub struct PhysicalDeviceImageFormatInfo2 {
+        pub s_type: u32, pub p_next: *const c_void, pub format: u32, pub image_type: u32, pub tiling: u32,
+        pub usage: u32, pub flags: u32,
+    }
+    pub struct PhysicalDeviceExternalImageFormatInfo { pub s_type: u32, pub p_next: *const c_void, pub handle_type: u32 }
+    pub struct PhysicalDeviceImageDrmFormatModifierInfoEXT {
+        pub s_type: u32, pub p_next: *const c_void, pub modifier: u64, pub sharing_mode: u32,
+        pub queue_family_index_count: u32, pub p_queue_family_indices: *const u32,
+    }
+    pub struct ImageFormatProperties {
+        pub max_extent: Extent3D, pub max_mip_levels: u32, pub max_array_layers: u32, pub sample_counts: u32,
+        pub max_resource_size: u64,
+    }
+    pub struct ImageFormatProperties2 { pub s_type: u32, pub p_next: *mut c_void, pub image_format_properties: ImageFormatProperties }
+    pub struct ExternalMemoryProperties {
+        pub external_memory_features: u32, pub export_from_imported_handle_types: u32, pub compatible_handle_types: u32,
+    }
+    pub struct ExternalImageFormatProperties { pub s_type: u32, pub p_next: *mut c_void, pub external_memory_properties: ExternalMemoryProperties }
+    pub struct PhysicalDeviceDrmPropertiesEXT {
+        pub s_type: u32, pub p_next: *mut c_void, pub has_primary: u32, pub has_render: u32,
+        pub primary_major: i64, pub primary_minor: i64, pub render_major: i64, pub render_minor: i64,
+    }
     pub struct DeviceQueueCreateInfo {
         pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub queue_family_index: u32,
         pub queue_count: u32, pub p_queue_priorities: *const f32,
@@ -965,6 +1024,10 @@ fn_table! {
             (PhysicalDevice, *mut PhysicalDeviceMemoryProperties);
         get_physical_device_format_properties req [b"vkGetPhysicalDeviceFormatProperties\0"]
             (PhysicalDevice, u32, *mut FormatProperties);
+        get_physical_device_format_properties2 opt [b"vkGetPhysicalDeviceFormatProperties2\0", b"vkGetPhysicalDeviceFormatProperties2KHR\0"]
+            (PhysicalDevice, u32, *mut FormatProperties2);
+        get_physical_device_image_format_properties2 opt [b"vkGetPhysicalDeviceImageFormatProperties2\0", b"vkGetPhysicalDeviceImageFormatProperties2KHR\0"]
+            (PhysicalDevice, *const PhysicalDeviceImageFormatInfo2, *mut ImageFormatProperties2) -> VkResult;
         enumerate_device_extension_properties req [b"vkEnumerateDeviceExtensionProperties\0"]
             (PhysicalDevice, *const u8, *mut u32, *mut ExtensionProperties) -> VkResult;
         create_device req [b"vkCreateDevice\0"] (PhysicalDevice, *const DeviceCreateInfo, A, *mut Device) -> VkResult;
@@ -1074,6 +1137,10 @@ fn_table! {
         wait_semaphores req [b"vkWaitSemaphores\0", b"vkWaitSemaphoresKHR\0"] (Device, *const SemaphoreWaitInfo, u64) -> VkResult;
         get_semaphore_counter_value req [b"vkGetSemaphoreCounterValue\0", b"vkGetSemaphoreCounterValueKHR\0"]
             (Device, Handle, *mut u64) -> VkResult;
+        get_memory_fd_khr opt [b"vkGetMemoryFdKHR\0"] (Device, *const MemoryGetFdInfoKHR, *mut i32) -> VkResult;
+        get_image_drm_format_modifier_properties_ext opt [b"vkGetImageDrmFormatModifierPropertiesEXT\0"]
+            (Device, Handle, *mut ImageDrmFormatModifierPropertiesEXT) -> VkResult;
+        get_image_subresource_layout opt [b"vkGetImageSubresourceLayout\0"] (Device, Handle, *const ImageSubresource, *mut SubresourceLayout);
         create_swapchain_khr opt [b"vkCreateSwapchainKHR\0"] (Device, *const SwapchainCreateInfoKHR, A, *mut Handle) -> VkResult;
         destroy_swapchain_khr opt [b"vkDestroySwapchainKHR\0"] (Device, Handle, A);
         get_swapchain_images_khr opt [b"vkGetSwapchainImagesKHR\0"] (Device, Handle, *mut u32, *mut Handle) -> VkResult;
