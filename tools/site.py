@@ -126,7 +126,7 @@ LANGUAGES = {"de": "German"}
 # the coloured tiles of the start page, the way in for most readers
 TILES = [("docs/GUIDE.md", "b-indigo"), ("docs/API.md", "b-blue"), ("CHANGELOG.md", "b-orange"), ("docs/ROADMAP.md", "b-green")]
 # the website, one folder above the output: the only files that pages and style sheet reach there
-WEBSITE_PAGES = ("index.html", "features.html", "apps.html", "legal.html", "privacy.html")
+WEBSITE_PAGES = ("index.html", "features.html", "apps.html", "roadmap.html", "legal.html", "privacy.html")
 FONTS = (("Atkinson Hyperlegible Next", "400 700", "atkinson"), ("Bricolage Grotesque", "700 800", "bricolage"),
          ("JetBrains Mono", "400 600", "jetbrains"))
 FONT_PARTS = (("latin", "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, "
@@ -1244,6 +1244,7 @@ PAGE = """<!doctype html>
     <nav class="menu" aria-label="Main">
       <a href="{root}../features.html">Features</a>
       <a href="{root}../apps.html">Apps</a>
+      <a href="{root}../roadmap.html">Roadmap</a>
       <a href="{root}index.html" aria-current="{current}">Docs</a>
       <a href="{repo}">GitHub</a>
     </nav>
@@ -1383,7 +1384,7 @@ html{--bar:97px}
 }
 @media (max-width:760px){.brand{margin-right:4px}.menu a{padding:6px 7px}}
 @media (max-width:560px){.tiles,.caps{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:480px){.brand{gap:6px;font-size:1.05rem}.mark svg{width:10px;height:10px}.menu a{padding:6px 5px;font-size:.875rem}}
+@media (max-width:480px){.brand{gap:6px;font-size:1.05rem}.mark{display:none}.menu{gap:0}.menu a{padding:6px 4px;font-size:.8125rem}}
 @media (prefers-reduced-motion:reduce){.sidebar{transition:none}}
 """
 
