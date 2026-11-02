@@ -24,13 +24,16 @@
 // coverage).  The preview goes through the compose hook (mv_row: hole, then the transformed
 // pixels P = rs_affine(F, M, Probenahme) blended with Normal); the commit runs the same row
 // function on the layer rows (history pixels + selection: one compound step "Ausgewählte
-// Pixel verschieben").
+// Pixel verschieben").  While the pixels move (a drag inside the frame, MV_NUDGE_MS after an
+// arrow key) the marching ants and the frame are hidden, so the edges of the pixels can be
+// seen; Auswahl verschieben keeps them: the outline is what it moves.
 //
 //   tmove_init()                 register the two tools
 //   tmove_active(doc) -> bool    true while a session of doc is pending
-//   tmove_timer()                (sel_cmd, TMR_TMOVE) nothing yet
+//   tmove_hides_outline(doc) -> bool   (sel_overlay) the pixels of doc are moving
+//   tmove_timer()                (sel_cmd, TMR_TMOVE) the outline back after an arrow key
 //   tmove_diag() -> (text, value)   test record 9984: "tx,ty,sx%,sy%,deg" of M,
-//                                value live | frame << 1 | drag << 2
+//                                value live | frame << 1 | drag << 2 | outline hidden << 5
 //   tmove_paste(doc, sf, x, y) -> 0 / -1   (K1, clip.rs) Einfügen: a session of Ausgewählte
 //                                Pixel verschieben whose floating pixels are sf (FMT_ARGB,
 //                                taken over) at (x, y); nothing is lifted, the selection shows
@@ -66,7 +69,7 @@ use crate::app::constants::*;
 use crate::document::model::{doc_active, doc_mark_px, Doc, DocId};
 use crate::document::history::{hist_begin_compound, hist_end_compound, hist_push_sel, hist_px_begin, hist_px_cancel, hist_px_end, hist_px_touch};
 use crate::workspace::nubs::{nub_set, nubs_damage, nubs_draw, nubs_hit, nubs_hover, Nub};
-use crate::document::selection::{sel_bake, sel_clear, sel_clip_row, sel_hrestore, sel_hsnap, sel_line, sel_set_rect, sel_set_xform, SelBlob};
+use crate::document::selection::{sel_bake, sel_clear, sel_clip_row, sel_hrestore, sel_hsnap, sel_line, sel_outline_redraw, sel_set_rect, sel_set_xform, SelBlob};
 use crate::tools::*;
 use crate::workspace::view::{view_damage_doc, view_doc_to_screen_f64};
 use crate::app::Pn;
@@ -85,6 +88,7 @@ const DR_MOVE: u32 = 1;
 const DR_SCALE: u32 = 2;
 const DR_ROTATE: u32 = 3;
 const DR_PIVOT: u32 = 4;
+const MV_NUDGE_MS: u32 = 600; // the outline stays hidden this long after an arrow key
 const DID_MOVE: u32 = 1;
 const DID_SCALE: u32 = 2;
 const DID_ROTATE: u32 = 4;
@@ -163,6 +167,8 @@ pub(crate) struct TMove {
     inv: bool,
     /// DR_*
     drag: u32,
+    /// an arrow key just moved the pixels (over with TMR_TMOVE)
+    nudge: bool,
     nub: i32,
     btn: u32,
     /// keys of the last drag step
@@ -209,6 +215,7 @@ impl Default for TMove {
             fh: 0,
             inv: false,
             drag: DR_NONE,
+            nudge: false,
             nub: 0,
             btn: 0,
             lmods: 0,
@@ -268,8 +275,18 @@ pub(crate) fn tmove_active(p: &Pn, doc: DocId) -> bool {
     p.tmove.live && p.tmove.doc == Some(doc)
 }
 
-/// tmove_timer() -- (no timer used yet)
-pub(crate) fn tmove_timer(_p: &mut Pn, _ui: &mut Ui) {}
+/// tmove_hides_outline(doc) -> true while the pixels of doc move (no marching ants, no frame)
+pub(crate) fn tmove_hides_outline(p: &Pn, doc: DocId) -> bool {
+    p.tmove.doc == Some(doc) && mv_moving(&p.tmove)
+}
+
+/// tmove_timer() -- the pause after an arrow key is over: the outline comes back
+pub(crate) fn tmove_timer(p: &mut Pn, ui: &mut Ui) {
+    if p.tmove.nudge {
+        p.tmove.nudge = false;
+        mv_outline_damage(p, ui);
+    }
+}
 
 /// tmove_diag() -> ("tx,ty,sx%,sy%,deg", live | frame << 1 | drag << 2)
 pub(crate) fn tmove_diag(t: &TMove) -> (String, u32) {
@@ -280,7 +297,7 @@ pub(crate) fn tmove_diag(t: &TMove) -> (String, u32) {
     let sy = mv_round(sqrtd(m.b * m.b + m.e * m.e) * 100.0);
     let deg = mv_round(t.rot * C_RAD2DEG);
     let s = crate::app::formatting::fmt_cap(format!("{},{},{},{},{}", tx, ty, sx, sy, deg), 96);
-    (s, (t.drag << 2) | (t.frame as u32) << 1 | t.live as u32)
+    (s, (mv_moving(t) as u32) << 5 | (t.drag << 2) | (t.frame as u32) << 1 | t.live as u32)
 }
 
 // ------------------------------------------------------------------ small helpers
@@ -328,6 +345,19 @@ fn inv_into(m: &Matrix, dst: &mut Matrix) -> bool {
 // mv_is_px() -> 1 when the session / frame belongs to Pixel verschieben
 fn mv_is_px(t: &TMove) -> bool {
     t.tool == TOOL_MOVE_PIXELS
+}
+
+// mv_moving() -> the pixels are moving: the outline is hidden
+fn mv_moving(t: &TMove) -> bool {
+    t.live && mv_is_px(t) && (t.drag == DR_MOVE || t.nudge)
+}
+
+// mv_outline_damage() -- the outline appears or disappears (mv_moving changed)
+fn mv_outline_damage(p: &mut Pn, ui: &mut Ui) {
+    mv_damage_frame(p, ui);
+    if let Some(doc) = p.tmove.doc {
+        sel_outline_redraw(p, ui, doc);
+    }
 }
 
 // ------------------------------------------------------------------ frame
@@ -754,12 +784,18 @@ fn mv_free(t: &mut TMove) {
 // mv_end() -- the session is over (frame rebuilt with the next tick)
 fn mv_end(p: &mut Pn, ui: &mut Ui) {
     let t = &mut p.tmove;
+    let hidden = mv_moving(t);
     mv_free(t);
     t.psel = None; // K1: the paste's saved selection
     t.paste = false;
     t.live = false;
     t.drag = DR_NONE;
-    mv_damage_frame(p, ui);
+    t.nudge = false;
+    if hidden {
+        mv_outline_damage(p, ui);
+    } else {
+        mv_damage_frame(p, ui);
+    }
     p.tmove.frame = false;
 }
 
@@ -1051,11 +1087,15 @@ fn mv_input(p: &mut Pn, ui: &mut Ui, doc: DocId, inp: &UiInput, x_fx: i32, y_fx:
             mv_drag_to(p, ui, x, y, inp.mods);
             return true;
         }
+        let hidden = mv_moving(t);
         t.drag = DR_NONE;
         for n in t.nubs.iter_mut() {
             n.flags &= !(NBF_DRAG as u32);
         }
         nubs_damage(&p.view, ui, &mut t.nubs);
+        if hidden && !mv_moving(&p.tmove) {
+            mv_outline_damage(p, ui);
+        }
         return true;
     }
     if !mv_frame_ok(p, Some(doc)) {
@@ -1106,6 +1146,9 @@ fn mv_input(p: &mut Pn, ui: &mut Ui, doc: DocId, inp: &UiInput, x_fx: i32, y_fx:
         t.nubs[k as usize].flags |= NBF_DRAG as u32;
         nubs_damage(&p.view, ui, &mut t.nubs);
     }
+    if mv_moving(&p.tmove) {
+        mv_outline_damage(p, ui);
+    }
     true
 }
 
@@ -1133,6 +1176,10 @@ fn mv_key(p: &mut Pn, ui: &mut Ui, vk: u32, mods: u32) -> bool {
         }
     }
     if mv_session(p, ui, doc.unwrap(), false) {
+        if mv_is_px(&p.tmove) {
+            p.tmove.nudge = true;
+            ui.timer(TMR_TMOVE, MV_NUDGE_MS);
+        }
         mv_translate(p, ui, dx as f64, dy as f64);
     }
     true
@@ -1171,7 +1218,7 @@ fn mv_tick(p: &mut Pn, ui: &mut Ui, doc: Option<DocId>) {
 // dirty-rectangle render is exact) + the handles
 fn mv_overlay(p: &mut Pn, g: &mut Gfx, doc: DocId, _rect: [i32; 4]) {
     let t = &mut p.tmove;
-    if !t.frame || t.doc != Some(doc) {
+    if !t.frame || t.doc != Some(doc) || mv_moving(t) {
         return;
     }
     let mut c = [[0i32; 2]; 4];
