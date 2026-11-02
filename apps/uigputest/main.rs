@@ -42,7 +42,7 @@
 //     canvas    a canvas (lib/ui/canvas.rs): no tile while its view stands still, a pan and a zoom
 //               from tiles with next to nothing drawn or uploaded, the CPU's picture and no more
 //               frames after them, an edit, damage, a popup and something of the base over it, a
-//               new size, eviction, a budget of nothing, a lost device
+//               new size, eviction, a budget of nothing, a lost device, the tiles' end (no frame)
 //     canvasplain  the same without reading back: during a gesture the framebuffer lacks the view,
 //               Ui::gpu_settle gives it; at rest it holds it
 //     canvasoff jfgui_GPU=0: the same canvas on the CPU path: no tiles, the framebuffer in every frame
@@ -1572,6 +1572,36 @@ impl Test {
                     self.pc = 27;
                 }
             }
+            28 => {
+                // the tiles go by themselves a while after the last move, without a frame
+                if self.canvas_move(4, |v, k| v.oy = 20.0 - 6.0 * k as f64) {
+                    self.pc = 29;
+                }
+            }
+            29 => {
+                if o.canvas_apart == 0 && o.canvas_settles > self.mark[3] {
+                    self.mark[0] = o.frames;
+                    self.mark[3] = o.reserved;
+                    self.pc = 30;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
+                } else if o.canvas_apart != 0 {
+                    self.mark[3] = o.canvas_settles;
+                }
+                if self.after(5000) {
+                    self.ok(false, "still apart after 5 s");
+                    self.finish(ui);
+                }
+            }
+            30 => {
+                if o.canvas_tiles == 0 && o.canvas_bytes == 0 {
+                    self.ok(o.frames <= self.mark[0] + 1, &format!("the tiles gone by themselves, {} frames for it", o.frames - self.mark[0]));
+                    self.finish(ui);
+                } else if self.after(5000) {
+                    self.ok(false, "the tiles did not go");
+                    self.finish(ui);
+                }
+            }
             27 => {
                 if o.canvas_apart == 1 {
                     self.ok(o.canvas_frames > 0, "a new size: tiles again");
@@ -1584,7 +1614,10 @@ impl Test {
             26 => {
                 if o.canvas_apart == 0 && self.after(50) {
                     self.same_so_far(ui, "at rest at the new size");
-                    self.finish(ui);
+                    ui.gpu_test_canvas_unused(300);
+                    self.pc = 28;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
                 } else if self.after(3000) {
                     self.ok(false, "still apart after 3 s");
                     self.finish(ui);

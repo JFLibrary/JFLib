@@ -394,7 +394,7 @@ impl Ui {
                     hh = hh.wrapping_mul(HASH_K);
                     // a canvas apart: the part of its rectangle the clips leave stands for it
                     let mut apart = None;
-                    if split && l == 0 && !d.canv.is_empty() && matches!(c, Cmd::Custom { .. }) {
+                    if split && l == 0 && !d.canv.is_empty() && dc.over == 0 && d.imgs.len() < TOP_BLOCKED as usize - 1 && matches!(c, Cmd::Custom { .. }) {
                         if let Some(&(_, r)) = d.canv.iter().find(|x| x.0 == i as u32) {
                             let v = [bb[0].max(r[0]), bb[1].max(r[1]), bb[2].min(r[0] + r[2]), bb[3].min(r[1] + r[3])];
                             hh = pos_mix(0x4341_4E56, v[0] as i64, v[1] as i64) ^ ((v[2] as u32 as u64) | (v[3] as u32 as u64) << 32).wrapping_mul(HASH_K);

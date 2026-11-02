@@ -2,7 +2,8 @@
 # the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from tiles, byte
 # for byte what the CPU draws (blit_scaled's mapping does not depend on the place); a zoom step and a
 # stroke go the CPU's way, the stroke's tiles are drawn again when the view next moves over them.
-# Every presented image is read back and compared.  Without a GPU `gpu` prints a SKIP once.
+# At the end the same with jfgui_GPU_CANVAS_ZOOM: scaled tiles until the CPU's picture follows.  Every
+# presented image is read back and compared.  Without a GPU `gpu` prints a SKIP once.
 system env jfgui_GPU_VALIDATE 1
 system env jfgui_GPU_RETRY_MS 100
 size 1400 900
@@ -87,5 +88,19 @@ gpu expect nodiff
 gpu expect same
 gpu print
 gpu off
+# ---- the switch: a zoom step from scaled tiles, then the CPU's picture
+system env jfgui_GPU_CANVAS_ZOOM kritzel
+gpu on
+gpu expect gpu
+gpu expect same
+wheel 700,450 120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu expect apart 0
+wheel 700,450 -120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu off
+system env jfgui_GPU_CANVAS_ZOOM -
 expect_nowarn gpu
 quit

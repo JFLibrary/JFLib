@@ -103,7 +103,7 @@ impl Ui {
         }
         let l = self.wp.cmd.layer as usize;
         let list = &self.wp.cmd.layers[l];
-        if let Some(Cmd::Custom { .. }) = list.last() {
+        if let Some(Cmd::Custom { f: Some(_), .. }) = list.last() {
             let index = list.len() as u32 - 1;
             self.wp.canv.recs.push(Rec { layer: l as u8, index, d });
         }

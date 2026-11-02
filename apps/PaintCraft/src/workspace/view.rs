@@ -36,9 +36,9 @@
 // 2^-L with zoom * 2^L <= 100 % is shown 1:1 or bilinearly filtered (k_view_row_pm); rows
 // are rendered in bands on the worker threads.  Pixel changes only damage their area
 // (ui.canvas_damage); zoom / scroll / size changes redraw the canvas.  While the view moves it comes
-// from tiles (ui.canvas_gpu, lib/ui/canvas.rs; canvas_register): the image as render_image draws it,
-// whole pixels away the same bytes; with the pixel grid, a selection or a tool's overlay, which the
-// draw callback paints with the image, it stays on the CPU.
+// from tiles while it pans (ui.canvas_gpu, lib/ui/canvas.rs; canvas_register): the image as
+// render_image draws it, whole pixels away the same bytes; with the pixel grid, a selection or a
+// tool's overlay, which the draw callback paints with the image, it stays on the CPU.
 //
 // The canvas is a ui::Draw object holding a Weak of the app (Pn lives in an Rc<RefCell>); at
 // render time it borrows Pn and draws as the asm's callback does.  The transforms read the
@@ -75,10 +75,11 @@ const WS_LIGHT: u32 = 0xFFDADADA; // workspace background
 const WS_DARK: u32 = 0xFF181818;
 const GRID_COLOR: u32 = 0x55808080;
 const OVL_MAX: usize = 8;
-/// how the canvas's moves use the GPU (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): tiles for a pan,
-/// byte for byte what the CPU draws, and scaled for a zoom until the CPU's picture follows;
-/// jfgui_GPU_CANVAS_PAN=paintcraft or _CPU=paintcraft take that back
-const CANVAS_GPU: CanvasGpu = CanvasGpu::Zoom;
+/// how the canvas's moves use the GPU (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from
+/// tiles, byte for byte what the CPU draws.  A zoom step goes the CPU's way at once: it costs 6 ms, a
+/// scaled tile would be softer for a moment; jfgui_GPU_CANVAS_ZOOM=paintcraft scales them all the
+/// same, jfgui_GPU_CANVAS_CPU=paintcraft keeps all of it on the CPU
+const CANVAS_GPU: CanvasGpu = CanvasGpu::Pan;
 const BAND_ROWS: i32 = 32; // rows per render work item
 const BAND_MAX: i32 = 64;
 static SHADOW_ALPHA: [u8; 6] = [0x04, 0x06, 0x08, 0x0B, 0x10, 0x18];

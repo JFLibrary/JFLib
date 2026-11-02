@@ -85,7 +85,8 @@
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 // jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
 // canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
-// jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
+// jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (they also zoom from
+// tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
 // jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
@@ -545,8 +546,10 @@ pub(crate) struct S {
     canvases: Vec<Canvas>,
     canvas_cpu: String,
     canvas_pan: String,
+    canvas_zoom: String,
     canvas_budget: u64,
     canvas_settle_us: u64,
+    canvas_unused_us: u64,
     tile_bytes: u64,
     tile_free: Vec<Rc<TileTex>>,
     tile_sf: Surface,
@@ -591,8 +594,10 @@ impl Default for S {
             canvases: Vec::new(),
             canvas_cpu: String::new(),
             canvas_pan: String::new(),
+            canvas_zoom: String::new(),
             canvas_budget: CANVAS_BUDGET,
             canvas_settle_us: SETTLE_US,
+            canvas_unused_us: CANVAS_UNUSED_US,
             tile_bytes: 0,
             tile_free: Vec::new(),
             tile_sf: Surface::default(),
@@ -639,6 +644,7 @@ impl S {
         self.canvases_on = self.layers_on && !off("jfgui_GPU_CANVAS");
         self.canvas_cpu = plat::env("jfgui_GPU_CANVAS_CPU").unwrap_or_default();
         self.canvas_pan = plat::env("jfgui_GPU_CANVAS_PAN").unwrap_or_default();
+        self.canvas_zoom = plat::env("jfgui_GPU_CANVAS_ZOOM").unwrap_or_default();
         if let Some(mb) = plat::env("jfgui_GPU_CANVAS_MB").and_then(|v| v.parse::<u64>().ok()) {
             self.canvas_budget = mb << 20;
         }
@@ -649,9 +655,12 @@ impl S {
 
     /// how this canvas may use the GPU (the variables say what the widget's choice is not)
     fn canvas_mode(&self, name: &str, gpu: CanvasGpu) -> CanvasGpu {
-        if self.canvas_cpu.split(',').any(|n| n == name) {
+        let named = |list: &str| list.split(',').any(|n| n == name);
+        if named(&self.canvas_cpu) {
             CanvasGpu::Cpu
-        } else if self.canvas_pan.split(',').any(|n| n == name) && gpu == CanvasGpu::Zoom {
+        } else if named(&self.canvas_zoom) {
+            CanvasGpu::Zoom
+        } else if named(&self.canvas_pan) {
             CanvasGpu::Pan
         } else {
             gpu
@@ -667,6 +676,7 @@ impl S {
         }
         self.tile_free.clear();
         self.tile_bytes = 0;
+        self.tile_sf = Surface::default();
         self.canvas_free_at = 0;
     }
 
@@ -1818,6 +1828,11 @@ impl Ui {
         self.m.gout.canvas_budget = bytes;
     }
 
+    /// (test aid) the tiles go this long (ms) after the last move
+    pub fn gpu_test_canvas_unused(&mut self, ms: u64) {
+        self.m.gout.canvas_unused_us = ms * 1000;
+    }
+
     /// every canvas whose view comes from tiles goes back to the CPU's picture with the next frame
     pub fn gpu_canvas_settle(&mut self) {
         let mut any = false;
@@ -2079,7 +2094,7 @@ impl Ui {
         let now = plat::time_us();
         let Ui { m, wp, .. } = self;
         let s = &mut m.gout;
-        let settle = s.canvas_settle_us;
+        let (settle, unused) = (s.canvas_settle_us, s.canvas_unused_us);
         wp.dirty.canv.clear();
         for rec in wp.canv.recs.iter() {
             let d = &rec.d;
@@ -2112,7 +2127,7 @@ impl Ui {
             }
             let c = &mut s.canvases[ci];
             let changed = new_ver || c.damaged;
-            let moved = c.known && c.view != d.view;
+            let moved = c.known && c.view != d.view && d.view.scale > 0.0 && d.view.scale < 1.0e6;
             let (dx, dy) = (d.view.ox - c.view.ox, d.view.oy - c.view.oy);
             let whole = d.view.scale == c.view.scale && (dx - rnd(dx)).abs() < PHASE_TOL && (dy - rnd(dy)).abs() < PHASE_TOL;
             c.moved = false;
@@ -2123,7 +2138,7 @@ impl Ui {
                 if c.apart {
                     c.moved = true;
                     c.until = now + settle;
-                    s.canvas_free_at = c.until + CANVAS_UNUSED_US;
+                    s.canvas_free_at = c.until + unused;
                 }
             }
             let c = &mut s.canvases[ci];
@@ -2582,6 +2597,14 @@ impl Ui {
             out.upload_bytes += bytes;
             if bytes > BIG_UPLOAD {
                 *trim_at = plat::time_us() + TRIM_US;
+            }
+        }
+        // (a cell a layer has left in this frame got the old view back from its store)
+        if sp.moved {
+            for k in 0..total {
+                if sp.redraw[k] && sp.hole[k] != 0 && sp.nr[k] == 0 {
+                    sp.owed[k] = true;
+                }
             }
         }
         sp.any_owed = sp.owed.iter().any(|&v| v);

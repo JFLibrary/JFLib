@@ -75,4 +75,34 @@ gpu expect same
 gpu print
 gpu expect screen
 gpu off
+# ---- the switches: only pans from tiles; no tiles at all
+system env jfgui_GPU_CANVAS_PAN diagram
+gpu on
+gpu expect gpu
+wheel 550,388 120 ctrl
+gpu expect apart 0
+gpu expect same
+drag 550,388 530,378 middle
+gpu expect apart 1
+gpu expect same
+gpu off
+system env jfgui_GPU_CANVAS_PAN -
+system env jfgui_GPU_CANVAS_CPU diagram
+gpu on
+gpu expect gpu
+drag 550,388 530,378 middle
+gpu expect apart 0
+gpu expect tiles 0
+gpu expect same
+gpu off
+system env jfgui_GPU_CANVAS_CPU -
+system env jfgui_GPU_CANVAS 0
+gpu on
+gpu expect gpu
+drag 550,388 530,378 middle
+gpu expect apart 0
+gpu expect tiles 0
+gpu expect same
+gpu off
+system env jfgui_GPU_CANVAS -
 quit

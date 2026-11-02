@@ -68,6 +68,9 @@ impl Ui {
     /// (test aid) on Windows: the bytes canvas tiles may take
     pub fn gpu_test_canvas_budget(&mut self, _bytes: u64) {}
 
+    /// (test aid) on Windows: the tiles go this long (ms) after the last move
+    pub fn gpu_test_canvas_unused(&mut self, _ms: u64) {}
+
     /// on Windows: every canvas whose view comes from tiles goes back to the CPU's picture now
     pub fn gpu_canvas_settle(&mut self) {}
 
