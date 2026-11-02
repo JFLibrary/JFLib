@@ -251,6 +251,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **cas:** Repairing a lost index file (repair_index, and gc before it sweeps) reads the index from the pack's end in two ranges instead of the whole pack. A pack the index names but the store does not have is Corrupt ("pack ... missing"), it was Io; a snapshot id with a NUL is refused like the other invalid ids (NotFound), and snapshot_ids leaves out names that cannot be ids. Repo::open reads repo.json again once it holds the lock, and Repo::create takes the lock before it writes repo.json
 - **spell:** The n-gram step builds an affixed form only when its length can be within reach of the word (and finds the edit distance only within its limit, and drops duplicates through a set): real suggestions are faster, hu_HU 35 -> 9 s for 400 (the slowest 953 -> 275 ms), ko_KR 43 -> 20 s, the same answers
 - **game:** The netcode's matches over netchan's ClientEvent and ServerEvent take the new events with a _ arm (it does not use the reliable channel)
+- **build:** Kritzel, the Build Manager and permprompt have English catalogues (the reasons of permprompt's ask lines too); python build_rs.py i18n also reads the reasons of an app's PERMISSIONS files
 
 ### Deprecated
 

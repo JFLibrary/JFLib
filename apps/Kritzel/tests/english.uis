@@ -1,0 +1,20 @@
+#!args --lang en
+# the texts in English (locales/ui.tsv): the ribbon, two dialogs with the library's buttons, the
+# layers panel; the other scripts stay German, the language of headless runs
+theme light
+expect text:"Selection" exists
+expect text:"Shapes" exists
+expect "Pencil" exists
+shot build/kritzel_en.png
+cmd 36
+expect dialog:"Resize and skew" exists
+expect "Keep aspect ratio" exists
+click button:"Cancel"
+expect dialog:"Resize and skew" missing
+cmd 37
+expect dialog:"Image properties" exists
+expect text:"File: Untitled" exists
+click button:"Cancel"
+cmd 46
+expect text:"Layer 1" exists
+expect text:"Opacity: 100%" exists

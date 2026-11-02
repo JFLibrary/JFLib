@@ -1,6 +1,7 @@
 # JFLib Build Manager
 
-Native, German-language build workspace for Windows and Linux, using RustLib's WinUI style.
+Native build workspace for Windows and Linux, using RustLib's WinUI style. The UI follows the
+user's language, German or English (`src/locales/ui.tsv`); the service's own messages stay German.
 The UI is a `no_std` Rust app; the Python standard-library service reuses `build_rs.py`,
 the shared app-test runner and `tools/package.py`.
 
@@ -110,7 +111,8 @@ The native matrix checks arguments (including empty/quoted/Unicode), cwd/environ
 large stdout/stderr, exit codes, process-tree cancellation, UI scripts with dirty-render
 verification and light/dark screenshots at 100/150% on both targets. `--fixture FILE`
 loads a deterministic catalog without starting the backend or saving settings. Fixture
-UI actions cannot write project files or launch builds.
+UI actions cannot write project files or launch builds. `tests/fixture.json` is what the
+scripts use, `tests/fixture_en.json` the same data in English for pictures with `--lang en`.
 
 The real service acceptance runs create artifacts below `build/manager-integration`.
 They also save a reusable `Dunkel · 150 %` start profile for the exercised app.

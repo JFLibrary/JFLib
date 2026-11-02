@@ -1,0 +1,136 @@
+de	en
+Unbenannt - Kritzel	Untitled - Kritzel
+Unbenannt	Untitled
+&Datei	&File
+&Bearbeiten	&Edit
+&Ansicht	&View
+&Neu	&New
+Ö&ffnen…	&Open…
+&Speichern	&Save
+Speichern &unter…	Save &As…
+Speichern &unter	Save &As
+&PNG-Bild	&PNG image
+&JPEG-Bild	&JPEG image
+&BMP-Bild	&BMP image
+&GIF-Bild	&GIF image
+&Anderes Format…	&Other format…
+&Beenden	E&xit
+&Rückgängig	&Undo
+&Wiederholen	&Redo
+&Ausschneiden	Cu&t
+&Kopieren	&Copy
+E&infügen	&Paste
+Alles aus&wählen	Select &All
+&Löschen	&Delete
+&Zuschneiden	Cr&op
+&Größe ändern und schräg stellen…	Resi&ze and Skew…
+&Drehen und spiegeln	Rotate and &Flip
+Nach &rechts drehen	Rotate &Right
+Nach &links drehen	Rotate &Left
+Um &180° drehen	Rotate &180°
+&Horizontal spiegeln	Flip &Horizontal
+&Vertikal spiegeln	Flip &Vertical
+Ver&größern	Zoom &In
+Ver&kleinern	Zoom &Out
+&100 %	&100%
+An &Fenster anpassen	&Fit to Window
+&Ebenen	&Layers
+&Design wechseln	Switch &Theme
+Bild&eigenschaften…	Image &Properties…
+&Farben bearbeiten…	Edit &Colors…
+Design wechseln	Switch theme
+Auswahl	Selection
+Drehen und spiegeln	Rotate and flip
+Stift	Pencil
+Radierer	Eraser
+Füllen	Fill
+Farbauswahl	Color picker
+Lupe	Magnifier
+Tools	Tools
+Formen	Shapes
+Farbe	Colors
+Ebenen	Layers
+An Fenster anpassen	Fit to window
+{} %	{}%
+Verkleinern	Zoom out
+Vergrößern	Zoom in
+Pinsel	Brush
+Kalligrafiepinsel	Calligraphy brush
+Kalligrafiestift	Calligraphy pen
+Airbrush	Airbrush
+Ölpinsel	Oil brush
+Buntstift	Crayon
+Marker	Marker
+Natürlicher Bleistift	Natural pencil
+Aquarellpinsel	Watercolor brush
+Pinselart	Brush type
+Größe ändern und schräg stellen	Resize and skew
+Größe ändern	Resize
+Prozent	Percent
+Pixel	Pixels
+Horizontal:	Horizontal:
+Vertikal:	Vertical:
+Seitenverhältnis beibehalten	Keep aspect ratio
+Schräg stellen (Grad)	Skew (degrees)
+Schräg stellen: Das Ergebnis wäre größer als 16384 × 16384 Pixel.	Skew: the result would be larger than 16384 × 16384 pixels.
+Bildeigenschaften	Image properties
+Datei: {}	File: {}
+Auflösung: 96 DPI · Ebenen: {}	Resolution: 96 DPI · Layers: {}
+Bildgröße (Pixel)	Image size (pixels)
+Breite:	Width:
+Höhe:	Height:
+Farben bearbeiten	Edit colors
+png=PNG-Bild	png=PNG image
+jpg;jpeg;jpe;jfif=JPEG-Bild	jpg;jpeg;jpe;jfif=JPEG image
+bmp;dib=BMP-Bild	bmp;dib=BMP image
+gif=GIF-Bild	gif=GIF image
+Die Änderungen an „{}“ sind noch nicht gesichert. Jetzt speichern?	The changes to “{}” have not been saved. Save them now?
+Nicht speichern	Don’t save
+Speichern fehlgeschlagen: Das Bild ließ sich nicht schreiben.	Saving failed: the image could not be written.
+Öffnen fehlgeschlagen: Die Datei ist kein lesbares Bild.	Opening failed: the file is not a readable image.
+Ebene hinzufügen	Add layer
+Deckkraft: {} %	Opacity: {}%
+Nach oben	Move up
+Nach unten	Move down
+Duplizieren	Duplicate
+Nach unten zusammenführen	Merge down
+Ebene löschen	Delete layer
+Ebene {}	Layer {}
+Sichtbarkeit	Visibility
+Einfügen: Das Bild ist größer als 16384 × 16384 Pixel.	Paste: the image is larger than 16384 × 16384 pixels.
+Auswahloptionen	Selection options
+Rechteckige Auswahl	Rectangular selection
+Freihandauswahl	Free-form selection
+Alle auswählen	Select all
+Auswahl umkehren	Invert selection
+Hintergrundfarbe aussparen	Exclude background color
+Linie	Line
+Kurve	Curve
+Oval	Oval
+Abgerundetes Rechteck	Rounded rectangle
+Polygon	Polygon
+Dreieck	Triangle
+Rechtwinkliges Dreieck	Right triangle
+Raute	Diamond
+Fünfeck	Pentagon
+Sechseck	Hexagon
+Pfeil nach rechts	Right arrow
+Pfeil nach links	Left arrow
+Pfeil nach oben	Up arrow
+Pfeil nach unten	Down arrow
+Stern mit vier Zacken	Four-point star
+Stern mit fünf Zacken	Five-point star
+Stern mit sechs Zacken	Six-point star
+Rechteckige Sprechblase	Rectangular callout
+Ovale Sprechblase	Oval callout
+Denkblase	Thought bubble
+Herz	Heart
+Blitz	Lightning
+Einfarbig	Solid color
+Kontur	Outline
+Keine Kontur	No outline
+Füllung	Fill
+Keine Füllung	No fill
+Normal	Regular
+Halbfett	Semibold
+Hintergrund füllen	Fill background

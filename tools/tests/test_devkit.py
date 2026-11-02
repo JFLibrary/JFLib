@@ -736,6 +736,16 @@ static TIPS: [&str; 2] = [
         self.write("demo/src/locales/engine.tsv", self.ENGINE)
         return self.dir / "demo"
 
+    def test_manifest_reasons(self):
+        app = self.app()
+        self.write("demo/PERMISSIONS", 'ask fs.write $TEMP/a/** "Briefe # speichern"   # a comment\n'
+                                       'ask url mailto "Eine Mail"\nask print\n# ask print "Kein Grund"\nprint "Kein ask"\n')
+        self.write("demo/src/locales/ui.tsv", self.UI + "Briefe # speichern\tSave letters\n")
+        rep, _ = i18n_check.check_app(app)
+        got = [(c, what) for c, _, what in rep.lines]
+        self.assertIn(("missing", "Eine Mail"), got)
+        self.assertFalse([x for x in got if x[1] in ("Kein Grund", "Kein ask") or "speichern" in x[1]], got)
+
     def test_report(self):
         rep, _ = i18n_check.check_app(self.app())
         got = {c: sorted(w for k, _, w in rep.lines if k == c) for c in rep.count}

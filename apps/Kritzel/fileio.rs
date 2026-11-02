@@ -58,14 +58,14 @@ impl Default for FileIo {
 /// file_frame() -- the file dialog and the "save changes?" dialog
 pub(crate) fn file_frame(p: &mut Kritzel, ui: &mut Ui) {
     let f = &mut p.file;
-    if ui.filedlg(ID_FILEDLG, f.fd_mode, &f.fd_open, &mut f.fd_path, PATH_CAP, &EXTS) & EV_ACT != 0 {
+    if ui.filedlg(ID_FILEDLG, f.fd_mode, &f.fd_open, &mut f.fd_path, PATH_CAP, &i18n::list(&EXTS)) & EV_ACT != 0 {
         ui.cmd_run(CMD_FILE_DONE, f.fd_mode);
     }
     let ask = f.ask_open.clone();
     if ui.dialog_begin(ID_ASKDLG, "Kritzel", &ask) {
-        let msg = fmt_cap(format!("Die Änderungen an „{}“ sind noch nicht gesichert. Jetzt speichern?", doc_name(&p.doc)), 512);
+        let msg = fmt_cap(i18n::tf("Die Änderungen an „{}“ sind noch nicht gesichert. Jetzt speichern?", &[doc_name(&p.doc)]), 512);
         ui.text(TS_BODY | TX_WRAP, &msg);
-        let r = ui.dialog_buttons(Some("Speichern"), Some("Nicht speichern"), Some("Abbrechen"));
+        let r = ui.dialog_buttons(Some(i18n::t("Speichern")), Some(i18n::t("Nicht speichern")), Some(i18n::t("Abbrechen")));
         if r != 0 {
             ui.cmd_run(CMD_ASK_DONE, r);
         }
@@ -81,7 +81,7 @@ pub(crate) fn paint_error(p: &mut Kritzel, msg: &'static str) {
 /// file_infobar() -- error bar after a failed open / save
 pub(crate) fn file_infobar(p: &mut Kritzel, ui: &mut Ui) {
     let Some(m) = p.file.err_msg else { return };
-    if ui.infobar(ID_FILEBAR, IB_ERROR, "Fehler", m) & EV_ACT != 0 {
+    if ui.infobar(ID_FILEBAR, IB_ERROR, i18n::t("Fehler"), m) & EV_ACT != 0 {
         p.file.err_msg = None;
     }
 }
@@ -190,7 +190,7 @@ fn show_dialog(p: &mut Kritzel, mode: u32) {
     if mode & FD_SAVE != 0 {
         // save: "folder/name" without the extension, the chosen file type adds its own
         if f.fd_path.is_empty() {
-            f.fd_path = String::from("Unbenannt");
+            f.fd_path = String::from(i18n::t("Unbenannt"));
         } else {
             let base = f.fd_path.rfind('/').unwrap_or(0);
             if let Some(dot) = f.fd_path[base..].rfind('.') {
@@ -206,7 +206,7 @@ fn save_to(p: &mut Kritzel, ui: &mut Ui, path: &str) -> i32 {
     doc_composite(&mut p.doc);
     let r = img_core::io::save(path, &p.doc.comp.borrow());
     if r != 0 {
-        p.file.err_msg = Some("Speichern fehlgeschlagen: Das Bild ließ sich nicht schreiben.");
+        p.file.err_msg = Some(i18n::t("Speichern fehlgeschlagen: Das Bild ließ sich nicht schreiben."));
         return -1;
     }
     if p.doc.path != path {
@@ -220,21 +220,21 @@ fn save_to(p: &mut Kritzel, ui: &mut Ui, path: &str) -> i32 {
 
 /// open_file(path) -> 0 ok -- load an image as a new one-layer document
 pub(crate) fn open_file(p: &mut Kritzel, ui: &mut Ui, path: &str) -> i32 {
-    const FAIL: &str = "Öffnen fehlgeschlagen: Die Datei ist kein lesbares Bild.";
+    let fail = i18n::t("Öffnen fehlgeschlagen: Die Datei ist kein lesbares Bild.");
     let sf = match img_core::io::load(path) {
         Ok(s) => s,
         Err(_) => {
-            p.file.err_msg = Some(FAIL);
+            p.file.err_msg = Some(fail);
             return -1;
         }
     };
     if sf.w as u32 > DOC_MAX as u32 || sf.h as u32 > DOC_MAX as u32 {
-        p.file.err_msg = Some(FAIL);
+        p.file.err_msg = Some(fail);
         return -1;
     }
     hist_clear(&mut p.hist);
     if doc_new(p, sf.w, sf.h) != 0 {
-        p.file.err_msg = Some(FAIL);
+        p.file.err_msg = Some(fail);
         return -1;
     }
     img_core::ops::blit_copy(doc_layer(&mut p.doc, 0), &sf, 0, 0);
@@ -253,7 +253,7 @@ pub(crate) fn open_file(p: &mut Kritzel, ui: &mut Ui, path: &str) -> i32 {
 pub(crate) fn doc_name(d: &Doc) -> &str {
     let s = d.path.as_str();
     if s.is_empty() {
-        return "Unbenannt";
+        return i18n::t("Unbenannt");
     }
     // "C:/x\y.png": the later separator wins
     match s.rfind(['/', '\\']) {

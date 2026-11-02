@@ -2678,7 +2678,8 @@ The texts are the string literals of `t("…")`, `tc("…")`, `tr("…")` (not t
 `i18n::tr`), `tf("…")`, `msg!` / `Msg::new` / `phrase` templates, `list(&TABLE)`, tables
 marked `// i18n` (`// i18n: name title` for some fields of a table, `… // i18n` for one
 line), and the labels of `Command::new` and `Mi::*` when the app translates its command
-table and menus. A text the library translates (`LIB_TEXTS`) needs no row in an app that
+table and menus, and the reasons of the `ask` lines in the app's `PERMISSIONS` files (the
+dialog reads them through the catalogue). A text the library translates (`LIB_TEXTS`) needs no row in an app that
 installs its catalogue with `i18n::set_catalog` (`t` falls back to the library). `python build_rs.py i18n APP` lists one app's gaps (`lib`: the library's `tr("…")`
 against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells to the app's
 catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
