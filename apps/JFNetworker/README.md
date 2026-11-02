@@ -441,6 +441,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 | `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
+| `model.uis`, Gruppe `hardware` | CPU und RAM gegen die Formeln: die Warteschlange allein gegen Erlang C (M/M/c) und M/D/1 auf 3 %, Sättigung X = Kerne · Tempo / Kosten auf 1 % über eine Lastreihe, M/D/1 über HTTP, der Gipfel des USL, die Sperre, zwei Dienste auf einem und auf zwei Hosts, lange Aufgaben in Stücken, langsame CPU und Speicherfresser, mehr RAM gegen Plattenlast, OOM-Kill mit 137 und Neustart durch die Einheit, Resize mit Ausfall und im Betrieb, jeder Dienst, Skripte, Konsole, Determinismus (zwei Läufe, Klon, Wiederholung aus Keyframes), die Schritte im Szenario, die Rückgängig-Schritte |
+| `scen_hw_basic.uis` | das Golden-Szenario Hardware Byte für Byte (`fixtures/hw_basic.jfnet`): Sättigung, Resize mit Ausfall und im Betrieb, langsame CPU, Speicherfresser, OOM, `top`, `free`, `lscpu` |
+| `hardware_panel.uis` | „Hardware simulieren“ mit seinem Rückgängig-Schritt, die Hardware-Karte eines Hosts (Annahmen, Eigene Angaben, Ablehnung, Resize mit Marke, im Betrieb), die neuen Fehler, die Zeile im Metriken-Panel |
+| `hardware_shots.uis` | die Bilder dazu hell und dunkel, 100 und 150 % |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
@@ -455,7 +459,8 @@ TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `fil
 `phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
 `phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
-und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`) und die Netze
+und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`), `hw_basic.jfnet` (ein Lastgenerator, zwei Webserver,
+Hardware simuliert; `hw_basic.scn` und die `hardware_*.uis`) und die Netze
 der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
@@ -561,6 +566,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
+| Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
 
 ### Gerätekatalog
 
@@ -4110,6 +4116,115 @@ Für Programme: `Action::Supplicant { dev, conf }`, `Engine::dot1x_sessions(dev)
 wird in der Selbsttest-Gruppe `dot1x` ([`src/dot1xtest.rs`](src/dot1xtest.rs)), in der coretest-Gruppe
 `eap` (Codecs und die Vektoren einer unabhängigen Python-Referenz von EAP-PWD), mit
 `scen_dot1x_imap.uis` und den Fensterskripten `dot1x_panel.uis` und `dot1x_shots.uis`.
+
+### Hardware: CPU und RAM der Geräte
+
+Netz, TCP, HTTP und Warteschlangen sind echt; ohne Hardware kostet Rechenzeit aber nichts, und ein
+Host mit zehn Diensten hat zehnmal so viel Kapazität. Mit Hardware lässt sich fragen, wann ein größerer
+Rechner mehrere kleine schlägt. Das ist das Fundament des Software-Architektur-Labors.
+
+**Ein Projekt ohne Hardware läuft Byte für Byte wie zuvor:** kein neues Ereignis, keine Zufallszahl, keine
+Reihe, und `"hw"` und `"metered"` stehen nicht in der Datei, solange sie nicht gesetzt sind. Alle Golden-Berichte
+prüfen das.
+
+Einschalten: **Hardware simulieren** auf der Projektseite des Inspektors (`Project::metered`, ein
+Rückgängig-Schritt, ohne Neustart) gibt jedem Host die Werte seines Modells (`catalog::hw_of`, eine Tabelle neben
+den Modellen). Ein Gerät kann eigene haben (`Device::hw`, auch ohne den Schalter). Lastgeneratoren, Netzgeräte und
+Smartphones bleiben ohne.
+
+| Modell | Kerne | Tempo | RAM | Swap | Disk |
+|---|---|---|---|---|---|
+| Rack-Server S | 4 | 110 % | 16 GiB | 2 GiB | SATA-SSD 480 GiB |
+| Rack-Server M | 8 | 100 % | 32 GiB | 4 GiB | NVMe-SSD 960 GiB |
+| Rack-Server L | 16 | 95 % | 64 GiB | 8 GiB | NVMe-SSD 1920 GiB |
+| Rack-Server XL | 32 | 90 % | 256 GiB | 16 GiB | schnelle NVMe-SSD 3840 GiB |
+| NAS | 2 | 70 % | 8 GiB | 2 GiB | Festplatte 8000 GiB |
+| Rack-Server 1U, 1U SFP28 | 8 | 100 % | 32 GiB | 4 GiB | SATA-SSD 960 GiB |
+| Tower-Server, PC | 4 | 100 % | 16 GiB | 2 GiB | SATA-SSD |
+| Laptop | 4 | 80 % | 16 GiB | 2 GiB | NVMe-SSD 480 GiB |
+| Load Balancer | 8 | 100 % | 16 GiB | 0 | SATA-SSD 240 GiB |
+| DB-Shard | 16 | 100 % | 64 GiB | 8 GiB | NVMe-SSD 1920 GiB |
+| Cache | 4 | 100 % | 64 GiB | 0 | SATA-SSD 240 GiB |
+| Message Queue | 4 | 100 % | 16 GiB | 2 GiB | NVMe-SSD 480 GiB |
+| Container-Host | 16 | 100 % | 64 GiB | 8 GiB | NVMe-SSD 960 GiB |
+
+Die Zahlen sind unsere **Annahmen** in runden Werten, keine Messungen an einem Produkt; Tooltip der Palette und
+Inspektor sagen das. Mehr Kerne kommen mit weniger Takt, damit „größer“ nicht einfach „mehr von allem“ ist.
+
+**Das Modell** ([`res.rs`](crates/jfn_sim/res.rs), gebaut wie [`disk.rs`](crates/jfn_sim/disk.rs)):
+
+- **CPU:** Wer zuerst kommt, mahlt zuerst, über alle Kerne. Eine Aufgabe nimmt den Kern, der als erster frei wird, und ihr
+  Ende steht beim Einreihen fest; das ist genau eine zentrale FIFO-Warteschlange (M/G/c), kostet O(Kerne) und kein
+  Ereignis. Kosten gelten für einen Referenzkern: Tempo 100 % heißt, 1 ms kostet 1 ms und ein Skriptbefehl seine 5 ns.
+  Lange Aufgaben kommen in Stücken von 4 ms, damit ein Scan kurze Anfragen nicht um seine ganze Länge aufhält.
+- **Konkurrenz:** Echte Warteschlangen, wo die Sache modelliert ist (die Sperre `serial_us`, die Disk). Dazu auf Wunsch je
+  Dienst der Faktor des Universal Scalability Law, `"usl": {"sigma": 0.05, "kappa": 0.02}`: die Kosten mal
+  1 + σ(N−1) + κN(N−1), N die mit dieser Aufgabe belegten Kerne. Das gibt fallende Kurven mit dem Gipfel bei √((1−σ)/κ). Es
+  ist die Formel, keine Messung von Sperren und Cache-Zeilen.
+- **Speicher:** Jeder Dienst hält eine Grundmenge, je Verbindung und seine Daten (`"mem_mb"`, `"conn_kb"`, `"data_mb"`; das OS
+  fragt `Service::mem` nach jedem Aufruf). Über den RAM hinaus steigen die Kosten linear bis zum 20-Fachen am Ende des Swaps, und
+  Seiten kommen über die echte Disk herein (je 10 µs Rechenzeit eine berührte Seite, davon der Anteil außerhalb des RAMs; ein Zähler
+  entscheidet, keine Zufallszahl). Über RAM und Swap hinaus endet der größte Dienst mit Status 137, was Restart-Regeln einer Einheit
+  sehen.
+- **Größe ändern:** `Action::Resize { dev, hw, downtime }`, im Fenster und mit `resize` im Szenario. Standard ist ein Neustart mit
+  30 s Ausfall, eine Marke auf der Zeitleiste (`Fault::Resize`); was auf der Disk liegt, bleibt, Kerne und Speicher starten leer. Ohne
+  Ausfall (`downtime: 0`, „Im Betrieb ändern“) nimmt das laufende System die Werte: neue Aufgaben zahlen das neue Tempo, Kerne, die
+  gehen, geben ihre wartende Arbeit weiter.
+- **Laute Nachbarn:** Die Fehler `Fault::SlowCpu` (alle Rechenzeit mal Faktor) und `Fault::MemHog` (etwas anderes hält so viel
+  Speicher) im Inspektor und mit `fault cpu`, `fault mem` im Szenario.
+
+**Was die Dienste zahlen:**
+
+| Dienst | Rechenzeit | Speicher (Grund, je Verbindung) |
+|---|---|---|
+| `http-server` | `cpu_ms` je Route oder Server, zuerst und auf den Kernen (Standard 20 µs); `time_ms` bleibt reine Wartezeit; `serial_us`: eine Sperre, einer zur Zeit, im Tempo der Kerne; `usl` | 32 MiB, 64 KiB, `data_mb` |
+| `lb` | `cpu_us` je HTTP-Anfrage, bevor ein Backend gewählt wird (Standard 50 µs); TCP-Durchleitung kostet nichts | 16 MiB, 64 KiB |
+| `cache` | `hit_us` je Treffer auf den Kernen (ohne Hardware ein reiner Zeitgeber wie bisher) | 16 MiB, 64 KiB, die gehaltenen Antworten |
+| `kv` | `cpu_us` je Anfrage (Standard 30 µs) | 64 MiB, 64 KiB, die gehaltenen Daten |
+| `worker` | `cpu_ms` je Nachricht (Standard 0); `time_ms` bleibt Wartezeit | 16 MiB, 64 KiB |
+| Skripte | jedes Stück (`slice`) nimmt sich seinen Platz in der Warteschlange der Kerne; `ns_per_op` gilt am Referenzkern | 8 MiB, 64 KiB, `data_mb`, der Heap |
+| `http-load`, Protokolldienste | nichts: Lastgeneratoren zahlen nie | keiner |
+
+**Sehen und prüfen:**
+
+- Inspektor eines Hosts: Karte **Hardware** mit CPU, Warteschlange und Speicher von jetzt, Vorlagen aus dem Katalog, Kerne, Tempo, RAM,
+  Swap, Disk und dem Schalter „Im Betrieb ändern“. Darunter im Fehlerkasten „Bremsen“ und „Belegen“.
+- Panel **Metriken**: eine eigene Zeile „Hardware“ unter den Diensten des Geräts, mit Kacheln und Verläufen für CPU, Warteschlange,
+  Speicher und Disk.
+- Konsole: `top` zeigt die echten Kerne, Last und Speicher; `free` und `lscpu` gibt es nur auf Geräten mit Hardware.
+- Szenario: Die Reihen heißen wie ein Dienst `_host`: `expect WEB1 svc _host metric cpu_pm >= 990 over 3s`. Reihen: `cpu_pm`, `running`,
+  `runq`, `mem_bytes`, `swap_bytes`, `pageins`, `oom_kills`, `disk_bytes`; ohne Zeitraum auch `cores`, `speed_pm`, `ram_bytes`,
+  `busy_ms`, `jobs`, `wait_ms`.
+- Schritte: `resize DEV model server-l`, `resize DEV cores 8 speed 1.5 ram 32G [swap 4G] [disk nvme] [disk_gb 960] [down 10s] [live]`,
+  `fault cpu DEV factor 3 [for 5s]`, `fault mem DEV 12G [for 5s]`, `heal cpu DEV`, `heal mem DEV`.
+
+**Was es nicht modelliert** (bewusst, damit niemand die Zahlen für mehr hält, als sie sind):
+
+- Eine Reservierung lässt sich nicht zurücknehmen: Die wartende Arbeit eines beendeten Dienstes hält ihre Kerne, bis sie um wäre (Strom aus
+  beendet sie).
+- Keine CPU je Rahmen: Leitungsrate und Warteschlangen der Kabel sind dort der Engpass.
+- Keine Prozessor-Aufteilung: Die Sättigung ist dieselbe, aber Enden würden sich bei jeder Ankunft verschieben. Innerhalb eines Stücks von
+  4 ms läuft eine Aufgabe durch, und ein Stück eines Skripts überholt die schon zugesagten Aufgaben ein wenig (seine Arbeit zählt voll).
+- Keine NUMA-, Cache- oder Hyper-Threading-Effekte außer dem, was `usl` ausdrückt; kein Speicher des Betriebssystems selbst; Caches werden unter Druck
+  nicht freigegeben.
+- Die Queue `mq` rechnet nicht und hält nur ihre Grundmenge; ein `db`-Dienst mit Puffer und Index kommt mit SA4.
+
+Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::MemHog`, `Fault::Resize`, `Engine::res_view(dev)`,
+`Engine::res_of(dev)`, `Service::mem`, `OsApi::cpu`, `cpu_usl`, `cpu_or_timer`, `cpu_slice`, `cpu_slice_usl`, `metered`, `cpu_turn`, `cpu_charge`,
+`cpu_ps`, `res::CpuGate`, `res::SvcMem`, `res::Usl`, `catalog::{Hw, DiskClass, hw_of, hw_presets}`. Geprüft wird in der Selbsttest-Gruppe
+`hardware` ([`src/hardwaretest.rs`](src/hardwaretest.rs)), mit `scen_hw_basic.uis` und den Fensterskripten `hardware_panel.uis` und
+`hardware_shots.uis`.
+
+**Tempo** (Windows, Entwicklungs-Build, ausgelasteter Rechner, Mitschnitt an; offene Last, 1 ms Rechenzeit je Anfrage auf 32 Kernen, je 10 s
+virtuelle Zeit):
+
+| Last | mit Hardware | ohne Hardware |
+|---|---|---|
+| 100 Anfragen/s | 27 ms, 330 000 Ereignisse/s | 22 ms, 400 000 Ereignisse/s |
+| 1000 Anfragen/s | 342 ms, 240 000 Ereignisse/s, 29 000 Anfragen/s | 212 ms, 385 000 Ereignisse/s, 47 000 Anfragen/s |
+| 5000 Anfragen/s | 1302 ms, 309 000 Ereignisse/s, 38 000 Anfragen/s | 989 ms, 406 000 Ereignisse/s, 51 000 Anfragen/s |
+
+Eine Anfrage kostet rund 8 Ereignisse; Hardware macht einen Lauf etwa ein Viertel bis ein Drittel langsamer.
 
 ## Performance
 
