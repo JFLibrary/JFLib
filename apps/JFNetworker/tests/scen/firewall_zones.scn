@@ -1,0 +1,75 @@
+# Drei Zonen um FW: INNEN (PC1, 192.168.1.0/24), DMZ (WEB, 10.0.0.0/24), AUSSEN (EXT, 203.0.113.0/24).
+# Von innen geht alles hinaus (inspect), die Antworten kommen zurück, das Büro erscheint draußen als
+# 203.0.113.1 (PAT). Von außen kommt nur Web in die DMZ, über die Portweiterleitung 203.0.113.1:80.
+# Zuerst lernt FW seine Nachbarn: IOS verwirft das Paket, für das es nach ARP fragt (".!!!!").
+FW: enable
+FW: ping 192.168.1.10
+FW: ping 10.0.0.10
+FW: ping 203.0.113.10
+run 12s
+expect FW output contains ".!!!!"
+# ohne Regel kein Weg: von außen nach innen, von der DMZ nach innen, von der DMZ nach außen
+EXT: ping -c 2 192.168.1.10
+run 3s
+expect EXT output not contains "bytes from"
+WEB: ping -c 1 192.168.1.10
+run 2s
+expect WEB output not contains "bytes from"
+# von innen hinaus: eine Sitzung beginnt, die Antwort kommt durch sie zurück
+PC1: ping -c 3 203.0.113.10
+run 4s
+expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+FW: show policy-map type inspect zone-pair I-A sessions
+expect FW output contains "icmp 192.168.1.10 -> 203.0.113.10"
+PC1: curl -s http://203.0.113.10/
+run 2s
+expect PC1 output contains "Hallo aus dem Internet, 203.0.113.1 fragt EXT"
+# von innen in die DMZ, ohne NAT
+PC1: curl -s http://10.0.0.10/
+run 2s
+expect PC1 output contains "Hallo aus der DMZ, 192.168.1.10 fragt WEB"
+# von außen nur Web in die DMZ, und nur über die Weiterleitung: die Regel sieht die wahre Adresse
+EXT: curl -s http://203.0.113.1/
+run 2s
+expect EXT output contains "Hallo aus der DMZ, 203.0.113.10 fragt WEB"
+expect FW output contains "%FW-6-SESSION_START: session"
+# ein anderer Port von außen: class-default verwirft ihn und meldet es
+EXT: ping -c 1 10.0.0.10
+run 2s
+expect EXT output not contains "64 bytes from 10.0.0.10"
+expect FW output contains "%FW-6-DROP: class-default drops icmp 203.0.113.10 -> 10.0.0.10"
+# traceroute hinaus: die ICMP-Fehler von EXT passen zur Sitzung
+PC1: traceroute -n 203.0.113.10
+run 6s
+expect PC1 output contains " 1  192.168.1.1"
+expect PC1 output contains " 2  203.0.113.10"
+# was die Firewall tut, Zeile für Zeile
+FW: debug policy-firewall
+PC1: ping -c 1 203.0.113.10
+run 2s
+expect FW output contains "FW: icmp 192.168.1.10 -> 203.0.113.10 begins session"
+expect FW output contains "belongs to session"
+FW: undebug all
+FW: show zone security
+expect FW output contains "zone INNEN\n  description: das Buero\n  interfaces: GigabitEthernet0/0\n"
+FW: show zone-pair security
+expect FW output contains "pair A-D: AUSSEN -> DMZ, policy IN-DIE-DMZ\n"
+FW: show policy-map type inspect zone-pair A-D
+expect FW output contains "action: inspect log; 1 packets"
+expect FW output contains "action: drop log; "
+FW: show policy-map type inspect zone-pair sessions
+FW: show ip nat translations
+FW: show running-config
+expect FW output contains "zone-pair security A-D source AUSSEN destination DMZ\n service-policy type inspect IN-DIE-DMZ\n"
+expect FW output contains " ip nat inside\n zone-member security DMZ\n"
+# ICMP lebt 10 s, UDP 30 s; nach FIN 30 s: nach einer Minute ist alles abgelaufen, und die Notizen
+# dazu kommen mit dem nächsten Paket
+run 60s
+FW: show policy-map type inspect zone-pair sessions
+expect FW output contains "pair I-A: 0 sessions\n"
+PC1: ping -c 1 203.0.113.10
+run 2s
+FW: clear zone-pair inspect sessions
+FW: show zone-pair security
+expect FW output contains "Sessions: 0 now"
+expect hops icmp >= 20

@@ -8,7 +8,8 @@
 //   tab(n, ui, k, dev)           the parts Regeln (what protects which interface, a list, its rules
 //                                in a grid, the rule form), NAT (sides, pools, dynamic and static
 //                                rules, the running translations), Test (which rule meets a
-//                                packet); below them the refusal and Befehle, the lines typed last
+//                                packet); on firewall models also Zonen and Sitzungen (fwzones.rs);
+//                                below them the refusal and Befehle, the lines typed last
 //
 // What the forms make (pure, for the tests in fwguitest.rs):
 //   wild_of(text) / wild_text(&Wild)     an address field: any, 10.0.0.5, 10.0.0.0/24, A W
@@ -51,7 +52,8 @@
 // line, + 0x30 Übernehmen, + 0x31 Abbrechen; NAT: + 0x40 .. 0x44 a pool, + 0x45 .. 0x4A a dynamic
 // rule, + 0x4B .. 0x52 a static one, + 0x53 clear; Test: + 0x60 Schnittstelle, + 0x61 Richtung, + 0x62
 // Protokoll, + 0x63 Quelle, + 0x64 Ziel, + 0x65 Quellport, + 0x66 Zielport, + 0x67 ACK, + 0x68 ICMP,
-// + 0x69 Prüfen; + 0x100 + 2 i the lists of the i-th interface shown (+ 1 outgoing), + 0x180 + i its NAT
+// + 0x69 Prüfen; + 0x70 the parts of a firewall model (+ 1 + i each), + 0x78, + 0x79 the scroll views of
+// Zonen and Sitzungen; + 0x100 + 2 i the lists of the i-th interface shown (+ 1 outgoing), + 0x180 + i its NAT
 // side, + 0x1C0 + i, + 0x1E0 + i, + 0x200 + i what removes a pool, a dynamic rule, a static rule; + 0x400 the
 // rules' grid and + 0x600 the translations' grid (rows + 1 + i, at most ROWS_MAX).
 
@@ -60,10 +62,12 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use jfn_model::catalog::F_FIREWALL;
 use jfn_model::ifname;
 use jfn_model::Project;
 use jfn_sim::acl::{icmp_text, port_number, proto_text, Ace, Acl, AclKind, Acls, Item, Ports, Probe, Wild, ICMP_TYPES, PROTOCOLS};
 use jfn_sim::nat::{Global, Pool, Rule, Side, Target};
+use jfn_sim::fw::{Firewall, FwRow, FwTest};
 use jfn_sim::{Action, Engine};
 use netpkt::ipv4::{PROTO_ICMP, PROTO_TCP, PROTO_UDP};
 use netpkt::nat::{is_query, Flow};
@@ -74,10 +78,11 @@ use ui::*;
 use crate::app::constants::*;
 use crate::app::tr::{t, tf};
 use crate::app::Net;
+use super::fwzones::{self, ZForm};
 use crate::doc::console;
 
 /// rows a grid here shows at most (its row ids must stay in the tab's block)
-const ROWS_MAX: usize = 500;
+pub(super) const ROWS_MAX: usize = 500;
 /// the key of the implicit deny's row
 const KEY_IMPLICIT: u64 = u64::MAX;
 /// the key of a remark's row: this bit, its line (a rule's key is its sequence number)
@@ -172,9 +177,11 @@ pub(crate) struct StaticForm {
 
 /// the state of the tab
 pub(crate) struct Form {
+    /// the fields of Zonen and Sitzungen (fwzones.rs)
+    pub(super) z: ZForm,
     /// the device the fields belong to
     dev: u32,
-    /// the part shown: 0 Regeln, 1 NAT, 2 Test
+    /// the part shown: 0 Regeln, 1 NAT, 2 Test, 3 Zonen, 4 Sitzungen
     part: i32,
     /// the chosen list
     list: String,
@@ -212,6 +219,7 @@ pub(crate) struct Form {
 impl Form {
     pub(crate) fn new() -> Form {
         Form {
+            z: ZForm::new(),
             dev: 0,
             part: 0,
             list: String::new(),
@@ -243,16 +251,16 @@ impl Form {
 }
 
 /// what a button asks for
-struct Plan {
+pub(super) struct Plan {
     /// the undo step's name
-    label: String,
-    lines: Vec<String>,
+    pub label: String,
+    pub lines: Vec<String>,
     /// the rule to choose afterwards (its configuration line)
-    pick: Option<String>,
+    pub pick: Option<String>,
     /// the list to show afterwards
-    list: Option<String>,
+    pub list: Option<String>,
     /// the rule form or the new list's fields close
-    close: bool,
+    pub close: bool,
 }
 
 /// the protocols of the rule form: every protocol, the three with their own fields, the others by
@@ -905,21 +913,24 @@ pub(crate) fn refusal(routes: bool, locked: Option<&str>, dev: &str) -> Option<S
 // ---------------------------------------------------------------- the window
 
 /// an interface as the tab lists it
-struct If {
-    index: u16,
-    name: String,
-    short: String,
-    addr: String,
+pub(super) struct If {
+    pub index: u16,
+    pub name: String,
+    pub short: String,
+    pub addr: String,
 }
 
 /// what the tab shows of the device, at the moment the view stands at
-struct Snap {
-    name: String,
+pub(super) struct Snap {
+    pub name: String,
     /// nothing can change: the reason
-    locked: Option<String>,
-    routes: bool,
-    acls: Acls,
-    ifs: Vec<If>,
+    pub locked: Option<String>,
+    pub routes: bool,
+    pub acls: Acls,
+    pub ifs: Vec<If>,
+    /// a firewall model: it has Zonen and Sitzungen
+    pub is_fw: bool,
+    pub fw: Firewall,
     sides: BTreeMap<u16, Side>,
     pools: Vec<(String, Pool)>,
     rules: Vec<Rule>,
@@ -937,39 +948,48 @@ fn snap(n: &Net, dev: u32) -> Option<Snap> {
     } else {
         None
     };
-    Some(Snap { name: d.name.clone(), locked, routes: st.forwarding, acls: st.acls.clone(), ifs, sides: st.nat.sides.clone(), pools: st.nat.pools.iter().map(|(a, b)| (a.clone(), *b)).collect(), rules: st.nat.rules.iter().map(|(_, r)| r.clone()).collect() })
+    let is_fw = n.doc.proj.model_of(dev).is_some_and(|m| m.has(F_FIREWALL));
+    Some(Snap { name: d.name.clone(), locked, routes: st.forwarding, acls: st.acls.clone(), ifs, is_fw, fw: st.fw.without_sessions(), sides: st.nat.sides.clone(), pools: st.nat.pools.iter().map(|(a, b)| (a.clone(), *b)).collect(), rules: st.nat.rules.iter().map(|(_, r)| r.clone()).collect() })
 }
 
 // a "label  field" row (the fields follow, then box_end); it breaks when it is narrow
-fn field(ui: &mut Ui, label: &'static str) {
+pub(super) fn field(ui: &mut Ui, label: &'static str) {
     ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 8);
     ui.next_size(120, 0);
     ui.text(TS_BODY | TX_SECONDARY, t(label));
 }
 
 // a section's heading
-fn heading(ui: &mut Ui, s: &'static str) {
+pub(super) fn heading(ui: &mut Ui, s: &'static str) {
     ui.text(TS_BODY_STRONG, t(s));
 }
 
 // a caption that wraps
-fn note(ui: &mut Ui, s: &str) {
+pub(super) fn note(ui: &mut Ui, s: &str) {
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, s);
 }
 
 // a small button with an icon
-fn icon_button(ui: &mut Ui, id: u32, icon: u32, label: &str, on: bool) -> bool {
+pub(super) fn icon_button(ui: &mut Ui, id: u32, icon: u32, label: &str, on: bool) -> bool {
     ui.next_flags(if on { 0 } else { ST_DISABLED });
     ui.next_icon(icon);
     ui.button(id, label) & EV_ACT != 0
 }
 
 /// a row's remove button
-fn remove_button(ui: &mut Ui, id: u32, label: &str) -> bool {
+pub(super) fn remove_button(ui: &mut Ui, id: u32, label: &str) -> bool {
     ui.next_flags(ST_SUBTLE | ST_COMPACT | ST_ICON_ONLY);
     ui.next_icon(IC_DELETE);
     ui.button(id, label) & EV_ACT != 0
+}
+
+/// a change of the tab, unless the device cannot be changed now
+pub(super) fn offer(s: &Snap, p: Result<Plan, String>) -> Result<Plan, String> {
+    match refusal(s.routes, s.locked.as_deref(), &s.name) {
+        Some(why) => Err(why),
+        None => p,
+    }
 }
 
 /// the Firewall tab of device window k
@@ -984,6 +1004,9 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     };
     // (the table of translations only while it is shown: it can be long)
     let translations = if n.devwin.peek(k).is_some_and(|w| w.fw.part == 1 && w.fw.dev == dev) { n.doc.sim.state().nat_translations(dev) } else { Vec::new() };
+    // (the sessions and the zones' answer likewise: both are read here, the parts only show them)
+    let sessions: Vec<FwRow> = if n.devwin.peek(k).is_some_and(|w| w.fw.part == 4 && w.fw.dev == dev) { n.doc.sim.state().fw_sessions(dev) } else { Vec::new() };
+    let zone_test: Option<FwTest> = n.devwin.peek(k).filter(|w| w.fw.part == 2 && w.fw.dev == dev).and_then(|w| w.fw.asked.as_ref()).filter(|_| s.fw.active()).and_then(|(i, out, fl)| n.doc.sim.state().fw_test(dev, *i, *out, fl));
     let now = n.doc.sim.state().now();
     let Some(w) = n.devwin.get(k) else { return };
     let f = &mut w.fw;
@@ -996,10 +1019,23 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 6);
     // the parts
-    let parts = [t("Regeln"), t("NAT"), t("Test")];
-    if ui.segmented(id, &mut f.part, &parts) & EV_ACT != 0 {
-        f.err.clear();
-        ui.repass();
+    if s.is_fw {
+        // (the order on the screen; f.part keeps its number)
+        const ORDER: [i32; 5] = [0, 1, 3, 4, 2];
+        let parts = [t("Regeln"), t("NAT"), t("Zonen"), t("Sitzungen"), t("Test")];
+        let mut pos = ORDER.iter().position(|p| *p == f.part).unwrap_or(0) as i32;
+        if ui.segmented(id + 0x70, &mut pos, &parts) & EV_ACT != 0 {
+            f.part = ORDER.get(pos as usize).copied().unwrap_or(0);
+            f.err.clear();
+            ui.repass();
+        }
+    } else {
+        f.part = f.part.clamp(0, 2);
+        let parts = [t("Regeln"), t("NAT"), t("Test")];
+        if ui.segmented(id, &mut f.part, &parts) & EV_ACT != 0 {
+            f.err.clear();
+            ui.repass();
+        }
     }
     if let Some(why) = &s.locked {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
@@ -1018,12 +1054,14 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     }
     let lock = if s.locked.is_some() { BOX_DISABLED } else { 0 };
     ui.next_size(-1, -1);
-    ui.scroll_begin(id + 4 + f.part.clamp(0, 2) as u32, SC_V);
+    ui.scroll_begin(if f.part > 2 { id + 0x78 + (f.part - 3) as u32 } else { id + 4 + f.part.clamp(0, 2) as u32 }, SC_V);
     ui.box_begin(0, BOX_V | pad(4), 10);
     match f.part {
         0 => part_rules(ui, id, f, &s, lock, &mut plan),
         1 => part_nat(ui, id, f, &s, lock, &translations, now, &mut plan),
-        _ => part_test(ui, id, f, &s),
+        3 => fwzones::part_zones(ui, id, k, f, &s, lock, &mut plan),
+        4 => fwzones::part_sessions(ui, id, k, f, &s, lock, &sessions, now, &mut plan),
+        _ => part_test(ui, id, f, &s, zone_test.as_ref()),
     }
     ui.box_end();
     ui.scroll_end();
@@ -1582,7 +1620,7 @@ fn endpoint(e: (Ipv4, Option<u16>)) -> String {
 }
 
 // a key for a row (FNV-1a)
-fn key_of(s: &str) -> u64 {
+pub(super) fn key_of(s: &str) -> u64 {
     let mut h: u64 = 0xCBF2_9CE4_8422_2325;
     for b in s.bytes() {
         h = (h ^ b as u64).wrapping_mul(0x0100_0000_01B3);
@@ -1803,7 +1841,7 @@ fn part_nat(ui: &mut Ui, id: u32, f: &mut Form, s: &Snap, lock: u32, rows: &[jfn
 }
 
 // Test: which rule meets this packet
-fn part_test(ui: &mut Ui, id: u32, f: &mut Form, s: &Snap) {
+fn part_test(ui: &mut Ui, id: u32, f: &mut Form, s: &Snap, zones: Option<&FwTest>) {
     heading(ui, "Welche Regel trifft dieses Paket?");
     note(ui, t("Hier fragt das Fenster die Listen des Geräts, ohne ein Paket zu senden; die Zähler bleiben, wie sie sind. Eine eingehende Liste sieht das Paket, wie es ankommt, eine ausgehende nach dem Routing und nach NAT: dort zählt die übersetzte Quelle."));
     let if_short: Vec<&str> = s.ifs.iter().map(|x| x.short.as_str()).collect();
@@ -1883,5 +1921,21 @@ fn part_test(ui: &mut Ui, id: u32, f: &mut Form, s: &Snap) {
             note(ui, t("Der Absender bekommt „administratively prohibited“ (ICMP Typ 3, Code 13)."));
         }
         ui.box_end();
+        // after the list come the zones and sessions (they see the inside addresses: fw.rs)
+        if s.fw.active() && a.pass {
+            if *out && s.sides.get(iface) == Some(&Side::Outside) {
+                note(ui, t("Die Zonen sehen ein Paket vor der Übersetzung der Quelle: fragen Sie nach der inneren Quelle an der Schnittstelle, auf der es ankommt."));
+            } else if let Some(x) = zones {
+                let z = fwzones::told_zones(x);
+                ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 4);
+                ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
+                ui.status_dot(if z.pass { BADGE_OK } else { BADGE_CRIT });
+                ui.text(TS_BODY_STRONG, t(if z.pass { "Zonen: passiert" } else { "Zonen: wird verworfen" }));
+                ui.box_end();
+                ui.next_size(-1, 0);
+                ui.text(TS_BODY | TX_WRAP, &z.text);
+                ui.box_end();
+            }
+        }
     }
 }

@@ -457,6 +457,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
 | `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
 | `firewall_en.uis`, `firewall_shots.uis` | der Reiter auf Englisch; die Bilder hell, dunkel, schmal, 100 und 150 % (`build/f1/shots/fw_*.png`) |
+| `model.uis`, Gruppe `firewall` | Zonen und Sitzungen (siehe [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)): jede Vorgabe der Zonenregeln, `inspect` mit Rückweg und ein unverlangtes Paket, jeder TCP-Zustand mit Timeout, UDP und ICMP, die Grenze halboffener Sitzungen, NAT und Listen zusammen mit Zonen in beiden Richtungen, die Zone `self`, `drop` und `reject`, IPv6, Hin und Zurück durch laufende und Startkonfiguration, Ausschalten, zwei gleiche Läufe, ein Klon mitten im Lauf, ein Replay aus Keyframes, die Vorhersage von `Firewall::probe` gegen echte Pakete, was die Formulare tippen, die Show-Befehle, die Probleme, ein Gerät ohne Zonen, `ufw` auf einem Host |
+| `scen_firewall_zones.uis` | Golden-Szenario `firewall_zones.scn`: drei Zonen um FW mit PAT und einer Portweiterleitung, Sitzungen, `debug policy-firewall`, das Log, die Tabellen und das Ablaufen der Sitzungen |
+| `firewall_zones.uis`, `firewall_zones_shots.uis` | die Teile Zonen und Sitzungen im Fenster: das Bild, Zone, Klasse, Richtlinie und Paar aus den Formularen, Ablehnungen, Rückgängig, die Sitzungen eines Pings, der Test-Teil; die Bilder hell, dunkel, schmal, 100 und 150 % (`build/f2/shots/fwz_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
 Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -576,6 +579,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Zonen und Sitzungen | [`crates/jfn_sim/fw.rs`](crates/jfn_sim/fw.rs), [`fwtrace.rs`](crates/jfn_sim/fwtrace.rs), [`cli/fw.rs`](crates/jfn_sim/cli/fw.rs), [`cli/ufw.rs`](crates/jfn_sim/cli/ufw.rs), [`src/workspace/devwin/fwzones.rs`](src/workspace/devwin/fwzones.rs), [`src/firewalltest.rs`](src/firewalltest.rs) |
 | Firewall-Reiter | [`src/workspace/devwin/firewall.rs`](src/workspace/devwin/firewall.rs), [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs) (`Acls::probe`), [`src/doc/console.rs`](src/doc/console.rs) (`run_lines_running`), [`src/fwguitest.rs`](src/fwguitest.rs) | Regeln, NAT und Test im Gerätefenster als Formulare über den Befehlen, sein Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs) | Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
@@ -619,10 +623,12 @@ Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interfa
 
 Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu dazukam, verhält sich so:
 
-- **Die Firewalls sind heute Router mit Access-Listen und NAT.** Ohne Liste lassen sie alles durch,
-  auch was von außen beginnt; ihre Titel sagen das. Listen und NAT lassen sich im Reiter Firewall des
-  Gerätefensters pflegen (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)). Zonen und
-  zustandsbehaftetes Filtern kommen mit Meilenstein F2.
+- **Die Firewalls sind Router mit Access-Listen und NAT, dazu Zonen mit Sitzungen.** Solange keine
+  Schnittstelle in einer Zone ist, verhalten sie sich wie Router: Ohne Liste lassen sie alles durch,
+  auch was von außen beginnt. Mit Zonen wird zwischen zwei Zonen verworfen, was keine Richtlinie
+  erlaubt, und die Antworten auf das, was „inspect“ durchließ, kommen zurück (siehe
+  [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)). Listen, NAT und Zonen lassen sich im
+  Reiter Firewall des Gerätefensters pflegen. Keine Anwendungserkennung, kein IPS.
 - **PoE ist bisher nur eine Angabe am Port** (PoE+, PoE++, PoE-gespeist): Es gibt kein Leistungsbudget.
 - **Der Repeater** wiederholt jeden Rahmen an den anderen Port und verlängert so eine Kupferstrecke.
   Die Grenze gilt je Kabel: zweimal 90 m gehen, zweimal 120 m nicht.
@@ -766,7 +772,8 @@ Muster; der Simulator sieht sie nicht, den Zustand zeigen weiter die LEDs.
   `interface …`, `ip address …`, `ip route …` bzw. `ip addr add …`, `ip route add default via
   …` – und werden ein Rückgängig-Schritt in der Startkonfiguration; „Laufende Konfiguration
   sichern“), Firewall (bei IOS-artigen Geräten, die routen: Zugriffslisten, was welche Schnittstelle
-  schützt, NAT, welche Regel ein Paket trifft; siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)),
+  schützt, NAT, welche Regel ein Paket trifft; siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten);
+  auf Firewalls auch Zonen und Sitzungen, siehe [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)),
   Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
@@ -2498,9 +2505,8 @@ mit: Sonst könnte er diese Regeln nicht verschieben oder löschen.
 
 Noch offen: Hairpinning (ein innerer Host erreicht einen anderen über dessen globale Adresse;
 RFC 4787 verlangt es, das klassische Vorbild kann es nicht), `ip nat outside source`,
-Route-Maps, Helfer für Protokolle mit Adressen im Inhalt (FTP …), Zonen und
-zustandsbehaftete Prüfung der Firewall, NAT und Filter auf Linux-Geräten (iptables, der
-Heimrouter).
+Route-Maps, Helfer für Protokolle mit Adressen im Inhalt (FTP …), NAT und Filter auf Linux-Geräten
+(iptables, der Heimrouter).
 
 Geprüft wird das in der Selbsttest-Gruppe `nat` ([`src/nattest.rs`](src/nattest.rs)) und im
 Golden-Szenario `nat_pat.scn` auf `fixtures/nat_pat.jfnet`: ein Büro hinter R1 mit PAT auf
@@ -2509,6 +2515,109 @@ Port-Weiterleitung von 203.0.113.1:80 auf den Webserver im Büro und eine Zugrif
 nicht ins Web lässt; Pings, `curl` von innen (SRV sieht 203.0.113.1) und von außen (WEB sieht
 EXT), `traceroute` durch PAT, `debug ip nat`, die Tabellen und nach fünf Minuten die
 abgelaufenen Übersetzungen.
+
+### Firewall: Zonen und Sitzungen
+
+Die Firewall-Modelle (JF-FW, JF-FW2, JF-FW8) filtern zusätzlich nach Zonen und verfolgen Verbindungen
+([`crates/jfn_sim/fw.rs`](crates/jfn_sim/fw.rs), Befehle in [`cli/fw.rs`](crates/jfn_sim/cli/fw.rs)). Router
+und L3-Switches kennen die Befehle nicht. Solange keine Schnittstelle in einer Zone ist, läuft nichts
+davon: kein Ereignis, keine Notiz, keine Zeile in der Konfiguration, das Gerät bleibt der Router mit
+Listen und NAT.
+
+**Die Regeln.** Jede Schnittstelle gehört zu höchstens einer Zone.
+
+| Wege | Was geschieht |
+|---|---|
+| innerhalb einer Zone | passiert |
+| zwischen zwei Zonen | verworfen, außer ein Zonenpaar für diese Richtung hat eine Richtlinie, die es durchlässt |
+| zwischen einer Zone und einer Schnittstelle ohne Zone | verworfen |
+| zwischen zwei Schnittstellen ohne Zone | passiert, das geht die Firewall nichts an |
+| zum Gerät und vom Gerät (Zone `self`) | passiert, außer ein Zonenpaar nennt `self` und hat eine Richtlinie: dann entscheidet sie |
+
+In einer Richtlinie entscheidet die erste passende Klasse; was keine trifft, landet in `class-default`, und
+die verwirft. Eine Klasse ohne Aktion verwirft ebenfalls.
+
+**Die Aktionen.** `inspect` beginnt eine Sitzung: Der Rest der Verbindung passiert in beiden Richtungen,
+ohne eine Richtlinie zu fragen. `pass` lässt das eine Paket durch und merkt sich nichts; eine Antwort braucht
+dann eine eigene Regel. `drop` verwirft still, `reject` verwirft und sagt es dem Absender (ICMP
+„administratively prohibited“, ICMPv6 ebenso, unter der Grenze des Geräts für Unreachables). Jede mit `log`:
+Das schreibt eine Zeile in die Konsole und ins Log des Geräts, das sie an seine Syslog-Hosts weitergibt;
+`inspect` bei Beginn und Ende einer Sitzung, die anderen höchstens alle fünf Minuten mit der Zahl der Pakete.
+
+**Die Reihenfolge** eines Pakets durch Listen, NAT und Zonen:
+
+| Schritt | Was es sieht |
+|---|---|
+| 1. eingehende Zugriffsliste | das Paket, wie es ankommt |
+| 2. NAT von außen: das Ziel wird die innere Adresse | |
+| 3. für das Gerät selbst: Zonen (Zone → `self`). Sonst: Routing, dann Zonen und Sitzungen (Zone des Wegs hinein → Zone des Wegs hinaus) | die innere Adresse in beiden Richtungen, die Quelle noch unübersetzt |
+| 4. NAT von innen: die Quelle wird die globale Adresse | |
+| 5. ausgehende Zugriffsliste | die übersetzte Quelle |
+
+Eine Klasse trifft also immer die wahre Adresse eines Hosts, und eine Sitzung liest sich hin und zurück gleich.
+Eine Portweiterleitung, die keine Richtlinie erlaubt, wird übersetzt und dann verworfen. Was das Gerät selbst
+sendet, geht von `self` in die Zone des Wegs hinaus und trifft keine ausgehende Liste.
+
+**Sitzungen.** TCP folgt SYN, SYN+ACK, ACK, einem FIN, FIN von beiden Enden; ein RST beendet die Sitzung sofort.
+Nur ein SYN ohne ACK beginnt eine; jedes andere Segment ohne Sitzung verwirft `inspect`. Sequenznummern prüft
+sie nicht. ICMP-Anfragen beginnen eine Sitzung, ihre Antworten brauchen sie. Ein ICMP-Fehler über ein Paket einer
+Sitzung passiert (traceroute geht also) und frischt nichts auf. Ein späteres Fragment hat keine Ports: Es
+passiert, wenn seine beiden Adressen eine Sitzung seines Protokolls haben, sonst sieht eine Richtlinie es ohne Ports.
+Halboffene TCP-Sitzungen sind begrenzt, ein SYN darüber wird verworfen.
+
+| Einstellung | Vorgabe | gilt für |
+|---|---|---|
+| `ip inspect tcp synwait-time` | 30 s | bevor der Handschlag fertig ist |
+| `ip inspect tcp idle-time` | 3600 s | eine bestehende Verbindung ohne Verkehr |
+| `ip inspect tcp finwait-time` | 30 s | nach einem FIN |
+| `ip inspect udp idle-time` | 30 s | UDP und andere Protokolle |
+| `ip inspect dns-timeout` | 5 s | UDP an Port 53 |
+| `ip inspect icmp idle-time` | 10 s | ICMP |
+| `ip inspect max-incomplete high` | 1000 | halboffene TCP-Sitzungen |
+
+Sitzungen haben keinen Timer: Sie liegen in einer `BTreeMap`, und was abgelaufen ist, geht, wenn das nächste
+Paket die Firewall erreicht; die Anzeigen lassen es schon vorher weg. Einschalten, ein Neustart und
+`clear zone-pair inspect sessions` vergessen sie. Geht ein Zonenpaar oder seine Richtlinie, gehen seine Sitzungen mit.
+
+**Befehle.** `zone security NAME`, `zone-pair security NAME source A destination B` (A und B auch `self`),
+`service-policy type inspect NAME` darin, `class-map type inspect [match-any|match-all] NAME` mit `match protocol`
+und `match access-group`, `policy-map type inspect NAME` mit `class type inspect NAME` und `class class-default` und
+darin `inspect`, `pass`, `drop`, `reject`, je mit `log`; an der Schnittstelle `zone-member security NAME`. Zum
+Ansehen `show zone security`, `show zone-pair security` (mit den Zählern der Firewall), `show policy-map type
+inspect zone-pair [NAME]`, `show policy-map type inspect zone-pair [NAME] sessions`; `clear zone-pair inspect sessions
+[NAME]`, `clear zone-pair counter`, `debug policy-firewall`. Alles steht in der laufenden Konfiguration und
+startet durch denselben Parser aus der Startkonfiguration. Die Hilfetexte und die Tabellen sind eigene Worte.
+
+**Im Fenster.** Auf Firewall-Modellen hat der Reiter Firewall zwei Teile mehr
+([`devwin/fwzones.rs`](src/workspace/devwin/fwzones.rs)). „Zonen“ zeigt als Bild, wer mit wem sprechen darf, und
+pflegt Zonen, Schnittstellen, Klassen, Richtlinien und Zonenpaare in Formularen. „Sitzungen“ ist ein Raster der
+laufenden Sitzungen mit einem Knopf zum Löschen. Der Teil „Test“ sagt hinter der Liste auch, was Zonen und
+Sitzungen zu dem Paket sagen, etwa „Bestehende Verbindung“ oder „Keine Regel zwischen den Zonen“: Das ist dieselbe
+Funktion (`Firewall::probe`), nach der die Engine handelt. Wie überall im Reiter tippen die Formulare
+Befehlszeilen als einen Rückgängig-Schritt, und in der Vergangenheit zeigt alles, ändert aber nichts.
+
+**Probleme.** Der Reiter Probleme nennt eine Schnittstelle mit Adresse und ohne Zone auf einer Firewall mit Zonen,
+eine Zone ohne Zonenpaar mit Richtlinie, ein Zonenpaar ohne Richtlinie und eine Richtlinie, die niemand benutzt.
+Entscheidungen erscheinen als Ereignisse und im Simulationsmodus.
+
+**IPv6.** Zonen und Sitzungen gelten auch für IPv6. Neighbor Discovery und MLD sehen sie nicht, so wenig wie ARP.
+`match access-group` trifft nur IPv4, und `ipv6 access-list` gibt es nicht; eine Klasse für IPv6 nennt also Protokolle.
+
+**Auf Linux-Geräten.** `ufw` ist eine kleine Firewall für den Host selbst
+([`cli/ufw.rs`](crates/jfn_sim/cli/ufw.rs)): `ufw enable`, `disable`, `reset`, `status`, `default allow|deny|reject
+[incoming|outgoing]`, `allow|deny|reject [out] PORT[/tcp|/udp]`, `allow from NETZ [to any port PORT]`, `delete …`.
+Eingehend gilt ohne Regel `deny`, ausgehend `allow`. Was erlaubt ist, beginnt eine Sitzung aus derselben Tabelle wie
+oben, und die Antworten kommen zurück. Ping, ICMP-Fehler und die Antworten an einen DHCP-Client passieren immer; was
+der Host weiterleitet, sieht sie nicht an. Die Zeilen stehen in der Konfiguration des Geräts, die Regeln gelten für
+IPv4 und IPv6, `from` nur für IPv4. Kein Log, keine Anwendungsprofile.
+
+**Was sie nicht kann.** Die Firewall schaut nicht in die Daten: `match protocol http` heißt TCP-Port 80, nichts
+weiter. Keine Anwendungserkennung, kein IPS, keine Benutzer oder URLs, keine Hilfe für FTPs Datenverbindung,
+keine Prüfung von Sequenznummern, keine Objektgruppen.
+
+Geprüft wird das in der Selbsttest-Gruppe `firewall` ([`src/firewalltest.rs`](src/firewalltest.rs)), im
+Golden-Szenario `firewall_zones.scn` auf `fixtures/firewall_zones.jfnet` (INNEN, DMZ, AUSSEN mit PAT und einer
+Portweiterleitung) und in den Fensterskripten `firewall_zones.uis` und `firewall_zones_shots.uis`.
 
 ### IPv6
 

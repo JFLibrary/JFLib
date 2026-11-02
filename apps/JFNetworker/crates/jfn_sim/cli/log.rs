@@ -108,6 +108,13 @@ impl Engine {
         self.log_report(ni, sev, tag, text);
     }
 
+    /// a log line on the console and the sessions that follow it, for a message os_log brings to
+    /// the user interface's log (fw.rs)
+    pub(crate) fn ios_console_log(&mut self, ni: usize, msg: &str) {
+        let line = format!("{}{}\n", ios_stamp(self.now), msg);
+        self.log_out(ni, &line);
+    }
+
     /// a console line for the user interface's log as well (Report::Log)
     fn log_report(&mut self, ni: usize, sev: u8, tag: &str, text: &str) {
         let dev = self.dev_of(ni);
@@ -256,6 +263,8 @@ impl Engine {
             n @ Note::Ssh(_) if d & super::D_SSH != 0 => text = self.ssh_debug(n),
             // debug dot1x (cli/dot1x.rs)
             n @ Note::Dot1x(_) if d & super::D_DOT1X != 0 => text = self.dot1x_debug(n),
+            // debug policy-firewall (cli/fw.rs)
+            n @ Note::Fw(_) if d & super::D_FW != 0 => text = self.fw_debug(n),
             _ => {}
         }
         if text.is_empty() {

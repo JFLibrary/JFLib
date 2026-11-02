@@ -1,0 +1,284 @@
+# JFNetworker-Szenario firewall_zones.scn: „Drei Zonen“, 4 Geräte, 3 Verbindungen, Seed 7
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0 is up
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0 is up
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/1 is up
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/1 is up
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/2 is up
+   0.000000000  FW      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/2 is up
+   0.000000000  FW      FW>enable
+   0.000000000  FW      FW#ping 192.168.1.10
+   0.000000000  FW      Ctrl+Shift+6 stops the ping.
+   0.000000000  FW      Pinging 192.168.1.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+   0.000000000  --      run 12s
+   2.000009232  FW      .!!!!
+   2.000009232  FW      Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+   2.000009232  FW      FW#ping 10.0.0.10
+   2.000009232  FW      Ctrl+Shift+6 stops the ping.
+   2.000009232  FW      Pinging 10.0.0.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+   4.000018464  FW      .!!!!
+   4.000018464  FW      Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+   4.000018464  FW      FW#ping 203.0.113.10
+   4.000018464  FW      Ctrl+Shift+6 stops the ping.
+   4.000018464  FW      Pinging 203.0.113.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+   6.000027696  FW      .!!!!
+   6.000027696  FW      Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+  12.000000000  ok      expect FW output contains ".!!!!"
+  12.000000000  EXT     root@EXT:~# ping -c 2 192.168.1.10
+  12.000000000  EXT     PING 192.168.1.10 (192.168.1.10) 56(84) bytes of data.
+  12.000000000  --      run 3s
+  15.000000000  ok      expect EXT output not contains "bytes from"
+  15.000000000  WEB     root@WEB:~# ping -c 1 192.168.1.10
+  15.000000000  WEB     PING 192.168.1.10 (192.168.1.10) 56(84) bytes of data.
+  15.000000000  --      run 2s
+  17.000000000  ok      expect WEB output not contains "bytes from"
+  17.000000000  PC1     root@PC1:~# ping -c 3 203.0.113.10
+  17.000000000  PC1     PING 203.0.113.10 (203.0.113.10) 56(84) bytes of data.
+  17.000000000  --      run 4s
+  17.000004104  PC1     64 bytes from 203.0.113.10: icmp_seq=1 ttl=63 time=0.004 ms
+  18.000004104  PC1     64 bytes from 203.0.113.10: icmp_seq=2 ttl=63 time=0.004 ms
+  19.000004104  PC1     64 bytes from 203.0.113.10: icmp_seq=3 ttl=63 time=0.004 ms
+  19.000004104  PC1     
+  19.000004104  PC1     --- 203.0.113.10 ping statistics ---
+  19.000004104  PC1     3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+  19.000004104  PC1     rtt min/avg/max/mdev = 0.004/0.004/0.004/0.000 ms
+  21.000000000  ok      expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+  21.000000000  FW      FW#show policy-map type inspect zone-pair I-A sessions
+  21.000000000  FW      pair I-A: 1 sessions
+  21.000000000  FW        1 icmp 192.168.1.10 -> 203.0.113.10 open, class ALLES
+  21.000000000  FW          age 00:00:03, ends in 00:00:08; packets 3 there, 3 back; bytes 252 there, 252 back
+  21.000000000  ok      expect FW output contains "icmp 192.168.1.10 -> 203.0.113.10"
+  21.000000000  PC1     root@PC1:~# curl -s http://203.0.113.10/
+  21.000000000  --      run 2s
+  21.002010576  PC1     Hallo aus dem Internet, 203.0.113.1 fragt EXT
+  23.000000000  EXT     
+  23.000000000  EXT     --- 192.168.1.10 ping statistics ---
+  23.000000000  EXT     2 packets transmitted, 0 received, 100% packet loss, time 1000ms
+  23.000000000  ok      expect PC1 output contains "Hallo aus dem Internet, 203.0.113.1 fragt EXT"
+  23.000000000  PC1     root@PC1:~# curl -s http://10.0.0.10/
+  23.000000000  --      run 2s
+  23.002010464  PC1     Hallo aus der DMZ, 192.168.1.10 fragt WEB
+  25.000000000  WEB     
+  25.000000000  WEB     --- 192.168.1.10 ping statistics ---
+  25.000000000  WEB     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+  25.000000000  ok      expect PC1 output contains "Hallo aus der DMZ, 192.168.1.10 fragt WEB"
+  25.000000000  EXT     root@EXT:~# curl -s http://203.0.113.1/
+  25.000000000  --      run 2s
+  25.000000722  FW      *Mar  1 00:00:25.000: %FW-6-SESSION_START: session 4 (tcp 203.0.113.10:59010 -> 10.0.0.10:80) started, A-D from AUSSEN to DMZ
+  25.002010496  EXT     Hallo aus der DMZ, 203.0.113.10 fragt WEB
+  27.000000000  ok      expect EXT output contains "Hallo aus der DMZ, 203.0.113.10 fragt WEB"
+  27.000000000  ok      expect FW output contains "%FW-6-SESSION_START: session"
+  27.000000000  EXT     root@EXT:~# ping -c 1 10.0.0.10
+  27.000000000  EXT     PING 10.0.0.10 (10.0.0.10) 56(84) bytes of data.
+  27.000000000  --      run 2s
+  27.000001026  FW      *Mar  1 00:00:27.000: %FW-6-DROP: class-default drops icmp 203.0.113.10 -> 10.0.0.10 (1 packets)
+  29.000000000  ok      expect EXT output not contains "64 bytes from 10.0.0.10"
+  29.000000000  ok      expect FW output contains "%FW-6-DROP: class-default drops icmp 203.0.113.10 -> 10.0.0.10"
+  29.000000000  PC1     root@PC1:~# traceroute -n 203.0.113.10
+  29.000000000  PC1     traceroute to 203.0.113.10 (203.0.113.10), 30 hops max, 60 byte packets
+  29.000000000  --      run 6s
+  29.000004908  PC1      1  192.168.1.1  0.002 ms  0.002 ms  0.002 ms
+  29.000016260  PC1      2  203.0.113.10  0.004 ms  0.004 ms  0.004 ms
+  35.000000000  ok      expect PC1 output contains " 1  192.168.1.1"
+  35.000000000  ok      expect PC1 output contains " 2  203.0.113.10"
+  35.000000000  FW      FW#debug policy-firewall
+  35.000000000  FW      Debug output for the firewall: on
+  35.000000000  PC1     root@PC1:~# ping -c 1 203.0.113.10
+  35.000000000  PC1     PING 203.0.113.10 (203.0.113.10) 56(84) bytes of data.
+  35.000000000  --      run 2s
+  35.000001026  FW      *Mar  1 00:00:35.000: FW: icmp 192.168.1.10 -> 203.0.113.10 begins session 8 (I-A, class ALLES)
+  35.000003078  FW      *Mar  1 00:00:35.000: FW: icmp 203.0.113.10 -> 192.168.1.10 belongs to session 8 (back)
+  35.000004104  PC1     64 bytes from 203.0.113.10: icmp_seq=1 ttl=63 time=0.004 ms
+  35.000004104  PC1     
+  35.000004104  PC1     --- 203.0.113.10 ping statistics ---
+  35.000004104  PC1     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  35.000004104  PC1     rtt min/avg/max/mdev = 0.004/0.004/0.004/0.000 ms
+  37.000000000  EXT     
+  37.000000000  EXT     --- 10.0.0.10 ping statistics ---
+  37.000000000  EXT     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+  37.000000000  ok      expect FW output contains "FW: icmp 192.168.1.10 -> 203.0.113.10 begins session"
+  37.000000000  ok      expect FW output contains "belongs to session"
+  37.000000000  FW      FW#undebug all
+  37.000000000  FW      Debug output: all off
+  37.000000000  FW      FW#show zone security
+  37.000000000  FW      zone AUSSEN
+  37.000000000  FW        interfaces: GigabitEthernet0/2
+  37.000000000  FW      zone DMZ
+  37.000000000  FW        description: der Webserver
+  37.000000000  FW        interfaces: GigabitEthernet0/1
+  37.000000000  FW      zone INNEN
+  37.000000000  FW        description: das Buero
+  37.000000000  FW        interfaces: GigabitEthernet0/0
+  37.000000000  FW      zone self (the device itself; every interface reaches it)
+  37.000000000  ok      expect FW output contains "zone INNEN\n  description: das Buero\n  interfaces: GigabitEthernet0/0\n"
+  37.000000000  FW      FW#show zone-pair security
+  37.000000000  FW      pair A-D: AUSSEN -> DMZ, policy IN-DIE-DMZ
+  37.000000000  FW      pair I-A: INNEN -> AUSSEN, policy NACH-AUSSEN
+  37.000000000  FW      pair I-D: INNEN -> DMZ, policy NACH-AUSSEN
+  37.000000000  FW      Sessions: 7 now (0 half-open, limit 1000); 8 began, 1 timed out, 0 reset
+  37.000000000  FW      Packets: 33 by a session; dropped: 3 without a rule, 0 beginning nothing, 0 over the limit
+  37.000000000  ok      expect FW output contains "pair A-D: AUSSEN -> DMZ, policy IN-DIE-DMZ\n"
+  37.000000000  FW      FW#show policy-map type inspect zone-pair A-D
+  37.000000000  FW      pair A-D: AUSSEN -> DMZ
+  37.000000000  FW        policy IN-DIE-DMZ
+  37.000000000  FW          class WEB (match-all)
+  37.000000000  FW            match protocol http
+  37.000000000  FW            action: inspect log; 1 packets
+  37.000000000  FW            sessions now: 1
+  37.000000000  FW          class class-default
+  37.000000000  FW            action: drop log; 1 packets
+  37.000000000  ok      expect FW output contains "action: inspect log; 1 packets"
+  37.000000000  ok      expect FW output contains "action: drop log; "
+  37.000000000  FW      FW#show policy-map type inspect zone-pair sessions
+  37.000000000  FW      pair A-D: 1 sessions
+  37.000000000  FW        4 tcp 203.0.113.10:59010 -> 10.0.0.10:80 closing, class WEB
+  37.000000000  FW          age 00:00:11, ends in 00:00:18; packets 6 there, 4 back; bytes 318 there, 355 back
+  37.000000000  FW      pair I-A: 5 sessions
+  37.000000000  FW        2 tcp 192.168.1.10:48020 -> 203.0.113.10:80 closing, class ALLES
+  37.000000000  FW          age 00:00:15, ends in 00:00:14; packets 6 there, 4 back; bytes 319 there, 359 back
+  37.000000000  FW        5 udp 192.168.1.10:37064 -> 203.0.113.10:33437 open, class ALLES
+  37.000000000  FW          age 00:00:07, ends in 00:00:22; packets 1 there, 0 back; bytes 60 there, 0 back
+  37.000000000  FW        6 udp 192.168.1.10:37064 -> 203.0.113.10:33438 open, class ALLES
+  37.000000000  FW          age 00:00:07, ends in 00:00:22; packets 1 there, 0 back; bytes 60 there, 0 back
+  37.000000000  FW        7 udp 192.168.1.10:37064 -> 203.0.113.10:33439 open, class ALLES
+  37.000000000  FW          age 00:00:07, ends in 00:00:22; packets 1 there, 0 back; bytes 60 there, 0 back
+  37.000000000  FW        8 icmp 192.168.1.10 -> 203.0.113.10 open, class ALLES
+  37.000000000  FW          age 00:00:01, ends in 00:00:08; packets 1 there, 1 back; bytes 84 there, 84 back
+  37.000000000  FW      pair I-D: 1 sessions
+  37.000000000  FW        3 tcp 192.168.1.10:39880 -> 10.0.0.10:80 closing, class ALLES
+  37.000000000  FW          age 00:00:13, ends in 00:00:16; packets 6 there, 4 back; bytes 316 there, 355 back
+  37.000000000  FW      FW#show ip nat translations
+  37.000000000  FW      Pro Inside global         Inside local          Outside local         Outside global
+  37.000000000  FW      tcp 203.0.113.1:80        10.0.0.10:80          ---                   ---
+  37.000000000  FW      tcp 203.0.113.1:80        10.0.0.10:80          203.0.113.10:59010    203.0.113.10:59010
+  37.000000000  FW      icmp 203.0.113.1:9388      192.168.1.10:9388     203.0.113.10:9388     203.0.113.10:9388
+  37.000000000  FW      icmp 203.0.113.1:30617     192.168.1.10:30617    203.0.113.10:30617    203.0.113.10:30617
+  37.000000000  FW      udp 203.0.113.1:37064     192.168.1.10:37064    203.0.113.10:33437    203.0.113.10:33437
+  37.000000000  FW      udp 203.0.113.1:37064     192.168.1.10:37064    203.0.113.10:33438    203.0.113.10:33438
+  37.000000000  FW      udp 203.0.113.1:37064     192.168.1.10:37064    203.0.113.10:33439    203.0.113.10:33439
+  37.000000000  FW      tcp 203.0.113.1:48020     192.168.1.10:48020    203.0.113.10:80       203.0.113.10:80
+  37.000000000  FW      FW#show running-config
+  37.000000000  FW      Collecting the configuration ...
+  37.000000000  FW      
+  37.000000000  FW      ! configuration in effect, 1730 bytes
+  37.000000000  FW      !
+  37.000000000  FW      version 1.0
+  37.000000000  FW      !
+  37.000000000  FW      hostname FW
+  37.000000000  FW      !
+  37.000000000  FW      ipv6 unicast-routing
+  37.000000000  FW      !
+  37.000000000  FW      class-map type inspect match-any ALLES
+  37.000000000  FW       match protocol tcp
+  37.000000000  FW       match protocol udp
+  37.000000000  FW       match protocol icmp
+  37.000000000  FW      !
+  37.000000000  FW      class-map type inspect WEB
+  37.000000000  FW       match protocol http
+  37.000000000  FW      !
+  37.000000000  FW      policy-map type inspect IN-DIE-DMZ
+  37.000000000  FW       class type inspect WEB
+  37.000000000  FW        inspect log
+  37.000000000  FW       class class-default
+  37.000000000  FW        drop log
+  37.000000000  FW      !
+  37.000000000  FW      policy-map type inspect NACH-AUSSEN
+  37.000000000  FW       class type inspect ALLES
+  37.000000000  FW        inspect
+  37.000000000  FW      !
+  37.000000000  FW      zone security AUSSEN
+  37.000000000  FW      !
+  37.000000000  FW      zone security DMZ
+  37.000000000  FW       description der Webserver
+  37.000000000  FW      !
+  37.000000000  FW      zone security INNEN
+  37.000000000  FW       description das Buero
+  37.000000000  FW      !
+  37.000000000  FW      zone-pair security A-D source AUSSEN destination DMZ
+  37.000000000  FW       service-policy type inspect IN-DIE-DMZ
+  37.000000000  FW      !
+  37.000000000  FW      zone-pair security I-A source INNEN destination AUSSEN
+  37.000000000  FW       service-policy type inspect NACH-AUSSEN
+  37.000000000  FW      !
+  37.000000000  FW      zone-pair security I-D source INNEN destination DMZ
+  37.000000000  FW       service-policy type inspect NACH-AUSSEN
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/0
+  37.000000000  FW       ip address 192.168.1.1 255.255.255.0
+  37.000000000  FW       ip nat inside
+  37.000000000  FW       zone-member security INNEN
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/1
+  37.000000000  FW       ip address 10.0.0.1 255.255.255.0
+  37.000000000  FW       ip nat inside
+  37.000000000  FW       zone-member security DMZ
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/2
+  37.000000000  FW       ip address 203.0.113.1 255.255.255.0
+  37.000000000  FW       ip nat outside
+  37.000000000  FW       zone-member security AUSSEN
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/3
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/4
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/5
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/6
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface GigabitEthernet0/7
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface TenGigabitEthernet0/8
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      interface TenGigabitEthernet0/9
+  37.000000000  FW       no ip address
+  37.000000000  FW       shutdown
+  37.000000000  FW      !
+  37.000000000  FW      ip nat inside source list 1 interface GigabitEthernet0/2 overload
+  37.000000000  FW      ip nat inside source static tcp 10.0.0.10 80 203.0.113.1 80
+  37.000000000  FW      !
+  37.000000000  FW      access-list 1 permit 192.168.1.0 0.0.0.255
+  37.000000000  FW      !
+  37.000000000  FW      line con 0
+  37.000000000  FW      line vty 0 4
+  37.000000000  FW       login
+  37.000000000  FW      !
+  37.000000000  FW      end
+  37.000000000  ok      expect FW output contains "zone-pair security A-D source AUSSEN destination DMZ\n service-policy type inspect IN-DIE-DMZ\n"
+  37.000000000  ok      expect FW output contains " ip nat inside\n zone-member security DMZ\n"
+  37.000000000  --      run 60s
+  97.000000000  FW      FW#show policy-map type inspect zone-pair sessions
+  97.000000000  FW      pair A-D: 0 sessions
+  97.000000000  FW      pair I-A: 0 sessions
+  97.000000000  FW      pair I-D: 0 sessions
+  97.000000000  ok      expect FW output contains "pair I-A: 0 sessions\n"
+  97.000000000  PC1     root@PC1:~# ping -c 1 203.0.113.10
+  97.000000000  PC1     PING 203.0.113.10 (203.0.113.10) 56(84) bytes of data.
+  97.000000000  --      run 2s
+  97.000002470  FW      *Mar  1 00:01:37.000: %FW-6-SESSION_END: session 4 (tcp 203.0.113.10:59010 -> 10.0.0.10:80) ended, 6 packets there, 4 back
+  97.000006992  PC1     64 bytes from 203.0.113.10: icmp_seq=1 ttl=63 time=0.006 ms
+  97.000006992  PC1     
+  97.000006992  PC1     --- 203.0.113.10 ping statistics ---
+  97.000006992  PC1     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  97.000006992  PC1     rtt min/avg/max/mdev = 0.006/0.006/0.006/0.000 ms
+  99.000000000  FW      FW#clear zone-pair inspect sessions
+  99.000000000  FW      FW#show zone-pair security
+  99.000000000  FW      pair A-D: AUSSEN -> DMZ, policy IN-DIE-DMZ
+  99.000000000  FW      pair I-A: INNEN -> AUSSEN, policy NACH-AUSSEN
+  99.000000000  FW      pair I-D: INNEN -> DMZ, policy NACH-AUSSEN
+  99.000000000  FW      Sessions: 0 now (0 half-open, limit 1000); 9 began, 8 timed out, 0 reset
+  99.000000000  FW      Packets: 34 by a session; dropped: 3 without a rule, 0 beginning nothing, 0 over the limit
+  99.000000000  ok      expect FW output contains "Sessions: 0 now"
+  99.000000000  ok      expect hops icmp >= 20 (57)
+# 24 von 24 Erwartungen erfüllt
