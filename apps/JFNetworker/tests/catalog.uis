@@ -1,6 +1,7 @@
 #!args --verify-dirty
 # the device palette (workspace/palette.rs): every catalog model as a tile in its category,
 # the expanders, the search over names and descriptions, the tooltip with title and ports
+size 1280 1000
 theme light
 expect button:"Endgeräte (9)" open
 expect button:"Netzwerk (17)" open
@@ -66,7 +67,7 @@ type "x"
 expect text:"Kein Gerät gefunden" exists
 key ctrl+a
 type "server"
-expect button:"Server (8)" open
+expect button:"Server (7)" open
 expect button:"Container-Host" missing
 key ctrl+a
 type "kamera"

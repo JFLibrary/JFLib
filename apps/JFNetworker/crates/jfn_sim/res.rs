@@ -4,8 +4,8 @@
 //
 //   Res::new(hw, own)                  cores, speed, RAM from jfn_model's Hw
 //   Res::submit(svc, now, cost, usl)   a job of `cost` at a reference core: (its start, its end)
-//   Res::turn(svc, now) / charge(..)   a place in the queue for work whose size is not known yet
-//                                      (a script's slice), what it cost when its turn came
+//   Res::turn(now) / charge(svc, core, now, took)   a place in the queue for work whose size is not
+//                                      known yet (a script's slice), what it took when its turn came
 //   Res::done_at(t) / running(t) / waiting(t)   core time spent up to t, cores busy, jobs waiting
 //   Res::set_mem(svc, bytes) / forget(svc)      what a service holds (Service::mem)
 //   Res::metric(name, t)               the numbers of `expect DEV svc _host metric NAME`
@@ -19,7 +19,7 @@
 //   OsApi::cpu_or_timer(cost)          a job now (no hardware: now + cost, as a plain timer)
 //   OsApi::cpu_slice(&mut left)        the next quantum of a long job (QUANTUM): when it is done
 //   OsApi::cpu_slice_usl(&mut left, usl)   the same with a service's factor
-//   OsApi::metered() / cpu_turn() / cpu_charge(cost) / cpu_ps(ps)   a script's way (scriptsvc.rs)
+//   OsApi::metered() / cpu_turn() / cpu_charge(core, took) / cpu_ps(ps)   a script's way (scriptsvc.rs)
 //   Service::mem()                     the bytes a service holds; the OS asks after each of its
 //                                      calls on a device with hardware (Engine::svc_call)
 //   Action::Resize { dev, hw, downtime } / Action::Metered { on }   other hardware (0: hot-plugged),

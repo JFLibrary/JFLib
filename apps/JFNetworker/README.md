@@ -441,7 +441,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 | `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
-| `model.uis`, Gruppe `hardware` | CPU und RAM gegen die Formeln: die Warteschlange allein gegen Erlang C (M/M/c) und M/D/1 auf 3 %, Sättigung X = Kerne · Tempo / Kosten auf 1 % über eine Lastreihe, M/D/1 über HTTP, der Gipfel des USL, die Sperre, zwei Dienste auf einem und auf zwei Hosts, lange Aufgaben in Stücken, langsame CPU und Speicherfresser, mehr RAM gegen Plattenlast, OOM-Kill mit 137 und Neustart durch die Einheit, Resize mit Ausfall und im Betrieb, jeder Dienst, Skripte, Konsole, Determinismus (zwei Läufe, Klon, Wiederholung aus Keyframes), die Schritte im Szenario, die Rückgängig-Schritte |
+| `model.uis`, Gruppe `hardware` | CPU und RAM gegen die Formeln: die Warteschlange allein gegen Erlang C (M/M/c, auf 6 %) und M/D/1 (auf 2 %), Sättigung X = Kerne · Tempo / Kosten auf 1 % über eine Lastreihe, M/D/1 über HTTP, der Gipfel des USL, die Sperre, zwei Dienste auf einem und auf zwei Hosts, lange Aufgaben in Stücken, langsame CPU und Speicherfresser, mehr RAM gegen Plattenlast, OOM-Kill mit 137 und Neustart durch die Einheit, Resize mit Ausfall und im Betrieb, jeder Dienst, Skripte, Konsole, Determinismus (zwei Läufe, Klon, Wiederholung aus Keyframes), die Schritte im Szenario, die Rückgängig-Schritte |
 | `scen_hw_basic.uis` | das Golden-Szenario Hardware Byte für Byte (`fixtures/hw_basic.jfnet`): Sättigung, Resize mit Ausfall und im Betrieb, langsame CPU, Speicherfresser, OOM, `top`, `free`, `lscpu` |
 | `hardware_panel.uis` | „Hardware simulieren“ mit seinem Rückgängig-Schritt, die Hardware-Karte eines Hosts (Annahmen, Eigene Angaben, Ablehnung, Resize mit Marke, im Betrieb), die neuen Fehler, die Zeile im Metriken-Panel |
 | `hardware_shots.uis` | die Bilder dazu hell und dunkel, 100 und 150 % |
@@ -4213,18 +4213,19 @@ Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::M
 `Engine::res_of(dev)`, `Service::mem`, `OsApi::cpu`, `cpu_usl`, `cpu_or_timer`, `cpu_slice`, `cpu_slice_usl`, `metered`, `cpu_turn`, `cpu_charge`,
 `cpu_ps`, `res::CpuGate`, `res::SvcMem`, `res::Usl`, `catalog::{Hw, DiskClass, hw_of, hw_presets}`. Geprüft wird in der Selbsttest-Gruppe
 `hardware` ([`src/hardwaretest.rs`](src/hardwaretest.rs)), mit `scen_hw_basic.uis` und den Fensterskripten `hardware_panel.uis` und
-`hardware_shots.uis`.
+`hardware_shots.uis`. `JFNetworker --selftest --only=hardware --numbers` schreibt jeden Vergleich mit einer Formel mit seinen Zahlen.
 
-**Tempo** (Windows, Entwicklungs-Build, ausgelasteter Rechner, Mitschnitt an; offene Last, 1 ms Rechenzeit je Anfrage auf 32 Kernen, je 10 s
-virtuelle Zeit):
+**Tempo** (Windows, Entwicklungs-Build, Mitschnitt an, Rechner nicht frei; offene Last, je 10 s virtuelle Zeit, ein Thread):
 
-| Last | mit Hardware | ohne Hardware |
-|---|---|---|
-| 100 Anfragen/s | 27 ms, 330 000 Ereignisse/s | 22 ms, 400 000 Ereignisse/s |
-| 1000 Anfragen/s | 342 ms, 240 000 Ereignisse/s, 29 000 Anfragen/s | 212 ms, 385 000 Ereignisse/s, 47 000 Anfragen/s |
-| 5000 Anfragen/s | 1302 ms, 309 000 Ereignisse/s, 38 000 Anfragen/s | 989 ms, 406 000 Ereignisse/s, 51 000 Anfragen/s |
+| Netz | Last | Laufzeit | Ereignisse/s | Anfragen je Wandsekunde | Ereignisse je Anfrage |
+|---|---|---|---|---|---|
+| Generator am Kabel eines Servers, 1 ms Rechenzeit, 32 Kerne | 1000/s | 249 ms | 330 000 | 40 000 | 8 |
+| dasselbe | 5000/s | 1244 ms | 323 000 | 40 000 | 8 |
+| `lab_shards`: Loadbalancer, drei Webserver, drei KV-Knoten | 2000/s | 2528 ms | 397 000 | 7500 | 53 |
+| dasselbe | 10 000/s | 14 012 ms | 351 000 | 6800 | 52 |
 
-Eine Anfrage kostet rund 8 Ereignisse; Hardware macht einen Lauf etwa ein Viertel bis ein Drittel langsamer.
+Hardware selbst kostet wenig: Gegenüber demselben Lauf ohne Hardware, aber mit 1 ms Wartezeit (`time_ms`), sind es ohne neue Ereignisse rund 3 %. In `lab_shards`
+kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ihrer Rechenzeit halten.
 
 ## Performance
 

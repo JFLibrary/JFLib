@@ -13,6 +13,7 @@
 //   utilisation    rho = lambda * S / c
 //
 // Floating point is fine here: it only compares results, nothing here feeds the simulation.
+// "--selftest --only=hardware --numbers" prints every such comparison with its numbers.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -118,7 +119,11 @@ fn near(got: f64, want: f64, tol: f64) -> bool {
 }
 
 fn check_near(t: &mut T, name: &str, got: f64, want: f64, tol: f64) {
-    t.check(&format!("{}: {:.3} against {:.3} (within {:.1} %)", name, got, want, tol * 100.0), near(got, want, tol));
+    let line = format!("{}: {:.3} against {:.3} (within {:.1} %)", name, got, want, tol * 100.0);
+    if plat::args().iter().any(|a| a == "--numbers") {
+        plat::write_stdout(format!("{}, off by {:.2} %\n", line, (got - want).abs() / want.abs().max(1e-12) * 100.0).as_bytes());
+    }
+    t.check(&line, near(got, want, tol));
 }
 
 pub(crate) fn run(t: &mut T) {
@@ -264,16 +269,20 @@ fn poisson(c: u32, lambda: f64, n: u64, s: &mut dyn FnMut(&mut Pcg32) -> u64) ->
 }
 
 fn res_alone(t: &mut T) {
-    // M/M/c: Erlang's C, one million jobs: the spread of the mean is well under the 2 % asked for
-    // at these loads (the run is fixed by its seed: this says the queue is right, not lucky)
+    // The tolerances are three times the spread of such a mean over seeds, from an independent
+    // simulation (Lindley's recursion with other random numbers): M/M/c at 80 % and a million jobs
+    // 1.1 % (one core) to 2 % (eight), M/D/1 at 90 % and two million jobs 0.7 %.  The run itself is
+    // fixed by its seed.  The formula takes the utilisation the run really had, as its arrivals are
+    // random too: at 90 % a tenth of a per cent more load is a per cent more waiting.
     const S: u64 = MS;
     for c in [1u32, 2, 4, 8] {
         for rho in [0.5f64, 0.8] {
             let a = rho * c as f64;
             let lambda = a / (S as f64 / 1e9);
             let (w, u) = poisson(c, lambda, 1_000_000, &mut |g| exp_sample(S, g.next_u32()));
-            let want = erlang_c(c, a) * S as f64 / (c as f64 - a);
-            check_near(t, &format!("M/M/{} at {} %: the mean wait in µs", c, rho * 100.0), w / 1000.0, want / 1000.0, 0.03);
+            let real = u * c as f64;
+            let want = erlang_c(c, real) * S as f64 / (c as f64 - real);
+            check_near(t, &format!("M/M/{} at {} %: the mean wait in µs", c, rho * 100.0), w / 1000.0, want / 1000.0, 0.06);
             check_near(t, &format!("M/M/{} at {} %: utilisation", c, rho * 100.0), u, rho, 0.01);
         }
     }
@@ -281,8 +290,8 @@ fn res_alone(t: &mut T) {
     for rho in [0.3f64, 0.5, 0.8, 0.9] {
         let lambda = rho / (S as f64 / 1e9);
         let (w, u) = poisson(1, lambda, 2_000_000, &mut |_| S);
-        let want = rho * S as f64 / (2.0 * (1.0 - rho));
-        check_near(t, &format!("M/D/1 at {} %: the mean wait in µs", rho * 100.0), w / 1000.0, want / 1000.0, 0.03);
+        let want = u * S as f64 / (2.0 * (1.0 - u));
+        check_near(t, &format!("M/D/1 at {} %: the mean wait in µs", rho * 100.0), w / 1000.0, want / 1000.0, 0.02);
         check_near(t, &format!("M/D/1 at {} %: utilisation", rho * 100.0), u, rho, 0.01);
     }
 }
@@ -413,8 +422,9 @@ fn saturation(t: &mut T) {
 
 fn md1_http(t: &mut T) {
     // M/D/1 over HTTP: arrivals of the load generator's Poisson process, one core, a fixed cost.
-    // The mean over 30 s at these loads spreads by about 10 % (batch means of the queue alone,
-    // res_alone with 15 000 jobs), so that is the tolerance; the queue alone is checked tighter
+    // The mean of 30 s spreads by 3 to 4 % over seeds at these loads (the independent simulation of
+    // res_alone: 7500 jobs at 25 %, 22 500 at 75 %), so the tolerance is about four times that; the
+    // queue alone is checked tighter
     for (rps, rho) in [(250u32, 0.25f64), (500, 0.5), (750, 0.75)] {
         let n = net(Some(hw(1, 1000, 8)), &[web("web", 80, "1")], &open(rps));
         let mut e = engine(&n.p);
