@@ -577,6 +577,22 @@ if self.tab == 0 {
   `next_flags(CUR_* << HB_CURSOR_SHIFT)`. `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
+  id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
+  `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
+  `CanvasView { scale, ox, oy }` (window px = o + content * scale), opaque, what the `Draw` paints at
+  that view; `ver` stands for everything it shows, `ui.canvas_gpu_damage(id, r)` reports a changed
+  content rectangle. With the GPU output, while the view moves and the content stays, the
+  picture comes from tiles (256 x 256 textures, drawn once, kept under a budget) that the GPU
+  draws with the transform; a moment after the last move the CPU draws it, so at rest it is the
+  CPU path's byte for byte. `gpu`: `CanvasGpu::Pan` only moves by whole pixels at the same scale (exact
+  when the raster does not depend on the place), `Zoom` also scales the tiles while a zoom runs
+  (soft for a moment), `Cpu` never. On other targets, without a GPU and in headless runs it does
+  nothing: the code is the same, the `Draw` paints every frame. Everything over the canvas
+  (selection, handles, anything recorded after it) stays recorded commands. `image_view`
+  (`ImageViewState::gpu`) and `diagram` (`DiagramState::gpu`) do this themselves. While a canvas is
+  apart `ui.fb()` lacks its view: `ui.gpu_settle()` first, outside a pass. Details and numbers: GPU.md
+  "Leinwände".
 * Direct pixel work (paint programs): `gfx::Surface::new(w, h, FMT_PARGB)`, a `gfx::Dc`
   (`fill`, `blit`, `blit_scaled`, clip and origin), `gfx::path` / `raster` / `stroke` for
   anti-aliased vector paths, `gfx::blendmode`, `gfx::tmask` (selection masks), `gfx::flood`,
@@ -1577,7 +1593,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
-| `gpu on\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer, a render after every input edge. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `budget`: what image textures may take. `same`: every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist |
+| `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |

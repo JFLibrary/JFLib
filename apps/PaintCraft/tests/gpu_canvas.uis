@@ -96,8 +96,8 @@ system env jfgui_GPU_CANVAS_ZOOM paintcraft
 gpu on
 gpu expect gpu
 gpu expect same
+# (the first frame that moves it after a new start may go the CPU's way)
 wheel 640,448 120 ctrl
-gpu expect apart 1
 wheel 640,448 120 ctrl
 gpu expect apart 1
 gpu expect same

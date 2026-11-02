@@ -1596,9 +1596,18 @@ impl Test {
             30 => {
                 if o.canvas_tiles == 0 && o.canvas_bytes == 0 {
                     self.ok(o.frames <= self.mark[0] + 1, &format!("the tiles gone by themselves, {} frames for it", o.frames - self.mark[0]));
-                    self.finish(ui);
+                    self.pc = 31;
+                    self.since = plat::time_us();
+                    self.since_pass = self.passes;
                 } else if self.after(5000) {
                     self.ok(false, "the tiles did not go");
+                    self.finish(ui);
+                }
+            }
+            31 => {
+                // (the device gives its blocks back when it next looks)
+                if self.after(2000) {
+                    out(&format!("  note reserved with the tiles {} MiB, 2 s after them {} MiB", self.mark[3] >> 20, o.reserved >> 20));
                     self.finish(ui);
                 }
             }

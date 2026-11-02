@@ -329,15 +329,15 @@ Schatten und runde Ecken macht DWM am Hauptfenster, sie gelten auch für das Kin
 geprüft).
 
 **Shader.** WGSL in [`lib/ui/gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), vorübersetzt in
-[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 373 + 513 Wörter): UI-Programme linken `lib/wgsl`
+[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 373 + 513 + 659 Wörter): UI-Programme linken `lib/wgsl`
 nicht. `uigputest --test shaders` vergleicht die Wörter mit `wgsl::compile`, `uigputest --gen-shaders
 lib/ui/gpu_out_spv.rs` schreibt sie neu.
 
 **Tests.** `apps/gallery/tests/gpu_output.uis` (das Skriptkommando `gpu`, GUIDE §12) und
 `apps/uigputest` (nur Windows; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
 `switch`, `resize`, `minimize`, `dpi`, `windows`, `off`, `noloader`, `lose`, `idle`, `csd`, `monitors`, `shaders`,
-`adapter`, `hwnd`, `layers`, `images`, `imgplain`; dazu `apps/gallery/tests/gpu_layers.uis` und
-`gpu_layers_rtl.uis`. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
+`adapter`, `hwnd`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`; dazu `apps/gallery/tests/gpu_layers.uis` und
+`gpu_layers_rtl.uis`, und `gpu_canvas.uis` von `svgtest`, `diagramtest` (auch `gpu_canvas_rtl.uis`), Kritzel und PaintCraft. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
 zurückgelesen; ohne GPU `SKIP`; liegt ein anderes Fenster über dem Testfenster, ist die Prüfung des
 Bildschirms ein Hinweis statt eines Fehlers. Maximieren und Vollbild aktivieren das Fenster, deshalb tut das
 kein Test mehr; eine frühere Fassung von `csd` hat beides einmal geprüft. `gputest --test upload` prüft Ring, `write_texture_rects`, `write_texture_rects_at` und
@@ -402,7 +402,7 @@ Pixel des Bildes (`owed`); `gp_settle` zeichnet sie nach, bevor ihn jemand liest
 Ebene darüber, `jfgui_GPU_VERIFY`, `--verify-dirty`, `shot`, `expect pixel`, `expect same`, der Agent; ein Programm, das selbst `Ui::fb()` liest,
 ruft vorher `Ui::gpu_settle()`. Mit Bildern auf der GPU gibt es ebenfalls keine Scroll-Kopien.
 
-Was nicht `Cmd::Image` ist, geht nicht diesen Weg: die Bildansicht `image_view` und die Leinwände zeichnen über `Cmd::Custom` (G3c).
+Was nicht `Cmd::Image` ist, geht nicht diesen Weg: die Bildansicht `image_view` und die Leinwände zeichnen über `Cmd::Custom` ([Leinwände](#leinwände)).
 
 ### Messungen
 
@@ -494,15 +494,106 @@ Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 10–13 MiB mi
 plus 0,7 MiB CPU-Speicher für die Pixel darunter, ein Dialog 2,3 + 1,1 MiB, Dunst über dem ganzen Fenster 7,5 + 7,7 MiB. Das Bild: 45,8 MiB Textur,
 `memory_reserved` 67–78 MiB (vorher 13–28 MiB), kurz dazu 48 MiB Staging, der eine Sekunde später zurückgeht. Ohne Ebenen und ohne geänderte Bilder: kein Unterschied zu vorher.
 
-### Was fehlt, und was G3c hieraus nimmt
+### Leinwände
 
-- `show` zeichnet Grund, Bilder, Ebenen in einem Durchgang. G3c hängt Leinwände mit eigener Transformation an die Stelle der Bilder
-  (`Quad`: eine Fläche in Zellen, die die GPU füllt und die CPU auslässt); beides kann auf denselben Wegen zurück auf den CPU-Pfad.
+Zoomen und Verschieben einer Leinwand kostete je Bild ein ganzes Rastern. Solange sich nur die Ansicht bewegt, kommt ihr Inhalt jetzt aus
+GPU-Texturen, nur die Transformation ändert sich ([`lib/ui/canvas.rs`](../lib/ui/canvas.rs), [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3c). Die CPU bleibt die Wahrheit:
+**in Ruhe ist das Bild Byte für Byte das des CPU-Pfads.**
+
+**Die API.** Eine Leinwand zeichnet wie immer über `ui.canvas(...)` oder `cmd_custom` mit ihrem `Draw`. Direkt danach sagt sie, woraus das besteht:
+
+```rust
+let inp = ui.canvas(ID, Some(draw.clone()), 0, ver).clone();
+ui.canvas_gpu(CanvasDesc {
+    id: ID,
+    name: "bild",                        // für die Umgebungsvariablen unten
+    rect: [x, y, w, h],                  // die Fläche im Fenster, die der Inhalt deckend füllt
+    view: CanvasView { scale, ox, oy },  // Fensterpixel = o + Inhalt * scale
+    ver: inhalt,                         // steht für alles, was der Inhalt zeigt; neu: seine Kacheln gehen
+    content: draw,                       // Rc<dyn CanvasContent>: draw_view(g, view, rect)
+    gpu: CanvasGpu::Pan,                 // Cpu | Pan | Zoom
+    exact_pan: true,                     // das Rastern hängt nicht vom Ort ab: jfgui_GPU_VERIFY besteht darauf
+});
+ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln darüber gehen
+```
+
+`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, unter Linux, Android und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
+`image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
+
+**Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
+
+| Vorgang | CPU | GPU |
+| --- | --- | --- |
+| Ansicht steht still, Inhalt unverändert | nichts | nichts: keine Textur vor der ersten Bewegung, kein Bild, kein Thread |
+| Verschieben um ganze Pixel | die Kacheln, die neu ins Bild kommen (einmal); Zellen mit etwas darüber: ihr `Draw`, das Darüber | die Kacheln kopiert (`fs`) |
+| Zoom, `CanvasGpu::Zoom` | dasselbe, eine neue Stufe, wenn der Faktor 0,55 .. 1,9 verlässt (die alte bleibt, zurück kostet nichts) | die Kacheln bilinear (`fs_tile`) |
+| Zoom, `CanvasGpu::Pan` | das Bild, sofort, wie ohne GPU | wie immer |
+| 180 ms nach der letzten Bewegung | ein Bild wie ohne GPU, hochgeladen | wie immer: jetzt stimmt alles, und es kommt kein Bild mehr |
+| Strich, verschobener Knoten, neue `ver` | wie ohne GPU, die Bewegung endet sofort; `canvas_gpu_damage` gibt nur die betroffenen Kacheln frei | wie immer |
+
+Der Befehl einer Leinwand, die aus Kacheln kommt, geht mit seinem Ort statt seines Inhalts in den Hash der Zellen (`dirty.rs`), sonst wäre jede Zelle jedes Bild schmutzig. Sie wird genau wie ein Bild aus G3b vermerkt: in den Zellen, in denen sie als Letzte der Grundebene liegt, zeichnet die GPU, die CPU zeichnet und lädt nichts (`Split::owed`, `Split::stale`); auch in Randzellen, die sie nur teilweise füllt, dort mit dem Scissor an ihrem Rand. Zellen mit etwas darüber (Griffe, Bildlaufleisten, Auswahl) und Zellen ohne ihre Kachel laufen über ihr `Draw` und werden hochgeladen; unter einer offenen Ebene ebenso, damit die Ebene das Richtige über sich hält. `gp_settle` ruft das `Draw`, bevor jemand den Framebuffer liest: `Ui::gpu_settle()` außerhalb eines Durchgangs, `shot`, `expect pixel`, der Agent, `--verify-dirty` und die Wege zurück zum CPU-Pfad geben also immer die richtigen Pixel, auch mitten in einer Geste. PaintCrafts Drucken und Zwischenablage und Kritzels Export lesen den Framebuffer nicht, sie zeichnen in eigene Flächen.
+
+**Budget und Lebensdauer.** 128 MiB (`jfgui_GPU_CANVAS_MB`), verdrängt wird die am längsten nicht gezeichnete Kachel, nie eine des laufenden Bildes; passt nichts mehr hinein, läuft der Rest über die CPU. 30 s nach der letzten Bewegung gehen alle Kacheln, ohne ein Bild. Neue Größe, Inspektor, minimiert: das Fenster zeichnet über die CPU, die Kacheln bleiben. Gerät verloren: alle Kacheln weg, die nächste Geste füllt sie auf dem neuen Gerät neu. Ein gespiegeltes Fenster (RTL) zeichnet Leinwände auf der CPU.
+
+**Was während einer Geste anders aussieht.** Gemessen mit `gpu shot` (das zurückgelesene dargestellte Bild) gegen `shot` (die Pixel der CPU), 1920 × 1000; `jfgui_GPU_VERIFY` zählt dasselbe je Bild in `GpuOutput::canvas_diff_*`.
+
+| Leinwand | Verschieben um ganze Pixel | Zoom um den Faktor 1,25, bis zu 180 ms nach dem letzten Rad | Standard |
+| --- | --- | --- | --- |
+| Kritzel | **gleich**, 0 Pixel (`exact_pan`: `blit_scaled` rechnet von der Bildecke aus, ein Unterschied wäre ein Fehler) | nur mit dem Schalter: 1,41 Mio. Pixel, im Mittel 34 Stufen (rauschiges Testbild) | `Pan`: der Zoom-Schritt läuft über die CPU, kein Unterschied zu keiner Zeit |
+| PaintCraft | **gleich**, 0 Pixel (`exact_pan`: die Tabellen von `render_image` rechnen von der Bildecke aus) | nur mit dem Schalter: 1,58 Mio. Pixel, im Mittel 20 Stufen | `Pan`, ebenso. Mit Pixelraster, Auswahl oder einem Overlay des Werkzeugs bleibt die Leinwand auf der CPU: das `Draw` malt sie mit dem Bild |
+| `image_view`, Bitmap | gleich, 0 Pixel (200 %, nicht bewiesen: `affine` rechnet in Fließkomma) | Foto: 734 000 Pixel, im Mittel 5, höchstens 20 Stufen, kaum zu sehen. 32 × 24 Pixel groß: Blockkanten weich, das Raster bleibt, im Mittel 32 Stufen | `Zoom` |
+| `image_view`, SVG | fast: 97 von 1,6 Mio. Pixeln, um 1 Stufe | 973 000 Pixel, im Mittel 11, höchstens 86: etwas weich | `Zoom` |
+| `diagram` | fast: 0 bis 1 Pixel je Bild, um 1 Stufe | 269 000 Pixel, im Mittel 7, höchstens 224 (Text- und Linienkanten): weicher, die Geometrie stimmt; beim Stehenbleiben wird das Bild scharf | `Zoom` |
+
+**Ganzzahliges Verschieben.** `scrollcopy.rs` warnt zu Recht: der Rasterer rechnet in absoluten f32-Koordinaten. Das trifft nur Vektorinhalt: eine Kachel hat andere absolute Koordinaten als das Fenster, und ein Diagramm rechnet Welt nach Fenster mit etwas anderen Rundungen. Gemessen sind das 0 bis 1 Pixel je Bild um eine Stufe (Diagramm) und 97 Pixel um eine Stufe (SVG, viele Kurven). Rasterinhalt ist gleich, weil seine Abbildung nur vom Abstand zur Bildecke abhängt. Deshalb bleibt es auch beim Verschieben dabei: 180 ms danach zeichnet die CPU.
+
+**Der Schalter je Leinwand.** Im Code `CanvasDesc::gpu`, `ImageViewState::gpu`, `DiagramState::gpu`, `CANVAS_GPU` in `apps/Kritzel/view.rs` und `apps/PaintCraft/src/workspace/view.rs`. Ohne Bauen: `jfgui_GPU_CANVAS_CPU=image,diagram,kritzel,paintcraft` hält die genannten auf der CPU, `jfgui_GPU_CANVAS_PAN=...` lässt sie nur verschieben, `jfgui_GPU_CANVAS_ZOOM=...` lässt sie auch skalieren, `jfgui_GPU_CANVAS=0` schaltet alles ab, `jfgui_GPU_CANVAS_SETTLE_MS=n` ändert die 180 ms.
+
+**Warum Kritzel und PaintCraft nicht skalieren.** Ein Zoom-Schritt kostet dort auf der CPU 6 ms, gleich groß wie das Bild im Fenster, nicht wie das Dokument. Das merkt niemand. Skaliert wären es 1 ms, dafür zeigt jedes Rad für 180 ms ein weicheres Bild, das dann wieder scharf springt, und am Ende kostet es trotzdem die 6 ms. Nächster Nachbar exakt aus den Pixeln des Dokuments ginge auch (das tut `fs_image` für Bilder), kostet aber den Speicher des ganzen Dokuments und bringt dieselben 5 ms. Nicht gebaut.
+
+**Messungen.** Nur `lib/ui` im selben Programm, `jfgui_GPU_CANVAS=0` gegen Standard, Release, 1920 × 1000, GeForce RTX 2070 SUPER, Ryzen 5 3600, je 3 Läufe im Wechsel in einem Fenster je Lauf (`gpu on fast`, `bench`), parallel bauten andere Sitzungen. Median der Läufe, je Bild; Render ist `render_live`, Present `gp_present`, hochgeladen in KB. Die Skripte waren Wegwerf-Code: Szene laden, `bench 120 drag A B`, `gpu print`.
+
+| Leinwand, Inhalt | Vorgang | Render vorher | nachher | Present vorher | nachher | hochgeladen vorher | nachher |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `image_view`, Foto 1600 × 1200 bei 200 % | verschieben | 30 044 µs | 1 983 µs | 1 375 µs | 435 µs | 7 617 | 732 |
+| | Rad, ±1 Schritt | 32 472 µs | 1 713 µs | 1 358 µs | 388 µs | 7 680 | 680 |
+| | Rad, 8 hinauf, 8 hinab | 21 838 µs | 6 069 µs | 1 306 µs | 494 µs | 7 680 | 2 490 |
+| | das Bild danach, einmal | | 28 410–30 784 µs | | 483–656 µs | | 6 636 |
+| `image_view`, SVG bei 612 % | verschieben | 9 128 µs | 603 µs | 1 314 µs | 375 µs | 7 617 | 569 |
+| | Rad, ±1 Schritt | 9 862 µs | 1 169 µs | 1 327 µs | 407 µs | 7 680 | 769 |
+| | das Bild danach, einmal | | 9 655–9 981 µs | | 446–500 µs | | 6 636 |
+| `diagram`, 3 630 Knoten (`diagramtest --grid 60`) | verschieben | 15 671 µs | 1 029 µs | 1 421 µs | 427 µs | 7 555 | 373 |
+| | Rad, ±1 Schritt | 13 330 µs | 572 µs | 1 372 µs | 438 µs | 7 680 | 354 |
+| | Rad, 8 hinauf, 8 hinab | 7 373 µs | 3 459 µs | 1 348 µs | 641 µs | 7 680 | 3 079 |
+| | das Bild danach, einmal | | 3 135–17 043 µs | | 495–508 µs | | 7 373 |
+| Kritzel, 4000 × 3000 | verschieben | 6 367 µs | 553 µs | 1 563 µs | 350 µs | 7 680 | 478 |
+| | Zoom-Schritt (CPU) | 6 216 µs | 5 667 µs | 1 553 µs | 1 515 µs | 7 680 | 7 680 |
+| | Zoom-Schritt, Schalter `ZOOM` | | 824 µs | | 439 µs | | 660 |
+| | **Strich** | 82 µs | 83 µs | 366 µs | 342 µs | 27 | 27 |
+| | das Bild danach, einmal | | 5 712 µs | | 399 µs | | 6 390 |
+| PaintCraft, 4000 × 3000 bei 100 % | verschieben | 5 972 µs | 1 285 µs | 1 436 µs | 502 µs | 7 617 | 595 |
+| | Zoom-Schritt (CPU) | 6 098 µs | 5 911 µs | 1 385 µs | 1 427 µs | 7 680 | 7 680 |
+| | Zoom-Schritt, Schalter `ZOOM` | | 1 088 µs | | 426 µs | | 524 |
+| | **Strich** | 274 µs | 295 µs | 369 µs | 340 µs | 29 | 29 |
+| | das Bild danach, einmal | | 6 234 µs | | 439 µs | | 6 636 |
+
+Beim Strich kein Unterschied (Streuung der Läufe 262–334 und 273–314 µs); ein Strich berührt keine Kachel außer durch `canvas_gpu_damage`, die in Mikrosekunden frei wird, und wartet auf nichts. Ein gezogener Knoten im `diagram` läuft wie vorher über die CPU: sein Inhalt ändert sich, also keine Kacheln (in `diagramtest` 0,4 ms je Bild vorher und nachher, das Ziehen zeichnet dort nur Überlagerungen).
+
+Wo der Gewinn kleiner ist: **unter 1 ms** bleibt nur, was keine Zellen über der Leinwand hat. Das Foto hat Bildlaufleisten und eine Statuszeile, deren Zellen je Bild `IvDraw` kosten (170 000 Pixel, 1,4 ms von 2 ms), PaintCraft Lineale und Leisten. Beim Rad in einem Zug zählen die neuen Stufen: das Foto 113 Kacheln in 16 Bildern (5 ms je Bild), das Diagramm 163. Das erste Bild einer Geste füllt seine Kacheln: das längste Bild war beim Foto 14,7 ms (vorher 39), Kritzel 11,9 (15), PaintCraft 12–15 (14,5), Diagramm 6,3 (26), hier ohne die 5-ms-Grenze, die für Skripte nicht gilt. Das Bild danach kostet genau ein Bild wie vorher, wer also alle 200 ms ruckelt, zahlt fast so viel wie zuvor. Bei einem kleinen Fenster oder einer kleinen Zeichnung bringt das alles entsprechend weniger.
+
+Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 16–23 MiB je nach Zustand, mit Leinwänden je nach Zahl der Kacheln: 50 MiB (Kritzel, PaintCraft: 32 Kacheln, 8 MiB), 82 MiB (Foto 75 Kacheln, 19 MiB; Diagramm 82, 21 MiB), 146 MiB nach einem Zoom über viele Stufen (188–245 Kacheln, 48–62 MiB). Der Rest ist Staging des Hochladens (ein ganzes Bild im Ring) und Blockreste. Nach 30 s ohne Bewegung gehen die Kacheln. Eine Leinwand, die nie bewegt wird, kostet nichts.
+
+Größe, Release, gegen den Stand davor: gallery Windows 4 153 856 → 4 201 984 Byte (+48 128), PaintCraft 8 624 128 → 8 677 376 (+53 248), gallery Linux 4 441 480 → 4 442 808 (+1 328), Browser 3 542 127 → 3 584 472 (+42 345), simd 3 481 482 → 3 531 406 (+49 924), threads 3 490 369 → 3 496 433 (+6 064). Unter Linux kommt fast nichts dazu, im Browser ist die Spanne so groß, dass das nach Inlining-Schwankung aussieht; nachgegangen bin ich dem nicht. Keine Vulkan-Zeichenkette in beiden.
+
+### Was fehlt
+
+- Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
+- Beim Verschieben über eine Geste hinweg wäre die Kachel oft schon das richtige Bild; dass das Bild danach trotzdem gezeichnet wird, kostet ein Bild, ist aber der Beweis in Ruhe.
 - Eine verschobene Ebene wird neu gezeichnet und ganz hochgeladen. Ihr deckendes Inneres könnte in der Textur bleiben, nur der
   durchscheinende Rand müsste neu. Das setzt voraus, dass Pixel beim Verschieben gleich bleiben: der Rasterer rechnet in
   absoluten f32-Koordinaten, abgerundete Ecken, Kreise und Linien ändern sich (siehe `scrollcopy.rs`). Nicht gebaut.
 - Durchscheinende Bilder, Bilder in höheren Ebenen und unter 256 × 256 bleiben auf der CPU. Die Bildränder (eine Zelle breit) laufen weiter über den Grund.
-- `Cmd::Custom` (Bildansicht, Leinwände) gar nicht: das ist G3c.
+- Andere `Cmd::Custom` (Diagramme von `chart`, Timeline, Terminal) bleiben auf der CPU; `ui.canvas_gpu` gibt es auch für sie, wenn es sich lohnt.
 - Kein teilweises Zeichnen in die Swapchain (`VK_KHR_incremental_present`): jedes Bild zeichnet das
   ganze Fenster, auch für ein Blinken. Billig, aber nicht nichts auf einer schwachen GPU.
 - Scroll-Kopien laufen im Framebuffer; die Textur bekommt die verschobenen Zellen neu (die GPU könnte sie
@@ -528,6 +619,12 @@ plus 0,7 MiB CPU-Speicher für die Pixel darunter, ein Dialog 2,3 + 1,1 MiB, Dun
 | `jfgui_GPU_LAYERS=0` | die UI-Ausgabe hält eine Textur je Fenster: keine Ebenen, keine Bilder ([Ebenen und Bilder](#ebenen-und-bilder)) |
 | `jfgui_GPU_IMAGES=0` | keine Bilder als Texturen, Ebenen bleiben |
 | `jfgui_GPU_IMAGE_MB=n` | Budget der Bildtexturen (Vorgabe 256) |
+| `jfgui_GPU_CANVAS=0` | keine Leinwand nutzt Kacheln ([Leinwände](#leinwände)) |
+| `jfgui_GPU_CANVAS_CPU=a,b` | die so benannten Leinwände (`image`, `diagram`, `kritzel`, `paintcraft`) zeichnen auf der CPU |
+| `jfgui_GPU_CANVAS_PAN=a,b` | sie verschieben nur aus Kacheln, ein Zoom läuft über die CPU |
+| `jfgui_GPU_CANVAS_ZOOM=a,b` | sie zoomen auch aus Kacheln, was immer das Widget gewählt hat |
+| `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128) |
+| `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
