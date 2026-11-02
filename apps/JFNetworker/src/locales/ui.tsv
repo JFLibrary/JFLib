@@ -2157,3 +2157,60 @@ Sitzungen jetzt: {}, halboffen: {} (höchstens {}). Begonnen: {}, abgelaufen: {}
 Gerade läuft keine Sitzung. Eine Sitzung beginnt, wenn eine Klasse mit „inspect“ das erste Paket einer Verbindung durchlässt.	No session is running. A session begins when a class with “inspect” lets the first packet of a connection through.
 Die ersten {} von {}; alle zeigt „show policy-map type inspect zone-pair sessions“.	The first {} of {}; “show policy-map type inspect zone-pair sessions” shows all.
 Sitzung {}: {} {} nach {}, {}	Session {}: {} {} to {}, {}
+Alle Fragen von vorn	All questions from the start
+Alle Versuche sind verbraucht. Fortschritt zurücksetzen in der Kursübersicht gibt sie zurück.	All attempts are used up. Reset progress in the course overview gives them back.
+Auf der Zeichenfläche wählen	Choose on the canvas
+Bestanden	Passed
+Bestanden ab {} %.	Pass from {} %.
+Bestes Ergebnis bisher: {} %.	Best result so far: {} %.
+Bringen Sie die Einträge in die richtige Reihenfolge.	Put the entries in the right order.
+Der nächste Schritt des Kurses; diese Fehlersuche bleibt offen	The next step of the course; this fault hunt stays open
+Diagnose	Diagnosis
+Die Antwort zählt erst beim Abgeben.	The answer only counts when handed in.
+Die Zeit ist um: abgegeben wurde, was bis dahin da stand.	Time is up: what stood there by then was handed in.
+Diese Fehlersuche noch einmal aus ihrer Datei laden	Load this fault hunt from its file again
+Dieser Schritt ist noch gesperrt	This step is still locked
+Dieser Schritt lässt sich nicht öffnen. Das stimmt mit seiner Datei nicht:	This step cannot be opened. This is wrong with its file:
+Dieser Versuch wird dann bewertet und lässt sich nicht mehr ändern.	This attempt is then graded and can no longer be changed.
+Ein begonnener Versuch wird nicht gespeichert: Nach einem Neustart des Programms beginnt er von vorn.	An attempt in progress is not saved: after a restart of the program it starts over.
+Eine Antwort ist richtig.	One answer is right.
+Er öffnet sich, wenn die Schritte davor erledigt sind, die er verlangt.	It opens when the earlier steps it requires are done.
+Erklärung zu Frage {}	Explanation of question {}
+Frage {}	Question {}
+Frage {} von {}	Question {} of {}
+Ihre Antwort	Your answer
+Ihre Reihenfolge: {}	Your order: {}
+Keine Antwort gewählt	No answer chosen
+Keine Antwort.	No answer.
+Klicken Sie auf das Gerät oder Kabel, das die Ursache ist.	Click the device or cable that is the cause.
+Mehrere Antworten können richtig sein.	Several answers can be right.
+Neu beginnen	Start over
+Neuer Versuch	New attempt
+Nicht bestanden	Not passed
+Noch gesperrt	Still locked
+Noch nicht richtig.	Not right yet.
+Noch ohne Antwort: {}	Still without an answer: {}
+Richtig ist: {}	Right is: {}
+Richtig.	Right.
+Richtig: {}	Right: {}
+Sie geben einmal ab; danach zeigt der Test Punkte und Erklärungen. Die Zeit läuft, sobald Sie beginnen, auch auf anderen Seiten.	You hand in once; then the test shows points and explanations. The time runs as soon as you begin, on other pages too.
+Teilweise richtig: {} von {} Punkten.	Partly right: {} of {} points.
+Test abgeben?	Hand in the test?
+Test beginnen	Begin the test
+Tragen Sie Ihre Antwort ein.	Enter your answer.
+Tragen Sie eine Zahl ein.	Enter a number.
+Wahl abbrechen	Cancel choosing
+Zahl	Number
+beliebig viele Versuche	any number of attempts
+keine Zeitgrenze	no time limit
+noch {} von {} Versuchen	{} of {} attempts left
+{} (Ihre Wahl)	{} (your choice)
+{} Fragen	{} questions
+{} von {} Punkten	{} of {} points
+{} von {} Punkten · {} % · bestanden	{} of {} points · {} % · passed
+{} von {} Punkten · {} %, bestanden ab {} %	{} of {} points · {} %, pass from {} %
+{}, bestes Ergebnis {} %	{}, best result {} %
+{}, gesperrt	{}, locked
+Üben: Prüfen Sie jede Frage, so oft Sie wollen. Die Erklärung kommt gleich dazu.	Practice: check each question as often as you like. The explanation comes with it.
+„{}“ nach oben	Move “{}” up
+„{}“ nach unten	Move “{}” down

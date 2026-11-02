@@ -13,6 +13,9 @@
 //   project(n, ui)                every active fault (nothing selected)
 //   concerns(fault, devs, links)  a fault is about these devices or cables
 //
+// A lab that locks the faults (Lab::lock, AK2) has none of these cards: the learner finds what is broken
+// and repairs it as a real one would.
+//
 // Every injection and every heal goes through the document (Doc::inject, heal, heal_all in
 // doc/faults.rs): jfn_sim's fault actions (Action::Fault, Heal, HealAll), one undo step each --
 // undo heals an injected fault, redo injects it again, an undone heal brings the faults back
@@ -136,6 +139,9 @@ fn refused(n: &mut Net, of: u32, text: &'static str) {
 
 /// the card of a device: power off, a service stopped, a slower disk; its faults
 pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     let Some(d) = n.doc.proj.device(id).cloned() else { return };
     let links: Vec<u32> = n.doc.proj.links.iter().filter(|l| l.a.dev == id || l.b.dev == id).map(|l| l.id).collect();
     let eng = n.doc.sim.engine();
@@ -258,6 +264,9 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
 
 /// the card of a cable: pulled, worse (delay, loss, rate); its faults
 pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     let Some(l) = n.doc.proj.link(id).cloned() else { return };
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     head(n, ui, t("Fehler einspielen"));
@@ -308,6 +317,9 @@ pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
 
 /// the card of a selection: its devices in a partition against the rest; their faults
 pub(crate) fn several(n: &mut Net, ui: &mut Ui, devs: &[u32], links: &[u32]) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     if !devs.is_empty() {
         head(n, ui, t("Partition"));
@@ -326,7 +338,7 @@ pub(crate) fn several(n: &mut Net, ui: &mut Ui, devs: &[u32], links: &[u32]) {
 
 /// every active fault (the project's page), when there is one
 pub(crate) fn project(n: &mut Net, ui: &mut Ui) {
-    if n.doc.sim.engine().active_faults().next().is_none() {
+    if crate::workspace::task::lock(n).faults || n.doc.sim.engine().active_faults().next().is_none() {
         return;
     }
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);

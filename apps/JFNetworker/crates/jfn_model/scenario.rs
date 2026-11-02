@@ -6,6 +6,9 @@
 //   parse_expectation("LB1 svc lb metric requests >= 10 over 5s") -> Expect   one
 //                                                expectation alone (the checks of a lab's goals;
 //                                                a leading "expect" is allowed); Expect::dev
+//   parse_fault_text("link R1 Gi0/1 for 5s") -> (FaultSpec, Option<dur>)   one fault alone (a lab's
+//                                                start_faults; a leading "fault" is allowed);
+//                                                spec.devices() / spec.cable()
 //
 // One step per line, "#" starts a comment.  A step may start with "at TIME" (virtual time
 // since the start); without it, it happens when the previous steps are done.
@@ -519,11 +522,8 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
         ["series", file] => StepKind::Series(String::from(*file)),
         ["print", text @ ..] => StepKind::Print(text.join(" ")),
         ["fault", rest @ ..] => {
-            let (rest, dur) = match rest {
-                [r @ .., "for", d] => (r, Some(parse_duration(d).filter(|&x| x > 0).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zeitangabe (z. B. 250ms, 1.5s).", d))?)),
-                r => (r, None),
-            };
-            StepKind::Fault { fault: parse_fault(rest)?, dur }
+            let (fault, dur) = fault_words(rest)?;
+            StepKind::Fault { fault, dur }
         }
         ["heal", rest @ ..] => StepKind::Heal(parse_heal(rest)?),
         ["move", dev, x, y] => {
@@ -683,6 +683,45 @@ fn parse_resize(dev: &str, w: &[&str]) -> Result<StepKind, String> {
         return Err(String::from("resize braucht \u{201e}model NAME\u{201c} oder Werte wie \u{201e}cores 8\u{201c}, \u{201e}ram 32G\u{201c}."));
     }
     Ok(StepKind::Resize { dev: String::from(dev), hw, down })
+}
+
+/// the words after "fault", with or without "for DURATION"
+fn fault_words(w: &[&str]) -> Result<(FaultSpec, Option<u64>), String> {
+    let (rest, dur) = match w {
+        [r @ .., "for", d] => (r, Some(parse_duration(d).filter(|&x| x > 0).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zeitangabe (z. B. 250ms, 1.5s).", d))?)),
+        r => (r, None),
+    };
+    Ok((parse_fault(rest)?, dur))
+}
+
+/// one fault as a scenario writes it, with or without the "fault" in front (a lab's start_faults); the
+/// German reason when it does not parse
+pub fn parse_fault_text(s: &str) -> Result<(FaultSpec, Option<u64>), String> {
+    let w = words(s.trim())?;
+    let ws: Vec<&str> = w.iter().map(String::as_str).collect();
+    match ws.as_slice() {
+        [] | ["fault"] => Err(String::from("Der Fehler ist leer.")),
+        ["fault", rest @ ..] => fault_words(rest),
+        rest => fault_words(rest),
+    }
+}
+
+impl FaultSpec {
+    /// the devices it names
+    pub fn devices(&self) -> Vec<&str> {
+        match self {
+            FaultSpec::Link { dev, .. } | FaultSpec::Impair { dev, .. } | FaultSpec::Power { dev } | FaultSpec::Stop { dev, .. } => alloc::vec![dev.as_str()],
+            FaultSpec::Disk { dev, .. } | FaultSpec::Cpu { dev, .. } | FaultSpec::Mem { dev, .. } => alloc::vec![dev.as_str()],
+            FaultSpec::Partition { a, b } => a.iter().chain(b.iter()).map(String::as_str).collect(),
+        }
+    }
+    /// the port whose cable it is about (a device and a port)
+    pub fn cable(&self) -> Option<(&str, &str)> {
+        match self {
+            FaultSpec::Link { dev, port } | FaultSpec::Impair { dev, port, .. } => Some((dev, port)),
+            _ => None,
+        }
+    }
 }
 
 /// the words after "fault" (without "for DURATION")

@@ -244,10 +244,22 @@ pub fn check_project(proj: &Project) -> (Vec<String>, usize) {
         }
     }
     match jfn_sim::Engine::from_project(proj) {
-        Ok(e) => {
+        Ok(mut e) => {
             for d in &proj.devices {
                 for b in e.boot_errors(d.id) {
                     lines.push(format!("Fehler: {}, startup-config Zeile {}: {}\n    {}\n", d.name, b.line, b.text, b.msg));
+                    errors += 1;
+                }
+            }
+            // the faults its lab starts with: on this engine, as when it loads
+            let (acts, bad) = jfn_sim::runner::start_actions(proj, &e);
+            for why in bad {
+                lines.push(format!("Fehler: Startfehler {}\n", why));
+                errors += 1;
+            }
+            for a in acts {
+                if let Err(x) = e.apply(a) {
+                    lines.push(format!("Fehler: Startfehler: {}\n", x.msg().text()));
                     errors += 1;
                 }
             }
@@ -263,7 +275,7 @@ pub fn check_project(proj: &Project) -> (Vec<String>, usize) {
 /// what is wrong with the course in folder `dir` (without a trailing '/'): its lines, how many of
 /// them keep it from being offered.  The labs get what `check` finds as well.
 pub fn check_course(dir: &str) -> (Vec<String>, usize) {
-    use jfn_model::academy::{lab_issues, load, safe_path, StepKind, COURSE_FILE, LANGS};
+    use jfn_model::academy::{fault_issues, lab_issues, load, quiz_issues, safe_path, StepKind, COURSE_FILE, LANGS};
     let read = |rel: &str| plat::read_file(&format!("{}/{}", dir, rel)).map(|b| String::from_utf8_lossy(&b).into_owned());
     let exists = |rel: &str| plat::file_exists(&format!("{}/{}", dir, rel)) == 1;
     let (course, mut found) = load(base_name(dir), read(COURSE_FILE).as_deref(), &exists);
@@ -278,15 +290,20 @@ pub fn check_course(dir: &str) -> (Vec<String>, usize) {
                     }
                 }
             }
-            Some(StepKind::Lab) => {
+            Some(k @ (StepKind::Lab | StepKind::Fault)) => {
                 if let Some(t) = read(&s.file) {
-                    found.extend(lab_issues(&s.id, &t));
+                    found.extend(if k == StepKind::Lab { lab_issues(&s.id, &t) } else { fault_issues(&s.id, &t) });
                     if let Ok(p) = Project::from_text(&t) {
                         labs.push((s.file.clone(), p));
                     }
                 }
             }
-            _ => {}
+            Some(k @ (StepKind::Quiz | StepKind::Exam)) => {
+                if let Some(t) = read(&s.file) {
+                    found.extend(quiz_issues(&s.id, k, &t));
+                }
+            }
+            None => {}
         }
     }
     let mut errors = found.iter().filter(|p| p.fatal).count();

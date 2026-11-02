@@ -1696,3 +1696,36 @@ Die Richtlinie {} gilt für kein Zonenpaar und wirkt deshalb nicht.	Policy {} ap
 Zone {} hat kein Zonenpaar mit Richtlinie: nichts kommt aus ihr heraus oder in sie hinein.	Zone {} has no zone pair with a policy: nothing gets out of it or into it.
 Das Zonenpaar {} ({} nach {}) hat keine Richtlinie und verwirft alles.	Zone pair {} ({} to {}) has no policy and drops everything.
 Diese Firewall gibt es nur auf Linux-Geräten.	This firewall exists on Linux devices only.
+Das Quiz hat keine Fragen.	The quiz has no questions.
+Das Quiz hat mehr als {} Fragen.	The quiz has more than {} questions.
+Das ist keine Quizdatei.	This is not a quiz file.
+Der Titel des Quiz fehlt auf {}.	The quiz's title is missing in {}.
+Die Bestehensgrenze (pass) ist {}; höchstens 100 %.	The pass mark (pass) is {}; 100 % at most.
+Die Datei enthält kein Quiz.	The file holds no quiz.
+Englisch	English
+Frage {} braucht mindestens zwei Antworten.	Question {} needs at least two answers.
+Frage {} braucht mindestens zwei Einträge zum Ordnen.	Question {} needs at least two entries to put in order.
+Frage {} hat keine Erklärung.	Question {} has no explanation.
+Frage {} hat keine richtige Antwort.	Question {} has no right answer.
+Frage {} hat mehr als {} Antworten.	Question {} has more than {} answers.
+Frage {} hat mehr als {} Einträge zum Ordnen.	Question {} has more than {} entries to put in order.
+Frage {} hat {} richtige Antworten; bei „single“ ist es genau eine.	Question {} has {} right answers; with “single” it is exactly one.
+Frage {} ist 0 Punkte wert.	Question {} is worth 0 points.
+Frage {} nennt keine akzeptierten Muster (accept).	Question {} names no accepted patterns (accept).
+Frage {}, Antwort {}: der Text fehlt auf {}.	Question {}, answer {}: the text is missing in {}.
+Frage {}, Antwort {}: die Erklärung fehlt auf {}.	Question {}, answer {}: the explanation is missing in {}.
+Frage {}, Eintrag {}: der Text fehlt auf {}.	Question {}, entry {}: the text is missing in {}.
+Frage {}: das Muster „{}“ lässt sich nicht übersetzen: {}	Question {}: the pattern “{}” does not compile: {}
+Frage {}: der Text fehlt auf {}.	Question {}: the text is missing in {}.
+Frage {}: der richtige Wert (value) ist keine Zahl.	Question {}: the right value (value) is not a number.
+Frage {}: die Art „{}“ gibt es nicht (single, multi, text, number, order).	Question {}: there is no kind “{}” (single, multi, text, number, order).
+Frage {}: die Erklärung fehlt auf {}.	Question {}: the explanation is missing in {}.
+Frage {}: die Toleranz (tolerance) ist keine Zahl ab 0.	Question {}: the tolerance (tolerance) is not a number from 0.
+Ihre Antwort: {}	Your answer: {}
+Schritt {}: Zeitlimit und Versuche gelten nur in einem Test (kind „exam“).	Step {}: a time limit and attempts only apply to a test (kind “exam”).
+Schritt {}: der verlangte Schritt {} steht nicht davor.	Step {}: the required step {} does not come before it.
+Schritt {}: eine Fehlersuche wird bewertet; die Datei hat keine Kriterien (assess).	Step {}: a fault hunt is graded; the file has no criteria (assess).
+Startfehler {}: an {} {} steckt kein Kabel.	Start fault {}: no cable is plugged into {} {}.
+Startfehler {}: das Gerät {} gibt es im Projekt nicht.	Start fault {}: the project has no device {}.
+Startfehler {}: „{}“ ist kein Fehler: {}	Start fault {}: “{}” is no fault: {}
+Welches Gerät oder Kabel ist die Ursache?	Which device or cable is the cause?

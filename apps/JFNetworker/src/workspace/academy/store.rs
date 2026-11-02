@@ -7,6 +7,7 @@
 //   list(root) -> Vec<Entry>          every folder with its course, sorted by name: a bad one is an
 //                                     entry with its message and hurts nothing else
 //   lesson(dir, file, lang) -> (text, lang)   the lesson in that language, else in the other
+//   read_quiz(dir, file) -> text      a quiz's or test's file
 //   image(dir, addr) -> Option<bytes> a lesson's picture: only what jfn_model::academy::image_file allows
 //   read_progress(path) / write_progress(path, &progress)   missing or corrupt: empty
 //
@@ -109,6 +110,11 @@ pub(crate) fn list(root: &str) -> Vec<Entry> {
 /// a lesson's text in `lang`, else in the other language, with the language it is in
 pub(crate) fn lesson(dir: &str, file: &str, lang: &str) -> Option<(String, &'static str)> {
     academy::lesson_files(file, lang).into_iter().find_map(|(path, l)| read_text(&format!("{}/{}", dir, path), LESSON_MAX).map(|t| (t, l)))
+}
+
+/// the text of a quiz's or test's file (the path was checked with the course)
+pub(crate) fn read_quiz(dir: &str, file: &str) -> Option<String> {
+    read_text(&format!("{}/{}", dir, file), COURSE_MAX)
 }
 
 /// the bytes of a lesson's picture: the view asks with the address it made from the course's folder

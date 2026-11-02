@@ -2,7 +2,7 @@
 # the Akademie with courses that are not all right (tests/fixtures/academy): a bad path and an unknown step
 # kind, a version from the future, a folder without a course.json: each a card with its message, and they
 # hurt nothing else; a lesson in one language only, with the note; links that are refused, pictures that are
-# not read; quizzes, fault hunts and exams in the outline as not available, without a button.  Ids: 130048
+# not read; quizzes, fault hunts and exams that are only announced (no file yet) in the outline as not available, without a button.  Ids: 130048
 # + i the cards of the start page in the order of the folders (halb, kaputt, neu, ohne), 135170 back, 135171
 # Weiter, 136192 + k the steps of a course (quiz 136195, fault hunt 136196, exam 136197), 135202 a lesson's Weiter.
 size 1280 800
@@ -32,7 +32,7 @@ key esc
 click button:"Kurs: ohne"
 expect text:"Die Datei course.json fehlt oder lässt sich nicht lesen." exists
 key esc
-# ---- what AK2 brings: in the outline, disabled, with its reason; Weiter passes over it
+# ---- announced, with no file yet: in the outline, disabled, with its reason; Weiter passes over it
 click button:"Kurs: Halb fertig"
 expect text:"Erfahrene · 5 Min." exists
 expect text:"0 von 4 Schritten erledigt" exists

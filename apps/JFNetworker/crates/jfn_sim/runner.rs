@@ -4,6 +4,8 @@
 //
 //   run_scenario(&Project, &Scenario, name) -> Outcome { report, ok, expects, failed, pcap,
 //   series }
+//   start_actions(&Project, &Engine) -> (actions, refusals)   the faults a project's lab starts with
+//                                         (AK2, Lab::start_faults), with their names resolved
 //
 // The steps go through the Inline driver like the user interface's commands (Cmd::Cli,
 // Cmd::Interrupt for "^C", RunFor, Apply).  A report line is "    12.000004104  WHO  text":
@@ -30,6 +32,8 @@
 // "deploy ..." starts a rolling deployment (A2, deploy.rs): the hosts are a group of the
 // project or names with commas, its log lines follow in the report with their times
 // ("deploy N: ...") after the run they fell into.
+// A project whose lab has start faults gets them before the first step, each with a line
+// "Startfehler N: ..." (the window applies the same actions: doc/sim.rs).
 // "resize DEV ..." gives a device other hardware (Action::Resize, res.rs): the figures it names on
 // what the device has (a model's where it names one); its line says what it has now; with a
 // downtime the reboot is a fault whose end gets its line like any other.
@@ -204,6 +208,22 @@ fn fault_of(p: &Project, e: &Engine, f: &FaultSpec) -> Result<Fault, String> {
     })
 }
 
+/// the faults a project's lab starts with as actions, in the order of the file, and why others could not
+/// be resolved (a lab's issues name those too)
+pub fn start_actions(p: &Project, e: &Engine) -> (Vec<Action>, Vec<String>) {
+    let (mut acts, mut bad) = (Vec::new(), Vec::new());
+    let Some(lab) = &p.lab else {
+        return (acts, bad);
+    };
+    for f in &lab.start_faults {
+        match jfn_model::scenario::parse_fault_text(f).and_then(|(spec, dur)| fault_of(p, e, &spec).map(|fault| Action::Fault { fault, dur })) {
+            Ok(a) => acts.push(a),
+            Err(why) => bad.push(format!("{}: {}", f, why)),
+        }
+    }
+    (acts, bad)
+}
+
 /// the hardware a "resize" step means on a device: what it has now (or its model's), a model's
 /// figures it names, the single ones it names
 fn hw_step(e: &Engine, id: u32, spec: &HwSpec) -> Result<Hw, String> {
@@ -302,6 +322,24 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
     let mut d = Inline::new(eng);
     drain(&mut d, &mut r);
     let (mut expects, mut failed, mut ok) = (0u32, 0u32, true);
+    let (acts, bad) = start_actions(&proj, &d.eng);
+    for a in acts {
+        let id = d.eng.next_fault_id();
+        match d.send(Cmd::Apply(a), 0) {
+            Ok(_) => {
+                let text = d.eng.faults().iter().find(|m| m.id == id).map_or_else(String::new, |m| m.text.clone());
+                r.line(0, "--", &format!("Startfehler {}: {}", id, text));
+            }
+            Err(e) => {
+                r.line(0, "FEHLER", &format!("Startfehler: {}", e.msg().text()));
+                ok = false;
+            }
+        }
+    }
+    for why in bad {
+        r.line(0, "FEHLER", &format!("Startfehler {}", why));
+        ok = false;
+    }
     let mut pcap: Option<String> = None;
     let mut series: Option<String> = None;
     let mut healed: BTreeSet<u32> = BTreeSet::new();

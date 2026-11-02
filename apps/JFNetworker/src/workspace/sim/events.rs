@@ -19,7 +19,8 @@
 // from, "Bei" the one that decided; "Typ" the protocol the decision is about (the question a
 // router asks before it forwards a ping is ARP), with its category's colour; what was dropped
 // says so.  The lab's faults (Engine::faults) have a lane of their own on the timeline: a tick
-// in the error colour where each one started and where it was healed.
+// in the error colour where each one started and where it was healed.  A lab that locks the faults
+// (Lab::lock, AK2) has no such lane and no lines of their starts and ends.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -169,6 +170,7 @@ fn secs_f(t: Ns) -> f64 {
 pub(crate) fn refresh(n: &mut Net, dark: bool) {
     let h = hidden(n);
     let devs = super::devices(n).to_vec();
+    let hide_faults = crate::workspace::task::lock(n).faults;
     let eng = n.doc.sim.engine();
     let ev = &mut n.sim.ev;
     // the ring of the recording dropped its oldest ones
@@ -179,6 +181,9 @@ pub(crate) fn refresh(n: &mut Net, dark: bool) {
         rebuild = true;
     }
     for e in eng.trace.events_after(ev.last) {
+        if hide_faults && matches!(e.note, jfn_sim::Note::FaultStart { .. } | jfn_sim::Note::FaultEnd { .. }) {
+            continue;
+        }
         let hop = e.hop.and_then(|id| eng.trace.hop(id));
         let hm = hop.map_or(0, |x| x.mask);
         // IPv6 in place of IPv4 for decisions about IPv6 traffic (DevEvent::mask)
@@ -233,7 +238,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_begin(0, BOX_V, 0);
     chips(n, ui);
     // the timeline as high as its lanes (14 DIP each below the axis), unless dragged
-    let lanes = (n.sim.ev.ticks.iter().filter(|t| !t.is_empty()).count() + !n.doc.sim.engine().faults().is_empty() as usize).max(1) as i32;
+    let hide_faults = crate::workspace::task::lock(n).faults;
+    let lanes = (n.sim.ev.ticks.iter().filter(|t| !t.is_empty()).count() + (!hide_faults && !n.doc.sim.engine().faults().is_empty()) as usize).max(1) as i32;
     let mut tl_h = if n.sim.ev.tl_h > 0 { n.sim.ev.tl_h } else { (28 + 16 * lanes).clamp(70, 160) };
     ui.next_size(-1, -1);
     ui.split_begin(ID_EV_TL_SPLIT, tl_h, true);
@@ -294,6 +300,7 @@ fn timeline(n: &mut Net, ui: &mut Ui) {
     let now = n.doc.sim.engine().now();
     let shown = n.doc.sim.view_time();
     let sim = n.sim.sim_mode;
+    let hide_faults = crate::workspace::task::lock(n).faults;
     let ev = &mut n.sim.ev;
     // real time: the playhead follows the live end over the whole span.  The simulation mode:
     // the playhead stands at the moment shown, and the view fits the recorded ticks (the
@@ -316,7 +323,7 @@ fn timeline(n: &mut Net, ui: &mut Ui) {
     };
     // the lab's faults (U6a): a lane with their starts and ends in the error colour
     let crit = ui.color(T_CRIT);
-    let mut faults: Vec<(f64, u32)> = n.doc.sim.engine().faults().iter().flat_map(|m| core::iter::once(m.at).chain(m.healed)).map(|x| (secs_f(x), crit)).collect();
+    let mut faults: Vec<(f64, u32)> = if hide_faults { Vec::new() } else { n.doc.sim.engine().faults().iter().flat_map(|m| core::iter::once(m.at).chain(m.healed)).map(|x| (secs_f(x), crit)).collect() };
     faults.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut tracks: Vec<TlTrack> = Vec::new();
     for (k, c) in CATS.iter().enumerate() {

@@ -1,26 +1,97 @@
 {
   "format": "jfn-course",
   "version": 1,
-  "course_version": 1,
-  "title": ["Beispielkurs: das erste Netz", "Sample course: your first network"],
+  "course_version": 2,
+  "title": [
+    "Beispielkurs: das erste Netz",
+    "Sample course: your first network"
+  ],
   "summary": [
-    "Was ein Netz ist, wozu Adressen dienen, und ein erstes Labor im Simulator.",
-    "What a network is, what addresses are for, and a first lab in the simulator."
+    "Was ein Netz ist, wozu Adressen dienen, ein erstes Labor im Simulator, dann ein Quiz, eine Fehlersuche und ein Test.",
+    "What a network is, what addresses are for, a first lab in the simulator, then a quiz, a fault hunt and a test."
   ],
   "level": "beginner",
-  "minutes": 15,
+  "minutes": 40,
   "units": [
     {
-      "title": ["Grundlagen", "The basics"],
+      "title": [
+        "Grundlagen",
+        "The basics"
+      ],
       "steps": [
-        { "id": "netz", "kind": "lesson", "title": ["Was ist ein Netz?", "What is a network?"], "file": "01-netz.md" },
-        { "id": "adressen", "kind": "lesson", "title": ["Adressen", "Addresses"], "file": "02-adressen.md" }
+        {
+          "id": "netz",
+          "kind": "lesson",
+          "title": [
+            "Was ist ein Netz?",
+            "What is a network?"
+          ],
+          "file": "01-netz.md"
+        },
+        {
+          "id": "adressen",
+          "kind": "lesson",
+          "title": [
+            "Adressen",
+            "Addresses"
+          ],
+          "file": "02-adressen.md"
+        }
       ]
     },
     {
-      "title": ["Übung", "Practice"],
+      "title": [
+        "Übung",
+        "Practice"
+      ],
       "steps": [
-        { "id": "erstes-netz", "kind": "lab", "title": ["PC2 braucht eine Adresse", "PC2 needs an address"], "file": "labs/erstes-netz.jfnet" }
+        {
+          "id": "erstes-netz",
+          "kind": "lab",
+          "title": [
+            "PC2 braucht eine Adresse",
+            "PC2 needs an address"
+          ],
+          "file": "labs/erstes-netz.jfnet"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Wissen prüfen",
+        "Check what you know"
+      ],
+      "steps": [
+        {
+          "id": "wissen",
+          "kind": "quiz",
+          "title": [
+            "Quiz: Netze und Adressen",
+            "Quiz: networks and addresses"
+          ],
+          "file": "quiz/wissen.json"
+        },
+        {
+          "id": "fehlersuche",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: der Server antwortet nicht",
+            "Fault hunt: the server does not answer"
+          ],
+          "file": "labs/fehlersuche.jfnet"
+        },
+        {
+          "id": "pruefung",
+          "kind": "exam",
+          "title": [
+            "Test: das erste Netz",
+            "Test: your first network"
+          ],
+          "file": "quiz/pruefung.json",
+          "requires": [
+            "wissen"
+          ]
+        }
       ]
     }
   ]

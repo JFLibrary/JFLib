@@ -199,8 +199,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Bewertung). Tab läuft durch die Karten, Eingabe öffnet; die Leiste einer automatischen Sicherung
   steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
   ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
-- **Akademie** (Startseite › Lernen oder Datei › Akademie …): Kurse aus Dateien mit Lektionen zum Lesen
-  und Laboren im Simulator, ihr Fortschritt bleibt erhalten (siehe [Akademie](#akademie)).
+- **Akademie** (Startseite › Lernen oder Datei › Akademie …): Kurse aus Dateien mit Lektionen zum Lesen,
+  Laboren im Simulator, Quiz, Tests und Fehlersuche; ihr Fortschritt bleibt erhalten (siehe [Akademie](#akademie)).
 - **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
   Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
@@ -309,7 +309,11 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `start_page_en.uis`, `start_page_shots.uis` | die Seite auf Englisch mit einer geöffneten Vorlage; die Bilder hell und dunkel mit 100 und 150 %, im kleinsten Fenster (auch gescrollt), breit, mit Fokus und Hover, die Vorlage Campus und der Dialog Projektinfo (`build/jfnetworker/start_page_*.png`) |
 | `academy_course.uis` | die Akademie mit dem Beispielkurs (`--academy-dir apps/JFNetworker/academy`, der Fortschritt bleibt im Speicher): die Karte auf der Startseite, Gliederung mit Zuständen und Fortschritt, Lektionen mit Bild, ein Link, Weiter und Vorheriger Schritt, das Labor mit seinen Zielen und der Leiste, hin und zurück ohne neues Laden, Weitergehen ohne Abschluss, Abschließen, die Frage nach ungespeicherten Änderungen, Fortschritt zurücksetzen, Datei › Akademie, die Sprache mitten in einer Lektion, die Tastatur |
 | `academy_files.uis` | Kurse, die nicht in Ordnung sind (`tests/fixtures/academy`): ein Pfad hinaus und eine unbekannte Art, eine Version aus der Zukunft, ein Ordner ohne `course.json`, jeder mit seiner genauen Meldung und ohne Folgen für die anderen; eine Lektion in nur einer Sprache mit dem Hinweis; abgelehnte Links, Bilder außerhalb des Kurses; Quiz, Fehlersuche und Prüfung als „noch nicht verfügbar“ |
+| `academy_quiz.uis` | Quiz und Test im Beispielkurs: Üben mit Erklärungen (falsch, neuer Versuch, teilweise richtig, Text, Zahl, Reihenfolge; das beste Ergebnis in der Gliederung, erledigt, sobald bestanden), ein Test, der auf das Quiz wartet, sein Anfang, ein Versuch mit Zeit, die Frage vor dem Abgeben, das Ergebnis mit Punkten je Frage, ein neuer Versuch, die Zeit, die auf einer anderen Seite abläuft, keine Versuche mehr; Englisch; die Tastatur; Zurücksetzen gibt die Versuche zurück |
+| `academy_fault.uis` | die Fehlersuche im Beispielkurs: das kaputte Netz, was es verbirgt (Probleme, Fehler im Inspektor, Alle Fehler beheben, Aufgabe erstellen, die Fehlerspur der Zeitleiste), die Punkte unterwegs, die Reparatur (ein neues Kabel, das Gateway an der Konsole), die Diagnose per Klick und per Liste, Abgeben, zurück zum Kurs, Neu beginnen |
+| `academy_quiz_shots.uis` | die Bilder von Quiz, Test und Fehlersuche; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/quiz_*.png`, `fault_*.png`) |
 | `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `model.uis`, Gruppe `quiz` | das Quizformat und jede Meldung, was es prüft (keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt, eine fehlende Sprache), die Bewertung jeder Art mit Teilpunkten, Mustern und Toleranz, die Reihenfolge aus dem Seed, Versuche und Zeitgrenze, was in den Fortschritt geht, `requires`; `start_faults` und `lock` samt ihren Standardwerten (ein altes Labor bleibt, wie es war), die Diagnose, die Prüfung, dass etwas nicht gehen darf, Determinismus und Zurückspulen mit Startfehlern; die Fehlersuche des Beispielkurses mit und ohne ihre Lösung |
 | `model.uis`, Gruppe `academy` | das Format (ein guter Kurs und eine gute Kursliste, neuere Version, falsches Format, Pfade, die hinausführen, eine Lektion in einer Sprache, eine unbekannte Art, was eine Lektion verlinkt), der Fortschritt (hin und zurück, kaputte Datei, neue Kursversion), Reihenfolge und Zustände, wo ein Lauf sucht, was die Seite liest und was sie ablehnt; jeder Kurs unter `--academy-dir` (darum nennt `model.uis` den Ordner): seine Dateien in beiden Sprachen, seine Labore mit dem, was `jfn-sim check` findet, ungelöst und gelöst, die Namensregel |
 | `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
 | `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
@@ -581,7 +585,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
 | Zonen und Sitzungen | [`crates/jfn_sim/fw.rs`](crates/jfn_sim/fw.rs), [`fwtrace.rs`](crates/jfn_sim/fwtrace.rs), [`cli/fw.rs`](crates/jfn_sim/cli/fw.rs), [`cli/ufw.rs`](crates/jfn_sim/cli/ufw.rs), [`src/workspace/devwin/fwzones.rs`](src/workspace/devwin/fwzones.rs), [`src/firewalltest.rs`](src/firewalltest.rs) |
 | Firewall-Reiter | [`src/workspace/devwin/firewall.rs`](src/workspace/devwin/firewall.rs), [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs) (`Acls::probe`), [`src/doc/console.rs`](src/doc/console.rs) (`run_lines_running`), [`src/fwguitest.rs`](src/fwguitest.rs) | Regeln, NAT und Test im Gerätefenster als Formulare über den Befehlen, sein Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
-| Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs) | Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
+| Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_model/quiz.rs`](crates/jfn_model/quiz.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`, `quiz.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs), [`src/quiztest.rs`](src/quiztest.rs) | Quiz und Tests als Dateien, ihre Bewertung und ihre Seite; Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 | Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
 
@@ -4401,7 +4405,8 @@ Hardware selbst kostet wenig: Gegenüber demselben Lauf ohne Hardware, aber mit 
 kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ihrer Rechenzeit halten.
 ### Akademie
 
-Die Akademie bringt Kurse: Lektionen zum Lesen, dann Üben im Simulator mit Aufgabe und Prüfungen. Sie steht
+Die Akademie bringt Kurse: Lektionen zum Lesen, Üben im Simulator mit Aufgabe und Prüfungen, Quiz und Tests
+mit Auswertung und, für Fortgeschrittene, kaputte Netze zur Fehlersuche. Sie steht
 auf der Startseite unter Lernen als eigene Gruppe über den Laboren und im Menü unter Datei › Akademie …
 (die Liste der Kurse). Kurse sind reine Dateien und nicht Teil des Programms: installierte liegen in
 `data://academy/` (unter Windows `%LOCALAPPDATA%\JFNetworker\academy`), zum Schreiben und Testen nennt
@@ -4417,7 +4422,9 @@ dem Bereich Aufgabe, wie jedes Labor; eine schmale Leiste über der Zeichenfläc
 weitergeht, lässt ihn offen. Solange kein anderes Labor öffnet, bleibt das Projekt unter der Seite, wie es
 ist; erst ein anderes fragt nach ungespeicherten Änderungen. Wie die Startseite tritt die Seite an die
 Stelle von Werkzeugleiste, Dock und Statusleiste, Dialoge und Timer laufen weiter. Tastatur: Tab durch die
-Schritte, Eingabe öffnet, Esc oder Alt+Links zurück.
+Schritte, Eingabe öffnet, Esc oder Alt+Links zurück. Ein **Quiz**, ein **Test** und eine **Fehlersuche** sind
+weiter unten beschrieben; die Gliederung zeigt ihr bestes Ergebnis neben dem Zustand, ein Schritt mit `requires`
+bleibt gesperrt, bis die verlangten Schritte erledigt sind, und „Weiter“ geht daran vorbei.
 
 **Der Ordner eines Kurses:**
 
@@ -4427,7 +4434,8 @@ academy/progress.json           der Fortschritt (schreibt das Programm)
 academy/<kurs>/course.json      der Kurs; der Ordnername ist seine Kennung
 academy/<kurs>/de/*.md          die Lektionen auf Deutsch
 academy/<kurs>/en/*.md          die Lektionen auf Englisch (jede neue Sprache ein Ordner mit ihrem Kürzel)
-academy/<kurs>/labs/*.jfnet     die Labore
+academy/<kurs>/labs/*.jfnet     die Labore und Fehlersuchen
+academy/<kurs>/quiz/*.json      die Quiz und Tests
 academy/<kurs>/img/*            die Bilder (png, jpg, gif, bmp, svg)
 ```
 
@@ -4461,8 +4469,9 @@ academy/<kurs>/img/*            die Bilder (png, jpg, gif, bmp, svg)
 | `minutes` | die ungefähre Dauer |
 | `units[].title`, `units[].steps` | eine Einheit: ihr Titel, ihre Schritte; die Reihenfolge ist die des Kurses |
 | `steps[].id` | kleine Buchstaben, Ziffern, `-`, `_`; eindeutig im Kurs. An ihr hängt der Fortschritt: sie bleibt über neue Versionen des Kurses |
-| `steps[].kind` | `lesson` und `lab` gehen heute; `quiz`, `fault` und `exam` kennt das Format, die Gliederung zeigt sie als „noch nicht verfügbar“; alles andere ist ein Fehler |
-| `steps[].file` | eine Lektion: der Name in den Sprachordnern (`01-netz.md`, auf `.md`); ein Labor: der Pfad im Kursordner (`labs/x.jfnet`) |
+| `steps[].kind` | `lesson`, `lab`, `quiz`, `exam` oder `fault`; alles andere ist ein Fehler |
+| `steps[].file` | eine Lektion: der Name in den Sprachordnern (`01-netz.md`, auf `.md`); ein Labor oder eine Fehlersuche: der Pfad im Kursordner (`labs/x.jfnet`); ein Quiz oder Test: `quiz/x.json`. Ein leeres `file` bei `quiz`, `exam` oder `fault` kündigt den Schritt nur an: Die Gliederung zeigt ihn als „noch nicht verfügbar“ |
+| `steps[].requires` | Kennungen früherer Schritte, die erledigt sein müssen, bevor dieser sich öffnet (Standard: keine); ein späterer oder unbekannter ist ein Fehler |
 
 Fehlende Felder nehmen ihren Standardwert an, unbekannte werden übersprungen. **Pfade** sind relativ und
 bleiben im Kursordner: kein `..`, kein `/` am Anfang, kein Laufwerk, keine Adresse, nur Buchstaben, Ziffern und
@@ -4480,27 +4489,119 @@ Labor; Links ins Web lehnt die Ansicht vorerst mit einer Meldung ab.
 prüft der Simulator, sobald eine Sekunde virtueller Zeit vergangen ist, das Projekt sich geändert hat oder, in
 einem Netz ohne anstehende Ereignisse, eine Konsole wieder ihren Prompt zeigt.
 
+**Ein Quiz oder Test** ist eine JSON-Datei mit den Texten beider Sprachen zusammen. Dieselbe Datei kann beides sein,
+die Art des Schritts entscheidet. Ein `quiz` ist Übung: Jede Frage hat ihr „Prüfen“, die Erklärung kommt sofort, neue
+Versuche sind frei, jede Frage behält das Beste, was sie erreicht hat; der Schritt ist erledigt, sobald die Summe
+besteht. Ein `exam` ist ein Test: Vorher steht da, was er verlangt; dann alle Fragen und die Zeit; einmal abgeben je
+Versuch; danach Punkte je Frage, bestanden oder nicht und alle Erklärungen. Ein bestandener Test erledigt den
+Schritt. Das beste Ergebnis steht in `progress.json`. Die Zeit läuft auf der Uhr des Programms, auch auf anderen
+Seiten; ist sie um, zählt, was bis dahin da stand. Ein begonnener Versuch wird nicht gespeichert, das sagt der Test
+auch; nur abgegebene Versuche zählen. Die Antworten sind Widgets des Programms und stehen in keinem Dokument.
+
+```json
+{
+  "format": "jfn-quiz", "version": 1,
+  "title": ["Netze und Adressen", "Networks and addresses"],
+  "pass": 70, "minutes": 5, "attempts": 3, "shuffle": true,
+  "questions": [
+    { "kind": "single", "points": 2,
+      "stem": ["Was tut ein **Switch**?", "What does a **switch** do?"],
+      "explain": ["Er lernt MAC-Adressen …", "It learns MAC addresses …"],
+      "answers": [
+        { "text": ["Er leitet nach MAC-Adressen weiter", "It forwards by MAC addresses"], "right": true },
+        { "text": ["Er routet", "It routes"], "explain": ["Das tut ein Router.", "That is what a router does."] } ] },
+    { "kind": "text", "stem": ["Welches Netz …?", "Which network …?"], "explain": ["…", "…"],
+      "accept": ["10\\.1\\.2\\.0 ?/ ?24"], "case": false },
+    { "kind": "number", "stem": ["Wie viele Hosts …?", "How many hosts …?"], "explain": ["…", "…"],
+      "value": 254, "tolerance": 0 },
+    { "kind": "order", "stem": ["In welcher Reihenfolge …?", "In what order …?"], "explain": ["…", "…"],
+      "order": [["Zuerst", "First"], ["Dann", "Then"], ["Zuletzt", "Last"]] }
+  ]
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `pass` | ab wie viel Prozent bestanden ist (Standard 100) |
+| `minutes`, `attempts` | Zeitgrenze und Zahl der Versuche eines Tests (Standard: keine); in einem `quiz` gelten sie nicht, `jfn-sim course` sagt das |
+| `shuffle` | Fragen und Antworten je Versuch in anderer Reihenfolge, aus einem Seed je Versuch; ein Lauf ohne Fenster nimmt einen festen, damit Skripte immer gleich laufen |
+| `questions[].kind` | `single`: genau eine richtige Antwort. `multi`: mehrere, mit Teilpunkten: (richtige − falsche Kreuze) ÷ richtige, nie unter 0. `text`: ein Muster aus `accept` muss die ganze Antwort treffen (POSIX erweitert, `.` also als `\\.`), Leerzeichen außen und mehrfache innen zählen nicht, Großschreibung nur mit `"case": true`. `number`: innerhalb `tolerance` um `value`, Komma oder Punkt. `order`: alle Einträge an ihrem Platz; sie starten immer anders, auch ohne `shuffle` |
+| `questions[].stem`, `explain` | Markdown (Bilder relativ zum Kursordner wie in einer Lektion) |
+| `questions[].points` | Punkte (Standard 1) |
+| `answers[].right`, `answers[].explain` | ist richtig; was bei dieser Wahl dazu erscheint (freiwillig) |
+
+`jfn-sim course` nennt jeden Fehler genau: keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt (mit dem
+Grund), ein Wert, der keine Zahl ist, eine fehlende Sprache mit Frage und Antwort. Bis zu 64 Fragen, 12 Antworten je Frage.
+
+**Eine Fehlersuche** (`fault`) ist eine `.jfnet`-Datei, die ein kaputtes Netz enthält und das in ihrem `lab` sagt.
+Sie wird mit [`assess`](#aufgaben-mit-bewertung) bewertet, nicht mit Zielen, denn wer weiterarbeitet, kann das Netz
+vor dem Abgeben wieder kaputt machen. Abgeben zeigt das Ergebnis; ab `pass` Prozent ist der Schritt erledigt, „Neu
+beginnen“ auf der Leiste lädt die Datei noch einmal.
+
+```json
+"lab": {
+  "title": ["Der Server antwortet nicht", "The server does not answer"],
+  "goals": [],
+  "assess": { "feedback": "score", "time_limit_s": 0, "items": [
+    { "what": "check", "checks": ["PC1 reaches 10.0.2.10"], "points": 4, "text": ["PC1 erreicht den Server", "PC1 reaches the server"] },
+    { "what": "check", "checks": ["PC2 not reaches 10.0.2.10", "PC2 reaches 10.0.1.1"], "points": 2, "text": ["PC2 bleibt draußen", "PC2 stays out"] },
+    { "what": "diagnosis", "dev": "R1", "id": 4, "port": "GigabitEthernet0/0/1", "peer": "SRV1", "peer_id": 5, "peer_port": "eth0", "points": 2,
+      "text": ["Welches Kabel war defekt?", "Which cable was faulty?"], "explain": ["Das Kabel …", "The cable …"] }
+    ], "target": { "devices": [], "links": [] } },
+  "start_faults": ["link SRV1 eth0"],
+  "lock": { "problems": true, "faults": true, "answer": true },
+  "pass": 80
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `start_faults` | Fehler, die beim Laden da sind, so geschrieben wie in einem Szenario nach `fault`: `link R1 Gi0/1`, `impair R1 Gi0/1 loss 30%`, `power SRV1`, `stop WEB1 web`, `disk`, `cpu`, `mem`, `partition`, jeweils auch mit `for 30s`. Sie gehen als Aktionen in den Simulator: Zurückspulen spielt sie mit ab. „Simulation zurücksetzen“ bringt sie wieder, nur nicht auf ein Kabel, das seitdem neu ist |
+| `lock.problems` | kein Bereich Probleme, keine Problemzahl an zugeklappten Gruppen |
+| `lock.faults` | keine Fehlerkarten im Inspektor, kein „Wiederherstellen“, kein „Alle Fehler beheben“, keine Spur in Zeitleiste und Diagrammen, keine Zeilen in den Ereignissen |
+| `lock.answer` | kein Bereich „Aufgabe erstellen“, der das Zielnetz zeigt |
+| `pass` | ab wie viel Prozent der Schritt erledigt ist (Standard 100) |
+
+Fehlen `start_faults` und `lock`, bleibt alles, wie es war: Ein älteres Labor verhält sich und speichert sich gleich,
+auch die Felder selbst kommen nur in die Datei, wenn sie gesetzt sind. Mit `lock.faults` repariert man wie im echten
+Netz: Ein gezogenes oder schlechtes Kabel wird gelöscht und neu verbunden, ein Gerät ohne Strom aus- und eingeschaltet,
+ein gestoppter Dienst in seinem Fenster gestartet. `disk`, `cpu`, `mem` und `partition` lassen sich dann nicht beheben;
+sie taugen für eine reine Diagnose.
+
+Die neuen Prüfungen: **`diagnosis`** fragt nach dem Gerät oder Kabel, das schuld ist: `dev` (mit `id`) ein Gerät,
+mit `peer` (`peer_id`, `port`, `peer_port`, die Ports dürfen fehlen) das Kabel zwischen beiden. Die Antwort kommt aus
+einer Liste aller Geräte und Kabel im Bereich Aufgabe oder per Klick auf die Zeichenfläche; sie zählt erst beim Abgeben,
+damit sich die Punktzahl nicht abfragen lässt, ein ersetztes Kabel bleibt dieselbe Antwort, und `explain` erscheint dann.
+**Dass etwas nicht gehen darf**, sagt die vorhandene Form `PC2 not reaches 10.0.2.10`; zusammen mit einer positiven
+Prüfung im selben Kriterium genügt es nicht, das Gerät einfach auszuschalten.
+
+**Die Lösung bleibt in der Datei lesbar**: Zielnetz, richtige Antworten und Diagnosen stehen im Klartext in den
+Dateien des Kurses. Für das Selbststudium ist das gut, für eine sichere Prüfung taugt es nicht.
+
 **`index.json`** ist die Liste, aus der später installiert wird: `format` `"jfn-academy"`, `version`, `courses` mit
 `id`, `title`, `summary`, `level`, `minutes`, `version` (des Inhalts) und `files` (`path`, `size`, `sha256`). Damit
 die Prüfsummen stimmen, hält `.gitattributes` die Bytes unter `apps/JFNetworker/academy/` unverändert.
 
 **`progress.json`** schreibt das Programm sofort beim Erledigen: `format` `"jfn-progress"`, `version`, `courses`, je
-Kurs `steps`, je Schritt `state` (`open`, `done`), `when` (Sekunden seit 1970), `best` (das beste Ergebnis eines
-Tests, später). Eine kaputte oder fehlende Datei bedeutet „noch nichts erledigt“, nie einen Absturz. Sie steht nie in
+Kurs `steps`, je Schritt `state` (`open`, `done`), `when` (Sekunden seit 1970), `best` (das beste Ergebnis in Prozent),
+`tries` (abgegebene Versuche). Eine kaputte oder fehlende Datei bedeutet „noch nichts erledigt“, nie einen Absturz. Sie steht nie in
 der Projektdatei und ist kein Rückgängig-Schritt; „Fortschritt zurücksetzen“ auf der Seite eines Kurses
 fragt vorher. Einträge von Schritten, die ein neuer Kurs nicht mehr hat, bleiben stehen, falls sie wiederkommen. Mit
 `--academy-dir` liegt die Datei in jenem Ordner, ein Lauf ohne Fenster hält sie im Speicher und sieht ohne den
 Schalter gar keine Kurse: Tests berühren die Daten des Benutzers nicht.
 
 **So entsteht ein Kurs:** einen Ordner wie [`academy/beispiel`](academy/beispiel) anlegen, mit
-`jfn-sim course ORDNER` prüfen (Datei, Lektionen in jeder Sprache, Bilder, Links, Labore mit dem, was `jfn-sim
-check` findet; Rückgabe 1, wenn etwas den Kurs verhindert), mit `JFNetworker --academy-dir OBERORDNER` ansehen. Der
+`jfn-sim course ORDNER` prüfen (Datei, Lektionen in jeder Sprache, Bilder, Links, Quiz und Tests, Labore und
+Fehlersuchen mit dem, was `jfn-sim check` findet; Rückgabe 1, wenn etwas den Kurs verhindert), mit `JFNetworker --academy-dir OBERORDNER` ansehen. Der
 Selbsttest prüft jeden Kurs unter `apps/JFNetworker/academy/`.
 
 Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `safe_path`, `image_file`, `lesson_refs`,
-`link_to`, `lab_issues`), `jfn_run::check_course`, `workspace/academy` (`Academy`, `store::place`, `store::list`).
+`link_to`, `lab_issues`, `fault_issues`, `quiz_issues`), `jfn_model::quiz` (`Quiz`, `Question`, `Reply`, `Attempt`, `Plan`,
+`Score`), `jfn_model::lab` (`Lock`, `Lab::start_faults`, `Item::explain`), `jfn_sim::runner::start_actions`,
+`jfn_sim::assess` (`Pick`, `grade_picks`), `jfn_run::check_course`, `workspace/academy` (`Academy`, `store::place`,
+`store::list`, `quiz.rs`).
 
-Noch offen: Quiz, Tests und Fehlersuche (AK2), Installieren aus dem Netz mit Index und Prüfsummen (AK3),
+Noch offen: Installieren aus dem Netz mit Index und Prüfsummen (AK3),
 die Kurse selbst (AK4).
 
 ## Performance

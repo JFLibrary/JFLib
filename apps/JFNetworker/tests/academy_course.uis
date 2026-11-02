@@ -14,7 +14,7 @@ theme light
 # ---- the card, a group of its own above the labs
 expect text:"Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator." exists
 expect button:"Kurs: Beispielkurs: das erste Netz" exists
-expect text:"Einsteiger · 15 Min. · Was ein Netz ist, wozu Adressen dienen, und ein erstes Labor im Simulator." exists
+expect text:"Einsteiger · 40 Min. · Was ein Netz ist, wozu Adressen dienen, ein erstes Labor im Simulator, dann ein Quiz, eine Fehlersuche und ein Test." exists
 expect button:"Campus: ein VLAN für die Studierenden" exists
 expect #129040 focused
 click button:"Kurs: Beispielkurs: das erste Netz"
@@ -23,8 +23,8 @@ expect button:"Leeres Projekt" missing
 expect tab:"Geräte" missing
 expect menu:"Datei" exists
 expect text:"Beispielkurs: das erste Netz" exists
-expect text:"Einsteiger · 15 Min." exists
-expect text:"0 von 3 Schritten erledigt" exists
+expect text:"Einsteiger · 40 Min." exists
+expect text:"0 von 6 Schritten erledigt" exists
 expect #135172 value 0
 expect text:"Grundlagen" exists
 expect text:"Übung" exists
@@ -46,24 +46,24 @@ expect heading:"Was ist ein Netz?" exists
 expect #135200 exists
 expect #135200 focused
 expect image:"Zwei PCs, jeder mit einem Kabel an einem Switch in der Mitte" exists
-expect text:"Schritt 1 von 3" exists
+expect text:"Schritt 1 von 6" exists
 expect "Diese Lektion gibt es noch nicht in Ihrer Sprache" missing
 expect #135201 missing
 expect button:"Weiter" exists
 # a link inside the course: the lesson it names; that is no Weiter, the first stays open
 click link:"nächsten Lektion"
-expect text:"Schritt 2 von 3" exists
+expect text:"Schritt 2 von 6" exists
 expect heading:"Adressen" exists
 expect image:"Links ein Netz mit zwei Hosts, rechts ein zweites Netz mit einem Host; die beiden berühren sich nicht" exists
 expect #135201 exists
 # Vorheriger Schritt, then on with Weiter: now the first is done
 click button:"Vorheriger Schritt"
-expect text:"Schritt 1 von 3" exists
+expect text:"Schritt 1 von 6" exists
 click button:"Weiter"
-expect text:"Schritt 2 von 3" exists
+expect text:"Schritt 2 von 6" exists
 # Esc: to the outline, on the step just left, and the states have moved
 key esc
-expect text:"1 von 3 Schritten erledigt" exists
+expect text:"1 von 6 Schritten erledigt" exists
 expect #135172 value 1
 expect button:"Was ist ein Netz?, erledigt" exists
 expect button:"Adressen, als Nächstes" exists
@@ -74,12 +74,12 @@ expect button:"Fortschritt zurücksetzen" exists
 key alt+left
 expect button:"Leeres Projekt" exists
 expect #130048 focused
-expect text:"1 von 3" exists
+expect text:"1 von 6" exists
 key enter
-expect text:"1 von 3 Schritten erledigt" exists
+expect text:"1 von 6 Schritten erledigt" exists
 # ---- the next open step, through to the lab: the bar, the goals, no file; the first frame of the dock
 click button:"Weiter"
-expect text:"Schritt 2 von 3" exists
+expect text:"Schritt 2 von 6" exists
 click button:"Weiter"
 expect text:"PC2 braucht eine Adresse · Beispielkurs: das erste Netz" exists
 expect button:"Zurück zum Kurs" exists
@@ -91,7 +91,7 @@ expect text:"3 Geräte · 2 Kabel" exists
 # back to the course: the project stays below, the page comes up, the lab is what comes next
 click button:"Zurück zum Kurs"
 expect tab:"Geräte" missing
-expect text:"2 von 3 Schritten erledigt" exists
+expect text:"2 von 6 Schritten erledigt" exists
 expect button:"PC2 braucht eine Adresse, als Nächstes" exists
 expect #136194 focused
 # ... and into the same lab again: nothing is reloaded, no question, the Aufgabe in front (also when
@@ -121,9 +121,11 @@ expect dialog:"Änderungen speichern?" exists
 expect text:"„erstes-netz.jfnet“ hat ungespeicherte Änderungen. Sollen sie gespeichert werden?" exists
 click button:"Abbrechen"
 expect button:"Weiter im Kurs" exists
-# going on without finishing leaves it open: nothing follows the lab, so the outline shows
+# going on without finishing leaves it open: the next step shows, the lab is what comes next in the outline
 click button:"Weiter im Kurs"
-expect text:"2 von 3 Schritten erledigt" exists
+expect text:"Quiz: Netze und Adressen" exists
+key esc
+expect text:"2 von 6 Schritten erledigt" exists
 expect button:"PC2 braucht eine Adresse, als Nächstes" exists
 key esc
 # ---- finishing it: a console line, the goals follow, the step is done, the bar says so
@@ -136,11 +138,12 @@ expect #49169 checked
 expect text:"2 von 2 Zielen erreicht" exists
 expect text:"Geschafft: alle Ziele erreicht." exists
 click button:"Weiter im Kurs"
-expect text:"3 von 3 Schritten erledigt" exists
+expect text:"Quiz: Netze und Adressen" exists
+key esc
+expect text:"3 von 6 Schritten erledigt" exists
 expect #135172 value 3
-expect text:"Kurs abgeschlossen" exists
 expect button:"PC2 braucht eine Adresse, erledigt" exists
-expect #135171 missing
+expect button:"Quiz: Netze und Adressen, als Nächstes" exists
 # Speichern unter proposes the lab's file name, as with every lab
 key esc
 cmd 4
@@ -154,11 +157,11 @@ expect dialog:"Fortschritt zurücksetzen?" exists
 expect text:"Alles, was Sie in „Beispielkurs: das erste Netz“ erledigt haben, gilt dann wieder als offen. Das lässt sich nicht rückgängig machen." exists
 click button:"Abbrechen"
 expect dialog:"Fortschritt zurücksetzen?" missing
-expect text:"3 von 3 Schritten erledigt" exists
+expect text:"3 von 6 Schritten erledigt" exists
 click button:"Fortschritt zurücksetzen"
 click button:"Zurücksetzen"
 expect dialog:"Fortschritt zurücksetzen?" missing
-expect text:"0 von 3 Schritten erledigt" exists
+expect text:"0 von 6 Schritten erledigt" exists
 expect #135172 value 0
 expect button:"Was ist ein Netz?, als Nächstes" exists
 expect button:"Fortschritt zurücksetzen" missing
@@ -175,7 +178,7 @@ expect button:"Kurs: Beispielkurs: das erste Netz" exists
 expect button:"Zurück zum Labor" exists
 expect #135424 focused
 key enter
-expect text:"0 von 3 Schritten erledigt" exists
+expect text:"0 von 6 Schritten erledigt" exists
 expect button:"Alle Kurse" exists
 expect #135171 focused
 key alt+left
@@ -205,7 +208,7 @@ click #136194
 expect dialog:"Änderungen speichern?" exists
 click button:"Abbrechen"
 expect dialog:"Änderungen speichern?" missing
-expect text:"0 von 3 Schritten erledigt" exists
+expect text:"0 von 6 Schritten erledigt" exists
 click #136194
 click button:"Verwerfen"
 expect text:"0 von 2 Zielen erreicht" exists
@@ -225,13 +228,13 @@ key tab
 key tab
 expect #136192 focused
 key enter
-expect text:"Schritt 1 von 3" exists
+expect text:"Schritt 1 von 6" exists
 expect #135200 focused
 key esc
 expect #136192 focused
 # ---- the window's language switched while a lesson shows: the lesson in it, the page's own texts too
 key enter
-expect text:"Schritt 1 von 3" exists
+expect text:"Schritt 1 von 6" exists
 cmd 216
 expect dialog:"Einstellungen" exists
 focus #209344286
@@ -239,14 +242,14 @@ click #209344286
 click "English"
 expect dialog:"Settings" exists
 click button:"Close"
-expect text:"Step 1 of 3" exists
+expect text:"Step 1 of 6" exists
 expect heading:"What is a network?" exists
 expect image:"Two PCs, each with a cable to a switch in the middle" exists
 expect button:"Next" exists
 key esc
 expect text:"Sample course: your first network" exists
 expect text:"The basics" exists
-expect text:"Beginner · 15 min" exists
+expect text:"Beginner · 40 min" exists
 expect button:"Reset progress" missing
 cmd 216
 focus #209344286

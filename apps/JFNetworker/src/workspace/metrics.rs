@@ -459,7 +459,7 @@ impl Metrics {
 /// enabled / checked of CMD_METRICS and CMD_HEAL_ALL (every frame)
 pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_METRICS, if n.shell.dock.visible(P_METRICS) { CF_CHECKED } else { 0 });
-    let any = n.doc.sim.engine().active_faults().next().is_some();
+    let any = n.doc.sim.engine().active_faults().next().is_some() && !crate::workspace::task::lock(n).faults;
     ui.cmd_state(CMD_HEAL_ALL, if any { 0 } else { CF_DISABLED });
 }
 
@@ -477,7 +477,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, _arg: u32) -> bool {
             ui.focus(ID_MET_TREE);
         }
         CMD_HEAL_ALL => {
-            let _ = n.doc.heal_all();
+            if !crate::workspace::task::lock(n).faults {
+                let _ = n.doc.heal_all();
+            }
         }
         _ => return false,
     }
@@ -653,6 +655,7 @@ fn refresh(n: &mut Net) {
         n.metrics.data = None;
         return;
     };
+    let hide_faults = crate::workspace::task::lock(n).faults;
     let eng = n.doc.sim.engine();
     let at = shown_at(n);
     let key = (dev, svc.clone(), eng.series_gen(), at, n.metrics.span, faults_key(n), crate::app::tr::en());
@@ -683,6 +686,7 @@ fn refresh(n: &mut Net) {
     let marks = eng
         .chart_marks(from, end)
         .iter()
+        .filter(|_| !hide_faults)
         .map(|m| {
             let t1 = m.healed.unwrap_or(end).min(end.max(m.at));
             (m.at as f64, t1 as f64, tf("Fehler {}: {}", &[&m.id.to_string(), &crate::app::tr::msg(&m.msg)]))
