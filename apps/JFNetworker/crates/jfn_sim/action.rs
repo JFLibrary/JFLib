@@ -44,6 +44,7 @@
 //                                                      are used, their hit counters (acl.rs)
 //   Nat                                                address translation: interfaces, pools,
 //                                                      rules, timeouts, clearing (nat.rs)
+//   Fw                                                 the zone firewall (fw.rs)
 //   Ip6                                                IPv6: routing, addresses, the link-local
 //                                                      one, autoconfiguration, advertisements,
 //                                                      routes, neighbors (ip6.rs, nd.rs); IPv6
@@ -263,6 +264,8 @@ pub enum Action {
     /// address translation (nat.rs): the side of an interface, pools, rules, timeouts,
     /// clearing translations or counters
     Nat { dev: u32, act: crate::nat::NatAct },
+    /// the zone firewall (fw.rs): zones, members, classes, policies, zone pairs, timers, clearing
+    Fw { dev: u32, op: crate::fw::FwOp },
     /// a change of the IPv6 configuration (ip6.rs, nd.rs)
     Ip6 { dev: u32, set: crate::ip6::Ip6Set },
     /// a change of OSPF's configuration, or "clear ip ospf process" (ospf.rs)
@@ -698,6 +701,7 @@ impl Engine {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 self.nat_apply(ni, dev, act)
             }
+            Action::Fw { dev, op } => self.fw_apply(dev, op),
             Action::Ip6 { dev, set } => self.ip6_apply(dev, set),
             Action::Ospf { dev, set } => self.ospf_apply(dev, set),
             // WLAN (wlan.rs)

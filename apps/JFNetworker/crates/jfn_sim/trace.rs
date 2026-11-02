@@ -498,6 +498,8 @@ pub enum Note {
     OomKill { svc: String, bytes: u64 },
     /// a decision of 802.1X (dot1xtrace.rs)
     Dot1x(crate::dot1xtrace::DNote),
+    /// the zone firewall (fw.rs, fwtrace.rs)
+    Fw(crate::fwtrace::FwNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -630,6 +632,7 @@ impl Note {
             Note::Tls(_) => 7,
             Note::OomKill { .. } => 3,
             Note::Dot1x(_) => 2,
+            Note::Fw(_) => 3,
             _ => 2,
         }
     }
@@ -778,6 +781,7 @@ impl Note {
             || matches!(self, Note::Ssh(n) if n.is_drop())
             || matches!(self, Note::Tls(n) if n.is_drop())
             || matches!(self, Note::Dot1x(n) if n.is_drop())
+            || matches!(self, Note::Fw(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1223,6 +1227,7 @@ impl Note {
             Note::Tls(n) => n.message(),
             Note::OomKill { svc, bytes } => msg!("Speicher voll: Dienst {} mit {} beendet", svc, crate::disk::size_text(*bytes)),
             Note::Dot1x(n) => n.message(),
+            Note::Fw(n) => n.message(),
         }
     }
 }
@@ -1698,6 +1703,7 @@ impl Note {
             Note::Tls(n) => n.mask(),
             Note::OomKill { .. } => 0,
             Note::Dot1x(n) => n.mask(),
+            Note::Fw(n) => n.mask(),
             _ => 0,
         }
     }

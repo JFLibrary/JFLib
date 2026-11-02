@@ -203,6 +203,7 @@ pub struct SesCli {
     pub sg_name: String,
     pub rs_name: String,
     pub sh: sh::Shell,
+    pub fw: [String; 2],
 }
 
 impl SesCli {
@@ -227,6 +228,7 @@ impl SesCli {
             sg_name: String::new(),
             rs_name: String::new(),
             sh: sh::Shell::new(style),
+            fw: Default::default(),
         }
     }
     fn footprint(&self) -> usize {
@@ -272,6 +274,7 @@ impl CliDev {
         swap(&mut self.sg_name, &mut st.sg_name);
         swap(&mut self.rs_name, &mut st.rs_name);
         swap(&mut self.sh, &mut st.sh);
+        swap(&mut self.fw, &mut st.fw);
     }
     /// the infos of session `s`
     pub fn ses(&self, s: u32) -> Option<&SesInfo> {

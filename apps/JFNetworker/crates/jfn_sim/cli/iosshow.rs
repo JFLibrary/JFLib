@@ -167,6 +167,9 @@ impl Engine {
                 if d & super::D_DOT1X != 0 {
                     s.push_str("Debug output for 802.1X: on\n");
                 }
+                if d & super::D_FW != 0 {
+                    s.push_str("Debug output for the firewall: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -221,6 +224,8 @@ impl Engine {
                 s.push_str("!\n");
             }
         }
+        // the zone firewall: classes, policies, zones, pairs (cli/fw.rs; the interfaces name zones)
+        s.push_str(&self.ios_fw_config(ni));
         // interfaces: loopbacks, ports with their subinterfaces, the bridge's interfaces
         let list = self.ios_ifaces(ni);
         let (los, rest): (Vec<_>, Vec<_>) = list.into_iter().partition(|(name, _, _)| name.starts_with("Loopback"));
@@ -363,6 +368,8 @@ impl Engine {
             }
             // its side of NAT (cli/nat.rs)
             s.push_str(&self.ios_nat_if_config(ni, i));
+            // its zone (cli/fw.rs)
+            s.push_str(&self.ios_fw_if_config(ni, i));
         }
         let admin = match (port, f) {
             (Some(p), None) | (Some(p), Some(_)) if !name.contains('.') => n.ports.get(p as usize).is_some_and(|x| x.admin_up),

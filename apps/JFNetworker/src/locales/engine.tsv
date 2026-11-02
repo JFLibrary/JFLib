@@ -82,7 +82,7 @@ Heimrouter mit WLAN 802.11ax (1G WAN, 4× 1G LAN)	Home router with WLAN 802.11ax
 Hub	Hub
 Hub 8× 100M (Lehrgerät: jedes Paket an alle)	Hub 8× 100M (for teaching: every frame to every port)
 JF-FW	JF-FW
-Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+	Firewall (router with ACLs and NAT) 8× 1G, 2× 10G SFP+
+Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 1G, 2× 10G SFP+	Firewall (router with ACLs and NAT, zones with sessions) 8× 1G, 2× 10G SFP+
 JF-AP6E	JF-AP6E
 WLAN-Access-Point 802.11ax (6 GHz, 2.5G, PoE-gespeist)	WLAN access point 802.11ax (6 GHz, 2.5G, PoE-powered)
 Modem/ONT	Modem/ONT
@@ -1565,9 +1565,9 @@ Repeater 2× 1G (Schicht 1: verlängert eine Kupferstrecke)	Repeater 2× 1G (lay
 Bridge	Bridge
 Bridge 2× 1G (Schicht 2: lernt Adressen, ohne Befehlszeile)	Bridge 2× 1G (layer 2: learns addresses, no command line)
 JF-FW2	JF-FW2
-Kleine Firewall (Router mit ACLs und NAT) 1G WAN, 4× 1G LAN	Small firewall (router with ACLs and NAT) 1G WAN, 4× 1G LAN
+Kleine Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 1G WAN, 4× 1G LAN	Small firewall (router with ACLs and NAT, zones with sessions) 1G WAN, 4× 1G LAN
 JF-FW8	JF-FW8
-Rechenzentrums-Firewall (Router mit ACLs und NAT) 8× 10G SFP+, 4× 100G QSFP28	Data center firewall (router with ACLs and NAT) 8× 10G SFP+, 4× 100G QSFP28
+Rechenzentrums-Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 10G SFP+, 4× 100G QSFP28	Data center firewall (router with ACLs and NAT, zones with sessions) 8× 10G SFP+, 4× 100G QSFP28
 JF-AP7	JF-AP7
 WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist)	WLAN access point 802.11be (6 GHz, 5G, PoE-powered)
 Farbe der Kabelart	Color of the cable kind
@@ -1663,3 +1663,36 @@ Die Datei enthält keine Kursliste.	The file holds no list of courses.
 Das ist keine Kursliste.	This is not a list of courses.
 Kurs {}: {}	Course {}: {}
 Kurs {}: die Prüfsumme von {} ist kein SHA-256.	Course {}: the checksum of {} is no SHA-256.
+# F2: the zone firewall (jfn_sim/fw.rs, fwtrace.rs, problems.rs)
+Zonen gibt es nur auf Firewall-Modellen.	Zones exist on firewall models only.
+Die Zone {} gibt es nicht.	There is no zone {}.
+Der Name self gehört dem Gerät selbst.	The name self belongs to the device itself.
+Die Zone {} hat noch Schnittstellen.	Zone {} still has interfaces.
+Die Zone {} steht noch in einem Zonenpaar.	Zone {} is still part of a zone pair.
+Die Klasse {} steht noch in einer Richtlinie.	Class {} is still part of a policy.
+Die Klasse {} gibt es nicht.	There is no class {}.
+Die Richtlinie {} gilt noch für ein Zonenpaar.	Policy {} still applies to a zone pair.
+Die Richtlinie {} gibt es nicht.	There is no policy {}.
+Ein Zonenpaar verbindet zwei verschiedene Zonen.	A zone pair joins two different zones.
+Von {} nach {} gibt es schon ein Zonenpaar.	There already is a zone pair from {} to {}.
+Das Zonenpaar {} gibt es nicht.	There is no zone pair {}.
+Firewall: {} bleibt in Zone {}, es passiert.	Firewall: {} stays in zone {} and passes.
+Firewall: {} von {} nach {}: das Gerät selbst, keine Richtlinie, es passiert.	Firewall: {} from {} to {}: the device itself, no policy, it passes.
+Firewall: {} zwischen Zone {} und einer Schnittstelle ohne Zone, verworfen.	Firewall: {} between zone {} and an interface without a zone, dropped.
+Firewall: {} von {} nach {}: keine Regel zwischen den Zonen, verworfen.	Firewall: {} from {} to {}: no rule between the zones, dropped.
+Firewall: {} beginnt Sitzung {} ({}, Klasse {}).	Firewall: {} begins session {} ({}, class {}).
+Firewall: {} gehört zu Sitzung {} (Hinweg).	Firewall: {} belongs to session {} (on its way there).
+Firewall: {} gehört zu Sitzung {} (Rückweg).	Firewall: {} belongs to session {} (on its way back).
+Firewall: {} ist ein ICMP-Fehler zu Sitzung {} und passiert.	Firewall: {} is an ICMP error about session {} and passes.
+Firewall: {} passiert ohne Sitzung ({}, Klasse {}).	Firewall: {} passes without a session ({}, class {}).
+Firewall: {} verworfen ({}, Klasse {}).	Firewall: {} dropped ({}, class {}).
+Firewall: {} abgelehnt, der Absender erfährt es ({}, Klasse {}).	Firewall: {} rejected, the sender is told ({}, class {}).
+Firewall: {} beginnt keine Verbindung und gehört zu keiner Sitzung, verworfen ({}).	Firewall: {} begins no connection and belongs to no session, dropped ({}).
+Firewall: {} verworfen, schon {} halboffene Sitzungen ({}).	Firewall: {} dropped, already {} half-open sessions ({}).
+Firewall: {} beendet Sitzung {} (RST).	Firewall: {} ends session {} (RST).
+Firewall: Sitzung {} ({}) ist abgelaufen.	Firewall: session {} ({}) timed out.
+Die Richtlinie {} gilt für kein Zonenpaar und wirkt deshalb nicht.	Policy {} applies to no zone pair and so has no effect.
+{} hat eine Adresse, aber keine Zone: Verkehr zwischen ihr und den Zonen wird verworfen.	{} has an address but no zone: traffic between it and the zones is dropped.
+Zone {} hat kein Zonenpaar mit Richtlinie: nichts kommt aus ihr heraus oder in sie hinein.	Zone {} has no zone pair with a policy: nothing gets out of it or into it.
+Das Zonenpaar {} ({} nach {}) hat keine Richtlinie und verwirft alles.	Zone pair {} ({} to {}) has no policy and drops everything.
+Diese Firewall gibt es nur auf Linux-Geräten.	This firewall exists on Linux devices only.

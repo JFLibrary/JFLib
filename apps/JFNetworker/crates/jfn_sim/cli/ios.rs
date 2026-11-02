@@ -36,6 +36,7 @@
 // it, "%SYS-5-CONFIG_I" names the session the configuration came from.
 // SSH (cli/ssh.rs, sshd.rs): ip domain-name, crypto key generate|zeroize, ip ssh ..., show ip ssh,
 // show ssh, show crypto key, debug ip ssh and the client ssh -l USER HOST.
+// The zone firewall (cli/fw.rs): on firewall models only; its modes are found by their prompt.
 
 use alloc::format;
 use alloc::string::String;
@@ -43,7 +44,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use base::cmdtree::{Error, ModeId, Names, Parsed, Tree, F_HIDDEN, F_NO};
-use jfn_model::catalog::{Media, F_AP, F_BRIDGE, F_ROUTER};
+use jfn_model::catalog::{Media, F_AP, F_BRIDGE, F_FIREWALL, F_ROUTER};
 use netpkt::{Ipv4, Mac, Prefix4};
 
 use super::{Ask, AskKind, LineCfg, Method, Mode, D_ARP, D_ICMP, D_RIP};
@@ -293,6 +294,24 @@ pub enum K {
     ShowDot1x,
     ShowAuthSes,
     Dot1xNow,
+    // the zone firewall (cli/fw.rs)
+    FwZone,
+    FwZoneDescr,
+    FwMember,
+    FwPair,
+    FwService,
+    FwClass,
+    FwMatch,
+    FwPolicy,
+    FwPolicyClass,
+    FwAct,
+    FwExit,
+    FwTimer,
+    FwMax,
+    ShowZone,
+    ShowZonePair,
+    ShowPolicyZone,
+    ClearFw,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -309,6 +328,7 @@ const ROUTER: ModeId = 8;
 const CAP_BRIDGE: u32 = 1;
 const CAP_ROUTER: u32 = 2;
 const CAP_AP: u32 = 4;
+const CAP_FIREWALL: u32 = 8;
 
 fn mode_id(m: Mode) -> ModeId {
     match m {
@@ -322,7 +342,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::DhcpPool => POOL,
         Mode::Router(_) => ROUTER,
         // modes of later parts are found by their prompt (tree_mode)
-        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv => CONF,
+        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv | Mode::FwZone | Mode::FwPair | Mode::FwClass | Mode::FwPolicy | Mode::FwPolicyClass => CONF,
     }
 }
 
@@ -330,7 +350,7 @@ fn mode_id(m: Mode) -> ModeId {
 /// (and later parts) add by their prompt, so their numbers may differ from tree to tree
 fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
     match m {
-        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv | Mode::FwZone | Mode::FwPair | Mode::FwClass | Mode::FwPolicy | Mode::FwPolicyClass => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
         // OSPF's router mode shares the prompt with RIP's: the tree knows it by its key
         Mode::Router(super::Proc::Ospf(_)) => t.find_mode(super::ospf::MODE_KEY).unwrap_or(CONF),
         Mode::Router(super::Proc::Bgp(_)) => t.find_mode(super::bgp::MODE_KEY).unwrap_or(CONF),
@@ -355,6 +375,11 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::AclExt => "(config-ext-nacl)#",
         Mode::AaaGroup => "(config-sg-radius)#",
         Mode::RadiusSrv => "(config-radius-server)#",
+        Mode::FwZone => "(config-sec-zone)#",
+        Mode::FwPair => "(config-sec-zone-pair)#",
+        Mode::FwClass => "(config-cmap)#",
+        Mode::FwPolicy => "(config-pmap)#",
+        Mode::FwPolicyClass => "(config-pmap-c)#",
     }
 }
 
@@ -666,6 +691,10 @@ fn build(caps: u32) -> Tree<K> {
     if bridge && caps & CAP_AP == 0 {
         super::dot1x::build_dot1x(&mut t, [user, prv, conf, ifm]);
     }
+    // ---- the zone firewall with its modes, on firewall models (cli/fw.rs)
+    if caps & CAP_FIREWALL != 0 {
+        super::fw::build_fw(&mut t, [user, prv, conf, ifm, sub]);
+    }
     t
 }
 
@@ -743,7 +772,7 @@ fn caps_of(e: &Engine, ni: usize) -> u32 {
     match e.nodes.get(ni) {
         Some(Some(n)) => {
             let m = n.model;
-            (if m.has(F_BRIDGE) { CAP_BRIDGE } else { 0 }) | (if m.has(F_ROUTER) { CAP_ROUTER } else { 0 }) | (if m.has(F_AP) { CAP_AP } else { 0 })
+            (if m.has(F_BRIDGE) { CAP_BRIDGE } else { 0 }) | (if m.has(F_ROUTER) { CAP_ROUTER } else { 0 }) | (if m.has(F_AP) { CAP_AP } else { 0 }) | (if m.has(F_FIREWALL) { CAP_FIREWALL } else { 0 })
         }
         _ => 0,
     }
@@ -841,7 +870,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv | Mode::FwZone | Mode::FwPair | Mode::FwClass | Mode::FwPolicy | Mode::FwPolicyClass) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -975,7 +1004,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS | super::D_SSH | super::D_DOT1X
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS | super::D_SSH | super::D_DOT1X | super::D_FW
                 } else if line.split_whitespace().nth(1) == Some("dot1x") {
                     super::D_DOT1X
                 } else if p.has("icmp") {
@@ -984,6 +1013,8 @@ impl Engine {
                     D_RIP
                 } else if p.has("nat") {
                     super::D_NAT
+                } else if p.has("fw") {
+                    super::D_FW
                 } else if p.has("authentication") || p.has("aaa") {
                     super::D_AAA
                 } else if p.has("radius") {
@@ -1008,6 +1039,7 @@ impl Engine {
                     (o, _, super::D_DOT1X) => format!("Debug output for 802.1X: {}\n", if o { "off" } else { "on" }),
                     (o, _, D_RIP) => format!("Debug output for RIP: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_NAT) => format!("Debug output for NAT: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_FW) => format!("Debug output for the firewall: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_AAA) => format!("Debug output for AAA authentication: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_RADIUS) => format!("Debug output for RADIUS: {}\n", if o { "off" } else { "on" }),
                     (o, _, _) => format!("Debug output for ARP: {}\n", if o { "off" } else { "on" }),
@@ -1194,6 +1226,17 @@ impl Engine {
             | K::ShowProtocols
             | K::ClearRoute => self.ios_rip(ni, p),
             K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
+            K::FwZone | K::FwZoneDescr | K::FwPair | K::FwService | K::FwClass | K::FwMatch | K::FwPolicy | K::FwPolicyClass | K::FwAct | K::FwExit | K::FwTimer | K::FwMax | K::ShowZone | K::ShowZonePair | K::ShowPolicyZone | K::ClearFw => self.ios_fw(ni, p),
+            K::FwMember => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_fw_member(ni, &f, p) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
             K::Ipv6Global | K::Ipv6Route | K::Ipv6Neighbor | K::Ipv6If | K::ShowIpv6 | K::Ping6 | K::Trace6 | K::Debug6 | K::ClearIpv6 => self.ios_ip6(ni, p),
             K::RouterOspf
             | K::OspfRouterId
