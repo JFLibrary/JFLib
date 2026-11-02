@@ -885,7 +885,7 @@ impl Engine {
     }
 
     /// "R1 Gi0/0/1 – SW1 Gi1/0/1"
-    fn cable_label(&self, link: u32) -> String {
+    pub(crate) fn cable_label(&self, link: u32) -> String {
         let Some(l) = self.link_rt(link) else {
             return format!("Kabel {}", link);
         };

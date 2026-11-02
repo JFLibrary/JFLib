@@ -1,0 +1,398 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Der Server antwortet nicht",
+  "description": "Beispielkurs: ein kaputtes Netz. Die Lösung steht in dieser Datei: zum Üben, nicht für eine sichere Prüfung.",
+  "seed": 1,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.254\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 150,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 300,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n ip access-group 101 in\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\naccess-list 101 deny ip host 10.0.1.11 10.0.2.0 0.0.0.255\naccess-list 101 permit ip any any\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SRV1",
+      "model": "pc",
+      "x": 450,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 250,
+    "cy": 110,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Der Server antwortet nicht",
+      "The server does not answer"
+    ],
+    "summary": [
+      "PC1 soll den Server SRV1 erreichen, PC2 darf es nicht. Finden Sie, was kaputt ist, und reparieren Sie es.",
+      "PC1 should reach the server SRV1, PC2 must not. Find what is broken and repair it."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Dieses Netz ist kaputt: PC1 erreicht den Server SRV1 unter 10.0.2.10 nicht. Dabei ist nicht nur ein Fehler im Spiel. PC2 dagegen soll den Server auch künftig nicht erreichen; das regelt die Zugriffsliste auf R1.",
+        "This network is broken: PC1 does not reach the server SRV1 at 10.0.2.10. More than one fault is at work. PC2, on the other hand, must keep failing to reach the server; the access list on R1 sees to that."
+      ],
+      [
+        "Untersuchen Sie das Netz mit den Konsolen, reparieren Sie es, nennen Sie unter Diagnose das schuldige Kabel und geben Sie ab. Ein Kabel ersetzen Sie, indem Sie es löschen und neu verbinden. Die Probleme-Ansicht und die Fehlerliste bleiben hier ausgeblendet.",
+        "Examine the network with the consoles, repair it, name the guilty cable under Diagnosis and hand in. To replace a cable, delete it and connect the ends again. The Problems view and the list of faults stay hidden here."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Beginnen Sie auf PC1: ping 10.0.1.1 zeigt, ob der Weg zum Router frei ist, ip route, welches Gateway eingetragen ist.",
+        "Start on PC1: ping 10.0.1.1 shows whether the way to the router is clear, ip route which gateway is set."
+      ],
+      [
+        "Auf R1 zeigt show ip interface brief, welche Schnittstelle keine Verbindung hat.",
+        "On R1, show ip interface brief shows which interface has no link."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 route 0.0.0.0/0 via 10.0.1.1"
+          ],
+          "points": 2,
+          "text": [
+            "PC1 hat das richtige Gateway",
+            "PC1 has the right gateway"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.2.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC1 erreicht den Server",
+            "PC1 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC2 not reaches 10.0.2.10",
+            "PC2 reaches 10.0.1.1"
+          ],
+          "points": 2,
+          "text": [
+            "PC2 erreicht den Router, aber nicht den Server",
+            "PC2 reaches the router, but not the server"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R1",
+          "id": 4,
+          "port": "GigabitEthernet0/0/1",
+          "peer": "SRV1",
+          "peer_id": 5,
+          "peer_port": "eth0",
+          "points": 2,
+          "text": [
+            "Welches Kabel war defekt?",
+            "Which cable was faulty?"
+          ],
+          "explain": [
+            "Das Kabel zwischen R1 und SRV1 trug nichts: Die Schnittstelle Gi0/0/1 von R1 hatte keine Verbindung. Das falsche Gateway auf PC1 war der zweite Fehler; es liegt an seiner Konfiguration, nicht an einem Kabel.",
+            "The cable between R1 and SRV1 carried nothing: R1's interface Gi0/0/1 had no link. The wrong gateway on PC1 was the second fault; that lies in its configuration, not in a cable."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SW1",
+            "model": "jf-s24p",
+            "x": 150,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 300,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n ip access-group 101 in\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\naccess-list 101 deny ip host 10.0.1.11 10.0.2.0 0.0.0.255\naccess-list 101 permit ip any any\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "SRV1",
+            "model": "pc",
+            "x": 450,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 6,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 8,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 9,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 5,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [
+      "link SRV1 eth0"
+    ],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

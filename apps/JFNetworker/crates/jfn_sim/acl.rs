@@ -26,7 +26,7 @@
 //   Engine::access_lists(dev) / access_groups(dev)   views for the user interface and the
 //                                    show commands
 //
-// Where the lists act (with NAT: nat.rs has the whole order): a packet that arrives on an
+// Where the lists act (with NAT and zones: fw.rs has the whole order): a packet that arrives on an
 // interface with an inbound list meets it first, before the device decides whether the
 // packet is its own or to be forwarded, so a list also guards the device itself; a packet the
 // device forwards meets the outbound list of the interface it leaves through, after routing

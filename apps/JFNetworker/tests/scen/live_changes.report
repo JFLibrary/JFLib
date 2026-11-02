@@ -1,0 +1,82 @@
+# JFNetworker-Szenario live_changes.scn: „Änderungen unter Last“, 9 Geräte, 8 Verbindungen, Seed 19
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/7 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/7 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/8 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/8 is up
+   4.000000000  ok      expect LB svc lb metric requests >= 90 over 2s (96.5)
+   4.000000000  ok      expect WEB1 svc web metric requests >= 40 over 2s (49)
+   4.000000000  ok      expect WEB3 svc web metric requests == 1 (1)
+   4.000000000  ok      expect CACHE svc cache metric hits > 0 (58)
+   4.000000000  --      load set GEN load rps 300.000
+   7.000000000  ok      expect GEN svc load metric sent >= 295 over 2s (308)
+   7.000000000  ok      expect GEN svc load metric sent <= 320 over 2s (308)
+   7.000000000  ok      expect WEB1 svc web metric requests >= 130 over 2s (155)
+   7.000000000  --      load set GEN users users 8
+   9.000000000  ok      expect CACHE svc cache metric requests >= 70 over 1s (80)
+   9.000000000  --      lb add LB lb web3 10.0.0.13:80
+  12.000000000  ok      expect WEB3 svc web metric requests >= 80 over 2s (100.5)
+  12.000000000  ok      expect WEB1 svc web metric requests >= 80 over 2s (100.5)
+  12.000000000  ok      expect WEB1 svc web metric requests <= 120 over 2s (100.5)
+  12.000000000  --      lb algo LB lb weighted
+  12.000000000  --      lb weight LB lb web2 3
+  15.000000000  ok      expect WEB2 svc web metric requests >= 120 over 2s (176)
+  15.000000000  ok      expect WEB1 svc web metric requests <= 80 over 2s (59.5)
+  15.000000000  --      lb algo LB lb round-robin
+  15.000000000  --      lb drain LB lb web1
+  18.000000000  ok      expect WEB1 svc web metric max requests <= 1 over 2s (1)
+  18.000000000  ok      expect LB svc lb metric errors == 0 (0)
+  18.000000000  ok      expect GEN svc load metric errors == 0 (0)
+  18.000000000  --      lb enable LB lb web1
+  21.000000000  ok      expect WEB1 svc web metric requests >= 80 over 2s (108.5)
+  21.000000000  --      svc set WEB2 web workers 1
+  21.000000000  --      svc set WEB2 web time_ms 10
+  24.000000000  ok      expect WEB2 svc web metric queued > 0 (6)
+  24.000000000  ok      expect WEB2 svc web metric requests >= 90 over 2s (101)
+  24.000000000  ok      expect WEB2 svc web metric responses <= 110 over 2s (99.5)
+  24.000000000  --      svc set WEB2 web workers 0
+  24.000000000  --      svc set WEB2 web time_ms 2
+  26.000000000  ok      expect WEB2 svc web metric queued == 0 (0)
+  26.000000000  --      der KV-Speicher
+  26.000000000  --      kv set KV1 kv consistency eventual w 1 r 1
+  26.000000000  KV1     root@KV1:~# kvctl
+  26.000000000  KV1     KV-Knoten kv: 10.0.0.31, Port 7000, Heartbeats UDP 7946 alle 500,000 ms (ausgefallen nach 1,500 s)
+  26.000000000  KV1     Ring: 2 Knoten mit je 16 vnodes, RF 2, Konsistenz eventual (W 1, R 1, W + R ≤ RF), Read Repair an
+  26.000000000  KV1     
+  26.000000000  KV1     Knoten     Zustand        seit  Ring-Anteil
+  26.000000000  KV1     10.0.0.31  dieser Knoten  -     55,2 %
+  26.000000000  KV1     10.0.0.32  erreichbar     0 ns  44,7 %
+  26.000000000  KV1     
+  26.000000000  KV1     Schlüssel 0 (0 B), Disk 0 B von 1 GiB, 100 µs
+  26.000000000  KV1     Anfragen 0: gelesen 0, geschrieben 0, nicht gefunden 0, nicht verfügbar 0, Disk voll 0
+  26.000000000  KV1     Weitergereicht 0, selbst geführt 0; Replikate geschrieben 0, gelesen 0
+  26.000000000  KV1     Veraltete Antworten 0, Read Repair gesendet 0, erhalten 0; Ausfälle erkannt 0
+  26.000000000  KV1     Antwortzeit p50 -, p95 -, p99 -
+  26.000000000  --      cache clear CACHE cache
+  27.000000000  ok      expect WEB3 svc web metric requests >= 1 (1849)
+  27.000000000  ok      expect CACHE svc cache metric misses >= 2 (8)
+  27.000000000  --      load set GEN load rps 50.000
+  30.000000000  ok      expect GEN svc load metric sent <= 60 over 2s (55.5)
+  30.000000000  ok      expect LB svc lb metric status_5xx == 0 (0)
+  30.000000000  LB      root@LB:~# lbctl
+  30.000000000  LB      Loadbalancer lb: HTTP auf Port 80, Verfahren round-robin, Health Checks http GET / alle 1,000 s (Timeout 500,000 ms, verfügbar nach 2, ausgefallen nach 3 Prüfungen)
+  30.000000000  LB      Anfragen 7304, beendet 7304, offen 0, Fehler 0 (ohne Backend 0), Wiederholungen 0
+  30.000000000  LB      Antwortzeit p50 2,015 ms, p95 2,015 ms, p99 99,614 ms
+  30.000000000  LB      
+  30.000000000  LB      Backend  Adresse       Gewicht  Zustand    seit      offen  gesamt  Fehler  p99
+  30.000000000  LB      web1     10.0.0.11:80  1        verfügbar  18,000 s  0      2308    0       2,011 ms
+  30.000000000  LB      web2     10.0.0.12:80  3        verfügbar  0 ns      0      3114    0       131,071 ms
+  30.000000000  LB      web3     10.0.0.13:80  1        verfügbar  9,000 s   0      1882    0       2,010 ms
+  30.000000000  --      fertig
+# 25 von 25 Erwartungen erfüllt

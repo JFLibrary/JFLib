@@ -1,0 +1,35 @@
+# JFNetworker-Experiment sweep_small.jfnex: „Der kurze Lauf der Testsuite“
+# Konfigurationen: 4, Laststufen: 3, Seeds: 2; 2 s Warmlauf, je Stufe 1 s Übergang und 2 s Messung (virtuelle Zeit)
+# SLO: p99 bis 200 ms, Fehler bis 1 %
+# Ergebnis des Modells mit seinen Annahmen; die Kosten sind angenommene Preise (catalog::Prices), keine Angebote
+
+größer 2 Kerne 110 % 16 GiB (1.696 €/h)
+Last    erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s      107.750     4.1     4.2     5.4       6.7      0.00   19.6  0.004372    ok  -
+400/s      402.250     5.0    12.1    19.6      22.8      0.00   73.6  0.001171  Knie  CPU WEB1
+1600/s     544.250  1325.4  1929.3  1996.4    1996.4      0.00  100.0  0.000865  nein  CPU WEB1
+
+größer server-m (2.078 €/h)
+Last    erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s      107.750     4.5     4.6     4.6       4.6      0.00    5.3  0.005357    ok  -
+400/s      402.000     4.5     4.6     4.7       4.7      0.00   20.3  0.001435    ok  -
+1600/s    1589.000     5.1     9.0    12.1      14.0      0.00   85.1  0.000363  Knie  CPU WEB1
+
+mehr Hosts 2 (2.026 €/h)
+Last    erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s      107.750     4.1     4.1     4.2       4.2      0.00    4.8  0.005222    ok  -
+400/s      401.750     4.1     4.2     4.2       4.3      0.00   18.2  0.001400    ok  -
+1600/s    1588.750     4.2     5.9     7.2       8.5      0.00   74.0  0.000354  Knie  CPU WEB1
+
+mehr Hosts 4 (2.554 €/h)
+Last    erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s      107.750     4.1     4.1     4.2       4.2      0.00    2.4  0.006584    ok  -
+400/s      401.750     4.1     4.1     4.2       4.3      0.00    9.1  0.001765    ok  -
+1600/s    1588.750     4.1     4.3     4.5       4.6      0.00   36.4  0.000446  Knie  -
+
+Zusammenfassung
+Konfiguration                  €/h    Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+größer 2 Kerne 110 % 16 GiB  1.696   400/s    544.250        0.001171  CPU WEB1
+größer server-m              2.078  1600/s   1589.000        0.000363  CPU WEB1
+mehr Hosts 2                 2.026  1600/s   1588.750        0.000354  CPU WEB1
+mehr Hosts 4                 2.554  1600/s   1588.750        0.000446  -

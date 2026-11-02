@@ -3,7 +3,12 @@
 // and the engine's reports arrive
 //
 //   Sim::new(&project)            an engine for the project (Engine::from_project; when the
-//                                 engine refuses a part it runs without it, `errors` says why)
+//                                 engine refuses a part it runs without it, `errors` says why);
+//                                 the faults its lab starts with go in as inputs (AK2), so the
+//                                 recording replays them
+//   again(&project, &born)        Simulation zurücksetzen: the same, but a start fault of a cable
+//                                 only where the cable is one of `born`, the project's when it
+//                                 loaded (a cable the learner put in since is not pulled again)
 //   start()                       realtime from now on the task clock (a script run's virtual
 //                                 clock: tests repeat exactly)
 //   sync(&project)                the engine follows the project: what differs from what it
@@ -37,6 +42,8 @@
 //                                 its files too (Action::Files, before the services: a script
 //                                 that starts from a file reads it; also in sync: files never
 //                                 restart a device)
+//   sync                          a service's new config goes in without a restart where it can
+//                                 (live_steps, Service::reconfigure); else the device restarts
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
@@ -215,6 +222,29 @@ struct Past {
     live: Option<Shot>,
 }
 
+/// the actions that give a running device's services their new settings without a restart
+/// (Service::reconfigure), None when one of them cannot: the same services, some of them with another
+/// config or switched; `can` asks the engine for a service's new config
+pub(crate) fn live_steps(dev: u32, old: &[ServiceDef], new: &[ServiceDef], can: &dyn Fn(&ServiceDef) -> bool) -> Option<Vec<Action>> {
+    if old.len() != new.len() {
+        return None;
+    }
+    let mut acts = Vec::new();
+    for b in new {
+        let a = old.iter().find(|a| a.name == b.name && a.kind == b.kind)?;
+        if a.config != b.config {
+            if !can(b) {
+                return None;
+            }
+            acts.push(Action::ServiceConfig { dev, svc: b.name.clone(), config: b.config.clone() });
+        }
+        if a.disabled != b.disabled {
+            acts.push(Action::ServiceRun { dev, name: b.name.clone(), on: !b.disabled });
+        }
+    }
+    Some(acts)
+}
+
 /// a project's link with the length and delay its places give it (what Action::Connect takes)
 fn resolved(p: &Project, tree: &jfn_model::Tree, l: &Link) -> (Link, u32, u64) {
     let len = jfn_model::phys::length(p, tree, l).m;
@@ -346,6 +376,16 @@ pub(crate) struct Sim {
 impl Sim {
     /// an engine for the project, paused until start()
     pub(crate) fn new(p: &Project) -> Sim {
+        Sim::build(p, None)
+    }
+
+    /// Simulation zurücksetzen: the same; the faults the lab starts with come back, on the cables of
+    /// `born` only
+    pub(crate) fn again(p: &Project, born: &[u32]) -> Sim {
+        Sim::build(p, Some(born))
+    }
+
+    fn build(p: &Project, born: Option<&[u32]>) -> Sim {
         let (eng, whole) = match Engine::from_project(p) {
             Ok(e) => (e, true),
             Err(_) => {
@@ -398,6 +438,16 @@ impl Sim {
         }
         // keyframes and inputs from here on (K1)
         s.drv.rewind_on(Budget::default());
+        // the faults the lab starts with (AK2); what cannot be resolved is the lab's issue (Lab::issues)
+        for a in jfn_sim::runner::start_actions(p, &s.drv.eng).0 {
+            let fresh = match &a {
+                Action::Fault { fault: jfn_sim::Fault::Unplug { link } | jfn_sim::Fault::Impair { link, .. }, .. } => born.is_some_and(|b| !b.contains(link)),
+                _ => false,
+            };
+            if !fresh {
+                let _ = s.drv.send(Cmd::Apply(a), plat::task::now_us());
+            }
+        }
         s.note_told();
         s.snapshot();
         s
@@ -454,6 +504,19 @@ impl Sim {
         // "Hardware simulieren" (first: a new device takes it)
         if self.metered != p.metered && self.act(Action::Metered { on: p.metered }).is_ok() {
             self.metered = p.metered;
+        }
+        // a service's new settings, if it can take them while it runs (Service::reconfigure)
+        let changed: Vec<u32> = self.devs.iter().filter(|(id, m)| p.device(**id).is_some_and(|d| m.services != d.services && m.model == d.model && m.startup == d.startup_config)).map(|(id, _)| *id).collect();
+        for id in changed {
+            let (Some(d), Some(m)) = (p.device(id), self.devs.get(&id)) else { continue };
+            let eng = &self.drv.eng;
+            let Some(steps) = live_steps(id, &m.services, &d.services, &|b: &ServiceDef| eng.can_reconfigure(id, &b.name, &b.config)) else { continue };
+            for a in steps {
+                let _ = self.act(a);
+            }
+            if let Some(m) = self.devs.get_mut(&id) {
+                m.services = d.services.clone();
+            }
         }
         // devices that are gone, or start again with another model, configuration or services
         let out: Vec<(u32, bool)> = self

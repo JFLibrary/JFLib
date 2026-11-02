@@ -84,6 +84,12 @@
 //   dot1x    802.1X: "dot1x system-auth-control", "authentication port-control", "dot1x pae|
 //            timeout|max-req", show dot1x, show authentication sessions, debug dot1x on IOS-like
 //            switches; wpa_supplicant and wpa_cli on the shell
+//   fw       the zone firewall on firewall models: zone security, zone-pair security, class-map and
+//            policy-map type inspect (their own modes), zone-member security, ip inspect, show zone
+//            security, show zone-pair security, show policy-map type inspect zone-pair [sessions],
+//            clear zone-pair, debug policy-firewall
+//   ufw      the small firewall of a Linux host on the shell: enable, disable, default, allow, deny,
+//            reject, delete, status, reset
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -141,6 +147,8 @@ pub mod jfstest;
 pub mod units;
 pub mod ssh;
 pub mod dot1x;
+pub mod fw;
+pub mod ufw;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -167,6 +175,8 @@ pub const D_RADIUS: u32 = 0x200000;
 pub const D_SSH: u32 = 0x800000;
 /// "debug dot1x" (cli/dot1x.rs)
 pub const D_DOT1X: u32 = 0x1000000;
+/// "debug policy-firewall" (cli/fw.rs)
+pub const D_FW: u32 = 0x2000000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -202,6 +212,13 @@ pub enum Mode {
     AaaGroup,
     /// "radius server NAME": "(config-radius-server)#" (cli/aaa.rs)
     RadiusSrv,
+    /// the zone firewall (cli/fw.rs): "zone security NAME", "zone-pair security NAME ...",
+    /// "class-map type inspect NAME", "policy-map type inspect NAME", "class ..." in a policy
+    FwZone,
+    FwPair,
+    FwClass,
+    FwPolicy,
+    FwPolicyClass,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -370,6 +387,9 @@ pub struct CliDev {
     pub parked: BTreeMap<u32, ses::SesCli>,
     /// the id the next session gets
     pub next_ses: u32,
+    /// what a mode of the zone firewall edits: the zone, pair, class or policy, the policy's class
+    /// (cli/fw.rs)
+    pub fw: [String; 2],
 }
 
 impl CliDev {
@@ -405,6 +425,7 @@ impl CliDev {
             sessions: alloc::vec![ses::SesInfo::console(m.cli)],
             parked: BTreeMap::new(),
             next_ses: 1,
+            fw: Default::default(),
         }
     }
 }
@@ -438,6 +459,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         Note::Snmp(_) => c.debug > 0,
         Note::Ssh(_) => c.debug > 0,
         Note::Dot1x(_) => c.debug > 0,
+        Note::Fw(_) => c.debug > 0,
         _ => false,
     }
 }

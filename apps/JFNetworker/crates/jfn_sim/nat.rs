@@ -15,7 +15,10 @@
 //   Engine::nat_arp(..)              global addresses an outside interface answers ARP for
 //   Engine::nat_translations(dev) / nat(dev)   rows of "show ip nat translations", the state
 //   SLOT_NAT                         the node timer: translations and fragments that time out
+//   Engine::nat_peek_in(ni, &Flow)   where a packet from outside would go, changing nothing
 //
+// With zones on a firewall the session and policy step comes between the route lookup and the source
+// translation (fw.rs has the whole order); without zones it is as follows.
 // The order of a router's decisions, as the original makes them: an arriving packet meets the
 // inbound access list of its interface first (acl.rs).  If it came in on an outside interface
 // and its destination is a global address with a translation, the destination becomes the
@@ -726,6 +729,31 @@ impl Engine {
                 false
             }
         }
+    }
+
+    /// where a packet from outside would go, changing nothing (the Firewall tab's Test: fw_test)
+    pub(crate) fn nat_peek_in(&self, ni: usize, f: &Flow) -> Option<To> {
+        let n = self.nat_part(ni)?;
+        let (g, r) = ((f.dst, f.dport), (f.src, f.sport));
+        if port_flow(f) && !icmp_request(f) {
+            if let Some(s) = n.session_by_out(f.proto, g, r).and_then(|id| n.sessions.get(&id)) {
+                return Some((s.local.0, Some(s.local.1)));
+            }
+            if f.proto != PROTO_ICMP {
+                if let Some(l) = self.static_port_in(ni, f.proto, g) {
+                    return Some((l.0, Some(l.1)));
+                }
+                if let Some(m) = n.map_global.get(&(f.proto, g.0, g.1)).and_then(|id| n.maps.get(id))
+                    && n.talks_to(f.proto, g, r.0)
+                {
+                    return Some((m.local.0, Some(m.local.1)));
+                }
+            }
+        }
+        if let Some(l) = self.static_addr_in(ni, f.dst) {
+            return Some((l, None));
+        }
+        n.map_global.get(&(0, f.dst, 0)).and_then(|id| n.maps.get(id)).map(|m| (m.local.0, None))
     }
 
     /// the inside endpoint of a packet that left translated (the quote of an error from

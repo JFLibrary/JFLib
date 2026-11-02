@@ -2,7 +2,8 @@
 // the canvas, the inspector and the simulator's panels, the status bar, the info dialog
 //
 //   Shell::new()        the dock layout (the user's, else the default) and the dialog flag
-//   frame(n, ui)        the whole window, once per frame
+//   frame(n, ui)        the whole window, once per frame; a lab that locks the problems or its answer
+//                       (Lab::lock, AK2) has no panel Probleme or Aufgabe erstellen, not even in a menu
 //
 // Dock: Geräte (left), Eigenschaften and PDUs (right; PDUs shows with the simulation mode),
 // Terminal / Ereignisse / Paket / Protokoll / Probleme (bottom, one group).  Terminal (the
@@ -88,6 +89,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         return;
     }
     toolbar(n, ui);
+    let lock = crate::workspace::task::lock(n);
+    let hide_problems = lock.problems;
     let panels = [
         DockPanel::new(P_DEVICES, t("Geräte"), JN_DEVICES).at(DOCK_LEFT, 0),
         DockPanel::new(P_PROPS, t("Eigenschaften"), IC_SETTINGS).at(DOCK_RIGHT, 0),
@@ -95,11 +98,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         DockPanel::new(P_EVENTS, t("Ereignisse"), IC_BULLETED_LIST).at(DOCK_BOTTOM, 0),
         DockPanel::new(P_PACKET, t("Paket"), JN_PACKET).at(DOCK_BOTTOM, 0),
         DockPanel::new(P_LOG, t("Protokoll"), IC_HISTORY).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_PROBLEMS, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
+        DockPanel::new(if hide_problems { 0 } else { P_PROBLEMS }, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, t("PDUs"), IC_MAIL).at(DOCK_RIGHT, 1) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_TASK, t("Aufgabe"), IC_FLAG).at(DOCK_RIGHT, 0) },
         DockPanel::new(P_METRICS, t("Metriken"), JN_METRICS).at(DOCK_BOTTOM, 0),
-        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_AUTHOR, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(if lock.answer { 0 } else { P_AUTHOR }, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
@@ -119,7 +122,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             }
             P_DEVICES => palette::frame(n, ui),
             P_PROPS => inspector::frame(n, ui),
-            P_PROBLEMS => problems(n, ui),
+            P_PROBLEMS if !hide_problems => problems(n, ui),
             P_TERMINAL => crate::workspace::terminal::panel(n, ui),
             P_EVENTS => sim::events::frame(n, ui),
             P_PACKET => sim::packet::frame(n, ui),
@@ -127,7 +130,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             P_LOG => crate::workspace::logview::panel(n, ui),
             P_TASK => crate::workspace::task::panel(n, ui),
             P_METRICS => crate::workspace::metrics::panel(n, ui),
-            P_AUTHOR => crate::workspace::author::panel(n, ui),
+            P_AUTHOR if !lock.answer => crate::workspace::author::panel(n, ui),
             _ => {}
         }
     }

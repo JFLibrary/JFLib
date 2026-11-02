@@ -161,7 +161,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
-- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
+- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
@@ -794,6 +794,8 @@ basic -- the basic widgets                                           [src/ui/ui_
   tool_button(id, icon, label, &mut sel, mine) -> EV   selects sel = mine (tool palettes)
   checkbox(id, label, &mut v) -> EV      v: 0, 1, 2 = indeterminate
   radio(id, label, &mut v, mine) -> EV   v = mine when clicked
+  checkbox_wrap / radio_wrap             the same with a label that wraps (next_size(-1, 0)): a mark
+                                         beside a long text, a click on the text counts
   switch(id, label, &mut v) -> EV        toggle switch
   slider(id, &mut v, &range) -> EV       EV_ACT while the value changes, EV_COMMIT on release
   progress(id, v, max)                   progress bar
@@ -842,6 +844,13 @@ Label strings are copied, so they may live in scratch buffers.
 - **`fn checkbox(&mut self, id: u32, label: &str, v: &mut i32) -> u32`**
   ui_checkbox(id, label, &mut v) -> EV_\*: v 0, 1, 2 = indeterminate (Space toggles,
   Enter is the dialog's)
+- **`fn checkbox_wrap(&mut self, id: u32, label: &str, v: &mut i32) -> u32`**
+  ui_checkbox_wrap(id, label, &mut v) -> EV_\*: a check box for a text that may be long: the
+  mark, beside it the label wrapped at the width the layout gives (next_size(-1, 0)); a click
+  on the text toggles too; the record is the check box's, named by the text
+- **`fn radio_wrap(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32`**
+  ui_radio_wrap(id, label, &mut v, mine) -> EV_\*: a radio for a text that may be long, as
+  checkbox_wrap
 - **`fn radio(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32`**
   ui_radio(id, label, &mut v, mine) -> EV_\*: v = mine when clicked; the radios of one
   variable are one Tab stop, the arrows select inside (kbnav.rs)
@@ -7245,6 +7254,9 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
        (st.set_markdown / set_html / set_doc)
+  ui.markdown_fit(&mut MdViewState, text, w_px, MV_*) -> DIP     how high a view w_px wide must be to
+       show the whole text without scrolling: for a short text among other widgets (a question
+       in a form); every block is laid out now; give next_size(-1, h) to markdown_view
   MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
        activated); link: the activated link's target (a click on it, Enter on the focused
        one); hover: the target of the link under the pointer; field: a form field the user
@@ -7451,6 +7463,9 @@ MI_APP: u8 = 2
 
 - **`fn markdown_view(&mut self, id: u32, st: &mut MdViewState, text: &str, flags: u32) -> MdEv`**
   ui_markdown_view(id, &mut st, text, MV_\*) -> MdEv (see the module header of md_view.rs)
+- **`fn markdown_fit(&mut self, st: &mut MdViewState, text: &str, w_px: i32, flags: u32) -> i32`**
+  ui_markdown_fit(&mut st, text, w_px, MV_\*) -> the height in DIP a view w_px wide needs for the whole
+  text (see the module header)
 - **`fn html_view(&mut self, id: u32, st: &mut MdViewState, html: &str, flags: u32) -> MdEv`**
   ui_html_view(id, &mut st, html, MV_\*) -> MdEv: the HTML counterpart of markdown_view
 - **`fn doc_view(&mut self, id: u32, st: &mut MdViewState, flags: u32) -> MdEv`**

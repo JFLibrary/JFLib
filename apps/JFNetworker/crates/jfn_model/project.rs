@@ -83,6 +83,9 @@
 // Hardware (SA1, the simulator's res.rs): the project's "metered" (every device gets the figures of
 // its model: catalog::hw_of) and a device's "hw" (figures of its own).  Neither is written at its
 // default, so a project that does not use them stays the same file.
+//
+// Experiments (SA2, experiment.rs): the project's "experiments", parameter sweeps kept with it; not
+// written while there are none.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -275,6 +278,8 @@ record! {
         /// "Hardware simulieren": devices have CPU and RAM (the simulator's res.rs), by catalog::hw_of
         /// unless they have figures of their own
         pub metered: bool,
+        /// parameter sweeps kept with the project (experiment.rs; empty: none, and no member in the file)
+        pub experiments: Vec<crate::experiment::Experiment>,
     }
 }
 
@@ -361,7 +366,7 @@ impl fmt::Display for LoadErr {
 /// stays the same file
 fn no_default_hw(v: &mut Value) {
     let Value::Object(o) = v else { return };
-    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)));
+    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)) && !(k == "experiments" && *x == Value::Array(Vec::new())));
     for (k, x) in o.iter_mut() {
         if let ("devices", Value::Array(ds)) = (k.as_str(), x) {
             for d in ds.iter_mut() {

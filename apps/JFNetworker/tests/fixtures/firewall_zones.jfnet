@@ -1,0 +1,159 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Drei Zonen",
+  "description": "FW mit den Zonen INNEN (PC1), DMZ (WEB) und AUSSEN (EXT): von innen geht alles hinaus und die Antworten kommen zurueck, von außen kommt nur Web in die DMZ, per Portweiterleitung auf 203.0.113.1:80.",
+  "seed": 7,
+  "next_id": 9,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 192.168.1.10/24 dev eth0\nip route add default via 192.168.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "WEB",
+      "model": "server-1u",
+      "x": 200,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname WEB\nip addr add 10.0.0.10/24 dev eth0\nip route add default via 10.0.0.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo aus der DMZ, {client} fragt {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "EXT",
+      "model": "server-1u",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname EXT\nip addr add 203.0.113.10/24 dev eth0\nip route add default via 203.0.113.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo aus dem Internet, {client} fragt {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "FW",
+      "model": "jf-fw",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname FW\n!\nipv6 unicast-routing\n!\nclass-map type inspect match-any ALLES\n match protocol tcp\n match protocol udp\n match protocol icmp\n!\nclass-map type inspect WEB\n match protocol http\n!\npolicy-map type inspect NACH-AUSSEN\n class type inspect ALLES\n  inspect\n!\npolicy-map type inspect IN-DIE-DMZ\n class type inspect WEB\n  inspect log\n class class-default\n  drop log\n!\nzone security INNEN\n description das Buero\n!\nzone security DMZ\n description der Webserver\n!\nzone security AUSSEN\n!\nzone-pair security I-A source INNEN destination AUSSEN\n service-policy type inspect NACH-AUSSEN\n!\nzone-pair security I-D source INNEN destination DMZ\n service-policy type inspect NACH-AUSSEN\n!\nzone-pair security A-D source AUSSEN destination DMZ\n service-policy type inspect IN-DIE-DMZ\n!\ninterface GigabitEthernet0/0\n ip address 192.168.1.1 255.255.255.0\n ip nat inside\n zone-member security INNEN\n no shutdown\n!\ninterface GigabitEthernet0/1\n ip address 10.0.0.1 255.255.255.0\n ip nat inside\n zone-member security DMZ\n no shutdown\n!\ninterface GigabitEthernet0/2\n ip address 203.0.113.1 255.255.255.0\n ip nat outside\n zone-member security AUSSEN\n no shutdown\n!\nip nat inside source list 1 interface GigabitEthernet0/2 overload\nip nat inside source static tcp 10.0.0.10 80 203.0.113.1 80\n!\naccess-list 1 permit 192.168.1.0 0.0.0.255\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/2"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

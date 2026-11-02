@@ -3,6 +3,7 @@
 // list of the app's labs (Datei › Labor öffnen …)
 //
 //   Task::new()                  no lab
+//   lock(n) -> Lock              what the project's lab hides or forbids (jfn_model::lab::Lock)
 //   loaded(n)                    a new or loaded project: its lab's goals start over, a lab
 //                                brings the panel forward (a tab beside Eigenschaften; the
 //                                right side at least 340 DIP wide)
@@ -42,7 +43,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_model::lab::{Lab, Text};
+use jfn_model::lab::{Lab, Lock, Text};
 use jfn_sim::goal::{check_text, LabRun};
 use jfn_sim::SEC;
 use ui::*;
@@ -152,6 +153,11 @@ pub(crate) fn assessments() -> Vec<LabInfo> {
             Some(LabInfo { path, title: lab.title, summary: lab.summary, topic: lab.topic, goals: lab.goals.len(), points })
         })
         .collect()
+}
+
+/// what the project's lab hides or forbids
+pub(crate) fn lock(n: &Net) -> Lock {
+    n.doc.proj.lab.as_ref().map(|l| l.lock.clone()).unwrap_or_default()
 }
 
 /// a new or loaded project: its lab's goals start over; a lab brings the panel forward (the

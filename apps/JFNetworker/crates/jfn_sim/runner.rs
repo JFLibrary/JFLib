@@ -4,6 +4,8 @@
 //
 //   run_scenario(&Project, &Scenario, name) -> Outcome { report, ok, expects, failed, pcap,
 //   series }
+//   start_actions(&Project, &Engine) -> (actions, refusals)   the faults a project's lab starts with
+//                                         (AK2, Lab::start_faults), with their names resolved
 //
 // The steps go through the Inline driver like the user interface's commands (Cmd::Cli,
 // Cmd::Interrupt for "^C", RunFor, Apply).  A report line is "    12.000004104  WHO  text":
@@ -30,6 +32,12 @@
 // "deploy ..." starts a rolling deployment (A2, deploy.rs): the hosts are a group of the
 // project or names with commas, its log lines follow in the report with their times
 // ("deploy N: ...") after the run they fell into.
+// A project whose lab has start faults gets them before the first step, each with a line
+// "Startfehler N: ..." (the window applies the same actions: doc/sim.rs).
+// "load set", "lb ...", "kv set", "svc set" and "cache clear" change a running service through the
+// Actions the window uses too (HttpLoadSet, LbBackend, LbAlgorithm, KvSet, ServiceConfig, CacheClear),
+// so they run under load and rewinding replays them; "svc set" keeps the project's definition with it,
+// so several steps add up, and a change that needs a restart gets its reason as a FEHLER line.
 // "resize DEV ..." gives a device other hardware (Action::Resize, res.rs): the figures it names on
 // what the device has (a model's where it names one); its line says what it has now; with a
 // downtime the reboot is a fault whose end gets its line like any other.
@@ -42,7 +50,7 @@ use alloc::vec::Vec;
 use jfn_model::catalog::{self, Hw};
 use jfn_model::ifname;
 use jfn_model::project::Project;
-use jfn_model::scenario::{Expect, FaultSpec, HealSpec, HwSpec, Scenario, StepKind};
+use jfn_model::scenario::{Expect, FaultSpec, HealSpec, HwSpec, LbStep, Scenario, StepKind};
 use netpkt::pcapng::{Writer, LINKTYPE_ETHERNET};
 
 use crate::action::Action;
@@ -204,6 +212,22 @@ fn fault_of(p: &Project, e: &Engine, f: &FaultSpec) -> Result<Fault, String> {
     })
 }
 
+/// the faults a project's lab starts with as actions, in the order of the file, and why others could not
+/// be resolved (a lab's issues name those too)
+pub fn start_actions(p: &Project, e: &Engine) -> (Vec<Action>, Vec<String>) {
+    let (mut acts, mut bad) = (Vec::new(), Vec::new());
+    let Some(lab) = &p.lab else {
+        return (acts, bad);
+    };
+    for f in &lab.start_faults {
+        match jfn_model::scenario::parse_fault_text(f).and_then(|(spec, dur)| fault_of(p, e, &spec).map(|fault| Action::Fault { fault, dur })) {
+            Ok(a) => acts.push(a),
+            Err(why) => bad.push(format!("{}: {}", f, why)),
+        }
+    }
+    (acts, bad)
+}
+
 /// the hardware a "resize" step means on a device: what it has now (or its model's), a model's
 /// figures it names, the single ones it names
 fn hw_step(e: &Engine, id: u32, spec: &HwSpec) -> Result<Hw, String> {
@@ -278,6 +302,70 @@ fn deploy_hosts(p: &Project, e: &Engine, hosts: &str) -> Result<Vec<u32>, String
     hosts.split(',').map(|h| resolve(p, e, h).ok_or_else(|| format!("das Gerät oder die Gruppe {} gibt es nicht", h))).collect()
 }
 
+/// a step that is one Action on a device: its line, or a FEHLER line when the device or the action
+/// refuses it; whether it was taken
+#[allow(clippy::too_many_arguments)]
+fn step_act(d: &mut Inline, r: &mut Rep, p: &Project, dev: &str, line: u32, ok: &mut bool, text: String, make: impl FnOnce(u32) -> Result<Action, String>) -> bool {
+    let now = d.eng.now();
+    let res = resolve(p, &d.eng, dev).ok_or_else(|| format!("das Gerät {} gibt es nicht", dev)).and_then(make).and_then(|a| d.send(Cmd::Apply(a), 0).map_err(|e| format!("{}", e)));
+    match res {
+        Ok(_) => {
+            r.line(now, "--", &text);
+            true
+        }
+        Err(e) => {
+            r.line(now, "FEHLER", &format!("Zeile {}: {}", line, e));
+            *ok = false;
+            false
+        }
+    }
+}
+
+/// a "lb" step's verb and what it says after the service: "web3 10.0.2.13:80"
+fn lb_text(op: &LbStep) -> (&'static str, String) {
+    match op {
+        LbStep::Add { name, addr, port, weight } if *weight == 1 => ("add", format!("{} {}:{}", name, addr, port)),
+        LbStep::Add { name, addr, port, weight } => ("add", format!("{} {}:{} weight {}", name, addr, port, weight)),
+        LbStep::Drain(n) => ("drain", n.clone()),
+        LbStep::Remove(n) => ("remove", n.clone()),
+        LbStep::Enable(n) => ("enable", n.clone()),
+        LbStep::Weight(n, w) => ("weight", format!("{} {}", n, w)),
+        LbStep::Algo(a) => ("algo", a.clone()),
+    }
+}
+
+/// the action of a "lb" step
+fn lb_action(dev: u32, svc: &str, op: &LbStep) -> Result<Action, String> {
+    use crate::lb::{Algo, LbOp};
+    let svc = String::from(svc);
+    Ok(match op {
+        LbStep::Algo(a) => {
+            let algo = Algo::parse(a).ok_or_else(|| format!("den Algorithmus {} gibt es nicht (round-robin, least-conn, weighted, hash)", a))?;
+            Action::LbAlgorithm { dev, svc, algo }
+        }
+        LbStep::Add { name, addr, port, weight } => {
+            let addr = netpkt::IpAddr::parse(addr).ok_or_else(|| format!("{} ist keine IP-Adresse", addr))?;
+            Action::LbBackend { dev, svc, op: LbOp::Add { name: name.clone(), addr, port: *port, weight: *weight } }
+        }
+        LbStep::Drain(n) => Action::LbBackend { dev, svc, op: LbOp::Drain { name: n.clone() } },
+        LbStep::Remove(n) => Action::LbBackend { dev, svc, op: LbOp::Remove { name: n.clone() } },
+        LbStep::Enable(n) => Action::LbBackend { dev, svc, op: LbOp::Enable { name: n.clone() } },
+        LbStep::Weight(n, w) => Action::LbBackend { dev, svc, op: LbOp::Weight { name: n.clone(), weight: *w } },
+    })
+}
+
+/// the config of a service with the settings of a "svc set" step: a value is JSON, else a text
+fn svc_config(p: &Project, dev: &str, svc: &str, sets: &[(String, String)]) -> Result<agent_core::jmap::Value, String> {
+    let d = p.find(dev).ok_or_else(|| format!("das Gerät {} gibt es nicht", dev))?;
+    let s = d.services.iter().find(|s| s.name.eq_ignore_ascii_case(svc)).ok_or_else(|| format!("{} hat keinen Dienst {}", dev, svc))?;
+    let mut c = s.config.clone();
+    for (k, v) in sets {
+        let value = agent_core::json::parse(v.as_bytes()).unwrap_or_else(|_| agent_core::jmap::Value::string(v.as_str()));
+        jfn_model::experiment::set_path(&mut c, k, value).map_err(|e| e.text())?;
+    }
+    Ok(c)
+}
+
 /// runs a scenario against a project (`pcap`: capture also without a "pcap" step)
 pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outcome {
     let force_pcap = pcap;
@@ -302,6 +390,24 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
     let mut d = Inline::new(eng);
     drain(&mut d, &mut r);
     let (mut expects, mut failed, mut ok) = (0u32, 0u32, true);
+    let (acts, bad) = start_actions(&proj, &d.eng);
+    for a in acts {
+        let id = d.eng.next_fault_id();
+        match d.send(Cmd::Apply(a), 0) {
+            Ok(_) => {
+                let text = d.eng.faults().iter().find(|m| m.id == id).map_or_else(String::new, |m| m.text.clone());
+                r.line(0, "--", &format!("Startfehler {}: {}", id, text));
+            }
+            Err(e) => {
+                r.line(0, "FEHLER", &format!("Startfehler: {}", e.msg().text()));
+                ok = false;
+            }
+        }
+    }
+    for why in bad {
+        r.line(0, "FEHLER", &format!("Startfehler {}", why));
+        ok = false;
+    }
     let mut pcap: Option<String> = None;
     let mut series: Option<String> = None;
     let mut healed: BTreeSet<u32> = BTreeSet::new();
@@ -499,6 +605,58 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                         ok = false;
                     }
                 }
+            }
+            // what changes under load (SA2)
+            StepKind::LoadSet { dev, svc, rate_m, users } => {
+                let text = match (rate_m, users) {
+                    (Some(r), _) => format!("load set {} {} rps {}.{:03}", dev, svc, r / 1000, r % 1000),
+                    (_, Some(u)) => format!("load set {} {} users {}", dev, svc, u),
+                    _ => format!("load set {} {}", dev, svc),
+                };
+                step_act(&mut d, &mut r, &proj, dev, step.line, &mut ok, text, |id| Ok(Action::HttpLoadSet { dev: id, svc: svc.clone(), rate_m: *rate_m, users: *users }));
+            }
+            StepKind::Lb { dev, svc, op } => {
+                let (verb, rest) = lb_text(op);
+                let text = if rest.is_empty() { format!("lb {} {} {}", verb, dev, svc) } else { format!("lb {} {} {} {}", verb, dev, svc, rest) };
+                step_act(&mut d, &mut r, &proj, dev, step.line, &mut ok, text, |id| lb_action(id, svc, op));
+            }
+            StepKind::KvSet { dev, svc, consistency, w, r: rq } => {
+                let mut text = format!("kv set {} {}", dev, svc);
+                if let Some(c) = consistency {
+                    text.push_str(&format!(" consistency {}", c));
+                }
+                if let Some(x) = w {
+                    text.push_str(&format!(" w {}", x));
+                }
+                if let Some(x) = rq {
+                    text.push_str(&format!(" r {}", x));
+                }
+                step_act(&mut d, &mut r, &proj, dev, step.line, &mut ok, text, |id| {
+                    let cons = match consistency {
+                        Some(c) => Some(crate::kv::Consistency::parse(c).ok_or_else(|| format!("\u{201e}{}\u{201c} kennt kv set nicht (strong, eventual)", c))?),
+                        None => None,
+                    };
+                    Ok(Action::KvSet { dev: id, svc: svc.clone(), consistency: cons, w: *w, r: *rq })
+                });
+            }
+            StepKind::SvcSet { dev, svc, sets } => {
+                let mut text = format!("svc set {} {}", dev, svc);
+                for (k, v) in sets {
+                    text.push_str(&format!(" {} {}", k, v));
+                }
+                let config = svc_config(&proj, dev, svc, sets);
+                let good = step_act(&mut d, &mut r, &proj, dev, step.line, &mut ok, text, |id| config.clone().map(|config| Action::ServiceConfig { dev: id, svc: svc.clone(), config }));
+                // what it runs with now: the next step adds to it
+                if good
+                    && let Ok(config) = config
+                    && let Some(s) = proj.find(dev).map(|x| x.id).and_then(|id| proj.device_mut(id)).and_then(|x| x.services.iter_mut().find(|s| s.name.eq_ignore_ascii_case(svc)))
+                {
+                    s.config = config;
+                }
+            }
+            StepKind::CacheClear { dev, svc } => {
+                let text = format!("cache clear {} {}", dev, svc);
+                step_act(&mut d, &mut r, &proj, dev, step.line, &mut ok, text, |id| Ok(Action::CacheClear { dev: id, svc: svc.clone() }));
             }
             // a rolling deployment (deploy.rs)
             StepKind::Deploy(x) => {

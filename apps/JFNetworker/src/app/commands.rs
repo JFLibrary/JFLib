@@ -39,8 +39,8 @@
 // The start page (ST1, workspace/startpage.rs): Datei › Startseite goes back to it (the save question
 // first), Datei › Projektinfo … edits the project's description and author; while the page shows, only
 // what makes sense without a project stays enabled.
-// The Akademie (AK1, workspace/academy): Datei › Akademie … shows its courses; Esc and Alt+Left go back
-// while its page shows.
+// The Akademie (AK1, AK2, workspace/academy): Datei › Akademie … shows its courses; Esc and Alt+Left go back
+// while its page shows; TIMER_QUIZ moves a test's countdown.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -409,8 +409,11 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_SNAP, flag(n.prefs.snap, CF_CHECKED));
     ui.cmd_state(CMD_MINIMAP, flag(n.prefs.minimap, CF_CHECKED));
     ui.cmd_state(CMD_WLAN_RANGES, flag(n.canvas.wl.ranges, CF_CHECKED));
+    // (a lab that hides the panel Probleme has no such command: Lab::lock, AK2)
+    let hide_problems = crate::workspace::task::lock(n).problems;
     for (k, &p) in PANELS.iter().enumerate() {
-        ui.cmd_state(CMD_PANEL0 + k as u32, flag(n.shell.dock.visible(p), CF_CHECKED));
+        let off = hide_problems && p == P_PROBLEMS;
+        ui.cmd_state(CMD_PANEL0 + k as u32, if off { CF_DISABLED } else { flag(n.shell.dock.visible(p), CF_CHECKED) });
     }
     let t = n.canvas.tool;
     ui.cmd_state(CMD_TOOL_SELECT, flag(t == Tool::Select, CF_CHECKED));
@@ -602,6 +605,10 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // assessments (A1): handing in, the author's panel, the countdown
         CMD_ASSESS_SUBMIT => return crate::workspace::assess::command(n, ui, id),
         CMD_AUTHOR | CMD_AUTHOR_TARGET | CMD_AUTHOR_START | CMD_AUTHOR_SAVE => return crate::workspace::author::command(n, ui, id),
+        UIC_TIMER if arg == TIMER_QUIZ => {
+            crate::workspace::academy::quiz::timer(n, ui);
+            return true;
+        }
         UIC_TIMER if arg == TIMER_ASSESS => {
             crate::workspace::assess::timer(n, ui);
             return true;
@@ -620,7 +627,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // the start page and the project's info (workspace/startpage.rs)
         CMD_START_PAGE..=CMD_SP_FORGET => return crate::workspace::startpage::command(n, ui, id, arg),
         // the Akademie (workspace/academy)
-        CMD_ACADEMY..=CMD_AK_RESET => return crate::workspace::academy::command(n, ui, id, arg),
+        CMD_ACADEMY..=CMD_AK_RETRY => return crate::workspace::academy::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

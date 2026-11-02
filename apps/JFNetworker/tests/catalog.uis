@@ -53,7 +53,7 @@ shot build/jfnetworker/catalog_open.png
 # the tooltip: description and ports
 move button:"JF-FW"
 wait 900
-expect text:"Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+ · Ports: 8× 1G, 2× 10G SFP+, Konsole" exists
+expect text:"Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 1G, 2× 10G SFP+ · Ports: 8× 1G, 2× 10G SFP+, Konsole" exists
 # the search: names and descriptions, every category with a hit open
 click #16385
 type "router"

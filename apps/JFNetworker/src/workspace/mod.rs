@@ -17,7 +17,8 @@
 // host (IDE1): Explorer, tabs, language services, find in files, run as a process or a
 // service, the debugger, tests; its device window's IDE tab hosts it.  startpage.rs: the page the
 // window opens on (new projects and templates, recent projects, labs), the project's info.
-// academy/: the Akademie (AK1): courses from files, their outline, lessons and labs, the progress.
+// academy/: the Akademie (AK1, AK2): courses from files, their outline, lessons and labs, quizzes, tests and
+// fault hunts, the progress.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -52,7 +53,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // the lab's goals follow the simulation (workspace/task.rs), an assessment grades
     task::tick(n);
     assess::tick(n, ui);
-    academy::tick(n);
+    academy::tick(n, ui);
     shell::frame(n, ui);
     terminal::windows(n, ui);
     devwin::frame(n, ui);
