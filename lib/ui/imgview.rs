@@ -21,6 +21,8 @@
 //        currentColor black, IV_TEXT_COLOR: the text colour).  Transparent parts over a
 //        checkerboard (IV_NO_CHECKER: the view's background); the theme decides its colours
 //        (light, dark, high contrast: plain background).
+//        With a GPU the view's zoom and pan come from tiles while they run (canvas.rs, st.gpu: "image"),
+//        the CPU draws the picture a moment later.
 //   ImageViewState { zoom, cx, cy, fit, label }: zoom 1.0 = 100 % (a bitmap pixel on one
 //        screen pixel, an SVG at its intrinsic size in DIP); (cx, cy) the image point at the
 //        view's centre; fit: the zoom follows the view.  st.set_fit() / set_actual() /
@@ -45,6 +47,7 @@ use img_core::xform::{affine, XF_TRANSPARENT};
 use img_svg::{FontSpec, Opts, Svg, TextHook};
 use text::{Gp, Text, FONT_BOLD, FONT_REG, FONT_SEMI};
 
+use crate::canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
 use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::consts::*;
 use crate::i18n::tr;
@@ -323,13 +326,15 @@ pub struct ImageViewState {
     pub fit: bool,
     /// the accessible name (empty: the SVG's title, else "Bild")
     pub label: String,
+    /// how the view's zoom and pan use the GPU (canvas.rs)
+    pub gpu: CanvasGpu,
     key: usize,
     ver: u32,
     // a PARGB copy of an XRGB bitmap and the mip levels
     conv: Option<Rc<Surface>>,
     mips: Option<Rc<MipChain>>,
     g: Gesture,
-    draw: Option<(u64, DrawRef)>,
+    draw: Option<(u64, Rc<IvDraw>)>,
     // the last frame: view size (px), device px per image px at zoom 1
     view: [i32; 2],
     unit: f64,
@@ -343,6 +348,7 @@ impl Default for ImageViewState {
             cy: 0.0,
             fit: true,
             label: String::new(),
+            gpu: CanvasGpu::Zoom,
             key: 0,
             ver: 0,
             conv: None,
@@ -450,9 +456,9 @@ enum IvImg {
 
 impl IvDraw {
     // the bitmap through the mips and the sampler into the rows y0 .. y1 of x0 .. x1
-    fn bitmap(&self, g: &mut Gfx, src0: &Surface, a: [i32; 4]) {
+    fn bitmap(&self, g: &mut Gfx, src0: &Surface, a: [i32; 4], v: CanvasView) {
         let mut src = src0;
-        let mut s = self.s;
+        let mut s = v.scale;
         let mut level = 1;
         if let Some(m) = &self.mips {
             while s < 0.5 {
@@ -468,7 +474,7 @@ impl IvDraw {
         }
         let sx = src.w as f64 / src0.w.max(1) as f64; // level px per image px
         let sy = src.h as f64 / src0.h.max(1) as f64;
-        let filter = if self.s >= NEAREST_FROM && self.flags & IV_SMOOTH == 0 { RS_NEAREST } else { RS_BILINEAR };
+        let filter = if v.scale >= NEAREST_FROM && self.flags & IV_SMOOTH == 0 { RS_NEAREST } else { RS_BILINEAR };
         let w = a[2] - a[0];
         const BAND: i32 = 64;
         let mut tile = Surface::new(w, BAND, FMT_PARGB);
@@ -480,7 +486,7 @@ impl IvDraw {
         while y < a[3] {
             let n = (a[3] - y).min(BAND);
             // tile (tx, ty) = device (tx + a[0], ty + y) -> level px
-            let m = Matrix { a: sx / self.s, b: 0.0, c: (a[0] as f64 - self.ox) * sx / self.s, d: 0.0, e: sy / self.s, f: (y as f64 - self.oy) * sy / self.s };
+            let m = Matrix { a: sx / v.scale, b: 0.0, c: (a[0] as f64 - v.ox) * sx / v.scale, d: 0.0, e: sy / v.scale, f: (y as f64 - v.oy) * sy / v.scale };
             if affine(src, &mut tile, &m, filter, XF_TRANSPARENT, Some([0, 0, w, n])) != 0 {
                 return;
             }
@@ -492,7 +498,7 @@ impl IvDraw {
                 match self.checker {
                     Some((cell, c0, c1)) => {
                         let cfg = gfx::straight::ViewCfg { cell, c0, c1 };
-                        gfx::straight::view_row_pm(drow, trow, a[0] - self.ox as i32, y + r - self.oy as i32, &cfg);
+                        gfx::straight::view_row_pm(drow, trow, a[0] - v.ox as i32, y + r - v.oy as i32, &cfg);
                     }
                     None => gfx::blend::blit_over(drow, trow, 255),
                 }
@@ -502,7 +508,7 @@ impl IvDraw {
     }
 
     // the checkerboard under an SVG
-    fn checker_fill(&self, g: &mut Gfx, a: [i32; 4]) {
+    fn checker_fill(&self, g: &mut Gfx, a: [i32; 4], v: CanvasView) {
         let Some((cell, c0, c1)) = self.checker else { return };
         let cfg = gfx::straight::ViewCfg { cell, c0, c1 };
         let stride = g.sf.stride as usize;
@@ -510,28 +516,28 @@ impl IvDraw {
             let d = y as usize * stride + a[0] as usize * 4;
             let Some(row) = g.sf.px.get_mut(d..d + (a[2] - a[0]) as usize * 4) else { continue };
             for (i, px) in row.chunks_exact_mut(4).enumerate() {
-                let c = gfx::straight::view_bg(a[0] + i as i32 - self.ox as i32, y - self.oy as i32, &cfg);
+                let c = gfx::straight::view_bg(a[0] + i as i32 - v.ox as i32, y - v.oy as i32, &cfg);
                 px.copy_from_slice(&c.to_le_bytes());
             }
         }
     }
 
     // pixel boundaries at high zoom
-    fn grid(&self, g: &mut Gfx, a: [i32; 4]) {
+    fn grid(&self, g: &mut Gfx, a: [i32; 4], v: CanvasView) {
         let (dx, dy) = (g.dc.ox, g.dc.oy);
         g.dc.set_color(self.grid);
-        let i0 = ((a[0] as f64 - self.ox) / self.s).max(0.0) as i64;
-        let i1 = (((a[2] as f64 - self.ox) / self.s) as i64 + 1).min(self.iw as i64);
+        let i0 = ((a[0] as f64 - v.ox) / v.scale).max(0.0) as i64;
+        let i1 = (((a[2] as f64 - v.ox) / v.scale) as i64 + 1).min(self.iw as i64);
         for i in i0..=i1 {
-            let x = (self.ox + i as f64 * self.s).rnd() as i32;
+            let x = (v.ox + i as f64 * v.scale).rnd() as i32;
             if x >= a[0] && x < a[2] {
                 g.dc.fill(g.sf, x - dx, a[1] - dy, 1, a[3] - a[1]);
             }
         }
-        let j0 = ((a[1] as f64 - self.oy) / self.s).max(0.0) as i64;
-        let j1 = (((a[3] as f64 - self.oy) / self.s) as i64 + 1).min(self.ih as i64);
+        let j0 = ((a[1] as f64 - v.oy) / v.scale).max(0.0) as i64;
+        let j1 = (((a[3] as f64 - v.oy) / v.scale) as i64 + 1).min(self.ih as i64);
         for j in j0..=j1 {
-            let y = (self.oy + j as f64 * self.s).rnd() as i32;
+            let y = (v.oy + j as f64 * v.scale).rnd() as i32;
             if y >= a[1] && y < a[3] {
                 g.dc.fill(g.sf, a[0] - dx, y - dy, a[2] - a[0], 1);
             }
@@ -541,6 +547,19 @@ impl IvDraw {
 
 impl Draw for IvDraw {
     fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
+        self.paint(g, r, CanvasView { scale: self.s, ox: self.ox, oy: self.oy });
+    }
+}
+
+impl CanvasContent for IvDraw {
+    fn draw_view(&self, g: &mut Gfx, v: CanvasView, rect: [i32; 4]) {
+        self.paint(g, rect, v);
+    }
+}
+
+impl IvDraw {
+    // background and image through view v in the clip
+    fn paint(&self, g: &mut Gfx, r: [i32; 4], v: CanvasView) {
         let (dx, dy) = (g.dc.ox, g.dc.oy);
         let clip = g.dc.clip;
         let view = [r[0] + dx, r[1] + dy, r[0] + dx + r[2], r[1] + dy + r[3]];
@@ -553,10 +572,10 @@ impl Draw for IvDraw {
         g.dc.fill(g.sf, k[0] - dx, k[1] - dy, k[2] - k[0], k[3] - k[1]);
         // the image's pixels inside the clip
         let ir = [
-            self.ox.max(-1.0e9) as i64,
-            self.oy.max(-1.0e9) as i64,
-            (self.ox + self.iw * self.s).min(1.0e9).ceil_i64(),
-            (self.oy + self.ih * self.s).min(1.0e9).ceil_i64(),
+            v.ox.max(-1.0e9) as i64,
+            v.oy.max(-1.0e9) as i64,
+            (v.ox + self.iw * v.scale).min(1.0e9).ceil_i64(),
+            (v.oy + self.ih * v.scale).min(1.0e9).ceil_i64(),
         ];
         let a = [
             (ir[0].max(k[0] as i64)) as i32,
@@ -569,16 +588,16 @@ impl Draw for IvDraw {
         }
         match &self.img {
             IvImg::Bitmap(sf) => {
-                self.bitmap(g, sf, a);
-                if self.s >= GRID_FROM && self.flags & IV_NO_GRID == 0 {
-                    self.grid(g, a);
+                self.bitmap(g, sf, a, v);
+                if v.scale >= GRID_FROM && self.flags & IV_NO_GRID == 0 {
+                    self.grid(g, a, v);
                 }
             }
             IvImg::Svg(doc) => {
-                self.checker_fill(g, a);
+                self.checker_fill(g, a, v);
                 let mut th = SvgText { text: &mut *g.text, fonts: &self.fonts };
                 let mut o = Opts { color: self.color, text: Some(&mut th) };
-                let m = Matrix { a: self.s, b: 0.0, c: self.ox, d: 0.0, e: self.s, f: self.oy };
+                let m = Matrix { a: v.scale, b: 0.0, c: v.ox, d: 0.0, e: v.scale, f: v.oy };
                 doc.render(g.sf, &m, Some(a), &mut o);
             }
         }
@@ -880,15 +899,17 @@ impl Ui {
         };
         let color = if flags & IV_TEXT_COLOR != 0 { self.color(T_TEXT) } else { 0xFF00_0000 };
         let fonts = self.svg_fonts();
+        // what the view shows, wherever it lies
         let mut h = Fnv::new();
         h.u64(key as u64 | (st.ver as u64) << 48);
-        h.u64(s.to_bits());
-        h.u64(ox.to_bits());
-        h.u64(oy.to_bits());
         h.u64(flags as u64 | (bg as u64) << 32);
         h.u64(checker.map_or(0, |c| c.0 as u64 | (c.1 as u64) << 16 | (c.2 as u64) << 40));
         h.u64(grid as u64 | (color as u64) << 32);
         h.u64(Rc::as_ptr(&fonts) as usize as u64 ^ st.mips.as_ref().map_or(0, |m| Rc::as_ptr(m) as usize as u64));
+        let content = h.0;
+        h.u64(s.to_bits());
+        h.u64(ox.to_bits());
+        h.u64(oy.to_bits());
         let hash = h.0;
         let obj = match &st.draw {
             Some((k, d)) if *k == hash => d.clone(),
@@ -897,7 +918,7 @@ impl Ui {
                     ViewImage::Bitmap(sf, _) => IvImg::Bitmap(st.conv.clone().unwrap_or_else(|| sf.clone())),
                     ViewImage::Svg(d) => IvImg::Svg(d.clone()),
                 };
-                let d: DrawRef = Rc::new(IvDraw {
+                let d = Rc::new(IvDraw {
                     img: image,
                     mips: st.mips.clone(),
                     s,
@@ -918,7 +939,11 @@ impl Ui {
         };
         self.ltr_begin(r[0], r[2]);
         self.clip_push(r[0], r[1], r[2], r[3]);
-        self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj), 0, hash as u32);
+        self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj.clone()), 0, hash as u32);
+        if has {
+            let (view, ver, gpu) = (CanvasView { scale: s, ox, oy }, (content ^ content >> 32) as u32, st.gpu);
+            self.canvas_gpu(CanvasDesc { id, name: "image", rect: r, view, ver, content: obj, gpu, exact_pan: false });
+        }
         // scroll bars (over the image; their hit boxes after the view's)
         if has && flags & IV_NO_BARS == 0 {
             let sty = self.style;

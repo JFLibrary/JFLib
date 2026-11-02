@@ -18,6 +18,8 @@
 //   view_frame_end(p, ui)            lends the layers to the draw object (end of every pass
 //                                    and command); view_reclaim(p) takes them back
 //   view_canvas_rect(v) -> [x, y, w, h] of the image on screen
+//   view_canvas_gpu(p, ui)           the canvas command recorded last: what it shows through which
+//                                    view (ui.canvas_gpu, lib/ui/canvas.rs: moves come from tiles)
 //
 // The image is centred while it is smaller than the view; otherwise it scrolls, with a
 // margin around it.
@@ -42,6 +44,11 @@ use crate::Kritzel;
 const ZOOM_MIN: i32 = 125;
 const ZOOM_MAX: i32 = 8000;
 static ZOOM_LEVELS: [i32; 12] = [125, 250, 333, 500, 667, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
+/// how the canvas's moves use the GPU: a pan comes from tiles, byte for byte what the CPU draws (the
+/// mapping of blit_scaled does not depend on the place).  A zoom step goes the CPU's way at once:
+/// CanvasGpu::Zoom would scale tiles until the CPU has drawn the picture, softer for a moment and
+/// not much cheaper (docs/GPU.md "Leinwände"); jfgui_GPU_CANVAS_CPU=kritzel keeps all of it on the CPU
+const CANVAS_GPU: CanvasGpu = CanvasGpu::Pan;
 
 /// the view state (the .data / .bss of view.s)
 pub(crate) struct View {
@@ -146,6 +153,7 @@ pub(crate) fn view_version(p: &Kritzel) -> u32 {
 /// widget (rc = its rectangle, px) is redrawn with the next render (ui.canvas_damage)
 pub(crate) fn view_damage(p: &mut Kritzel, ui: &mut Ui, rc: [i32; 4]) {
     let Some([x0, y0, x1, y1]) = doc_damage_take(&mut p.doc) else { return };
+    ui.canvas_gpu_damage(ID_CANVAS, [x0 as f64, y0 as f64, x1 as f64, y1 as f64]);
     let v = &p.view;
     let (dw, dh) = (doc_w(&p.doc).max(1) as i64, doc_h(&p.doc).max(1) as i64);
     // doc -> screen exactly as the blit maps it (gfx blit_scaled: screen px u shows doc px
@@ -281,6 +289,8 @@ pub(crate) struct ViewDraw {
     opaque: Cell<bool>,
     /// checker cell (8 DIP)
     cell: Cell<i32>,
+    /// what lies around the image (a tile's part outside it)
+    bg: Cell<u32>,
 }
 
 /// the canvas draw object (one per app: its identity keeps the canvas command stable)
@@ -298,7 +308,7 @@ pub(crate) fn view_draw_ref(p: &mut Kritzel) -> DrawRef {
             w: 0,
             h: 0,
         };
-        Rc::new(ViewDraw { comp, lent: RefCell::new(lent), rect: Cell::new([0; 4]), opaque: Cell::new(true), cell: Cell::new(8) })
+        Rc::new(ViewDraw { comp, lent: RefCell::new(lent), rect: Cell::new([0; 4]), opaque: Cell::new(true), cell: Cell::new(8), bg: Cell::new(0xFF80_8080) })
     });
     d.clone()
 }
@@ -328,6 +338,29 @@ pub(crate) fn view_frame_end(p: &mut Kritzel, ui: &mut Ui) {
     d.cell.set(ui.dp(8));
 }
 
+/// after the canvas command and view_layout: the canvas shows the composite through the view; a
+/// pan comes from tiles while it runs (lib/ui/canvas.rs)
+pub(crate) fn view_canvas_gpu(p: &mut Kritzel, ui: &mut Ui) {
+    if !ui.canvas_gpu_wanted() {
+        return;
+    }
+    let Some(d) = p.view.draw.clone() else { return };
+    let bg = ui.color(T_BG_ALT) | 0xFF00_0000;
+    let (cell, opaque) = (ui.dp(8), doc_opaque(&p.doc));
+    d.bg.set(bg);
+    d.cell.set(cell);
+    d.opaque.set(opaque);
+    // what the tiles hold besides the pixels (those are damage: view_damage)
+    let mut ver = 0x811C_9DC5u32;
+    for x in [doc_w(&p.doc) as u32, doc_h(&p.doc) as u32, bg, cell as u32, opaque as u32] {
+        ver = ver.wrapping_mul(0x0100_0193).wrapping_add(x);
+    }
+    let v = &p.view;
+    let view = CanvasView { scale: v.zoom as f64 / 1000.0, ox: v.cx as f64, oy: v.cy as f64 };
+    let rect = [v.cx, v.cy, v.cw, v.ch];
+    ui.canvas_gpu(CanvasDesc { id: ID_CANVAS, name: "kritzel", rect, view, ver, content: d, gpu: CANVAS_GPU, exact_pan: true });
+}
+
 /// start of a pass or command: take the layers back (with the dirty state a render left)
 pub(crate) fn view_reclaim(p: &mut Kritzel) {
     let Some(d) = p.view.draw.clone() else { return };
@@ -345,6 +378,29 @@ pub(crate) fn view_reclaim(p: &mut Kritzel) {
 impl Draw for ViewDraw {
     // view_draw(user, rect) -- render the image into the view (ui.canvas callback)
     fn draw(&self, g: &mut Gfx, _r: [i32; 4]) {
+        self.paint(g, self.rect.get());
+    }
+}
+
+impl CanvasContent for ViewDraw {
+    // a tile: as the canvas, through its view (blit_scaled's mapping starts at the image's corner:
+    // a tile holds what the window holds, whole pixels away)
+    fn draw_view(&self, g: &mut Gfx, v: CanvasView, rect: [i32; 4]) {
+        g.dc.set_color(self.bg.get());
+        g.dc.fill(g.sf, rect[0], rect[1], rect[2], rect[3]);
+        let z = (v.scale * 1000.0 + 0.5) as u32;
+        let (w, h) = {
+            let comp = self.comp.borrow();
+            (comp.w as u32, comp.h as u32)
+        };
+        let size = |d: u32| (d.wrapping_mul(z).wrapping_add(500) / 1000) as i32;
+        self.paint(g, [v.ox as i32, v.oy as i32, size(w), size(h)]);
+    }
+}
+
+impl ViewDraw {
+    // the composite up to date, over the checkerboard, in the rectangle cx, cy, cw, ch
+    fn paint(&self, g: &mut Gfx, r: [i32; 4]) {
         {
             let mut l = self.lent.borrow_mut();
             if l.held {
@@ -355,17 +411,16 @@ impl Draw for ViewDraw {
         }
         let comp = self.comp.borrow();
         if !self.opaque.get() {
-            self.draw_checker(g);
+            self.draw_checker(g, r);
         }
-        let [cx, cy, cw, ch] = self.rect.get();
+        let [cx, cy, cw, ch] = r;
         g.dc.blit_scaled(g.sf, &comp, cx, cy, cw, ch);
     }
-}
-impl ViewDraw {
+
     // draw_checker() -- light/grey 8 DIP checkerboard under the image
-    fn draw_checker(&self, g: &mut Gfx) {
+    fn draw_checker(&self, g: &mut Gfx, r: [i32; 4]) {
         let c = self.cell.get();
-        let [cx, cy, cw, ch] = self.rect.get();
+        let [cx, cy, cw, ch] = r;
         g.dc.clip_push(cx, cy, cw, ch);
         g.dc.set_color(0xFFFF_FFFF);
         g.dc.fill(g.sf, cx, cy, cw, ch);

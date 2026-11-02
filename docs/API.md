@@ -288,6 +288,22 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `image_uploads: u64`
   - `image_hits: u64`
   - `image_evicted: u64`
+  - `canvas_apart: u32` -- canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
+    in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
+    and the time that took (us), tiles evicted, gestures ended by the CPU's picture
+  - `canvas_quads: u32`
+  - `canvas_frames: u64`
+  - `canvas_tiles: u32`
+  - `canvas_bytes: u64`
+  - `canvas_fills: u64`
+  - `canvas_fill_us: u64`
+  - `canvas_evicted: u64`
+  - `canvas_settles: u64`
+  - `canvas_diff_frames: u64` -- jfgui_GPU_VERIFY: where the tiles' picture differed from the CPU's during a gesture: frames,
+    pixels, the sum of the largest channel difference per pixel, the largest one
+  - `canvas_diff_px: u64`
+  - `canvas_diff_sum: u64`
+  - `canvas_diff_max: u32`
   - `render_us: u64` -- time in the window's renders and presents (us)
   - `present_us: u64`
   - `switches: u32` -- switches to the swapchain, and back to the CPU path
@@ -374,7 +390,8 @@ event carries its window (Event::win).
 
 - **`fn fb(&self) -> &Surface`**
   ui_fb: the live window's framebuffer.  While its frames go through the GPU a big image may be
-  drawn only there: Ui::gpu_settle() first when the pixels matter
+  drawn only there, the view of a canvas while it moves (canvas.rs) too: Ui::gpu_settle() first
+  when the pixels matter
 - **`fn client_size(&self) -> (i32, i32)`**
   ui_client_size: client area in DIP
 - **`fn anim_off(&self) -> bool`**
@@ -4429,7 +4446,9 @@ there before the rectangles are drawn.
 
 While a window's frames go through the GPU (gpu_out.rs, W::split) the pass also keeps the hash
 of every cell after each layer (W::through: what changed in which layer) and notes the big
-images of the base layer and which cells they end up on top of (W::top, W::imgs).
+images of the base layer and which cells they end up on top of (W::top, W::imgs).  A canvas whose
+view comes from tiles (canvas.rs, W::canv) is noted the same way; its hash stands only for where
+it lies: what it shows there is the GPU's.
 ```
 
 **`impl Ui`**
@@ -6459,7 +6478,9 @@ every dirty rectangle copies its part out of it.  Skip what lies outside DgFrame
 wheel turns until MOVING_MS after the last one, a drag of nodes or a waypoint)
 DgFrame::moving asks for less detail; a full paint follows the gesture.  Content that moves
 every frame (packets) is best drawn after diagram() with ui.draw_* inside
-ui.clip_push(st.vp.rect).
+ui.clip_push(st.vp.rect).  With a GPU a pan or a wheel zoom comes from tiles of the full paint
+(canvas.rs, DiagramState::gpu, "diagram"; the first ones are copied from the backing store), no
+less detail then; the CPU paints what lies under overlays and, a moment after it ends, the view.
 ```
 
 ```rust
@@ -6650,6 +6671,7 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `name: String` -- the canvas' name for screen readers (its K_CANVAS record; empty: none)
   - `frame_bar: f32` -- the height of a DN_FRAME node's title bar in world units (its hit area, its record, the
     side of its DN_TOGGLE button)
+  - `gpu: CanvasGpu` -- how the view's pan and zoom use the GPU (canvas.rs)
 
 **`impl DiagramState`**
 
@@ -7799,6 +7821,8 @@ imgview -- SVG pictures and the image viewer (ROADMAP §6)
        currentColor black, IV_TEXT_COLOR: the text colour).  Transparent parts over a
        checkerboard (IV_NO_CHECKER: the view's background); the theme decides its colours
        (light, dark, high contrast: plain background).
+       With a GPU the view's zoom and pan come from tiles while they run (canvas.rs, st.gpu: "image"),
+       the CPU draws the picture a moment later.
   ImageViewState { zoom, cx, cy, fit, label }: zoom 1.0 = 100 % (a bitmap pixel on one
        screen pixel, an SVG at its intrinsic size in DIP); (cx, cy) the image point at the
        view's centre; fit: the zoom follows the view.  st.set_fit() / set_actual() /
@@ -7852,6 +7876,7 @@ IV_TEXT_COLOR: u32 = 32  // an SVG's currentColor is the text colour (else black
   - `cy: f64`
   - `fit: bool` -- the zoom follows the view: the whole image, centred
   - `label: String` -- the accessible name (empty: the SVG's title, else "Bild")
+  - `gpu: CanvasGpu` -- how the view's zoom and pan use the GPU (canvas.rs)
 
 **`impl ImageViewState`**
 
@@ -8424,6 +8449,21 @@ CPU neither draws nor uploads them (Split::owed: the framebuffer lacks them; gp_
 before anybody reads it).  Everything else, also the cells at the image's edge or with something
 on top of it, goes the usual way.
 
+Canvases (G3c, canvas.rs).  While a canvas's view moves and its content stays, its content comes
+from tiles: TILE x TILE px textures of the content at one scale (a Level), drawn once by
+CanvasContent::draw_view on this thread (at most FILL_US per frame) and kept under a budget with
+LRU eviction.  The render pass draws them with the transform: by copy (fs) at the level's scale
+and whole pixels away, else bilinear (fs_tile).  In the cells the canvas ends up on top of (also
+those it only partly covers, with the scissor at its edge) the CPU neither draws nor uploads it:
+its command's hash stands only for where it lies (dirty.rs), Split::owed and Split::stale as for
+images, gp_settle runs its Draw before anybody reads the framebuffer.  Cells with something over
+it and cells without their tiles go the CPU's way: its Draw, the overlay, the upload.  SETTLE_US
+after the last move gp_tick asks for a frame, the canvas is no longer apart, the CPU draws what
+the view shows: at rest the picture is the CPU path's.  A frame that changes the content (new
+CanvasDesc::ver, ui.canvas_gpu_damage) ends the gesture at once and costs no tile; a tile is only
+drawn when a view moves over it.  Nothing of it exists before the first move, and nothing SETTLE
++ CANVAS_UNUSED_US after the last one.  Right-to-left windows draw canvases on the CPU.
+
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 usable adapter or surface: the CPU path for good, silently.
@@ -8431,19 +8471,26 @@ usable adapter or surface: the CPU path for good, silently.
 Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
-jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget); lib/gpu's
-jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
+canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
+jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (they also zoom from
+tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
+jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
+lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
 without a GPU, it prints a SKIP once and does nothing):
-  gpu on                 a real window per UI window (shown without activation) with
-                         the output, every presented image compared with the framebuffer, a
-                         render after every input edge; waits for the swapchain
+  gpu on [fast]          a real window per UI window (shown without activation) with
+                         the output, every presented image compared with the framebuffer (fast:
+                         not compared, for measurements), a render after every input edge; waits
+                         for the swapchain; a canvas stays apart until `gpu settle` or `same`
   gpu off                windows closed
   gpu wait [MS]          until the scoped windows are on the swapchain (after `size`, `gpu lose`)
   gpu expect gpu|cpu     the main window's stage
-  gpu expect same        every window presents once more: the image read back = the framebuffer
-                         byte for byte (x byte: 255), and no frame differed since the last check
+  gpu settle             every canvas goes back to the CPU's picture now
+  gpu expect same        every canvas settled, every window presents once more: the image read
+                         back = the framebuffer byte for byte (x byte: 255), and no frame differed
+                         since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
                          top of ours is a note, not a failure)
   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
@@ -8452,7 +8499,15 @@ without a GPU, it prints a SKIP once and does nothing):
   gpu expect raster N    at most N pixels of the base layer drawn since the last check
   gpu expect layers N    N layers above the base have a texture now
   gpu expect images N    N image textures exist
+  gpu expect apart N     N canvases of the window come from tiles now
+  gpu expect tiles N     N canvas tiles exist
+  gpu expect fills N     at most N tiles were drawn since the last check
+  gpu expect nodiff      no pixel of a canvas's tiles differed from the CPU's since the last
+                         `same` or `nodiff`
   gpu budget BYTES       the images' budget
+  gpu tilebudget BYTES   the tiles' budget
+  gpu shot FILE          the image the window presents now (read back: also what a gesture's
+                         tiles show; `shot` writes the framebuffer)
   gpu lose               the device behaves as lost from now on (Device::test_lose)
   gpu print              the counters
 ```
@@ -8466,6 +8521,12 @@ without a GPU, it prints a SKIP once and does nothing):
   path, a new device follows
 - **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
   (test aid) the bytes image textures may take
+- **`fn gpu_test_canvas_budget(&mut self, bytes: u64)`**
+  (test aid) the bytes canvas tiles may take
+- **`fn gpu_test_canvas_unused(&mut self, ms: u64)`**
+  (test aid) the tiles go this long (ms) after the last move
+- **`fn gpu_canvas_settle(&mut self)`**
+  every canvas whose view comes from tiles goes back to the CPU's picture with the next frame
 - **`fn gpu_settle(&mut self)`**
   the pixels of the images the GPU draws into the framebuffers (Ui::fb reads them then)
 
@@ -8488,6 +8549,83 @@ every frame takes the platform's path, no Vulkan code is linked
   on Windows: the pixels of the GPU's images into the framebuffer
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
   (test aid) on Windows: the bytes image textures may take
+- **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
+  (test aid) on Windows: the bytes canvas tiles may take
+- **`fn gpu_test_canvas_unused(&mut self, _ms: u64)`**
+  (test aid) on Windows: the tiles go this long (ms) after the last move
+- **`fn gpu_canvas_settle(&mut self)`**
+  on Windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+
+#### `ui/canvas.rs`
+
+Source: [`lib/ui/canvas.rs`](../lib/ui/canvas.rs)
+
+```text
+canvas -- a canvas whose zoom and pan go through GPU textures (G3c; docs/GPU.md "Leinwände")
+
+The CPU stays the truth: a canvas records its Cmd::Custom as ever (ui.canvas, ui.cmd_custom), its
+Draw paints what the view shows.  Right after it the widget tells the library what that drawing
+is made of:
+
+  ui.canvas_gpu_wanted() -> bool     is it worth building a CanvasDesc?  (Never on other targets,
+                                     without a GPU output, in headless runs.)
+  ui.canvas_gpu(CanvasDesc { .. })   the custom command recorded last shows this content through
+                                     this view
+  ui.canvas_gpu_damage(id, r)        the content rectangle r (x0, y0, x1, y1, content units)
+                                     changed: its tiles are drawn again when they are needed
+
+While the view moves and the content stays, the content comes from tiles (TILE x TILE px GPU
+textures, drawn once by CanvasContent::draw_view, kept under a budget) that the render pass draws
+with the transform: no raster, no upload of the view.  A short time after the last change the
+view is drawn once more by the CPU: at rest the picture is byte for byte the CPU path's.  An edit
+goes the CPU's way as without a GPU and costs no tile.
+
+Everywhere else, and with CanvasGpu::Cpu, ui.canvas_gpu does nothing and the Draw paints every
+frame; the widget's code stays the same on every target.
+```
+
+- **`enum CanvasGpu`**
+  how a canvas may use the GPU while its view moves
+  - `Cpu` -- the CPU path in every frame, as without a GPU
+  - `Pan` -- moves by whole pixels at the same scale come from the tiles; another scale is drawn by the
+    CPU at once.  Pixel-exact when the content's raster does not depend on its place
+  - `Zoom` -- also zoom: the tiles are scaled while the gesture runs (a little soft or coarse), the CPU
+    draws the picture sharp a moment after it
+
+- **`struct CanvasView`**
+  the view of a canvas: the content point (u, v) shows at the window pixel position
+  (ox + u \* scale, oy + v \* scale)
+  - `scale: f64`
+  - `ox: f64`
+  - `oy: f64`
+
+- **`trait CanvasContent`**
+  what a canvas shows, drawable through any view (at render time)
+  - `fn draw_view(&self, g: &mut Gfx, v: CanvasView, rect: [i32; 4])`
+    draw the content through view v into g (origin 0, the clip says what needs pixels, rect = the
+    target's rectangle): what the canvas's Draw paints there at this view, without what lies
+    over it, every pixel opaque
+
+- **`struct CanvasDesc`**
+  a canvas for ui.canvas_gpu
+  - `id: u32` -- its identity in the window (the tiles live as long as it is drawn; ui.canvas_gpu_damage)
+  - `name: &'static str` -- its name for jfgui_GPU_CANVAS_CPU / jfgui_GPU_CANVAS_PAN ("image", "diagram", ...)
+  - `rect: [i32; 4]` -- the window rectangle x, y, w, h the content fills, opaque (inside the custom command's box)
+  - `view: CanvasView`
+  - `ver: u32` -- stands for everything the content shows: another value drops its tiles
+  - `content: Rc<dyn CanvasContent>`
+  - `gpu: CanvasGpu`
+  - `exact_pan: bool` -- the raster does not depend on the place: a move by whole pixels must match byte for byte
+    (jfgui_GPU_VERIFY fails on a difference; else it is counted, GpuOutput::canvas_diff_\*)
+
+**`impl Ui`**
+
+- **`fn canvas_gpu_wanted(&self) -> bool`**
+  is the GPU output there to use a CanvasDesc?  A widget without one saves building it
+- **`fn canvas_gpu(&mut self, d: CanvasDesc)`**
+  the custom command recorded last shows this content through this view (module header)
+- **`fn canvas_gpu_damage(&mut self, id: u32, r: [f64; 4])`**
+  the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go
 
 #### `ui/inspect.rs`
 

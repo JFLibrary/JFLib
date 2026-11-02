@@ -531,6 +531,7 @@ impl Ui {
         w.dcol = 0xFF00_0000;
         self.wp.rtl.reset();
         self.wp.scopy.reset(); // the scroll views recorded (scrollcopy.rs)
+        self.wp.canv.recs.clear(); // the canvases recorded (canvas.rs)
     }
 
     /// cmd_layer(l) -> previous layer

@@ -20,6 +20,17 @@ impl Ui {
     pub(crate) fn gp_plan_images(&mut self) -> bool {
         false
     }
+    pub(crate) fn gp_plan_canvases(&mut self) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_wanted(&self) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_steady(&self, _id: u32, _ver: u32) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_begin(&mut self) {}
+    pub(crate) fn gp_canvas_damage(&mut self, _id: u32, _r: [f64; 4]) {}
     pub(crate) fn gp_split_begin(&mut self, _n: i32) -> bool {
         false
     }
@@ -53,6 +64,15 @@ impl Ui {
 
     /// (test aid) on Windows: the bytes image textures may take
     pub fn gpu_test_image_budget(&mut self, _bytes: u64) {}
+
+    /// (test aid) on Windows: the bytes canvas tiles may take
+    pub fn gpu_test_canvas_budget(&mut self, _bytes: u64) {}
+
+    /// (test aid) on Windows: the tiles go this long (ms) after the last move
+    pub fn gpu_test_canvas_unused(&mut self, _ms: u64) {}
+
+    /// on Windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+    pub fn gpu_canvas_settle(&mut self) {}
 
     // the script command `gpu` (gpu_out.rs): a SKIP once
     pub(crate) fn sc_gpu(&mut self, _app: &mut dyn App, _a: &[u8]) {

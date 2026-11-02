@@ -19,7 +19,9 @@
 //
 // While a window's frames go through the GPU (gpu_out.rs, W::split) the pass also keeps the hash
 // of every cell after each layer (W::through: what changed in which layer) and notes the big
-// images of the base layer and which cells they end up on top of (W::top, W::imgs).
+// images of the base layer and which cells they end up on top of (W::top, W::imgs).  A canvas whose
+// view comes from tiles (canvas.rs, W::canv) is noted the same way; its hash stands only for where
+// it lies: what it shows there is the GPU's.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -102,6 +104,8 @@ pub(crate) struct W {
     /// per cell: 0 nothing yet, k the k-th image of imgs is on top, TOP_BLOCKED
     pub(crate) top: Vec<u8>,
     pub(crate) imgs: Vec<ImgSeen>,
+    /// (gpu_out.rs) the canvases of the base layer apart in this frame: command, rectangle
+    pub(crate) canv: Vec<(u32, [i32; 4])>,
 }
 
 impl W {
@@ -329,6 +333,9 @@ impl Ui {
                 k.clear();
             }
         }
+        if self.gp_canvas_wanted() {
+            self.gp_canvas_begin(); // which canvases come from tiles in this frame (gpu_out.rs)
+        }
         let mut sc = self.sc_pass(w, h);
         if self.wp.dirty.cells.is_none() || self.wp.dirty.cells_prev.is_none() {
             self.sc_plan(sc, 0, 0, false);
@@ -385,6 +392,15 @@ impl Ui {
                     hh = hh.wrapping_mul(HASH_K);
                     hh ^= (dc.c[2] as u32 as u64) | (dc.c[3] as u32 as u64) << 32;
                     hh = hh.wrapping_mul(HASH_K);
+                    // a canvas apart: the part of its rectangle the clips leave stands for it
+                    let mut apart = None;
+                    if split && l == 0 && !d.canv.is_empty() && dc.over == 0 && d.imgs.len() < TOP_BLOCKED as usize - 1 && matches!(c, Cmd::Custom { .. }) {
+                        if let Some(&(_, r)) = d.canv.iter().find(|x| x.0 == i as u32) {
+                            let v = [bb[0].max(r[0]), bb[1].max(r[1]), bb[2].min(r[0] + r[2]), bb[3].min(r[1] + r[3])];
+                            hh = pos_mix(0x4341_4E56, v[0] as i64, v[1] as i64) ^ ((v[2] as u32 as u64) | (v[3] as u32 as u64) << 32).wrapping_mul(HASH_K);
+                            apart = Some(v);
+                        }
+                    }
                     if grids {
                         sc.cmd(l, i, c, parts, bb0, dc.c, dc.over == 0, hh);
                     }
@@ -398,13 +414,15 @@ impl Ui {
                     let r1 = ((bb[3] - 1) >> CELL_SHIFT).min(rows - 1);
                     // (the GPU output) the big images of the base layer and what lies over them
                     let mut tag = 0;
-                    if split && l == 0 && matches!(c, Cmd::Image { .. }) && dc.over == 0 && d.imgs.len() < TOP_BLOCKED as usize - 1
-                        && (bb[2] - bb[0]) as i64 * (bb[3] - bb[1]) as i64 >= IMG_MIN_PX
-                    {
+                    let seen = match apart {
+                        Some(v) => (v[0] < v[2] && v[1] < v[3]).then_some(v),
+                        None => (matches!(c, Cmd::Image { .. }) && (bb[2] - bb[0]) as i64 * (bb[3] - bb[1]) as i64 >= IMG_MIN_PX).then_some(bb),
+                    };
+                    if let Some(vis) = seen.filter(|_| split && l == 0 && dc.over == 0 && d.imgs.len() < TOP_BLOCKED as usize - 1) {
                         if d.top.is_empty() {
                             d.top.resize(cols as usize * rows as usize, 0);
                         }
-                        d.imgs.push(ImgSeen { index: i as u32, vis: bb });
+                        d.imgs.push(ImgSeen { index: i as u32, vis });
                         tag = d.imgs.len() as u8;
                     }
                     let track = l == 0 && !d.top.is_empty();
@@ -431,7 +449,10 @@ impl Ui {
         // keeps no separate layers and may lack an image's pixels
         let split = cfg!(windows) && self.wp.dirty.split;
         let apart = split && {
-            let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy) && self.gp_plan_images();
+            let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy) && {
+                let images = self.gp_plan_images();
+                self.gp_plan_canvases() | images
+            };
             quads || self.wp.dirty.busy || self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty())
         };
         let allowed = !self.wp.dirty.full && !pending && !apart;
