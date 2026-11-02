@@ -58,6 +58,13 @@ agent write ui.click {"id":$id}
 agent expect ok
 expect text:"Treffer: 2" exists
 agent keep
+# ---- at the end of a small view: scrolled as far as it goes, the margin does not fit and that
+# takes no further passes (expect_nowarn)
+agent id #7937
+agent write ui.click {"id":$id}
+agent expect ok
+expect text:"Treffer: 3" exists
+agent keep
 cmd 9062
 agent call ui.state
 agent keep

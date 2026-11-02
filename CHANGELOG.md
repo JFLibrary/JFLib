@@ -178,6 +178,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **text:** FontConf puts the <default> and append_last families of a family further in the list at the end of the whole list, as fontconfig does: on Fedora monospace no longer continued with the sans-serif families before the monospace ones.
 - **ui:** Agent control on real windows: without App::action_revision the revision no longer counts frames, it moves when the controls change or an agent's change ran, so ui.click, ui.type and ui.key work with the revision read last (--agent); uiRevision and sinceUiRevision likewise
 - **ui:** ui.click reports a click only when its press reaches the widget: it asks the hit test the press will meet (clipping, layers, open popups, modal windows, second windows, right to left), a widget out of view is scrolled in first, otherwise unavailable with details.reason, point and what lies there; presses for a second window go to its platform window
+- **ui:** A screen reader's click that no widget takes (a record whose id is not its hit box, a link of a document) is pressed only where the press reaches the record: a scroll view brings it into view first, and nothing is pressed when another widget lies in its middle; scrolling a widget into view (focus, ui.click) takes no further passes when its margin does not fit at the content's end
 
 ### Security
 

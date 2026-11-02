@@ -391,21 +391,32 @@ impl Ui {
         };
         let axes = scr_axes(e.flags);
         let m = self.dp(8); // margin: keep the focus visual inside
+        // as far as the content goes: a margin that does not fit at its end is no reason for
+        // another pass (never measured: the first pass keeps the position, scr_settle)
+        let (mx, my) = self.scr_max(e);
+        let measured = {
+            let s = self.slot(e.id);
+            s.measw | s.meash != 0
+        };
         if axes & 1 != 0 {
             let d = into_view(r[1].wrapping_sub(m), r[3].wrapping_add(m * 2), e.rect[1], e.rect[3]);
-            if d != 0 {
-                let s = self.slot(e.id);
-                s.scrolly = s.scrolly.wrapping_add(d);
-                s.adur = s.scrolly as u32;
+            let s = self.slot(e.id);
+            let to = s.scrolly.wrapping_add(d);
+            let to = if measured { to.clamp(0, my) } else { to };
+            if to != s.scrolly {
+                s.scrolly = to;
+                s.adur = to as u32;
                 self.repass();
             }
         }
         if axes & 2 != 0 {
             let d = into_view(r[0].wrapping_sub(m), r[2].wrapping_add(m * 2), e.rect[0], e.rect[2]);
-            if d != 0 {
-                let s = self.slot(e.id);
-                s.scrollx = s.scrollx.wrapping_add(d);
-                s.at0 = s.scrollx as u32;
+            let s = self.slot(e.id);
+            let to = s.scrollx.wrapping_add(d);
+            let to = if measured { to.clamp(0, mx) } else { to };
+            if to != s.scrollx {
+                s.scrollx = to;
+                s.at0 = to as u32;
                 self.repass();
             }
         }

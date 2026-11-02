@@ -16,7 +16,7 @@ pub(crate) struct State {
     images: Vec<(String, Vec<u8>)>,
     controls: Revision, // App::action_revision's stand-in: what an action depends on
     shown: Revision,    // uiRevision: everything ui.state reports
-    reveal: Option<(u8, u32)>, // (window, id): the scroll views bring this widget into view
+    pub(crate) reveal: Option<(u8, u32)>, // (window, id): the scroll views bring this widget into view
     #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     server: Option<agent_io::ipc::Server>,
 }
@@ -327,14 +327,14 @@ fn error(code: ErrorCode, text: &str) -> ActionError { ActionError::new(code, te
 
 // Why a widget cannot be used from outside: details.reason of the refusal, the point looked at
 // and the id of what a press there meets (0: nothing with an id).
-struct Miss {
-    reason: &'static str,
+pub(crate) struct Miss {
+    pub(crate) reason: &'static str,
     text: &'static str,
     id: u32,
     win: u8,
     rect: [i32; 4],
-    point: Option<(i32, i32)>,
-    by: u32,
+    pub(crate) point: Option<(i32, i32)>,
+    pub(crate) by: u32,
 }
 impl Miss {
     fn new(reason: &'static str, text: &'static str, node: &Sem, point: Option<(i32, i32)>, by: u32) -> Self {
@@ -363,7 +363,7 @@ impl Ui {
     // hit tests what it draws (the nodes of a diagram have no box); with `parts` also what shows
     // of its boxes (a row half under a bar, a link over two lines), then a part of it in the
     // middle (a row over its list).
-    fn agent_aim(&self, node: &Sem, parts: bool) -> Result<(i32, i32), Miss> {
+    pub(crate) fn agent_aim(&self, node: &Sem, parts: bool) -> Result<(i32, i32), Miss> {
         let Some(p) = self.uiw_parts(node.win as u32) else { return Err(Miss::new("window", "The widget's window is not shown", node, None, 0)); };
         let (list, modal) = (&p.ctx.hits[p.ctx.hit_cur ^ 1], p.ctx.modal_prev);
         // hit boxes are logical: a right-to-left window mirrors x, as it does with the press
@@ -404,7 +404,8 @@ impl Ui {
         }
         Err(Miss::new("covered", "Something else lies over this widget", node, point, by))
     }
-    /// (scr_close) the widget a click asked for, when it is one of the window being built
+    /// (scr_close) the widget a click asked for, when it is one of the window being built (a
+    /// client's: click_target, a screen reader's: a11y_reveal)
     pub(crate) fn agent_reveal(&self) -> Option<u32> {
         self.agent.reveal.filter(|r| r.0 as u32 == self.uiw_cur).map(|r| r.1)
     }

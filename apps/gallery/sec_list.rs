@@ -55,6 +55,8 @@ const ID_HIT_UNDER: u32 = 7932; // a button with a lid over it
 const ID_HIT_LID: u32 = 7933;
 const ID_HIT_HALF: u32 = 7934; // a button with a bar over its middle
 const ID_HIT_BAR: u32 = 7935;
+const ID_HIT_VIEW: u32 = 7936; // a small view, the button at its end
+const ID_HIT_END: u32 = 7937;
 const ID_LIST_FLY: u32 = 7900; // flyout at the pointer: a list without a selection
 const ID_LIST_FLY_L: u32 = 7910; // its list, rows 7911 .. 7922
 
@@ -469,7 +471,8 @@ pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
 }
 
 /// test hook 9062 (apps/gallery/tests/agent_click.uis): a box that clips and does not scroll,
-/// a button under a lid of the same layer, one with only its middle covered
+/// a button under a lid of the same layer, one with only its middle covered, one at the end of a
+/// small view (the margin of scrolling it into view does not fit)
 pub(crate) fn hit_cases(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.list;
     if !s.hit_cases {
@@ -492,6 +495,11 @@ pub(crate) fn hit_cases(g: &mut Gal, ui: &mut Ui) {
     hit(ui, ID_HIT_HALF, "Halb bedeckt");
     let r = ui.last_rect();
     ui.hit_rect(ID_HIT_BAR, r[0], r[1] + r[3] / 3, r[2], r[3] / 3, 0);
+    ui.next_size(200, 60);
+    ui.scroll_begin(ID_HIT_VIEW, SC_V);
+    ui.place(ui.dp(120), ui.dp(44));
+    hit(ui, ID_HIT_END, "Am Ende");
+    ui.scroll_end();
     let t = cap(format!("Treffer: {}", s.hit_clicks), 32);
     ui.text(TS_CAPTION, &t);
 }

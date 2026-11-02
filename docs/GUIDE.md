@@ -2621,7 +2621,8 @@ if self.grid {
 ```
 
 * Use the id you gave `behave`: then a screen reader's click arrives as `EV_ACT`. A record with
-  another id gets a pointer click in its middle instead.
+  another id gets a pointer click in its middle instead, after a scroll view brought it into view,
+  and none when something else lies there.
 * Name every control: icon-only buttons through their label, drawings through the label of
   their `K_CANVAS` record. Text boxes, sliders, drop-downs, progress bars and lists without a
   label take the text (or heading) record directly before them -- put `text(TS_BODY, "Name")` to

@@ -776,6 +776,10 @@ impl Ui {
         while self.text_refill() {
             tasks_ran = self.settle(app, &mut passes, &mut build_us);
         }
+        if self.a11y_reveal() {
+            tasks_ran = self.settle(app, &mut passes, &mut build_us);
+            self.agent.reveal = None;
+        }
         self.touch_after_passes();
         self.dnd_after_passes(); // a DS_START without drag_set is no drag
         self.focus_req_expire();

@@ -6288,7 +6288,8 @@ roles: plat::a11y::set_translator), a11y_poll on E_WAKE (takes the requests).
 Widgets: behave asks a11y_click(id) (a pending click, toggle, select or open acts like
 Space on the focused widget: EV_ACT); the sliders ask a11y_value(id), the text boxes
 a11y_text(id) for a new value (both public for widgets of an app's own).  A click no widget took in its passes becomes a pointer
-click in the middle of the record.
+click where the press reaches the record (a11y_aim), after the scroll views brought it into view; there is
+none when the middle lies on something else.
 
 The tree: every record of a window becomes a node in the record order -- roles from the
 kinds (K_*), states from SS_* (a check box with value 2 is mixed), a heading's level from its
