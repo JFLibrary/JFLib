@@ -941,6 +941,67 @@ fn gc(t: &mut T) {
     let _ = vm.run(&mut (), u64::MAX);
     vm.collect();
     t.eq("cycle freed (the two closures stay)", (with, vm.heap_objects()), (5, 2));
+    host_garbage(t);
+}
+
+/// what the host makes between runs reaches the collector too: a callback that allocates nothing
+/// itself would otherwise fill the heap with its arguments
+fn host_garbage(t: &mut T) {
+    let Ok(prog) = script::compile("let last = nil\nfn take(m) { last = m }\nfn make() { return {a: 1} }") else { return };
+    let mut vm = Vm::new(&prog, Limits { heap: 64 << 10, ..Limits::default() });
+    let _ = vm.run(&mut (), u64::MAX);
+    let mut ok = true;
+    for i in 0..5000 {
+        let m = vm.new_map().unwrap_or(Value::Nil);
+        let k = vm.new_str("i").unwrap_or(Value::Nil);
+        let v = vm.new_str(&format!("{}", i)).unwrap_or(Value::Nil);
+        ok &= vm.map_set(m, k, v).is_ok() && vm.call("take", &[m]).is_ok() && vm.run(&mut (), u64::MAX) == Status::Done(Value::Nil);
+    }
+    t.check("callbacks that allocate nothing fit a small heap", ok);
+    t.check(&format!("their arguments were collected ({} times)", vm.collections()), vm.collections() >= 10);
+    let last = vm.global("last").unwrap_or(Value::Nil);
+    let i = vm.map_get_str(last, "i").unwrap_or(Value::Nil);
+    t.eq("what the script kept stays", vm.str(i), Some("4999"));
+    // what the host made since the last run stays through the collections its allocations start
+    let mut vm = Vm::new(&prog, Limits::default());
+    let _ = vm.run(&mut (), u64::MAX);
+    let _ = vm.call("make", &[]);
+    let done = vm.run(&mut (), u64::MAX);
+    let result = if let Status::Done(v) = done { v } else { Value::Nil };
+    let before = vm.collections();
+    let list = vm.new_list(Vec::new()).unwrap_or(Value::Nil);
+    let mut items = Vec::new();
+    for i in 0..20_000 {
+        let s = vm.new_str(&format!("{}", i)).unwrap_or(Value::Nil);
+        ok &= vm.list_push(list, s).is_ok();
+        items.push(s);
+    }
+    t.check(&format!("allocations of the host collect ({} times)", vm.collections() - before), ok && vm.collections() > before);
+    t.check("what it made is all there", items.iter().enumerate().all(|(i, s)| vm.str(*s) == Some(format!("{}", i).as_str())) && vm.list(list).map(|l| l.len()) == Some(20_000));
+    t.eq("the last result too", vm.map_get_str(result, "a"), Some(Value::Int(1)));
+    // garbage of an earlier round goes with the next run, or with collect()
+    let _ = vm.call("take", &[Value::Nil]);
+    let _ = vm.run(&mut (), u64::MAX);
+    vm.collect();
+    t.check("after a run it is gone", !vm.valid(list) && !vm.valid(items[0]));
+    let fresh = vm.new_str("x").unwrap_or(Value::Nil);
+    vm.collect();
+    t.check("collect() frees what nothing holds", !vm.valid(fresh));
+    // a limit is reached with what really lives only
+    let mut vm = Vm::new(&prog, Limits { heap: 64 << 10, ..Limits::default() });
+    let _ = vm.run(&mut (), u64::MAX);
+    let mut made = 0;
+    let end = loop {
+        match vm.new_str("0123456789") {
+            Ok(_) => made += 1,
+            Err(e) => break e.kind,
+        }
+    };
+    t.eq("a full heap gives the limit's error", (made, end), (1558, ErrorKind::Heap));
+    t.eq("its text needs no room", vm.str(vm.limit_text()), Some("Speichergrenze erreicht"));
+    vm.collect();
+    t.check("and stays valid", vm.valid(vm.limit_text()));
+    t.check("and is free again after collect()", vm.new_str("x").is_ok());
 }
 
 fn fuel(t: &mut T) {

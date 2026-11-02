@@ -1803,7 +1803,15 @@ Konfiguration sieht das Skript als `config` (`config.port`):
   Anweisungen je Rückruf (`fuel`) sind hart; eine Ausnahme, die niemand fängt, oder eine Grenze
   nennt Zeile und Spalte in der Statuszeile, in `script errors`, im Log des Geräts und in der
   Ereignisliste. Ein Fehler im Hauptprogramm beendet den Dienst, mit `"stop_on_error": true`
-  jeder; sonst läuft das Skript weiter, und ein HTTP-Handler, der scheitert, antwortet 500.
+  jeder; sonst läuft das Skript weiter, und ein HTTP-Handler, der scheitert oder gar nicht erst
+  starten kann (kein Platz mehr für die Anfrage), antwortet 500. Die Speichergrenze trifft nur,
+  was das Skript wirklich hält: Die Speicherbereinigung räumt auch weg, was der Dienst selbst
+  für Rückrufe anlegt (`req`, Daten, Antworten). `heap_kb` pendelt deshalb unter Dauerlast
+  zwischen dem Gehaltenen und mindestens 256 KiB, ohne zu wachsen. Ist der Speicher wirklich
+  voll, bekommen Rückrufe von `http.request`, `dns.resolve` und `disk` den Text
+  „Speichergrenze erreicht“ als `err`, damit ein wartendes `res` noch antworten kann. Eine neue
+  Verbindung wird geschlossen, eine mit Daten, die nicht mehr passen, abgebrochen; `close` kommt
+  auch dann, notfalls mit `nil` statt des Grundes.
   Stoppen und Strom aus beenden das Programm samt Speicher; was es auf die Disk legte, bleibt.
 - **Determinismus:** keine Uhr außer der virtuellen, Zufall aus einem eigenen Strom je Dienst
   (vom Gerät und Seed abgeleitet), Gleitkomma in Software: gleiche Projekte ergeben auf jedem
@@ -1870,7 +1878,8 @@ Test da war. `Engine::jfs_tests(dev)` hält den letzten Lauf eines Geräts (die 
 Zeilen, die Ergebnisse, ob er fertig ist) für die IDE.
 Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
 Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
-Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
+Endlosschleife, Grenzen, Dauerlast über mehr als 20 000 Anfragen ohne wachsenden Heap und ohne
+offene Anfrage, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
 Zahlen und Fehler behält, Umbenennen im Lauf) und im Golden-Szenario oben.
 
 **Module aus den Dateien des Geräts** (SK7): `let util = import("/home/user/lib/util.jfs")`
