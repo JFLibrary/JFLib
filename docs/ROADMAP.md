@@ -1694,8 +1694,20 @@ Fensterrand hinaus.
   MiB statt 16–23 MiB, bis die Kacheln 30 s nach der letzten Bewegung gehen. Nicht getestet: ein
   echter Treiber-Reset, Remote Desktop, andere GPUs, ein großes JFNetworker-Modell, Linux und Web nur
   gebaut, Android nicht.
-- **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
-  Auflösungsgrenze), Browser (WebGPU).
+- **P2** · *erledigt* (2026-11-02) · G4a: glibc-Build für GPU-Programme und `lib/gpu` mit Vulkan unter
+  Linux, noch ohne Fenster ([GPU.md](GPU.md#linux)). Eine Datei `apps/NAME/GLIBC` wählt den Build je
+  App, bisher nur `gputest`; statische Programme bleiben Byte für Byte gleich. Gelinkt wird ohne
+  Installation gegen selbst erzeugte Stubs, alle Importe auf `GLIBC_2.2.5`. `gputest` besteht in WSL
+  (llvmpipe) und auf einer Intel HD 610 (Mesa, Vulkan 1.4), der ersten GPU neben der RTX 2070: 1 Mio.
+  Würfel in 70 ms, 100 000 in 9,2 ms je Bild. Der Lauf fand einen echten Fehler (ein Device-Puffer
+  auf einem CPU-Adapter ließ sich beschreiben); `rgba8unorm` darf jetzt eine Stelle von k / 255
+  abweichen. Das llvmpipe auf demselben Rechner (Mesa 26, ohne AVX) stürzt ab oder rechnet falsch;
+  die UI wählt CPU-Adapter ohnehin nicht. Nicht getestet: glibc vor 2.34, NVIDIA und AMD unter Linux,
+  die Validierungsschicht unter Linux.
+- **P2** · *fehlt* · G4b: Ausgabe unter Linux als dmabuf über den eigenen Wayland- und X11-Code, die
+  UI-Fenster dort über die GPU, GUI-Programme im glibc-Build, eine statische Variante ohne GPU.
+- **P2** · *fehlt* · G4c: Android (Vulkan über die C-Brücke, ohne Auflösungsgrenze).
+- **P2** · *fehlt* · G4d: Browser (WebGPU, Shader direkt als WGSL).
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
   Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
