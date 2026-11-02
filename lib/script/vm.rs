@@ -64,11 +64,14 @@
 // end it at once and cannot be caught.
 //
 // Collector: mark and sweep over the heap arena, from the stack, the globals, host values,
-// pinned values, the last result and objects a native made during its call.  It runs only in
-// run(), when an allocation crosses the threshold (twice the live bytes after the last
-// collection, at least 256 KiB, at most the heap limit).  Values the host keeps between runs
-// must be pinned (pin / unpin) or be reachable from the script.  Values the host passes in
-// are checked (valid()): a stale value of a freed object gives an error or None, not a crash.
+// pinned values, the last result, objects a native made during its call and objects the host
+// made since the last run.  It runs when an allocation crosses the threshold (twice the live
+// bytes after the last collection, at least 256 KiB, at most the heap limit), the host's own
+// allocations between runs included: a callback that allocates nothing itself would never
+// collect what the host made for it.  Values the host keeps between runs must be pinned (pin /
+// unpin) or be reachable from the script; a value it took out of a pin or a map is only safe
+// while the pin or the map still holds it.  Values the host passes in are checked (valid()): a
+// stale value of a freed object gives an error or None, not a crash.
 //
 // Modules (module.rs): import(path) links a module's code into the VM's own (`code` starts as
 // the program's and grows with each module; `units` are the program and its modules with
@@ -350,7 +353,8 @@ pub struct Vm {
     pub(crate) running: bool,
     pub(crate) in_native: bool,
     yield_req: bool,
-    /// objects allocated by the native running now (and values it keeps while it calls back)
+    /// objects allocated by the native running now (and values it keeps while it calls back);
+    /// between runs those the host made since the last one
     pub(crate) nroots: Vec<Ref>,
     result: Value,
     next_gc: u64,
@@ -485,6 +489,8 @@ impl Vm {
         }
         self.used = 0;
         self.running = true;
+        // (what the host made for this run is on the stack now, or the host pinned it)
+        self.nroots.clear();
         if let Some(d) = self.dbg.as_deref_mut() {
             d.run_starts();
         }
@@ -878,6 +884,11 @@ impl Vm {
     /// collect garbage now: everything the script cannot reach, except pinned values and the
     /// last result, is freed
     pub fn collect(&mut self) {
+        self.nroots.clear();
+        self.gc();
+    }
+
+    fn gc(&mut self) {
         let mut gray: Vec<u32> = Vec::new();
         let roots = self.stack.iter().chain(self.globals.iter()).chain(self.hostv.iter().flatten()).chain(self.pins.iter().flatten());
         // the modules' constants and maps
@@ -914,11 +925,11 @@ impl Vm {
         self.gcs
     }
 
-    /// make room for n more bytes: collect when the threshold is crossed (only in run(), where
-    /// every live value is rooted), fail beyond the limit
+    /// make room for n more bytes: collect when the threshold is crossed (every live value is
+    /// rooted: on the stack, in nroots), fail beyond the limit
     pub(crate) fn reserve(&mut self, n: u64) -> Result<(), Exc> {
-        if self.running && self.heap.bytes + n > self.next_gc {
-            self.collect();
+        if self.heap.bytes + n > self.next_gc {
+            self.gc();
         }
         if self.heap.bytes + n > self.lim.heap {
             return Err(Exc::Fatal(ErrorKind::Heap, format!("Speichergrenze erreicht ({} Bytes)", self.lim.heap)));
@@ -930,7 +941,7 @@ impl Vm {
     pub(crate) fn alloc(&mut self, o: Obj) -> Result<Ref, Exc> {
         self.reserve(heap::size_of(&o))?;
         let r = self.heap.insert(o);
-        if self.in_native {
+        if self.in_native || !self.running {
             self.nroots.push(r);
         }
         Ok(r)

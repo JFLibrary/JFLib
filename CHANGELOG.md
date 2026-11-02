@@ -140,6 +140,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Fixed
 
 - **JFNetworker:** A closed-loop load generator no longer stops for good when its target goes away and requests fail as they are made (no route, ARP gave up): it tries again every 100 ms
+- **JFNetworker:** A script service with http.serve no longer stops after about 11 000 requests: what the service makes for a callback is collected also when the callback allocates nothing itself, and a request the handler cannot start for (heap full, frame too large) is answered 500 instead of staying open
+- **script:** The collector also runs for allocations the host makes between runs (Vm::new_str, new_map ..), so a host's arguments no longer fill the heap of a script that allocates nothing itself; what the host made since the last run stays alive until the next run, a value it took out of a pin only while the pin holds it
 - **tests:** The cancellation, wake-up and download checks of plattest and coretest no longer race on a loaded machine
 - **ui:** Text scale 150 to 200 %: bar chart column labels no longer run into each other (every k-th one, the first and the last kept, inside the chart; value steps a line apart), badges, grid headers, navigation items, segmented items, tabs, info bars, legend entries and text box placeholders that do not fit end with an ellipsis instead of a cut through a glyph, badge and navigation pills grow with the text (Ui::dp_text), donut centre texts stay inside the hole
 - **ui:** The weekday toggles (ui.weekday_toggles) wrap their seven buttons (BOX_WRAP) where the row has less room than they need, instead of running past the edge of a narrow card

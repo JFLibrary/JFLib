@@ -90,7 +90,8 @@
 //                        repeated name: its last value); res.send(status, body, headers),
 //                        res.json(status, value, headers), even from a later callback; a
 //                        handler that returns a str, bytes, a list, a map or a status (int)
-//                        without using res answers with it, one that fails answers 500
+//                        without using res answers with it, one that fails or cannot start (the
+//                        heap has no room for the request, its frame not on the stack) answers 500
 //   http.request(url | {url, method, headers, body, timeout_ms}, fn(err, resp))
 //                        resp {status, headers, body}; names go through the resolver, the
 //                        timeout is 30 s unless given (0: none)
@@ -1978,11 +1979,20 @@ impl Run {
             Pending::Dns(_) => "dns",
             Pending::Disk(_) => "disk",
         };
+        let req = if let Pending::Http(r) = &p { Some(r.id) } else { None };
         match self.prepare(os, p, cause) {
             Ok(Some(c)) => self.begin(book, def, os, c, cause),
             Ok(None) => {}
             Err(e) => {
                 let now = os.now();
+                // what it made of the event is of no use now (no run takes it off the roots)
+                if let Some(vm) = self.vm.as_mut() {
+                    vm.collect();
+                }
+                // the handler never starts, nothing else would answer it
+                if let Some(id) = req {
+                    self.effects.push_back((now, cause, Effect::Respond(id, Reply::status_page(500))));
+                }
                 self.fail(book, e, during, now, cause, def.cfg.stop_on_error);
             }
         }
@@ -2219,6 +2229,9 @@ impl Run {
             if let Err(e) = vm.call_value(c.f, &c.args) {
                 if let Some(p) = c.unpin {
                     vm.unpin(p);
+                }
+                if let Some(id) = c.req {
+                    self.answer(id, None, now, cause);
                 }
                 self.then(os, c.then, now);
                 self.fail(book, e, c.during, now, cause, def.cfg.stop_on_error);
