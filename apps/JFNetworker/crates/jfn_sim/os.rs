@@ -49,6 +49,8 @@
 //                             service (cli/shrun.rs; services show as 100 + id)
 //   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
 //                             its name on the device
+//   OsApi::recording          notes are kept (not in a sweep's quiet trace): notes with texts of
+//                             their own, on a hot path, need not be made otherwise
 //   Engine::rename_service    Action::RenameService: a service goes on under another name
 //                             (Service::renamed tells it; its time series follow)
 //   both families             Sock::addr says what a UDP socket takes: 0.0.0.0 every IPv4
@@ -702,6 +704,10 @@ impl OsApi<'_> {
     }
     pub fn cancel(&mut self, key: u32) {
         self.eng.cancel_timer(self.ni, SLOT_SVC + self.id * SVC_TIMERS + key.min(SVC_TIMERS - 1));
+    }
+    /// decisions are kept (a sweep's quiet trace keeps none)
+    pub fn recording(&self) -> bool {
+        !self.eng.trace.is_quiet()
     }
     /// records a decision
     pub fn note(&mut self, n: Note) {

@@ -8,8 +8,10 @@
 //   Experiment::configs() -> Vec<Config>   the configurations in their order: the series, within
 //                                      each the cross product of its axes (the first axis slowest)
 //   Experiment::levels() -> Vec<Level>     the load levels, Level::text()
-//   Experiment::seeds_or(project_seed)     the seeds of a run
-//   Slo::of(&experiment) -> SloLimits      the limits in ns and parts per million; held(...), text()
+//   Experiment::seeds_or(project_seed)     the seeds of a run; prices_of(): the assumed prices with
+//                                      what it names instead (catalog::Prices)
+//   Slo::limits() -> SloLimits         the limits in ns and parts per million; held(...), text()
+//   Config::label() / labels()         a configuration in words, its value per axis
 //   patch_hw / patch_config / patch_load / patch_pool / patch_clones   what an axis does to a copy
 //                                      of the project (jfn_sim's experiment.rs calls them)
 //   known_keys(kind)                   the settings of the services this checks by name
@@ -45,9 +47,11 @@
 //    switch the device hangs on
 //
 // Levels are strictly rising (the knee is the highest level up to which every level holds the SLO).
-// Every run boots each configuration once per seed, warms up at "warm" (default: the first level),
-// and then every level starts from that same warm state: settle_s after the change of load,
+// Every run boots each configuration once per seed, warms up at "warm" of "load" (default: the first
+// level), and then every level starts from that same warm state: settle_s after the change of load,
 // measure_s of measuring.  Times are whole seconds, which are the slots of the latency windows.
+// Texts are messages for the app's catalogue where they tell what is wrong (jfn_model::msg); a
+// configuration's labels are the words of the tables, which stay German like a scenario's report.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -197,13 +201,15 @@ impl Config {
     pub fn labels(&self) -> Vec<(String, String)> {
         self.picks.iter().map(|(a, i)| (a.column(), a.value_label(*i))).collect()
     }
-    /// "vertikal, cores=2" as the tables show it
+    /// "größer 8 Kerne", "mehr Hosts 4" as the tables show it: an axis with one value says nothing
     pub fn label(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
         if !self.series.is_empty() {
             parts.push(self.series.clone());
         }
-        parts.extend(self.picks.iter().map(|(a, i)| a.value_label(*i)));
+        for (a, i) in self.picks.iter().filter(|(a, _)| a.len() > 1) {
+            parts.push(if a.kind == "hw" { a.value_label(*i) } else { format!("{} {}", a.column(), a.value_label(*i)) });
+        }
         if parts.is_empty() { String::from("-") } else { parts.join(" ") }
     }
 }
@@ -254,7 +260,7 @@ impl SloLimits {
     pub fn text(&self) -> String {
         let mut parts = Vec::new();
         let ms = |ns: u64| fixed(ns, 1_000_000);
-        for (name, lim) in [("p50", self.p50), ("p95", self.p95), ("p99", self.p99), ("p99,9", self.p999)] {
+        for (name, lim) in [("p50", self.p50), ("p95", self.p95), ("p99", self.p99), ("p99.9", self.p999)] {
             if let Some(l) = lim {
                 parts.push(format!("{} bis {} ms", name, ms(l)));
             }
@@ -287,7 +293,7 @@ pub fn known_keys(kind: &str) -> Option<&'static [&'static str]> {
         "kv" => &["nodes", "port", "hb_port", "cpu_us", "mem_mb", "conn_kb", "data_mb", "vnodes", "rf", "w", "r", "consistency", "read_repair", "timeout_ms", "heartbeat_ms", "down_ms", "disk"],
         "cache" => &["backend", "port", "entries", "max_kb", "ttl_ms", "cache_control", "hit_us", "collapse", "timeout_ms", "connect_timeout_ms", "mem_mb", "conn_kb", "data_mb"],
         "worker" => &["queue", "topic", "concurrency", "time_ms", "cpu_ms", "mem_mb", "conn_kb", "data_mb", "jitter_ms", "error_rate", "wait_ms", "idle_ms", "timeout_ms"],
-        "mq" => &["port", "visibility_ms", "max_deliveries", "max_depth", "durable", "topics", "mem_mb", "conn_kb", "data_mb"],
+        "mq" => &["port", "visibility_ms", "max_deliveries", "max_depth", "durable", "topics"],
         _ => return None,
     })
 }

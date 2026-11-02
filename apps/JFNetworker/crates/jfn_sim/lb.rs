@@ -589,7 +589,9 @@ impl Lb {
         h.add("X-Forwarded-For", &xff);
         let url = Url { host: format!("{}", be.addr), port: be.port, target: r.head.target.clone() };
         let req = Req { method: r.head.method.clone(), url, version: Version::Http11, headers: h, body: r.body.clone(), timeout: self.timeout, connect_timeout: self.connect_timeout, reuse: self.keepalive, keep_body: true };
-        os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        if os.recording() {
+            os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        }
         let aid = self.agent.submit(os, req);
         let be = &mut self.backends[b];
         be.active += 1;

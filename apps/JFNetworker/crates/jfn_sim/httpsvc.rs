@@ -690,7 +690,9 @@ impl HttpServer {
 
     fn arrive(&mut self, os: &mut OsApi, r: ReqIn) {
         let now = os.now();
-        os.note(Note::HttpRequest { method: r.head.method.clone(), path: String::from(r.head.path()) });
+        if os.recording() {
+            os.note(Note::HttpRequest { method: r.head.method.clone(), path: String::from(r.head.path()) });
+        }
         self.per.add(now, 0, 1);
         let (reply, time, call, costs) = self.route(os, &r);
         let cpu = if os.metered() { costs.cpu } else { 0 };

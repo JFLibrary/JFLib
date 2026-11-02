@@ -1,6 +1,7 @@
 // mq -- a message queue and the workers that take from it: topics with at-least-once
 // delivery (a message stays until it is acknowledged; one not acknowledged within its
-// visibility timeout comes again), acknowledgements, redelivery, dead letters, depth
+// visibility timeout comes again), acknowledgements, redelivery, dead letters, depth; a worker's
+// Service::reconfigure takes a new config while it runs, all but its queue and topic
 //
 //   kind    config (JSON; every member may be left out but the worker's "queue")
 //   mq      {"port": 9000, "visibility_ms": 5000, "max_deliveries": 5, "max_depth": 0,

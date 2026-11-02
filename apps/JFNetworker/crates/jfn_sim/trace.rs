@@ -3,6 +3,8 @@
 //
 //   Trace::hops() / hop(id) / hops_after(id)      frames in send order; ids are consecutive
 //   Trace::events() / events_of(hop)              decisions in time order
+//   Trace::set_quiet()                            keeps none of them from now on, only their
+//                                                 numbers (a sweep: experiment.rs)
 //   Note::describe(port, iface) -> German text     "MAC 02:4a:.. an Gi1/0/1 gelernt (VLAN 1)"
 //   Note::message(port, iface) -> Msg             the same as a template with arguments, for
 //                                                 the app's catalogue (jfn_model::msg)

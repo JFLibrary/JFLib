@@ -1065,6 +1065,8 @@ struct WaitFor {
 
 #[derive(Clone, Debug)]
 struct AReq {
+    /// it stands in `waiting` (thousands may, under overload: no search for each of them)
+    queued: bool,
     req: Req,
     addr: Option<IpAddr>,
     /// the name's other addresses to try when this one cannot be reached (an answer with both
@@ -1241,7 +1243,7 @@ impl Agent {
         let tls = tls.map(|t| (host.clone(), t));
         self.reqs.insert(
             id,
-            AReq {
+            AReq { queued: false,
                 req,
                 addr: literal,
                 alts: VecDeque::new(),
@@ -1428,7 +1430,10 @@ impl Agent {
             }
         }
         if self.max_per_host > 0 && self.per_host.get(&key).copied().unwrap_or(0) >= self.max_per_host {
-            if !self.waiting.contains(&id) {
+            if let Some(r) = self.reqs.get_mut(&id)
+                && !r.queued
+            {
+                r.queued = true;
                 self.waiting.push_back(id);
                 let want = WaitFor { key, tls_req, reuse };
                 match &self.wait_for {
@@ -1439,7 +1444,7 @@ impl Agent {
             }
             return;
         }
-        self.waiting.retain(|w| *w != id);
+        self.unqueue(id);
         self.ev(AgentEv::Trying { id, addr, port: key.1 });
         let ct = self.reqs.get(&id).map(|r| r.req.connect_timeout).unwrap_or(0);
         match os.tcp_connect_msg(addr, key.1, self.opts) {
@@ -1916,6 +1921,9 @@ impl Agent {
             let Some(id) = self.waiting.pop_front() else {
                 break;
             };
+            if let Some(r) = self.reqs.get_mut(&id) {
+                r.queued = false;
+            }
             self.dispatch(os, id);
             if !self.wait_mixed && self.waiting.back() == Some(&id) {
                 self.waiting.pop_back();
@@ -1926,6 +1934,16 @@ impl Agent {
         if self.waiting.is_empty() {
             self.wait_for = None;
             self.wait_mixed = false;
+        }
+    }
+
+    /// a request leaves `waiting`, if it stands there
+    fn unqueue(&mut self, id: u64) {
+        if let Some(r) = self.reqs.get_mut(&id)
+            && r.queued
+        {
+            r.queued = false;
+            self.waiting.retain(|x| *x != id);
         }
     }
 
@@ -1999,7 +2017,7 @@ impl Agent {
     fn detach(&mut self, os: &mut OsApi, id: u64) {
         let sock = self.reqs.get(&id).and_then(|r| r.sock);
         self.lookups.values_mut().for_each(|v| v.retain(|x| *x != id));
-        self.waiting.retain(|x| *x != id);
+        self.unqueue(id);
         let on = sock.and_then(|s| {
             let c = self.conns.get_mut(&s)?;
             c.inflight.retain(|x| *x != id);
@@ -2087,7 +2105,7 @@ impl Agent {
 
     fn fail(&mut self, os: &mut OsApi, id: u64, f: Fail) {
         let now = os.now();
-        self.waiting.retain(|x| *x != id);
+        self.unqueue(id);
         let timeout = f.is_timeout();
         if let Some(d) = self.finish(id, now, Err(f)) {
             os.note(Note::HttpFailed { timeout });

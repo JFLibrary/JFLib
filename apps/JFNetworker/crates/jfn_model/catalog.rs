@@ -9,6 +9,7 @@
 //   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s" (speed_msg: as a Msg)
 //   Optic / form(m) / rack_units(m)   the transceiver of an optics cage (PortSpec::optic), how
 //                                 a model stands in the physical view, its height in a rack (P1)
+//   Prices (ASSUMED, of_hw, of_device)   what devices cost per hour, assumptions for an experiment
 //   Hw / DiskClass / hw_of(id) / hw_presets()   the hardware of a device for the simulator's
 //                                 res.rs (SA1): cores, speed, RAM, swap, disk; a table beside the
 //                                 models

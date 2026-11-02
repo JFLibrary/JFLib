@@ -1,0 +1,5 @@
+#!args apps/JFNetworker/tests/experiments/scale_up_vs_out.jfnet --sweep apps/JFNetworker/tests/experiments/sweep_small.jfnex --threads 2 --golden apps/JFNetworker/tests/experiments/sweep_small.report
+# a short parameter sweep through the GUI program, without a window: two configurations of a growing
+# server and two of more small ones at three loads with two seeds, on two threads.  The table must equal
+# tests/experiments/sweep_small.report byte for byte on every target and for any number of threads (the
+# script itself is not run)

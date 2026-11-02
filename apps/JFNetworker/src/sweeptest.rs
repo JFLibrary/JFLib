@@ -253,7 +253,7 @@ fn axes(t: &mut T) {
     // the cross product, the last axis fastest; a series with the axes of the experiment
     let x = experiment(&exp_rps("10", 1, r#", "axes": [{"kind": "hw", "dev": "W1", "name": "Kerne", "values": [{"cores": 1}, {"cores": 2}]}], "series": [{"name": "a", "axes": [{"kind": "config", "dev": "W1", "path": "web.workers", "values": [1, 2, 3]}]}, {"name": "b"}]"#));
     let labels: Vec<String> = x.configs().iter().map(|c| c.label()).collect();
-    t.eq("the configurations in their order", labels, vec!["a 1 Kerne 1", "a 1 Kerne 2", "a 1 Kerne 3", "a 2 Kerne 1", "a 2 Kerne 2", "a 2 Kerne 3", "b 1 Kerne", "b 2 Kerne"].iter().map(|s| String::from(*s)).collect::<Vec<String>>());
+    t.eq("the configurations in their order", labels, vec!["a 1 Kerne W1 web.workers 1", "a 1 Kerne W1 web.workers 2", "a 1 Kerne W1 web.workers 3", "a 2 Kerne W1 web.workers 1", "a 2 Kerne W1 web.workers 2", "a 2 Kerne W1 web.workers 3", "b 1 Kerne", "b 2 Kerne"].iter().map(|s| String::from(*s)).collect::<Vec<String>>());
     let plan = Plan::new(&x, &p, "x");
     t.check("a plan of them", plan.as_ref().is_ok_and(|pl| pl.cfgs.len() == 8 && pl.runs() == 8));
     // hardware: figures on what it has, a preset
@@ -334,7 +334,7 @@ fn axes(t: &mut T) {
     t.check("no port left", r.is_err_and(|e| e.first().is_some_and(|m| m.text().contains("ist für die Kopie") && m.text().contains("kein Port mehr frei"))));
     let taken = exp_rps("100", 2, r#", "axes": [{"kind": "backends", "dev": "LB", "svc": "lb", "template": "W1", "counts": [2]}]"#);
     let r = Plan::new(&experiment(&taken), &p, "x");
-    t.check("an address that is taken", r.is_err_and(|e| e.first().is_some_and(|m| m.text() == "Konfiguration 2: Die Adresse 10.0.0.12 der Kopie 2 hat schon ein anderes Gerät.")));
+    t.check("an address that is taken", r.is_err_and(|e| e.first().is_some_and(|m| m.text() == "Konfiguration -: Die Adresse 10.0.0.12 der Kopie 2 hat schon ein anderes Gerät.")));
 }
 
 // ---------------------------------------------------------------- clones and threads
@@ -357,15 +357,15 @@ fn clone_and_threads(t: &mut T) {
     };
     let before = digest(&warm);
     for l in 0..plan.levels.len() {
-        let a = plan.measure(&warm, 1, 0, l);
+        let a = plan.measure(&warm, l);
         let Ok(mut fresh) = plan.warm(1, 0) else { continue };
-        let b = plan.run_level(&mut fresh, 1, 0, l);
+        let b = plan.run_level(&mut fresh, l);
         t.check(&format!("level {}: a clone equals a fresh boot", l), a == b && a.responses > 0);
     }
     t.eq("levels leave the warm state as it was", digest(&warm), before);
     // the order of the levels leaves no trace
-    let up: Vec<_> = (0..4).map(|l| plan.measure(&warm, 1, 0, l)).collect();
-    let down: Vec<_> = (0..4).rev().map(|l| plan.measure(&warm, 1, 0, l)).collect();
+    let up: Vec<_> = (0..4).map(|l| plan.measure(&warm, l)).collect();
+    let down: Vec<_> = (0..4).rev().map(|l| plan.measure(&warm, l)).collect();
     t.check("in the other order", up.iter().eq(down.iter().rev()));
     // the same bytes on 1 and N threads, and between two runs
     let one = jfn_run::run_sweep(&plan, 1);
@@ -391,11 +391,8 @@ fn clone_and_threads(t: &mut T) {
         let n = csv.lines().next().map_or(0, |h| h.split(',').count());
         csv.lines().count() > 1 && csv.lines().all(|l| l.split(',').count() == n)
     });
-    // a sweep does not grow with its levels: the warm engine holds what it held, a clone goes
     t.eq("seeds are pooled", one.points[0].sent, one.details[0].sent + one.details[plan.index(0, 1, 0)].sent);
     // a level that holds too much ends where it is
-    let mut small = plan.clone();
-    small.mem_limit = 1;
     let mut q = pair(Some(cores(2)), &web("2"), LOAD);
     q.seed = 5;
     let x = experiment(&exp_rps("100", 8, ""));
@@ -634,7 +631,7 @@ fn reconfigure(t: &mut T) {
     // a web server: more workers at once, and its numbers go on
     let srv = r#"{"workers": 1, "time_ms": 10, "max_requests": 0, "routes": [{"path": "*", "method": "", "body": "ok"}]}"#;
     let p = pair(None, srv, r#"{"targets": ["http://10.0.0.2/"], "mode": "closed", "users": 16, "timeout_ms": 60000}"#);
-    let (g, s) = (p.find("GEN").map_or(0, |d| d.id), p.find("WEB").map_or(0, |d| d.id));
+    let s = p.find("WEB").map_or(0, |d| d.id);
     let mut e = Engine::from_project(&p).unwrap_or_else(|_| Engine::new(0));
     let conf = p.find("WEB").map(|d| d.services[0].config.clone()).unwrap_or(Value::Null);
     e.run_until(3 * SEC, BUDGET);
@@ -673,7 +670,6 @@ fn reconfigure(t: &mut T) {
     t.check("a stopped one takes it", e.apply(Action::ServiceConfig { dev: s, svc: String::from("web"), config: set(&new2, "workers", "2") }).is_ok());
     t.eq("and has it", e.service::<jfn_sim::httpsvc::HttpServer>(s, "web").map(|h| h.workers), Some(2));
     // the load generator: another rate from now on, without a restart
-    let conf = p.find("GEN").map(|d| d.services[0].config.clone()).unwrap_or(Value::Null);
     let q = pair(None, &web("0"), LOAD);
     let (g2, _) = (q.find("GEN").map_or(0, |d| d.id), q.find("WEB").map_or(0, |d| d.id));
     let lconf = q.find("GEN").map(|d| d.services[0].config.clone()).unwrap_or(Value::Null);
@@ -687,7 +683,6 @@ fn reconfigure(t: &mut T) {
     check_near(t, "500 per second", (e2.metric(g2, "load", "sent").unwrap_or(0) - sent) as f64, 500.0, 0.01);
     refused(t, &mut e2, "another kind of load", g2, "load", set(&lconf, "mode", r#""closed""#), "Offene und geschlossene Last wechseln nur mit einem Neustart.");
     refused(t, &mut e2, "another duration", g2, "load", set(&lconf, "duration_ms", "1000"), "Die Dauer eines Laufs ändert sich nur mit einem Neustart.");
-    let _ = (g, conf);
     // a load balancer: a backend more, its algorithm, one that drains; the same connection numbers
     let n = lb_net();
     let (lb, w2) = (n.find("LB").map_or(0, |d| d.id), n.find("W2").map_or(0, |d| d.id));

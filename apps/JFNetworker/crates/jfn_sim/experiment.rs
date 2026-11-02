@@ -5,10 +5,11 @@
 //   Plan::new(&experiment, &project, name) -> Result<Plan, Vec<Msg>>   what the experiment asks of
 //                                      the project checked and every configuration patched
 //   plan.warm(config, seed) -> Result<Engine, Msg>   boots a copy once, quiet trace, runs the warm-up
-//   plan.measure(&warm, config, seed, level) -> Fig  a clone of it through one level
-//   plan.run_level(&mut engine, config, seed, level) -> Fig   the same on an engine of yours
+//   plan.measure(&warm, level) -> Fig  a clone of it through one level
+//   plan.run_level(&mut engine, level) -> Fig   the same on an engine of yours
 //   plan.run_all() -> Sweep            all of it on this thread (jfn_run's sweep does it on many)
-//   plan.empty() / plan.collect(figs) -> Sweep   the results of figs[plan.index(config, seed, level)]
+//   plan.runs() / index(config, seed, level) / collect(figs) -> Sweep   the results of what each run
+//                                      gave, at its place
 //   Sweep                              configs (ConfigOut: label, cost, knee, maximum, limit), points
 //                                      (Point), table() / csv() / detail_csv(); the same bytes on
 //                                      every machine and for any order of the runs
@@ -57,6 +58,8 @@ use crate::series::SeriesCfg;
 
 /// a level that holds more than this ends where it is (keyframe::footprint)
 pub const MEM_LIMIT: usize = 1 << 30;
+/// what a request not answered yet holds at the generator, about
+const REQ_BYTES: usize = 1024;
 /// a resource below this share of its time is no bottleneck, per mille
 const NO_LIMIT_PM: u64 = 500;
 
@@ -249,13 +252,13 @@ impl Plan {
     }
 
     /// a clone of the warm engine through one level
-    pub fn measure(&self, warm: &Engine, config: usize, seed: usize, level: usize) -> Fig {
+    pub fn measure(&self, warm: &Engine, level: usize) -> Fig {
         let mut e = warm.clone();
-        self.run_level(&mut e, config, seed, level)
+        self.run_level(&mut e, level)
     }
 
     /// one level on this engine: its load, settling, measuring
-    pub fn run_level(&self, e: &mut Engine, _config: usize, _seed: usize, level: usize) -> Fig {
+    pub fn run_level(&self, e: &mut Engine, level: usize) -> Fig {
         let t = &self.exp.timing;
         let svc = self.exp.load.svc.clone();
         let (rate_m, users) = match self.levels[level] {
@@ -265,22 +268,30 @@ impl Plan {
         if e.apply(Action::HttpLoadSet { dev: self.gen_dev, svc: svc.clone(), rate_m, users }).is_err() {
             return Fig { status: Status::Failed, ..Fig::default() };
         }
-        e.run_until(e.now() + t.settle_s * SEC, usize::MAX);
+        let (t0, mut status) = (e.now(), Status::Ok);
+        for s in 1..=t.settle_s {
+            e.run_until(t0 + s * SEC, usize::MAX);
+            if s % 4 == 0 && self.too_big(e, &svc) {
+                status = Status::Memory;
+                break;
+            }
+        }
         let from = e.now();
         let done0 = e.events_done();
         let before = Snap::of(e, self.gen_dev, &svc);
         // the longest waits count from here (nothing but this reads them)
         e.res_marks_reset();
         let mut backlog: Vec<(u32, Ns)> = Vec::new();
-        let mut status = Status::Ok;
         let mut seconds = 0;
         for s in 1..=t.measure_s {
+            if status != Status::Ok {
+                break;
+            }
             e.run_until(from + s * SEC, usize::MAX);
             seconds = s;
             e.backlog_peaks(&mut backlog);
-            if s % 4 == 0 && crate::keyframe::footprint(e) > self.mem_limit {
+            if s % 4 == 0 && self.too_big(e, &svc) {
                 status = Status::Memory;
-                break;
             }
         }
         let to = e.now();
@@ -303,6 +314,12 @@ impl Plan {
         }
     }
 
+    /// it holds more than a level may: what keyframes count, and the generator's waiting requests
+    fn too_big(&self, e: &Engine, svc: &str) -> bool {
+        let waiting = e.service::<HttpLoad>(self.gen_dev, svc).map_or(0, |l| l.inflight() as usize);
+        crate::keyframe::footprint(e) + waiting * REQ_BYTES > self.mem_limit
+    }
+
     /// all of it on this thread
     pub fn run_all(&self) -> Sweep {
         let mut figs = alloc::vec![None; self.runs()];
@@ -311,7 +328,7 @@ impl Plan {
                 let warm = self.warm(c, s);
                 for l in 0..self.levels.len() {
                     figs[self.index(c, s, l)] = Some(match &warm {
-                        Ok(w) => self.measure(w, c, s, l),
+                        Ok(w) => self.measure(w, l),
                         Err(_) => Fig { status: Status::Failed, ..Fig::default() },
                     });
                 }
@@ -808,7 +825,8 @@ fn euro3(v: u64) -> String {
     format!("{}.{:03}", v / 1_000_000, v % 1_000_000 / 1000)
 }
 
-/// a table's rows with the columns as wide as they need (the first column left, the others right)
+/// a table's rows with the columns as wide as they need (the first column left, the others right, a
+/// last column of words left)
 fn aligned(rows: &[Vec<String>], out: &mut String) {
     let n = rows.iter().map(|r| r.len()).max().unwrap_or(0);
     let mut w = alloc::vec![0; n];
@@ -825,7 +843,7 @@ fn aligned(rows: &[Vec<String>], out: &mut String) {
                 line.push_str("  ");
             }
             let last = i + 1 == r.len();
-            if i == 0 || (last && c.parse::<f32>().is_err()) {
+            if i == 0 || (last && !c.bytes().all(|b| b.is_ascii_digit() || b == b'.')) {
                 line.push_str(c);
                 if !last {
                     for _ in 0..pad {
@@ -855,13 +873,13 @@ impl Sweep {
         let mut s = String::new();
         let t = if self.title.is_empty() { String::new() } else { format!(": \u{201e}{}\u{201c}", self.title) };
         s.push_str(&format!("# JFNetworker-Experiment {}{}\n", self.name, t));
-        s.push_str(&format!("# {} Konfigurationen, {} Laststufen, {} Seeds; {} s Warmlauf, je Stufe {} s Übergang und {} s Messung (virtuelle Zeit)\n", self.configs.len(), self.levels.len(), self.seeds.len(), self.warmup_s, self.settle_s, self.measure_s));
+        s.push_str(&format!("# Konfigurationen: {}, Laststufen: {}, Seeds: {}; {} s Warmlauf, je Stufe {} s Übergang und {} s Messung (virtuelle Zeit)\n", self.configs.len(), self.levels.len(), self.seeds.len(), self.warmup_s, self.settle_s, self.measure_s));
         s.push_str(&format!("# SLO: {}\n", self.slo.text()));
         s.push_str("# Ergebnis des Modells mit seinen Annahmen; die Kosten sind angenommene Preise (catalog::Prices), keine Angebote\n");
         for (c, cfg) in self.configs.iter().enumerate() {
             s.push('\n');
             s.push_str(&format!("{} ({} \u{20ac}/h)\n", cfg.label, euro3(cfg.cost_uh)));
-            let mut rows = alloc::vec![["Last", "erreicht/s", "p50 ms", "p95 ms", "p99 ms", "p99,9 ms", "Fehler %", "CPU %", "\u{20ac}/1000", "SLO", "Engpass"].iter().map(|x| String::from(*x)).collect::<Vec<String>>()];
+            let mut rows = alloc::vec![["Last", "erreicht/s", "p50 ms", "p95 ms", "p99 ms", "p99.9 ms", "Fehler %", "CPU %", "\u{20ac}/1000", "SLO", "Engpass"].iter().map(|x| String::from(*x)).collect::<Vec<String>>()];
             for p in self.points_of(c) {
                 rows.push(alloc::vec![
                     self.levels.get(p.level).map_or(String::new(), |l| l.text()),

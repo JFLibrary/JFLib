@@ -538,7 +538,7 @@ fn sweep_worker(w: &SweepWork) {
             (Some((warm, c, s, l)), _) => {
                 let mut e = warm.lock().clone();
                 drop(warm);
-                let f = w.plan.run_level(&mut e, c, s, l);
+                let f = w.plan.run_level(&mut e, l);
                 drop(e);
                 w.figs.lock()[w.plan.index(c, s, l)] = Some(f);
             }
