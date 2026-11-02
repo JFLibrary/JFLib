@@ -140,6 +140,7 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
 | `apps/NAME/tests/*.uis` | test scripts (`apps/NAME/tests/*.uis` for scripts that only the Rust build has) |
 | `apps/NAME/STYLE` | one word: the app's style (default `winui`) |
 | `apps/NAME/TARGETS` | e.g. `win linux web`: explicit supported targets; owned GUI apps default to native plus web, native CLI probes to Windows/Linux |
+| `apps/NAME/GLIBC` | on Linux this program links dynamically against glibc instead of being static: it uses the GPU, and every Linux GPU driver is a glibc library (`gputest`; GPU.md "Linux") |
 | `apps/NAME/res/app.ico`, `app_{48,128,256}.png` | exe icon, Linux icons (`tools/mkicon.py`) |
 | `apps/NAME/PACKAGE` | packaging metadata (PACKAGING.md); `version=` is the app's own version (`rt::app_version!()`, VERSIONING.md) |
 | `apps/NAME/PERMISSIONS`, `BINS`, `assets/` | what it may do (PERMISSIONS.md), further programs (section 16), files built in as `app://` (VFS.md) |
@@ -172,7 +173,8 @@ Every app crate gets every library crate (`ui`, `gfx`, `text`, `plat`, `base`, `
 are incremental (about 1.5 s after an edit in `ui`). Use `--out build/<name>` when several
 agents build at the same time.
 
-**Platforms need no app code.** The same source builds a Windows exe and a static Linux ELF.
+**Platforms need no app code.** The same source builds a Windows exe and a static Linux ELF (with
+a file `apps/NAME/GLIBC`: a Linux ELF linked against glibc and nothing else, for the GPU drivers).
 On Linux the library picks the display backend at start-up: Wayland when `WAYLAND_DISPLAY` is
 set, else X11 via `DISPLAY` (`jfgui_BACKEND=x11|wayland` forces one). Apps call only `ui`,
 `gfx`, `img_core`, `text`, `fx` and the neutral `plat` helpers (files, clock, threads). The only

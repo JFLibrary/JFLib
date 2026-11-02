@@ -1,8 +1,8 @@
 // vk_inst -- Vulkan instance and adapters
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>
-//        jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL or vulkan-1.dll
-//        (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
+//        jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL, vulkan-1.dll or
+//        libvulkan.so.1 (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
 //        Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
 //        present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
 //   instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
@@ -178,7 +178,7 @@ impl Instance {
             return Err(GpuError::Disabled);
         }
         let dll = plat::env("jfgui_GPU_DLL").filter(|s| !s.is_empty());
-        let lib = Lib::open(dll.as_deref().unwrap_or("vulkan-1.dll"))?;
+        let lib = Lib::open(dll.as_deref().unwrap_or(crate::vk_load::LOADER))?;
         let lf = vk::LoaderFns::load(&|n| lib.gipa(0, n)).map_err(|_| GpuError::NoLoader)?;
         let mut ver = vk::make_api_version(1, 0, 0);
         if let Some(e) = lf.enumerate_instance_version {

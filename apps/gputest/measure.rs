@@ -216,6 +216,10 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
     let mut rep = Report { frames: c.frames, timestamps: dev.features().timestamps, ..Report::default() };
     let mut last_t = 0.0f32;
     let scene;
+    if c.window.is_some() && !dev.features().swapchain {
+        t.fail("--window: no swapchains on this device");
+        return None;
+    }
     if let Some(present) = c.window {
         // a plat window of the size (within the work area) and a swapchain
         let w = plat::win_create("gputest --bench", 640, 360, plat::PWF_SYSFRAME, plat::PW_NOOWNER, plat::PW_DEFAULT,

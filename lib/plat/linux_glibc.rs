@@ -1,0 +1,171 @@
+// linux_glibc -- a program linked against glibc (--cfg jfgui_glibc; build_rs.py section "glibc",
+// docs/GPU.md "Linux"): every Linux GPU driver is a glibc library
+//
+//   _start, glibc_main          the process start through __libc_start_main (ld.so has set up the
+//                               main thread's TLS and run libc's initialisers by then), then what
+//                               linux_entry does in a static program
+//   exit(code)                  plat::exit: glibc's exit (atexit handlers, the destructors of the
+//                               loaded libraries, stdio); so does returning from the program's main.
+//                               Crash reports end in rt::os::exit as everywhere: exit_group, no
+//                               destructor runs inside a signal handler
+//   at_exit(f)                  f at that normal end, before the handlers registered earlier
+//   dl_open / dl_sym / dl_close / dl_error    the system's dynamic linker (lib/gpu: libvulkan.so.1);
+//                               plugins keep their own loader (linux_elfload.rs: they import nothing)
+//   glibc_version()             the running libc ("2.43")
+//   glibc_thread_ids()          the calling thread's FS base, pthread_self, &errno (gputest --test glibc)
+//
+// Threads: linux_thread.rs, its last part: pthread_create on the same mapping as in a static
+// program.  Everything else of plat stays raw system calls next to glibc, which is fine: they do
+// not touch errno or glibc's state.  The fault handlers (linux_crash.rs, linux_guard.rs) use
+// rt_sigaction directly and leave glibc's two internal signals alone.  A driver's own threads have
+// no alternate signal stack, the report runs on their stack; Mesa's block every signal but SIGSEGV
+// and SIGSYS, so another fault there (SIGILL in llvmpipe's JIT code) ends the process at once, by the
+// kernel, without a report.  The allocator (rt::mem) has its own mappings and takes no TLS, so a
+// driver's thread may call back into it (debug messages); a child after a raw fork only makes system
+// calls until its exec.  plat::setenv changes JFLib's list, which plat::env and child processes see;
+// a driver's getenv reads the start environment.
+
+use alloc::string::String;
+use core::ffi::c_void;
+
+unsafe extern "C" {
+    fn __libc_start_main(main: extern "C" fn(i32, *const usize, *const usize) -> i32, argc: i32, argv: *const usize,
+                         init: usize, fini: usize, rtld_fini: usize, stack_end: *const u8) -> i32;
+    fn __cxa_atexit(f: extern "C" fn(*mut c_void), arg: *mut c_void, dso: *mut c_void) -> i32;
+    fn __errno_location() -> *mut i32;
+    #[link_name = "exit"]
+    fn c_exit(code: i32) -> !;
+    fn gnu_get_libc_version() -> *const u8;
+    fn pthread_self() -> usize;
+    fn dlopen(name: *const u8, flags: i32) -> *mut c_void;
+    fn dlsym(handle: *mut c_void, name: *const u8) -> *mut c_void;
+    fn dlclose(handle: *mut c_void) -> i32;
+    fn dlerror() -> *const u8;
+    pub(super) fn pthread_attr_init(attr: *mut PthreadAttr) -> i32;
+    pub(super) fn pthread_attr_destroy(attr: *mut PthreadAttr) -> i32;
+    pub(super) fn pthread_attr_setstack(attr: *mut PthreadAttr, stack: *mut u8, size: usize) -> i32;
+    pub(super) fn pthread_create(thread: *mut usize, attr: *const PthreadAttr, start: extern "C" fn(*mut u8) -> *mut u8,
+                                 arg: *mut u8) -> i32;
+    pub(super) fn pthread_join(thread: usize, ret: *mut *mut u8) -> i32;
+}
+
+/// pthread_attr_t of x86-64 (56 bytes)
+#[repr(C, align(8))]
+pub(super) struct PthreadAttr(pub(super) [u8; 56]);
+
+const SYS_ARCH_PRCTL: usize = 158;
+const ARCH_GET_FS: usize = 0x1003;
+const RTLD_NOW: i32 = 2;
+
+// the ABI's entry: rsp -> argc, argv[], 0, envp[], 0; rdx = ld.so's finaliser (registered by
+// __libc_start_main).  init and fini 0: this program has neither (glibc takes both as optional).
+core::arch::global_asm!(
+    ".globl _start",
+    "_start:",
+    "    xor ebp, ebp",
+    "    mov r9, rdx",
+    "    pop rsi",
+    "    mov rdx, rsp",
+    "    and rsp, -16",
+    "    push rax",
+    "    push rsp",
+    "    xor r8d, r8d",
+    "    xor ecx, ecx",
+    "    lea rdi, [rip + {main}]",
+    "    call {start}",
+    "    ud2",
+    main = sym glibc_main,
+    start = sym __libc_start_main,
+);
+
+extern "C" fn glibc_main(_argc: i32, argv: *const usize, _envp: *const usize) -> i32 {
+    // SAFETY: argv lies on the initial stack right after argc, as linux.rs reads it; written once
+    // before anything reads it, on the only thread of this program.
+    unsafe { super::START_SP = argv.sub(1) };
+    super::crash::crash_init();
+    super::thread::wake_init();
+    crate::cpu::simd_override();
+    rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
+    // SAFETY: the program's entry symbol (ui::main!, rt::main!); the return value goes to exit
+    unsafe { super::jfgui_main() }
+}
+
+/// end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
+/// from any thread, not from a signal handler
+pub fn exit(code: i32) -> ! {
+    // SAFETY: ends the process.
+    unsafe { c_exit(code) }
+}
+
+extern "C" fn run_at_exit(f: *mut c_void) {
+    // SAFETY: at_exit stored a fn() here.
+    let f = unsafe { core::mem::transmute::<*mut c_void, fn()>(f) };
+    f();
+}
+
+/// run f at the normal end of the process (plat::exit, or the program's main returns), not after
+/// a crash; before the handlers registered earlier
+pub fn at_exit(f: fn()) {
+    // SAFETY: a fn pointer fits the argument; 0: not tied to a library that could be unloaded.
+    unsafe { __cxa_atexit(run_at_exit, f as *mut c_void, core::ptr::null_mut()) };
+}
+
+/// open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
+/// and run its initialisers -> its handle
+pub fn dl_open(name: &str) -> Option<usize> {
+    if name.contains('\0') {
+        return None;
+    }
+    let mut z: alloc::vec::Vec<u8> = name.as_bytes().to_vec();
+    z.push(0);
+    // SAFETY: z is NUL-terminated.
+    let h = unsafe { dlopen(z.as_ptr(), RTLD_NOW) };
+    if h.is_null() { None } else { Some(h as usize) }
+}
+
+/// the address of a symbol of a library from dl_open (0: none); name ends in NUL
+pub fn dl_sym(handle: usize, name: &[u8]) -> usize {
+    if name.last() != Some(&0) {
+        return 0;
+    }
+    // SAFETY: a handle of dl_open, a NUL-terminated name.
+    unsafe { dlsym(handle as *mut c_void, name.as_ptr()) as usize }
+}
+
+/// close a library from dl_open
+pub fn dl_close(handle: usize) {
+    // SAFETY: a handle of dl_open; the caller no longer uses what it got from it.
+    unsafe { dlclose(handle as *mut c_void) };
+}
+
+unsafe fn c_text(p: *const u8) -> String {
+    if p.is_null() {
+        return String::new();
+    }
+    // SAFETY: a NUL-terminated string (the caller's source says so).
+    unsafe { super::cstr(p) }
+}
+
+/// why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
+pub fn dl_error() -> String {
+    // SAFETY: dlerror returns null or a string that stays valid until this thread's next dl call.
+    unsafe { c_text(dlerror()) }
+}
+
+/// the version of the running glibc ("2.43")
+pub fn glibc_version() -> String {
+    // SAFETY: a static NUL-terminated string.
+    unsafe { c_text(gnu_get_libc_version()) }
+}
+
+/// the calling thread's FS base, pthread_self() and the address of errno: its thread control block
+/// and thread-local storage (a raw clone would have 0 and the creator's)
+pub fn glibc_thread_ids() -> (usize, usize, usize) {
+    let mut fs = 0usize;
+    // SAFETY: arch_prctl writes the FS base to fs; the two libc calls have no preconditions on a
+    // thread started by glibc.
+    unsafe {
+        rt::os::syscall3(SYS_ARCH_PRCTL, ARCH_GET_FS, &mut fs as *mut usize as usize, 0);
+        (fs, pthread_self(), __errno_location() as usize)
+    }
+}

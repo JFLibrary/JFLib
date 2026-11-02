@@ -2,7 +2,8 @@
 
 Stand 2026-10-30, Branch `linux-wayland-fixes` (Commits `1069f11`, `e0f2cd4`); ergänzt am
 2026-10-31 um das, was seitdem auf `main` kam (Abschnitt 7), und um die Übergabe an eine
-Sitzung auf dem Linux-Rechner (Abschnitt 8); am 2026-11-01 um den Lauf auf Fedora KDE (1a). Die
+Sitzung auf dem Linux-Rechner (Abschnitt 8); am 2026-11-01 um den Lauf auf Fedora KDE (1a); am
+2026-11-02 um `lib/gpu` ohne Fenster auf demselben Rechner (1b). Die
 Linux-Überarbeitung lief zuerst nur in einer Cloud-Umgebung (headless GNOME 46, sway, Weston,
 Xvfb mit openbox), dann auf dem KDE-Rechner (Plasma 6.6.6, Wayland, ein Monitor eDP-1 mit
 125 %, Layout de, keine Eingabemethode). Dieser Plan hält fest, was dort geprüft ist und was
@@ -56,8 +57,8 @@ G4560T, 7,6 GB RAM, Intel HD 610 mit Mesa 26.0.3. Zweig `linux-tests-minipc-2026
   HarfBuzz: 1171 Glyphen, 0 Abweichungen, größte Distanz 0,00049 Einheiten. Laden 8,8 ms,
   65 535 Konturen × 3 in 760 ms, 2000 Glyphen bei 16 px in 15,7 ms, Speicher beim Rendern 34 MiB.
   Schriftdialog mit Regler für die Strichstärke geöffnet, Text in einer Instanz nicht verglichen.
-- **GPU**: `gputest` und `uigputest` werden nur für Windows gebaut (G4 fehlt), `gallery` enthält
-  keinen Vulkan-Code. `jfgui_GPU=1`, `=0` und ohne Schalter liefern dasselbe Bild.
+- **GPU**: `gallery` enthält keinen Vulkan-Code. `jfgui_GPU=1`, `=0` und ohne Schalter liefern
+  dasselbe Bild. `lib/gpu` selbst: Abschnitt 1b.
 - **Dekorationen**: KWin zeichnet den Rahmen, mit `jfgui_CSD=1` die App; je eine Titelleiste im Bild.
 - **Fenster**: Maximieren und Minimieren vom Desktop, gleiche Größe danach.
 - **Vollbild** (`desktest`): F11 und Knopf, aus maximiert und zurück, vom Desktop aus gesteuert (die
@@ -102,6 +103,23 @@ G4560T, 7,6 GB RAM, Intel HD 610 mit Mesa 26.0.3. Zweig `linux-tests-minipc-2026
 Bedienelemente ändern oder eine Agentenaktion etwas geändert hat
 (`apps/gallery/tests/agent_revision.uis`, `apps/agenttest/tests/gui_ipc_check.py`, auch auf diesem
 Rechner). Ein Testlauf mit `--agent` braucht also keine geratene Revision mehr.
+
+---
+
+## 1b. `lib/gpu` ohne Fenster auf Fedora 44 (2026-11-02, G4a)
+
+Derselbe Rechner, Mesa 26.0.3, glibc 2.43; `gputest` gegen glibc gelinkt, auf Windows gebaut und mit
+`scp` kopiert. Keine Fenster, die Fenstertests melden `SKIP`. Einzelheiten, Funde und Zahlen stehen
+in [GPU.md](GPU.md) „Linux“. `uigputest` bleibt bis G4b nur für Windows.
+
+- **HD Graphics 610**: `gputest --test all` bestanden, in 7–13 s, mit `glibc` (Start, Threads, Ende,
+  Abstürze) und `noloader`. Messszene: 100 000 Würfel in 1080p 108 Bilder/s, 1 Mio. 14 Bilder/s.
+- **llvmpipe** (`jfgui_GPU_ADAPTER=llvmpipe`): Mesa 26.0.3 mit LLVM 22.1 ist auf diesem Prozessor
+  ohne AVX und BMI kaputt, Abstürze in `libLLVM`, falsche Ergebnisse, `SIGILL`. Bestanden nur
+  `copies`, `upload`, `bindless`, `noloader`. Auf WSL (LLVM 20, AVX2) läuft dasselbe Programm.
+- **Nicht da**: `VK_LAYER_KHRONOS_validation`, also keine Validierung. `vulkaninfo` und `gdb` sind da.
+- **Hinweis**: Treiber schreiben ihren Shader-Cache nach `~/.cache/mesa_shader_cache`; für Läufe in
+  einem eigenen Ordner `MESA_SHADER_CACHE_DIR` setzen.
 
 ---
 
@@ -214,6 +232,11 @@ GNOME und KDE auf Fedora haben keine X11-Sitzung mehr; Xfce läuft auf X11.
 - Windows: F-03 und F-04 ungetestet, ebenso die Windows-Seite der Token-Übergabe in
   `lib/plat/instance.rs`. Braucht einen Windows-Rechner mit Build.
 - `portal_bus` und die PaintCraft-Plugin-Skripte brauchen `build/rwref`.
+- Programme gegen glibc auf einer alten glibc (Debian 11, Ubuntu 20.04, RHEL 8: vor 2.34):
+  `gputest --test glibc` und `--test noloader` dort, die Datei von hier kopiert. Bisher lief sie nur auf
+  2.39 und 2.43; alle Importe tragen `GLIBC_2.2.5`, und `libdl` / `libpthread` stehen in `DT_NEEDED`,
+  gerade dafür. Ebenso `lib/gpu` auf NVIDIA und AMD unter Linux, und einmal mit
+  `VK_LAYER_KHRONOS_validation`.
 
 ---
 
