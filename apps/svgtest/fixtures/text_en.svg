@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Text</title>
+  <defs>
+    <linearGradient id="tg" x2="1" y2="0">
+      <stop offset="0" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <line x1="100" y1="5" x2="100" y2="95" stroke="#cbd5e1"/>
+  <text x="100" y="25" font-size="16" text-anchor="start" fill="#111827">Start</text>
+  <text x="100" y="50" font-size="16" text-anchor="middle" fill="#111827">Middle</text>
+  <text x="100" y="75" font-size="16" text-anchor="end" fill="#111827">End</text>
+  <text x="10" y="120" font-size="20" fill="#374151">Hello, <tspan font-weight="bold" fill="#dc2626">SVG</tspan>   world!</text>
+  <text x="10" y="150" font-size="24" font-weight="bold" fill="url(#tg)" stroke="#111827" stroke-width="0.5">Gradient</text>
+  <text x="10" y="180" font-size="14" font-style="italic" fill="#0f766e">italic <tspan dy="-6" font-size="9">up</tspan><tspan dy="6"> and back</tspan></text>
+  <text transform="translate(185 190) rotate(-90)" font-size="12" fill="#6b7280">rotated</text>
+</svg>

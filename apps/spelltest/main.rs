@@ -41,6 +41,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
 const ID_ON: u32 = 101;
 const ID_DE: u32 = 102;
@@ -51,7 +52,7 @@ const ID_BODY: u32 = 111;
 const ID_PLAIN: u32 = 112;
 const ID_PW: u32 = 113;
 
-const DESC: AppDesc = AppDesc { title: "jfgui Rechtschreibung", flags: AF_RESIZABLE, w: 640, h: 560, min_w: 360, min_h: 300, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "JFLib Rechtschreibung", flags: AF_RESIZABLE, w: 640, h: 560, min_w: 360, min_h: 300, ..AppDesc::NONE }; // i18n
 
 const SUBJECT: &str = "Die Hasu-Tür";
 const BODY: &str = "Heute ist die Arbit in der Strasse sehr schön. Die Hausaufgaben sind gut, z.B. das Wörterbuch.\nJFLib und E-Mail-Adresse, 3D, https://example.org/wort";
@@ -79,10 +80,10 @@ fn words(text: &str, r: &[(usize, usize)]) -> String {
 
 fn state_name(s: u32) -> &'static str {
     match s {
-        SPELL_LOADING => "lädt",
-        SPELL_READY => "bereit",
-        SPELL_NONE => "kein Wörterbuch",
-        _ => "aus",
+        SPELL_LOADING => t("lädt"),
+        SPELL_READY => t("bereit"),
+        SPELL_NONE => t("kein Wörterbuch"),
+        _ => t("aus"),
     }
 }
 
@@ -90,6 +91,8 @@ impl App for Spell {
     fn init(&mut self, ui: &mut Ui) -> bool {
         if let Some(l) = plat::arg_value("--spell-lang") {
             ui.spell_language(&l);
+        } else if i18n::language_code() != "de" {
+            ui.spell_language("de"); // the samples are German, whatever the window's language
         }
         if plat::args().iter().any(|a| a == "--report") {
             self.report = Some(String::new());
@@ -102,31 +105,31 @@ impl App for Spell {
 
     fn frame(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | pad(16), 8);
-        ui.text(TS_SUBTITLE, "Rechtschreibung");
+        ui.text(TS_SUBTITLE, t("Rechtschreibung"));
         ui.box_begin(0, BOX_H, 8);
-        if ui.checkbox(ID_ON, "Rechtschreibung prüfen", &mut self.on) & EV_ACT != 0 {
+        if ui.checkbox(ID_ON, t("Rechtschreibung prüfen"), &mut self.on) & EV_ACT != 0 {
             ui.spell_enable(self.on != 0);
         }
-        if ui.button(ID_DE, "Deutsch") & EV_ACT != 0 {
+        if ui.button(ID_DE, t("Deutsch")) & EV_ACT != 0 {
             ui.spell_language("de");
         }
-        if ui.button(ID_EN, "English") & EV_ACT != 0 {
+        if ui.button(ID_EN, t("English")) & EV_ACT != 0 {
             ui.spell_language("en");
         }
-        if ui.button(ID_USER, "Benutzersprachen") & EV_ACT != 0 {
+        if ui.button(ID_USER, t("Benutzersprachen")) & EV_ACT != 0 {
             ui.spell_language("");
         }
         ui.box_end();
-        ui.text(TS_BODY, "Betreff");
+        ui.text(TS_BODY, t("Betreff"));
         ui.next_size(-1, 0);
-        ui.textbox(ID_SUBJECT, Some("Betreff"), &mut self.subject, 256 | TB_SPELL);
-        ui.text(TS_BODY, "Nachricht");
+        ui.textbox(ID_SUBJECT, Some(t("Betreff")), &mut self.subject, 256 | TB_SPELL);
+        ui.text(TS_BODY, t("Nachricht"));
         ui.next_size(-1, 0);
-        ui.textbox(ID_BODY, Some("Nachricht"), &mut self.body, 4096 | TB_MULTI | TB_WRAP | TB_SPELL);
-        ui.text(TS_BODY, "Ohne Prüfung");
+        ui.textbox(ID_BODY, Some(t("Nachricht")), &mut self.body, 4096 | TB_MULTI | TB_WRAP | TB_SPELL);
+        ui.text(TS_BODY, t("Ohne Prüfung"));
         ui.next_size(-1, 0);
         ui.textbox(ID_PLAIN, None, &mut self.plain, 256);
-        ui.text(TS_BODY, "Kennwort");
+        ui.text(TS_BODY, t("Kennwort"));
         ui.next_size(-1, 0);
         ui.textbox(ID_PW, None, &mut self.pw, 64 | TB_PASSWORD | TB_SPELL);
         // the status: checker, misspelled words, the personal word list
@@ -139,11 +142,11 @@ impl App for Spell {
         let e2 = ui.spell_errors(ID_BODY);
         let e3 = ui.spell_errors(ID_PW);
         let lines = [
-            format!("Sprache: {} ({}), {}", lang, backend, state_name(st)),
-            format!("Fehler Betreff: {}", words(&self.subject, &e1)),
-            format!("Fehler Nachricht: {}", words(&self.body, &e2)),
-            format!("Fehler Kennwort: {}", words(&self.pw, &e3)),
-            format!("Wörterbuch: {}", if personal.is_empty() { "-" } else { personal.as_str() }),
+            tf("Sprache: {} ({}), {}", &[&lang, backend, state_name(st)]),
+            tf("Fehler Betreff: {}", &[&words(&self.subject, &e1)]),
+            tf("Fehler Nachricht: {}", &[&words(&self.body, &e2)]),
+            tf("Fehler Kennwort: {}", &[&words(&self.pw, &e3)]),
+            tf("Wörterbuch: {}", &[if personal.is_empty() { "-" } else { personal.as_str() }]),
         ];
         for l in &lines {
             ui.text(TS_CAPTION, l);
@@ -160,6 +163,7 @@ impl App for Spell {
 }
 
 fn spelltest() -> i32 {
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
     if plat::arg_value("--test").as_deref() == Some("engine") {
         return engine::run();
     }
@@ -170,9 +174,9 @@ fn spelltest() -> i32 {
         return compare::hyphenate();
     }
     if plat::args().iter().any(|a| a == "--hyphen") {
-        return ui::launch(&hyphen::DESC, hyphen::Hy::default(), &style::STYLE);
+        return ui::launch(&hyphen::DESC.translated(), hyphen::Hy::default(), &style::STYLE);
     }
-    ui::launch(&DESC, Spell::default(), &style::STYLE)
+    ui::launch(&DESC.translated(), Spell::default(), &style::STYLE)
 }
 
 ui::main!(spelltest());

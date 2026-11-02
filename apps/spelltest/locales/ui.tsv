@@ -1,0 +1,27 @@
+de	en
+JFLib Silbentrennung	JFLib hyphenation
+Silbentrennung	Hyphenation
+Mit: {}	With: {}
+Ohne: {}	Without: {}
+Englisch: {}	English: {}
+Muster: {} + {}	Patterns: {} + {}
+Muster: keine	Patterns: none
+JFLib Rechtschreibung	JFLib spell checking
+lädt	loading
+bereit	ready
+kein Wörterbuch	no dictionary
+aus	off
+Rechtschreibung	Spell checking
+Rechtschreibung prüfen	Check spelling
+Deutsch	German
+English	English
+Benutzersprachen	User languages
+Betreff	Subject
+Nachricht	Message
+Ohne Prüfung	Without checking
+Kennwort	Password
+Sprache: {} ({}), {}	Language: {} ({}), {}
+Fehler Betreff: {}	Errors subject: {}
+Fehler Nachricht: {}	Errors message: {}
+Fehler Kennwort: {}	Errors password: {}
+Wörterbuch: {}	Dictionary: {}
