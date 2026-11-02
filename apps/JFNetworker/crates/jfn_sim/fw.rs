@@ -844,6 +844,14 @@ impl Firewall {
                 self.stats.reset += 1;
                 return false;
             }
+            // a new connection on the same ports while the old one still winds down
+            if !back && f.flags & SYN != 0 && f.flags & ACK == 0 && (s.fin[0] || s.fin[1]) {
+                s.fin = [false; 2];
+                s.tcp = Some(TcpState::Syn);
+                let end = s.ends(&self.timers);
+                self.due = Some(self.due.map_or(end, |d| d.min(end)));
+                return true;
+            }
             if f.flags & FIN != 0 {
                 s.fin[d] = true;
             }

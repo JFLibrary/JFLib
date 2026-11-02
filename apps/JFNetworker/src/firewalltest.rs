@@ -343,6 +343,9 @@ fn tcp_states(t: &mut T) {
     let row = e.fw_sessions(FW).into_iter().find(|r| r.session.sport == 42000);
     t.eq("closing at the end", row.as_ref().and_then(|r| r.session.tcp), Some(TcpState::Closing));
     t.check("packets both ways", row.as_ref().is_some_and(|r| r.session.packets[0] >= 3 && r.session.packets[1] >= 3 && r.session.bytes[0] > 0));
+    // a new connection on the same ports while the old one winds down starts over
+    let fl = flow(PROTO_TCP, "192.168.1.10", "203.0.113.10", 42000, 80, SYN);
+    t.check("a SYN on the ports of a closing session belongs to it", e.firewall(FW).is_some_and(|f| matches!(f.probe(Some("INSIDE"), Some("OUTSIDE"), &fl, &jfn_sim::acl::Acls::default(), e.now()), FwProbe::Session { back: false, .. })));
     // closing times out after the FIN timer
     let _ = conf(&mut e, &["ip inspect tcp finwait-time 2"]);
     run_for(&mut e, 3 * SEC);

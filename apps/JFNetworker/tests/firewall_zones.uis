@@ -9,7 +9,7 @@
 # the protocol 143364, Klasse anlegen 143367, a policy's name 143368, its class 143369, the action 143370,
 # log 143371, Regel setzen 143372, a pair's name 143373, from 143374, to 143375, its policy 143376, Paar
 # anlegen 143377, Sitzungen löschen 143378, Zähler löschen 143379; remove: a policy 143552 + i, a pair
-# 143616 + i; the Test part as in firewall_panel.uis (ID_FW0 = 131072).
+# 143616 + i; the Test part as in firewall_panel.uis (ID_FW0 = 131072), its protocol 131170 and source port 131173.
 size 1280 900
 theme light
 wait 500
@@ -168,26 +168,31 @@ key ctrl+a
 type "22"
 click #131177
 expect text:"A-D, Richtlinie IN-DIE-DMZ, Klasse class-default: wird still verworfen." exists
-# ---- an existing connection: the answer to what PC1 pings now
+# ---- an existing connection: the answer to a datagram of PC1, by its global address (PAT)
 activate 27136
-type "clear\n"
+key ctrl+c
 wait 100
-type "ping -c 8 203.0.113.10\n"
-wait 1500
+type "nc -u -p 5555 203.0.113.10 7777\n"
+wait 200
+type "hallo\n"
+wait 500
 activate 26624
-click #131168
-click listitem:"Gi0/2"
+click #131170
+click listitem:"udp"
 click #131171
 key ctrl+a
 type "203.0.113.10"
 click #131172
 key ctrl+a
-type "192.168.1.10"
+type "203.0.113.1"
+click #131173
+type "7777"
 click #131174
 key ctrl+a
-type "80"
+type "5555"
 click #131177
-expect text:"Keine Regel zwischen den Zonen AUSSEN und INNEN: wird still verworfen." exists
+expect text:"Zonen: passiert" exists
+expect text:"Bestehende Verbindung: Rückweg von Sitzung 2 in I-A, das Paket passiert." exists
 close window 27136
 activate 26624
 # ---- a router has neither part (the tab of the other model is firewall_panel.uis)
