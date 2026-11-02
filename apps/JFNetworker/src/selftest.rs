@@ -79,6 +79,8 @@
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
 // hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
 // queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
+// fwguitest.rs: the Firewall tab (group fwgui: what its forms type, rows back from the engine, moves,
+// the Test part against packets sent for real, the steps of console::run_lines_running).
 
 use alloc::format;
 use alloc::string::String;
@@ -188,9 +190,11 @@ mod modelstest;
 mod startpagetest;
 #[path = "hardwaretest.rs"]
 mod hardwaretest;
+#[path = "fwguitest.rs"]
+mod fwguitest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 59] = [
+    let groups: [(&'static str, fn(&mut T)); 60] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -250,6 +254,7 @@ pub fn run() -> i32 {
         ("labels", labelstest::run),
         ("startpage", startpagetest::run),
         ("hardware", hardwaretest::run),
+        ("fwgui", fwguitest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

@@ -716,3 +716,7 @@ pub(crate) const ID_FLT_CPU_X: u32 = 0x0002_2010;
 pub(crate) const ID_FLT_CPU: u32 = 0x0002_2011;
 pub(crate) const ID_FLT_MEM_GB: u32 = 0x0002_2012;
 pub(crate) const ID_FLT_MEM: u32 = 0x0002_2013;
+// ---- F1: the Firewall tab (commands 1020 .. 1039, widgets 0x0002_0000 .. 0x0002_0FFF; no timers, the
+// commands are not used)
+/// the Firewall tab of device window k: ID_FW0 + 0x800 k (devwin/firewall.rs has the block's layout)
+pub(crate) const ID_FW0: u32 = 0x0002_0000;

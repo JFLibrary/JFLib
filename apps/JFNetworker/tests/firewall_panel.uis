@@ -1,0 +1,321 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/nat_pat.jfnet
+# the Firewall tab of a device window (F1, workspace/devwin/firewall.rs) on fixtures/nat_pat.jfnet: R1
+# with its list 110 on Gi0/0/0 and its NAT.  A new list, its rules from the form, bound to an interface:
+# a ping is refused and the hit counter rises; undo restarts R1 and the counter is 0, the ping passes;
+# a rule typed on the console appears, moves and goes; port forwarding from the form reaches the web
+# server; the Test part; refusals with their reasons; a device without routing; the view in the past.
+# (That the prediction equals the engine packet by packet, what every form types: the selftest group
+# fwgui.)
+# Ids: the window 26624; the tab ID_FW0 = 131072: the list 131088, Neue Liste 131089, its name 131093,
+# Anlegen 131095, Routing einschalten 131097, Neu 131098, Bearbeiten 131099, Duplizieren 131100, nach
+# oben 131101, nach unten 131102, Löschen 131103; the rule form: Aktion 131104, Protokoll 131105, Quelle
+# 131106, Ziel 131110, Bemerkung 131117, Übernehmen 131120, Abbrechen 131121; the lists of Gi0/0/1
+# 131330 (in) and 131331 (out); the rows of the grid 132097 + i; NAT: the static form's interface 131152,
+# address 131148, port 131149, global port 131153, Anlegen 131154, clear 131155; Test: Schnittstelle
+# 131168, Richtung 131169, Quelle 131171, Ziel 131172, Zielport 131174, Prüfen 131177.
+size 1280 900
+theme light
+wait 500
+# ---- only on devices that route: not on a host or a plain switch
+dblclick listitem:"PC1" shift
+expect window 26624 open
+expect tab:"Firewall" missing
+close window 26624
+dblclick listitem:"SW1" shift
+expect window 26624 open
+expect tab:"Firewall" missing
+close window 26624
+dblclick listitem:"R1" shift
+expect window 26624 open
+resizewin 26624 900 840
+expect tab:"Firewall" exists
+click tab:"Firewall"
+expect tab:"Regeln" selected
+# ---- what the fixture has, at a glance
+expect text:"Was schützt welche Schnittstelle?" exists
+expect text:"Gi0/0/0 eingehend: Liste 110" exists
+expect text:"Gi0/0/0 ausgehend: keine Liste, alles passiert" exists
+expect text:"Gi0/0/1 ausgehend: keine Liste, alles passiert" exists
+# list 1 is NAT's selector
+expect text:"Diese Liste filtert nichts: NAT wählt mit ihr die Hosts aus, die es übersetzt." exists
+expect text:"Zeile 10: permit 192.168.1.0 0.0.0.255, 0 Treffer" exists
+click #131088
+click listitem:"110 (erweitert, 2 Regeln)"
+expect text:"Gebunden an Gi0/0/0 eingehend. Was keine Regel erlaubt, verwirft das implizite deny am Ende." exists
+expect text:"Zeile 10: deny tcp host 192.168.1.11 any eq www, 0 Treffer" exists
+expect text:"Zeile 20: permit ip any any, 0 Treffer" exists
+expect text:"PC2 darf nicht ins Web" exists
+expect text:"Am Ende: implizites deny" exists
+# nothing typed yet: Befehle says what it will show
+expect text:"Was die Formulare tun, steht hier als die Zeilen, die in der Konsole des Geräts laufen." exists
+# ---- a new list: the name is refused first, then it is there, empty
+click #131089
+click #131093
+type "2 Listen"
+click #131095
+expect text:"„2 Listen“ ist kein Listenname: Buchstaben, Ziffern, - und _, vorn ein Buchstabe." exists
+click #131093
+key ctrl+a
+type "BLOCK"
+click #131095
+expect text:"ip access-list extended BLOCK" exists
+expect text:"Diese Liste hat keine Regeln: gebunden oder nicht, alles passiert." exists
+# ---- a rule: an address that is no address is refused, the form stays
+click #131098
+expect #131120 exists
+click #131110
+key ctrl+a
+type "198.51.100.300"
+click #131120
+expect text:"„198.51.100.300“ ist keine Adresse: any, 10.0.0.5, 10.0.0.0/24 oder 10.0.0.0 0.0.0.255." exists
+expect #131120 exists
+click #131110
+key ctrl+a
+type "198.51.100.10"
+click #131105
+click listitem:"icmp"
+click #131104
+click listitem:"verwerfen (deny)"
+expect text:"Wird zu: deny icmp any host 198.51.100.10" exists
+click #131120
+# the form is closed, the lines are in Befehle, the rule is in the grid and on the console
+expect #131120 missing
+expect text:"Zeile 10: deny icmp any host 198.51.100.10, 0 Treffer" exists
+# a second one, at the end
+click #131098
+click #131120
+expect text:"Zeile 20: permit ip any any, 0 Treffer" exists
+expect text:"Diese Liste ist an keine Schnittstelle gebunden: sie filtert nichts, alles passiert." exists
+# the same rule again is refused
+click #131098
+click #131120
+expect text:"Diese Regel steht schon in der Liste (Zeile 20). Ändern Sie mindestens ein Feld." exists
+click #131121
+# ---- bound to Gi0/0/1 outbound
+expect text:"Gi0/0/1 ausgehend: keine Liste, alles passiert" exists
+click #131331
+click listitem:"BLOCK"
+expect text:"ip access-group BLOCK out" exists
+expect text:"Gi0/0/1 ausgehend: Liste BLOCK" exists
+expect text:"Gebunden an Gi0/0/1 ausgehend. Was keine Regel erlaubt, verwirft das implizite deny am Ende." exists
+# it is on the console and in the running configuration
+click tab:"CLI"
+wait 100
+type "enable\n"
+type "show access-lists BLOCK\n"
+expect text:"    10 deny icmp any host 198.51.100.10" exists
+type "terminal length 0\n"
+type "show running-config\n"
+expect text:" ip access-group BLOCK out" exists
+click tab:"Firewall"
+# ---- a ping is refused, the counter rises (PC1's console in the second device window)
+dblclick listitem:"PC1" shift
+expect window 27136 open
+resizewin 27136 700 500
+click tab:"CLI" window 27136
+activate 27136
+wait 100
+type "ping -c 2 198.51.100.10\n"
+wait 3000
+expect text:"From 192.168.1.1 icmp_seq=1 Packet filtered" exists
+expect text:"Zeile 10: deny icmp any host 198.51.100.10, 2 Treffer" exists
+# ---- undo: R1 starts again with the old configuration, the list is not bound, the counter is 0
+cmd 10
+wait 500
+expect text:"Gi0/0/1 ausgehend: keine Liste, alles passiert" exists
+expect text:"Zeile 10: deny icmp any host 198.51.100.10, 0 Treffer" exists
+activate 27136
+type "clear\n"
+wait 100
+type "ping -c 6 198.51.100.10\n"
+wait 12000
+expect text:"From 192.168.1.1 icmp_seq=1 Packet filtered" missing
+expect text:"Zeile 10: deny icmp any host 198.51.100.10, 0 Treffer" exists
+expect text:"6 packets transmitted, 3 received, 50% packet loss, time 5000ms" exists
+close window 27136
+activate 26624
+# ---- a rule typed on the console appears at once
+click tab:"CLI"
+wait 100
+type "\n"
+type "enable\n"
+type "conf t\n"
+type "ip access-list extended BLOCK\n"
+type "remark nur DNS\n"
+type "permit udp any any eq domain\n"
+type "end\n"
+click tab:"Firewall"
+expect text:"Zeile 30: permit udp any any eq domain, 0 Treffer" exists
+expect text:"nur DNS" exists
+# ---- moved up with its remark: the neighbour goes below it by number, nothing else is touched
+click #132099
+expect text:"permit udp any any eq domain  ·  nur DNS" exists
+click #131101
+expect text:"no 20" exists
+expect text:"40 permit ip any any" exists
+expect text:"Zeile 30: permit udp any any eq domain, 0 Treffer" exists
+expect text:"Zeile 40: permit ip any any, 0 Treffer" exists
+# the numbers are no longer 10, 20, ...: first the numbers, then the rule
+click #132097
+click #131102
+expect text:"ip access-list resequence BLOCK 10 10" exists
+expect text:"no 10" exists
+expect text:"25 deny icmp any host 198.51.100.10" exists
+expect text:"Zeile 20: permit udp any any eq domain, 0 Treffer" exists
+expect text:"Zeile 25: deny icmp any host 198.51.100.10, 0 Treffer" exists
+# duplicate: the form with a copy, refused until something differs
+click #131100
+expect text:"Neue Regel nach Zeile 25 von Liste BLOCK" exists
+click #131120
+expect text:"Diese Regel steht schon in der Liste (Zeile 25). Ändern Sie mindestens ein Feld." exists
+click #131110
+key ctrl+a
+type "198.51.100.11"
+click #131120
+expect text:"Zeile 25: deny icmp any host 198.51.100.11, 0 Treffer" exists
+# edit, then delete it
+click #131099
+expect text:"Zeile 25 von Liste BLOCK ändern" exists
+click #131110
+key ctrl+a
+type "198.51.100.12"
+click #131120
+expect text:"Zeile 30: deny icmp any host 198.51.100.12, 0 Treffer" exists
+click #132099
+key delete
+expect text:"no deny icmp any host 198.51.100.12" exists
+expect text:"Zeile 30: deny icmp any host 198.51.100.12, 0 Treffer" missing
+# ---- a list that filters cannot go
+click #131088
+click listitem:"110 (erweitert, 2 Regeln)"
+click button:"Liste löschen"
+expect text:"Liste 110 filtert noch Gi0/0/0 (eingehend): erst die Bindung lösen." exists
+# ---- port forwarding from the form reaches the web server from outside
+click tab:"NAT"
+expect tab:"NAT" selected
+expect text:"Liste 1 → Adresse von Gi0/0/1 (PAT)" exists
+expect text:"tcp 192.168.1.20:80 = 203.0.113.1:80" exists
+click #131584
+expect text:"no ip nat inside source static tcp 192.168.1.20 80" exists
+expect text:"tcp 192.168.1.20:80 = 203.0.113.1:80" missing
+click #131152
+click listitem:"Gi0/0/1"
+click #131148
+type "192.168.1.20"
+click #131149
+type "80"
+click #131153
+type "hugo"
+click #131154
+expect text:"„hugo“ ist kein Port von 1 bis 65535." exists
+click #131153
+key ctrl+a
+type "8080"
+click #131154
+expect text:"ip nat inside source static tcp 192.168.1.20 80 interface GigabitEthernet0/0/1 8080" exists
+expect text:"tcp 192.168.1.20:80 = Gi0/0/1:8080" exists
+expect text:"203.0.113.1:8080" exists
+dblclick listitem:"EXT" shift
+expect window 27136 open
+resizewin 27136 700 500
+click tab:"CLI" window 27136
+activate 27136
+wait 100
+type "curl -s http://203.0.113.1:8080/\n"
+wait 4000
+expect text:"Hallo vom Webserver im Buero, 192.0.2.20 fragt WEB" exists
+close window 27136
+activate 26624
+# ... and it runs as a translation until the button clears it
+expect text:"192.0.2.20:" missing
+expect #131155 enabled
+click #131155
+expect text:"do clear ip nat translation *" exists
+# ---- the Test part
+click tab:"Test"
+expect tab:"Test" selected
+expect text:"Welche Regel trifft dieses Paket?" exists
+click #131171
+type "192.168.1.11"
+click #131172
+type "198.51.100.10"
+click #131174
+type "www"
+click #131177
+expect text:"Wird verworfen" exists
+expect text:"Liste 110, Zeile 10: deny tcp host 192.168.1.11 any eq www" exists
+expect text:"Der Absender bekommt „administratively prohibited“ (ICMP Typ 3, Code 13)." exists
+click #131171
+key ctrl+a
+type "192.168.1.10"
+click #131177
+expect text:"Passiert" exists
+expect text:"Liste 110, Zeile 20: permit ip any any" exists
+# the other direction has no list
+click #131169
+click listitem:"ausgehend"
+click #131177
+expect text:"Gi0/0/0 hat ausgehend keine Liste: das Paket passiert." exists
+# no address: refused, with the reason
+click #131171
+key ctrl+a
+type "10.0.0.300"
+click #131177
+expect text:"„10.0.0.300“ ist keine IPv4-Adresse." exists
+# the implicit deny: list 1 on Gi0/0/1 inbound lets only the inside's sources in
+click tab:"Regeln"
+click #131330
+click listitem:"1"
+expect text:"Gi0/0/1 eingehend: Liste 1" exists
+click tab:"Test"
+click #131168
+click listitem:"Gi0/0/1"
+click #131169
+click listitem:"eingehend"
+click #131171
+key ctrl+a
+type "8.8.8.8"
+click #131177
+expect text:"Liste 1: keine Regel passt, das implizite deny am Ende verwirft das Paket." exists
+# asking counted nothing: the 1 is NAT's, for the ping behind it
+click tab:"Regeln"
+click #131088
+click listitem:"1 (Standard, 1 Regel)"
+expect text:"Zeile 10: permit 192.168.1.0 0.0.0.255, 1 Treffer" exists
+# ---- a device without routing refuses and says why
+click tab:"CLI"
+wait 100
+type "conf t\n"
+type "no ip routing\n"
+type "end\n"
+click tab:"Firewall"
+expect text:"R1 routet nicht: Regeln und NAT träfen nur Pakete an das Gerät selbst." exists
+click #131098
+click #131120
+expect text:"R1 routet nicht (ip routing ist aus): eine Regel träfe nur Pakete an das Gerät selbst, weitergeleitet wird nichts. Erst Routing einschalten." exists
+click #131121
+click #131097
+expect text:"ip routing" exists
+expect text:"R1 routet nicht: Regeln und NAT träfen nur Pakete an das Gerät selbst." missing
+# ---- while the view stands in the past everything shows and nothing changes
+cmd 422 500
+wait 300
+expect text:"Die Ansicht steht in der Vergangenheit: hier lässt sich nur lesen, was damals galt." exists
+expect #131098 disabled
+expect #131089 disabled
+expect text:"Gi0/0/1 eingehend: keine Liste, alles passiert" exists
+click button:"Zurück zu live"
+wait 200
+expect text:"Die Ansicht steht in der Vergangenheit: hier lässt sich nur lesen, was damals galt." missing
+expect #131098 enabled
+expect text:"Gi0/0/1 eingehend: Liste 1" exists
+# ---- without power too
+click tab:"Übersicht"
+click #26641
+click tab:"Firewall"
+expect text:"R1 ist ausgeschaltet: Regeln und NAT lassen sich ändern, wenn es läuft." exists
+expect #131098 disabled
+click tab:"Übersicht"
+click #26641
+click tab:"Firewall"
+expect #131098 enabled
