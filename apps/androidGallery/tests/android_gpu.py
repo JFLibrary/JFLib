@@ -20,8 +20,8 @@ program cannot see of itself:
 A device without a usable GPU (the emulator's -gpu swiftshader_indirect, an old phone): the phases that
 need one SKIP, the fallback is still tested.  -gpu host offers Vulkan 1.3 in the emulator.
 Runs on a phone unchanged: it installs the debug APK, changes no setting of the system, injects no
-touch, uses only the app's own data (`pm clear` of the package; beside a gallery with data there: build
-with jfgui_ANDROID_PACKAGE=NAME, tools/android.py, and pass --package NAME).  The phone must be unlocked.
+touch, of the app's data deletes only its state file.  It replaces a gallery of that package; beside one:
+build with jfgui_ANDROID_PACKAGE=NAME, tools/android.py, and pass --package NAME.  The phone must be unlocked.
 Without --apk: build/android/androidGallery-<ro.product.cpu.abi>-debug.apk.  No device: SKIP, exit code 0.
 Exit code 1 when something failed.  adb comes from ANDROID_SDK_ROOT / ANDROID_HOME / %LOCALAPPDATA%\\Android\\Sdk.
 """
@@ -204,11 +204,14 @@ def main():
             run("shell", "am", "force-stop", PKG, check=False)
             run("shell", "am", "start", "-W", "-n", ACTIVITY, *extras, check=False, timeout=60)
 
+        def forget():
+            run("shell", "run-as", PKG, "rm", "-f", state, check=False)
+
         def remembered():
             return run("shell", "run-as", PKG, "cat", state, check=False).strip().splitlines()[-1:] or [""]
 
         vulkan = "android.hardware.vulkan.version" in run("shell", "pm", "list", "features", check=False)
-        run("shell", "pm", "clear", PKG, check=False)
+        forget()
         if not vulkan:
             print("SKIP guard: the system reports no Vulkan")
         else:
@@ -224,7 +227,7 @@ def main():
             ok(remembered()[0] == "never", f"never: {remembered()}")
             start()
             ok(alive(3.0) and remembered()[0] == "never", "the next run too, without touching the driver")
-            run("shell", "pm", "clear", PKG, check=False)
+            forget()
             start()
             if skipped:
                 time.sleep(6)
@@ -238,7 +241,7 @@ def main():
                     if seen == "ok":
                         break
                 ok(seen == "ok", f"cleared: it tries again, the state file says ok: {seen}")
-            run("shell", "pm", "clear", PKG, check=False)
+            forget()
 
     # the manifest: no phone may be refused the app because of Vulkan
     sdk = Path(adb[0]).resolve().parents[1]

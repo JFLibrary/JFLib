@@ -112,6 +112,19 @@ fn screen_px(x: i32, y: i32) -> u32 {
 
 /// the colour shown at client pixel x, y of window 0: Windows the composed screen, Linux what the
 /// window system holds; None: no way to know
+/// the window's pixel once it is want, else what it is after 1.5 s (a Wayland window says nothing
+/// while its buffer waits for the compositor: a busy machine, a WSLg just waking up)
+fn pixel_becomes(x: i32, y: i32, want: i64) -> i64 {
+    let t0 = plat::time_us();
+    let mut p = plat::win_test(plat::WT_PIXEL, 0, [x, y, 0, 0]);
+    while p != want && plat::time_us() < t0 + 1_500_000 {
+        plat::sleep_ms(4);
+        plat::gpu_wait(plat::time_us());
+        p = plat::win_test(plat::WT_PIXEL, 0, [x, y, 0, 0]);
+    }
+    p
+}
+
 fn shown_px(x: i32, y: i32) -> Option<u32> {
     if cfg!(windows) {
         plat::win_get_rect(0).map(|r| screen_px(r[0] + x, r[1] + y))
@@ -760,7 +773,7 @@ impl Test {
                     self.ok(!o.on && !o.building, "the CPU path");
                     self.ok(o.never == never, &format!("no output for this run: {} ({:?})", o.never, o.error));
                     self.ok(o.frames == 0, "nothing through a swapchain");
-                    let p = plat::win_test(plat::WT_PIXEL, 0, [150, 120, 0, 0]);
+                    let p = pixel_becomes(150, 120, bgr(self.patch) as i64);
                     self.ok(p == bgr(self.patch) as i64, &format!("the window's DC shows the frame ({p:06x})"));
                     self.patch = 0xFF00_90F0;
                     self.next();
@@ -768,7 +781,7 @@ impl Test {
             }
             1 => {
                 if self.after(100) {
-                    let p = plat::win_test(plat::WT_PIXEL, 0, [150, 120, 0, 0]);
+                    let p = pixel_becomes(150, 120, bgr(self.patch) as i64);
                     self.ok(p == bgr(self.patch) as i64, "a change shows");
                     self.screen_check(ui, "a change");
                     self.finish(ui);

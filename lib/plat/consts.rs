@@ -88,16 +88,6 @@ pub const WST_FULLSCREEN: u32 = 2;
 pub const WST_ACTIVE: u32 = 4; // one of the APP's windows is active
 pub const WST_TILED: u32 = 8;
 pub const WST_MINIMIZED: u32 = 16;
-
-// gpu_out_state: how the UI's output through the GPU came up
-/// nothing known, nothing to remember
-pub const GPU_STATE_UNKNOWN: u32 = 2;
-/// the first start is about to run a driver
-pub const GPU_STATE_TRYING: u32 = 3;
-/// a window showed through the GPU
-pub const GPU_STATE_OK: u32 = 4;
-/// this system cannot: the CPU path for good
-pub const GPU_STATE_NEVER: u32 = 5;
 pub const WST_CSD: u32 = 32; // no system frame: the app must draw its own title bar
 /// the window is drawn inside its owner (a Wayland subsurface): win_get_rect / win_set_rect /
 /// E_WINPOS use positions relative to the owner's surface origin (px), the owner carries it
@@ -110,6 +100,16 @@ pub const WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT;
 pub const WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT;
 pub const WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT;
 pub const WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT;
+
+// gpu_out_state: how the UI's output through the GPU came up
+/// nothing known, nothing to remember
+pub const GPU_STATE_UNKNOWN: u32 = 2;
+/// the first start is about to run a driver
+pub const GPU_STATE_TRYING: u32 = 3;
+/// a window showed through the GPU
+pub const GPU_STATE_OK: u32 = 4;
+/// this system cannot: the CPU path for good
+pub const GPU_STATE_NEVER: u32 = 5;
 
 // ---- clipboard formats
 pub const CLIP_TEXT: u32 = 1; // UTF-8

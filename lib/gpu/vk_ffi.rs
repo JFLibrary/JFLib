@@ -1,5 +1,5 @@
-// vk_ffi -- the Vulkan declarations of lib/gpu's backend, written by hand from vulkan_core.h
-// , vulkan_win32.h and vulkan_android.h: only the handles, constants, structures and commands the backend uses.
+// vk_ffi -- the Vulkan declarations of lib/gpu's backend, written by hand from vulkan_core.h,
+// vulkan_win32.h and vulkan_android.h: only the handles, constants, structures and commands the backend uses.
 //
 //   constants      the C names without "VK_" (STRUCTURE_TYPE_BUFFER_CREATE_INFO, FORMAT_D32_SFLOAT)
 //   structures     the C names without "Vk", fields in snake_case (s_type, p_next, ...);
