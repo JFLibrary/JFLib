@@ -345,6 +345,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", default=os.path.join(ROOT, "build", "win", "PaintCraft.exe"))
     args = ap.parse_args()
+    args.exe = os.path.abspath(args.exe)  # the program starts in a folder of its own
     if not hasattr(user32, "InitializeTouchInjection") or not user32.InitializeTouchInjection(2, 3):
         print("SKIP: this system does not inject touch input")
         return SKIP
