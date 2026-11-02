@@ -1813,3 +1813,49 @@ Projektinfo	Project info
 Worum es in diesem Projekt geht	What this project is about
 Autor	Author
 Ihr Name	Your name
+
+# SA1: the hardware of a device (inspector/hardware.rs, inspector/faults.rs, metrics.rs, palette.rs)
+CPU ×	CPU ×
+Bremsen	Slow down
+Alle Rechenzeit des Geräts dauert so viel länger: ein lauter Nachbar auf demselben Rechner.	All CPU time of the device takes this much longer: a noisy neighbour on the same machine.
+Belegen	Occupy
+Etwas anderes hält so viel Speicher: über den RAM hinaus wird alles langsamer, über den Swap hinaus endet der größte Dienst.	Something else holds this much memory: beyond the RAM everything gets slower, beyond the swap the largest service ends.
+CPU	CPU
+{}, {} wartend	{}, {} waiting
+Speicher	Memory
+Im Swap	In swap
+Beendet	Killed
+{} Dienste (Speicher voll)	{} services (memory full)
+Hardware	Hardware
+Ohne simulierte Hardware kosten CPU und RAM hier nichts. Sie gilt für alle Geräte mit „Hardware simulieren“ im Projekt oder nur für dieses:	Without simulated hardware, CPU and RAM cost nothing here. It applies to all devices with “Simulate hardware” in the project, or to this one alone:
+Für dieses Gerät angeben	Set for this device
+Eigene Werte	Own figures
+Vorlage	Preset
+Disk	Disk
+Kerne	Cores
+RAM	RAM
+Swap	Swap
+Disk-Art	Disk kind
+Tempo: 100 % ist der Referenzkern, mit dem die Kosten der Dienste angegeben sind (ein Skriptbefehl 5 ns).	Speed: 100 % is the reference core the costs of the services are given for (a script instruction 5 ns).
+Im Betrieb ändern	Change while running
+Das Gerät startet dafür neu und fällt 30 s aus; was auf der Disk liegt, bleibt.	The device restarts for this and is down for 30 s; what is on the disk stays.
+Die neuen Werte gelten sofort, ohne Neustart.	The new figures apply at once, without a restart.
+Modellwerte	Model’s figures
+Hardware simulieren	Simulate hardware
+Server und Hosts bekommen CPU und RAM ihres Modells: Dienste warten auf freie Kerne, zu wenig Speicher bremst sie. Aus: Rechenzeit kostet nichts, wie bisher.	Servers and hosts get the CPU and RAM of their model: services wait for free cores, too little memory slows them. Off: CPU time costs nothing, as before.
+Wartende Aufgaben	Jobs waiting
+Belegte Kerne	Cores busy
+Im RAM	In RAM
+Disk/s	Disk/s
+{} · Annahme: {}	{} · Assumed: {}
+Eigene Angaben.	Own figures.
+Annahmen für dieses Modell, keine Messwerte eines echten Geräts.	Assumptions for this model, not measurements of a real device.
+Die Zahl der Kerne geht von 1 bis 1024.	The number of cores goes from 1 to 1024.
+Das Tempo ist eine Zahl in Prozent des Referenzkerns, z. B. 100.	The speed is a number in percent of the reference core, for example 100.
+Der RAM ist eine Zahl von GiB größer als 0, z. B. 16 oder 0,5.	The RAM is a number of GiB greater than 0, for example 16 or 0.5.
+Der Swap ist eine Zahl von GiB, 0 für keinen.	The swap is a number of GiB, 0 for none.
+Die Disk ist eine Zahl von GiB größer als 0.	The disk is a number of GiB greater than 0.
+Der Faktor ist eine Zahl größer als 0, z. B. 3.	The factor is a number greater than 0, for example 3.
+Der Speicher ist eine Zahl von GiB größer als 0, z. B. 8.	The memory is a number of GiB greater than 0, for example 8.
+Hardware simulieren ändern	Change simulate hardware
+Hardware ändern	Change hardware

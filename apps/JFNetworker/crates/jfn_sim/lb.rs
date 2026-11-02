@@ -9,7 +9,8 @@
 //          "backends": [{"name": "web1", "addr": "10.0.2.11", "port": 80, "weight": 1}],
 //          "health": {"type": "http", "path": "/", "interval_ms": 2000, "timeout_ms": 1000,
 //          "rise": 2, "fall": 3}, "retries": 1, "timeout_ms": 10000, "connect_timeout_ms": 1000,
-//          "drain_ms": 30000, "max_conns": 0, "keepalive": true, "tag": true}
+//          "drain_ms": 30000, "max_conns": 0, "keepalive": true, "tag": true, "cpu_us": 50, "mem_mb": 16,
+//          "conn_kb": 64}
 //
 // Algorithms ("algorithm"): "round-robin" takes the backends in turn; "least-conn" the one
 // with the fewest requests (HTTP) or connections (TCP) in flight, in turn among equals;
@@ -39,6 +40,9 @@
 // backend with its state, checks and latencies (the lab); lbctl shows it on the console.  The
 // time series (series.rs) take p50_us, p95_us, p99_us of each interval from the window.  The
 // status line is a message for the app's catalogue (status_msg; status() is its German text).
+//
+// On a device with hardware (res.rs) every HTTP request costs "cpu_us" at a reference core before a
+// backend is picked: a balancer can be the bottleneck.  The bytes of a TCP pipe cost no CPU.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -242,6 +246,8 @@ enum LTimer {
     Connect(u32),
     /// the drain time of a backend is over
     Drain(usize),
+    /// a request's CPU work is done (res.rs)
+    Gate(u64),
 }
 
 /// an HTTP request on its way to a backend
@@ -281,6 +287,10 @@ struct Pipe {
 /// the load balancer
 #[derive(Clone, Debug)]
 pub struct Lb {
+    /// a request's CPU work, the requests that wait for it, what it holds (res.rs)
+    pub cpu: Ns,
+    gate: crate::res::CpuGate<ReqIn>,
+    pub mem: crate::res::SvcMem,
     pub mode: LbMode,
     pub port: u16,
     pub algo: Algo,
@@ -331,6 +341,9 @@ fn hop_by_hop(name: &str) -> bool {
 }
 
 impl Lb {
+    /// the CPU work of a request at a reference core unless the config says otherwise (res.rs)
+    const CPU: Ns = 50 * crate::kernel::US;
+
     pub fn new(mode: LbMode, port: u16) -> Lb {
         let cfg = ServeCfg { port, server: String::new(), max_requests: 0, max_body: 64 << 20, ..ServeCfg::default() };
         Lb {
@@ -347,6 +360,9 @@ impl Lb {
             max_conns: 0,
             keepalive: true,
             tag: true,
+            cpu: Lb::CPU,
+            gate: crate::res::CpuGate::default(),
+            mem: crate::res::SvcMem::default(),
             backends: Vec::new(),
             ring: Ring::new(),
             turn: 0,
@@ -530,6 +546,18 @@ impl Lb {
 
     fn arrive(&mut self, os: &mut OsApi, r: ReqIn) {
         self.requests += 1;
+        // its work on the request first: the backend is picked after it (res.rs)
+        let (now, at) = (os.now(), os.cpu(self.cpu));
+        if at > now {
+            let id = self.gate.hold(r);
+            self.wheel.add(at, LTimer::Gate(id));
+            return;
+        }
+        self.pass(os, r);
+    }
+
+    /// a backend for the request, or 503
+    fn pass(&mut self, os: &mut OsApi, r: ReqIn) {
         let key = self.key_of(&r);
         match self.pick(key, &[]) {
             Some(b) => self.forward(os, r, key, b, Vec::new()),
@@ -1034,6 +1062,11 @@ impl Lb {
         let now = os.now();
         for (_, t) in self.wheel.due(now) {
             match t {
+                LTimer::Gate(id) => {
+                    if let Some(r) = self.gate.take(id) {
+                        self.pass(os, r);
+                    }
+                }
                 LTimer::Check(i) => {
                     if self.backends.get(i).is_some_and(|b| !b.gone()) && self.health.kind != CheckKind::None {
                         self.start_check(os, i);
@@ -1266,6 +1299,7 @@ impl Service for Lb {
         self.agent.reset();
         self.checker.reset();
         self.wheel.clear();
+        self.gate.clear();
         self.fwd.clear();
         self.by_agent.clear();
         self.hchecks.clear();
@@ -1329,6 +1363,7 @@ impl Service for Lb {
         self.agent.reset();
         self.checker.reset();
         self.wheel.clear();
+        self.gate.clear();
         self.fwd.clear();
         self.by_agent.clear();
         self.hchecks.clear();
@@ -1340,6 +1375,9 @@ impl Service for Lb {
             b.active = 0;
             b.checking = false;
         }
+    }
+    fn mem(&self) -> u64 {
+        self.mem.bytes((self.serve.conns() + self.agent.conns() + 2 * self.pipes.len()) as u64, 0)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -1438,6 +1476,8 @@ pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     lb.connect_timeout = ms("connect_timeout_ms", 1000).max(MS);
     lb.drain = ms("drain_ms", 30_000);
     lb.max_conns = num("max_conns", 0).min(1_000_000) as u32;
+    lb.cpu = c.get("cpu_us").and_then(|v| decimal(v, crate::kernel::US)).unwrap_or(Lb::CPU);
+    lb.mem = crate::res::SvcMem::of(c, 16, 64);
     lb.keepalive = c.get("keepalive").and_then(|v| v.as_bool()).unwrap_or(true);
     lb.tag = c.get("tag").and_then(|v| v.as_bool()).unwrap_or(true);
     if let Some(h) = c.get("health") {

@@ -152,6 +152,9 @@ impl Engine {
             }
             "ss" => self.sh_ss(ni, &args),
             "top" => self.sh_top(ni, &args),
+            // only a device with hardware has them (res.rs)
+            "free" if self.os(ni).is_some_and(|o| o.res.is_some()) => self.sh_free(ni),
+            "lscpu" if self.os(ni).is_some_and(|o| o.res.is_some()) => self.sh_lscpu(ni),
             "dig" => self.sh_dig(ni, &args),
             "host" => self.sh_host(ni, &args),
             "nslookup" => self.sh_nslookup(ni, &args),
