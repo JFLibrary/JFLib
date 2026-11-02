@@ -27,8 +27,8 @@
 // (doc/autosave.rs), so an idle page wakes nothing.  Every way off the page ends in Net::after_load,
 // which takes it down.
 //
-// learn() is the seam for the courses of AK1: it lists what there is to learn from, and shows no
-// button that does nothing yet.
+// learn() lists what there is to learn from: the courses of the Akademie (workspace/academy, AK1) as a
+// group of their own, then the labs and assessments; there is no group without anything in it.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -288,6 +288,7 @@ fn prepare(n: &mut Net) {
         n.shell.page.labs = task::labs();
         n.shell.page.assess = task::assessments();
         n.shell.page.zone = Some(local_zone());
+        n.academy.ensure();
     }
     let page = &mut n.shell.page;
     if page.stale || page.rows_for != n.file.recent {
@@ -310,7 +311,7 @@ pub(crate) fn open_template(n: &mut Net, ui: &mut Ui, k: usize) {
 /// enabled per command while the page shows (every frame) -> it shows (commands.rs sets the others)
 pub(crate) fn states(n: &Net, ui: &mut Ui) -> bool {
     let dimmed = &n.shell.page.dimmed;
-    if !n.shell.start {
+    if !n.shell.start && !n.academy.on {
         // back on the project: the table's flags, then the states of the frame
         if dimmed.replace(false) {
             for c in CMDS.iter() {
@@ -320,8 +321,9 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) -> bool {
         return false;
     }
     dimmed.set(true);
+    let course = n.academy.on;
     for c in CMDS.iter() {
-        let free = matches!(c.id, CMD_NEW | CMD_OPEN | CMD_LAB_OPEN | CMD_QUIT | CMD_SETTINGS | CMD_SHORTCUTS | CMD_ABOUT | CMD_DESK_FULL);
+        let free = matches!(c.id, CMD_NEW | CMD_OPEN | CMD_LAB_OPEN | CMD_QUIT | CMD_SETTINGS | CMD_SHORTCUTS | CMD_ABOUT | CMD_DESK_FULL | CMD_ACADEMY) || (course && matches!(c.id, CMD_START_PAGE | CMD_AK_BACK));
         ui.cmd_state(c.id, if free { 0 } else { CF_DISABLED });
     }
     true
@@ -511,17 +513,42 @@ fn recent_section(n: &mut Net, ui: &mut Ui) {
     ui.box_end();
 }
 
-// Lernen: the labs and assessments of the app.  This is the seam for the courses of AK1: they come
-// as a group of their own above the labs, with ids after these in ID_SP_LEARN's block.
+// Lernen: the courses of the Akademie, the labs and assessments of the app.
 fn learn(n: &mut Net, ui: &mut Ui, w: i32) {
     ui.next_size(-1, 0);
     ui.box_begin(0, BOX_V, CARD_GAP);
     heading(ui, t("Lernen"));
     ui.box_end();
+    course_group(n, ui, w);
     let (labs, assess) = (n.shell.page.labs.clone(), n.shell.page.assess.clone());
     learn_group(ui, t("Labore: ein Netz, Ziele, die der Simulator prüft, und Hinweise."), &labs, 0, IC_FLAG, w);
     learn_group(ui, t("Aufgaben mit Bewertung: das Netz aufbauen und Punkte bekommen."), &assess, labs.len() as u32, IC_ACCEPT, w);
     ui.box_end();
+}
+
+// the courses of the Akademie: their line, their cards with what the learner has done
+fn course_group(n: &mut Net, ui: &mut Ui, w: i32) {
+    let cards = n.academy.cards();
+    if cards.is_empty() {
+        return;
+    }
+    ui.next_size(-1, 0);
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator."));
+    let cols = columns(w, &[2], LEARN_MIN_W);
+    for (r, row) in cards.chunks(cols as usize).enumerate() {
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_H, CARD_GAP);
+        for (c, x) in row.iter().enumerate() {
+            let i = (r * cols as usize + c) as u32;
+            ui.next_size(card_w(w, cols, c as i32), 0);
+            let badge = x.badge.as_ref().map(|(k, s)| (*k, s.as_str()));
+            let d = CardDesc { title: &x.title, icon: IC_OFFICE_READ_MODE, text: &x.text, badge, ..CardDesc::default() };
+            if ui.action_card(ID_SP_COURSE + i, &tf("Kurs: {}", &[&x.title]), &d) & EV_ACT != 0 {
+                ui.cmd_run(CMD_SP_COURSE, i);
+            }
+        }
+        ui.box_end();
+    }
 }
 
 // a group of Lernen: its line, its cards (index `first` and on in the page's list)

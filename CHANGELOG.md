@@ -113,6 +113,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A double click on the background of ui.diagram (DEv::DoubleClick with the world point of the second press), DN_HITMIN for small nodes that stay selectable at low zoom, ui.focus_quiet (the keyboard focus without the ring after a pointer gesture)
 - **ui:** A card or list row that does one thing when it is chosen: ui.action_card with CardDesc (title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area), for start pages and the like
 - **JFNetworker:** Firewall rules in the window: a Firewall tab in the device window of firewalls, routers and L3 switches. Rules shows what protects which interface and each access list as a grid with its hit counters, remarks and the implicit deny; rules are added, edited, duplicated, moved and deleted in a form, a raw line for what the form cannot hold. NAT has forms for sides, pools, PAT, static translations and port forwarding, and the running translations with a clear button. Test says which rule meets a packet without sending one, through `Acls::probe`, the function the engine's filter acts on. Every step runs as command lines on the device's console and is one undo step; the lines are shown. The engine behaves as before
+- **JFNetworker:** The Akademie's first part: courses as files (`course.json`, lessons in `de/` and `en/`, labs, pictures; `index.json` and its checksums defined for later), every path checked to stay in the course's folder, a bad course gives its message and hurts nothing else; the list of courses, an outline with states and progress, lessons, a lab step with a bar over the canvas, progress in `data://academy/progress.json` with a reset; `--academy-dir`, `jfn-sim course`, a sample course in `apps/JFNetworker/academy`
 
 ### Changed
 
@@ -180,6 +181,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **text:** Generic families (monospace, sans-serif) no longer resolve to a font without Latin letters: Fedora puts Noto Sans Arabic first in them, and hex views, terminals and code then showed proportional text in tall rows. FontDb marks such faces (FDFF_NOLATIN, font cache version 4) and takes them last, except for emoji and math.
 - **text:** FontConf puts the <default> and append_last families of a family further in the list at the end of the whole list, as fontconfig does: on Fedora monospace no longer continued with the sans-serif families before the monospace ones.
 - **ui:** Agent control on real windows: without App::action_revision the revision no longer counts frames, it moves when the controls change or an agent's change ran, so ui.click, ui.type and ui.key work with the revision read last (--agent); uiRevision and sinceUiRevision likewise
+- **JFNetworker:** A lab opened from the start page before the dock's first frame now brings its Aufgabe panel forward; in a lab whose network has nothing scheduled the goals are judged when a console shows its prompt again
 
 ### Security
 

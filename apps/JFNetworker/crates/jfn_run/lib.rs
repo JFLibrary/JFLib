@@ -5,8 +5,13 @@
 //                                    [--pcap F] [--report F] [--golden F] [--series F]" runs
 //                                    and ends
 //   main(&args) -> i32               jfn-sim: run PROJECT [--scenario S] [--pcap F] [--report F]
-//                                    [--golden F] [--series F] | check PROJECT | decode HEX |
-//                                    gen N [--out F]
+//                                    [--golden F] [--series F] | check PROJECT | course DIR |
+//                                    decode HEX | gen N [--out F]
+//   check_project(&project) -> (lines, errors)   what `check` finds, without printing it
+//   check_course(dir) -> (lines, errors)   jfn-sim course: a course's folder (jfn_model::academy):
+//                                    the file, its lessons in every language with their pictures and
+//                                    links, its labs with `check`'s findings; a line per finding,
+//                                    errors are what keeps the course from being offered
 //   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
 //   rewind(&args) -> i32             jfn-sim rewind PROJECT [SECONDS] [--traffic K]: the
 //                                    keyframes of a run (K1) and how long restores take (times
@@ -74,7 +79,7 @@ pub fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--report" => o.report = Some(value()?),
             "--golden" => o.golden = Some(value()?),
             "--series" => o.series = Some(value()?),
-            "--script" | "--shot" | "--style" | "--lang" => {
+            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" => {
                 value()?;
             }
             k if k.starts_with('-') => {}
@@ -218,30 +223,90 @@ pub fn check(path: &str) -> i32 {
             return 2;
         }
     };
+    let (lines, errors) = check_project(&proj);
+    for l in &lines {
+        say(l);
+    }
+    say(&format!("{}: {} Geräte, {} Verbindungen, {}\n", base_name(path), proj.devices.len(), proj.links.len(), if errors == 0 { String::from("in Ordnung") } else { format!("{} Fehler", errors) }));
+    if errors == 0 { 0 } else { 1 }
+}
+
+/// what `check` finds in a project: its lines, how many of them are errors
+pub fn check_project(proj: &Project) -> (Vec<String>, usize) {
+    let mut lines = Vec::new();
     let mut errors = 0;
     let name = |id: Option<u32>| id.and_then(|i| proj.device(i)).map(|d| d.name.clone());
     for i in proj.check() {
         let who = name(i.dev).map(|n| format!("{}: ", n)).unwrap_or_default();
-        say(&format!("{}{}{}\n", if i.error { "Fehler: " } else { "Warnung: " }, who, i.text));
+        lines.push(format!("{}{}{}\n", if i.error { "Fehler: " } else { "Warnung: " }, who, i.text));
         if i.error {
             errors += 1;
         }
     }
-    match jfn_sim::Engine::from_project(&proj) {
+    match jfn_sim::Engine::from_project(proj) {
         Ok(e) => {
             for d in &proj.devices {
                 for b in e.boot_errors(d.id) {
-                    say(&format!("Fehler: {}, startup-config Zeile {}: {}\n    {}\n", d.name, b.line, b.text, b.msg));
+                    lines.push(format!("Fehler: {}, startup-config Zeile {}: {}\n    {}\n", d.name, b.line, b.text, b.msg));
                     errors += 1;
                 }
             }
         }
         Err(e) => {
-            say(&format!("Fehler: das Projekt läuft nicht: {}\n", e));
+            lines.push(format!("Fehler: das Projekt läuft nicht: {}\n", e));
             errors += 1;
         }
     }
-    say(&format!("{}: {} Geräte, {} Verbindungen, {}\n", base_name(path), proj.devices.len(), proj.links.len(), if errors == 0 { String::from("in Ordnung") } else { format!("{} Fehler", errors) }));
+    (lines, errors)
+}
+
+/// what is wrong with the course in folder `dir` (without a trailing '/'): its lines, how many of
+/// them keep it from being offered.  The labs get what `check` finds as well.
+pub fn check_course(dir: &str) -> (Vec<String>, usize) {
+    use jfn_model::academy::{lab_issues, load, safe_path, StepKind, COURSE_FILE, LANGS};
+    let read = |rel: &str| plat::read_file(&format!("{}/{}", dir, rel)).map(|b| String::from_utf8_lossy(&b).into_owned());
+    let exists = |rel: &str| plat::file_exists(&format!("{}/{}", dir, rel)) == 1;
+    let (course, mut found) = load(base_name(dir), read(COURSE_FILE).as_deref(), &exists);
+    let mut labs = Vec::new();
+    // a path that was refused is not read
+    for s in course.iter().flat_map(|c| c.steps()).filter(|s| safe_path(&s.file).is_ok()) {
+        match s.kind() {
+            Some(StepKind::Lesson) => {
+                for lang in LANGS {
+                    if let (Some(md), Some(c)) = (read(&format!("{}/{}", lang, s.file)), &course) {
+                        found.extend(c.lesson_issues(&s.id, &md, &exists));
+                    }
+                }
+            }
+            Some(StepKind::Lab) => {
+                if let Some(t) = read(&s.file) {
+                    found.extend(lab_issues(&s.id, &t));
+                    if let Ok(p) = Project::from_text(&t) {
+                        labs.push((s.file.clone(), p));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut errors = found.iter().filter(|p| p.fatal).count();
+    let mut lines: Vec<String> = found.iter().map(|p| format!("{}{}\n", if p.fatal { "Fehler: " } else { "Hinweis: " }, p.msg.text())).collect();
+    for (file, p) in labs {
+        let (more, e) = check_project(&p);
+        lines.extend(more.into_iter().map(|l| format!("{}: {}", file, l)));
+        errors += e;
+    }
+    (lines, errors)
+}
+
+/// jfn-sim course DIR: the lines of check_course and a last line; 0: nothing keeps it from being offered
+pub fn course(dir: &str) -> i32 {
+    let dir = dir.trim_end_matches(['/', '\\']);
+    let (lines, errors) = check_course(dir);
+    for l in &lines {
+        say(l);
+    }
+    say(&format!("{}: {}\n", base_name(dir), if errors == 0 { String::from("in Ordnung") } else { format!("{} Fehler", errors) }));
     if errors == 0 { 0 } else { 1 }
 }
 
@@ -289,7 +354,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -303,6 +368,13 @@ pub fn main(args: &[String]) -> i32 {
         },
         Some("check") => match args.get(2) {
             Some(p) => check(p),
+            None => {
+                complain(USAGE);
+                2
+            }
+        },
+        Some("course") => match args.get(2) {
+            Some(d) => course(d),
             None => {
                 complain(USAGE);
                 2

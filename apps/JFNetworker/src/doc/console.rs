@@ -341,6 +341,7 @@ fn pump_paged(n: &mut Net, paged: Option<(u32, u32)>) -> String {
                     c.term.set_prompt(&prompt);
                     c.term.set_mode(if busy { TM_BUSY } else { TM_LINE });
                 }
+                n.task.console |= !busy;
                 continue;
             }
             Report::SesPrompt { dev, ses, prompt, busy } => {

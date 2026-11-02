@@ -1629,3 +1629,37 @@ Speicherfresser auf {}: {}	Memory hog on {}: {}
 {} hat keine simulierte Hardware.	{} has no simulated hardware.
 Der Faktor einer langsamen CPU muss größer als 0 sein.	The factor of a slow CPU must be greater than 0.
 Speicher voll: Dienst {} mit {} beendet	Memory full: service {} with {} killed
+Der Pfad ist leer.	The path is empty.
+Der Pfad „{}“ ist absolut; erlaubt sind nur Pfade im Ordner des Kurses.	The path “{}” is absolute; only paths inside the course's folder are allowed.
+Der Pfad „{}“ führt mit „..“ aus dem Ordner des Kurses.	The path “{}” leads out of the course's folder with “..”.
+Der Pfad „{}“ ist zu lang oder enthält andere Zeichen als Buchstaben, Ziffern und - _ . /	The path “{}” is too long or holds characters other than letters, digits and - _ . /
+Der Pfad „{}“ hat einen leeren oder unzulässigen Teil.	The path “{}” has an empty or invalid part.
+Schritt {}: {}	Step {}: {}
+Schritt {}: die Datei hat keine Aufgabe.	Step {}: the file has no task.
+Schritt {}: das Labor hat keine Ziele, an denen sich sein Ende erkennen lässt.	Step {}: the lab has no goals that would show when it is finished.
+Die Datei enthält keinen Kurs.	The file holds no course.
+Das ist keine Kursdatei.	This is not a course file.
+Der Kurs hat keinen Titel.	The course has no title.
+Der Kurs hat keine Schritte.	The course has no steps.
+Der Kurs hat mehr als {} Schritte.	The course has more than {} steps.
+Der Kurs hat keine Versionsnummer (course_version).	The course has no version number (course_version).
+„{}“ hat keinen englischen Text.	“{}” has no English text.
+Einheit {} hat keinen Titel.	Unit {} has no title.
+Die Kennung {} kommt doppelt vor.	The id {} appears twice.
+Schritt {}: die Lektion {} fehlt in jeder Sprache.	Step {}: the lesson {} is missing in every language.
+Schritt {}: die Lektion {} fehlt im Ordner {}; es erscheint die andere Sprache.	Step {}: the lesson {} is missing in the folder {}; the other language shows.
+Schritt {}: die Datei {} fehlt.	Step {}: the file {} is missing.
+Schritt {}: das Bild {} fehlt.	Step {}: the picture {} is missing.
+Schritt {}: den Schritt {} gibt es nicht.	Step {}: there is no step {}.
+Schritt {}: {} ist kein Labor.	Step {}: {} is not a lab.
+Schritt {}: der Link „{}“ führt nirgendwohin; es gibt step:, lab:, http: und https:.	Step {}: the link “{}” leads nowhere; there are step:, lab:, http: and https:.
+Die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	The id “{}” may hold only small letters, digits, - and _.
+Die Datei {} fehlt oder lässt sich nicht lesen.	The file {} is missing or cannot be read.
+Schritt {}: die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	Step {}: the id “{}” may hold only small letters, digits, - and _.
+Schritt {} hat keinen Titel.	Step {} has no title.
+Schritt {}: die Art „{}“ gibt es nicht (lesson, lab, quiz, fault, exam).	Step {}: there is no kind “{}” (lesson, lab, quiz, fault, exam).
+Schritt {}: die Datei {} endet nicht auf {}.	Step {}: the file {} does not end in {}.
+Die Datei enthält keine Kursliste.	The file holds no list of courses.
+Das ist keine Kursliste.	This is not a list of courses.
+Kurs {}: {}	Course {}: {}
+Kurs {}: die Prüfsumme von {} ist kein SHA-256.	Course {}: the checksum of {} is no SHA-256.

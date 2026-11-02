@@ -8,7 +8,8 @@
 //                           --gen-topology N (a synthetic project without a file) and
 //                           --traffic K (K pings at once) for tests; the start page when nothing
 //                           was opened (workspace/startpage.rs; headless runs: --start-page, their
-//                           recent files from --recent=A|B)
+//                           recent files from --recent=A|B); where the Akademie's courses and its
+//                           progress are (workspace/academy, --academy-dir PATH)
 //   after_load()            a new or loaded project: canvas, inspector, consoles, log and
 //                           device windows start over, the simulator runs in real time
 //   save_prefs(ui)          settings, recent files and the dock layout (UIC_EXIT)
@@ -78,6 +79,8 @@ pub(crate) struct Net {
     pub author: crate::workspace::author::Author,
     /// the physical view: places, plans, racks (workspace/phys, P1)
     pub phys: crate::workspace::phys::Phys,
+    /// the courses, the learner's progress, the page and the lab of a course (workspace/academy, AK1)
+    pub academy: crate::workspace::academy::Academy,
 }
 
 impl Net {
@@ -105,6 +108,7 @@ impl Net {
             metrics: Metrics::new(),
             author: crate::workspace::author::Author::new(),
             phys: crate::workspace::phys::Phys::new(),
+            academy: crate::workspace::academy::Academy::new(),
         }
     }
 
@@ -145,6 +149,7 @@ impl Net {
         if let Some(k) = num("--traffic") {
             self.doc.sim.with_engine("traffic", move |e| e.ping_many(k));
         }
+        self.academy.setup(ui.headless(), plat::arg_value("--academy-dir"));
         // the start page: after_load above took it down, a file that did not open leaves its message
         crate::workspace::startpage::startup(self, ui, &args);
         true
@@ -154,6 +159,7 @@ impl Net {
     /// running in real time
     pub(crate) fn after_load(&mut self) {
         self.shell.start = false;
+        self.academy.loaded();
         self.canvas.reset(&self.doc.proj);
         self.phys.reset(&self.doc.proj);
         self.inspector.reset();

@@ -2018,3 +2018,56 @@ Wird verworfen	Dropped
 dynamisch	dynamic
 statisch	static
 im Konfigurationsmodus (configure terminal)	in configuration mode (configure terminal)
+&Akademie …	&Academy …
+In der Akademie zurück	Back in the Academy
+Dieser Kurs lässt sich nicht öffnen.	This course cannot be opened.
+Fehlerhaft	Faulty
+Abgeschlossen	Completed
+Einsteiger	Beginner
+Fortgeschrittene	Intermediate
+Erfahrene	Advanced
+{} Min.	{} min
+Der Link „{}“ geht nicht auf	The link “{}” does not open
+Er führt zu keinem Schritt dieses Kurses. Links ins Web gehen hier noch nicht auf.	It leads to no step of this course. Links to the web do not open here yet.
+Der Fortschritt wurde nicht gespeichert	The progress was not saved
+Kursübersicht	Course overview
+Alle Kurse	All courses
+Zurück zum Labor	Back to the lab
+Zurück zum Projekt	Back to the project
+Zurück (Esc, Alt+Links)	Back (Esc, Alt+Left)
+Akademie	Academy
+Kurse zum Lesen und Üben: Lektionen erklären, Labore im Simulator prüfen, was Sie gebaut haben.	Courses to read and practise: lessons explain, labs in the simulator check what you have built.
+Hier erscheinen die Kurse, die in der Akademie installiert sind.	The courses installed in the Academy appear here.
+Noch keine Kurse	No courses yet
+Kurs: {}	Course: {}
+Lektion	Lesson
+Labor	Lab
+Quiz	Quiz
+Fehlersuche	Fault hunt
+Test	Test
+Dieser Kurs lässt sich nicht öffnen. Das stimmt mit seinen Dateien nicht:	This course cannot be opened. This is wrong with its files:
+{} von {} Schritten erledigt	{} of {} steps done
+Beginnen	Begin
+Kurs abgeschlossen	Course completed
+Fortschritt zurücksetzen	Reset progress
+Erledigt	Done
+{}, erledigt	{}, done
+Als Nächstes	Up next
+{}, als Nächstes	{}, up next
+{}, noch nicht verfügbar	{}, not available yet
+Noch nicht verfügbar	Not available yet
+Schritt {} von {}	Step {} of {}
+Diese Lektion gibt es noch nicht in Ihrer Sprache	This lesson does not exist in your language yet
+Sie sehen die Fassung auf {}.	You are seeing the version in {}.
+Die Datei dieser Lektion fehlt oder lässt sich nicht lesen.	The file of this lesson is missing or cannot be read.
+Vorheriger Schritt	Previous step
+Zur Kursübersicht	To the course overview
+Alle Ziele erreicht	All goals reached
+Zurück zum Kurs	Back to the course
+Weiter im Kurs	Continue the course
+Der nächste Schritt des Kurses	The next step of the course
+Der nächste Schritt des Kurses; dieses Labor bleibt offen	The next step of the course; this lab stays open
+Fortschritt zurücksetzen?	Reset progress?
+Alles, was Sie in „{}“ erledigt haben, gilt dann wieder als offen. Das lässt sich nicht rückgängig machen.	Everything you have done in “{}” then counts as open again. This cannot be undone.
+Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator.	Academy: courses with lessons to read and labs in the simulator.
+Zurücksetzen	Reset
