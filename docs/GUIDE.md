@@ -1947,7 +1947,7 @@ source order; existing rows are never changed, and the app keeps showing German 
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
 languages in a comment (`# languages: de en fr`, PaintCraft's). The suite runs
 `i18n --check`: it fails on errors and on gaps in the catalogues that are complete
-(BackupCraft, JFNetworker, the library) and only counts the others (PaintCraft's).
+(`COMPLETE`: all of them today, the library too) and only counts the others.
 
 **Sorting and case** follow the user's format locale, as Windows' `CompareStringEx` does:
 `i18n::collate(a, b)` orders base letters, then accents, then case ("a" < "A" < "ä" < "b"),

@@ -114,6 +114,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A card or list row that does one thing when it is chosen: ui.action_card with CardDesc (title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area), for start pages and the like
 - **JFNetworker:** Firewall rules in the window: a Firewall tab in the device window of firewalls, routers and L3 switches. Rules shows what protects which interface and each access list as a grid with its hit counters, remarks and the implicit deny; rules are added, edited, duplicated, moved and deleted in a form, a raw line for what the form cannot hold. NAT has forms for sides, pools, PAT, static translations and port forwarding, and the running translations with a clear button. Test says which rule meets a packet without sending one, through `Acls::probe`, the function the engine's filter acts on. Every step runs as command lines on the device's console and is one undo step; the lines are shown. The engine behaves as before
 - **JFNetworker:** The Akademie's first part: courses as files (`course.json`, lessons in `de/` and `en/`, labs, pictures; `index.json` and its checksums defined for later), every path checked to stay in the course's folder, a bad course gives its message and hurts nothing else; the list of courses, an outline with states and progress, lessons, a lab step with a bar over the canvas, progress in `data://academy/progress.json` with a reset; `--academy-dir`, `jfn-sim course`, a sample course in `apps/JFNetworker/academy`
+- **ui:** A catalogue can offer the library's languages (`Catalog::with_library_languages`): the library's texts and mirroring follow the user there, the app's own texts show their English column; `t` falls back to the library, then to that column. `AppDesc::translated`, `i18n::menu`, `commands`, `tf` and `list` translate static tables and filled texts
 
 ### Changed
 
@@ -136,6 +137,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **script:** script::Diagnostic, Error and TraceLine carry the file of their position (file), Status has the variant Paused, Host has load (with a default); exhaustive matches on Status and struct literals of Error and Diagnostic need the new parts; messages of single files are unchanged
 - **ui:** A dock tab, or the empty part of a dock's tab strip, can drag only after the button was held for 300 ms (`DOCK_HOLD_MS`): a click that slips no longer moves or floats a panel. At 300 ms the tab shows it (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`), movement before that does not count, Esc ends the hold; clicks, double clicks, the menu and the splitters need none. Scripts: `drag ... hold MS` (or `wait` after `down`)
 - **JFNetworker:** The title of JF-FW says what a firewall does today, a router with access lists and NAT; zones and stateful filtering come with milestone F2
+- **build:** The demos (gallery, datagallery, editortest, docktest, dndtest, diagramtest, svgtest, spelltest, fontpicktest, template, androidGallery, mdviewtest, audiotest, prefstest) have English catalogues and no old names in their texts; they follow the user's language in a window, headless runs stay German, and tools that drive real windows, browsers or phones pin German
 
 ### Fixed
 
@@ -182,6 +184,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **text:** FontConf puts the <default> and append_last families of a family further in the list at the end of the whole list, as fontconfig does: on Fedora monospace no longer continued with the sans-serif families before the monospace ones.
 - **ui:** Agent control on real windows: without App::action_revision the revision no longer counts frames, it moves when the controls change or an agent's change ran, so ui.click, ui.type and ui.key work with the revision read last (--agent); uiRevision and sinceUiRevision likewise
 - **JFNetworker:** A lab opened from the start page before the dock's first frame now brings its Aufgabe panel forward; in a lab whose network has nothing scheduled the goals are judged when a console shows its prompt again
+- **ui:** PaintCraft reads `--lang` and `jfgui_LANG` like every app and gives the library its language; its catalogue is complete again
 
 ### Security
 
