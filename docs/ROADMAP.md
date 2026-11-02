@@ -1711,11 +1711,11 @@ Fensterrand hinaus.
   1 ms, hängt aber von keiner impliziten Synchronisation ab. Programme mit UI bauen gegen glibc,
   Kommandozeilen- und Serverprogramme bleiben statisch, `--static` baut die Variante ohne GPU für
   Systeme wie Alpine. Pakete: deb und rpm mit `libc6` / `glibc`, Vulkan empfohlen, Flatpak mit
-  `--device=dri`. Geprüft auf der HD 610 (KWin, Wayland und X11), der Iris Xe und der NVIDIA T500 mit
-  proprietärem Treiber. Der Weg läuft nur auf der GPU des Compositors, PRIME ist nicht gebaut; eine
+  `--device=dri`. Geprüft auf der HD 610 und der NVIDIA T500 mit proprietärem Treiber unter KWin, auf der Iris Xe
+  unter KWin und Mutter, jeweils Wayland und X11. Der Weg läuft nur auf der GPU des Compositors, PRIME ist nicht gebaut; eine
   erzwungene andere GPU fällt auf den CPU-Pfad zurück. Auf der HD 610 kostet er 1,7–2,6 ms GPU je Bild
   bei 1280 × 800 und rund 40 MiB RSS plus 25–50 MiB im Treiber, im Leerlauf nichts. Nicht getestet: AMD,
-  GNOME und andere Compositors, X11 ohne Xwayland, ein echter Treiber-Reset, die Validierungsschicht
+  die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, ein echter Treiber-Reset, die Validierungsschicht
   unter Linux, glibc vor 2.34, ein installiertes Paket auf einem System mit GPU.
 - **P2** · *fehlt* · G4c: Android (Vulkan über die C-Brücke, ohne Auflösungsgrenze).
 - **P2** · *fehlt* · G4d: Browser (WebGPU, Shader direkt als WGSL).

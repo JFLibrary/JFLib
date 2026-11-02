@@ -683,7 +683,9 @@ Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB
 | Intel Iris Xe (TGL GT2) | 0,53 ms | 2,48 ms | 19,4 ms |
 | NVIDIA T500 | 0,68 ms | 1,70 ms | 8,4 ms |
 
-**Nicht getestet:** AMD, GNOME und andere Compositors, X11 ohne Xwayland, eine zweite GPU, die schläft, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
+**Gegenprobe auf Mutter** (50.1, derselbe Laptop, ein eigener Mutter ohne Bildschirm, `mutter --headless --wayland --virtual-monitor 1920x1080`; er läuft auf der Iris Xe und bietet keine Rahmen vom Server): Die Tests von `uigputest`, `gputest --test window` und die drei Skripte der Galerie bestehen unter Wayland und über Xwayland, 0 zurückgelesene Bilder anders. Der Lauf fand einen Fehler unter X11: `WCMD_RESTORE` schickte nur `MapWindow`, und das bewirkt bei einem Fenstermanager nichts, der minimierte Fenster abgebildet lässt. Jetzt geht dazu `_NET_ACTIVE_WINDOW` hinaus.
+
+**Nicht getestet:** AMD, die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, eine zweite GPU, die schläft, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
 
 ### Was fehlt
 

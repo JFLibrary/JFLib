@@ -139,7 +139,8 @@ der zusammengesetzte Bildschirm gegen `shot` vergleichen. Sparsam auf dem echten
 - **Echter Desktop**: wie oben bestanden, Wayland und X11.
 - **Sandbox**: `sandboxtest` (`sandbox strict`): HD 610 arbeitet darunter.
 - **Laptop mit zwei GPUs**: ThinkPad mit Iris Xe und NVIDIA T500, [GPU.md](GPU.md) „Ausgabe unter Linux“: wählt auf dem echten Desktop die Intel-GPU; auf einem eigenen KWin auf der NVIDIA bestehen die GPU-Tests auch mit dem proprietären Treiber.
-- **Offen**: GNOME und andere Compositors, AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
+- **Mutter 50.1**, ohne Bildschirm auf demselben Laptop: `dbus-run-session -- mutter --headless --wayland --virtual-monitor 1920x1080 --wayland-display NAME`, den X11-Bildschirm nennt sein Log („public X11 display“). GPU-Tests bestehen unter Wayland und über Xwayland; Mutter lässt minimierte Fenster abgebildet, `WCMD_RESTORE` geht deshalb auch über `_NET_ACTIVE_WINDOW`.
+- **Offen**: die ganze GNOME-Oberfläche und andere Compositors, AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
 - **Hinweis**: `GetImage` eines geflippten Fensters unter Xwayland liefert das Bild davor; die Komposition zeigt das letzte. KWins eigene GPU-Zeit ist nicht lesbar (Datei-Capability, `fdinfo` gesperrt).
 
 ---
