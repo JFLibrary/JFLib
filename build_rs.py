@@ -29,10 +29,11 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
   python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, lib/VERSION, docs/api/X.Y.Z.txt
                                                                 (tools/changelog.py)
-  python build_rs.py site [--out DIR] [--check]              the website: landing page, docs and API reference from
-                                                                the Markdown -> build/site/ (tools/site.py); --check
-                                                                builds into a temporary folder and checks links,
-                                                                anchors, images and the HTML (the suite runs it)
+  python build_rs.py site [--out DIR] [--check]              the docs of the website: guides, API reference, changelog
+                                                                and roadmap from the Markdown -> build/site/
+                                                                (tools/site.py); --check builds into a temporary folder
+                                                                and checks links, anchors, images and the HTML (the
+                                                                suite runs it)
   python build_rs.py i18n [APP|lib] [--update] [--unused]    the translatable texts against the catalogues
                                                                 (tools/i18n_check.py): missing, untranslated, unused,
                                                                 placeholders and plural forms; --update adds the
@@ -1482,7 +1483,7 @@ def run_tests(builders, out, quick):
     print((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip())
     if r.returncode:
         fails.append("tools/i18n_check.py --check")
-    # the website (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
+    # the website's docs (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
     # builds byte-identical; a temporary folder below build/
     r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
                        capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
