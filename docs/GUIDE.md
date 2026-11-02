@@ -3784,7 +3784,10 @@ impl Host for MyHost {
   scripts send a packet then: `apps/JFNetworker/crates/jfn_sim/scriptsvc.rs`).
 * Values (`Value`, 16 bytes) refer to the VM's heap. A value the host keeps beyond the next
   `run` must be pinned (`pin` / `pinned` / `unpin`), e.g. a request handler; `valid(v)` tells
-  a stale one, and the API returns `None` or an error instead of crashing on it.
+  a stale one, and the API returns `None` or an error instead of crashing on it. The host's own
+  allocations between runs can collect too (a callback that allocates nothing itself must not
+  fill the heap with its arguments): what the host made since the last `run` stays until the next
+  one, a value it took out of a pin or a map only while the pin or the map still holds it.
 * Fuel: one per instruction, more for copying (string and list concatenation, literals, map
   iteration). `run(host, fuel)` stops before the next instruction once `fuel` is used (it may
   use a little more: `last_fuel()`). `Limits::fuel` caps one invocation over all its runs, so

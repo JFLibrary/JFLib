@@ -544,8 +544,10 @@ fn run_loop(vm: &mut Vm, host: &mut Console, o: &Opts, until: Option<u64>, faile
         }
         let (f, args) = if let Some((pin, res)) = host.ready.pop_front() {
             let f = vm.pinned(pin);
+            // (pinned while the arguments are made: that can collect)
+            let args = disk_args(vm, res);
             vm.unpin(pin);
-            match disk_args(vm, res) {
+            match args {
                 Ok(a) => (f, a),
                 Err(e) => {
                     *failed = Some(e);

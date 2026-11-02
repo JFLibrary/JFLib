@@ -32746,11 +32746,14 @@ line and column, a stack trace).  The limits (fuel per invocation, heap, call de
 end it at once and cannot be caught.
 
 Collector: mark and sweep over the heap arena, from the stack, the globals, host values,
-pinned values, the last result and objects a native made during its call.  It runs only in
-run(), when an allocation crosses the threshold (twice the live bytes after the last
-collection, at least 256 KiB, at most the heap limit).  Values the host keeps between runs
-must be pinned (pin / unpin) or be reachable from the script.  Values the host passes in
-are checked (valid()): a stale value of a freed object gives an error or None, not a crash.
+pinned values, the last result, objects a native made during its call and objects the host
+made since the last run.  It runs when an allocation crosses the threshold (twice the live
+bytes after the last collection, at least 256 KiB, at most the heap limit), the host's own
+allocations between runs included: a callback that allocates nothing itself would never
+collect what the host made for it.  Values the host keeps between runs must be pinned (pin /
+unpin) or be reachable from the script; a value it took out of a pin or a map is only safe
+while the pin or the map still holds it.  Values the host passes in are checked (valid()): a
+stale value of a freed object gives an error or None, not a crash.
 
 Modules (module.rs): import(path) links a module's code into the VM's own (`code` starts as
 the program's and grows with each module; `units` are the program and its modules with
@@ -32886,6 +32889,9 @@ drives exec one instruction at a time (exec_debug) and checks between them where
   m.key
 - **`fn map_entries(&self, m: Value) -> Vec<(Value, Value)>`**
   the entries of a map in order
+- **`fn limit_text(&self) -> Value`**
+  "Speichergrenze erreicht" as a permanent str: what a host can still give a callback when
+  the heap has no room for anything else; it takes none and is always valid
 - **`fn new_str(&mut self, s: &str) -> Result<Value, Error>`**
   a new str (valid until the next run unless the script keeps it or it is pinned)
 - **`fn new_bytes(&mut self, b: &[u8]) -> Result<Value, Error>`**

@@ -5,7 +5,9 @@
 // answer of a returned value, 500 after an error, 503 when the queue is full, the plan's
 // example with its disk and cache) and http.request, dns.resolve, the disk with its access
 // times and capacity, metrics and their time series, an endless loop as 100 % CPU while the simulation goes on, the
-// limits (fuel, heap, depth), errors with line and column in status, log and trace,
+// limits (fuel, heap, depth), http.serve over more than 20 000 requests without a growing heap
+// and with an answer for every request, a heap that really is full (callbacks hear of it,
+// connections end), errors with line and column in status, log and trace,
 // stop_on_error, a failed start and a restart, the shell's script command and top,
 // definitions and their refusals, the English of the texts, determinism (twice, and a clone in
 // the middle of a callback); for the script editor (U7) a new definition that keeps the disk,
@@ -333,6 +335,8 @@ pub fn run(t: &mut T) {
     series(t);
     endless(t);
     limits(t);
+    long_serve(t);
+    full_heap(t);
     errors(t);
     shell(t);
     defs(t);
@@ -733,6 +737,164 @@ fn limits(t: &mut T) {
     t.eq("limits: depth", kinds(&e, "deep"), vec![(ErrorKind::Depth, 1)]);
     let trace = sv(&e, h[0], "deep").and_then(|s| s.errors().first().map(|x| x.trace.len())).unwrap_or(0);
     t.eq("limits: the calls of the trace", trace, 50);
+}
+
+/// a generator on `from` with `users` users in a closed loop against SRV1
+fn users(e: &mut Engine, from: u32, users: u32) -> bool {
+    add(e, from, "http-load", "load", &format!(r#"{{"targets": ["http://10.0.0.1/"], "mode": "closed", "users": {}, "timeout_ms": 600000}}"#, users))
+}
+
+/// runs until the service made `calls` calls (30 s at most): the highest heap_kb on the way
+fn serve_until(e: &mut Engine, dev: u32, svc: &str, calls: i64) -> i64 {
+    let (mut peak, mut end) = (0, e.now());
+    while metric(e, dev, svc, "calls") < calls && end < 30 * SEC {
+        end += 5 * MS;
+        run_to(e, end);
+        let _ = e.take_reports();
+        peak = peak.max(metric(e, dev, svc, "heap_kb"));
+    }
+    peak
+}
+
+/// (answers, of these 2xx, 5xx, timeouts) of the generator on `dev`
+fn answers(e: &Engine, dev: u32) -> (i64, i64, i64, i64) {
+    (metric(e, dev, "load", "responses"), metric(e, dev, "load", "status_2xx"), metric(e, dev, "load", "status_5xx"), metric(e, dev, "load", "timeouts"))
+}
+
+// http.serve for a long time: the heap does not grow, also with a handler that allocates nothing
+// itself (only what the host makes of a request fills it), and a request always gets an answer
+fn long_serve(t: &mut T) {
+    let web = "http.serve(80, fn(req, res) {\n  res.send(200, \"ok\")\n})";
+    let (mut e, h) = net(2);
+    t.check("long: services", script(&mut e, h[0], "web", web, "") && users(&mut e, h[1], 16));
+    let peak = serve_until(&mut e, h[0], "web", 25_000);
+    let calls = metric(&e, h[0], "web", "calls");
+    t.check(&format!("long: more than 20 000 requests ({})", calls), calls > 20_000);
+    t.check(&format!("long: the heap stays near the collector's threshold ({} KiB at most)", peak), peak > 0 && peak <= 260);
+    t.eq("long: no error", metric(&e, h[0], "web", "errors"), 0);
+    let (all, ok, bad, late) = answers(&e, h[1]);
+    t.check(&format!("long: every answer a 200 ({} of {})", ok, all), all > 20_000 && all == ok);
+    t.eq("long: no 5xx, no timeout", (bad, late), (0, 0));
+
+    // answers given later: what they need stays alive (a closure in a timer's pin) through the
+    // collections
+    let later = "http.serve(80, fn(req, res) {\n  timer.after(1, fn() { res.send(200, req.path) })\n})";
+    let (mut e, h) = net(2);
+    t.check("long, later: services", script(&mut e, h[0], "web", later, "") && users(&mut e, h[1], 16));
+    let peak = serve_until(&mut e, h[0], "web", 6000);
+    let (all, ok, _, _) = answers(&e, h[1]);
+    t.check(&format!("long, later: every answer a 200 ({} of {})", ok, all), all > 2000 && all == ok);
+    t.eq("long, later: no error", metric(&e, h[0], "web", "errors"), 0);
+    t.check(&format!("long, later: the heap ({} KiB at most)", peak), peak > 0 && peak <= 260);
+
+    // a live list of more than half the limit: the threshold is the limit itself, and requests
+    // still find room in what the earlier ones left
+    let big = "let big = []\nlet i = 0\nwhile i < 40000 {\n  big.push(i)\n  i += 1\n}\nhttp.serve(80, fn(req, res) {\n  res.send(200, \"ok\")\n})";
+    let (mut e, h) = net(2);
+    t.check("long, big: services", script(&mut e, h[0], "web", big, "\"limits\": {\"heap_kb\": 1024}") && users(&mut e, h[1], 16));
+    let peak = serve_until(&mut e, h[0], "web", 3000);
+    let (all, ok, _, _) = answers(&e, h[1]);
+    t.check(&format!("long, big: the list is there and the limit reached ({} KiB)", peak), peak > 640 && peak <= 1024);
+    t.check(&format!("long, big: every answer a 200 ({} of {})", ok, all), all > 2000 && all == ok);
+    t.eq("long, big: no error", metric(&e, h[0], "web", "errors"), 0);
+
+    // a heap that really is full: what cannot start answers 500, the server goes on
+    let keep = "let keep = []\nhttp.serve(80, fn(req, res) {\n  keep.push(req)\n  res.send(200, \"ok\")\n})";
+    let (mut e, h) = net(2);
+    t.check("long, full: services", script(&mut e, h[0], "web", keep, "\"limits\": {\"heap_kb\": 64}") && users(&mut e, h[1], 4));
+    run_to(&mut e, 100 * MS);
+    let (all, ok, bad, late) = answers(&e, h[1]);
+    t.check(&format!("long, full: the first ones are answered ({})", ok), ok > 5);
+    t.check(&format!("long, full: then 500, none stays open ({} of {})", bad, all), bad > 1000 && all == ok + bad && late == 0 && metric(&e, h[1], "load", "inflight") <= 4);
+    t.eq("long, full: still running", sv(&e, h[0], "web").map(|s| s.state()), Some(ScriptState::Running));
+    let errs = sv(&e, h[0], "web").map(|s| s.errors()).unwrap_or_default();
+    t.eq("long, full: the error", errs.last().map(|x| (x.kind, x.line, x.during)), Some((ErrorKind::Heap, 0, "http")));
+    t.eq("long, full: in the log", logs(&e, h[0], "web").last().map(|x| x.as_str()), Some("Fehler (http): Speichergrenze erreicht (65536 Bytes)"));
+
+    // a handler that cannot even start (its frame does not fit the stack): 500 as well
+    let locals: String = (0..300).map(|i| format!("  let v{} = {}\n", i, i)).collect();
+    let fat = format!("http.serve(80, fn(req, res) {{\n{}  res.send(200, \"ok\")\n}})", locals);
+    let (mut e, h) = net(2);
+    t.check("long, stack: services", script(&mut e, h[0], "web", &fat, "\"limits\": {\"stack\": 256}") && users(&mut e, h[1], 1));
+    run_to(&mut e, 50 * MS);
+    let (all, _, bad, _) = answers(&e, h[1]);
+    t.check(&format!("long, stack: answered 500 ({} of {})", bad, all), all > 5 && all == bad);
+    let errs = sv(&e, h[0], "web").map(|s| s.errors()).unwrap_or_default();
+    t.eq("long, stack: the error", errs.last().map(|x| x.kind), Some(ErrorKind::Stack));
+}
+
+/// fills a heap of 64 KiB `at` ms after the start, to less than the 16 bytes a list's item takes
+/// (the limit ends that callback).  The functions of these scripts are global: what a callback
+/// leaves behind would make room again at the next collection, and a closure made at a full heap
+/// would be the first thing to fail
+fn fill(at: u32) -> String {
+    format!("let keep = []\nfn grow() {{\n  while true {{ keep.push(1) }}\n}}\ntimer.after({}, grow)\n", at)
+}
+
+const SMALL: &str = "\"limits\": {\"heap_kb\": 64}";
+
+// a heap that really is full: a callback something waits for still comes, with the limit as its
+// err, and what a connection needs in the end still happens
+fn full_heap(t: &mut T) {
+    let ask = "fn on_dns(err, a) { log(\"dns:\", err) }\nfn on_get(err, v) { log(\"get:\", err) }\nfn on_scan(err, m) { log(\"scan:\", err) }\nfn on_answer(err, r) { log(\"request:\", err) }\nfn ask() {\n  dns.resolve(\"nix.example\", on_dns)\n  disk.get(\"k\", on_get)\n  disk.scan(\"k\", on_scan)\n  http.request(\"http://10.0.0.2/\", on_answer)\n}\ndisk.put(\"k\", \"text\")\ntimer.after(10, ask)\n";
+    let src = format!("{}{}", fill(5), ask);
+    let (mut e, h) = net(2);
+    let web = r#"{"port": 80, "routes": [{"path": "*", "method": "", "body": "ok"}]}"#;
+    t.check("full: services", script(&mut e, h[0], "s", &src, SMALL) && add(&mut e, h[1], "http-server", "web", web));
+    run_to(&mut e, 100 * MS);
+    let lines = logs(&e, h[0], "s");
+    for want in ["dns: Speichergrenze erreicht", "get: Speichergrenze erreicht", "scan: Speichergrenze erreicht", "request: Speichergrenze erreicht"] {
+        t.check(&format!("full: {} ({:?})", want, lines), lines.iter().any(|l| l == want));
+    }
+    let errs = sv(&e, h[0], "s").map(|s| s.errors()).unwrap_or_default();
+    let mut during: Vec<&str> = errs.iter().filter(|x| x.kind == ErrorKind::Heap).map(|x| x.during).collect();
+    during.sort();
+    t.eq("full: the errors, each reported", during, vec!["disk", "disk", "dns", "request", "timer"]);
+    t.eq("full: still running", sv(&e, h[0], "s").map(|s| s.state()), Some(ScriptState::Running));
+
+    // an answer too big for the heap: the callback hears of it, the client gets its answer
+    let big = format!(r#"{{"port": 81, "routes": [{{"path": "*", "method": "", "body": "{}"}}]}}"#, "x".repeat(100_000));
+    let proxy = "http.serve(80, fn(req, res) {\n  http.request(\"http://10.0.0.2:81/\", fn(err, r) {\n    if err { return res.send(502, err) }\n    res.send(200, r.body)\n  })\n})";
+    let (mut e, h) = net(3);
+    t.check("full, proxy: services", script(&mut e, h[0], "web", proxy, SMALL) && add(&mut e, h[1], "http-server", "big", &big) && users(&mut e, h[2], 1));
+    run_to(&mut e, 200 * MS);
+    let (all, _, bad, late) = answers(&e, h[2]);
+    t.check(&format!("full, proxy: every request answered 502 ({} of {}, {} late)", bad, all, late), all > 5 && all == bad && late == 0);
+    t.eq("full, proxy: the error", sv(&e, h[0], "web").and_then(|s| s.errors().last().map(|x| (x.kind, x.during))), Some((ErrorKind::Heap, "request")));
+
+    // a connection at a full heap: no handle for it, so it is closed
+    let listen = format!("{}fn on_accept(c) {{ log(\"accepted\") }}\nnet.listen(7, {{accept: on_accept}})\n", fill(1));
+    let client = "fn on_close(c, why) { log(\"closed:\", why) }\nfn dial() { net.connect(\"10.0.0.1\", 7, {close: on_close}) }\ntimer.after(5, dial)\n";
+    let (mut e, h) = net(2);
+    t.check("full, accept: services", script(&mut e, h[0], "s", &listen, SMALL) && script(&mut e, h[1], "c", client, ""));
+    run_to(&mut e, 100 * MS);
+    t.eq("full, accept: closed for the client", logs(&e, h[1], "c"), vec![String::from("closed: closed")]);
+    t.eq("full, accept: nothing left", (metric(&e, h[0], "s", "conns"), metric(&e, h[1], "c", "conns")), (0, 0));
+    t.check("full, accept: never reached the script", !logs(&e, h[0], "s").iter().any(|l| l == "accepted"));
+    t.eq("full, accept: the error", sv(&e, h[0], "s").and_then(|s| s.errors().last().map(|x| (x.kind, x.during))), Some((ErrorKind::Heap, "accept")));
+
+    // data at a full heap: gone, so the connection cannot go on; the script hears of its end,
+    // without the word, which does not fit either
+    let server = format!("{}fn on_data(c, d) {{ log(\"data\") }}\nfn on_close(c, why) {{ log(\"closed:\", why) }}\nnet.listen(7, {{data: on_data, close: on_close}})\n", fill(5));
+    let client = "fn on_close(c, why) { log(\"closed:\", why) }\nfn on_connect(c) { timer.after(10, fn() { c.send(\"hallo\") }) }\nfn dial() { net.connect(\"10.0.0.1\", 7, {connect: on_connect, close: on_close}) }\ntimer.after(1, dial)\n";
+    let (mut e, h) = net(2);
+    t.check("full, data: services", script(&mut e, h[0], "s", &server, SMALL) && script(&mut e, h[1], "c", client, ""));
+    run_to(&mut e, 100 * MS);
+    let lines = logs(&e, h[0], "s");
+    t.check(&format!("full, data: never reached the script ({:?})", lines), !lines.iter().any(|l| l == "data"));
+    t.check(&format!("full, data: the end, without its word ({:?})", lines), lines.iter().any(|l| l == "closed: nil"));
+    t.eq("full, data: reset for the client", logs(&e, h[1], "c"), vec![String::from("closed: reset")]);
+    t.eq("full, data: nothing left", (metric(&e, h[0], "s", "conns"), metric(&e, h[1], "c", "conns")), (0, 0));
+
+    // the peer's FIN at a full heap: the connection still closes on both sides
+    let client = "fn on_close(c, why) { log(\"closed:\", why) }\nfn on_connect(c) { timer.after(10, fn() { c.close() }) }\nfn dial() { net.connect(\"10.0.0.1\", 7, {connect: on_connect, close: on_close}) }\ntimer.after(1, dial)\n";
+    let (mut e, h) = net(2);
+    t.check("full, fin: services", script(&mut e, h[0], "s", &server, SMALL) && script(&mut e, h[1], "c", client, ""));
+    run_to(&mut e, 100 * MS);
+    let lines = logs(&e, h[0], "s");
+    t.check(&format!("full, fin: the end, without its word ({:?})", lines), lines.iter().any(|l| l == "closed: nil"));
+    t.eq("full, fin: closed for the client", logs(&e, h[1], "c"), vec![String::from("closed: closed")]);
+    t.eq("full, fin: nothing left", (metric(&e, h[0], "s", "conns"), metric(&e, h[1], "c", "conns")), (0, 0));
 }
 
 const DIV: &str = "net.udp(7, fn(s, m) {\n  let x = 1 / 0\n})\nprint(\"bereit\")";

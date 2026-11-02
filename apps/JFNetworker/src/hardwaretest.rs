@@ -806,10 +806,6 @@ fn script_at(port: u16, spin: u32, ns_per_op: u64) -> ServiceDef {
     let src = format!("http.serve({}, fn(req, res) {{\n  let i = 0\n  while i < {} {{ i += 1 }}\n  res.send(200, \"ok\")\n}})\n", port, spin);
     let mut o = Value::Object(Vec::new());
     o.insert("source", Value::string(&src));
-    // (a request leaves about 1.5 KiB on its heap: room for the runs here)
-    let mut l = Value::Object(Vec::new());
-    l.insert("heap_kb", Value::u64(1 << 18));
-    o.insert("limits", l);
     o.insert("ns_per_op", Value::u64(ns_per_op));
     ServiceDef { kind: String::from("script"), name: format!("s{}", port), disabled: false, config: o }
 }
