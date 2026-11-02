@@ -1,0 +1,6 @@
+#!args --test glibc
+# (Linux, linked against glibc; else a SKIP) the arguments and the environment; the main thread and
+# every plat thread with a thread control block and TLS of their own; the stack a thread asked for;
+# 300 threads leave no mapping behind; Vulkan on a plat thread; glibc's exit from main and from a
+# thread, also with threads spinning and a device still open; a crash, a stack overflow and a panic
+# give the report and exit code 3 without at_exit handlers

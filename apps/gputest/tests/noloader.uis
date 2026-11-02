@@ -1,0 +1,3 @@
+#!args --test noloader
+# jfgui_GPU_DLL names a missing file or a library that is no Vulkan loader: Err(NoLoader), no crash;
+# a program without the loader starts, --info says SKIP, exit code 0

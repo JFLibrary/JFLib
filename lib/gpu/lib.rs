@@ -1,7 +1,8 @@
 // gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows
-// (vulkan-1.dll loaded at run time; vk_*.rs).  Planned: Vulkan on Linux and Android, WebGPU
-// in the browser, Metal; they provide the same types and methods.
+// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
+// Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
+// vk_*.rs; on Linux no windows yet).  Planned: Android, WebGPU in the browser, Metal; they provide
+// the same types and methods.
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -106,7 +107,8 @@ pub const COLOR_TARGETS_MAX: usize = 8;
 pub enum GpuError {
     /// the GPU is switched off (jfgui_GPU=0)
     Disabled,
-    /// the GPU API is not installed (no vulkan-1.dll, or jfgui_GPU_DLL names a missing file)
+    /// the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
+    /// missing file, or a Linux program not linked against glibc)
     NoLoader,
     /// no usable GPU (or jfgui_GPU_ADAPTER matched none)
     NoAdapter,

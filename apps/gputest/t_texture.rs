@@ -119,6 +119,19 @@ fn unorm(b: u8) -> u32 {
     (b as f32 / 255.0).to_bits()
 }
 
+/// an rgba8unorm channel as a shader reads it: k / 255 within one unit in the last place.  The
+/// correctly rounded quotient is what NVIDIA gives; Mesa's llvmpipe and Intel's storage reads
+/// multiply by 1 / 255 and land next to it for some k, which Vulkan allows.  Every other format
+/// stays exact.
+fn unorm_near(got: u32, want: u32) -> bool {
+    got.abs_diff(want) <= 1
+}
+
+/// words not equal to the reference but next to it (what unorm_near lets through)
+fn next_to(got: &[u32], want: &[u32]) -> usize {
+    got.iter().zip(want).filter(|(g, w)| g != w).count()
+}
+
 fn fetch_cases() -> Vec<FetchCase> {
     let s = TextureUsage::SAMPLED | TextureUsage::COPY_DST;
     vec![
@@ -220,7 +233,8 @@ fn fetch(t: &mut T, dev: &Device) {
         if t.res(rb.read(0, &mut got), "read").is_none() {
             continue;
         }
-        let (mut k, mut bad) = (0usize, None);
+        let unorm_format = d.format == Format::Rgba8Unorm;
+        let (mut k, mut bad, mut beside) = (0usize, None, 0);
         for m in 0..d.mips {
             let (w, h) = ((d.width >> m).max(1), (d.height >> m).max(1));
             for l in 0..d.layers {
@@ -229,8 +243,10 @@ fn fetch(t: &mut T, dev: &Device) {
                         let want = (c.want)(m, l, x, y);
                         for (ci, wv) in want.iter().enumerate() {
                             if let Some(wv) = wv {
-                                if bad.is_none() && got[k + ci] != *wv {
-                                    bad = Some(format!("mip {m} layer {l} ({x}, {y}) component {ci}: {:#x}, expected {wv:#x}", got[k + ci]));
+                                let g = got[k + ci];
+                                beside += (g != *wv) as u32;
+                                if bad.is_none() && g != *wv && !(unorm_format && unorm_near(g, *wv)) {
+                                    bad = Some(format!("mip {m} layer {l} ({x}, {y}) component {ci}: {g:#x}, expected {wv:#x}"));
                                 }
                             }
                         }
@@ -239,7 +255,8 @@ fn fetch(t: &mut T, dev: &Device) {
                 }
             }
         }
-        t.ok(bad.is_none(), &format!("fetch {}: every texel of every mip and layer exact{}", c.name,
+        let how = if unorm_format { format!("k / 255 ({beside} values one unit in the last place off)") } else { String::from("exact") };
+        t.ok(bad.is_none(), &format!("fetch {}: every texel of every mip and layer {how}{}", c.name,
                                      bad.map_or(String::new(), |b| format!(" -- {b}"))));
     }
 }
@@ -485,7 +502,12 @@ fn storage(t: &mut T, dev: &Device) {
         t.ok(raw == want_raw, &format!("storage {name}: textureStore of {w} x {h} texels, the texture's bytes{}", first_diff(&raw, &want_raw)));
         let mut want: Vec<u32> = (0..h).flat_map(|y| (0..w).flat_map(move |x| samples::storage_read(fmt, x, y))).collect();
         want.extend_from_slice(&[w, h]);
-        t.ok(got == want, &format!("storage {name}: textureLoad of every texel, textureDimensions = ({w}, {h}){}", first_diff(&got, &want)));
+        // rgba8unorm: k / 255 (unorm_near), the sizes after it exact
+        let texels = want.len() - 2;
+        let near = fmt == Fmt::Rgba8 && got.len() == want.len() && got[texels..] == want[texels..]
+            && got[..texels].iter().zip(&want[..texels]).all(|(g, w)| unorm_near(*g, *w));
+        let beside = if near { format!(" ({} values one unit in the last place off k / 255)", next_to(&got, &want)) } else { first_diff(&got, &want) };
+        t.ok(got == want || near, &format!("storage {name}: textureLoad of every texel, textureDimensions = ({w}, {h}){beside}"));
     }
     // read-write: v -> v * 2 + 1 / v * 3 + 1 / v - 5
     for (fmt, name) in [(Fmt::R32f, "r32float"), (Fmt::R32ui, "r32uint"), (Fmt::R32i, "r32sint")] {
@@ -626,19 +648,23 @@ fn fragment(t: &mut T, dev: &Device) {
     // nearest: explicit LOD L and implicit LOD on a target of the mip's size: the mip's texels
     for (mode, mname) in [(0u32, "textureSampleLevel (explicit LOD)"), (1, "textureSample (implicit LOD: mip from derivatives)")] {
         let mut bad = None;
+        let mut beside = 0;
         for l in 0..5u32 {
             let s = 16 >> l;
             let Some(px) = draw(t, dev, &f, tex.view(), &nearest, s, 1.0 / s as f32, 0.0, l as f32, mode, mname) else { return };
             for y in 0..s {
                 for x in 0..s {
                     let want = texel(l, x, y);
-                    if bad.is_none() && px[(y * s + x) as usize] != want {
-                        bad = Some(format!("mip {l} ({x}, {y}) = {:?}, expected {:?}", px[(y * s + x) as usize], want));
+                    let got = px[(y * s + x) as usize];
+                    beside += (0..4).filter(|&c| got[c] != want[c]).count();
+                    if bad.is_none() && !(0..4).all(|c| unorm_near(got[c].to_bits(), want[c].to_bits())) {
+                        bad = Some(format!("mip {l} ({x}, {y}) = {got:?}, expected {want:?}"));
                     }
                 }
             }
         }
-        t.ok(bad.is_none(), &format!("fragment {mname}, nearest: mips 0 .. 4 exact{}", bad.map_or(String::new(), |b| format!(" -- {b}"))));
+        t.ok(bad.is_none(), &format!("fragment {mname}, nearest: mips 0 .. 4 = k / 255 ({beside} values one unit in the last place off){}",
+                                     bad.map_or(String::new(), |b| format!(" -- {b}"))));
     }
     // bilinear at LOD 0, a quarter texel off the centres (16 x 16 target)
     if let Some(px) = draw(t, dev, &f, tex.view(), &bilin, 16, 1.0 / 16.0, 0.25 / 16.0, 0.0, 0, "bilinear") {

@@ -1,0 +1,1 @@
+On Linux this program is linked against glibc: GPU drivers are glibc libraries (build_rs.py, section "glibc").
