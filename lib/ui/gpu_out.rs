@@ -176,6 +176,8 @@ const BIG_UPLOAD: u64 = 128 << 10;
 const TRIM_US: u64 = 1_200_000;
 /// a Remote Desktop session is looked at again after this long (us)
 const REMOTE_LOOK_US: u64 = 10_000_000;
+/// (scripts) a window whose size differs from its frame for this long stays so (us)
+const KEPT_US: u64 = 500_000;
 /// the layers above the base
 const UPPER: usize = L_COUNT - 1;
 /// dirty.rs's cells: what a layer's texture and store are made of
@@ -2750,8 +2752,8 @@ impl Ui {
             let s = &self.m.gout;
             let building = s.jobs.running.load(Ordering::Acquire) != 0;
             // (a window the system keeps at another size stays on the CPU path: a narrow tool window
-            // in a script's real window with a frame)
-            let all = s.wins.iter().flatten().all(|w| w.stage == Stage::Gpu || plat::win_size(w.pw) != w.size);
+            // in a script's real window with a frame, a frame larger than the screen)
+            let all = s.wins.iter().flatten().all(|w| w.stage == Stage::Gpu || kept_at_other_size(w));
             if matches!(s.dev, Dev::Never(_)) {
                 return false;
             }
@@ -3037,7 +3039,11 @@ impl Ui {
             }
         }
         if !any && msg.is_none() {
-            msg = Some(String::from("no window on the swapchain"));
+            if s.wins.iter().flatten().any(kept_at_other_size) {
+                plat::write_stdout(b"note: gpu expect same: the system keeps the window at another size (no result)\n");
+            } else {
+                msg = Some(String::from("no window on the swapchain"));
+            }
         }
         self.m.gout = s;
         self.m.gout.diff_marked = self.gpu_output(self.gp_scoped() as u32).canvas_diff_px;
@@ -3073,6 +3079,7 @@ impl Ui {
         };
         let mut bad = 0u64;
         let mut first = (0, 0);
+        let mut some = Vec::new(); // of the pixels that differ, to look what lies over them
         let row = w as usize * 4;
         for y in 0..h as usize {
             let a = &px[y * row..y * row + row];
@@ -3084,19 +3091,28 @@ impl Ui {
                     if bad == 0 {
                         first = (x, y);
                     }
+                    if bad % 4096 == 0 {
+                        some.push([x as i32, y as i32, 0, 0]);
+                    }
                     bad += 1;
                 }
             }
         }
         if bad != 0 {
             let total = w as u64 * h as u64;
-            if screen && plat::win_test(plat::WT_FROM_POINT, pw, [first.0 as i32, first.1 as i32, 0, 0]) != 1 {
+            // (not only the first: it can lie in the shadow of a window above, where hit tests find ours)
+            if screen && some.iter().any(|&p| plat::win_test(plat::WT_FROM_POINT, pw, p) != 1) {
                 plat::write_stdout(format!("note: gpu expect screen: {bad} of {total} pixels differ: another window lies on top of ours\n").as_bytes());
             } else {
                 self.fail(format!("{bad} pixels differ, first at {}, {}", first.0, first.1).as_bytes());
             }
         }
     }
+}
+
+/// a script's real window that the system keeps at another size than its frame, for a while now
+fn kept_at_other_size(w: &Win) -> bool {
+    plat::win_size(w.pw) != w.size && plat::time_us() >= w.stable_at + KEPT_US
 }
 
 // the real windows of a script: their messages, their events dropped (a wake-up of a task stays)

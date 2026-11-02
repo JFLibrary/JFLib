@@ -1,0 +1,5 @@
+#!args --test canvas
+# a canvas (lib/ui/canvas.rs): no tile while its view stands still, a pan and a zoom from tiles with
+# next to nothing drawn or uploaded, the CPU's picture and no more frames after them, an edit, damage,
+# a popup and something of the base over it, a new size, eviction, a budget of nothing, a lost device,
+# the tiles' end (no frame)

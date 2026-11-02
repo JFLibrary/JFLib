@@ -1689,7 +1689,7 @@ Fensterrand hinaus.
   letzten Bewegung zeichnet die CPU einmal neu, was 3–31 ms kostet. Während des Zoomens sind Diagramm
   und Bildansicht bis dahin etwas weicher, Kritzel und PaintCraft zoomen auf der CPU (6 ms) und
   weichen nie ab. `jfgui_GPU_CANVAS_CPU`, `_PAN` und `_ZOOM` schalten je Leinwand um. Auf der CPU
-  bleiben PaintCraft mit Pixelraster, Auswahl oder Werkzeug-Overlay, RTL-Fenster sowie Diagramme,
+  bleiben PaintCraft mit Pixelraster, Auswahl oder Werkzeug-Overlay, RTL-Fenster sowie Charts,
   Zeitleisten und Terminal, die andere `Cmd::Custom` nutzen. Die GPU belegt je nach Leinwand 50–146
   MiB statt 16–23 MiB, bis die Kacheln 30 s nach der letzten Bewegung gehen. Nicht getestet: ein
   echter Treiber-Reset, Remote Desktop, andere GPUs, ein großes JFNetworker-Modell, Linux und Web nur
