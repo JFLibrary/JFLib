@@ -109,7 +109,31 @@ Weitere gemeinsame Methoden sind `agent/info`, `actions/batch`, `state/inspect`,
 Ressourcenreferenzen geliefert und separat begrenzt gelesen. Es gibt keinen allgemeinen
 Shell-Ausführungsbefehl und keine freie Dateisystemadresse als Ressourcenkennung.
 
-Verändernde Fachaktionen verlangen die zuletzt gelesene Revision. Stapel laufen geordnet;
+Verändernde Aktionen verlangen die zuletzt gelesene Revision (außer solchen mit
+`revision_required: false`, etwa `ui.focus`). Das ist die aus `ui.state`, `state/inspect` oder
+der Antwort auf die letzte Aktion; jede Antwort nennt die aktuelle. Eine
+App mit `App::action_revision` meldet ihre Dokumentrevision, sie gilt dann auch für `ui.*`. Ohne
+sie führt die UI-Runtime selbst eine Revision. Diese bewegt sich, wenn sich die Bedienelemente
+ändern (welche es gibt, Beschriftung, Wert, Zustand, Ebene), außerdem Fokus, offener modaler
+Dialog, Titel oder freigegebene Befehle, und nach jeder ausgeführten ändernden Agentenaktion.
+Sie bewegt sich nicht durch gezeichnete Bilder, den Mauszeiger über einem Widget, verschobene
+Rechtecke, reine Anzeigen (Texte, Bilder, Fortschritt) oder einen Client, der sich verbindet
+oder trennt. Ein echtes Fenster zeichnet bei jeder Anfrage ein Bild; die zuletzt gelesene Revision
+bleibt trotzdem gültig. Änderungen des Benutzers an Daten, die in keinem Bedienelement stehen,
+sieht diese Revision nicht; das schützt nur `action_revision`.
+
+`ui.state` meldet zusätzlich `uiRevision`, die sich bei allem bewegt, was die Antwort enthält,
+auch bei Rechtecken und Hover. Mit `sinceUiRevision` antwortet `ui.state` nur `unchanged`, wenn
+sich nichts geändert hat. Ablauf über die CLI:
+
+```powershell
+python tools/jfgui-agent.py inspect ENDPOINT --input-json '{"limit":100}'
+python tools/jfgui-agent.py call ENDPOINT ui.click --input-json '{"id":700}' --expected-revision 5
+python tools/jfgui-agent.py call ENDPOINT ui.type --input-json '{"text":"Hallo"}' --expected-revision 7
+```
+
+Die zweite Revision steht in der Antwort auf den Klick. Ein Konflikt (`revision_conflict`) verändert
+nichts; dann den Zustand neu lesen. Stapel laufen geordnet;
 ein atomarer Stapel wird vor Ausführung abgelehnt, wenn keine passende gemeinsame
 Transaktion registriert ist. Aufgabe, Fortschritt und Abbruch sind gemeinsame Verträge;
 lange App-Operationen müssen ihre Unterbrechungspunkte und Commit-Prüfungen implementieren.
@@ -284,6 +308,10 @@ landet es wie Firefox dort).
 - `apps/agenttest`: Schema-, Revisions-, Stapel-, Aufgaben-, Ressourcen- und Protokollverträge.
 - `apps/agenttest/tests/ipc_check.py`: getrennte native Prozesse, private Endpunkte, Instanzen,
   CLI und MCP-Gateway. Unter Windows und Linux jeweils mit dem jeweiligen Build ausführen.
+- `apps/agenttest/tests/gui_ipc_check.py`: echte Fenster von Gallery und Kritzel, auch Klicken und
+  Tippen mit der zuletzt gelesenen Revision, über eine Verbindung und über die CLI.
+- `apps/gallery/tests/agent_revision.uis` (in `build_rs.py test`): dasselbe kopflos, mit Bildern
+  und Mausbewegungen zwischen den Aufrufen.
 - `apps/jfWord/tests/agent.py`: echte Prozesse über JSON und MCP; Bearbeiten, Formatieren,
   Quelle, Zitat, Note, Undo/Redo, DOCX-Speichern/Öffnen und Bildressource.
 - `tools/tests/web_apps.mjs`: Chromium-/Firefox-Prüfungen für gemeinsame Darstellung,

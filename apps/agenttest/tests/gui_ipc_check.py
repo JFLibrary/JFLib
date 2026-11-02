@@ -25,7 +25,7 @@ def launch(exe, enabled):
         startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
         options.update(startupinfo=startup, creationflags=0x08000000)
-    args = [str(exe), "--auto-close", "20000" if enabled else "2500", "--size", "800x600"]
+    args = [str(exe), "--auto-close", "30000" if enabled else "2500", "--size", "1000x800"]
     if enabled:
         args.append("--agent")
     return subprocess.Popen(args, **options)
@@ -58,8 +58,56 @@ def call(client, action, input=None, revision=None):
     return result["result"]
 
 
+def click_with_last_revision(client, gallery_cli):
+    """A real window draws for every request: the revision read last must still hold."""
+    checks = 0
+    state = lambda **query: client.request("state/inspect", query)["result"]
+    first = state(limit=500)
+    time.sleep(0.2)
+    assert [state(limit=1)["revision"] for _ in range(5)] == [first["revision"]] * 5
+    checks += 1
+    assert state(sinceUiRevision=first["uiRevision"]).get("unchanged") is True
+    checks += 1
+    box = next(w for w in first["widgets"] if w["label"] == "Option A")
+    value = lambda: next(w for w in state(limit=500)["widgets"] if w["id"] == box["id"])["state"] & 8
+    for _ in range(3):
+        # read, then act: each round on a new revision, with the window's frames in between
+        before, checked = state(limit=1)["revision"], value()
+        time.sleep(0.05)
+        after = call(client, "ui.click", {"id": box["id"]}, before)["revision"]
+        assert after != before and value() != checked
+        assert state(limit=1)["revision"] == after
+        checks += 1
+    # the revision of a reply is the one to use next, also through the CLI (one connection per command)
+    revision = state(limit=1)["revision"]
+    for _ in range(3):
+        reply = gallery_cli("call", "ui.click", "--input-json", json.dumps({"id": box["id"]}), "--expected-revision", str(revision))
+        revision = reply["result"]["revision"]
+        checks += 1
+    revision = gallery_cli("inspect", "--input-json", json.dumps({"limit": 1}))["result"]["revision"]
+    assert gallery_cli("call", "ui.click", "--input-json", json.dumps({"id": box["id"]}), "--expected-revision", str(revision))["result"]
+    checks += 1
+    # a stale revision changes nothing
+    stale, checked = revision, value()
+    conflict = client.request("actions/execute", {"action": "ui.click", "input": {"id": box["id"]}, "expectedRevision": stale})
+    assert conflict["error"]["data"]["code"] == "revision_conflict" and value() == checked
+    checks += 1
+    # typing: focus by a click, text and a key with the revision of the reply before
+    text = next(w for w in first["widgets"] if w["kind"] == 8 and not w["state"] & 16 and w["rect"][2] > 0)
+    label = lambda: next(w for w in state(limit=500)["widgets"] if w["id"] == text["id"])["label"]
+    revision = call(client, "ui.click", {"id": text["id"]}, state(limit=1)["revision"])["revision"]
+    revision = call(client, "ui.type", {"text": "Grüße "}, revision)["revision"]
+    time.sleep(0.05)
+    revision = call(client, "ui.type", {"text": "研究"}, revision)["revision"]
+    assert label() == "Grüße 研究"
+    call(client, "ui.key", {"key": 8}, revision)
+    assert label() == "Grüße 研"
+    checks += 1
+    return checks
+
+
 def close_cleanly(process):
-    process.wait(timeout=25)
+    process.wait(timeout=35)
     assert process.returncode == 0, process.stderr.read().decode(errors="replace")
 
 
@@ -111,6 +159,12 @@ def main():
                 data = client.request("resources/read", {"uri": resource["uri"], "offset": 0, "limit": 8})["result"]
                 assert base64.b64decode(data["data"]) == b"\x89PNG\r\n\x1a\n"
                 checks += 1
+        def gallery_cli(*command):
+            done = subprocess.run([sys.executable, str(ROOT / "tools/jfgui-agent.py"), command[0], addresses[0], *command[1:]],
+                                  text=True, encoding="utf-8", capture_output=True, timeout=20)
+            return json.loads(done.stdout)
+        with agent.Connection(addresses[0]) as gallery:
+            checks += click_with_last_revision(gallery, gallery_cli)
         with agent.Connection(addresses[1]) as kritzel:
             initial = call(kritzel, "image.inspect")
             original = initial["value"]
@@ -123,6 +177,13 @@ def main():
             undone = call(kritzel, "image.undo", revision=filled["revision"])
             restored = call(kritzel, "image.undo", revision=undone["revision"])["value"]
             assert (restored["width"], restored["height"]) == (original["width"], original["height"])
+            checks += 1
+            # an app with action_revision: the window's frames leave it, a stale one is refused
+            state = kritzel.request("state/inspect", {"limit": 500})["result"]
+            time.sleep(0.1)
+            assert kritzel.request("state/inspect", {"limit": 1})["result"]["revision"] == state["revision"]
+            stale = kritzel.request("actions/execute", {"action": "image.layer.fill", "input": {"argb": 0xFF000000}, "expectedRevision": state["revision"] + 1})
+            assert stale["error"]["data"]["code"] == "revision_conflict"
             checks += 1
         for child, address in zip(enabled, addresses):
             close_cleanly(child)

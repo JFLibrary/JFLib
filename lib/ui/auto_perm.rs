@@ -19,6 +19,10 @@
 //                                 the input object, default {})
 //   agent expect ok | error CODE  the outcome of the last call (forbidden,
 //                                 confirmation_required, not_found, ...)
+//   agent keep                    remember the revision the last reply reported
+//   agent write ACTION [JSON]     agent call with that revision as expectedRevision
+//   agent expect same | moved     the last reply's revision against the remembered one
+//   agent id S                    the widget's id, $id in the JSON of the calls after it
 
 use alloc::format;
 use alloc::string::String;
@@ -34,6 +38,8 @@ pub(crate) struct S {
     session: Option<agent_core::RpcSession>,
     reply: Option<String>,
     calls: u64,
+    kept: Option<u64>,
+    id: u32,
 }
 
 impl Ui {
@@ -119,20 +125,41 @@ impl Ui {
                 self.set_agent_enabled(verb == "on");
                 self.run_passes(app);
             }
-            "call" => {
+            "call" | "write" => {
                 let rest = rest.trim();
                 let (action, input) = rest.split_once(' ').unwrap_or((rest, "{}"));
                 let input = if input.trim().is_empty() { "{}" } else { input.trim() };
+                let input = input.replace("$id", &format!("{}", self.sc.agent.id));
+                let expected = match self.sc.agent.kept {
+                    Some(revision) if verb == "write" => format!(",\"expectedRevision\":{}", revision),
+                    _ => String::new(),
+                };
                 self.sc.agent.calls += 1;
                 let req = format!(
-                    "{{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"actions/execute\",\"params\":{{\"action\":\"{}\",\"input\":{}}}}}",
-                    self.sc.agent.calls, action, input
+                    "{{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"actions/execute\",\"params\":{{\"action\":\"{}\",\"input\":{}{}}}}}",
+                    self.sc.agent.calls, action, input, expected
                 );
                 let mut session = self.sc.agent.session.take().unwrap_or_else(|| agent_core::RpcSession::new(agent_core::Protocol::Json, "script", "1"));
                 let reply = self.agent_request(app, &mut session, req.as_bytes());
                 self.sc.agent.session = Some(session);
                 self.sc.agent.reply = reply;
                 self.run_passes(app); // a question the call raised shows now
+            }
+            "keep" => {
+                self.sc.agent.kept = self.sc_agent_revision();
+                if self.sc.agent.kept.is_none() {
+                    self.fail(b"the last reply reports no revision");
+                }
+            }
+            "id" => match self.resolve(rest.trim().as_bytes()).0 {
+                Some(s) => self.sc.agent.id = self.sel_rec(s).id,
+                None => self.sel_fail(),
+            },
+            "expect" if matches!(rest.trim(), "same" | "moved") => {
+                let (now, kept) = (self.sc_agent_revision(), self.sc.agent.kept);
+                if (now == kept) != (rest.trim() == "same") {
+                    self.fail(format!("the revision is {:?}, it was {:?}", now, kept).as_bytes());
+                }
             }
             "expect" => {
                 let want = rest.trim();
@@ -150,7 +177,14 @@ impl Ui {
                     self.fail(format!("{} ({})", got, reply.trim()).as_bytes());
                 }
             }
-            _ => self.fail(b"agent on|off|call ACTION [JSON]|expect ok|error CODE"),
+            _ => self.fail(b"agent on|off|call|write ACTION [JSON]|keep|id S|expect ok|error CODE|same|moved"),
         }
+    }
+
+    // the revision the last reply reported
+    fn sc_agent_revision(&self) -> Option<u64> {
+        let reply = self.sc.agent.reply.as_deref()?;
+        let v = agent_core::json::parse(reply.trim().as_bytes()).ok()?;
+        v.get("result")?.get("revision")?.as_u64()
     }
 }

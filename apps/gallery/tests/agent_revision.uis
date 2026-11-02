@@ -1,0 +1,82 @@
+# agent control and the revision (lib/ui/agent.rs; docs/AGENT_WEB.md): a window draws a frame for
+# every request and for the user's pointer, neither is a change of state, and a client acts with
+# the revision it read last. --agent-json has no frames between its requests; a script has.
+agent on
+agent call ui.state
+agent expect ok
+agent keep
+wait 50
+move "Rot"
+wait 50
+move "WLAN"
+wait 50
+agent call ui.state
+agent expect same
+# a click with the revision read last, again and again, with frames in between
+agent id "Option A"
+expect "Option A" checked
+agent write ui.click {"id":$id}
+agent expect ok
+agent expect moved
+expect "Option A" unchecked
+agent keep
+agent write ui.click {"id":$id}
+agent expect ok
+expect "Option A" checked
+wait 50
+agent call ui.state
+agent keep
+wait 50
+move "Rot"
+agent write ui.click {"id":$id}
+agent expect ok
+expect "Option A" unchecked
+# the revision of a reply holds for the next call, also after the frames that follow it
+agent keep
+wait 50
+agent call ui.state
+agent expect same
+# a click that shows nothing is still a change for other clients
+agent id "Standard"
+agent write ui.click {"id":$id}
+agent expect ok
+agent expect moved
+# the user changed something since the last read: refused, and nothing happens
+agent call ui.state
+agent keep
+click "Rot"
+agent id "WLAN"
+expect "WLAN" checked
+agent write ui.click {"id":$id}
+agent expect error revision_conflict
+expect "WLAN" checked
+agent call ui.state
+agent expect moved
+# without a revision: refused as before
+agent call ui.click {"id":$id}
+agent expect error invalid_input
+expect "WLAN" checked
+# typing and keys, each with the revision of the reply before
+agent id #700
+agent call ui.state
+agent keep
+agent write ui.click {"id":$id}
+agent expect ok
+expect #700 focused
+agent keep
+agent write ui.type {"text":"Grüße"}
+agent expect ok
+agent expect moved
+expect #700 text "Grüße"
+wait 50
+agent keep
+agent write ui.type {"text":" 研究"}
+agent expect ok
+expect #700 text "Grüße 研究"
+agent keep
+agent write ui.key {"key":8}
+agent expect ok
+agent expect moved
+expect #700 text "Grüße 研"
+agent off
+expect_nowarn
