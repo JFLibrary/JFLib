@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use ui::*;
+use ui::i18n::{t, tf};
 
 const ID_LIST: u32 = 4000; // rows 4001 .. 4200
 const ID_RLIST: u32 = 4300; // rows 4301 ..
@@ -21,6 +22,7 @@ const RL_COLORS: [u32; RL_N] = [
     0xFFE81123, 0xFFFF8C00, 0xFFFFB900, 0xFF107C10, 0xFF00B7C3, 0xFF0078D4, 0xFF8764B8, 0xFFE3008C, 0xFF7A7574, 0xFF498205,
     0xFF038387, 0xFF881798,
 ];
+// i18n
 const TREE: [(u64, u16, bool, u32, &str, Option<&str>); 8] = [
     (1, 0, true, IC_FOLDER, "Fotos", Some("1,2 GB")),
     (2, 1, true, IC_FOLDER, "Urlaub", Some("840 MB")),
@@ -84,18 +86,18 @@ impl Default for Lists {
 
 impl Lists {
     pub fn page(&mut self, ui: &mut Ui) {
-        ui.text(TS_BODY_STRONG, "200 Einträge");
+        ui.text(TS_BODY_STRONG, t("200 Einträge"));
         ui.next_size(0, 240);
         let (first, end) = ui.list_begin(ID_LIST, &mut self.sel, 200, 48);
         for i in first..end {
-            if ui.list_item(i, &format!("Eintrag {}", i + 1)) & EV_DOUBLE != 0 {
+            if ui.list_item(i, &tf("Eintrag {}", &[&format!("{}", i + 1)])) & EV_DOUBLE != 0 {
                 self.double += 1;
             }
         }
         ui.list_end(&mut self.sel);
-        ui.text(TS_BODY | TX_SECONDARY, &format!("Auswahl: {}   Doppelt getippt: {}", self.sel, self.double));
+        ui.text(TS_BODY | TX_SECONDARY, &tf("Auswahl: {}   Doppelt getippt: {}", &[&format!("{}", self.sel), &format!("{}", self.double)]));
 
-        ui.text(TS_BODY_STRONG, "Ebenen zum Ziehen");
+        ui.text(TS_BODY_STRONG, t("Ebenen zum Ziehen"));
         ui.next_size(0, 240);
         let (first, end) = ui.list_begin(ID_RLIST, &mut self.rl_sel, RL_N as i32, 48 | LF_REORDER);
         for row in first..end {
@@ -108,7 +110,7 @@ impl Lists {
             ui.next_flags(ST_NOFOCUS); // a picture: no Tab stop
             ui.swatch(ID_RL_CB + 20 + it as u32, RL_COLORS[it], false);
             ui.next_size(-1, 0);
-            ui.text(TS_BODY | TX_ELLIPSIS, &format!("Ebene {}", it + 1));
+            ui.text(TS_BODY | TX_ELLIPSIS, &tf("Ebene {}", &[&format!("{}", it + 1)]));
             ui.checkbox(ID_RL_CB + it as u32, "", &mut self.rl_vis[it]);
             ui.list_item_end();
         }
@@ -124,22 +126,22 @@ impl Lists {
             self.rl_order[to] = item;
             self.rl_moves += 1;
         }
-        let mut order = String::from("Reihenfolge:");
+        let mut order = String::from(t("Reihenfolge:"));
         for o in self.rl_order {
             order.push_str(&format!(" {}", o as u32 + 1));
         }
         ui.text(TS_BODY | TX_WRAP, &order);
-        ui.text(TS_BODY | TX_SECONDARY, &format!("Auswahl: {}   Verschoben: {}", self.rl_sel, self.rl_moves));
+        ui.text(TS_BODY | TX_SECONDARY, &tf("Auswahl: {}   Verschoben: {}", &[&format!("{}", self.rl_sel), &format!("{}", self.rl_moves)]));
 
-        ui.text(TS_BODY_STRONG, "Baum");
+        ui.text(TS_BODY_STRONG, t("Baum"));
         self.tree(ui);
 
-        ui.text(TS_BODY_STRONG, "Zeichenfläche");
+        ui.text(TS_BODY_STRONG, t("Zeichenfläche"));
         ui.next_size(SIZE_FILL, 64);
         let d: DrawRef = self.ants.clone();
         ui.canvas(ID_ANTS, Some(d), 0, 1);
         ui.next_size(SIZE_FILL, 44);
-        if ui.button(ID_ANTS_STEP, "Ameisen laufen lassen") & EV_ACT != 0 {
+        if ui.button(ID_ANTS_STEP, t("Ameisen laufen lassen")) & EV_ACT != 0 {
             let p = &self.ants.phase;
             p.set(p.get().wrapping_add(3));
             // only the edges changed: the version stays
@@ -158,7 +160,7 @@ impl Lists {
                 }
                 hidden_below = None;
             }
-            rows.push(TreeRow { key: *key, depth: *depth, has_children: *kids, check: Some(self.checks[k]), icon: *icon, label, detail: *detail });
+            rows.push(TreeRow { key: *key, depth: *depth, has_children: *kids, check: Some(self.checks[k]), icon: *icon, label: t(label), detail: (*detail).map(t) });
             if *kids && !self.tree.expanded.contains(key) {
                 hidden_below = Some(*depth);
             }
@@ -170,7 +172,7 @@ impl Lists {
                 self.checks[p] = v;
             }
         }
-        let cur = self.tree.cur.and_then(|k| TREE.iter().find(|r| r.0 == k)).map_or("–", |r| r.4);
-        ui.text(TS_BODY | TX_SECONDARY, &format!("Knoten: {cur}"));
+        let cur = self.tree.cur.and_then(|k| TREE.iter().find(|r| r.0 == k)).map_or("–", |r| t(r.4));
+        ui.text(TS_BODY | TX_SECONDARY, &tf("Knoten: {}", &[cur]));
     }
 }

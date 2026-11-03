@@ -1,0 +1,413 @@
+de	en
+{} · Ordner, {} Einträge	{} · folder, {} items
+{} · {} Bytes	{} · {} bytes
+Nicht lesbar: {}	Not readable: {}
+Wieder geöffnet	Opened again
+Wird wieder geöffnet …	Opening again …
+Nicht mehr da: {}	No longer there: {}
+Nicht wieder geöffnet (abgelehnt oder nicht mehr da): {}	Not opened again (declined or no longer there): {}
+04  Dateien & Zwischenablage	04  Files & clipboard
+Öffnen…	Open…
+Speichern…	Save…
+Ordner…	Folder…
+Geöffnet	Opened
+Gespeichert: {}	Saved: {}
+Nicht gespeichert: {}	Not saved: {}
+Ordner: {}	Folder: {}
+Noch keine Datei gewählt.	No file chosen yet.
+Zuletzt: {}	Last: {}
+Zuletzt öffnen	Open last
+Notiz (bleibt nach dem Neustart):	Note (kept after a restart):
+Etwas notieren	Write something down
+Kopieren	Copy
+Einfügen	Paste
+App-Starts: {}	App starts: {}
+JFLib Pocket Gallery	JFLib Pocket Gallery
+Kleine Widgets.	Small widgets.
+Echte Library.	Real library.
+01  Interaktion	01  Interaction
+Klicks: {}	Clicks: {}
+Klick mich	Click me
+Reset	Reset
+Option aktivieren	Enable option
+Regler aktiv	Slider active
+Wert: {} %	Value: {}%
+02  Farben & Design	02  Colors & theme
+Helles Design	Light theme
+Dunkles Design	Dark theme
+03  Texteingabe	03  Text input
+Dein Name	Your name
+Hallo Android!	Hello Android!
+Hallo {}!	Hello {}!
+Desktop-Vorschau	Desktop preview
+Nativer Rust-Code · eigener Renderer · nach oben wischen	Native Rust code · own renderer · swipe up
+Schaltflächen	Buttons
+Menüs & Auswahl	Menus & selection
+Texteingabe	Text input
+Listen & Bäume	Lists & trees
+Container	Containers
+Werte & Farben	Values & colors
+Fenster & Dialoge	Windows & dialogs
+Randfälle	Edge cases
+Wasserwaage	Spirit level
+Handylage	Phone attitude
+Kompass	Compass
+GPS	GPS
+07  Weitere Seiten	07  More pages
+Alle Widgets der großen Galerie, für den Finger angeordnet.	All widgets of the big gallery, arranged for the finger.
+Sensoren und Standort des Geräts.	The device's sensors and location.
+Seiten	Pages
+Zurück	Back
+Stift	Pen
+Pinsel	Brush
+Radierer	Eraser
+Füllen	Fill
+Farbauswahl	Color picker
+Lupe	Zoom
+Rot	Red
+Grün	Green
+Blau	Blue
+Tag	Day
+Woche	Week
+Monat	Month
+Standard	Standard
+Akzent	Accent
+Deaktiviert	Disabled
+Speichern	Save
+Umschalten	Toggle
+Mit Icon	With icon
+Werkzeuge	Tools
+Werkzeug: {}	Tool: {}
+Auswahl	Selection
+Option A	Option A
+Unbestimmt	Indeterminate
+WLAN	Wi-Fi
+Bereiche	Ranges
+Senkrecht: {}	Vertical: {}
+Karte	Card
+Karten gruppieren Inhalte auf einer leicht abgesetzten Fläche.	Cards group content on a slightly raised surface.
+Hell / Dunkel	Light / Dark
+Aufklappen	Expand
+Hinweise	Notices
+Rollen	Scroll
+Hinweis	Note
+Gespeichert	Saved
+Achtung	Warning
+Fehler	Error
+Eine neue Version ist verfügbar.	A new version is available.
+Das Bild wurde gespeichert.	The image was saved.
+Der Akku ist fast leer.	The battery is almost empty.
+Die Datei konnte nicht geöffnet werden.	The file could not be opened.
+Alle Hinweise zeigen	Show all notices
+Kurze Meldung	Short message
+Meldung	Message
+Sie verschwindet von selbst.	It goes away on its own.
+Waagerecht wischen rollt die Reihe.	Swiping sideways scrolls the row.
+Knopf {}	Button {}
+Zuletzt: Knopf {}	Last: button {}
+Rollleiste: {}	Scroll bar: {}
+Erst nach langem Drücken, zwei Finger gehören ihm:	Only after a long press, two fingers belong to it:
+Finger darauf: {}	Fingers on it: {}
+Nimmt nur Tippen:	Takes taps only:
+Erweiterte Einstellungen	Advanced settings
+Automatisch speichern	Save automatically
+Der Inhalt erscheint, wenn der Expander offen ist.	The content appears when the expander is open.
+&Farbe merken	&Remember color
+Dezimalwerte	Decimal values
+Eigenschaften	Properties
+Radius	Radius
+Härte	Hardness
+Winkel und Verschieben	Angle and panning
+Farbspuren	Color tracks
+Farbrad	Color wheel
+Farbwähler	Color picker
+Gemerkt: {}	Remembered: {}
+Ausschneiden	Cut
+Duplizieren	Duplicate
+Umbenennen	Rename
+Löschen	Delete
+Januar	January
+Februar	February
+März	March
+April	April
+Mai	May
+Juni	June
+Juli	July
+August	August
+September	September
+Oktober	October
+November	November
+Dezember	December
+Öffnen	Open
+Nach vorne	Bring forward
+Nach hinten	Send backward
+Ganz nach hinten	Send to back
+Anordnen	Arrange
+Links	Left
+Ein breiter Tooltip am linken Rand des Bildschirms	A wide tooltip at the left edge of the screen
+Menü	Menu
+Lange drücken öffnet auf „Hinweis“ das Kontextmenü.	Long-pressing “Note” opens the context menu.
+Ein Tooltip am unteren rechten Rand des Bildschirms	A tooltip at the bottom right edge of the screen
+Fotos	Photos
+1,2 GB	1.2 GB
+Urlaub	Vacation
+840 MB	840 MB
+Strand.jpg	Beach.jpg
+2,1 MB	2.1 MB
+Berge.jpg	Mountains.jpg
+3,4 MB	3.4 MB
+Katze	Cat
+120 MB	120 MB
+Dokumente	Documents
+64 MB	64 MB
+Brief.txt	Letter.txt
+2 KB	2 KB
+Plan.pdf	Plan.pdf
+640 KB	640 KB
+200 Einträge	200 entries
+Eintrag {}	Entry {}
+Auswahl: {}   Doppelt getippt: {}	Selected: {}   Double-tapped: {}
+Ebenen zum Ziehen	Layers to drag
+Ebene {}	Layer {}
+Reihenfolge:	Order:
+Auswahl: {}   Verschoben: {}	Selected: {}   Moved: {}
+Baum	Tree
+Zeichenfläche	Canvas
+Ameisen laufen lassen	Run the ants
+Knoten: {}	Node: {}
+&Neu	&New
+Ö&ffnen…	&Open…
+&Speichern	&Save
+Seite &verlassen	&Leave page
+&Rückgängig	&Undo
+&Wiederholen	&Redo
+&Ausschneiden	Cu&t
+&Kopieren	&Copy
+E&infügen	&Paste
+&Raster	&Grid
+Ver&größern	Zoom &In
+Ver&kleinern	Zoom &Out
+&Hell	&Light
+&Dunkel	&Dark
+Liste &leeren	&Clear list
+&Datei	&File
+&Bearbeiten	&Edit
+&Ansicht	&View
+&Zuletzt geöffnet	&Recent files
+&Zoom	&Zoom
+&Design	&Theme
+Keine Dateien	No files
+&Eigenschaften	&Properties
+Kreis	Circle
+Quadrat	Square
+Dreieck	Triangle
+Stern	Star
+Sechseck	Hexagon
+Fein	Fine
+Mittel	Medium
+Breit	Wide
+urlaub.png	vacation.png
+katze.jpg	cat.jpg
+Auswahlliste und Kalender	Combo box and calendar
+Stärke	Weight
+Schließen	Close
+Als Text einfügen	Paste as text
+Als Bild einfügen	Paste as image
+Befehle	Commands
+Kontextmenü	Context menu
+Hier lange drücken	Long-press here
+Menü an dieser Stelle	Menu at this spot
+Mit Hinweis (Maus oder Stift)	With a tooltip (mouse or pen)
+Hinweise erscheinen, wenn der Zeiger über dem Element bleibt	Tooltips appear when the pointer stays over the element
+Werkzeug	Tool
+Letzter Befehl: {}   Form: {}   Stärke: {}   Zoom: {} %	Last command: {}   Shape: {}   Weight: {}   Zoom: {}%
+Beschleunigung	Acceleration
+Schwerkraft	Gravity
+Drehrate	Rotation rate
+Magnetfeld	Magnetic field
+Drehlage	Orientation
+aus	off
+wartet auf Daten	waiting for data
+läuft	running
+pausiert	paused
+nicht erlaubt	not allowed
+nicht verfügbar	not available
+N	N
+O	E
+S	S
+W	W
+NO	NE
+SO	SE
+SW	SW
+NW	NW
+Nicht erlaubt	Not allowed
+Die App darf die Bewegungssensoren nicht lesen.	The app may not read the motion sensors.
+Nicht verfügbar	Not available
+Dieses Gerät hat keine passenden Sensoren.	This device has no suitable sensors.
+Pausiert, solange die App im Hintergrund ist.	Paused while the app is in the background.
+Waagerecht	Level
+Auf der Kante	On its edge
+Geneigt	Tilted
+Quer: {}°   Längs: {}°	Sideways: {}°   Lengthwise: {}°
+Keine Daten	No data
+Nicken: {}°	Pitch: {}°
+Rollen: {}°	Roll: {}°
+keine Angabe	not specified
+relativ	relative
+Gieren: {}	Yaw: {}
+Relativ zum Start: ohne Magnetfeld kein Norden.	Relative to the start: no north without a magnetic field.
+Keine Richtung	No direction
+Ungenau: das Telefon in einer Acht bewegen.	Inaccurate: move the phone in a figure eight.
+Standort verwenden	Use location
+sucht	searching
+Draußen geht es schneller.	It is faster outdoors.
+Position da	Position found
+Die App darf den Standort nicht abfragen: in den Einstellungen des Systems erlauben und den Schalter neu setzen.	The app may not query the location: allow it in the system settings and set the switch again.
+Standort des Systems ist aus	System location is off
+In den Einstellungen des Systems einschalten.	Turn it on in the system settings.
+Dieses Gerät hat keinen Standortdienst.	This device has no location service.
+Standort: {}	Location: {}
+Satelliten	Satellites
+Netzwerk	Network
+Breite: {}	Latitude: {}
+Länge: {}	Longitude: {}
+Genauigkeit: {}	Accuracy: {}
+Höhe: {}	Altitude: {}
+Tempo: {}	Speed: {}
+Richtung: {}	Bearing: {}
+Alter: {}	Age: {}
+Quelle: {}	Source: {}
+Keine Karte, kein Netzwerkzugriff der App: nur die Werte des Systems.	No map, no network access by the app: only the system's values.
+„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?	“Untitled.png” has unsaved changes. Do you want to save the changes before you close the image?
+Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile.	Pneumonoultramicroscopicsilicovolcanoconiosis does not fit on any line.
+Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt.	This note is longer than two lines and is therefore cut at the end with an ellipsis.
+Zeile {}	Line {}
+Ein langer Absatz, der am Rand des Textfelds umgebrochen wird, damit alles sichtbar bleibt.	A long paragraph that is wrapped at the edge of the text box so that everything stays visible.
+Zweiter Absatz.	Second paragraph.
+Eine Zeile	One line
+Name eingeben	Enter a name
+Kennwort	Password
+Eingabe: {}   (übernommen: {})	Input: {}   (committed: {})
+Zahlen	Numbers
+Werte: {} und {}	Values: {} and {}
+Mehrere Zeilen	Several lines
+Mehrzeilig	Multi-line
+Umbruch	Wrapped
+Formular im Raster	Form in a grid
+Name	Name
+Vorname Nachname	First name last name
+Worum	About
+Worum es geht	What it is about
+Optionen	Options
+Teilen	Share
+Abgeschickt: {}	Submitted: {}
+Umbruch und Kürzung	Wrapping and truncation
+Erste Zeile	First line
+Zweite Zeile, länger als die Karte breit ist	Second line, longer than the card is wide
+Rund	Round
+Eckig	Square
+Weich	Soft
+Hart	Hard
+Neu	New
+Drucken	Print
+Drehen	Rotate
+Spiegeln	Flip
+Zuschneiden	Crop
+Normal	Normal
+Multiplizieren	Multiply
+Additiv	Additive
+Farbig nachbelichten	Color burn
+Farbig abwedeln	Color dodge
+Reflektieren	Reflect
+Leuchten	Glow
+Überlagern	Overlay
+Differenz	Difference
+Negation	Negation
+Aufhellen	Lighten
+Abdunkeln	Darken
+Bildschirm	Screen
+Xor	Xor
+Hartes Licht	Hard light
+Weiches Licht	Soft light
+Farbton	Hue
+Sättigung	Saturation
+Farbe	Color
+Luminanz	Luminosity
+Werkzeug- und Dialogfenster sind eigene Fenster mit eigenem Zustand.	Tool and dialog windows are separate windows with their own state.
+Werkzeugfenster	Tool window
+Werte-Fenster	Values window
+Popups aus dem Fenster	Popups from the window
+Dialogfenster…	Dialog window…
+Dialog auf der Seite…	Dialog on the page…
+Pinselgröße: {}   Name: {}   Form: {}	Brush size: {}   Name: {}   Shape: {}
+Dialog: {}   Seitendialog: {}	Dialog: {}   Page dialog: {}
+Bereit	Ready
+Winkel: {}	Angle: {}
+Änderungen speichern?	Save changes?
+Möchten Sie die Änderungen an „Unbenannt“ speichern?	Do you want to save the changes to “Untitled”?
+Ungespeicherte Änderungen gehen sonst verloren.	Unsaved changes will be lost otherwise.
+Abbrechen	Cancel
+Größe: {} px	Size: {} px
+Name des Pinsels	Brush name
+Zurücksetzen	Reset
+Setzt Größe und Form zurück	Resets size and shape
+Bild bearbeiten	Edit image
+Die Änderung wird auf das ganze Bild angewendet.	The change is applied to the whole image.
+Kanten glätten	Smooth edges
+Weitere Optionen…	More options…
+Weitere Optionen	More options
+Farbprofil einbetten	Embed color profile
+Profilname	Profile name
+Übernommen: {}	Committed: {}
+Werte	Values
+Winkel	Angle
+Popups	Popups
+Ein Tooltip, der über den unteren Rand des Fensters hinausragt	A tooltip that extends past the bottom edge of the window
+05  Sicherer Speicher	05  Secure storage
+Der Wert liegt verschlüsselt im Geheimnisspeicher des Systems.	The value is stored encrypted in the system's secret store.
+Kein sicherer Speicher verfügbar.	No secure storage available.
+Geheimnis	Secret
+Sichern	Store
+Laden	Load
+Noch nichts gesichert.	Nothing stored yet.
+Gesichert ({} Bytes).	Stored ({} bytes).
+Nicht gesichert: {}	Not stored: {}
+Geladen ({} Bytes).	Loaded ({} bytes).
+Kein Geheimnis gesichert.	No secret stored.
+Nicht geladen: {}	Not loaded: {}
+Gelöscht.	Deleted.
+Es war keines gesichert.	None was stored.
+Nicht gelöscht: {}	Not deleted: {}
+06  System	06  System
+Design des Systems	System theme
+Benachrichtigung	Notification
+JFLib Galerie	JFLib Gallery
+Benachrichtigung Nummer {}	Notification number {}
+Bildschirm anlassen	Keep screen on
+JFLib Galerie: Bildschirm an	JFLib Gallery: screen on
+ja	yes
+nein	no
+dunkel	dark
+hell	light
+Design: {} (System: {})	Theme: {} (system: {})
+normal	normal
+hoch (Systemfarben)	high (system colors)
+hoch	high
+Kontrast: {}  Bewegung: {}	Contrast: {}  Motion: {}
+reduziert	reduced
+keiner	none
+Text: {} %  Akzent: {}	Text: {}%  Accent: {}
+Einstellungen: {} Änderungen (zuletzt {}), Design {}	Settings: {} changes (last {}), theme {}
+noch keine	none yet
+nicht gezeigt	not shown
+geklickt	clicked
+weg	gone
+gezeigt	shown
+Benachrichtigung: {}	Notification: {}
+nicht möglich	not possible
+Bildschirm an: {}{}	Screen on: {}{}
+Lebenszyklus: aktiv {}, {}, Hintergrund {}×, zurück {}×	Lifecycle: active {}, {}, background {}×, back {}×
+im Hintergrund	in the background
+im Vordergrund	in the foreground
+Tippen, ziehen, ausprobieren. Dieselben Rust-Widgets auf dem Smartphone.	Tap, drag, try it out. The same Rust widgets on the smartphone.
+Startseite	Start page

@@ -1,5 +1,6 @@
 // faults -- fault injection in the inspector (the lab): for a device (power off, a service
-// stopped, a slower disk), for a cable (pulled; more delay, loss, a lower rate), for a
+// stopped, a slower disk; with hardware a slower CPU and a memory hog: noisy neighbours), for a
+// cable (pulled; more delay, loss, a lower rate), for a
 // selection (a partition of its devices against the rest of the network), each with an
 // optional duration; the active faults with "Wiederherstellen", and "Alle wiederherstellen"
 //
@@ -11,6 +12,9 @@
 //   several(n, ui, devs, links)   the card of a selection: the partition, their faults
 //   project(n, ui)                every active fault (nothing selected)
 //   concerns(fault, devs, links)  a fault is about these devices or cables
+//
+// A lab that locks the faults (Lab::lock, AK2) has none of these cards: the learner finds what is broken
+// and repairs it as a real one would.
 //
 // Every injection and every heal goes through the document (Doc::inject, heal, heal_all in
 // doc/faults.rs): jfn_sim's fault actions (Action::Fault, Heal, HealAll), one undo step each --
@@ -51,6 +55,9 @@ pub(crate) struct Bufs {
     rate: String,
     /// the service chosen for "Stoppen": (device, index)
     svc: (u32, i32),
+    /// a device with hardware: the CPU's factor, the memory hog's GiB
+    cpu_x: String,
+    mem_gb: String,
     /// why the last injection was refused, and what it was for (device or cable)
     err: String,
     err_for: u32,
@@ -60,6 +67,7 @@ pub(crate) struct Bufs {
 pub(crate) fn concerns(f: &Fault, devs: &[u32], links: &[u32]) -> bool {
     match f {
         Fault::Power { dev } | Fault::Stop { dev, .. } | Fault::SlowDisk { dev, .. } => devs.contains(dev),
+        Fault::SlowCpu { dev, .. } | Fault::MemHog { dev, .. } | Fault::Resize { dev } => devs.contains(dev),
         Fault::Unplug { link } | Fault::Impair { link, .. } => links.contains(link),
         Fault::Partition { a, b } => a.iter().chain(b.iter()).any(|d| devs.contains(d)),
     }
@@ -131,6 +139,9 @@ fn refused(n: &mut Net, of: u32, text: &'static str) {
 
 /// the card of a device: power off, a service stopped, a slower disk; its faults
 pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     let Some(d) = n.doc.proj.device(id).cloned() else { return };
     let links: Vec<u32> = n.doc.proj.links.iter().filter(|l| l.a.dev == id || l.b.dev == id).map(|l| l.id).collect();
     let eng = n.doc.sim.engine();
@@ -142,6 +153,7 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
         .map(|s| (s.name.clone(), tf("{} {}", &[crate::workspace::metrics::kind_name(s.kind), &s.name]), s.running))
         .collect();
     let disk = eng.disk_of(id).is_some();
+    let hw = eng.res_of(id).is_some();
     let powered = !d.off && n.doc.sim.live_view().devices.iter().find(|x| x.dev == id).is_none_or(|x| x.power);
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     head(n, ui, t("Fehler einspielen"));
@@ -205,6 +217,46 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
             }
         }
     }
+    // a device with hardware: a slower CPU, a memory hog (res.rs)
+    if hw {
+        let b = &mut n.inspector.flt;
+        field_begin(ui, t("CPU \u{d7}"));
+        ui.next_size(-1, 0);
+        ui.textbox(ID_FLT_CPU_X, Some("3"), &mut b.cpu_x, 12);
+        ui.box_end();
+        ui.box_begin(0, BOX_H | BOX_END, 8);
+        let go = ui.button(ID_FLT_CPU, t("Bremsen")) & EV_ACT != 0;
+        ui.tooltip(t("Alle Rechenzeit des Geräts dauert so viel länger: ein lauter Nachbar auf demselben Rechner."));
+        ui.box_end();
+        if go {
+            match parse_decimal(&n.inspector.flt.cpu_x, 1000, 1_000_000_000).filter(|&v| v > 0) {
+                Some(x) => inject(n, ui, id, Fault::SlowCpu { dev: id, factor_pm: x as u32 }),
+                None => {
+                    refused(n, id, "Der Faktor ist eine Zahl größer als 0, z. B. 3.");
+                    ui.repass();
+                }
+            }
+        }
+        let b = &mut n.inspector.flt;
+        field_begin(ui, t("Belegt"));
+        ui.next_size(-1, 0);
+        ui.textbox(ID_FLT_MEM_GB, Some("8"), &mut b.mem_gb, 12);
+        ui.text(TS_BODY | TX_SECONDARY, "GiB");
+        ui.box_end();
+        ui.box_begin(0, BOX_H | BOX_END, 8);
+        let go = ui.button(ID_FLT_MEM, t("Belegen")) & EV_ACT != 0;
+        ui.tooltip(t("Etwas anderes hält so viel Speicher: über den RAM hinaus wird alles langsamer, über den Swap hinaus endet der größte Dienst."));
+        ui.box_end();
+        if go {
+            match super::hardware::mib_of_gib(&n.inspector.flt.mem_gb).filter(|&v| v > 0) {
+                Some(mb) => inject(n, ui, id, Fault::MemHog { dev: id, bytes: mb << 20 }),
+                None => {
+                    refused(n, id, "Der Speicher ist eine Zahl von GiB größer als 0, z. B. 8.");
+                    ui.repass();
+                }
+            }
+        }
+    }
     error(n, ui, id);
     active(n, ui, &[id], &links);
     ui.box_end();
@@ -212,6 +264,9 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
 
 /// the card of a cable: pulled, worse (delay, loss, rate); its faults
 pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     let Some(l) = n.doc.proj.link(id).cloned() else { return };
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     head(n, ui, t("Fehler einspielen"));
@@ -262,6 +317,9 @@ pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
 
 /// the card of a selection: its devices in a partition against the rest; their faults
 pub(crate) fn several(n: &mut Net, ui: &mut Ui, devs: &[u32], links: &[u32]) {
+    if crate::workspace::task::lock(n).faults {
+        return;
+    }
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     if !devs.is_empty() {
         head(n, ui, t("Partition"));
@@ -280,7 +338,7 @@ pub(crate) fn several(n: &mut Net, ui: &mut Ui, devs: &[u32], links: &[u32]) {
 
 /// every active fault (the project's page), when there is one
 pub(crate) fn project(n: &mut Net, ui: &mut Ui) {
-    if n.doc.sim.engine().active_faults().next().is_none() {
+    if crate::workspace::task::lock(n).faults || n.doc.sim.engine().active_faults().next().is_none() {
         return;
     }
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);

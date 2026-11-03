@@ -330,7 +330,7 @@ try {
     const browser=await playwright[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try {
       for(const app of apps) {
-        const context=await browser.newContext({viewport:{width:1200,height:800},deviceScaleFactor:1});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:1200,height:800},deviceScaleFactor:1});
         const errors=[], page=await context.newPage();
         page.on('pageerror',e=>errors.push(String(e)));
         page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -374,7 +374,7 @@ try {
         } finally {await context.close();}
       }
       for(const scale of [1.5,2]) for(const app of [apps[0],...apps.filter(a=>a==='jfWord' && a!==apps[0])]) {
-        const context=await browser.newContext({viewport:{width:1000,height:760},deviceScaleFactor:scale});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:1000,height:760},deviceScaleFactor:scale});
         const page=await context.newPage();
         // Firefox may reset Playwright's DPR emulation on COOP process changes.
         // Supply the requested host DPR explicitly for the adapter's DPI cases.

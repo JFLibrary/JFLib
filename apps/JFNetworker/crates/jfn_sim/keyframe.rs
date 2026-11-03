@@ -529,6 +529,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         b += (ip.statics.len() + ip.dynamic.len()) * size_of::<Route>() + ip.reasm.len() * 2048 + ip.groups.len() * 8;
         // access lists, translations, IPv6 and the routing table of the last lookup
         b += 1024 + ip.dynamic.len() * size_of::<Route>();
+        // the zone firewall: its configuration and sessions (fw.rs, K1 restores them)
+        b += ip.fw.footprint();
     }
     if let Some(os) = &n.os {
         b += size_of::<crate::os::Os>() + os.socks.len() * size_of::<Sock>() + os.inbox.len() * 256 + os.hosts.len() * 64;
@@ -539,6 +541,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         b += os.resolver.cache.len() * 128 + os.resolver.lookups.len() * 256 + os.resolver.latency.bytes() + 1024;
         // its units and deployments (units.rs, deploy.rs)
         b += os.units.footprint();
+        // its CPU and memory (res.rs)
+        b += os.res.as_ref().map_or(0, |r| r.footprint());
         // the files on the device (each copy holds their bytes; the system image has none)
         b += os.files.len() * 96 + (os.files.used() - os.files.image.as_ref().map_or(0, |i| i.1)) as usize;
     }
@@ -584,6 +588,7 @@ pub fn digest(e: &Engine) -> u64 {
         }
     }
     let _ = write!(w, "|{:?}|{:?} {:?}|{:?} {:?}|{} {}", e.links, e.dev_idx, e.link_idx, e.jobs, e.next_job, e.seed, e.strict_mdix);
+    let _ = write!(w, "|{}", e.metered);
     let _ = write!(w, "|{} {:?}|{:?}|{:?}|{:?}|", e.cli.debug, e.cli.jobs, e.faults, e.series, e.wlan);
     let _ = e.trace.counters(&mut w);
     w.0

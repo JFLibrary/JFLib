@@ -7,7 +7,15 @@ use ui::{Mi, Ui};
 static LANGUAGE: AtomicU32 = AtomicU32::new(0);
 const CATALOG: &str = include_str!("../../locales/ui.tsv");
 pub(crate) const NAMES: [&str; 3] = ["Deutsch", "English", "Français"];
+const CODES: [&str; 3] = ["de", "en", "fr"];
 pub(crate) fn code(value: &str) -> u32 { match value { "en" | "English" => 1, "fr" | "Français" => 2, _ => 0 } }
+// --lang / jfgui_LANG, as every app reads them ("fr-CA" or a list "fr-CA:en"): the best of the
+// catalogue's languages, else English
+fn wanted() -> Option<u32> {
+    let v = plat::arg_value("--lang").or_else(|| plat::env("jfgui_LANG")).filter(|v| !v.trim().is_empty())?;
+    let list: Vec<&str> = v.split([':', ',']).map(str::trim).filter(|t| !t.is_empty()).collect();
+    Some(ui::i18n::negotiate(&CODES, &list).map_or(1, |k| k as u32))
+}
 pub(crate) fn tr(s: &str) -> &str { translate(s, LANGUAGE.load(Ordering::Relaxed)) }
 fn translate(s: &str, language: u32) -> &str {
     if language == 0 || s.is_empty() { return s; }
@@ -31,6 +39,7 @@ static MENUS: rt::sync::SpinLock<[Option<&'static [Mi]>; 3]> = rt::sync::SpinLoc
 pub(crate) fn apply(p: &mut Pn, ui: &mut Ui, language: u32) {
     let language = language.min(2); p.st.st.language = language;
     LANGUAGE.store(language, Ordering::Relaxed);
+    ui::i18n::set_language(language); // the library's texts (file dialog, date picker, ...) follow
     for original in &crate::app::commands::PN_CMDS {
         // Runtime-generated recent-file/effect labels stay intact.
         if original.label.is_empty() || original.label.bytes().all(|b| b.is_ascii_digit()) { continue; }
@@ -41,6 +50,8 @@ pub(crate) fn apply(p: &mut Pn, ui: &mut Ui, language: u32) {
     p.cmds_dirty = true; ui.repass(); ui.invalidate();
 }
 pub(crate) fn init(p: &mut Pn, ui: &mut Ui) {
-    let language = plat::arg_value("--language").map_or(p.st.st.language, |s| code(&s));
+    // a catalogue that only names the columns: this one is read by translate above
+    ui::i18n::set_catalog(ui::i18n::Catalog::from_tsv("de\ten\tfr\n"));
+    let language = plat::arg_value("--language").map(|s| code(&s)).or_else(wanted).unwrap_or(p.st.st.language);
     apply(p,ui,language);
 }

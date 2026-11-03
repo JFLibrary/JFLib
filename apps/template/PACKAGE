@@ -1,6 +1,6 @@
 # tools/package.py: the packages of template (docs/PACKAGING.md) -- a starting point for new apps
 #   python tools/package.py template --formats all
-display=jfgui Template
+display=JFLib Template
 version=0.1.0
 publisher=JFLib
 summary=Vorlage für neue JFLib-Apps

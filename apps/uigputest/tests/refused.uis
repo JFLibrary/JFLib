@@ -1,0 +1,3 @@
+#!args --test refused
+# (Linux) the display refuses the buffers (jfgui_GPU_DMABUF=refuse, as a `failed` or an X error would):
+# the CPU path for good, the picture stays; on Windows a SKIP

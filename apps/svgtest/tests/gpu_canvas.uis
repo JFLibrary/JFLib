@@ -1,0 +1,79 @@
+#!args --verify-dirty
+# ui.image_view on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a bitmap and an SVG, panned
+# and zoomed: the view comes from tiles, the CPU's picture follows; every presented image is read
+# back: outside the tiles it equals the framebuffer during the gesture (their differences are
+# counted), all of it at rest.  Without a GPU `gpu` prints a SKIP once and does nothing.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 1040 760
+theme light
+click "Betrachter"
+click tab:"Foto"
+expect text:"zoom: 51 %  cx: 800.0  cy: 600.0  fit: 1" exists
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect apart 0
+gpu expect tiles 0
+# ---- a photo at 100 %: whole pixels, what the rest of the frame does stays equal
+click "100 %"
+gpu expect same
+gpu expect apart 0
+drag 500,400 460,380
+gpu expect apart 1
+print "photo 100 %, pan"
+gpu print
+gpu expect nodiff
+gpu expect same
+# ---- the wheel zooms at the pointer: scaled tiles, then the picture
+wheel 500,400 120
+gpu expect apart 1
+print "photo, wheel"
+gpu print
+gpu expect same
+gpu expect apart 0
+wheel 500,400 -240
+gpu expect same
+# ---- below 50 %: the mip levels
+click "Einpassen"
+click "Kleiner"
+gpu expect same
+# ---- an SVG, drawn again at every zoom: a pan and a zoom
+click tab:"SVG"
+gpu expect same
+click "Größer"
+gpu expect same
+drag 500,400 460,380
+gpu expect apart 1
+print "svg, pan"
+gpu print
+gpu expect same
+wheel 500,400 120
+gpu expect apart 1
+print "svg, wheel"
+gpu print
+gpu expect same
+# ---- the pixels, with their grid
+click tab:"Pixel"
+gpu expect same
+wheel 500,400 120
+gpu expect apart 1
+gpu expect same
+# ---- a theme: new content
+theme dark
+gpu expect apart 0
+gpu expect same
+drag 500,400 460,380
+gpu expect same
+# ---- the view at 150 %: tiles of the new scale
+theme light
+scale 150
+size 1040 760
+gpu wait
+click "Einpassen"
+gpu expect same
+wheel 500,400 120
+gpu expect same
+gpu expect screen
+gpu off
+expect_nowarn

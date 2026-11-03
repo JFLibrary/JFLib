@@ -2,11 +2,11 @@
 #   python tools/package.py mdviewtest --formats all
 # version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
 # as rt::app_version!(), the packages and lib/update use it.  The library has its own (lib/VERSION).
-display=jfgui Markdown
+display=JFLib Markdown
 version=0.1.0
 publisher=JFLib
 summary=Test des Markdown- und HTML-Betrachters und der Listen mit variabler Zeilenhöhe
-description=jfgui Markdown: ui.markdown_view und ui.html_view mit einem Beispieldokument aus allen Elementen und ui.vlist_begin mit 100 000 Zeilen verschiedener Höhe.
+description=JFLib Markdown: ui.markdown_view und ui.html_view mit einem Beispieldokument aus allen Elementen und ui.vlist_begin mit 100 000 Zeilen verschiedener Höhe.
 generic=Testprogramm
 categories=Development;
 deb_name=jfgui-mdviewtest

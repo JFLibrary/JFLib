@@ -49,6 +49,8 @@
 //                             service (cli/shrun.rs; services show as 100 + id)
 //   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
 //                             its name on the device
+//   OsApi::recording          notes are kept (not in a sweep's quiet trace): notes with texts of
+//                             their own, on a hot path, need not be made otherwise
 //   Engine::rename_service    Action::RenameService: a service goes on under another name
 //                             (Service::renamed tells it; its time series follow)
 //   both families             Sock::addr says what a UDP socket takes: 0.0.0.0 every IPv4
@@ -70,6 +72,12 @@
 //   Os::files                 the device's files (jfn_model::files::Store: flash: and nvram: of
 //                             IOS-like devices, the Linux tree of hosts); files.rs reads and
 //                             writes them for services (OsApi::file_*) and the command lines
+//   Os::res                   its CPU and RAM (res.rs; None: it costs nothing); Service::mem: the
+//                             bytes a service holds, asked after each of its calls
+//   Service::reconfigure      takes a new config while it runs, without a restart; by default it
+//                             cannot (http-server, http-load, lb, cache, worker can, for what they
+//                             can use at once).  Engine::can_reconfigure asks a copy of it,
+//                             Action::ServiceConfig does it (lab.rs)
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -340,6 +348,19 @@ pub trait Service: Send {
     fn footprint(&self) -> usize {
         1024
     }
+    /// the bytes it holds in the RAM of a device with hardware (res.rs): asked after each of its
+    /// calls there; the default holds nothing
+    fn mem(&self) -> u64 {
+        0
+    }
+    /// takes its whole config anew while it runs, without a restart: its numbers, connections and
+    /// work stay, what comes next goes by the new settings.  `os`: None when it does not run or is
+    /// only asked whether it can (Engine::can_reconfigure, on a copy).  Err: why it needs a restart
+    /// for this, and nothing has changed; the default needs one for everything
+    fn reconfigure(&mut self, config: &agent_core::jmap::Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let _ = (config, os);
+        Err(msg::phrase("Dieser Dienst ändert seine Einstellungen nur mit einem Neustart."))
+    }
 }
 
 impl Clone for Box<dyn Service> {
@@ -394,6 +415,8 @@ pub(crate) enum Job {
     Start(u32),
     Ev(u32, SvcEvent),
     Resolver(u32, Dgram),
+    /// more is held than RAM and swap take: the largest service goes (res.rs)
+    Oom,
 }
 
 /// a line of the device's log
@@ -527,6 +550,8 @@ pub struct Os {
     pub files: jfn_model::files::Store,
     /// units and deployments (units.rs, deploy.rs)
     pub units: crate::units::Units,
+    /// its CPU and RAM (res.rs); None: it costs nothing
+    pub res: Option<Box<crate::res::Res>>,
 }
 
 impl Os {
@@ -553,6 +578,7 @@ impl Os {
             disk: crate::disk::Disk::default(),
             files: jfn_model::files::Store::for_model(model),
             units: crate::units::Units::default(),
+            res: None,
         }
     }
     /// a service by name
@@ -678,6 +704,10 @@ impl OsApi<'_> {
     }
     pub fn cancel(&mut self, key: u32) {
         self.eng.cancel_timer(self.ni, SLOT_SVC + self.id * SVC_TIMERS + key.min(SVC_TIMERS - 1));
+    }
+    /// decisions are kept (a sweep's quiet trace keeps none)
+    pub fn recording(&self) -> bool {
+        !self.eng.trace.is_quiet()
     }
     /// records a decision
     pub fn note(&mut self, n: Note) {
@@ -1151,6 +1181,11 @@ impl Engine {
         if let Some(s) = self.os_mut(ni).and_then(|os| os.svcs.iter_mut().find(|s| s.id == id)) {
             s.svc = Some(svc);
         }
+        // what it holds now, on a device with hardware (res.rs)
+        if self.os(ni).is_some_and(|os| os.res.is_some()) {
+            let bytes = self.os(ni).and_then(|os| os.svcs.iter().find(|s| s.id == id)).and_then(|s| s.svc.as_ref()).map_or(0, |x| x.mem());
+            self.res_after_call(ni, id, bytes);
+        }
     }
 
     fn svc_start(&mut self, ni: usize, id: u32) {
@@ -1183,6 +1218,10 @@ impl Engine {
             os.inbox.retain(|j| !matches!(j, Job::Ev(i, _) | Job::Start(i) if *i == id));
             if let Some(s) = os.svcs.iter_mut().find(|s| s.id == id) {
                 s.running = false;
+            }
+            // it holds no memory any more (res.rs)
+            if let Some(r) = os.res.as_deref_mut() {
+                r.forget(id);
             }
         }
     }
@@ -1230,6 +1269,7 @@ impl Engine {
                     }
                 }
                 Job::Resolver(l, d) => self.resolver_input(ni, l, d),
+                Job::Oom => self.res_oom(ni),
             }
         }
     }
@@ -1261,6 +1301,10 @@ impl Engine {
             os.log.port = None;
             os.resolver.power_off(now);
             os.tcp.power_off();
+            // the cores and the memory start empty, the disk stays (res.rs)
+            if let Some(r) = os.res.as_deref_mut() {
+                r.power_off(now);
+            }
         }
         self.units_power_off(ni);
     }
@@ -1477,6 +1521,10 @@ impl Engine {
     /// a number a service reports (`expect SRV1 svc web metric requests == 4`)
     pub fn metric(&self, dev: u32, svc: &str, name: &str) -> Option<i64> {
         let os = self.os(self.node_index(dev)?)?;
+        // the device's own numbers (res.rs)
+        if svc == crate::res::HOST {
+            return os.res.as_deref()?.metric(name, self.now).or_else(|| self.series_one(dev, svc, name)?.points.last().map(|p| p.1));
+        }
         os.svc(svc)?.svc.as_ref()?.metrics_at(self.now).into_iter().find(|m| m.name == name).map(|m| m.value)
     }
 

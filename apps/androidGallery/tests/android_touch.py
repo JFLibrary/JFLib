@@ -128,7 +128,7 @@ def main():
         d.sh("input", "keyevent", "KEYCODE_WAKEUP")
         d.sh("am", "force-stop", PKG)
         extra = ["--es", "jfgui_PAGE", page] if page else []
-        d.sh("am", "start", "-W", "-n", ACTIVITY, *extra, timeout=60)
+        d.sh("am", "start", "-W", "-n", ACTIVITY, "--es", "jfgui_LANG", "de", *extra, timeout=60)
         time.sleep(1.5)
 
     def motion(action, x=None, y=None):

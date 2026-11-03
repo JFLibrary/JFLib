@@ -216,6 +216,10 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
     let mut rep = Report { frames: c.frames, timestamps: dev.features().timestamps, ..Report::default() };
     let mut last_t = 0.0f32;
     let scene;
+    if c.window.is_some() && !dev.features().swapchain {
+        t.fail("--window: no swapchains on this device");
+        return None;
+    }
     if let Some(present) = c.window {
         // a plat window of the size (within the work area) and a swapchain
         let w = plat::win_create("gputest --bench", 640, 360, plat::PWF_SYSFRAME, plat::PW_NOOWNER, plat::PW_DEFAULT,
@@ -238,6 +242,11 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
         crate::t_window::pump(200);
         let r = (|| {
             let surf = t.res(Surface::new(&g.inst, w), "Surface::new")?;
+            // (Linux: no display in this session, or it runs on another GPU)
+            if cfg!(not(windows)) && !g.adapter.can_present(&surf) {
+                out("SKIP: this adapter cannot show on the window's display");
+                return None;
+            }
             let desc = SwapchainDesc { present, frames_in_flight: k as u32, ..SwapchainDesc::DEFAULT };
             let mut sc = t.res(dev.create_swapchain(&surf, &desc), "create_swapchain")?;
             let s = Scene::new(t, dev, c.n, sc.format(), k, c.shaders)?;

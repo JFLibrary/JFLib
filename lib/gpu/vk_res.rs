@@ -172,7 +172,9 @@ impl Buffer {
 
     fn mapped_range(&self, offset: u64, n: u64) -> Result<usize> {
         let b = &self.0;
-        if b.a.ptr == 0 {
+        // by its kind, not by where it lies: on an integrated or CPU adapter all memory may be
+        // host-visible, and a program that wrote there would fail on the next GPU
+        if b.mem == MemoryKind::Device || b.a.ptr == 0 {
             return Err(GpuError::Invalid("buffer not host-visible (MemoryKind::Device)"));
         }
         if offset.checked_add(n).is_none_or(|e| e > b.size) {

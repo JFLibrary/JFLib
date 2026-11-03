@@ -12,7 +12,7 @@ Vollständige Liste mit Prioritäten: [docs/ROADMAP.md](docs/ROADMAP.md) (§ = A
 10. Accessibility (Screenreader Support etc.) (§11)
 
 -----------
-1. Build Website for the Library (§12)
+1. Website for the Library (§12): lives in JFLibrary/jflibWebsite, docs from tools/site.py; open: launch on jflib.org
 2. Full Android / IOS MacOS campatibility (§9)
 3. Native Multi Threading (§7)
 4. Rust JVM Attacher

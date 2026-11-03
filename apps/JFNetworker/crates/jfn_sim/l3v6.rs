@@ -151,6 +151,10 @@ impl Engine {
             return;
         }
         if self.ip6_mine(ni, iface, dst) {
+            // the zones decide about what comes to the device itself (fw.rs)
+            if self.fw_on(ni) && !self.fw_in6(ni, iface, v.packet(), Some(hop)) {
+                return;
+            }
             self.ip6_deliver(ni, iface, &v, hop);
             return;
         }
@@ -358,6 +362,9 @@ impl Engine {
         let mut p = v.packet().to_vec();
         ipv6::dec_hop_limit(&mut p);
         self.note6(ni, Some(hop), Note6::Routed { dst, gw: nh.gw, iface: nh.iface });
+        if self.fw_on(ni) && !self.fw_out6(ni, Some(iface), nh.iface, &p, Some(hop)) {
+            return;
+        }
         self.ip6_l2(ni, nh, p, Origin::Forwarded { iface }, Some(hop));
     }
 
@@ -380,6 +387,9 @@ impl Engine {
         if dst.is_multicast() {
             let i = oif.or_else(|| self.v6(ni).and_then(|x| x.find(v.src())));
             if let Some(i) = i.filter(|&i| self.ip6_running(ni, i)) {
+                if self.fw_on(ni) && !self.fw_out6(ni, None, i, &pkt, cause) {
+                    return;
+                }
                 self.ip6_l2(ni, NextHop6 { iface: i, gw: dst, src: crate::ip6::Src6::Connected }, pkt, origin, cause);
             }
             return;
@@ -391,6 +401,10 @@ impl Engine {
             }
             return;
         };
+        // what the device makes meets the zones from self (fw.rs)
+        if self.fw_on(ni) && !self.fw_out6(ni, None, nh.iface, &pkt, cause) {
+            return;
+        }
         // the sender fragments what does not fit the path (RFC 8200 5)
         let path = self.v6(ni).and_then(|x| x.pmtu.get(&dst)).map(|p| p.0 as usize);
         let mtu = self.ip6_mtu(ni, nh.iface).min(path.unwrap_or(usize::MAX));

@@ -96,7 +96,8 @@ enum Tol {
     /// e1 % e2 = e1 - e2 * trunc(e1 / e2): trunc may be one off near a multiple, so the error
     /// is at most |e2| (and a little)
     Rem,
-    /// f32 -> f16 conversions round to either neighbour (WGSL): each 16-bit half within 1
+    /// f32 -> f16 conversions round to either neighbour (WGSL): each 16-bit half within 1; a
+    /// denormal f16 may come back as 0
     Halves,
     /// quantizeToF16 and f32 -> f16: within one f16 step (WGSL: either neighbour), f16
     /// denormals may become 0
@@ -510,8 +511,12 @@ fn word_ok(kind: char, tol: Tol, got: u32, want: u32, input: &[u32]) -> bool {
         return true;
     }
     if let Tol::Halves = tol {
-        let d = |s: u32| ((got >> s) as u16 as i32 - (want >> s) as u16 as i32).abs();
-        return d(0) <= 1 && d(16) <= 1;
+        // within 1, or a denormal f16 flushed to 0 (as a denormal f32 below; Intel flushes them)
+        let near = |s: u32| {
+            let (g, w) = ((got >> s) as u16, (want >> s) as u16);
+            g.abs_diff(w) <= 1 || (w & 0x7c00 == 0 && g & 0x7fff == 0)
+        };
+        return near(0) && near(16);
     }
     if let Tol::Fields(bits) = tol {
         let mask = ((1u64 << bits) - 1) as u32;

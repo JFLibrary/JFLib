@@ -278,7 +278,7 @@ def main():
         no_dialog()
         d.sh("am", "force-stop", PKG)
         d.run("shell", "run-as", PKG, "rm", "-f", STATE, check=False)
-        launch(["--es", "jfgui_SELFTEST", "system"])
+        launch(["--es", "jfgui_LANG", "de", "--es", "jfgui_SELFTEST", "system"])
         s = wait(lambda s: s.get("selftest") == "system" and s.get("active") == "1", "the app runs", 30)
         if not ok(s is not None, "the gallery runs with jfgui_SELFTEST=system and has the keyboard (UIC_ACTIVE 1)"):
             raise RuntimeError("the app did not start (a debug APK?)")

@@ -6,9 +6,11 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
+#[cfg(windows)]
 use plat::{PW_DEFAULT, PW_KEEP, PW_NOOWNER, PWF_RESIZABLE, PWF_SYSFRAME, PWS_SHOWNA};
 
 use crate::t_compute::readback;
+#[cfg(windows)]
 use crate::t_window::pump;
 use crate::{Gpu, T, out, setup};
 
@@ -48,11 +50,12 @@ pub fn upload(t: &mut T) {
     rects(t, &g);
     ring(t, &g);
     buffers(t, &g);
+    #[cfg(windows)]
     if g.dev.features().swapchain {
         swap(t, &g);
-    } else {
-        out("SKIP: no swapchains on this device");
+        return;
     }
+    out("SKIP: no swapchains on this device");
 }
 
 fn rects(t: &mut T, g: &Gpu) -> Option<()> {
@@ -136,12 +139,18 @@ fn ring(t: &mut T, g: &Gpu) -> Option<()> {
     // a frame of small rectangles again and again: what the UI does
     let f2 = frame(w, h, w * 4, 4);
     let mut peak = 0;
+    // three frames in flight, as with a swapchain: without that a CPU device falls hundreds of
+    // submissions behind, and what they read cannot go back into the ring
+    let mut flight = [None; 3];
     let t0 = plat::time_us();
     for k in 0..2000 {
         let r = [[(k * 37) % 1800, (k * 53) % 1000, 64, 32], [(k * 11) % 1800, (k * 7) % 1000, 200, 20]];
         t.res(q.write_texture_rects(&tex, &r, &f2, w * 4, Layout::Sampled, Layout::Sampled), "small upload")?;
-        t.res(q.flush(), "flush")?;
+        let id = t.res(q.flush(), "flush")?;
         peak = peak.max(dev.memory_reserved());
+        if let Some(prev) = flight[k as usize % 3].replace(id) {
+            t.res(dev.wait(prev, 10_000_000_000), "wait")?;
+        }
     }
     let us = (plat::time_us() - t0) as f64 / 2000.0;
     t.res(dev.wait_idle(), "wait_idle")?;
@@ -194,6 +203,8 @@ fn buffers(t: &mut T, g: &Gpu) -> Option<()> {
     Some(())
 }
 
+// on a child window (Windows; G4b: the UI's output on Linux has its own way)
+#[cfg(windows)]
 fn swap(t: &mut T, g: &Gpu) -> Option<()> {
     let dev = &g.dev;
     let w = plat::win_create("gputest", 320, 240, PWF_SYSFRAME | PWF_RESIZABLE, PW_NOOWNER, PW_DEFAULT, PW_DEFAULT);
@@ -208,6 +219,7 @@ fn swap(t: &mut T, g: &Gpu) -> Option<()> {
     r
 }
 
+#[cfg(windows)]
 fn clear(dev: &Device, sc: &mut Swapchain, fr: Frame) -> gpu::Result<SubmitId> {
     let sc = &*sc;
     let mut e = dev.encoder()?;
@@ -220,6 +232,7 @@ fn clear(dev: &Device, sc: &mut Swapchain, fr: Frame) -> gpu::Result<SubmitId> {
     sc.present(fr, [cmd])
 }
 
+#[cfg(windows)]
 fn swap_on(t: &mut T, g: &Gpu, dev: &Device, w: i32) -> Option<()> {
     // on a child window, as the UI's output
     let nw = plat::win_gpu_child(w);
@@ -288,6 +301,14 @@ fn swap_on(t: &mut T, g: &Gpu, dev: &Device, w: i32) -> Option<()> {
         }
     }
     t.ok(got, "a frame after the rebuild");
+    // the swapchain and its surface go with an upload still open: the swapchain first, at once;
+    // the buffer stays until the upload has run (validate.uis)
+    let buf = t.res(dev.create_buffer(&BufferDesc { size: 16, usage: BufferUsage::STORAGE, memory: MemoryKind::Device }), "a buffer")?;
+    t.res(dev.queue().write_buffer(&buf, 0, &[0u32; 4]), "an upload left open")?;
+    drop(sc);
+    drop(surf);
+    drop(buf);
+    t.res(dev.queue().flush(), "the upload")?;
     plat::win_gpu_child_show(w, false);
     pump(10);
     Some(())

@@ -25,7 +25,8 @@ more image formats, layered PDN documents, effects, and plugins, see
 - **Layers:** up to 16 layers with thumbnails, visibility and opacity controls,
   duplication, reordering, and merging.
 - **Image operations:** resize the image or canvas, rotate, flip, crop, and skew;
-  undo and redo; zoom, pan, and fit the canvas to the window.
+  undo and redo; zoom, pan, and fit the canvas to the window. On Windows a pan comes from
+  GPU textures, byte for byte what the CPU draws ([GPU.md](../../docs/GPU.md)).
 - **Appearance:** shared JFLib styles, light/dark themes, and UI scaling.
 
 ## Supported file formats

@@ -1,7 +1,8 @@
 // gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows
-// (vulkan-1.dll loaded at run time; vk_*.rs).  Planned: Vulkan on Linux and Android, WebGPU
-// in the browser, Metal; they provide the same types and methods.
+// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
+// Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
+// vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: Android, WebGPU in the browser, Metal; they provide
+// the same types and methods.
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -37,11 +38,15 @@
 //   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
 //   queue.write_buffer / write_texture / write_texture_rects / write_texture_rects_at (staged in
 //                    a ring, before the next submit), read_buffer (waits)
-//   Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
-//   Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
+//   Surface::new(&instance, plat_window)            a plat window (Windows: HWND; Linux: what its
+//                                                   display accepts, plat::win_gpu_child)
+//   Surface::native(&instance, handles, plat_window)  a window given by its handles (a child);
+//                    track_size(): the size for a rebuild on a worker (Linux)
 //   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
 //                    view(&frame), texture(&frame), present(frame, [cmd, ..]), resize(),
-//                    try_acquire() (never waits or rebuilds), rebuild()
+//                    try_acquire() (never waits or rebuilds), rebuild(), and for the same code on
+//                    every target flush(), busy(), next_look(retry) (a frame reaches a Linux window
+//                    after the GPU has finished it: vk_dmabuf.rs), damage(rects)
 //
 // Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
 // with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
@@ -83,6 +88,11 @@ mod vk_inst;
 mod vk_load;
 mod vk_mem;
 mod vk_res;
+#[cfg(not(jfgui_glibc))]
+mod vk_swap;
+// Linux: images without a VkSurface, handed to the window by plat as dma-bufs; the same types
+#[cfg(jfgui_glibc)]
+#[path = "vk_dmabuf.rs"]
 mod vk_swap;
 
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
@@ -106,7 +116,8 @@ pub const COLOR_TARGETS_MAX: usize = 8;
 pub enum GpuError {
     /// the GPU is switched off (jfgui_GPU=0)
     Disabled,
-    /// the GPU API is not installed (no vulkan-1.dll, or jfgui_GPU_DLL names a missing file)
+    /// the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
+    /// missing file, or a Linux program not linked against glibc)
     NoLoader,
     /// no usable GPU (or jfgui_GPU_ADAPTER matched none)
     NoAdapter,

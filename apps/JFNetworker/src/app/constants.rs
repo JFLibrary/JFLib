@@ -695,3 +695,99 @@ pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
 /// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
 /// the courses of AK1 can follow)
 pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;
+// ---- SA1: the hardware of a device (commands 1040 .. 1049, widgets 0x0002_2000 .. 0x0002_23FF, timers
+// 0x1D4 .. 0x1D7; the commands and timers are not used)
+/// "Hardware simulieren" on the project's page
+pub(crate) const ID_PROJ_METERED: u32 = 0x0002_2000;
+/// the hardware card of a device (inspector/hardware.rs)
+pub(crate) const ID_HW_OWN: u32 = 0x0002_2001;
+pub(crate) const ID_HW_PRESET: u32 = 0x0002_2002;
+pub(crate) const ID_HW_CORES: u32 = 0x0002_2003;
+pub(crate) const ID_HW_SPEED: u32 = 0x0002_2004;
+pub(crate) const ID_HW_RAM: u32 = 0x0002_2005;
+pub(crate) const ID_HW_SWAP: u32 = 0x0002_2006;
+pub(crate) const ID_HW_DISK_GB: u32 = 0x0002_2007;
+pub(crate) const ID_HW_DISK: u32 = 0x0002_2008;
+pub(crate) const ID_HW_LIVE: u32 = 0x0002_2009;
+pub(crate) const ID_HW_RESET: u32 = 0x0002_200A;
+pub(crate) const ID_HW_APPLY: u32 = 0x0002_200B;
+/// the fault card of a device with hardware: a slower CPU, a memory hog (inspector/faults.rs)
+pub(crate) const ID_FLT_CPU_X: u32 = 0x0002_2010;
+pub(crate) const ID_FLT_CPU: u32 = 0x0002_2011;
+pub(crate) const ID_FLT_MEM_GB: u32 = 0x0002_2012;
+pub(crate) const ID_FLT_MEM: u32 = 0x0002_2013;
+// ---- F1: the Firewall tab (commands 1020 .. 1039, widgets 0x0002_0000 .. 0x0002_0FFF; no timers, the
+// commands are not used)
+/// the Firewall tab of device window k: ID_FW0 + 0x800 k (devwin/firewall.rs has the block's layout)
+pub(crate) const ID_FW0: u32 = 0x0002_0000;
+// ---- AK1: the Akademie (commands 1005 .. 1019, widgets 0x0002_1000 .. 0x0002_1FFF, the rest of the block
+// of ID_SP_LEARN for the start page; the timers 0x1D0 .. 0x1D3 are not used)
+/// Datei › Akademie …; back (Esc, Alt+Left, the button of a page); a course from the start page and from the
+/// list of courses (arg: its index in the list); a step (arg: its place in the course); the next open step;
+/// a lesson's Vorheriger Schritt and Weiter; the lab's bar; the answer to resetting the progress
+pub(crate) const CMD_ACADEMY: u32 = 1005;
+pub(crate) const CMD_AK_BACK: u32 = 1006;
+pub(crate) const CMD_SP_COURSE: u32 = 1007;
+pub(crate) const CMD_AK_COURSE: u32 = 1008;
+pub(crate) const CMD_AK_STEP: u32 = 1009;
+pub(crate) const CMD_AK_CONTINUE: u32 = 1010;
+pub(crate) const CMD_AK_PREV: u32 = 1011;
+pub(crate) const CMD_AK_NEXT: u32 = 1012;
+pub(crate) const CMD_AK_BAR_BACK: u32 = 1013;
+pub(crate) const CMD_AK_BAR_NEXT: u32 = 1014;
+pub(crate) const CMD_AK_RESET: u32 = 1015;
+/// the cards of the courses on the start page (+ i)
+pub(crate) const ID_SP_COURSE: u32 = 0x0001_FC00;
+/// the page as a pane, its scroll view, back, "Weiter", the progress, the reset and its dialog
+pub(crate) const ID_AK_PANE: u32 = 0x0002_1000;
+pub(crate) const ID_AK_SCROLL: u32 = 0x0002_1001;
+pub(crate) const ID_AK_BACK: u32 = 0x0002_1002;
+pub(crate) const ID_AK_CONTINUE: u32 = 0x0002_1003;
+pub(crate) const ID_AK_PROGRESS: u32 = 0x0002_1004;
+pub(crate) const ID_AK_RESET: u32 = 0x0002_1005;
+pub(crate) const ID_AK_HOME_SCROLL: u32 = 0x0002_1006;
+pub(crate) const ID_AK_RESET_DLG: u32 = 0x0002_1010;
+/// a lesson: the document, Vorheriger Schritt, Weiter, the note about the other language
+pub(crate) const ID_AK_LESSON: u32 = 0x0002_1020;
+pub(crate) const ID_AK_PREV: u32 = 0x0002_1021;
+pub(crate) const ID_AK_NEXT: u32 = 0x0002_1022;
+pub(crate) const ID_AK_NOTE: u32 = 0x0002_1023;
+/// the bar over the canvas in a course's lab: a pane, Zurück zum Kurs, Weiter im Kurs
+pub(crate) const ID_AK_BAR: u32 = 0x0002_1030;
+pub(crate) const ID_AK_BAR_BACK: u32 = 0x0002_1031;
+pub(crate) const ID_AK_BAR_NEXT: u32 = 0x0002_1032;
+/// the cards of the list of courses (+ i), the steps of a course (+ its place in the course)
+pub(crate) const ID_AK_CARD: u32 = 0x0002_1100;
+pub(crate) const ID_AK_STEP: u32 = 0x0002_1400;
+
+// ---------------------------------------------------------------- F2: the zone firewall
+/// the parts Zonen and Sitzungen of the Firewall tab: ID_FW2 + 0x400 k (window k), the layout in the
+/// head of fwzones.rs; together 0x0002_3000..0x0002_37FF
+pub const ID_FW2: u32 = 0x0002_3000;
+
+// ---- AK2: quizzes, tests and fault hunts (commands 1016 .. 1019 and 1050 .. 1059, widgets 0x0002_3800 ..
+// 0x0002_3FFF, timers 0x1D0 .. 0x1D3; 1050 .. 1059 and 0x1D1 .. 0x1D3 are not used)
+/// a test's next attempt; the answer to handing it in; practice from the start; a fault hunt from its file
+pub(crate) const CMD_QZ_START: u32 = 1016;
+pub(crate) const CMD_QZ_HAND_IN: u32 = 1017;
+pub(crate) const CMD_QZ_AGAIN: u32 = 1018;
+pub(crate) const CMD_AK_RETRY: u32 = 1019;
+/// a test's countdown
+pub(crate) const TIMER_QUIZ: u32 = 0x1D0;
+/// the page's scroll view, Test beginnen / Neuer Versuch, Abgeben, its question, Alle Fragen von vorn, the bar
+/// of the points; Neu beginnen on a fault hunt's bar
+pub(crate) const ID_QZ_SCROLL: u32 = 0x0002_3800;
+pub(crate) const ID_QZ_START: u32 = 0x0002_3801;
+pub(crate) const ID_QZ_HAND: u32 = 0x0002_3802;
+pub(crate) const ID_QZ_ASK: u32 = 0x0002_3803;
+pub(crate) const ID_QZ_AGAIN: u32 = 0x0002_3804;
+pub(crate) const ID_QZ_PROGRESS: u32 = 0x0002_3805;
+pub(crate) const ID_AK_BAR_RETRY: u32 = 0x0002_3806;
+/// a diagnosis in the Aufgabe panel (+ its place among them): the list of devices and cables, Auf der
+/// Zeichenfläche wählen
+pub(crate) const ID_DG_LIST: u32 = 0x0002_3810;
+pub(crate) const ID_DG_PICK: u32 = 0x0002_3820;
+/// the widgets of a quiz's questions: + the question's place in the file * QZ_SLOTS + a slot (quiz.rs); room
+/// for jfn_model::quiz::QUESTIONS_MAX questions of ANSWERS_MAX answers
+pub(crate) const ID_QZ_Q: u32 = 0x0002_3900;
+pub(crate) const QZ_SLOTS: u32 = 28;

@@ -323,6 +323,9 @@ fn make_start(n: &mut Net) {
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
     match id {
         CMD_AUTHOR => {
+            if crate::workspace::task::lock(n).answer {
+                return true;
+            }
             open(n);
             ui.focus(ID_AU_TARGET);
         }
@@ -338,6 +341,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
 /// enabled of the commands (every frame)
 pub(crate) fn states(n: &Net, ui: &mut Ui) {
     let a = &n.author;
+    // a lab that keeps its answer to itself (Lab::lock, AK2)
+    ui.cmd_state(CMD_AUTHOR, if crate::workspace::task::lock(n).answer { CF_DISABLED } else { 0 });
     ui.cmd_state(CMD_AUTHOR_START, if a.target.is_some() && !a.items.is_empty() { 0 } else { CF_DISABLED });
     ui.cmd_state(CMD_AUTHOR_SAVE, if a.target.is_some() && !a.items.is_empty() { 0 } else { CF_DISABLED });
 }
@@ -602,7 +607,7 @@ fn editor(n: &mut Net, ui: &mut Ui, en: bool, checks: bool) {
         changed = true;
     }
     ui.box_end();
-    if let Some(k) = kind.filter(|&k| k != ItemKind::Check) {
+    if let Some(k) = kind.filter(|&k| !matches!(k, ItemKind::Check | ItemKind::Diagnosis)) {
         field(ui, "Vergleich");
         let was = a.items[i].item.cmp;
         let mut cmp = Compare::ALL.iter().position(|c| *c == was).unwrap_or(0) as i32;

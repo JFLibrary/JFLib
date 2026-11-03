@@ -86,6 +86,7 @@ public final class GalleryA11yInstrumentation extends Instrumentation {
                 }
             });
             Intent intent = new Intent(getTargetContext(), GalleryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.putExtra("jfgui_LANG", "de"); // debug builds: the texts these checks look for
             Activity activity = startActivitySync(intent);
             waitForIdleSync();
 

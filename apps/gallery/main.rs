@@ -1,4 +1,4 @@
-// gallery -- widget gallery: every jfguiLib control on one page  [apps/gallery/src/main.s, u2demo.s]
+// gallery -- widget gallery: every JFLib control on one page  [apps/gallery/src/main.s, u2demo.s]
 //
 //   python build_rs.py app gallery
 //   build/win/gallery.exe --shot g.png --theme light --scale 150
@@ -29,6 +29,7 @@ use alloc::format;
 use alloc::string::String;
 
 use ui::*;
+use ui::i18n::{t, tf, Catalog};
 
 const ID_BTN: u32 = 100;
 const ID_ACCENT: u32 = 101;
@@ -59,7 +60,7 @@ const ID_GB_KEEP: u32 = 8706;
 const ID_GB_OK: u32 = 8707;
 
 const DESC: AppDesc = AppDesc {
-    title: "jfgui Galerie",
+    title: "JFLib Galerie", // i18n
     flags: AF_RESIZABLE,
     w: 900,
     h: 620,
@@ -75,17 +76,16 @@ const DESC: AppDesc = AppDesc {
 const RANGE_PCT: Range = Range::new(0, 100, 1, 0);
 const RANGE_VERT: Range = Range::new(1, 50, 1, RG_VERT);
 pub(crate) const TOOL_ICONS: [u32; 6] = [IC_PENCIL, IC_BRUSH, IC_ERASER, IC_DROP, IC_EYEDROPPER, IC_ZOOM];
-pub(crate) const TOOL_NAMES: [&str; 6] = ["Stift", "Pinsel", "Radierer", "Füllen", "Farbauswahl", "Lupe"];
+pub(crate) const TOOL_NAMES: [&str; 6] = ["Stift", "Pinsel", "Radierer", "Füllen", "Farbauswahl", "Lupe"]; // i18n
 
-const S_LONG: &str = "Eine sehr lange Beschreibung, die nicht in die Breite passt";
-const S_LONG2: &str = "Pinsel: Klicken und ziehen, um mit der Primärfarbe zu malen.";
-const S_HINT: &str = "Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe.";
-const S_U2_ASK: &str = "„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?";
-const S_U2_LONG: &str = "Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile.";
-const S_U2_LINES: &str = "Erste Zeile\nZweite Zeile, länger als die Karte breit ist";
-const S_U2_ROW: &str = "Das Bild wird zusammengefasst gespeichert; die Ebenen im Dokument bleiben erhalten.";
-const S_U2_CUT: &str = "Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt.";
-const S_U2_PAGE: &str = "Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss.";
+const S_LONG: &str = "Eine sehr lange Beschreibung, die nicht in die Breite passt"; // i18n
+const S_LONG2: &str = "Pinsel: Klicken und ziehen, um mit der Primärfarbe zu malen."; // i18n
+const S_HINT: &str = "Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe."; // i18n
+const S_U2_ASK: &str = "„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?"; // i18n
+const S_U2_LONG: &str = "Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile."; // i18n
+const S_U2_ROW: &str = "Das Bild wird zusammengefasst gespeichert; die Ebenen im Dokument bleiben erhalten."; // i18n
+const S_U2_CUT: &str = "Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt."; // i18n
+const S_U2_PAGE: &str = "Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss."; // i18n
 
 /// fmt_buf(buf, cap, ...): the text cut to cap - 1 bytes (never inside a UTF-8 sequence)
 pub(crate) fn cap(s: String, cap: usize) -> String {
@@ -147,7 +147,7 @@ impl Default for Gal {
             vslider: 12,
             toggle: 0,
             clicks: 0,
-            u2_open: String::from("Ordner build: noch nicht geöffnet"),
+            u2_open: String::from(t("Ordner build: noch nicht geöffnet")),
             gb_name: String::new(),
             gb_desc: String::new(),
             gb_opt: [1, 0, 0],
@@ -179,55 +179,55 @@ impl App for Gal {
         // the page scrolls, the status bar stays at the bottom (container agent)
         sec_list::page_begin(g, ui);
         ui.box_begin(0, BOX_V | PAD_24, 12);
-        ui.text(TS_TITLE, "jfgui Galerie");
+        ui.text(TS_TITLE, t("JFLib Galerie"));
         sec_list::hit_cases(g, ui); // test hook 9062: what a click from outside cannot reach
-        ui.text(TS_BODY | TX_SECONDARY, "WinUI 3 Steuerelemente, geschrieben in purem x86-64 Assembly.");
+        ui.text(TS_BODY | TX_SECONDARY, t("Die Steuerelemente von JFLib auf einer Seite zum Ausprobieren."));
 
         // ---- buttons
-        ui.text(TS_SUBTITLE, "Schaltflächen");
+        ui.text(TS_SUBTITLE, t("Schaltflächen"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        if ui.button(ID_BTN, "Standard") & EV_ACT != 0 {
+        if ui.button(ID_BTN, t("Standard")) & EV_ACT != 0 {
             g.clicks += 1;
         }
-        if ui.accent_button(ID_ACCENT, "Akzent") & EV_ACT != 0 {
+        if ui.accent_button(ID_ACCENT, t("Akzent")) & EV_ACT != 0 {
             g.clicks += 1;
         }
         ui.next_flags(ST_DISABLED);
-        ui.button(ID_DISABLED, "Deaktiviert");
-        ui.icon_button(ID_SAVE, IC_SAVE, "Speichern");
-        ui.toggle_button(ID_TOGGLE, "Umschalten", &mut g.toggle);
+        ui.button(ID_DISABLED, t("Deaktiviert"));
+        ui.icon_button(ID_SAVE, IC_SAVE, t("Speichern"));
+        ui.toggle_button(ID_TOGGLE, t("Umschalten"), &mut g.toggle);
         ui.next_icon(IC_ADD);
-        ui.button(ID_ICONBTN, "Mit Icon");
+        ui.button(ID_ICONBTN, t("Mit Icon"));
         ui.box_end();
 
         // ---- tool palette (like Kritzel's tools)
         ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
         for i in 0..6 {
-            ui.tool_button(ID_TOOL0 + i as u32, TOOL_ICONS[i], TOOL_NAMES[i], &mut g.tool, i as i32);
+            ui.tool_button(ID_TOOL0 + i as u32, TOOL_ICONS[i], t(TOOL_NAMES[i]), &mut g.tool, i as i32);
         }
         ui.box_end();
 
         // ---- selection controls
-        ui.text(TS_SUBTITLE, "Auswahl");
+        ui.text(TS_SUBTITLE, t("Auswahl"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 24);
         ui.checkbox(ID_CB1, "Option A", &mut g.cb1);
-        ui.checkbox(ID_CB2, "Unbestimmt", &mut g.cb2);
-        ui.radio(ID_R1, "Rot", &mut g.radio, 0);
-        ui.radio(ID_R2, "Grün", &mut g.radio, 1);
-        ui.radio(ID_R3, "Blau", &mut g.radio, 2);
-        ui.switch(ID_SWITCH, "WLAN", &mut g.switch);
+        ui.checkbox(ID_CB2, t("Unbestimmt"), &mut g.cb2);
+        ui.radio(ID_R1, t("Rot"), &mut g.radio, 0);
+        ui.radio(ID_R2, t("Grün"), &mut g.radio, 1);
+        ui.radio(ID_R3, t("Blau"), &mut g.radio, 2);
+        ui.switch(ID_SWITCH, t("WLAN"), &mut g.switch);
         ui.box_end();
 
         // ---- ranges
-        ui.text(TS_SUBTITLE, "Bereiche");
+        ui.text(TS_SUBTITLE, t("Bereiche"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 24);
         ui.slider(ID_SLIDER, &mut g.slider, &RANGE_PCT);
         ui.progress(1, g.slider, 100);
         ui.next_size(60, 100);
         ui.slider(ID_VSLIDER, &mut g.vslider, &RANGE_VERT);
         // value text
-        let t = cap(format!("Wert: {} %   Klicks: {}", g.slider, g.clicks), 128);
-        ui.text(TS_BODY, &t);
+        let line = cap(tf("Wert: {} %   Klicks: {}", &[&format!("{}", g.slider), &format!("{}", g.clicks)]), 128);
+        ui.text(TS_BODY, &line);
         ui.box_end();
 
         // ---- text input (edit agent)
@@ -235,12 +235,12 @@ impl App for Gal {
 
         // ---- a card
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 4);
-        ui.text(TS_BODY_STRONG, "Karte");
-        ui.text(TS_CAPTION | TX_SECONDARY, "Karten gruppieren Inhalte auf einer leicht abgesetzten Fläche.");
+        ui.text(TS_BODY_STRONG, t("Karte"));
+        ui.text(TS_CAPTION | TX_SECONDARY, t("Karten gruppieren Inhalte auf einer leicht abgesetzten Fläche."));
         ui.separator();
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.text(TS_BODY, "Design:");
-        if ui.button(ID_THEME, "Hell / Dunkel") & EV_ACT != 0 {
+        ui.text(TS_BODY, t("Design:"));
+        if ui.button(ID_THEME, t("Hell / Dunkel")) & EV_ACT != 0 {
             ui.cmd_run(ID_THEME, 0);
         }
         ui.box_end();
@@ -298,21 +298,21 @@ impl App for Gal {
 
 // gal_texts: "Text" -- ui_text with TX_ELLIPSIS in narrow boxes, multi-line text boxes
 fn gal_texts(g: &mut Gal, ui: &mut Ui) {
-    ui.text(TS_SUBTITLE, "Text");
+    ui.text(TS_SUBTITLE, t("Text"));
     // ellipsis: the same sentence in three widths
     ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
     ui.next_size(120, 0);
-    ui.text(TS_BODY | TX_ELLIPSIS, S_LONG);
+    ui.text(TS_BODY | TX_ELLIPSIS, t(S_LONG));
     ui.next_size(220, 0);
-    ui.text(TS_CAPTION | TX_ELLIPSIS | TX_SECONDARY, S_LONG2);
+    ui.text(TS_CAPTION | TX_ELLIPSIS | TX_SECONDARY, t(S_LONG2));
     ui.next_size(400, 0);
-    ui.text(TS_BODY | TX_ELLIPSIS, "Kurzer Text");
+    ui.text(TS_BODY | TX_ELLIPSIS, t("Kurzer Text"));
     ui.box_end();
     // a status-bar-like row: the hint takes the rest of the width and is cut when needed
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.icon(IC_BRUSH, 16);
     ui.next_size(-1, 0);
-    ui.text(TS_CAPTION | TX_ELLIPSIS, S_HINT);
+    ui.text(TS_CAPTION | TX_ELLIPSIS, t(S_HINT));
     ui.text(TS_CAPTION, "800 × 600");
     ui.box_end();
     sec_edit::text_boxes(g, ui); // multi-line boxes (edit agent)
@@ -324,59 +324,62 @@ fn gal_texts(g: &mut Gal, ui: &mut Ui) {
 // gal_gridbox: "Raster" -- labels (natural column), fields (fill), buttons (120 DIP);
 // the description spans two columns, "Optionen" two rows, OK sits at the end of its cell
 fn gal_gridbox(g: &mut Gal, ui: &mut Ui) {
-    ui.text(TS_SUBTITLE, "Raster");
+    ui.text(TS_SUBTITLE, t("Raster"));
     ui.next_size(480, 0);
     ui.gridbox_begin(ID_GB, &[0, -1, 120], BOX_CARD | pad(16), 8);
-    ui.text(TS_BODY, "Name");
-    ui.textbox(ID_GB_NAME, Some("Vorname Nachname"), &mut g.gb_name, 64);
-    ui.button(ID_GB_PICK, "Wählen …");
-    ui.text(TS_BODY, "Beschreibung");
+    ui.text(TS_BODY, t("Name"));
+    ui.textbox(ID_GB_NAME, Some(t("Vorname Nachname")), &mut g.gb_name, 64);
+    ui.button(ID_GB_PICK, t("Wählen …"));
+    ui.text(TS_BODY, t("Beschreibung"));
     ui.next_span(2, 1);
-    ui.textbox(ID_GB_DESC, Some("Worum es geht"), &mut g.gb_desc, 256);
+    ui.textbox(ID_GB_DESC, Some(t("Worum es geht")), &mut g.gb_desc, 256);
     ui.next_span(1, 2);
     ui.next_align(AL_START, AL_START);
-    ui.text(TS_BODY, "Optionen");
+    ui.text(TS_BODY, t("Optionen"));
     let [a, b, c] = &mut g.gb_opt;
-    ui.checkbox(ID_GB_SAVE, "Speichern", a);
-    ui.checkbox(ID_GB_SHARE, "Teilen", b);
-    ui.checkbox(ID_GB_KEEP, "Archivieren", c);
+    ui.checkbox(ID_GB_SAVE, t("Speichern"), a);
+    ui.checkbox(ID_GB_SHARE, t("Teilen"), b);
+    ui.checkbox(ID_GB_KEEP, t("Archivieren"), c);
     ui.next_align(AL_END, AL_DEFAULT);
     ui.accent_button(ID_GB_OK, "OK");
     ui.gridbox_end();
 }
 
 fn gal_u2(g: &mut Gal, ui: &mut Ui) {
-    ui.text(TS_SUBTITLE, "Umbruch, Zahlen, Ordner");
+    ui.text(TS_SUBTITLE, t("Umbruch, Zahlen, Ordner"));
     // a 260 DIP card with wrapped texts
     ui.next_size(260, 0);
     ui.box_begin(ID_U2_CARD, BOX_V | BOX_CARD | pad(12), 8);
-    ui.text(TS_BODY | TX_WRAP, S_U2_ASK);
-    ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY | TX_CENTER, S_U2_LONG);
-    ui.text(TS_BODY | TX_WRAP | TX_RIGHT, S_U2_LINES);
+    ui.text(TS_BODY | TX_WRAP, t(S_U2_ASK));
+    ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY | TX_CENTER, t(S_U2_LONG));
+    ui.text(TS_BODY | TX_WRAP | TX_RIGHT, &format!("{}\n{}", t("Erste Zeile"), t("Zweite Zeile, länger als die Karte breit ist")));
     ui.box_end();
     // a row: icon, 200 DIP of wrapped text, a label after it
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.icon(IC_INFO, 16);
     ui.next_size(200, 0);
-    ui.text(TS_BODY | TX_WRAP, S_U2_ROW);
-    ui.text(TS_CAPTION, "danach");
+    ui.text(TS_BODY | TX_WRAP, t(S_U2_ROW));
+    ui.text(TS_CAPTION, t("danach"));
     ui.box_end();
     // two lines at most: the rest is cut with "…"
     ui.next_size(180, 40);
-    ui.text(TS_BODY | TX_WRAP | TX_ELLIPSIS, S_U2_CUT);
+    ui.text(TS_BODY | TX_WRAP | TX_ELLIPSIS, t(S_U2_CUT));
     // number boxes (int and f64) (edit agent)
     sec_edit::u2_numbers(g, ui);
     // open a folder in the file manager
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_icon(IC_FOLDER_OPEN);
-    if ui.button(ID_U2_OPEN, "Ordner öffnen") & EV_ACT != 0 {
+    if ui.button(ID_U2_OPEN, t("Ordner öffnen")) & EV_ACT != 0 {
         let r = ui.open_folder("build");
-        g.u2_open = cap(format!("Ordner build: Ergebnis {}", r), 64);
+        g.u2_open = cap(tf("Ordner build: Ergebnis {}", &[&format!("{}", r)]), 64);
     }
     ui.text(TS_BODY | TX_SECONDARY, &g.u2_open);
     ui.box_end();
     // stretched over the page: the line count follows the window width
-    ui.text(TS_BODY | TX_WRAP, S_U2_PAGE);
+    ui.text(TS_BODY | TX_WRAP, t(S_U2_PAGE));
 }
 
-ui::main!(ui::launch(&DESC, Gal::default(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), Gal::default(), &style::STYLE)
+});

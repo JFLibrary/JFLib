@@ -144,6 +144,8 @@ about the centre), outside or right button = rotate about the pivot (Umschalt: 1
 handle = move the pivot, arrow keys 1 px / Strg 10 px, buttons Horizontal / Vertikal
 spiegeln (#2260 / #2261; Auswahl verschieben: #2360 / #2361), Probenahme
 (#2250: Nächster Nachbar, Bilineare, Bikubisch, Bilinear mit Multisampling = RS_* of rs_affine).
+While Pixel verschieben moves the pixels (a drag inside the frame, 600 ms after an arrow key)
+the marching ants and the frame are hidden; Auswahl verschieben keeps them.
 Fertigstellen / Enter / another tool / another image / any document command (Auswahl
 aufheben, Rückgängig…) commits ONE step; Esc / Strg+Z drop it; a session without a change
 makes no step.  Pixels: the selected pixels are lifted into F (alpha × coverage); unless

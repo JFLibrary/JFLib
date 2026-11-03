@@ -9,7 +9,7 @@ Queues, Lastgeneratoren, eigene Skripte).
 
 **Stand (2026-11-02): Die Phasen 1 bis 6 sind fertig, Phase 7 läuft** (siehe [Fahrplan](#fahrplan)).
 
-- **Topologie-Editor:** 44 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
+- **Topologie-Editor:** 49 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
   per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem oder vorher gewähltem
   Kabeltyp (Kupfer gerade und gekreuzt, Glasfaser Multimode und Singlemode, seriell mit
   gewähltem Ende, Konsole, Funk, WAN, Telefon, Koax, DAC, AOC; Kategorien Cat5e bis Cat8 und OM3
@@ -199,6 +199,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   Bewertung). Tab läuft durch die Karten, Eingabe öffnet; die Leiste einer automatischen Sicherung
   steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
   ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
+- **Akademie** (Startseite › Lernen oder Datei › Akademie …): Kurse aus Dateien mit Lektionen zum Lesen,
+  Laboren im Simulator, Quiz, Tests und Fehlersuche; ihr Fortschritt bleibt erhalten (siehe [Akademie](#akademie)).
 - **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
   Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
@@ -266,6 +268,8 @@ build/win/JFNetworker.exe --gen-topology 500 --traffic 300  # synthetischer Camp
 build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lan_router.jfnet --scenario apps/JFNetworker/tests/scen/lan_router.scn
 build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lab_shards.jfnet --scenario apps/JFNetworker/tests/scen/lab_metrics.scn --series build/lab.csv
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
+build/win/jfn-sim.exe course apps/JFNetworker/academy/beispiel   # ein Kurs: seine Datei, Lektionen, Bilder, Links, Labore
+build/win/JFNetworker.exe --academy-dir apps/JFNetworker/academy # die Kurse aus diesem Ordner statt aus data://academy
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
 build/win/jfn-sim.exe rewind apps/JFNetworker/tests/fixtures/lab_window.jfnet 60   # Keyframes und Zeit zum Zurückspulen
@@ -303,6 +307,14 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `start_page.uis` | die Startseite (`--start-page`; `--recent=` gibt dem Lauf seine zuletzt geöffneten Dateien, ein Pfad allein ist erlaubt, mit `\|` verbundene sind es nicht): erster Fokus und Eingabe, was ohne Projekt abgeschaltet ist, das leere Projekt, eine Vorlage, Speichern fragt nach ihrem Namen, Datei › Startseite mit der Rückfrage, die Zeilen von Zuletzt (öffnen, fehlend und entfernen, nicht lesbar: der Dateidialog), eine Fehlermeldung auf der Seite, Labor und Aufgabe, Tab und Umschalt+Tab durch die Karten, Projektinfo mit Rückgängig, die Einstellung |
 | `start_page_crash.uis`, `start_page_later.uis`, `start_page_recover.uis` | die Wiederherstellung auf der Startseite (in dieser Reihenfolge): eine Sitzung endet mit ungespeicherten Änderungen, die nächste zeigt die Leiste über der Seite mit der Tastatur auf „Wiederherstellen“, „Später“ lässt die Seite stehen und die Kopie liegen, die dritte stellt sie wieder her; danach wieder die Seite ohne Angebot |
 | `start_page_en.uis`, `start_page_shots.uis` | die Seite auf Englisch mit einer geöffneten Vorlage; die Bilder hell und dunkel mit 100 und 150 %, im kleinsten Fenster (auch gescrollt), breit, mit Fokus und Hover, die Vorlage Campus und der Dialog Projektinfo (`build/jfnetworker/start_page_*.png`) |
+| `academy_course.uis` | die Akademie mit dem Beispielkurs (`--academy-dir apps/JFNetworker/academy`, der Fortschritt bleibt im Speicher): die Karte auf der Startseite, Gliederung mit Zuständen und Fortschritt, Lektionen mit Bild, ein Link, Weiter und Vorheriger Schritt, das Labor mit seinen Zielen und der Leiste, hin und zurück ohne neues Laden, Weitergehen ohne Abschluss, Abschließen, die Frage nach ungespeicherten Änderungen, Fortschritt zurücksetzen, Datei › Akademie, die Sprache mitten in einer Lektion, die Tastatur |
+| `academy_files.uis` | Kurse, die nicht in Ordnung sind (`tests/fixtures/academy`): ein Pfad hinaus und eine unbekannte Art, eine Version aus der Zukunft, ein Ordner ohne `course.json`, jeder mit seiner genauen Meldung und ohne Folgen für die anderen; eine Lektion in nur einer Sprache mit dem Hinweis; abgelehnte Links, Bilder außerhalb des Kurses; Quiz, Fehlersuche und Prüfung als „noch nicht verfügbar“ |
+| `academy_quiz.uis` | Quiz und Test im Beispielkurs: Üben mit Erklärungen (falsch, neuer Versuch, teilweise richtig, Text, Zahl, Reihenfolge; das beste Ergebnis in der Gliederung, erledigt, sobald bestanden), ein Test, der auf das Quiz wartet, sein Anfang, ein Versuch mit Zeit, die Frage vor dem Abgeben, das Ergebnis mit Punkten je Frage, ein neuer Versuch, die Zeit, die auf einer anderen Seite abläuft, keine Versuche mehr; Englisch; die Tastatur; Zurücksetzen gibt die Versuche zurück |
+| `academy_fault.uis` | die Fehlersuche im Beispielkurs: das kaputte Netz, was es verbirgt (Probleme, Fehler im Inspektor, Alle Fehler beheben, Aufgabe erstellen, die Fehlerspur der Zeitleiste), die Punkte unterwegs, die Reparatur (ein neues Kabel, das Gateway an der Konsole), die Diagnose per Klick und per Liste, Abgeben, zurück zum Kurs, Neu beginnen |
+| `academy_quiz_shots.uis` | die Bilder von Quiz, Test und Fehlersuche; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/quiz_*.png`, `fault_*.png`) |
+| `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `model.uis`, Gruppe `quiz` | das Quizformat und jede Meldung, was es prüft (keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt, eine fehlende Sprache), die Bewertung jeder Art mit Teilpunkten, Mustern und Toleranz, die Reihenfolge aus dem Seed, Versuche und Zeitgrenze, was in den Fortschritt geht, `requires`; `start_faults` und `lock` samt ihren Standardwerten (ein altes Labor bleibt, wie es war), die Diagnose, die Prüfung, dass etwas nicht gehen darf, Determinismus und Zurückspulen mit Startfehlern; die Fehlersuche des Beispielkurses mit und ohne ihre Lösung |
+| `model.uis`, Gruppe `academy` | das Format (ein guter Kurs und eine gute Kursliste, neuere Version, falsches Format, Pfade, die hinausführen, eine Lektion in einer Sprache, eine unbekannte Art, was eine Lektion verlinkt), der Fortschritt (hin und zurück, kaputte Datei, neue Kursversion), Reihenfolge und Zustände, wo ein Lauf sucht, was die Seite liest und was sie ablehnt; jeder Kurs unter `--academy-dir` (darum nennt `model.uis` den Ordner): seine Dateien in beiden Sprachen, seine Labore mit dem, was `jfn-sim check` findet, ungelöst und gelöst, die Namensregel |
 | `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
 | `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
@@ -441,7 +453,20 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `dot1x_shots.uis` | die Bilder von X1g (die gelbe LED des geschlossenen Ports, das 802.1X-Feld, E-Mail mit IMAP-Konto) hell und dunkel mit 100 und 150 % (`build/jfnetworker/x1g_*.png`) |
 | `scen_dot1x_imap.uis` | das Golden-Szenario 802.1X, WPA-Enterprise und IMAP Byte für Byte |
 | `model.uis`, Gruppe `models` | die Modelle von Welle 17 bei der Arbeit: die Ports, die Bauform und das sysObjectID-Blatt jedes Modells, die alten Vorgabe-Modelle jeder Art, ein Ping durch jeden neuen Switch mit der Geschwindigkeit beider Ports in der Laufzeit, Routing über JF-S48Y und JF-S32C mit gerouteten Ports und VLAN-Interface, die serielle Leitung von JF-R2, ACLs und NAT auf JF-FW2 und JF-FW8, dass die Firewalls ohne Liste alles durchlassen wie ein Router, JF-S8 leitet weiter und hat keine Befehlszeile, der Repeater wiederholt alles und trägt zweimal 90 m (ein Kabel von 180 m bleibt aus), die Bridge lernt und behält Rahmen auf ihrer Seite, ein Laptop an JF-AP7 auf 6 GHz, Dateien, Portvorschläge und die Datei mit allen neuen Modellen |
+| `model.uis`, Gruppe `hardware` | CPU und RAM gegen die Formeln: die Warteschlange allein gegen Erlang C (M/M/c, auf 6 %) und M/D/1 (auf 2 %), Sättigung X = Kerne · Tempo / Kosten auf 1 % über eine Lastreihe, M/D/1 über HTTP, der Gipfel des USL, die Sperre, zwei Dienste auf einem und auf zwei Hosts, lange Aufgaben in Stücken, langsame CPU und Speicherfresser, mehr RAM gegen Plattenlast, OOM-Kill mit 137 und Neustart durch die Einheit, Resize mit Ausfall und im Betrieb, jeder Dienst, Skripte, Konsole, Determinismus (zwei Läufe, Klon, Wiederholung aus Keyframes), die Schritte im Szenario, die Rückgängig-Schritte |
+| `scen_hw_basic.uis` | das Golden-Szenario Hardware Byte für Byte (`fixtures/hw_basic.jfnet`): Sättigung, Resize mit Ausfall und im Betrieb, langsame CPU, Speicherfresser, OOM, `top`, `free`, `lscpu` |
+| `hardware_panel.uis` | „Hardware simulieren“ mit seinem Rückgängig-Schritt, die Hardware-Karte eines Hosts (Annahmen, Eigene Angaben, Ablehnung, Resize mit Marke, im Betrieb), die neuen Fehler, die Zeile im Metriken-Panel |
+| `hardware_shots.uis` | die Bilder dazu hell und dunkel, 100 und 150 % |
+| `model.uis`, Gruppe `sweep` | Experimente: die Datei und jede Meldung einer falschen Achse; was jede Achse am Projekt ändert; ein Klon gegen einen frischen Start auf jeder Stufe; CSV, Tabelle und Details bei 1, 3 und 8 Threads und zwischen zwei Läufen gleich; das Knie, Durchsatz, CPU, Sperre, Platte und Kabel gegen die Formeln; der leise Mitschnitt ändert keine Zahl; `Service::reconfigure` jedes Dienstes unter Last ohne Neustart; das Fenster startet nur neu, wenn es muss; die neuen Schritte; die Wiederholung aus Keyframes |
+| `scen_live_changes.uis` | das Golden-Szenario Änderungen unter Last Byte für Byte (`fixtures/live_changes.jfnet`): Rate, Nutzer, Backends, Gewicht, Verfahren, Leeren, Einstellungen eines Webservers, KV, Cache |
+| `sweep_small.uis` | ein kurzer Sweep ohne Fenster durch das GUI-Programm: seine Tabelle Byte für Byte (`experiments/sweep_small.jfnex`, `.report`) auf zwei Threads |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
+| `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
+| `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
+| `firewall_en.uis`, `firewall_shots.uis` | der Reiter auf Englisch; die Bilder hell, dunkel, schmal, 100 und 150 % (`build/f1/shots/fw_*.png`) |
+| `model.uis`, Gruppe `firewall` | Zonen und Sitzungen (siehe [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)): jede Vorgabe der Zonenregeln, `inspect` mit Rückweg und ein unverlangtes Paket, jeder TCP-Zustand mit Timeout, UDP und ICMP, die Grenze halboffener Sitzungen, NAT und Listen zusammen mit Zonen in beiden Richtungen, die Zone `self`, `drop` und `reject`, IPv6, Hin und Zurück durch laufende und Startkonfiguration, Ausschalten, zwei gleiche Läufe, ein Klon mitten im Lauf, ein Replay aus Keyframes, die Vorhersage von `Firewall::probe` gegen echte Pakete, was die Formulare tippen, die Show-Befehle, die Probleme, ein Gerät ohne Zonen, `ufw` auf einem Host |
+| `scen_firewall_zones.uis` | Golden-Szenario `firewall_zones.scn`: drei Zonen um FW mit PAT und einer Portweiterleitung, Sitzungen, `debug policy-firewall`, das Log, die Tabellen und das Ablaufen der Sitzungen |
+| `firewall_zones.uis`, `firewall_zones_shots.uis` | die Teile Zonen und Sitzungen im Fenster: das Bild, Zone, Klasse, Richtlinie und Paar aus den Formularen, Ablehnungen, Rückgängig, die Sitzungen eines Pings, der Test-Teil; die Bilder hell, dunkel, schmal, 100 und 150 % (`build/f2/shots/fwz_*.png`) |
 
 Fixtures in `tests/fixtures/`: `units.jfnet` (DEV1 mit dem Webdienst als Dateien und seinen Einheiten, die
 Gruppe Webserver), `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -455,7 +480,9 @@ TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `fil
 `phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
 `phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
-und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`) und die Netze
+und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`), `hw_basic.jfnet` (ein Lastgenerator, zwei Webserver,
+Hardware simuliert; `hw_basic.scn` und die `hardware_*.uis`), `live_changes.jfnet` (Lastgenerator, Load Balancer, Webserver, Cache, KV; `live_changes.scn`), in
+`tests/experiments` das Projekt und die Experimente der Studie (`scale_up_vs_out.jfnet`, `.jfnex`, `sweep_small.jfnex`) und die Netze
 der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
@@ -526,7 +553,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | | [`crates/jfn_sim/series.rs`](crates/jfn_sim/series.rs) | Zeitreihen auf virtueller Zeit: jede Zahl jedes Dienstes und der Verkehr der Kabel jede Sekunde, KPIs, Shard-Last, Fehler als Markierungen, Werte über Zeiträume für Szenarien, CSV (siehe [Metriken und Zeitreihen](#metriken-und-zeitreihen)) |
 | Runner | [`crates/jfn_run`](crates/jfn_run/lib.rs), [`sim/main.rs`](sim/main.rs) | `jfn-sim` und `--scenario` der GUI-Exe: Dateien lesen, Bericht, pcapng, Zeitreihen als CSV, Vergleich mit Golden-Dateien |
 | App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen, Einstellungen ([`prefs.rs`](src/app/prefs.rs): Schema über `base::settings`), Sprachen ([`tr.rs`](src/app/tr.rs): Katalog, übersetzte Befehle und Menüs) |
-| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop), die Dialoge der Einstellungen und der Tastenkürzel ([`settings.rs`](src/workspace/settings.rs)) |
+| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Firewall, Dienste, CLI, Desktop), die Dialoge der Einstellungen und der Tastenkürzel ([`settings.rs`](src/workspace/settings.rs)) |
 | | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)), Sicherungen und ihre Wiederherstellung ([`autosave.rs`](src/doc/autosave.rs)) |
 | | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
 | | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/uitest.rs`](src/uitest.rs), [`src/campustest.rs`](src/campustest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, des Labors, dem, worauf die Konsolen bauen, der Oberfläche ohne Fenster (Kontrast, Einstellungen, Sicherungen, Katalog), des Campus und der synthetischen Projekte (`--selftest`) |
@@ -560,7 +587,12 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 | 802.1X und WPA-Enterprise | [`crates/jfn_sim/dot1x.rs`](crates/jfn_sim/dot1x.rs), [`supp.rs`](crates/jfn_sim/supp.rs), [`dot1xtrace.rs`](crates/jfn_sim/dot1xtrace.rs), [`cli/dot1x.rs`](crates/jfn_sim/cli/dot1x.rs), [`lib/eapm`](../../lib/eapm/lib.rs), [`lib/netpkt/eap.rs`](../../lib/netpkt/eap.rs), [`lib/crypto/eappwd.rs`](../../lib/crypto/eappwd.rs) |
 | IMAP | [`crates/jfn_sim/imapd.rs`](crates/jfn_sim/imapd.rs), [`mailbox.rs`](crates/jfn_sim/mailbox.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs), [`lib/netpkt/imap.rs`](../../lib/netpkt/imap.rs) |
+| Zonen und Sitzungen | [`crates/jfn_sim/fw.rs`](crates/jfn_sim/fw.rs), [`fwtrace.rs`](crates/jfn_sim/fwtrace.rs), [`cli/fw.rs`](crates/jfn_sim/cli/fw.rs), [`cli/ufw.rs`](crates/jfn_sim/cli/ufw.rs), [`src/workspace/devwin/fwzones.rs`](src/workspace/devwin/fwzones.rs), [`src/firewalltest.rs`](src/firewalltest.rs) |
+| Firewall-Reiter | [`src/workspace/devwin/firewall.rs`](src/workspace/devwin/firewall.rs), [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs) (`Acls::probe`), [`src/doc/console.rs`](src/doc/console.rs) (`run_lines_running`), [`src/fwguitest.rs`](src/fwguitest.rs) | Regeln, NAT und Test im Gerätefenster als Formulare über den Befehlen, sein Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
+| Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_model/quiz.rs`](crates/jfn_model/quiz.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`, `quiz.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs), [`src/quiztest.rs`](src/quiztest.rs) | Quiz und Tests als Dateien, ihre Bewertung und ihre Seite; Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
+| Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
+| Experimente | [`crates/jfn_model/experiment.rs`](crates/jfn_model/experiment.rs), [`crates/jfn_sim/experiment.rs`](crates/jfn_sim/experiment.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`run_sweep`), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs) (`Prices`), [`src/sweeptest.rs`](src/sweeptest.rs) |
 
 ### Gerätekatalog
 
@@ -600,9 +632,12 @@ Message Queue, Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interfa
 
 Die Modelle haben feste Ports; Steckplätze und Module kommen später. Was neu dazukam, verhält sich so:
 
-- **Die Firewalls sind heute Router mit Access-Listen und NAT.** Ohne Liste lassen sie alles durch,
-  auch was von außen beginnt; ihre Titel sagen das. Zonen und zustandsbehaftetes Filtern kommen mit
-  Meilenstein F2.
+- **Die Firewalls sind Router mit Access-Listen und NAT, dazu Zonen mit Sitzungen.** Solange keine
+  Schnittstelle in einer Zone ist, verhalten sie sich wie Router: Ohne Liste lassen sie alles durch,
+  auch was von außen beginnt. Mit Zonen wird zwischen zwei Zonen verworfen, was keine Richtlinie
+  erlaubt, und die Antworten auf das, was „inspect“ durchließ, kommen zurück (siehe
+  [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)). Listen, NAT und Zonen lassen sich im
+  Reiter Firewall des Gerätefensters pflegen. Keine Anwendungserkennung, kein IPS.
 - **PoE ist bisher nur eine Angabe am Port** (PoE+, PoE++, PoE-gespeist): Es gibt kein Leistungsbudget.
 - **Der Repeater** wiederholt jeden Rahmen an den anderen Port und verlängert so eine Kupferstrecke.
   Die Grenze gilt je Kabel: zweimal 90 m gehen, zweimal 120 m nicht.
@@ -745,7 +780,10 @@ Muster; der Simulator sieht sie nicht, den Zustand zeigen weiter die LEDs.
   DHCP, Standardroute und statische Routen; sie tippen die passenden Befehle in die Konsole –
   `interface …`, `ip address …`, `ip route …` bzw. `ip addr add …`, `ip route add default via
   …` – und werden ein Rückgängig-Schritt in der Startkonfiguration; „Laufende Konfiguration
-  sichern“), Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
+  sichern“), Firewall (bei IOS-artigen Geräten, die routen: Zugriffslisten, was welche Schnittstelle
+  schützt, NAT, welche Regel ein Paket trifft; siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten);
+  auf Firewalls auch Zonen und Sitzungen, siehe [Firewall: Zonen und Sitzungen](#firewall-zonen-und-sitzungen)),
+  Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
   Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
@@ -1781,7 +1819,15 @@ Konfiguration sieht das Skript als `config` (`config.port`):
   Anweisungen je Rückruf (`fuel`) sind hart; eine Ausnahme, die niemand fängt, oder eine Grenze
   nennt Zeile und Spalte in der Statuszeile, in `script errors`, im Log des Geräts und in der
   Ereignisliste. Ein Fehler im Hauptprogramm beendet den Dienst, mit `"stop_on_error": true`
-  jeder; sonst läuft das Skript weiter, und ein HTTP-Handler, der scheitert, antwortet 500.
+  jeder; sonst läuft das Skript weiter, und ein HTTP-Handler, der scheitert oder gar nicht erst
+  starten kann (kein Platz mehr für die Anfrage), antwortet 500. Die Speichergrenze trifft nur,
+  was das Skript wirklich hält: Die Speicherbereinigung räumt auch weg, was der Dienst selbst
+  für Rückrufe anlegt (`req`, Daten, Antworten). `heap_kb` pendelt deshalb unter Dauerlast
+  zwischen dem Gehaltenen und mindestens 256 KiB, ohne zu wachsen. Ist der Speicher wirklich
+  voll, bekommen Rückrufe von `http.request`, `dns.resolve` und `disk` den Text
+  „Speichergrenze erreicht“ als `err`, damit ein wartendes `res` noch antworten kann. Eine neue
+  Verbindung wird geschlossen, eine mit Daten, die nicht mehr passen, abgebrochen; `close` kommt
+  auch dann, notfalls mit `nil` statt des Grundes.
   Stoppen und Strom aus beenden das Programm samt Speicher; was es auf die Disk legte, bleibt.
 - **Determinismus:** keine Uhr außer der virtuellen, Zufall aus einem eigenen Strom je Dienst
   (vom Gerät und Seed abgeleitet), Gleitkomma in Software: gleiche Projekte ergeben auf jedem
@@ -1848,7 +1894,8 @@ Test da war. `Engine::jfs_tests(dev)` hält den letzten Lauf eines Geräts (die 
 Zeilen, die Ergebnisse, ob er fertig ist) für die IDE.
 Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
 Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
-Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
+Endlosschleife, Grenzen, Dauerlast über mehr als 20 000 Anfragen ohne wachsenden Heap und ohne
+offene Anfrage, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
 Zahlen und Fehler behält, Umbenennen im Lauf) und im Golden-Szenario oben.
 
 **Module aus den Dateien des Geräts** (SK7): `let util = import("/home/user/lib/util.jfs")`
@@ -2424,13 +2471,51 @@ ein L2-Switch an seinem VLAN-Interface.
   die erlauben oder verwerfen, neue, übersetzte und abgelaufene Übersetzungen, Pakete ohne
   Übersetzung oder Regel, ein erschöpfter Pool, wartende und verworfene Fragmente.
 - **Für Programme:** `Action::Acl`, `AccessGroup`, `AclCounters` und `Nat` (auch die Befehle
-  gehen über sie), `Engine::access_lists`, `access_groups`, `nat` und `nat_translations`.
+  gehen über sie), `Engine::access_lists`, `access_groups`, `nat` und `nat_translations`;
+  `Acls::probe` fragt eine Schnittstelle, was ihre Liste zu einem Paket sagt, ohne etwas zu zählen.
+
+**Im Fenster: der Reiter Firewall** ([`devwin/firewall.rs`](src/workspace/devwin/firewall.rs)). Das
+Gerätefenster von Firewalls, Routern und L3-Switches pflegt Listen und NAT in Formularen. Sie sind
+eine Oberfläche über den Befehlen: Jeder Schritt läuft sichtbar in der Konsole, wird zusammen mit der
+laufenden Konfiguration zur Startkonfiguration und ist ein Rückgängig-Schritt; was der Reiter zeigt,
+liest er aus der Engine, eine in der Konsole getippte Regel steht also sofort da. Das Verhalten der
+Engine ändert er nicht.
+
+- **Regeln:** oben, was welche Schnittstelle schützt (eine Liste je Richtung, ein Punkt sagt, ob sie
+  wirkt), darunter eine Liste mit Position, Aktion, Protokoll, Quelle, Ziel, Port, Log, Treffern und
+  Bemerkung und dem impliziten deny als letzter Zeile. Der Text über dem Raster sagt, was die Liste
+  gerade bedeutet: ungebunden oder ohne Regeln passiert alles. Neu, Bearbeiten, Duplizieren, nach oben,
+  nach unten, Löschen, Listen anlegen und löschen, Zähler löschen. Das Formular kennt die Protokolle
+  mit Namen, Adressen als `any`, `10.0.0.5`, `10.0.0.0/24` oder mit Wildcard-Bits, Port-Operatoren,
+  `established`, ICMP-Nachrichten, `log` und eine Bemerkung; eine Regel, die es nicht fassen kann (eine
+  Protokollnummer, ICMP-Typ und -Code ohne Namen), steht als ihre Zeile im Raster und lässt sich als
+  Zeile bearbeiten, die eine Konsole zur Probe liest.
+- **Verschieben** tippt, was auch die Befehlszeile täte: `no 30`, `15 permit …` (davor `ip access-list
+  resequence`, wenn die Nummern nicht 10, 20, … sind). Nur die verschobene Regel beginnt wieder bei 0
+  Treffern, die anderen behalten ihre. Eine Regel geht mit den Bemerkungen direkt über ihr. Weil eine
+  Bemerkung nur am Ende einer Liste hinzukommt, muss für eine Bemerkung mitten in der Liste (und wenn
+  beim Tausch beide Regeln Bemerkungen haben) neu getippt werden, was folgt: Dann beginnen auch diese
+  Regeln bei 0. Beim Löschen einer Regel gehen die Bemerkungen über ihr mit.
+- **NAT:** die Seite jeder Schnittstelle, Pools, dynamische Regeln mit PAT, statische Übersetzungen und
+  Port-Weiterleitungen, darunter die laufenden Übersetzungen mit einer Schaltfläche zum Löschen.
+- **Test:** Schnittstelle, Richtung, Quelle, Ziel, Protokoll, Port geben die Liste, die Regel, die
+  trifft, und das Ergebnis, auch das implizite deny, ohne ein Paket zu senden. Die Antwort kommt aus
+  `Acls::probe`, derselben Funktion, nach der die Engine filtert; ausgehende Listen sehen das Paket
+  nach NAT, dort zählt also die übersetzte Quelle.
+- **Befehle:** unter allen Teilen die Zeilen, die der letzte Schritt getippt hat.
+
+Unmögliches lehnt der Reiter mit dem Grund ab: ein Gerät, das nicht routet (mit einer Schaltfläche, die
+Routing einschaltet), eine Adresse, die keine ist, eine Netzmaske statt Wildcard-Bits, eine Regel, die es
+schon gibt, eine Liste, die noch filtert oder aus der NAT auswählt, ein Pool, den eine Regel liest. Während
+die Ansicht in der Vergangenheit steht, und auf einem Gerät ohne Strom, lässt sich nur lesen. Rückgängig
+startet das Gerät mit der alten Konfiguration neu, also beginnen danach alle Zähler und Übersetzungen
+bei 0. Was in der Konsole getippt und noch nicht gesichert war, sichert der nächste Schritt des Reiters
+mit: Sonst könnte er diese Regeln nicht verschieben oder löschen.
 
 Noch offen: Hairpinning (ein innerer Host erreicht einen anderen über dessen globale Adresse;
 RFC 4787 verlangt es, das klassische Vorbild kann es nicht), `ip nat outside source`,
-Route-Maps, Helfer für Protokolle mit Adressen im Inhalt (FTP …), Zonen und
-zustandsbehaftete Prüfung der Firewall, NAT und Filter auf Linux-Geräten (iptables, der
-Heimrouter).
+Route-Maps, Helfer für Protokolle mit Adressen im Inhalt (FTP …), NAT und Filter auf Linux-Geräten
+(iptables, der Heimrouter).
 
 Geprüft wird das in der Selbsttest-Gruppe `nat` ([`src/nattest.rs`](src/nattest.rs)) und im
 Golden-Szenario `nat_pat.scn` auf `fixtures/nat_pat.jfnet`: ein Büro hinter R1 mit PAT auf
@@ -2439,6 +2524,109 @@ Port-Weiterleitung von 203.0.113.1:80 auf den Webserver im Büro und eine Zugrif
 nicht ins Web lässt; Pings, `curl` von innen (SRV sieht 203.0.113.1) und von außen (WEB sieht
 EXT), `traceroute` durch PAT, `debug ip nat`, die Tabellen und nach fünf Minuten die
 abgelaufenen Übersetzungen.
+
+### Firewall: Zonen und Sitzungen
+
+Die Firewall-Modelle (JF-FW, JF-FW2, JF-FW8) filtern zusätzlich nach Zonen und verfolgen Verbindungen
+([`crates/jfn_sim/fw.rs`](crates/jfn_sim/fw.rs), Befehle in [`cli/fw.rs`](crates/jfn_sim/cli/fw.rs)). Router
+und L3-Switches kennen die Befehle nicht. Solange keine Schnittstelle in einer Zone ist, läuft nichts
+davon: kein Ereignis, keine Notiz, keine Zeile in der Konfiguration, das Gerät bleibt der Router mit
+Listen und NAT.
+
+**Die Regeln.** Jede Schnittstelle gehört zu höchstens einer Zone.
+
+| Wege | Was geschieht |
+|---|---|
+| innerhalb einer Zone | passiert |
+| zwischen zwei Zonen | verworfen, außer ein Zonenpaar für diese Richtung hat eine Richtlinie, die es durchlässt |
+| zwischen einer Zone und einer Schnittstelle ohne Zone | verworfen |
+| zwischen zwei Schnittstellen ohne Zone | passiert, das geht die Firewall nichts an |
+| zum Gerät und vom Gerät (Zone `self`) | passiert, außer ein Zonenpaar nennt `self` und hat eine Richtlinie: dann entscheidet sie |
+
+In einer Richtlinie entscheidet die erste passende Klasse; was keine trifft, landet in `class-default`, und
+die verwirft. Eine Klasse ohne Aktion verwirft ebenfalls.
+
+**Die Aktionen.** `inspect` beginnt eine Sitzung: Der Rest der Verbindung passiert in beiden Richtungen,
+ohne eine Richtlinie zu fragen. `pass` lässt das eine Paket durch und merkt sich nichts; eine Antwort braucht
+dann eine eigene Regel. `drop` verwirft still, `reject` verwirft und sagt es dem Absender (ICMP
+„administratively prohibited“, ICMPv6 ebenso, unter der Grenze des Geräts für Unreachables). Jede mit `log`:
+Das schreibt eine Zeile in die Konsole und ins Log des Geräts, das sie an seine Syslog-Hosts weitergibt;
+`inspect` bei Beginn und Ende einer Sitzung, die anderen höchstens alle fünf Minuten mit der Zahl der Pakete.
+
+**Die Reihenfolge** eines Pakets durch Listen, NAT und Zonen:
+
+| Schritt | Was es sieht |
+|---|---|
+| 1. eingehende Zugriffsliste | das Paket, wie es ankommt |
+| 2. NAT von außen: das Ziel wird die innere Adresse | |
+| 3. für das Gerät selbst: Zonen (Zone → `self`). Sonst: Routing, dann Zonen und Sitzungen (Zone des Wegs hinein → Zone des Wegs hinaus) | die innere Adresse in beiden Richtungen, die Quelle noch unübersetzt |
+| 4. NAT von innen: die Quelle wird die globale Adresse | |
+| 5. ausgehende Zugriffsliste | die übersetzte Quelle |
+
+Eine Klasse trifft also immer die wahre Adresse eines Hosts, und eine Sitzung liest sich hin und zurück gleich.
+Eine Portweiterleitung, die keine Richtlinie erlaubt, wird übersetzt und dann verworfen. Was das Gerät selbst
+sendet, geht von `self` in die Zone des Wegs hinaus und trifft keine ausgehende Liste.
+
+**Sitzungen.** TCP folgt SYN, SYN+ACK, ACK, einem FIN, FIN von beiden Enden; ein RST beendet die Sitzung sofort.
+Nur ein SYN ohne ACK beginnt eine; jedes andere Segment ohne Sitzung verwirft `inspect`. Sequenznummern prüft
+sie nicht. ICMP-Anfragen beginnen eine Sitzung, ihre Antworten brauchen sie. Ein ICMP-Fehler über ein Paket einer
+Sitzung passiert (traceroute geht also) und frischt nichts auf. Ein späteres Fragment hat keine Ports: Es
+passiert, wenn seine beiden Adressen eine Sitzung seines Protokolls haben, sonst sieht eine Richtlinie es ohne Ports.
+Halboffene TCP-Sitzungen sind begrenzt, ein SYN darüber wird verworfen.
+
+| Einstellung | Vorgabe | gilt für |
+|---|---|---|
+| `ip inspect tcp synwait-time` | 30 s | bevor der Handschlag fertig ist |
+| `ip inspect tcp idle-time` | 3600 s | eine bestehende Verbindung ohne Verkehr |
+| `ip inspect tcp finwait-time` | 30 s | nach einem FIN |
+| `ip inspect udp idle-time` | 30 s | UDP und andere Protokolle |
+| `ip inspect dns-timeout` | 5 s | UDP an Port 53 |
+| `ip inspect icmp idle-time` | 10 s | ICMP |
+| `ip inspect max-incomplete high` | 1000 | halboffene TCP-Sitzungen |
+
+Sitzungen haben keinen Timer: Sie liegen in einer `BTreeMap`, und was abgelaufen ist, geht, wenn das nächste
+Paket die Firewall erreicht; die Anzeigen lassen es schon vorher weg. Einschalten, ein Neustart und
+`clear zone-pair inspect sessions` vergessen sie. Geht ein Zonenpaar oder seine Richtlinie, gehen seine Sitzungen mit.
+
+**Befehle.** `zone security NAME`, `zone-pair security NAME source A destination B` (A und B auch `self`),
+`service-policy type inspect NAME` darin, `class-map type inspect [match-any|match-all] NAME` mit `match protocol`
+und `match access-group`, `policy-map type inspect NAME` mit `class type inspect NAME` und `class class-default` und
+darin `inspect`, `pass`, `drop`, `reject`, je mit `log`; an der Schnittstelle `zone-member security NAME`. Zum
+Ansehen `show zone security`, `show zone-pair security` (mit den Zählern der Firewall), `show policy-map type
+inspect zone-pair [NAME]`, `show policy-map type inspect zone-pair [NAME] sessions`; `clear zone-pair inspect sessions
+[NAME]`, `clear zone-pair counter`, `debug policy-firewall`. Alles steht in der laufenden Konfiguration und
+startet durch denselben Parser aus der Startkonfiguration. Die Hilfetexte und die Tabellen sind eigene Worte.
+
+**Im Fenster.** Auf Firewall-Modellen hat der Reiter Firewall zwei Teile mehr
+([`devwin/fwzones.rs`](src/workspace/devwin/fwzones.rs)). „Zonen“ zeigt als Bild, wer mit wem sprechen darf, und
+pflegt Zonen, Schnittstellen, Klassen, Richtlinien und Zonenpaare in Formularen. „Sitzungen“ ist ein Raster der
+laufenden Sitzungen mit einem Knopf zum Löschen. Der Teil „Test“ sagt hinter der Liste auch, was Zonen und
+Sitzungen zu dem Paket sagen, etwa „Bestehende Verbindung“ oder „Keine Regel zwischen den Zonen“: Das ist dieselbe
+Funktion (`Firewall::probe`), nach der die Engine handelt. Wie überall im Reiter tippen die Formulare
+Befehlszeilen als einen Rückgängig-Schritt, und in der Vergangenheit zeigt alles, ändert aber nichts.
+
+**Probleme.** Der Reiter Probleme nennt eine Schnittstelle mit Adresse und ohne Zone auf einer Firewall mit Zonen,
+eine Zone ohne Zonenpaar mit Richtlinie, ein Zonenpaar ohne Richtlinie und eine Richtlinie, die niemand benutzt.
+Entscheidungen erscheinen als Ereignisse und im Simulationsmodus.
+
+**IPv6.** Zonen und Sitzungen gelten auch für IPv6. Neighbor Discovery und MLD sehen sie nicht, so wenig wie ARP.
+`match access-group` trifft nur IPv4, und `ipv6 access-list` gibt es nicht; eine Klasse für IPv6 nennt also Protokolle.
+
+**Auf Linux-Geräten.** `ufw` ist eine kleine Firewall für den Host selbst
+([`cli/ufw.rs`](crates/jfn_sim/cli/ufw.rs)): `ufw enable`, `disable`, `reset`, `status`, `default allow|deny|reject
+[incoming|outgoing]`, `allow|deny|reject [out] PORT[/tcp|/udp]`, `allow from NETZ [to any port PORT]`, `delete …`.
+Eingehend gilt ohne Regel `deny`, ausgehend `allow`. Was erlaubt ist, beginnt eine Sitzung aus derselben Tabelle wie
+oben, und die Antworten kommen zurück. Ping, ICMP-Fehler und die Antworten an einen DHCP-Client passieren immer; was
+der Host weiterleitet, sieht sie nicht an. Die Zeilen stehen in der Konfiguration des Geräts, die Regeln gelten für
+IPv4 und IPv6, `from` nur für IPv4. Kein Log, keine Anwendungsprofile.
+
+**Was sie nicht kann.** Die Firewall schaut nicht in die Daten: `match protocol http` heißt TCP-Port 80, nichts
+weiter. Keine Anwendungserkennung, kein IPS, keine Benutzer oder URLs, keine Hilfe für FTPs Datenverbindung,
+keine Prüfung von Sequenznummern, keine Objektgruppen.
+
+Geprüft wird das in der Selbsttest-Gruppe `firewall` ([`src/firewalltest.rs`](src/firewalltest.rs)), im
+Golden-Szenario `firewall_zones.scn` auf `fixtures/firewall_zones.jfnet` (INNEN, DMZ, AUSSEN mit PAT und einer
+Portweiterleitung) und in den Fensterskripten `firewall_zones.uis` und `firewall_zones_shots.uis`.
 
 ### IPv6
 
@@ -4111,6 +4299,452 @@ wird in der Selbsttest-Gruppe `dot1x` ([`src/dot1xtest.rs`](src/dot1xtest.rs)), 
 `eap` (Codecs und die Vektoren einer unabhängigen Python-Referenz von EAP-PWD), mit
 `scen_dot1x_imap.uis` und den Fensterskripten `dot1x_panel.uis` und `dot1x_shots.uis`.
 
+### Hardware: CPU und RAM der Geräte
+
+Netz, TCP, HTTP und Warteschlangen sind echt; ohne Hardware kostet Rechenzeit aber nichts, und ein
+Host mit zehn Diensten hat zehnmal so viel Kapazität. Mit Hardware lässt sich fragen, wann ein größerer
+Rechner mehrere kleine schlägt. Das ist das Fundament des Software-Architektur-Labors.
+
+**Ein Projekt ohne Hardware läuft Byte für Byte wie zuvor:** kein neues Ereignis, keine Zufallszahl, keine
+Reihe, und `"hw"` und `"metered"` stehen nicht in der Datei, solange sie nicht gesetzt sind. Alle Golden-Berichte
+prüfen das.
+
+Einschalten: **Hardware simulieren** auf der Projektseite des Inspektors (`Project::metered`, ein
+Rückgängig-Schritt, ohne Neustart) gibt jedem Host die Werte seines Modells (`catalog::hw_of`, eine Tabelle neben
+den Modellen). Ein Gerät kann eigene haben (`Device::hw`, auch ohne den Schalter). Lastgeneratoren, Netzgeräte und
+Smartphones bleiben ohne.
+
+| Modell | Kerne | Tempo | RAM | Swap | Disk |
+|---|---|---|---|---|---|
+| Rack-Server S | 4 | 110 % | 16 GiB | 2 GiB | SATA-SSD 480 GiB |
+| Rack-Server M | 8 | 100 % | 32 GiB | 4 GiB | NVMe-SSD 960 GiB |
+| Rack-Server L | 16 | 95 % | 64 GiB | 8 GiB | NVMe-SSD 1920 GiB |
+| Rack-Server XL | 32 | 90 % | 256 GiB | 16 GiB | schnelle NVMe-SSD 3840 GiB |
+| NAS | 2 | 70 % | 8 GiB | 2 GiB | Festplatte 8000 GiB |
+| Rack-Server 1U, 1U SFP28 | 8 | 100 % | 32 GiB | 4 GiB | SATA-SSD 960 GiB |
+| Tower-Server, PC | 4 | 100 % | 16 GiB | 2 GiB | SATA-SSD |
+| Laptop | 4 | 80 % | 16 GiB | 2 GiB | NVMe-SSD 480 GiB |
+| Load Balancer | 8 | 100 % | 16 GiB | 0 | SATA-SSD 240 GiB |
+| DB-Shard | 16 | 100 % | 64 GiB | 8 GiB | NVMe-SSD 1920 GiB |
+| Cache | 4 | 100 % | 64 GiB | 0 | SATA-SSD 240 GiB |
+| Message Queue | 4 | 100 % | 16 GiB | 2 GiB | NVMe-SSD 480 GiB |
+| Container-Host | 16 | 100 % | 64 GiB | 8 GiB | NVMe-SSD 960 GiB |
+
+Die Zahlen sind unsere **Annahmen** in runden Werten, keine Messungen an einem Produkt; Tooltip der Palette und
+Inspektor sagen das. Mehr Kerne kommen mit weniger Takt, damit „größer“ nicht einfach „mehr von allem“ ist.
+
+**Das Modell** ([`res.rs`](crates/jfn_sim/res.rs), gebaut wie [`disk.rs`](crates/jfn_sim/disk.rs)):
+
+- **CPU:** Wer zuerst kommt, mahlt zuerst, über alle Kerne. Eine Aufgabe nimmt den Kern, der als erster frei wird, und ihr
+  Ende steht beim Einreihen fest; das ist genau eine zentrale FIFO-Warteschlange (M/G/c), kostet O(Kerne) und kein
+  Ereignis. Kosten gelten für einen Referenzkern: Tempo 100 % heißt, 1 ms kostet 1 ms und ein Skriptbefehl seine 5 ns.
+  Lange Aufgaben kommen in Stücken von 4 ms, damit ein Scan kurze Anfragen nicht um seine ganze Länge aufhält.
+- **Konkurrenz:** Echte Warteschlangen, wo die Sache modelliert ist (die Sperre `serial_us`, die Disk). Dazu auf Wunsch je
+  Dienst der Faktor des Universal Scalability Law, `"usl": {"sigma": 0.05, "kappa": 0.02}`: die Kosten mal
+  1 + σ(N−1) + κN(N−1), N die mit dieser Aufgabe belegten Kerne. Das gibt fallende Kurven mit dem Gipfel bei √((1−σ)/κ). Es
+  ist die Formel, keine Messung von Sperren und Cache-Zeilen.
+- **Speicher:** Jeder Dienst hält eine Grundmenge, je Verbindung und seine Daten (`"mem_mb"`, `"conn_kb"`, `"data_mb"`; das OS
+  fragt `Service::mem` nach jedem Aufruf). Über den RAM hinaus steigen die Kosten linear bis zum 20-Fachen am Ende des Swaps, und
+  Seiten kommen über die echte Disk herein (je 10 µs Rechenzeit eine berührte Seite, davon der Anteil außerhalb des RAMs; ein Zähler
+  entscheidet, keine Zufallszahl). Über RAM und Swap hinaus endet der größte Dienst mit Status 137, was Restart-Regeln einer Einheit
+  sehen.
+- **Größe ändern:** `Action::Resize { dev, hw, downtime }`, im Fenster und mit `resize` im Szenario. Standard ist ein Neustart mit
+  30 s Ausfall, eine Marke auf der Zeitleiste (`Fault::Resize`); was auf der Disk liegt, bleibt, Kerne und Speicher starten leer. Ohne
+  Ausfall (`downtime: 0`, „Im Betrieb ändern“) nimmt das laufende System die Werte: neue Aufgaben zahlen das neue Tempo, Kerne, die
+  gehen, geben ihre wartende Arbeit weiter.
+- **Laute Nachbarn:** Die Fehler `Fault::SlowCpu` (alle Rechenzeit mal Faktor) und `Fault::MemHog` (etwas anderes hält so viel
+  Speicher) im Inspektor und mit `fault cpu`, `fault mem` im Szenario.
+
+**Was die Dienste zahlen:**
+
+| Dienst | Rechenzeit | Speicher (Grund, je Verbindung) |
+|---|---|---|
+| `http-server` | `cpu_ms` je Route oder Server, zuerst und auf den Kernen (Standard 20 µs); `time_ms` bleibt reine Wartezeit; `serial_us`: eine Sperre, einer zur Zeit, im Tempo der Kerne; `usl` | 32 MiB, 64 KiB, `data_mb` |
+| `lb` | `cpu_us` je HTTP-Anfrage, bevor ein Backend gewählt wird (Standard 50 µs); TCP-Durchleitung kostet nichts | 16 MiB, 64 KiB |
+| `cache` | `hit_us` je Treffer auf den Kernen (ohne Hardware ein reiner Zeitgeber wie bisher) | 16 MiB, 64 KiB, die gehaltenen Antworten |
+| `kv` | `cpu_us` je Anfrage (Standard 30 µs) | 64 MiB, 64 KiB, die gehaltenen Daten |
+| `worker` | `cpu_ms` je Nachricht (Standard 0); `time_ms` bleibt Wartezeit | 16 MiB, 64 KiB |
+| Skripte | jedes Stück (`slice`) nimmt sich seinen Platz in der Warteschlange der Kerne; `ns_per_op` gilt am Referenzkern | 8 MiB, 64 KiB, `data_mb`, der Heap |
+| `http-load`, Protokolldienste | nichts: Lastgeneratoren zahlen nie | keiner |
+
+**Sehen und prüfen:**
+
+- Inspektor eines Hosts: Karte **Hardware** mit CPU, Warteschlange und Speicher von jetzt, Vorlagen aus dem Katalog, Kerne, Tempo, RAM,
+  Swap, Disk und dem Schalter „Im Betrieb ändern“. Darunter im Fehlerkasten „Bremsen“ und „Belegen“.
+- Panel **Metriken**: eine eigene Zeile „Hardware“ unter den Diensten des Geräts, mit Kacheln und Verläufen für CPU, Warteschlange,
+  Speicher und Disk.
+- Konsole: `top` zeigt die echten Kerne, Last und Speicher; `free` und `lscpu` gibt es nur auf Geräten mit Hardware.
+- Szenario: Die Reihen heißen wie ein Dienst `_host`: `expect WEB1 svc _host metric cpu_pm >= 990 over 3s`. Reihen: `cpu_pm`, `running`,
+  `runq`, `mem_bytes`, `swap_bytes`, `pageins`, `oom_kills`, `disk_bytes`; ohne Zeitraum auch `cores`, `speed_pm`, `ram_bytes`,
+  `busy_ms`, `jobs`, `wait_ms`.
+- Schritte: `resize DEV model server-l`, `resize DEV cores 8 speed 1.5 ram 32G [swap 4G] [disk nvme] [disk_gb 960] [down 10s] [live]`,
+  `fault cpu DEV factor 3 [for 5s]`, `fault mem DEV 12G [for 5s]`, `heal cpu DEV`, `heal mem DEV`.
+
+**Was es nicht modelliert** (bewusst, damit niemand die Zahlen für mehr hält, als sie sind):
+
+- Eine Reservierung lässt sich nicht zurücknehmen: Die wartende Arbeit eines beendeten Dienstes hält ihre Kerne, bis sie um wäre (Strom aus
+  beendet sie).
+- Keine CPU je Rahmen: Leitungsrate und Warteschlangen der Kabel sind dort der Engpass.
+- Keine Prozessor-Aufteilung: Die Sättigung ist dieselbe, aber Enden würden sich bei jeder Ankunft verschieben. Innerhalb eines Stücks von
+  4 ms läuft eine Aufgabe durch, und ein Stück eines Skripts überholt die schon zugesagten Aufgaben ein wenig (seine Arbeit zählt voll).
+- Keine NUMA-, Cache- oder Hyper-Threading-Effekte außer dem, was `usl` ausdrückt; kein Speicher des Betriebssystems selbst; Caches werden unter Druck
+  nicht freigegeben.
+- Die Queue `mq` rechnet nicht und hält nur ihre Grundmenge; ein `db`-Dienst mit Puffer und Index kommt mit SA4.
+
+Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::MemHog`, `Fault::Resize`, `Engine::res_view(dev)`,
+`Engine::res_of(dev)`, `Service::mem`, `OsApi::cpu`, `cpu_usl`, `cpu_or_timer`, `cpu_slice`, `cpu_slice_usl`, `metered`, `cpu_turn`, `cpu_charge`,
+`cpu_ps`, `res::CpuGate`, `res::SvcMem`, `res::Usl`, `catalog::{Hw, DiskClass, hw_of, hw_presets}`. Geprüft wird in der Selbsttest-Gruppe
+`hardware` ([`src/hardwaretest.rs`](src/hardwaretest.rs)), mit `scen_hw_basic.uis` und den Fensterskripten `hardware_panel.uis` und
+`hardware_shots.uis`. `JFNetworker --selftest --only=hardware --numbers` schreibt jeden Vergleich mit einer Formel mit seinen Zahlen.
+
+**Tempo** (Windows, Entwicklungs-Build, Mitschnitt an, Rechner nicht frei; offene Last, je 10 s virtuelle Zeit, ein Thread):
+
+| Netz | Last | Laufzeit | Ereignisse/s | Anfragen je Wandsekunde | Ereignisse je Anfrage |
+|---|---|---|---|---|---|
+| Generator am Kabel eines Servers, 1 ms Rechenzeit, 32 Kerne | 1000/s | 249 ms | 330 000 | 40 000 | 8 |
+| dasselbe | 5000/s | 1244 ms | 323 000 | 40 000 | 8 |
+| `lab_shards`: Loadbalancer, drei Webserver, drei KV-Knoten | 2000/s | 2528 ms | 397 000 | 7500 | 53 |
+| dasselbe | 10 000/s | 14 012 ms | 351 000 | 6800 | 52 |
+
+Hardware selbst kostet wenig: Gegenüber demselben Lauf ohne Hardware, aber mit 1 ms Wartezeit (`time_ms`), sind es ohne neue Ereignisse rund 3 %. In `lab_shards`
+kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ihrer Rechenzeit halten.
+### Experimente: Parameter-Sweeps
+
+Ein Experiment vergleicht Konfigurationen eines Projekts unter steigender Last: mehr Kerne gegen mehr Server, ein anderer
+Algorithmus, mehr Worker. Es läuft kopflos und mit voller Geschwindigkeit, nie in Echtzeit, und sein Ergebnis ist Byte für Byte gleich,
+egal auf wie vielen Threads und auf welchem Rechner. Eine Oberfläche dafür kommt mit dem nächsten Schritt; heute läuft es so:
+
+```bash
+jfn-sim sweep tests/experiments/scale_up_vs_out.jfnex tests/experiments/scale_up_vs_out.jfnet --threads 4 --csv ergebnis.csv
+```
+
+Das Projekt steht mit auf der Befehlszeile, denn das Programm liest nur Dateien, die dort genannt sind. Ein Projekt kann seine Experimente
+auch selbst tragen (Abschnitt `experiments`, ohne dass sich an Dateien ohne Experimente etwas ändert), dann reicht
+`jfn-sim sweep PROJEKT [--name N]`. `--detail F` schreibt je Lauf eine Zeile für jeden Host, jedes Kabel und jeden Dienst, `--report F` die Tabelle,
+`--golden F` vergleicht sie mit einer gespeicherten, `--timing` nennt auf stderr, wie lange es gedauert hat. Die GUI-Fassung heißt
+`JFNetworker PROJEKT --sweep DATEI ...` und läuft ohne Fenster.
+
+**Die Datei** (`.jfnex`, JSON):
+
+```json
+{
+  "format": "jfnex", "version": 1,
+  "title": "Ein Server wächst oder mehrere kleine",
+  "project": "scale_up_vs_out.jfnet",
+  "load": {"dev": "GEN", "svc": "load", "rps": [400, 800, 1600, 2400, 3200, 4800, 6400]},
+  "timing": {"warmup_s": 5, "settle_s": 5, "measure_s": 20, "seeds": [11]},
+  "slo": {"p99_ms": 200, "errors_pct": 1},
+  "series": [
+    {"name": "größer", "axes": [
+      {"kind": "backends", "name": "Hosts", "dev": "LB", "svc": "lb", "pool": ["WEB1", "WEB2"], "counts": [1]},
+      {"kind": "hw", "name": "Server", "dev": "WEB1", "values": [{"cores": 2, "speed": 1.1, "ram_gb": 16}, {"preset": "server-xl"}]}
+    ]},
+    {"name": "mehr", "axes": [
+      {"kind": "backends", "name": "Hosts", "dev": "LB", "svc": "lb", "pool": ["WEB1", "WEB2"], "counts": [1, 2]}
+    ]}
+  ]
+}
+```
+
+| Teil | Bedeutung |
+|---|---|
+| `load` | der Lastgenerator (`http-load`) und seine Stufen, streng steigend: `rps` (offene Last) oder `users` (geschlossene Last); `warm`: die Stufe des Warmlaufs (sonst die erste). Was den Lauf beenden würde (`duration_ms`, `requests`, `ramp_ms`), gilt im Experiment nicht |
+| `timing` | in ganzen Sekunden virtueller Zeit: `warmup_s` einmal je Konfiguration und Seed, je Stufe `settle_s` Übergang und `measure_s` Messung (zusammen höchstens 280 s); `seeds` (leer: der Seed des Projekts) |
+| `slo` | Grenzen: `p50_ms`, `p95_ms`, `p99_ms`, `p999_ms`, `errors_pct`; Dezimalzahlen sind erlaubt, ohne Angabe gilt keine Grenze |
+| `axes`, `series` | `axes` hat jede Konfiguration; jede Reihe in `series` ist eine Familie mit eigenen Achsen. Innerhalb einer Reihe wird jede Achse mit jeder kombiniert |
+| Achse `hw` | `dev` oder `group`, `values`: `preset` (ein Modell aus dem Katalog), `cores`, `speed` (Tempo gegen den Referenzkern), `ram_gb`, `swap_gb`, `disk`, `disk_gb`, einzeln auf dem, was das Gerät hat |
+| Achse `config` | `dev` oder `group`, `path`: Art oder Name eines Dienstes und die Einstellung, etwa `http-server.workers`, `lb.algorithm`, `web.routes.0.cpu_ms`, `values` |
+| Achse `backends` | `dev`, `svc` (ein `lb`), `counts`, dazu `pool` (die ersten N Hosts stehen dahinter, die anderen sind aus und kosten nichts) oder `template` (N Kopien eines Geräts mit den nächsten Adressen an den nächsten freien Ports seines Switchs) |
+| `prices`, `cost_exclude` | Euro je Stunde statt der angenommenen Preise, nach Name (`core`, `big`, `huge`, `ram_gb`, `hdd_gb`, `sata_gb`, `nvme_gb`, `nvme_fast_gb`, `host`, `switch`, `router`); Geräte, die nicht mitzählen |
+
+Was nicht passt, sagt `jfn-sim sweep` vor dem ersten Lauf, mit Achse und Grund: „Reihe mehr, Achse 1: Ein Dienst der Art http-server kennt „worker“ nicht
+(es gibt: port, root, workers, ...)“.
+
+**Wie gemessen wird.** Jede Konfiguration wird einmal je Seed gestartet und warmgefahren. Für jede Stufe gibt es dann eine Kopie des warmen
+Zustands: Der Generator bekommt die Stufe, nach dem Übergang läuft die Messung. So beginnt jede Stufe vom selben Punkt, und ihre Reihenfolge hinterlässt keine
+Spur. Die Aufzeichnung der Rahmen ist dabei aus (eine Prüfung im Selbsttest zeigt, dass das keine Zahl ändert).
+
+**Das Ergebnis lesen.** Eine Zeile je Konfiguration und Stufe, Seeds zusammengefasst:
+
+| Spalte | Bedeutung |
+|---|---|
+| `offered_rps`, `achieved_rps` | was die Stufe verlangt, was ohne Fehler beantwortet wurde. Geschlossene Last: was die Nutzer geschickt haben |
+| `p50_us` bis `p999_us`, `mean_us`, `max_us` | Latenz der Antworten am Generator, ab dem Zeitpunkt, an dem die Anfrage fällig war (keine koordinierte Auslassung); die Eimer der Histogramme sind etwa 3,1 % breit. `p99_min_us`, `p99_max_us`: die Streuung über die Seeds |
+| `err_pct`, `timeouts` | Fehlerantworten und Abbrüche. Eine abgelaufene Anfrage hat keine Latenz: p99 immer zusammen mit den Fehlern lesen |
+| `slo_ok`, `knee` | die Stufe hält das SLO; `knee` ist die höchste Stufe, bis zu der alle Stufen es halten |
+| `cpu_max_pct`, `cpu_dev`, `runq_mean`, `cpu_wait_us` | das Gerät mit der vollsten CPU (Mittel seiner Kerne), seine Warteschlange und die mittlere Wartezeit auf einen Kern |
+| `mem_max_mib`, `swap_max_mib`, `pageins`, `oom_kills` | Speicher, bis zur Grenze belegt |
+| `disk_max_pct`, `disk_dev`, `disk_wait_max_us`, `disk_backlog_max_us` | die Platte: wie lange ihr Kanal belegt war, die längste Wartezeit auf ihn, der größte Rückstau an einer vollen Sekunde |
+| `link_max_pct`, `link` | das vollste Kabel in seiner volleren Richtung (Rahmen ohne Präambel und Lücke) |
+| `lock_max_pct`, `lock` | die am längsten gehaltene Sperre eines Webservers (`serial_us`): sie begrenzt, ohne dass die CPU voll ist |
+| `bottleneck` | das meistgenutzte von allem; „-“ unter 50 % |
+| `cost_eur_h_assumed`, `cost_eur_per_1000_assumed` | die Kosten aller eingeschalteten Geräte außer dem Generator, je Stunde und je 1000 beantwortete Anfragen. **Das sind Annahmen:** runde Zahlen von uns (`catalog::Prices`), kein Angebot und kein Marktpreis. Ein Kern kostet bis 16 gleich viel, danach mehr; ein Host kostet eine Grundgebühr, gleich wie groß er ist |
+| `status` | `ok`, `speicher` (die Stufe hielt mehr als 1 GiB und endete vorzeitig), `fehler` |
+
+**Beispiel: größer oder mehr?** `tests/experiments/scale_up_vs_out.jfnex`, ein Server mit 2 bis 32 Kernen gegen 1 bis 8 kleine Hosts hinter demselben `lb`, alle mit derselben
+Datenbank. Jede Anfrage kostet 4 ms Rechenzeit am Referenzkern (USL σ 0,01 und κ 0,0002), eine Sperre von 180 µs im Webserver und eine von 170 µs in der Datenbank. Das ist **die Ausgabe
+des Modells mit seinen Annahmen**, keine Messung an echten Servern:
+
+```text
+Zusammenfassung
+Konfiguration                   €/h    Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+größer 2 Kerne 110 % 16 GiB   1.696   400/s    544.350        0.001157  CPU WEB1
+größer 4 Kerne 110 % 16 GiB   1.762   800/s   1065.500        0.000600  CPU WEB1
+größer 8 Kerne 100 % 32 GiB   1.934  1600/s   1849.950        0.000332  CPU WEB1
+größer 16 Kerne 95 % 64 GiB   2.278  2400/s   3171.950        0.000261  CPU WEB1
+größer 32 Kerne 90 % 128 GiB  3.158  3200/s   4773.300        0.000271  CPU WEB1
+mehr Hosts 1                  1.762   800/s   1065.500        0.000600  CPU WEB1
+mehr Hosts 2                  2.026  1600/s   2130.950        0.000348  CPU WEB1
+mehr Hosts 4                  2.554  3200/s   4261.900        0.000219  CPU WEB1
+mehr Hosts 8                  3.610  4800/s   5882.350        0.000207  Sperre DB db
+```
+
+Was daran ehrlich ist: Der große Server wird je Kern immer schlechter, weil seine Kerne sich gegenseitig bremsen und langsamer takten: 2 Kerne schaffen 544/s, 32 Kerne 4773/s, also 8,8-mal so viel statt 16-mal. Mehr kleine Hosts wachsen zunächst
+fast linear, bis die gemeinsame Datenbank mit ihrer Sperre bei rund 5900/s begrenzt. Die Kosten kreuzen sich: Für 1600/s und 2400/s ist der eine größere Server billiger (eine Grundgebühr statt mehrerer), ab 3200/s der Stapel kleiner Hosts, weil Kerne über 16 mehr kosten; für 4800/s reicht ein einzelner Server im Modell gar nicht mehr.
+
+**Änderungen ohne Neustart.** `Service::reconfigure` nimmt eine neue Konfiguration an, während der Dienst läuft: Zähler, Verbindungen und laufende Arbeit bleiben, was als Nächstes kommt, geht nach
+den neuen Werten. Das können `http-server`, `http-load`, `lb`, `cache` und `worker`. Der JSON-Editor im Fenster versucht es zuerst und startet das Gerät nur noch neu, wenn es nicht geht
+(ein anderer Port, ein anderer Modus der Last, die Backends der Routen; andere Dienste immer). Im Szenario laufen dieselben Änderungen unter Last, und das Zurückspulen spielt sie wieder ein:
+
+```text
+load set GEN load rps 300            die Rate eines laufenden Generators, oder: users 40
+lb add LB lb web3 10.0.0.13 [port 80] [weight 2]
+lb drain|remove|enable LB lb web3    ein Backend leert sich, geht, kommt zurück
+lb weight LB lb web3 3               sein Gewicht
+lb algo LB lb least-conn             das Verfahren
+kv set KV1 kv consistency eventual [w 1] [r 1]
+svc set WEB1 web workers 8 [time_ms 2.5]   Einstellungen nach ihrem Pfad in der Konfiguration
+cache clear CACHE cache
+```
+
+**Was es nicht modelliert:** alles aus dem Abschnitt Hardware (keine CPU je Rahmen, keine NUMA-, Cache- oder Hyper-Thread-Effekte außer `usl`). Dazu: Ein Generator verlangt offene Last, kennt aber keine
+Grenzen des Clients. Ein Server arbeitet Anfragen ab, deren Client längst aufgegeben hat, was unter Überlast die Leistung bis auf 0 drücken kann; das ist echtes Verhalten des Modells, und mit kurzen Timeouts kommt
+es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Ports wegen TIME-WAIT aus, ebenfalls wie im Leben. Die Datenbank im Beispiel ist ein Webserver mit Sperre, kein SQL (das kommt mit SA4). Ein SLO sagt
+etwas über die gewählten Stufen: Das Knie liegt nie zwischen zwei Stufen, und eine Messung von 20 s sieht keine seltenen Ereignisse.
+
+Für Programme: `jfn_model::experiment::{Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level}`, `Experiment::{from_text, problems, configs, levels}`, `jfn_sim::experiment::{Plan, Sweep, Point, ConfigOut, Fig}` mit `Plan::{new, warm, measure, run_level, run_all, collect}` und `Sweep::{table, csv, detail_csv}`,
+`jfn_run::run_sweep(&plan, threads)`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
+
+**Tempo:** Windows, Entwicklungs-Build, 12 logische Kerne, Rechner von anderen Läufen belegt. Die Studie oben (9 Konfigurationen, 7 Stufen, je 25 s, bis 6400/s, rund 2,1 Millionen gemessene Antworten und 98 Millionen gemessene Ereignisse):
+
+| Threads | Laufzeit | CPU-Zeit | höchster Speicher | Antworten je Wandsekunde |
+|---|---|---|---|---|
+| 1 | 553 s | 450 s | 291 MiB | 3900 |
+| 4 | 316 s | 512 s | 598 MiB | 6800 |
+
+CSV und Tabelle beider Läufe sind Byte für Byte gleich. Vier Threads brachten auf dem belegten Rechner das 1,75-Fache, weil ihnen im Schnitt nur 1,6 Kerne blieben; die CPU-Zeit stieg dabei nur um 14 %. Der Speicher wächst nicht mit den Stufen: Es liegen höchstens so viele warme Zustände vor, wie es Threads gibt, und ein Klon geht mit seiner Stufe. Der leise Mitschnitt spart bei einem kleinen Sweep 10 % Zeit und zwei Drittel des Speichers (23 s gegen 25 s, 56 MiB gegen 189 MiB), ohne eine Zahl zu ändern. Ein Gerät mit 32 Kernen kostet gegenüber einem mit 8 Kernen bei gleicher Last keine messbare Zeit mehr (höchstens rund 10 %, im Rauschen).
+
+Was beim Messen auffiel und behoben ist, jeweils bei gleichem Bericht (ein Szenario, das Beste von drei Läufen):
+
+| Fall | vorher | nachher |
+|---|---|---|
+| eine Verbindung je Anfrage, TIME-WAIT auf beiden Seiten, 400/s, 30 s | 88,6 s | 1,3 s |
+| Generator mit `max_conns` unter Überlast, 2000/s, 10 s | 451,7 s | 0,8 s |
+| 4000 offene Verbindungen, 10 s | 18,7 s | 1,0 s |
+
+Das Gerät fragte bei jedem Segment alle Verbindungen nach ihrer nächsten Frist, der Generator durchsuchte für jede Anfrage seine Verbindungen und die wartenden Anfragen. Der Allokator der Bibliothek hatte eine Sperre für alle kleinen Blöcke; ein Teil-Sweep brauchte deshalb auf 4 Threads so lange wie auf einem und auf 8 fast doppelt so lange (22 s, 22 s, 37 s, jetzt 22 s, 8 bis 11 s, 8 bis 10 s).
+
+### Akademie
+
+Die Akademie bringt Kurse: Lektionen zum Lesen, Üben im Simulator mit Aufgabe und Prüfungen, Quiz und Tests
+mit Auswertung und, für Fortgeschrittene, kaputte Netze zur Fehlersuche. Sie steht
+auf der Startseite unter Lernen als eigene Gruppe über den Laboren und im Menü unter Datei › Akademie …
+(die Liste der Kurse). Kurse sind reine Dateien und nicht Teil des Programms: installierte liegen in
+`data://academy/` (unter Windows `%LOCALAPPDATA%\JFNetworker\academy`), zum Schreiben und Testen nennt
+`--academy-dir PATH` einen Ordner. Der Name des Bereichs ist „Akademie“; Texte und Bilder eines Kurses
+sind eigene Worte und eigene Zeichnungen.
+
+Ein Kurs hat eine **Gliederung** mit Einheiten und Schritten, jeder mit seinem Zustand (erledigt, als
+Nächstes, offen), dazu Fortschritt, Stufe und Dauer; „Weiter“ führt zum ersten offenen Schritt. Eine
+**Lektion** erscheint in der Sprache des Fensters; fehlt sie dort, steht die andere da, mit einem Hinweis.
+Sie gilt als erledigt, wenn es mit „Weiter“ von ihr weitergeht. Ein **Labor** öffnet als Projekt ohne Datei mit
+dem Bereich Aufgabe, wie jedes Labor; eine schmale Leiste über der Zeichenfläche nennt Schritt und Kurs, mit
+„Zurück zum Kurs“ und „Weiter im Kurs“. Sind alle Ziele erreicht, ist der Schritt erledigt; wer vorher
+weitergeht, lässt ihn offen. Solange kein anderes Labor öffnet, bleibt das Projekt unter der Seite, wie es
+ist; erst ein anderes fragt nach ungespeicherten Änderungen. Wie die Startseite tritt die Seite an die
+Stelle von Werkzeugleiste, Dock und Statusleiste, Dialoge und Timer laufen weiter. Tastatur: Tab durch die
+Schritte, Eingabe öffnet, Esc oder Alt+Links zurück. Ein **Quiz**, ein **Test** und eine **Fehlersuche** sind
+weiter unten beschrieben; die Gliederung zeigt ihr bestes Ergebnis neben dem Zustand, ein Schritt mit `requires`
+bleibt gesperrt, bis die verlangten Schritte erledigt sind, und „Weiter“ geht daran vorbei.
+
+**Der Ordner eines Kurses:**
+
+```
+academy/index.json              die Kursliste zum Installieren (wird erzeugt; das Programm liest bisher die Ordner)
+academy/progress.json           der Fortschritt (schreibt das Programm)
+academy/<kurs>/course.json      der Kurs; der Ordnername ist seine Kennung
+academy/<kurs>/de/*.md          die Lektionen auf Deutsch
+academy/<kurs>/en/*.md          die Lektionen auf Englisch (jede neue Sprache ein Ordner mit ihrem Kürzel)
+academy/<kurs>/labs/*.jfnet     die Labore und Fehlersuchen
+academy/<kurs>/quiz/*.json      die Quiz und Tests
+academy/<kurs>/img/*            die Bilder (png, jpg, gif, bmp, svg)
+```
+
+**`course.json`:**
+
+```json
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": ["Beispielkurs: das erste Netz", "Sample course: your first network"],
+  "summary": ["Was ein Netz ist …", "What a network is …"],
+  "level": "beginner",
+  "minutes": 15,
+  "units": [
+    { "title": ["Grundlagen", "The basics"],
+      "steps": [
+        { "id": "netz", "kind": "lesson", "title": ["Was ist ein Netz?", "What is a network?"], "file": "01-netz.md" },
+        { "id": "erstes-netz", "kind": "lab", "title": ["PC2 braucht eine Adresse", "PC2 needs an address"], "file": "labs/erstes-netz.jfnet" }
+      ] }
+  ]
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `format`, `version` | `"jfn-course"` und die Version des Formats; eine neuere lehnt das Programm mit einer Meldung ab |
+| `course_version` | die Version des Inhalts (in `index.json` das `version` des Kurses) |
+| `title`, `summary` | Text in beiden Sprachen: `["Deutsch", "English"]` oder `{"de": …, "en": …}` |
+| `level` | `beginner`, `intermediate` oder `advanced` |
+| `minutes` | die ungefähre Dauer |
+| `units[].title`, `units[].steps` | eine Einheit: ihr Titel, ihre Schritte; die Reihenfolge ist die des Kurses |
+| `steps[].id` | kleine Buchstaben, Ziffern, `-`, `_`; eindeutig im Kurs. An ihr hängt der Fortschritt: sie bleibt über neue Versionen des Kurses |
+| `steps[].kind` | `lesson`, `lab`, `quiz`, `exam` oder `fault`; alles andere ist ein Fehler |
+| `steps[].file` | eine Lektion: der Name in den Sprachordnern (`01-netz.md`, auf `.md`); ein Labor oder eine Fehlersuche: der Pfad im Kursordner (`labs/x.jfnet`); ein Quiz oder Test: `quiz/x.json`. Ein leeres `file` bei `quiz`, `exam` oder `fault` kündigt den Schritt nur an: Die Gliederung zeigt ihn als „noch nicht verfügbar“ |
+| `steps[].requires` | Kennungen früherer Schritte, die erledigt sein müssen, bevor dieser sich öffnet (Standard: keine); ein späterer oder unbekannter ist ein Fehler |
+
+Fehlende Felder nehmen ihren Standardwert an, unbekannte werden übersprungen. **Pfade** sind relativ und
+bleiben im Kursordner: kein `..`, kein `/` am Anfang, kein Laufwerk, keine Adresse, nur Buchstaben, Ziffern und
+`- _ . /`, kein Teil mit einem Punkt am Anfang oder Ende. Ein Kurs, der das nicht einhält, bekommt eine Karte
+mit seinen Meldungen und schadet keinem anderen.
+
+**Eine Lektion** ist Markdown. Jede gibt es auf Deutsch und auf Englisch. Bilder stehen relativ zum Kursordner
+(`![Was das Bild zeigt](img/netz.svg)`; der Text in den Klammern ist der Name für Screenreader), das Programm
+liest nur Bilder aus diesem Ordner; ein SVG trägt seinen eigenen hellen Hintergrund, damit es auch im dunklen
+Thema lesbar bleibt. Links: `[Text](step:ID)` führt zu einem Schritt des Kurses, `[Text](lab:ID)` zu einem
+Labor; Links ins Web lehnt die Ansicht vorerst mit einer Meldung ab.
+
+**Ein Labor** ist eine `.jfnet`-Datei mit `lab` und mindestens einem Ziel (siehe
+[Labore und Aufgaben](#labore-und-aufgaben)), Titel, Einleitung, Ziele und Hinweise in beiden Sprachen. Die Ziele
+prüft der Simulator, sobald eine Sekunde virtueller Zeit vergangen ist, das Projekt sich geändert hat oder, in
+einem Netz ohne anstehende Ereignisse, eine Konsole wieder ihren Prompt zeigt.
+
+**Ein Quiz oder Test** ist eine JSON-Datei mit den Texten beider Sprachen zusammen. Dieselbe Datei kann beides sein,
+die Art des Schritts entscheidet. Ein `quiz` ist Übung: Jede Frage hat ihr „Prüfen“, die Erklärung kommt sofort, neue
+Versuche sind frei, jede Frage behält das Beste, was sie erreicht hat; der Schritt ist erledigt, sobald die Summe
+besteht. Ein `exam` ist ein Test: Vorher steht da, was er verlangt; dann alle Fragen und die Zeit; einmal abgeben je
+Versuch; danach Punkte je Frage, bestanden oder nicht und alle Erklärungen. Ein bestandener Test erledigt den
+Schritt. Das beste Ergebnis steht in `progress.json`. Die Zeit läuft auf der Uhr des Programms, auch auf anderen
+Seiten; ist sie um, zählt, was bis dahin da stand. Ein begonnener Versuch wird nicht gespeichert, das sagt der Test
+auch; nur abgegebene Versuche zählen. Die Antworten sind Widgets des Programms und stehen in keinem Dokument.
+
+```json
+{
+  "format": "jfn-quiz", "version": 1,
+  "title": ["Netze und Adressen", "Networks and addresses"],
+  "pass": 70, "minutes": 5, "attempts": 3, "shuffle": true,
+  "questions": [
+    { "kind": "single", "points": 2,
+      "stem": ["Was tut ein **Switch**?", "What does a **switch** do?"],
+      "explain": ["Er lernt MAC-Adressen …", "It learns MAC addresses …"],
+      "answers": [
+        { "text": ["Er leitet nach MAC-Adressen weiter", "It forwards by MAC addresses"], "right": true },
+        { "text": ["Er routet", "It routes"], "explain": ["Das tut ein Router.", "That is what a router does."] } ] },
+    { "kind": "text", "stem": ["Welches Netz …?", "Which network …?"], "explain": ["…", "…"],
+      "accept": ["10\\.1\\.2\\.0 ?/ ?24"], "case": false },
+    { "kind": "number", "stem": ["Wie viele Hosts …?", "How many hosts …?"], "explain": ["…", "…"],
+      "value": 254, "tolerance": 0 },
+    { "kind": "order", "stem": ["In welcher Reihenfolge …?", "In what order …?"], "explain": ["…", "…"],
+      "order": [["Zuerst", "First"], ["Dann", "Then"], ["Zuletzt", "Last"]] }
+  ]
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `pass` | ab wie viel Prozent bestanden ist (Standard 100) |
+| `minutes`, `attempts` | Zeitgrenze und Zahl der Versuche eines Tests (Standard: keine); in einem `quiz` gelten sie nicht, `jfn-sim course` sagt das |
+| `shuffle` | Fragen und Antworten je Versuch in anderer Reihenfolge, aus einem Seed je Versuch; ein Lauf ohne Fenster nimmt einen festen, damit Skripte immer gleich laufen |
+| `questions[].kind` | `single`: genau eine richtige Antwort. `multi`: mehrere, mit Teilpunkten: (richtige − falsche Kreuze) ÷ richtige, nie unter 0. `text`: ein Muster aus `accept` muss die ganze Antwort treffen (POSIX erweitert, `.` also als `\\.`), Leerzeichen außen und mehrfache innen zählen nicht, Großschreibung nur mit `"case": true`. `number`: innerhalb `tolerance` um `value`, Komma oder Punkt. `order`: alle Einträge an ihrem Platz; sie starten immer anders, auch ohne `shuffle` |
+| `questions[].stem`, `explain` | Markdown (Bilder relativ zum Kursordner wie in einer Lektion) |
+| `questions[].points` | Punkte (Standard 1) |
+| `answers[].right`, `answers[].explain` | ist richtig; was bei dieser Wahl dazu erscheint (freiwillig) |
+
+`jfn-sim course` nennt jeden Fehler genau: keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt (mit dem
+Grund), ein Wert, der keine Zahl ist, eine fehlende Sprache mit Frage und Antwort. Bis zu 64 Fragen, 12 Antworten je Frage.
+
+**Eine Fehlersuche** (`fault`) ist eine `.jfnet`-Datei, die ein kaputtes Netz enthält und das in ihrem `lab` sagt.
+Sie wird mit [`assess`](#aufgaben-mit-bewertung) bewertet, nicht mit Zielen, denn wer weiterarbeitet, kann das Netz
+vor dem Abgeben wieder kaputt machen. Abgeben zeigt das Ergebnis; ab `pass` Prozent ist der Schritt erledigt, „Neu
+beginnen“ auf der Leiste lädt die Datei noch einmal.
+
+```json
+"lab": {
+  "title": ["Der Server antwortet nicht", "The server does not answer"],
+  "goals": [],
+  "assess": { "feedback": "score", "time_limit_s": 0, "items": [
+    { "what": "check", "checks": ["PC1 reaches 10.0.2.10"], "points": 4, "text": ["PC1 erreicht den Server", "PC1 reaches the server"] },
+    { "what": "check", "checks": ["PC2 not reaches 10.0.2.10", "PC2 reaches 10.0.1.1"], "points": 2, "text": ["PC2 bleibt draußen", "PC2 stays out"] },
+    { "what": "diagnosis", "dev": "R1", "id": 4, "port": "GigabitEthernet0/0/1", "peer": "SRV1", "peer_id": 5, "peer_port": "eth0", "points": 2,
+      "text": ["Welches Kabel war defekt?", "Which cable was faulty?"], "explain": ["Das Kabel …", "The cable …"] }
+    ], "target": { "devices": [], "links": [] } },
+  "start_faults": ["link SRV1 eth0"],
+  "lock": { "problems": true, "faults": true, "answer": true },
+  "pass": 80
+}
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `start_faults` | Fehler, die beim Laden da sind, so geschrieben wie in einem Szenario nach `fault`: `link R1 Gi0/1`, `impair R1 Gi0/1 loss 30%`, `power SRV1`, `stop WEB1 web`, `disk`, `cpu`, `mem`, `partition`, jeweils auch mit `for 30s`. Sie gehen als Aktionen in den Simulator: Zurückspulen spielt sie mit ab. „Simulation zurücksetzen“ bringt sie wieder, nur nicht auf ein Kabel, das seitdem neu ist |
+| `lock.problems` | kein Bereich Probleme, keine Problemzahl an zugeklappten Gruppen |
+| `lock.faults` | keine Fehlerkarten im Inspektor, kein „Wiederherstellen“, kein „Alle Fehler beheben“, keine Spur in Zeitleiste und Diagrammen, keine Zeilen in den Ereignissen |
+| `lock.answer` | kein Bereich „Aufgabe erstellen“, der das Zielnetz zeigt |
+| `pass` | ab wie viel Prozent der Schritt erledigt ist (Standard 100) |
+
+Fehlen `start_faults` und `lock`, bleibt alles, wie es war: Ein älteres Labor verhält sich und speichert sich gleich,
+auch die Felder selbst kommen nur in die Datei, wenn sie gesetzt sind. Mit `lock.faults` repariert man wie im echten
+Netz: Ein gezogenes oder schlechtes Kabel wird gelöscht und neu verbunden, ein Gerät ohne Strom aus- und eingeschaltet,
+ein gestoppter Dienst in seinem Fenster gestartet. `disk`, `cpu`, `mem` und `partition` lassen sich dann nicht beheben;
+sie taugen für eine reine Diagnose.
+
+Die neuen Prüfungen: **`diagnosis`** fragt nach dem Gerät oder Kabel, das schuld ist: `dev` (mit `id`) ein Gerät,
+mit `peer` (`peer_id`, `port`, `peer_port`, die Ports dürfen fehlen) das Kabel zwischen beiden. Die Antwort kommt aus
+einer Liste aller Geräte und Kabel im Bereich Aufgabe oder per Klick auf die Zeichenfläche; sie zählt erst beim Abgeben,
+damit sich die Punktzahl nicht abfragen lässt, ein ersetztes Kabel bleibt dieselbe Antwort, und `explain` erscheint dann.
+**Dass etwas nicht gehen darf**, sagt die vorhandene Form `PC2 not reaches 10.0.2.10`; zusammen mit einer positiven
+Prüfung im selben Kriterium genügt es nicht, das Gerät einfach auszuschalten.
+
+**Die Lösung bleibt in der Datei lesbar**: Zielnetz, richtige Antworten und Diagnosen stehen im Klartext in den
+Dateien des Kurses. Für das Selbststudium ist das gut, für eine sichere Prüfung taugt es nicht.
+
+**`index.json`** ist die Liste, aus der später installiert wird: `format` `"jfn-academy"`, `version`, `courses` mit
+`id`, `title`, `summary`, `level`, `minutes`, `version` (des Inhalts) und `files` (`path`, `size`, `sha256`). Damit
+die Prüfsummen stimmen, hält `.gitattributes` die Bytes unter `apps/JFNetworker/academy/` unverändert.
+
+**`progress.json`** schreibt das Programm sofort beim Erledigen: `format` `"jfn-progress"`, `version`, `courses`, je
+Kurs `steps`, je Schritt `state` (`open`, `done`), `when` (Sekunden seit 1970), `best` (das beste Ergebnis in Prozent),
+`tries` (abgegebene Versuche). Eine kaputte oder fehlende Datei bedeutet „noch nichts erledigt“, nie einen Absturz. Sie steht nie in
+der Projektdatei und ist kein Rückgängig-Schritt; „Fortschritt zurücksetzen“ auf der Seite eines Kurses
+fragt vorher. Einträge von Schritten, die ein neuer Kurs nicht mehr hat, bleiben stehen, falls sie wiederkommen. Mit
+`--academy-dir` liegt die Datei in jenem Ordner, ein Lauf ohne Fenster hält sie im Speicher und sieht ohne den
+Schalter gar keine Kurse: Tests berühren die Daten des Benutzers nicht.
+
+**So entsteht ein Kurs:** einen Ordner wie [`academy/beispiel`](academy/beispiel) anlegen, mit
+`jfn-sim course ORDNER` prüfen (Datei, Lektionen in jeder Sprache, Bilder, Links, Quiz und Tests, Labore und
+Fehlersuchen mit dem, was `jfn-sim check` findet; Rückgabe 1, wenn etwas den Kurs verhindert), mit `JFNetworker --academy-dir OBERORDNER` ansehen. Der
+Selbsttest prüft jeden Kurs unter `apps/JFNetworker/academy/`.
+
+Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `safe_path`, `image_file`, `lesson_refs`,
+`link_to`, `lab_issues`, `fault_issues`, `quiz_issues`), `jfn_model::quiz` (`Quiz`, `Question`, `Reply`, `Attempt`, `Plan`,
+`Score`), `jfn_model::lab` (`Lock`, `Lab::start_faults`, `Item::explain`), `jfn_sim::runner::start_actions`,
+`jfn_sim::assess` (`Pick`, `grade_picks`), `jfn_run::check_course`, `workspace/academy` (`Academy`, `store::place`,
+`store::list`, `quiz.rs`).
+
+Noch offen: Installieren aus dem Netz mit Index und Prüfsummen (AK3),
+die Kurse selbst (AK4).
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -4181,7 +4815,7 @@ Geste).
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) ✓ · B4 CSS-Teilmenge, Cookies, HTTPS mit echtem TLS 1.3 im Simulator, Entwickleransicht ✓ (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 | 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
-| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche · F2 Zonen und Stateful · AK1 bis AK4 Akademie (Kurse, Tests und Fehlersuche, Installieren, Inhalte) · SA1 bis SA7 Architektur-Labor (Ressourcen, Sweeps, Experimente, Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
+| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche ✓ · F2 Zonen und Stateful ✓ · Akademie: AK1 Kursformat und Kursansicht ✓, AK2 Tests und Fehlersuche ✓, AK3 Installieren, AK4 Inhalte · Architektur-Labor: SA1 CPU und RAM je Gerät ✓, SA2 Sweeps ✓, SA3 bis SA7 (Experimente, Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

@@ -1813,3 +1813,404 @@ Projektinfo	Project info
 Worum es in diesem Projekt geht	What this project is about
 Autor	Author
 Ihr Name	Your name
+
+# SA1: the hardware of a device (inspector/hardware.rs, inspector/faults.rs, metrics.rs, palette.rs)
+CPU ×	CPU ×
+Bremsen	Slow down
+Alle Rechenzeit des Geräts dauert so viel länger: ein lauter Nachbar auf demselben Rechner.	All CPU time of the device takes this much longer: a noisy neighbour on the same machine.
+Belegen	Occupy
+Etwas anderes hält so viel Speicher: über den RAM hinaus wird alles langsamer, über den Swap hinaus endet der größte Dienst.	Something else holds this much memory: beyond the RAM everything gets slower, beyond the swap the largest service ends.
+CPU	CPU
+{}, {} wartend	{}, {} waiting
+Speicher	Memory
+Im Swap	In swap
+Beendet	Killed
+{} Dienste (Speicher voll)	{} services (memory full)
+Hardware	Hardware
+Ohne simulierte Hardware kosten CPU und RAM hier nichts. Sie gilt für alle Geräte mit „Hardware simulieren“ im Projekt oder nur für dieses:	Without simulated hardware, CPU and RAM cost nothing here. It applies to all devices with “Simulate hardware” in the project, or to this one alone:
+Für dieses Gerät angeben	Set for this device
+Eigene Werte	Own figures
+Vorlage	Preset
+Disk	Disk
+Kerne	Cores
+RAM	RAM
+Swap	Swap
+Disk-Art	Disk kind
+Tempo: 100 % ist der Referenzkern, mit dem die Kosten der Dienste angegeben sind (ein Skriptbefehl 5 ns).	Speed: 100 % is the reference core the costs of the services are given for (a script instruction 5 ns).
+Im Betrieb ändern	Change while running
+Das Gerät startet dafür neu und fällt 30 s aus; was auf der Disk liegt, bleibt.	The device restarts for this and is down for 30 s; what is on the disk stays.
+Die neuen Werte gelten sofort, ohne Neustart.	The new figures apply at once, without a restart.
+Modellwerte	Model’s figures
+Hardware simulieren	Simulate hardware
+Server und Hosts bekommen CPU und RAM ihres Modells: Dienste warten auf freie Kerne, zu wenig Speicher bremst sie. Aus: Rechenzeit kostet nichts, wie bisher.	Servers and hosts get the CPU and RAM of their model: services wait for free cores, too little memory slows them. Off: CPU time costs nothing, as before.
+Wartende Aufgaben	Jobs waiting
+Belegte Kerne	Cores busy
+Im RAM	In RAM
+Disk/s	Disk/s
+{} · Annahme: {}	{} · Assumed: {}
+Eigene Angaben.	Own figures.
+Annahmen für dieses Modell, keine Messwerte eines echten Geräts.	Assumptions for this model, not measurements of a real device.
+Die Zahl der Kerne geht von 1 bis 1024.	The number of cores goes from 1 to 1024.
+Das Tempo ist eine Zahl in Prozent des Referenzkerns, z. B. 100.	The speed is a number in percent of the reference core, for example 100.
+Der RAM ist eine Zahl von GiB größer als 0, z. B. 16 oder 0,5.	The RAM is a number of GiB greater than 0, for example 16 or 0.5.
+Der Swap ist eine Zahl von GiB, 0 für keinen.	The swap is a number of GiB, 0 for none.
+Die Disk ist eine Zahl von GiB größer als 0.	The disk is a number of GiB greater than 0.
+Der Faktor ist eine Zahl größer als 0, z. B. 3.	The factor is a number greater than 0, for example 3.
+Der Speicher ist eine Zahl von GiB größer als 0, z. B. 8.	The memory is a number of GiB greater than 0, for example 8.
+Hardware simulieren ändern	Change simulate hardware
+Hardware ändern	Change hardware
+#
+# ---- the Firewall tab (workspace/devwin/firewall.rs)
+alle	all
+eq (gleich)	eq (equal)
+gt (größer)	gt (greater)
+lt (kleiner)	lt (less)
+neq (ungleich)	neq (not equal)
+range (Bereich)	range (from, to)
+erlauben (permit)	allow (permit)
+verwerfen (deny)	drop (deny)
+ausgehend	outbound
+eingehend	inbound
+„{}“ ist keine Adresse: any, 10.0.0.5, 10.0.0.0/24 oder 10.0.0.0 0.0.0.255.	“{}” is no address: any, 10.0.0.5, 10.0.0.0/24 or 10.0.0.0 0.0.0.255.
+{} ist eine Netzmaske. Hier gehören Wildcard-Bits hin ({}) oder die Form {}/{}.	{} is a net mask. This field takes wildcard bits ({}) or the form {}/{}.
+„{}“ ist kein Port: eine Zahl von 0 bis 65535 oder ein Name wie www.	“{}” is no port: a number from 0 to 65535 or a name like www.
+„{}“ ist keine Regel: eine Zeile beginnt mit permit oder deny.	“{}” is no rule: a line starts with permit or deny.
+von {}	from {}
+implizit: was keine Regel trifft	implicit: what no rule meets
+Diese Regel steht schon in der Liste (Zeile {}). Ändern Sie mindestens ein Feld.	This rule is in the list already (line {}). Change at least one field.
+Eine Liste braucht einen Namen oder eine Nummer.	A list needs a name or a number.
+{} passt nicht: 1 bis 99 und 1300 bis 1999 sind Standardlisten, 100 bis 199 und 2000 bis 2699 erweiterte.	{} does not fit: 1 to 99 and 1300 to 1999 are standard lists, 100 to 199 and 2000 to 2699 extended ones.
+„{}“ ist kein Listenname: Buchstaben, Ziffern, - und _, vorn ein Buchstabe.	“{}” is no name for a list: letters, digits, - and _, starting with a letter.
+Die Liste {} gibt es schon.	List {} exists already.
+Die Liste {} gibt es nicht mehr.	List {} no longer exists.
+Liste {} filtert noch {} ({}): erst die Bindung lösen.	List {} still filters {} ({}): remove the binding first.
+NAT wählt noch mit Liste {} aus: erst die NAT-Regel entfernen.	NAT still chooses by list {}: remove the NAT rule first.
+„{}“ ist kein Name für einen Pool: ein Wort.	“{}” is no name for a pool: one word.
+„{}“ ist keine Netzmaske: 24, /24 oder 255.255.255.0.	“{}” is no net mask: 24, /24 or 255.255.255.0.
+{} bis {} liegt nicht in einem Netz der Länge /{}.	{} to {} does not lie in one network of length /{}.
+„{}“ nimmt die Adressen aus Pool {}: erst die Regel entfernen.	“{}” takes its addresses from pool {}: remove the rule first.
+„{}“ ist kein Port von 1 bis 65535.	“{}” is no port from 1 to 65535.
+Das Gerät hat keine Schnittstelle dafür.	The device has no interface for this.
+Liste {} → Pool {}{}	List {} → pool {}{}
+Liste {} → Adresse von {} (PAT)	List {} → address of {} (PAT)
+{} hat {} keine Liste: das Paket passiert.	{} has no list {}: the packet passes.
+Liste {} gibt es nicht: das Paket passiert.	List {} does not exist: the packet passes.
+Liste {} hat keine Regeln: das Paket passiert.	List {} has no rules: the packet passes.
+Liste {}, Zeile {}: {}	List {}, line {}: {}
+Liste {}: keine Regel passt, das implizite deny am Ende verwirft das Paket.	List {}: no rule fits, the implicit deny at the end drops the packet.
+{} routet nicht (ip routing ist aus): eine Regel träfe nur Pakete an das Gerät selbst, weitergeleitet wird nichts. Erst Routing einschalten.	{} does not route (ip routing is off): a rule would only meet packets to the device itself, nothing is forwarded. Enable routing first.
+Die Ansicht steht in der Vergangenheit: hier lässt sich nur lesen, was damals galt.	The view stands in the past: this tab only shows what applied then.
+{} ist ausgeschaltet: Regeln und NAT lassen sich ändern, wenn es läuft.	{} is switched off: rules and NAT can change once it runs.
+NAT	NAT
+Regeln	Rules
+Test	Test
+{} routet nicht: Regeln und NAT träfen nur Pakete an das Gerät selbst.	{} does not route: rules and NAT would only meet packets to the device itself.
+Routing einschalten	Enable routing
+Routing auf {} einschalten	Enable routing on {}
+Befehle	Commands
+Was die Formulare tun, steht hier als die Zeilen, die in der Konsole des Geräts laufen.	What the forms do appears here as the lines that run on the device's console.
+Pos.	Pos.
+Aktion	Action
+Log	Log
+Treffer	Hits
+Bemerkung	Remark
+Regel	Rule
+alle zeigen	show all
+Noch hat keine Schnittstelle eine Adresse.	No interface has an address yet.
+Liste an {} binden	Bind a list to {}
+{} {}: keine Liste, alles passiert	{} {}: no list, everything passes
+{} {}: Liste {}	{} {}: list {}
+{} {}: Liste {} ohne Regeln, alles passiert	{} {}: list {} without rules, everything passes
+erweitert	extended
+1 Regel	1 rule
+{} Regeln	{} rules
+Noch keine Liste: ohne Liste passiert alles.	No list yet: without a list everything passes.
+Neue Liste	New list
+Liste löschen	Delete list
+Liste {} löschen	Delete list {}
+Zähler löschen	Clear counters
+Zähler von Liste {} löschen	Clear the counters of list {}
+z. B. 110 oder WEB	e.g. 110 or WEB
+Standard (nur die Quelle)	standard (the source only)
+erweitert (alles)	extended (everything)
+Liste {} anlegen	Create list {}
+Diese Liste hat keine Regeln: gebunden oder nicht, alles passiert.	This list has no rules: bound or not, everything passes.
+Diese Liste filtert nichts: NAT wählt mit ihr die Hosts aus, die es übersetzt.	This list filters nothing: NAT uses it to choose the hosts it translates.
+Diese Liste ist an keine Schnittstelle gebunden: sie filtert nichts, alles passiert.	This list is bound to no interface: it filters nothing, everything passes.
+Gebunden an {}. Was keine Regel erlaubt, verwirft das implizite deny am Ende.	Bound to {}. What no rule permits is dropped by the implicit deny at the end.
+{} (implizit)	{} (implicit)
+Am Ende: implizites deny	At the end: implicit deny
+Bemerkung: {}	Remark: {}
+Zeile {}: {}, {} Treffer	Line {}: {}, {} hits
+Duplizieren	Duplicate
+Nach unten	Move down
+Zeile aus Liste {} löschen	Delete a line from list {}
+Regel in Liste {} verschieben	Move a rule in list {}
+Jeder Schritt läuft in der Konsole und wird zusammen mit der laufenden Konfiguration zur Startkonfiguration. Eine verschobene oder geänderte Regel beginnt bei 0 Treffern; steht ihr eine Bemerkung im Weg, gilt das auch für die Regeln darunter. Rückgängig startet das Gerät neu: dann beginnen alle Zähler und Übersetzungen bei 0.	Every step runs on the console and, with the running configuration, becomes the startup configuration. A moved or changed rule starts at 0 hits; where a remark stands in the way, so do the rules below it. Undo restarts the device: then all counters and translations start at 0.
+Neue Regel am Ende von Liste {}	New rule at the end of list {}
+Neue Regel nach Zeile {} von Liste {}	New rule after line {} of list {}
+Zeile {} von Liste {} ändern	Change line {} of list {}
+als Zeile eingeben	type it as a line
+z. B. permit 112 any any	e.g. permit 112 any any
+any, 10.0.0.5, 10.0.0.0/24	any, 10.0.0.5, 10.0.0.0/24
+nur bestehende Verbindungen (established)	only existing connections (established)
+jede	any
+Treffer in der Konsole melden (log)	report hits on the console (log)
+steht über der Regel	stands above the rule
+Wird zu: {}	Becomes: {}
+Regel in Liste {} ändern	Change a rule in list {}
+bis	to
+Innen global	Inside global
+Innen lokal	Inside local
+Außen	Outside
+Endet in	Ends in
+NAT auf {} ändern	Change NAT on {}
+Innen stehen die Hosts, deren Adressen übersetzt werden; außen das Netz, das die globalen Adressen sieht. Erst wenn eine Schnittstelle eine Seite hat, übersetzt das Gerät.	Inside are the hosts whose addresses are translated, outside the network that sees the global addresses. The device translates once an interface has a side.
+außen	outside
+innen	inside
+keine Seite	no side
+Pool {} entfernen	Remove pool {}
+Pool {} ist in Gebrauch: erst die laufenden Übersetzungen löschen.	Pool {} is in use: clear the running translations first.
+erste Adresse	first address
+letzte Adresse	last address
+Netz, z. B. /24	network, e.g. /24
+Pool anlegen	Create pool
+{} entfernen	Remove {}
+(noch keine)	(none yet)
+den Pool	the pool
+die Adresse von	the address of
+(noch keiner)	(none yet)
+PAT (overload)	PAT (overload)
+Regel anlegen	Create rule
+NAT wählt die Hosts mit einer Zugriffsliste aus: erst eine anlegen (Regeln).	NAT chooses the hosts by an access list: create one first (Rules).
+Es gibt noch keinen Pool: erst einen anlegen.	There is no pool yet: create one first.
+die ganze Adresse	the whole address
+einen TCP-Port	one TCP port
+einen UDP-Port	one UDP port
+Adresse innen	inside address
+Port innen	inside port
+Adresse außen	outside address
+Adresse von	address of
+Port außen	outside port
+Übersetzung anlegen	Create translation
+Übersetzungen löschen	Clear translations
+Gerade läuft keine Übersetzung.	No translation is running.
+Die ersten {} von {}; alle zeigt „show ip nat translations“.	The first {} of {}; “show ip nat translations” shows them all.
+Hier fragt das Fenster die Listen des Geräts, ohne ein Paket zu senden; die Zähler bleiben, wie sie sind. Eine eingehende Liste sieht das Paket, wie es ankommt, eine ausgehende nach dem Routing und nach NAT: dort zählt die übersetzte Quelle.	Here the window asks the device's lists without sending a packet; the counters stay as they are. An inbound list sees the packet as it arrives, an outbound one after routing and after NAT: there the translated source counts.
+(keine)	(none)
+z. B. 198.51.100.10	e.g. 198.51.100.10
+z. B. 80 oder www	e.g. 80 or www
+gehört zu einer bestehenden Verbindung (ACK)	belongs to an existing connection (ACK)
+Der Absender bekommt „administratively prohibited“ (ICMP Typ 3, Code 13).	The sender gets “administratively prohibited” (ICMP type 3, code 13).
+Firewall	Firewall
+Was schützt welche Schnittstelle?	What protects which interface?
+Zugriffslisten	Access lists
+Adresspools	Address pools
+Viele Hosts: dynamisch und PAT	Many hosts: dynamic and PAT
+Fest: statische Übersetzung und Portweiterleitung	Fixed: static translation and port forwarding
+Laufende Übersetzungen	Running translations
+Welche Regel trifft dieses Paket?	Which rule meets this packet?
+Name oder Nummer	Name or number
+Zeile	Line
+ICMP-Nachricht	ICMP message
+Passiert	Passes
+Wird verworfen	Dropped
+dynamisch	dynamic
+statisch	static
+im Konfigurationsmodus (configure terminal)	in configuration mode (configure terminal)
+&Akademie …	&Academy …
+In der Akademie zurück	Back in the Academy
+Dieser Kurs lässt sich nicht öffnen.	This course cannot be opened.
+Fehlerhaft	Faulty
+Abgeschlossen	Completed
+Einsteiger	Beginner
+Fortgeschrittene	Intermediate
+Erfahrene	Advanced
+{} Min.	{} min
+Der Link „{}“ geht nicht auf	The link “{}” does not open
+Er führt zu keinem Schritt dieses Kurses. Links ins Web gehen hier noch nicht auf.	It leads to no step of this course. Links to the web do not open here yet.
+Der Fortschritt wurde nicht gespeichert	The progress was not saved
+Kursübersicht	Course overview
+Alle Kurse	All courses
+Zurück zum Labor	Back to the lab
+Zurück zum Projekt	Back to the project
+Zurück (Esc, Alt+Links)	Back (Esc, Alt+Left)
+Akademie	Academy
+Kurse zum Lesen und Üben: Lektionen erklären, Labore im Simulator prüfen, was Sie gebaut haben.	Courses to read and practise: lessons explain, labs in the simulator check what you have built.
+Hier erscheinen die Kurse, die in der Akademie installiert sind.	The courses installed in the Academy appear here.
+Noch keine Kurse	No courses yet
+Kurs: {}	Course: {}
+Lektion	Lesson
+Labor	Lab
+Quiz	Quiz
+Fehlersuche	Fault hunt
+Dieser Kurs lässt sich nicht öffnen. Das stimmt mit seinen Dateien nicht:	This course cannot be opened. This is wrong with its files:
+{} von {} Schritten erledigt	{} of {} steps done
+Beginnen	Begin
+Kurs abgeschlossen	Course completed
+Fortschritt zurücksetzen	Reset progress
+Erledigt	Done
+{}, erledigt	{}, done
+Als Nächstes	Up next
+{}, als Nächstes	{}, up next
+{}, noch nicht verfügbar	{}, not available yet
+Noch nicht verfügbar	Not available yet
+Schritt {} von {}	Step {} of {}
+Diese Lektion gibt es noch nicht in Ihrer Sprache	This lesson does not exist in your language yet
+Sie sehen die Fassung auf {}.	You are seeing the version in {}.
+Die Datei dieser Lektion fehlt oder lässt sich nicht lesen.	The file of this lesson is missing or cannot be read.
+Vorheriger Schritt	Previous step
+Zur Kursübersicht	To the course overview
+Alle Ziele erreicht	All goals reached
+Zurück zum Kurs	Back to the course
+Weiter im Kurs	Continue the course
+Der nächste Schritt des Kurses	The next step of the course
+Der nächste Schritt des Kurses; dieses Labor bleibt offen	The next step of the course; this lab stays open
+Fortschritt zurücksetzen?	Reset progress?
+Alles, was Sie in „{}“ erledigt haben, gilt dann wieder als offen. Das lässt sich nicht rückgängig machen.	Everything you have done in “{}” then counts as open again. This cannot be undone.
+Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator.	Academy: courses with lessons to read and labs in the simulator.
+Zurücksetzen	Reset
+# ---- F2: Zonen and Sitzungen of the Firewall tab (workspace/devwin/fwzones.rs)
+Sitzungen	Sessions
+Zonen	Zones
+Zonen: passiert	Zones: it passes
+Zonen: wird verworfen	Zones: it is dropped
+Die Zonen sehen ein Paket vor der Übersetzung der Quelle: fragen Sie nach der inneren Quelle an der Schnittstelle, auf der es ankommt.	The zones see a packet before its source is translated: ask for the inside source on the interface where it arrives.
+inspect (mit Sitzung, Antworten kommen zurück)	inspect (with a session, answers come back)
+pass (nur dieses Paket)	pass (this packet only)
+drop (still verwerfen)	drop (silently)
+reject (verwerfen und Absender informieren)	reject (drop and tell the sender)
+{} braucht einen Namen aus einem Wort.	{} needs a name of one word.
+Eine Zone	A zone
+Die Zone {} gibt es schon.	Zone {} already exists.
+Zone {} hat noch Schnittstellen: erst sie einer anderen Zone geben.	Zone {} still has interfaces: give them another zone first.
+Zone {} steht noch im Zonenpaar {}: erst das Paar entfernen.	Zone {} is still part of zone pair {}: remove the pair first.
+Eine Klasse	A class
+Richtlinie {} benutzt die Klasse {}: erst die Regel dort entfernen.	Policy {} uses class {}: remove the rule there first.
+Eine Richtlinie	A policy
+Das Zonenpaar {} benutzt die Richtlinie {}: erst das Paar ändern.	Zone pair {} uses policy {}: change the pair first.
+Ein Zonenpaar	A zone pair
+Ein Zonenpaar verbindet zwei verschiedene Zonen.	A zone pair joins two different zones.
+Der Name self gehört dem Gerät selbst.	The name self belongs to the device itself.
+Von {} nach {} gibt es schon das Zonenpaar {}.	From {} to {} there already is zone pair {}.
+gesperrt	closed
+Keine der beiden Schnittstellen hat eine Zone: das Paket passiert.	Neither interface has a zone: the packet passes.
+Es bleibt in Zone {}: das Paket passiert.	It stays in zone {}: the packet passes.
+Von {} nach {}: das Gerät selbst, keine Richtlinie sagt etwas anderes, das Paket passiert.	From {} to {}: the device itself, no policy says otherwise, the packet passes.
+Zwischen Zone {} und einer Schnittstelle ohne Zone: wird still verworfen.	Between zone {} and an interface without a zone: dropped silently.
+Keine Regel zwischen den Zonen {} und {}: wird still verworfen.	No rule between the zones {} and {}: dropped silently.
+Bestehende Verbindung: Sitzung {} in {}, das Paket passiert.	Existing connection: session {} in {}, the packet passes.
+Bestehende Verbindung: Rückweg von Sitzung {} in {}, das Paket passiert.	Existing connection: the way back of session {} in {}, the packet passes.
+ICMP-Fehler zu Sitzung {} in {}: das Paket passiert.	ICMP error about session {} in {}: the packet passes.
+{}, Klasse {}: inspect, aber das Paket beginnt keine Verbindung und gehört zu keiner Sitzung, wird still verworfen.	{}, class {}: inspect, but the packet begins no connection and belongs to no session, dropped silently.
+{}, Klasse {}: schon {} halboffene Sitzungen, wird still verworfen.	{}, class {}: already {} half-open sessions, dropped silently.
+{}, Richtlinie {}, Klasse {}: inspect, das Paket passiert und beginnt eine Sitzung.	{}, policy {}, class {}: inspect, the packet passes and begins a session.
+{}, Richtlinie {}, Klasse {}: pass, das Paket passiert, eine Antwort braucht eine eigene Regel.	{}, policy {}, class {}: pass, the packet passes, an answer needs a rule of its own.
+{}, Richtlinie {}, Klasse {}: wird still verworfen.	{}, policy {}, class {}: dropped silently.
+{}, Richtlinie {}, Klasse {}: wird verworfen, der Absender bekommt „administratively prohibited“.	{}, policy {}, class {}: dropped, the sender gets “administratively prohibited”.
+oder	or
+und	and
+keine Bedingung: trifft nichts	no condition: matches nothing
+drop (keine Aktion genannt)	drop (no action named)
+Zonen auf {} ändern	Change the zones on {}
+Wer darf mit wem sprechen?	Who may talk to whom?
+Noch hat keine Schnittstelle eine Zone: das Gerät arbeitet als Router, nur Zugriffslisten filtern. Sobald eine Schnittstelle in einer Zone ist, gilt: zwischen zwei Zonen wird verworfen, was keine Richtlinie erlaubt.	No interface has a zone yet: the device works as a router and only access lists filter. Once an interface is in a zone, the rule is: between two zones, what no policy allows is dropped.
+von \ nach	from \ to
+Von {} nach {}: {}	From {} to {}: {}
+Grün: frei. Gelb: eine Richtlinie entscheidet. Rot: nichts kommt durch. Antworten auf das, was „inspect“ durchließ, kommen immer zurück. self ist das Gerät selbst.	Green: free. Yellow: a policy decides. Red: nothing gets through. Answers to what “inspect” let through always come back. self is the device itself.
+Zonen und Schnittstellen	Zones and interfaces
+keine Schnittstelle	no interface
+Zone {} entfernen	Remove zone {}
+z. B. INNEN	e.g. INSIDE
+Zone anlegen	Create zone
+keine Zone	no zone
+Klassen: welcher Verkehr?	Classes: which traffic?
+Klasse {} entfernen	Remove class {}
+Bedingung {} aus Klasse {} entfernen	Remove condition {} from class {}
+Zugriffsliste	Access list
+Name der Klasse	Name of the class
+eine Bedingung genügt (match-any)	one condition is enough (match-any)
+Klasse anlegen oder ergänzen	Create or extend class
+Es gibt noch keine Zugriffsliste: erst eine anlegen (Regeln).	There is no access list yet: create one first (Rules).
+Richtlinien: was geschieht damit?	Policies: what happens to it?
+Richtlinie {} entfernen	Remove policy {}
+Pakete	Packets
+Klasse {} aus Richtlinie {} entfernen	Remove class {} from policy {}
+Name der Richtlinie	Name of the policy
+protokollieren (log)	log it (log)
+Regel setzen	Set rule
+Zonenpaare: in welche Richtung?	Zone pairs: in which direction?
+keine Richtlinie	no policy
+Zonenpaar {} entfernen	Remove zone pair {}
+Name, frei lassen	Name, may stay empty
+von	from
+nach	to
+Paar anlegen	Create pair
+Jeder Schritt läuft in der Konsole und wird zusammen mit der laufenden Konfiguration zur Startkonfiguration. Eine Klasse nennt Protokolle nur beim Namen: „http“ heißt TCP-Port 80, in die Daten schaut die Firewall nicht.	Each step runs on the console and becomes the startup configuration together with the running configuration. A class names protocols by name only: “http” means TCP port 80, the firewall does not look into the data.
+Nr.	No.
+Paar	Pair
+Klasse	Class
+Firewall auf {}	Firewall on {}
+Laufende Sitzungen	Running sessions
+Sitzungen löschen	Clear sessions
+Sitzungen jetzt: {}, halboffen: {} (höchstens {}). Begonnen: {}, abgelaufen: {}, durch RST beendet: {}. Verworfen ohne Regel: {}, ohne Verbindungsbeginn: {}, über der Grenze: {}.	Sessions now: {}, half-open: {} (at most {}). Begun: {}, timed out: {}, ended by RST: {}. Dropped without a rule: {}, beginning nothing: {}, over the limit: {}.
+Gerade läuft keine Sitzung. Eine Sitzung beginnt, wenn eine Klasse mit „inspect“ das erste Paket einer Verbindung durchlässt.	No session is running. A session begins when a class with “inspect” lets the first packet of a connection through.
+Die ersten {} von {}; alle zeigt „show policy-map type inspect zone-pair sessions“.	The first {} of {}; “show policy-map type inspect zone-pair sessions” shows all.
+Sitzung {}: {} {} nach {}, {}	Session {}: {} {} to {}, {}
+Alle Fragen von vorn	All questions from the start
+Alle Versuche sind verbraucht. Fortschritt zurücksetzen in der Kursübersicht gibt sie zurück.	All attempts are used up. Reset progress in the course overview gives them back.
+Auf der Zeichenfläche wählen	Choose on the canvas
+Bestanden	Passed
+Bestanden ab {} %.	Pass from {} %.
+Bestes Ergebnis bisher: {} %.	Best result so far: {} %.
+Bringen Sie die Einträge in die richtige Reihenfolge.	Put the entries in the right order.
+Der nächste Schritt des Kurses; diese Fehlersuche bleibt offen	The next step of the course; this fault hunt stays open
+Diagnose	Diagnosis
+Die Antwort zählt erst beim Abgeben.	The answer only counts when handed in.
+Die Zeit ist um: abgegeben wurde, was bis dahin da stand.	Time is up: what stood there by then was handed in.
+Diese Fehlersuche noch einmal aus ihrer Datei laden	Load this fault hunt from its file again
+Dieser Schritt ist noch gesperrt	This step is still locked
+Dieser Schritt lässt sich nicht öffnen. Das stimmt mit seiner Datei nicht:	This step cannot be opened. This is wrong with its file:
+Dieser Versuch wird dann bewertet und lässt sich nicht mehr ändern.	This attempt is then graded and can no longer be changed.
+Ein begonnener Versuch wird nicht gespeichert: Nach einem Neustart des Programms beginnt er von vorn.	An attempt in progress is not saved: after a restart of the program it starts over.
+Eine Antwort ist richtig.	One answer is right.
+Er öffnet sich, wenn die Schritte davor erledigt sind, die er verlangt.	It opens when the earlier steps it requires are done.
+Erklärung zu Frage {}	Explanation of question {}
+Frage {}	Question {}
+Frage {} von {}	Question {} of {}
+Ihre Antwort	Your answer
+Ihre Reihenfolge: {}	Your order: {}
+Keine Antwort gewählt	No answer chosen
+Keine Antwort.	No answer.
+Klicken Sie auf das Gerät oder Kabel, das die Ursache ist.	Click the device or cable that is the cause.
+Mehrere Antworten können richtig sein.	Several answers can be right.
+Neu beginnen	Start over
+Neuer Versuch	New attempt
+Nicht bestanden	Not passed
+Noch gesperrt	Still locked
+Noch nicht richtig.	Not right yet.
+Noch ohne Antwort: {}	Still without an answer: {}
+Richtig ist: {}	Right is: {}
+Richtig.	Right.
+Richtig: {}	Right: {}
+Sie geben einmal ab; danach zeigt der Test Punkte und Erklärungen. Die Zeit läuft, sobald Sie beginnen, auch auf anderen Seiten.	You hand in once; then the test shows points and explanations. The time runs as soon as you begin, on other pages too.
+Teilweise richtig: {} von {} Punkten.	Partly right: {} of {} points.
+Test abgeben?	Hand in the test?
+Test beginnen	Begin the test
+Tragen Sie Ihre Antwort ein.	Enter your answer.
+Tragen Sie eine Zahl ein.	Enter a number.
+Wahl abbrechen	Cancel choosing
+Zahl	Number
+beliebig viele Versuche	any number of attempts
+keine Zeitgrenze	no time limit
+noch {} von {} Versuchen	{} of {} attempts left
+{} (Ihre Wahl)	{} (your choice)
+{} Fragen	{} questions
+{} von {} Punkten	{} of {} points
+{} von {} Punkten · {} % · bestanden	{} of {} points · {} % · passed
+{} von {} Punkten · {} %, bestanden ab {} %	{} of {} points · {} %, pass from {} %
+{}, bestes Ergebnis {} %	{}, best result {} %
+{}, gesperrt	{}, locked
+Üben: Prüfen Sie jede Frage, so oft Sie wollen. Die Erklärung kommt gleich dazu.	Practice: check each question as often as you like. The explanation comes with it.
+„{}“ nach oben	Move “{}” up
+„{}“ nach unten	Move “{}” down

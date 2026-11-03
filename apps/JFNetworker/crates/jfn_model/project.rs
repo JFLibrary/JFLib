@@ -79,6 +79,13 @@
 // an unknown value) means the sticker.
 // The project's info (ST1): "description" says what it is about, "author" who made it ("" without);
 // older files have no author.
+//
+// Hardware (SA1, the simulator's res.rs): the project's "metered" (every device gets the figures of
+// its model: catalog::hw_of) and a device's "hw" (figures of its own).  Neither is written at its
+// default, so a project that does not use them stays the same file.
+//
+// Experiments (SA2, experiment.rs): the project's "experiments", parameter sweeps kept with it; not
+// written while there are none.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -163,6 +170,9 @@ record! {
         pub phys: crate::phys::Spot,
         /// the optics plugged into its cages other than the model's (full port name -> optic)
         pub optics: BTreeMap<String, crate::catalog::Optic>,
+        /// the hardware it has, by hand (the simulator's res.rs; None: its model's in a metered
+        /// project)
+        pub hw: Option<crate::catalog::Hw>,
     }
 }
 
@@ -265,6 +275,11 @@ record! {
         pub background: Option<crate::background::Background>,
         /// who made it (Datei › Projektinfo; "": nobody named)
         pub author: String,
+        /// "Hardware simulieren": devices have CPU and RAM (the simulator's res.rs), by catalog::hw_of
+        /// unless they have figures of their own
+        pub metered: bool,
+        /// parameter sweeps kept with the project (experiment.rs; empty: none, and no member in the file)
+        pub experiments: Vec<crate::experiment::Experiment>,
     }
 }
 
@@ -344,6 +359,22 @@ impl LoadErr {
 impl fmt::Display for LoadErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.text)
+    }
+}
+
+/// the members of the hardware at their default stay out of the file: a project without them
+/// stays the same file
+fn no_default_hw(v: &mut Value) {
+    let Value::Object(o) = v else { return };
+    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)) && !(k == "experiments" && *x == Value::Array(Vec::new())));
+    for (k, x) in o.iter_mut() {
+        if let ("devices", Value::Array(ds)) = (k.as_str(), x) {
+            for d in ds.iter_mut() {
+                if let Value::Object(m) = d {
+                    m.retain(|(k, x)| !(k == "hw" && *x == Value::Null));
+                }
+            }
+        }
     }
 }
 
@@ -766,7 +797,9 @@ impl Project {
 
     /// the project as the text of a .jfnet file (indented JSON, LF line ends)
     pub fn to_text(&self) -> String {
-        let mut s = json::stringify_pretty(&self.to_json(), file_limits(), 2).unwrap_or_default();
+        let mut v = self.to_json();
+        no_default_hw(&mut v);
+        let mut s = json::stringify_pretty(&v, file_limits(), 2).unwrap_or_default();
         s.push('\n');
         s
     }

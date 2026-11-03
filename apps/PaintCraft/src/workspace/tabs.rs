@@ -29,7 +29,8 @@ use crate::app::Pn;
 
 const THUMB_W: i32 = 44; // thumbnail box (DIP)
 const THUMB_H: i32 = 30;
-const TAB_H: i32 = 40;
+const TAB_H: i32 = 40; // at most the height of the style's title bar (classic: 30)
+const THUMB_MIN_PAD: i32 = 2; // at least this much of a low tab above and below the thumbnail
 const TAB_PAD: i32 = 8; // left + right padding around the thumbnail
 const TAB_GAP: i32 = 4;
 const CLOSE_DIP: i32 = 16;
@@ -160,12 +161,13 @@ fn tab_list_id(i: u32) -> u32 {
     if i < 36 { i + ID_TAB_LIST0 } else { i + ID_TAB_LIST1 - 36 }
 }
 
-// thumb_size(doc) -> (w, h): the image aspect inside THUMB_W x THUMB_H DIP (px)
-fn thumb_size(ui: &Ui, d: &Doc) -> (i32, i32) {
+// thumb_size(doc, tab_h) -> (w, h): the image aspect inside THUMB_W x THUMB_H DIP, on a tab of
+// tab_h px (px)
+fn thumb_size(ui: &Ui, d: &Doc, tab_h: i32) -> (i32, i32) {
     let w = d.w.max(1) as u64;
     let h = d.h.max(1) as u64;
     let bw = ui.dp(THUMB_W) as u32;
-    let bh = ui.dp(THUMB_H) as u32;
+    let bh = ui.dp(THUMB_H).min(tab_h - ui.dp(THUMB_MIN_PAD * 2)).max(1) as u32;
     // tw = w * box_h / h; if tw > box_w: tw = box_w, th = h * box_w / w
     let tw = (w * bh as u64 / h) as u32;
     let (tw, th) = if tw > bw { (bw, (h * bw as u64 / w) as u32) } else { (tw, bh) };
@@ -177,6 +179,7 @@ pub(crate) fn tabs_frame(p: &mut Pn, ui: &mut Ui) {
     ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_CLIP, TAB_GAP);
     let r = ui.box_rect();
     let strip_w = r[2];
+    p.tabs.tab_hpx = ui.dp(TAB_H.min(ui.style.metric(SM_TB_H_LARGE)));
     let lbtn = ui.dp(LISTBTN_DIP + TAB_GAP);
     let n = doc_count(&p.doc).min(DOC_MAX);
     let cur = doc_cur(&p.doc);
@@ -186,7 +189,7 @@ pub(crate) fn tabs_frame(p: &mut Pn, ui: &mut Ui) {
     for i in 0..n {
         let d = &p.doc.docs[i as usize];
         sum = sum.wrapping_add(d.ver_px.wrapping_add(d.ver_lay).wrapping_add(i as u32));
-        let (tw, th) = thumb_size(ui, d);
+        let (tw, th) = thumb_size(ui, d, p.tabs.tab_hpx);
         // a missing / resized thumbnail is made now
         if d.thumb.px.is_empty() || d.thumb.w != tw || d.thumb.h != th {
             let id = d.id;
@@ -331,16 +334,14 @@ fn tab_item(p: &mut Pn, ui: &mut Ui, i: i32) {
     let d = &p.doc.docs[iu];
     let t = &mut p.tabs;
     let sel = doc_cur(&p.doc) == i;
-    let (tw, th) = if d.thumb.px.is_empty() { thumb_size(ui, d) } else { (d.thumb.w, d.thumb.h) };
-    let th_px = ui.dp(TAB_H);
-    let r = ui.place(t.tabw[iu], th_px);
+    let (tw, th) = if d.thumb.px.is_empty() { thumb_size(ui, d, t.tab_hpx) } else { (d.thumb.w, d.thumb.h) };
+    let r = ui.place(t.tabw[iu], t.tab_hpx);
     // remember the geometry for dragging
     t.tabcx[iu] = ((r[2] as u32 >> 1) as i32) + r[0];
     t.tabr[iu] = r[0] + r[2];
     if i == t.tab_first {
         t.tab_left = r[0];
         t.tab_top = r[1];
-        t.tab_hpx = r[3];
     }
     let ev = ui.behave(ID_TAB0 + i as u32, HB_FOCUS | if sel { HB_CURRENT } else { 0 });
     // the arrows of the tab group select the image they reach

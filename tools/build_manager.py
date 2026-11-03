@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""jfguiLib Build Manager: --stdio service or an internally supervised --job worker."""
+"""JFLib Build Manager: --stdio service or an internally supervised --job worker."""
 import argparse
 import os
 import sys

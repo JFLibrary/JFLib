@@ -1,0 +1,117 @@
+{
+  "format": "jfnex",
+  "version": 1,
+  "name": "scale_up_vs_out",
+  "title": "Ein Server wächst oder mehrere kleine",
+  "project": "scale_up_vs_out.jfnet",
+  "load": {
+    "dev": "GEN",
+    "svc": "load",
+    "rps": [
+      400,
+      800,
+      1600,
+      2400,
+      3200,
+      4800,
+      6400
+    ]
+  },
+  "timing": {
+    "warmup_s": 5,
+    "settle_s": 5,
+    "measure_s": 20,
+    "seeds": [
+      11
+    ]
+  },
+  "slo": {
+    "p99_ms": 200,
+    "errors_pct": 1
+  },
+  "series": [
+    {
+      "name": "größer",
+      "axes": [
+        {
+          "kind": "backends",
+          "name": "Hosts",
+          "dev": "LB",
+          "svc": "lb",
+          "pool": [
+            "WEB1",
+            "WEB2",
+            "WEB3",
+            "WEB4",
+            "WEB5",
+            "WEB6",
+            "WEB7",
+            "WEB8"
+          ],
+          "counts": [
+            1
+          ]
+        },
+        {
+          "kind": "hw",
+          "name": "Server",
+          "dev": "WEB1",
+          "values": [
+            {
+              "cores": 2,
+              "speed": 1.1,
+              "ram_gb": 16
+            },
+            {
+              "cores": 4,
+              "speed": 1.1,
+              "ram_gb": 16
+            },
+            {
+              "cores": 8,
+              "speed": 1.0,
+              "ram_gb": 32
+            },
+            {
+              "cores": 16,
+              "speed": 0.95,
+              "ram_gb": 64
+            },
+            {
+              "cores": 32,
+              "speed": 0.9,
+              "ram_gb": 128
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mehr",
+      "axes": [
+        {
+          "kind": "backends",
+          "name": "Hosts",
+          "dev": "LB",
+          "svc": "lb",
+          "pool": [
+            "WEB1",
+            "WEB2",
+            "WEB3",
+            "WEB4",
+            "WEB5",
+            "WEB6",
+            "WEB7",
+            "WEB8"
+          ],
+          "counts": [
+            1,
+            2,
+            4,
+            8
+          ]
+        }
+      ]
+    }
+  ]
+}

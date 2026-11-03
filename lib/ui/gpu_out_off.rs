@@ -1,5 +1,5 @@
-// gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows only for now):
-// every frame takes the platform's path, no Vulkan code is linked
+// gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows and Linux programs
+// against glibc): every frame takes the platform's path, no Vulkan code is linked
 
 use super::{App, GpuOutput, Ui};
 
@@ -20,6 +20,17 @@ impl Ui {
     pub(crate) fn gp_plan_images(&mut self) -> bool {
         false
     }
+    pub(crate) fn gp_plan_canvases(&mut self) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_wanted(&self) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_steady(&self, _id: u32, _ver: u32) -> bool {
+        false
+    }
+    pub(crate) fn gp_canvas_begin(&mut self) {}
+    pub(crate) fn gp_canvas_damage(&mut self, _id: u32, _r: [f64; 4]) {}
     pub(crate) fn gp_split_begin(&mut self, _n: i32) -> bool {
         false
     }
@@ -45,14 +56,23 @@ impl Ui {
         GpuOutput { never: true, ..GpuOutput::default() }
     }
 
-    /// (test aid) on Windows: the device behaves as lost from now on
+    /// (test aid) where the GPU shows windows: the device behaves as lost from now on
     pub fn gpu_test_lose(&mut self) {}
 
-    /// on Windows: the pixels of the GPU's images into the framebuffer
+    /// where the GPU shows windows: the pixels of the GPU's images into the framebuffer
     pub fn gpu_settle(&mut self) {}
 
-    /// (test aid) on Windows: the bytes image textures may take
+    /// (test aid) where the GPU shows windows: the bytes image textures may take
     pub fn gpu_test_image_budget(&mut self, _bytes: u64) {}
+
+    /// (test aid) where the GPU shows windows: the bytes canvas tiles may take
+    pub fn gpu_test_canvas_budget(&mut self, _bytes: u64) {}
+
+    /// (test aid) where the GPU shows windows: the tiles go this long (ms) after the last move
+    pub fn gpu_test_canvas_unused(&mut self, _ms: u64) {}
+
+    /// where the GPU shows windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+    pub fn gpu_canvas_settle(&mut self) {}
 
     // the script command `gpu` (gpu_out.rs): a SKIP once
     pub(crate) fn sc_gpu(&mut self, _app: &mut dyn App, _a: &[u8]) {

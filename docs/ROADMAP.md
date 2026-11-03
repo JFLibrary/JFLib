@@ -1681,10 +1681,44 @@ Fensterrand hinaus.
   und Leinwände nutzen den Weg erst mit G3c. `Ui::fb()` kann dabei Pixel solcher Bilder auslassen,
   `Ui::gpu_settle()` holt sie nach. Nicht getestet: ein echter Treiber-Reset, andere GPUs, ein
   Bildcache über zwei Fenster, ein echtes Bild in RTL.
-- **P2** · *fehlt* · G3c: Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel,
-  JFNetworker, Bildbetrachter und Diagramm.
-- **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
-  Auflösungsgrenze), Browser (WebGPU).
+- **P2** · *erledigt* (2026-11-02) · G3c: Leinwand-API `ui.canvas_gpu` mit Kacheln von 256 Pixeln
+  ([`lib/ui/canvas.rs`](../lib/ui/canvas.rs), [GPU.md](GPU.md#leinwände)), genutzt von `image_view`,
+  `diagram` (damit JFNetworker), Kritzel und PaintCraft. Verschieben zeichnet in 0,6–2 ms statt 6–30
+  ms, unter 1 ms aber nur dort, wo nichts über der Leinwand gezeichnet wird; das Zoomen im Diagramm
+  dauert 0,6 statt 13 ms. Im Ruhezustand ist das Bild Byte für Byte das des CPU-Wegs: 180 ms nach der
+  letzten Bewegung zeichnet die CPU einmal neu, was 3–31 ms kostet. Während des Zoomens sind Diagramm
+  und Bildansicht bis dahin etwas weicher, Kritzel und PaintCraft zoomen auf der CPU (6 ms) und
+  weichen nie ab. `jfgui_GPU_CANVAS_CPU`, `_PAN` und `_ZOOM` schalten je Leinwand um. Auf der CPU
+  bleiben PaintCraft mit Pixelraster, Auswahl oder Werkzeug-Overlay, RTL-Fenster sowie Charts,
+  Zeitleisten und Terminal, die andere `Cmd::Custom` nutzen. Die GPU belegt je nach Leinwand 50–146
+  MiB statt 16–23 MiB, bis die Kacheln 30 s nach der letzten Bewegung gehen. Nicht getestet: ein
+  echter Treiber-Reset, Remote Desktop, andere GPUs, ein großes JFNetworker-Modell, Linux und Web nur
+  gebaut, Android nicht.
+- **P2** · *erledigt* (2026-11-02) · G4a: glibc-Build für GPU-Programme und `lib/gpu` mit Vulkan unter
+  Linux, noch ohne Fenster ([GPU.md](GPU.md#linux)). Eine Datei `apps/NAME/GLIBC` wählt den Build je
+  App, bisher nur `gputest`; statische Programme bleiben Byte für Byte gleich. Gelinkt wird ohne
+  Installation gegen selbst erzeugte Stubs, alle Importe auf `GLIBC_2.2.5`. `gputest` besteht in WSL
+  (llvmpipe) und auf einer Intel HD 610 (Mesa, Vulkan 1.4), der ersten GPU neben der RTX 2070: 1 Mio.
+  Würfel in 70 ms, 100 000 in 9,2 ms je Bild. Der Lauf fand einen echten Fehler (ein Device-Puffer
+  auf einem CPU-Adapter ließ sich beschreiben); `rgba8unorm` darf jetzt eine Stelle von k / 255
+  abweichen. Das llvmpipe auf demselben Rechner (Mesa 26, ohne AVX) stürzt ab oder rechnet falsch;
+  die UI wählt CPU-Adapter ohnehin nicht. Nicht getestet: glibc vor 2.34, NVIDIA und AMD unter Linux,
+  die Validierungsschicht unter Linux.
+- **P2** · *erledigt* (2026-11-02) · G4b: Ausgabe unter Linux als dmabuf über den eigenen Wayland- und
+  X11-Code ([GPU.md](GPU.md#ausgabe-unter-linux)), ohne libwayland und libxcb: dieselbe
+  Ausgabe wie unter Windows, mit Ebenen, Bildern und Leinwänden, standardmäßig an (`jfgui_GPU=0`
+  schaltet ab). Ein Bild geht erst an den Compositor, wenn die GPU damit fertig ist, das kostet rund
+  1 ms, hängt aber von keiner impliziten Synchronisation ab. Programme mit UI bauen gegen glibc,
+  Kommandozeilen- und Serverprogramme bleiben statisch, `--static` baut die Variante ohne GPU für
+  Systeme wie Alpine. Pakete: deb und rpm mit `libc6` / `glibc`, Vulkan empfohlen, Flatpak mit
+  `--device=dri`. Geprüft auf der HD 610 und der NVIDIA T500 mit proprietärem Treiber unter KWin, auf der Iris Xe
+  unter KWin und Mutter, jeweils Wayland und X11. Der Weg läuft nur auf der GPU des Compositors, PRIME ist nicht gebaut; eine
+  erzwungene andere GPU fällt auf den CPU-Pfad zurück. Auf der HD 610 kostet er 1,7–2,6 ms GPU je Bild
+  bei 1280 × 800 und rund 40 MiB RSS plus 25–50 MiB im Treiber, im Leerlauf nichts. Nicht getestet: AMD,
+  die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, ein echter Treiber-Reset, die Validierungsschicht
+  unter Linux, glibc vor 2.34, ein installiertes Paket auf einem System mit GPU.
+- **P2** · *fehlt* · G4c: Android (Vulkan über die C-Brücke, ohne Auflösungsgrenze).
+- **P2** · *fehlt* · G4d: Browser (WebGPU, Shader direkt als WGSL).
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
   Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
@@ -2160,31 +2194,37 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Nicht-Rust-Verträge (`PERMISSIONS`-Syntax, `PACKAGE`-Schlüssel, Skriptsprache) bei einer
   Version, Git-Tags und Veröffentlichung (bewusst Handarbeit), eine Versionsprüfung beim
   Bauen fremder Apps gegen eine Mindestversion der Library.
-- **P2** · *teilweise* · Website und Dokumentation für die Library. Generator erledigt
-  (2026-10-21, [`tools/site.py`](../tools/site.py), nur Python-Standardbibliothek):
-  `python build_rs.py site [--out DIR]` schreibt eine statische Website nach `build/site/`, die
-  auch ohne Server aus dem Dateisystem läuft. Startseite aus den Abschnitten der README
-  (Einführung, Funktionen als Karten, Feature-Tour mit den Screenshots, Plattformen,
-  Schnellstart, Dokumentation, Lizenz); als Seiten README, die Dokumente aus `docs/`, die
-  App-READMEs, Changelog, Roadmap (als deutsch markiert, wie alle deutschen Seiten) und
+- **P2** · *teilweise* · Website und Dokumentation für die Library. Die Website liegt im eigenen
+  Repository [JFLibrary/jflibWebsite](https://github.com/JFLibrary/jflibWebsite): Startseite,
+  Features und Apps von Hand gepflegt, ein Workflow baut und veröffentlicht sie, vorerst als
+  Vorschau, mit Docs und Galerie aus dem JFLib-Commit in ihrer `jflib.lock`. Hier bleibt der
+  Generator der Docs (2026-10-21, seit 2026-11-02 nur noch die Docs,
+  [`tools/site.py`](../tools/site.py), nur Python-Standardbibliothek), denn seine Prüfung läuft in
+  jeder Suite und er liest die Dokumente von hier: `python build_rs.py site [--out DIR]` schreibt
+  sie nach `build/site/`, der Build der Website legt sie in ihren Ordner `docs/`. Kopfleiste, Fuß,
+  Farben und Schriften wie auf der Website, die Links dorthin und die Schriften liegen einen Ordner
+  höher; ohne Website gelten die Systemschriften. Eine schlichte Startseite aus der Tabelle `DOCS`
+  (Kacheln für Entwicklerhandbuch, API-Referenz, Changelog und Roadmap, darunter die übrigen
+  Anleitungen und die Apps); als Seiten README, die Dokumente aus `docs/` (ohne dieses Präfix im
+  Pfad), die App-READMEs, Changelog, Roadmap (als deutsch markiert, wie alle deutschen Seiten) und
   Drittanbieter-Hinweise; GUIDE.md mit einer Seite pro Abschnitt (Vor/Zurück), API.md mit einer
   Seite pro Crate (große Crates pro Abschnitt bzw. Modul) und einem Anker für jedes Item
   (`#fn.run`, `#Ui.text`). Die GitHub-Anker der Überschriften gelten weiter, Links auf `.md`
   werden zu Seite und Anker, andere Dateien und Ordner des Repositorys zu GitHub-Links.
   Navigation an der Seite (am Telefon als Schublade), Kopfleiste mit Suche über Titel,
   Überschriften und API-Items, helles und dunkles Design (System oder Schalter, gemerkt in
-  localStorage), Rust-Code farbig, keine fremden Schriften oder CDNs. Der Markdown-Konverter
+  localStorage unter demselben Schlüssel wie auf der Website), Rust-Code farbig, keine fremden
+  Schriften oder CDNs. Der Markdown-Konverter
   kann genau das, was die Dokumente nutzen (Tabellen, Code-Blöcke auch in Listen, verschachtelte
   Listen, `<img>`, `<br>`, `<a id>`); anderes HTML erscheint als Text.
   `python build_rs.py site --check` (läuft in jeder Suite, einige Sekunden) baut in einen
   temporären Ordner und prüft interne Links und Anker, Bilder, Links auf Repository-Dateien
   (auch deren Anker), die HTML-Verschachtelung, Titel, Beschreibung und Sprache jeder Seite,
-  dass kein lokaler Pfad in der Ausgabe steht und dass zwei Läufe byteweise gleich sind.
-  Es fehlt die Veröffentlichung, bewusst offen (Entscheidung des Maintainers): etwa GitHub
-  Pages über einen Workflow (bei jedem Push auf `main`: `python build_rs.py site`, dann
-  `actions/upload-pages-artifact` mit `build/site` und `actions/deploy-pages`; in den
-  Repository-Einstellungen Pages mit der Quelle „GitHub Actions“), ein `gh-pages`-Zweig oder ein
-  beliebiger statischer Host; dazu wahlweise eine eigene Domain und eine Fassung pro Release.
+  dass kein lokaler Pfad in der Ausgabe steht und dass zwei Läufe byteweise gleich sind. Die
+  Website selbst braucht sie nicht: Was den Ordner verlässt, muss eine der bekannten Seiten und
+  Schriften der Website aus der richtigen Tiefe sein, und jede Seite muss alle diese Seiten
+  verlinken. Es fehlt der Start auf jflib.org (bisher die Vorschau mit `--preview`), dazu wahlweise
+  eine Fassung der Docs pro Release.
 - **P3** · *erledigt* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
   Live-Inspector erledigt (2026-10-20, [GUIDE.md §30](GUIDE.md), `lib/ui/inspect.rs`): aus
   ohne Kosten und ohne Einfluss auf die Bilder (byteweise gleich), an mit `--inspect`,

@@ -6,6 +6,7 @@ use alloc::format;
 use alloc::string::String;
 
 use ui::*;
+use ui::i18n::{t, tf};
 
 use crate::{cap, Gal};
 
@@ -44,9 +45,11 @@ impl Default for S {
             tb_pw: String::new(),
             tb_num: 5,
             tb_commits: 0,
-            ml_text: String::from("Zeile 1\nZeile 2\nZeile 3"),
-            ml_wrap: String::from(
-                "Ein langer Absatz, der am Rand des Textfelds umgebrochen wird, damit alles sichtbar bleibt.\nZweiter Absatz.",
+            ml_text: format!("{0} 1\n{0} 2\n{0} 3", t("Zeile")),
+            ml_wrap: format!(
+                "{}\n{}",
+                t("Ein langer Absatz, der am Rand des Textfelds umgebrochen wird, damit alles sichtbar bleibt."),
+                t("Zweiter Absatz.")
             ),
             ml_commits: 0,
             u2_num: 7,
@@ -60,18 +63,18 @@ impl Default for S {
 /// the "Eingabe: ..." line
 pub(crate) fn text_input(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.edit;
-    ui.text(TS_SUBTITLE, "Texteingabe");
+    ui.text(TS_SUBTITLE, t("Texteingabe"));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
     ui.next_size(240, 0);
-    if ui.textbox(ID_TB_NAME, Some("Name eingeben"), &mut s.tb_name, 64) & EV_COMMIT != 0 {
+    if ui.textbox(ID_TB_NAME, Some(t("Name eingeben")), &mut s.tb_name, 64) & EV_COMMIT != 0 {
         s.tb_commits += 1;
     }
     ui.next_size(180, 0);
-    ui.textbox(ID_TB_PW, Some("Kennwort"), &mut s.tb_pw, 32 | TB_PASSWORD);
+    ui.textbox(ID_TB_PW, Some(t("Kennwort")), &mut s.tb_pw, 32 | TB_PASSWORD);
     ui.number_box(ID_TB_NUM, &mut s.tb_num, &RANGE_TB_NUM);
     ui.box_end();
-    let t = cap(format!("Eingabe: {}   (übernommen: {}, Zahl: {})", s.tb_name, s.tb_commits, s.tb_num), 192);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
+    let line = cap(tf("Eingabe: {}   (übernommen: {}, Zahl: {})", &[&s.tb_name, &format!("{}", s.tb_commits), &format!("{}", s.tb_num)]), 192);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
 }
 
 /// gal_texts' multi-line boxes: a row with "Mehrzeilig" (TB_MULTI) and "Umbruch" (TB_MULTI
@@ -80,21 +83,21 @@ pub(crate) fn text_boxes(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.edit;
     ui.box_begin(0, BOX_H, 16);
     ui.next_size(300, 0);
-    if ui.textbox(ID_TXT_MULTI, Some("Mehrzeilig"), &mut s.ml_text, 512 | TB_MULTI) & EV_COMMIT != 0 {
+    if ui.textbox(ID_TXT_MULTI, Some(t("Mehrzeilig")), &mut s.ml_text, 512 | TB_MULTI) & EV_COMMIT != 0 {
         s.ml_commits += 1;
     }
     ui.next_size(240, 120);
-    ui.textbox(ID_TXT_WRAP, Some("Umbruch"), &mut s.ml_wrap, 1024 | TB_MULTI | TB_WRAP);
+    ui.textbox(ID_TXT_WRAP, Some(t("Umbruch")), &mut s.ml_wrap, 1024 | TB_MULTI | TB_WRAP);
     ui.box_end();
-    let t = cap(format!("Übernommen: {}", s.ml_commits), 64);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
+    let line = cap(tf("Übernommen: {}", &[&format!("{}", s.ml_commits)]), 64);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
 }
 
 /// gal_u2's number boxes: the row "Zahl:", number_box, number_box_f, "Wert %d, Übernahmen %d"
 pub(crate) fn u2_numbers(g: &mut Gal, ui: &mut Ui) {
     let s = &mut g.edit;
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.text(TS_BODY, "Zahl:");
+    ui.text(TS_BODY, t("Zahl:"));
     ui.next_size(100, 0);
     if ui.number_box(ID_U2_NUM, &mut s.u2_num, &RG_U2_NUM) & EV_COMMIT != 0 {
         s.u2_commits += 1;
@@ -103,8 +106,8 @@ pub(crate) fn u2_numbers(g: &mut Gal, ui: &mut Ui) {
     if ui.number_box_f(ID_U2_NUMF, &mut s.u2_numf, &RG_U2_NUMF) & EV_COMMIT != 0 {
         s.u2_commits += 1;
     }
-    let t = cap(format!("Wert {}, Übernahmen {}", s.u2_num, s.u2_commits), 64);
-    ui.text(TS_BODY | TX_SECONDARY, &t);
+    let line = cap(tf("Wert {}, Übernahmen {}", &[&format!("{}", s.u2_num), &format!("{}", s.u2_commits)]), 64);
+    ui.text(TS_BODY | TX_SECONDARY, &line);
     ui.box_end();
 }
 

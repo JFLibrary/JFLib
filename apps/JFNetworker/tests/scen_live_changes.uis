@@ -1,0 +1,6 @@
+#!args apps/JFNetworker/tests/fixtures/live_changes.jfnet --scenario apps/JFNetworker/tests/scen/live_changes.scn --golden apps/JFNetworker/tests/scen/live_changes.report
+# golden scenario: what changes under load (load set, lb, kv set, svc set, cache clear): each step
+# acts on running services, their counters go on and none restarts.  The GUI program runs
+# tests/scen/live_changes.scn on tests/fixtures/live_changes.jfnet without a window and ends with the
+# report, which must equal tests/scen/live_changes.report byte for byte on every target (the script
+# itself is not run)

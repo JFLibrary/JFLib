@@ -466,6 +466,7 @@ fn canvas_area(p: &mut Kritzel, ui: &mut Ui) {
     let m = ui.dp(SLIDER_CARD_DIP);
     let rc = inp.rect;
     view::view_layout(p, ui, rc[0] + m, rc[1], rc[2] - m, rc[3]);
+    view::view_canvas_gpu(p, ui);
     let doc_ver = doc::doc_version(&p.doc);
     tools::tool_input(p, ui, &inp);
     // changed pixels (this pass's tool, commands since the last pass): only their part

@@ -1,0 +1,36 @@
+de	en
+JFLib Drag & Drop	JFLib Drag & Drop
+Apfel	Apple
+Birne	Pear
+Kirsche	Cherry
+Text	Text
+Bild	Image
+Dateien	Files
+HTML	HTML
+URL	URL
+kopieren	copy
+verschieben	move
+verknüpfen	link
+keine	none
+Frucht	Fruit
+? {} Bytes	? {} bytes
+Text {} -> {}	Text {} -> {}
+{}-Ziel	{} target
+{} Datei(en): {}	{} file(s): {}
+{} -> {}-Ziel ({})	{} -> {} target ({})
+Hallo aus JFLib	Hello from JFLib
+Bild 4x3	Image 4x3
+Drag & Drop	Drag & Drop
+Regal	Shelf
+Korb A	Basket A
+Korb B	Basket B
+Text ziehen	Drag text
+Bild ziehen	Drag image
+Datei ziehen	Drag file
+{} bei {},{}	{} at {},{}
+Ziehen: {}  Über: {}	Dragging: {}  Over: {}
+Abgelegt: {}	Dropped: {}
+Ende: {}	End: {}
+{} Datei(en)	{} file(s)
+Text {}	Text {}
+{} bei {},{} (Fenster {})	{} at {},{} (window {})

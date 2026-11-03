@@ -389,7 +389,7 @@ pub(crate) fn update(n: &mut Net) {
     }
     n.canvas.grp.seen = seen;
     let mut probs: BTreeMap<u32, (u32, u32)> = BTreeMap::new();
-    if !n.canvas.scene.clusters.is_empty() {
+    if !n.canvas.scene.clusters.is_empty() && !crate::workspace::task::lock(n).problems {
         let list = n.doc.sim.problems();
         let hidden = &n.canvas.scene.hidden;
         for x in list.iter() {

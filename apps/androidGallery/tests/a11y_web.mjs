@@ -36,7 +36,7 @@ const browser=await chromium.launch({...(channel?{channel}:chromiumOptions()),he
 let checks=0;
 const ok=(cond,what)=>{assert.ok(cond,what);checks++;};
 try {
-  const page=await browser.newPage({viewport:{width:420,height:900}});
+  const page=await browser.newPage({locale:'de-DE',viewport:{width:420,height:900}});
   const errors=[];
   page.on('pageerror',e=>errors.push(String(e)));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -58,7 +58,7 @@ try {
   // Chromium collapses the white space of names
   const find=(tree,role,name)=>tree.find(n=>n.role===role && (name===undefined || n.name===name.replace(/\s+/g,' ')));
   let ax=await axTree();
-  ok(find(ax,'region','jfgui Pocket Gallery'),'the main window is a region named by its title');
+  ok(find(ax,'region','JFLib Pocket Gallery'),'the main window is a region named by its title');
   ok(find(ax,'button','Klick mich') && find(ax,'button','Reset'),'buttons');
   ok(find(ax,'checkbox','Option aktivieren')?.props.checked==='false','check box, unchecked');
   ok(find(ax,'switch','Regler aktiv')?.props.checked==='true','switch, on');
@@ -145,7 +145,7 @@ try {
   ok(errors.length===0,'no page errors: '+errors.join('; '));
 
   // ?a11y=0: no shadow tree
-  const off=await browser.newPage({viewport:{width:420,height:900}});
+  const off=await browser.newPage({locale:'de-DE',viewport:{width:420,height:900}});
   await off.goto(base+'?a11y=0');
   await off.waitForFunction(()=>document.body.dataset.compute);
   await off.waitForTimeout(500);

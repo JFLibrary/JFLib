@@ -1,0 +1,3 @@
+#!args --test canvasplain
+# a canvas without reading back: during a gesture the framebuffer lacks the view, Ui::gpu_settle gives
+# it; at rest it holds it

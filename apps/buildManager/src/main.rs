@@ -1,4 +1,4 @@
-// jfguiLib Build Manager: native WinUI workspace, profiles, queue and release packages.
+// JFLib Build Manager: native WinUI workspace, profiles, queue and release packages.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -11,7 +11,7 @@ use agent_core::{json, Value};
 use ui::*;
 use client::Client;
 
-const DESC: AppDesc = AppDesc { title: "jfguiLib Build Manager", flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR,
+const DESC: AppDesc = AppDesc { title: "JFLib Build Manager", flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR,
     w: 1320, h: 900, min_w: 1000, min_h: 720, ..AppDesc::NONE };
 const PACKAGE_KEYS: [&str; 11] = ["display", "version", "publisher", "summary", "description", "generic", "categories", "deb_name", "default_win", "default_linux", "styles"];
 const PACKAGE_LABELS: [&str; 11] = ["Anzeigename", "Version", "Herausgeber", "Kurzbeschreibung", "Beschreibung", "Programmtyp", "Kategorien", "Debian-Paketname", "Windows-Standard", "Linux-Standard", "Paket-Styles"];
@@ -274,7 +274,7 @@ impl App for Manager {
         ui.box_begin(101, BOX_H | BOX_FIXED | BOX_XCENTER, 12);
         ui.next_size(-1, 0); ui.box_begin(102, BOX_V, 2);
         ui.text(TS_TITLE, "Build Manager");
-        ui.text(TS_CAPTION | TX_SECONDARY, "jfguiLib · Apps, Builds und Releases"); ui.box_end();
+        ui.text(TS_CAPTION | TX_SECONDARY, "JFLib · Apps, Builds und Releases"); ui.box_end();
         if ui.button(110, "Hell / Dunkel") & EV_ACT != 0 { ui.theme_set(u32::from(!ui.theme_dark())); }
         if ui.button(111, "Projekt & Werkzeuge") & EV_ACT != 0 { self.settings.set(1); }
         if ui.button(112, "Aktualisieren") & EV_ACT != 0 { self.send("catalog", object()); }

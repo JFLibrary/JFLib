@@ -99,7 +99,7 @@ for(const engine of option('engines','chromium').split(',')) {
     const flags=engine==='chromium' ? ['--autoplay-policy=no-user-gesture-required'] : [];
     const firefoxPrefs=engine==='firefox' ? {firefoxUserPrefs:{'media.autoplay.default':0,'media.autoplay.block-webaudio':false}} : {};
     const browser=await pw[engine].launch({headless:true,args:flags,...firefoxPrefs,...(engine==='chromium'?chromiumOptions():{})});
-    const page=await (await browser.newContext({viewport:{width:900,height:820}})).newPage();
+    const page=await (await browser.newContext({locale:'de-DE',viewport:{width:900,height:820}})).newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(String(e)));
     page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});

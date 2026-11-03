@@ -37,7 +37,7 @@ let checks=0;
 const ok=(cond,what)=>{assert.ok(cond,what);checks++;};
 const browser=await launchWasm(pw.chromium,{...chromiumOptions(),headless:!args.includes('--headed')});
 try {
-  const context=await browser.newContext({viewport:{width:412,height:860},deviceScaleFactor:2,hasTouch:true,isMobile:true});
+  const context=await browser.newContext({locale:'de-DE',viewport:{width:412,height:860},deviceScaleFactor:2,hasTouch:true,isMobile:true});
   const page=await context.newPage();
   const errors=[];
   page.on('pageerror',e=>errors.push(String(e)));

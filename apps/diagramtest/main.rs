@@ -19,6 +19,8 @@
 // (4)" at their middle, which a double click opens again; edges into it end at the cluster,
 // the one inside is hidden) and the area "Fläche" under N25 and N26 (DN_RESIZE | DN_OUTLINE,
 // key 600: its handle resizes it).
+//
+// --grid N adds N x N boxes with their edges below the 30 (a big model for measurements).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -34,8 +36,9 @@ use core::cell::RefCell;
 
 use gfx::dash::{DASH_DASH, DASH_SOLID, LCAP_ARROW_FILLED, LCAP_FLAT};
 use ui::*;
+use ui::i18n::{t, tf, list, Catalog};
 
-const DESC: AppDesc = AppDesc { title: "Diagramm-Test", flags: AF_RESIZABLE, w: 1100, h: 760, min_w: 640, min_h: 480, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "Diagramm-Test", flags: AF_RESIZABLE, w: 1100, h: 760, min_w: 640, min_h: 480, ..AppDesc::NONE }; // i18n
 
 const ID_DIAGRAM: u32 = 100;
 const ID_MINI: u32 = 101;
@@ -299,9 +302,22 @@ impl Scene {
         s.add_edge(p(29, 2), p(30, 1), DR_BEZIER, &[], false);
         s.add_edge(p(12, 4), p(18, 3), DR_STRAIGHT, &[], false);
         s.add_edge(p(18, 4), p(24, 3), DR_ORTHO, &[], false);
+        if let Some(g) = plat::arg_value("--grid").and_then(|v| v.parse::<u64>().ok()) {
+            for y in 0..g {
+                for x in 0..g {
+                    let k = s.add_node(32.0 + x as f32 * 168.0, 800.0 + y as f32 * 104.0);
+                    if x > 0 {
+                        s.add_edge(port_key(k - 1, 2), port_key(k, 1), DR_BEZIER, &[], false);
+                    }
+                    if y > 0 {
+                        s.add_edge(port_key(k - g, 4), port_key(k, 3), DR_ORTHO, &[], false);
+                    }
+                }
+            }
+        }
         if plat::args().iter().any(|a| a == "--frames") {
             s.frames.push(Frame { key: FRAME0 + 1, label: String::from("G1"), members: alloc::vec![n(8), n(9), n(14), n(15)], collapsed: false, rect: [0.0; 4] });
-            s.areas.push(Area { key: AREA0 + 1, label: String::from("Fläche"), rect: [32.0, 472.0, 304.0, 104.0] });
+            s.areas.push(Area { key: AREA0 + 1, label: String::from(t("Fläche")), rect: [32.0, 472.0, 304.0, 104.0] });
         }
         s.rebuild();
         s
@@ -457,7 +473,7 @@ impl DiagramTest {
             f.members.retain(|m| !sel.contains(m));
         }
         sc.rebuild();
-        self.last = format!("Gelöscht: {}", sel.len());
+        self.last = tf("Gelöscht: {}", &[&format!("{}", sel.len())]);
     }
 
     fn handle(&mut self, ev: DEv) {
@@ -470,20 +486,21 @@ impl DiagramTest {
                 }
                 sc.rebuild();
                 if done {
-                    self.last = format!("Verschoben: {}", keys.len());
+                    self.last = tf("Verschoben: {}", &[&format!("{}", keys.len())]);
                 }
             }
             DEv::Connect { from, to, quick } => {
                 let mut sc = self.sc.borrow_mut();
                 sc.add_edge(from, to, self.route, &[], false);
                 sc.rebuild();
-                self.last = format!("Verbunden: {}-{}{}", sc.label(from), sc.label(to), if quick { " (schnell)" } else { "" });
+                let fast = if quick { format!(" ({})", t("schnell")) } else { String::new() };
+                self.last = tf("Verbunden: {}-{}{}", &[&sc.label(from), &sc.label(to), &fast]);
             }
             DEv::ConnectDrag { over, .. } => {
                 let sc = self.sc.borrow();
-                self.last = if over != 0 { format!("Verbinden mit {}", sc.label(over)) } else { String::from("Verbinden …") };
+                self.last = if over != 0 { tf("Verbinden mit {}", &[&sc.label(over)]) } else { String::from(t("Verbinden …")) };
             }
-            DEv::ConnectCancel => self.last = String::from("Verbinden abgebrochen"),
+            DEv::ConnectCancel => self.last = String::from(t("Verbinden abgebrochen")),
             DEv::Waypoint { edge, idx, at, insert, done } => {
                 let mut sc = self.sc.borrow_mut();
                 if let Some(e) = sc.edges.iter_mut().find(|e| e.key == edge) {
@@ -496,7 +513,7 @@ impl DiagramTest {
                 }
                 sc.rebuild();
                 if done {
-                    self.last = format!("Wegpunkt {}: {},{}", idx + 1, at[0] as i32, at[1] as i32);
+                    self.last = tf("Wegpunkt {}: {},{}", &[&format!("{}", idx + 1), &format!("{}", at[0] as i32), &format!("{}", at[1] as i32)]);
                 }
             }
             DEv::WaypointDelete { edge, idx } => {
@@ -507,7 +524,7 @@ impl DiagramTest {
                     }
                 }
                 sc.rebuild();
-                self.last = format!("Wegpunkt {} entfernt", idx + 1);
+                self.last = tf("Wegpunkt {} entfernt", &[&format!("{}", idx + 1)]);
             }
             DEv::Delete => self.delete(),
             DEv::Click { at } => {
@@ -515,14 +532,14 @@ impl DiagramTest {
                     let mut sc = self.sc.borrow_mut();
                     let k = sc.add_node(at[0] - NW * 0.5, at[1] - NH * 0.5);
                     sc.rebuild();
-                    self.last = format!("Platziert: {}", sc.label(k));
+                    self.last = tf("Platziert: {}", &[&sc.label(k)]);
                 }
             }
-            DEv::DoubleClick { at } => self.last = format!("Doppelklick: {},{}", rnd(at[0] as f64), rnd(at[1] as f64)),
+            DEv::DoubleClick { at } => self.last = tf("Doppelklick: {},{}", &[&format!("{}", rnd(at[0] as f64)), &format!("{}", rnd(at[1] as f64))]),
             DEv::Activate(h) => {
                 // a cluster opens again
                 let mut sc = self.sc.borrow_mut();
-                self.last = format!("Aktiviert: {}", sc.label(h.key()));
+                self.last = tf("Aktiviert: {}", &[&sc.label(h.key())]);
                 if let Some(f) = sc.frames.iter_mut().find(|f| f.key == h.key() && f.collapsed) {
                     f.collapsed = false;
                     sc.rebuild();
@@ -534,7 +551,7 @@ impl DiagramTest {
                     f.collapsed = !f.collapsed;
                 }
                 sc.rebuild();
-                self.last = format!("Umgeschaltet: {}", sc.label(k));
+                self.last = tf("Umgeschaltet: {}", &[&sc.label(k)]);
             }
             DEv::Resize { key, rect, done } => {
                 let mut sc = self.sc.borrow_mut();
@@ -543,12 +560,12 @@ impl DiagramTest {
                 }
                 sc.rebuild();
                 if done {
-                    self.last = format!("Größe: {}x{}", rect[2] as i32, rect[3] as i32);
+                    self.last = tf("Größe: {}x{}", &[&format!("{}", rect[2] as i32), &format!("{}", rect[3] as i32)]);
                 }
             }
             DEv::Context(h, _) => {
-                let what = if h == DHit::None { String::from("Hintergrund") } else { self.sc.borrow().label(h.key()) };
-                self.last = format!("Kontext: {}", what);
+                let what = if h == DHit::None { String::from(t("Hintergrund")) } else { self.sc.borrow().label(h.key()) };
+                self.last = tf("Kontext: {}", &[&what]);
             }
             DEv::Select | DEv::ViewChanged => {}
         }
@@ -558,31 +575,31 @@ impl DiagramTest {
         let sc = self.sc.borrow();
         let st = &self.st;
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_LAYER | pad(6), 16);
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Auswahl: {}", st.sel.len()));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Auswahl: {}", &[&format!("{}", st.sel.len())]));
         let z = (st.vp.zoom * 100.0 + 0.5) as i32;
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Zoom: {} %", z));
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Mitte: {},{}", rnd(st.vp.cx), rnd(st.vp.cy)));
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Knoten: {}", sc.nodes.len()));
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Kanten: {}", sc.edges.len()));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Zoom: {} %", &[&format!("{}", z)]));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Mitte: {},{}", &[&format!("{}", rnd(st.vp.cx)), &format!("{}", rnd(st.vp.cy))]));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Knoten: {}", &[&format!("{}", sc.nodes.len())]));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Kanten: {}", &[&format!("{}", sc.edges.len())]));
         let focus = if st.focus != 0 { sc.label(st.focus) } else { String::from("–") };
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Fokus: {}", focus));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Fokus: {}", &[&focus]));
         if st.sel.len() == 1 {
             let k = *st.sel.iter().next().unwrap_or(&0);
             if let Some(fr) = sc.frames.iter().find(|f| f.key == k) {
-                ui.text(TS_CAPTION | TX_SECONDARY, &format!("Rahmen: {},{} {}x{}", fr.rect[0] as i32, fr.rect[1] as i32, fr.rect[2] as i32, fr.rect[3] as i32));
+                ui.text(TS_CAPTION | TX_SECONDARY, &tf("Rahmen: {},{} {}x{}", &[&format!("{}", fr.rect[0] as i32), &format!("{}", fr.rect[1] as i32), &format!("{}", fr.rect[2] as i32), &format!("{}", fr.rect[3] as i32)]));
             } else if let Some(a) = sc.areas.iter().find(|a| a.key == k) {
-                ui.text(TS_CAPTION | TX_SECONDARY, &format!("Fläche: {},{} {}x{}", a.rect[0] as i32, a.rect[1] as i32, a.rect[2] as i32, a.rect[3] as i32));
+                ui.text(TS_CAPTION | TX_SECONDARY, &tf("Fläche: {},{} {}x{}", &[&format!("{}", a.rect[0] as i32), &format!("{}", a.rect[1] as i32), &format!("{}", a.rect[2] as i32), &format!("{}", a.rect[3] as i32)]));
             } else if let Some(&i) = sc.at.get(&k) {
                 let r = sc.nodes[i].rect;
-                ui.text(TS_CAPTION | TX_SECONDARY, &format!("Position: {},{}", r[0] as i32, r[1] as i32));
+                ui.text(TS_CAPTION | TX_SECONDARY, &tf("Position: {},{}", &[&format!("{}", r[0] as i32), &format!("{}", r[1] as i32)]));
             } else if let Some(e) = sc.edges.iter().find(|e| e.key == k) {
-                ui.text(TS_CAPTION | TX_SECONDARY, &format!("Wegpunkte: {}", e.wps.len()));
+                ui.text(TS_CAPTION | TX_SECONDARY, &tf("Wegpunkte: {}", &[&format!("{}", e.wps.len())]));
             }
         }
         if let Some(fr) = sc.frames.first() {
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("Gruppe: {}", if fr.collapsed { "zugeklappt" } else { "aufgeklappt" }));
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("Gruppe: {}", &[if fr.collapsed { t("zugeklappt") } else { t("aufgeklappt") }]));
         }
-        ui.text(TS_CAPTION | TX_SECONDARY, &format!("Ereignis: {}", self.last));
+        ui.text(TS_CAPTION | TX_SECONDARY, &tf("Ereignis: {}", &[&self.last]));
         ui.box_end();
     }
 }
@@ -593,38 +610,38 @@ impl App for DiagramTest {
         ui.box_begin(0, BOX_V | BOX_FIXED, 0);
         // the tool bar
         ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_LAYER | pad(6), 6);
-        for (k, name) in TOOLS.iter().enumerate() {
+        for (k, name) in list(&TOOLS).iter().enumerate() {
             ui.next_flags(if self.tool == k as u32 { ST_CHECKED } else { 0 });
             if ui.button(ID_TOOL + k as u32, name) & EV_ACT != 0 {
                 self.tool = k as u32;
             }
         }
         ui.separator();
-        for (k, name) in ROUTES.iter().enumerate() {
+        for (k, name) in list(&ROUTES).iter().enumerate() {
             ui.next_flags(if self.route == k as u8 { ST_CHECKED } else { 0 });
             if ui.button(ID_ROUTE + k as u32, name) & EV_ACT != 0 {
                 self.route = k as u8;
             }
         }
         ui.separator();
-        if ui.button(ID_ADD, "Knoten hinzufügen") & EV_ACT != 0 {
+        if ui.button(ID_ADD, t("Knoten hinzufügen")) & EV_ACT != 0 {
             let (cx, cy) = (self.st.vp.cx as f32, self.st.vp.cy as f32);
             let g = 16.0;
             let (x, y) = (((cx - NW * 0.5) / g + 0.5) as i32 as f32 * g, ((cy - NH * 0.5) / g + 0.5) as i32 as f32 * g);
             let mut sc = self.sc.borrow_mut();
             let k = sc.add_node(x, y);
             sc.rebuild();
-            self.last = format!("Hinzugefügt: {}", sc.label(k));
+            self.last = tf("Hinzugefügt: {}", &[&sc.label(k)]);
         }
         ui.next_flags(if self.st.sel.is_empty() { ST_DISABLED } else { 0 });
-        if ui.button(ID_DEL, "Löschen") & EV_ACT != 0 {
+        if ui.button(ID_DEL, t("Löschen")) & EV_ACT != 0 {
             self.delete();
         }
-        if ui.button(ID_FIT, "Einpassen") & EV_ACT != 0 {
+        if ui.button(ID_FIT, t("Einpassen")) & EV_ACT != 0 {
             self.st.request_fit();
         }
         let mut snap = self.st.snap as i32;
-        ui.checkbox(ID_SNAP, "Am Raster ausrichten", &mut snap);
+        ui.checkbox(ID_SNAP, t("Am Raster ausrichten"), &mut snap);
         self.st.snap = snap != 0;
         ui.box_end();
         // the canvas with its overview and its records
@@ -654,4 +671,7 @@ impl App for DiagramTest {
     }
 }
 
-ui::main!(ui::launch(&DESC, DiagramTest::new(), &style::STYLE));
+ui::main!({
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), DiagramTest::new(), &style::STYLE)
+});

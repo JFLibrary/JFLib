@@ -18,7 +18,7 @@
 //   edge_grips()   resize handles for frameless windows on Linux (the runtime calls it;
 //        also for resizable secondary windows with the library frame); the caption buttons
 //        win over them where they are
-//   titlebar_begin(title, icon) / titlebar_end()
+//   titlebar_begin(title, icon) / titlebar_end() / titlebar_open()
 //        custom title bar row (style: SM_TB_H, SM_TB_H_LARGE with next_flags(ST_LARGE)):
 //        icon + title, then the caller's widgets; empty parts are an HB_DRAG region, the end
 //        adds the caption buttons (HB_MIN / HB_MAX / HB_CLOSE; with SM_CAP_LEFT the begin puts
@@ -121,6 +121,8 @@ pub(crate) struct W {
     tb_state: u32,
     /// This titlebar overlays app content and places the agent badge by the window controls.
     tb_overlay: bool,
+    /// the title bar being built, the style's window_titlebar behind it (reset with the pass)
+    pub(crate) tb_rect: Option<[i32; 4]>,
     /// dialog_buttons closed the content box of a dialog window
     wc_footer: bool,
     /// the caption buttons' hit boxes of this pass: edge_grips puts them on top again, so
@@ -530,6 +532,7 @@ impl Ui {
         let mut sp = Sp { value: (tbs & plat::WST_ACTIVE != 0) as i32, ..Default::default() };
         sp.place(self.wp.ctx.last_rect);
         if !overlay { st.window_titlebar(self, &sp); }
+        self.wp.chrome.tb_rect = if overlay { None } else { Some(self.wp.ctx.last_rect) };
         // the whole bar is a drag region; widgets placed on it later win the hit test
         let ev = self.behave(TB_ID, HB_DRAG);
         self.tb_clicks(ev, tbs);
@@ -594,6 +597,16 @@ impl Ui {
             }
         }
         self.box_end();
+        self.wp.chrome.tb_rect = None;
+    }
+
+    /// The title bar being built, between `titlebar_begin` and `titlebar_end` (None elsewhere
+    /// and on an overlay, which paints no bar): its rectangle (px) and whether the window is
+    /// active.  For a style whose bar has the same colours in every theme (classic): a widget
+    /// drawn right on it cannot use the theme's T_TEXT.
+    pub fn titlebar_open(&self) -> Option<([i32; 4], bool)> {
+        let c = &self.wp.chrome;
+        c.tb_rect.map(|r| (r, c.tb_state & plat::WST_ACTIVE != 0))
     }
 
     // tb_clicks(ev, state): the presses on the empty part of the title bar (behave's events

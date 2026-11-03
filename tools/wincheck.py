@@ -314,7 +314,7 @@ def events(log):
 
 def run_checks(a, proc, log, dy, b_tool, b_dlg, w_tool, w_dlg, slider, textbox, cancel, tool_png, dlg_png,
                closeb):
-    main = find(proc.pid, "jfgui Galerie", 10)
+    main = find(proc.pid, "JFLib Galerie", 10)
     if not check(main is not None, "main window appears"):
         return
     time.sleep(0.8)
@@ -485,7 +485,7 @@ def check_popups(a):
                              "--log-events", "--popups-window", "--auto-close", "60000"],
                             stdout=logf, stderr=subprocess.STDOUT, cwd=ROOT)
     try:
-        main = find(proc.pid, "jfgui Galerie")
+        main = find(proc.pid, "JFLib Galerie")
         tool = find(proc.pid, "Popups")
         if not check(bool(main and tool), "main window and tool window \"Popups\" shown"):
             return
@@ -609,7 +609,7 @@ def check_edges(a):
     proc = subprocess.Popen([exe, "--size", "600x400", "--anim", "off", "--theme", "light", "--log-events",
                              "--popup-edges", "--auto-close", "60000"], stdout=logf, stderr=subprocess.STDOUT, cwd=ROOT)
     try:
-        main = find(proc.pid, "jfgui Galerie")
+        main = find(proc.pid, "JFLib Galerie")
         if not check(bool(main), "main window shown"):
             return
         time.sleep(0.5)

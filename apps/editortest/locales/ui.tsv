@@ -1,0 +1,47 @@
+de	en
+JFLib Editoren	JFLib Editors
+Code	Code
+Rich-Text	Rich text
+Fertiges Rich-Text-Widget	Ready-made rich text widget
+Ein Absatz mit 	A paragraph with 
+fett	bold
+kursiv	italic
+unterstrichen	underlined
+durchgestrichen	strikethrough
+rot	red
+groß	large
+Serifen	serif
+markiert	highlighted
+ und einem 	 and a 
+Listen	Lists
+Erster Punkt	First item
+Zweiter Punkt mit Unterpunkt	Second item with a sub-item
+Unterpunkt	Sub-item
+Schritt eins	Step one
+Schritt zwei	Step two
+Teilschritt	Sub-step
+Ein Zitat steht eingerückt mit einem Balken davor.	A quotation is indented with a bar in front of it.
+Zentrierter Absatz	Centered paragraph
+Blocksatz verteilt den Platz einer Zeile auf ihre Leerzeichen, so dass beide Ränder gerade sind; die letzte Zeile des Absatzes bleibt linksbündig, wie es sich gehört.	Justified text spreads the space of a line over its spaces so that both margins are straight; the last line of the paragraph stays left-aligned, as it should.
+Rechtsbündig	Right-aligned
+Offene Aufgabe	Open task
+Umbenennen	Rename
+Formatieren	Format
+Beispiel	Sample
+Leeren	Clear
+JSON hin und zurück	JSON round trip
+HTML hin und zurück	HTML round trip
+Nur lesen	Read only
+100 000 Zeilen	100,000 lines
+Tabweite 8	Tab width 8
+Tabs	Tabs
+Prüfen	Check
+Beim Tippen	While typing
+Ein Teil über vier Zeilen	A part over four lines
+Ein Punkt am Zeilenende	A point at the end of the line
+Ein Hinweis	A hint
+Eine Warnung darüber	A warning above it
+compute: eine Meldung	compute: a message
+IME-Vorschau	IME preview
+Vorschau	Preview
+Hoher Kontrast	High contrast

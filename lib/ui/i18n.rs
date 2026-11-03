@@ -23,11 +23,17 @@
 //                                       the current language (the source when missing)
 //   month_name(m) / month_short(m) / weekday_short(d)   calendar names of the UI language
 //                                       (m 1..12, d 0 = Mon)
+//   Catalog::with_library_languages()   also offer the languages of the library's own texts;
+//                                       the app's texts show their English column in them
 //   set_catalog(catalog) / t(s)         the app's catalogue for the whole process: t(s) is the
-//                                       text in the current language (German source when
-//                                       missing).  Unless set_language came first, the column
-//                                       is negotiated with the user's languages
+//                                       text in the current language (the library's text, then
+//                                       the English column, then the German source when the
+//                                       cell is missing).  Unless set_language came first, the
+//                                       column is negotiated with the user's languages
+//   commands(table) / menu(table)       a static command table or menu in the current language
+//                                       (a copy made once per table and language)
 //   fill(text, args)                    "{}" placeholders replaced in order
+//   tf(s, args) / list(&TABLE)          t with its "{}" filled; a table of texts through t
 //   msg(text, args)                     named / numbered placeholders, plurals, select,
 //                                       numbers and dates in the user's format (i18n_msg.rs)
 //   locale(), Locale, fmt_*, plural     regional formats and plural rules (i18n_locale.rs)
@@ -41,6 +47,8 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+use crate::{Command, Mi};
 
 #[path = "i18n_locale.rs"]
 mod regional;
@@ -209,7 +217,6 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Schließen", "Close", "Fermer", "Cerrar", "Chiudi", "Sluiten", "Zamknij", "إغلاق", "סגירה"],
     ["Zurücksetzen", "Reset", "Réinitialiser", "Restablecer", "Reimposta", "Opnieuw instellen", "Resetuj", "إعادة تعيين", "איפוס"],
     ["Dateiname:", "File name:", "Nom du fichier\u{A0}:", "Nombre de archivo:", "Nome file:", "Bestandsnaam:", "Nazwa pliku:", "اسم الملف:", "שם קובץ:"],
-    ["Dateityp:", "File type:", "Type de fichier\u{A0}:", "Tipo de archivo:", "Tipo file:", "Bestandstype:", "Typ pliku:", "نوع الملف:", "סוג קובץ:"],
     ["Ordner auswählen", "Select folder", "Sélectionner un dossier", "Seleccionar carpeta", "Seleziona cartella", "Map selecteren", "Wybierz folder", "تحديد مجلد", "בחירת תיקייה"],
     ["Neuer Ordner", "New folder", "Nouveau dossier", "Nueva carpeta", "Nuova cartella", "Nieuwe map", "Nowy folder", "مجلد جديد", "תיקייה חדשה"],
     ["Übergeordneter Ordner", "Parent folder", "Dossier parent", "Carpeta superior", "Cartella superiore", "Bovenliggende map", "Folder nadrzędny", "المجلد الأصل", "תיקיית אב"],
@@ -978,6 +985,20 @@ impl Catalog {
         Catalog { langs, rows }
     }
 
+    /// also offer the languages of the library's own texts (library_languages): there the
+    /// library's texts follow the user and Arabic and Hebrew mirror the window, while the app's
+    /// own texts show their English column.  The browser bundle has no font for Arabic and
+    /// Hebrew: there they stay out, the user gets English instead of empty boxes
+    pub fn with_library_languages(mut self) -> Catalog {
+        for l in LIB_LANGS {
+            let no_font = cfg!(target_arch = "wasm32") && matches!(l, "ar" | "he");
+            if !no_font && !self.langs.iter().any(|c| c == l) {
+                self.langs.push(String::from(l));
+            }
+        }
+        self
+    }
+
     /// the language codes of the columns ("de", "en", ...)
     pub fn languages(&self) -> &[String] {
         &self.langs
@@ -1020,23 +1041,81 @@ pub fn set_catalog(c: Catalog) {
 }
 
 /// the app's text in the current language: the installed catalogue, then the library's own
-/// texts, then the German source
+/// texts, then the catalogue's English column, then the German source
 pub fn t(s: &'static str) -> &'static str {
     if language() == LANG_DE {
         return s;
     }
     let cat = *APP.lock();
-    match cat.and_then(|c| c.get_static(s)) {
-        Some(x) => x,
-        None => tr(s),
+    if let Some(x) = cat.and_then(|c| c.get_static(s)) {
+        return x;
     }
+    let lib = tr(s);
+    if !core::ptr::eq(lib, s) {
+        return lib;
+    }
+    cat.and_then(|c| c.english(s)).unwrap_or(s)
+}
+
+// the translated copies of the static tables: (the table, the language, the copy)
+static COMMANDS: rt::sync::SpinLock<Vec<(usize, u32, &'static [Command])>> = rt::sync::SpinLock::new(Vec::new());
+static MENUS: rt::sync::SpinLock<Vec<(usize, u32, &'static [Mi])>> = rt::sync::SpinLock::new(Vec::new());
+
+/// a command table (static, German) in the current language, made once per table and language
+pub fn commands(src: &'static [Command]) -> &'static [Command] {
+    let l = language();
+    if l == LANG_DE || src.is_empty() {
+        return src;
+    }
+    let key = src.as_ptr() as usize;
+    if let Some(&(_, _, done)) = COMMANDS.lock().iter().find(|e| e.0 == key && e.1 == l) {
+        return done;
+    }
+    let done: &'static [Command] = Vec::leak(src.iter().map(|c| Command { label: t(c.label), ..*c }).collect());
+    COMMANDS.lock().push((key, l, done));
+    done
+}
+
+/// a menu (static, German) in the current language, made once per menu and language
+pub fn menu(src: &'static [Mi]) -> &'static [Mi] {
+    let l = language();
+    if l == LANG_DE || src.is_empty() {
+        return src;
+    }
+    let key = src.as_ptr() as usize;
+    if let Some(&(_, _, done)) = MENUS.lock().iter().find(|e| e.0 == key && e.1 == l) {
+        return done;
+    }
+    let v: Vec<Mi> = src
+        .iter()
+        .map(|it| match *it {
+            Mi::Menu(label, sub) => Mi::Menu(t(label), menu(sub)),
+            Mi::Sub(label, sub) => Mi::Sub(t(label), menu(sub)),
+            Mi::Item(id, label, icon) => Mi::Item(id, t(label), icon),
+            Mi::List(id, n, label) => Mi::List(id, n, t(label)),
+            other => other,
+        })
+        .collect();
+    let done: &'static [Mi] = Vec::leak(v);
+    MENUS.lock().push((key, l, done));
+    done
 }
 
 /// (perm.rs) a text that is not 'static (a manifest's reason): the app's catalogue, else the
 /// text itself
 pub(crate) fn t_text(s: &str) -> String {
     let cat = if language() == LANG_DE { None } else { *APP.lock() };
-    String::from(cat.and_then(|c| c.get_static(s)).unwrap_or(s))
+    String::from(cat.and_then(|c| c.get_static(s).or_else(|| c.english(s))).unwrap_or(s))
+}
+
+/// the app's text in the current language with its "{}" placeholders filled in order
+pub fn tf(s: &'static str, args: &[&str]) -> String {
+    fill(t(s), args)
+}
+
+/// a table of the app's texts in the current language (combo boxes, tabs)
+pub fn list(items: &[&'static str]) -> Vec<&'static str> {
+    items.iter().map(|s| t(s)).collect()
 }
 
 /// replace the "{}" placeholders of a text in order
@@ -1062,5 +1141,11 @@ impl Catalog {
             return None;
         }
         self.rows.get(s).and_then(|r| r.get(l - 1)).copied().filter(|t| !t.is_empty())
+    }
+
+    // the text's English cell: what a language without a cell of its own shows
+    fn english(&self, s: &str) -> Option<&'static str> {
+        let k = self.langs.iter().position(|c| c == "en").filter(|k| *k > 0)?;
+        self.rows.get(s).and_then(|r| r.get(k - 1)).copied().filter(|t| !t.is_empty())
     }
 }

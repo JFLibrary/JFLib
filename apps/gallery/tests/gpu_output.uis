@@ -117,6 +117,10 @@ expect #7601 value 51
 gpu expect same
 close window 7600
 gpu expect same
+# ---- the gallery's canvases never moved: nothing of them in tiles (apps/*/tests/gpu_canvas.uis
+# and uigputest --test canvas move theirs)
+gpu expect apart 0
+gpu expect tiles 0
 # ---- jfgui_GPU_VERIFY found nothing on the way
 gpu print
 gpu off

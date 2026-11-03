@@ -9,6 +9,10 @@
 //   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s" (speed_msg: as a Msg)
 //   Optic / form(m) / rack_units(m)   the transceiver of an optics cage (PortSpec::optic), how
 //                                 a model stands in the physical view, its height in a rack (P1)
+//   Prices (ASSUMED, of_hw, of_device)   what devices cost per hour, assumptions for an experiment
+//   Hw / DiskClass / hw_of(id) / hw_presets()   the hardware of a device for the simulator's
+//                                 res.rs (SA1): cores, speed, RAM, swap, disk; a table beside the
+//                                 models
 //
 // The German names the app translates (its catalogue src/locales/engine.tsv): Category::title,
 // Media::name, a model's name and title (the tables marked "i18n" for tools/i18n_check.py).
@@ -747,7 +751,7 @@ static CATALOG: &[Model] = &[
         name: "JF-FW",
         kind: DeviceKind::Firewall,
         category: Category::Security,
-        title: "Firewall (Router mit ACLs und NAT) 8× 1G, 2× 10G SFP+",
+        title: "Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 1G, 2× 10G SFP+",
         symbol: "firewall_ngfw",
         cli: CliStyle::Ios,
         features: F_ROUTER | F_FIREWALL | F_NAT,
@@ -763,7 +767,7 @@ static CATALOG: &[Model] = &[
         name: "JF-FW2",
         kind: DeviceKind::Firewall,
         category: Category::Security,
-        title: "Kleine Firewall (Router mit ACLs und NAT) 1G WAN, 4× 1G LAN",
+        title: "Kleine Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 1G WAN, 4× 1G LAN",
         symbol: "firewall_desk",
         cli: CliStyle::Ios,
         features: F_ROUTER | F_FIREWALL | F_NAT,
@@ -779,7 +783,7 @@ static CATALOG: &[Model] = &[
         name: "JF-FW8",
         kind: DeviceKind::Firewall,
         category: Category::Security,
-        title: "Rechenzentrums-Firewall (Router mit ACLs und NAT) 8× 10G SFP+, 4× 100G QSFP28",
+        title: "Rechenzentrums-Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 10G SFP+, 4× 100G QSFP28",
         symbol: "firewall_ngfw",
         cli: CliStyle::Ios,
         features: F_ROUTER | F_FIREWALL | F_NAT,
@@ -999,6 +1003,67 @@ static CATALOG: &[Model] = &[
         name_prefix: "Modem",
         groups: &[one("dsl0", Rj11, 100_000, false, NoPoe), one("lan0", Rj45, K1G, true, NoPoe)],
     },
+    // ---- the servers by size (SA1; their figures: hw_of)
+    Model {
+        id: "server-s",
+        name: "Rack-Server S",
+        kind: DeviceKind::Server,
+        category: Category::Servers,
+        title: "Rack-Server S (2× 10GBASE-T, 1G Management)",
+        symbol: "server_1u",
+        cli: CliStyle::Linux,
+        features: F_HOST,
+        name_prefix: "SRV",
+        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), grp("eth", 1, 2, Rj45, K10G, false, NoPoe)],
+    },
+    Model {
+        id: "server-m",
+        name: "Rack-Server M",
+        kind: DeviceKind::Server,
+        category: Category::Servers,
+        title: "Rack-Server M (2× 25G SFP28, 1G Management)",
+        symbol: "server_1u",
+        cli: CliStyle::Linux,
+        features: F_HOST,
+        name_prefix: "SRV",
+        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), grp("eth", 1, 2, Sfp28, K25G, false, NoPoe)],
+    },
+    Model {
+        id: "server-l",
+        name: "Rack-Server L",
+        kind: DeviceKind::Server,
+        category: Category::Servers,
+        title: "Rack-Server L (2× 25G SFP28, 1G Management)",
+        symbol: "server_1u",
+        cli: CliStyle::Linux,
+        features: F_HOST,
+        name_prefix: "SRV",
+        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), grp("eth", 1, 2, Sfp28, K25G, false, NoPoe)],
+    },
+    Model {
+        id: "server-xl",
+        name: "Rack-Server XL",
+        kind: DeviceKind::Server,
+        category: Category::Servers,
+        title: "Rack-Server XL (2× 100G QSFP28, 1G Management)",
+        symbol: "server_1u",
+        cli: CliStyle::Linux,
+        features: F_HOST,
+        name_prefix: "SRV",
+        groups: &[grp("eth", 0, 1, Rj45, K1G, false, NoPoe), grp("eth", 1, 2, Qsfp28, K100G, false, NoPoe)],
+    },
+    Model {
+        id: "nas",
+        name: "NAS",
+        kind: DeviceKind::Server,
+        category: Category::Servers,
+        title: "NAS mit Festplatten (2× 10GBASE-T)",
+        symbol: "server_tower",
+        cli: CliStyle::Linux,
+        features: F_HOST,
+        name_prefix: "NAS",
+        groups: &[grp("eth", 0, 2, Rj45, K10G, false, NoPoe)],
+    },
 ];
 
 /// every model in palette order
@@ -1109,7 +1174,195 @@ pub fn rack_units(m: &Model) -> u8 {
         return 0;
     }
     match m.id {
-        "jf-r8" | "jf-fw8" | "database" | "container-host" => 2,
+        "jf-r8" | "jf-fw8" | "database" | "container-host" | "server-l" | "server-xl" | "nas" => 2,
         _ => 1,
+    }
+}
+
+// ---------------------------------------------------------------- the hardware of a device (SA1)
+//
+// Hw: what the simulator's res.rs simulates of a device: cores, how fast a core is against the
+// reference core, RAM, swap, the disk.  A device has its own (Device::hw), or in a project with "Hardware
+// simulieren" (Project::metered) the row of its model below; without either it has none and costs
+// nothing (jfn_sim stays as it always was).  The figures of hw_of are round assumptions of ours,
+// typical of the size and not measured on a product: the window says so.  More cores come with a
+// lower clock, as they do in real servers, so a bigger machine is not simply more of everything.
+
+wire_enum! {
+    /// the kind of a device's disk (its access times: DiskClass::spec)
+    pub enum DiskClass {
+        Sata = "sata",
+        Nvme = "nvme",
+        NvmeFast = "nvme-fast",
+        Hdd = "hdd",
+    }
+}
+
+impl DiskClass {
+    /// latency (ns), bytes per second, accesses per second
+    pub fn spec(self) -> (u64, u64, u64) {
+        match self {
+            // the numbers of a device's disk without hardware (jfn_sim's Disk::default)
+            DiskClass::Sata => (100_000, 500_000_000, 50_000),
+            DiskClass::Nvme => (20_000, 3_000_000_000, 500_000),
+            DiskClass::NvmeFast => (10_000, 7_000_000_000, 1_000_000),
+            DiskClass::Hdd => (6_000_000, 200_000_000, 200),
+        }
+    }
+    /// its name (the app translates it)
+    pub fn title(self) -> &'static str {
+        // i18n
+        match self {
+            DiskClass::Sata => "SATA-SSD",
+            DiskClass::Nvme => "NVMe-SSD",
+            DiskClass::NvmeFast => "schnelle NVMe-SSD",
+            DiskClass::Hdd => "Festplatte",
+        }
+    }
+}
+
+agent_core::record! {
+    /// the hardware of a device (the simulator's res.rs)
+    pub struct Hw {
+        /// cores (at least 1)
+        pub cores: u32,
+        /// how fast a core is in per mille of the reference core (1000: a script's instruction
+        /// takes its 5 ns, a cost of 1 ms takes 1 ms)
+        pub speed_pm: u32,
+        pub ram_mb: u64,
+        /// what may lie on the disk beyond the RAM before the largest service is killed
+        pub swap_mb: u64,
+        pub disk: DiskClass,
+        pub disk_gb: u64,
+    }
+}
+
+impl Eq for Hw {}
+
+impl Hw {
+    const fn of(cores: u32, speed_pm: u32, ram_gb: u64, swap_gb: u64, disk: DiskClass, disk_gb: u64) -> Hw {
+        Hw { cores, speed_pm, ram_mb: ram_gb << 10, swap_mb: swap_gb << 10, disk, disk_gb }
+    }
+    /// values that cannot run brought into range: at least a core at 1 ‰ of the reference, 1 MiB
+    pub fn sane(&self) -> Hw {
+        Hw { cores: self.cores.clamp(1, 1024), speed_pm: self.speed_pm.clamp(1, 100_000), ram_mb: self.ram_mb.max(1), swap_mb: self.swap_mb, disk: self.disk, disk_gb: self.disk_gb }
+    }
+    /// "8 Kerne, 32 GiB RAM, NVMe-SSD 960 GiB" (the app translates it)
+    pub fn summary_msg(&self) -> Msg {
+        let ram = if self.ram_mb >= 1024 { msg!("{} GiB", self.ram_mb >> 10) } else { msg!("{} MiB", self.ram_mb) };
+        let cores = if self.cores == 1 { phrase("1 Kern") } else { msg!("{} Kerne", self.cores) };
+        if self.speed_pm == 1000 {
+            msg!("{}, {} RAM, {} {} GiB", cores, ram, phrase(self.disk.title()), self.disk_gb)
+        } else {
+            msg!("{} mit {} % Tempo, {} RAM, {} {} GiB", cores, self.speed_pm / 10, ram, phrase(self.disk.title()), self.disk_gb)
+        }
+    }
+}
+
+/// the figures of a model in a project with "Hardware simulieren" (assumptions, see above): None
+/// for devices that stay without (network devices, phones, load generators: they never pay)
+pub fn hw_of(id: &str) -> Option<Hw> {
+    use DiskClass::{Hdd, Nvme, NvmeFast, Sata};
+    Some(match id {
+        "pc" => Hw::of(4, 1000, 16, 2, Sata, 480),
+        "laptop" => Hw::of(4, 800, 16, 2, Nvme, 480),
+        "server-tower" => Hw::of(4, 1000, 16, 2, Sata, 960),
+        "server-1u" | "server-1u-sfp" => Hw::of(8, 1000, 32, 4, Sata, 960),
+        "server-s" => Hw::of(4, 1100, 16, 2, Sata, 480),
+        "server-m" => Hw::of(8, 1000, 32, 4, Nvme, 960),
+        "server-l" => Hw::of(16, 950, 64, 8, Nvme, 1920),
+        "server-xl" => Hw::of(32, 900, 256, 16, NvmeFast, 3840),
+        "nas" => Hw::of(2, 700, 8, 2, Hdd, 8000),
+        "load-balancer" => Hw::of(8, 1000, 16, 0, Sata, 240),
+        "database" => Hw::of(16, 1000, 64, 8, Nvme, 1920),
+        "cache" => Hw::of(4, 1000, 64, 0, Sata, 240),
+        "queue" => Hw::of(4, 1000, 16, 2, Nvme, 480),
+        "container-host" => Hw::of(16, 1000, 64, 8, Nvme, 960),
+        _ => return None,
+    })
+}
+
+/// the models with figures, smallest server first: the choices of the window's hardware page
+pub fn hw_presets() -> impl Iterator<Item = &'static Model> {
+    ["server-s", "server-tower", "server-1u", "server-m", "server-l", "server-xl", "nas", "pc", "laptop", "load-balancer", "database", "cache", "queue", "container-host"].into_iter().filter_map(model)
+}
+
+// ---------------------------------------------------------------- what a device costs (SA2)
+//
+// Prices: euros per hour, as round figures of our own, near what rented servers cost in 2026 and not
+// the offer of any provider: an experiment's results say so wherever they show them.  A core costs
+// the same up to 16 cores, more beyond that and more again beyond 32 (machines of that size are rarer
+// and dearer per core); a host costs a fee of its own whatever its size (housing, power, operating
+// it), which is what makes many small machines dearer than one of the same sum.  An experiment may
+// name other figures (Experiment::prices).
+
+/// euros per hour in millionths (assumptions, see above)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Prices {
+    /// a core at the reference speed; its price goes with its speed
+    pub core: u64,
+    /// the factor on cores beyond 16 and beyond 32, in millionths
+    pub big: u64,
+    pub huge: u64,
+    /// a GiB of RAM
+    pub ram_gb: u64,
+    /// a GiB of disk by its kind
+    pub hdd_gb: u64,
+    pub sata_gb: u64,
+    pub nvme_gb: u64,
+    pub nvme_fast_gb: u64,
+    /// the fee of a host whatever its size
+    pub host: u64,
+    /// a switch, a router or firewall
+    pub switch: u64,
+    pub router: u64,
+}
+
+impl Prices {
+    /// the figures of an experiment that names none
+    pub const ASSUMED: Prices = Prices { core: 30_000, big: 1_500_000, huge: 2_000_000, ram_gb: 4_000, hdd_gb: 40, sata_gb: 100, nvme_gb: 200, nvme_fast_gb: 400, host: 20_000, switch: 10_000, router: 30_000 };
+    /// the names an experiment may give figures for
+    pub const KEYS: &'static [&'static str] = &["core", "big", "huge", "ram_gb", "hdd_gb", "sata_gb", "nvme_gb", "nvme_fast_gb", "host", "switch", "router"];
+    /// one figure by its name
+    pub fn set(&mut self, key: &str, v: u64) {
+        match key {
+            "core" => self.core = v,
+            "big" => self.big = v,
+            "huge" => self.huge = v,
+            "ram_gb" => self.ram_gb = v,
+            "hdd_gb" => self.hdd_gb = v,
+            "sata_gb" => self.sata_gb = v,
+            "nvme_gb" => self.nvme_gb = v,
+            "nvme_fast_gb" => self.nvme_fast_gb = v,
+            "host" => self.host = v,
+            "switch" => self.switch = v,
+            "router" => self.router = v,
+            _ => {}
+        }
+    }
+    /// what hardware of these figures costs per hour (millionths of a euro)
+    pub fn of_hw(&self, hw: &Hw) -> u64 {
+        let c = hw.cores as u64;
+        // the cores in thousandths of a core at the reference price
+        let cores = c.min(16) * 1000 + c.clamp(16, 32).saturating_sub(16) * self.big / 1000 + c.saturating_sub(32) * self.huge / 1000;
+        let per_gb = match hw.disk {
+            DiskClass::Hdd => self.hdd_gb,
+            DiskClass::Sata => self.sata_gb,
+            DiskClass::Nvme => self.nvme_gb,
+            DiskClass::NvmeFast => self.nvme_fast_gb,
+        };
+        self.core * cores / 1000 * hw.speed_pm as u64 / 1000 + self.ram_gb * hw.ram_mb / 1024 + per_gb * hw.disk_gb + self.host
+    }
+    /// what a device of this model costs per hour, with its own figures or else its model's; a
+    /// load generator, a client or a cloud has no price
+    pub fn of_device(&self, model_id: &str, hw: Option<&Hw>) -> u64 {
+        match hw.cloned().or_else(|| hw_of(model_id)) {
+            Some(h) => self.of_hw(&h),
+            None => match model(model_id).map(|m| m.kind) {
+                Some(DeviceKind::Switch | DeviceKind::L3Switch) => self.switch,
+                Some(DeviceKind::Router | DeviceKind::Firewall) => self.router,
+                _ => 0,
+            },
+        }
     }
 }

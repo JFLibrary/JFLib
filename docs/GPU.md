@@ -6,22 +6,26 @@ Vulkan und WebGPU (Instanz, Adapter, Gerät, Warteschlange, Ressourcen, Pipeline
 Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird pro Ziel beim
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
-Stand (G1a): Vulkan unter Windows. `vulkan-1.dll` wird zur Laufzeit geladen, das Programm
-startet also auch auf Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
-Vulkan unter Linux und Android, WebGPU im Browser, später Metal -- mit denselben Typen und
-Methoden. Die Oberfläche rastert weiter auf der CPU; unter Windows zeigt die GPU das Ergebnis
-(G3a, [Ausgabe der UI](#ausgabe-der-ui), `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
+Stand: Vulkan unter Windows und unter Linux ([Linux](#linux)).
+`vulkan-1.dll` bzw. `libvulkan.so.1` wird zur Laufzeit geladen, das Programm startet also auch auf
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: Android, WebGPU im Browser,
+später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
+Windows und Linux zeigt die GPU das Ergebnis
+(G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux);
+`jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
 und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
 | Teil | Wo |
 | --- | --- |
 | Öffentliche Typen: Beschreibungen, Formate, Fehler, Features, Limits, `Pod` | [`lib/gpu/lib.rs`](../lib/gpu/lib.rs) |
-| Instanz, Adapter, Validierung | [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs), Laden der DLL: [`vk_load.rs`](../lib/gpu/vk_load.rs) |
+| Instanz, Adapter, Validierung | [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs), Laden der Bibliothek: [`vk_load.rs`](../lib/gpu/vk_load.rs) |
+| Programme gegen glibc (Linux) | `build_rs.py` Abschnitt „glibc“, [`lib/plat/linux_glibc.rs`](../lib/plat/linux_glibc.rs), [Linux](#linux) |
 | Gerät, Warteschlange, Zeitleiste, verzögertes Freigeben, Uploads | [`lib/gpu/vk_dev.rs`](../lib/gpu/vk_dev.rs) |
 | Speicher-Unterverteilung | [`lib/gpu/vk_mem.rs`](../lib/gpu/vk_mem.rs) |
 | Puffer, Texturen, Sampler, Shader, Bindungen, Bindless, Pipelines, Zeitstempel | [`lib/gpu/vk_res.rs`](../lib/gpu/vk_res.rs) |
 | Befehle aufzeichnen | [`lib/gpu/vk_cmd.rs`](../lib/gpu/vk_cmd.rs) |
-| Fensterflächen und Swapchains | [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs) |
+| Fensterflächen und Swapchains | [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs); unter Linux dieselben Typen über dmabuf: [`vk_dmabuf.rs`](../lib/gpu/vk_dmabuf.rs) |
+| Puffer der GPU am Fenster (Linux) | [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs), [`linux_wl_gpu.rs`](../lib/plat/linux_wl_gpu.rs) (zwp_linux_dmabuf_v1), [`linux_x11_gpu.rs`](../lib/plat/linux_x11_gpu.rs) (DRI3, Present) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
@@ -111,7 +115,9 @@ rb.read(0, &mut out)?;
   (`None`, solange das Fenster minimiert ist oder keine Fläche hat), `try_acquire()` (wartet nie,
   baut nie neu: `Frame`, `NotReady`, `Stale`, `NoArea`), `rebuild()` (auch auf einem anderen
   Thread), `view(&frame)`, `texture(&frame)`, `present(frame, [cmd, ..])`, `resize()`,
-  `set_present_mode(m)`, `size()`, `format()`, `present_mode()`.
+  `set_present_mode(m)`, `size()`, `format()`, `present_mode()`. Für denselben Code auf jedem Ziel
+  außerdem `prepare()`, `flush()`, `busy()`, `next_look(retry)`, `damage(rects)` und
+  `Surface::track_size()`: unter Windows wirkungslos, unter Linux [Ausgabe unter Linux](#ausgabe-unter-linux).
 
 ## Konventionen
 
@@ -243,12 +249,13 @@ zurücklesen.
 ## Ausgabe der UI
 
 Die UI rastert weiter auf der CPU und bleibt pixelgleich; der Framebuffer ist die Wahrheit. Unter
-Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a): die
+Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a), unter Linux derselbe Code
+([Ausgabe unter Linux](#ausgabe-unter-linux), G4b; dort auch, was anders ist): die
 Änderungsrechtecke, die die Laufzeit ohnehin berechnet, gehen in eine Textur je Fenster, ein
 Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
-Skript verlangt mit `gpu on` anderes. Andere Ziele linken nichts davon
+Skript verlangt mit `gpu on` anderes. Andere Ziele und statische Linux-Programme linken nichts davon
 (`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
 
 **Der Weg eines Fensters.**
@@ -329,15 +336,15 @@ Schatten und runde Ecken macht DWM am Hauptfenster, sie gelten auch für das Kin
 geprüft).
 
 **Shader.** WGSL in [`lib/ui/gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), vorübersetzt in
-[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 373 + 513 Wörter): UI-Programme linken `lib/wgsl`
+[`lib/ui/gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) (204 + 373 + 513 + 659 Wörter): UI-Programme linken `lib/wgsl`
 nicht. `uigputest --test shaders` vergleicht die Wörter mit `wgsl::compile`, `uigputest --gen-shaders
 lib/ui/gpu_out_spv.rs` schreibt sie neu.
 
 **Tests.** `apps/gallery/tests/gpu_output.uis` (das Skriptkommando `gpu`, GUIDE §12) und
-`apps/uigputest` (nur Windows; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
+`apps/uigputest` (Windows und Linux; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
 `switch`, `resize`, `minimize`, `dpi`, `windows`, `off`, `noloader`, `lose`, `idle`, `csd`, `monitors`, `shaders`,
-`adapter`, `hwnd`, `layers`, `images`, `imgplain`; dazu `apps/gallery/tests/gpu_layers.uis` und
-`gpu_layers_rtl.uis`. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
+`adapter`, `hwnd`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`, `nodmabuf`, `refused`; dazu `apps/gallery/tests/gpu_layers.uis` und
+`gpu_layers_rtl.uis`, und `gpu_canvas.uis` von `svgtest`, `diagramtest` (auch `gpu_canvas_rtl.uis`), Kritzel und PaintCraft. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
 zurückgelesen; ohne GPU `SKIP`; liegt ein anderes Fenster über dem Testfenster, ist die Prüfung des
 Bildschirms ein Hinweis statt eines Fehlers. Maximieren und Vollbild aktivieren das Fenster, deshalb tut das
 kein Test mehr; eine frühere Fassung von `csd` hat beides einmal geprüft. `gputest --test upload` prüft Ring, `write_texture_rects`, `write_texture_rects_at` und
@@ -402,7 +409,7 @@ Pixel des Bildes (`owed`); `gp_settle` zeichnet sie nach, bevor ihn jemand liest
 Ebene darüber, `jfgui_GPU_VERIFY`, `--verify-dirty`, `shot`, `expect pixel`, `expect same`, der Agent; ein Programm, das selbst `Ui::fb()` liest,
 ruft vorher `Ui::gpu_settle()`. Mit Bildern auf der GPU gibt es ebenfalls keine Scroll-Kopien.
 
-Was nicht `Cmd::Image` ist, geht nicht diesen Weg: die Bildansicht `image_view` und die Leinwände zeichnen über `Cmd::Custom` (G3c).
+Was nicht `Cmd::Image` ist, geht nicht diesen Weg: die Bildansicht `image_view` und die Leinwände zeichnen über `Cmd::Custom` ([Leinwände](#leinwände)).
 
 ### Messungen
 
@@ -494,15 +501,201 @@ Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 10–13 MiB mi
 plus 0,7 MiB CPU-Speicher für die Pixel darunter, ein Dialog 2,3 + 1,1 MiB, Dunst über dem ganzen Fenster 7,5 + 7,7 MiB. Das Bild: 45,8 MiB Textur,
 `memory_reserved` 67–78 MiB (vorher 13–28 MiB), kurz dazu 48 MiB Staging, der eine Sekunde später zurückgeht. Ohne Ebenen und ohne geänderte Bilder: kein Unterschied zu vorher.
 
-### Was fehlt, und was G3c hieraus nimmt
+### Leinwände
 
-- `show` zeichnet Grund, Bilder, Ebenen in einem Durchgang. G3c hängt Leinwände mit eigener Transformation an die Stelle der Bilder
-  (`Quad`: eine Fläche in Zellen, die die GPU füllt und die CPU auslässt); beides kann auf denselben Wegen zurück auf den CPU-Pfad.
+Zoomen und Verschieben einer Leinwand kostete je Bild ein ganzes Rastern. Solange sich nur die Ansicht bewegt, kommt ihr Inhalt jetzt aus
+GPU-Texturen, nur die Transformation ändert sich ([`lib/ui/canvas.rs`](../lib/ui/canvas.rs), [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3c). Die CPU bleibt die Wahrheit:
+**in Ruhe ist das Bild Byte für Byte das des CPU-Pfads.**
+
+**Die API.** Eine Leinwand zeichnet wie immer über `ui.canvas(...)` oder `cmd_custom` mit ihrem `Draw`. Direkt danach sagt sie, woraus das besteht:
+
+```rust
+let inp = ui.canvas(ID, Some(draw.clone()), 0, ver).clone();
+ui.canvas_gpu(CanvasDesc {
+    id: ID,
+    name: "bild",                        // für die Umgebungsvariablen unten
+    rect: [x, y, w, h],                  // die Fläche im Fenster, die der Inhalt deckend füllt
+    view: CanvasView { scale, ox, oy },  // Fensterpixel = o + Inhalt * scale
+    ver: inhalt,                         // steht für alles, was der Inhalt zeigt; neu: seine Kacheln gehen
+    content: draw,                       // Rc<dyn CanvasContent>: draw_view(g, view, rect)
+    gpu: CanvasGpu::Pan,                 // Cpu | Pan | Zoom
+    exact_pan: true,                     // das Rastern hängt nicht vom Ort ab: jfgui_GPU_VERIFY besteht darauf
+});
+ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln darüber gehen
+```
+
+`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, unter Linux, Android und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
+`image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
+
+**Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
+
+| Vorgang | CPU | GPU |
+| --- | --- | --- |
+| Ansicht steht still, Inhalt unverändert | nichts | nichts: keine Textur vor der ersten Bewegung, kein Bild, kein Thread |
+| Verschieben um ganze Pixel | die Kacheln, die neu ins Bild kommen (einmal); Zellen mit etwas darüber: ihr `Draw`, das Darüber | die Kacheln kopiert (`fs`) |
+| Zoom, `CanvasGpu::Zoom` | dasselbe, eine neue Stufe, wenn der Faktor 0,55 .. 1,9 verlässt (die alte bleibt, zurück kostet nichts) | die Kacheln bilinear (`fs_tile`) |
+| Zoom, `CanvasGpu::Pan` | das Bild, sofort, wie ohne GPU | wie immer |
+| 180 ms nach der letzten Bewegung | ein Bild wie ohne GPU, hochgeladen | wie immer: jetzt stimmt alles, und es kommt kein Bild mehr |
+| Strich, verschobener Knoten, neue `ver` | wie ohne GPU, die Bewegung endet sofort; `canvas_gpu_damage` gibt nur die betroffenen Kacheln frei | wie immer |
+
+Der Befehl einer Leinwand, die aus Kacheln kommt, geht mit seinem Ort statt seines Inhalts in den Hash der Zellen (`dirty.rs`), sonst wäre jede Zelle jedes Bild schmutzig. Sie wird genau wie ein Bild aus G3b vermerkt: in den Zellen, in denen sie als Letzte der Grundebene liegt, zeichnet die GPU, die CPU zeichnet und lädt nichts (`Split::owed`, `Split::stale`); auch in Randzellen, die sie nur teilweise füllt, dort mit dem Scissor an ihrem Rand. Zellen mit etwas darüber (Griffe, Bildlaufleisten, Auswahl) und Zellen ohne ihre Kachel laufen über ihr `Draw` und werden hochgeladen; unter einer offenen Ebene ebenso, damit die Ebene das Richtige über sich hält. `gp_settle` ruft das `Draw`, bevor jemand den Framebuffer liest: `Ui::gpu_settle()` außerhalb eines Durchgangs, `shot`, `expect pixel`, der Agent, `--verify-dirty` und die Wege zurück zum CPU-Pfad geben also immer die richtigen Pixel, auch mitten in einer Geste. PaintCrafts Drucken und Zwischenablage und Kritzels Export lesen den Framebuffer nicht, sie zeichnen in eigene Flächen.
+
+**Budget und Lebensdauer.** 128 MiB (`jfgui_GPU_CANVAS_MB`), verdrängt wird die am längsten nicht gezeichnete Kachel, nie eine des laufenden Bildes; passt nichts mehr hinein, läuft der Rest über die CPU. 30 s nach der letzten Bewegung gehen alle Kacheln, ohne ein Bild. Neue Größe, Inspektor, minimiert: das Fenster zeichnet über die CPU, die Kacheln bleiben. Gerät verloren: alle Kacheln weg, die nächste Geste füllt sie auf dem neuen Gerät neu. Ein gespiegeltes Fenster (RTL) zeichnet Leinwände auf der CPU.
+
+**Was während einer Geste anders aussieht.** Gemessen mit `gpu shot` (das zurückgelesene dargestellte Bild) gegen `shot` (die Pixel der CPU), 1920 × 1000; `jfgui_GPU_VERIFY` zählt dasselbe je Bild in `GpuOutput::canvas_diff_*`.
+
+| Leinwand | Verschieben um ganze Pixel | Zoom um den Faktor 1,25, bis zu 180 ms nach dem letzten Rad | Standard |
+| --- | --- | --- | --- |
+| Kritzel | **gleich**, 0 Pixel (`exact_pan`: `blit_scaled` rechnet von der Bildecke aus, ein Unterschied wäre ein Fehler) | nur mit dem Schalter: 1,41 Mio. Pixel, im Mittel 34 Stufen (rauschiges Testbild) | `Pan`: der Zoom-Schritt läuft über die CPU, kein Unterschied zu keiner Zeit |
+| PaintCraft | **gleich**, 0 Pixel (`exact_pan`: die Tabellen von `render_image` rechnen von der Bildecke aus) | nur mit dem Schalter: 1,58 Mio. Pixel, im Mittel 20 Stufen | `Pan`, ebenso. Mit Pixelraster, Auswahl oder einem Overlay des Werkzeugs bleibt die Leinwand auf der CPU: das `Draw` malt sie mit dem Bild |
+| `image_view`, Bitmap | gleich, 0 Pixel (200 %, nicht bewiesen: `affine` rechnet in Fließkomma) | Foto: 734 000 Pixel, im Mittel 5, höchstens 20 Stufen, kaum zu sehen. 32 × 24 Pixel groß: Blockkanten weich, das Raster bleibt, im Mittel 32 Stufen | `Zoom` |
+| `image_view`, SVG | fast: 97 von 1,6 Mio. Pixeln, um 1 Stufe | 973 000 Pixel, im Mittel 11, höchstens 86: etwas weich | `Zoom` |
+| `diagram` | fast: 0 bis 1 Pixel je Bild, um 1 Stufe | 269 000 Pixel, im Mittel 7, höchstens 224 (Text- und Linienkanten): weicher, die Geometrie stimmt; beim Stehenbleiben wird das Bild scharf | `Zoom` |
+
+**Ganzzahliges Verschieben.** `scrollcopy.rs` warnt zu Recht: der Rasterer rechnet in absoluten f32-Koordinaten. Das trifft nur Vektorinhalt: eine Kachel hat andere absolute Koordinaten als das Fenster, und ein Diagramm rechnet Welt nach Fenster mit etwas anderen Rundungen. Gemessen sind das 0 bis 1 Pixel je Bild um eine Stufe (Diagramm) und 97 Pixel um eine Stufe (SVG, viele Kurven). Rasterinhalt ist gleich, weil seine Abbildung nur vom Abstand zur Bildecke abhängt. Deshalb bleibt es auch beim Verschieben dabei: 180 ms danach zeichnet die CPU.
+
+**Der Schalter je Leinwand.** Im Code `CanvasDesc::gpu`, `ImageViewState::gpu`, `DiagramState::gpu`, `CANVAS_GPU` in `apps/Kritzel/view.rs` und `apps/PaintCraft/src/workspace/view.rs`. Ohne Bauen: `jfgui_GPU_CANVAS_CPU=image,diagram,kritzel,paintcraft` hält die genannten auf der CPU, `jfgui_GPU_CANVAS_PAN=...` lässt sie nur verschieben, `jfgui_GPU_CANVAS_ZOOM=...` lässt sie auch skalieren, `jfgui_GPU_CANVAS=0` schaltet alles ab, `jfgui_GPU_CANVAS_SETTLE_MS=n` ändert die 180 ms.
+
+**Warum Kritzel und PaintCraft nicht skalieren.** Ein Zoom-Schritt kostet dort auf der CPU 6 ms, gleich groß wie das Bild im Fenster, nicht wie das Dokument. Das merkt niemand. Skaliert wären es 1 ms, dafür zeigt jedes Rad für 180 ms ein weicheres Bild, das dann wieder scharf springt, und am Ende kostet es trotzdem die 6 ms. Nächster Nachbar exakt aus den Pixeln des Dokuments ginge auch (das tut `fs_image` für Bilder), kostet aber den Speicher des ganzen Dokuments und bringt dieselben 5 ms. Nicht gebaut.
+
+**Messungen.** Nur `lib/ui` im selben Programm, `jfgui_GPU_CANVAS=0` gegen Standard, Release, 1920 × 1000, GeForce RTX 2070 SUPER, Ryzen 5 3600, je 3 Läufe im Wechsel in einem Fenster je Lauf (`gpu on fast`, `bench`), parallel bauten andere Sitzungen. Median der Läufe, je Bild; Render ist `render_live`, Present `gp_present`, hochgeladen in KB. Die Skripte waren Wegwerf-Code: Szene laden, `bench 120 drag A B`, `gpu print`.
+
+| Leinwand, Inhalt | Vorgang | Render vorher | nachher | Present vorher | nachher | hochgeladen vorher | nachher |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `image_view`, Foto 1600 × 1200 bei 200 % | verschieben | 30 044 µs | 1 983 µs | 1 375 µs | 435 µs | 7 617 | 732 |
+| | Rad, ±1 Schritt | 32 472 µs | 1 713 µs | 1 358 µs | 388 µs | 7 680 | 680 |
+| | Rad, 8 hinauf, 8 hinab | 21 838 µs | 6 069 µs | 1 306 µs | 494 µs | 7 680 | 2 490 |
+| | das Bild danach, einmal | | 28 410–30 784 µs | | 483–656 µs | | 6 636 |
+| `image_view`, SVG bei 612 % | verschieben | 9 128 µs | 603 µs | 1 314 µs | 375 µs | 7 617 | 569 |
+| | Rad, ±1 Schritt | 9 862 µs | 1 169 µs | 1 327 µs | 407 µs | 7 680 | 769 |
+| | das Bild danach, einmal | | 9 655–9 981 µs | | 446–500 µs | | 6 636 |
+| `diagram`, 3 630 Knoten (`diagramtest --grid 60`) | verschieben | 15 671 µs | 1 029 µs | 1 421 µs | 427 µs | 7 555 | 373 |
+| | Rad, ±1 Schritt | 13 330 µs | 572 µs | 1 372 µs | 438 µs | 7 680 | 354 |
+| | Rad, 8 hinauf, 8 hinab | 7 373 µs | 3 459 µs | 1 348 µs | 641 µs | 7 680 | 3 079 |
+| | das Bild danach, einmal | | 3 135–17 043 µs | | 495–508 µs | | 7 373 |
+| Kritzel, 4000 × 3000 | verschieben | 6 367 µs | 553 µs | 1 563 µs | 350 µs | 7 680 | 478 |
+| | Zoom-Schritt (CPU) | 6 216 µs | 5 667 µs | 1 553 µs | 1 515 µs | 7 680 | 7 680 |
+| | Zoom-Schritt, Schalter `ZOOM` | | 824 µs | | 439 µs | | 660 |
+| | **Strich** | 82 µs | 83 µs | 366 µs | 342 µs | 27 | 27 |
+| | das Bild danach, einmal | | 5 712 µs | | 399 µs | | 6 390 |
+| PaintCraft, 4000 × 3000 bei 100 % | verschieben | 5 972 µs | 1 285 µs | 1 436 µs | 502 µs | 7 617 | 595 |
+| | Zoom-Schritt (CPU) | 6 098 µs | 5 911 µs | 1 385 µs | 1 427 µs | 7 680 | 7 680 |
+| | Zoom-Schritt, Schalter `ZOOM` | | 1 088 µs | | 426 µs | | 524 |
+| | **Strich** | 274 µs | 295 µs | 369 µs | 340 µs | 29 | 29 |
+| | das Bild danach, einmal | | 6 234 µs | | 439 µs | | 6 636 |
+
+Beim Strich kein Unterschied (Streuung der Läufe 262–334 und 273–314 µs); ein Strich berührt keine Kachel außer durch `canvas_gpu_damage`, die in Mikrosekunden frei wird, und wartet auf nichts. Ein gezogener Knoten im `diagram` läuft wie vorher über die CPU: sein Inhalt ändert sich, also keine Kacheln (in `diagramtest` je Bild im Median 442 µs vorher, 389 µs nachher, 3 Läufe; das Ziehen zeichnet dort nur Überlagerungen, das Loslassen einmal alles).
+
+Wo der Gewinn kleiner ist: **unter 1 ms** bleibt nur, was keine Zellen über der Leinwand hat. Das Foto hat Bildlaufleisten und eine Statuszeile, deren Zellen je Bild `IvDraw` kosten (170 000 Pixel, 1,4 ms von 2 ms), PaintCraft Lineale und Leisten. Beim Rad in einem Zug zählen die neuen Stufen: das Foto 113 Kacheln in 16 Bildern (5 ms je Bild), das Diagramm 163. Das erste Bild einer Geste füllt seine Kacheln: das längste Bild war beim Foto 14,7 ms (vorher 39), Kritzel 11,9 (15), PaintCraft 12–15 (14,5), Diagramm 6,3 (26), hier ohne die 5-ms-Grenze, die für Skripte nicht gilt. Das Bild danach kostet genau ein Bild wie vorher, wer also alle 200 ms ruckelt, zahlt fast so viel wie zuvor. Bei einem kleinen Fenster oder einer kleinen Zeichnung bringt das alles entsprechend weniger.
+
+Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 16–23 MiB je nach Zustand, mit Leinwänden je nach Zahl der Kacheln: 50 MiB (Kritzel, PaintCraft: 32 Kacheln, 8 MiB), 82 MiB (Foto 75 Kacheln, 19 MiB; Diagramm 82, 21 MiB), 146 MiB nach einem Zoom über viele Stufen (188–245 Kacheln, 48–62 MiB). Der Rest ist Staging des Hochladens (ein ganzes Bild im Ring) und Blockreste. Nach 30 s ohne Bewegung gehen die Kacheln ohne ein Bild (`uigputest --test canvas`, kleines Fenster: 21 → 17 MiB). Eine Leinwand, die nie bewegt wird, kostet nichts.
+
+Größe, Release, gegen den Stand davor: gallery Windows 4 153 856 → 4 201 984 Byte (+48 128), PaintCraft 8 624 128 → 8 677 376 (+53 248), gallery Linux 4 441 480 → 4 442 808 (+1 328), Browser 3 542 127 → 3 584 472 (+42 345), simd 3 481 482 → 3 531 406 (+49 924), threads 3 490 369 → 3 496 433 (+6 064). Unter Linux kommt fast nichts dazu, im Browser ist die Spanne so groß, dass das nach Inlining-Schwankung aussieht; nachgegangen bin ich dem nicht. Keine Vulkan-Zeichenkette in beiden.
+
+### Ausgabe unter Linux
+
+Derselbe Presenter wie unter Windows (`lib/ui/gpu_out.rs`), mit denselben Stufen, Rückfällen, Ebenen, Bildern und
+Leinwänden. Anders ist, was unter ihm liegt. Vulkans Wayland-Fläche will einen Zeiger aus `libwayland-client`, die für X11
+einen aus `libxcb`; JFLib spricht beide Protokolle selbst und hat beide nicht. Also zeichnet die GPU in eigene Bilder
+(`Swapchain` in [`vk_dmabuf.rs`](../lib/gpu/vk_dmabuf.rs), keine `VkSurface`), exportiert sie als dma-buf, und der eigene
+Protokollcode hängt sie ans Fenster.
+
+**Der Weg eines Bildes.**
+
+| Schritt | Wayland | X11 |
+| --- | --- | --- |
+| Was der Bildschirm nimmt | `zwp_linux_dmabuf_v1` ab Version 4: Default-Feedback (Formattabelle, Hauptgerät, Tranchen des Hauptgeräts); Version 3: Modifier-Events; darunter CPU-Pfad. Erst beim ersten Bedarf gefragt | DRI3 1.2 und Present 1.0, sonst CPU-Pfad; `DRI3Open` nennt das Gerät (`st_rdev`), `GetSupportedModifiers` für Tiefe 24, 32 Bit |
+| Bilder | XRGB8888 (sonst XBGR, ARGB, ABGR), Modifier mit einer Ebene, die Gerät und Bildschirm beide können; der Treiber wählt (`VkImageDrmFormatModifierListCreateInfoEXT`), eigene Speicherbelegung, `vkGetMemoryFdKHR` | ebenso, nur XRGB8888 |
+| Anmelden | `zwp_linux_buffer_params_v1.create`, nicht `create_immed`: ein Import, der scheitert, gibt `failed` und den CPU-Pfad, `create_immed` darf die Verbindung beenden | `PixmapFromBuffers`, ein X-Fehler gibt den CPU-Pfad |
+| Zeichnen | Render-Durchgang wie unter Windows; davor holt ein Barrier das Bild von `VK_QUEUE_FAMILY_FOREIGN_EXT`, danach gibt einer es zurück, Layout `GENERAL` | ebenso |
+| Zeigen | erst wenn die Zeitleiste die Übergabe erreicht hat (`Swapchain::flush`, kein Warten): attach, damage_buffer, frame, commit | ebenso: `PresentPixmap`, die Rechtecke als Update-Region (XFixes) |
+| Nächstes Bild | nach `wl_callback.done` (höchstens 1 s) | nach `PresentCompleteNotify` (höchstens 1 s) |
+| Bild wieder frei | nach `wl_buffer.release` und wenn `poll(POLLOUT)` auf dem dma-buf keine Leser-Fence mehr meldet | nach `PresentIdleNotify`, ebenso |
+
+Ein Wechsel zwischen Shared Memory und dmabuf auf einem `wl_surface` oder X-Fenster braucht kein Kindfenster: ein `wl_buffer`
+ist ein `wl_buffer`. `win_gpu_child` heißt nur so wie unter Windows und sagt, was der Bildschirm nimmt. Viewport, Fractional
+Scale, Bestätigen des Configure und Fenstergeometrie laufen durch denselben Code wie beim Shared Memory
+(`surface_state`, `commit_buffer` in [`linux_wl_present.rs`](../lib/plat/linux_wl_present.rs)).
+
+**Warum nie ein falsches Bild zu sehen ist.** Implicit Sync setzt voraus, dass Treiber und Kernel Fences an den dma-buf hängen
+(ohne WSI nur mit `DMA_BUF_IOCTL_IMPORT_SYNC_FILE`, Linux ab 6.0) und der Compositor sie beachtet. Darauf baut hier nichts:
+
+- Ein Bild geht erst ans Fenster, wenn die GPU fertig ist. Beim attach hängt also keine Fence daran, auf keinem Compositor, Kernel oder Treiber.
+- In ein Bild wird erst gezeichnet, wenn der Compositor es zurückgegeben hat, keine Leser-Fence mehr daran hängt (seine GPU kann beim `release` noch lesen) und es nicht das neueste ist (ein erneut gezeigtes Fenster bekommt es wieder).
+- `plat::win_present` beendet den Weg über die Puffer: ein Bild unterwegs wird verworfen, das Shared Memory zeigt das ganze Bild. Was das Shared Memory noch zeigen wollte, verfällt beim ersten Puffer; die Wiederholungen nach dem Mappen (WSLg) und `Expose` laufen unter den Puffern nicht übers Shared Memory.
+
+Der Preis: das Bild steht ein bis drei Millisekunden später am Fenster als mit einer Fence. Mehr als die GPU-Zeit und die letzte Millisekunde
+des Nachschauens ist es nicht (der Compositor müsste ohnehin warten). Geht ein Bild unterwegs, schaut die Fensterschleife jede Millisekunde nach; ein
+`sync_file` im `poll` der Schleife spart diese Millisekunde, ist aber nicht gebaut.
+
+**Takt.** Wie beim Shared Memory ein Commit je Antwort des Bildschirms. Solange die fehlt, gibt `try_acquire` `NotReady`, das Bild bleibt in der
+Textur, sein neuester Stand wird gezeichnet, wenn die Antwort kommt: es staut sich nichts, die GPU zeichnet keine Bilder, die niemand sieht, also
+was MAILBOX für ein Fenster bedeutet (`present_mode()` sagt `Mailbox`). Die Antwort beendet das Warten der Schleife (`wait` kehrt zurück, kein Event, kein neues Bild der UI);
+vorher schaut nichts nach. Nur das erste Bild nach dem Anlegen wartet nicht: bei einem Fenster, das sich bewegt, ist immer eine Antwort auf das letzte CPU-Bild unterwegs.
+
+**Damage.** Der Compositor bekommt die Rechtecke, die die Laufzeit ohnehin kennt (`Swapchain::damage`), außer bei Bildern mit Ebenen, Bildern und Leinwänden und dem Bild danach: dann das Ganze.
+
+**Threads.** Der Fenster-Code darf nur vom Thread der Fensterschleife benutzt werden. Der Arbeitsthread baut also nur Vulkan-Objekte: die Größe kommt über `Surface::track_size`, das Anmelden
+der Puffer (`prepare`) und das Freigeben alter (`RETIRED`) geschieht auf dem UI-Thread. Stapel des Arbeitsthreads: 8 MiB wie die Vorgabe von glibc, nur belegt, was benutzt wird; anv kommt
+ohne Shader-Cache mit 128 KiB aus (`jfgui_GPU_WORKER_KB`, je ein Lauf mit 128, 256, 512, 1024, 2048 KiB), andere Treiber sind nicht gemessen.
+
+**Rückfälle.** Kein Vulkan, kein passender Adapter (CPU-Adapter nie: `adapters_low_power`, `can_present`; ein anderes Gerät als das des Compositors auch nicht), kein dmabuf im Compositor, kein DRI3 oder Present, kein gemeinsames Format, ein
+abgelehnter Puffer: CPU-Pfad für den ganzen Lauf, ohne Meldung. Ein statisches Programm hat das alles nicht (`gpu_out_off.rs`).
+
+**Was man zurücklesen kann.** `jfgui_GPU_VERIFY=1` liest jedes gezeigte Bild aus der GPU zurück. Ein Wayland-Client kann sein Fenster nicht lesen: `gpu expect screen` und die Prüfungen von `uigputest` sind dort Hinweise.
+Unter X11 liest `GetImage`, was der Server hat; bei einem geflippten Fenster unter Xwayland ist das das Bild davor (gesehen mit KWin 6.6, die Komposition zeigt das letzte), deshalb zeigt `gpu expect screen` dort einmal mehr dasselbe.
+Der echte Beweis war einmalig von Hand: ein eigener KWin ohne Bildschirm (`kwin_wayland --virtual --xwayland`, eigener Sitzungsbus, `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1`, unsichtbar für jeden), `spectacle -b -n -f` darin, Ausschnitt mit `shot` verglichen: 0 Pixel anders, mit offenem Menü, nach dem Schließen, nach Teil-Updates, auf Wayland und X11, auf Wayland auch bei Maßstab 1,5 (Viewport).
+
+**Messungen.** Intel HD Graphics 610 (KBL GT1), Mesa 26.0.3, Pentium G4560T, Fedora 44, KWin 6.6; Release-Build, Fenster 1280 × 800. Wenn nicht anders gesagt auf dem eigenen KWin ohne Bildschirm (virtuelle Ausgabe, 60 Hz, echte GPU, Wayland);
+drei Läufe je Variante, gezeigt die Spanne der Läufe. Der Rechner ist geteilt (Last um 1). `uigputest --bench stages|latency|idle|caret`.
+
+| Messung | CPU-Pfad | GPU-Pfad | wie |
+| --- | ---: | ---: | --- |
+| Prozessstart bis Prozessende über 300 ms (gallery `--auto-close 300`) | statisch 22–28 ms, glibc 19–35 ms | 28–42 ms | von außen; streut stark |
+| Erstes Bild → Swapchain | – | 74–78 ms; Instanz 40–45, Adapter 6–7, Gerät 2,5–3,4, Bilder + Textur 1, Pipeline 1–1,6 (ohne Shader-Cache 15–27); der Wechsel auf dem UI-Thread 5,6–6,4 ms | `jfgui_GPU_TRACE=1` |
+| Taste → Commit, kleiner Fleck, Median | 0,13–0,14 ms | 2,8–3,0 ms | wp_presentation, 120 Tasten je Fenster |
+| Taste → Bildschirm, kleiner Fleck, Median (p95) | 9,2–9,5 ms (17) | 12,5–13,3 ms (20) | ebenso |
+| Taste → Commit, ganzes Bild, Median | 1,6–2,0 ms | 6,1–6,3 ms | ebenso |
+| Taste → Bildschirm, ganzes Bild, Median (p95) | 11,8–13,2 ms (20) | 14,3–15,2 ms (23) | ebenso |
+| **Echter KWin, Taste → Bildschirm**, kleiner Fleck | 16,6 / 24,7 / 17,6 ms | 24,6 / 18,9 / 24,8 ms | 3 Läufe; zweigipflig, in beiden Pfaden: kein Unterschied zu sehen |
+| **Echter KWin**, ganzes Bild | 26,4 ms | 26,0 ms | 1 Lauf |
+| Leerlauf: CPU, Kontextwechsel, Threads | 0 ms, 0 in 10 s, 3 Threads | 0 ms, 0 in 10 s, 5 Threads | von außen, `/proc` (Schritte von 10 ms) |
+| Blinkender Cursor: CPU, Kontextwechsel | 0–10 ms, 40–61 in 10 s | 10 ms, 84–102 in 10 s | ebenso |
+| Speicher im Leerlauf: RSS / anonym | 13,1 / 4,4 MiB | 54,0 / 10,5 MiB | das meiste davon sind Seiten des Treibers |
+| Speicher nach den Szenen: RSS / anonym | 21,4 / 4,6 MiB | 55,4 / 11,9 MiB | ebenso |
+| GPU-Speicher des Prozesses (fdinfo `drm-total`) | 0 | Leerlauf 24,5 MiB, nach den Szenen 49–53 MiB; `memory_reserved()` 15–21 MiB | |
+| Ganze Seite, 60 Bilder/s, je Bild: CPU des Programms | 6,1–8,8 ms | 6,1–6,7 ms | `--bench stages`, 120 Bilder |
+| … GPU des Programms / CPU des Compositors | 0 / 1,4–1,75 ms | 2,64 ms / 0,58–0,67 ms | KWins GPU-Zeit nicht lesbar (Datei-Capability) |
+| Kleiner Fleck: CPU / GPU / Compositor | 1,03–1,12 / 0 / 0,83–0,92 ms | 1,05–1,47 / 1,71 / 0,67–0,83 ms | das ganze Fenster wird gezeichnet |
+| Popup auf, zu: CPU / GPU / Compositor | 3,2–3,8 / 0 / 2,0–2,1 ms | 2,3–3,2 / 1,83 / 0,58–0,75 ms | |
+| Leinwand verschieben: CPU / GPU / Compositor | 1,19–1,49 / 0 / 1,17–1,42 ms | 0,68–0,95 / 1,96 / 0,58–0,92 ms | einfacher Inhalt; teure Inhalte gewinnen mehr |
+| Größe gallery, Release | statisch 4 472 664 Byte | glibc mit GPU 4 787 544 Byte (+314 880) | |
+
+Unter X11 (Xwayland desselben KWin, je 3 Läufe) ist es dasselbe Bild: ganze Seite CPU 6,1–8,2 gegen 6,1–6,3 ms, kleiner Fleck 0,91–1,18 gegen 1,26–1,48 ms, GPU 2,64 und 1,71 ms; RSS 17–21 gegen 55 MiB.
+
+Was das heißt: Eine schwache GPU reicht, 1,7 bis 2,6 ms je Bild bei diesem Fenster. Die CPU des Programms ist gleich oder kleiner, die des Compositors kleiner (er muss nichts kopieren). Im Leerlauf kostet der Weg nichts. Der Preis ist
+Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB im Treiber, und der Commit kommt um die GPU-Zeit später; auf dem Bildschirm bleibt davon wenig. Empfehlung: an, wie unter Windows (`DEFAULT_ON_LINUX` in `gpu_out.rs`, eine Zeile), solange kein Treiber anderes zeigt.
+
+**Gegenprobe auf einem Laptop mit zwei GPUs** (ThinkPad P14s Gen 2i, Ubuntu 26.04, Intel Iris Xe mit Mesa 26.0.8, NVIDIA T500 mit dem proprietären Treiber 595.99). Der echte Desktop läuft auf der Intel-GPU, und die UI wählt sie von selbst, unter Wayland und X11 (`uigputest --test switch`: 23 gezeigte Bilder zurückgelesen, keins anders). Eine erzwungene NVIDIA (`jfgui_GPU_ADAPTER=NVIDIA`) zeigt dort nichts: Die Bilder laufen nur auf der GPU, auf der der Compositor läuft, das Fenster bleibt auf dem CPU-Pfad. Bilder von einer GPU zur anderen (PRIME) sind nicht gebaut. Auf einem eigenen KWin ohne Bildschirm, der selbst auf der NVIDIA lief, bestehen `gputest --test all`, die GPU-Tests von `uigputest` und die Skripte `gpu_output`, `gpu_layers` und `gpu_layers_rtl` der Galerie, unter Wayland und X11: Der proprietäre Treiber kommt mit dmabuf zurecht. Ob das Auflisten der Adapter eine schlafende zweite GPU weckt, bleibt offen: Die T500 schläft auf diesem Rechner nie.
+
+| Messszene, 1080p, Entwicklungs-Build, je drei Läufe | 10 000 Würfel | 100 000 | 1 Mio. |
+| --- | ---: | ---: | ---: |
+| Intel Iris Xe (TGL GT2) | 0,53 ms | 2,48 ms | 19,4 ms |
+| NVIDIA T500 | 0,68 ms | 1,70 ms | 8,4 ms |
+
+**Gegenprobe auf Mutter** (50.1, derselbe Laptop, ein eigener Mutter ohne Bildschirm, `mutter --headless --wayland --virtual-monitor 1920x1080`; er läuft auf der Iris Xe und bietet keine Rahmen vom Server): Die Tests von `uigputest`, `gputest --test window` und die drei Skripte der Galerie bestehen unter Wayland und über Xwayland, 0 zurückgelesene Bilder anders. Der Lauf fand einen Fehler unter X11: `WCMD_RESTORE` schickte nur `MapWindow`, und das bewirkt bei einem Fenstermanager nichts, der minimierte Fenster abgebildet lässt. Jetzt geht dazu `_NET_ACTIVE_WINDOW` hinaus.
+
+**Nicht getestet:** AMD, die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, eine zweite GPU, die schläft, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
+
+### Was fehlt
+
+- Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
+- Beim Verschieben über eine Geste hinweg wäre die Kachel oft schon das richtige Bild; dass das Bild danach trotzdem gezeichnet wird, kostet ein Bild, ist aber der Beweis in Ruhe.
 - Eine verschobene Ebene wird neu gezeichnet und ganz hochgeladen. Ihr deckendes Inneres könnte in der Textur bleiben, nur der
   durchscheinende Rand müsste neu. Das setzt voraus, dass Pixel beim Verschieben gleich bleiben: der Rasterer rechnet in
   absoluten f32-Koordinaten, abgerundete Ecken, Kreise und Linien ändern sich (siehe `scrollcopy.rs`). Nicht gebaut.
 - Durchscheinende Bilder, Bilder in höheren Ebenen und unter 256 × 256 bleiben auf der CPU. Die Bildränder (eine Zelle breit) laufen weiter über den Grund.
-- `Cmd::Custom` (Bildansicht, Leinwände) gar nicht: das ist G3c.
+- Andere `Cmd::Custom` (Diagramme von `chart`, Timeline, Terminal) bleiben auf der CPU; `ui.canvas_gpu` gibt es auch für sie, wenn es sich lohnt.
 - Kein teilweises Zeichnen in die Swapchain (`VK_KHR_incremental_present`): jedes Bild zeichnet das
   ganze Fenster, auch für ein Blinken. Billig, aber nicht nichts auf einer schwachen GPU.
 - Scroll-Kopien laufen im Framebuffer; die Textur bekommt die verschobenen Zellen neu (die GPU könnte sie
@@ -522,14 +715,23 @@ plus 0,7 MiB CPU-Speicher für die Pixel darunter, ein Dialog 2,3 + 1,1 MiB, Dun
 | Variable | Wirkung |
 | --- | --- |
 | `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
-| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)) |
+| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON` und `DEFAULT_ON_LINUX` in `gpu_out.rs` |
+| `jfgui_GPU_DMABUF=0` / `=refuse` | (Linux, Tests) der Bildschirm nimmt keine GPU-Puffer / lehnt sie ab |
+| `jfgui_GPU_WORKER_KB=n` | Stapel des Arbeitsthreads der UI-Ausgabe (um zu sehen, was ein Treiber braucht) |
+| `jfgui_WL_FEEDBACK=1` | (Wayland, Messungen) `wp_presentation`: wann ein Commit auf dem Bildschirm war (`plat::gpu_test_presented`, `uigputest --bench latency`) |
 | `jfgui_GPU_VERIFY=1` | die UI-Ausgabe liest jedes dargestellte Bild zurück und vergleicht es mit dem Framebuffer (langsam, zum Testen) |
 | `jfgui_GPU_TRACE=1` | die UI-Ausgabe schreibt ihre Schritte und Zeiten auf stderr |
 | `jfgui_GPU_LAYERS=0` | die UI-Ausgabe hält eine Textur je Fenster: keine Ebenen, keine Bilder ([Ebenen und Bilder](#ebenen-und-bilder)) |
 | `jfgui_GPU_IMAGES=0` | keine Bilder als Texturen, Ebenen bleiben |
 | `jfgui_GPU_IMAGE_MB=n` | Budget der Bildtexturen (Vorgabe 256) |
+| `jfgui_GPU_CANVAS=0` | keine Leinwand nutzt Kacheln ([Leinwände](#leinwände)) |
+| `jfgui_GPU_CANVAS_CPU=a,b` | die so benannten Leinwände (`image`, `diagram`, `kritzel`, `paintcraft`) zeichnen auf der CPU |
+| `jfgui_GPU_CANVAS_PAN=a,b` | sie verschieben nur aus Kacheln, ein Zoom läuft über die CPU |
+| `jfgui_GPU_CANVAS_ZOOM=a,b` | sie zoomen auch aus Kacheln, was immer das Widget gewählt hat |
+| `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128) |
+| `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
-| `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) |
+| `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
 | `jfgui_GPU_PRESENT=fifo\|mailbox\|immediate` | Darstellungsmodus jeder neuen Swapchain |
 | `jfgui_GPU_VALIDATE=1` | Khronos-Validierungsschicht mit Synchronisationsprüfung, wenn installiert |
@@ -563,8 +765,8 @@ für Messungen den Configurator ausschalten.
 
 ## Tests
 
-`python -u build_rs.py test gputest` (nur Windows: `apps/gputest/TARGETS`) führt
-`apps/gputest/tests/*.uis` aus:
+`python -u build_rs.py test gputest` führt `apps/gputest/tests/*.uis` aus, unter Windows und Linux
+(dort gegen glibc, ohne die Fenstertests: [Linux](#linux)):
 
 | Skript | Prüft |
 | --- | --- |
@@ -584,13 +786,16 @@ für Messungen den Configurator ausschalten.
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
 | `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung) |
+| `glibc.uis` | (Linux, gegen glibc gelinkt; sonst `SKIP`) Argumente und Umgebung; Hauptthread und jeder `plat`-Thread mit eigenem Kontrollblock und TLS (FS-Basis = `pthread_self`, eigenes `errno`, eigener `dlerror`-Text); der verlangte Stapel; 300 Threads hinterlassen keine Abbildung; Vulkan auf einem `plat`-Thread von 2 MiB. In Kindprozessen: `exit` von glibc aus `main` und von einem Thread, auch mit laufenden Threads und einem noch offenen Gerät; Absturz auf dem Haupt- und einem `plat`-Thread, Stapelüberlauf und Panik mit Bericht, Code 3 und ohne `at_exit` |
+| `noloader.uis` | `jfgui_GPU_DLL` nennt eine fehlende Datei (Name, Pfad) oder eine Bibliothek, die kein Vulkan-Loader ist: `Err(NoLoader)`; ein Programm ohne Loader startet, `--info` meldet `SKIP`, Code 0 |
 
 Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
 `gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
 
 **Texturen in Shadern** (`gputest --test textures`, [`t_texture.rs`](../apps/gputest/t_texture.rs);
 die Shader sind `shader::samples`, vor dem Hochladen von `shader::val` geprüft). Exakt heißt:
-gleich der CPU-Referenz Bit für Bit (unorm-Texel als `k / 255` in f32).
+gleich der CPU-Referenz Bit für Bit; ein rgba8unorm-Kanal darf von `k / 255` in f32 eine Stelle
+abweichen (die RTX tut es nie, Mesa manchmal: [Linux](#linux)), der Test zählt das.
 
 | Teil | was | Ergebnis auf der RTX 2070 SUPER |
 | --- | --- | --- |
@@ -840,11 +1045,150 @@ Die übersetzten Shader sind so schnell wie die handgeschriebenen (`move` sogar 
 die Robustheit kostet in `move` 0,007 ms (+2,8 %), sonst nichts Messbares. Der Einzel-Pfad ist
 CPU-gebunden (100 000 Draws je Bild); seine Bildzeiten schwanken mit der Last des Rechners.
 
+## Linux
+
+Alle GPU-Treiber unter Linux sind glibc-Bibliotheken, ein Prozess ohne glibc kann keinen laden.
+Ein Programm für die GPU wird deshalb dynamisch gegen glibc gelinkt und gegen nichts sonst;
+`libvulkan.so.1` kommt zur Laufzeit per `dlopen`, ohne die Datei startet es und `Instance::new`
+gibt `Err(NoLoader)`. Kommandozeilen- und Serverprogramme bleiben statisch ohne libc
+([ROADMAP.md](ROADMAP.md) §8). Ein statisches Programm, das `gpu` linkt, bekommt immer `NoLoader`.
+
+**Stand (G4b):** Alles wie unter Windows, Fenster über dmabuf ([Ausgabe unter Linux](#ausgabe-unter-linux)).
+`Features::swapchain` ist auf einem CPU-Adapter `false`, die Fenstertests von `gputest` melden dort `SKIP`.
+
+**Welche Programme.** Ein Programm, das `ui` nennt, wird gegen glibc gelinkt, auch `gui`-Programme einer App in `BINS`;
+`cli`-Programme und alles ohne `ui` bleiben statisch und im Release-Build Byte für Byte, wie sie waren (`wgsltest`, `jfs`, `appimagert` geprüft; ein Entwicklungs-Build wie `coretest` kann um Füllbytes abweichen, weil `plat` sich anders in Codegen-Einheiten teilt: dieselben Funktionen in derselben Größe).
+Eine Datei `apps/NAME/GLIBC` erzwingt glibc (`gputest`, `uigputest`), eine Datei `apps/NAME/STATIC` hält eine App statisch
+(`plattest`, `linuxtest`: sie testen weiter, was `--static` ergibt). `build_rs.py ... --static` und `tools/package.py --static`
+bauen die UI-Programme dieses Laufs statisch: kein Vulkan-Code, nur Shared Memory, für Systeme ohne glibc wie Alpine. Module und Plugins
+bleiben, wie sie sind: ihr Lader braucht keine libc, sie importieren nichts (PaintCraft mit `jxlenc` und den Rust-Plugins bestanden, auch der Absturz eines Plugins).
+
+**Bauen.** `build_rs.py`, Abschnitt „glibc“:
+
+- Jede Crate bekommt `--cfg jfgui_glibc` und liegt in `build/linux/.glibc`, das Programm wie jedes
+  andere in `build/linux`. Nennt es `ui` nicht, wird kein Stil gebaut (`gputest`: 7 Crates).
+- Zum Linken ist nichts zu installieren. `Builder.glibc_stubs` schreibt aus der Tabelle `GLIBC_STUBS`
+  drei Attrappen `libpthread.so.0`, `libdl.so.2` und `libc.so.6`: eine Funktion `ret` unter jedem
+  Namen (`rustc --emit=obj`), dann `ld.lld -shared` mit einem Versionsskript. Sie nennen dem Linker
+  nur Namen und Versionen; zur Laufzeit gelten die Bibliotheken des Systems.
+- Das Programm hat eine feste Adresse wie die statischen (`ET_EXEC`, die `.map` gilt weiter), den
+  Interpreter `/lib64/ld-linux-x86-64.so.2`, `DT_NEEDED` auf die drei Dateien, bindet beim Start
+  (`BIND_NOW`), importiert nur Funktionen und exportiert nichts: `memcpy` aus `rt` ersetzt nie die
+  der Treiber.
+- Alle 15 Importe tragen die Version `GLIBC_2.2.5`, die älteste, die x86-64 hat. Bis glibc 2.33
+  stehen die Funktionen so in `libdl` und `libpthread`. Seit 2.34 stehen sie in `libc`, dort bleibt
+  diese Version als Kompatibilitätssymbol, und `libdl` und `libpthread` bleiben als leere Dateien.
+  Dieselbe Datei startet also auf beiden Seiten; von den Symbolen her auf jeder glibc für x86-64, eine
+  Grenze setzen eher die Treiber (Vulkan 1.1 gibt es ab etwa RHEL 7, glibc 2.17). **Geprüft** ist
+  bisher nur die neue Seite (2.39, 2.43); auf den Linux-Umgebungen hier liegt keine ältere glibc
+  ([LINUX_TESTPLAN.md](LINUX_TESTPLAN.md) Abschnitt 5).
+
+**Was in `lib/plat` anders ist** ([`linux_glibc.rs`](../lib/plat/linux_glibc.rs), das Ende von
+[`linux_thread.rs`](../lib/plat/linux_thread.rs)):
+
+| Teil | statisch | gegen glibc |
+| --- | --- | --- |
+| Start | `_start` ruft `jfgui_main`, dann `exit_group` | `_start` ruft `__libc_start_main` (TLS und Initialisierung hat `ld.so` schon erledigt), die gibt den Rückgabewert an `exit` |
+| Threads | roher `clone` ohne TLS | `pthread_create` auf derselben Abbildung (Schutzseite, Signalstapel, Schutzseite, Stapel); oben 16 KiB mehr für Kontrollblock und statischen TLS, der Stapel bleibt so groß wie verlangt; `pthread_join`, dann `munmap` |
+| `plat::exit`, Rückkehr aus `main` | `exit_group` | `exit`: `plat::at_exit`, Destruktoren der Treiber, stdio |
+| Absturz, Panik (`rt::os::exit`) | `exit_group` | `exit_group`, kein Destruktor im Signal-Handler |
+| `dl_open`, `dl_sym`, `dl_close`, `dl_error`, `glibc_version` | gibt es nicht | das `dlopen` des Systems |
+
+`rt` bleibt gleich. Signale setzt `plat` weiter mit `rt_sigaction` direkt, ohne die zwei internen von
+glibc zu berühren; der Allokator (`rt::mem`, eigene Abbildungen, kein TLS, auch von Treiber-Threads
+aufrufbar) und `fork` (das Kind macht bis `exec` nur Systemaufrufe) bleiben, wie sie sind. Die
+Threads eines Treibers haben keinen Signalstapel: Dort läuft der Bericht auf ihrem Stapel. Mesa sperrt
+auf seinen Threads alle Signale außer SIGSEGV und SIGSYS; ein SIGILL dort beendet den Prozess also
+sofort durch den Kernel, ohne Bericht, ein SIGSEGV kommt an. `plat::setenv` ändert die Liste von JFLib,
+die `plat::env` und Kindprozesse sehen; das `getenv` eines Treibers liest die Umgebung vom Start.
+
+Statische Programme sind dabei Byte für Byte gleich geblieben (`plattest`, `gallery` im
+Entwicklungs-Build, `wgsltest` im Release-Build, gegen den Stand davor). Deshalb stehen die
+`cfg`-Attribute in `linux.rs` und `linux_thread.rs` in derselben Zeile wie das Element: die
+Zeilennummern der Panik-Stellen sind Bytes im Programm.
+
+Größe von `gputest`: Release statisch 2 569 872, gegen glibc 2 599 296 Byte (+29 424),
+Entwicklungs-Build 2 782 232 und 2 817 944 (+35 712). Darin steckt der Test `glibc`, den nur dieser
+Build hat (rund 12 KB); Dynamik-Tabellen und PLT sind knapp 2 KB.
+
+**Tests.** `gputest --test glibc` (Start, Threads, Ende) und `--test noloader`, siehe
+[Tests](#tests). Dabei läuft auch Vulkan auf einem `plat`-Thread mit 2 MiB Stapel, der Größe des
+Arbeits-Threads von `gpu_out`. Einmal von Hand in WSL: Das Programm in einem `bwrap` mit nichts als
+`ld.so` und den drei Bibliotheken startet, `--info` meldet `SKIP`, `--test glibc` besteht.
+
+| Umgebung | Treiber | Ergebnis |
+| --- | --- | --- |
+| WSL Ubuntu 24.04, glibc 2.39, Ryzen 5 3600 | llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 256 Bit | alles bestanden, Fenstertests `SKIP` |
+| Fedora 44, glibc 2.43, Pentium G4560T | Intel HD Graphics 610 (KBL GT1), anv, Mesa 26.0.3, Vulkan 1.4.335 | alles bestanden, Fenstertests `SKIP`, in 7–13 s |
+| Fedora 44, derselbe Rechner | llvmpipe, Mesa 26.0.3, LLVM 22.1, 128 Bit | Treiberfehler, unten; bestanden nur `copies`, `upload`, `bindless`, `noloader` |
+| WSL mit `GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128` | llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 128 Bit | alles bis in `wgsl`, dort nach `modf` ein Absturz in `libLLVM` (`InstCombine`) |
+
+Die Validierungsschicht ist auf beiden Rechnern nicht installiert, unter Linux lief also noch keine
+Validierung (`validate.uis` läuft dort ohne sie).
+
+**Was die erste fremde GPU und llvmpipe gefunden haben:**
+
+- *Ein `Device`-Puffer ließ sich auf einem CPU-Adapter schreiben.* Dort ist aller Speicher
+  abbildbar, `Buffer::write` prüfte nur, ob eine Adresse da ist; ein Programm liefe auf llvmpipe und
+  scheiterte auf der nächsten GPU. Jetzt zählt die Art des Puffers, auf jedem Adapter `Invalid`.
+- *Der Ring wuchs auf llvmpipe um 10 MiB.* 2000 Übergaben ohne Warten: Ein CPU-Gerät liegt
+  Hunderte zurück, und was sie lesen, kann nicht zurück in den Ring. Das ist richtig; der Test hat
+  nachgestellt, was die UI nicht tut. Er hält jetzt drei Bilder in Flug wie eine Swapchain, die Grenze
+  von 2 MiB bleibt und gilt überall.
+- *`k / 255` ist nicht auf jeder GPU korrekt gerundet.* Mesa landet bei manchen `k` eine Stelle
+  daneben, was Vulkan erlaubt: llvmpipe überall (513 von 1364 Werten beim Laden und Abtasten, 281 von
+  768 bei Speichertexturen), Intel nur bei Speichertexturen (281 von 768), die RTX nie. `gputest`
+  erlaubt das nur bei rgba8unorm und zählt es; alle anderen Formate bleiben exakt.
+- *Intel spült f16-Denormale auf 0.* WGSL erlaubt das, `Tol::Halves` kannte die Regel nur für f32.
+- *llvmpipe auf Fedora 44 ist auf diesem Prozessor unbrauchbar* (Mesa 26.0.3 mit LLVM 22.1, Pentium
+  ohne AVX und BMI): Abstürze in `libLLVM` beim Übersetzen (`simplifyMaskedScatter`,
+  `SimplifyDemandedVectorElts`), falsche Ergebnisse (`i32 +` gibt für 1 + 1 die 0), `SIGILL` in
+  gejittetem Code (`andn` auf einem Prozessor ohne BMI1). Dieselben SPIR-V-Module laufen auf der
+  HD 610, der RTX 2070 und auf llvmpipe mit LLVM 20 und AVX2; es liegt am Treiber. Die UI nimmt ohnehin
+  keinen CPU-Adapter (`adapters_low_power`), `instance.adapter()` nimmt ihn als letzten.
+- *Nichts gefunden* bei den Speichertypen einer integrierten GPU (`vk_mem.rs` trifft dort den
+  richtigen Typ, Uploads und Rücklesen stimmen), bei den Grenzen (Uniform-Ausrichtung 64, Speicher 4,
+  Bindung bis 4095 MiB) und bei der wechselnden Subgroup-Größe (8 bis 32, gesehen 8, 16 und 32; die
+  Referenz der Subgroup-Tests kennt sie). Alle 13 469 Ergebnisse des WGSL-Tests stimmen.
+
+**Die HD 610 in Zahlen.** Release-Build, ohne Fenster, Mesa 26.0.3; je Variante drei Läufe,
+abwechselnd, auf dem geteilten Rechner (Last um 1, Firefox lief mit). Median, in Klammern die
+Spanne über die Läufe. Zeiten in ms. 300 Bilder nach 60 zum Aufwärmen, bei 1 Mio. und 100k einzeln
+weniger.
+
+| N | Modus, Ziel | CPU Med. | GPU move / cull / draw | GPU gesamt (Spanne) | Bildzeit Med. (p99) | Bilder/s | Dreiecke/s |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10k | indirekt, 1080p | 0,21 | 0,08 / 0,10 / 2,23 | 2,42 (2,37–2,43) | 2,51 (3,82) | 382 | 0,03 G |
+| 100k | indirekt, 720p | 0,20 | 0,53 / 0,92 / 6,43 | 7,95 (7,93–7,97) | 7,95 (8,88) | 127 | 0,08 G |
+| 100k | indirekt, 1080p | 0,20 | 0,52 / 0,93 / 7,46 | 9,19 (9,16–9,19) | 9,29 (10,3) | 108 | 0,07 G |
+| 100k | indirekt, 1080p, WGSL | 0,19 | 0,51 / 0,85 / 7,57 | 9,19 (9,13–9,20) | 9,30 (10,4) | 108 | 0,07 G |
+| 1M | indirekt, 720p | 0,34 | 5,21 / 10,2 / 53,6 | 68,8 (68,7–68,9) | 70,0 (71,3) | 14 | 0,09 G |
+| 1M | indirekt, 1080p | 0,30 | 5,40 / 9,91 / 54,9 | 70,2 (69,8–70,3) | 70,5 (72,2) | 14 | 0,09 G |
+| 10k | einzeln, 1080p | 4,89 | 0,06 / – / 3,55 | 3,63 (3,58–3,64) | 4,89 (6,07) | 205 | 0,03 G |
+| 100k | einzeln, 1080p | 32,9 | 0,48 / – / 29,1 | 29,6 (29,5–29,6) | 32,9 (40,7) | 30 | 0,04 G |
+
+Was eine schwache GPU also tut: 100 000 bewegte Würfel in 1080p bei 108 Bildern/s, gerechnet rund
+200 000 bei 60 Bildern/s. Die RTX 2070 SUPER ([Messszene](#messszene)) ist bei 1 Mio. Würfeln gut 40-mal
+schneller (70 ms gegen 1,65 ms), bei 100 000 Würfeln 32-mal. Engpass ist die Geometrie, rund 90 Mio.
+Dreiecke/s gegen 3,5 Mrd.; `move` ist 21-mal langsamer, `draw` 44-mal, `cull` 75-mal (es liest die
+ganzen Objektdaten, vermutlich die Speicherbandbreite). Die Pixel kosten wenig: 1080p gegen 720p bei
+100 000 Würfeln 1,2 ms. Ein Zeichenbefehl je Objekt kostet die CPU 330–490 ns und bremst hier auch die
+GPU (29,1 statt 7,46 ms bei 100 000). WGSL und SPIR-V sind gleich schnell. Für die UI ist das reichlich:
+ein ganzes Bild 1080p hochladen 2,5–3,4 ms, kleine Uploads 41 µs, eine Million Elemente rechnen und
+zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 ms). Zeiten mit Darstellung:
+[Ausgabe unter Linux](#ausgabe-unter-linux).
+
+**Sandbox.** Eine App mit `sandbox`-Zeile braucht für den Treiber nichts zusätzlich: Landlock erlaubt `/usr`, `/etc`, `/lib*`, `/opt`, `/sys`, `/run` zum Lesen und `/dev`, `/tmp` zum Schreiben
+([`linux_sandbox.rs`](../lib/plat/linux_sandbox.rs)), die Liste von seccomp sperrt nichts, was ein Treiber zwingend braucht (`perf_event_open` gibt `EPERM`). Der Shader-Cache in `~/.cache` schlägt fehl, wenn das Manifest ihn nicht erlaubt: Dann übersetzt der Treiber jedes Mal.
+`sandboxtest` prüft das mit dem echten Treiber (Fedora: HD 610 unter `sandbox strict`).
+
+**Pakete.** `.deb` und RPM nennen glibc als Abhängigkeit und empfehlen Vulkan, Flatpak bekommt `--device=dri` ([PACKAGING.md](PACKAGING.md)); mit `--static` nichts davon.
+
 ## Bekannte Lücken
 
-- Nur Windows. Linux und Android brauchen einen Weg zu `libvulkan.so` (JFLib lädt unter Linux
-  ohne libc) und ihre Fensterflächen; das Backend übersetzt dort, `Instance::new` gibt
-  `NoLoader`.
+- Unter Android noch kein Weg zu `libvulkan.so` (G4c); das Backend
+  übersetzt dort, `Instance::new` gibt `NoLoader`. Unter Linux lief noch keine Validierung und
+  noch keine ältere glibc als 2.39 ([Linux](#linux)); nur Intel und KWin als Treiber und Compositor ([Ausgabe unter Linux](#ausgabe-unter-linux)).
 - Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
   `move` und `cull` neben dem Zeichnen laufen lassen).
 - Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.

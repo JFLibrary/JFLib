@@ -1,8 +1,11 @@
 // lab -- the task of a lab project: a title, an introduction, goals that checks in the .scn
 // expectation syntax decide, hints, every text in German and English
 //
-//   Lab { title, summary, topic, intro, ordered, goals, hints }   Project::lab (None: a free
-//                                                 project); the "lab" member of a .jfnet file
+//   Lab { title, summary, topic, intro, ordered, goals, hints, assess, start_faults, lock, pass }
+//                                                 Project::lab (None: a free project); the "lab"
+//                                                 member of a .jfnet file; the last three are left
+//                                                 out of the file at their defaults
+//   Lock { problems, faults, answer }             what a lab hides or forbids (default: nothing)
 //   Goal { text, checks, hints }                  checks: the words of "expect ..." lines of a
 //                                                 scenario (scenario.rs), all of them must hold
 //                                                 at one moment
@@ -16,6 +19,15 @@
 // A text in a file is a string (German, shown in every language) or a pair ["Deutsch",
 // "English"].  Which goals are reached, and when, is the simulator's business (jfn_sim's goal.rs
 // evaluates the checks against the running engine); the file only describes the task.
+//
+// A broken network for a fault hunt (AK2): "start_faults" are faults as a scenario writes them
+// after "fault" ("link R1 Gi0/1", "power SRV1", "stop WEB1 web for 30s"); the simulator applies
+// them when the project loads and again when it is reset, as actions (jfn_sim's runner.rs
+// start_actions).  "lock": {"problems": true} hides the panel Probleme, {"faults": true} the
+// faults: no list, no "Wiederherstellen", no marks on the timeline and the charts; a learner
+// then repairs what breaks as a real one would (a new cable, the power switch, the service's
+// switch); {"answer": true} forbids the author's panel, which shows the target network.  "pass":
+// the per cent a graded lab must reach to count as done in a course (default 100).
 //
 // An assessment (Lab::assess, A1) grades the work with points: the project itself is the start
 // network, the target ("answer") network travels in the file, and graded items say what of it
@@ -49,7 +61,10 @@
 //       {"what": "config", "dev": "R1", "value": ["interface GigabitEthernet0/0/1",
 //        " ip address 10.0.2.1 255.255.255.0", " no shutdown"]},
 //       {"what": "cable", "dev": "PC2", "port": "eth0", "peer": "SW2", "peer_port": "Gi1/0/2"},
-//       {"what": "check", "checks": ["PC1 reaches 10.0.2.10"], "points": 4}],
+//       {"what": "check", "checks": ["PC1 reaches 10.0.2.10"], "points": 4},
+//       {"what": "check", "checks": ["PC2 not reaches 10.0.2.10"], "points": 2},
+//       {"what": "diagnosis", "dev": "R1", "port": "Gi0/0/1", "peer": "SW1", "peer_port": "Gi1/0/1",
+//        "text": ["Welches Kabel ...?", "Which cable ...?"], "explain": ["...", "..."], "points": 2}],
 //     "target": {"devices": [...], "links": [...]}
 //   }
 //
@@ -59,7 +74,10 @@
 // route, RouteVal), "service" (`svc` and the path `key` of a setting, "pools.0.range": a JSON
 // value), "cable" (between dev/port and peer/peer_port, a port left out: any; value: a
 // CableKind or nothing), "config" (lines of the running configuration, a block's lines indented
-// under its first line), "check" (expectations in the .scn syntax, all at one moment).  A device
+// under its first line), "check" (expectations in the .scn syntax, all at one moment; "PC1 not
+// reaches X" says something must fail), "diagnosis" (a question: the device `dev`, or with `peer`
+// the cable between them, is what is at fault; the learner names one, and it counts only when
+// handed in, so that the score cannot be asked; `explain` is shown then).  A device
 // is found by `id` (the start network keeps the target's ids), else by `dev`.  "cmp": "norm" (the
 // default: equivalent spellings count), "exact" (the same text), "any" (value is a list, one of
 // which counts).  Members at their default are left out of the file; "points" defaults to 1.
@@ -67,7 +85,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use agent_core::jmap::{Field, Value};
+use agent_core::jmap::{Field, Json, Value};
 use agent_core::{record, wire_enum};
 use netpkt::{Ipv4, Prefix4, Prefix6};
 
@@ -130,22 +148,90 @@ record! {
 }
 
 record! {
-    /// the task of a lab project
-    pub struct Lab {
-        pub title: Text,
-        /// one line for the list of labs
-        pub summary: Text,
-        /// the shelf of the list: "net" (networks) or "ds" (distributed systems)
-        pub topic: String,
-        /// the introduction, a text per paragraph
-        pub intro: Vec<Text>,
-        /// a goal counts only after the goals before it (a story: change, break, recover)
-        pub ordered: bool,
-        pub goals: Vec<Goal>,
-        /// hints for the whole task, opened one by one
-        pub hints: Vec<Text>,
-        /// graded items with points, the target network, the feedback (None: goals only)
-        pub assess: Option<Assess>,
+    /// what a lab hides or forbids; the defaults hide nothing, as in every lab before these
+    pub struct Lock {
+        /// the panel Probleme, the problem marks of collapsed groups
+        pub problems: bool,
+        /// the faults: their list, their marks, healing them
+        pub faults: bool,
+        /// the author's panel, which shows the target network
+        pub answer: bool,
+    }
+}
+
+/// the task of a lab project
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Lab {
+    pub title: Text,
+    /// one line for the list of labs
+    pub summary: Text,
+    /// the shelf of the list: "net" (networks) or "ds" (distributed systems)
+    pub topic: String,
+    /// the introduction, a text per paragraph
+    pub intro: Vec<Text>,
+    /// a goal counts only after the goals before it (a story: change, break, recover)
+    pub ordered: bool,
+    pub goals: Vec<Goal>,
+    /// hints for the whole task, opened one by one
+    pub hints: Vec<Text>,
+    /// graded items with points, the target network, the feedback (None: goals only)
+    pub assess: Option<Assess>,
+    /// faults that are there when the project loads, as a scenario writes them after "fault"
+    pub start_faults: Vec<String>,
+    /// what the lab hides or forbids
+    pub lock: Lock,
+    /// the per cent a graded lab must reach to count as done in a course (0: 100)
+    pub pass: u32,
+}
+
+impl Json for Lab {
+    fn to_json(&self) -> Value {
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("title", self.title.put());
+        o.insert("summary", self.summary.put());
+        o.insert("topic", self.topic.put());
+        o.insert("intro", self.intro.put());
+        o.insert("ordered", self.ordered.put());
+        o.insert("goals", self.goals.put());
+        o.insert("hints", self.hints.put());
+        o.insert("assess", self.assess.put());
+        // at their defaults they stay out of the file: a lab without them is written as ever
+        if !self.start_faults.is_empty() {
+            o.insert("start_faults", self.start_faults.put());
+        }
+        if self.lock != Lock::default() {
+            o.insert("lock", self.lock.put());
+        }
+        if self.pass != 0 {
+            o.insert("pass", self.pass.put());
+        }
+        o
+    }
+    fn from_json(v: &Value) -> Option<Self> {
+        v.as_object()?;
+        let f = |k: &str| v.get(k);
+        Some(Lab {
+            title: Field::take(f("title")),
+            summary: Field::take(f("summary")),
+            topic: Field::take(f("topic")),
+            intro: Field::take(f("intro")),
+            ordered: Field::take(f("ordered")),
+            goals: Field::take(f("goals")),
+            hints: Field::take(f("hints")),
+            assess: Field::take(f("assess")),
+            start_faults: Field::take(f("start_faults")),
+            lock: Field::take(f("lock")),
+            pass: Field::take(f("pass")),
+        })
+    }
+}
+
+impl Field for Lab {
+    fn put(&self) -> Value {
+        self.to_json()
+    }
+    fn take(v: Option<&Value>) -> Self {
+        v.and_then(Lab::from_json).unwrap_or_default()
     }
 }
 
@@ -191,7 +277,31 @@ impl Lab {
         if let Some(a) = &self.assess {
             v.extend(a.issues(p));
         }
+        for (i, f) in self.start_faults.iter().enumerate() {
+            let n = i + 1;
+            match scenario::parse_fault_text(f) {
+                Err(e) => v.push(msg!("Startfehler {}: \u{201e}{}\u{201c} ist kein Fehler: {}", n, f, e)),
+                Ok((spec, _)) => {
+                    for d in spec.devices().into_iter().filter(|d| p.find(d).is_none()) {
+                        v.push(msg!("Startfehler {}: das Gerät {} gibt es im Projekt nicht.", n, d));
+                    }
+                    if let Some((d, port)) = spec.cable()
+                        && p.find(d).is_some_and(|x| p.link_at(x.id, port).is_none())
+                    {
+                        v.push(msg!("Startfehler {}: an {} {} steckt kein Kabel.", n, d, port));
+                    }
+                }
+            }
+        }
+        if self.pass > 100 {
+            v.push(msg!("Die Bestehensgrenze (pass) ist {}; höchstens 100 %.", self.pass));
+        }
         v
+    }
+
+    /// the per cent that pass
+    pub fn pass_percent(&self) -> u32 {
+        if self.pass == 0 { 100 } else { self.pass }
     }
 }
 
@@ -233,6 +343,7 @@ wire_enum! {
         Cable = "cable",
         Config = "config",
         Check = "check",
+        Diagnosis = "diagnosis",
     }
 }
 
@@ -271,6 +382,8 @@ pub struct Item {
     pub checks: Vec<String>,
     pub points: u32,
     pub text: Text,
+    /// a diagnosis: what is shown once it is handed in
+    pub explain: Text,
 }
 
 impl Field for Item {
@@ -307,6 +420,9 @@ impl Field for Item {
         if !self.text.de.is_empty() || !self.text.en.is_empty() {
             o.insert("text", self.text.put());
         }
+        if !self.explain.de.is_empty() || !self.explain.en.is_empty() {
+            o.insert("explain", self.explain.put());
+        }
         o
     }
     fn take(v: Option<&Value>) -> Self {
@@ -330,6 +446,7 @@ impl Field for Item {
             // an item without "points" is worth one
             points: v.get("points").map_or(1, |p| Field::take(Some(p))),
             text: Field::take(v.get("text")),
+            explain: Field::take(v.get("explain")),
         }
     }
 }
@@ -381,6 +498,7 @@ impl Target {
     pub fn project(&self, base: &Project) -> Project {
         let mut p = Project::new(&base.title, base.seed);
         p.strict_mdix = base.strict_mdix;
+        p.metered = base.metered;
         p.devices = self.devices.clone();
         p.links = self.links.clone();
         p.next_id = p.max_id() + 1;
@@ -446,6 +564,9 @@ impl Assess {
                 }
                 continue;
             }
+            if kind == ItemKind::Diagnosis && !it.peer.trim().is_empty() && !found(it.peer_id, &it.peer) {
+                v.push(msg!("Kriterium {}: das Gerät {} gibt es im Projekt nicht.", n, it.peer));
+            }
             if it.dev.is_empty() && it.id == 0 {
                 v.push(msg!("Kriterium {} nennt kein Gerät.", n));
             } else if !found(it.id, &it.dev) {
@@ -467,7 +588,7 @@ impl Assess {
                 continue;
             }
             let values = it.values();
-            if values.is_empty() && kind != ItemKind::Cable {
+            if values.is_empty() && !matches!(kind, ItemKind::Cable | ItemKind::Diagnosis) {
                 v.push(msg!("Kriterium {} erwartet keinen Wert.", n));
             }
             for x in values {

@@ -24,8 +24,9 @@ use alloc::vec::Vec;
 
 use gfx::{Surface, FMT_PARGB};
 use ui::*;
+use ui::i18n::{t, list, Catalog};
 
-const DESC: AppDesc = AppDesc { title: "jfgui SVG", flags: AF_RESIZABLE, w: 1040, h: 760, min_w: 480, min_h: 360, ..AppDesc::NONE };
+const DESC: AppDesc = AppDesc { title: "JFLib SVG", flags: AF_RESIZABLE, w: 1040, h: 760, min_w: 480, min_h: 360, ..AppDesc::NONE }; // i18n
 
 /// the fixtures (name, file)
 pub(crate) const FIXTURES: [(&str, &[u8]); 13] = [
@@ -43,6 +44,7 @@ pub(crate) const FIXTURES: [(&str, &[u8]); 13] = [
     ("image", include_bytes!("fixtures/image.svg")),
     ("editor", include_bytes!("fixtures/editor.svg")),
 ];
+static TEXT_EN: &[u8] = include_bytes!("fixtures/text_en.svg"); // the words of "text" in English
 static ICON: &[u8] = include_bytes!("fixtures/icon.svg");
 
 const ID_TABS: u32 = 100;
@@ -57,6 +59,8 @@ const ID_SVG: u32 = 200; // + fixture index
 const ID_ICON: u32 = 300; // + size index
 const ID_VIEW: u32 = 500;
 const ICON_SIZES: [i32; 5] = [16, 24, 32, 48, 96];
+const PICKS: [&str; 3] = ["Pixel", "Foto", "SVG"];
+const TABS: [&str; 2] = ["Galerie", "Betrachter"];
 
 struct SvgTest {
     tab: i32,
@@ -125,7 +129,7 @@ fn photo_image() -> Surface {
 
 impl SvgTest {
     fn new() -> SvgTest {
-        let docs = FIXTURES.iter().filter_map(|(n, d)| Svg::parse(d).ok().map(|s| (*n, Rc::new(s)))).collect();
+        let docs = FIXTURES.iter().filter_map(|(n, d)| Svg::parse(if *n == "text" && i18n::language_code() != "de" { TEXT_EN } else { *d }).ok().map(|s| (*n, Rc::new(s)))).collect();
         SvgTest {
             tab: 0,
             hc: 0,
@@ -156,7 +160,7 @@ impl SvgTest {
         }
         if let Some(icon) = &self.icon {
             ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
-            ui.text(TS_BODY, "Symbol in der Textfarbe:");
+            ui.text(TS_BODY, t("Symbol in der Textfarbe:"));
             for (k, &s) in ICON_SIZES.iter().enumerate() {
                 ui.svg(ID_ICON + k as u32, icon, s, s);
             }
@@ -168,21 +172,21 @@ impl SvgTest {
 
     fn viewer(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.tabs(ID_PICK, &mut self.pick, &["Pixel", "Foto", "SVG"]);
+        ui.tabs(ID_PICK, &mut self.pick, &list(&PICKS));
         ui.spacer(-1);
-        if ui.button(ID_FIT, "Einpassen") & EV_ACT != 0 {
+        if ui.button(ID_FIT, t("Einpassen")) & EV_ACT != 0 {
             self.st.set_fit();
         }
         if ui.button(ID_ACTUAL, "100 %") & EV_ACT != 0 {
             self.st.set_actual();
         }
-        if ui.button(ID_IN, "Größer") & EV_ACT != 0 {
+        if ui.button(ID_IN, t("Größer")) & EV_ACT != 0 {
             self.st.zoom_by(2.0);
         }
-        if ui.button(ID_OUT, "Kleiner") & EV_ACT != 0 {
+        if ui.button(ID_OUT, t("Kleiner")) & EV_ACT != 0 {
             self.st.zoom_by(0.5);
         }
-        ui.checkbox(ID_SMOOTH, "Glatt", &mut self.smooth);
+        ui.checkbox(ID_SMOOTH, t("Glatt"), &mut self.smooth);
         ui.box_end();
         let st = &self.st;
         let line = format!("zoom: {} %  cx: {:.1}  cy: {:.1}  fit: {}", st.zoom_pct(), st.cx, st.cy, st.fit as i32);
@@ -209,10 +213,10 @@ impl App for SvgTest {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | pad(12), 8);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-        ui.tabs(ID_TABS, &mut self.tab, &["Galerie", "Betrachter"]);
+        ui.tabs(ID_TABS, &mut self.tab, &list(&TABS));
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
-        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+        if ui.checkbox(ID_HC, t("Hoher Kontrast"), &mut self.hc) & EV_ACT != 0 {
             ui.set_contrast(Some(self.hc != 0));
         }
         ui.box_end();
@@ -229,7 +233,8 @@ fn svgtest() -> i32 {
     if plat::arg_value("--test").as_deref() == Some("unit") {
         return unit::run();
     }
-    ui::launch(&DESC, SvgTest::new(), &style::STYLE)
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")).with_library_languages());
+    ui::launch(&DESC.translated(), SvgTest::new(), &style::STYLE)
 }
 
 ui::main!(svgtest());

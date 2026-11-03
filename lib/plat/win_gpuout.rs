@@ -9,6 +9,7 @@
 //   win_in_sizemove()                    the modal move / size loop runs
 //   win_display_adapter(w) -> (vendor id, device id)   the GPU that drives the window's monitor
 //   win_remote_session()                 this is a Remote Desktop session
+//   gpu_wait(deadline_us)                pump the messages until then (Linux: linux_gpuout.rs)
 //
 // Why a child: once a swapchain has presented on a window, what GDI draws on that window stays
 // invisible, also after the swapchain and its surface are destroyed (measured: DWM keeps showing
@@ -183,6 +184,10 @@ pub fn win_release_kept(w: i32) {
 }
 
 /// the modal move / size loop of a window runs (the program's own loop waits for its end)
+pub fn gpu_wait(deadline_us: u64) {
+    super::wait(deadline_us);
+}
+
 pub fn win_in_sizemove() -> bool {
     st().in_sizemove.get()
 }
