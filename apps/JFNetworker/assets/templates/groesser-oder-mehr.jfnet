@@ -91,17 +91,35 @@
       "startup_config": "hostname DB\nip addr add 10.0.0.30/24 dev eth0\n",
       "services": [
         {
-          "kind": "http-server",
+          "kind": "db",
           "name": "db",
           "disabled": false,
           "config": {
-            "port": 80,
-            "cpu_ms": 0.1,
-            "serial_us": 170,
-            "routes": [
+            "port": 7100,
+            "pool_mb": 4096,
+            "max_conns": 512,
+            "write_us": 150,
+            "tables": [
               {
-                "path": "/q",
-                "body": "row"
+                "name": "users",
+                "rows": 1000000,
+                "row_bytes": 200,
+                "key": "id",
+                "columns": [
+                  "email:text"
+                ],
+                "indexes": [
+                  "email"
+                ]
+              },
+              {
+                "name": "counters",
+                "rows": 10,
+                "row_bytes": 64,
+                "key": "id",
+                "columns": [
+                  "hits"
+                ]
               }
             ],
             "mem_mb": 2048,
@@ -135,12 +153,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -170,12 +198,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -205,12 +243,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -240,12 +288,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -275,12 +333,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -310,12 +378,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -345,12 +423,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],
@@ -380,12 +468,22 @@
             "routes": [
               {
                 "path": "/",
-                "body": "ok",
-                "backend": "http://10.0.0.30/q"
+                "backend": "db",
+                "param": "draw",
+                "sql": [
+                  "SELECT * FROM users WHERE id = ?",
+                  "UPDATE counters SET hits = hits + 1 WHERE id = 1"
+                ]
               }
             ],
             "mem_mb": 256,
-            "conn_kb": 64
+            "conn_kb": 64,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 30000,
+              "conns": 32
+            }
           }
         }
       ],

@@ -33,6 +33,8 @@
 //                     (lb.rs)
 //     kv              {"nodes": ["10.0.2.21", "10.0.2.22"], "rf": 2, "consistency": "strong",
 //                     ...} (kv.rs)
+//     db              {"port": 7100, "tables": [{"name": "users", "rows": 1000000, ...}], "pool_mb": 128,
+//                     ...} (db.rs)
 //     cache           {"backend": "http://10.0.2.11/", "ttl_ms": 30000, "entries": 1000, ...}
 //                     (cache.rs)
 //     mq              {"port": 9000, "visibility_ms": 5000, "max_deliveries": 5, ...} (mq.rs)
@@ -234,6 +236,7 @@ impl Engine {
             "http-server" | "http-client" | "http-load" => crate::httpsvc::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
             "lb" => crate::lb::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "kv" => crate::kv::from_def_msg(c).map_err(|w| bad(kind, w))?,
+            "db" => crate::db::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "cache" => crate::cache::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "mq" | "worker" => crate::mq::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
             "script" => crate::scriptsvc::from_def_msg(c).map_err(|w| bad(kind, w))?,

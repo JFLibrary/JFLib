@@ -82,6 +82,8 @@
 // file, the CSV, the overload warning, the bars of the Metriken panel).
 // sweeptest.rs: parameter sweeps (group sweep: jfn_model::experiment, jfn_sim::experiment, jfn_run's
 // threads, Service::reconfigure, the scenario's steps for changes under load).
+// dbtest.rs: the database service (group db: its models against closed forms, each naming its formula;
+// locks, versions, crash and recovery; refusals; the form and the JSON it writes).
 // hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
 // queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
 // firewalltest.rs: the zone firewall (group firewall: zones, sessions, NAT and lists with them).
@@ -202,6 +204,8 @@ mod modelstest;
 mod startpagetest;
 #[path = "hardwaretest.rs"]
 mod hardwaretest;
+#[path = "dbtest.rs"]
+mod dbtest;
 #[path = "fwguitest.rs"]
 mod fwguitest;
 #[path = "firewalltest.rs"]
@@ -218,7 +222,7 @@ mod installtest;
 mod expguitest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 66] = [
+    let groups: [(&'static str, fn(&mut T)); 67] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -285,6 +289,7 @@ pub fn run() -> i32 {
         ("sweep", sweeptest::run),
         ("install", installtest::run),
         ("expgui", expguitest::run),
+        ("db", dbtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

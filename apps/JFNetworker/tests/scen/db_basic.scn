@@ -1,0 +1,84 @@
+# Eine Datenbank: DB hat die Tabellen users und orders, von denen nur die geänderten Zeilen wirklich da
+# sind. GEN fragt sie direkt mit curl, WEB1 über seine Routen, ab 1 s kommt eine feste Last über WEB1.
+#
+# zuerst eine Anweisung von Hand: die Antwort sagt Zeilen und was sie gekostet hat
+run 500ms
+GEN: curl -s -d "SELECT * FROM users WHERE id = 5" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"id\":5"
+expect GEN output contains "\"email\":\"email-"
+expect GEN output contains "\"rows_examined\":1"
+# ein Fehler sagt die Stelle
+GEN: curl -s -d "SELECT * FORM users" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"code\":\"syntax\""
+expect GEN output contains "\"pos\":10"
+# wie eine Anweisung liefe: über den Index, oder über alle Seiten
+DB: dbctl explain "SELECT * FROM users WHERE email = 'email-77'"
+run 10ms
+expect DB output contains "\"plan\":\"index\""
+DB: dbctl explain SELECT COUNT(*) FROM orders WHERE sum = 7
+run 10ms
+expect DB output contains "\"plan\":\"scan\""
+# ein Zusammenhang über einen Index
+GEN: curl -s -d "SELECT users.id, orders.oid FROM users JOIN orders ON users.id = orders.uid WHERE users.id = 8 LIMIT 2" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"orders.oid\":"
+# eine Route mit einem Wert aus der Anfrage
+GEN: curl -s http://10.0.0.20/by/email-123
+run 100ms
+expect GEN output contains "email-123"
+# eine Transaktion von Hand: BEGIN gibt ihre Nummer, FOR UPDATE hält die Zeile
+GEN: curl -s -d "BEGIN" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"txn\":1"
+GEN: curl -s -H "X-Txn: 1" -d "UPDATE users SET balance = 1000000 WHERE id = 42" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"changed\":1"
+DB: dbctl locks
+run 10ms
+expect DB output contains "users"
+DB: dbctl
+run 10ms
+expect DB output contains "1 Transaktionen offen"
+# erst der Commit macht sie für andere sichtbar
+GEN: curl -s -H "X-Txn: 1" -d "COMMIT" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"committed\":1"
+GEN: curl -s -d "SELECT balance FROM users WHERE id = 42" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"balance\":1000000"
+# die Last über die Routen: Leser und Überweisungen, keine Fehler
+at 6s expect GEN svc load metric errors == 0
+expect DB svc db metric statements >= 80 over 3s
+expect DB svc db metric commits >= 5 over 3s
+expect DB svc db metric errors == 0 over 3s
+expect DB svc db metric max pool_use_pm <= 1000 over 3s
+expect WEB1 svc web metric backend_calls >= 80 over 3s
+DB: dbctl tables
+run 10ms
+expect DB output contains "orders"
+# ein Index kommt im Betrieb dazu: Bauen kostet Zeit, dann läuft die Anfrage über ihn
+DB: dbctl explain SELECT COUNT(*) FROM users WHERE balance = 7
+run 10ms
+expect DB output contains "\"plan\":\"scan\""
+GEN: curl -s -d "CREATE INDEX ON users (balance)" http://10.0.0.30:7100/query
+run 2s
+expect GEN output contains "\"created\":true"
+DB: dbctl explain SELECT COUNT(*) FROM users WHERE balance = 7
+run 10ms
+expect DB output contains "\"plan\":\"index\""
+# ein Absturz: die Datenbank liest ihr Log, dann läuft sie weiter; alle Commits sind da
+at 10s power off DB
+at 10500ms power on DB
+at 12s expect DB svc db metric recoveries == 1
+GEN: curl -s -d "SELECT balance FROM users WHERE id = 42" http://10.0.0.30:7100/query
+run 100ms
+expect GEN output contains "\"balance\":1000000"
+GEN: curl -s http://10.0.0.30:7100/_db/health
+run 100ms
+expect GEN output contains "\"status\":\"ok\""
+DB: dbctl
+run 10ms
+expect DB output contains "verlorene Commits 0"
+at 13s expect GEN svc load metric ok >= 400

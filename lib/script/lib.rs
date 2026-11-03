@@ -120,7 +120,7 @@ impl core::fmt::Display for Diagnostic {
 /// standard library (check warns about other unknown names)
 pub const GLOBALS: &[&str] = &[
     "print", "log", "len", "str", "int", "float", "type", "math", "json", "bytes", "now", "rand", "config", "timer", "net",
-    "dns", "http", "disk", "metrics", "list", "map", "import", "assert", "assert_eq",
+    "dns", "http", "db", "disk", "metrics", "list", "map", "import", "assert", "assert_eq",
 ];
 
 /// the functions and constants of the standard library ("str.split", "math.pi", "bytes"),

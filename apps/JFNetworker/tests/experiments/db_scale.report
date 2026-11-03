@@ -1,0 +1,97 @@
+# JFNetworker-Experiment db_scale.jfnex: „Was eine Datenbank begrenzt“
+# Konfigurationen: 9, Laststufen: 6, Seeds: 1; 60 s Warmlauf, je Stufe 2 s Übergang und 8 s Messung (virtuelle Zeit)
+# SLO: p99 bis 100 ms, Fehler bis 1 %
+# Ergebnis des Modells mit seinen Annahmen; die Kosten sind angenommene Preise (catalog::Prices), keine Angebote
+
+Puffer MiB 16 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     1.4     1.9     2.3       2.7      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     1.4     2.1     2.6       3.3      0.00    1.1  0.000129    ok  -
+2000/s     1993.000     1.7     3.3     4.3       6.3      0.00    2.2  0.000065  Knie  Platte DB
+4000/s     2777.125  1862.2  2919.2  3053.4    3053.4      0.00    3.1  0.000047  nein  Platte DB
+8000/s     2777.250  3925.8  6241.1  6509.5    6509.5      0.00    3.1  0.000047  nein  Platte DB
+16000/s    2777.250  5033.1  7985.9  8254.3    8254.3      0.00    3.1  0.000047  nein  Platte DB
+
+Puffer MiB 64 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.7     1.5     2.1       2.4      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     0.7     1.6     2.1       2.6      0.00    1.1  0.000129    ok  -
+2000/s     1993.250     0.9     1.9     2.5       3.5      0.00    2.2  0.000065    ok  Platte DB
+4000/s     3969.625    34.0    56.0    91.2     105.9      0.00    4.5  0.000032  Knie  Platte DB
+8000/s     3976.750  2986.3  4764.7  5033.1    5033.1      0.00    4.5  0.000032  nein  Platte DB
+16000/s    3976.125  4496.2  7180.6  7449.0    7449.0      0.00    4.5  0.000032  nein  Platte DB
+
+Puffer MiB 256 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.7     0.9     1.4       1.6      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     0.7     0.9     1.5       1.8      0.00    1.1  0.000129    ok  -
+2000/s     1993.375     0.7     1.0     1.6       2.1      0.00    2.2  0.000065    ok  -
+4000/s     3999.500     0.7     1.3     1.9       2.8      0.00    4.5  0.000032  Knie  Platte DB
+8000/s     7273.500   562.0   897.5   931.1     947.9      0.00    8.2  0.000017  nein  Platte DB
+16000/s    7274.625  3254.7  5301.6  5435.8    5435.8      0.00    8.2  0.000017  nein  Platte DB
+
+Puffer MiB 1024 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.0     0.7     1.4       1.4      0.00    0.5  0.000254    ok  -
+1000/s     1009.125     0.0     0.7     1.4       1.5      0.00    1.1  0.000129    ok  -
+2000/s     1993.375     0.0     0.7     1.4       1.6      0.00    2.2  0.000065    ok  -
+4000/s     3999.625     0.0     0.7     1.4       1.9      0.00    4.5  0.000032    ok  -
+8000/s     7948.750     0.0     0.8     1.4       2.0      0.00    9.0  0.000016    ok  -
+16000/s   15992.375     0.0     0.9     1.4       2.2      0.00   18.1  0.000008  Knie  Platte DB
+
+E-Mail Index ["email"] (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       510.250     0.0     0.7     1.4       2.1      0.00    0.5  0.000255    ok  -
+1000/s     1012.125     0.0     0.7     1.4       2.1      0.00    1.1  0.000128    ok  -
+2000/s     2024.875     0.0     0.7     1.4       2.1      0.00    2.3  0.000064    ok  -
+4000/s     4016.750     0.0     0.7     1.4       2.2      0.00    4.5  0.000032    ok  -
+8000/s     8038.250     0.0     0.7     1.6       2.3      0.00    9.1  0.000016    ok  -
+16000/s   16009.875     0.0     0.7     1.8       2.5      0.00   18.1  0.000008  Knie  -
+
+E-Mail Index [] (0.470 €/h)
+Last     erreicht/s   p50 ms   p95 ms   p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+1000/s      140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+2000/s      140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+4000/s      140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+8000/s      140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+16000/s     140.500  61740.1  64961.3  64961.3   64961.3      0.00  100.0  0.000929  nein  CPU DB
+
+Lesen Gewicht 95 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.7     0.9     1.4       1.6      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     0.7     0.9     1.5       1.8      0.00    1.1  0.000129    ok  -
+2000/s     1993.375     0.7     1.0     1.6       2.1      0.00    2.2  0.000065    ok  -
+4000/s     3999.500     0.7     1.3     1.9       2.8      0.00    4.5  0.000032  Knie  Platte DB
+8000/s     7273.500   562.0   897.5   931.1     947.9      0.00    8.2  0.000017  nein  Platte DB
+16000/s    7274.625  3254.7  5301.6  5435.8    5435.8      0.00    8.2  0.000017  nein  Platte DB
+
+Lesen Gewicht 45 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.7     1.4     1.5       1.9      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     0.7     1.4     1.6       2.0      0.00    1.1  0.000129    ok  -
+2000/s     1993.250     0.7     1.4     1.8       2.2      0.00    2.2  0.000065    ok  -
+4000/s     3999.500     0.7     1.6     2.3       3.5      0.00    4.5  0.000032  Knie  Platte DB
+8000/s     7167.625   645.9  1090.5  1124.0    1157.6      0.00    8.1  0.000018  nein  Platte DB
+16000/s    7169.125  3254.7  5301.6  5570.0    5570.0      0.00    8.1  0.000018  nein  Platte DB
+
+Lesen Gewicht 5 (0.470 €/h)
+Last     erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+500/s       512.625     0.7     1.7     2.1       2.2      0.00    0.5  0.000254    ok  -
+1000/s     1009.375     0.7     1.9     2.1       2.4      0.00    1.1  0.000129    ok  -
+2000/s     1993.250     0.9     2.1     2.3       2.6      0.00    2.2  0.000065    ok  -
+4000/s     3999.750     1.1     2.7     3.4       4.6      0.00    4.5  0.000032  Knie  Platte DB
+8000/s     6529.125  1224.7  2130.7  2248.1    2248.1      0.00    7.4  0.000019  nein  Platte DB
+16000/s    6527.000  3456.1  5838.4  6106.9    6106.9      0.00    7.4  0.000020  nein  Platte DB
+
+Zusammenfassung
+Konfiguration             €/h     Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+Puffer MiB 16           0.470   2000/s   2777.250        0.000065  Platte DB
+Puffer MiB 64           0.470   4000/s   3976.750        0.000032  Platte DB
+Puffer MiB 256          0.470   4000/s   7274.625        0.000032  Platte DB
+Puffer MiB 1024         0.470  16000/s  15992.375        0.000008  Platte DB
+E-Mail Index ["email"]  0.470  16000/s  16009.875        0.000008  -
+E-Mail Index []         0.470        -    140.500               -  CPU DB
+Lesen Gewicht 95        0.470   4000/s   7274.625        0.000032  Platte DB
+Lesen Gewicht 45        0.470   4000/s   7169.125        0.000032  Platte DB
+Lesen Gewicht 5         0.470   4000/s   6529.125        0.000032  Platte DB

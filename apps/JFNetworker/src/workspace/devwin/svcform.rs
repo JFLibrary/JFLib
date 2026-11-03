@@ -2,7 +2,8 @@
 // of help, the rarer settings folded away; a backend or a target chosen from the project's devices
 //
 //   form_of(kind) -> Option<&[Group]>     the form of a kind (http-server, http-load, lb, kv, cache, mq,
-//                                         worker), none for the others: their settings stay JSON
+//                                         worker, db), none for the others: their settings stay JSON;
+//                                         a database's tables are the form's list, one row each
 //   fields(kind)                          its fields in the order of the widgets (ID_SF_FIELD + 2 i)
 //   fill(kind, &config) -> Vals           what the form shows for a config
 //   merged(kind, &base, &vals) -> Result<Value, String>   the config: only what changed in the form
@@ -116,6 +117,13 @@ const CH_THINK: &[Ch] = &[Ch { word: "fixed", label: "fest" }, Ch { word: "exp",
 const CH_BALANCE: &[Ch] = &[Ch { word: "round-robin", label: "der Reihe nach" }, Ch { word: "random", label: "zufällig" }];
 // i18n: label
 const CH_CONSISTENCY: &[Ch] = &[Ch { word: "strong", label: "stark: Mehrheit" }, Ch { word: "eventual", label: "schwach: ein Knoten" }];
+
+// i18n: label
+const CH_DB_DIST: &[Ch] = &[Ch { word: "uniform", label: "gleichmäßig" }, Ch { word: "zipf", label: "Zipf: wenige Zeilen oft" }];
+// i18n: label
+const CH_DURABILITY: &[Ch] = &[Ch { word: "full", label: "voll: Antwort erst nach dem Schreiben" }, Ch { word: "relaxed", label: "locker: Antwort sofort, Verlust möglich" }];
+// i18n: label
+const CH_ISOLATION: &[Ch] = &[Ch { word: "read committed", label: "read committed: je Anweisung neu" }, Ch { word: "repeatable read", label: "repeatable read: ein Stand je Transaktion" }];
 
 // what holds a service in memory, the same in every form
 // i18n: label unit help
@@ -263,6 +271,50 @@ static KV: [Group; 2] = [
 ];
 
 // i18n: title label unit help
+static DB: [Group; 3] = [
+    Group {
+        title: "Datenbank",
+        rare: false,
+        fields: &[
+            Field { key: "tables", label: "Tabellen", unit: "", help: "Name, Zeilen, Bytes je Zeile, Schlüssel, Verteilung und Indizes. Spalten stehen im JSON. Nur geänderte Zeilen sind wirklich da, alle anderen folgen aus ihrem Schlüssel.", kind: Fk::List },
+            Field { key: "pool_mb", label: "Puffer im RAM", unit: "MiB", help: "So viel hält die Datenbank von ihren Seiten im RAM. Zu groß für das Gerät: erst Swap, dann beendet sie der Speichermangel.", kind: Fk::Dec },
+            Field { key: "max_conns", label: "Verbindungen", unit: "", help: "Darüber bekommt eine Verbindung 503 und wird geschlossen.", kind: Fk::Int },
+            Field { key: "durability", label: "Beim Commit", unit: "", help: "Voll wartet auf die Platte. Locker antwortet sofort und ist schneller, ein Absturz verliert dann die letzten Commits und zählt sie.", kind: Fk::Choice(CH_DURABILITY) },
+            Field { key: "isolation", label: "Isolation", unit: "", help: "Was eine Transaktion sieht, wenn andere gleichzeitig ändern.", kind: Fk::Choice(CH_ISOLATION) },
+            Field { key: "port", label: "Port", unit: "", help: "Hier nimmt sie Anweisungen an: POST /query.", kind: Fk::Int },
+        ],
+    },
+    Group {
+        title: "Kosten (Annahmen dieses Labors)",
+        rare: true,
+        fields: &[
+            Field { key: "stmt_us", label: "CPU je Anweisung", unit: "µs", help: "Annahme: Lesen und Planen einer Anweisung auf einem Referenzkern. Zählt nur mit simulierter Hardware.", kind: Fk::Dec },
+            Field { key: "page_us", label: "CPU je Seite", unit: "µs", help: "Annahme: jede Seite, die eine Anweisung anfasst, ob im Puffer oder nicht.", kind: Fk::Dec },
+            Field { key: "row_us", label: "CPU je Zeile", unit: "µs", help: "Annahme: jede Zeile, die eine Anweisung ansieht.", kind: Fk::Dec },
+            Field { key: "write_us", label: "CPU je Änderung", unit: "µs", help: "Annahme: jede Zeile, die eine Anweisung schreibt.", kind: Fk::Dec },
+            Field { key: "page_kb", label: "Seitengröße", unit: "KiB", help: "Annahme: 1, 2, 4, 8, 16, 32 oder 64. Daraus folgen die Zeilen je Seite und die Tiefe der Bäume.", kind: Fk::Int },
+            Field { key: "fanout", label: "Äste je Baumseite", unit: "", help: "Annahme: 0 rechnet aus der Seitengröße mit 16 Bytes je Eintrag.", kind: Fk::Int },
+            Field { key: "redo_mbps", label: "Log wieder anwenden", unit: "MB/s", help: "Annahme: So schnell läuft die Wiederherstellung nach einem Absturz.", kind: Fk::Dec },
+        ],
+    },
+    Group {
+        title: "Seltener gebraucht",
+        rare: true,
+        fields: &[
+            Field { key: "lock_timeout_ms", label: "Warten auf eine Sperre", unit: "ms", help: "Danach bricht die Transaktion ab und darf es noch einmal versuchen.", kind: Fk::Dec },
+            Field { key: "txn_idle_ms", label: "Stille Transaktion", unit: "ms", help: "So lange darf eine Transaktion ohne Anweisung offen bleiben, dann gehen ihre Sperren.", kind: Fk::Dec },
+            Field { key: "flush_ms", label: "Log schreiben alle", unit: "ms", help: "Nur bei lockerem Commit: das ist die Zeit, die ein Absturz höchstens verliert.", kind: Fk::Dec },
+            Field { key: "checkpoint_s", label: "Prüfpunkt alle", unit: "s", help: "Ein Prüfpunkt schreibt geänderte Seiten; das Log davor braucht die Wiederherstellung nicht mehr.", kind: Fk::Int },
+            Field { key: "max_rows", label: "Zeilen je Antwort", unit: "", help: "Mehr schickt sie nicht; die Antwort sagt dann truncated.", kind: Fk::Int },
+            Field { key: "write_rows_max", label: "Zeilen je Änderung", unit: "", help: "Eine Anweisung, die mehr ändern würde, wird abgewiesen.", kind: Fk::Int },
+            Field { key: "touched_max", label: "Geänderte Zeilen", unit: "", help: "Grenze des Simulators: darüber vergisst er die ältesten Werte und zählt das. Die Zeiten stimmen weiter, diese Werte nicht.", kind: Fk::Int },
+            MEM_FIELDS[0],
+            MEM_FIELDS[1],
+        ],
+    },
+];
+
+// i18n: title label unit help
 static CACHE: [Group; 2] = [
     Group {
         title: "Cache",
@@ -342,6 +394,7 @@ pub(crate) fn form_of(kind: &str) -> Option<&'static [Group]> {
         "cache" => &CACHE,
         "mq" => &MQ,
         "worker" => &WORKER,
+        "db" => &DB,
         _ => return None,
     })
 }
@@ -358,6 +411,9 @@ pub(crate) struct Row {
     pub addr: String,
     pub port: String,
     pub weight: String,
+    /// a table's: its distribution and indexes
+    pub dist: String,
+    pub indexes: String,
     /// its place in the config it came from: what else it has stays
     pub src: Option<usize>,
 }
@@ -443,6 +499,21 @@ fn rows_of(kind: &str, c: &Value) -> Vec<Row> {
                 port: num(b.get("port")),
                 weight: num(b.get("weight")),
                 src: Some(i),
+                ..Row::default()
+            })
+            .collect(),
+        // a table: name, rows, bytes per row, key, distribution, indexes
+        "db" => list("tables")
+            .iter()
+            .enumerate()
+            .map(|(i, b)| Row {
+                name: String::from(b.get("name").and_then(|x| x.as_str()).unwrap_or("")),
+                addr: num(b.get("rows")),
+                port: num(b.get("row_bytes")),
+                weight: String::from(b.get("key").and_then(|x| x.as_str()).unwrap_or("")),
+                dist: String::from(b.get("dist").and_then(|x| x.as_str()).unwrap_or("")),
+                indexes: b.get("indexes").and_then(|x| x.as_array()).map_or(String::new(), |a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")),
+                src: Some(i),
             })
             .collect(),
         _ => Vec::new(),
@@ -472,6 +543,9 @@ fn parsed(f: &Field, text: &str) -> Result<Value, String> {
 
 /// the form's list into a config: what stands there beside the fields of a row stays
 fn write_rows(kind: &str, c: &mut Value, base: &Value, rows: &[Row]) -> Result<(), String> {
+    if kind == "db" {
+        return write_tables(c, base, rows);
+    }
     let used: Vec<&Row> = rows.iter().filter(|r| !r.addr.trim().is_empty()).collect();
     let key = match kind {
         "http-load" => "targets",
@@ -512,6 +586,46 @@ fn write_rows(kind: &str, c: &mut Value, base: &Value, rows: &[Row]) -> Result<(
         out.push(b);
     }
     c.insert("backends", Value::Array(out));
+    Ok(())
+}
+
+/// a database's tables into a config: what a table has beside its row's fields (its columns) stays
+fn write_tables(c: &mut Value, base: &Value, rows: &[Row]) -> Result<(), String> {
+    let used: Vec<&Row> = rows.iter().filter(|r| !r.name.trim().is_empty()).collect();
+    if used.is_empty() {
+        remove_path(c, "tables");
+        return Ok(());
+    }
+    let olds = base.get("tables").and_then(|b| b.as_array()).unwrap_or(&[]);
+    let mut out = Vec::new();
+    for r in used {
+        let mut b = r.src.and_then(|i| olds.get(i)).cloned().unwrap_or_else(empty_object);
+        let mut put = |k: &str, text: &str, num: bool| -> Result<(), String> {
+            let text = text.trim();
+            if text.is_empty() {
+                remove_path(&mut b, k);
+            } else if num {
+                let v = text.parse::<u64>().map_err(|_| tf("{}: das ist keine ganze Zahl.", &[text]))?;
+                b.insert(k, Value::u64(v));
+            } else {
+                b.insert(k, Value::string(text));
+            }
+            Ok(())
+        };
+        put("name", &r.name, false)?;
+        put("rows", &r.addr, true)?;
+        put("row_bytes", &r.port, true)?;
+        put("key", &r.weight, false)?;
+        put("dist", &r.dist, false)?;
+        let words: Vec<Value> = r.indexes.split(',').map(str::trim).filter(|s| !s.is_empty()).map(Value::string).collect();
+        if words.is_empty() {
+            remove_path(&mut b, "indexes");
+        } else {
+            b.insert("indexes", Value::Array(words));
+        }
+        out.push(b);
+    }
+    c.insert("tables", Value::Array(out));
     Ok(())
 }
 
@@ -719,8 +833,71 @@ fn pick_box(n: &mut Net, ui: &mut Ui, id: u32, disabled: bool) -> i32 {
     if ui.combobox(id, &mut sel, &refs) & EV_ACT != 0 { sel } else { 0 }
 }
 
+// the form's list of a database: a table per row, what it says of itself in two lines
+fn table_rows(n: &mut Net, ui: &mut Ui, disabled: bool) {
+    let rows = n.devwin.svc.form.as_ref().map_or(0, |x| x.vals.rows.len());
+    let flags = if disabled { ST_DISABLED } else { 0 };
+    let mut gone = None;
+    for r in 0..rows.min(ROWS_MAX) {
+        let id = ID_SF_ROW + r as u32 * 8;
+        let Some(x) = n.devwin.svc.form.as_mut().and_then(|x| x.vals.rows.get_mut(r)) else { continue };
+        ui.box_begin(0, BOX_V, 4);
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
+        ui.next_size(-1, 0);
+        ui.next_flags(flags);
+        ui.textbox(id, Some(t("Name der Tabelle")), &mut x.name, 64);
+        ui.next_size(110, 0);
+        ui.next_flags(flags);
+        ui.textbox(id + 1, Some(t("Zeilen")), &mut x.addr, 16);
+        ui.next_size(90, 0);
+        ui.next_flags(flags);
+        ui.textbox(id + 3, Some(t("Bytes je Zeile")), &mut x.port, 8);
+        ui.next_flags(flags | ST_SUBTLE | ST_COMPACT | ST_ICON_ONLY);
+        ui.next_icon(IC_DELETE);
+        if ui.button(id + 2, t("Entfernen")) & EV_ACT != 0 {
+            gone = Some(r);
+        }
+        ui.box_end();
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
+        ui.next_size(90, 0);
+        ui.next_flags(flags);
+        ui.textbox(id + 4, Some(t("Schlüssel")), &mut x.weight, 32);
+        let mut sel = CH_DB_DIST.iter().position(|c| c.word == x.dist).map_or(0, |k| k as i32 + 1);
+        let labels: Vec<&str> = core::iter::once(t("Verteilung: gleichmäßig")).chain(CH_DB_DIST.iter().map(|c| t(c.label))).collect();
+        ui.next_size(190, 0);
+        ui.next_flags(flags);
+        if ui.combobox(id + 5, &mut sel, &labels) & EV_ACT != 0 {
+            x.dist = sel.checked_sub(1).and_then(|k| CH_DB_DIST.get(k as usize)).map_or(String::new(), |c| String::from(c.word));
+            ui.repass();
+        }
+        ui.next_size(-1, 0);
+        ui.next_flags(flags);
+        ui.textbox(id + 6, Some(t("Indizes, durch Kommas getrennt")), &mut x.indexes, 200);
+        ui.box_end();
+        ui.box_end();
+    }
+    if let Some(r) = gone {
+        if let Some(x) = n.devwin.svc.form.as_mut() {
+            x.vals.rows.remove(r);
+        }
+        ui.repass();
+    }
+    ui.next_flags(flags | ST_SUBTLE | ST_COMPACT);
+    ui.next_icon(IC_ADD);
+    if rows < ROWS_MAX && ui.button(ID_SF_ROW_ADD, t("Tabelle hinzufügen")) & EV_ACT != 0 {
+        if let Some(x) = n.devwin.svc.form.as_mut() {
+            x.vals.rows.push(Row::default());
+        }
+        ui.repass();
+    }
+}
+
 // the form's list: a row each, with the choice of a device; a backend has a name, a port and a weight
 fn list_rows(n: &mut Net, ui: &mut Ui, kind: &str, f: &Field, disabled: bool) {
+    if kind == "db" {
+        table_rows(n, ui, disabled);
+        return;
+    }
     let rows = n.devwin.svc.form.as_ref().map_or(0, |x| x.vals.rows.len());
     let mut gone = None;
     let lb = kind == "lb";
@@ -992,7 +1169,7 @@ struct AddKind {
 }
 
 // i18n: help
-const KINDS: [AddKind; 7] = [
+const KINDS: [AddKind; 8] = [
     AddKind { kind: "http-server", help: "Antwortet auf HTTP-Anfragen, mit Rechenzeit, Wartezeit und Fehlerrate." },
     AddKind { kind: "http-load", help: "Erzeugt Last: Nutzer, die warten, oder eine feste Rate." },
     AddKind { kind: "lb", help: "Verteilt Anfragen oder Verbindungen auf mehrere Backends." },
@@ -1000,6 +1177,7 @@ const KINDS: [AddKind; 7] = [
     AddKind { kind: "cache", help: "Hält Antworten eines Backends und antwortet schneller." },
     AddKind { kind: "mq", help: "Hält Nachrichten, bis ein Worker sie abgeholt und bestätigt hat." },
     AddKind { kind: "worker", help: "Holt Nachrichten aus einer Queue und arbeitet sie ab." },
+    AddKind { kind: "db", help: "Eine Datenbank mit Tabellen, Puffer, Sperren, Versionen und Log; sie nimmt SQL-artige Anweisungen über HTTP an." },
 ];
 
 /// the usual name of a service of a kind

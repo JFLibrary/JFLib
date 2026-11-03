@@ -11,7 +11,7 @@
 //                  "type": "text/plain", "size": 0, "chunk": 0, "time_ms": 0, "jitter_ms": 0,
 //                  "error_rate": 0, "error_status": 500, "headers": {"Cache-Control": "no-store"},
 //                  "backend": "kv", "cpu_ms": 0, "serial_us": 0}], "kv": {"nodes": ["10.0.2.21"], "port": 7000,
-//                  "rf": 2, ...}, "cpu_ms": 0.02, "serial_us": 0, "usl": {"sigma": 0, "kappa": 0}, "mem_mb": 32,
+//                  "rf": 2, ...}, "db": {"addr": "10.0.2.30", "port": 7100, "timeout_ms": 5000, "conns": 32}, "cpu_ms": 0.02, "serial_us": 0, "usl": {"sigma": 0, "kappa": 0}, "mem_mb": 32,
 //                  "conn_kb": 64, "data_mb": 0}
 //                  With "tls" (tlssim.rs: {"names": [...], "issuer": "lab" | "self", "org": "..", "days":
 //                  365, "age_days": 0, "starts_in_days": 0}) it speaks TLS; its port is then 443 unless
@@ -34,7 +34,12 @@
 // with "backend" asks before it answers, while its worker waits: "kv" uses the key-value
 // store of "kv" (kv.rs: the key is the part of the path after the route's prefix, GET reads,
 // PUT and POST write, DELETE deletes; status, value and X-Version come back, with X-Kv-Node),
-// a URL forwards the request to another server (the rest of the path appended).  Every
+// a URL forwards the request to another server (the rest of the path appended).  "db" asks the
+// database of "db" (db.rs): the route's "sql" is one statement or a list of them, each a round trip with
+// its worker waiting, a list inside the transaction BEGIN gave; "param" says what a ? is: "rest" (the
+// rest of the path, the default), "query:NAME" (a field of the URL), "draw" (a key by the distribution of
+// the statement's table, drawn by the database once per request, so all statements see the same) or
+// "none"; "retries": how often it starts again after an answer that says retryable (a deadlock).  Every
 // request needs a worker for its time (time_ms plus up to jitter_ms, the route's or the
 // server's); with "workers" > 0 at most that many work at once, the others wait in order,
 // and beyond "queue" waiting ones (> 0) a request gets 503 at once.  The error rate (the
@@ -401,6 +406,45 @@ pub enum RouteBackend {
     Kv,
     /// another web server: the request goes on to this URL, the rest of the path appended
     Url(Url),
+    /// the database of the server ("db"): these statements
+    Db(alloc::sync::Arc<DbRoute>),
+}
+
+/// a route's statements (db.rs)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DbRoute {
+    pub sql: Vec<String>,
+    /// how many ? each one has
+    pub params: Vec<u16>,
+    pub param: DbParam,
+    pub retries: u32,
+}
+
+/// what a ? of a route's statement is
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DbParam {
+    None,
+    Rest,
+    Query(String),
+    Draw,
+}
+
+/// the database of a web server
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DbBackend {
+    pub host: String,
+    pub port: u16,
+}
+
+/// how far a request is through its route's statements
+#[derive(Clone, Debug)]
+struct DbRun {
+    route: alloc::sync::Arc<DbRoute>,
+    step: usize,
+    txn: Option<u64>,
+    /// the value of its ? as JSON (a drawn key after the first answer)
+    param: Option<String>,
+    tries: u32,
 }
 
 impl HttpRoute {
@@ -442,6 +486,8 @@ struct Work {
     /// the CPU work it has left, its critical section still to come (res.rs)
     cpu: Ns,
     serial: Ns,
+    /// its route's statements (db.rs)
+    db: Option<DbRun>,
 }
 
 /// what a request asks of the CPU and the server's lock (res.rs)
@@ -502,6 +548,9 @@ pub struct HttpServer {
     pub lock_busy: Ns,
     /// "kv" of its config, as Service::reconfigure compares it
     kv_cfg: Option<Value>,
+    /// the database of its routes, and "db" of its config
+    pub db: Option<DbBackend>,
+    db_cfg: Option<Value>,
 }
 
 impl HttpServer {
@@ -541,6 +590,8 @@ impl HttpServer {
             lock_free: 0,
             lock_busy: 0,
             kv_cfg: None,
+            db: None,
+            db_cfg: None,
         }
     }
     /// the settings of its connections (port, keep-alive, limits, Server header)
@@ -696,7 +747,7 @@ impl HttpServer {
         self.per.add(now, 0, 1);
         let (reply, time, call, costs) = self.route(os, &r);
         let cpu = if os.metered() { costs.cpu } else { 0 };
-        let w = Work { req: r, reply, time, started: now, call, cpu, serial: costs.serial };
+        let w = Work { req: r, reply, time, started: now, call, cpu, serial: costs.serial, db: None };
         if self.workers > 0 && self.busy() >= self.workers {
             if self.queue_max > 0 && self.queue.len() as u32 >= self.queue_max {
                 self.rejected += 1;
@@ -792,6 +843,10 @@ impl HttpServer {
         let Some((b, rest)) = w.call.clone() else {
             return;
         };
+        if let RouteBackend::Db(route) = &b {
+            self.db_start(os, w, route.clone(), &rest);
+            return;
+        }
         let Some(up) = self.upstream.as_mut() else {
             return;
         };
@@ -820,10 +875,121 @@ impl HttpServer {
                 }
                 up.http(os, m, Url { host: base.host.clone(), port: base.port, target }, h, w.req.body.clone())
             }
-            RouteBackend::None => return,
+            RouteBackend::Db(_) | RouteBackend::None => return,
         };
         self.backend_calls += 1;
         self.calls.insert(id, w);
+    }
+
+    /// a request starts through its route's statements
+    fn db_start(&mut self, os: &mut OsApi, mut w: Work, route: alloc::sync::Arc<DbRoute>, rest: &str) {
+        let as_json = |t: &str| -> String {
+            if let Ok(n) = t.parse::<i64>() {
+                return format!("{}", n);
+            }
+            let mut s = String::new();
+            crate::dbstore::Val::Text(String::from(t)).json(&mut s);
+            s
+        };
+        let param = match &route.param {
+            DbParam::None => None,
+            DbParam::Rest => Some(as_json(rest)),
+            DbParam::Query(n) => crate::kv::query_value(&w.req.head.target, n).map(as_json),
+            DbParam::Draw => Some(String::from("{\"draw\":true}")),
+        };
+        w.db = Some(DbRun { route, step: 0, txn: None, param, tries: 0 });
+        self.db_send(os, w);
+    }
+
+    /// the request's next statement
+    fn db_send(&mut self, os: &mut OsApi, w: Work) {
+        let (Some(run), Some(db), Some(up)) = (w.db.as_ref(), self.db.as_ref(), self.upstream.as_mut()) else {
+            return;
+        };
+        let mut body = String::from("{\"sql\":");
+        crate::dbstore::Val::Text(run.route.sql[run.step].clone()).json(&mut body);
+        let n = run.route.params[run.step];
+        if n > 0 {
+            let p = run.param.as_deref().unwrap_or("null");
+            body.push_str(",\"params\":[");
+            for i in 0..n {
+                if i > 0 {
+                    body.push(',');
+                }
+                body.push_str(p);
+            }
+            body.push(']');
+        }
+        if let Some(t) = run.txn {
+            body.push_str(&format!(",\"txn\":{}", t));
+        }
+        body.push('}');
+        let mut h = Headers::new();
+        h.add("Content-Type", "application/json");
+        let url = Url { host: db.host.clone(), port: db.port, target: String::from("/query") };
+        let id = up.http(os, "POST", url, h, body.into_bytes());
+        self.backend_calls += 1;
+        self.calls.insert(id, w);
+    }
+
+    /// the database answered a statement of a route
+    fn db_called(&mut self, os: &mut OsApi, mut w: Work, d: crate::kv::KvDone) {
+        let number = |b: &[u8], name: &str| -> Option<u64> {
+            let pat = format!("\"{}\":", name);
+            let s = core::str::from_utf8(b).ok()?;
+            let i = s.find(&pat)? + pat.len();
+            let t = &s[i..];
+            let e = t.find(|c: char| !c.is_ascii_digit()).unwrap_or(t.len());
+            t[..e].parse().ok()
+        };
+        if d.status >= 500 {
+            self.backend_errors += 1;
+        }
+        let Some(run) = w.db.as_mut() else {
+            return;
+        };
+        let ok = d.status == 200;
+        let last = run.step + 1 >= run.route.sql.len();
+        if ok && !last {
+            if run.txn.is_none() {
+                run.txn = number(&d.body, "txn");
+            }
+            if let Some(k) = number(&d.body, "drawn") {
+                run.param = Some(format!("{}", k));
+            }
+            run.step += 1;
+            self.db_send(os, w);
+            return;
+        }
+        // an answer that says it can be tried again: from the start, the same value
+        let retry = d.status == 409 && d.body.windows(16).any(|x| x == b"\"retryable\":true") && run.tries < run.route.retries;
+        if retry {
+            run.tries += 1;
+            run.step = 0;
+            run.txn = None;
+            self.db_send(os, w);
+            return;
+        }
+        // a statement failed and its transaction still stands (a conflict has ended it)
+        if !ok
+            && d.status != 409
+            && let (Some(t), Some(db), Some(up)) = (run.txn, self.db.as_ref(), self.upstream.as_mut())
+        {
+            let mut h = Headers::new();
+            h.add("Content-Type", "application/json");
+            let url = Url { host: db.host.clone(), port: db.port, target: String::from("/query") };
+            up.http(os, "POST", url, h, format!("{{\"sql\":\"ROLLBACK\",\"txn\":{}}}", t).into_bytes());
+        }
+        let mut h = Headers::new();
+        h.add("Content-Type", if d.fail.is_some() { "text/plain" } else { "application/json" });
+        let body = if d.fail.is_some() { format!("Backend nicht erreichbar: {}\n", d.fail.as_ref().map(|f| f.text()).unwrap_or_default()).into_bytes() } else { d.body };
+        self.answer(os, w.req, Reply { status: d.status, headers: h, body, chunk: 0, close: false });
+        while (self.workers == 0 || self.busy() < self.workers)
+            && let Some(next) = self.queue.pop_front()
+        {
+            self.begin(os, next);
+        }
+        self.wheel.arm(os);
     }
 
     /// a backend answered: the request is answered with what it said, its worker is free
@@ -831,6 +997,10 @@ impl HttpServer {
         let Some(w) = self.calls.remove(&d.id) else {
             return;
         };
+        if w.db.is_some() {
+            self.db_called(os, w, d);
+            return;
+        }
         if d.status >= 500 {
             self.backend_errors += 1;
         }
@@ -1080,7 +1250,7 @@ impl Service for HttpServer {
         if self.tls != f.tls {
             return Err(msg!("Das Zertifikat ändert sich nur mit einem Neustart."));
         }
-        if self.kv_cfg != f.kv_cfg || self.upstream.is_some() != f.upstream.is_some() {
+        if self.kv_cfg != f.kv_cfg || self.db_cfg != f.db_cfg || self.upstream.is_some() != f.upstream.is_some() {
             return Err(msg!("Die Backends der Routen ändern sich nur mit einem Neustart."));
         }
         self.routes = f.routes.clone();
@@ -1970,6 +2140,35 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
     from_def_msg(kind, c).map_err(|m| m.text())
 }
 
+/// a route's statements from its config: "sql" (one or a list), "param", "retries"
+fn db_route_of(r: &Value) -> Result<DbRoute, Msg> {
+    let list: Vec<String> = match r.get("sql") {
+        Some(Value::String(s)) => alloc::vec![s.clone()],
+        Some(Value::Array(a)) => a.iter().filter_map(|x| x.as_str()).map(String::from).collect(),
+        _ => Vec::new(),
+    };
+    if list.is_empty() {
+        return Err(msg!("Eine Route mit \u{201e}backend\u{201c} db braucht \u{201e}sql\u{201c}."));
+    }
+    let mut params = Vec::with_capacity(list.len());
+    for s in &list {
+        match crate::dbsql::parse(s) {
+            Ok(st) => params.push(crate::dbsql::params_of(&st)),
+            Err(e) => return Err(msg!("Die Anweisung \u{201e}{}\u{201c}: {}", s.clone(), e.line())),
+        }
+    }
+    let param = match r.get("param").and_then(|v| v.as_str()).unwrap_or("rest") {
+        "rest" => DbParam::Rest,
+        "none" => DbParam::None,
+        "draw" => DbParam::Draw,
+        p => match p.strip_prefix("query:") {
+            Some(n) => DbParam::Query(String::from(n)),
+            None => return Err(msg!("\u{201e}param\u{201c} kennt {} nicht (rest, draw, query:NAME, none).", p)),
+        },
+    };
+    Ok(DbRoute { sql: list, params, param, retries: r.get("retries").and_then(|v| v.as_u64()).unwrap_or(0).min(1000) as u32 })
+}
+
 /// from_def, the reason as a message for the app's catalogue
 pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
@@ -2030,6 +2229,7 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
                 rt.backend = match rs("backend").as_deref() {
                     None | Some("") | Some("none") => RouteBackend::None,
                     Some("kv") => RouteBackend::Kv,
+                    Some("db") => RouteBackend::Db(alloc::sync::Arc::new(db_route_of(r)?)),
                     Some(u) => RouteBackend::Url(url_of(u)?),
                 };
                 if !rt.path.starts_with('/') && rt.path != "*" {
@@ -2056,6 +2256,23 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
             }
             if s.upstream.is_none() && s.routes.iter().any(|r| matches!(r.backend, RouteBackend::Url(_))) {
                 s.upstream = Some(crate::kv::KvClient::new(K_UP));
+            }
+            if let Some(d) = c.get("db") {
+                let addr = d.get("addr").and_then(|v| v.as_str()).unwrap_or("");
+                if netpkt::Ipv4::parse(addr.trim()).is_none() {
+                    return Err(msg!("\u{201e}db.addr\u{201c}: \u{201e}{}\u{201c} ist keine IPv4-Adresse.", addr));
+                }
+                let port = match d.get("port").and_then(|v| v.as_u64()).unwrap_or(crate::db::DB_PORT as u64) {
+                    p @ 1..=65535 => p as u16,
+                    p => return Err(msg!("Port {} gibt es nicht.", p)),
+                };
+                s.db = Some(DbBackend { host: String::from(addr.trim()), port });
+                s.db_cfg = Some(d.clone());
+                let up = s.upstream.get_or_insert_with(|| crate::kv::KvClient::new(K_UP));
+                up.timeout = up.timeout.max(d.get("timeout_ms").and_then(|v| decimal(v, MS)).unwrap_or(5000 * MS).max(MS));
+                up.set_conns(d.get("conns").and_then(|v| v.as_u64()).unwrap_or(32).clamp(1, 100_000) as usize);
+            } else if s.routes.iter().any(|r| matches!(r.backend, RouteBackend::Db(_))) {
+                return Err(msg!("Eine Route fragt die Datenbank, aber \u{201e}db\u{201c} fehlt."));
             }
             Box::new(s)
         }

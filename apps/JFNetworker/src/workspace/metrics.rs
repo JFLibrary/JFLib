@@ -154,6 +154,15 @@ static G_CACHE: [Group; 4] = [
     Group { title: "Inhalt", show: Show::Num, names: &["entries"] },
 ];
 // i18n: title
+static G_DB: [Group; 6] = [
+    Group { title: "Durchsatz", show: Show::Num, names: &["statements", "commits", "rollbacks"] },
+    Group { title: "Latenz", show: Show::Lat, names: LAT3 },
+    Group { title: "Puffer", show: Show::Pct, names: &["pool_hit_pm", "pool_use_pm"] },
+    Group { title: "Sperren", show: Show::Num, names: &["lock_waits", "deadlocks", "lock_timeouts", "conflicts"] },
+    Group { title: "Log", show: Show::Num, names: &["wal_flushes", "group_pm", "lost_commits"] },
+    Group { title: "Fehler|Diagramm", show: Show::Num, names: &["errors", "refused"] },
+];
+// i18n: title
 static G_MQ: [Group; 4] = [
     Group { title: "Durchsatz", show: Show::Num, names: &["published", "delivered", "acked"] },
     Group { title: "Latenz", show: Show::Lat, names: LAT3 },
@@ -229,6 +238,7 @@ pub(crate) fn groups(kind: &str) -> &'static [Group] {
         "http-load" | "http-client" => &G_LOAD,
         "lb" => &G_LB,
         "kv" => &G_KV,
+        "db" => &G_DB,
         "cache" => &G_CACHE,
         "mq" => &G_MQ,
         "worker" => &G_WORKER,
@@ -251,7 +261,7 @@ struct Lbl {
 
 /// the series of the charts in words (rates per second end in "/s")
 // i18n: label
-static LABELS: [Lbl; 69] = [
+static LABELS: [Lbl; 80] = [
     Lbl { key: "requests", label: "Anfragen/s" },
     Lbl { key: "responses", label: "Antworten/s" },
     Lbl { key: "connections", label: "Verbindungen/s" },
@@ -310,6 +320,7 @@ static LABELS: [Lbl; 69] = [
     Lbl { key: "naks", label: "NAK/s" },
     Lbl { key: "declines", label: "DECLINE/s" },
     Lbl { key: "conflicts", label: "Konflikte/s" },
+    Lbl { key: "lost_commits", label: "Verlorene Commits/s" },
     Lbl { key: "leases", label: "Leases" },
     Lbl { key: "calls", label: "Rückrufe/s" },
     Lbl { key: "received", label: "Empfangen/s" },
@@ -321,6 +332,16 @@ static LABELS: [Lbl; 69] = [
     Lbl { key: "failed_logins", label: "Abgelehnte Anmeldungen/s" },
     Lbl { key: "deleted", label: "Gelöscht/s" },
     Lbl { key: "logins", label: "Anmeldungen/s" },
+    Lbl { key: "statements", label: "Anweisungen/s" },
+    Lbl { key: "commits", label: "Commits/s" },
+    Lbl { key: "rollbacks", label: "Rollbacks/s" },
+    Lbl { key: "pool_hit_pm", label: "Treffer im Puffer" },
+    Lbl { key: "pool_use_pm", label: "Puffer belegt" },
+    Lbl { key: "lock_waits", label: "Warten auf Sperren/s" },
+    Lbl { key: "deadlocks", label: "Verklemmungen/s" },
+    Lbl { key: "lock_timeouts", label: "Sperren zu spät/s" },
+    Lbl { key: "wal_flushes", label: "Log geschrieben/s" },
+    Lbl { key: "group_pm", label: "Commits je Schreiben (Tausendstel)" },
 ];
 
 /// a series' name in the window: "Anfragen/s" for requests, "p99" for p99_us (the language);
@@ -348,6 +369,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
     match kind {
         "lb" => t("Loadbalancer"),
         "kv" => t("KV-Knoten"),
+        "db" => t("Datenbank"),
         "cache" => t("Cache"),
         "mq" => t("Queue"),
         "worker" => t("Worker"),
@@ -887,7 +909,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
         ui.box_end();
     }
     // the disk of services that store
-    if matches!(brief.kind, "kv" | "mq" | "script") {
+    if matches!(brief.kind, "kv" | "db" | "mq" | "script") {
         if let Some(d) = n.doc.sim.state().disk_of(dev) {
             ui.text(TS_CAPTION | TX_SECONDARY, &tf("Disk: {}", &[&crate::app::tr::msg(&d.msg())]));
         }
