@@ -43596,7 +43596,8 @@ back a version that does not start
                                start_download() (a background thread, plat::wake() when
                                done), status() (phase, progress, error), cancel(), staged()
   state(&cfg), newer(a, b), target(), Manifest::parse, verify
-  install(&cfg) -> Packaged     how the program is installed (plat::pkg::packaged; cfg.exe
+  fetch::{get, download, join, Progress}   its HTTP(S) for other downloads of an app (fetch.rs)
+  install(&cfg) -> Packaged    how the program is installed (plat::pkg::packaged; cfg.exe
                                set: Plain), which decides what an update is:
     Plain     exe / bundle / package entries of update.json (below)
     AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
@@ -43673,7 +43674,9 @@ Re-exports: `plat::pkg::Packaged`
   why a step failed
   - `Config(String)` -- no channel, no valid key or an invalid address
   - `Denied(String)` -- the app's PERMISSIONS do not allow the host (net.connect)
-  - `Net(String)` -- connection, TLS or protocol failure
+  - `Net(String)` -- connection or protocol failure
+  - `Tls(String)` -- the TLS layer refused: the certificate or the handshake
+  - `TooLarge(String)` -- the answer is over the limit fetch::get was given
   - `Http(u16)` -- the server answered with another status than 200 / 206
   - `Signature` -- the signature of update.json matches no trusted key
   - `Manifest(String)` -- update.json is malformed or for another app
@@ -43874,17 +43877,40 @@ the backup.  Large files are copied in pieces, never read whole.
 Source: [`lib/update/fetch.rs`](../lib/update/fetch.rs)
 
 ```text
-fetch -- the updater's HTTP(S): small files with redirects, and downloads that hash while
-they write and resume an interrupted file with a Range request
+fetch -- the updater's HTTP(S), public for an app's other downloads: small files with
+redirects, and downloads that hash while they write and resume an interrupted file with a
+Range request (docs/UPDATES.md "Downloads without an update")
 
   join(base, href) -> Option<Url>   a manifest's file address
   get(cfg, url, max) -> (final url, bytes)
   download(cfg, url, part, size, sha256, progress) -> Ok when part holds the whole file
+
+Of the Config only app and version (the User-Agent), ca_pem and timeout_ms count, so
+Config::new(app, version, "", &[]) is enough.  Connections go through netio and plat::net: the
+app's net.connect rules apply, an `ask` line asks on the calling thread's behalf (not the UI
+thread, these calls block).  Failures: Error::Denied (the host), Tls, TooLarge (get), Net, Http,
+Size, Hash, Incomplete (the part stays for the next call), Cancelled, Io.
 ```
+
+- **`struct Progress<'a>`**
+  the counters a download updates and the flag that stops it
+  - `done: &'a AtomicU64`
+  - `total: &'a AtomicU64`
+  - `cancel: &'a AtomicBool`
 
 - **`fn join(base: &Url, href: &str) -> Option<Url>`**
   href relative to base: an absolute http(s) address, "//host/..", "/path" or a name
   relative to base's folder
+
+- **`fn get(cfg: &Config, url: &Url, max: usize) -> Result<(Url, Vec<u8>), Error>`**
+  a small file (at most max bytes), redirects followed -> the address it came from and its
+  bytes
+
+- **`fn download(cfg: &Config, url: &Url, part: &str, size: u64, sha256: &[u8; 32], p: &Progress) -> Result<(), Error>`**
+  download url into the file part: a part that already holds the start of the file is
+  hashed and continued with a Range request (a server that answers 200 instead starts it
+  over).  The answer must have exactly `size` bytes with this SHA-256; a wrong file is
+  deleted (Error::Size / Error::Hash), an interrupted one kept (Error::Incomplete).
 
 ### `update/manifest.rs`
 
