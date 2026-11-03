@@ -43,6 +43,10 @@
 //
 // On a device with hardware (res.rs) every HTTP request costs "cpu_us" at a reference core before a
 // backend is picked: a balancer can be the bottleneck.  The bytes of a TCP pipe cost no CPU.
+//
+// Service::reconfigure takes a whole new config while it runs, all but its mode, port and kind of
+// health check: backends that are new start now, those that are gone drain first, another address
+// of a backend needs another name.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -585,7 +589,9 @@ impl Lb {
         h.add("X-Forwarded-For", &xff);
         let url = Url { host: format!("{}", be.addr), port: be.port, target: r.head.target.clone() };
         let req = Req { method: r.head.method.clone(), url, version: Version::Http11, headers: h, body: r.body.clone(), timeout: self.timeout, connect_timeout: self.connect_timeout, reuse: self.keepalive, keep_body: true };
-        os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        if os.recording() {
+            os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        }
         let aid = self.agent.submit(os, req);
         let be = &mut self.backends[b];
         be.active += 1;
@@ -1375,6 +1381,69 @@ impl Service for Lb {
             b.active = 0;
             b.checking = false;
         }
+    }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let fresh = from_def_msg(c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<Lb>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "lb"));
+        };
+        if self.mode != f.mode || self.port != f.port {
+            return Err(msg!("Modus und Port eines Load Balancers ändern sich nur mit einem Neustart."));
+        }
+        if self.health.kind != f.health.kind {
+            return Err(msg!("Die Art der Prüfungen ändert sich nur mit einem Neustart."));
+        }
+        // what happens to the backends, seen before anything changes
+        let mut ops = Vec::new();
+        for b in &f.backends {
+            match self.backends.iter().find(|x| !x.gone() && x.name.eq_ignore_ascii_case(&b.name)) {
+                Some(x) if x.addr != b.addr || x.port != b.port => return Err(msg!("Das Backend {} hat eine andere Adresse: es braucht einen anderen Namen.", b.name.clone())),
+                Some(x) if x.weight != b.weight => ops.push(LbOp::Weight { name: b.name.clone(), weight: b.weight }),
+                Some(_) => {}
+                None => ops.push(LbOp::Add { name: b.name.clone(), addr: b.addr, port: b.port, weight: b.weight }),
+            }
+        }
+        for x in self.backends.iter().filter(|x| !x.gone()) {
+            if !f.backends.iter().any(|b| b.name.eq_ignore_ascii_case(&x.name)) {
+                ops.push(LbOp::Remove { name: x.name.clone() });
+            }
+        }
+        if self.algo != f.algo {
+            self.set_algo(f.algo);
+        }
+        self.hash_key = f.hash_key.clone();
+        let rering = self.vnodes != f.vnodes;
+        self.vnodes = f.vnodes;
+        self.health.path = f.health.path.clone();
+        self.health.interval = f.health.interval;
+        self.health.timeout = f.health.timeout;
+        self.health.rise = f.health.rise;
+        self.health.fall = f.health.fall;
+        self.retries = f.retries;
+        self.timeout = f.timeout;
+        self.connect_timeout = f.connect_timeout;
+        self.drain = f.drain;
+        self.max_conns = f.max_conns;
+        self.keepalive = f.keepalive;
+        self.tag = f.tag;
+        self.cpu = f.cpu;
+        self.mem = f.mem;
+        if rering {
+            self.rering();
+        }
+        match os {
+            Some(os) => {
+                for op in ops {
+                    self.change(os, op)?;
+                }
+            }
+            None => {
+                for op in ops {
+                    self.change_stopped(op)?;
+                }
+            }
+        }
+        Ok(())
     }
     fn mem(&self) -> u64 {
         self.mem.bytes((self.serve.conns() + self.agent.conns() + 2 * self.pipes.len()) as u64, 0)

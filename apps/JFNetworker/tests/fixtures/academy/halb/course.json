@@ -61,7 +61,7 @@
             "Ein Quiz",
             "A quiz"
           ],
-          "file": "quiz/a.json"
+          "file": ""
         },
         {
           "id": "suche",
@@ -70,7 +70,7 @@
             "Eine Fehlersuche",
             "A fault hunt"
           ],
-          "file": "labs/kaputt.jfnet"
+          "file": ""
         },
         {
           "id": "pruefung",
@@ -79,7 +79,7 @@
             "Eine Prüfung",
             "An exam"
           ],
-          "file": "quiz/b.json"
+          "file": ""
         },
         {
           "id": "schluss",

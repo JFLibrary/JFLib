@@ -49,6 +49,8 @@
 //                             service (cli/shrun.rs; services show as 100 + id)
 //   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
 //                             its name on the device
+//   OsApi::recording          notes are kept (not in a sweep's quiet trace): notes with texts of
+//                             their own, on a hot path, need not be made otherwise
 //   Engine::rename_service    Action::RenameService: a service goes on under another name
 //                             (Service::renamed tells it; its time series follow)
 //   both families             Sock::addr says what a UDP socket takes: 0.0.0.0 every IPv4
@@ -72,6 +74,10 @@
 //                             writes them for services (OsApi::file_*) and the command lines
 //   Os::res                   its CPU and RAM (res.rs; None: it costs nothing); Service::mem: the
 //                             bytes a service holds, asked after each of its calls
+//   Service::reconfigure      takes a new config while it runs, without a restart; by default it
+//                             cannot (http-server, http-load, lb, cache, worker can, for what they
+//                             can use at once).  Engine::can_reconfigure asks a copy of it,
+//                             Action::ServiceConfig does it (lab.rs)
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -346,6 +352,14 @@ pub trait Service: Send {
     /// calls there; the default holds nothing
     fn mem(&self) -> u64 {
         0
+    }
+    /// takes its whole config anew while it runs, without a restart: its numbers, connections and
+    /// work stay, what comes next goes by the new settings.  `os`: None when it does not run or is
+    /// only asked whether it can (Engine::can_reconfigure, on a copy).  Err: why it needs a restart
+    /// for this, and nothing has changed; the default needs one for everything
+    fn reconfigure(&mut self, config: &agent_core::jmap::Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let _ = (config, os);
+        Err(msg::phrase("Dieser Dienst ändert seine Einstellungen nur mit einem Neustart."))
     }
 }
 
@@ -690,6 +704,10 @@ impl OsApi<'_> {
     }
     pub fn cancel(&mut self, key: u32) {
         self.eng.cancel_timer(self.ni, SLOT_SVC + self.id * SVC_TIMERS + key.min(SVC_TIMERS - 1));
+    }
+    /// decisions are kept (a sweep's quiet trace keeps none)
+    pub fn recording(&self) -> bool {
+        !self.eng.trace.is_quiet()
     }
     /// records a decision
     pub fn note(&mut self, n: Note) {

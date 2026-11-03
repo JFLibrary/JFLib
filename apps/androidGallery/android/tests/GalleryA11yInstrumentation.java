@@ -79,7 +79,7 @@ public final class GalleryA11yInstrumentation extends Instrumentation {
             // an accessibility client: the app's AccessibilityManager reports accessibility on
             UiAutomation ui = getUiAutomation();
             ui.setOnAccessibilityEventListener(e -> {
-                if (!"org.jflib.gallery".contentEquals(e.getPackageName() == null ? "" : e.getPackageName())) return;
+                if (!getTargetContext().getPackageName().contentEquals(e.getPackageName() == null ? "" : e.getPackageName())) return;
                 synchronized (events) {
                     events.add(new int[] {e.getEventType(), e.getContentChangeTypes()});
                     eventTexts.add(String.valueOf(e.getText()) + " " + e.getContentDescription());

@@ -1,0 +1,79 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/firewall_zones.jfnet
+# the shot matrix of the parts Zonen and Sitzungen (F2), light and dark at 100 and 150 %, and narrow
+# (build/f2/shots/fwz_<view>_<theme>_<scale>.png).  Ids as in firewall_zones.uis.
+size 1280 900
+theme light
+wait 500
+dblclick listitem:"FW" shift
+expect window 26624 open
+resizewin 26624 900 840
+click tab:"Firewall"
+click tab:"Zonen"
+wait 100
+move 640,860
+shot build/f2/shots/fwz_zones_light_100.png window 26624
+theme dark
+shot build/f2/shots/fwz_zones_dark_100.png window 26624
+scale 150 window 26624
+shot build/f2/shots/fwz_zones_dark_150.png window 26624
+theme light
+shot build/f2/shots/fwz_zones_light_150.png window 26624
+scale 100 window 26624
+# ---- narrow: fields that break
+resizewin 26624 440 760
+shot build/f2/shots/fwz_zones_light_narrow.png window 26624
+theme dark
+shot build/f2/shots/fwz_zones_dark_narrow.png window 26624
+theme light
+resizewin 26624 900 840
+# ---- further down: the classes, policies and pairs
+wheel #131192 -2000
+wait 100
+shot build/f2/shots/fwz_zones2_light_100.png window 26624
+# ---- Sitzungen with traffic
+click tab:"Sitzungen"
+dblclick listitem:"PC1" shift
+expect window 27136 open
+resizewin 27136 700 500
+click tab:"CLI" window 27136
+activate 27136
+wait 100
+type "ping -c 2 203.0.113.10\n"
+wait 200
+type "\n"
+wait 3000
+close window 27136
+activate 26624
+wait 100
+move 640,860
+shot build/f2/shots/fwz_sessions_light_100.png window 26624
+theme dark
+shot build/f2/shots/fwz_sessions_dark_100.png window 26624
+scale 150 window 26624
+shot build/f2/shots/fwz_sessions_dark_150.png window 26624
+theme light
+shot build/f2/shots/fwz_sessions_light_150.png window 26624
+scale 100 window 26624
+resizewin 26624 440 760
+shot build/f2/shots/fwz_sessions_light_narrow.png window 26624
+theme dark
+shot build/f2/shots/fwz_sessions_dark_narrow.png window 26624
+theme light
+resizewin 26624 900 840
+# ---- Test with the zones' answer
+click tab:"Test"
+click #131168
+click listitem:"Gi0/2"
+click #131171
+type "203.0.113.10"
+click #131172
+type "192.168.1.10"
+click #131174
+type "80"
+click #131177
+wait 100
+move 640,860
+shot build/f2/shots/fwz_test_light_100.png window 26624
+theme dark
+shot build/f2/shots/fwz_test_dark_100.png window 26624
+theme light

@@ -51,7 +51,7 @@ pub fn upload(t: &mut T) {
     ring(t, &g);
     buffers(t, &g);
     #[cfg(windows)]
-    if g.dev.features().swapchain {
+    if crate::windows(&g.dev) {
         swap(t, &g);
         return;
     }
@@ -173,7 +173,11 @@ fn ring(t: &mut T, g: &Gpu) -> Option<()> {
     let px = read_tex(t, &dev, &tex, Layout::Sampled)?;
     let same = px.chunks_exact((w * 4) as usize).zip(f.chunks_exact((w * 4) as usize)).all(|(a, b)| a == b);
     t.ok(same, "a whole frame arrives byte for byte");
-    plat::sleep_ms(1100);
+    // (not sleep_ms: on Android, as in the browser, the main thread does not sleep)
+    let t2 = plat::time_us();
+    while plat::time_us() - t2 < 1_100_000 {
+        plat::thread_yield();
+    }
     t.res(dev.poll(), "poll")?;
     let after = dev.memory_reserved();
     t.ok(after <= base + 2 * MIB, &format!("a second later the large buffer is gone: {:.1} MiB reserved", after as f64 / MIB as f64));

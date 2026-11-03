@@ -3,8 +3,9 @@
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>
 //        jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL, vulkan-1.dll or
 //        libvulkan.so.1 (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
-//        Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
-//        present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
+//        Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface
+//        (Android: VK_KHR_android_surface) when present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE
+//        / jfgui_GPU_DEBUG.
 //   instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
 //        virtual, CPU, other (stable within a kind); AdapterInfo::missing says why one is
 //        unusable (Vulkan 1.1, a graphics + compute queue, timeline semaphores, dynamic
@@ -199,10 +200,18 @@ impl Instance {
         }
         let layer_exts = if want { instance_extensions(&lf, LAYER_VALIDATION.as_ptr()) } else { Vec::new() };
         let mut names: Vec<*const u8> = Vec::new();
-        let surface = cfg!(windows) && has_ext(&exts, b"VK_KHR_surface\0") && has_ext(&exts, b"VK_KHR_win32_surface\0");
+        // the target's surfaces (Linux: none, vk_dmabuf.rs)
+        let surface_ext: Option<&[u8]> = if cfg!(windows) {
+            Some(b"VK_KHR_win32_surface\0")
+        } else if cfg!(target_os = "android") {
+            Some(b"VK_KHR_android_surface\0")
+        } else {
+            None
+        };
+        let surface = surface_ext.is_some_and(|e| has_ext(&exts, b"VK_KHR_surface\0") && has_ext(&exts, e));
         if surface {
             names.push(b"VK_KHR_surface\0".as_ptr());
-            names.push(b"VK_KHR_win32_surface\0".as_ptr());
+            names.extend(surface_ext.map(<[u8]>::as_ptr));
         }
         let du = (want || debug) && (has_ext(&exts, b"VK_EXT_debug_utils\0") || has_ext(&layer_exts, b"VK_EXT_debug_utils\0"));
         if du {

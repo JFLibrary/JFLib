@@ -284,6 +284,15 @@ expect_nowarn
 key esc
 expect #100 exists
 
+# ---- "Bild & Leinwand": an image view and a big picture (the GPU's way: android_gpu.py, phase images)
+click #900
+click menuitem:"Bild & Leinwand"
+expect #930 exists
+expect #9000 exists
+expect_nowarn
+key esc
+expect #100 exists
+
 # ---- "Randfälle": the corners of the screen
 click #900
 click menuitem:"Randfälle"

@@ -529,6 +529,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         b += (ip.statics.len() + ip.dynamic.len()) * size_of::<Route>() + ip.reasm.len() * 2048 + ip.groups.len() * 8;
         // access lists, translations, IPv6 and the routing table of the last lookup
         b += 1024 + ip.dynamic.len() * size_of::<Route>();
+        // the zone firewall: its configuration and sessions (fw.rs, K1 restores them)
+        b += ip.fw.footprint();
     }
     if let Some(os) = &n.os {
         b += size_of::<crate::os::Os>() + os.socks.len() * size_of::<Sock>() + os.inbox.len() * 256 + os.hosts.len() * 64;

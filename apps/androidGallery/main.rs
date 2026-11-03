@@ -4,7 +4,7 @@
 // main.rs: the start page (the cards 01 to 07) and the way between the pages (nav.rs).  The cards
 // files.rs, secrets.rs, system.rs; behind them what the big gallery (apps/gallery) has, for the
 // finger: pg_basic.rs, pg_menus.rs, pg_text.rs, pg_lists.rs, pg_boxes.rs, pg_colors.rs,
-// pg_windows.rs, pg_edge.rs; the phone's own: pg_sensors.rs (Wasserwaage, Handylage, Kompass, GPS).
+// pg_windows.rs, pg_edge.rs, pg_image.rs; the phone's own: pg_sensors.rs (Wasserwaage, Handylage, Kompass, GPS).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -20,6 +20,7 @@ mod pg_basic;
 mod pg_boxes;
 mod pg_colors;
 mod pg_edge;
+mod pg_image;
 mod pg_lists;
 mod pg_menus;
 mod pg_sensors;
@@ -46,7 +47,7 @@ struct Gallery {
     page: Page, next: Option<Page>, started: bool, home_y: i32, home_restore: u32,
     basic: pg_basic::Basic, menus: pg_menus::Menus, texts: pg_text::Texts, lists: pg_lists::Lists,
     boxes: pg_boxes::Boxes, colors: pg_colors::Colors, windows: pg_windows::Windows, edge: pg_edge::Edge,
-    sensors: pg_sensors::Sensors,
+    images: pg_image::Images, sensors: pg_sensors::Sensors,
 }
 impl Default for Gallery {
     fn default() -> Self {
@@ -55,7 +56,7 @@ impl Default for Gallery {
             page: Page::Home, next: None, started: false, home_y: 0, home_restore: 0,
             basic: Default::default(), menus: Default::default(), texts: Default::default(), lists: Default::default(),
             boxes: Default::default(), colors: Default::default(), windows: Default::default(), edge: Default::default(),
-            sensors: Default::default() }
+            images: Default::default(), sensors: Default::default() }
     }
 }
 impl Gallery {
@@ -105,6 +106,7 @@ impl Gallery {
                 Page::Boxes => self.boxes.page(ui),
                 Page::Colors => self.colors.page(ui),
                 Page::Windows => self.windows.page(ui),
+                Page::Images => self.images.page(ui),
                 Page::Level => self.sensors.level(ui),
                 Page::Attitude => self.sensors.attitude(ui),
                 Page::Compass => self.sensors.compass(ui),

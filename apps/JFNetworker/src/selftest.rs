@@ -77,12 +77,17 @@
 // of doc/edits.rs, the scene of canvas/paint.rs).
 // startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// sweeptest.rs: parameter sweeps (group sweep: jfn_model::experiment, jfn_sim::experiment, jfn_run's
+// threads, Service::reconfigure, the scenario's steps for changes under load).
 // hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
 // queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
+// firewalltest.rs: the zone firewall (group firewall: zones, sessions, NAT and lists with them).
 // fwguitest.rs: the Firewall tab (group fwgui: what its forms type, rows back from the engine, moves,
 // the Test part against packets sent for real, the steps of console::run_lines_running).
 // academytest.rs: the Akademie (group academy: jfn_model::academy, the progress in its file, step order
 // and state, what the page reads, every course below --academy-dir).
+// quiztest.rs: quizzes, tests and fault hunts (group quiz: jfn_model::quiz, a lab's start faults and locks,
+// a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
 
 use alloc::format;
 use alloc::string::String;
@@ -194,11 +199,17 @@ mod startpagetest;
 mod hardwaretest;
 #[path = "fwguitest.rs"]
 mod fwguitest;
+#[path = "firewalltest.rs"]
+mod firewalltest;
 #[path = "academytest.rs"]
 mod academytest;
+#[path = "quiztest.rs"]
+mod quiztest;
+#[path = "sweeptest.rs"]
+mod sweeptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 61] = [
+    let groups: [(&'static str, fn(&mut T)); 64] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -260,6 +271,9 @@ pub fn run() -> i32 {
         ("hardware", hardwaretest::run),
         ("fwgui", fwguitest::run),
         ("academy", academytest::run),
+        ("firewall", firewalltest::run),
+        ("quiz", quiztest::run),
+        ("sweep", sweeptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

@@ -1,5 +1,5 @@
 // academy -- the Akademie: courses from files (jfn_model::academy), their outline, lessons to read, labs
-// in the simulator, what the learner has done
+// in the simulator, quizzes and tests (quiz.rs), fault hunts, what the learner has done
 //
 //   Academy::new() / setup(headless, dir)    where the files are (store.rs, --academy-dir PATH)
 //   academy.ensure()                         the courses and the progress, read once
@@ -12,7 +12,8 @@
 //   open_lab(n, ui, course, step)            After::CourseLab: a lab step's file as a project without a
 //                                            file (doc/file.rs open_lab), named as its file until it is saved
 //   follow_link(n, ui, target)               a link of a lesson: step:ID and lab:ID; else a message
-//   tick(n)                                  every frame: a course's lab with every goal reached is done
+//   tick(n, ui)                              every frame: a course's lab with every goal reached is done; a
+//                                            fault hunt handed in has its result; a test out of time ends
 //   frame(n, ui) / bar(n, ui) / dialog(n, ui)   pages.rs: the page, the bar over the canvas, the question
 //                                            before resetting
 //
@@ -24,12 +25,16 @@
 // open.  Progress is written at once to its own file (store.rs), never into the project and without an
 // undo step; it goes by ids, so a new version of a course keeps it.
 //
-// For AK2: quizzes, fault hunts and exams are steps the format knows (StepKind) and the outline lists as
-// not available; open_step gets a page for each, Progress's `best` takes their results.  For AK3: installed
+// A quiz or a test is a page of its own (quiz.rs); what this session knows of it stays while other pages show.
+// A fault hunt is a lab whose project is broken (Lab::start_faults, Lab::lock) and that grades: handing it
+// in (assess.rs) gives its result, it is done when it reaches the lab's `pass`, and Neu beginnen on the bar
+// loads it from its file again.  Results go to Progress.best.  A step with `requires` stays locked until those
+// are done, Weiter goes past it.  For AK3: installed
 // courses appear in the folder store.rs lists: list it again (Academy::read back to false), and the list of
 // courses gets its "Jetzt installieren"; a lesson's web links come to follow_link (they are refused here).
 
 pub(crate) mod pages;
+pub(crate) mod quiz;
 pub(crate) mod store;
 
 pub(crate) use pages::{bar, dialog, frame};
@@ -56,6 +61,8 @@ pub(crate) enum View {
     Course,
     /// the lesson at this place of the current course
     Lesson(usize),
+    /// the quiz or test at this place of the current course
+    Quiz(usize),
 }
 
 /// the project below the page is this lab step of a course
@@ -103,6 +110,11 @@ pub(crate) struct Academy {
     pub focus_quiet: bool,
     /// the note about the other language was closed
     pub note_closed: bool,
+    /// the quizzes and tests this session opened; a run without a window (their fixed order); a test's
+    /// countdown has its timer
+    pub quizzes: Vec<quiz::Page>,
+    pub headless: bool,
+    pub timer_armed: bool,
 }
 
 impl Academy {
@@ -125,12 +137,16 @@ impl Academy {
             focus: 0,
             focus_quiet: false,
             note_closed: false,
+            quizzes: Vec::new(),
+            headless: true,
+            timer_armed: false,
         }
     }
 
     /// Net::init: where the files are
     pub(crate) fn setup(&mut self, headless: bool, dir: Option<String>) {
         self.place = store::place(headless, dir);
+        self.headless = headless;
     }
 
     /// the courses and the progress, once
@@ -178,6 +194,51 @@ impl Academy {
                 Card { title: String::from(c.title.get(en)), text: format!("{} · {}", meta_text(c), c.summary.get(en)), badge }
             })
             .collect()
+    }
+
+    // the next step after place i of the current course that can be opened now
+    pub(crate) fn next_after(&self, i: usize) -> Option<usize> {
+        let (c, id) = (self.course()?, self.course_id());
+        c.steps().enumerate().skip(i + 1).find(|(_, s)| s.ready() && !self.progress.locked(c, id, s)).map(|(k, _)| k)
+    }
+
+    // the ids of a step
+    fn ids(&self, course: usize, step: usize) -> Option<(String, String)> {
+        let e = self.entries.get(course)?;
+        let s = e.course.as_ref()?.step_at(step)?;
+        Some((e.id.clone(), s.id.clone()))
+    }
+
+    /// the attempts handed in of a step
+    pub(crate) fn tries_at(&self, course: usize, step: usize) -> u32 {
+        self.ids(course, step).map_or(0, |(c, s)| self.progress.tries_of(&c, &s))
+    }
+
+    /// the best result of a step
+    pub(crate) fn best_at(&self, course: usize, step: usize) -> Option<u32> {
+        self.ids(course, step).and_then(|(c, s)| self.progress.best_of(&c, &s))
+    }
+
+    /// an attempt was handed in: its result, done when it passed; at once in its file (false: it could not
+    /// be written)
+    pub(crate) fn result(&mut self, course: usize, step: usize, percent: u32, passed: bool) -> bool {
+        let Some((c, s)) = self.ids(course, step) else { return true };
+        let when = plat::unix_time_ns() / 1_000_000_000;
+        self.progress.record(&c, &s, percent, when);
+        if passed {
+            self.progress.mark_done(&c, &s, when);
+        }
+        store::write_progress(&self.place.progress, &self.progress)
+    }
+
+    /// practice reached this: kept if it is the most so far, done when it passes
+    pub(crate) fn note(&mut self, course: usize, step: usize, percent: u32, passed: bool) -> bool {
+        let Some((c, s)) = self.ids(course, step) else { return true };
+        let mut changed = self.progress.note_best(&c, &s, percent);
+        if passed {
+            changed |= self.progress.mark_done(&c, &s, plat::unix_time_ns() / 1_000_000_000);
+        }
+        !changed || store::write_progress(&self.place.progress, &self.progress)
     }
 
     // a step is done: at once in its file (false: it could not be written)
@@ -249,11 +310,22 @@ fn open_course(n: &mut Net, i: usize, via_home: bool) {
     a.focus = if a.course().is_some_and(|c| a.progress.next_open(c, &a.entries[i].id).is_some()) { ID_AK_CONTINUE } else { ID_AK_BACK };
 }
 
-// the step at place i of the current course: a lesson on the page; a lab as the project, unless it is the
-// project already (the page then only moves away); what the program cannot open yet stays where it is
+// the step at place i of the current course: a lesson, a quiz or a test on the page; a lab or a fault hunt as
+// the project, unless it is the project already (the page then only moves away); what the program cannot open
+// yet or what is still locked stays where it is
 fn open_step(n: &mut Net, ui: &mut Ui, i: usize) {
-    let Some(s) = n.academy.course().and_then(|c| c.step_at(i)) else { return };
-    let (kind, step_id) = (s.kind(), s.id.clone());
+    let a = &n.academy;
+    let Some(c) = a.course() else { return };
+    let Some(s) = c.step_at(i) else { return };
+    let (kind, step_id, ready, locked) = (s.kind(), s.id.clone(), s.ready(), a.progress.locked(c, a.course_id(), s));
+    if !ready {
+        return;
+    }
+    if locked {
+        n.file.msg = Some((IB_INFO, String::from(t("Dieser Schritt ist noch gesperrt")), String::from(t("Er öffnet sich, wenn die Schritte davor erledigt sind, die er verlangt."))));
+        ui.repass();
+        return;
+    }
     match kind {
         Some(StepKind::Lesson) => {
             n.file.msg = None;
@@ -264,7 +336,11 @@ fn open_step(n: &mut Net, ui: &mut Ui, i: usize) {
             a.focus = ID_AK_LESSON;
             a.focus_quiet = true;
         }
-        Some(StepKind::Lab) => {
+        Some(StepKind::Quiz | StepKind::Exam) => {
+            n.file.msg = None;
+            quiz::open(n, i);
+        }
+        Some(StepKind::Lab | StepKind::Fault) => {
             n.file.msg = None;
             let a = &mut n.academy;
             if a.lab.as_ref().is_some_and(|l| l.course == a.cur && l.step == i) {
@@ -277,7 +353,7 @@ fn open_step(n: &mut Net, ui: &mut Ui, i: usize) {
                 file::request(n, ui, After::CourseLab(course, step_id));
             }
         }
-        _ => {}
+        None => {}
     }
 }
 
@@ -295,6 +371,12 @@ pub(crate) fn open_lab(n: &mut Net, ui: &mut Ui, course: &str, step: &str) {
         a.lab = Some(LabStep { course: c, step: i, marked: false });
         a.focus = ID_TASK_CHECK;
         a.focus_quiet = true;
+        // a fault hunt is handed in, with or without a time limit
+        if fault_hunt(n)
+            && let Some(run) = n.task.assess.as_mut()
+        {
+            run.hand_in = true;
+        }
     }
 }
 
@@ -303,7 +385,7 @@ pub(crate) fn back(n: &mut Net, ui: &mut Ui) {
     n.file.msg = None;
     let a = &mut n.academy;
     match a.view {
-        View::Lesson(i) => {
+        View::Lesson(i) | View::Quiz(i) => {
             a.view = View::Course;
             a.focus = ID_AK_STEP + i as u32;
         }
@@ -346,20 +428,40 @@ pub(crate) fn follow_link(n: &mut Net, ui: &mut Ui, target: &str) {
 }
 
 // the learner's file could not be written: said once per attempt, what was done still counts in memory
-fn saved(n: &mut Net, ok: bool) {
+pub(crate) fn saved(n: &mut Net, ok: bool) {
     if !ok {
         n.file.msg = Some((IB_WARNING, String::from(t("Der Fortschritt wurde nicht gespeichert")), String::from(t("Die Datei ließ sich nicht schreiben."))));
     }
 }
 
-/// every frame: a course's lab with every goal reached is done
-pub(crate) fn tick(n: &mut Net) {
+// the project below the page is a fault hunt of a course
+pub(crate) fn fault_hunt(n: &Net) -> bool {
+    let a = &n.academy;
+    a.lab.as_ref().and_then(|l| a.entries.get(l.course)?.course.as_ref()?.step_at(l.step)?.kind()) == Some(StepKind::Fault)
+}
+
+/// every frame: a course's lab with every goal reached is done; a fault hunt handed in has its result and
+/// is done if it reached the lab's `pass`; a test out of time ends
+pub(crate) fn tick(n: &mut Net, ui: &mut Ui) {
+    quiz::tick(n, ui);
+    let hunt = fault_hunt(n);
     let Some(lab) = n.academy.lab.as_mut() else { return };
-    if lab.marked || !n.task.run.as_ref().is_some_and(|r| r.done()) {
+    if lab.marked {
+        return;
+    }
+    let (c, s) = (lab.course, lab.step);
+    if hunt {
+        let Some(percent) = n.task.assess.as_ref().filter(|r| r.end.is_some()).and_then(|r| r.score.as_ref()).map(|x| x.percent()) else { return };
+        lab.marked = true;
+        let pass = n.doc.proj.lab.as_ref().map_or(100, |l| l.pass_percent());
+        let ok = n.academy.result(c, s, percent, percent >= pass);
+        saved(n, ok);
+        return;
+    }
+    if !n.task.run.as_ref().is_some_and(|r| r.done()) {
         return;
     }
     lab.marked = true;
-    let (c, s) = (lab.course, lab.step);
     let ok = n.academy.mark_done(c, s);
     saved(n, ok);
 }
@@ -379,17 +481,22 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             }
         }
         CMD_AK_PREV => {
-            let View::Lesson(i) = n.academy.view else { return true };
+            let (View::Lesson(i) | View::Quiz(i)) = n.academy.view else { return true };
             if let Some(k) = n.academy.course().and_then(|c| c.prev_ready(i)) {
                 open_step(n, ui, k);
             }
         }
-        // Weiter: this lesson is done; after the last step the outline shows what is left
+        // Weiter: this lesson is done (a quiz or a test by its result); after the last step the outline
+        // shows what is left
         CMD_AK_NEXT => {
-            let View::Lesson(i) = n.academy.view else { return true };
+            let (i, lesson) = match n.academy.view {
+                View::Lesson(i) => (i, true),
+                View::Quiz(i) => (i, false),
+                _ => return true,
+            };
             let cur = n.academy.cur;
-            let ok = n.academy.mark_done(cur, i);
-            let next = n.academy.course().and_then(|c| c.next_ready(i));
+            let ok = !lesson || n.academy.mark_done(cur, i);
+            let next = n.academy.next_after(i);
             match next {
                 Some(k) => open_step(n, ui, k),
                 None => {
@@ -413,7 +520,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             let Some(l) = n.academy.lab.clone() else { return true };
             n.academy.cur = l.course;
             n.academy.via_home = false;
-            let next = n.academy.course().and_then(|c| c.next_ready(l.step));
+            let next = n.academy.next_after(l.step);
             match next {
                 Some(k) => open_step(n, ui, k),
                 None => {
@@ -430,7 +537,18 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
                 let ok = store::write_progress(&a.place.progress, &a.progress);
                 saved(n, ok);
             }
+            let cur = n.academy.cur;
+            quiz::drop_course(n, cur);
             n.academy.focus = ID_AK_CONTINUE;
+        }
+        CMD_QZ_START | CMD_QZ_HAND_IN | CMD_QZ_AGAIN => {
+            quiz::command(n, id);
+        }
+        // a fault hunt once more: from its file, after the question about what changed in it
+        CMD_AK_RETRY => {
+            let Some(l) = n.academy.lab.clone() else { return true };
+            let Some((c, s)) = n.academy.ids(l.course, l.step) else { return true };
+            file::request(n, ui, After::CourseLab(c, s));
         }
         _ => return false,
     }

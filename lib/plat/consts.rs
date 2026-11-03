@@ -101,6 +101,16 @@ pub const WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT;
 pub const WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT;
 pub const WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT;
 
+// gpu_out_state: how the UI's output through the GPU came up
+/// nothing known, nothing to remember
+pub const GPU_STATE_UNKNOWN: u32 = 2;
+/// the first start is about to run a driver
+pub const GPU_STATE_TRYING: u32 = 3;
+/// a window showed through the GPU
+pub const GPU_STATE_OK: u32 = 4;
+/// this system cannot: the CPU path for good
+pub const GPU_STATE_NEVER: u32 = 5;
+
 // ---- clipboard formats
 pub const CLIP_TEXT: u32 = 1; // UTF-8
 pub const CLIP_PNG: u32 = 2; // PNG file bytes

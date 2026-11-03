@@ -357,7 +357,7 @@ impl Engine {
             link: id,
             from: (fd, from.1),
             to: (td, to.1),
-            mask: if serial && frame.len() > 4 { decode::ip_mask(&frame[4..]) } else { decode::proto_mask(&frame) },
+            mask: if self.trace.is_quiet() { 0 } else if serial && frame.len() > 4 { decode::ip_mask(&frame[4..]) } else { decode::proto_mask(&frame) },
             drop: if lost { Some(crate::trace::HopDrop::Loss) } else { None },
             bytes: frame.clone(),
             cause,

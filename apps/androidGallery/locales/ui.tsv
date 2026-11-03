@@ -411,3 +411,8 @@ im Hintergrund	in the background
 im Vordergrund	in the foreground
 Tippen, ziehen, ausprobieren. Dieselben Rust-Widgets auf dem Smartphone.	Tap, drag, try it out. The same Rust widgets on the smartphone.
 Startseite	Start page
+Bild & Leinwand	Image & canvas
+Bildansicht	Image view
+Ziehen verschiebt, das Mausrad zoomt: die Kacheln liegen auf der GPU.	Drag to move, the mouse wheel zooms: the tiles are on the GPU.
+Muster	Pattern
+Großes Bild	Large image

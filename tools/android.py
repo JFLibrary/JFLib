@@ -2,10 +2,15 @@
 
 The shared Java/JNI host presents the library's pixels and forwards input. Apps opt in
 with `android` in TARGETS and supply android/AndroidManifest.xml and android/res/.
+A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest) is a
+plain executable for `adb shell` instead (build_exe, android/exe_main.c).
+jfgui_ANDROID_PACKAGE=NAME (test builds): the APK under another package, beside what is installed
+on a phone, which it leaves alone (other debug keys, the user's data there).
 """
 from pathlib import Path
 import hashlib
 import os
+import re
 import shutil
 import struct
 import sys
@@ -121,6 +126,11 @@ def manifest_gaps(perms, manifest):
     would refuse it without a word) -> the message, or None.  Only the location needs a line:
     motion sensors have no permission, and the other rules have no Android permission behind them
     or ask for theirs elsewhere"""
+    # the UI runs without Vulkan (GalleryActivity, docs/GPU.md "Ausgabe unter Android"): the store must
+    # not hide the app from phones without it
+    for tag in re.findall(r'<uses-feature[^>]*android\.hardware\.vulkan[^>]*>', manifest):
+        if 'android:required="false"' not in tag:
+            return f'AndroidManifest.xml requires Vulkan ({tag}): the app must start without it (android:required="false").'
     if perms is None:
         return None
     keys = set()
@@ -132,6 +142,65 @@ def manifest_gaps(perms, manifest):
         return ('PERMISSIONS has `location`: android/AndroidManifest.xml needs <uses-permission> for '
                 'android.permission.ACCESS_FINE_LOCATION and / or ACCESS_COARSE_LOCATION.')
     return None
+
+
+def manifest_for(manifest, work):
+    """the manifest to link: the app's, under another package with jfgui_ANDROID_PACKAGE"""
+    package = os.environ.get('jfgui_ANDROID_PACKAGE')
+    if not package:
+        return manifest
+    text = manifest.read_text(encoding='utf-8')
+    old = re.search(r'package="([^"]+)"', text).group(1)
+    text = text.replace('android:name=".', f'android:name="{old}.').replace(f'package="{old}"', f'package="{package}"')
+    text = text.replace(f'android:targetPackage="{old}"', f'android:targetPackage="{package}"')
+    text = text.replace(f'android:authorities="{old}.', f'android:authorities="{package}.')
+    out = work / 'AndroidManifest.xml'
+    out.write_text(text, encoding='utf-8')
+    return out
+
+
+def native_link_flags():
+    """what every native link of this target has: only what is used, 16 KiB pages, no text relocations"""
+    return ['-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
+            '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now']
+
+
+def build_exe(builder, name, root, crates, run):
+    """a program without a UI -> <out>/android/NAME-<abi>: `adb push` it to /data/local/tmp and run it
+    from `adb shell` (the driver of a GPU needs no app for that); no APK, no Java"""
+    error = sys.modules[builder.__class__.__module__].BuildError
+    try:
+        sdk, ndk, llvm, sdkbuild, platform, java, suffix = sdk_tools()
+    except RuntimeError as exc:
+        raise error(str(exc)) from exc
+    work = builder.dir / 'apps' / name
+    work.mkdir(parents=True, exist_ok=True)
+    output = builder.android_output / f'{name}-{builder.android_abi}'
+    perms, assets, boot = builder.boot_inputs(name)
+    digest = hashlib.sha256(builder.src_hash(root, crates, extra=boot).encode())
+    for path in (Path(__file__), ROOT / 'build_rs.py', ROOT / 'android' / 'exe_main.c'):
+        digest.update(path.read_bytes())
+    digest.update(f'{ndk}'.encode())
+    stamp = work / 'exe.sha256'
+    fingerprint = digest.hexdigest()
+    if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
+        return output
+    archive = work / f'lib{name}.a'
+    cmd = ['rustc'] + builder.flags() + ['--crate-type', 'staticlib', '--crate-name', name.lower()]
+    if builder.release:
+        cmd += ['-C', 'lto=fat']
+    for crate in crates:
+        cmd += ['--extern', f'{crate}={builder.rlib(crate)}']
+    boot_args, env = builder.boot_args(name, perms, assets)
+    cmd += boot_args + ['-o', archive, root]
+    run(cmd, env=env)
+    triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
+    run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}', f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2',
+         '-fPIE', '-pie', '-Wall', '-Wextra', '-Werror', ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(),
+         '-llog', '-ldl', '-lm', '-o', output])
+    run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', output])
+    stamp.write_text(fingerprint)
+    return output
 
 
 def build_apk(builder, name, style, variant, root, crates, run, notices):
@@ -173,6 +242,7 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
         digest.update(relative.as_posix().encode() + b'\0' + path.read_bytes())
     digest.update(f'{ndk}:{sdkbuild}:{platform}:{java}'.encode())
     digest.update((f'release:{keystore}:{alias}' if release else 'debug').encode())
+    digest.update(os.environ.get('jfgui_ANDROID_PACKAGE', '').encode())
     stamp = work / 'apk.sha256'
     fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
@@ -193,9 +263,8 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}',
          f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2', '-fPIC', '-fvisibility=hidden',
          '-Wall', '-Wextra', '-Werror', '-shared', ROOT / 'android' / 'bridge.c', ROOT / 'android' / 'audio.c',
-         ROOT / 'android' / 'system.c', archive,
-         '-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
-         '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now', '-llog', '-ljnigraphics', '-laaudio', '-ldl', '-lm', '-o', native])
+         ROOT / 'android' / 'system.c', archive, *native_link_flags(),
+         '-llog', '-ljnigraphics', '-landroid', '-laaudio', '-ldl', '-lm', '-o', native])
     run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', native])
     try:
         verify_elf(native, builder.android_abi)
@@ -219,7 +288,7 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     resources = work / 'compiled-res.zip'
     run([sdkbuild / ('aapt2' + suffix), 'compile', '--dir', app / 'android' / 'res', '-o', resources])
     unsigned = work / 'unsigned.apk'
-    run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest,
+    run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest_for(manifest, work),
          '-R', resources, '--min-sdk-version', str(MIN_API), '--target-sdk-version', '35', '--auto-add-overlay'])
     with zipfile.ZipFile(unsigned, 'a') as apk:
         apk.write(dex / 'classes.dex', 'classes.dex', compress_type=zipfile.ZIP_DEFLATED)

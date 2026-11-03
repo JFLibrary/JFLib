@@ -86,8 +86,11 @@
 // second); the latency windows give p50_us, p95_us, p99_us of each interval, a web server's
 // backend also backend_p50_us .. backend_p99_us, the load generator also mean_us and max_us.
 // Views for the lab: HttpServer::view, HttpLoad::view (per-second slots with p50/p95/p99);
-// Engine::http_server_view / http_load_view.  Actions HttpLoadSet and HttpServerSet change a
-// running service without losing its numbers.  from_def (svcact.rs) refuses a definition with
+// Engine::http_server_view / http_load_view.  HttpLoad::lat_between: the latencies of a span as one
+// histogram (a sweep).  Actions HttpLoadSet and HttpServerSet change a
+// running service without losing its numbers.  Service::reconfigure takes a whole new config: a web
+// server all but its port, certificate, listen backlog and backends; a load generator all but its
+// mode and duration.  from_def (svcact.rs) refuses a definition with
 // German text, from_def_msg with a Msg for the app's catalogue; status_msg() words the status
 // lines so too.
 
@@ -495,6 +498,10 @@ pub struct HttpServer {
     pub mem: crate::res::SvcMem,
     /// its lock is free then
     lock_free: Ns,
+    /// the time its lock was held so far (a sweep reads it, experiment.rs)
+    pub lock_busy: Ns,
+    /// "kv" of its config, as Service::reconfigure compares it
+    kv_cfg: Option<Value>,
 }
 
 impl HttpServer {
@@ -532,6 +539,8 @@ impl HttpServer {
             usl: crate::res::Usl::default(),
             mem: crate::res::SvcMem::default(),
             lock_free: 0,
+            lock_busy: 0,
+            kv_cfg: None,
         }
     }
     /// the settings of its connections (port, keep-alive, limits, Server header)
@@ -681,7 +690,9 @@ impl HttpServer {
 
     fn arrive(&mut self, os: &mut OsApi, r: ReqIn) {
         let now = os.now();
-        os.note(Note::HttpRequest { method: r.head.method.clone(), path: String::from(r.head.path()) });
+        if os.recording() {
+            os.note(Note::HttpRequest { method: r.head.method.clone(), path: String::from(r.head.path()) });
+        }
         self.per.add(now, 0, 1);
         let (reply, time, call, costs) = self.route(os, &r);
         let cpu = if os.metered() { costs.cpu } else { 0 };
@@ -726,6 +737,7 @@ impl HttpServer {
         }
         let hold = os.cpu_ps(core::mem::take(&mut w.serial));
         self.lock_free = self.lock_free.max(now) + hold;
+        self.lock_busy += hold;
         self.lock_free + w.time
     }
 
@@ -1026,6 +1038,46 @@ impl Service for HttpServer {
     }
     fn mem(&self) -> u64 {
         self.mem.bytes(self.serve.conns() as u64, 0)
+    }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let fresh = from_def_msg("http-server", c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<HttpServer>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "http-server"));
+        };
+        let (a, b) = (&self.serve.cfg, &f.serve.cfg);
+        if a.port != b.port || a.backlog != b.backlog {
+            return Err(msg!("Port und Warteschlange der Verbindungen ändern sich nur mit einem Neustart."));
+        }
+        if self.tls != f.tls {
+            return Err(msg!("Das Zertifikat ändert sich nur mit einem Neustart."));
+        }
+        if self.kv_cfg != f.kv_cfg || self.upstream.is_some() != f.upstream.is_some() {
+            return Err(msg!("Die Backends der Routen ändern sich nur mit einem Neustart."));
+        }
+        self.routes = f.routes.clone();
+        self.queue_max = f.queue_max;
+        self.time = f.time;
+        self.jitter = f.jitter;
+        self.error_ppm = f.error_ppm;
+        self.error_status = f.error_status;
+        self.root = f.root.clone();
+        self.cpu = f.cpu;
+        self.serial = f.serial;
+        self.usl = f.usl;
+        self.mem = f.mem;
+        let (keepalive, max_requests, header_timeout, max_body, server) = (b.keepalive, b.max_requests, b.header_timeout, b.max_body, b.server.clone());
+        let cfg = self.cfg_mut();
+        cfg.keepalive = keepalive;
+        cfg.max_requests = max_requests;
+        cfg.header_timeout = header_timeout;
+        cfg.max_body = max_body;
+        cfg.server = server;
+        match os {
+            // more workers take waiting requests at once
+            Some(os) => self.set(os, None, None, Some(f.workers)),
+            None => self.workers = f.workers,
+        }
+        Ok(())
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -1353,6 +1405,10 @@ impl HttpLoad {
     /// requests in flight
     pub fn inflight(&self) -> u64 {
         self.agent.active() as u64
+    }
+    /// the latencies of the answers in [from, to) as one histogram (whole seconds: its slots)
+    pub fn lat_between(&self, from: Ns, to: Ns) -> Hist {
+        self.lat.hist_between(from, to)
     }
     /// still sending new requests
     pub fn running(&self) -> bool {
@@ -1783,6 +1839,44 @@ impl Service for HttpLoad {
     fn windows(&self) -> Vec<LatWindow<'_>> {
         alloc::vec![LatWindow::new(&self.lat, LOAD_LAT)]
     }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let fresh = from_def_msg("http-load", c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<HttpLoad>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "http-load"));
+        };
+        if self.mode != f.mode {
+            return Err(msg!("Offene und geschlossene Last wechseln nur mit einem Neustart."));
+        }
+        if self.duration != f.duration {
+            return Err(msg!("Die Dauer eines Laufs ändert sich nur mit einem Neustart."));
+        }
+        self.targets = f.targets.clone();
+        self.random_target = f.random_target;
+        self.think = f.think;
+        self.think_exp = f.think_exp;
+        self.poisson = f.poisson;
+        self.delay = f.delay;
+        self.max_requests = f.max_requests;
+        self.timeout = f.timeout;
+        self.connect_timeout = f.connect_timeout;
+        self.keepalive = f.keepalive;
+        self.max_conns = f.max_conns;
+        self.agent.max_per_host = f.max_conns as usize;
+        self.mix = f.mix.clone();
+        let rate = if self.rate_m != f.rate_m { Some(f.rate_m) } else { None };
+        let users = if self.users != f.users { Some(f.users) } else { None };
+        match os {
+            // the schedule goes on from now at the new rate, more users start now
+            Some(os) => self.set_load(os, rate, users),
+            None => {
+                self.rate_m = f.rate_m;
+                self.users = f.users;
+            }
+        }
+        self.ramp = f.ramp;
+        self.start_rate_m = f.start_rate_m;
+        Ok(())
+    }
     fn status(&self) -> String {
         self.status_msg().text()
     }
@@ -1902,6 +1996,7 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
             }
             if let Some(k) = c.get("kv") {
                 s.upstream = Some(crate::kv::client_of(k, K_UP)?);
+                s.kv_cfg = Some(k.clone());
             } else if s.routes.iter().any(|r| r.backend == RouteBackend::Kv) {
                 return Err(msg!("Eine Route fragt den KV-Speicher, aber \u{201e}kv\u{201c} fehlt."));
             }

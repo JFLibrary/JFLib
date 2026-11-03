@@ -109,7 +109,7 @@ pub fn bench() {
         }
     }
     // window: swapchain creation, then a clear-and-present loop per present mode
-    if !dev.features().swapchain {
+    if !crate::windows(&dev) {
         return;
     }
     let Some(w) = open_window(&mut t) else { return };
