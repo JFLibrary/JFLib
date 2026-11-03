@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -162,7 +162,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -1017,6 +1017,9 @@ numbers for them.
   ui_menu_cmd(cmd) -> EV_\*: menu row for a command (widget id = command id)
 - **`fn menu_sep(&mut self) -> u32`**
   ui_menu_sep -> 0: separator line across the flyout
+- **`fn menu_list_empty(&mut self, base: u32, text: &str)`**
+  the disabled row an empty Mi::List with this base id shows instead of its placeholder
+  ("": the placeholder again), for a list that can be empty for different reasons
 - **`fn menu_list<T: AsRef<str>>(&mut self, base: u32, rows: &[T])`**
   the rows of the Mi::List menus with this base id (row k: id base + k; the asm app's
   STRLIST buffer); the list ends at the first empty string
@@ -8440,8 +8443,8 @@ ID_HASH_BASE: u32 = 0x0800_0000
 Source: [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs)
 
 ```text
-gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc:
-docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux")
+gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc;
+Android: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android")
 
 The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -8480,6 +8483,15 @@ polling, the answer ends the wait; the frame stays in the texture and its newest
 then), the compositor gets the frame's rectangles (damage), a worker may not ask the window system
 (Surface::track_size).  What cannot be read back is said by the tests: no client reads a Wayland
 window, Xwayland's GetImage of a flipped window lags one frame.
+
+Android: the same code again.  The host's View with its Bitmap is the CPU path and stays below; the
+swapchain lives on a SurfaceView above it (plat android_gpu.rs), the analogue of Windows' child
+window: the surface exists while the View is visible, shows nothing until its first present and
+then covers the Bitmap.  Going back: the frame to the Bitmap, the SurfaceView away, and with it the
+surface and swapchain (win_gpu_child_show).  The system can also take the surface (the activity
+stops): gp_surface_gone, before the host's callback returns.  win_gpu_child says None for a while
+(the surface is on its way, a tool window or popup shows on the canvas below): win_gpu_child_later,
+the host wakes the loop.
 
 Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -8533,9 +8545,11 @@ drawn when a view moves over it.  Nothing of it exists before the first move, an
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
-silently.
+silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
+runs: a driver that killed the program does not get a third chance).
 
-Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX), jfgui_GPU_VERIFY=1 (every presented
+Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX; Android: GalleryActivity
+always sets it, GPU_DEFAULT there), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -8604,8 +8618,8 @@ Linux program, the browser), or without a GPU, it prints a SKIP once and does no
 Source: [`lib/ui/gpu_out_off.rs`](../lib/ui/gpu_out_off.rs)
 
 ```text
-gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows and Linux programs
-against glibc): every frame takes the platform's path, no Vulkan code is linked
+gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows, Linux programs
+against glibc, Android): every frame takes the platform's path, no Vulkan code is linked
 ```
 
 **`impl Ui`**
@@ -18008,10 +18022,10 @@ FXW_NEDGE: i32 = 7
 
 ```text
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
-Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
-vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: Android, WebGPU in the browser, Metal; they provide
-the same types and methods.
+and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows, on Linux,
+there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
+loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: WebGPU
+in the browser, Metal; they provide the same types and methods.
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -18875,8 +18889,9 @@ vk_inst -- Vulkan instance and adapters
   Instance::new() / with(&InstanceDesc) -> Result<Instance>
        jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL, vulkan-1.dll or
        libvulkan.so.1 (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
-       Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
-       present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
+       Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface
+       (Android: VK_KHR_android_surface) when present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE
+       / jfgui_GPU_DEBUG.
   instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
        virtual, CPU, other (stable within a kind); AdapterInfo::missing says why one is
        unusable (Vulkan 1.1, a graphics + compute queue, timeline semaphores, dynamic
@@ -19140,7 +19155,9 @@ Source: [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs)
 vk_swap -- window surfaces and swapchains
 
   Surface::new(&instance, window) -> Result<Surface>   a plat window (Windows: its HWND and
-       HINSTANCE through plat::win_native, VK_KHR_win32_surface); other targets: Unsupported
+       HINSTANCE through plat::win_native, VK_KHR_win32_surface; Android: the ANativeWindow of
+       plat::win_gpu_child, VK_KHR_android_surface, NotReady while there is none); other targets:
+       Unsupported
   device.create_swapchain(&surface, &SwapchainDesc) -> Result<Swapchain>
        B8G8R8A8 (or R8G8B8A8) UNORM / SRGB, sRGB non-linear colour space; the present mode of
        the desc or jfgui_GPU_PRESENT=fifo|mailbox|immediate, FIFO when the surface lacks it;
@@ -19173,6 +19190,11 @@ semaphore per image (the present that waited on it has finished when the image i
 again).
 The window must not be presented by the CPU (plat::win_present) at the same time: a plat
 window that never presents keeps nothing of its own to paint (win_api.rs WM_PAINT).
+
+Android: the image stays upright (VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) and the compositor turns
+it; the surface's currentTransform would ask us to draw it turned, with every rectangle turned as
+well.  The system then says SUBOPTIMAL at every present while the display is turned, which means
+nothing here: a new size is seen in window_size (a surface there never says OUT_OF_DATE for it).
 ```
 
 **`impl Surface`**
@@ -19181,6 +19203,9 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
   (Linux: the window's size for a rebuild on a worker; here the driver knows it)
 - **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
   the surface of plat window `window` (an index of plat::win_create)
+- **`fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the surface of a window given by its handles (the ANativeWindow of plat::win_gpu_child)
+  whose size and state are those of plat window `window`
 - **`fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
   the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
   whose size and state are those of plat window `window`
@@ -27310,6 +27335,18 @@ the focus.  It is destroyed together with its parent.
 - **`fn gpu_wait(deadline_us: u64)`**
   the modal move / size loop of a window runs (the program's own loop waits for its end)
 
+- **`fn win_gpu_child_later(_w: i32) -> bool`**
+  no child now, but it may come (the host or the next frame wakes the loop): only Android
+
+- **`fn win_gpu_child_alone(_w: i32) -> bool`**
+  the window still shows on its child alone: here always
+
+- **`fn gpu_out_state(_state: u32)`**
+  how the output came up (GPU_STATE_\*): Android keeps it across runs
+
+- **`fn gpu_thread_spawn(stack: usize, f: alloc::boxed::Box<dyn FnOnce() + Send>) -> Option<crate::Thread>`**
+  a thread for the output's jobs
+
 - **`fn win_in_sizemove() -> bool`**
 
 - **`fn win_remote_session() -> bool`**
@@ -27956,6 +27993,26 @@ handler (win_crash.rs).
 
 - **`fn lib_sym(h: &Lib, name: &str) -> usize`**
   the address of the export name, 0 when missing / forwarded  [plat_lib_sym]
+
+### `plat/win_clr.rs` (Windows)
+
+Source: [`lib/plat/win_clr.rs`](../lib/plat/win_clr.rs)
+
+```text
+win_clr -- run a managed program on the CoreCLR another application ships
+
+  clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
+                                 whole framework: load that runtime into this process, trust
+                                 every assembly of dir, execute app's Main -> its exit code.
+                                 No installed .NET is involved.  Plugin policy applies.
+  machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
+```
+
+- **`fn clr_run(dir: &str, app: &str, args: &[String]) -> Result<i32, String>`**
+  the runtime of dir runs app with args (no program name) on this thread
+
+- **`fn machine_reg_string(sub: &str, name: &str) -> Option<String>`**
+  a string value of HKLM\\sub
 
 ### `plat/linux.rs` (Linux)
 
@@ -28924,6 +28981,18 @@ GPU_BUF_FAILED: u32 = 3
 
 - **`fn win_release_kept(_w: i32)`**
 
+- **`fn win_gpu_child_later(_w: i32) -> bool`**
+  no child now, but it may come (the host or the next frame wakes the loop): only Android
+
+- **`fn win_gpu_child_alone(_w: i32) -> bool`**
+  the window still shows on its child alone: here always
+
+- **`fn gpu_out_state(_state: u32)`**
+  how the output came up (GPU_STATE_\*): Android keeps it across runs
+
+- **`fn gpu_thread_spawn(stack: usize, f: alloc::boxed::Box<dyn FnOnce() + Send>) -> Option<crate::Thread>`**
+  a thread for the output's jobs
+
 - **`fn win_in_sizemove() -> bool`**
 
 - **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
@@ -29081,6 +29150,10 @@ REQUEST_UNSAVED: u32 = 22
     Process one explicitly enabled agent request, returning its UTF-8 response.
   - `fn set_control_enabled(&mut self, _enabled: bool)`
     Synchronize runtime visibility and command state when the host changes activation.
+  - `fn surface_gone(&mut self) -> bool`
+    (Android) the surface of the GPU output went away -> a frame waits for the host's canvas.
+  - `fn gpu_test(&mut self, _op: u32) -> Option<String>`
+    (Android, tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
 
 - **`fn install(app: Box<dyn WebApplication>) -> bool`**
   Install the owned runtime. Returns false if an app is already registered.
@@ -29157,12 +29230,13 @@ REQUEST_UNSAVED: u32 = 22
   Cooperative yield is achieved by returning from the current runtime step.
 
 - **`struct Thread`**
-  Browser thread handle placeholder; spawning native threads is unsupported.
+  Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
+  output's jobs have threads of their own, android_gpu.rs).
 
 **`impl Thread`**
 
 - **`fn join(self)`**
-  No thread was started.
+  Wait for it (no thread was started in the browser).
 
 - **`fn thread_spawn(_stack: usize, _f: Box<dyn FnOnce() + Send>) -> Option<Thread>`**
   Reject native thread creation. Use Job for cooperative background work.
@@ -29261,6 +29335,14 @@ REQUEST_UNSAVED: u32 = 22
 - **`extern "C" fn jfgui_present_us() -> f64`**
   Microseconds spent presenting so far (present_time: the windows' copies, the composition,
   the hand-over to the host); for measurements.
+
+- **`extern "C" fn jfgui_present_frames() -> u64`**
+  (Android) frames shown so far, through the platform or the GPU (present_time).
+
+- **`extern "C" fn jfgui_gpu_test(op: u32) -> u32`**
+  (Android, tests) the GPU output: its counters as a line (GalleryGpuInstrumentation); op: 1 lose
+  the device, 2 settle, 3 the next frame draws everything.  -> the length, the bytes in the
+  response buffer.
 
 - **`extern "C" fn jfgui_tick(time_ms: u32)`**
   Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
@@ -29670,6 +29752,100 @@ the host's nativeEvent(E_WAKE)), the UI's UIC_SENSOR / UIC_LOCATION follow.
   The host's location: a state (LocationState as a number) or with state 2 a fix; NaN: the
   provider does not say; age_ms: how old the fix is now; source: 1 GPS, 2 network -> 1
 
+### `plat/android_gpu.rs`
+
+Source: [`lib/plat/android_gpu.rs`](../lib/plat/android_gpu.rs)
+
+```text
+android_gpu -- what the GPU layer and the UI's output through the GPU need of Android
+(lib/gpu vk_load.rs, vk_swap.rs; lib/ui/gpu_out.rs; docs/GPU.md "Ausgabe unter Android")
+
+  dl_open(name) / dl_sym(handle, name) / dl_close(handle)   libvulkan.so at run time: no
+                                     DT_NEEDED, the program starts on a phone without it
+  gpu_thread_spawn(stack, f)         a real thread for the output's jobs.  thread_spawn stays
+                                     None here: the pools and tasks of this target are cooperative
+                                     and start nothing behind the UI's back; nothing but the
+                                     output's jobs, which end by themselves, runs on these
+  win_gpu_child(w)                   the surface of the SurfaceView (ANativeWindow), the analogue
+                                     of Windows' child window; only for window 0 while nothing
+                                     else shows on the canvas (tool windows and popups are
+                                     composed on the CPU, below the surface)
+  win_gpu_child_later(w)             no surface now, a frame or the host brings it: not a reason
+                                     to give up, and nothing to poll for
+  win_gpu_child_show(w, show)        show: the frame is on the surface, the canvas path rests;
+                                     hide: the frame is on its way to the Bitmap, the host takes
+                                     the SurfaceView away (the surface goes with it)
+  win_release_kept(w)                the canvas's copy of the window goes
+
+The surface comes and goes with the system (GalleryActivity's SurfaceHolder.Callback, bridge.c):
+jfgui_gpu_surface(window) on the UI thread.  bridge.c owns the ANativeWindow reference; the
+VkSurfaceKHR takes its own, so a worker still building on a surface that went away gets errors,
+not a dangling pointer.
+```
+
+- **`fn dl_open(name: &str) -> Option<usize>`**
+  open a shared library (a name as the linker searches it, or a path) -> its handle
+
+- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+  a symbol of the library (name NUL-terminated) -> its address, 0 when missing
+
+- **`fn dl_close(handle: usize)`**
+  give the library back
+
+- **`fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread>`**
+  a real thread with stack bytes of stack (the output's jobs) -> its handle
+
+- **`struct NativeWindow`**
+  a target for swapchains: the ANativeWindow of the SurfaceView, with a reference of its own (a
+  worker may get to it after the surface went)
+  - `window: usize`
+
+- **`extern "C" fn jfgui_gpu_surface(window: usize) -> u32`**
+  (bridge.c) the surface came (an ANativeWindow) or went (0; nothing uses it when this returns)
+  -> 1: the frame waits to go to the canvas, the host renders once more
+
+- **`fn gpu_out_state(state: u32)`**
+  how the output came up: the host keeps it across runs, the program's resolution follows
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+  the surface for window w; None: see win_gpu_child_later
+
+- **`fn win_gpu_child_later(w: i32) -> bool`**
+  no surface for window w now, but it may come: the host or the next frame wakes the loop
+
+- **`fn win_gpu_child_alone(w: i32) -> bool`**
+  the window still shows on its surface alone: nothing else came on the canvas
+
+- **`fn win_gpu_child_show(w: i32, show: bool)`**
+  show: the window shows on the surface; hide: on the canvas, the surface goes
+
+- **`fn win_release_kept(w: i32)`**
+  the frame is on the surface: the canvas's copy of the window goes (it comes back whole)
+
+- **`fn win_in_sizemove() -> bool`**
+  no modal size loop here
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  one GPU, which drives the display
+
+- **`fn win_remote_session() -> bool`**
+  no remote sessions here
+
+```rust
+// the script command `gpu` (a script's real windows) has nothing to work with here: scripts run on
+// the desktop, this target has its own test (apps/androidGallery/tests/android_gpu.py)
+WT_NOANIM: u32 = 0
+WT_FROM_POINT: u32 = 0
+```
+
+- **`fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64`**
+
+- **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
+
+- **`fn gpu_wait(_deadline_us: u64)`**
+
 ### `plat/android_ime.rs`
 
 Source: [`lib/plat/android_ime.rs`](../lib/plat/android_ime.rs)
@@ -30065,6 +30241,15 @@ WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT
 WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT
 WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT
 WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT
+// gpu_out_state: how the UI's output through the GPU came up
+/// nothing known, nothing to remember
+GPU_STATE_UNKNOWN: u32 = 2
+/// the first start is about to run a driver
+GPU_STATE_TRYING: u32 = 3
+/// a window showed through the GPU
+GPU_STATE_OK: u32 = 4
+/// this system cannot: the CPU path for good
+GPU_STATE_NEVER: u32 = 5
 ```
 
 *clipboard formats*

@@ -61,6 +61,10 @@ app_{48,128,256}.png (tools/mkicon.py), styles/<style>/INFO (shown name, descrip
 WSL on Windows (jfgui_WSL_DISTRO, default Ubuntu-24.04). Payload layout:
 docs/PACKAGING.md (apps/installer/payload.rs reads it).
 
+pdn-host: PaintCraft's host for original paint.net plugins (build_rs.py, section "pdn-host") is
+built where the .NET SDK and paint.net exist and installed in pdn-host/ of the program folder; only
+our assembly, never paint.net's files.  A build machine without them packages PaintCraft without it.
+
 jxl-module: the loadable modules an app uses (build_rs.py APP_MODULES; PaintCraft: jxlenc, the
 JPEG XL writer) are built with its variants (one file for every style) and installed next to
 the exe: a PK_FILE entry of the setup (installed into the program folder, listed in
@@ -98,6 +102,7 @@ sys.path.insert(0, str(ROOT))
 from build_rs import APP_MODULES, module_file, app_notices  # noqa: E402  (jxl-module)
 from build_rs import app_bin_files  # noqa: E402  (app-bins)
 from build_rs import app_glibc, set_static_ui  # noqa: E402  (section "glibc")
+from build_rs import pdn_host_files  # noqa: E402  (section "pdn-host")
 from tools.host_exec import linux_path, run_linux
 STYLES = {"rs": ROOT / "styles", "asm": ROOT.parent / "legacy" / "ASMLIB" / "styles"}  # <style>/INFO
 WSL = ["wsl.exe", "-d", "Ubuntu-24.04"]
@@ -156,6 +161,10 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
             shutil.copyfile(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))
             for m in app_modules(app, t, "rs") + app_bins(app, t, "rs"):
                 shutil.copyfile(ROOT / rsout / t / m, ROOT / work / s / t / m)
+            for m in pdn_host_files(app, t):      # pdn-host: only when this machine could build it
+                if (ROOT / rsout / t / m).exists():
+                    (ROOT / work / s / t / m).parent.mkdir(exist_ok=True)
+                    shutil.copyfile(ROOT / rsout / t / m, ROOT / work / s / t / m)
 
 
 def app_modules(app, target, impl):
@@ -167,6 +176,11 @@ def app_bins(app, target, impl):
     """(app-bins) the app's further executables (apps/<App>/BINS), one file for every style,
     installed next to its exe (none for --impl asm)"""
     return app_bin_files(app, target) if impl == "rs" else []
+
+
+def app_host(app, target, work, style):
+    """(pdn-host) the plugin host's files in a variant's folder, when they were built"""
+    return [m for m in pdn_host_files(app, target) if (ROOT / work / style / target / m).exists()]
 
 
 def package_notices(styles, impl):
@@ -234,7 +248,7 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
         png = preview(ROOT / work / s / "win" / f"{app}.exe", ROOT / work / f"preview_{s}.png")
         entries.append((PK_PREVIEW, 0, s, label, png, len(png)))
     # jxl-module: the app's modules (the same file for every style) next to the exe
-    for m in app_modules(app, "win", impl) + app_bins(app, "win", impl):     # app-bins: installed alike
+    for m in app_modules(app, "win", impl) + app_bins(app, "win", impl) + app_host(app, "win", work, styles[0]):     # app-bins, pdn-host: installed alike
         data = (ROOT / work / styles[0] / "win" / m).read_bytes()
         entries.append((PK_FILE, PF_ZLIB, m, "", zlib.compress(data, 9), len(data)))
     for name, data in cross_files(app, meta, rsout, "linux"):    # app-bins: the other system's build
@@ -457,6 +471,7 @@ def sign_variants(app, styles, work, signing, impl):
     """Authenticode for every Windows exe variant and the files installed next to it"""
     files = [ROOT / work / s / "win" / f"{app}.exe" for s in styles]
     files += [ROOT / work / s / "win" / m for s in styles for m in app_modules(app, "win", impl) + app_bins(app, "win", impl)]
+    files += [ROOT / work / s / "win" / m for s in styles for m in app_host(app, "win", work, s) if m.endswith(".dll")]
     signing.windows([f for f in files if f.exists()])
 
 
@@ -476,7 +491,7 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
         files = []
         win = ROOT / work / s / "win"
         if (win / f"{app}.exe").exists():
-            extra = app_modules(app, "win", impl) + app_bins(app, "win", impl)
+            extra = app_modules(app, "win", impl) + app_bins(app, "win", impl) + app_host(app, "win", work, s)
             if extra:
                 bundle = assetpack.pack_files({f"{app}.exe": (win / f"{app}.exe").read_bytes(),
                                                **{m: (win / m).read_bytes() for m in extra}}, compress=False)
@@ -601,7 +616,7 @@ def make_job(app, meta, styles, dist, work, impl, rsout, targets):
         app=app, meta=meta, styles=styles, root=ROOT, dist=ROOT / dist, work=ROOT / work, impl=impl, pkg=pkg,
         version=meta.get("version", "0.1.0"),
         exe={s: {t: ROOT / work / s / t / exe_name(app, t) for t in targets} for s in styles},
-        extra={t: [(m, ROOT / work / styles[0] / t / m) for m in app_modules(app, t, impl) + app_bins(app, t, impl)]
+        extra={t: [(m, ROOT / work / styles[0] / t / m) for m in app_modules(app, t, impl) + app_bins(app, t, impl) + app_host(app, t, work, styles[0])]
                for t in ("win", "linux")},
         bins={t: app_bins(app, t, impl) for t in ("win", "linux")},
         cross={"linux": cross_files(app, meta, rsout if impl == "rs" else None, "win") if "linux" in targets else [],

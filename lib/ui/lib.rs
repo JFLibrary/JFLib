@@ -141,12 +141,12 @@ pub mod i18n;
 mod ids;
 // the output through a swapchain: Windows and Linux programs against glibc, their windows only
 // (docs/GPU.md "Ausgabe der UI"); static Linux programs, the browser and Android link no Vulkan
-#[cfg(any(windows, jfgui_glibc))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android"))]
 mod gpu_out;
-#[cfg(not(any(windows, jfgui_glibc)))]
+#[cfg(not(any(windows, jfgui_glibc, target_os = "android")))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
-#[cfg(any(windows, jfgui_glibc))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android"))]
 pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;

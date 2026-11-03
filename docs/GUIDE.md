@@ -1535,7 +1535,7 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=0`
-  (nothing of the GPU anywhere; on Windows and Linux the windows show their frames through the GPU by default;
+  (nothing of the GPU anywhere; on Windows, Linux and Android the windows show their frames through the GPU by default;
   GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
   `jfgui_GPU_TRACE=1` prints its stages, `jfgui_GPU_LAYERS=0` keeps one texture per window,
   `jfgui_GPU_IMAGES=0` keeps images on the CPU, `jfgui_GPU_IMAGE_MB=n` their budget), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
@@ -1559,6 +1559,9 @@ if (desc.render)(&args, &mut dst) == 0 {
   across a restart, the system's picker answered through UiAutomation, `content://`, the
   clipboard), the sensors and the location (`android_sensors.py --serial S`, also for a real
   phone: it says what to do); see [apps/androidGallery/README.md](../apps/androidGallery/README.md).
+  The output through the GPU: `android_gpu.py --serial S` (the swapchain, its life cycle, the fallback),
+  `apps/gputest/tests/android.py --serial S` (`gputest` as a program for `adb shell`); the suite runs
+  these two with `jfgui_TEST_ANDROID=S`.
 * Look at screenshots (`shot`) with an image viewer or the Read tool; test dark and light and
   150 %. Real windows: `python tools/wincap.py build/win/NAME.exe --out cap.png`,
   `python tools/wslcap.py --title T --out cap.png -- build/linux/NAME`.
@@ -1674,7 +1677,7 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
-* **Presenting through the GPU** (Windows and Linux, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
+* **Presenting through the GPU** (Windows, Linux and Android, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
   UI", "Ausgabe unter Linux"): the first frames, every frame of a resize and every window after a failure go the way below;
   otherwise the rectangles go into a texture and a swapchain shows it (Windows: on a child window; Linux: dma-bufs on the
   window itself, through JFLib's own Wayland and X11 code, no libwayland or libxcb), without
@@ -5221,8 +5224,9 @@ browser's `requestAnimationFrame`); all samples of a frame make one pass. Idle i
 While a finger scrolls, scroll copies (`scrollcopy.rs`) are taken whenever they are possible, flat cells
 too: the rest to draw stays small. On a Samsung SM-A566B (120 Hz) the start page went from 24 ms to
 11 ms a frame (`dumpsys gfxinfo`, the median), `nativeRender` from about 12 ms to about 6 ms:
-`apps/androidGallery/README.md` has the numbers. A debug APK started with the extra `jfgui_PERF` `1`
-logs `nativeRender` under the tag `jfgui-perf`.
+`apps/androidGallery/README.md` has the numbers (they are of the Bitmap path; the UI thread's numbers
+through the GPU and at the screen's whole resolution: GPU.md "Ausgabe unter Android"). A debug APK started with the extra
+`jfgui_PERF` `1` logs `nativeRender` under the tag `jfgui-perf`.
 
 In the browser `#input` has `inputmode="none"` under `pointer: coarse` until a text field has the focus,
 so a touch does not open the system's keyboard; on Android the keyboard follows a tap or a drag, not a

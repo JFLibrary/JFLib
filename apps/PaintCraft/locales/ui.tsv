@@ -288,6 +288,13 @@ Stilisieren	Stylize	Styliser
 Weichzeichnen	Blur	Flou
 Verzerren	Distort	Déformer
 (Keine kompatiblen Effekte gefunden)	(No compatible effects found)	(Aucun effet compatible trouvé)
+paint.net 5.1 ist nicht installiert	paint.net 5.1 is not installed	paint.net 5.1 n’est pas installé
+Der Plugin-Host fehlt in dieser Installation	The plugin host is missing from this installation	L’hôte de plugins manque dans cette installation
+Unter Linux nur über die Wine-Brücke	On Linux only through the Wine bridge	Sous Linux, uniquement par le pont Wine
+Plugins sind abgeschaltet	Plugins are turned off	Les plugins sont désactivés
+Plugins werden gesucht …	Looking for plugins …	Recherche des plugins …
+Die Plugin-Suche ist fehlgeschlagen	The plugin search failed	La recherche de plugins a échoué
+Keine Effekte geladen, siehe Einstellungen > Plugin-Fehler	No effects loaded, see Settings > Plugin errors	Aucun effet chargé, voir Paramètres > Erreurs des plugins
 PaintCraft wurde unerwartet beendet	PaintCraft quit unexpectedly	PaintCraft s’est arrêté de manière inattendue
 In die Zwischenablage kopieren	Copy to clipboard	Copier dans le presse-papiers
 Ordner der Absturzberichte öffnen	Open crash reports folder	Ouvrir le dossier des rapports d’incident
@@ -399,7 +406,7 @@ Integrierte Effekte, Dateiformate und Formen sind weiterhin verfügbar.	Built-in
 Alle Plugins wurden fehlerfrei geladen.	All plugins loaded without errors.	Tous les plugins ont été chargés sans erreur.
 Diese Plugins ließen sich nicht laden oder wurden nach einem Fehler abgeschaltet:	These plugins could not be loaded or were turned off after an error:	Ces plugins n’ont pas pu être chargés ou ont été désactivés après une erreur :
 Plugins werden beim Start aus den Ordnern Effects, FileTypes und Shapes neben PaintCraft geladen (Windows: *.dll, Linux: *.so).	Plugins are loaded at start from the folders Effects, FileTypes and Shapes next to PaintCraft (Windows: *.dll, Linux: *.so).	Les plugins sont chargés au démarrage depuis les dossiers Effects, FileTypes et Shapes à côté de PaintCraft (Windows : *.dll, Linux : *.so).
-Originale Paint.NET-DLLs werden unter Windows zusätzlich aus Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation erkannt. Nach dem Kopieren neu starten. ZIP-Dateien zuerst entpacken; Abhängigkeiten neben der DLL belassen. Moderne Bitmap-/GPU-Plugins werden als noch nicht unterstützt angezeigt.	Original Paint.NET DLLs are also found on Windows in Documents/PaintCraft App Files, Documents/Paint.NET App Files and the Paint.NET installation. Restart after copying. Unpack ZIP files first; keep dependencies next to the DLL. Modern bitmap/GPU plugins are shown as not supported yet.	Sous Windows, les DLL Paint.NET d’origine sont aussi détectées dans Documents/PaintCraft App Files, Documents/Paint.NET App Files et l’installation de Paint.NET. Redémarrez après la copie. Décompressez d’abord les fichiers ZIP ; laissez les dépendances à côté de la DLL. Les plugins modernes bitmap/GPU sont indiqués comme pas encore pris en charge.
+Originale Paint.NET-DLLs werden unter Windows zusätzlich aus Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation erkannt, auch in Unterordnern von Effects und FileTypes. Dafür muss Paint.NET 5.1 installiert sein. Nach dem Kopieren neu starten. ZIP-Dateien zuerst entpacken; Abhängigkeiten neben der DLL belassen.	Original Paint.NET DLLs are also found on Windows in Documents/PaintCraft App Files, Documents/Paint.NET App Files and the Paint.NET installation, including subfolders of Effects and FileTypes. This needs Paint.NET 5.1 to be installed. Restart after copying. Extract ZIP files first; keep dependencies next to the DLL.	Sous Windows, les DLL d’origine de Paint.NET sont aussi trouvées dans Documents/PaintCraft App Files, Documents/Paint.NET App Files et l’installation de Paint.NET, y compris les sous-dossiers de Effects et FileTypes. Paint.NET 5.1 doit être installé. Redémarrez après la copie. Décompressez d’abord les fichiers ZIP ; laissez les dépendances à côté de la DLL.
 Geladene Plugins	Loaded plugins	Plugins chargés
 (keine)	(none)	(aucun)
 Paletten	Palettes	Palettes

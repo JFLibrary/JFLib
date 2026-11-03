@@ -16,6 +16,50 @@ pub(crate) fn helper_path() -> String {
     option("--pdn-host", "PAINTCRAFT_PDN_HOST")
         .unwrap_or_else(|| format!("{dir}/pdn-host/PaintCraft.PdnHost.dll"))
 }
+pub(crate) fn gpu_choice() -> Option<String> {
+    option("--pdn-gpu", "PAINTCRAFT_PDN_GPU")
+}
+/// paint.net's folder: what the user named, then what its installer recorded, then the default
+#[cfg(windows)]
+fn install_dir() -> String {
+    option("--pdn-install", "PAINTDOTNET_DIR")
+        .or_else(|| plat::machine_reg_string("SOFTWARE\\paint.net", "TARGETDIR"))
+        .or_else(|| plat::env("ProgramFiles").map(|p| format!("{p}\\paint.net")))
+        .unwrap_or_default()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .into()
+}
+/// why original plugins cannot run here, in the words of the menu (None: nothing known against it)
+pub(crate) fn problem() -> Option<&'static str> {
+    if !configured() {
+        return Some("Unter Linux nur über die Wine-Brücke");
+    }
+    #[cfg(windows)]
+    if plat::file_exists(&format!("{}\\PaintDotNet.Effects.Core.dll", install_dir())) == 0 {
+        return Some("paint.net 5.1 ist nicht installiert");
+    }
+    if plat::file_exists(&helper_path()) == 0 {
+        return Some("Der Plugin-Host fehlt in dieser Installation");
+    }
+    None
+}
+/// `PaintCraft --pdn-clr <paint.net folder> <host dll> <host arguments>`: this process is the
+/// plugin host, on the runtime paint.net brings along (Invocation::new starts it)
+#[cfg(windows)]
+pub(crate) fn clr_main() -> Option<i32> {
+    let args = plat::args();
+    if args.get(1).map(String::as_str) != Some("--pdn-clr") {
+        return None;
+    }
+    let (Some(install), Some(host)) = (args.get(2), args.get(3)) else {
+        return Some(1);
+    };
+    Some(plat::clr_run(install, host, &args[4..]).unwrap_or_else(|e| {
+        plat::write_stderr(format!("{e}\n").as_bytes());
+        1
+    }))
+}
 #[cfg(target_os = "linux")]
 fn prefix() -> String {
     option("--pdn-wine-prefix", "WINEPREFIX")
@@ -39,33 +83,37 @@ struct Invocation {
 }
 impl Invocation {
     fn new(helper: &str, args: &[&str], heartbeat: &str) -> Result<Self, String> {
-        let mut env = alloc::vec![(String::from("DOTNET_ReadyToRun"), String::from("0"))];
         #[cfg(windows)]
         {
+            let install = install_dir();
             let apphost = helper.to_ascii_lowercase().ends_with(".exe");
-            let mut full = if apphost {
-                Vec::new()
+            let dotnet = option("--pdn-dotnet", "PAINTCRAFT_PDN_DOTNET");
+            let mut env = alloc::vec![(String::from("PAINTDOTNET_DIR"), install.clone())];
+            // paint.net brings the very runtime its images were compiled for, so a normal
+            // user needs no .NET installation and the images stay usable
+            let own_runtime = !apphost
+                && dotnet.is_none()
+                && plat::file_exists(&format!("{install}\\coreclr.dll")) != 0;
+            let (program, mut full) = if apphost {
+                (String::from(helper), Vec::new())
+            } else if own_runtime {
+                let exe = plat::current_exe().ok_or_else(|| String::from("Der Programmpfad ist unbekannt."))?;
+                (exe, alloc::vec![String::from("--pdn-clr"), install, String::from(helper)])
             } else {
-                alloc::vec![String::from(helper)]
+                env.push((String::from("DOTNET_ReadyToRun"), String::from("0")));
+                (dotnet.unwrap_or_else(|| String::from("dotnet")), alloc::vec![String::from(helper)])
             };
             full.extend(args.iter().map(|s| String::from(*s)));
             full.extend([String::from("--watchdog"), String::from(heartbeat)]);
-            if let Some(install) = option("--pdn-install", "PAINTDOTNET_DIR") {
-                env.push((String::from("PAINTDOTNET_DIR"), install));
-            }
             Ok(Self {
-                program: if apphost {
-                    String::from(helper)
-                } else {
-                    option("--pdn-dotnet", "PAINTCRAFT_PDN_DOTNET")
-                        .unwrap_or_else(|| String::from("dotnet"))
-                },
+                program,
                 args: full,
                 env,
             })
         }
         #[cfg(target_os = "linux")]
         {
+            let mut env = alloc::vec![(String::from("DOTNET_ReadyToRun"), String::from("0"))];
             let program = option("--pdn-wine", "PAINTCRAFT_PDN_WINE")
                 .ok_or_else(|| String::from("Linux-DLL-Brücke: --pdn-wine und eine Windows-.NET-/Paint.NET-Installation konfigurieren."))?;
             let cwd = plat::cwd();

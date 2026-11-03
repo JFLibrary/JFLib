@@ -1717,7 +1717,18 @@ Fensterrand hinaus.
   bei 1280 × 800 und rund 40 MiB RSS plus 25–50 MiB im Treiber, im Leerlauf nichts. Nicht getestet: AMD,
   die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, ein echter Treiber-Reset, die Validierungsschicht
   unter Linux, glibc vor 2.34, ein installiertes Paket auf einem System mit GPU.
-- **P2** · *fehlt* · G4c: Android (Vulkan über die C-Brücke, ohne Auflösungsgrenze).
+- **P2** · *erledigt* (2026-11-02) · G4c: Ausgabe unter Android ([GPU.md](GPU.md#ausgabe-unter-android)): dieselbe
+  Ausgabe wie unter Windows und Linux, mit Ebenen, Bildern und Leinwänden. `libvulkan.so` wird zur Laufzeit
+  geladen, die Swapchain liegt auf einem `SurfaceView` über der View mit ihrem Bitmap, die weiter Eingaben,
+  Tastatur und Barrierefreiheit nimmt. Standardmäßig an (`GPU_DEFAULT` in `GalleryActivity`), ohne Vulkan 1.1
+  bleibt alles beim Bitmap. Durch die GPU fällt die Auflösungsgrenze (`GPU_FULL_RESOLUTION`, 1080 × 2104 statt
+  768 × 1496 auf dem A56), der CPU-Pfad behält sie, weil er sie braucht. Ein Treiber, der das Programm beendet,
+  bekommt zwei Versuche (`files/gpu-state`). Geprüft auf dem Samsung A56 (Xclipse 540) und im Emulator.
+  Volle Auflösung kostet rund 100 MiB PSS mehr und hält dort beim Rollen 120 Hz, kleine Änderungen kommen
+  rund 8 ms früher an. Quer komponiert der Compositor auf der GPU (in einem Lauf 98 statt 118 von 120 Bildern beim
+  Rollen), `preTransform` ist nicht gebaut. Nicht getestet: Adreno, Mali, Vulkan 1.1, Android 8 und 9, schwache
+  Telefone, ein echter Treiber-Reset, ein echter Treiberabsturz, TalkBack auf dem GPU-Pfad, ein Lauf ohne die
+  Spiegelung von Android Studio, die Akkulaufzeit.
 - **P2** · *fehlt* · G4d: Browser (WebGPU, Shader direkt als WGSL).
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
   Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
@@ -1855,6 +1866,16 @@ Fensterrand hinaus.
 - **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend` ohne libc ist eigener
   Aufwand); heute macOS nur über das Web.
 - **P2** · *fehlt* · Native iOS-Version.
+- **P2** · *fehlt* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
+  den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
+  - Zu tun: Syscall-Nummern, Flags und Kernel-Layouts an einer Stelle (265 Stellen, geht schon ohne
+    ARM), Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
+    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete.
+  - NEON für `lib/simd` ist darin ARM6 und bringt auch Android etwas; die Arbeit nützt später auch
+    macOS und iOS auf ARM.
+  - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
+    braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter
   Speicher, System-Zwischenablage ([VFS.md](VFS.md) „Android“, GUIDE §5, §7, §8,
   [apps/androidGallery/README.md](../apps/androidGallery/README.md)).

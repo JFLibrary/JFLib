@@ -1,4 +1,7 @@
-/* Thin Android host for jfguiLib. No widget toolkit or WebView renders the gallery. */
+/* Thin Android host for jfguiLib. No widget toolkit or WebView renders the gallery.
+ * How a frame reaches the screen (docs/GPU.md "Ausgabe unter Android"): GalleryView's Bitmap (the CPU
+ * path; the first frames of every run), or a Vulkan swapchain on the SurfaceView above it (gpuView:
+ * lib/ui/gpu_out.rs, lib/plat/android_gpu.rs, bridge.c). */
 package org.jflib.gallery;
 
 import android.app.Activity;
@@ -9,6 +12,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,6 +22,8 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.KeyCharacterMap;
 import android.view.MotionEvent;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -31,8 +37,20 @@ import android.widget.FrameLayout;
 import java.nio.charset.StandardCharsets;
 
 public final class GalleryActivity extends Activity {
+    // The UI through the GPU where the device has Vulkan 1.1 (off: the Bitmap alone, no driver is
+    // loaded); these two lines decide, docs/GPU.md "Ausgabe unter Android" has the measurements
+    private static final boolean GPU_DEFAULT = true;
+    // With it, the view's whole resolution; off: the resolution the Bitmap path has (see scale())
+    private static final boolean GPU_FULL_RESOLUTION = true;
+    // What is largest on the way to the screen: a Bitmap's limit in bridge.c, a swapchain's in old systems
+    private static final int MAX_SIDE = 4096;
+
     static { System.loadLibrary("jfgui_android"); }
     static native int nativeRender(Bitmap bitmap, int dpi, boolean newSurface);
+    // the SurfaceView's surface, null when it went -> a frame waits to go to the Bitmap
+    private static native boolean nativeGpuSurface(android.view.Surface surface);
+    // (tests) the GPU output's counters; op 1 loses the device, 2 settles, 3 asks for a full frame
+    static native byte[] nativeGpuTest(int op);
     private static native int nativeFrameDelay();
     private static native long nativePresentUs();
     static native byte[] nativeEditorState();
@@ -42,7 +60,7 @@ public final class GalleryActivity extends Activity {
     private static native boolean nativeIme();
     // a raw finger, phase 0 down, 1 move, 2 up, 3 cancel: pan, fling, tap and long press are decided
     // in Rust (lib/ui/touch.rs)
-    private static native void nativeFinger(int phase, int id, int x, int y, long time, boolean last);
+    static native void nativeFinger(int phase, int id, int x, int y, long time, boolean last);
     // the gesture that just ended reached a widget (a tap, a drag), it did not only scroll
     private static native boolean nativeFingerReached();
     // the accessibility tree (GalleryAccessibility): mirror on / off, its updates, an action
@@ -51,6 +69,13 @@ public final class GalleryActivity extends Activity {
     static native void nativeA11yAct(int win, int keyLo, int keyHi, int act, int a, int b, double value, byte[] text);
     private GalleryView gallery;
     private static GalleryActivity current;
+    private SurfaceView gpuView;
+    // the frames fill the view's pixels (else scale()'s limit): the device is expected to show them
+    // through the GPU, see gpuPlan
+    private static boolean fullResolution;
+    // what the GPU did is kept across runs (not for runs a test forced)
+    private static boolean gpuRemember;
+    private static int gpuTries;
     /** A frame now: what a sensor or a fix changed (GallerySensors, GallerySystem.back). */
     static void frameNow() {
         if (current != null && current.gallery != null) current.gallery.requestFrame();
@@ -60,6 +85,104 @@ public final class GalleryActivity extends Activity {
         if (current == null || current.gallery == null) return;
         current.gallery.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
         current.gallery.performLongClick();
+    }
+
+    // ---- the UI through the GPU
+
+    static final int CALL_GPU = 60; // lib/plat/android_gpu.rs
+    private static final int GPU_HIDE = 0, GPU_SHOW = 1, GPU_UNKNOWN = 2, GPU_TRYING = 3, GPU_OK = 4, GPU_NEVER = 5;
+    private static final String GPU_FILE = "gpu-state";
+
+    /* Rust's question on the UI thread: the SurfaceView (the system may call back at once from
+     * setVisibility while Rust holds the app: hence post), how the output came up. */
+    static byte[] gpuCall(byte[] in) {
+        GalleryActivity a = current;
+        if (a == null || in == null || in.length != 1) return null;
+        switch (in[0]) {
+            case GPU_HIDE:
+            case GPU_SHOW:
+                if (a.gpuView != null) {
+                    int visibility = in[0] == GPU_SHOW ? View.VISIBLE : View.INVISIBLE;
+                    a.gpuView.post(() -> { if (a.gpuView.getVisibility() != visibility) a.gpuView.setVisibility(visibility); });
+                }
+                break;
+            case GPU_NEVER:
+                a.gpuRemember(GPU_NEVER, 0);
+                if (fullResolution) { // a frame of the size the Bitmap path has
+                    fullResolution = false;
+                    if (a.gallery != null) a.gallery.post(a.gallery::rescale);
+                }
+                if (a.gpuView != null) a.gpuView.post(() -> a.gpuView.setVisibility(View.GONE));
+                break;
+            case GPU_TRYING: a.gpuRemember(GPU_TRYING, gpuTries + 1); break;
+            case GPU_OK: a.gpuRemember(GPU_OK, 0); break;
+            default: a.gpuRemember(GPU_UNKNOWN, 0); break;
+        }
+        return new byte[0];
+    }
+    // "the system's build\nok|never|trying N": a new system gets a new chance
+    private void gpuRemember(int state, int tries) {
+        if (!gpuRemember) return;
+        java.io.File f = new java.io.File(getFilesDir(), GPU_FILE);
+        if (state == GPU_UNKNOWN) { f.delete(); return; }
+        String word = state == GPU_OK ? "ok" : state == GPU_NEVER ? "never" : "trying " + tries;
+        GalleryHost.write(f, (Build.FINGERPRINT + "\n" + word).getBytes(StandardCharsets.UTF_8));
+    }
+    private String gpuRemembered() {
+        try {
+            byte[] all = java.nio.file.Files.readAllBytes(new java.io.File(getFilesDir(), GPU_FILE).toPath());
+            String[] lines = new String(all, StandardCharsets.UTF_8).split("\n");
+            return lines.length == 2 && lines[0].equals(Build.FINGERPRINT) ? lines[1] : "";
+        } catch (java.io.IOException | RuntimeException e) {
+            return "";
+        }
+    }
+    /* Before the first frame: is the output wanted, and at which resolution do the frames start.
+     * Off without Vulkan 1.1 in the system's features (no driver is touched), when the last run found
+     * it unusable, or when two runs in a row died while it came up (a broken driver).  debug builds:
+     * the extra jfgui_GPU=0|1 forces it, jfgui_GPU_RES=cap|full the resolution. */
+    private void gpuPlan(Bundle extras) {
+        String forced = extras != null ? extras.getString("jfgui_GPU") : null;
+        String res = extras != null ? extras.getString("jfgui_GPU_RES") : null;
+        boolean on;
+        if (forced != null) {
+            on = !forced.equals("0") && !forced.equalsIgnoreCase("off");
+        } else {
+            on = GPU_DEFAULT && getPackageManager().hasSystemFeature(
+                android.content.pm.PackageManager.FEATURE_VULKAN_HARDWARE_VERSION, (1 << 22) | (1 << 12));
+            String known = on ? gpuRemembered() : "";
+            if (known.equals("never")) on = false;
+            else if (known.startsWith("trying ")) {
+                try { gpuTries = Integer.parseInt(known.substring(7)); } catch (NumberFormatException e) { gpuTries = 2; }
+                if (gpuTries >= 2) on = false;
+            }
+        }
+        gpuRemember = forced == null && (extras == null || extras.getString("jfgui_GPU_DLL") == null);
+        if (gpuRemember && gpuTries >= 2) gpuRemember(GPU_NEVER, 0);
+        env("jfgui_GPU", on ? "1" : "0");
+        fullResolution = "full".equals(res) || (!"cap".equals(res) && on && GPU_FULL_RESOLUTION);
+        if (!on) return;
+        // above the window's contents, nothing to see until its first present; the View below takes the input
+        gpuView = new SurfaceView(this);
+        gpuView.setZOrderOnTop(true);
+        gpuView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        gpuView.getHolder().setFormat(PixelFormat.RGBX_8888);
+        gpuView.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override public void surfaceCreated(SurfaceHolder holder) {}
+            @Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                nativeGpuSurface(holder.getSurface());
+                if (gallery != null) gallery.requestFrame();
+            }
+            @Override public void surfaceDestroyed(SurfaceHolder holder) {
+                if (nativeGpuSurface(null) && gallery != null) gallery.renderNow();
+            }
+        });
+    }
+    // the surface's buffers: the frame's size (the compositor scales them to the view)
+    private void gpuSize(int frameWidth, int frameHeight, int width, int height) {
+        if (gpuView == null) return;
+        if (frameWidth == width && frameHeight == height) gpuView.getHolder().setSizeFromLayout();
+        else gpuView.getHolder().setFixedSize(frameWidth, frameHeight);
     }
 
     private static native void nativeEnv(byte[] entry);
@@ -118,12 +241,17 @@ public final class GalleryActivity extends Activity {
         env("jfgui_ANDROID_CACHE", getCacheDir().getAbsolutePath());
         // debug builds: jfgui_* string extras of the start intent as settings (self-tests)
         Bundle extras = getIntent() != null ? getIntent().getExtras() : null;
-        if (extras != null && (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+        boolean debuggable = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (extras != null && debuggable) {
             for (String key : extras.keySet()) {
                 String value = key.startsWith("jfgui_") ? extras.getString(key) : null;
                 if (value != null) env(key, value);
             }
         }
+        gpuPlan(debuggable ? extras : null);
+        // (android_gpu.py: both paths on a turned display, compared from outside; the activity's own wish)
+        if (debuggable && extras != null && "1".equals(extras.getString("jfgui_TEST_LANDSCAPE")))
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
             | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         FrameLayout root = new FrameLayout(this);
@@ -140,6 +268,7 @@ public final class GalleryActivity extends Activity {
             root.setFitsSystemWindows(true);
         }
         gallery = new GalleryView(this);
+        if (gpuView != null) root.addView(gpuView, new FrameLayout.LayoutParams(-1, -1));
         root.addView(gallery, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         if (Build.VERSION.SDK_INT >= 30) {
@@ -244,19 +373,31 @@ public final class GalleryActivity extends Activity {
             Choreographer.getInstance().removeFrameCallback(this);
             Choreographer.getInstance().postFrameCallback(this);
         }
+        // library px per view px.  The Bitmap path keeps what it could always compute: at most 2 px per
+        // DIP and 2048 px on the longer side; through the GPU the view's own pixels
+        private float scale(int width, int height, float density) {
+            if (fullResolution) return Math.min(1f, (float)MAX_SIDE / Math.max(width, height));
+            return Math.min(Math.min(1f, 2f / density), 2048f / Math.max(width, height));
+        }
+        void rescale() {
+            if (getWidth() > 0 && getHeight() > 0) onSizeChanged(getWidth(), getHeight(), getWidth(), getHeight());
+        }
         @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
             if (width <= 0 || height <= 0) return;
             float density = getResources().getDisplayMetrics().density;
-            renderScale = Math.min(1f, 2f / density);
-            renderScale = Math.min(renderScale, 2048f / Math.max(width, height));
+            renderScale = scale(width, height, density);
             dpi = Math.max(48, Math.round(96 * density * renderScale));
             // Android reclaims the old Bitmap after any in-flight hardware Canvas releases it.
             frame = Bitmap.createBitmap(Math.max(1, Math.round(width * renderScale)),
                 Math.max(1, Math.round(height * renderScale)), Bitmap.Config.ARGB_8888);
             dest.set(0, 0, width, height);
             newSurface = true;
+            GalleryActivity a = (GalleryActivity)getContext();
+            a.gpuSize(frame.getWidth(), frame.getHeight(), width, height);
             requestFrame();
         }
+        // the system took the surface: the frame in the Bitmap, the window may be seen again before the next
+        void renderNow() { render(); }
         private void render() {
             if (frame != null && failure == null) {
                 long start = perf != null ? System.nanoTime() : 0;
@@ -264,7 +405,7 @@ public final class GalleryActivity extends Activity {
                 if (perf != null && status > 0) perfAdd(System.nanoTime() - start);
                 newSurface = false;
                 if (status < 0) failure = "jfgui konnte nicht starten (" + status + ").";
-                if (status != 0) invalidate();
+                if (status != 0 && status != 2) invalidate(); // (2: through the GPU, the Bitmap rests)
             }
         }
         // debug builds with the extra jfgui_PERF=1: how long nativeRender takes on frames that

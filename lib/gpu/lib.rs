@@ -1,8 +1,8 @@
 // gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
-// Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
-// vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: Android, WebGPU in the browser, Metal; they provide
-// the same types and methods.
+// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows, on Linux,
+// there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
+// loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: WebGPU
+// in the browser, Metal; they provide the same types and methods.
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader

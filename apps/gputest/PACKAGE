@@ -2,7 +2,7 @@
 display=GPU-Test
 version=0.1.0
 publisher=JFLib
-summary=Selbsttests der GPU-Schicht (lib/gpu): Vulkan unter Windows und Linux
+summary=Selbsttests der GPU-Schicht (lib/gpu): Vulkan unter Windows, Linux und Android
 description=GPU-Test: Adapter, Rechen-Shader, Kopien, Grafik mit Tiefentest, indirekte Aufrufe, Zeitstempel, ein Fenster mit Swapchain und die Messszene mit bis zu einer Million Würfeln; die Testanwendung von lib/gpu.
 generic=GPU-Test
 categories=Development;

@@ -190,8 +190,8 @@ IME composition display; English and French UI catalogs are available with Germa
 fallback for untranslated strings. High-depth imports are converted to its 8-bit
 SDR canvas. The [handbook comparison](apps/PaintCraft/docs/MANUAL_PARITY.md) lists
 tested behavior and the remaining Photoshop, HDR and plugin limitations.
-The optional classic Paint.NET DLL host now also connects to native Linux PaintCraft
-through Wine. Brush Factory / Dynamic Draw JSON and legacy XML presets can be
+The Paint.NET DLL host runs classic, v5 CPU and GPU effects on Windows and also connects to
+native Linux PaintCraft through Wine. Brush Factory / Dynamic Draw JSON and legacy XML presets can be
 imported for supported controls, with unsupported active parameters reported explicitly.
 See the [Wine setup](tools/paintcraft-pdn-host/README.md#linuxwine-setup) and
 [preset guide](apps/PaintCraft/docs/CREATIVE_TOOLS.md#brush-factory--dynamic-draw-presets).
@@ -626,6 +626,7 @@ For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
 | [Changelog](CHANGELOG.md) | What changed in each release of the library |
 | [Roadmap](docs/ROADMAP.md) | What the library still lacks, with priorities (German) |
 | [Linux test plan](docs/LINUX_TESTPLAN.md) | What is checked on real Linux desktops and what is still to check on KDE, GNOME and X11 (German) |
+| [ARM64 plan](docs/ARM64.md) | The planned port to ARM64 on Windows and Linux: milestones, traps, how it is tested (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [PaintCraft plugins](plugins/README.md) | Native plugins and plugin builds |

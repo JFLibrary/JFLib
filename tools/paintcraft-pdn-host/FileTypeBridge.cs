@@ -1,6 +1,12 @@
 using System.IO;
 using PaintDotNet;
 
+// What IFileTypeFactory2 hands its file types: the same services effects get.
+internal sealed class FileTypeHost:IFileTypeHost
+{
+    public IServiceProvider Services { get; }=new HostServices(false);
+}
+
 internal static class FileTypeBridge
 {
     const uint Magic=0x4D494350; // PCIM: width, height, DPI x/y (16.16), original layer count, BGRA
@@ -8,8 +14,12 @@ internal static class FileTypeBridge
     {
         var assembly=PluginCatalog.Load(args[0]);
         var key=args[1].Split('#');
-        var instance=Activator.CreateInstance(assembly.GetType(key[0],true)!)!;
-        var ft=instance is IFileTypeFactory factory ? factory.GetFileTypeInstances()[int.Parse(key[1])] : (FileType)instance;
+        var instance=Activator.CreateInstance(assembly.GetType(key[0],true)!,true)!;
+        var ft=instance switch {
+            IFileTypeFactory factory=>factory.GetFileTypeInstances()[int.Parse(key[1])],
+            IFileTypeFactory2 factory=>factory.GetFileTypeInstances(new FileTypeHost())[int.Parse(key[1])],
+            _=>(FileType)instance
+        };
         if(args.Contains("--decode")) {
             using var document=ft.Load(new MemoryStream(data,false));
             CheckSize(document.Width,document.Height);

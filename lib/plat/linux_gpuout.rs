@@ -102,6 +102,24 @@ pub fn win_gpu_child_show(_w: i32, _show: bool) {}
 
 pub fn win_release_kept(_w: i32) {}
 
+/// no child now, but it may come (the host or the next frame wakes the loop): only Android
+pub fn win_gpu_child_later(_w: i32) -> bool {
+    false
+}
+
+/// the window still shows on its child alone: here always
+pub fn win_gpu_child_alone(_w: i32) -> bool {
+    true
+}
+
+/// how the output came up (GPU_STATE_*): Android keeps it across runs
+pub fn gpu_out_state(_state: u32) {}
+
+/// a thread for the output's jobs
+pub fn gpu_thread_spawn(stack: usize, f: alloc::boxed::Box<dyn FnOnce() + Send>) -> Option<crate::Thread> {
+    crate::thread_spawn(stack, f)
+}
+
 pub fn win_in_sizemove() -> bool {
     false
 }

@@ -18,6 +18,12 @@ static EFFECTS: SpinLock<Vec<Entry>> = SpinLock::new(Vec::new());
 static FILES: SpinLock<Vec<Entry>> = SpinLock::new(Vec::new());
 static MESSAGES: SpinLock<Vec<String>> = SpinLock::new(Vec::new());
 static SHAPES: SpinLock<Vec<(String, String)>> = SpinLock::new(Vec::new());
+/// the folder shapes_feed last ran for, so a late search can add its shapes
+static SHAPES_FOLDER: SpinLock<Option<String>> = SpinLock::new(None);
+/// a plugin search runs (the script `sync` waits for it)
+pub(crate) static SEARCHING: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+/// why the menu has no effects, in the catalogue's words ("": its placeholder, nothing compatible)
+static STATUS: SpinLock<&'static str> = SpinLock::new("");
 
 pub(crate) fn messages() -> Vec<String> {
     MESSAGES.lock().clone()
@@ -62,6 +68,29 @@ pub(crate) fn states(p: &mut Pn, ui: &mut Ui) {
             },
         );
     }
+    let status = *STATUS.lock();
+    ui.menu_list_empty(FIRST, crate::preferences::localization::tr(status));
+}
+/// the plugin search of a normal start reports here
+pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        let Some(job) = p.pdn.scan.clone() else {
+            return;
+        };
+        ui.timer(0x5118, 100);
+        let Some(result) = job.result.lock().take() else {
+            return;
+        };
+        if let Some(worker) = p.pdn.scan_worker.take() {
+            worker.join();
+        }
+        p.pdn.scan = None;
+        apply(p, ui, result, true);
+        SEARCHING.store(false, core::sync::atomic::Ordering::Release);
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let _ = (p, ui);
 }
 pub(crate) fn command(p: &mut Pn, ui: &mut Ui, id: u32, _: u32) -> bool {
     if !(FIRST..=LAST).contains(&id) {
@@ -119,13 +148,15 @@ pub(crate) fn init(p: &mut Pn, ui: &mut Ui) {
 }
 #[cfg(any(windows, target_os = "linux"))]
 fn init_desktop(p: &mut Pn, ui: &mut Ui) {
-    if !super::transport::configured() || plat::args().iter().any(|s| s == "--no-plugins") {
+    if plat::args().iter().any(|s| s == "--no-plugins") {
+        *STATUS.lock() = "Plugins sind abgeschaltet";
+        return;
+    }
+    if let Some(problem) = super::transport::problem() {
+        *STATUS.lock() = problem;
         return;
     }
     let helper = crate::integrations::paint_dot_net::host::helper_path();
-    if plat::file_exists(&helper) == 0 {
-        return;
-    }
     let root = crate::integrations::plugins::root(p);
     if root.is_empty() {
         return; // no plugin root (the executable folder is unknown): the host must not fall back to the current directory
@@ -135,24 +166,74 @@ fn init_desktop(p: &mut Pn, ui: &mut Ui) {
     if let Some(root) = explicit.as_deref() {
         args.extend_from_slice(&["--root", root]);
     }
-    if plat::args().iter().any(|s| s == "--pdn-isolated") {
+    let isolated = plat::args().iter().any(|s| s == "--pdn-isolated");
+    if isolated {
         args.push("--isolated");
     }
-    let data = match crate::integrations::paint_dot_net::host::exchange(
-        &helper,
-        &args,
-        &[],
-        4_000_000,
-        60_000,
-        || false,
-    ) {
+    // Named plugin folders are asked for now, so a file given to this start can use their
+    // formats. Otherwise the search must not hold up the window: many plugins take seconds.
+    // (--pdn-background: a named folder the way a normal start searches, for the tests)
+    let background = plat::args().iter().any(|s| s == "--pdn-background");
+    if (isolated || explicit.is_some()) && !background {
+        let result = crate::integrations::paint_dot_net::host::exchange(
+            &helper,
+            &args,
+            &[],
+            4_000_000,
+            60_000,
+            || false,
+        );
+        apply(p, ui, result, false);
+    } else if background || (plat::arg_value("--script").is_none() && plat::arg_value("--shot").is_none()) {
+        // (test scripts stay independent of what this machine has installed)
+        let args: Vec<String> = args.iter().map(|s| String::from(*s)).collect();
+        search_in_background(p, helper, args);
+    }
+}
+#[cfg(any(windows, target_os = "linux"))]
+fn search_in_background(p: &mut Pn, helper: String, args: Vec<String>) {
+    use crate::integrations::paint_dot_net::host::{SharedJob, exchange};
+    use core::sync::atomic::{AtomicBool, Ordering};
+    let job = alloc::sync::Arc::new(SharedJob {
+        stop: AtomicBool::new(false),
+        result: SpinLock::new(None),
+    });
+    let worker_job = job.clone();
+    let worker = plat::thread_spawn(
+        0,
+        alloc::boxed::Box::new(move || {
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            let result = exchange(&helper, &args, &[], 4_000_000, 60_000, || {
+                worker_job.stop.load(Ordering::Acquire)
+            });
+            *worker_job.result.lock() = Some(result);
+            plat::wake();
+        }),
+    );
+    if worker.is_none() {
+        error(String::from("Der Thread der Plugin-Suche konnte nicht gestartet werden."));
+        *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen";
+        return;
+    }
+    *STATUS.lock() = "Plugins werden gesucht …";
+    SEARCHING.store(true, Ordering::Release);
+    p.pdn.scan = Some(job);
+    p.pdn.scan_worker = worker;
+}
+/// the rows of a finished search into the menu, the file formats and the shapes
+#[cfg(any(windows, target_os = "linux"))]
+fn apply(p: &mut Pn, ui: &mut Ui, result: Result<Vec<u8>, String>, late: bool) {
+    let data = match result {
         Ok(data) => data,
         Err(e) => {
             error(e);
+            *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen";
+            ui.repass();
             return;
         }
     };
     let text = String::from_utf8_lossy(&data);
+    let mut found = Vec::new();
     for row in text.lines() {
         let fields: Vec<_> = row.split('\t').collect();
         if fields.len() != 6 {
@@ -182,18 +263,7 @@ fn init_desktop(p: &mut Pn, ui: &mut Ui) {
             caps,
         };
         match fields[0] {
-            "E" => {
-                let mut effects = EFFECTS.lock();
-                if effects.len() >= 128 {
-                    error(String::from("Maximal 128 Original-Effekte"));
-                    continue;
-                }
-                let id = FIRST + effects.len() as u32;
-                let name = entry.name.replace('&', "&&").leak();
-                p.cmds.push(Command::new(id, name, 0, 0, 0, CF_DISABLED));
-                p.cmds_dirty = true;
-                effects.push(entry);
-            }
+            "E" => found.push(entry),
             "F" => register_file(entry, &exts),
             "S" => {
                 if SHAPES.lock().len() < 128 {
@@ -204,11 +274,42 @@ fn init_desktop(p: &mut Pn, ui: &mut Ui) {
             _ => error(String::from("Unbekannte Plugin-Kategorie")),
         }
     }
-    let names: Vec<String> = EFFECTS.lock().iter().map(|e| e.name.clone()).collect();
+    // Alphabetical: the search order follows folders, and packs bring dozens of effects.
+    found.sort_by_key(|e| e.name.to_lowercase());
+    if found.len() > 128 {
+        error(String::from("Maximal 128 Original-Effekte"));
+        found.truncate(128);
+    }
+    let mut names = Vec::with_capacity(found.len());
+    {
+        let mut effects = EFFECTS.lock();
+        for entry in found {
+            let id = FIRST + effects.len() as u32;
+            let name = entry.name.replace('&', "&&");
+            names.push(name.clone());
+            p.cmds.push(Command::new(id, name.leak(), 0, 0, 0, CF_DISABLED));
+            p.cmds_dirty = true;
+            effects.push(entry);
+        }
+    }
     ui.menu_list(FIRST, &names);
+    *STATUS.lock() = if !names.is_empty() || MESSAGES.lock().is_empty() {
+        ""
+    } else {
+        "Keine Effekte geladen, siehe Einstellungen > Plugin-Fehler"
+    };
+    if late {
+        crate::integrations::file_io::build_filters(&mut p.fio);
+        let folder = SHAPES_FOLDER.lock().clone();
+        if let Some(folder) = folder {
+            shapes_feed(p, &folder);
+        }
+    }
+    ui.repass();
 }
 
 pub(crate) fn shapes_feed(p: &mut Pn, primary_dir: &str) {
+    *SHAPES_FOLDER.lock() = Some(String::from(primary_dir));
     let canonical = |s: &str| s.replace('\\', "/").to_ascii_lowercase();
     let primary = canonical(&if primary_dir.as_bytes().get(1) == Some(&b':')
         || primary_dir.starts_with('/')

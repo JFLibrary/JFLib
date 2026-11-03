@@ -216,7 +216,7 @@ pub fn run(t: &mut T, g: &Gpu, c: &Config) -> Option<Report> {
     let mut rep = Report { frames: c.frames, timestamps: dev.features().timestamps, ..Report::default() };
     let mut last_t = 0.0f32;
     let scene;
-    if c.window.is_some() && !dev.features().swapchain {
+    if c.window.is_some() && !crate::windows(&dev) {
         t.fail("--window: no swapchains on this device");
         return None;
     }

@@ -1,0 +1,132 @@
+# v5 effects of tools/paintcraft-pdn-host/tests/EffectFixture.cs through Effekte > Paint.NET-Plugins.
+# The runner names the fixture folder: --pdn-plugins <root> --pdn-isolated --pdn-defaults
+# (tools/paintcraft_manual_check.py --pdn-host). The DLL lies in a subfolder of Effects.
+# Every effect starts a process: on a busy machine that outlasts sync's default 10 seconds.
+size 1280 800
+theme light
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+
+# A CPU effect: result, one undo step with its name, redo.
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Bitmap"
+sync 60000
+expect window 24800 closed
+cmd 901 65537
+expect #9900 text "FF000000"
+expect #4391 text "Paint.NET-Plugin"
+key ctrl+z
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+key ctrl+y
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+
+# A GPU effect, the same way.
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture GPU Image"
+sync 60000
+expect window 24800 closed
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+
+# The other kinds: floating-point output, a form with its own token, no token at all,
+# imperative GPU drawing. All turn this white image black.
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Bitmap Float"
+sync 60000
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Bitmap Form"
+sync 60000
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Bitmap Plain"
+sync 60000
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture GPU Drawing"
+sync 60000
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+
+# A registered pixel shader: paint.net's brightness at its minimum darkens without clipping to black.
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture GPU Shader"
+sync 60000
+cmd 901 65537
+expect #9900 text "FFCDCDCD"
+key ctrl+z
+
+# Both kinds see a selection; PaintCraft keeps its fractional coverage at the edge.
+cmd 982 2621500
+cmd 983 13107460
+cmd 984 0
+cmd 981 1
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Bitmap"
+sync 60000
+cmd 901 655370
+expect #9900 text "FFFFFFFF"
+cmd 901 7864480
+expect #9900 text "FF000000"
+cmd 901 4128998
+expect #9900 text "FF484848"
+key ctrl+z
+cmd 901 7864480
+expect #9900 text "FFFFFFFF"
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture GPU Image"
+sync 60000
+cmd 901 655370
+expect #9900 text "FFFFFFFF"
+cmd 901 7864480
+expect #9900 text "FF000000"
+cmd 901 4128998
+expect #9900 text "FF484848"
+key ctrl+z
+cmd 901 7864480
+expect #9900 text "FFFFFFFF"
+cmd 981 0
+
+# Cancelling ends the separate process while the effect still renders; nothing changes.
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Slow Bitmap"
+expect window 24800 open
+wait 800
+click #0x90020
+sync 60000
+expect window 24800 closed
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+click menuitem:"Fixture Slow GPU"
+expect window 24800 open
+wait 800
+click #0x90020
+sync 60000
+expect window 24800 closed
+cmd 901 65537
+expect #9900 text "FFFFFFFF"

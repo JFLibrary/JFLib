@@ -339,7 +339,7 @@ pub fn scene(t: &mut T) {
 pub fn bench_smoke(t: &mut T) {
     let Some(g) = setup(t) else { return };
     let n = if t.validate { 5000 } else { 20_000 };
-    let swap = g.dev.features().swapchain;
+    let swap = crate::windows(&g.dev);
     for (mode, window, shaders) in [(Mode::Indirect, None, Shaders::Spirv), (Mode::Single, None, Shaders::Spirv),
                                     (Mode::Indirect, Some(PresentMode::Fifo), Shaders::Spirv),
                                     (Mode::Single, Some(PresentMode::Immediate), Shaders::Spirv), (Mode::Indirect, None, Shaders::WGSL),
