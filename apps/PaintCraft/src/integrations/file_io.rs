@@ -439,6 +439,10 @@ fn file_part(path: &str) -> &str {
 // silently shortened path, which would name another file)
 const PATH_LONG: usize = 32768;
 fn canon_path(src: &str) -> String {
+    // a document of Android's picker: a name, not a path (its "//" and segments stay)
+    if src.starts_with("content://") {
+        return String::from(src);
+    }
     let s = src.as_bytes();
     let abs = matches!(s.first(), None | Some(b'/') | Some(b'\\')) || s.get(1) == Some(&b':');
     let t = if abs { String::from(src) } else { format!("{}/{}", plat::cwd(), src) };
@@ -520,7 +524,7 @@ pub(crate) fn fio_open_path(p: &mut Pn, ui: &mut Ui, path: &str) -> i32 {
 }
 
 fn decode_open(data: &[u8], path: &str, cancel: Option<&AtomicU32>) -> Result<LoadedImage, i32> {
-    let hint = img_core::io::format_from_path(path);
+    let hint = img_core::io::format_from_path(&plat::display_name(path));
     let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, cancel, maxmem: img_mem_budget(), ..ImgDec::default() };
     if dec.cancelled() { return Err(img_core::ERR_CANCEL); }
     if data.starts_with(b"8BPS") {
@@ -566,11 +570,12 @@ fn install_open(p: &mut Pn, ui: &mut Ui, image: LoadedImage, path: &str) -> i32 
 }
 
 /// Interactive open: serialize reads/decodes off the UI thread; commit complete results only.
-/// Startup uses fio_open_path before normal interaction. Scalar WebAssembly has no worker threads.
+/// Startup uses fio_open_path before normal interaction. Scalar WebAssembly and Android have no
+/// worker threads (plat::thread_spawn answers None).
 pub(crate) fn fio_queue_path(p: &mut Pn, ui: &mut Ui, path: &str) {
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     { fio_open_path(p, ui, path); return; }
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     {
         let path = canon_path(path);
         let existing = doc_find_path(&p.doc, &path);
@@ -958,7 +963,7 @@ fn recent_add_p(p: &mut Pn, path: &str) {
 fn recent_labels(p: &mut Pn) {
     for i in 0..p.fio.recent.len() {
         let mut l: Vec<u8> = if i < 9 { format!("&{} ", i + 1).into_bytes() } else { Vec::from(&b"1&0 "[..]) };
-        for &c in file_part(&p.fio.recent[i]).as_bytes() {
+        for &c in plat::display_name(&p.fio.recent[i]).as_bytes() {
             if l.len() >= LABEL_CAP - 3 {
                 break;
             }
@@ -1621,7 +1626,8 @@ pub(crate) fn fio_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_FIO_SAVED => match p.fio.sa_doc.filter(|&d| doc_index(&p.doc, d) >= 0) {
             Some(d) => {
                 let path = p.fio.fd_path.clone();
-                let fmt = img_core::io::format_from_path(&path);
+                // (display_name: a content:// name has no extension, the document's own name does)
+                let fmt = img_core::io::format_from_path(&plat::display_name(&path));
                 p.fio.sv_saveas = true;
                 let r = request_save(p, ui, d, Some(&path), fmt);
                 after(p, ui, r);
