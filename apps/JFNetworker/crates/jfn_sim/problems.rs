@@ -778,6 +778,12 @@ impl Engine {
                 let why = crate::svcform::missing(&def.kind, &def.config).unwrap_or_else(|| why.clone());
                 out.push(problem(ProblemKind::ServiceNotStarted, Severity::Warning, dev, None, None, Vec::new(), msg!("Der Dienst {} läuft nicht. {}", def.name.clone(), why)));
             }
+            // a database whose tables do not fit on the device's disk
+            for s in &os.svcs {
+                if let Some(why) = s.svc.as_ref().and_then(|x| x.as_any().downcast_ref::<crate::db::Db>()).and_then(|d| d.disk_problem()) {
+                    out.push(problem(ProblemKind::ServiceNotStarted, Severity::Warning, dev, None, None, Vec::new(), msg!("Der Dienst {} läuft nicht. {}", s.name.clone(), why)));
+                }
+            }
         }
     }
 }

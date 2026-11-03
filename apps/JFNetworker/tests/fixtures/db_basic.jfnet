@@ -1,0 +1,227 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Datenbank: Anweisungen, Sperren, Absturz",
+  "description": "GEN fragt über WEB1 und direkt die Datenbank DB; das Projekt simuliert Hardware.",
+  "seed": 41,
+  "next_id": 20,
+  "strict_mdix": false,
+  "metered": true,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 40,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.0.20/"
+            ],
+            "mode": "open",
+            "rps": 50,
+            "arrival": "uniform",
+            "timeout_ms": 5000,
+            "max_conns": 16,
+            "delay_ms": 1000,
+            "mix": [
+              {
+                "method": "GET",
+                "path": "/u",
+                "weight": 3
+              },
+              {
+                "method": "POST",
+                "path": "/pay",
+                "weight": 1
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s48x",
+      "x": 220,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname SW1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-s",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.20/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "cpu_ms": 0.1,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "conns": 8
+            },
+            "routes": [
+              {
+                "path": "/u",
+                "backend": "db",
+                "sql": "SELECT * FROM users WHERE id = ?",
+                "param": "draw"
+              },
+              {
+                "path": "/pay",
+                "method": "POST",
+                "backend": "db",
+                "retries": 3,
+                "param": "draw",
+                "sql": [
+                  "BEGIN",
+                  "SELECT balance FROM users WHERE id = ? FOR UPDATE",
+                  "UPDATE users SET balance = balance + 1 WHERE id = ?",
+                  "COMMIT"
+                ]
+              },
+              {
+                "path": "/by/*",
+                "backend": "db",
+                "sql": "SELECT id, email FROM users WHERE email = ?"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "DB",
+      "model": "database",
+      "x": 400,
+      "y": 320,
+      "off": false,
+      "startup_config": "hostname DB\nip addr add 10.0.0.30/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "db",
+          "name": "db",
+          "disabled": false,
+          "config": {
+            "port": 7100,
+            "pool_mb": 64,
+            "tables": [
+              {
+                "name": "users",
+                "rows": 100000,
+                "row_bytes": 200,
+                "key": "id",
+                "dist": "zipf",
+                "columns": [
+                  "email:text",
+                  "balance:int:1000"
+                ],
+                "indexes": [
+                  "email"
+                ]
+              },
+              {
+                "name": "orders",
+                "rows": 500000,
+                "row_bytes": 120,
+                "key": "oid",
+                "columns": [
+                  "uid:int:100000",
+                  "sum:int:500"
+                ],
+                "indexes": [
+                  "uid"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 10,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

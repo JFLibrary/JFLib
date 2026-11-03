@@ -39,6 +39,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "script" => "Skript",
         "lb" => "Loadbalancer",
         "kv" => "KV-Knoten",
+        "db" => "Datenbank",
         "cache" => "Cache",
         "mq" => "Message Queue",
         "worker" => "Worker",
