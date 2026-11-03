@@ -1,0 +1,170 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lab_forms.jfnet
+# the database as a form (workspace/devwin/svcform.rs, jfn_sim's db.rs): "Dienst hinzufügen" for the kind, what
+# it lacks, the table editor, form and JSON agree, a refusal with its words, live or a restart said before and
+# done, the costs folded away with their assumptions, one undo step, the tile that brings a database, the
+# keyboard.  Ids: the first device window 26624; "Dienst hinzufügen …" 140304, its kind 140321, its name 140322;
+# the form: Übernehmen 140288, Abbrechen 140289, Als JSON bearbeiten 140290, the rarer groups 140293 and 140294,
+# a field 140544 + 2 i (Puffer 140546, Verbindungen 140548, Commit 140550, Isolation 140552, Port 140554), a table
+# 140800 + 8 r (name, rows + 1, remove + 2, bytes + 3, key + 4, distribution + 5, indexes + 6), Tabelle hinzufügen
+# 141056; the JSON 51456, its Abbrechen 51473
+size 1400 1200
+theme light
+wait 2000
+# ---- the kind: its words, its usual name; without a table it does not start and says so
+dblclick listitem:"HOST1" shift
+expect window 26624 open
+resizewin 26624 900 1100
+click tab:"Dienste"
+click #140304
+click #140321
+click listitem:"Datenbank"
+expect #140322 text "db"
+expect text:"Eine Datenbank mit Tabellen, Puffer, Sperren, Versionen und Log; sie nimmt SQL-artige Anweisungen über HTTP an." exists
+click button:"Hinzufügen"
+wait 200
+expect text:"Datenbank · db" exists
+expect text:"läuft nicht" exists
+expect text:"Noch keine Tabellen: die Datenbank hat nichts, worauf sich eine Anweisung beziehen könnte." exists
+expect text:"So viel hält die Datenbank von ihren Seiten im RAM. Zu groß für das Gerät: erst Swap, dann beendet sie der Speichermangel." exists
+# the defaults the service says
+expect #140546 text ""
+expect #140548 text ""
+# ---- a table: a word where a number belongs is refused with its words
+click #141056
+wait 50
+click #140800
+type "users"
+click #140801
+type "viele"
+wait 50
+expect text:"viele: das ist keine ganze Zahl." exists
+expect #140288 disabled
+click #140801
+key ctrl+a
+type "0"
+wait 50
+expect text:"Dienst db: Tabelle users: „rows“ nimmt 1 bis 2^40 Zeilen." exists
+click #140801
+key ctrl+a
+type "100000"
+click #140803
+type "200"
+click #140804
+type "id"
+click #140805
+click listitem:"Zipf: wenige Zeilen oft"
+wait 50
+expect text:"HOST1 startet dafür neu." exists
+expect #140288 enabled
+# a second table and away again
+click #141056
+wait 50
+click #140808
+type "orders"
+click #140809
+type "500"
+click #140810
+wait 50
+expect #140808 missing
+expect #140800 text "users"
+# form and JSON agree: what is typed goes along, nothing is lost
+click #140546
+type "16"
+click #140290
+expect #51456 exists
+click #51473
+expect button:"Einstellungen …" exists
+click button:"Einstellungen …"
+click #141056
+wait 50
+click #140800
+type "users"
+click #140801
+type "100000"
+click #140803
+type "200"
+click #140805
+click listitem:"Zipf: wenige Zeilen oft"
+click #140546
+type "16"
+click #140288
+wait 300
+expect #140546 missing
+expect text:"Port 7100: 0 Anweisungen, Treffer im Puffer 0 ‰, 0 Transaktionen offen. Ohne Hardware kostet die CPU nichts: diese Zahlen sagen wenig." exists
+# ---- what the form wrote comes back: the table and its fields
+click button:"Einstellungen …"
+expect #140800 text "users"
+expect #140801 text "100000"
+expect #140803 text "200"
+expect #140546 text "16"
+# ---- the pool changes at once, the tables take a restart; it says so first
+click #140546
+key ctrl+a
+type "32"
+wait 50
+expect text:"Gilt sofort: db läuft weiter, ohne Neustart." exists
+click #140288
+wait 200
+expect text:"Port 7100: 0 Anweisungen, Treffer im Puffer 0 ‰, 0 Transaktionen offen. Ohne Hardware kostet die CPU nichts: diese Zahlen sagen wenig." exists
+click button:"Einstellungen …"
+expect #140546 text "32"
+click #140801
+key ctrl+a
+type "200000"
+wait 50
+expect text:"HOST1 startet dafür neu." exists
+click #140801
+key ctrl+a
+type "100000"
+wait 50
+expect text:"Noch nichts geändert." exists
+# a choice among its words
+click #140550
+click listitem:"locker: Antwort sofort, Verlust möglich"
+wait 50
+expect text:"Gilt sofort: db läuft weiter, ohne Neustart." exists
+click #140288
+wait 200
+# ---- the costs are assumptions and say so
+click button:"Einstellungen …"
+expect text:"Annahme: Lesen und Planen einer Anweisung auf einem Referenzkern. Zählt nur mit simulierter Hardware." missing
+click #140293
+expect text:"Annahme: Lesen und Planen einer Anweisung auf einem Referenzkern. Zählt nur mit simulierter Hardware." exists
+expect text:"Annahme: 0 rechnet aus der Seitengröße mit 16 Bytes je Eintrag." exists
+click #140293
+click #140294
+expect text:"Grenze des Simulators: darüber vergisst er die ältesten Werte und zählt das. Die Zeiten stimmen weiter, diese Werte nicht." exists
+click #140294
+# ---- the keyboard: Tab walks through a table and on to the fields
+focus #140800
+key tab
+expect #140801 focused
+key tab
+expect #140803 focused
+click #140289
+# ---- one undo step takes the last change back
+cmd 10
+wait 200
+click button:"Einstellungen …"
+expect #140550 exists
+click #140289
+cmd 11
+wait 200
+close window 26624
+wait 100
+# ---- the tile brings a database with an example table: it runs, nothing is missing; one undo step
+click button:"Verteilte Systeme (6)"
+wait 50
+focus button:"DB-Shard"
+key enter
+wait 300
+expect text:"DB1: Der Dienst db läuft nicht." missing
+dblclick listitem:"DB1" shift
+resizewin 26624 900 1100
+click tab:"Dienste"
+expect text:"Datenbank · db" exists
+click button:"Einstellungen …"
+expect #140800 text "users"
+expect #140801 text "100000"
+click #140289
+close window 26624

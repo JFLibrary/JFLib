@@ -1389,11 +1389,19 @@ impl Prices {
 pub fn preset_service(model: &str) -> Option<(&'static str, &'static str)> {
     Some(match model {
         "load-balancer" => ("lb", "lb"),
-        // (SA4 brings a database service)
-        "database" => ("kv", "kv"),
+        "database" => ("db", "db"),
         "cache" => ("cache", "cache"),
         "queue" => ("mq", "mq"),
         "traffic-gen" => ("http-load", "load"),
         _ => return None,
     })
+}
+
+/// the config of a tile's service when it is more than empty: JSON text
+pub fn preset_config(model: &str) -> Option<&'static str> {
+    match model {
+        // a small example table, so that the database runs as soon as it stands there
+        "database" => Some(r#"{"tables": [{"name": "users", "rows": 100000, "row_bytes": 200, "key": "id", "columns": ["email:text", "balance:int:1000"], "indexes": ["email"]}]}"#),
+        _ => None,
+    }
 }

@@ -1,0 +1,366 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Test: Grundlagen der Netze",
+    "Test: network basics"
+  ],
+  "pass": 75,
+  "minutes": 25,
+  "attempts": 0,
+  "shuffle": true,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Was gibt ein Switch an allen anderen Ports aus?",
+        "What does a switch send out of all other ports?"
+      ],
+      "explain": [
+        "Rahmen an unbekannte MAC-Adressen und Broadcasts. Rahmen an bekannte Adressen gehen gezielt.",
+        "Frames to unknown MAC addresses and broadcasts. Frames to known addresses go straight there."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Broadcasts und Rahmen an unbekannte MAC-Adressen",
+            "Broadcasts and frames to unknown MAC addresses"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Jeden Rahmen",
+            "Every frame"
+          ]
+        },
+        {
+          "text": [
+            "Nur IP-Pakete mit passender Route",
+            "Only IP packets with a matching route"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Wofür braucht ein Host ARP?",
+        "What does a host need ARP for?"
+      ],
+      "explain": [
+        "Er kennt die IP-Adresse des nächsten Schritts und braucht für den Rahmen dessen MAC-Adresse.",
+        "It knows the IP address of the next step and needs its MAC address for the frame."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Zur IP-Adresse des nächsten Schritts die MAC-Adresse finden",
+            "To find the MAC address for the IP address of the next step"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Einen Namen in eine Adresse übersetzen",
+            "To translate a name into an address"
+          ],
+          "explain": [
+            "Das tut DNS.",
+            "DNS does that."
+          ]
+        },
+        {
+          "text": [
+            "Eine eigene Adresse bekommen",
+            "To get an address of its own"
+          ],
+          "explain": [
+            "Das tut DHCP.",
+            "DHCP does that."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "number",
+      "points": 2,
+      "stem": [
+        "Wie viele Hostadressen hat ein `/27`-Netz?",
+        "How many host addresses does a `/27` network have?"
+      ],
+      "explain": [
+        "5 Bits für den Hostteil: 32 Adressen, minus Netzadresse und Broadcast.",
+        "5 bits for the host part: 32 addresses, minus network address and broadcast."
+      ],
+      "value": 30,
+      "tolerance": 0
+    },
+    {
+      "kind": "text",
+      "points": 2,
+      "stem": [
+        "Welche Maske gehört zu `/26`?",
+        "Which mask belongs to `/26`?"
+      ],
+      "explain": [
+        "255.255.255.192: im letzten Oktett die Bits für 128 und 64.",
+        "255.255.255.192: in the last octet the bits for 128 and 64."
+      ],
+      "accept": [
+        "255\\.255\\.255\\.192"
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 2,
+      "stem": [
+        "Wie heißt die Broadcast-Adresse des Netzes `10.4.8.0/24`?",
+        "What is the broadcast address of the network `10.4.8.0/24`?"
+      ],
+      "explain": [
+        "Alle Hostbits auf 1: `10.4.8.255`.",
+        "All host bits set to 1: `10.4.8.255`."
+      ],
+      "accept": [
+        "10\\.4\\.8\\.255"
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Host A hat `192.168.4.20/24`. Für welche Ziele braucht er sein Gateway?",
+        "Host A has `192.168.4.20/24`. For which destinations does it need its gateway?"
+      ],
+      "explain": [
+        "Nur Ziele außerhalb von 192.168.4.0/24 gehen über das Gateway.",
+        "Only destinations outside 192.168.4.0/24 go through the gateway."
+      ],
+      "answers": [
+        {
+          "text": [
+            "192.168.5.20",
+            "192.168.5.20"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "10.0.0.1",
+            "10.0.0.1"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "192.168.4.200",
+            "192.168.4.200"
+          ]
+        },
+        {
+          "text": [
+            "192.168.4.1",
+            "192.168.4.1"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Warum muss das Gateway im eigenen Netz des Hosts liegen?",
+        "Why must the gateway lie in the host's own network?"
+      ],
+      "explain": [
+        "Der Host muss per ARP seine MAC-Adresse finden, und ARP reicht nicht über das eigene Netz hinaus.",
+        "The host has to find its MAC address by ARP, and ARP does not reach beyond its own network."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Weil der Host es per ARP finden muss",
+            "Because the host has to find it by ARP"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Weil Router sonst keine Adressen haben",
+            "Because routers have no addresses otherwise"
+          ]
+        },
+        {
+          "text": [
+            "Weil DHCP es sonst nicht nennt",
+            "Because DHCP does not name it otherwise"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Ein Ping meldet `From 10.1.0.1 icmp_seq=1 Destination Net Unreachable`. Was sagt das?",
+        "A ping reports `From 10.1.0.1 icmp_seq=1 Destination Net Unreachable`. What does that say?"
+      ],
+      "explain": [
+        "Der Router 10.1.0.1 hat das Paket bekommen und kennt keinen Weg ins Zielnetz. Bis dorthin war alles in Ordnung.",
+        "The router 10.1.0.1 got the packet and knows no way to the destination network. Up to there all was well."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Der Router 10.1.0.1 kennt keinen Weg zum Ziel",
+            "The router 10.1.0.1 knows no way to the destination"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Der eigene Host hat kein Gateway",
+            "The host itself has no gateway"
+          ],
+          "explain": [
+            "Dann käme die Meldung sofort und von ihm selbst.",
+            "Then the message would come at once and from itself."
+          ]
+        },
+        {
+          "text": [
+            "Das Ziel ist ausgeschaltet",
+            "The destination is switched off"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 2,
+      "stem": [
+        "Welche IOS-artige Zeile nennt den Clients eines Pools `10.0.0.1` als Gateway?",
+        "Which IOS-like line tells the clients of a pool `10.0.0.1` as their gateway?"
+      ],
+      "explain": [
+        "`default-router 10.0.0.1`, im Modus des Pools.",
+        "`default-router 10.0.0.1`, in the pool's mode."
+      ],
+      "accept": [
+        "default-router +10\\.0\\.0\\.1"
+      ]
+    },
+    {
+      "kind": "order",
+      "points": 2,
+      "stem": [
+        "Ein frischer PC holt per DHCP seine Adresse und pingt dann einen Namen. Namensserver und Ziel liegen in anderen Netzen. In welcher Reihenfolge läuft das ab?",
+        "A fresh PC gets its address by DHCP and then pings a name. The name server and the destination lie in other networks. In what order does it happen?"
+      ],
+      "explain": [
+        "Ohne Adresse und Namensserver geht nichts. Dann muss er den Namen auflösen, und dafür braucht er die MAC-Adresse des Gateways. Erst dann kann das Echo los.",
+        "Without an address and a name server, nothing works. Then it has to resolve the name, for which it needs the gateway's MAC address if the name server is elsewhere. Only then can the echo leave."
+      ],
+      "order": [
+        [
+          "DHCP liefert Adresse, Gateway und Namensserver",
+          "DHCP delivers address, gateway and name server"
+        ],
+        [
+          "Per ARP findet er die MAC-Adresse des Gateways",
+          "By ARP it finds the gateway's MAC address"
+        ],
+        [
+          "Er fragt den Namensserver nach dem Namen",
+          "It asks the name server for the name"
+        ],
+        [
+          "Er schickt das Echo an die Adresse aus der Antwort",
+          "It sends the echo to the address from the answer"
+        ]
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Was zeigt `show ip route` auf einem Router?",
+        "What does `show ip route` show on a router?"
+      ],
+      "explain": [
+        "Eigene Netze (C), eigene Adressen (L), statische Routen (S), die Standardroute. MAC-Adressen stehen in anderen Tabellen.",
+        "Own networks (C), own addresses (L), static routes (S), the default route. MAC addresses are in other tables."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Netze an den eigenen Schnittstellen",
+            "Networks at the device's own interfaces"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Statische Routen",
+            "Static routes"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Gelernte MAC-Adressen",
+            "Learned MAC addresses"
+          ],
+          "explain": [
+            "Die stehen in `show mac address-table` auf einem Switch.",
+            "Those are in `show mac address-table` on a switch."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Auf PC1 zeigt `cat /etc/resolv.conf` nichts, `dig @10.30.0.53 www.schule.lab` liefert aber die Adresse. Woran liegt es, dass `ping www.schule.lab` nicht geht?",
+        "On PC1, `cat /etc/resolv.conf` shows nothing, but `dig @10.30.0.53 www.schule.lab` delivers the address. Why does `ping www.schule.lab` not work?"
+      ],
+      "explain": [
+        "Der Server ist da und kennt den Namen. Nur der Host weiß nicht, dass er ihn fragen soll.",
+        "The server is there and knows the name. Only the host does not know it should ask it."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Der Host kennt keinen Namensserver",
+            "The host knows no name server"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Der Eintrag fehlt auf dem Server",
+            "The record is missing on the server"
+          ],
+          "explain": [
+            "Dann käme auch bei `dig` keine Adresse.",
+            "Then `dig` would not deliver an address either."
+          ]
+        },
+        {
+          "text": [
+            "Das Kabel ist gezogen",
+            "The cable is pulled"
+          ],
+          "explain": [
+            "Dann käme auch bei `dig` keine Antwort.",
+            "Then `dig` would get no answer either."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 // gives scripts
 //
 //   host_items() -> Vec<HostItem>   the host's globals (jfn_sim/scriptsvc.rs: log, now, rand,
-//                                   config, timer, net, dns, http, disk, metrics) with their
+//                                   config, timer, net, dns, http, db, disk, metrics) with their
 //                                   parameters and a short description in the window's
 //                                   language (our own words, t())
 //   Assist                          ui::CodeAssist on script::ls with those names: completion,
@@ -58,6 +58,8 @@ pub(crate) fn host_items() -> Vec<HostItem<'static>> {
         v("http", t("HTTP: serve, request.")),
         f("http.serve", "port, f", t("Ein HTTP-Server (einmal je Skript); f(req, res), die Rückgabe oder res.send / res.json antwortet.")),
         f("http.request", "url, f", t("Eine HTTP-Anfrage an url (oder eine Map mit url, method, headers, body, timeout_ms); f(err, resp).")),
+        v("db", t("Eine Datenbank des Labors: connect.")),
+        f("db.connect", "addr, port", t("Verbindet mit einer Datenbank (Port 7100, wenn keiner dasteht); die Verbindung kennt query, begin, commit, rollback und close.")),
         v("disk", t("JSON-Werte auf der Disk des Geräts: get, put, delete, scan; sie überstehen Neustarts.")),
         f("disk.get", "key, f", t("Liest den Wert zu key; f(err, value).")),
         f("disk.put", "key, value, f", t("Schreibt value unter key; f(err).")),

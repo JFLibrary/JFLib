@@ -1,0 +1,356 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Der Server, der keiner ist",
+  "description": "Kurs Fehlersuche: eine doppelte Adresse.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.20/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Intranet der Firma\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "LAP1",
+      "model": "laptop",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname LAP1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Der Server, der keiner ist",
+      "The server that is not one"
+    ],
+    "summary": [
+      "PC1 kann 10.0.0.10 anpingen, aber die Webseite des Servers kommt nicht. Der Server selbst läuft.",
+      "PC1 can ping 10.0.0.10, but the server's web page does not come. The server itself is running."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Die Webseite des Servers SRV1 unter 10.0.0.10 kommt auf PC1 nicht (curl http://10.0.0.10/ meldet einen Fehler), obwohl ein Ping an dieselbe Adresse beantwortet wird. Auf dem Server läuft der Webdienst, und nichts hat sich dort geändert. Seit gestern ist ein Laptop im Netz.",
+        "The web page of the server SRV1 at 10.0.0.10 does not come on PC1 (curl http://10.0.0.10/ reports an error), although a ping to the same address is answered. The web service is running on the server, and nothing has changed there. A laptop has been in the network since yesterday."
+      ],
+      [
+        "Finden Sie die Ursache und reparieren Sie sie. Wer eine neue Adresse braucht, bekommt 10.0.0.77, und der Server behält seine. Dann nennen Sie das Gerät und geben ab.",
+        "Find the cause and repair it. Whatever needs a new address gets 10.0.0.77, and the server keeps its own. Then name the device and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Wer antwortet eigentlich auf den Ping? ip neigh auf PC1 nennt die MAC-Adresse, zu der 10.0.0.10 gerade führt. Vergleichen Sie sie mit ip link show eth0 auf dem Server.",
+        "Who is actually answering the ping? ip neigh on PC1 gives the MAC address that 10.0.0.10 currently leads to. Compare it with ip link show eth0 on the server."
+      ],
+      [
+        "Die MAC-Tabelle von SW1 sagt, an welchem Port diese MAC-Adresse sitzt.",
+        "The MAC table of SW1 says which port this MAC address sits at."
+      ],
+      [
+        "PC1 merkt sich den falschen Eintrag noch eine Weile. ip neigh flush all auf PC1 lässt ihn neu fragen.",
+        "PC1 remembers the wrong entry for a while. ip neigh flush all on PC1 makes it ask again."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.0.77",
+            "SRV1 reaches 10.0.0.20"
+          ],
+          "points": 4,
+          "text": [
+            "Das Gerät unter 10.0.0.77 antwortet, und Server und PC1 erreichen einander",
+            "The device at 10.0.0.77 answers, and server and PC1 reach each other"
+          ]
+        },
+        {
+          "what": "address",
+          "dev": "SRV1",
+          "id": 2,
+          "port": "eth0",
+          "value": "10.0.0.10/24",
+          "points": 3,
+          "text": [
+            "Der Server behält 10.0.0.10",
+            "The server keeps 10.0.0.10"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "LAP1",
+          "id": 3,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "Der Laptop hatte dieselbe Adresse wie der Server. Auf die ARP-Frage antworteten beide, und PC1 glaubte der letzten Antwort: der des Laptops. Der Ping ging also an den Laptop, der ihn beantwortete, während auf dem Laptop kein Webdienst läuft. Die MAC-Adresse aus ip neigh und die MAC-Tabelle von SW1 führen zu seinem Port. Echte Systeme warnen in solchen Fällen manchmal, verlassen sollte man sich darauf nicht.",
+            "The laptop had the same address as the server. Both answered the ARP question, and PC1 believed the last answer: the laptop's. So the ping went to the laptop, which answered it, while no web service runs on the laptop. The MAC address from ip neigh and the MAC table of SW1 lead to its port. Real systems sometimes warn in such cases, but you should not rely on that."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.0.20/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 400,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+            "services": [
+              {
+                "kind": "http-server",
+                "name": "web",
+                "disabled": false,
+                "config": {
+                  "workers": 4,
+                  "time_ms": 2,
+                  "routes": [
+                    {
+                      "path": "/",
+                      "body": "Intranet der Firma\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "LAP1",
+            "model": "laptop",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname LAP1\nip addr add 10.0.0.77/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 200,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "b": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

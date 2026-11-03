@@ -508,7 +508,7 @@ fn lab_t(t: &mut T, name: &str, e: &store::Entry, step: &Step) {
         run.reached()
     };
     t.eq(&format!("{}: no goal at the start", name), reached(&p), 0);
-    // the sample's solution; another course's labs are for AK4 to prove
+    // the sample's solution; every other course's labs are solved at the console in coursetest.rs
     if e.id == "beispiel" && step.id == "erstes-netz" {
         let mut solved = p.clone();
         if let Some(d) = solved.devices.iter_mut().find(|d| d.name == "PC2") {

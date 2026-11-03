@@ -1,0 +1,407 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Test: Fehlersuche",
+    "Test: fault finding"
+  ],
+  "pass": 75,
+  "minutes": 20,
+  "attempts": 0,
+  "shuffle": true,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Ein Ping meldet `ping: connect: Network is unreachable`. Was wissen Sie?",
+        "A ping reports `ping: connect: Network is unreachable`. What do you know?"
+      ],
+      "explain": [
+        "Der Host selbst hat keinen Weg: kein passendes Netz und kein Gateway. Es ging nichts auf die Leitung.",
+        "The host itself has no way: no matching network and no gateway. Nothing went onto the wire."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Der Host hat keine Route, kein Paket ging los",
+            "The host has no route, no packet left"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Ein Router auf dem Weg kennt das Ziel nicht",
+            "A router on the way does not know the destination"
+          ],
+          "explain": [
+            "Dann meldete der Router das, mit seiner Adresse als Absender.",
+            "Then the router would report that, with its address as the sender."
+          ]
+        },
+        {
+          "text": [
+            "Das Kabel des Ziels ist gezogen",
+            "The destination's cable is pulled"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "`From 10.0.0.11 icmp_seq=1 Destination Host Unreachable`, und PC1 hat selbst die Adresse 10.0.0.11. Wo suchen Sie zuerst?",
+        "`From 10.0.0.11 icmp_seq=1 Destination Host Unreachable`, and PC1 itself has the address 10.0.0.11. Where do you look first?"
+      ],
+      "explain": [
+        "PC1 hat im eigenen Netz gefragt und keine ARP-Antwort bekommen. Also: Ist das Ziel da? Steht sein Kabel, stimmt sein VLAN?",
+        "PC1 asked in its own network and got no ARP answer. So: is the destination there? Is its cable in, is its VLAN right?"
+      ],
+      "answers": [
+        {
+          "text": [
+            "Im eigenen Netz, beim Ziel oder dem Weg dorthin",
+            "In the own network, at the destination or the way there"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Auf dem nächsten Router",
+            "On the next router"
+          ],
+          "explain": [
+            "Der Absender ist PC1 selbst; kein Router war beteiligt.",
+            "The sender is PC1 itself; no router was involved."
+          ]
+        },
+        {
+          "text": [
+            "Beim Namensserver",
+            "At the name server"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Der Port eines Hosts steht im falschen VLAN. Woran kann man das erkennen?",
+        "A host's port is in the wrong VLAN. How can you tell?"
+      ],
+      "explain": [
+        "Der Host selbst merkt nichts. Er erreicht aber die Geräte des falschen VLANs, und `show vlan brief` zeigt es direkt.",
+        "The host itself notices nothing. But it reaches the devices of the wrong VLAN, and `show vlan brief` shows it directly."
+      ],
+      "answers": [
+        {
+          "text": [
+            "`show vlan brief` nennt den Port beim falschen VLAN",
+            "`show vlan brief` lists the port under the wrong VLAN"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Der Host erreicht Geräte der falschen Gruppe",
+            "The host reaches devices of the wrong group"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Der Host meldet einen VLAN-Fehler",
+            "The host reports a VLAN error"
+          ],
+          "explain": [
+            "Hosts wissen von ihrem VLAN nichts.",
+            "Hosts know nothing of their VLAN."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Was unterscheidet `administratively down` von `down`?",
+        "What sets `administratively down` apart from `down`?"
+      ],
+      "explain": [
+        "Abgeschaltet durch einen Befehl gegen kein Partner am anderen Ende. Das erste behebt `no shutdown`, das zweite ein Blick auf Kabel und Gegenstelle.",
+        "Shut down by a command against no partner at the other end. `no shutdown` fixes the first, a look at the cable and the other end the second."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Das erste ist abgeschaltet, beim zweiten fehlt der Partner",
+            "The first is shut down, the second lacks a partner"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Das erste ist ein Kabelbruch, beim zweiten fehlt die Adresse",
+            "The first is a broken cable, the second lacks an address"
+          ]
+        },
+        {
+          "text": [
+            "Es ist dasselbe",
+            "They are the same"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "PC1 pingt einen Server ohne Antwort. Der Ping von R1 zum selben Server klappt. PC1 hat das richtige Gateway. Was ist am wahrscheinlichsten?",
+        "PC1 pings a server without an answer. The ping from R1 to the same server works. PC1 has the right gateway. What is most likely?"
+      ],
+      "explain": [
+        "Der Unterschied ist der Absender. Ein Router dahinter kennt das Netz von R1, aber nicht das von PC1.",
+        "The difference is the sender. A router behind it knows the network of R1, but not that of PC1."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Auf dem Rückweg fehlt die Route zum Netz von PC1",
+            "The way back lacks the route to the network of PC1"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Der Server ist ausgeschaltet",
+            "The server is switched off"
+          ],
+          "explain": [
+            "Dann bekäme auch R1 keine Antwort.",
+            "Then R1 would get no answer either."
+          ]
+        },
+        {
+          "text": [
+            "Das Kabel zwischen R1 und PC1 ist gezogen",
+            "The cable between R1 and PC1 is pulled"
+          ],
+          "explain": [
+            "Dann wäre schon das Gateway nicht erreichbar.",
+            "Then the gateway itself could not be reached."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 2,
+      "stem": [
+        "Welche Zeile fehlt an einer Router-Schnittstelle, wenn Clients dort kein DHCP vom Server `10.0.3.10` hinter dem Router bekommen?",
+        "Which line is missing at a router interface if clients there get no DHCP from the server `10.0.3.10` behind the router?"
+      ],
+      "explain": [
+        "`ip helper-address 10.0.3.10`: Sie reicht die Broadcasts gezielt an den Server weiter.",
+        "`ip helper-address 10.0.3.10`: it passes the broadcasts straight on to the server."
+      ],
+      "accept": [
+        "ip +helper-address +10\\.0\\.3\\.10"
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Ein Ping an die Adresse geht, ein Ping an den Namen meldet `Temporary failure in name resolution`. Was prüfen Sie?",
+        "A ping to the address works, a ping to the name reports `Temporary failure in name resolution`. What do you check?"
+      ],
+      "explain": [
+        "Wen der Host fragt und ob dort ein Server antwortet. Wäre der Name unbekannt, hieße es `Name or service not known`.",
+        "Whom the host asks and whether a server answers there. If the name were unknown, it would say `Name or service not known`."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Den Namensserver in `/etc/resolv.conf`",
+            "The name server in `/etc/resolv.conf`"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Das Gateway",
+            "The gateway"
+          ],
+          "explain": [
+            "Der Ping an die Adresse zeigt, dass der Weg trägt.",
+            "The ping to the address shows that the path carries."
+          ]
+        },
+        {
+          "text": [
+            "Das Kabel",
+            "The cable"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Zwei Geräte haben dieselbe IP-Adresse. Woran erkennen Sie das am ehesten?",
+        "Two devices have the same IP address. How are you most likely to tell?"
+      ],
+      "explain": [
+        "Ein Gerät weiß nichts davon. Erst die MAC-Adresse, die ein anderer gelernt hat, verrät, dass die falsche Karte antwortet.",
+        "A device knows nothing of it. Only the MAC address someone else has learned gives away that the wrong card is answering."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Die MAC-Adresse in `ip neigh` gehört zum falschen Gerät",
+            "The MAC address in `ip neigh` belongs to the wrong device"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "`ip addr` meldet einen Fehler",
+            "`ip addr` reports an error"
+          ],
+          "explain": [
+            "`ip addr` zeigt auf beiden Geräten zufrieden dieselbe Adresse.",
+            "`ip addr` contentedly shows the same address on both devices."
+          ]
+        },
+        {
+          "text": [
+            "Der Switch schaltet einen Port ab",
+            "The switch shuts a port down"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "number",
+      "points": 2,
+      "stem": [
+        "Bei einem Weg mit 16 Stationen halbieren Sie bei jedem Test. Wie viele Tests brauchen Sie höchstens, um die schuldige Station zu finden?",
+        "On a way with 16 stations you halve with each test. How many tests do you need at most to find the guilty station?"
+      ],
+      "explain": [
+        "16, 8, 4, 2, 1: vier Halbierungen.",
+        "16, 8, 4, 2, 1: four halvings."
+      ],
+      "value": 4,
+      "tolerance": 0
+    },
+    {
+      "kind": "single",
+      "points": 2,
+      "stem": [
+        "Ein Ping mit `-c 1` geht, die Anwendung ist aber quälend langsam. Was ist der nächste sinnvolle Test?",
+        "A ping with `-c 1` works, but the application is painfully slow. What is the next sensible test?"
+      ],
+      "explain": [
+        "Einer sagt fast nichts über Verlust. Viele Pings zeigen ihn, und Pings je Teilstück zeigen, wo er liegt.",
+        "One says next to nothing about loss. Many pings show it, and pings per leg show where it lies."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Viele Pings und auf die Verlustzeile achten",
+            "Many pings, watching the loss line"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Den Namensserver wechseln",
+            "Change the name server"
+          ]
+        },
+        {
+          "text": [
+            "Das Gateway neu eintragen",
+            "Enter the gateway again"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Was gehört in die Notizen während einer Fehlersuche?",
+        "What belongs in the notes during a fault hunt?"
+      ],
+      "explain": [
+        "Alles, was Sie geprüft und geändert haben, auch das, was sich als falsch erwies. Passwörter gehören nie in Notizen.",
+        "Everything you have checked and changed, including what proved wrong. Passwords never belong in notes."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Was Sie geprüft haben und was herauskam",
+            "What you checked and what came out"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Was Sie geändert haben",
+            "What you changed"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Vermutungen, die falsch waren",
+            "Guesses that were wrong"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Die Passwörter der Geräte",
+            "The devices' passwords"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "order",
+      "points": 2,
+      "stem": [
+        "Ein Host holt keine Webseite von `www.firma.lab`. In welcher Reihenfolge prüfen Sie von unten nach oben?",
+        "A host fetches no web page from `www.firma.lab`. In what order do you check from the bottom up?"
+      ],
+      "explain": [
+        "Erst die Verbindung, dann der Nachbar, dann der Weg, zuletzt Name und Dienst.",
+        "First the link, then the neighbour, then the path, and name and service last."
+      ],
+      "order": [
+        [
+          "`ip -br link` zeigt die Schnittstelle",
+          "`ip -br link` shows the interface"
+        ],
+        [
+          "`ip neigh` zeigt das Gateway",
+          "`ip neigh` shows the gateway"
+        ],
+        [
+          "`ping` an die Adresse des Ziels",
+          "`ping` to the destination's address"
+        ],
+        [
+          "`dig` fragt nach dem Namen",
+          "`dig` asks for the name"
+        ]
+      ]
+    }
+  ]
+}

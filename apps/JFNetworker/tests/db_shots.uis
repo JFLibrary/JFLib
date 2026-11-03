@@ -1,0 +1,52 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/db_basic.jfnet
+# pictures of the database (workspace/devwin/svcform.rs, metrics.rs), light and dark, narrow, at 100 and 150 %:
+# the form with its table and the costs unfolded, the Metriken panel under load.  build/jfnetworker/db_*.png.
+# Ids as in db_forms.uis; the Metriken tree 47104
+size 1500 1000
+theme light
+wait 6000
+# ---- the form
+dblclick listitem:"DB" shift
+expect window 26624 open
+resizewin 26624 900 1100
+click tab:"Dienste"
+click button:"Einstellungen …"
+wait 100
+expect #140800 text "users"
+shot build/jfnetworker/db_form_light_100.png window 26624
+theme dark
+shot build/jfnetworker/db_form_dark_100.png window 26624
+scale 150 window 26624
+wait 100
+shot build/jfnetworker/db_form_dark_150.png window 26624
+scale 100 window 26624
+theme light
+click #140293
+wait 100
+expect text:"Annahme: jede Zeile, die eine Anweisung ansieht." exists
+shot build/jfnetworker/db_form_costs_light.png window 26624
+resizewin 26624 560 900
+wait 100
+shot build/jfnetworker/db_form_narrow.png window 26624
+resizewin 26624 900 1100
+click #140289
+close window 26624
+wait 100
+# ---- the Metriken panel: its service under load
+key ctrl+shift+m
+wait 200
+click listitem:"Datenbank db"
+wait 200
+shot build/jfnetworker/db_metrics_light.png
+theme dark
+shot build/jfnetworker/db_metrics_dark.png
+scale 150
+wait 100
+shot build/jfnetworker/db_metrics_dark_150.png
+theme light
+shot build/jfnetworker/db_metrics_light_150.png
+scale 100
+size 1000 800
+wait 100
+shot build/jfnetworker/db_metrics_narrow.png
+size 1500 1000

@@ -95,6 +95,12 @@
 //   http.request(url | {url, method, headers, body, timeout_ms}, fn(err, resp))
 //                        resp {status, headers, body}; names go through the resolver, the
 //                        timeout is 30 s unless given (0: none)
+//   db.connect(addr, port) -> conn   a database (db.rs; addr: an address or "http://addr:port", the port
+//                        7100 unless given); conn.query(sql, params, fn(err, res)) (params may be left
+//                        out), conn.begin(fn(err, res)), conn.commit(fn(err, res)),
+//                        conn.rollback(fn(err, res)), conn.close(); res: the answer decoded (rows, count,
+//                        figures), err: the text of an error (then res says code and retryable).  A conn
+//                        keeps the transaction of its begin; each call is one HTTP request
 //   disk.get(key, fn(err, value)), disk.put(key, value, fn(err)), disk.delete(key, fn(err,
 //   had)), disk.scan(prefix, fn(err, items))   JSON values on the device's disk (disk.rs:
 //                        access times and capacity); they outlive restarts and power cycles
@@ -200,7 +206,7 @@ const REQUEST_TIMEOUT: Ns = 30 * SEC;
 /// the functions a script may also read as values (`let f = log`)
 const FUNCS: &[&str] = &[
     "log", "log.debug", "log.info", "log.warn", "log.error", "now", "rand", "timer.after", "timer.every", "timer.cancel", "net.listen", "net.connect",
-    "net.udp", "dns.resolve", "http.serve", "http.request", "disk.get", "disk.put", "disk.delete", "disk.scan", "metrics.inc", "metrics.gauge",
+    "net.udp", "dns.resolve", "http.serve", "http.request", "db.connect", "disk.get", "disk.put", "disk.delete", "disk.scan", "metrics.inc", "metrics.gauge",
     "metrics.observe",
 ];
 
@@ -532,6 +538,8 @@ enum Handle {
     Listener(u64),
     Udp(u16),
     Res(u64),
+    /// db.connect
+    Db(u64),
 }
 
 /// what follows a callback
@@ -692,6 +700,9 @@ struct Run {
     /// http.request: callbacks by the script's id, the Agent's ids
     requests: BTreeMap<u64, Pin>,
     by_agent: BTreeMap<u64, u64>,
+    /// db.connect: the databases it talks to (where, its open transaction), which of them a request is for
+    dbs: BTreeMap<u64, (Url, Option<u64>)>,
+    db_calls: BTreeMap<u64, u64>,
     /// dns.resolve: callbacks by the script's id, the lookups
     resolves: BTreeMap<u64, Pin>,
     by_lookup: BTreeMap<u32, u64>,
@@ -974,6 +985,31 @@ fn resp_map(vm: &mut Vm, r: &Resp) -> Result<Value, script::Error> {
     vm_map(vm, &[("status", F::I(r.head.status as i64)), ("headers", F::V(headers)), ("body", F::V(body))])
 }
 
+/// an answer of a database as the script sees it: (err, res); a conn follows its transaction
+fn db_answer(vm: &mut Vm, r: &Resp, conn: Option<&mut (Url, Option<u64>)>) -> Result<Vec<Value>, script::Error> {
+    let text = String::from_utf8_lossy(&r.body).into_owned();
+    let res = vm.json_decode(&text).unwrap_or(Value::Nil);
+    let num = |name: &str| -> Option<u64> {
+        let pat = format!("\"{}\":", name);
+        let t = &text[text.find(&pat)? + pat.len()..];
+        t[..t.find(|c: char| !c.is_ascii_digit()).unwrap_or(t.len())].parse().ok()
+    };
+    if let Some(c) = conn {
+        if r.head.status == 409 && text.contains("\"retryable\":true") || num("committed").is_some() || num("rolled_back").is_some() {
+            c.1 = None;
+        } else if let Some(t) = num("txn") {
+            c.1 = Some(t);
+        }
+    }
+    if r.head.status == 200 {
+        return Ok(vec![Value::Nil, res]);
+    }
+    // the words of the error, else its status
+    let why = agent_core::json::parse(&r.body).ok().and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from)).unwrap_or_else(|| format!("Status {}", r.head.status));
+    let err = vm.new_str(&why)?;
+    Ok(vec![err, res])
+}
+
 /// the answer a handler gives by returning a value without using res
 fn reply_from(vm: &mut Vm, v: Value) -> Option<Reply> {
     match v {
@@ -1254,6 +1290,64 @@ impl Api<'_, '_> {
         Ok(Value::Nil)
     }
 
+    /// db.connect(addr, port)
+    fn db_connect(&mut self, cx: &mut Cx, addr: Value, port: Value) -> Result<Value, Fail> {
+        let Some(text) = cx.str(addr).map(String::from) else {
+            return Err(cx.error("db.connect: die Adresse fehlt"));
+        };
+        let url = if text.starts_with("http://") {
+            let Ok(mut u) = Url::parse(&text) else {
+                return Err(cx.error(&format!("db.connect: {} ist keine http-URL", text)));
+            };
+            u.target = String::from("/query");
+            u
+        } else {
+            let Some(p) = (if port == Value::Nil { Some(crate::db::DB_PORT) } else { port_of(port).filter(|&x| x > 0) }) else {
+                return Err(cx.error("db.connect: der Port muss eine ganze Zahl von 1 bis 65535 sein"));
+            };
+            Url { host: text.clone(), port: p, target: String::from("/query") }
+        };
+        let id = self.id();
+        let m = cx_map(cx, &[("kind", F::S("db")), ("id", F::I(id as i64)), ("addr", F::S(&text))])?;
+        if let Some(r) = ref_of(m) {
+            self.run.handles.insert(r, Handle::Db(id));
+        }
+        self.run.dbs.insert(id, (url, None));
+        Ok(m)
+    }
+
+    /// a statement of a db.connect conn: one request, fn(err, res) with the answer decoded
+    fn db_send(&mut self, cx: &mut Cx, conn: u64, sql: &str, params: Value, f: Value) -> Result<Value, Fail> {
+        if !is_fn(f) {
+            return Err(cx.error("db: das letzte Argument muss eine Funktion sein: fn(err, res)"));
+        }
+        let Some((url, txn)) = self.run.dbs.get(&conn).cloned() else {
+            return Err(cx.error("db: die Verbindung ist schon geschlossen"));
+        };
+        let mut body = String::from("{\"sql\":");
+        crate::dbstore::Val::Text(String::from(sql)).json(&mut body);
+        if params != Value::Nil {
+            let p = cx.json_encode(params, 0)?;
+            body.push_str(",\"params\":");
+            body.push_str(&p);
+        }
+        if let Some(t) = txn {
+            body.push_str(&format!(",\"txn\":{}", t));
+        }
+        body.push('}');
+        let mut req = Req::get(url);
+        req.method = String::from("POST");
+        req.body = body.into_bytes();
+        req.timeout = REQUEST_TIMEOUT;
+        req.headers.add("Content-Type", "application/json");
+        let id = self.id();
+        let pin = cx.pin(f);
+        self.run.requests.insert(id, pin);
+        self.run.db_calls.insert(id, conn);
+        self.effect(cx, Effect::Request(id, req));
+        Ok(Value::Nil)
+    }
+
     fn disk(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
         let a = |i: usize| args.get(i).copied().unwrap_or(Value::Nil);
         let Some(key) = cx.str(a(0)).map(String::from) else {
@@ -1351,6 +1445,7 @@ impl Api<'_, '_> {
                 (Some("tcp"), "send" | "close" | "abort") => Err(cx.error("Die Verbindung ist schon geschlossen.")),
                 (Some("udp" | "listener"), "send" | "close") => Err(cx.error("Der Socket ist schon geschlossen.")),
                 (Some("response"), "send" | "json") => Err(cx.error("Die Anfrage ist schon beantwortet.")),
+                (Some("db"), "query" | "begin" | "commit" | "rollback" | "close") => Err(cx.error("db: die Verbindung ist schon geschlossen")),
                 _ => Err(Fail::Unknown),
             };
         };
@@ -1398,6 +1493,22 @@ impl Api<'_, '_> {
             (Handle::Udp(p), "close") => {
                 self.run.handles.remove(&r);
                 self.effect(cx, Effect::UdpClose(p));
+                Ok(Value::Nil)
+            }
+            (Handle::Db(c), "query") => {
+                let Some(sql) = cx.str(a(1)).map(String::from) else {
+                    return Err(cx.error("query: die Anweisung muss ein Text sein"));
+                };
+                // the values may be left out
+                let (params, f) = if is_fn(a(2)) { (Value::Nil, a(2)) } else { (a(2), a(3)) };
+                self.db_send(cx, c, &sql, params, f)
+            }
+            (Handle::Db(c), "begin") => self.db_send(cx, c, "BEGIN", Value::Nil, a(1)),
+            (Handle::Db(c), "commit") => self.db_send(cx, c, "COMMIT", Value::Nil, a(1)),
+            (Handle::Db(c), "rollback") => self.db_send(cx, c, "ROLLBACK", Value::Nil, a(1)),
+            (Handle::Db(c), "close") => {
+                self.run.handles.remove(&r);
+                self.run.dbs.remove(&c);
                 Ok(Value::Nil)
             }
             (Handle::Res(id), "send" | "json") => {
@@ -1469,6 +1580,7 @@ impl script::Host for Api<'_, '_> {
             "dns.resolve" => self.resolve(cx, a(0), a(1)),
             "http.serve" => self.serve(cx, a(0), a(1), a(2)),
             "http.request" => self.request(cx, a(0), a(1)),
+            "db.connect" => self.db_connect(cx, a(0), a(1)),
             "disk.get" | "disk.put" | "disk.delete" | "disk.scan" => self.disk(cx, name, args),
             "metrics.inc" | "metrics.gauge" | "metrics.observe" => self.metric(cx, name, a(0), a(1)),
             _ => match name.strip_prefix("map.") {
@@ -1522,6 +1634,8 @@ impl Run {
             open: BTreeMap::new(),
             requests: BTreeMap::new(),
             by_agent: BTreeMap::new(),
+            dbs: BTreeMap::new(),
+            db_calls: BTreeMap::new(),
             resolves: BTreeMap::new(),
             by_lookup: BTreeMap::new(),
             disk: BTreeMap::new(),
@@ -2178,9 +2292,11 @@ impl Run {
                 let Some(cb) = self.requests.remove(&id) else {
                     return Ok(None);
                 };
-                let made = match &d.result {
-                    Ok(r) => resp_map(vm, r).map(|m| vec![Value::Nil, m]),
-                    Err(f) => vm.new_str(&f.text()).map(|t| vec![t, Value::Nil]),
+                let conn = self.db_calls.remove(&id);
+                let made = match (&d.result, conn) {
+                    (Ok(r), Some(c)) => db_answer(vm, r, self.dbs.get_mut(&c)),
+                    (Ok(r), None) => resp_map(vm, r).map(|m| vec![Value::Nil, m]),
+                    (Err(f), _) => vm.new_str(&f.text()).map(|t| vec![t, Value::Nil]),
                 };
                 let (args, lost) = results(vm, made);
                 Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "request") })
