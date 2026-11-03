@@ -8,6 +8,7 @@
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
+//   plattest --test kernel                 rt's kernel table on the running kernel (t_kernel.rs)
 //   plattest --test ini                    parse / query / modify / save / reload, malformed
 //                                          and random input, f64 text round trips, INI
 //                                          objects on worker threads
@@ -186,6 +187,7 @@ mod t_guard;
 mod t_ibus;
 mod t_icc;
 mod t_instance;
+mod t_kernel;
 mod t_life;
 mod t_lib;
 mod t_log;
@@ -316,6 +318,7 @@ fn plattest() -> i32 {
     let test: fn(&mut T) = match args.value("--test") {
         Some("threads") => t_threads,
         Some("files") => t_files,
+        Some("kernel") => t_kernel::t_kernel,
         Some("ini") => t_ini,
         Some("cpu") => t_cpu,
         Some("evq") => t_evq,

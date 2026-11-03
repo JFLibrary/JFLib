@@ -50,9 +50,8 @@ mod os {
 mod os {
     use core::sync::atomic::AtomicU32;
 
-    use rt::os::syscall6;
+    use rt::os::{syscall6, SYS_FUTEX};
 
-    const SYS_FUTEX: usize = 202;
     const FUTEX_WAIT_PRIVATE: usize = 128;
     const FUTEX_WAKE_PRIVATE: usize = 129;
     const ETIMEDOUT: isize = 110;

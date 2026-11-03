@@ -24,7 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_EVENTFD2, SYS_READ, SYS_WRITE};
 use rt::sync::SpinLock;
 
 use crate::linux_dbus::{Conn, Msg, T_ERROR, T_RETURN, T_SIGNAL, Value, session_available};
@@ -61,7 +61,7 @@ fn queue(op: Op) -> bool {
     OPS.lock().push(op);
     if STATE.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire).is_ok() {
         // SAFETY: eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK).
-        let fd = unsafe { syscall6(290, 0, 0x80000 | 0x800, 0, 0, 0, 0) };
+        let fd = unsafe { syscall6(SYS_EVENTFD2, 0, 0x80000 | 0x800, 0, 0, 0, 0) };
         WAKE.store(fd as i32, Ordering::Release);
         if crate::thread_spawn(128 << 10, Box::new(run)).is_none() {
             STATE.store(3, Ordering::Release);
@@ -72,7 +72,7 @@ fn queue(op: Op) -> bool {
     if fd >= 0 {
         let one = 1u64;
         // SAFETY: an 8-byte counter increment on our eventfd.
-        unsafe { syscall6(1, fd as usize, &one as *const u64 as usize, 8, 0, 0, 0) };
+        unsafe { syscall6(SYS_WRITE, fd as usize, &one as *const u64 as usize, 8, 0, 0, 0) };
     }
     true
 }
@@ -170,10 +170,10 @@ fn run() {
         let wake = WAKE.load(Ordering::Acquire);
         let mut pfd = [c.fd() as u32 as u64 | (1u64 << 32), wake as u32 as u64 | (1u64 << 32)];
         // SAFETY: two pollfd records.
-        unsafe { syscall6(7, pfd.as_mut_ptr() as usize, 2, usize::MAX, 0, 0, 0) };
+        unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 2, -1) };
         let mut n = 0u64;
         // SAFETY: drain the eventfd counter (nonblocking).
-        unsafe { syscall6(0, wake as usize, &mut n as *mut u64 as usize, 8, 0, 0, 0) };
+        unsafe { syscall6(SYS_READ, wake as usize, &mut n as *mut u64 as usize, 8, 0, 0, 0) };
     }
 }
 

@@ -304,22 +304,10 @@ mod lnx {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    use rt::os::{SYS_CLOSE, SYS_WRITE, syscall3, syscall6};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_EXCL, O_WRONLY, SYS_CLOSE, SYS_GETUID, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_RENAMEAT2, SYS_UNLINKAT, SYS_WRITE, Stat};
 
-    const SYS_RENAME: usize = 82;
-    const SYS_GETUID: usize = 102;
-    const SYS_OPENAT: usize = 257;
-    const SYS_MKDIRAT: usize = 258;
-    const SYS_NEWFSTATAT: usize = 262;
-    const SYS_UNLINKAT: usize = 263;
-    const SYS_RENAMEAT2: usize = 316;
-    const AT_FDCWD: usize = -100isize as usize;
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const RENAME_NOREPLACE: usize = 1;
-    const O_WRONLY: usize = 1;
-    const O_CREAT: usize = 0x40;
-    const O_EXCL: usize = 0x80;
-    const O_CLOEXEC: usize = 0x80000;
     const EINTR: isize = 4;
     const EEXIST: isize = 17;
     const EINVAL: isize = 22;
@@ -338,12 +326,11 @@ mod lnx {
     /// (st_dev, st_mode, st_uid) of path (follow: links followed)
     fn meta(path: &str, follow: bool) -> Option<(u64, u32, u32)> {
         let p = z(path);
-        let mut st = [0u64; 18]; // struct stat, 144 bytes
+        let mut st = Stat::default();
         let flags = if follow { 0 } else { AT_SYMLINK_NOFOLLOW };
-        // SAFETY: NUL-terminated path; st holds a struct stat.
-        let r = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, st.as_mut_ptr() as usize, flags, 0, 0) };
-        // st_dev at 0, st_mode at 24, st_uid at 28
-        (r == 0).then(|| (st[0], st[3] as u32, (st[3] >> 32) as u32))
+        // SAFETY: NUL-terminated path; st is a struct stat.
+        let r = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, &mut st as *mut Stat as usize, flags, 0, 0) };
+        (r == 0).then_some((st.st_dev, st.st_mode, st.st_uid))
     }
 
     fn is_dir(m: Option<(u64, u32, u32)>) -> bool {
@@ -527,7 +514,7 @@ mod lnx {
             return -EEXIST;
         }
         // SAFETY: NUL-terminated paths.
-        unsafe { syscall3(SYS_RENAME, o.as_ptr() as usize, n.as_ptr() as usize, 0) }
+        unsafe { rt::os::rename(o.as_ptr() as usize, n.as_ptr() as usize) }
     }
 
     // the Path value: bytes other than A-Z a-z 0-9 - . _ ~ / as %XX (RFC 3986, as GLib)

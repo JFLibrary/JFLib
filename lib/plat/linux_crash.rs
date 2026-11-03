@@ -10,10 +10,8 @@
 use core::fmt::Write;
 
 use rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CrashInfo, StackText};
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_GETPID, SYS_PROCESS_VM_READV, SYS_RT_SIGACTION, SYS_SIGALTSTACK};
 
-const SYS_RT_SIGACTION: usize = 13;
-const SYS_SIGALTSTACK: usize = 131;
 const SIGILL: i32 = 4;
 const SIGBUS: i32 = 7;
 const SIGFPE: i32 = 8;
@@ -38,9 +36,10 @@ static mut ALTSTACK: AltStack = AltStack([0; ALTSTACK_SIZE]);
 core::arch::global_asm!(
     ".globl jfgui_rs_sigret",
     "jfgui_rs_sigret:",
-    "    mov eax, 15",
+    "    mov eax, {nr}",
     "    syscall",
     "    hlt",
+    nr = const rt::os::SYS_RT_SIGRETURN,
 );
 
 unsafe extern "C" {
@@ -145,8 +144,6 @@ fn code_range(ci: &mut CrashInfo) {
 // not found in that 1 KB): the stack scan of the asm (stack_scan), filtered -- see
 // scan_filtered for its limits.
 
-const SYS_GETPID: usize = 39;
-const SYS_PROCESS_VM_READV: usize = 310;
 const CRASH_STACK: usize = 16384; // bytes of the crashing stack scanned for return addresses
 const PT_LOAD: u32 = 1;
 const PT_GNU_EH_FRAME: u32 = 0x6474_e550;

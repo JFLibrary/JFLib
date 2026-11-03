@@ -15,16 +15,10 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_GETPID, SYS_GETTID, SYS_MMAP, SYS_RT_SIGACTION, SYS_SIGALTSTACK, SYS_TGKILL};
 
 use crate::{GK_ACCESS, GK_ARITH, GK_BREAK, GK_BUS, GK_ILLEGAL, guard_fault_ip, guard_hit};
 
-const SYS_MMAP: usize = 9;
-const SYS_RT_SIGACTION: usize = 13;
-const SYS_GETPID: usize = 39;
-const SYS_SIGALTSTACK: usize = 131;
-const SYS_GETTID: usize = 186;
-const SYS_TGKILL: usize = 234;
 const SIGILL: i32 = 4;
 const SIGTRAP: i32 = 5;
 const SIGBUS: i32 = 7;
@@ -53,9 +47,10 @@ static OLD_ACT: [[AtomicUsize; 4]; 32] = [OLD0; 32];
 core::arch::global_asm!(
     ".globl jfgui_rs_guard_sigret",
     "jfgui_rs_guard_sigret:",
-    "    mov eax, 15",
+    "    mov eax, {nr}",
     "    syscall",
     "    hlt",
+    nr = const rt::os::SYS_RT_SIGRETURN,
 );
 
 unsafe extern "C" {

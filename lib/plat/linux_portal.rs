@@ -33,29 +33,17 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
-use rt::os::syscall6;
+use rt::os::{syscall6, AT_FDCWD, O_CLOEXEC, O_PATH, SYS_CLOSE, SYS_CONNECT, SYS_GETUID, SYS_OPENAT, SYS_READ, SYS_SENDMSG, SYS_SOCKET, SYS_WRITE};
 
 use crate::{
     BK_X11, E_CLOSE, E_DPI, E_FOCUS_IN, E_FOCUS_OUT, E_PAINT, E_RESIZE, Event, FD_EXT_SHIFT, FD_FOLDER, FD_SAVE, PAPER_N,
     PJF_LANDSCAPE, PPage, PrintJob,
 };
 
-const SYS_READ: usize = 0;
-const SYS_WRITE: usize = 1;
-const SYS_CLOSE: usize = 3;
-const SYS_POLL: usize = 7;
-const SYS_SOCKET: usize = 41;
-const SYS_CONNECT: usize = 42;
-const SYS_SENDMSG: usize = 46;
-const SYS_GETUID: usize = 102;
-const SYS_OPENAT: usize = 257;
 const AF_UNIX: u16 = 1;
 const SOCK_STREAM_CLOEXEC: usize = 1 | 0x80000;
 const POLLIN: u16 = 1;
 const EINTR: isize = -4;
-const AT_FDCWD: isize = -100;
-const O_PATH: usize = 0x20_0000;
-const O_CLOEXEC: usize = 0x8_0000;
 const MSG_NOSIGNAL: usize = 0x4000;
 
 const MB_CAP: usize = 32768; // body builder (file filters: every letter as [xX])
@@ -403,7 +391,7 @@ impl Bus {
             pfd[..4].copy_from_slice(&self.fd.to_le_bytes());
             pfd[4..6].copy_from_slice(&POLLIN.to_le_bytes());
             // SAFETY: one pollfd.
-            let r = unsafe { syscall6(SYS_POLL, pfd.as_mut_ptr() as usize, 1, timeout_ms as isize as usize, 0, 0, 0) };
+            let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, timeout_ms) };
             if r == EINTR {
                 continue;
             }
@@ -1318,7 +1306,7 @@ impl Bus {
         let mut z = of.clone();
         z.push(0);
         // SAFETY: openat with a NUL-terminated path.
-        let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD as usize, z.as_ptr() as usize, O_PATH | O_CLOEXEC, 0, 0, 0) };
+        let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, z.as_ptr() as usize, O_PATH | O_CLOEXEC, 0, 0, 0) };
         if fd < 0 {
             return -1;
         }

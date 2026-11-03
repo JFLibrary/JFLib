@@ -30,7 +30,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 #[cfg_attr(jfgui_glibc, allow(unused_imports))]
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_READ, SYS_SENDMSG, SYS_SOCKET, SYS_UNAME, SYS_WRITE};
 
 use super::*;
 
@@ -687,7 +687,7 @@ impl X11 {
         loop {
             let mut pfd = [(self.fd as u32 as u64) | (events as u64) << 32];
             // SAFETY: one pollfd.
-            let r = unsafe { syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 1, ms as isize as usize) };
+            let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, ms) };
             if r == -EINTR {
                 continue;
             }
@@ -724,7 +724,7 @@ impl X11 {
             // SAFETY: inb[in_len..] has room bytes.
             #[cfg(not(jfgui_glibc))]
             let r = unsafe {
-                syscall6(SYS_RECVFROM, self.fd as usize, self.inb.as_mut_ptr() as usize + self.in_len, room, MSG_DONTWAIT, 0, 0)
+                syscall6(rt::os::SYS_RECVFROM, self.fd as usize, self.inb.as_mut_ptr() as usize + self.in_len, room, MSG_DONTWAIT, 0, 0)
             };
             if r == -EINTR {
                 continue;

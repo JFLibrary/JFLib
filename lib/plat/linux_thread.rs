@@ -14,13 +14,6 @@ use rt::os::*;
 
 use crate::{Date, E_WAKE, Event};
 
-const SYS_MPROTECT: usize = 10;
-#[cfg(not(jfgui_glibc))] const SYS_CLONE: usize = 56;
-#[cfg(not(jfgui_glibc))] const SYS_EXIT: usize = 60;
-const SYS_SYSINFO: usize = 99;
-const SYS_FUTEX: usize = 202;
-const SYS_SCHED_GETAFFINITY: usize = 204;
-const SYS_EVENTFD2: usize = 290;
 const FUTEX_WAIT: usize = 0;
 const FUTEX_WAKE: usize = 1;
 const FUTEX_PRIVATE: usize = 128;
@@ -31,7 +24,6 @@ const GUARD_SIZE: usize = 4096;
 /// each thread's alternate signal stack (the crash handler runs on it: a stack overflow of the
 /// thread still gets its report), between two guard pages below the thread's stack
 const ALT_SIZE: usize = 65536;
-const SYS_SIGALTSTACK: usize = 131;
 const THREAD_STACK_DEF: usize = 0x10_0000; // 1 MB
 const THREAD_STACK_MAX: usize = 0x1000_0000; // 256 MB
 
@@ -50,7 +42,8 @@ struct ThreadRec {
     _rsv: [usize; 4],
 }
 
-// clone(flags, stack = rec, &rec.tid, &rec.tid): the child starts on its own stack (rsp = rec,
+// clone(flags, stack = rec, parent_tid = &rec.tid, child_tid = &rec.tid, tls = 0; rdx, r10, r8 in
+// x86-64's order, rt::os::clone_args): the child starts on its own stack (rsp = rec,
 // 16-aligned) with the record in r9 and calls thread_main(rec)
 #[cfg(not(jfgui_glibc))] core::arch::global_asm!(
     ".globl jfgui_rs_clone",
@@ -286,7 +279,7 @@ pub fn wait_events(deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32 {
         // one pollfd: fd, POLLIN (a negative fd is ignored: a plain sleep)
         let mut pfd = [(WAKE_FD.load(Ordering::SeqCst) as u32 as i64) | (1i64 << 32)];
         // SAFETY: one pollfd.
-        let r = unsafe { syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 1, ms as isize as usize) };
+        let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, ms) };
         if r == -EINTR {
             continue;
         }

@@ -33,7 +33,7 @@ use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, SYS_FTRUNCATE, SYS_MEMFD_CREATE, SYS_MMAP, SYS_MUNMAP, SYS_SHMAT, SYS_SHMCTL, SYS_SHMDT, SYS_SHMGET};
 
 use super::wire::sys_close;
 use super::*;

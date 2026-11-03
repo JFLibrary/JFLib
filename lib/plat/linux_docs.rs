@@ -29,17 +29,11 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use rt::os::syscall6;
+use rt::os::{syscall6, AT_FDCWD, O_CLOEXEC, O_PATH, SYS_CLOSE, SYS_GETUID, SYS_OPENAT};
 use rt::sync::SpinLock;
 
 use crate::linux_dbus::{Conn, Msg, Value};
 
-const SYS_CLOSE: usize = 3;
-const SYS_GETUID: usize = 102;
-const SYS_OPENAT: usize = 257;
-const AT_FDCWD: isize = -100;
-const O_PATH: usize = 0x20_0000;
-const O_CLOEXEC: usize = 0x8_0000;
 const T_PORTAL: i32 = 5_000; // ms until the portal answers (it may be started first)
 const NAME: &str = "org.freedesktop.portal.Documents";
 const PATH: &str = "/org/freedesktop/portal/documents";
@@ -99,7 +93,7 @@ pub(crate) fn persistent(path: &str) -> Option<String> {
     let mut z = Vec::from(path.as_bytes());
     z.push(0);
     // SAFETY: openat with a NUL-terminated path; the descriptor is closed below.
-    let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD as usize, z.as_ptr() as usize, O_PATH | O_CLOEXEC, 0, 0, 0) };
+    let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, z.as_ptr() as usize, O_PATH | O_CLOEXEC, 0, 0, 0) };
     if fd < 0 {
         return None;
     }
