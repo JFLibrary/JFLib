@@ -1,5 +1,6 @@
-// pages -- the Akademie's page: the list of courses, a course's outline, a lesson; the bar over the canvas
-// in a course's lab; the question before resetting the progress
+// pages -- the Akademie's page: the list of courses (with install.rs's parts where there is a folder to install
+// into), a course's outline, a lesson; the bar over the canvas in a course's lab; the question before resetting
+// the progress
 //
 //   frame(n, ui)     the page in the place of toolbar, dock and status bar, once per frame; it hosts the
 //                    recovery bar and the files' info bar, as the start page does
@@ -121,24 +122,43 @@ fn home(n: &mut Net, ui: &mut Ui) {
     ui.next_size(-1, 0);
     ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Kurse zum Lesen und Üben: Lektionen erklären, Labore im Simulator prüfen, was Sie gebaut haben."));
     ui.box_end();
+    let installing = n.academy.can_install();
+    if installing {
+        super::install::tools(n, ui);
+    }
     let cards = n.academy.cards();
     if cards.is_empty() {
         ui.next_size(-1, 0);
-        ui.box_begin(0, BOX_V | BOX_XCENTER | pad(24), 0);
+        ui.box_begin(0, BOX_V | BOX_XCENTER | pad(24), 8);
         ui.empty_state(IC_OFFICE_READ_MODE, t("Noch keine Kurse"), t("Hier erscheinen die Kurse, die in der Akademie installiert sind."));
+        if installing {
+            super::install::empty(n, ui);
+        }
         ui.box_end();
     } else {
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V, CARD_GAP);
+        if installing {
+            ui.text(TS_SUBTITLE, t("Meine Kurse"));
+        }
         for (i, x) in cards.iter().enumerate() {
             let badge = x.badge.as_ref().map(|(k, s)| (*k, s.as_str()));
+            ui.next_size(-1, 0);
+            ui.box_begin(0, BOX_V, 2);
             ui.next_size(-1, 0);
             let d = CardDesc { title: &x.title, icon: IC_OFFICE_READ_MODE, text: &x.text, badge, ..CardDesc::default() };
             if ui.action_card(ID_AK_CARD + i as u32, &tf("Kurs: {}", &[&x.title]), &d) & EV_ACT != 0 {
                 ui.cmd_run(CMD_AK_COURSE, i as u32);
             }
+            if installing {
+                super::install::row(n, ui, i);
+            }
+            ui.box_end();
         }
         ui.box_end();
+    }
+    if installing {
+        super::install::offered(n, ui);
     }
     column_end(ui);
 }
@@ -455,9 +475,10 @@ pub(crate) fn bar(n: &mut Net, ui: &mut Ui) {
     ui.focus_pane_end();
 }
 
-/// "Fortschritt zurücksetzen?", "Test abgeben?"
+/// "Fortschritt zurücksetzen?", "Test abgeben?", those of installing
 pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
     super::quiz::dialog(n, ui);
+    super::install::dialog(n, ui);
     let open = n.academy.ask_reset.clone();
     if ui.dialog_begin(ID_AK_RESET_DLG, t("Fortschritt zurücksetzen?"), &open) {
         let a = &n.academy;

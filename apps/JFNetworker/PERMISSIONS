@@ -3,3 +3,7 @@ fs.user                      # the projects the user opens and saves
 fs.write $APPCONFIG/**       # settings, recent files, the dock layout, the window's place
 fs.write $APPDATA/**         # autosave and recovery (later)
 fs.write $DOCUMENTS/JFNetworker/**
+# the Akademie: the courses come from here, asked with the first click that needs them, never at the start
+ask net.connect raw.githubusercontent.com:443 "Kurse der Akademie laden"
+# a lesson's web link, after the app's own question that shows the address
+url https http

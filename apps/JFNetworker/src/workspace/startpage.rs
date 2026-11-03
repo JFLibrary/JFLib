@@ -28,7 +28,8 @@
 // which takes it down.
 //
 // learn() lists what there is to learn from: the courses of the Akademie (workspace/academy, AK1) as a
-// group of their own, then the labs and assessments; there is no group without anything in it.
+// group of their own with the way to its list, also while no course is installed; then the labs and
+// assessments; there is no other group without anything in it.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -61,12 +62,13 @@ pub(crate) struct Template {
 }
 
 // i18n: name text
-pub(crate) const TEMPLATES: [Template; 5] = [
+pub(crate) const TEMPLATES: [Template; 6] = [
     Template { file: "heimnetz.jfnet", name: "Heimnetz", text: "Heimrouter mit WLAN und DHCP, dazu PC, Drucker, Laptop und Smartphone." },
     Template { file: "buero-vlans.jfnet", name: "Büro mit VLANs", text: "VLANs für Büro, Technik und Server, ein Router am Trunk, DHCP und DNS." },
     Template { file: "campus.jfnet", name: "Campus", text: "Zwei Gebäude mit L3-Switches, OSPF zum Router, DHCP über Relays, DNS." },
     Template { file: "rechenzentrum.jfnet", name: "Rechenzentrum (Leaf-Spine)", text: "Zwei Spines, vier Leafs, acht Server; geroutet mit OSPF über gleich gute Wege." },
     Template { file: "webdienst.jfnet", name: "Webdienst hinter Loadbalancer", text: "Ein Loadbalancer verteilt die Anfragen auf drei Webserver und prüft sie." },
+    Template { file: "groesser-oder-mehr.jfnet", name: "Größer oder mehr?", text: "Ein Webdienst mit Datenbank: ein immer größerer Server gegen immer mehr kleine, als Experiment im Bereich Experimente." },
 ];
 
 /// the page's content at most (DIP)
@@ -529,11 +531,22 @@ fn learn(n: &mut Net, ui: &mut Ui, w: i32) {
 // the courses of the Akademie: their line, their cards with what the learner has done
 fn course_group(n: &mut Net, ui: &mut Ui, w: i32) {
     let cards = n.academy.cards();
-    if cards.is_empty() {
+    let installing = n.academy.can_install();
+    if cards.is_empty() && !installing {
         return;
     }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator."));
+    if installing {
+        // the way to more of them: the Akademie's list, where nothing goes online without a click
+        ui.box_begin(0, BOX_H, 0);
+        ui.next_flags(ST_COMPACT);
+        ui.next_icon(IC_DOWNLOAD);
+        if ui.button(ID_AI_SP_MORE, if cards.is_empty() { t("Kurse installieren …") } else { t("Alle Kurse …") }) & EV_ACT != 0 {
+            ui.cmd_run(CMD_ACADEMY, 0);
+        }
+        ui.box_end();
+    }
     let cols = columns(w, &[2], LEARN_MIN_W);
     for (r, row) in cards.chunks(cols as usize).enumerate() {
         ui.next_size(-1, 0);

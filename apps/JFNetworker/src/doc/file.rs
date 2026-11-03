@@ -64,6 +64,8 @@ pub(crate) struct Files {
     pub fd_active: bool,
     /// it opens a background picture (G1, canvas/backdrop.rs: CMD_BG_CHOSEN), not a project
     pub fd_image: bool,
+    /// it chooses a folder of courses (workspace/academy/install.rs: CMD_AI_FOLDER_DONE)
+    pub fd_folder: bool,
     pub fd_path: String,
     pub ask_open: Shared<i32>,
     pub after: Option<After>,
@@ -80,6 +82,7 @@ impl Files {
             fd_save: false,
             fd_active: false,
             fd_image: false,
+            fd_folder: false,
             fd_path: String::new(),
             ask_open: Shared::new(0),
             after: None,
@@ -345,13 +348,27 @@ pub(crate) fn answer(n: &mut Net, ui: &mut Ui, keep: bool) {
 /// the file dialog and the question (at the end of the frame)
 pub(crate) fn dialogs(n: &mut Net, ui: &mut Ui) {
     let open = n.file.fd_open.clone();
-    let flags = if n.file.fd_save { FD_SAVE } else { FD_OPEN };
-    // a background picture (G1): the formats every window decodes
-    let exts: &[&str] = if n.file.fd_image { &[t(IMG_EXT)] } else { &[t(EXT)] };
+    let flags = if n.file.fd_folder {
+        FD_OPEN | FD_FOLDER
+    } else if n.file.fd_save {
+        FD_SAVE
+    } else {
+        FD_OPEN
+    };
+    // a background picture (G1): the formats every window decodes; a folder has none
+    let exts: &[&str] = if n.file.fd_folder {
+        &[]
+    } else if n.file.fd_image {
+        &[t(IMG_EXT)]
+    } else {
+        &[t(EXT)]
+    };
     let ev = ui.filedlg(ID_FILEDLG, flags, &open, &mut n.file.fd_path, 1040, exts);
     if ev & EV_ACT != 0 {
         n.file.fd_active = false;
-        if core::mem::take(&mut n.file.fd_image) {
+        if core::mem::take(&mut n.file.fd_folder) {
+            ui.cmd_run(CMD_AI_FOLDER_DONE, 0);
+        } else if core::mem::take(&mut n.file.fd_image) {
             ui.cmd_run(CMD_BG_CHOSEN, 0);
         } else {
             ui.cmd_run(CMD_FILE_DONE, n.file.fd_save as u32);
@@ -360,6 +377,7 @@ pub(crate) fn dialogs(n: &mut Net, ui: &mut Ui) {
         // cancelled: nothing waits for it any more
         n.file.fd_active = false;
         n.file.fd_image = false;
+        n.file.fd_folder = false;
         n.file.after = None;
     }
     let ask = n.file.ask_open.clone();

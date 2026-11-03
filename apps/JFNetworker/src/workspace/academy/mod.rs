@@ -7,11 +7,16 @@
 //   academy.loaded()                         a new or loaded project (Net::after_load): the page goes, the
 //                                            project below it is no course's lab any more
 //   command(n, ui, id, arg)                  CMD_ACADEMY .. CMD_AK_RESET
+//   academy.can_install()                    there is a folder to install into (a run without a window has
+//                                            none unless --academy-dir names one)
+//   academy.relist(&changed) -> bool         the courses again after these changed (install.rs); true: the page
+//                                            moved away from one of them
 //   back(n, ui)                              Esc and Alt+Left while the page shows: lesson, course, the
 //                                            list of courses, then what lay below the page
 //   open_lab(n, ui, course, step)            After::CourseLab: a lab step's file as a project without a
 //                                            file (doc/file.rs open_lab), named as its file until it is saved
-//   follow_link(n, ui, target)               a link of a lesson: step:ID and lab:ID; else a message
+//   follow_link(n, ui, target)               a link of a lesson: step:ID and lab:ID; the web after a question
+//                                            that shows the address; else a message
 //   tick(n, ui)                              every frame: a course's lab with every goal reached is done; a
 //                                            fault hunt handed in has its result; a test out of time ends
 //   frame(n, ui) / bar(n, ui) / dialog(n, ui)   pages.rs: the page, the bar over the canvas, the question
@@ -29,10 +34,18 @@
 // A fault hunt is a lab whose project is broken (Lab::start_faults, Lab::lock) and that grades: handing it
 // in (assess.rs) gives its result, it is done when it reaches the lab's `pass`, and Neu beginnen on the bar
 // loads it from its file again.  Results go to Progress.best.  A step with `requires` stays locked until those
-// are done, Weiter goes past it.  For AK3: installed
-// courses appear in the folder store.rs lists: list it again (Academy::read back to false), and the list of
-// courses gets its "Jetzt installieren"; a lesson's web links come to follow_link (they are refused here).
+// are done, Weiter goes past it.  How courses come and go is install.rs.
+//
+// A course can change while it is open, because a worker runs on while the learner reads.  Files are read whole and
+// nothing stays open, so renaming a course's folder takes nothing away from under a page.  Then Academy::relist
+// goes by ids, because everything here holds places in the list: a lesson of a course that changed goes back to its
+// outline with a note (the text it showed may no longer exist), of a course that went to the list of courses; a
+// page of another course stays where it is.  A lab of a course that changed stays the project it is, in memory; it
+// keeps its bar while the step still exists, else it is a plain project without one.  Quizzes and tests are never
+// taken away: while a quiz's page shows or a test runs the list waits (install.rs), and only then
+// Academy::quizzes is cleared, since its pages hold numbers of the old list.
 
+pub(crate) mod install;
 pub(crate) mod pages;
 pub(crate) mod quiz;
 pub(crate) mod store;
@@ -115,6 +128,11 @@ pub(crate) struct Academy {
     pub quizzes: Vec<quiz::Page>,
     pub headless: bool,
     pub timer_armed: bool,
+    /// the lists of what can be installed, a worker, the questions (install.rs)
+    pub inst: install::Inst,
+    /// the question before leaving with a test under way, its answer (quiz.rs)
+    pub ask_quit: Shared<i32>,
+    pub quit_ok: bool,
 }
 
 impl Academy {
@@ -140,6 +158,9 @@ impl Academy {
             quizzes: Vec::new(),
             headless: true,
             timer_armed: false,
+            inst: install::Inst::new(),
+            ask_quit: Shared::new(0),
+            quit_ok: false,
         }
     }
 
@@ -147,6 +168,7 @@ impl Academy {
     pub(crate) fn setup(&mut self, headless: bool, dir: Option<String>) {
         self.place = store::place(headless, dir);
         self.headless = headless;
+        self.inst.setup(headless);
     }
 
     /// the courses and the progress, once
@@ -154,8 +176,48 @@ impl Academy {
         if core::mem::replace(&mut self.read, true) {
             return;
         }
+        install::read_last(self);
         self.entries = self.place.courses.as_deref().map(store::list).unwrap_or_default();
         self.progress = store::read_progress(&self.place.progress);
+    }
+
+    /// there is a folder to install into
+    pub(crate) fn can_install(&self) -> bool {
+        self.place.courses.is_some()
+    }
+
+    /// the courses again after these changed: everything that holds a place in the list follows by id (the top
+    /// of this file) -> the page moved away from a course that changed
+    pub(crate) fn relist(&mut self, changed: &[String]) -> bool {
+        let cur = self.entries.get(self.cur).map(|e| e.id.clone());
+        let lab = self.lab.as_ref().and_then(|l| self.ids(l.course, l.step).map(|ids| (ids, l.marked)));
+        self.entries = self.place.courses.as_deref().map(store::list).unwrap_or_default();
+        self.quizzes.clear();
+        let place_of = |id: &str| self.entries.iter().position(|e| e.id == id);
+        let found = cur.as_deref().and_then(place_of);
+        let touched = cur.as_deref().is_some_and(|c| changed.iter().any(|x| x == c));
+        self.lab = lab.and_then(|((c, s), marked)| {
+            let course = place_of(&c)?;
+            let step = self.entries[course].usable()?.index_of(&s)?;
+            Some(LabStep { course, step, marked })
+        });
+        self.cur = found.unwrap_or(0);
+        let mut moved = false;
+        match self.view {
+            View::Lesson(_) | View::Quiz(_) if touched || found.is_none() => {
+                moved = self.on;
+                self.view = if found.is_some() { View::Course } else { View::Home };
+            }
+            View::Course if found.is_none() => {
+                moved = self.on;
+                self.view = View::Home;
+            }
+            View::Home | View::Course | View::Lesson(_) | View::Quiz(_) => {}
+        }
+        if self.entries.is_empty() {
+            self.cur = 0;
+        }
+        moved
     }
 
     /// a new or loaded project
@@ -283,7 +345,12 @@ fn level_name(l: Level) -> &'static str {
 
 /// "Einsteiger · 15 Min."
 pub(crate) fn meta_text(c: &Course) -> String {
-    format!("{} · {}", level_name(c.level), tf("{} Min.", &[&c.minutes.to_string()]))
+    level_text(c.level, c.minutes)
+}
+
+/// "Einsteiger · 15 Min."
+pub(crate) fn level_text(l: Level, minutes: u32) -> String {
+    format!("{} · {}", level_name(l), tf("{} Min.", &[&minutes.to_string()]))
 }
 
 // the list of courses
@@ -293,7 +360,11 @@ fn home(n: &mut Net) {
     a.on = true;
     a.view = View::Home;
     a.via_home = true;
-    a.focus = if a.entries.is_empty() { ID_AK_BACK } else { ID_AK_CARD };
+    a.focus = match (a.entries.is_empty(), a.can_install()) {
+        (false, _) => ID_AK_CARD,
+        (true, true) => ID_AI_ALL,
+        (true, false) => ID_AK_BACK,
+    };
 }
 
 // a course's outline (a bad one: its messages)
@@ -410,9 +481,13 @@ pub(crate) fn back(n: &mut Net, ui: &mut Ui) {
     ui.repass();
 }
 
-/// a link of a lesson: step:ID and lab:ID stay in the course; anything else is refused for now (AK3 asks
-/// about the web)
+/// a link of a lesson: step:ID and lab:ID stay in the course; the web opens after a question that shows the
+/// address; anything else is refused
 pub(crate) fn follow_link(n: &mut Net, ui: &mut Ui, target: &str) {
+    if link_to(target) == LinkTo::Web {
+        install::ask_link(n, ui, target);
+        return;
+    }
     let found = n.academy.course().and_then(|c| match link_to(target) {
         LinkTo::Step(id) => c.index_of(id),
         LinkTo::Lab(id) => c.index_of(id).filter(|&i| c.step_at(i).and_then(|s| s.kind()) == Some(StepKind::Lab)),
@@ -421,7 +496,7 @@ pub(crate) fn follow_link(n: &mut Net, ui: &mut Ui, target: &str) {
     match found {
         Some(i) => ui.cmd_run(CMD_AK_STEP, i as u32),
         None => {
-            n.file.msg = Some((IB_WARNING, tf("Der Link „{}“ geht nicht auf", &[target]), String::from(t("Er führt zu keinem Schritt dieses Kurses. Links ins Web gehen hier noch nicht auf."))));
+            n.file.msg = Some((IB_WARNING, tf("Der Link „{}“ geht nicht auf", &[target]), String::from(t("Er führt zu keinem Schritt dieses Kurses."))));
             ui.repass();
         }
     }
@@ -444,6 +519,7 @@ pub(crate) fn fault_hunt(n: &Net) -> bool {
 /// is done if it reached the lab's `pass`; a test out of time ends
 pub(crate) fn tick(n: &mut Net, ui: &mut Ui) {
     quiz::tick(n, ui);
+    install::tick(n, ui);
     let hunt = fault_hunt(n);
     let Some(lab) = n.academy.lab.as_mut() else { return };
     if lab.marked {

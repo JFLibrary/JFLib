@@ -1,6 +1,9 @@
 // edits -- the undoable changes of a project (ui::Edit over jfn_model::Project)
 //
-//   add_device(p, model, x, y) -> (id, edit)   a new device (free name: PC1, SW2, ...), applied
+//   add_placed(p, model, x, y) -> (id, edit)   a new device (free name: PC1, SW2, ...), applied, as the
+//                                              palette places it: with the service its tile brings
+//                                              (catalog::preset_service), in one step
+//   experiments(p, label, list) -> edit        the project's experiments (SA3; not applied yet)
 //   add_note(p, x, y) -> (id, edit)            a new empty note, applied
 //   add_label(p, x, y, w, h, text) -> (id, edit)   a new label with its text in one step, applied
 //   moves(p, &[(id, x, y)], to) -> edit        devices and notes to new positions (a drag)
@@ -99,12 +102,40 @@ impl Edit<Project> for AddDevice {
     }
 }
 
-/// a new device of a catalog model at x, y (applied) -> its id and the undo step
-pub(crate) fn add_device(p: &mut Project, model: &str, x: i32, y: i32) -> Result<(u32, Box<dyn Edit<Project>>), ProjErr> {
+/// a new device as the palette places it: with the service its tile brings (not when a file loads) ->
+/// its id and the one undo step
+pub(crate) fn add_placed(p: &mut Project, model: &str, x: i32, y: i32) -> Result<(u32, Box<dyn Edit<Project>>), ProjErr> {
     let id = p.add_device(model, x, y)?;
+    if let (Some((kind, name)), Some(d)) = (jfn_model::catalog::preset_service(model), p.device_mut(id)) {
+        d.services.push(jfn_model::ServiceDef { kind: String::from(kind), name: String::from(name), disabled: false, config: agent_core::jmap::empty_object() });
+    }
     let dev = p.device(id).cloned().unwrap_or_default();
     let label = format!("{} hinzufügen", dev.name);
     Ok((id, Box::new(AddDevice { dev, label })))
+}
+
+/// the project's experiments before and after a change
+struct ExperimentsEdit {
+    before: Vec<jfn_model::experiment::Experiment>,
+    after: Vec<jfn_model::experiment::Experiment>,
+    label: String,
+}
+
+impl Edit<Project> for ExperimentsEdit {
+    fn apply(&mut self, p: &mut Project) {
+        p.experiments = self.after.clone();
+    }
+    fn revert(&mut self, p: &mut Project) {
+        p.experiments = self.before.clone();
+    }
+    fn label(&self) -> &str {
+        &self.label
+    }
+}
+
+/// the project's experiments become this list (not applied yet)
+pub(crate) fn experiments(p: &Project, label: &str, list: Vec<jfn_model::experiment::Experiment>) -> Box<dyn Edit<Project>> {
+    Box::new(ExperimentsEdit { before: p.experiments.clone(), after: list, label: String::from(label) })
 }
 
 struct AddNote {

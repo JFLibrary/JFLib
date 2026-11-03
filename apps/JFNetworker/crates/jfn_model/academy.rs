@@ -2,7 +2,8 @@
 // learner has done.  Text in, records and messages out, no I/O and no clock, so that the app, jfn-sim
 // and the selftest read the same files the same way.
 //
-//   academy/index.json           Index: what can be installed (AK3 reads it, the app lists folders)
+//   academy/index.json           Index: what can be installed (the installer in crates/jfn_run reads it,
+//                                the list of courses comes from the folders)
 //   academy/<kurs>/course.json   Course: title, summary, level, time, units with steps
 //   academy/<kurs>/de/*.md, en/*.md   the lessons, one folder per language code
 //   academy/<kurs>/labs/*.jfnet, img/*   the labs and the pictures
@@ -13,7 +14,11 @@
 //                                                take their defaults, unknown ones are skipped
 //   load(id, text, &exists) -> (Option<Course>, Vec<Problem>)   a course's folder as a whole: its
 //                                                name, its course.json (None: it cannot be read), its files
-//   index.issues() / course.issues() -> Vec<Problem>   what is wrong in the file itself
+//   index.issues() / course.issues() -> Vec<Problem>   what is wrong in the file itself; for the index also
+//                                its limits: INDEX_MAX bytes, INDEX_COURSES_MAX courses, per course
+//                                COURSE_FILES_MAX files of FILE_MAX bytes, COURSE_BYTES_MAX bytes in all
+//   standing(installed, offered) -> Standing     a course against the index, by the versions of its content
+//   entry.total() -> bytes                       an index entry's files together
 //   course.file_issues(&exists) -> Vec<Problem>  the lessons in every language, the labs (exists: a
 //                                                path relative to the course's folder)
 //   course.lesson_issues(step, text, &exists)    a lesson's pictures and links
@@ -44,7 +49,7 @@
 // A step's `file` is relative to the course's folder ("labs/x.jfnet"), a lesson's to the folder of
 // its language ("01-netz.md" -> de/01-netz.md, en/01-netz.md): a new language is a new folder.  A
 // lesson's pictures are relative to the course's folder ("img/x.svg").  Its links are step:ID, lab:ID
-// or an address of the web (which the app refuses for now and AK3 asks about).
+// or an address of the web (which the app opens only after a question that shows the address).
 //
 // `version` of index.json and course.json is the version of the format; the version of a course's
 // content is `version` of its entry in index.json and `course_version` of its course.json.  Progress
@@ -83,6 +88,12 @@ const PATH_MAX: usize = 200;
 const ID_MAX: usize = 64;
 /// the most steps of a course (the app's block of ids has room for them)
 const STEPS_MAX: usize = 1000;
+/// what an index may ask for: its own size, its courses, per course the files, a file's bytes and all its bytes
+pub const INDEX_MAX: usize = 4 << 20;
+pub const INDEX_COURSES_MAX: usize = 512;
+pub const COURSE_FILES_MAX: usize = 4096;
+pub const FILE_MAX: u64 = 64 << 20;
+pub const COURSE_BYTES_MAX: u64 = 512 << 20;
 
 wire_enum! {
     /// who a course is for
@@ -137,6 +148,8 @@ record! {
         pub minutes: u32,
         /// the version of its content (course_version of its course.json)
         pub version: u32,
+        /// a sample that shows the format: offered, but not among the courses a first install takes
+        pub sample: bool,
         pub files: Vec<FileEntry>,
     }
 }
@@ -179,6 +192,8 @@ record! {
         pub version: u32,
         /// the version of the content
         pub course_version: u32,
+        /// a sample that shows the format (the index says so too)
+        pub sample: bool,
         pub title: Text,
         pub summary: Text,
         pub level: Level,
@@ -597,10 +612,13 @@ impl Index {
         Ok(i)
     }
 
-    /// what is wrong in the list: ids, paths, checksums
+    /// what is wrong in the list: ids, paths, checksums, its limits
     pub fn issues(&self) -> Vec<Problem> {
         let mut v = Vec::new();
         let mut seen: Vec<&str> = Vec::new();
+        if self.courses.len() > INDEX_COURSES_MAX {
+            v.push(fatal(msg!("Die Kursliste nennt mehr als {} Kurse.", INDEX_COURSES_MAX)));
+        }
         for c in &self.courses {
             if !safe_id(&c.id) {
                 v.push(fatal(msg!("Die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.", c.id)));
@@ -609,9 +627,28 @@ impl Index {
                 v.push(fatal(msg!("Die Kennung {} kommt doppelt vor.", c.id)));
             }
             seen.push(&c.id);
+            if !c.files.iter().any(|f| f.path == COURSE_FILE) {
+                v.push(fatal(msg!("Kurs {}: die Kursliste nennt keine Datei {}.", c.id, COURSE_FILE)));
+            }
+            if c.files.len() > COURSE_FILES_MAX {
+                v.push(fatal(msg!("Kurs {}: die Kursliste nennt mehr als {} Dateien.", c.id, COURSE_FILES_MAX)));
+            }
+            if c.total() > COURSE_BYTES_MAX {
+                v.push(fatal(msg!("Kurs {}: er ist mit {} Bytes größer als die erlaubten {} Bytes.", c.id, c.total(), COURSE_BYTES_MAX)));
+            }
+            let mut names: Vec<String> = Vec::new();
             for f in &c.files {
                 if let Err(m) = safe_path(&f.path) {
                     v.push(fatal(msg!("Kurs {}: {}", c.id, m)));
+                }
+                // the same name to a file system that ignores case
+                let low = f.path.to_ascii_lowercase();
+                if names.contains(&low) {
+                    v.push(fatal(msg!("Kurs {}: die Datei {} kommt doppelt vor.", c.id, f.path)));
+                }
+                names.push(low);
+                if f.size > FILE_MAX {
+                    v.push(fatal(msg!("Kurs {}: die Datei {} ist mit {} Bytes größer als die erlaubten {} Bytes.", c.id, f.path, f.size, FILE_MAX)));
                 }
                 if f.sha256.len() != 64 || !f.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
                     v.push(fatal(msg!("Kurs {}: die Prüfsumme von {} ist kein SHA-256.", c.id, f.path)));
@@ -619,6 +656,40 @@ impl Index {
             }
         }
         v
+    }
+}
+
+impl IndexCourse {
+    /// the bytes of its files together
+    pub fn total(&self) -> u64 {
+        self.files.iter().fold(0u64, |a, f| a.saturating_add(f.size))
+    }
+}
+
+/// how a course stands against the index
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Standing {
+    /// the index offers it, it is not here
+    NotInstalled,
+    /// here in the version the index offers
+    Current,
+    /// the index has a newer version
+    Update,
+    /// here in a newer version than the index offers (an author's folder, say): no way down
+    Newer,
+    /// here, and the index does not name it (or there is no index)
+    Unlisted,
+}
+
+/// a course against the index: the version of its content here (`course_version`) and in the index
+/// (`version`); None: not here, not in the index
+pub fn standing(installed: Option<u32>, offered: Option<u32>) -> Standing {
+    match (installed, offered) {
+        (None, _) => Standing::NotInstalled,
+        (Some(_), None) => Standing::Unlisted,
+        (Some(a), Some(b)) if b > a => Standing::Update,
+        (Some(a), Some(b)) if a > b => Standing::Newer,
+        _ => Standing::Current,
     }
 }
 

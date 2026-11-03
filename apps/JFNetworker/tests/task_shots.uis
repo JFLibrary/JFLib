@@ -44,7 +44,8 @@ dblclick listitem:"KV1" shift
 expect window 26624 open
 click tab:"Dienste"
 click #51200
-expect text:"Die Einstellungen von kv als JSON. Übernehmen prüft sie und startet KV1 mit ihnen neu." exists
+click #140290
+expect text:"Die Einstellungen von kv als JSON. Übernehmen prüft sie." exists
 shot build/jfnetworker/task_settings_light_100.png window 26624
 theme dark
 shot build/jfnetworker/task_settings_dark_100.png window 26624

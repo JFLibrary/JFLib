@@ -63,6 +63,40 @@ The `Config` fields after `new`: `dir` (the updater's folder, default `data://up
 restarts), `max_size` (1 GiB), `ca_pem` (extra CAs of a self-hosted https channel),
 `timeout_ms`.
 
+## Downloads without an update
+
+`update::fetch` is the updater's HTTP(S) for an app's other files (JFNetworker's courses use
+it). Nothing is signed here: the caller knows the size and the SHA-256 from somewhere it trusts.
+
+```rust
+use core::sync::atomic::{AtomicBool, AtomicU64};
+use update::fetch::{download, get, join, Progress};
+
+let cfg = update::Config::new("Kritzel", "1.4.0", "", &[]);   // app and version: the User-Agent
+let base = netio::Url::parse("https://example.org/brushes/").unwrap();
+// a small file, redirects followed; more than max bytes: Error::TooLarge
+let (_, list) = get(&cfg, &join(&base, "list.json").unwrap(), 1 << 20)?;
+// a file into `part`, hashed while it is written; a part from an earlier attempt goes on with a
+// Range request (a server that answers 200 starts it over)
+let (done, total, cancel) = (AtomicU64::new(0), AtomicU64::new(0), AtomicBool::new(false));
+let p = Progress { done: &done, total: &total, cancel: &cancel };
+download(&cfg, &join(&base, "ink.brush").unwrap(), "data://brushes/ink.part", size, &sha256, &p)?;
+```
+
+| Function | Does |
+| --- | --- |
+| `join(base, href)` | an address relative to `base`: absolute, `//host/..`, `/path` or a name in `base`'s folder |
+| `get(cfg, url, max)` | the address the file came from and its bytes; at most 5 redirects, https never redirects to http |
+| `download(cfg, url, part, size, sha256, progress)` | `Ok` when `part` holds exactly that file; set `cancel` from another thread, `done` and `total` follow |
+
+Both block, so they belong on a worker thread or in a console program. The app's `net.connect`
+rules apply as for updates; on a worker an `ask` line asks and waits for the answer. Of `Config`
+only `app`, `version`, `ca_pem` and `timeout_ms` count. A wrong file is deleted (`Error::Size`,
+`Error::Hash`), an interrupted one kept for the next call (`Error::Incomplete`), `Cancelled`
+keeps it too. `Error::Tls` is a refused certificate or handshake, `Error::Net` any other
+connection or protocol failure, `Error::Denied` a host the rules do not allow. `netio` has no
+HTTP proxy, and a network that breaks TLS open works only with its root in the system.
+
 ## The channel
 
 Two files at the channel's address, written by `tools/update_manifest.py` (or
@@ -279,6 +313,7 @@ keys in `Config::keys`, then sign with the new one.
 redirect, a wrong signature, a manifest changed after signing, a wrong hash, a download broken
 off and continued with `Range`, an older version, a replayed manifest, another app's manifest,
 an expired one, no package for the system, hosts the `PERMISSIONS` refuse (manifest and file),
+`update::fetch` on its own (`get`, its limit, `download`, a wrong checksum),
 cancelling a background download, applying `exe` and `bundle` updates with trial, health
 marker and rollback, a `package` update, a damaged staged file and a program folder without
 write permission. `apply.uis` installs a copy of the test program in a scratch folder, lets it

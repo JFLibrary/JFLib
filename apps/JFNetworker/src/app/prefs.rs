@@ -5,8 +5,8 @@
 //                              Minimap; Simulation: Tempo beim Start, Bewegung; Allgemein:
 //                              Sprache, automatisch speichern (Sekunden, 0 aus); Desktop (the
 //                              hosts' desktops, V2): Hintergrund, Größe der Symbole, Uhr der
-//                              Taskleiste; Startseite: Beim Start anzeigen; the recent files live
-//                              in the same file outside the schema
+//                              Taskleiste; Startseite: Beim Start anzeigen; Akademie: Adresse der
+//                              Kurse; the recent files live in the same file outside the schema
 //   DESK_*_COUNT, desk_names(k)   the desktop's choices for its Einstellungen program
 //   Prefs::open(headless)      the user's file; headless runs (--script, --shot) keep them in
 //                              memory only (Settings::new), so tests never read or write them
@@ -67,8 +67,13 @@ const START_PAGE: Key<bool> = Key::bool("start.show", true)
     .label("Beim Start anzeigen")
     .help("Ohne diese Seite beginnt das Programm mit einem leeren Projekt.");
 
-static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d, DESK_BG.d, DESK_ICON.d, DESK_CLOCK.d, START_PAGE.d])
-    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien"), ("desk", "Desktop"), ("start", "Startseite")]);
+// the Akademie (AK3, workspace/academy/install.rs)
+const ACADEMY_BASE: Key<String> = Key::text("academy.base", jfn_run::install::DEFAULT_BASE, 500)
+    .label("Adresse der Kurse") // i18n
+    .help("Von hier lädt „Nach Kursen suchen“ die Kursliste und die Kurse. Erlaubt ist nur der Host raw.githubusercontent.com; der Knopf daneben führt zur Vorgabe zurück."); // i18n
+
+static SCHEMA: Schema = Schema::new(1, &[GRID.d, GRID_STEP.d, SNAP.d, MINIMAP.d, TEMPO.d, MOTION.d, LANG.d, AUTOSAVE.d, DESK_BG.d, DESK_ICON.d, DESK_CLOCK.d, START_PAGE.d, ACADEMY_BASE.d])
+    .sections(&[("view", "Ansicht"), ("sim", "Simulation"), ("app", "Allgemein"), ("files", "Dateien"), ("desk", "Desktop"), ("start", "Startseite"), ("academy", "Akademie")]);
 
 /// the backgrounds, icon sizes and clocks of the desktop (DESK_BGS, DESK_ICONS, DESK_CLOCKS)
 pub(crate) const DESK_BG_COUNT: usize = DESK_BGS.len();
@@ -124,6 +129,8 @@ pub(crate) struct Prefs {
     pub desk_clock: usize,
     /// the window opens on the start page (when nothing was opened)
     pub start_page: bool,
+    /// where the Akademie looks for its courses: the folder of index.json
+    pub academy_base: String,
     /// they belong to the user's file (not a headless run)
     pub kept: bool,
 }
@@ -145,6 +152,7 @@ impl Prefs {
             desk_icons: 1,
             desk_clock: 0,
             start_page: true,
+            academy_base: String::new(),
             kept: false,
         };
         p.pull();
@@ -185,6 +193,19 @@ impl Prefs {
         self.desk_icons = s.get(&DESK_ICON);
         self.desk_clock = s.get(&DESK_CLOCK);
         self.start_page = s.get(&START_PAGE);
+        self.academy_base = s.get(&ACADEMY_BASE);
+    }
+
+    /// another address for the courses (selftest; the window's way is the settings page)
+    pub(crate) fn set_academy_base(&mut self, url: &str) {
+        self.s.set(&ACADEMY_BASE, String::from(url));
+        self.pull();
+    }
+
+    /// the address of the courses back at its default (the page's reset button does the same)
+    pub(crate) fn reset_academy_base(&mut self) {
+        self.s.reset(&ACADEMY_BASE);
+        self.pull();
     }
 
     /// the toggles of the Ansicht menu and the desktop's Einstellungen program into the

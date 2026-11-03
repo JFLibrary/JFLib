@@ -50,6 +50,8 @@
 //                       nothing leaves or enters it (warning)
 //   FwPairNoPolicy      a zone pair without a service policy: it drops everything (warning)
 //   FwPolicyUnused      a policy no zone pair uses (warning)
+//   ServiceNotStarted   a service of the project that does not start: what it lacks, as a form
+//                       shows it (svcform::missing), else the refusal of its config (warning)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -153,6 +155,8 @@ pub enum ProblemKind {
     FwPairNoPolicy,
     /// a policy no zone pair uses
     FwPolicyUnused,
+    /// a service of the project does not start
+    ServiceNotStarted,
 }
 
 /// a problem of the set-up
@@ -311,6 +315,7 @@ impl Engine {
         self.script_problems(&mut out);
         self.dot1x_problems(&mut out);
         self.fw_problems(&mut out);
+        self.service_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }
@@ -759,6 +764,19 @@ impl Engine {
             }
             for (name, p) in fw.pairs.iter().filter(|(_, p)| p.policy.is_none() && p.src != SELF_ZONE && p.dst != SELF_ZONE) {
                 out.push(warn(ProblemKind::FwPairNoPolicy, None, msg!("Das Zonenpaar {} ({} nach {}) hat keine Richtlinie und verwirft alles.", name, p.src, p.dst)));
+            }
+        }
+    }
+}
+
+impl Engine {
+    /// the project's services that do not start (a bad one is left out when the device starts)
+    fn service_problems(&self, out: &mut Vec<Problem>) {
+        for (&dev, &ni) in &self.dev_idx {
+            let Some(os) = self.os(ni) else { continue };
+            for (def, why) in os.refused.iter().filter(|(d, _)| !d.disabled) {
+                let why = crate::svcform::missing(&def.kind, &def.config).unwrap_or_else(|| why.clone());
+                out.push(problem(ProblemKind::ServiceNotStarted, Severity::Warning, dev, None, None, Vec::new(), msg!("Der Dienst {} läuft nicht. {}", def.name.clone(), why)));
             }
         }
     }

@@ -529,6 +529,30 @@ impl Provider for MemFs {
         if old == new {
             return t.files.contains_key(old);
         }
+        // a folder moves with everything below it, onto nothing that exists, not into itself
+        if t.dirs.contains_key(old) {
+            let below = alloc::format!("{old}/");
+            if t.kind(new) != 0 || !t.can_create(new) || new.starts_with(&below) {
+                return false;
+            }
+            let moved = |k: &str| alloc::format!("{new}/{}", &k[below.len()..]);
+            let files: Vec<String> = t.files.keys().filter(|k| k.starts_with(&below)).cloned().collect();
+            for k in files {
+                if let Some(f) = t.files.remove(&k) {
+                    t.files.insert(moved(&k), f);
+                }
+            }
+            let dirs: Vec<String> = t.dirs.keys().filter(|k| k.starts_with(&below)).cloned().collect();
+            for k in dirs {
+                if let Some(d) = t.dirs.remove(&k) {
+                    t.dirs.insert(moved(&k), d);
+                }
+            }
+            let Some(d) = t.dirs.remove(old) else { return false };
+            t.add_dirs(parent(new));
+            t.dirs.insert(String::from(new), d);
+            return true;
+        }
         if !t.files.contains_key(old) || !t.can_create(new) {
             return false;
         }

@@ -13,6 +13,7 @@
 //                                   changes nothing in the project (faults.rs)
 //   replace(project, path)          a loaded or new project: a fresh history and engine, saved
 //   dirty() / saved(path)           unsaved changes; the file was written
+//   file_changed()                  a change of the file that is no undo step: a run kept or removed
 //   file_name()                     "Büro.jfnet", "Unbenannt" for a project without a file (a
 //                                   lab of the app: its file's name, `origin`)
 //
@@ -112,13 +113,15 @@ pub(crate) struct Doc {
     pub runs: faults::Runs,
     /// the cables the project had when it loaded (Sim::again)
     pub born: alloc::vec::Vec<u32>,
+    /// the file changed outside the history (file_changed)
+    unsaved: bool,
 }
 
 impl Doc {
     pub(crate) fn new() -> Doc {
         let proj = Project::new("", 1);
         let sim = Sim::new(&proj);
-        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, origin: None, rev: 1, sim, runs: faults::Runs::default(), born: alloc::vec::Vec::new() }
+        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, origin: None, rev: 1, sim, runs: faults::Runs::default(), born: alloc::vec::Vec::new(), unsaved: false }
     }
 
     /// a project from a file (or a new one): a fresh history and engine, saved; the engine
@@ -131,6 +134,13 @@ impl Doc {
         self.runs = faults::Runs::default();
         self.path = path;
         self.origin = None;
+        self.unsaved = false;
+        self.touch();
+    }
+
+    /// what the file holds changed without a step of the history (a kept run: experiments)
+    pub(crate) fn file_changed(&mut self) {
+        self.unsaved = true;
         self.touch();
     }
 
@@ -214,13 +224,14 @@ impl Doc {
     }
 
     pub(crate) fn dirty(&self) -> bool {
-        self.hist.dirty()
+        self.hist.dirty() || self.unsaved
     }
 
     /// the project was written to path
     pub(crate) fn saved(&mut self, path: &str) {
         self.path = Some(String::from(path));
         self.hist.mark_saved();
+        self.unsaved = false;
     }
 
     /// the name of the file ("Büro.jfnet"), a lab's file name, "Unbenannt" without one

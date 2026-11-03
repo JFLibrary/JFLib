@@ -6,7 +6,8 @@
 //                              Range, an older version and a replayed manifest, another app's
 //                              manifest, an expired one, no package for this system (also
 //                              none for an exe running as an AppImage), hosts the
-//                              PERMISSIONS refuse (manifest and file), cancel in the background;
+//                              PERMISSIONS refuse (manifest and file), update::fetch on its own,
+//                              cancel in the background;
 //                              then applying exe and bundle updates to stand-in programs with
 //                              cfg.restart = false: trial, health marker, rollback, a package
 //                              update, a damaged staged file, a program folder without write
@@ -340,6 +341,35 @@ fn t_update(t: &mut T) {
     t.eq(u.download(), Err(Error::Denied(String::from("download.invalid"))), "update: a file host net.connect does not allow: Error::Denied");
     let d = plat::policy::denials();
     t.check(["updates.invalid", "download.invalid"].iter().all(|h| d.iter().any(|x| x.kind == "net.connect" && x.target == *h)), "update: both refusals are in plat::policy::denials()");
+
+    // update::fetch on its own, as an app's other downloads use it: no manifest, no key
+    {
+        use core::sync::atomic::{AtomicBool, AtomicU64};
+        use update::fetch::{download, get, join, Progress};
+        let f = Config::new(APP, "1.0.0", "", &[]);
+        let base = netio::Url::parse(&format!("{}/good/", s.base));
+        let (list, file) = (base.as_ref().and_then(|b| join(b, "update.json")), base.as_ref().and_then(|b| join(b, "app-2.0.0.bin")));
+        if let (Some(list), Some(file)) = (list, file) {
+            let got = get(&f, &list, 1 << 20);
+            t.check(got.as_ref().is_ok_and(|(u, b)| *u == list && b.starts_with(b"{")), "fetch: get a small file");
+            t.check(matches!(get(&f, &list, 8), Err(Error::TooLarge(_))), "fetch: get over its limit: Error::TooLarge");
+            t.check(matches!(get(&f, &join(&list, "gibt-es-nicht").unwrap_or(list.clone()), 1024), Err(Error::Http(404))), "fetch: an address that is not there: Error::Http");
+            let data = get(&f, &file, 256 << 20).map_or_else(|_| Vec::new(), |x| x.1);
+            let sha = crypto::sha256(&data);
+            let (done, total, cancel) = (AtomicU64::new(0), AtomicU64::new(0), AtomicBool::new(false));
+            let p = Progress { done: &done, total: &total, cancel: &cancel };
+            let part = format!("{}/fetch.part", dir);
+            t.eq(download(&f, &file, &part, data.len() as u64, &sha, &p), Ok(()), "fetch: download the whole file");
+            t.check(plat::read_file(&part).is_some_and(|b| b == data) && total.load(core::sync::atomic::Ordering::SeqCst) == data.len() as u64, "fetch: its bytes, its counters");
+            plat::delete(&part);
+            let mut other = sha;
+            other[0] ^= 1;
+            t.eq(download(&f, &file, &part, data.len() as u64, &other, &p), Err(Error::Hash), "fetch: another checksum: Error::Hash");
+            t.check(plat::file_exists(&part) == 0, "fetch: a wrong file does not stay");
+        } else {
+            t.check(false, "fetch: the addresses");
+        }
+    }
 
     // in the background, cancelled
     let c = config(&s, &dir, "big", "1.0.0", "s-big");

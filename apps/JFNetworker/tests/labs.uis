@@ -41,7 +41,8 @@ expect window 26624 open
 click tab:"Services"
 expect text:"Cache · cache" exists
 click #51200
-expect text:"The settings of cache as JSON. Apply checks them and restarts CACHE1 with them." exists
+click #140290
+expect text:"The settings of cache as JSON. Apply checks them." exists
 focus #51456
 key ctrl+a
 type "{\"port\": 80, \"backend\": \"http://10.0.2.30/\", \"entries\": 1000, \"ttl_ms\": 30000}"

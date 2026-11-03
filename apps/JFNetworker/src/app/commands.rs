@@ -23,6 +23,8 @@
 // and Nächster Hinweis.  Assessments (A1): Werkzeuge › Aufgabe erstellen … (the author's panel,
 // workspace/author.rs), Simulation › Aufgabe abgeben (workspace/assess.rs); TIMER_ASSESS moves
 // a time limit's countdown.
+// Ansicht › Bereiche › Experimente (Ctrl+Shift+E): parameter sweeps in a panel of their own (SA3,
+// workspace/experiments); TIMER_EXP brings a run's progress.
 // WLAN (W1): Ansicht › WLAN-Reichweiten shows the range of every access
 // point on the canvas (canvas/wlan.rs; without it the selected ones show theirs).
 // The physical view (P1, workspace/phys): Ansicht › Logische Ansicht (Ctrl+Shift+L) and
@@ -40,7 +42,8 @@
 // first), Datei › Projektinfo … edits the project's description and author; while the page shows, only
 // what makes sense without a project stays enabled.
 // The Akademie (AK1, AK2, workspace/academy): Datei › Akademie … shows its courses; Esc and Alt+Left go back
-// while its page shows; TIMER_QUIZ moves a test's countdown.
+// while its page shows; TIMER_QUIZ moves a test's countdown, TIMER_AI_JOB what a worker installing a course has
+// done (AK3, workspace/academy/install.rs: CMD_AI_*).
 
 use jfn_model::CableKind;
 use ui::*;
@@ -52,7 +55,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 121] = [
+pub(crate) static CMDS: [Command; 122] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -174,6 +177,7 @@ pub(crate) static CMDS: [Command; 121] = [
     Command::new(CMD_PROJECT_INFO, "Projekt&info …", IC_INFO, 0, 0, 0),
     Command::new(CMD_ACADEMY, "&Akademie …", IC_OFFICE_READ_MODE, 0, 0, 0),
     Command::new(CMD_AK_BACK, "In der Akademie zurück", IC_BACK, MOD_ALT, VK_LEFT, CF_DISABLED),
+    Command::new(CMD_EXPERIMENTS, "E&xperimente", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'E' as u32, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -268,7 +272,7 @@ pub(crate) static M_PHYS_BG: [Mi; 9] = [
     Mi::Cmd(CMD_PHYS_UP),
     Mi::Cmd(CMD_PHYS_BACK),
 ];
-static M_PANELS: [Mi; 13] = [
+static M_PANELS: [Mi; 14] = [
     Mi::Cmd(CMD_FOCUS_CANVAS),
     Mi::Cmd(CMD_PANEL0),
     Mi::Cmd(CMD_PANEL0 + 1),
@@ -280,6 +284,7 @@ static M_PANELS: [Mi; 13] = [
     Mi::Cmd(CMD_PANEL0 + 7),
     Mi::Cmd(CMD_METRICS),
     Mi::Cmd(CMD_TASK_PANEL),
+    Mi::Cmd(CMD_EXPERIMENTS),
     Mi::Sep,
     Mi::Cmd(CMD_LAYOUT_RESET),
 ];
@@ -415,6 +420,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
         let off = hide_problems && p == P_PROBLEMS;
         ui.cmd_state(CMD_PANEL0 + k as u32, if off { CF_DISABLED } else { flag(n.shell.dock.visible(p), CF_CHECKED) });
     }
+    crate::workspace::experiments::states(n, ui);
     let t = n.canvas.tool;
     ui.cmd_state(CMD_TOOL_SELECT, flag(t == Tool::Select, CF_CHECKED));
     ui.cmd_state(CMD_TOOL_HAND, flag(t == Tool::Hand, CF_CHECKED));
@@ -496,6 +502,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             return false;
         }
         UIC_CLOSE => {
+            if crate::workspace::academy::quiz::ask_quit(n, ui) {
+                return true; // a test is under way: the question first
+            }
             if !n.doc.dirty() {
                 return false; // the window closes
             }
@@ -521,7 +530,11 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             file::save(n, ui);
         }
         CMD_SAVE_AS => file::save_as(n, ui),
-        CMD_QUIT => file::request(n, ui, After::Quit),
+        CMD_QUIT => {
+            if !crate::workspace::academy::quiz::ask_quit(n, ui) {
+                file::request(n, ui, After::Quit);
+            }
+        }
         CMD_FILE_DONE => file::chosen(n, ui, arg != 0),
         CMD_ASK_ANSWER => file::answer(n, ui, arg != 0),
         _ if (CMD_RECENT0..CMD_RECENT0 + RECENT_MAX as u32).contains(&id) => {
@@ -602,11 +615,21 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_SCRIPTS => return crate::workspace::devwin::scripts::command(n, ui, id),
         // the lab (U6a: the Metriken panel, faults)
         CMD_METRICS | CMD_HEAL_ALL => return crate::workspace::metrics::command(n, ui, id, arg),
+        // the panel Experimente (SA3): a run's progress, the panel, its file dialog
+        UIC_TIMER if arg == TIMER_EXP => {
+            ui.repass();
+            return true;
+        }
+        CMD_EXPERIMENTS | CMD_EXP_FILE_DONE => return crate::workspace::experiments::command(n, ui, id, arg),
         // assessments (A1): handing in, the author's panel, the countdown
         CMD_ASSESS_SUBMIT => return crate::workspace::assess::command(n, ui, id),
         CMD_AUTHOR | CMD_AUTHOR_TARGET | CMD_AUTHOR_START | CMD_AUTHOR_SAVE => return crate::workspace::author::command(n, ui, id),
         UIC_TIMER if arg == TIMER_QUIZ => {
             crate::workspace::academy::quiz::timer(n, ui);
+            return true;
+        }
+        UIC_TIMER if arg == TIMER_AI_JOB => {
+            crate::workspace::academy::install::timer(n, ui);
             return true;
         }
         UIC_TIMER if arg == TIMER_ASSESS => {
@@ -628,6 +651,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_START_PAGE..=CMD_SP_FORGET => return crate::workspace::startpage::command(n, ui, id, arg),
         // the Akademie (workspace/academy)
         CMD_ACADEMY..=CMD_AK_RETRY => return crate::workspace::academy::command(n, ui, id, arg),
+        CMD_AI_SEARCH..=CMD_AI_GATE => return crate::workspace::academy::install::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

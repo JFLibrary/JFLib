@@ -85,7 +85,8 @@
 // default, so a project that does not use them stays the same file.
 //
 // Experiments (SA2, experiment.rs): the project's "experiments", parameter sweeps kept with it; not
-// written while there are none.
+// written while there are none.  Its "runs" (SA3): runs kept by their names with their results
+// (experiment.rs: SavedRun, at most KEEP_RUNS of at most KEEP_POINTS points); not written while there are none.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -280,6 +281,8 @@ record! {
         pub metered: bool,
         /// parameter sweeps kept with the project (experiment.rs; empty: none, and no member in the file)
         pub experiments: Vec<crate::experiment::Experiment>,
+        /// runs of them kept by their names (experiment.rs; empty: none, and no member in the file)
+        pub runs: Vec<crate::experiment::SavedRun>,
     }
 }
 
@@ -366,7 +369,7 @@ impl fmt::Display for LoadErr {
 /// stays the same file
 fn no_default_hw(v: &mut Value) {
     let Value::Object(o) = v else { return };
-    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)) && !(k == "experiments" && *x == Value::Array(Vec::new())));
+    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)) && !(k == "experiments" && *x == Value::Array(Vec::new())) && !(k == "runs" && *x == Value::Array(Vec::new())));
     for (k, x) in o.iter_mut() {
         if let ("devices", Value::Array(ds)) = (k.as_str(), x) {
             for d in ds.iter_mut() {
