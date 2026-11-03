@@ -13,6 +13,7 @@
 //                                      takes the canvas away after it (after_flush): no gap, no wrong frame
 //   win_release_kept(w)                the copy of the window for #screen goes, and the worker's pooled
 //                                      pixel buffers with it
+//   win_gpu_child_blank()              the page found that the canvas shows nothing (once)
 //
 // A canvas that has shown nothing yet shows nothing: until the first frame reaches the compositor the
 // page's #screen is seen through it, the same pixels (the switch needs no message and no timing).  A
@@ -36,6 +37,8 @@ static CANVAS: AtomicU32 = AtomicU32::new(0);
 static ASKED: AtomicBool = AtomicBool::new(false);
 // the next flush takes the canvas away
 static HIDE: AtomicBool = AtomicBool::new(false);
+// the page's watcher found that the canvas shows nothing
+static BLANK: AtomicBool = AtomicBool::new(false);
 
 /// (worker.js) the page's canvas, as a number of web/gpu.js's table
 #[unsafe(no_mangle)]
@@ -43,6 +46,18 @@ pub extern "C" fn jfgui_gpu_canvas(handle: u32) {
     CANVAS.store(handle, Ordering::Release);
     ASKED.store(false, Ordering::Release);
     super::wake();
+}
+
+/// (worker.js) the page's watcher (watchGpuCanvas in loader.js): the canvas shows nothing
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_gpu_blank() {
+    BLANK.store(true, Ordering::Release);
+    super::wake();
+}
+
+/// the page found that the canvas shows nothing, though everything computes right; asked once
+pub fn win_gpu_child_blank() -> bool {
+    BLANK.swap(false, Ordering::AcqRel)
 }
 
 pub(super) fn after_flush() {

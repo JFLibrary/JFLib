@@ -13,6 +13,8 @@
 //   - a lost device (device.destroy() from the test: a simulation, no driver reset): back to the
 //     old path without a wrong frame, then a new device and a new canvas
 //   - the default without ?gpu: on on the desktop; phones and tablets the old path, ?gpu=1 brings it
+//   - the watcher: a canvas that never gets a frame, or a black one, while everything computes right:
+//     the old path; a canvas that is fine stays; no animation frames, no verdict
 // In a browser without a working WebGPU (Playwright's Firefox here: its build blocks WebGPU) the part
 // that needs one says SKIP and the fallback test is what remains.
 //   python build_rs.py app gallery --target web --release
@@ -29,6 +31,11 @@ const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=
 const pw=loadPlaywright();
 const dir=resolve(build,'web','gallery'), images=resolve(build,'web','androidGallery');
 
+// a texture of the canvas's size and format, nobody shows it (an open block: the stubs below close it)
+const AWAY=`{const conf=GPUCanvasContext.prototype.configure;
+  GPUCanvasContext.prototype.configure=function(d){this.jf=d;return conf.call(this,d);};
+  const away=x=>x.jf.device.createTexture({size:[x.canvas.width,x.canvas.height],format:x.jf.format,usage:x.jf.usage,viewFormats:x.jf.viewFormats});
+  `;
 // what a browser without it looks like, put in front of the host's worker
 const STUBS={
   nogpu:`Object.defineProperty(WorkerNavigator.prototype,"gpu",{get(){return undefined;}});`,
@@ -37,22 +44,31 @@ const STUBS={
   // (the small picture finds it: nothing arrives in the textures)
   badpixels:`GPUQueue.prototype.writeTexture=function(){};`,
   badshader:`{const c=GPUDevice.prototype.createShaderModule;GPUDevice.prototype.createShaderModule=function(d){return c.call(this,{code:"this is no WGSL"});};}`,
+  // (only the watcher finds these: everything computes right, the output draws into a texture nobody shows)
+  blankcanvas:`${AWAY}GPUCanvasContext.prototype.getCurrentTexture=function(){return away(this);};}`,
+  // (the same, and what reaches the canvas is black)
+  blackcanvas:`${AWAY}{const cur=GPUCanvasContext.prototype.getCurrentTexture;GPUCanvasContext.prototype.getCurrentTexture=function(){
+    const e=this.jf.device.createCommandEncoder();
+    e.beginRenderPass({colorAttachments:[{view:cur.call(this).createView(),loadOp:"clear",storeOp:"store",clearValue:[0,0,0,1]}]}).end();
+    this.jf.device.queue.submit([e.finish()]);
+    return away(this);
+  };}}`,
 };
 const server=createServer(async (request,response)=>{
   try {
     const url=new URL(request.url,'http://localhost');
     const parts=decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if(parts.join('/')==='favicon.ico') {response.writeHead(204).end();return;}
-    // /isolated/... : the headers the threads bundle needs; /STUB/... : a stub before worker.js
-    const first=parts.shift()||'';
+    // /isolated/... : the headers the threads bundle needs; /STUB/..., /isolated-STUB/... : a stub before worker.js
+    const first=parts.shift()||'', stub=first.replace(/^isolated-/,'');
     if(first==='gone'&&parts[0]==='gpu.js') {response.writeHead(404).end();return;}
     const root=first==='images'?images:dir;
     const file=resolve(root,...(parts.length ? parts : ['index.html']));
     if(!file.startsWith(root+sep)) throw new Error('outside');
     const type={'.js':'text/javascript','.css':'text/css','.html':'text/html','.wasm':'application/wasm','.json':'application/json'}[extname(file)] || 'application/octet-stream';
     let body=await readFile(file);
-    if(STUBS[first]&&parts[0]==='worker.js') body=Buffer.concat([Buffer.from(STUBS[first]+'\n'),body]);
-    const isolate=first==='isolated'?{'cross-origin-opener-policy':'same-origin','cross-origin-embedder-policy':'require-corp'}:{};
+    if(STUBS[stub]&&parts[0]==='worker.js') body=Buffer.concat([Buffer.from(STUBS[stub]+'\n'),body]);
+    const isolate=first.startsWith('isolated')?{'cross-origin-opener-policy':'same-origin','cross-origin-embedder-policy':'require-corp'}:{};
     response.writeHead(200,{'content-type':type,'cache-control':'no-store',...isolate}).end(body);
   } catch(error) {response.writeHead(404).end(String(error));}
 });
@@ -204,6 +220,73 @@ async function defaults(browser) {
   }
   const asked=await shows(phone,'&gpu=1',15000);
   say(asked.on,`an Android phone with ?gpu=1: the canvas above #screen after ${asked.ms} ms`);
+}
+
+// ---- the watcher (watchGpuCanvas in web/loader.js): everything computes right, the canvas shows nothing
+async function watcher(browser,modes) {
+  const open=async (stub,mode,init)=>{
+    const context=await browser.newContext({locale:'de-DE',viewport:{width:800,height:600}});
+    const folder=mode==='threads'?(stub?`isolated-${stub}`:'isolated'):(stub||'plain');
+    const page=await context.newPage(), errors=[];
+    page.on('pageerror',e=>errors.push(String(e)));
+    page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+    if(init) await page.addInitScript(init);
+    await page.addInitScript(()=>{window.__ready=false;addEventListener('jfgui-ready',()=>window.__ready=true);});
+    await page.goto(`${origin}/${folder}/index.html?agent=1&gpu=1&theme=light&compute=${mode}`);
+    await page.waitForFunction(()=>window.__ready,null,{timeout:60000});
+    await page.addStyleTag({content:'#input{opacity:0!important}'});
+    return {context,page,errors};
+  };
+  // a canvas that is fine stays, past the watcher's time
+  for(const mode of modes) {
+    const {context,page,errors}=await open('',mode);
+    try {
+      await until(()=>counters(page),x=>x.on===1,`${mode}: on the canvas`);
+      await page.waitForTimeout(2500);
+      const c=await counters(page);
+      say(c.on===1&&c.never===0&&c.leaves===0&&await hasCanvas(page)&&errors.length===0,`the watcher, ${mode}: a canvas that is fine stays (on=${c.on}, leaves=${c.leaves}, error=${c.error})`);
+    } finally {await context.close();}
+  }
+  const cases=[...modes.map(mode=>['no frame ever arrives','blankcanvas',mode]),['its frames are black','blackcanvas',modes[0]]];
+  for(const [want,stub,mode] of cases) {
+    const label=`the watcher, ${mode}: ${want}`;
+    const {context,page,errors}=await open(stub,mode);
+    try {
+      const box=await page.locator('#screen').boundingBox();
+      // (it comes up as always, nothing it computes is wrong)
+      const on=await until(()=>counters(page),x=>x.on===1||x.never===1,`${label}: on the canvas`);
+      const t0=Date.now();
+      const off=await until(()=>counters(page),x=>x.never===1,`${label}: the old path takes over`);
+      const ms=Date.now()-t0;
+      await until(()=>hasCanvas(page),x=>!x,`${label}: the canvas gone`,3000);
+      say(on.on===1&&off.on===0&&/shows.nothing/.test(off.error),`${label}: on the canvas (${on.on}), the old path after ${ms} ms, for good (error=${off.error})`);
+      await compareScreen(page,`${label}: at rest`);
+      await page.mouse.move(box.x+300,box.y+220);
+      await compareScreen(page,`${label}: a new frame`);
+      await page.waitForTimeout(500);
+      const c=await counters(page);
+      // (one line of the log says why, as the library logs anything: on the console as an error)
+      const other=errors.filter(e=>!/the canvas shows nothing/.test(e));
+      say(c.on===0&&c.never===1&&errors.length===1&&other.length===0,`${label}: it stays there, the log says why, no other error on the page ${other.join('; ')}`);
+    } finally {await context.close();}
+  }
+  // no animation frames for the watcher (a hidden page has none; here only its own held, the host's messages need them): no verdict
+  const hold=()=>{
+    const raf=window.requestAnimationFrame.bind(window), held=[];
+    window.__hold=true;
+    window.requestAnimationFrame=f=>window.__hold&&f.name==='look'?held.push(f):raf(f);
+    window.__release=()=>{window.__hold=false;held.splice(0).forEach(f=>raf(f));};
+  };
+  const {context,page}=await open('blankcanvas',modes[0],hold);
+  try {
+    const on=await until(()=>counters(page),x=>x.on===1||x.never===1,'without animation frames: on the canvas');
+    await page.waitForTimeout(3000);
+    const held=await counters(page);
+    say(on.on===1&&held.on===1&&held.never===0,`the watcher: no animation frames for 3 s (simulated): no verdict (on=${held.on}, never=${held.never})`);
+    await page.evaluate(()=>window.__release());
+    const off=await until(()=>counters(page),x=>x.never===1,'with animation frames again: the old path takes over');
+    say(off.on===0,`the watcher: animation frames again: the old path (never=${off.never})`);
+  } finally {await context.close();}
 }
 
 // ---- the fallback: each way to have no WebGPU, the old path, nothing above #screen
@@ -392,7 +475,7 @@ try {
       let any=false;
       for(const mode of modes) for(const scale of mode==='simd'?[1,1.25,1.5,2]:[1]) any=await path(browser,engine,mode,scale)||any;
       if(!any) console.log(`SKIP ${engine}: the path without a working WebGPU; the fallback is what this browser tests`);
-      else {await canvasAndImage(browser,engine);if(engine==='chromium')await defaults(browser);}
+      else {await canvasAndImage(browser,engine);if(engine==='chromium')await defaults(browser);await watcher(browser,modes);}
       await fallback(browser,engine);
     } finally {await browser.close();}
   }

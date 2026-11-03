@@ -75,6 +75,38 @@ function snapHostbar() {hostbar.style.height=`${Math.round(38*devicePixelRatio)/
 snapHostbar();
 function sizes() { const r=canvas.getBoundingClientRect(), d=devicePixelRatio; return {width:Math.max(1,Math.round(r.right*d)-Math.round(r.left*d)), height:Math.max(1,Math.round(r.bottom*d)-Math.round(r.top*d)), dpi:Math.round(96*d)}; }
 function report(message) { status.textContent=L(message); }
+// the GPU output's watcher (docs/GPU.md "Ausgabe im Browser"): a canvas whose frames never arrive leaves the app on a
+// still picture, #screen seen through it, while everything computes right, and nothing else would notice.  So a grid of
+// samples of what reached the canvas: one colour (nothing there reads clear in Chrome, black in Firefox) while #screen
+// shows something else, through 1.5 s of animation frames (a hidden page has none), and the old path takes over.
+// What the compositor makes of a canvas that holds the right picture, a page cannot see.
+function watchGpuCanvas(shown) {
+  const grid=document.createElement("canvas");grid.width=32;grid.height=18;
+  const g=grid.getContext("2d",{willReadFrequently:true});g.imageSmoothingEnabled=false;
+  const samples=source=>{g.clearRect(0,0,32,18);g.drawImage(source,0,0,32,18);return new Uint32Array(g.getImageData(0,0,32,18).data.buffer);};
+  const plain=a=>a.every(v=>v===a[0]);
+  const fine=()=>{
+    try {
+      const a=samples(shown);
+      if(!plain(a)) return true;
+      const b=samples(canvas);
+      return plain(b)&&b[0]===a[0];
+    } catch(error) {console.warn("GPU output:",error);return false;} // (a browser that cannot say: nobody vouches for that canvas)
+  };
+  let seen=0, last=0, next=50;
+  const look=now=>{
+    if(gpuCanvas!==shown) return;
+    if(last) seen+=Math.min(now-last,100); // (a page that hangs is not the canvas's fault)
+    last=now;
+    if(seen>=next) {
+      next=seen+100;
+      if(fine()) return;
+      if(seen>=1500) {worker.postMessage({type:"gpu-blank"});return;}
+    }
+    requestAnimationFrame(look);
+  };
+  requestAnimationFrame(look);
+}
 async function storage() {
   return openFilesStorage();
 }
@@ -361,6 +393,7 @@ async function service(m) {
       worker.postMessage({type:"gpu-canvas",canvas:offscreen},[offscreen]);
     }
     else if(m.kind===29) {gpuCanvas?.remove();gpuCanvas=null;}
+    else if(m.kind===30) watchGpuCanvas(gpuCanvas);
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
     // a change of the secret store (secrets.js): encrypted and committed in order

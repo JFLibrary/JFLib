@@ -834,6 +834,35 @@ Größe: wie überall jedes Bild über die CPU, 100 ms nach dem letzten eine neu
 | der Browser verwirft einen Shader, das kleine Bild stimmt nicht | CPU-Pfad für den ganzen Lauf; die leere Leinwand geht |
 | Gerät verloren (`device.lost`, auch zwischen zwei Bildern: `gp_tick` schaut) | das Bild über `#screen`, die Leinwand weg, neue Instanz nach 2 s, 4 s, …, neue Leinwand. Chrome zeigt nach `device.destroy()` weiter das letzte Bild, also keine Lücke; ob das bei einem echten Treiber-Reset so ist, ist nicht geprüft |
 | ein Aufruf wirft in `gpu.js` | gefangen (sonst stünde der Worker), gilt als interner Fehler des Geräts |
+| die Leinwand bekommt nichts, obwohl alles richtig rechnet | der Wächter, unten: das Bild über `#screen`, die Leinwand weg, CPU-Pfad für den ganzen Lauf |
+
+**Der Wächter.** Alle Prüfungen oben sitzen im Worker. Kommt bei der Leinwand trotzdem nichts an, scheint `#screen` mit seinem letzten Bild durch sie hindurch, und das Programm wirkt eingefroren, während alles richtig rechnet. Deshalb schaut die Seite nach jedem Wechsel auf eine neue Leinwand nach (`watchGpuCanvas` in [`web/loader.js`](../web/loader.js), ausgelöst von `REQUEST_GPU_SHOWN`): `drawImage` von `#gpu` in ein Raster von 32 × 18 Proben ohne Glättung.
+
+- **Mehrere Farben:** in Ordnung, der Wächter ist fertig, für diese Leinwand schaut er nicht wieder.
+- **Eine Farbe, und `#screen` zeigt dieselbe:** ebenfalls in Ordnung, das Programm zeigt gerade eine Farbe.
+- **Eine Farbe, und `#screen` zeigt etwas anderes:** Er schaut alle 100 ms wieder. Bleibt das 1,5 s so, meldet die Seite es dem Worker (`gpu-blank`), und `gp_tick` geht für den ganzen Lauf auf den CPU-Pfad zurück (`Unsupported`, im Log `the canvas shows nothing`). Der nächste Seitenaufruf prüft von vorn, gespeichert wird nichts.
+- **`drawImage` wirft:** Das zählt wie eine Farbe. Wo niemand für die Leinwand bürgen kann, bleibt der alte Weg.
+
+Es heißt „eine Farbe“ und nicht „durchsichtig“, weil eine Leinwand ohne Bild sich in Chrome durchsichtig und in Firefox deckend schwarz liest. Die Zeit zählt über Animationsbilder, je Bild höchstens 100 ms: Ein minimiertes Fenster hat keine und bekommt kein Urteil, eine hängende Seite wird nicht der Leinwand angelastet.
+
+| Der Wächter, je Fall ein Lauf (die leere Leinwand nachgestellt: Die Ausgabe zeichnet in eine Textur, die niemand zeigt) | Chrome 156 | Firefox 159 |
+| --- | --- | --- |
+| echtes Fenster, gesunde Leinwand | bleibt auf der GPU, einmal gelesen | ebenso |
+| echtes Fenster, leere Leinwand | alter Weg | alter Weg |
+| minimiertes Fenster, leere Leinwand | kein Blick und kein Urteil (letzter Bericht nach 6 s), nach dem Wiederherstellen alter Weg | nicht geprüft |
+
+Kopflos in `gpu_web.mjs`, alle drei Bündel: Der alte Weg kommt nach 1,4–1,6 s, das Bild auf dem Schirm gleicht dann dem Framebuffer auf 0 Pixel genau, auch nach einem neuen Bild.
+
+**Was er kostet.** Einmal lesen je Leinwand, also nach jeder neuen Größe wieder. In Chrome 1–3 ms, das erste Mal je Browser-Prozess 55–68 ms im Haupt-Thread (`getImageData`; kopflos wie im echten Fenster), kurz nach dem Start und einmalig; eine Umgehung ist nicht gesucht. In Firefox 5–15 ms. Nur bei einer verdächtigen Leinwand liest er öfter, dann alle 100 ms für 1,5 s.
+
+**Was er nicht sieht.**
+
+- **Den Bildschirm.** Er liest, was bei der Leinwand angekommen ist, nicht, was der Compositor daraus macht. Ein Treiber, der ein richtiges Bild schwarz anzeigt, bleibt unbemerkt; eine Seite kann den Bildschirm nicht lesen. Dagegen hilft nur `?gpu=0`.
+- **Spätere Ausfälle.** Er schaut einmal je Leinwand. Bleiben danach die Bilder aus, ohne dass das Gerät verloren geht, merkt er nichts. Einen Grund dafür kennen wir nicht, ein Vergleich mit dem Framebuffer bei jeder Ruhepause wäre der nächste Schritt.
+- **Falsche Bilder.** Ein buntes, aber falsches Bild besteht. Die Pipelines prüft das kleine Bild vor dem Wechsel, und `jfgui_GPU_VERIFY` vergleicht in den Tests jedes Bild.
+- **Ein schwarzes Programm in Firefox.** Zeigt `#screen` schwarz, ist eine leere Leinwand dort nicht von diesem Bild zu unterscheiden.
+
+Einen falschen Alarm gäbe es, wenn ein Programm genau beim Wechsel von mehreren Farben auf eine geht und 1,5 s dort bleibt. Dann läuft dieser Lauf über den alten Weg, sonst geschieht nichts.
 
 **Die Vorgabe** steht in einer Zeile: `DEFAULT_ON_BROWSER` in `gpu_out.rs`. Telefone und Tablets bleiben beim alten Weg, bis eins getestet ist: `web/loader.js` setzt dort `jfgui_GPU=0` (`userAgentData.mobile`, `Android`, `iPhone`, `iPad`, `iPod` oder `Mobile` in der Kennung, ein iPad, das sich als Mac ausgibt). `?gpu=0` und `?gpu=1` in der Adresse überschreiben beides, `?gpuenv=jfgui_GPU_VERIFY=1,..` setzt Variablen `jfgui_GPU_*`. Läufe mit `?agent=1` bleiben ohne `?gpu=1` auf dem CPU-Pfad, wie Skripte: Die Browser-Tests lesen `#screen`.
 
@@ -883,7 +912,7 @@ Was das heißt:
 - **Leinwände**: Das Hochladen sinkt auf ein Achtel. Bei diesem billigen Muster gewinnt der Worker nichts; was unter Windows 30 ms kostet (ein Foto, ein Diagramm), kostet auch hier nur noch die Kacheln ([Leinwände](#leinwände)), gemessen ist das im Browser nicht.
 - **Der Preis ist Speicher**: rund 95 MiB privat mehr, fast alles im GPU-Prozess (Dawn, Swapchain, Texturen), die Pixelpuffer des Workers gehen dafür. GPU-Speicher sagt der Browser nicht.
 - **Im Leerlauf** kein Unterschied: kein Bild, gleiche CPU.
-- **Entschieden am 03.11.2026: an auf dem Desktop** (`DEFAULT_ON_BROWSER = true`), Telefone und Tablets bleiben beim alten Weg, bis eins getestet ist. Der Rückfall ist sauber, und die beiden Browser, die hier gehen, zeigen dasselbe Bild früher. Der Preis sind 95 MiB, 200 KB WASM (70 KB gzip) und Ausreißer beim Rollen. Das Risiko liegt in dem, was nicht geprüft ist: ein Browser, dessen WebGPU richtig rechnet, dessen Leinwand aber nichts zeigt, bliebe auf einem stehenden Bild; das merkt der Rückfall nicht.
+- **Entschieden am 03.11.2026: an auf dem Desktop** (`DEFAULT_ON_BROWSER = true`), Telefone und Tablets bleiben beim alten Weg, bis eins getestet ist. Der Rückfall ist sauber, und die beiden Browser, die hier gehen, zeigen dasselbe Bild früher. Der Preis sind 95 MiB, 200 KB WASM (70 KB gzip) und Ausreißer beim Rollen. Das Risiko liegt in dem, was nicht geprüft ist. Eine Leinwand, bei der nichts ankommt, fängt der Wächter; eine, die das richtige Bild hat und auf dem Schirm trotzdem nichts zeigt, merkt niemand.
 
 | Größe, gallery, Release (Byte) | vor G4d | jetzt | + | gzip vor G4d | gzip jetzt |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -914,11 +943,11 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 
 **Firefox.** Playwrights Firefox 153 sperrt WebGPU („disabled by blocklist“, kein Adapter), das installierte Firefox 159 kopflos ebenso: Dort prüfen die Tests den Rückfall. In einem echten Fenster hat Firefox 159 einen Adapter und zeigt die Ausgabe (die Zahlen oben, ohne Treiber in der Seite gemessen, weil Playwright es nicht steuern kann). Es nennt seinen Adapter nicht, `GpuOutput::adapter` bleibt dort leer.
 
-**Tests.** `apps/gallery/tests/gpu_web.mjs` (die Ausgabe in allen drei Bündeln, Chrome und Firefox; ohne brauchbares WebGPU `SKIP` und nur der Rückfall; ein verlorenes Gerät über `device.destroy()`, also nachgestellt), `apps/webgputest` mit `tests/api_web.mjs` (die API ohne Fenster: Fehler, Rechen-Shader, Kopien, Zeichnen, Gerät verloren, in jedem Bündel), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) (die Messungen). `.uis`-Skripte laufen im Browser nicht; das Skriptkommando `gpu` gibt es dort nicht.
+**Tests.** `apps/gallery/tests/gpu_web.mjs` (die Ausgabe in allen drei Bündeln, Chrome und Firefox; ohne brauchbares WebGPU `SKIP` und nur der Rückfall; ein verlorenes Gerät über `device.destroy()`, also nachgestellt; der Wächter mit einer leeren und einer schwarzen Leinwand, ebenfalls nachgestellt), `apps/webgputest` mit `tests/api_web.mjs` (die API ohne Fenster: Fehler, Rechen-Shader, Kopien, Zeichnen, Gerät verloren, in jedem Bündel), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) (die Messungen). `.uis`-Skripte laufen im Browser nicht; das Skriptkommando `gpu` gibt es dort nicht.
 
-**Nicht getestet:** Safari, Chrome auf Android und Linux, Firefox außerhalb dieses einen Rechners und ohne die Vorführung oben (Ebenen, Bilder, Leinwände sind in Firefox nicht durchlaufen; `threads` nur minimiert, also ohne Blick auf den Bildschirm), AMD und Intel, Monitore mit HDR oder großem Farbraum, ein echter Treiber-Reset, ein Tab im Hintergrund, der Zoom der Seite in einem echten Fenster, ein Telefon.
+**Nicht getestet:** Safari, Chrome auf Android und Linux, Firefox außerhalb dieses einen Rechners und ohne die Vorführung oben (Ebenen, Bilder, Leinwände sind in Firefox nicht durchlaufen; `threads` nur minimiert, also ohne Blick auf den Bildschirm), AMD und Intel, Monitore mit HDR oder großem Farbraum, ein echter Treiber-Reset, ein Tab im Hintergrund (nur der Wächter in einem minimierten Fenster), der Zoom der Seite in einem echten Fenster, ein Telefon.
 
-**Nicht gebaut:** Zeitstempel, `create_compute_pipeline_sized`, Bindless; ein Wächter dagegen, dass die Leinwand nichts zeigt, obwohl alles richtig rechnet; das Skriptkommando `gpu`; Freigeben von `#screen` während der GPU-Zeit (dort bleiben 8 MB für den Rückweg).
+**Nicht gebaut:** Zeitstempel, `create_compute_pipeline_sized`, Bindless; das Skriptkommando `gpu`; Freigeben von `#screen` während der GPU-Zeit (dort bleiben 8 MB für den Rückweg).
 
 ### Was fehlt
 
