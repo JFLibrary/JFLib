@@ -1869,7 +1869,8 @@ Fensterrand hinaus.
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
   den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
-  - Erledigt: Syscall-Nummern, Flags und Kernel-Layouts in einer Tabelle pro Architektur
+  - Erledigt: `build_rs.py --arch aarch64` (ARM0, der Bau endet noch in `rt`), Syscall-Nummern, Flags und
+    Kernel-Layouts in einer Tabelle pro Architektur
     ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1; auf ARM noch nicht gelaufen), NEON für `lib/simd`
     (ARM6), das auf Android schon jetzt wirkt.
   - Zu tun: Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene

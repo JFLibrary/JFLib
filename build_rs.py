@@ -43,7 +43,8 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
   options: --target win|linux|both (default both; run: win), --release, --out DIR, -j N,
-           --profile size|o2 (release variants, section "r13-measure")
+           --profile size|o2 (release variants, section "r13-measure"),
+           --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
 
 Both targets build side by side.  Every crate starts as soon as its own dependencies are done
 (no waves), an app waits only for the crates its sources name (app_crates: PaintCraft does not
@@ -54,7 +55,8 @@ everything.
 
 Output folders (--out overrides): build/<target> for development builds, build/release/<target>
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
-other).  The assembly reference builds into legacy/build (legacy/build.py).
+other).  --arch aarch64 puts win-arm64 and linux-arm64 in place of <target>.  The assembly
+reference builds into legacy/build (legacy/build.py).
 
 Linux: command-line and server programs are one static file without libc.  A program that names
 ui links dynamically against glibc and nothing else (section "glibc"; every GPU driver is a glibc
@@ -116,6 +118,10 @@ ROOT = Path(__file__).resolve().parent              # RustLib/
 RS = ROOT
 LLVM = Path(r"C:\Program Files\LLVM\bin")
 TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", "web": "wasm32-unknown-unknown", "android": "aarch64-linux-android"}
+# --arch aarch64 (docs/ARM64.md): the same two targets for ARM64, each in a folder of its own
+ARCHS = ("x86_64", "aarch64")
+ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
+ARM64_FOLDER = {"win": "win-arm64", "linux": "linux-arm64"}
 RUSTC_VERSION = "1.98"          # the toolchain this code is written for (checked, minor ignored)
 UNSAFE_OK = {"rt", "simd", "plat", "plugin", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
@@ -196,6 +202,15 @@ STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and en
 
 class BuildError(Exception):
     pass
+
+
+def arch_triple(target, arch):
+    return ARM64_TRIPLE[target] if arch == "aarch64" else TRIPLE[target]
+
+
+def arch_folder(target, arch):
+    """the target's folder below the output folder, and its name in the build's messages"""
+    return ARM64_FOLDER[target] if arch == "aarch64" else target
 
 
 def tool(name):
@@ -916,13 +931,14 @@ PROFILES = {
 # Nothing has to be installed for it: Builder.glibc_stubs writes the three libraries to link against
 # from GLIBC_STUBS (one function "ret" per name, rustc --emit=obj, then ld.lld -shared with a version
 # script).  They only name what the program imports and at which version; at run time the system's
-# libraries are used.  Every symbol is asked for at GLIBC_2.2.5, the oldest version x86-64 has:
+# libraries are used.  Every symbol is asked for at the oldest version the architecture has (x86-64
+# GLIBC_2.2.5, ARM64 GLIBC_2.17):
 # glibc up to 2.33 has these functions in libdl and libpthread under that version; 2.34 moved them
 # into libc, keeps that version as a compatibility symbol there and libdl / libpthread as empty files,
 # so the same binary starts on both.  The program imports no data, only functions (no copy
 # relocations), and exports nothing: rt's memcpy never replaces the drivers'.
-GLIBC_INTERP = "/lib64/ld-linux-x86-64.so.2"
-GLIBC_VERSION = "GLIBC_2.2.5"
+GLIBC_INTERP = {"x86_64": "/lib64/ld-linux-x86-64.so.2", "aarch64": "/lib/ld-linux-aarch64.so.1"}
+GLIBC_VERSION = {"x86_64": "GLIBC_2.2.5", "aarch64": "GLIBC_2.17"}
 GLIBC_STUBS = {                                     # in the order a C program names them: libc last
     "libpthread.so.0": ["pthread_attr_destroy", "pthread_attr_init", "pthread_attr_setstack", "pthread_create", "pthread_join"],
     "libdl.so.2": ["dlopen", "dlsym", "dlclose", "dlerror"],
@@ -950,19 +966,22 @@ def app_glibc(name):
     return entrypoint(d, "app", False) is not None and "ui" in app_crates(name)
 
 
-def glibc_stub_text():
+def glibc_stub_text(arch):
     """what the stubs and the link depend on (part of a program's digest)"""
-    return f"glibc {GLIBC_INTERP} {GLIBC_VERSION} {sorted(GLIBC_STUBS.items())}"
+    return f"glibc {GLIBC_INTERP[arch]} {GLIBC_VERSION[arch]} {sorted(GLIBC_STUBS.items())}"
 # ---------------------------------------------------------------- end glibc
 
 
 # ---------------------------------------------------------------- build
 class Builder:
-    def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None):
+    def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None,
+                 arch="x86_64"):
         self.target = target
+        self.arch = arch
+        self.folder = arch_folder(target, arch)
         self.out = out
         self.profile_name = profile
-        self.dir = out / target
+        self.dir = out / self.folder
         self.public = self.dir                # where the programs go
         self.glibc = glibc_base is not None   # section "glibc": this Builder makes its programs
         self.base = glibc_base or self        # the static Builder (the modules, BINS)
@@ -1000,9 +1019,11 @@ class Builder:
         self.asset_out = {}
         self.piped = set()                    # rlibs compiled in this run (their .rmeta is current)
 
+    def triple(self):
+        return "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else arch_triple(self.target, self.arch)
+
     def flags(self, name=""):
-        triple = "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else TRIPLE[self.target]
-        f = ["--edition", "2024", "--target", triple, "-C", "panic=abort", "-C", "debuginfo=0",
+        f = ["--edition", "2024", "--target", self.triple(), "-C", "panic=abort", "-C", "debuginfo=0",
              "-D", "warnings", "-L", f"dependency={self.dir}",
              f"--remap-path-prefix={ROOT}{os.sep}="]       # panic locations: rs/..., no build paths
         if self.release and self.profile:                 # r13-measure: --profile
@@ -1081,7 +1102,7 @@ class Builder:
         self.hashes["text_shape"] = digest
         if self.up_to_date("text_shape", digest, self.rlib("text_shape")):
             return False
-        triple = "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else TRIPLE[self.target]
+        triple = self.triple()
         cargo_dir = self.dir / "cargo-shaping"
         env = os.environ.copy()
         # Embedded LLVM bitcode is required by JFLib's release LTO link.
@@ -1184,7 +1205,7 @@ class Builder:
         perms, assets, boot = self.boot_inputs(name)     # permissions, vfs: manifest and assets
         digest = self.src_hash(root, deps, extra=style + ("" if lto == "fat" else f" lto={lto}")
                                + (" wasm-variant-link-v1" if self.target == "web" else "") + boot
-                               + (" " + glibc_stub_text() if self.glibc else ""))
+                               + (" " + glibc_stub_text(self.arch) if self.glibc else ""))
         key = "app_" + name + (f"@{style}" if variant else "")
         vdir = self.public / style if variant else self.public
         if self.target == "web":
@@ -1260,7 +1281,7 @@ class Builder:
         if self.target == "linux" and self.glibc:
             # no -static and no crt-static: a dynamic executable at a fixed address, like the static
             # ones (the .map lists its addresses); --no-as-needed: all three libraries stay named
-            args = ["-nostdlib", f"--dynamic-linker={GLIBC_INTERP}", "-e", "_start", "--gc-sections", "-z", "noexecstack",
+            args = ["-nostdlib", f"--dynamic-linker={GLIBC_INTERP[self.arch]}", "-e", "_start", "--gc-sections", "-z", "noexecstack",
                     f"-Map={exe}.map", "--no-as-needed"] + [str(s) for s in self.glibc_stubs()]
             return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"] + \
                    [x for a in args for x in ("-C", "link-arg=" + a)]
@@ -1276,14 +1297,14 @@ class Builder:
         its crates in <dir>/.glibc, its programs next to the static ones"""
         with self.twin_lock:
             if self.twin is None:
-                self.twin = Builder(self.target, self.out, self.release, self.jobs, self.profile_name, glibc_base=self)
+                self.twin = Builder(self.target, self.out, self.release, self.jobs, self.profile_name, glibc_base=self, arch=self.arch)
             return self.twin
 
     def glibc_stubs(self):
         """section "glibc": the libraries to link against -> their paths, in the order of GLIBC_STUBS"""
         stub = self.dir / "glibc-stubs"
         paths = [stub / lib for lib in GLIBC_STUBS]
-        text = glibc_stub_text()
+        text = glibc_stub_text(self.arch)
         with self.stub_lock:
             if self.up_to_date("glibc_stubs", text, paths[0]) and all(p.exists() for p in paths):
                 return paths
@@ -1294,11 +1315,11 @@ class Builder:
             src.write_text("#![no_std]\ncore::arch::global_asm!(\n" + "".join(f'    "{ln}",\n' for ln in lines) + ");\n",
                            encoding="utf-8")
             obj = stub / "stub.o"
-            run_cmd(["rustc", "--edition", "2024", "--target", TRIPLE["linux"], "--crate-type", "lib", "--crate-name", "glibc_stub",
+            run_cmd(["rustc", "--edition", "2024", "--target", self.triple(), "--crate-type", "lib", "--crate-name", "glibc_stub",
                      "-C", "panic=abort", "-C", "codegen-units=1", "--emit=obj", "-o", obj, src])
             for lib, symbols in GLIBC_STUBS.items():
                 script = stub / (lib + ".map")
-                script.write_text(GLIBC_VERSION + " {\n  global:\n" + "".join(f"    {n};\n" for n in symbols) + "  local: *;\n};\n",
+                script.write_text(GLIBC_VERSION[self.arch] + " {\n  global:\n" + "".join(f"    {n};\n" for n in symbols) + "  local: *;\n};\n",
                                   encoding="utf-8")
                 run_cmd([tool("ld.lld"), "-shared", f"--soname={lib}", f"--version-script={script}", "-o", stub / lib, obj])
             self.stamp("glibc_stubs", text)
@@ -1317,7 +1338,7 @@ class Builder:
         key = f"bin_{app}_{name}"
         perms, assets, boot = self.boot_inputs(app, name)   # permissions, vfs: as the app's exe
         digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot
-                               + (" " + glibc_stub_text() if self.glibc else ""))
+                               + (" " + glibc_stub_text(self.arch) if self.glibc else ""))
         if self.up_to_date(key, digest, exe):
             return exe
         cmd = ["rustc"] + self.flags() + ["--crate-type", "bin", "--crate-name", name.replace("-", "_").lower(),
@@ -1358,9 +1379,9 @@ class Builder:
         return res
 
 
-def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a"):
+def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch="x86_64"):
     """The CLI and Build Manager use the same browser variant selection."""
-    return [Builder(target, out, release, jobs, profile, mode, android_abi)
+    return [Builder(target, out, release, jobs, profile, mode, android_abi, arch=arch)
             for target in targets
             for mode in ((["scalar", "simd", "threads"] if web_mode == "auto" else [web_mode])
                          if target == "web" else ["scalar"])]
@@ -1825,16 +1846,17 @@ def plugin_lint():
 class PluginBuilder:
     """the plugin crate (rlib) and the plugins of one target"""
 
-    def __init__(self, target, out):
+    def __init__(self, target, out, arch="x86_64"):
         self.target = target
-        self.dir = out / target / "plugins"
-        self.lib_dir = out / target / "plugin_lib"
+        self.arch = arch
+        self.dir = out / arch_folder(target, arch) / "plugins"
+        self.lib_dir = out / arch_folder(target, arch) / "plugin_lib"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lib_dir.mkdir(parents=True, exist_ok=True)
         self.lib_digest = None
 
     def flags(self):
-        f = ["--edition", "2024", "--target", TRIPLE[self.target], "-C", "panic=abort", "-C", "debuginfo=0",
+        f = ["--edition", "2024", "--target", arch_triple(self.target, self.arch), "-C", "panic=abort", "-C", "debuginfo=0",
              "-D", "warnings", "-C", "opt-level=3", "-C", "codegen-units=1", f"--remap-path-prefix={ROOT}{os.sep}="]
         if self.target == "linux":
             f += ["-C", "relocation-model=pic"]
@@ -2087,12 +2109,12 @@ def elf_verify(b, export="pn_plugin_query"):
     return sorted(set(bad), key=bad.index)
 
 
-def build_plugins(targets, out, name):
+def build_plugins(targets, out, name, arch="x86_64"):
     for t in targets:
-        pb = PluginBuilder(t, out)
+        pb = PluginBuilder(t, out, arch)
         for n in [name] if name else rs_plugin_names():
             p = pb.build(n)
-            print(f"[{t}] plugin {n}: {p.relative_to(ROOT) if p.is_relative_to(ROOT) else p} ({p.stat().st_size} bytes)")
+            print(f"[{arch_folder(t, arch)}] plugin {n}: {p.relative_to(ROOT) if p.is_relative_to(ROOT) else p} ({p.stat().st_size} bytes)")
 
 
 def rust_plugin_scripts(b):
@@ -2104,7 +2126,7 @@ def rust_plugin_scripts(b):
     names = [n for ns in PLUGIN_TEST_SET.values() for n in ns]
     if not exe.exists() or not all(entrypoint(PLUGINS_RS / n, "lib", False) for n in names):
         return 0, []
-    pb = PluginBuilder(b.target, b.dir.parent)
+    pb = PluginBuilder(b.target, b.dir.parent, b.arch)
     sets = {"rsptest": PLUGIN_TEST_SET, "rsplug": {"Effects": [n for n in rs_plugin_names() if n not in names]}}
     for dname, layout in sets.items():
         for folder, ns in layout.items():
@@ -2375,6 +2397,8 @@ def main():
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
                     help="Android native ABI (default ARM64; x86_64 for emulator tests)")
+    ap.add_argument("--arch", choices=ARCHS, default="x86_64",
+                    help="win and linux: the processor (aarch64 builds into win-arm64 and linux-arm64, docs/ARM64.md)")
     ap.add_argument("--style")
     ap.add_argument("--web-mode", choices=["auto", "scalar", "simd", "threads"], default="auto",
                     help="browser bundle: auto builds scalar, SIMD128 and shared-memory worker variants")
@@ -2405,6 +2429,9 @@ def main():
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     set_static_ui(a.static)                         # section "glibc"
+    if a.arch != "x86_64" and a.cmd in ("run", "test", "watch"):
+        print(f"{a.cmd}: nothing starts programs of --arch {a.arch} yet (docs/ARM64.md, ARM2)")
+        return 1
     if a.cmd == "ide":
         write_ide()
         return 0
@@ -2443,13 +2470,15 @@ def main():
     check_toolchain()
     tgt = a.target or ("win" if a.cmd == "run" else "both")
     targets = ["win", "linux"] if tgt == "both" else ["win", "linux", "web"] if tgt == "all" else [tgt]
+    if a.arch != "x86_64" and not set(targets) <= set(ARM64_TRIPLE):
+        raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
     if "android" in targets and a.cmd not in ("app", "lib"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
     if a.cmd in ("run", "test", "plugin") and "web" in targets:
         raise BuildError("Use app/all --target web to build browser bundles; serve their index.html for browser tests. Native run/test/plugin requires win/linux/both.")
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
-    builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi)
+    builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch)
     global RUSTC_SLOTS
     RUSTC_SLOTS = threading.BoundedSemaphore(max(1, a.j))
     t0 = time.perf_counter()
@@ -2459,7 +2488,7 @@ def main():
                 res = [(b, ex.submit(b.build_libs, list(all_libs()))) for b in builders]
                 for b, f in res:
                     built = f.result()
-                    print(f"[{b.target}] libraries: {len(built)} rebuilt ({', '.join(built) or 'none'})")
+                    print(f"[{b.folder}] libraries: {len(built)} rebuilt ({', '.join(built) or 'none'})")
         elif a.cmd in ("app", "run"):
             if not a.name:
                 raise BuildError("app name missing")
@@ -2469,7 +2498,7 @@ def main():
                 raise BuildError(f"unknown style {', '.join(bad)} (styles: {', '.join(STYLES)})")
             for b, n, exe in build_apps(builders, [a.name], styles):
                 if exe:
-                    print(f"[{b.target}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
+                    print(f"[{b.folder}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
             if a.cmd == "run":
                 if a.bin:                           # app-bins
                     if a.bin not in [n for n, _, _ in app_bins(a.name)]:
@@ -2482,9 +2511,9 @@ def main():
         elif a.cmd == "all":
             for b, n, exe in build_apps(builders, apps()):
                 if exe:
-                    print(f"[{b.target}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
+                    print(f"[{b.folder}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
         elif a.cmd == "plugin":                     # rust-plugin
-            build_plugins(targets, out, a.name)
+            build_plugins(targets, out, a.name, a.arch)
         elif a.cmd == "test":
             ok = run_app_suite(builders, a.name) if a.name else run_tests(builders, out, a.quick)
             print(f"test: {'ok' if ok else 'FAILED'} ({time.perf_counter() - t0:.1f} s)")

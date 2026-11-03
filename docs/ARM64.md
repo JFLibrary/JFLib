@@ -1,7 +1,7 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher sind nur ARM1 und ARM6 umgesetzt, und von ARM1 lief
-noch nichts auf ARM. Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Syscalls,
+Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher sind nur ARM0, ARM1 und ARM6 umgesetzt, und von ARM1
+lief noch nichts auf ARM. Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Syscalls,
 Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`), die
 Relocations noch nicht. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
@@ -42,7 +42,8 @@ Nur auf x86-64 ausgelegt:
 | Assembler Linux | `_start` (2), Thread-Start, `sigreturn` (2) | `plat/linux.rs`, `linux_glibc.rs`, `linux_thread.rs`, `linux_crash.rs`, `linux_guard.rs` |
 | Assembler `rt` | `memcpy` und Verwandte, `cpuid`, x87-Mathematik, `__chkstk`, Syscall | `rt/mem.rs`, `rt/cpu.rs`, `rt/x87.rs`, `rt/fx.rs`, `rt/os.rs` |
 | Guard um Plugin-Aufrufe | Trampolin und Test-Code | `plat/plib.rs` (2 Blöcke) |
-| Plugin- und Modul-ABI | 90-mal `extern "win64"` in 13 Dateien, auch auf Linux | `lib/plugin/`, `modules/`, `plat/modabi.rs`, `plat/modhost.rs`, PaintCraft `plugins/native.rs` |
+| Assembler Plugins und Module | `memcpy` und Verwandte, `ud2`, `prepare_tramp` | `plugin/mem.rs`, `plugin/lib.rs`, `plugin/fx.rs`, `modules/modrt/lib.rs` |
+| Plugin- und Modul-ABI | 90-mal `extern "win64"` in 13 Dateien, auch auf Linux | `lib/plugin/`, `modules/`, `plat/modabi.rs`, `plat/modhost.rs`, `plat/plib.rs`, `apps/plattest/`, PaintCraft `plugins/native.rs` |
 | Eigene Loader | nur `EM_X86_64` und `R_X86_64_*`, nur PE-Machine `0x8664` | `plat/linux_elfload.rs`, `plat/win_lib.rs`, `pe_verify` / `elf_verify` in `build_rs.py` |
 | Crash-Berichte | `CONTEXT`, `ucontext`, DWARF-Register, Erkennen von `call` | `plat/win_crash.rs`, `plat/linux_crash.rs` |
 | Sandbox | `AUDIT_ARCH_X86_64`, Liste der Syscall-Nummern | `plat/linux_sandbox.rs` |
@@ -86,6 +87,54 @@ Größe: S klein, M mittel, L groß, jeweils nur relativ zueinander.
 **Fertig, wenn:** `build_rs.py lib --target linux --arch aarch64` startet und die Fehlerliste den
 Stellen dieses Plans entspricht, und die x86-Programme bytegleich zu vorher sind.
 
+**Umgesetzt:** `--arch` gilt für `lib`, `app`, `all` und `plugin`, die Ausgabe liegt in `win-arm64` und
+`linux-arm64` unter dem jeweiligen Ausgabeordner (`build/`, `build/release/`, `--out`). `run`, `test` und `watch`
+lehnen `--arch aarch64` ab, bis ARM2 den Test-Runner bringt, `--target web` und `android` ebenso.
+
+- **x86-64:** `coretest`, `gallery`, `PaintCraft` mit `jxlenc`, alle elf Plugins und die glibc-Stubs sind im
+  Release-Bau für beide Ziele Byte für Byte gleich, beide Stände aus demselben Verzeichnis gebaut. Unter Windows
+  weichen die drei Programme nur im Zeitstempel des Linkers ab. Auch die Stamps sind gleich, also Quellen und Flags.
+- **Linken:** Mit kleinen Programmen ohne die Bibliothek geprüft. Das statische läuft unter `qemu-aarch64` und
+  liefert den erwarteten Exit-Code. Das gegen die Stubs gelinkte nennt `/lib/ld-linux-aarch64.so.1` und
+  `exit@GLIBC_2.17`, das für Windows hat die PE-Machine `0xAA64`; diese beiden wurden nicht gestartet.
+  `text_shape` baut über Cargo für beide Ziele.
+- **Noch offen:** die Nebenprobe auf `windows-11-arm`. Sie braucht GitHub Actions und damit einen Push.
+
+**Fehlerliste, Stand ARM0.** `build_rs.py lib --target linux --arch aarch64` startet und endet in `rt` mit 150
+Fehlern, alle aus ARM2:
+
+| Datei | Fehler | Was |
+|---|---|---|
+| `rt/x87.rs` | 128 | Register `st(0)` bis `st(7)`, Modifizierer `e`; ARM nimmt `portable/math.rs` |
+| `rt/mem.rs` | 9 | `rep movsb`, `rep stosb` |
+| `rt/os.rs` | 9 | `syscall` |
+| `rt/cpu.rs` | 4 | `core::arch::x86_64`, `xgetbv`; ARM nimmt `portable/cpu.rs` |
+
+Mit `--target win` sind es dieselben ohne `rt/os.rs`, also 141. `build_rs.py plugin --arch aarch64` endet für beide
+Ziele mit 25-mal `win64` in `lib/plugin/` (ARM4).
+
+Hinter `rt` kommt der echte Bau nicht. Um den Rest zu sehen, lief jede Crate, jedes Programm und jedes Plugin einzeln
+durch `rustc`, ohne zu linken, auf einer Wegwerf-Kopie: `rt` mit den portablen Dateien, `svc 0` und Schleifen statt
+`rep movsb`, `extern "C"` statt `win64`. Diese Notlösungen sind nicht im Repository und wurden nie gestartet. Dabei
+kam noch dies:
+
+| Stelle | Meldung | Im Plan |
+|---|---|---|
+| `plat/modabi.rs`, `modhost.rs`, `plib.rs` | 26-mal `win64` | ARM4 |
+| `plat/linux_glibc.rs:167` | `SYS_ARCH_PRCTL` fehlt, auf ARM64 gibt es den Aufruf nicht | ARM3 |
+| `apps/plattest`, `apps/linuxtest/t_files.rs`, PaintCraft `src/diagnostics/crash.rs` | `plat::crash_test`, `crash_test_caller`, `avx2_probe`, `stack_aligned` fehlen | ARM3, `linuxtest` und PaintCraft nachgetragen |
+| `plat`, `global_asm!` | x86-Befehle, erst beim Erzeugen des Codes | ARM3 |
+| `rt/os.rs:77` | `__chkstk` (nur Windows), erst beim Erzeugen des Codes | ARM5 |
+| `plugin/fx.rs`, `plugin/mem.rs`, `plugin/lib.rs:168` | `prepare_tramp`, `memcpy` und Verwandte, `ud2` | ARM4, `mem.rs` und `ud2` nachgetragen |
+| `modules/modrt` | 139 Fehler in den per `#[path]` eingebundenen `rt/cpu.rs`, `rt/fx.rs`, `rt/x87.rs` und in `lib.rs:232`; `lib.rs:75` beim Code | ARM3 nennt nur `modrt`, Einzelheiten unter ARM4 nachgetragen |
+| `plugins/crash/lib.rs:22`, `plugins/crashpf/lib.rs:38` | x86-Befehle | ARM3 |
+
+Alles andere baut bis zum Objektcode: für Linux 64 Crates und 15 statische Programme, gegen glibc 64 Crates und 48
+Programme, für Windows 63 Crates und 63 Programme, darunter `simd`, `gpu`, `ui` und alle Styles. Neue Stellen außerhalb von
+`rt`, `plat`, `lib/plugin`, `modules` und den genannten Programmen gibt es nicht. Viel mehr zeigt der Compiler aber
+nicht: Bei `global_asm!` hört LLVM nach dem ersten Fehler einer Codeeinheit auf, deshalb sind die
+Assembler-Stellen zusätzlich aus den Quellen gezählt, und die Fallen weiter unten findet er gar nicht.
+
 ### ARM1: Kernel-ABI an einer Stelle, noch ohne ARM (L)
 
 - Nummern, `O_*`, `stat`-Felder und `clone`-Reihenfolge in eine Tabelle in `rt`, alle 265 Stellen darauf
@@ -110,7 +159,8 @@ dieselben Nummern in derselben Reihenfolge wie vorher und kommt jetzt aus der Ta
   `portable/math.rs` (`aarch64/fx.rs` wählt es schon, seit ARM6).
 - `rt/mem.rs` trennen: Der Heap mit den 64 Shards gilt für alle, `memcpy` und Verwandte sowie `load8`
   kommen pro Architektur.
-- Test-Runner: `build_rs.py test --arch aarch64` startet Programme über `qemu-aarch64` in WSL.
+- Test-Runner: `build_rs.py test --arch aarch64` startet Programme über `qemu-aarch64` in WSL. Das geht für
+  statische Programme; für gegen glibc gelinkte fehlt dort eine glibc für ARM64.
 - Outline-Atomics prüfen: `_start` führt ohne libc keine Initialisierung aus, also klären, ob die
   LSE-Erkennung läuft.
 
@@ -128,7 +178,7 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 - Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), die Sperrliste kommt schon aus der Tabelle.
 - glibc-Variante: `_start`, `TPIDR_EL0` statt `arch_prctl`.
 - `plat/cpu.rs` (Stack-Zeiger, AVX-Probe) und die Crash-Tests in `plat/lib.rs`, für die es den Zweig für
-  Android schon gibt.
+  Android schon gibt. `plattest`, `linuxtest` und PaintCraft (`src/diagnostics/crash.rs`) rufen sie auf.
 - Testprogramme: `jfgui_gt_code` in `plib.rs`, `plugins/crash`, `plugins/crashpf`, `modrt`,
   `tools/memory_safety/native_probe.rs`.
 
@@ -140,6 +190,10 @@ Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
 - Makro für `extern "win64"` nach Entscheidung 4.
 - `prepare_tramp` in `lib/plugin/fx.rs` gibt zwei Register zurück: auf ARM `x0` und `x1`, sauber über
   eine `repr(C)`-Struktur.
+- `lib/plugin/mem.rs`: `memcpy` und Verwandte in Assembler, je ein Block für Windows und System V. Auf ARM64
+  rufen beide Systeme gleich auf, einer reicht. `plugin::trap` in `lib/plugin/lib.rs` nutzt `ud2`.
+- `modules/modrt` bindet `rt/cpu.rs`, `rt/fx.rs`, `rt/x87.rs` und `plugin/mem.rs` selbst per `#[path]` ein, die
+  Auswahl in `rt/lib.rs` gilt dort nicht. Dazu kommen `ud2` und der Testfehler `JXT_FAULT` in `modrt/lib.rs`.
 - `build_rs.py plugin`, `pe_verify`, `elf_verify`, Meldung für Plugins der falschen Architektur.
 
 **Fertig, wenn:** die PaintCraft-Plugins, das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf
@@ -147,10 +201,12 @@ ARM64 und unverändert auf x86-64 laufen.
 
 ### ARM5: Windows ARM64 (M)
 
-- `__chkstk` (Größe in `x15` mal 16, nur `x16` und `x17` frei), TEB über `x18` statt `gs:`.
+- `__chkstk` (Größe in `x15` mal 16, nur `x16` und `x17` frei), TEB über `x18` statt `gs:`
+  (`win_crash.rs`, `win_lib.rs`).
 - `CONTEXT` und `RtlVirtualUnwind` in `win_crash.rs`, Guard-Trampolin mit Unwind-Daten.
 - PE-Loader: Machine `0xAA64`, `FlushInstructionCache`.
-- `native_link_args`: Ziel ARM64 für `lld-link`.
+- `native_link_args`: Das Ziel braucht keine eigene Angabe, `lld-link` nimmt die Maschine aus den Objekten
+  (ARM0, an einem kleinen Programm geprüft). Ob ein ganzes Programm so startet, zeigt erst dieser Schritt.
 - `win_clr.rs` lädt die CoreCLR einer anderen Anwendung in den Prozess. Das geht nur, wenn sie auch
   ARM64 ist, bei einer x64-Runtime braucht es eine klare Meldung statt eines Fehlers beim Laden.
 
@@ -275,13 +331,14 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   handgeschriebenen Einstieg.
 - **Seitengröße:** `4096` steht an 20 Stellen in 11 Linux-Dateien von `plat`, nicht alles davon meint
   Seiten. Asahi Linux läuft mit 16 KB.
-- **`c_char`:** auf Linux ARM64 `u8`, auf Windows ARM64 `i8`, das meldet der Compiler aber.
+- **`c_char`:** auf Linux ARM64 `u8`, auf Windows ARM64 `i8`, das meldet der Compiler aber. Beim Stand von ARM0
+  meldet er dazu nichts.
 
 ## Testen
 
 | Was | Wo | Grenze |
 |---|---|---|
-| `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL | langsam, kein echtes Speichermodell |
+| `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL | langsam, kein echtes Speichermodell, nur statische Programme |
 | Signale, Sandbox, Crash, `process_vm_readv` | `qemu-system-aarch64` in WSL (Gast noch einzurichten) | sehr langsam, keine KVM-Beschleunigung; seccomp und Landlock nicht über `qemu-aarch64` prüfen |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
 | Windows ARM64 | `windows-11-arm` | Fenster-Tests noch offen, lokal keine Möglichkeit |
