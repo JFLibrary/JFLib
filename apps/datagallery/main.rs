@@ -1,7 +1,8 @@
 // datagallery -- the data views and app shell parts of lib/ui on one page: navigation pane,
 // command bar, breadcrumb, KPI cards with sparklines, bar chart, donut, grid, tree, wizard
 // steps, segmented control, time / weekday / date input, badges, meters, toasts, spinner,
-// rows that wrap (BOX_WRAP), a details grid box whose note wraps (tests/wrap.uis), all of it
+// rows that wrap (BOX_WRAP), a details grid box whose note wraps (tests/wrap.uis), a toast for
+// a grid row or tree node opened by double click or Enter (tests/gridkeys.uis), all of it
 // at a text scale of 150 % (tests/textscale.uis); the page "Simulation" (navigation, Labor):
 // a timeline over three tracks of events and a hex view of an Ethernet / IPv4 / ICMP frame
 // with its layers marked; the page "Metriken" (navigation, Labor): line charts of a
@@ -703,6 +704,9 @@ impl Gal {
             if let Some(p) = all.iter().position(|r| r.0 == k) {
                 self.checks[all[p].6] = v;
             }
+        }
+        if let Some(r) = ev.activated.and_then(|k| rows.iter().find(|r| r.key == k)) {
+            ui.toast(IB_INFO, t("Eintrag öffnen"), r.label, 0);
         }
     }
 
