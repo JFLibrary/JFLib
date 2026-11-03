@@ -708,36 +708,9 @@ mod lnx {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
     use alloc::vec::Vec;
-    use rt::os::{syscall3, syscall6};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSYNC, SYS_GETDENTS64, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READLINKAT, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
 
-    const AT_FDCWD: isize = -100;
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
-    const O_RDONLY: usize = 0;
-    const O_WRONLY: usize = 1;
-    const O_CREAT: usize = 0x40;
-    const O_EXCL: usize = 0x80;
-    const O_DIRECTORY: usize = 0x10000;
-    const O_CLOEXEC: usize = 0x80000;
-    const O_NOFOLLOW: usize = 0x20000;
-    const O_NONBLOCK: usize = 0x800;
-    const SYS_FCHMOD: usize = 91;
-    const SYS_FCHMODAT: usize = 268;
-    const O_PATH: usize = 0x20_0000;
-    const SYS_WRITE: usize = 1;
-    const SYS_CLOSE: usize = 3;
-    const SYS_FSYNC: usize = 74;
-    const SYS_RENAME: usize = 82;
-    const SYS_MKDIR: usize = 83;
-    const SYS_STATFS: usize = 137;
-    const SYS_GETDENTS64: usize = 217;
-    const SYS_OPENAT: usize = 257;
-    const SYS_FCHOWNAT: usize = 260;
-    const SYS_NEWFSTATAT: usize = 262;
-    const SYS_UNLINK: usize = 87;
-    const SYS_LINKAT: usize = 265;
-    const SYS_SYMLINKAT: usize = 266;
-    const SYS_READLINKAT: usize = 267;
-    const SYS_UTIMENSAT: usize = 280;
     const EINTR: isize = 4;
 
     fn z(s: &str) -> Vec<u8> {
@@ -758,7 +731,7 @@ mod lnx {
         let p = z(path);
         loop {
             // SAFETY: a NUL-terminated path.
-            let r = unsafe { syscall6(SYS_OPENAT, AT_FDCWD as usize, p.as_ptr() as usize, flags | O_CLOEXEC, mode, 0, 0) };
+            let r = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, flags | O_CLOEXEC, mode, 0, 0) };
             if r == -EINTR {
                 continue;
             }
@@ -772,10 +745,6 @@ mod lnx {
         u64::from_ne_bytes(a)
     }
 
-    fn rd_u32(b: &[u8], o: usize) -> u32 {
-        u32::from_ne_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]])
-    }
-
     fn kind_of_mode(mode: u32) -> FileKind {
         match mode & 0o170000 {
             0o100000 => FileKind::File,
@@ -787,27 +756,26 @@ mod lnx {
 
     fn statx(path: &str, flags: usize) -> Option<Meta> {
         let p = z(path);
-        let mut b = [0u8; 144];
-        // SAFETY: struct stat is 144 bytes on x86_64.
-        let r = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD as usize, p.as_ptr() as usize, b.as_mut_ptr() as usize, flags, 0, 0) };
+        let mut st = Stat::default();
+        // SAFETY: a NUL-terminated path; st is a struct stat.
+        let r = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, &mut st as *mut Stat as usize, flags, 0, 0) };
         if r < 0 {
             return None;
         }
-        let t = |o: usize| (rd_u64(&b, o) as i64).saturating_mul(1_000_000_000).saturating_add(rd_u64(&b, o + 8) as i64);
-        let mode = rd_u32(&b, 24);
+        let t = |s: i64, ns: i64| s.saturating_mul(1_000_000_000).saturating_add(ns);
         Some(Meta {
-            kind: Some(kind_of_mode(mode)),
-            size: rd_u64(&b, 48),
-            atime_ns: t(72),
-            mtime_ns: t(88),
-            ctime_ns: t(104),
-            mode,
-            uid: rd_u32(&b, 28),
-            gid: rd_u32(&b, 32),
+            kind: Some(kind_of_mode(st.st_mode)),
+            size: st.st_size as u64,
+            atime_ns: t(st.st_atime, st.st_atime_nsec),
+            mtime_ns: t(st.st_mtime, st.st_mtime_nsec),
+            ctime_ns: t(st.st_ctime, st.st_ctime_nsec),
+            mode: st.st_mode,
+            uid: st.st_uid,
+            gid: st.st_gid,
             attrs: 0,
-            dev: rd_u64(&b, 0),
-            ino: rd_u64(&b, 8),
-            nlink: rd_u64(&b, 16) as u32,
+            dev: st.st_dev,
+            ino: st.st_ino,
+            nlink: st.st_nlink as u32,
         })
     }
 
@@ -882,7 +850,7 @@ mod lnx {
         let p = z(path);
         let mut buf = alloc::vec![0u8; 4096];
         // SAFETY: the buffer is writable.
-        let r = unsafe { syscall6(SYS_READLINKAT, AT_FDCWD as usize, p.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
+        let r = unsafe { syscall6(SYS_READLINKAT, AT_FDCWD, p.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
         if r < 0 {
             return None;
         }
@@ -896,7 +864,7 @@ mod lnx {
         }
         let (t, l) = (z(target), z(link));
         // SAFETY: NUL-terminated paths.
-        unsafe { syscall3(SYS_SYMLINKAT, t.as_ptr() as usize, AT_FDCWD as usize, l.as_ptr() as usize) >= 0 }
+        unsafe { syscall3(SYS_SYMLINKAT, t.as_ptr() as usize, AT_FDCWD, l.as_ptr() as usize) >= 0 }
     }
 
     pub fn hard_link(existing: &str, new: &str) -> bool {
@@ -905,7 +873,7 @@ mod lnx {
         }
         let (e, n) = (z(existing), z(new));
         // SAFETY: NUL-terminated paths.
-        unsafe { syscall6(SYS_LINKAT, AT_FDCWD as usize, e.as_ptr() as usize, AT_FDCWD as usize, n.as_ptr() as usize, 0, 0) >= 0 }
+        unsafe { syscall6(SYS_LINKAT, AT_FDCWD, e.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, 0, 0) >= 0 }
     }
 
     pub fn set_times(path: &str, atime_ns: i64, mtime_ns: i64) -> bool {
@@ -915,7 +883,7 @@ mod lnx {
         let p = z(path);
         let ts = [atime_ns.div_euclid(1_000_000_000), atime_ns.rem_euclid(1_000_000_000), mtime_ns.div_euclid(1_000_000_000), mtime_ns.rem_euclid(1_000_000_000)];
         // SAFETY: two timespecs; the link itself (AT_SYMLINK_NOFOLLOW).
-        unsafe { syscall6(SYS_UTIMENSAT, AT_FDCWD as usize, p.as_ptr() as usize, ts.as_ptr() as usize, AT_SYMLINK_NOFOLLOW, 0, 0) >= 0 }
+        unsafe { syscall6(SYS_UTIMENSAT, AT_FDCWD, p.as_ptr() as usize, ts.as_ptr() as usize, AT_SYMLINK_NOFOLLOW, 0, 0) >= 0 }
     }
 
     /// permission bits (07777); a symbolic link is left alone and never followed (the entry is
@@ -930,7 +898,7 @@ mod lnx {
         if let Some(fd) = open(path, O_PATH | O_NOFOLLOW, 0) {
             let link = z(&alloc::format!("/proc/self/fd/{}", fd.0));
             // SAFETY: fchmodat on a NUL-terminated path.
-            let r = unsafe { syscall6(SYS_FCHMODAT, AT_FDCWD as usize, link.as_ptr() as usize, (mode & 0o7777) as usize, 0, 0, 0) };
+            let r = unsafe { syscall6(SYS_FCHMODAT, AT_FDCWD, link.as_ptr() as usize, (mode & 0o7777) as usize, 0, 0, 0) };
             if r != -2 {
                 return r >= 0; // (-ENOENT: no /proc)
             }
@@ -948,7 +916,7 @@ mod lnx {
         }
         let p = z(path);
         // SAFETY: a NUL-terminated path; the link itself.
-        unsafe { syscall6(SYS_FCHOWNAT, AT_FDCWD as usize, p.as_ptr() as usize, uid as usize, gid as usize, AT_SYMLINK_NOFOLLOW, 0) >= 0 }
+        unsafe { syscall6(SYS_FCHOWNAT, AT_FDCWD, p.as_ptr() as usize, uid as usize, gid as usize, AT_SYMLINK_NOFOLLOW, 0) >= 0 }
     }
 
     pub fn set_attrs(_path: &str, _attrs: u32) -> bool {
@@ -961,7 +929,7 @@ mod lnx {
         }
         let p = z(path);
         let mut b = [0u8; 120];
-        // SAFETY: struct statfs is 120 bytes on x86_64.
+        // SAFETY: struct statfs is 120 bytes on x86-64 and ARM64.
         if unsafe { syscall3(SYS_STATFS, p.as_ptr() as usize, b.as_mut_ptr() as usize, 0) } < 0 {
             return None;
         }
@@ -1013,7 +981,7 @@ mod lnx {
         drop(fd);
         let (t, d) = (z(&tmp), z(path));
         // SAFETY: NUL-terminated paths.
-        if !synced || unsafe { syscall3(SYS_RENAME, t.as_ptr() as usize, d.as_ptr() as usize, 0) } < 0 {
+        if !synced || unsafe { rt::os::rename(t.as_ptr() as usize, d.as_ptr() as usize) } < 0 {
             unlink(&tmp);
             return false;
         }
@@ -1023,7 +991,7 @@ mod lnx {
     fn unlink(path: &str) {
         let p = z(path);
         // SAFETY: a NUL-terminated path.
-        unsafe { syscall3(SYS_UNLINK, p.as_ptr() as usize, 0, 0) };
+        unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, p.as_ptr() as usize, 0) };
     }
 
     pub fn mkdir_private(path: &str) -> bool {
@@ -1039,7 +1007,7 @@ mod lnx {
         }
         let p = z(path);
         // SAFETY: a NUL-terminated path.
-        let r = unsafe { syscall3(SYS_MKDIR, p.as_ptr() as usize, 0o700, 0) };
+        let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
         r >= 0 || stat(path).is_some_and(|m| m.is_dir())
     }
 

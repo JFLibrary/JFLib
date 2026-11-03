@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets;
 
 final class GallerySystem {
     // android_host.rs: the calls of web_notify.rs (GalleryNotify) and web_power.rs
-    static final int CALL_FIRST = 50, CALL_LAST = 59, CALL_POWER = 52, CALL_BACK = 55, CALL_LONG_PRESS = 56;
+    static final int CALL_FIRST = 50, CALL_LAST = 59, CALL_POWER = 52, CALL_BACK = 55, CALL_LONG_PRESS = 56, CALL_FINISH = 57;
     // plat::INHIBIT_*, plat::E_POWER, E_WAKE
     static final int INHIBIT_SUSPEND = 1, INHIBIT_IDLE = 2, E_POWER = 20, E_WAKE = 14;
     // Settings.Secure.ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED (hidden; readable on most systems)
@@ -161,6 +161,14 @@ final class GallerySystem {
         }
         if (kind == CALL_LONG_PRESS) {
             GalleryActivity.longPressed(); // a finger rested (lib/ui/touch.rs)
+            return new byte[] {1};
+        }
+        if (kind == CALL_FINISH) { // plat app_finish: the runtime ended, a new start needs a new process
+            final Activity a = activity;
+            if (a != null) a.getWindow().getDecorView().post(() -> {
+                a.finishAndRemoveTask();
+                android.os.Process.killProcess(android.os.Process.myPid());
+            });
             return new byte[] {1};
         }
         if (kind == GallerySensors.CALL_SENSORS || kind == GallerySensors.CALL_LOCATION) return GallerySensors.call(kind, in);

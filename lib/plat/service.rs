@@ -394,7 +394,7 @@ mod linux {
 
     fn is_root() -> bool {
         // SAFETY: getuid has no arguments and cannot fail.
-        unsafe { rt::os::syscall3(102, 0, 0, 0) == 0 }
+        unsafe { rt::os::syscall3(rt::os::SYS_GETUID, 0, 0, 0) == 0 }
     }
 
     /// systemctl ARGS -> its output, or why it failed

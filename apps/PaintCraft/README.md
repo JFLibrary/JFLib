@@ -171,9 +171,24 @@ For a smaller build that does not need `rust-src`, add `--web-mode scalar` to th
 build command. See the [browser build guide](../../README.md#browser-builds) for
 the SIMD and worker variants.
 
-This app currently has `win`, `linux`, and `web` build targets. Native plugins and
-the optional paint.net compatibility host are desktop features. Dedicated native
-Android, macOS, and iOS app targets are not currently provided.
+### Android (experimental)
+
+```sh
+rustup target add aarch64-linux-android
+python build_rs.py app PaintCraft --target android
+adb install -r build/android/PaintCraft-arm64-v8a-debug.apk
+```
+
+For the emulator add `--android-abi x86_64`. This is the desktop interface on a phone: painting,
+files through the system picker, undo, and two-finger zoom work, but the interface is not
+adapted to a small screen yet. In portrait the title bar is cut off (Korrekturen, Effekte, the
+tabs, the panel buttons), and in landscape some dialogs are taller than the screen; turning the
+phone reaches what is missing either way. There are no worker threads on Android, so opening and
+effects run on the interface thread.
+
+This app currently has `win`, `linux`, `web`, and the experimental `android` build targets.
+Native plugins, the `jxlenc` module, printing, and the optional paint.net compatibility host
+are desktop features. Dedicated native macOS and iOS app targets are not currently provided.
 
 ### Release builds and styles
 

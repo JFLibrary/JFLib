@@ -35,7 +35,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use rt::os::{syscall3, SYS_READ, SYS_WRITE};
+use rt::os::{syscall3, O_CLOEXEC, O_NONBLOCK, SYS_FCNTL, SYS_PIPE2, SYS_READ, SYS_WRITE};
 
 use super::proto::*;
 use super::wire::{poll, sys_close, Args, PollFd, A, EAGAIN, EINTR, POLLERR, POLLHUP, POLLIN, POLLOUT};
@@ -66,11 +66,7 @@ const DND_MAX: usize = 1 << 20; // largest text/uri-list of a drop (K1)
 const DND_IMAGE_MAX: usize = 1 << 28; // largest image of a drop
 const DND_ACTION_COPY: u32 = 1;
 const DND_ACTION_MOVE: u32 = 2;
-const SYS_FCNTL: usize = 72;
-const SYS_PIPE2: usize = 293;
 const F_SETFL: usize = 4;
-const O_NONBLOCK: usize = 0x800;
-const O_CLOEXEC: usize = 0x80000;
 
 const MIME_UTF8: &[u8] = b"text/plain;charset=utf-8";
 const MIME_UTF8S: &[u8] = b"UTF8_STRING";

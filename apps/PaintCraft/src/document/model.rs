@@ -425,12 +425,15 @@ pub(crate) fn doc_resized(p: &mut Pn, doc: DocId) -> i32 {
 /// doc_set_path(doc, path) -> 0 / -1 -- DOC_PATH = copy of path, DOC_NAME = its file name
 pub(crate) fn doc_set_path(p: &mut Pn, doc: DocId, path: &str) -> i32 {
     let Some(d) = p.doc.get_mut(doc) else { return -1 };
-    // the file name: after the last '/' or '\'
-    let name = match path.rfind(['/', '\\']) {
-        Some(i) => &path[i + 1..],
-        None => path,
+    // the file name: after the last '/' or '\' (a content:// name: the document's own name)
+    d.name = if path.starts_with("content://") {
+        plat::display_name(path)
+    } else {
+        String::from(match path.rfind(['/', '\\']) {
+            Some(i) => &path[i + 1..],
+            None => path,
+        })
     };
-    d.name = String::from(name);
     d.path = Some(String::from(path));
     d.serial = 0;
     d.flags &= !(DF_UNTITLED as u32);

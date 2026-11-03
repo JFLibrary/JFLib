@@ -101,24 +101,7 @@ mod imp {
 mod imp {
     use core::arch::asm;
 
-    pub const SYS_READ: usize = 0;
-    pub const SYS_WRITE: usize = 1;
-    pub const SYS_OPEN: usize = 2;
-    pub const SYS_CLOSE: usize = 3;
-    pub const SYS_FSTAT: usize = 5;
-    pub const SYS_POLL: usize = 7;
-    pub const SYS_MMAP: usize = 9;
-    pub const SYS_MUNMAP: usize = 11;
-    pub const SYS_MADVISE: usize = 28;
-    pub const SYS_SCHED_YIELD: usize = 24;
-    pub const SYS_SOCKET: usize = 41;
-    pub const SYS_CONNECT: usize = 42;
-    pub const SYS_SENDMSG: usize = 46;
-    pub const SYS_RECVMSG: usize = 47;
-    pub const SYS_FTRUNCATE: usize = 77;
-    pub const SYS_CLOCK_GETTIME: usize = 228;
-    pub const SYS_EXIT_GROUP: usize = 231;
-    pub const SYS_MEMFD_CREATE: usize = 319;
+    pub use crate::kernel::*;
 
     /// # Safety
     /// Raw system call: the arguments must be valid for the call.
@@ -137,6 +120,67 @@ mod imp {
     #[inline]
     pub unsafe fn syscall3(n: usize, a: usize, b: usize, c: usize) -> isize {
         unsafe { syscall6(n, a, b, c, 0, 0, 0) }
+    }
+
+    /// poll with the timeout in milliseconds (negative: none), by ppoll: ARM64 has no poll
+    ///
+    /// # Safety
+    /// fds must point to n struct pollfd.
+    #[inline]
+    pub unsafe fn poll(fds: usize, n: usize, ms: i32) -> isize {
+        // ppoll writes the time left back
+        let mut ts = [(ms / 1000) as i64, (ms % 1000) as i64 * 1_000_000];
+        let timeout = if ms < 0 { 0 } else { ts.as_mut_ptr() as usize };
+        // SAFETY: fds as the caller promises, ts lives during the call; no signal mask.
+        unsafe { syscall6(SYS_PPOLL, fds, n, timeout, 0, 8, 0) }
+    }
+
+    /// clone with its arguments in the kernel's order
+    ///
+    /// # Safety
+    /// See syscall6; with a new stack or CLONE_VM the child must not return from here (a thread's
+    /// start is assembly: linux_thread.rs).
+    #[inline]
+    pub unsafe fn clone(flags: usize, stack: usize, parent_tid: usize, child_tid: usize, tls: usize) -> isize {
+        let [a, b, c] = clone_args(parent_tid, child_tid, tls);
+        unsafe { syscall6(SYS_CLONE, flags, stack, a, b, c, 0) }
+    }
+
+    /// fork, by clone with only the child's exit signal (SIGCHLD): ARM64 has no fork
+    ///
+    /// # Safety
+    /// As fork: in the child of a process with threads only what is safe there.
+    #[inline]
+    pub unsafe fn fork() -> isize {
+        unsafe { clone(17, 0, 0, 0, 0) }
+    }
+
+    /// dup2, by dup3: ARM64 has no dup2.  dup3 refuses old == new, dup2 only looks whether old
+    /// is open then
+    ///
+    /// # Safety
+    /// new is closed first if it is open: it must not be in use elsewhere.
+    #[inline]
+    pub unsafe fn dup2(old: usize, new: usize) -> isize {
+        if old == new {
+            // SAFETY: fcntl(F_GETFD) changes nothing.
+            let r = unsafe { syscall3(SYS_FCNTL, old, 1, 0) };
+            return if r < 0 { r } else { old as isize };
+        }
+        unsafe { syscall3(SYS_DUP3, old, new, 0) }
+    }
+
+    /// rename, replacing new, by renameat2 (renameat before Linux 3.15): ARM64 has no rename
+    ///
+    /// # Safety
+    /// old and new must be NUL-terminated paths.
+    #[inline]
+    pub unsafe fn rename(old: usize, new: usize) -> isize {
+        let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, old, AT_FDCWD, new, 0, 0) };
+        if r != -38 {
+            return r; // not ENOSYS
+        }
+        unsafe { syscall6(SYS_RENAMEAT, AT_FDCWD, old, AT_FDCWD, new, 0, 0) }
     }
 
     pub fn exit(code: i32) -> ! {
@@ -164,7 +208,7 @@ mod imp {
                 // until it takes more instead of spinning on sched_yield
                 let mut pfd = [fd as i32, 4]; // struct pollfd: fd, events POLLOUT, revents 0
                 // SAFETY: one pollfd record, no timeout.
-                unsafe { syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 1, usize::MAX) };
+                unsafe { poll(pfd.as_mut_ptr() as usize, 1, -1) };
                 continue;
             }
             if r <= 0 {

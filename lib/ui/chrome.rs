@@ -964,6 +964,7 @@ impl Ui {
         // right-to-left: the logical left edge is the window's right one
         let (left, right) = if self.rtl { (plat::EDGE_RIGHT, plat::EDGE_LEFT) } else { (plat::EDGE_LEFT, plat::EDGE_RIGHT) };
         let (nwse, nesw) = if self.rtl { (CUR_SIZE_NESW, CUR_SIZE_NWSE) } else { (CUR_SIZE_NWSE, CUR_SIZE_NESW) };
+        let content = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
         // edges: top, bottom, left, right (between the corners)
         self.grip(0, EDGE_TOP, CUR_SIZE_NS, c, 0, w - c - c, t);
         self.grip(1, EDGE_BOTTOM, CUR_SIZE_NS, cf, h - tf, w - cf - cf, tf);
@@ -974,8 +975,26 @@ impl Ui {
         self.grip(5, EDGE_TOP | right, nesw, w - c, 0, c, c);
         self.grip(6, EDGE_BOTTOM | left, nesw, 0, h - cf, cf, cf);
         self.grip(7, EDGE_BOTTOM | right, nwse, w - cf, h - cf, cf, cf);
-        // the caption buttons on top again (the same widget: continuation boxes)
         let layer = self.wp.ctx.cmd_layer_ui as u8;
+        // a finger's wider handles must not swallow the small widgets at the edge (the bottom bar
+        // of a panel): those on top again too; a list or a bar stays below the handle
+        if self.m.touch.on {
+            let small = self.dp(super::touch::TARGET_DIP);
+            let c = &mut self.wp.ctx;
+            let list = &mut c.hits[c.hit_cur];
+            for k in 0..content {
+                let mut b = list[k];
+                let (bw, bh) = (b.x1 - b.x0, b.y1 - b.y0);
+                let widget = b.id != 0 && b.flags as u32 & (HB_BLOCK | HB_DRAG) == 0 && bw > 0 && bh > 0 && bw < small && bh < small;
+                let edge = b.x0 < tf || b.x1 > w - tf || b.y1 > h - tf || (b.y1 > h - cf && (b.x0 < cf || b.x1 > w - cf));
+                if widget && edge && list.len() < super::ctx::HITS_MAX {
+                    b.continuation = true;
+                    b.layer = b.layer.max(layer);
+                    list.push(b);
+                }
+            }
+        }
+        // the caption buttons on top again (the same widget: continuation boxes)
         for k in 0..self.wp.chrome.cap_n as usize {
             let mut h = self.wp.chrome.cap_hits[k];
             h.continuation = true;

@@ -3,6 +3,7 @@
 //
 //   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
 //   Linux the raw syscall helpers plat builds on)
+//   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
 //   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
 //   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
 //   rt::sync SpinLock
@@ -99,8 +100,10 @@ pub mod boot;
 #[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/cpu.rs")]
 pub mod cpu;
 pub mod crash;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/fx.rs")]
+#[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
 pub mod fx;
+#[cfg(target_os = "linux")]
+pub mod kernel;
 #[cfg(not(target_os = "android"))]
 #[cfg_attr(target_arch = "wasm32", path = "portable/mem.rs")]
 mod mem;

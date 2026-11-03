@@ -10,24 +10,11 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_PATH, SYS_ADD_KEY, SYS_BPF, SYS_CHROOT, SYS_CLOSE, SYS_DELETE_MODULE, SYS_EXECVE, SYS_EXECVEAT, SYS_FINIT_MODULE, SYS_FSTAT, SYS_INIT_MODULE, SYS_KEXEC_FILE_LOAD, SYS_KEXEC_LOAD, SYS_KEYCTL, SYS_LANDLOCK_ADD_RULE, SYS_LANDLOCK_CREATE_RULESET, SYS_LANDLOCK_RESTRICT_SELF, SYS_MOUNT, SYS_OPENAT, SYS_OPEN_BY_HANDLE_AT, SYS_PERF_EVENT_OPEN, SYS_PIVOT_ROOT, SYS_PRCTL, SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV, SYS_PTRACE, SYS_REQUEST_KEY, SYS_SECCOMP, SYS_SETNS, SYS_UMOUNT2, SYS_UNSHARE, SYS_USERFAULTFD, Stat};
 
 use crate::policy::LinuxPlan;
 use crate::sandbox::Status;
 
-// syscall numbers (x86-64)
-const SYS_OPENAT: usize = 257;
-const SYS_CLOSE: usize = 3;
-const SYS_FSTAT: usize = 5;
-const SYS_PRCTL: usize = 157;
-const SYS_SECCOMP: usize = 317;
-const SYS_LANDLOCK_CREATE_RULESET: usize = 444;
-const SYS_LANDLOCK_ADD_RULE: usize = 445;
-const SYS_LANDLOCK_RESTRICT_SELF: usize = 446;
-
-const AT_FDCWD: usize = -100i64 as usize;
-const O_PATH: usize = 0x20_0000;
-const O_CLOEXEC: usize = 0x8_0000;
 
 const PR_SET_NO_NEW_PRIVS: usize = 38;
 
@@ -183,9 +170,9 @@ fn add_path(ruleset: i32, path: &str, access: u64) {
         return;
     }
     // the kernel rejects (EINVAL) directory-only rights on a file: a granted file keeps its own
-    let mut st = [0u64; 18]; // struct stat; st_mode at 24
-    // SAFETY: a live descriptor and storage for the x86-64 stat structure.
-    let is_dir = unsafe { syscall3(SYS_FSTAT, pfd as usize, st.as_mut_ptr() as usize, 0) } == 0 && st[3] as u32 & S_IFMT == S_IFDIR;
+    let mut st = Stat::default();
+    // SAFETY: a live descriptor and storage for the stat structure.
+    let is_dir = unsafe { syscall3(SYS_FSTAT, pfd as usize, &mut st as *mut Stat as usize, 0) } == 0 && st.st_mode & S_IFMT == S_IFDIR;
     let access = if is_dir { access } else { access & ACCESS_FILE };
     if access == 0 {
         close(pfd);
@@ -243,18 +230,18 @@ const SECCOMP_SET_MODE_FILTER: usize = 1;
 
 // syscalls denied with EPERM: tracing, cross-process memory, kexec, module loading, mount,
 // bpf, perf_event_open, userfaultfd, keyrings, handle reopen, namespace juggling
-const DENY: &[u32] = &[
-    101, // ptrace
-    310, 311, // process_vm_readv / writev
-    246, 320, // kexec_load / kexec_file_load
-    175, 313, 176, // init_module / finit_module / delete_module
-    165, 166, 155, 161, // mount / umount2 / pivot_root / chroot
-    321, // bpf
-    298, // perf_event_open
-    323, // userfaultfd
-    250, 248, 249, // keyctl / add_key / request_key
-    304, // open_by_handle_at
-    308, 272, // setns / unshare
+const DENY: &[usize] = &[
+    SYS_PTRACE,
+    SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV,
+    SYS_KEXEC_LOAD, SYS_KEXEC_FILE_LOAD,
+    SYS_INIT_MODULE, SYS_FINIT_MODULE, SYS_DELETE_MODULE,
+    SYS_MOUNT, SYS_UMOUNT2, SYS_PIVOT_ROOT, SYS_CHROOT,
+    SYS_BPF,
+    SYS_PERF_EVENT_OPEN,
+    SYS_USERFAULTFD,
+    SYS_KEYCTL, SYS_ADD_KEY, SYS_REQUEST_KEY,
+    SYS_OPEN_BY_HANDLE_AT,
+    SYS_SETNS, SYS_UNSHARE,
 ];
 
 // install the deny-list filter; execve / execveat are added when no program is allowed
@@ -272,11 +259,11 @@ fn seccomp(exec_allowed: bool, st: &mut Status) {
         i += 1;
     };
     for &k in DENY {
-        emit(k, &mut prog);
+        emit(k as u32, &mut prog);
     }
     if !exec_allowed {
-        emit(59, &mut prog); // execve
-        emit(322, &mut prog); // execveat
+        emit(SYS_EXECVE as u32, &mut prog);
+        emit(SYS_EXECVEAT as u32, &mut prog);
     }
     prog.push(sf(0x06, 0, 0, SECCOMP_RET_ALLOW)); // allow
     prog.push(sf(0x06, 0, 0, SECCOMP_RET_ERRNO_EPERM)); // deny

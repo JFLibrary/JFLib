@@ -1,6 +1,6 @@
 /* What a frame costs to reach the Bitmap (lib/plat/web_windows.rs, android/bridge.c), and that
  * partial frames leave the same pixels as a full one; run explicitly with
- * adb shell am instrument -w -r org.jflib.gallery/.GalleryPresentInstrumentation.
+ * adb shell am instrument -w -r [-e page NAME] org.jflib.gallery/.GalleryPresentInstrumentation.
  * Full frames: nativeRender with a new surface (the whole canvas again, nothing re-rendered);
  * partial frames: the pointer over the widgets. The result has the times (median, ms) and a
  * hash of the Bitmap (the same in every build that shows the same pixels).
@@ -17,7 +17,12 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 
 public final class GalleryPresentInstrumentation extends Instrumentation {
-    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+    private String page;
+    @Override public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        page = arguments != null ? arguments.getString("page") : null;
+        start();
+    }
     private static Object field(Object object, String name) throws Exception {
         Field field = object.getClass().getDeclaredField(name);
         field.setAccessible(true);
@@ -38,6 +43,7 @@ public final class GalleryPresentInstrumentation extends Instrumentation {
         try {
             Intent intent = new Intent(getTargetContext(), GalleryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.putExtra("jfgui_GPU", "0"); // the Bitmap's path; through the GPU: GalleryGpuInstrumentation
+            if (page != null) intent.putExtra("jfgui_PAGE", page);
             Activity activity = startActivitySync(intent);
             waitForIdleSync();
             final Throwable[] failure = new Throwable[1];

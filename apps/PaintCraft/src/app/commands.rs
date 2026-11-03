@@ -366,10 +366,12 @@ pub(crate) static PN_MENUBAR: [Mi; 7] = [
     Mi::Menu("&Korrekturen", &M_ADJUST),
     Mi::Menu("E&ffekte", &M_EFFECTS),
 ];
-static M_FILE: [Mi; 14] = [
+// (Android: no scanner, no print service, no helper programs, no paint.net host)
+static M_FILE: [Mi; if cfg!(target_os = "android") { 11 } else { 14 }] = [
     Mi::Cmd(CMD_NEW),
     Mi::Cmd(CMD_OPEN),
     Mi::Sub("&Zuletzt geöffnet", &M_RECENT),
+    #[cfg(not(target_os = "android"))]
     Mi::Sub("Üb&ernehmen", &M_ACQUIRE),
     Mi::Sep,
     Mi::Cmd(CMD_SAVE),
@@ -377,7 +379,9 @@ static M_FILE: [Mi; 14] = [
     Mi::Cmd(CMD_SAVE_ALL),
     Mi::Sep,
     Mi::Cmd(CMD_CLOSE),
+    #[cfg(not(target_os = "android"))]
     Mi::Sep,
+    #[cfg(not(target_os = "android"))]
     Mi::Cmd(CMD_PRINT),
     Mi::Sep,
     Mi::Cmd(CMD_EXIT),
@@ -512,9 +516,12 @@ static M_ADJUST: [Mi; 16] = [
     Mi::Cmd(CMD_ADJ_POSTERIZE),
     Mi::List(CMD_ADJ_PLUGIN0, 40, ""),
 ];
-static M_EFFECTS: [Mi; 16] = [
+static M_EFFECTS: [Mi; if cfg!(target_os = "android") { 13 } else { 16 }] = [
+    #[cfg(not(target_os = "android"))]
     Mi::Sub("Paint.NET-Plugins", &M_PDN_EFFECTS),
+    #[cfg(not(target_os = "android"))]
     Mi::Cmd(crate::integrations::paint_dot_net::host::COMMAND),
+    #[cfg(not(target_os = "android"))]
     Mi::Cmd(crate::integrations::gmic::COMMAND),
     Mi::Cmd(CMD_FX_REPEAT),
     Mi::Sep,

@@ -25,13 +25,12 @@ fn os_fill(buf: &mut [u8]) -> bool {
 
 #[cfg(target_os = "linux")]
 fn os_fill(buf: &mut [u8]) -> bool {
-    const SYS_GETRANDOM: usize = 318;
     const EINTR: isize = 4;
     let mut done = 0;
     while done < buf.len() {
         let want = (buf.len() - done).min(1 << 25);
         // SAFETY: writes at most `want` bytes into the rest of the buffer.
-        let r = unsafe { rt::os::syscall3(SYS_GETRANDOM, buf[done..].as_mut_ptr() as usize, want, 0) };
+        let r = unsafe { rt::os::syscall3(rt::os::SYS_GETRANDOM, buf[done..].as_mut_ptr() as usize, want, 0) };
         if r == -EINTR {
             continue;
         }

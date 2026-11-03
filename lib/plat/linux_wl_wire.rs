@@ -23,8 +23,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use alloc::format;
 
-use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_POLL, SYS_RECVMSG, SYS_SENDMSG, SYS_SOCKET};
-const SYS_RECVFROM: usize = 45;
+use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_GETUID, SYS_RECVFROM, SYS_RECVMSG, SYS_SENDMSG, SYS_SOCKET};
 
 use super::proto::{Iface, Req, DISPLAY_SYNC, IFACE_CB_SYNC, IFACE_WL_DISPLAY};
 use super::Wl;
@@ -56,7 +55,6 @@ pub(crate) const POLLOUT: u16 = 0x004;
 pub(crate) const POLLERR: u16 = 0x008;
 pub(crate) const POLLHUP: u16 = 0x010;
 pub(crate) const POLLNVAL: u16 = 0x020;
-const SYS_GETUID: usize = 102;
 
 /// struct pollfd
 #[repr(C)]
@@ -70,7 +68,7 @@ pub(crate) struct PollFd {
 /// poll(fds, timeout ms) -> the raw result (negative errno)
 pub(crate) fn poll(fds: &mut [PollFd], ms: i32) -> isize {
     // SAFETY: the slice holds fds.len() pollfd records.
-    unsafe { syscall3(SYS_POLL, fds.as_mut_ptr() as usize, fds.len(), ms as isize as usize) }
+    unsafe { rt::os::poll(fds.as_mut_ptr() as usize, fds.len(), ms) }
 }
 
 pub(crate) fn sys_close(fd: i32) {

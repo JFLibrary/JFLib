@@ -24,16 +24,8 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_CLOSE, SYS_CONNECT, SYS_GETUID, SYS_READ, SYS_SENDMSG, SYS_SOCKET, SYS_WRITE};
 
-const SYS_READ: usize = 0;
-const SYS_WRITE: usize = 1;
-const SYS_CLOSE: usize = 3;
-const SYS_POLL: usize = 7;
-const SYS_SOCKET: usize = 41;
-const SYS_CONNECT: usize = 42;
-const SYS_SENDMSG: usize = 46;
-const SYS_GETUID: usize = 102;
 const MSG_NOSIGNAL: usize = 0x4000;
 const MSG_MAX: usize = 1 << 20;
 
@@ -616,7 +608,7 @@ impl Conn {
     fn fill(&mut self, ms: i32) -> bool {
         let mut pfd = [self.fd as u32 as u64 | (1u64 << 32)]; // struct pollfd {fd, events POLLIN, revents}
         // SAFETY: one pollfd record.
-        let r = unsafe { syscall6(SYS_POLL, pfd.as_mut_ptr() as usize, 1, ms as usize, 0, 0, 0) };
+        let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, ms) };
         if r <= 0 {
             return false;
         }

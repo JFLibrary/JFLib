@@ -343,6 +343,7 @@ public final class GalleryActivity extends Activity {
             if ((context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0 && start != null
                 && "1".equals(start.getStringExtra("jfgui_PERF"))) perf = new long[120];
         }
+        private boolean imeWas;
         void resume() {
             if (resumed) return;
             resumed = true;
@@ -366,6 +367,10 @@ public final class GalleryActivity extends Activity {
             render();
             if (connection != null) connection.syncFromNative();
             a11y.pull();
+            // a text box went away (its dialog closed): the keyboard goes with it
+            boolean ime = nativeIme();
+            if (imeWas && !ime) ((InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(getWindowToken(), 0);
+            imeWas = ime;
             Choreographer.getInstance().postFrameCallbackDelayed(this, nativeFrameDelay());
         }
         void requestFrame() {

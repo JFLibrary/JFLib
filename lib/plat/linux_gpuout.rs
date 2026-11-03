@@ -294,7 +294,7 @@ pub fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize {
 pub fn win_test_usage() -> (u64, u64, u64) {
     let mut ts = [0i64; 2];
     // SAFETY: CLOCK_PROCESS_CPUTIME_ID into a timespec.
-    unsafe { rt::os::syscall3(228, 2, ts.as_mut_ptr() as usize, 0) };
+    unsafe { rt::os::syscall3(rt::os::SYS_CLOCK_GETTIME, 2, ts.as_mut_ptr() as usize, 0) };
     let cpu = ts[0] as u64 * 1_000_000 + ts[1] as u64 / 1000;
     let (mut rss, mut anon) = (0, 0);
     if let Some(b) = super::sys::read_file_raw("/proc/self/status") {

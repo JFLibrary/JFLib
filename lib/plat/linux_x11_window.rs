@@ -83,7 +83,7 @@ fn wake_poll(fd: i32, events: u16, ms: i32) -> u16 {
     let wfd = super::super::thread::wake_fd();
     let mut pfd = [(fd as u32 as u64) | (events as u64) << 32, (wfd as u32 as u64) | (POLLIN as u64) << 32];
     // SAFETY: two pollfds.
-    let r = unsafe { rt::os::syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 2, ms as isize as usize) };
+    let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 2, ms) };
     if r <= 0 {
         return 0;
     }
@@ -229,7 +229,7 @@ impl X11 {
         self.change_prop32(win, self.atoms[A_WM_PROTOCOLS], XA_ATOM, &[del, ping]);
         // _NET_WM_PID
         // SAFETY: getpid has no arguments.
-        let pid = unsafe { rt::os::syscall3(SYS_GETPID, 0, 0, 0) } as u32;
+        let pid = unsafe { rt::os::syscall3(rt::os::SYS_GETPID, 0, 0, 0) } as u32;
         self.change_prop32(win, self.atoms[A_NET_WM_PID], XA_CARDINAL, &[pid]);
         // WM_CLIENT_MACHINE
         let node = self.nodename.clone();

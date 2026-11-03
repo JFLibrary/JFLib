@@ -110,7 +110,8 @@ impl Default for Prt {
 
 /// prt_states() -- Drucken… only with an image
 pub(crate) fn prt_states(p: &mut Pn, ui: &mut Ui) {
-    let f = if doc_count(&p.doc) != 0 { 0 } else { CF_DISABLED };
+    // (Android: no print service behind plat::print)
+    let f = if cfg!(target_os = "android") { CF_HIDDEN } else if doc_count(&p.doc) != 0 { 0 } else { CF_DISABLED };
     pn_cmd_set(ui, CMD_PRINT, f);
 }
 

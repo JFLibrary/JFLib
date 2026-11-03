@@ -139,11 +139,11 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
     }
     ui.window_end();
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn run(_scan: bool, _beta: bool, _fixture: Option<&str>, _job: &Job) -> Result<Vec<u8>, String> {
     Err(String::from("Systemdienste sind in der Desktop-Version verfügbar."))
 }
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(windows, target_os = "linux"))]
 fn run(scan: bool, beta: bool, fixture: Option<&str>, job: &Job) -> Result<Vec<u8>, String> {
     if scan {
         if let Some(path) = fixture {

@@ -22,16 +22,13 @@
 
 use alloc::vec::Vec;
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_MMAP, SYS_MPROTECT, SYS_MUNMAP};
 
 use crate::{
     OsFile, LH_SEGMAX, LIB_FILE_MAX, LIBE_DEPS, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_MAP, LIBE_NOMEM,
     LIBE_RELOC, Lib, LibSeg,
 };
 
-const SYS_MMAP: usize = 9;
-const SYS_MPROTECT: usize = 10;
-const SYS_MUNMAP: usize = 11;
 const PROT_READ: u32 = 1;
 const PROT_WRITE: u32 = 2;
 const PROT_EXEC: u32 = 4;

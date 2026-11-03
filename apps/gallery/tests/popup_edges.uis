@@ -52,7 +52,7 @@ expect text:"Ein breiter Tooltip am linken Rand des Hauptfensters" rect -110 88 
 rclick #7812
 expect menuitem:"Öffnen" rect 556 376 148 32
 click menuitem:"Anordnen"
-expect menuitem:"Nach vorne" rect 395 449 158 32
+expect menuitem:"Nach vorne" rect 394 449 158 32
 shot build/popup_edges/context_out.png desktop
 click menuitem:"Nach hinten"
 expect menuitem:"Öffnen" missing
@@ -75,7 +75,7 @@ key esc
 rclick #7812
 expect menuitem:"Öffnen" rect 400 231 148 32
 click menuitem:"Anordnen"
-expect menuitem:"Nach vorne" rect 239 300 158 32
+expect menuitem:"Nach vorne" rect 238 300 158 32
 shot build/popup_edges/context_flipped.png desktop
 key esc esc
 expect menuitem:"Öffnen" missing

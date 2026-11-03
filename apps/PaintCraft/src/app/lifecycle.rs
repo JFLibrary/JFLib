@@ -282,12 +282,20 @@ pub(super) fn pn_frame(p: &mut Pn, ui: &mut Ui) {
     for f in MOD_FRAME.iter() {
         f(p, ui);
     }
+    // Android: the back key closes a menu or a dialog (as Esc) before it leaves the app
+    let open = ui.popup_count() != 0 || ui.window_modal() != 0;
+    if open != p.back_trap {
+        p.back_trap = open;
+        plat::back_trap(open);
+    }
 }
 
 /// pn_cmd(id, arg) -> handled
 ///   ids 100..999: the module of ROUTE_TAB
 ///   UIC_CLOSE:    fio_cmd only (true keeps the window: "save changes?")
 ///   UIC_EXIT:     the settings are saved (every end of a real window run, U3)
+///   UIC_SUSPEND 2: the app went to the background and may be ended without a word (Android, a
+///                 hidden browser tab): the settings are saved, the modules hear it as usual
 ///   UIC_SESSION_END: log-off / shutdown: the settings and a recovery copy of every modified
 ///                 image are saved (file_io::fio_session_end); the next start opens them again
 ///   other UIC_*:  broadcast in MOD_CMD order; UIC_THEME / UIC_DPI / UIC_WAKE reach every
@@ -315,6 +323,9 @@ pub(super) fn pn_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
             crate::preferences::set_save_quit(p, ui);
             crate::integrations::file_io::fio_session_end(p, ui);
             return true;
+        }
+        if id == UIC_SUSPEND && arg == 2 {
+            crate::preferences::set_save_quit(p, ui);
         }
         if id == UIC_CLOSE {
             crate::tools::tool_commit_live(p, ui); // T1: a pending tool edit is part of the image

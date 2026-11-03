@@ -5087,7 +5087,8 @@ emulator or a real phone `android_sensors.py`; `plattest --test sensors` checks 
 without hardware.
 
 On Android, `plat::back_trap(on)` makes the back key an Esc for the app (a page goes back on
-`UIC_ESCAPE`). The finger is §37.
+`UIC_ESCAPE`); `ui.quit()` ends the activity and its process there (`plat::app_finish`, the next
+start is a new runtime). The finger is §37.
 
 ## 37. The finger
 

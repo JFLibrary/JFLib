@@ -116,8 +116,8 @@ const HOLD_SHOW_MS: u32 = 120;
 const PALM_MS: u32 = 500;
 /// a second finger takes a press of a TF_TWO widget back that is younger than this
 const TAKE_BACK_MS: u32 = 200;
-/// a small widget's rectangle for a finger (touch_aim)
-const TARGET_DIP: i32 = 44;
+/// a small widget's rectangle for a finger (touch_aim, edge_grips)
+pub(crate) const TARGET_DIP: i32 = 44;
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum Mode {

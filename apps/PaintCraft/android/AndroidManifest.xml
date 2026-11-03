@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PaintCraft on Android: the shared Java host (android/*.java, package org.jflib.gallery) with
+     the app's own package (app_id in ../PACKAGE); files go through the system picker and need no
+     permission. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.jfreund.PaintCraft" android:versionCode="1" android:versionName="0.1.0">
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <application android:label="PaintCraft" android:icon="@drawable/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="false"
+        android:supportsRtl="true" android:largeHeap="true">
+        <activity android:name="org.jflib.gallery.GalleryActivity" android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode|fontScale"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!-- images the app puts on the clipboard (android/GalleryFiles.java) -->
+        <provider android:name="org.jflib.gallery.GalleryFiles"
+            android:authorities="org.jfreund.PaintCraft.jfgui.files"
+            android:exported="false" android:grantUriPermissions="true" />
+    </application>
+</manifest>

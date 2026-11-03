@@ -229,26 +229,6 @@ const XWW_FRAME: u32 = 4; // re-read _NET_FRAME_EXTENTS
 const X11_WM_ICONIC: u32 = 3; // WM_STATE / WM_CHANGE_STATE IconicState
 const X11_MOVERESIZE_MOVE: u32 = 8;
 
-// syscalls
-const SYS_READ: usize = 0;
-const SYS_WRITE: usize = 1;
-const SYS_CLOSE: usize = 3;
-const SYS_POLL: usize = 7;
-const SYS_MMAP: usize = 9;
-const SYS_MUNMAP: usize = 11;
-const SYS_SHMGET: usize = 29;
-const SYS_SHMAT: usize = 30;
-const SYS_SHMCTL: usize = 31;
-const SYS_GETPID: usize = 39;
-const SYS_SOCKET: usize = 41;
-const SYS_CONNECT: usize = 42;
-#[cfg(not(jfgui_glibc))]
-const SYS_RECVFROM: usize = 45;
-const SYS_SENDMSG: usize = 46;
-const SYS_UNAME: usize = 63;
-const SYS_SHMDT: usize = 67;
-const SYS_FTRUNCATE: usize = 77;
-const SYS_MEMFD_CREATE: usize = 319;
 const EINTR: isize = 4;
 const EAGAIN: isize = 11;
 const POLLIN: u16 = 0x001;

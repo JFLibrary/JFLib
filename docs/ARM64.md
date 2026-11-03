@@ -1,7 +1,9 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher ist nichts davon gebaut oder gelaufen: Die
-Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Die ARM64-Werte (Syscalls, Flags, Layouts, Relocations) sind noch nicht gegen die Kernel-Header geprüft, das gehört an den Anfang von ARM1. Der Eintrag in der Roadmap steht in
+Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher sind nur ARM1 und ARM6 umgesetzt, und von ARM1 lief
+noch nichts auf ARM. Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Syscalls,
+Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`), die
+Relocations noch nicht. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
 
 ## Ziel
@@ -20,7 +22,7 @@ Schon vorhanden:
 
 - **Android ARM64** baut, dafür gibt es `lib/rt/portable/` (`cpu`, `fx`, `math`, `mem`). Android
   nutzt aber Bionic statt eigener Syscalls, der Linux-Pfad ohne libc ist also neu.
-- **`lib/simd`** fällt ohne x86 auf skalaren Code zurück, das läuft sofort, nur langsamer.
+- **`lib/simd`** hat mit `neon.rs` ein Backend für ARM64 (ARM6).
 - **`lib/gpu`** enthält keinen Architektur-Code. Nur die Syscall-Nummern in `vk_dmabuf.rs` hängen an
   x86-64.
 - **`lib/update/manifest.rs`** kennt `windows-aarch64` und `linux-aarch64`.
@@ -44,7 +46,6 @@ Nur auf x86-64 ausgelegt:
 | Eigene Loader | nur `EM_X86_64` und `R_X86_64_*`, nur PE-Machine `0x8664` | `plat/linux_elfload.rs`, `plat/win_lib.rs`, `pe_verify` / `elf_verify` in `build_rs.py` |
 | Crash-Berichte | `CONTEXT`, `ucontext`, DWARF-Register, Erkennen von `call` | `plat/win_crash.rs`, `plat/linux_crash.rs` |
 | Sandbox | `AUDIT_ARCH_X86_64`, Liste der Syscall-Nummern | `plat/linux_sandbox.rs` |
-| SIMD | 245 x86-Stellen, kein NEON | `simd/native.rs` |
 | Pakete | `amd64`, `x86_64`, `x64` fest eingetragen | `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `linux_task.py` |
 
 ## Entscheidungen
@@ -96,10 +97,17 @@ Stellen dieses Plans entspricht, und die x86-Programme bytegleich zu vorher sind
 `sandboxtest`, `lifetest`). Dieser Schritt lässt sich ohne ARM mergen und nützt auch so. Er fasst rund
 40 Dateien an, also vorher prüfen, welche Sessions gerade in `lib/plat` arbeiten, und schnell mergen.
 
+**Umgesetzt:** Die Tabelle ist [`lib/rt/kernel.rs`](../lib/rt/kernel.rs), auch erreichbar als `rt::os::*`. Dort
+stehen außerdem die Helfer `poll`, `fork`, `clone`, `dup2` und `rename`. `tools/kernel_table_check.py` vergleicht
+beide Tabellen mit den Kernel-Headern des Android-NDK, `plattest --test kernel` prüft Flags, `struct stat`, die
+`clone`-Reihenfolge und die Helfer auf dem laufenden Kernel. Die Lint-Regel prüft auch, dass beide Tabellen
+dieselben Namen enthalten. Die Sperrliste der Sandbox enthielt keinen der ersetzten Aufrufe, sie hat auf x86-64
+dieselben Nummern in derselben Reihenfolge wie vorher und kommt jetzt aus der Tabelle.
+
 ### ARM2: `rt` auf Linux ARM64 (M)
 
 - `svc 0` statt `syscall`, `_start`, Thread-Start, `rt/lib.rs` wählt für ARM `portable/cpu.rs`,
-  `portable/fx.rs`, `portable/math.rs`.
+  `portable/math.rs` (`aarch64/fx.rs` wählt es schon, seit ARM6).
 - `rt/mem.rs` trennen: Der Heap mit den 64 Shards gilt für alle, `memcpy` und Verwandte sowie `load8`
   kommen pro Architektur.
 - Test-Runner: `build_rs.py test --arch aarch64` startet Programme über `qemu-aarch64` in WSL.
@@ -117,7 +125,7 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 - Crash-Berichte: DWARF-Register, `calls_into` erkennt `bl` und `blr`.
 - ELF-Loader: `EM_AARCH64`, `R_AARCH64_RELATIVE`, `ABS64`, `GLOB_DAT`, `JUMP_SLOT`, Befehlscache leeren,
   Seitengröße zur Laufzeit.
-- Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), Sperrliste aus der Tabelle.
+- Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), die Sperrliste kommt schon aus der Tabelle.
 - glibc-Variante: `_start`, `TPIDR_EL0` statt `arch_prctl`.
 - `plat/cpu.rs` (Stack-Zeiger, AVX-Probe) und die Crash-Tests in `plat/lib.rs`, für die es den Zweig für
   Android schon gibt.
@@ -148,15 +156,62 @@ ARM64 und unverändert auf x86-64 laufen.
 
 **Fertig, wenn:** `coretest`, `plattest` und ein Start der `gallery` auf `windows-11-arm` grün sind.
 
-### ARM6: NEON für `lib/simd` (L, unabhängig von den anderen)
+### ARM6: NEON für `lib/simd` (erledigt 2026-11-03)
 
-- `lib/simd/neon.rs` nach dem Muster von `wasm.rs`: `Neon128 as Sse2`, `Scalar256 as Avx2`.
-- `portabletest` prüft jede Operation gegen den skalaren Code.
-- Wirkt sofort auch auf Android. Die Roadmap nennt NEON dort als offenen Punkt (ein großer Teil der
-  verbleibenden 6 ms im Rasterer).
+- `lib/simd/neon.rs` nach dem Muster von `wasm.rs`: `Neon128 as Sse2`, `Scalar256 as Avx2`, ohne
+  Erkennung zur Laufzeit. Die Ergebnisse sind Bit für Bit die von SSE2, auch bei NaN, Unendlich und
+  Überlauf. Am Anfang der Datei steht, wo das mehr braucht als den naheliegenden Befehl.
+- Der Preis der NaN-Regel: Jede Float-Rechnung prüft ihr Ergebnis (`fmaxv`, `fcmp`, `b.vs`), ein NaN nimmt
+  einen kalten Pfad. Ohne das wäre `sqrtf(-1)` auf ARM `7fc00000` statt `ffc00000`.
+- `portabletest` läuft von `adb shell` (`--target android`, `tests/android.py`) und prüft jede Operation
+  gegen den skalaren Code, jetzt auch mit Grenzwerten: Sättigung, alle Schiebeweiten, Float-Operationen auf
+  rohen Bits mit jedem Paar aus signierten Nullen, denormalen Zahlen, Unendlich und NaN. Derselbe Digest
+  auf dem SM-A566B, unter Windows und Linux (SSE2, AVX2) und im Browser (Chromium, Firefox, Node).
+- `copy_stream` und `stream_fence` bekommen nichts Eigenes: `stnp` ist nur ein Hinweis und bräuchte wegen
+  seiner lockeren Ordnung eine Barriere, ein gewöhnliches Kopieren ganzer Zeilen erkennen ARM-Kerne selbst
+  und legen sie dann nicht mehr im Cache ab (Write Streaming). Nur `render_par` ruft sie, und das läuft auf Android nicht
+  (kein Pool). Übergeben wird über `SpinLock` und `parallel_for`, also mit Release und Acquire. Ob sich das
+  mit Threads auf ARM auszahlt, lässt sich erst mit ARM3 messen.
 
-**Fertig, wenn:** `portabletest` grün ist und das A56 messbar schneller rendert (`nativeRender`,
-`dumpsys gfxinfo`). Kann jederzeit parallel starten, weil Android ARM64 schon baut.
+Gemessen auf dem SM-A566B (Android 16, 120 Hz, Bitmap 768 × 1496), Entwicklungsbau, je drei Durchgänge
+abwechselnd mit `apps/androidGallery/tests/android_perf.py`, Median der Durchgänge. Android Studio spiegelte
+dabei den Bildschirm; `nativeRender` stört das kaum (vorher 5,7 ms wie ohne Spiegelung am 01.11.), die Werte von
+`gfxinfo` taugen damit nur zum Vergleich untereinander:
+
+| | Startseite vorher | nachher | „Werte & Farben“ vorher | nachher |
+|---|---|---|---|---|
+| `nativeRender` Median | 5,72 ms | 5,22 ms | 6,88 ms | 6,31 ms |
+| `nativeRender` Mittel | 5,84 ms | 5,30 ms | 7,17 ms | 6,53 ms |
+| `nativeRender` 95 % | 6,84 ms | 6,33 ms | 9,47 ms | 7,95 ms |
+| davon Darstellen (Mittel) | 2,13 ms | 2,25 ms | 2,00 ms | 2,04 ms |
+| ruckelnd (`gfxinfo`) | 2,6 % | 2,0 % | 17 % | 6 % |
+| Bildzeit Median / 95 % | 11 / 13 ms | 11 / 13 ms | 13 / 17 ms | 11 / 15 ms |
+| verpasste Vsyncs | 0 | 0 | 2 | 0 |
+
+Alle zehn Seiten aus `GalleryPresentInstrumentation -e page NAME` haben vorher und nachher denselben
+Bitmap-Hash. `coretest` und `gallery` sind für x86-64 im Release-Bau Byte für Byte gleich, unter Windows
+bis auf den Zeitstempel des Linkers. Das gilt nur für Bauten aus demselben Verzeichnis: Die Metadaten der
+von Cargo gebauten Abhängigkeiten von `text_shape` hängen vom Pfad ab, und das verschiebt `gallery`.
+
+Das Rechnen ohne Darstellen wird also 18 % schneller (3,71 auf 3,05 ms), viel weniger, als die Roadmap
+erwartet hatte: `simpleperf` (alle Threads der App, Startseite) zeigt, dass `gfx::blend::fill_over` von
+12,2 auf 3,2 % fällt und `mask_over` von 3,4 auf 1,9 %, der Rest liegt nicht in `lib/simd`: `memmove` 32 %,
+`plat::web::windows::to_rgba` 17 % (im Entwicklungsbau nicht vektorisiert, `plat` hat Stufe 1),
+`rt::fx::sqrt_bits` und `rt::fx::nearest` zusammen 6 % (portabler Code, wo ARM `fsqrt` und `fcvtns` hat).
+
+Diese letzten 6 % sind seitdem weg: `rt::fx` hat auf ARM64 eine eigene Datei mit den Befehlen der CPU
+(`lib/rt/aarch64/fx.rs`, die Ergebnisse von SSE), `portabletest` vergleicht sie Wert für Wert mit
+`portable/fx.rs`, auch um die Grenzen von `i32` und `i64` und bei exakten Halben. Gegen den Stand nur mit
+NEON, gleiche Messung wie oben (die Zahlen schwanken von Tag zu Tag, deshalb immer im Wechsel):
+
+| | Startseite vorher | nachher | „Werte & Farben“ vorher | nachher |
+|---|---|---|---|---|
+| `nativeRender` Median | 5,02 ms | 4,53 ms | 6,20 ms | 5,75 ms |
+| `nativeRender` Mittel | 5,15 ms | 4,65 ms | 6,46 ms | 5,84 ms |
+| `nativeRender` 95 % | 6,30 ms | 5,85 ms | 7,55 ms | 6,75 ms |
+| ruckelnd (`gfxinfo`) | 2,2 % | 1,9 % | 4,8 % | 2,6 % |
+| Bildzeit Median / 95 % | 11 / 13 ms | 10 / 13 ms | 11 / 14 ms | 11 / 13 ms |
+| verpasste Vsyncs | 0 | 0 | 2 | 0 |
 
 ### ARM7: Atomics-Prüfung auf echter Hardware (M)
 
@@ -192,7 +247,7 @@ was getestet ist.
 
 ```text
 ARM0 -> ARM1 -> ARM2 -> ARM3 -> ARM4 -> ARM5 -> ARM7 -> ARM8 -> ARM9
-ARM6 (NEON): jederzeit parallel
+ARM6 (NEON): erledigt
 ```
 
 ARM1 lässt sich sofort und ohne ARM-Hardware erledigen. ARM2 und ARM3 sind der Kern. ARM5 kann nach ARM2
@@ -209,6 +264,8 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   `st_mtim` bleiben gleich, `android_files.rs` beschreibt das schon. `linux_sys.rs` und
   `linux_sandbox.rs` rechnen mit festen Stellen.
 - **`clone`:** x86-64 hat `child_tid, tls`, ARM64 `tls, child_tid`.
+- **`dup3`:** Anders als `dup2` lehnt es `old == new` mit `EINVAL` ab. `process::launch` kann dorthin kommen,
+  wenn Standardeingabe geschlossen war. `rt::os::dup2` fängt das ab.
 - **Sandbox offen statt zu:** Eine falsche Nummer in der Sperrliste sperrt still den falschen Aufruf.
 - **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Die eigenen Loader leeren ihn heute nicht, auf
   x86 ist das auch nicht nötig. Geladene Plugins können sonst zufällig abstürzen.

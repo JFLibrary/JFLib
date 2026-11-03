@@ -11,17 +11,13 @@
 //        jfgui_PRINT_PORTAL=1       allow the portal without a window (fake bus tests);
 //        otherwise a run without a display (headless) returns ERR_UNSUPPORTED.
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_CLOSE, SYS_LSEEK, SYS_MEMFD_CREATE, SYS_WRITE};
 
 use crate::{
     ERR_CANCEL, ERR_DIMS, ERR_IO, ERR_UNSUPPORTED, PJF_LANDSCAPE, PJF_SMASK, PrintJob, page_init, print_pdf,
     portal_print_end, portal_print_prepare, portal_print_send,
 };
 
-const SYS_WRITE: usize = 1;
-const SYS_CLOSE: usize = 3;
-const SYS_LSEEK: usize = 8;
-const SYS_MEMFD_CREATE: usize = 319;
 const MFD_CLOEXEC: usize = 1;
 const EINTR: isize = -4;
 

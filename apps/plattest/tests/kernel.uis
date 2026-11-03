@@ -1,0 +1,4 @@
+#!args --test kernel
+# (Rust only) plattest --test kernel: lib/rt/kernel.rs on the running kernel (Linux; on Windows
+# nothing to do). The whole test runs before the UI starts and ends the process with the number
+# of failures.

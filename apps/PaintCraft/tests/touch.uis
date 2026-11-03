@@ -319,3 +319,31 @@ expect #9905 value 0
 expect #9909 text "90,-106"
 key ctrl+0
 wait 200
+
+# ------------------------------------------------------------ small widgets under a finger's handles
+# the first and the last button of a panel's bottom bar lie in the corner handles (chrome.rs edge_grips):
+# the buttons win where they are, the handle stays around them
+system env jfgui_CSD 1
+wait 16
+expect #9903 value 1
+window 24579
+tap #0x1069
+window any
+wait 16
+expect wm none
+expect #9903 value 2
+key ctrl+z
+wait 16
+expect #9903 value 1
+window 24579
+tap #0x106F
+window any
+wait 16
+expect wm none
+expect window 24608 open
+window 24608
+key esc
+window any
+wait 200
+dump build/pn_touch_dump.txt
+system env jfgui_CSD -

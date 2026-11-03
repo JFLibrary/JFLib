@@ -168,6 +168,13 @@ pub fn back_trap(on: bool) {
     let _ = on;
 }
 
+/// Android: the runtime ended (ui.quit): the activity goes and its process with it, a new start
+/// needs a new runtime.  Elsewhere nothing: there the main loop ends the program
+pub fn app_finish() {
+    #[cfg(target_os = "android")]
+    web::system_host::app_finish();
+}
+
 /// (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
 /// `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
 /// next pointer event decides again

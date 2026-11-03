@@ -16,6 +16,8 @@ pub(crate) struct Pn {
     /// ui_repass / ui_invalidate requested by code without a Ui (flushed after the callback)
     pub(crate) want_repass: bool,
     pub(crate) want_invalidate: bool,
+    /// the back key is Esc for now (plat::back_trap, Android: a menu or a dialog is open)
+    pub(crate) back_trap: bool,
     // Document, workspace and preferences.
     pub(crate) doc: crate::document::model::Docs,
     pub(crate) lay: crate::document::layers::Lay,
@@ -88,6 +90,7 @@ impl Pn {
             cmds_dirty: false,
             want_repass: false,
             want_invalidate: false,
+            back_trap: false,
             doc: Default::default(),
             lay: Default::default(),
             comp: Default::default(),
