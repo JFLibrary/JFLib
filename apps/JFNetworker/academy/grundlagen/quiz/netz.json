@@ -1,0 +1,184 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: das erste Netz",
+    "Quiz: the first network"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Was tut ein Switch mit einem Rahmen an eine MAC-Adresse, die er noch nicht kennt?",
+        "What does a switch do with a frame to a MAC address it does not know yet?"
+      ],
+      "explain": [
+        "Er flutet ihn: Alle anderen Ports bekommen eine Kopie. Antwortet das Ziel, lernt er dessen Port aus der Quell-MAC der Antwort.",
+        "It floods it: all other ports get a copy. When the destination answers, the switch learns its port from the source MAC of the answer."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Er gibt ihn an allen anderen Ports aus",
+            "It sends it out of all other ports"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Er verwirft ihn",
+            "It drops it"
+          ],
+          "explain": [
+            "Dann käme nie ein erster Rahmen an, und er könnte nie etwas lernen.",
+            "Then no first frame would ever arrive, and it could never learn anything."
+          ]
+        },
+        {
+          "text": [
+            "Er fragt per ARP nach",
+            "It asks by ARP"
+          ],
+          "explain": [
+            "ARP ist die Sache der Hosts; ein Switch liest keine IP-Adressen.",
+            "ARP is the business of hosts; a switch does not read IP addresses."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Was lernt ein Switch aus einem ankommenden Rahmen?",
+        "What does a switch learn from an arriving frame?"
+      ],
+      "explain": [
+        "Die Quell-MAC verrät, wer hinter diesem Port sitzt. Die Ziel-MAC sagt nur, wohin der Rahmen will.",
+        "The source MAC gives away who sits behind this port. The destination MAC only says where the frame wants to go."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Hinter diesem Port sitzt die Quell-MAC",
+            "The source MAC sits behind this port"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Hinter diesem Port sitzt die Ziel-MAC",
+            "The destination MAC sits behind this port"
+          ],
+          "explain": [
+            "Das Ziel sitzt gerade nicht an dem Port, von dem der Rahmen kommt.",
+            "The destination is precisely not at the port the frame comes from."
+          ]
+        },
+        {
+          "text": [
+            "Die IP-Adresse des Absenders",
+            "The IP address of the sender"
+          ],
+          "explain": [
+            "Das liest er nicht; er arbeitet mit MAC-Adressen.",
+            "It does not read that; it works with MAC addresses."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "Mit welchem Befehl sehen Sie auf einem IOS-artigen Switch, welche MAC-Adresse an welchem Port gelernt wurde?",
+        "Which command shows on an IOS-like switch which MAC address was learned on which port?"
+      ],
+      "explain": [
+        "`show mac address-table`, auf der Stufe nach `enable`.",
+        "`show mac address-table`, at the level after `enable`."
+      ],
+      "accept": [
+        "show +mac[ -]address-table",
+        "sh(ow)? +mac[ -]address-table"
+      ]
+    },
+    {
+      "kind": "order",
+      "points": 2,
+      "stem": [
+        "PC1 pingt PC2 im selben Netz, beide Tabellen sind leer. In welcher Reihenfolge läuft das ab?",
+        "PC1 pings PC2 in the same network, all tables are empty. In what order does it happen?"
+      ],
+      "explain": [
+        "Ohne MAC-Adresse geht kein Rahmen los. Erst die Frage, dann die Antwort, dann das Echo und seine Antwort.",
+        "No frame leaves without a MAC address. First the question, then the answer, then the echo and its reply."
+      ],
+      "order": [
+        [
+          "PC1 fragt per Broadcast nach der MAC-Adresse von PC2",
+          "PC1 asks by broadcast for the MAC address of PC2"
+        ],
+        [
+          "Der Switch flutet die Anfrage",
+          "The switch floods the request"
+        ],
+        [
+          "PC2 antwortet nur an PC1",
+          "PC2 answers to PC1 only"
+        ],
+        [
+          "PC1 schickt das Echo an PC2",
+          "PC1 sends the echo to PC2"
+        ]
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Welche Aussagen über ARP stimmen?",
+        "Which statements about ARP are true?"
+      ],
+      "explain": [
+        "Die Anfrage ist ein Broadcast, die Antwort geht gezielt zurück, und das Ergebnis bleibt eine Weile in einer Tabelle. Router geben ARP-Anfragen nicht weiter.",
+        "The request is a broadcast, the reply goes straight back, and the result stays in a table for a while. Routers do not pass on ARP requests."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Die Anfrage ist ein Broadcast",
+            "The request is a broadcast"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Die Antwort geht nur an den, der gefragt hat",
+            "The reply goes only to the one who asked"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Das Ergebnis wird für eine Weile gemerkt",
+            "The result is remembered for a while"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Eine Anfrage gelangt über Router in andere Netze",
+            "A request reaches other networks through routers"
+          ],
+          "explain": [
+            "Nein, ARP bleibt im eigenen Netz.",
+            "No, ARP stays in its own network."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Adressen vom Router",
+  "description": "Kurs Grundlagen: ein DHCP-Pool auf dem Router.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.10.0.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Adressen vom Router",
+      "Addresses from the router"
+    ],
+    "summary": [
+      "Richten Sie auf R1 einen DHCP-Pool ein und lassen Sie sich von ihm Adressen und das Gateway geben.",
+      "Set up a DHCP pool on R1 and let it hand out addresses and the gateway."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 und PC2 haben noch keine Adresse, und niemand soll sie von Hand vergeben. R1 hat die Adresse 10.10.0.1/24 und soll das Verteilen übernehmen.",
+        "PC1 and PC2 have no address yet, and nobody is to assign them by hand. R1 has the address 10.10.0.1/24 and is to take over handing them out."
+      ],
+      [
+        "Die Adressen 10.10.0.1 bis 10.10.0.99 sind für Geräte mit festen Adressen reserviert. Der Pool heißt BUERO, Clients sollen 10.10.0.1 als Gateway bekommen.",
+        "The addresses 10.10.0.1 to 10.10.0.99 are reserved for devices with fixed addresses. The pool is called BUERO, and clients are to get 10.10.0.1 as their gateway."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "PC1 hat eine Adresse und das Gateway vom Pool",
+          "PC1 has an address and the gateway from the pool"
+        ],
+        "checks": [
+          "PC1 route 10.10.0.0/24 via connected",
+          "PC1 route 0.0.0.0/0 via 10.10.0.1"
+        ],
+        "hints": [
+          [
+            "In der Konsole von R1: enable, configure terminal, ip dhcp excluded-address 10.10.0.1 10.10.0.99.",
+            "In the console of R1: enable, configure terminal, ip dhcp excluded-address 10.10.0.1 10.10.0.99."
+          ],
+          [
+            "Dann: ip dhcp pool BUERO, network 10.10.0.0 255.255.255.0, default-router 10.10.0.1, end.",
+            "After that: ip dhcp pool BUERO, network 10.10.0.0 255.255.255.0, default-router 10.10.0.1, end."
+          ],
+          [
+            "Auf PC1: dhclient -v eth0 zeigt die Nachrichten, während sie kommen.",
+            "On PC1: dhclient -v eth0 shows the messages as they come."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC2 hat eine Adresse und das Gateway vom Pool",
+          "PC2 has an address and the gateway from the pool"
+        ],
+        "checks": [
+          "PC2 route 10.10.0.0/24 via connected",
+          "PC2 route 0.0.0.0/0 via 10.10.0.1"
+        ],
+        "hints": [
+          [
+            "Auf PC2 genauso: dhclient eth0",
+            "The same on PC2: dhclient eth0"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Der Pool vergibt erst ab 10.10.0.100",
+          "The pool starts at 10.10.0.100"
+        ],
+        "checks": [
+          "R1 reaches 10.10.0.100",
+          "R1 reaches 10.10.0.101"
+        ],
+        "hints": [
+          [
+            "Antwortet nichts auf 10.10.0.100, fehlt wohl der Ausschluss. Ein Client behält seine Adresse; dhclient -r eth0 gibt sie zurück, danach holt dhclient eth0 eine neue.",
+            "If nothing answers at 10.10.0.100, the exclusion is probably missing. A client keeps its address; dhclient -r eth0 gives it back, then dhclient eth0 fetches a new one."
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}

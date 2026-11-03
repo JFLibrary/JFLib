@@ -26,10 +26,13 @@ expect #135170 focused
 key esc
 expect button:"Leeres Projekt" exists
 # ---- a newer version, a folder without its file
-click button:"Kurs: neu"
+# (these two cards lie below the window now that the page opens at its top)
+focus #130050
+key enter
 expect text:"Die Datei hat die Version 99; dieses Programm liest Version 1 bis 1." exists
 key esc
-click button:"Kurs: ohne"
+focus #130051
+key enter
 expect text:"Die Datei course.json fehlt oder lässt sich nicht lesen." exists
 key esc
 # ---- announced, with no file yet: in the outline, disabled, with its reason; Weiter passes over it

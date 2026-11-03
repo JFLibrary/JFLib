@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="240" viewBox="0 0 620 240">
+  <title>Two networks and a router</title>
+  <rect x="1" y="1" width="618" height="238" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="16" y="16" width="232" height="208" rx="10" fill="#E3EEF8" stroke="#3A6EA5" stroke-width="2" stroke-dasharray="8 5"/>
+  <rect x="372" y="16" width="232" height="208" rx="10" fill="#F6ECDD" stroke="#A9702A" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="132" y="40" font-family="monospace" font-size="14" text-anchor="middle" fill="#3A6EA5" font-weight="bold">10.1.0.0/24</text>
+  <text x="488" y="40" font-family="monospace" font-size="14" text-anchor="middle" fill="#A9702A" font-weight="bold">10.2.0.0/24</text>
+  <path d="M90 104 L90 150" fill="none" stroke="#44515E" stroke-width="3"/>
+  <path d="M174 104 L174 150" fill="none" stroke="#44515E" stroke-width="3"/>
+  <path d="M178 166 L286 122" fill="none" stroke="#44515E" stroke-width="3"/>
+  <path d="M334 122 L442 166" fill="none" stroke="#44515E" stroke-width="3"/>
+  <path d="M446 104 L446 150" fill="none" stroke="#44515E" stroke-width="3"/>
+  <path d="M530 104 L530 150" fill="none" stroke="#44515E" stroke-width="3"/>
+  <rect x="60" y="58" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="66" y="64" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="78" y="94" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="144" y="58" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="150" y="64" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="162" y="94" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="86" y="150" width="92" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="96" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="116" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="136" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="156" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <text x="132" y="204" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SW1</text>
+  <circle cx="310" cy="110" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M314 110 L317 110" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M328.0 110.0 L317.0 104.0 L317.0 116.0 Z" fill="#44515E"/>
+  <path d="M306 110 L303 110" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M292.0 110.0 L303.0 116.0 L303.0 104.0 Z" fill="#44515E"/>
+  <path d="M310 114 L310 117" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M310.0 128.0 L316.0 117.0 L304.0 117.0 Z" fill="#44515E"/>
+  <path d="M310 106 L310 103" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M310.0 92.0 L304.0 103.0 L316.0 103.0 Z" fill="#44515E"/>
+  <text x="310" y="154" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">R1</text>
+  <text x="268" y="104" font-family="monospace" font-size="13" text-anchor="middle" fill="#3A6EA5" font-weight="bold">.1</text>
+  <text x="352" y="104" font-family="monospace" font-size="13" text-anchor="middle" fill="#A9702A" font-weight="bold">.1</text>
+  <rect x="416" y="58" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="422" y="64" width="48" height="24" rx="1" fill="#F6ECDD" stroke="#F6ECDD" stroke-width="0"/>
+  <rect x="434" y="94" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="500" y="58" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="506" y="64" width="48" height="24" rx="1" fill="#F6ECDD" stroke="#F6ECDD" stroke-width="0"/>
+  <rect x="518" y="94" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="442" y="150" width="92" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="452" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="472" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="492" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="512" y="160" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <text x="488" y="204" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SW2</text>
+</svg>

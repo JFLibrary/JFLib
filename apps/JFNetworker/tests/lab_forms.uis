@@ -287,8 +287,8 @@ focus button:"Message Queue"
 key enter
 wait 100
 expect text:"9 Geräte · 4 Kabel" exists
-# the database for now has the KV store, the queue runs at once and is no finding
-expect text:"DB1: Der Dienst kv läuft nicht. Noch keine Knoten: der KV-Speicher weiß nicht, wer dazugehört." exists
+# the database brings a small example table and runs, like the queue: neither is a finding
+expect text:"DB1: Der Dienst db läuft nicht." missing
 expect text:"Gen1: Der Dienst load läuft nicht. Noch kein Ziel: der Lastgenerator sendet nichts." exists
 expect text:"Cache1: Der Dienst cache läuft nicht. Noch kein Backend: der Cache kann nichts nachladen." exists
 # ---- the keyboard: Tab walks through a form

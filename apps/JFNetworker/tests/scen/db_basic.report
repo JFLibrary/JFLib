@@ -1,0 +1,119 @@
+# JFNetworker-Szenario db_basic.scn: „Datenbank: Anweisungen, Sperren, Absturz“, 4 Geräte, 3 Verbindungen, Seed 41
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TenGigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TenGigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TenGigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/0/3 is up
+   0.000000000  --      run 500ms
+   0.500000000  GEN     root@GEN:~# curl -s -d "SELECT * FROM users WHERE id = 5" http://10.0.0.30:7100/query
+   0.500000000  --      run 100ms
+   0.500106941  GEN     {"ok":true,"rows":[{"id":5,"email":"email-20835","balance":969}],"count":1,"figures":{"rows_examined":1,"pages_hit":0,"pages_missed":3,"lock_wait_us":0,"us":104}}
+   0.600000000  ok      expect GEN output contains "\"id\":5"
+   0.600000000  ok      expect GEN output contains "\"email\":\"email-"
+   0.600000000  ok      expect GEN output contains "\"rows_examined\":1"
+   0.600000000  GEN     root@GEN:~# curl -s -d "SELECT * FORM users" http://10.0.0.30:7100/query
+   0.600000000  --      run 100ms
+   0.600001774  GEN     {"ok":false,"code":"syntax","error":"Zeichen 10: Hier fehlt from, es steht „FORM“ da.","pos":10,"retryable":false}
+   0.700000000  ok      expect GEN output contains "\"code\":\"syntax\""
+   0.700000000  ok      expect GEN output contains "\"pos\":10"
+   0.700000000  DB      root@DB:~# dbctl explain "SELECT * FROM users WHERE email = 'email-77'"
+   0.700000000  DB      {"plan":"index","index":"email","depth":2,"est_rows":1,"rows_examined":1,"pages":3,"pages_tree":2,"pages_heap":1,"cpu_us":36,"why":"Es gibt einen Index auf dieser Spalte: Baum, dann die Zeilen."}
+   0.700000000  --      run 10ms
+   0.710000000  ok      expect DB output contains "\"plan\":\"index\""
+   0.710000000  DB      root@DB:~# dbctl explain SELECT COUNT(*) FROM orders WHERE sum = 7
+   0.710000000  DB      {"plan":"scan","est_rows":1000,"rows_examined":500000,"pages":7353,"pages_tree":0,"pages_heap":7353,"cpu_us":264736,"why":"Auf diesen Spalten liegt kein Index: alle Seiten der Tabelle."}
+   0.710000000  --      run 10ms
+   0.720000000  ok      expect DB output contains "\"plan\":\"scan\""
+   0.720000000  GEN     root@GEN:~# curl -s -d "SELECT users.id, orders.oid FROM users JOIN orders ON users.id = orders.uid WHERE users.id = 8 LIMIT 2" http://10.0.0.30:7100/query
+   0.720000000  --      run 100ms
+   0.720238775  GEN     {"ok":true,"rows":[{"users.id":8,"orders.oid":69699},{"users.id":8,"orders.oid":169699}],"count":2,"figures":{"rows_examined":6,"pages_hit":3,"pages_missed":8,"lock_wait_us":0,"us":236}}
+   0.820000000  ok      expect GEN output contains "\"orders.oid\":"
+   0.820000000  GEN     root@GEN:~# curl -s http://10.0.0.20/by/email-123
+   0.820000000  --      run 100ms
+   0.820199958  GEN     {"ok":true,"rows":[{"id":79293,"email":"email-123"}],"count":1,"figures":{"rows_examined":1,"pages_hit":0,"pages_missed":3,"lock_wait_us":0,"us":104}}
+   0.920000000  ok      expect GEN output contains "email-123"
+   0.920000000  GEN     root@GEN:~# curl -s -d "BEGIN" http://10.0.0.30:7100/query
+   0.920000000  --      run 100ms
+   0.920031555  GEN     {"ok":true,"txn":1,"isolation":"read committed"}
+   1.020000000  ok      expect GEN output contains "\"txn\":1"
+   1.020000000  GEN     root@GEN:~# curl -s -H "X-Txn: 1" -d "UPDATE users SET balance = 1000000 WHERE id = 42" http://10.0.0.30:7100/query
+   1.020000000  --      run 100ms
+   1.020071105  GEN     {"ok":true,"changed":1,"txn":1,"figures":{"rows_examined":1,"pages_hit":2,"pages_missed":1,"lock_wait_us":0,"us":69}}
+   1.120000000  ok      expect GEN output contains "\"changed\":1"
+   1.120000000  DB      root@DB:~# dbctl locks
+   1.120000000  DB      Tabelle  Zeile  Transaktion  wartend
+   1.120000000  DB      users    42     1            0
+   1.120000000  --      run 10ms
+   1.130000000  ok      expect DB output contains "users"
+   1.130000000  DB      root@DB:~# dbctl
+   1.130000000  DB      Datenbank db: Port 7100, 1 von höchstens 100 Verbindungen, 1 Transaktionen offen, 0 Anweisungen in Arbeit
+   1.130000000  DB      Puffer: 200 KiB von 64 MiB, Treffer 50,0 %
+   1.130000000  DB      Log: Stand 1248, auf der Platte 1248, Prüfpunkt 0; Schreiben 3, Durability full, Isolation read committed
+   1.130000000  DB      Anweisungen 21: gelesen 10, eingefügt 0, geändert 4, gelöscht 0; Commits 3, Rollbacks 0
+   1.130000000  DB      Fehler 1: Syntax 1, Konflikte 0, Verklemmungen 0, Sperren zu spät 0, still abgebrochen 0, abgewiesen 0
+   1.130000000  DB      Sperren gewartet 0; Zeilen angesehen 19, Seiten gelesen 25; geänderte Zeilen 2, vergessen 0
+   1.130000000  DB      Nach Abstürzen: 0 Mal, zuletzt 0 ms, verlorene Commits 0
+   1.130000000  DB      Antwortzeit p50 51 µs, p95 105 µs, p99 236 µs
+   1.130000000  --      run 10ms
+   1.140000000  ok      expect DB output contains "1 Transaktionen offen"
+   1.140000000  GEN     root@GEN:~# curl -s -H "X-Txn: 1" -d "COMMIT" http://10.0.0.30:7100/query
+   1.140000000  --      run 100ms
+   1.140053657  GEN     {"ok":true,"committed":1}
+   1.240000000  ok      expect GEN output contains "\"committed\":1"
+   1.240000000  GEN     root@GEN:~# curl -s -d "SELECT balance FROM users WHERE id = 42" http://10.0.0.30:7100/query
+   1.240000000  --      run 100ms
+   1.240038375  GEN     {"ok":true,"rows":[{"balance":1000000}],"count":1,"figures":{"rows_examined":1,"pages_hit":3,"pages_missed":0,"lock_wait_us":0,"us":36}}
+   1.340000000  ok      expect GEN output contains "\"balance\":1000000"
+   6.000000000  ok      expect GEN svc load metric errors == 0 (0)
+   6.000000000  ok      expect DB svc db metric statements >= 80 over 3s (86)
+   6.000000000  ok      expect DB svc db metric commits >= 5 over 3s (12)
+   6.000000000  ok      expect DB svc db metric errors == 0 over 3s (0)
+   6.000000000  ok      expect DB svc db metric max pool_use_pm <= 1000 over 3s (37)
+   6.000000000  ok      expect WEB1 svc web metric backend_calls >= 80 over 3s (86)
+   6.000000000  DB      root@DB:~# dbctl tables
+   6.000000000  DB      Tabelle  Schlüssel  Zeilen  geändert  Seiten  im Puffer  Baumtiefe  Indizes  Spalten
+   6.000000000  DB      users    id         100000  44        2500    176        2          email    email, balance
+   6.000000000  DB      orders   oid        500000  0         7353    5          3          uid      uid, sum
+   6.000000000  --      run 10ms
+   6.010000000  ok      expect DB output contains "orders"
+   6.010000000  DB      root@DB:~# dbctl explain SELECT COUNT(*) FROM users WHERE balance = 7
+   6.010000000  DB      {"plan":"scan","est_rows":100,"rows_examined":100000,"pages":2500,"pages_tree":0,"pages_heap":2500,"cpu_us":55030,"why":"Auf diesen Spalten liegt kein Index: alle Seiten der Tabelle."}
+   6.010000000  --      run 10ms
+   6.020000000  ok      expect DB output contains "\"plan\":\"scan\""
+   6.020000000  GEN     root@GEN:~# curl -s -d "CREATE INDEX ON users (balance)" http://10.0.0.30:7100/query
+   6.020000000  --      run 2s
+   6.870031683  GEN     {"ok":true,"created":true}
+   8.020000000  ok      expect GEN output contains "\"created\":true"
+   8.020000000  DB      root@DB:~# dbctl explain SELECT COUNT(*) FROM users WHERE balance = 7
+   8.020000000  DB      {"plan":"index","index":"balance","depth":2,"est_rows":100,"rows_examined":100,"pages":102,"pages_tree":2,"pages_heap":100,"cpu_us":284,"why":"Es gibt einen Index auf dieser Spalte: Baum, dann die Zeilen."}
+   8.020000000  --      run 10ms
+   8.030000000  ok      expect DB output contains "\"plan\":\"index\""
+  10.000000000  --      power off DB
+  10.000000000  SW1     *Mar  1 00:00:10.000: %LINK-3-UPDOWN: TenGigabitEthernet1/0/3 is down
+  10.000000000  SW1     *Mar  1 00:00:10.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/0/3 is down
+  10.500000000  --      power on DB
+  10.500000000  SW1     *Mar  1 00:00:10.500: %LINK-3-UPDOWN: TenGigabitEthernet1/0/3 is up
+  10.500000000  SW1     *Mar  1 00:00:10.500: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/0/3 is up
+  12.000000000  ok      expect DB svc db metric recoveries == 1 (1)
+  12.000000000  GEN     root@GEN:~# curl -s -d "SELECT balance FROM users WHERE id = 42" http://10.0.0.30:7100/query
+  12.000000000  --      run 100ms
+  12.000084303  GEN     {"ok":true,"rows":[{"balance":1000000}],"count":1,"figures":{"rows_examined":1,"pages_hit":1,"pages_missed":2,"lock_wait_us":0,"us":81}}
+  12.100000000  ok      expect GEN output contains "\"balance\":1000000"
+  12.100000000  GEN     root@GEN:~# curl -s http://10.0.0.30:7100/_db/health
+  12.100000000  --      run 100ms
+  12.100001748  GEN     {"status":"ok","role":"primary","lsn":42312,"flushed_lsn":42312,"checkpoint_lsn":36080,"recoveries":1,"recovery_ms":0}
+  12.200000000  ok      expect GEN output contains "\"status\":\"ok\""
+  12.200000000  DB      root@DB:~# dbctl
+  12.200000000  DB      Datenbank db: Port 7100, 1 von höchstens 100 Verbindungen, 0 Transaktionen offen, 0 Anweisungen in Arbeit
+  12.200000000  DB      Puffer: 1 MiB von 64 MiB, Treffer 71,2 %
+  12.200000000  DB      Log: Stand 42640, auf der Platte 42640, Prüfpunkt 36080; Schreiben 130, Durability full, Isolation read committed
+  12.200000000  DB      Anweisungen 931: gelesen 540, eingefügt 0, geändert 130, gelöscht 0; Commits 130, Rollbacks 0
+  12.200000000  DB      Fehler 8: Syntax 1, Konflikte 0, Verklemmungen 0, Sperren zu spät 0, still abgebrochen 0, abgewiesen 7
+  12.200000000  DB      Sperren gewartet 0; Zeilen angesehen 675, Seiten gelesen 672; geänderte Zeilen 102, vergessen 0
+  12.200000000  DB      Nach Abstürzen: 1 Mal, zuletzt 0 ms, verlorene Commits 0
+  12.200000000  DB      Antwortzeit p50 51 µs, p95 82 µs, p99 82 µs
+  12.200000000  --      run 10ms
+  12.210000000  ok      expect DB output contains "verlorene Commits 0"
+  13.000000000  ok      expect GEN svc load metric ok >= 400 (575)
+# 30 von 30 Erwartungen erfüllt

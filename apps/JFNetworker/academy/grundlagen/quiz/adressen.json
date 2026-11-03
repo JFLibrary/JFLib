@@ -1,0 +1,140 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: Adressen",
+    "Quiz: addresses"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "number",
+      "points": 1,
+      "stem": [
+        "Wie viele Adressen stehen in einem `/26`-Netz für Hosts bereit?",
+        "How many addresses does a `/26` network have for hosts?"
+      ],
+      "explain": [
+        "6 Bits bleiben für den Hostteil: 64 Adressen. Netzadresse und Broadcast gehen ab, bleiben 62.",
+        "6 bits remain for the host part: 64 addresses. Network address and broadcast are taken, leaving 62."
+      ],
+      "value": 62,
+      "tolerance": 0
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "Wie heißt die Maske zu `/25`, ausgeschrieben?",
+        "What is the mask for `/25`, written out?"
+      ],
+      "explain": [
+        "25 Einsen: 255.255.255. und dann eine einzelne 1 im letzten Oktett, die 128 wert ist.",
+        "25 ones: 255.255.255. and then a single 1 in the last octet, which is worth 128."
+      ],
+      "accept": [
+        "255\\.255\\.255\\.128"
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 2,
+      "stem": [
+        "Ein Host hat `172.16.5.130/25`. Wie heißt sein Netz, mit Präfixlänge geschrieben?",
+        "A host has `172.16.5.130/25`. What is its network, written with the prefix length?"
+      ],
+      "explain": [
+        "130 liegt in der oberen Hälfte (ab 128). Der Hostteil wird null: `172.16.5.128/25`.",
+        "130 lies in the upper half (from 128). The host part becomes zero: `172.16.5.128/25`."
+      ],
+      "accept": [
+        "172\\.16\\.5\\.128 ?/ ?25"
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "PC1 hat `10.0.0.5/24`. Welche Ziele erreicht er ohne Gateway direkt?",
+        "PC1 has `10.0.0.5/24`. Which destinations does it reach directly, without a gateway?"
+      ],
+      "explain": [
+        "Bei /24 zählen die ersten drei Zahlen; sie müssen `10.0.0` lauten.",
+        "With /24 the first three numbers count; they must read `10.0.0`."
+      ],
+      "answers": [
+        {
+          "text": [
+            "10.0.0.200",
+            "10.0.0.200"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "10.0.0.1",
+            "10.0.0.1"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "10.0.1.5",
+            "10.0.1.5"
+          ],
+          "explain": [
+            "Die dritte Zahl ist anders: ein anderes Netz.",
+            "The third number differs: another network."
+          ]
+        },
+        {
+          "text": [
+            "192.168.0.5",
+            "192.168.0.5"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "PC2 hat `192.168.10.130/25`, PC1 hat `192.168.10.10/24`, ohne Gateways. Was geschieht, wenn PC1 PC2 anpingt?",
+        "PC2 has `192.168.10.130/25`, PC1 has `192.168.10.10/24`, no gateways. What happens when PC1 pings PC2?"
+      ],
+      "explain": [
+        "PC1 hält PC2 für nah und schickt das Echo. PC2 rechnet mit /25, hält PC1 für fern und findet keinen Weg für die Antwort.",
+        "PC1 considers PC2 near and sends the echo. PC2 calculates with /25, considers PC1 far away and finds no way for the reply."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Das Echo kommt an, die Antwort bleibt aus",
+            "The echo arrives, the reply does not come"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "PC1 meldet sofort, dass es keinen Weg gibt",
+            "PC1 reports at once that there is no way"
+          ],
+          "explain": [
+            "Das sagt PC2 in der Gegenrichtung; für PC1 liegt das Ziel im eigenen Netz.",
+            "PC2 says that in the opposite direction; for PC1 the destination lies in its own network."
+          ]
+        },
+        {
+          "text": [
+            "Alles geht, denn der Switch verbindet sie",
+            "Everything works, because the switch joins them"
+          ],
+          "explain": [
+            "Der Switch reicht Rahmen weiter, entscheidet aber nicht, was ein Host für erreichbar hält.",
+            "The switch passes on frames but does not decide what a host considers reachable."
+          ]
+        }
+      ]
+    }
+  ]
+}

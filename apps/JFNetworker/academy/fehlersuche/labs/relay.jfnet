@@ -1,0 +1,426 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Keine Adresse im zweiten Netz",
+  "description": "Kurs Fehlersuche: DHCP ohne Relay.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 200,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip helper-address 10.0.3.10\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/2\n ip address 10.0.3.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.3.10/24 dev eth0\nip route add default via 10.0.3.1\n",
+      "services": [
+        {
+          "kind": "dhcp-server",
+          "name": "dhcpd",
+          "disabled": false,
+          "config": {
+            "pools": [
+              {
+                "name": "A",
+                "network": "10.0.1.0/24",
+                "range": [
+                  "10.0.1.100",
+                  "10.0.1.200"
+                ],
+                "routers": [
+                  "10.0.1.1"
+                ],
+                "dns": []
+              },
+              {
+                "name": "B",
+                "network": "10.0.2.0/24",
+                "range": [
+                  "10.0.2.100",
+                  "10.0.2.200"
+                ],
+                "routers": [
+                  "10.0.2.1"
+                ],
+                "dns": []
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/2"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Keine Adresse im zweiten Netz",
+      "No address in the second network"
+    ],
+    "summary": [
+      "PC1 bekommt seine Adresse per DHCP, PC2 im neuen Netz nicht. Der DHCP-Server kennt beide Netze.",
+      "PC1 gets its address by DHCP, PC2 in the new network does not. The DHCP server knows both networks."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Der DHCP-Server SRV1 steht im Netz 10.0.3.0/24 und hat Pools für 10.0.1.0/24 und das neue Netz 10.0.2.0/24. PC1 hat seine Adresse bekommen. PC2 hängt am neuen Netz und bekommt keine; `dhclient -v eth0` wartet vergeblich auf ein Angebot.",
+        "The DHCP server SRV1 stands in the network 10.0.3.0/24 and has pools for 10.0.1.0/24 and the new network 10.0.2.0/24. PC1 has got its address. PC2 is on the new network and gets none; `dhclient -v eth0` waits in vain for an offer."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie, holen Sie auf PC2 die Adresse, nennen Sie das Gerät und geben Sie ab.",
+        "Find the cause, repair it, fetch the address on PC2, name the device and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Der Discover ist ein Broadcast. Wie weit kommt er?",
+        "The Discover is a broadcast. How far does it get?"
+      ],
+      [
+        "Vergleichen Sie auf R1 die beiden Schnittstellen zu den PCs: show running-config",
+        "On R1, compare the two interfaces towards the PCs: show running-config"
+      ],
+      [
+        "Nach der Reparatur holt sich der wartende Client die Adresse nicht sofort. Auf PC2: dhclient eth0",
+        "After the repair, the waiting client does not fetch the address at once. On PC2: dhclient eth0"
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC2 route 10.0.2.0/24 via connected"
+          ],
+          "points": 4,
+          "text": [
+            "PC2 hat eine Adresse im neuen Netz",
+            "PC2 has an address in the new network"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.3.10"
+          ],
+          "points": 3,
+          "text": [
+            "PC2 erreicht den Server",
+            "PC2 reaches the server"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R1",
+          "id": 3,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "An der Schnittstelle Gi0/0/1 von R1 fehlte ip helper-address 10.0.3.10. Der Discover von PC2 ist ein Broadcast und endet am Router; erst die Helper-Adresse lässt R1 ihn als gezielte Anfrage an den Server weitergeben. An der Schnittstelle zu PC1 stand die Zeile. Der Server war in Ordnung: Er hat von PC2 nie etwas gehört.",
+            "The interface Gi0/0/1 of R1 lacked ip helper-address 10.0.3.10. The Discover from PC2 is a broadcast and ends at the router; only the helper address makes R1 pass it on to the server as a directed request. The interface towards PC1 had the line. The server was fine: it never heard anything from PC2."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\n",
+            "services": [
+              {
+                "kind": "dhcp-client",
+                "name": "dhcp-client@eth0",
+                "disabled": false,
+                "config": {
+                  "iface": "eth0"
+                }
+              }
+            ],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname PC2\n",
+            "services": [
+              {
+                "kind": "dhcp-client",
+                "name": "dhcp-client@eth0",
+                "disabled": false,
+                "config": {
+                  "iface": "eth0"
+                }
+              }
+            ],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 200,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip helper-address 10.0.3.10\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip helper-address 10.0.3.10\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/2\n ip address 10.0.3.1 255.255.255.0\n no shutdown\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 400,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.3.10/24 dev eth0\nip route add default via 10.0.3.1\n",
+            "services": [
+              {
+                "kind": "dhcp-server",
+                "name": "dhcpd",
+                "disabled": false,
+                "config": {
+                  "pools": [
+                    {
+                      "name": "A",
+                      "network": "10.0.1.0/24",
+                      "range": [
+                        "10.0.1.100",
+                        "10.0.1.200"
+                      ],
+                      "routers": [
+                        "10.0.1.1"
+                      ],
+                      "dns": []
+                    },
+                    {
+                      "name": "B",
+                      "network": "10.0.2.0/24",
+                      "range": [
+                        "10.0.2.100",
+                        "10.0.2.200"
+                      ],
+                      "routers": [
+                        "10.0.2.1"
+                      ],
+                      "dns": []
+                    }
+                  ]
+                }
+              }
+            ],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/2"
+            },
+            "b": {
+              "dev": 4,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

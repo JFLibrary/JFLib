@@ -1,0 +1,250 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": [
+    "Fehlersuche im Netz",
+    "Fault finding in networks"
+  ],
+  "summary": [
+    "Eine Methode statt Raten: von unten nach oben, eingrenzen, eine Änderung auf einmal. Dann kaputte Netze zum Reparieren, von einem gezogenen Kabel bis zu mehreren Fehlern gegen die Uhr.",
+    "A method instead of guessing: from the bottom up, narrowing down, one change at a time. Then broken networks to repair, from a pulled cable to several faults against the clock."
+  ],
+  "level": "intermediate",
+  "minutes": 200,
+  "units": [
+    {
+      "title": [
+        "Die Methode",
+        "The method"
+      ],
+      "steps": [
+        {
+          "id": "methode",
+          "kind": "lesson",
+          "title": [
+            "Erst denken, dann tippen",
+            "Think first, then type"
+          ],
+          "file": "01-methode.md"
+        },
+        {
+          "id": "schichten",
+          "kind": "lesson",
+          "title": [
+            "Von unten nach oben",
+            "From the bottom up"
+          ],
+          "file": "02-schichten.md"
+        },
+        {
+          "id": "eingrenzen",
+          "kind": "lesson",
+          "title": [
+            "Eingrenzen statt absuchen",
+            "Narrowing down instead of searching everywhere"
+          ],
+          "file": "03-eingrenzen.md"
+        },
+        {
+          "id": "werkzeuge",
+          "kind": "lesson",
+          "title": [
+            "Was die Ausgaben verraten",
+            "What the outputs give away"
+          ],
+          "file": "04-werkzeuge.md"
+        },
+        {
+          "id": "notizen",
+          "kind": "lesson",
+          "title": [
+            "Eine Änderung, ein Test, eine Notiz",
+            "One change, one test, one note"
+          ],
+          "file": "05-notizen.md"
+        },
+        {
+          "id": "quiz-methode",
+          "kind": "quiz",
+          "title": [
+            "Quiz: die Methode",
+            "Quiz: the method"
+          ],
+          "file": "quiz/methode.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Kabel und Einstellungen",
+        "Cables and settings"
+      ],
+      "steps": [
+        {
+          "id": "kabel",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: der Dateiserver ist weg",
+            "Fault hunt: the file server is gone"
+          ],
+          "file": "labs/kabel.jfnet"
+        },
+        {
+          "id": "port",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: PC2 ist allein",
+            "Fault hunt: PC2 is on its own"
+          ],
+          "file": "labs/port.jfnet"
+        },
+        {
+          "id": "gateway",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: nur nach draußen geht nichts",
+            "Fault hunt: only the outside does not work"
+          ],
+          "file": "labs/gateway.jfnet"
+        },
+        {
+          "id": "halbes-netz",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: die Hälfte der Clients",
+            "Fault hunt: half of the clients"
+          ],
+          "file": "labs/halbes-netz.jfnet"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Was man nicht sofort sieht",
+        "What you do not see at once"
+      ],
+      "steps": [
+        {
+          "id": "doppelt",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: der Server, der keiner ist",
+            "Fault hunt: the server that is not one"
+          ],
+          "file": "labs/doppelt.jfnet"
+        },
+        {
+          "id": "vlan-kurz",
+          "kind": "lesson",
+          "title": [
+            "Kurz erinnert: VLANs",
+            "A short reminder: VLANs"
+          ],
+          "file": "06-vlan-kurz.md"
+        },
+        {
+          "id": "vlan",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: im falschen VLAN",
+            "Fault hunt: in the wrong VLAN"
+          ],
+          "file": "labs/vlan.jfnet",
+          "requires": [
+            "vlan-kurz"
+          ]
+        },
+        {
+          "id": "rueckweg",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: hin geht es, zurück nicht",
+            "Fault hunt: the way there works, the way back does not"
+          ],
+          "file": "labs/rueckweg.jfnet"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Dienste und Qualität",
+        "Services and quality"
+      ],
+      "steps": [
+        {
+          "id": "name",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: Adresse ja, Name nein",
+            "Fault hunt: by address yes, by name no"
+          ],
+          "file": "labs/name.jfnet"
+        },
+        {
+          "id": "relay-kurz",
+          "kind": "lesson",
+          "title": [
+            "Kurz erinnert: DHCP über einen Router",
+            "A short reminder: DHCP across a router"
+          ],
+          "file": "07-relay-kurz.md"
+        },
+        {
+          "id": "relay",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: keine Adresse im zweiten Netz",
+            "Fault hunt: no address in the second network"
+          ],
+          "file": "labs/relay.jfnet",
+          "requires": [
+            "relay-kurz"
+          ]
+        },
+        {
+          "id": "verlust",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: es geht, aber zäh",
+            "Fault hunt: it works, but slowly"
+          ],
+          "file": "labs/verlust.jfnet"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Der Ernstfall",
+        "The real thing"
+      ],
+      "steps": [
+        {
+          "id": "montagmorgen",
+          "kind": "fault",
+          "title": [
+            "Fehlersuche: Montagmorgen (mit Zeitgrenze)",
+            "Fault hunt: Monday morning (with a time limit)"
+          ],
+          "file": "labs/montagmorgen.jfnet",
+          "requires": [
+            "rueckweg",
+            "name"
+          ]
+        },
+        {
+          "id": "pruefung",
+          "kind": "exam",
+          "title": [
+            "Test: Fehlersuche",
+            "Test: fault finding"
+          ],
+          "file": "quiz/pruefung.json",
+          "requires": [
+            "quiz-methode"
+          ]
+        }
+      ]
+    }
+  ]
+}

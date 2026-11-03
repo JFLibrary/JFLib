@@ -171,7 +171,7 @@ fn file_and_checks(t: &mut T) {
     axis(t, "a disk that is none", r#"{"kind": "hw", "dev": "WEB", "values": [{"disk": "band"}]}"#, "Die Plattenart \u{201e}band\u{201c} gibt es nicht (sata, nvme, nvme-fast, hdd).");
     axis(t, "a path without a member", r#"{"kind": "config", "dev": "WEB", "path": "workers", "values": [1]}"#, "Der Pfad \u{201e}workers\u{201c} nennt einen Dienst und seine Einstellung, etwa http-server.workers.");
     axis(t, "a service it does not have", r#"{"kind": "config", "dev": "WEB", "path": "lb.algorithm", "values": ["hash"]}"#, "WEB hat keinen Dienst \u{201e}lb\u{201c} (es gibt: web).");
-    let keys = "port, root, workers, queue, time_ms, jitter_ms, error_rate, error_status, keepalive_ms, max_requests, header_timeout_ms, max_body, backlog, server, routes, kv, cpu_ms, serial_us, usl, mem_mb, conn_kb, data_mb, tls";
+    let keys = "port, root, workers, queue, time_ms, jitter_ms, error_rate, error_status, keepalive_ms, max_requests, header_timeout_ms, max_body, backlog, server, routes, kv, db, cpu_ms, serial_us, usl, mem_mb, conn_kb, data_mb, tls";
     axis(t, "a setting with a typo", r#"{"kind": "config", "dev": "WEB", "path": "http-server.worker", "values": [1]}"#, &format!("Ein Dienst der Art http-server kennt \u{201e}worker\u{201c} nicht (es gibt: {}).", keys));
     axis(t, "an element that is not there", r#"{"kind": "config", "dev": "WEB", "path": "web.routes.3.cpu_ms", "values": [1]}"#, "Im Pfad gibt es kein Element 3.");
     axis(t, "backends without a service", r#"{"kind": "backends", "dev": "WEB", "svc": "lb", "pool": ["WEB"], "counts": [1]}"#, "WEB hat keinen Dienst \u{201e}lb\u{201c}.");

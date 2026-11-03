@@ -1,0 +1,202 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Eine Maske zu eng",
+  "description": "Kurs Grundlagen: PC2 hat die falsche Maske.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 192.168.10.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 192.168.10.130/25 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "PC3",
+      "model": "pc",
+      "x": 440,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 192.168.10.140/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 220,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 220,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Eine Maske zu eng",
+      "A mask too narrow"
+    ],
+    "summary": [
+      "Alle drei PCs sollen in 192.168.10.0/24 sein, aber PC2 sieht nur die Hälfte des Netzes. Finden Sie heraus, warum, und ändern Sie es.",
+      "All three PCs are meant to be in 192.168.10.0/24, but PC2 sees only half the network. Find out why and change it."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Drei PCs hängen am selben Switch, und alle drei sollen im Netz 192.168.10.0/24 sein. PC2 erreicht PC3, aber nicht PC1. Kabel und Switch sind in Ordnung.",
+        "Three PCs hang off the same switch, and all three are meant to be in the network 192.168.10.0/24. PC2 reaches PC3, but not PC1. Cables and switch are fine."
+      ],
+      [
+        "Vergleichen Sie, was die drei mit ip addr über sich sagen. Rechnen Sie nach, wo das Netz von PC2 endet, und geben Sie PC2 die richtige Maske. Seine Adresse bleibt 192.168.10.130.",
+        "Compare what the three say about themselves with ip addr. Work out where the network of PC2 ends and give PC2 the right mask. Its address stays 192.168.10.130."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "PC2 hat die Adresse 192.168.10.130 mit der Maske /24",
+          "PC2 has the address 192.168.10.130 with the mask /24"
+        ],
+        "checks": [
+          "PC2 route 192.168.10.0/24 via connected",
+          "PC2 no route 192.168.10.128/25"
+        ],
+        "hints": [
+          [
+            "ip addr auf PC2 zeigt /25. Das Netz von PC2 reicht also nur von 192.168.10.128 bis 192.168.10.255.",
+            "ip addr on PC2 shows /25. So the network of PC2 only runs from 192.168.10.128 to 192.168.10.255."
+          ],
+          [
+            "Die alte Adresse geht mit ip addr del 192.168.10.130/25 dev eth0, die neue kommt mit ip addr add 192.168.10.130/24 dev eth0.",
+            "The old address goes with ip addr del 192.168.10.130/25 dev eth0, the new one comes with ip addr add 192.168.10.130/24 dev eth0."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC2 bekommt von PC1 eine Antwort",
+          "PC2 gets an answer from PC1"
+        ],
+        "checks": [
+          "PC2 reaches 192.168.10.10"
+        ],
+        "hints": [
+          [
+            "Vorher sagte PC2 sofort, dass es dorthin keinen Weg gibt. Mit /24 liegt PC1 im eigenen Netz.",
+            "Before, PC2 said at once that there is no way there. With /24, PC1 lies in its own network."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC1 bekommt von PC2 eine Antwort",
+          "PC1 gets an answer from PC2"
+        ],
+        "checks": [
+          "PC1 reaches 192.168.10.130"
+        ],
+        "hints": [
+          [
+            "Auch das hing an der Maske: Die Anfrage kam bei PC2 an, nur wusste PC2 nicht, wohin mit der Antwort.",
+            "This hung on the mask as well: the request reached PC2, but PC2 did not know where to send the answer."
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}

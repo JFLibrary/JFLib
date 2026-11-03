@@ -1,0 +1,371 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Das ganze Netz",
+  "description": "Kurs Grundlagen: alles zusammen, vom Kabel bis zum Namen.",
+  "seed": 1,
+  "next_id": 14,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 170,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 340,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 192.168.50.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SW2",
+      "model": "jf-s24",
+      "x": 510,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "NS1",
+      "model": "server-1u",
+      "x": 680,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname NS1\nip addr add 10.30.0.53/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "schule.lab",
+                "ttl": 300,
+                "records": [
+                  "www A 10.30.0.80",
+                  "ns A 10.30.0.53",
+                  "start CNAME www"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 680,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.30.0.80/27 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Willkommen auf der Seite der Schule!\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 8,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 340,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Das ganze Netz",
+      "The whole network"
+    ],
+    "summary": [
+      "Zwei Netze, ein Router, DHCP für die PCs, ein Namensserver und eine Webseite: Am Ende holt PC1 die Seite über ihren Namen.",
+      "Two networks, one router, DHCP for the PCs, a name server and a web page: in the end, PC1 fetches the page by its name."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Links sind die PCs im Netz 192.168.50.0/24, rechts die Server im Netz 10.30.0.0/24, dazwischen R1. Fast alles fehlt noch: Die zweite Schnittstelle von R1 ist aus, es gibt keinen DHCP-Pool, die Server kennen kein Gateway, und bei WEB1 stimmt die Maske nicht.",
+        "On the left are the PCs in the network 192.168.50.0/24, on the right the servers in the network 10.30.0.0/24, with R1 in between. Nearly everything is still missing: the second interface of R1 is off, there is no DHCP pool, the servers know no gateway, and the mask on WEB1 is wrong."
+      ],
+      [
+        "R1 soll im Servernetz die Adresse 10.30.0.1 haben. Der Pool heißt LAN, vergibt ab 192.168.50.100 und nennt den Clients ihr Gateway und den Namensserver 10.30.0.53. Arbeiten Sie von unten nach oben; jedes Ziel baut auf dem davor auf.",
+        "R1 is to have the address 10.30.0.1 in the server network. The pool is called LAN, hands out addresses from 192.168.50.100 on and tells clients their gateway and the name server 10.30.0.53. Work from the bottom up; every goal builds on the one before."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "R1 ist in beiden Netzen",
+          "R1 is in both networks"
+        ],
+        "checks": [
+          "R1 route 192.168.50.0/24 via connected",
+          "R1 route 10.30.0.0/24 via connected"
+        ],
+        "hints": [
+          [
+            "Wie im Labor mit dem Router: interface GigabitEthernet0/0/1, ip address, no shutdown.",
+            "As in the lab with the router: interface GigabitEthernet0/0/1, ip address, no shutdown."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "NS1 und WEB1 sind richtig eingerichtet",
+          "NS1 and WEB1 are set up correctly"
+        ],
+        "checks": [
+          "NS1 route 0.0.0.0/0 via 10.30.0.1",
+          "WEB1 route 10.30.0.0/24 via connected",
+          "WEB1 route 0.0.0.0/0 via 10.30.0.1"
+        ],
+        "hints": [
+          [
+            "WEB1 hat /27, also ein Netz aus 32 Adressen, von 10.30.0.64 bis 10.30.0.95. Tauschen Sie seine Adresse aus: ip addr del 10.30.0.80/27 dev eth0 und ip addr add 10.30.0.80/24 dev eth0.",
+            "WEB1 has /27, a network of 32 addresses, from 10.30.0.64 to 10.30.0.95. Replace its address: ip addr del 10.30.0.80/27 dev eth0 and ip addr add 10.30.0.80/24 dev eth0."
+          ],
+          [
+            "Beide Server brauchen ip route add default via 10.30.0.1. Das Gateway muss im eigenen Netz liegen, darum zuerst die Maske.",
+            "Both servers need ip route add default via 10.30.0.1. The gateway must lie in their own network, so the mask comes first."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC1 und PC2 haben ihre Adressen vom Pool",
+          "PC1 and PC2 have their addresses from the pool"
+        ],
+        "checks": [
+          "PC1 route 192.168.50.0/24 via connected",
+          "PC1 route 0.0.0.0/0 via 192.168.50.1",
+          "PC2 route 192.168.50.0/24 via connected",
+          "PC2 route 0.0.0.0/0 via 192.168.50.1",
+          "R1 reaches 192.168.50.100"
+        ],
+        "hints": [
+          [
+            "Auf R1: ip dhcp excluded-address 192.168.50.1 192.168.50.99, dann ip dhcp pool LAN mit network, default-router und dns-server.",
+            "On R1: ip dhcp excluded-address 192.168.50.1 192.168.50.99, then ip dhcp pool LAN with network, default-router and dns-server."
+          ],
+          [
+            "Auf den PCs: dhclient eth0",
+            "On the PCs: dhclient eth0"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC1 und PC2 erreichen www.schule.lab über den Namen",
+          "PC1 and PC2 reach www.schule.lab by its name"
+        ],
+        "checks": [
+          "PC1 reaches www.schule.lab",
+          "PC2 reaches www.schule.lab"
+        ],
+        "hints": [
+          [
+            "cat /etc/resolv.conf auf einem PC zeigt, ob der Pool den Namensserver mitgegeben hat. Fehlte die Zeile dns-server, als der PC seine Adresse holte, holen Sie sie mit dhclient eth0 neu.",
+            "cat /etc/resolv.conf on a PC shows whether the pool passed the name server along. If the line dns-server was missing when the PC fetched its address, fetch it again with dhclient eth0."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Die Webseite kommt bei PC1 an",
+          "The web page reaches PC1"
+        ],
+        "checks": [
+          "PC1 output contains \"Willkommen\""
+        ],
+        "hints": [
+          [
+            "Auf PC1: curl http://www.schule.lab/",
+            "On PC1: curl http://www.schule.lab/"
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}

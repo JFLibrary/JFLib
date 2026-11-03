@@ -1,0 +1,38 @@
+#!args --verify-dirty --lang en --open apps/JFNetworker/tests/fixtures/lab_forms.jfnet
+# the database's form in English (workspace/devwin/svcform.rs): the dialog, a form's words, what it lacks, a
+# refusal, what applying does.  Ids as in db_forms.uis
+size 1400 1200
+theme light
+wait 2000
+dblclick listitem:"HOST1" shift
+resizewin 26624 900 1100
+click tab:"Services"
+click #140304
+click #140321
+click listitem:"Database"
+expect text:"A database with tables, buffer pool, locks, versions and a log; it takes SQL-shaped statements over HTTP." exists
+click button:"Add"
+wait 200
+expect text:"Database · db" exists
+expect text:"No tables yet: the database has nothing a statement could refer to." exists
+expect text:"Name, rows, bytes per row, key, distribution and indexes. Columns are in the JSON. Only changed rows really exist, all others follow from their key." exists
+click #141056
+wait 50
+click #140800
+type "users"
+click #140801
+type "0"
+wait 50
+expect text:"Service db: Table users: \"rows\" takes 1 to 2^40 rows." exists
+click #140801
+key ctrl+a
+type "1000"
+wait 50
+click #140288
+wait 300
+expect text:"Port 7100: 0 statements, pool hits 0 ‰, 0 transactions open. Without hardware the CPU costs nothing: these figures mean little." exists
+click button:"Settings …"
+click #140293
+expect text:"Assumption: reading and planning a statement on a reference core. Counts only with simulated hardware." exists
+click #140289
+close window 26624

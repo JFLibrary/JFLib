@@ -309,7 +309,7 @@ fn live_or_restart(t: &mut T) {
 fn presets(t: &mut T) {
     let mut doc = Doc::new();
     doc.replace(Project::new("p", 1), None);
-    let cases = [("load-balancer", "lb", "lb"), ("database", "kv", "kv"), ("cache", "cache", "cache"), ("queue", "mq", "mq"), ("traffic-gen", "http-load", "load")];
+    let cases = [("load-balancer", "lb", "lb"), ("database", "db", "db"), ("cache", "cache", "cache"), ("queue", "mq", "mq"), ("traffic-gen", "http-load", "load")];
     for (model, kind, name) in cases {
         let made = edits::add_placed(&mut doc.proj, model, 0, 0);
         let Ok((id, e)) = made else {

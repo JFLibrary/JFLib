@@ -1,0 +1,180 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Zwei PCs und ein Switch",
+  "description": "Kurs Grundlagen: das erste Netz aufbauen.",
+  "seed": 1,
+  "next_id": 5,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 192.168.1.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 220,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 4,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 110,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Zwei PCs und ein Switch",
+      "Two PCs and a switch"
+    ],
+    "summary": [
+      "Verbinden Sie PC2 mit dem Switch, geben Sie ihm eine Adresse und sehen Sie nach, was PC1 und der Switch dabei lernen.",
+      "Connect PC2 to the switch, give it an address and look at what PC1 and the switch learn along the way."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 hängt schon am Switch und hat die Adresse 192.168.1.10/24. PC2 steht daneben: kein Kabel, keine Adresse.",
+        "PC1 is already on the switch and has the address 192.168.1.10/24. PC2 stands next to it: no cable, no address."
+      ],
+      [
+        "Stecken Sie PC2 an, geben Sie ihm 192.168.1.20/24 und lassen Sie PC1 einen Ping schicken. Danach sehen Sie in zwei Tabellen nach: der ARP-Tabelle von PC1 und der MAC-Tabelle des Switches.",
+        "Plug PC2 in, give it 192.168.1.20/24 and have PC1 send a ping. Then look into two tables: the ARP table of PC1 and the MAC table of the switch."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "PC2 hängt mit einem Kabel am Switch",
+          "PC2 is on the switch with a cable"
+        ],
+        "checks": [
+          "cable PC2 eth0 up"
+        ],
+        "hints": [
+          [
+            "Wählen Sie das Werkzeug Verbinden (Taste C) und ziehen Sie von PC2 auf SW1. Eingabe bestätigt die vorgeschlagenen Ports.",
+            "Choose the Connect tool (key C) and drag from PC2 onto SW1. Enter confirms the proposed ports."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC2 hat die Adresse 192.168.1.20/24",
+          "PC2 has the address 192.168.1.20/24"
+        ],
+        "checks": [
+          "PC2 route 192.168.1.0/24 via connected"
+        ],
+        "hints": [
+          [
+            "Ein Doppelklick auf PC2 in der Geräteliste öffnet seine Konsole.",
+            "A double click on PC2 in the device list opens its console."
+          ],
+          [
+            "Dort: ip addr add 192.168.1.20/24 dev eth0",
+            "There: ip addr add 192.168.1.20/24 dev eth0"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC1 bekommt von PC2 eine Antwort",
+          "PC1 gets an answer from PC2"
+        ],
+        "checks": [
+          "PC1 reaches 192.168.1.20"
+        ],
+        "hints": [
+          [
+            "Das kommt von selbst, sobald Kabel und Adresse stimmen. Probieren Sie es auf PC1 aus: ping -c 2 192.168.1.20",
+            "This follows by itself once cable and address are right. Try it on PC1: ping -c 2 192.168.1.20"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "In der ARP-Tabelle von PC1 steht PC2",
+          "The ARP table of PC1 lists PC2"
+        ],
+        "checks": [
+          "PC1 output contains \"192.168.1.20 dev eth0 lladdr\""
+        ],
+        "hints": [
+          [
+            "Nach dem Ping zeigt ip neigh auf PC1 die Tabelle.",
+            "After the ping, ip neigh on PC1 shows the table."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Sie haben die MAC-Tabelle von SW1 gelesen",
+          "You have read the MAC table of SW1"
+        ],
+        "checks": [
+          "SW1 output contains \"DYNAMIC\""
+        ],
+        "hints": [
+          [
+            "In der Konsole von SW1: erst enable, dann show mac address-table.",
+            "In the console of SW1: first enable, then show mac address-table."
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}
