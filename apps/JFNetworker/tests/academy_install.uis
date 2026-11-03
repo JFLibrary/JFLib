@@ -29,6 +29,23 @@ click button:"Nach Kursen suchen"
 sync
 expect text:"Die Verbindung wurde nicht erlaubt" exists
 expect text:"Noch keine Kurse" exists
+# ---- the question comes with the click: the worker waits for it, the window keeps running; refused, nothing leaves
+perm answer dialog
+perm expect none
+click button:"Nach Kursen suchen"
+perm wait 5000
+perm expect open
+expect text:"Grund: Kurse der Akademie laden" exists
+expect text:"Regel: net.connect raw.githubusercontent.com:443" exists
+shot build/jfnetworker/install_question.png
+expect #147460 exists
+expect text:"Die Kursliste wird geladen" exists
+click button:"Ablehnen"
+sync
+perm expect net.connect raw.githubusercontent.com:443 deny
+expect text:"Die Verbindung wurde nicht erlaubt" exists
+perm reset
+perm answer none
 # ---- another host is the setting's: refused without a question, and the way back is beside it
 cmd 216
 focus #166945967
