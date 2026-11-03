@@ -35,7 +35,7 @@ try {
         assert.equal(compute.mode,mode==='auto'?'simd':mode);assert.deepEqual(errors,[]);
         if(app==='portabletest') {
           assert.ok(logs.some(x=>x.includes('overlap=4 nested=320 cancellation restart')),logs.join('\n'));
-          assert.ok(logs.some(x=>x.includes('digest=c2b5eca7297ea5fa')),logs.join('\n'));
+          assert.ok(logs.some(x=>x.includes('digest=edea7e9d9579c77a')),logs.join('\n'));
         }
         if(app==='PaintCraft'&&mode==='threads')assert.equal(compute.workers,4);
         results.push({engine,app,mode,isolated,compute,logs,ok:true});console.log(JSON.stringify(results.at(-1)));

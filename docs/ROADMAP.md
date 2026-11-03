@@ -1943,10 +1943,10 @@ Fensterrand hinaus.
     Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
   - NEON für `lib/simd` (2026-11-03, [ARM64.md](ARM64.md) ARM6): `nativeRender` im Median von 5,7 auf
     5,2 ms, auf „Werte & Farben“ von 6,9 auf 6,3 ms bei 6 statt 17 % ruckelnden Bildern, dieselben Pixel.
+    Dazu `rt::fx` mit `fsqrt` und `fcvtns` (`lib/rt/aarch64/fx.rs`): noch einmal rund 0,5 ms je Bild.
   - Offen: Die größten Posten liegen nicht in `lib/simd` (`simpleperf`, Startseite): die Bilder gehen
     zweimal durch den Speicher (Fenster, dann Bitmap; `memmove` 32 %), vom GPU-Weg abgesehen;
-    `to_rgba` 17 % (ein Release-Bau vektorisiert es, ein Entwicklungsbau nicht); `rt::fx::sqrt` und
-    `cvt` auf ARM portabel statt `fsqrt` und `fcvtns` (6 %); Zoom mit zwei Fingern (die Naht steht: `TF_TWO`, `ui.touch_fingers`); Ziehen
+    `to_rgba` 17 % (ein Release-Bau vektorisiert es, ein Entwicklungsbau nicht); Zoom mit zwei Fingern (die Naht steht: `TF_TWO`, `ui.touch_fingers`); Ziehen
     und Ablegen braucht in rollenden Sichten einen Griff (`ui.touch_drag`); Windows und Linux melden
     noch keine Finger (dort `plat::finger` rufen, die Maus-Emulation des Systems abschalten); der
     Browser auf einem echten Telefon ist nur in Chromiums Emulation geprüft.

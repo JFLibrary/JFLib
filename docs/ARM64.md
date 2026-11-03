@@ -98,7 +98,7 @@ Stellen dieses Plans entspricht, und die x86-Programme bytegleich zu vorher sind
 ### ARM2: `rt` auf Linux ARM64 (M)
 
 - `svc 0` statt `syscall`, `_start`, Thread-Start, `rt/lib.rs` wählt für ARM `portable/cpu.rs`,
-  `portable/fx.rs`, `portable/math.rs`.
+  `portable/math.rs` (`aarch64/fx.rs` wählt es schon, seit ARM6).
 - `rt/mem.rs` trennen: Der Heap mit den 64 Shards gilt für alle, `memcpy` und Verwandte sowie `load8`
   kommen pro Architektur.
 - Test-Runner: `build_rs.py test --arch aarch64` startet Programme über `qemu-aarch64` in WSL.
@@ -189,6 +189,20 @@ erwartet hatte: `simpleperf` (alle Threads der App, Startseite) zeigt, dass `gfx
 12,2 auf 3,2 % fällt und `mask_over` von 3,4 auf 1,9 %, der Rest liegt nicht in `lib/simd`: `memmove` 32 %,
 `plat::web::windows::to_rgba` 17 % (im Entwicklungsbau nicht vektorisiert, `plat` hat Stufe 1),
 `rt::fx::sqrt_bits` und `rt::fx::nearest` zusammen 6 % (portabler Code, wo ARM `fsqrt` und `fcvtns` hat).
+
+Diese letzten 6 % sind seitdem weg: `rt::fx` hat auf ARM64 eine eigene Datei mit den Befehlen der CPU
+(`lib/rt/aarch64/fx.rs`, die Ergebnisse von SSE), `portabletest` vergleicht sie Wert für Wert mit
+`portable/fx.rs`, auch um die Grenzen von `i32` und `i64` und bei exakten Halben. Gegen den Stand nur mit
+NEON, gleiche Messung wie oben (die Zahlen schwanken von Tag zu Tag, deshalb immer im Wechsel):
+
+| | Startseite vorher | nachher | „Werte & Farben“ vorher | nachher |
+|---|---|---|---|---|
+| `nativeRender` Median | 5,02 ms | 4,53 ms | 6,20 ms | 5,75 ms |
+| `nativeRender` Mittel | 5,15 ms | 4,65 ms | 6,46 ms | 5,84 ms |
+| `nativeRender` 95 % | 6,30 ms | 5,85 ms | 7,55 ms | 6,75 ms |
+| ruckelnd (`gfxinfo`) | 2,2 % | 1,9 % | 4,8 % | 2,6 % |
+| Bildzeit Median / 95 % | 11 / 13 ms | 10 / 13 ms | 11 / 14 ms | 11 / 13 ms |
+| verpasste Vsyncs | 0 | 0 | 2 | 0 |
 
 ### ARM7: Atomics-Prüfung auf echter Hardware (M)
 

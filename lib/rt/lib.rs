@@ -99,7 +99,7 @@ pub mod boot;
 #[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/cpu.rs")]
 pub mod cpu;
 pub mod crash;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/fx.rs")]
+#[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
 pub mod fx;
 #[cfg(not(target_os = "android"))]
 #[cfg_attr(target_arch = "wasm32", path = "portable/mem.rs")]

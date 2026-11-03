@@ -6,7 +6,8 @@ from `RustLib/`. The comparison uses Node's standard WebAssembly engine and buil
 it does not install any JavaScript packages.
 
 The same Rust test corpus serializes every scalar `Simd` operation and compares it with
-SSE2 and AVX2 on native x86-64 hardware and with NEON on ARM64. It covers lane layout,
+SSE2 and AVX2 on native x86-64 hardware and with NEON on ARM64, and the portable `rt::fx`
+with the instructions of either CPU. It covers lane layout,
 saturation, wrapping arithmetic, large shifts, shuffles, pixel packs, memory helpers at odd
 addresses, IEEE conversions and square roots, float arithmetic on raw bits (every pair of a
 table of signed zeros, denormals, infinities and quiet and signalling NaNs, with SSE's NaN

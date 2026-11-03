@@ -142,58 +142,82 @@ fn vector_checks(hash: &mut u64) {
     }
 }
 
-fn float_checks(hash: &mut u64) {
-    let edges = [
-        0, 1, 0x80000000, 0x007fffff, 0x00800000, 0x3f000000, 0x3fc00000, 0x40200000, 0xbfc00000,
-        0xc0200000, 0x4effffff, 0x4f000000, 0xcf000000, 0xcf000001, 0x7f800000, 0xff800000,
-        0x7fc01234, 0x7f800001,
+// the portable scalar operations against the native ones
+fn check_f32(bits: u32, hash: &mut u64) {
+    let x = f32::from_bits(bits);
+    let results = [fx::cvtt(x) as u32, fx::cvt(x) as u32, fx::sqrt(x).to_bits(), fx::floor_i(x) as u32, fx::ceil_i(x) as u32];
+    #[cfg(not(target_arch = "wasm32"))]
+    assert_eq!(
+        results,
+        [
+            rt::fx::cvtt(x) as u32,
+            rt::fx::cvt(x) as u32,
+            rt::fx::sqrt(x).to_bits(),
+            rt::fx::floor_i(x) as u32,
+            rt::fx::ceil_i(x) as u32
+        ],
+        "f32 {bits:08x}"
+    );
+    for value in results {
+        digest(hash, &value.to_le_bytes());
+    }
+}
+
+fn check_f64(bits: u64, hash: &mut u64) {
+    let x = f64::from_bits(bits);
+    let results = [
+        fx::cvttd(x) as u64,
+        fx::cvtd(x) as u64,
+        fx::cvttd64(x) as u64,
+        fx::cvtd64(x) as u64,
+        fx::sqrtd(x).to_bits(),
     ];
+    #[cfg(not(target_arch = "wasm32"))]
+    assert_eq!(
+        results,
+        [
+            rt::fx::cvttd(x) as u64,
+            rt::fx::cvtd(x) as u64,
+            rt::fx::cvttd64(x) as u64,
+            rt::fx::cvtd64(x) as u64,
+            rt::fx::sqrtd(x).to_bits()
+        ],
+        "f64 {bits:016x}"
+    );
+    for value in results {
+        digest(hash, &value.to_le_bytes());
+    }
+}
+
+fn float_checks(hash: &mut u64) {
+    // the edges and the values right next to them
+    for bits in EDGE_F32 {
+        for b in [bits.wrapping_sub(1), bits, bits.wrapping_add(1)] {
+            check_f32(b, hash);
+        }
+    }
+    for bits in EDGE_F64 {
+        for b in [bits.wrapping_sub(1), bits, bits.wrapping_add(1)] {
+            check_f64(b, hash);
+        }
+    }
     let mut seed = 0x984813dc02179452;
-    for i in 0..20000 {
-        let bits = if i < edges.len() {
-            edges[i]
-        } else {
-            next(&mut seed) as u32
-        };
-        let x = f32::from_bits(bits);
-        let results = [fx::cvtt(x) as u32, fx::cvt(x) as u32, fx::sqrt(x).to_bits()];
-        #[cfg(not(target_arch = "wasm32"))]
-        assert_eq!(
-            results,
-            [
-                rt::fx::cvtt(x) as u32,
-                rt::fx::cvt(x) as u32,
-                rt::fx::sqrt(x).to_bits()
-            ],
-            "f32 {bits:08x}"
-        );
-        for value in results {
-            digest(hash, &value.to_le_bytes());
-        }
-        let bits = next(&mut seed);
-        let x = f64::from_bits(bits);
-        let results = [
-            fx::cvttd(x) as u64,
-            fx::cvtd(x) as u64,
-            fx::cvttd64(x) as u64,
-            fx::cvtd64(x) as u64,
-            fx::sqrtd(x).to_bits(),
-        ];
-        #[cfg(not(target_arch = "wasm32"))]
-        assert_eq!(
-            results,
-            [
-                rt::fx::cvttd(x) as u64,
-                rt::fx::cvtd(x) as u64,
-                rt::fx::cvttd64(x) as u64,
-                rt::fx::cvtd64(x) as u64,
-                rt::fx::sqrtd(x).to_bits()
-            ],
-            "f64 {bits:016x}"
-        );
-        for value in results {
-            digest(hash, &value.to_le_bytes());
-        }
+    for _ in 0..20000 {
+        // any bits (few of them inside the range of an i32)
+        check_f32(next(&mut seed) as u32, hash);
+        check_f64(next(&mut seed), hash);
+        // inside the range of an i32, with a fraction of 0 to 16 bits; every power of two down
+        // to 2^-16 of a random integer has its ties, ...
+        let (i, k) = (next(&mut seed) as u32 as i32, next(&mut seed) % 17);
+        let scale = 1.0 / (1u32 << k) as f64;
+        check_f32(((i as f64 * scale) as f32).to_bits(), hash);
+        check_f64((i as f64 * scale).to_bits(), hash);
+        // ... and exact ties around small integers and the bounds
+        let (small, top) = ((i >> 20) as f64, (i >> 24) as f64);
+        check_f32(((small + 0.5) as f32).to_bits(), hash);
+        check_f64((small + 0.5).to_bits(), hash);
+        check_f64((2147483647.5 + top).to_bits(), hash);
+        check_f64((-2147483648.5 + top).to_bits(), hash);
     }
     assert_eq!(fx::minss(0.0, -0.0).to_bits(), (-0.0f32).to_bits());
     assert_eq!(fx::maxsd(f64::NAN, 3.0), 3.0);

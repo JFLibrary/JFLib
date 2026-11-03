@@ -79,8 +79,9 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
 
 - `rt` verwendet unter Android Bionic für ausgerichtete Allokationen und Logcat für
   Diagnoseausgaben. Es gibt keine feste Annahme über die Speicher-Seitengröße.
-- ARM64 verwendet die vorhandenen portablen Float-/Math-Implementierungen und für `lib/simd` NEON
-  (`lib/simd/neon.rs`, Bit für Bit die Ergebnisse von SSE2).
+- ARM64 verwendet die vorhandene portable Mathematik, für `rt::fx` die Befehle der CPU
+  (`lib/rt/aarch64/fx.rs`) und für `lib/simd` NEON (`lib/simd/neon.rs`), Bit für Bit mit den Ergebnissen
+  von SSE2.
 - Der bestehende Host-Adapter in `lib/plat/web*.rs` wird für Android nativ kompiliert:
   Ereignisse, Fenster-Komposition und der besitzende UI-Laufzeitkern sind derselbe Code.
 - `android/bridge.c` kopiert die geänderten Zeilen (schon R, G, B, A; bei einem einzelnen
@@ -427,7 +428,8 @@ Rest ist Aufbau und Zeichnen, damals noch ohne SIMD. Die Seite „Werte & Farben
 blieb bei 7 ms und verfehlte manchmal einen Vsync (23 % ruckelnd, 12 ms im Median).
 
 Mit NEON (`lib/simd/neon.rs`, 03.11.2026) sind es 5,2 ms auf der Startseite und 6,3 ms auf „Werte &
-Farben“ (17 % → 6 % ruckelnd); Tabelle, Profil und was noch offen ist in
+Farben“ (17 % → 6 % ruckelnd), mit `fsqrt` und `fcvtns` in `rt::fx` rund 0,5 ms weniger; Tabellen, Profil
+und was noch offen ist in
 [ARM64.md](../../docs/ARM64.md) unter ARM6. `tests/android_perf.py` wiederholt diese Messung:
 
 ```powershell
