@@ -24,16 +24,18 @@ const OFFICE: &str = include_str!("../assets/templates/buero-vlans.jfnet");
 const CAMPUS: &str = include_str!("../assets/templates/campus.jfnet");
 const DC: &str = include_str!("../assets/templates/rechenzentrum.jfnet");
 const WEB: &str = include_str!("../assets/templates/webdienst.jfnet");
+const STUDY: &str = include_str!("../assets/templates/groesser-oder-mehr.jfnet");
 const TWO_PCS: &str = include_str!("../tests/fixtures/two_pcs.jfnet");
 
 /// per template: its file, how long it runs (s), what must hold then (the words of "expect ..."
 /// lines of a scenario)
-const PROOFS: [(&str, &str, u64, &[&str]); 5] = [
+const PROOFS: [(&str, &str, u64, &[&str]); 6] = [
     ("heimnetz.jfnet", HOME, 20, &["PC1 reaches 192.168.1.1", "PC1 reaches 203.0.113.10", "PC1 reaches 192.168.1.20", "Laptop1 reaches 203.0.113.10", "Phone1 reaches 192.168.1.1", "Phone1 reaches 203.0.113.10", "WEB1 reaches 192.168.1.20"]),
     ("buero-vlans.jfnet", OFFICE, 20, &["PC1 reaches 10.0.10.1", "PC1 reaches 10.0.30.10", "PC1 reaches intranet.buero.lab", "PC3 reaches 10.0.10.20", "PC4 reaches drucker.buero.lab", "SRV1 reaches 10.0.20.1"]),
     ("campus.jfnet", CAMPUS, 90, &["PC1 reaches 10.20.10.1", "PC1 reaches www.campus.lab", "PC2 reaches 10.10.100.10", "Laptop1 reaches www.campus.lab", "PC3 reaches www.campus.lab", "PC4 reaches 10.10.100.10", "Laptop2 reaches 10.20.10.1", "R1 route 10.30.20.0/24 via 10.10.0.6", "R1 route 10.20.10.0/24 via 10.10.0.2"]),
     ("rechenzentrum.jfnet", DC, 60, &["SRV1 reaches 10.1.1.12", "SRV1 reaches 10.1.2.11", "SRV1 reaches 10.1.4.12", "SRV8 reaches 10.1.1.11", "SRV3 reaches 10.1.3.11", "SRV3 svc web metric requests >= 1", "Leaf1 route 10.1.4.0/24 via 10.0.11.1", "Leaf1 route 10.1.4.0/24 via 10.0.21.1"]),
     ("webdienst.jfnet", WEB, 20, &["PC1 reaches 10.0.1.1", "LB1 reaches 10.0.2.13", "WEB1 svc web metric requests >= 20", "WEB2 svc web metric requests >= 20", "WEB3 svc web metric requests >= 20", "GEN1 svc load metric errors == 0"]),
+    ("groesser-oder-mehr.jfnet", STUDY, 10, &["LB reaches 10.0.0.11", "WEB1 svc web metric requests >= 20", "GEN svc load metric errors == 0"]),
 ];
 
 pub(crate) fn run(t: &mut T) {
@@ -102,6 +104,9 @@ fn proofs(t: &mut T) {
         let problems: Vec<String> = sim.engine().problems().iter().map(|x| x.msg.text()).collect();
         t.eq(&format!("{}: the simulator finds nothing", file), problems, Vec::<String>::new());
     }
+    // the template of the lab has its experiment, and it fits
+    let study = Project::from_text(STUDY).unwrap_or_default();
+    t.eq("the study's experiment", study.experiments.iter().map(|x| x.problems(&study).len()).collect::<Vec<_>>(), alloc::vec![0]);
 }
 
 fn setting(t: &mut T) {

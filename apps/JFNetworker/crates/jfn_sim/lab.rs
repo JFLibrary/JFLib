@@ -4,6 +4,7 @@
 //                                  (lb.rs); KvSet (kv.rs); CacheClear (cache.rs); WorkerSet
 //                                  (mq.rs); ServiceConfig (Service::reconfigure)
 //   Engine::can_reconfigure(dev, svc, &config)   a copy of the service could take this config
+//   Engine::refused(dev)           the project's services this device could not start, with the reason
 //   Engine::service_list()         every configured service of every device in brief (SvcBrief:
 //                                  device, name, kind, enabled, running), without numbers or
 //                                  status -- cheap enough for the badges of 500 devices
@@ -66,6 +67,11 @@ impl Engine {
             out = s.reconfigure(config, None);
         }
         out.map_err(ActErr::Refused)
+    }
+
+    /// the project's services this device could not start, each with the reason (the Dienste tab)
+    pub fn refused(&self, dev: u32) -> &[(jfn_model::project::ServiceDef, jfn_model::msg::Msg)] {
+        self.node_index(dev).and_then(|ni| self.os(ni)).map_or(&[], |o| o.refused.as_slice())
     }
 
     /// a copy of the service could take this config without a restart (doc/sim.rs asks before it

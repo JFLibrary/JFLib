@@ -1,0 +1,8 @@
+# jfn-sim: what the program without a window may do (docs/PERMISSIONS.md); it asks nobody, so a rule that the
+# window asks about stands here plainly: whoever calls course-install names the address on the command line
+fs.user                      # the projects, folders and reports named on the command line
+fs.write $APPCONFIG/**       # as the window's rules
+fs.write $APPDATA/**
+fs.write $DOCUMENTS/JFNetworker/**
+net.connect raw.githubusercontent.com:443    # course-install: the courses
+net.connect localhost:*                      # course-install: an author's own server, tools/academy_e2e.py

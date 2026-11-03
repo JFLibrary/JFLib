@@ -11,7 +11,8 @@
 //                           recent files from --recent=A|B); where the Akademie's courses and its
 //                           progress are (workspace/academy, --academy-dir PATH)
 //   after_load()            a new or loaded project: canvas, inspector, consoles, log and
-//                           device windows start over, the simulator runs in real time
+//                           device windows start over, the simulator runs in real time; a run of
+//                           the panel Experimente ends with the project it belongs to
 //   save_prefs(ui)          settings, recent files and the dock layout (UIC_EXIT)
 //   sim_timer(ui)           sets the simulator's timer when it needs one (every frame)
 //
@@ -81,6 +82,14 @@ pub(crate) struct Net {
     pub phys: crate::workspace::phys::Phys,
     /// the courses, the learner's progress, the page and the lab of a course (workspace/academy, AK1)
     pub academy: crate::workspace::academy::Academy,
+    /// the panel Experimente: the draft, a run under way, the last result (workspace/experiments, SA3)
+    pub exp: crate::workspace::experiments::Exp,
+}
+
+/// a script's `sync` waits for the runs of the panel Experimente and the workers of the Akademie
+/// (ui.sync_hook_set keeps one plain fn)
+fn jobs_pending() -> bool {
+    jfn_run::sweeps_pending() || crate::workspace::academy::install::pending()
 }
 
 impl Net {
@@ -109,6 +118,7 @@ impl Net {
             author: crate::workspace::author::Author::new(),
             phys: crate::workspace::phys::Phys::new(),
             academy: crate::workspace::academy::Academy::new(),
+            exp: crate::workspace::experiments::Exp::new(),
         }
     }
 
@@ -116,6 +126,7 @@ impl Net {
     /// line (--open FILE, or a .jfnet path)
     pub(crate) fn init(&mut self, ui: &mut Ui) -> bool {
         icons::install(ui);
+        ui.sync_hook_set(Some(jobs_pending));
         let mono = ui.text.load_mem(MONO, 0);
         if mono >= 0 {
             ui.mono_font_set(mono as u32);
@@ -174,6 +185,8 @@ impl Net {
         crate::workspace::task::loaded(self);
         // an assessment in the making belongs to the old project
         self.author = crate::workspace::author::Author::new();
+        // and so does a run with what it gave (a run under way is cancelled)
+        self.exp = crate::workspace::experiments::Exp::new();
         // the copy of the project that went is no longer needed
         crate::doc::autosave::clean(self);
     }

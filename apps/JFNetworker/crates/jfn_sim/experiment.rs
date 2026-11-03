@@ -13,6 +13,11 @@
 //   Sweep                              configs (ConfigOut: label, cost, knee, maximum, limit), points
 //                                      (Point), table() / csv() / detail_csv(); the same bytes on
 //                                      every machine and for any order of the runs
+//   sweep.to_value() / Sweep::from_value(&v)   what a kept run stores in the project (SA3): all but the
+//                                      details of each run; table() and csv() of the copy are the same bytes
+//   sweep.overloads() -> Vec<Msg>      where the throughput breaks down with timeouts (SA3)
+//   addr_of(&engine, host, near)       a host's address, on a network it shares with `near` if it can
+//   plan.stop                          set: the run ends early when it turns true, at whole seconds
 //
 // How a level runs: the warm engine is cloned (Engine: Clone, nothing shared but frames that never
 // change), the load generator takes the level through Action::HttpLoadSet, settle_s pass, then
@@ -40,8 +45,12 @@
 
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
 
+use agent_core::jmap::{empty_object, Value};
+use agent_core::json;
 use base::metrics::Hist;
 use jfn_model::catalog::Prices;
 use jfn_model::experiment::{patch_clones, patch_config, patch_hw, patch_load, patch_pool, Config, Experiment, Level, SloLimits};
@@ -51,7 +60,7 @@ use jfn_model::project::Project;
 use jfn_model::scenario::Agg;
 
 use crate::action::Action;
-use crate::httpsvc::{HttpLoad, HttpServer};
+use crate::httpsvc::HttpLoad;
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::res::HOST;
 use crate::series::SeriesCfg;
@@ -81,6 +90,31 @@ impl Status {
             Status::Memory => "speicher",
             Status::Failed => "fehler",
         }
+    }
+    /// the status of as_str()
+    pub fn parse(s: &str) -> Status {
+        match s {
+            "speicher" => Status::Memory,
+            "fehler" => Status::Failed,
+            _ => Status::Ok,
+        }
+    }
+}
+
+/// a flag that ends a run early (Plan::stop), never part of what a plan is
+#[derive(Clone, Debug, Default)]
+pub struct Stop(pub Option<Arc<AtomicBool>>);
+
+impl PartialEq for Stop {
+    fn eq(&self, _: &Stop) -> bool {
+        true
+    }
+}
+
+impl Stop {
+    /// the flag says stop
+    pub fn now(&self) -> bool {
+        self.0.as_ref().is_some_and(|f| f.load(Ordering::Relaxed))
     }
 }
 
@@ -185,12 +219,14 @@ pub struct Plan {
     pub mem_limit: usize,
     /// a quiet trace (Trace::set_quiet), as a sweep has it; off only to compare
     pub quiet: bool,
+    /// ends the run early (what comes back then is no result: jfn_run's jobs drop it)
+    pub stop: Stop,
     gen_dev: u32,
     keep: usize,
 }
 
 /// a host's address for the load balancer at `lb`: on a network they share, else its first
-fn addr_of(e: &Engine, host: u32, lb: Option<u32>) -> Option<String> {
+pub fn addr_of(e: &Engine, host: u32, lb: Option<u32>) -> Option<String> {
     let ifs = |d: u32| e.stack(e.node_index(d)?).map(|s| s.ifaces.iter().filter(|f| !f.hidden && !f.is_loopback()).flat_map(|f| f.addrs.iter().copied()).collect::<Vec<_>>());
     let mine = ifs(host)?;
     let near = lb.and_then(ifs).unwrap_or_default();
@@ -224,7 +260,7 @@ impl Plan {
             return Err(errs);
         }
         let keep = ((t.warmup_s + t.settle_s + t.measure_s + 4) as usize).clamp(300, crate::series::KEEP_MAX);
-        Ok(Plan { exp: exp.clone(), name: String::from(name), cfgs, levels: exp.levels(), seeds: exp.seeds_or(base.seed), slo: exp.slo.limits(), prices, mem_limit: MEM_LIMIT, quiet: true, gen_dev, keep })
+        Ok(Plan { exp: exp.clone(), name: String::from(name), cfgs, levels: exp.levels(), seeds: exp.seeds_or(base.seed), slo: exp.slo.limits(), prices, mem_limit: MEM_LIMIT, quiet: true, stop: Stop::default(), gen_dev, keep })
     }
 
     /// the runs of a sweep in the order index() gives them
@@ -247,7 +283,17 @@ impl Plan {
         }
         // the cables come from their counters: no series of their own
         e.set_series_cfg(SeriesCfg { every: SEC, keep: self.keep, links: false });
-        e.run_until(self.exp.timing.warmup_s * SEC, usize::MAX);
+        if self.stop.0.is_some() {
+            // whole seconds, so that a stop does not wait for the end of the warm-up
+            for s in 1..=self.exp.timing.warmup_s {
+                if self.stop.now() {
+                    break;
+                }
+                e.run_until(s * SEC, usize::MAX);
+            }
+        } else {
+            e.run_until(self.exp.timing.warmup_s * SEC, usize::MAX);
+        }
         Ok(e)
     }
 
@@ -270,6 +316,9 @@ impl Plan {
         }
         let (t0, mut status) = (e.now(), Status::Ok);
         for s in 1..=t.settle_s {
+            if self.stop.now() {
+                return Fig { status: Status::Failed, ..Fig::default() };
+            }
             e.run_until(t0 + s * SEC, usize::MAX);
             if s % 4 == 0 && self.too_big(e, &svc) {
                 status = Status::Memory;
@@ -286,6 +335,9 @@ impl Plan {
         for s in 1..=t.measure_s {
             if status != Status::Ok {
                 break;
+            }
+            if self.stop.now() {
+                return Fig { status: Status::Failed, ..Fig::default() };
             }
             e.run_until(from + s * SEC, usize::MAX);
             seconds = s;
@@ -574,8 +626,8 @@ impl Snap {
                 devs.push(DevSnap { dev, done: r.done_at(now), jobs: r.jobs, waited: r.wait_ns, pageins: r.pageins, oom_kills: r.oom_kills, disk_busy: o.disk.busy_ns, disk_bytes: o.disk.bytes_read + o.disk.bytes_written });
             }
             for s in o.svcs.iter().filter(|s| !s.console) {
-                if let Some(h) = s.svc.as_ref().and_then(|x| x.as_any().downcast_ref::<HttpServer>()) {
-                    locks.push((dev, s.name.clone(), h.lock_busy));
+                if let Some(h) = s.svc.as_ref() {
+                    locks.push((dev, s.name.clone(), h.lock_busy()));
                 }
             }
         }
@@ -1009,5 +1061,205 @@ impl Sweep {
             }
         }
         s
+    }
+}
+
+// ---------------------------------------------------------------- what a kept run stores (SA3)
+
+/// an optional number
+fn opt(v: Option<u64>) -> Value {
+    v.map_or(Value::Null, Value::u64)
+}
+
+/// a point as one array, member by member (Sweep::to_value writes it as one line of text)
+fn point_row(p: &Point) -> Value {
+    let n = Value::u64;
+    let s = |x: &str| Value::string(x);
+    Value::Array(alloc::vec![
+        n(p.config as u64), n(p.level as u64), n(p.offered_m), n(p.achieved_m), n(p.sent), n(p.responses), n(p.ok), n(p.errors), n(p.failed), n(p.timeouts), n(p.err_ppm),
+        opt(p.p50), opt(p.p95), opt(p.p99), opt(p.p999), opt(p.mean), opt(p.max), opt(p.p99_min), opt(p.p99_max),
+        Value::Bool(p.slo_ok), Value::Bool(p.knee),
+        n(p.cpu_max_pm), s(&p.cpu_dev), n(p.runq_milli), n(p.cpu_wait), n(p.mem_max), n(p.swap_max), n(p.pageins), n(p.oom_kills),
+        n(p.disk_max_pm), s(&p.disk_dev), n(p.disk_wait_max), n(p.disk_backlog_max),
+        n(p.link_max_pm), s(&p.link_name), n(p.lock_max_pm), s(&p.lock_name), s(&p.bottleneck),
+        n(p.cost_uh), n(p.cost_per_1000_u), s(p.status.as_str()), n(p.seconds),
+    ])
+}
+
+/// the point of point_row
+fn row_point(v: &Value) -> Option<Point> {
+    let a = v.as_array()?;
+    let mut i = 0;
+    let mut next = || {
+        i += 1;
+        a.get(i - 1)
+    };
+    fn u(x: Option<&Value>) -> Option<u64> {
+        x?.as_u64()
+    }
+    fn o(x: Option<&Value>) -> Option<Option<u64>> {
+        match x? {
+            Value::Null => Some(None),
+            y => y.as_u64().map(Some),
+        }
+    }
+    fn s(x: Option<&Value>) -> Option<String> {
+        x?.as_str().map(String::from)
+    }
+    fn b(x: Option<&Value>) -> Option<bool> {
+        x?.as_bool()
+    }
+    Some(Point {
+        config: u(next())? as usize,
+        level: u(next())? as usize,
+        offered_m: u(next())?,
+        achieved_m: u(next())?,
+        sent: u(next())?,
+        responses: u(next())?,
+        ok: u(next())?,
+        errors: u(next())?,
+        failed: u(next())?,
+        timeouts: u(next())?,
+        err_ppm: u(next())?,
+        p50: o(next())?,
+        p95: o(next())?,
+        p99: o(next())?,
+        p999: o(next())?,
+        mean: o(next())?,
+        max: o(next())?,
+        p99_min: o(next())?,
+        p99_max: o(next())?,
+        slo_ok: b(next())?,
+        knee: b(next())?,
+        cpu_max_pm: u(next())?,
+        cpu_dev: s(next())?,
+        runq_milli: u(next())?,
+        cpu_wait: u(next())?,
+        mem_max: u(next())?,
+        swap_max: u(next())?,
+        pageins: u(next())?,
+        oom_kills: u(next())?,
+        disk_max_pm: u(next())?,
+        disk_dev: s(next())?,
+        disk_wait_max: u(next())?,
+        disk_backlog_max: u(next())?,
+        link_max_pm: u(next())?,
+        link_name: s(next())?,
+        lock_max_pm: u(next())?,
+        lock_name: s(next())?,
+        bottleneck: s(next())?,
+        cost_uh: u(next())?,
+        cost_per_1000_u: u(next())?,
+        status: Status::parse(next()?.as_str()?),
+        seconds: u(next())?,
+    })
+}
+
+/// the words of a list
+fn words(v: Option<&Value>) -> Vec<String> {
+    v.and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
+}
+
+impl Sweep {
+    /// what a kept run stores: everything but the details of each run; a point is one line of text in
+    /// the file, its members in the order of point_row
+    pub fn to_value(&self) -> Value {
+        let mut o = empty_object();
+        o.insert("name", Value::string(self.name.as_str()));
+        o.insert("title", Value::string(self.title.as_str()));
+        o.insert("columns", Value::Array(self.columns.iter().map(|c| Value::string(c.as_str())).collect()));
+        let open = matches!(self.levels.first(), None | Some(Level::Rps(_)));
+        o.insert(if open { "rps" } else { "users" }, Value::Array(self.levels.iter().map(|l| Value::u64(l.value())).collect()));
+        o.insert("seeds", Value::Array(self.seeds.iter().map(|s| Value::u64(*s)).collect()));
+        let l = &self.slo;
+        o.insert("slo", Value::object([("p50", opt(l.p50)), ("p95", opt(l.p95)), ("p99", opt(l.p99)), ("p999", opt(l.p999)), ("errors_ppm", opt(l.errors_ppm))]));
+        o.insert("warmup_s", Value::u64(self.warmup_s));
+        o.insert("settle_s", Value::u64(self.settle_s));
+        o.insert("measure_s", Value::u64(self.measure_s));
+        let configs = self.configs.iter().map(|c| {
+            let labels = c.labels.iter().map(|(a, b)| Value::Array(alloc::vec![Value::string(a.as_str()), Value::string(b.as_str())])).collect();
+            Value::object([
+                ("label", Value::string(c.label.as_str())),
+                ("series", Value::string(c.series.as_str())),
+                ("labels", Value::Array(labels)),
+                ("cost_uh", Value::u64(c.cost_uh)),
+                ("knee", opt(c.knee.map(|k| k as u64))),
+                ("max_achieved_m", Value::u64(c.max_achieved_m)),
+                ("limit", Value::string(c.limit.as_str())),
+            ])
+        });
+        o.insert("configs", Value::Array(configs.collect()));
+        let rows = self.points.iter().map(|p| Value::string(json::stringify(&point_row(p)).unwrap_or_default()));
+        o.insert("points", Value::Array(rows.collect()));
+        o
+    }
+
+    /// the sweep of to_value (its details are gone)
+    pub fn from_value(v: &Value) -> Option<Sweep> {
+        let num = |k: &str| v.get(k).and_then(|x| x.as_u64());
+        let list = |k: &str| v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_u64()).collect::<Vec<u64>>());
+        let levels: Vec<Level> = match (list("rps"), list("users")) {
+            (Some(r), _) => r.into_iter().map(Level::Rps).collect(),
+            (_, Some(u)) => u.into_iter().map(|x| Level::Users(x as u32)).collect(),
+            _ => return None,
+        };
+        let l = v.get("slo")?;
+        let lim = |k: &str| l.get(k).and_then(|x| x.as_u64());
+        let slo = SloLimits { p50: lim("p50"), p95: lim("p95"), p99: lim("p99"), p999: lim("p999"), errors_ppm: lim("errors_ppm") };
+        let mut configs = Vec::new();
+        for c in v.get("configs")?.as_array()? {
+            let text = |k: &str| c.get(k).and_then(|x| x.as_str()).map(String::from).unwrap_or_default();
+            let labels = c.get("labels").and_then(|x| x.as_array()).unwrap_or(&[]).iter().filter_map(|p| {
+                let p = p.as_array()?;
+                Some((String::from(p.first()?.as_str()?), String::from(p.get(1)?.as_str()?)))
+            });
+            configs.push(ConfigOut {
+                label: text("label"),
+                series: text("series"),
+                labels: labels.collect(),
+                cost_uh: c.get("cost_uh")?.as_u64()?,
+                knee: c.get("knee").and_then(|x| x.as_u64()).map(|k| k as usize),
+                max_achieved_m: c.get("max_achieved_m")?.as_u64()?,
+                limit: text("limit"),
+            });
+        }
+        let mut points = Vec::new();
+        for r in v.get("points")?.as_array()? {
+            let row = json::parse(r.as_str()?.as_bytes()).ok()?;
+            points.push(row_point(&row)?);
+        }
+        Some(Sweep {
+            name: String::from(v.get("name").and_then(|x| x.as_str()).unwrap_or("")),
+            title: String::from(v.get("title").and_then(|x| x.as_str()).unwrap_or("")),
+            columns: words(v.get("columns")),
+            configs,
+            levels,
+            seeds: list("seeds").unwrap_or_default(),
+            slo,
+            warmup_s: num("warmup_s")?,
+            settle_s: num("settle_s")?,
+            measure_s: num("measure_s")?,
+            points,
+            details: Vec::new(),
+        })
+    }
+
+    /// where the throughput breaks down: a level of a configuration that answers less than half of what
+    /// a lower level answered, with requests that ran out of time or failed.  What it says is correct
+    /// (requests that timed out still cost the server, and their connections close), but surprising
+    pub fn overloads(&self) -> Vec<Msg> {
+        let mut out = Vec::new();
+        for (c, cfg) in self.configs.iter().enumerate() {
+            let mut peak = 0;
+            for p in self.points_of(c) {
+                if p.achieved_m * 2 < peak && (p.timeouts > 0 || p.errors > 0) {
+                    let level = self.levels.get(p.level).map_or(String::new(), |l| l.text());
+                    out.push(msg!("{}: bei {} sinkt der Durchsatz auf {}/s (vorher {}/s), {} Anfragen liefen in die Zeitgrenze.", cfg.label.clone(), level, p.achieved_m / 1000, peak / 1000, p.timeouts));
+                    break;
+                }
+                peak = peak.max(p.achieved_m);
+            }
+        }
+        out
     }
 }

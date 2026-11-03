@@ -1,0 +1,43 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": [
+    "Grundkurs",
+    "Basic course"
+  ],
+  "summary": [
+    "Ein kleiner Kurs für die Tests.",
+    "A small course for the tests."
+  ],
+  "level": "beginner",
+  "minutes": 10,
+  "units": [
+    {
+      "title": [
+        "Teil eins",
+        "Part one"
+      ],
+      "steps": [
+        {
+          "id": "eins",
+          "kind": "lesson",
+          "title": [
+            "Die erste Lektion",
+            "The first lesson"
+          ],
+          "file": "eins.md"
+        },
+        {
+          "id": "labor",
+          "kind": "lab",
+          "title": [
+            "Ein Labor",
+            "A lab"
+          ],
+          "file": "labs/netz.jfnet"
+        }
+      ]
+    }
+  ]
+}

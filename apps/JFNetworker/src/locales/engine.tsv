@@ -1799,3 +1799,34 @@ Die Art der Prüfungen ändert sich nur mit einem Neustart.	The kind of checks c
 Das Backend {} hat eine andere Adresse: es braucht einen anderen Namen.	The backend {} has another address: it needs another name.
 Warteschlange und Thema eines Workers ändern sich nur mit einem Neustart.	The queue and topic of a worker change only with a restart.
 Dieser Dienst ändert seine Einstellungen nur mit einem Neustart.	This service changes its settings only with a restart.
+Die Kursliste nennt mehr als {} Kurse.	The course list names more than {} courses.
+Kurs {}: die Kursliste nennt keine Datei {}.	Course {}: the course list names no file {}.
+Kurs {}: die Kursliste nennt mehr als {} Dateien.	Course {}: the course list names more than {} files.
+Kurs {}: er ist mit {} Bytes größer als die erlaubten {} Bytes.	Course {}: at {} bytes it is larger than the {} bytes allowed.
+Kurs {}: die Datei {} kommt doppelt vor.	Course {}: the file {} is listed twice.
+Kurs {}: die Datei {} ist mit {} Bytes größer als die erlaubten {} Bytes.	Course {}: the file {} at {} bytes is larger than the {} bytes allowed.
+Abgebrochen.	Cancelled.
+{} lässt sich nicht schreiben.	{} cannot be written.
+Die Datei {} hat {} Bytes; die Kursliste nennt {} Bytes.	The file {} has {} bytes; the course list says {} bytes.
+Die Prüfsumme der Datei {} stimmt nicht mit der Kursliste überein.	The checksum of the file {} does not match the course list.
+Die Verbindung zu {} wurde nicht erlaubt.	The connection to {} was not allowed.
+Der Host {} ist nicht erlaubt; Kurse kommen nur von {}.	The host {} is not allowed; courses come from {} only.
+Die sichere Verbindung kam nicht zustande: {}	The secure connection failed: {}
+Die Kursliste ist größer als die erlaubten {} Bytes.	The course list is larger than the {} bytes allowed.
+Keine Verbindung: {}	No connection: {}
+Der Server antwortet für {} mit dem Status {}.	The server answers {} with status {}.
+Die Verbindung brach bei {} von {} Bytes ab.	The connection broke off at {} of {} bytes.
+„{}“ ist keine Adresse für Kurse (http:// oder https://).	“{}” is no address for courses (http:// or https://).
+Im Ordner {} liegt keine {}. Autoren erzeugen sie mit tools/academy_index.py.	The folder {} holds no {}. Authors create it with tools/academy_index.py.
+Die Datei {} fehlt in der Quelle.	The file {} is missing at the source.
+Die Kursliste ist kein UTF-8-Text.	The course list is no UTF-8 text.
+Der Kurs {} hat {} Fehler.	The course {} has {} errors.
+Die Kursdatei nennt die Version {}, die Kursliste die Version {}.	The course file says version {}, the course list version {}.
+Eine andere Installation läuft gerade in diesem Ordner.	Another installation is running in this folder.
+{}: bei {} sinkt der Durchsatz auf {}/s (vorher {}/s), {} Anfragen liefen in die Zeitgrenze.	{}: at {} the throughput falls to {}/s (before: {}/s), {} requests ran into the time limit.
+Der Dienst {} läuft nicht. {}	The service {} is not running. {}
+Noch keine Backends: der Load Balancer hat niemanden, an den er verteilen kann.	No backends yet: the load balancer has nobody to distribute to.
+Noch kein Ziel: der Lastgenerator sendet nichts.	No target yet: the load generator sends nothing.
+Noch keine Knoten: der KV-Speicher weiß nicht, wer dazugehört.	No nodes yet: the KV store does not know who belongs to it.
+Noch kein Backend: der Cache kann nichts nachladen.	No backend yet: the cache cannot fetch anything.
+Noch keine Queue: der Worker holt nichts ab.	No queue yet: the worker fetches nothing.

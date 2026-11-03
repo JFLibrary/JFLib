@@ -1,8 +1,10 @@
 // services -- the Dienste tab of a device window: the services the simulator runs on the device
 // (DHCP, DNS, syslog, NTP, the TCP test services) with their state, status and numbers
 //
-//   tab(n, ui, k, id, dev)       a card per service; the project's services switch on and off
-//                                and open their settings (svcedit.rs, in window k)
+//   tab(n, ui, k, id, dev)       a card per service, "Dienst hinzufügen …" below them (svcform.rs); the project's
+//                                services switch on and off and open their settings (svcedit.rs, in
+//                                window k); a service of the project that does not start has a card
+//                                that says what it lacks
 //
 // A switch is one undo step that keeps the running device (Doc::apply_kept: the service
 // starts or stops at once, and so it does again on undo and redo).  Services the device made
@@ -65,7 +67,8 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.next_size(-1, -1);
     ui.scroll_begin(id, SC_V);
     ui.box_begin(0, BOX_V | pad(4), 8);
-    if svcs.is_empty() {
+    let waiting: Vec<usize> = (0..d.services.len()).filter(|&j| !svcs.iter().any(|s| s.name.eq_ignore_ascii_case(&d.services[j].name))).collect();
+    if svcs.is_empty() && waiting.is_empty() {
         ui.next_size(-1, 0);
         ui.text(
             TS_BODY | TX_SECONDARY | TX_WRAP,
@@ -112,8 +115,27 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         ui.box_end();
     }
+    // the project's services that do not start: what they lack, their settings
+    for (i, &j) in waiting.iter().enumerate().take(30) {
+        let s = &d.services[j];
+        ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 4);
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+        ui.status_dot(BADGE_WARN);
+        ui.text(TS_BODY_STRONG, &format!("{} · {}", kind_name(&s.kind), s.name));
+        ui.text(TS_BODY | TX_SECONDARY, t(if s.disabled { "aus" } else { "läuft nicht" }));
+        ui.spacer(-1);
+        super::svcedit::button(n, ui, ID_SVC_EDIT_BTN0 + 0x40 * k as u32 + (svcs.len() + i) as u32, dev, j);
+        ui.box_end();
+        ui.next_size(-1, 0);
+        let why = jfn_sim::svcform::missing(&s.kind, &s.config).or_else(|| n.doc.sim.state().refused(dev).iter().find(|r| r.0.name == s.name).map(|r| r.1.clone()));
+        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &why.map_or(String::new(), |m| crate::app::tr::msg(&m)));
+        super::svcedit::editor(n, ui, dev, j);
+        ui.box_end();
+    }
+    super::svcform::add_button(n, ui, k, dev);
     ui.box_end();
     ui.scroll_end();
+    super::svcform::add_dialog(n, ui, dev);
     // the switch, after the widgets: one undo step, the service starts or stops now
     if let Some((j, on)) = switch {
         let name = d.services[j].name.clone();

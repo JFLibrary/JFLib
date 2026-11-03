@@ -544,7 +544,7 @@ fn series(t: &mut T) {
     let mut e = engine(&n.p);
     run_for(&mut e, 12 * SEC);
     let names: Vec<&str> = e.series(n.srv, HOST).iter().map(|s| s.name).collect();
-    t.eq("the series", names, alloc::vec!["cpu_pm", "running", "runq", "mem_bytes", "swap_bytes", "pageins", "oom_kills", "disk_bytes"]);
+    t.eq("the series", names, alloc::vec!["cpu_pm", "running", "runq", "mem_bytes", "swap_bytes", "pageins", "oom_kills", "disk_bytes", "disk_pm", "disk_wait_us", "disk_backlog_us"]);
     t.check("the load generator has none", e.series(n.gen_, HOST).is_empty());
     let v = |name: &str, e: &Engine| e.series_value(n.srv, HOST, name, jfn_sim::series::Agg::Natural, 2 * SEC, 12 * SEC).map_or(-1.0, |x| x.milli as f64 / 1000.0);
     // 1000 per second of 1 ms on two cores: half of each; Little: on average one core busy
