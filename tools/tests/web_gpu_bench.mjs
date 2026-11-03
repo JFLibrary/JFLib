@@ -3,7 +3,7 @@
 // temp folder), ?gpu=0 against ?gpu=1 in turn, one page per round.  Per scenario: the UI worker's time per
 // batch (a wrapper around the worker's onmessage, served with worker.js), the page's main thread per frame
 // (CDP Performance.getMetrics TaskDuration; includes this script's small evaluate calls), late frames (a
-// display frame that found the last batch unfinished: new input had to wait), and over a quiet time the CPU
+// display frame that found a batch older than 12 ms unfinished: new input had to wait), and over a quiet time the CPU
 // of the browser's processes, its memory and what moved.  What this does not see: the real display (headless
 // Chrome composes on demand: its trace has no swap for most frames, "to the screen" takes a real window), the
 // GPU's time (timestamps are not built).
@@ -57,7 +57,10 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin=`http://127.0.0.1:${server.address().port}`;
 
 function instruments() {
-  const b=window.__bench={flight:0,frames:0,bytes:0,frameMs:0};
+  const b=window.__bench={flight:0,frames:0,bytes:0,postedAt:0,late:0,rafs:0};
+  // a display frame that finds a batch older than most of a frame unfinished: new input has to wait
+  const look=()=>{b.rafs++;if(b.flight>0&&performance.now()-b.postedAt>12)b.late++;requestAnimationFrame(look);};
+  requestAnimationFrame(look);
   const Base=window.Worker;
   window.Worker=class extends Base {
     constructor(...a) {
@@ -69,7 +72,7 @@ function instruments() {
         if(m.type==='bench'&&window.__benchReply) {window.__lastOps=m.ops;window.__benchReply(m.list);}
       });
     }
-    postMessage(m,...rest) {if(m.type==='batch') b.flight++;super.postMessage(m,...rest);}
+    postMessage(m,...rest) {if(m.type==='batch') {b.flight++;b.postedAt=performance.now();}super.postMessage(m,...rest);}
   };
   window.__ready=false;addEventListener('jfgui-ready',()=>window.__ready=true);
 }
@@ -91,12 +94,10 @@ async function scenario(page,cdp,n,step) {
   const before=await page.evaluate(()=>({...window.__bench}));
   const c0=await counters(page);
   const t0=await taskDuration(cdp);
-  let late=0;
   const w0=performance.now();
   for(let i=0;i<n;i++) {
     await step(i);
     await raf(page);
-    if(await page.evaluate(()=>window.__bench.flight>0)) late++;
   }
   const wall=performance.now()-w0;
   await page.evaluate(()=>new Promise(r=>setTimeout(r,100)));
@@ -106,7 +107,7 @@ async function scenario(page,cdp,n,step) {
   const c1=await counters(page);
   const ops=args.includes('--ops')?await page.evaluate(()=>window.__lastOps):undefined;
   return {ops,n,workerMedian:+median(list).toFixed(2),workerP95:+pct(list,.95).toFixed(2),workerMax:+Math.max(0,...list).toFixed(1),batches:list.length,
-    mainPerFrame:+(main/n).toFixed(2),late,msPerStep:+(wall/n).toFixed(1),
+    mainPerFrame:+(main/n).toFixed(2),late:after.late-before.late,rafs:after.rafs-before.rafs,msPerStep:+(wall/n).toFixed(1),
     framesCpu:after.frames-before.frames,bytesPage:after.bytes-before.bytes,framesGpu:c1.frames-c0.frames,uploaded:c1.upload_bytes-c0.upload_bytes,base:c1.base_px-c0.base_px,tiles:c1.canvas_tiles,splitFrames:c1.split_frames-c0.split_frames};
 }
 // the browser's processes (their command lines name this profile): cpu seconds, memory

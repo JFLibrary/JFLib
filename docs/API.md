@@ -61,13 +61,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
-  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs)
+  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -8433,7 +8433,8 @@ Source: [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs)
 
 ```text
 gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc;
-Android: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android")
+Android; the browser: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android",
+"Ausgabe im Browser")
 
 The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -8481,6 +8482,18 @@ surface and swapchain (win_gpu_child_show).  The system can also take the surfac
 stops): gp_surface_gone, before the host's callback returns.  win_gpu_child says None for a while
 (the surface is on its way, a tool window or popup shows on the canvas below): win_gpu_child_later,
 the host wakes the loop.
+
+The browser: the same code once more, through WebGPU (lib/gpu web_*.rs, web/gpu.js).  The UI runs in a
+worker in all three bundles and WebGPU's objects stay on that thread: there are no job threads, the jobs
+run on this thread when the browser has answered (S::web_start: requestAdapter and requestDevice
+answer later, the app goes on through the CPU path meanwhile).  The page's #screen is the CPU path and
+stays below; a canvas above it, an OffscreenCanvas here, is the analogue of the SurfaceView: it shows
+nothing until its first frame, then covers #screen; each period on the GPU has a new one (plat
+web_gpu.rs).  Before a device is used, a small picture through all three pipelines is read back and
+compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  Reading back comes
+later here: jfgui_GPU_VERIFY compares when the browser has answered (verify_poll).  The shaders go as
+WGSL (gpu_out.wgsl), no SPIR-V in the bundle.  Runs with ?agent=1 stay on the CPU path like scripts,
+unless ?gpu=1 asks; no script command here.
 
 Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -8537,8 +8550,8 @@ usable adapter or surface, a display that takes or imports no dma-bufs: the CPU 
 silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
 runs: a driver that killed the program does not get a third chance).
 
-Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX; Android: GalleryActivity
-always sets it, GPU_DEFAULT there), jfgui_GPU_VERIFY=1 (every presented
+Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX, DEFAULT_ON_BROWSER; Android:
+GalleryActivity always sets it, GPU_DEFAULT there; the browser: ?gpu=0|1), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -8608,7 +8621,7 @@ Source: [`lib/ui/gpu_out_off.rs`](../lib/ui/gpu_out_off.rs)
 
 ```text
 gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows, Linux programs
-against glibc, Android): every frame takes the platform's path, no Vulkan code is linked
+against glibc, Android, the browser): every frame takes the platform's path, no GPU code is linked
 ```
 
 **`impl Ui`**
@@ -17980,10 +17993,11 @@ FXW_NEDGE: i32 = 7
 
 ```text
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows, on Linux,
+and WebGPU over one backend per target (docs/GPU.md).  Backends now: Vulkan on Windows, on Linux,
 there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
-loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: WebGPU
-in the browser, Metal; they provide the same types and methods.
+loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
+browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs).
+Planned: Metal; it provides the same types and methods.
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -17991,6 +18005,8 @@ in the browser, Metal; they provide the same types and methods.
   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
                    index into adapters() or a part of the name)
   instance.adapters_low_power(display)          the GPUs for showing windows, frugal ones first
+  instance.prepare() -> Result<bool>             adapter and device are there (false: the browser's
+                   answer is on its way; never waits; true at once elsewhere)
   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
@@ -18075,7 +18091,7 @@ COLOR_TARGETS_MAX: usize = 8
   what went wrong
   - `Disabled` -- the GPU is switched off (jfgui_GPU=0)
   - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
-    missing file, or a Linux program not linked against glibc)
+    missing file, a Linux program not linked against glibc, a browser without navigator.gpu)
   - `NoAdapter` -- no usable GPU (or jfgui_GPU_ADAPTER matched none)
   - `Unsupported(&'static str)` -- the adapter or this backend lacks something (a feature, a format, the level)
   - `Invalid(&'static str)` -- a call the API does not allow (sizes, alignments, states, order)
@@ -18889,6 +18905,8 @@ messages, info level and up).
   the validation layer is active on this instance
 - **`fn adapters(&self) -> Result<Vec<Adapter>>`**
   every GPU of the system, discrete ones first (AdapterInfo::missing: unusable ones)
+- **`fn prepare(&self) -> Result<bool>`**
+  (the browser: adapter and device come asynchronously; here they are there)
 - **`fn adapter(&self) -> Result<Adapter>`**
   the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
 - **`fn adapters_low_power(&self, display: Option<(u32, u32)>) -> Result<Vec<Adapter>>`**
@@ -19333,6 +19351,446 @@ rebuild and any drop only note the buffers that go (RETIRED), try_acquire and fl
 - **`fn image_count(&self) -> usize`**
 - **`fn drm_format(&self) -> (u32, u64)`**
   the images' DRM format and modifier (tests, traces)
+
+### `gpu/web_cmd.rs`
+
+Source: [`lib/gpu/web_cmd.rs`](../lib/gpu/web_cmd.rs)
+
+```text
+web_cmd -- command recording in the browser: CommandEncoder -> CommandBuffer
+
+The commands become words here and a GPUCommandEncoder in web/gpu.js, all in the one call of
+Queue::submit (the op numbers: GpuHost.submit there): a frame costs one crossing into JavaScript, not
+one per command, and nothing of WebGPU lives across calls.  What the API lets go on anywhere WebGPU
+wants in a pass: the host opens a compute pass at the first dispatch and ends it before the next
+thing that is no dispatch.  Barriers and layouts mean nothing here (WebGPU's usage scopes do that);
+their calls stay so that the same code runs on every target.
+
+Every command checks what can be known here (the pipeline and pass state, bind group layouts, buffer
+usages, ranges and alignments, row lengths of 256 bytes on copies); a failed check skips the
+command and finish() returns it as GpuError::Invalid.  The rest is the browser's, later (web_dev.rs).
+The level Voll's commands are Invalid.
+```
+
+- **`struct CommandEncoder<'a>`**
+  records commands; finish() makes a CommandBuffer for Queue::submit
+
+- **`struct CommandBuffer<'a>`**
+  recorded commands, ready to submit (dropped unsubmitted: discarded)
+
+**`impl Device`**
+
+- **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
+  a command encoder
+
+**`impl<'a> CommandEncoder<'a>`**
+
+- **`fn copy_buffer(&mut self, src: &'a Buffer, src_off: u64, dst: &'a Buffer, dst_off: u64, size: u64)`**
+- **`fn fill_buffer(&mut self, buf: &'a Buffer, offset: u64, size: u64, value: u32)`**
+  fill size bytes at offset with a 32-bit value (both multiples of 4)
+- **`fn copy_buffer_to_texture(&mut self, src: &'a Buffer, layout: DataLayout, dst: TextureRegion<'a>)`**
+  buffer data -> a texture region
+- **`fn copy_texture_to_buffer(&mut self, src: TextureRegion<'a>, dst: &'a Buffer, layout: DataLayout)`**
+  a texture region -> buffer data
+- **`fn barrier(&mut self, _before: Access, _after: Access)`**
+  (WebGPU's usage scopes do this)
+- **`fn texture_barrier(&mut self, _tex: &'a Texture, _before: Layout, _after: Layout)`**
+- **`fn texture_barrier_range(&mut self, _tex: &'a Texture, _base_mip: u32, _mips: u32, _base_layer: u32, _layers: u32, _before: Layout, _after: Layout)`**
+- **`fn set_compute_pipeline(&mut self, p: &'a ComputePipeline)`**
+- **`fn set_bind_group(&mut self, index: u32, group: &'a BindGroup)`**
+  bind group g (= @group(g)) of the current pipeline's layout
+- **`fn push_constants<T: Pod>(&mut self, offset: u32, data: &[T])`**
+  push constants at offset (bytes) for the current pipeline (a uniform block in the browser)
+- **`fn dispatch(&mut self, x: u32, y: u32, z: u32)`**
+- **`fn dispatch_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  workgroup counts (3 x u32) from buf at offset
+- **`fn begin_render(&mut self, desc: &RenderPassDesc<'_, 'a>)`**
+- **`fn end_render(&mut self)`**
+- **`fn set_render_pipeline(&mut self, p: &'a RenderPipeline)`**
+- **`fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32, min_depth: f32, max_depth: f32)`**
+  the viewport in pixels from the top left (depth range min ..= max)
+- **`fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32)`**
+- **`fn set_vertex_buffer(&mut self, slot: u32, buf: &'a Buffer, offset: u64)`**
+- **`fn set_index_buffer(&mut self, buf: &'a Buffer, offset: u64, format: IndexFormat)`**
+- **`fn draw(&mut self, vertices: u32, instances: u32, first_vertex: u32, first_instance: u32)`**
+- **`fn draw_indexed(&mut self, indices: u32, instances: u32, first_index: u32, base_vertex: i32, first_instance: u32)`**
+- **`fn draw_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one draw: vertex count, instance count, first vertex, first instance (4 x u32)
+- **`fn draw_indexed_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one indexed draw: index count, instance count, first index, base vertex (i32), first instance
+- **`fn draw_indexed_indirect_multi(&mut self, _buf: &'a Buffer, _offset: u64, _count: u32, _stride: u32)`**
+  (level Voll)
+- **`fn draw_indexed_indirect_count(&mut self, _buf: &'a Buffer, _offset: u64, _count_buf: &'a Buffer, _count_offset: u64, _max_count: u32, _stride: u32)`**
+  (level Voll)
+- **`fn reset_timestamps(&mut self, _ts: &'a Timestamps, _first: u32, _n: u32)`**
+  (not built in the browser)
+- **`fn timestamp(&mut self, _ts: &'a Timestamps, _i: u32)`**
+  (not built in the browser)
+- **`fn finish(mut self) -> Result<CommandBuffer<'a>>`**
+  the recorded commands, or the first misuse
+
+### `gpu/web_dev.rs`
+
+Source: [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs)
+
+```text
+web_dev -- WebGPU in the browser: instance, adapter, device and queue, through web/gpu.js
+
+  Instance::new() -> Result<Instance>     Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without
+       navigator.gpu; starts requestAdapter and requestDevice, which answer later
+  instance.prepare() -> Result<bool>      true: adapter and device are there (never waits; the
+       worker has to return to the browser's event loop for it); Err(NoAdapter), Err(Failed)
+  instance.adapter() / adapters() / adapters_low_power(display)   Err(NotReady) before that; one
+       adapter (the browser chooses, "low-power" asked); a fallback adapter (software) is Cpu and
+       not among adapters_low_power
+  adapter.create_device(&DeviceDesc)      the device that was prepared, level Basis; once per
+       instance: a new device takes a new Instance (a WebGPU adapter gives one)
+  device.queue() -> &Queue                queue.submit([cmd, ..]) -> Result<SubmitId>
+  queue.write_buffer, write_texture, write_texture_rects, write_texture_rects_at   the browser's
+       queue.writeBuffer / writeTexture: copied at the call, before the next submission, from
+       the WASM memory itself (no staging ring here)
+  device.is_done(id), completed(), poll()  never wait
+
+What the API promises and the browser cannot do, said as errors and not faked: the worker cannot
+wait for the GPU (the answer needs its event loop), so wait(id, _) answers at once (false: not done
+yet), wait_idle and queue.read_buffer are Unsupported, Buffer::read says NotReady until the
+submission has finished.  SPIR-V is Unsupported (ShaderModule::from_wgsl).  Errors the browser finds
+(validation, memory) come later than the call that caused them, as its uncaptured errors, and are
+returned by the next submit, try_acquire or poll.  Bindless, indirect count, multi-draw, timestamps
+and subgroup sizes are not built here (the level Basis; Features says so).
+
+WebGPU's objects belong to this thread: the types of this backend hold Rc, so the compiler keeps
+them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Browser").
+```
+
+- **`struct Instance`**
+  the browser's WebGPU; adapter and device come asynchronously (prepare)
+
+**`impl Instance`**
+
+- **`fn new() -> Result<Instance>`**
+  the browser's WebGPU, adapter and device asked for (prepare says when they are there)
+- **`fn with(_desc: &InstanceDesc) -> Result<Instance>`**
+  (app_name and validate mean nothing here: the browser validates every call)
+- **`fn prepare(&self) -> Result<bool>`**
+  have the browser's adapter and device arrived?  Never waits; a worker gets them by
+  returning to the browser's event loop.  (true at once on the other targets.)
+- **`fn validating(&self) -> bool`**
+- **`fn adapters(&self) -> Result<Vec<Adapter>>`**
+  the one adapter the browser offers
+- **`fn adapter(&self) -> Result<Adapter>`**
+- **`fn adapters_low_power(&self, _display: Option<(u32, u32)>) -> Result<Vec<Adapter>>`**
+  the adapter for showing windows: not a software one, which is no gain over the CPU path
+
+- **`fn low_power_rank(kind: AdapterKind, _drives_display: bool) -> Option<u32>`**
+  the order of adapters for showing windows (the browser has one; see adapters_low_power)
+
+- **`fn validation_messages() -> (u32, u32)`**
+  nothing counts them here: the browser's console shows what its validation says
+
+- **`struct Adapter(Rc<AdapterInner>)`**
+  the GPU the browser offers
+
+**`impl Adapter`**
+
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+  always Basis in the browser
+- **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
+- **`fn create_device(&self, _desc: &DeviceDesc) -> Result<Device>`**
+  the device of this adapter, which prepare got (WebGPU gives one per adapter: a second one
+  takes a new Instance)
+
+- **`struct Device`**
+  a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct Queue`**
+  the device's queue
+
+**`impl Device`**
+
+- **`fn queue(&self) -> &Queue`**
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+- **`fn is_lost(&self) -> bool`**
+  the device was lost: every call fails with DeviceLost; create a new device
+- **`fn test_lose(&self)`**
+  (test aid) the device is destroyed: the browser's own way of losing it
+- **`fn validating(&self) -> bool`**
+- **`fn poll(&self) -> Result<()>`**
+  what the browser has said since the last look (nothing to free here)
+- **`fn wait(&self, id: SubmitId, _timeout_ns: u64) -> Result<bool>`**
+  the browser cannot wait on this thread: at once whether the submission is done
+- **`fn wait_idle(&self) -> Result<()>`**
+- **`fn completed(&self) -> SubmitId`**
+- **`fn is_done(&self, id: SubmitId) -> bool`**
+  the submission id is done on the GPU (the browser's answer comes with its event loop)
+- **`fn memory_reserved(&self) -> u64`**
+  what the buffers and textures asked for (the browser says nothing about its own memory)
+
+**`impl Queue`**
+
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  run command buffers in order -> their number
+- **`fn flush(&self) -> Result<SubmitId>`**
+  nothing waits for a submission here
+- **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
+  write data into a buffer at offset, before the next submission
+- **`fn write_texture(&self, dst: &TextureRegion, data: &[u8], layout: DataLayout, _before: Layout, _after: Layout) -> Result<()>`**
+  write texels into a texture region, before the next submission (no layouts here)
+- **`fn write_texture_rects(&self, t: &crate::Texture, rects: &[[i32; 4]], data: &[u8], stride: u32, before: Layout, after: Layout) -> Result<()>`**
+  write rectangles (x, y, w, h; clipped to the texture, empty ones skipped) of mip 0, layer 0 from
+  `data`, an image of the texture's size in rows of `stride` bytes (a framebuffer)
+- **`fn write_texture_rects_at(&self, t: &crate::Texture, rects: &[[i32; 4]], origin: (i32, i32), data: &[u8], stride: u32, _before: Layout, _after: Layout) -> Result<()>`**
+  write_texture_rects from an image of another size: rectangles of `data` go to (x - origin.0,
+  y - origin.1) of the texture; what lies outside the image or the texture is skipped
+- **`fn read_buffer<T: Pod>(&self, _buf: &crate::Buffer, _offset: u64, _out: &mut [T]) -> Result<()>`**
+  the worker cannot wait for the GPU: a Readback buffer and Buffer::read
+
+### `gpu/web_res.rs`
+
+Source: [`lib/gpu/web_res.rs`](../lib/gpu/web_res.rs)
+
+```text
+web_res -- WebGPU resources, bindings and pipelines in the browser (through web/gpu.js)
+
+  device.create_buffer(&BufferDesc)      copies to and from it allowed.  Upload: Buffer::write is
+       queue.writeBuffer (before the next submission, as mapped memory would be there).  Readback:
+       only copies may write it (WebGPU: MAP_READ goes with COPY_DST alone); after a submission that
+       copied into it the browser maps it, Buffer::read says NotReady until then
+  device.create_texture, texture.create_view, device.create_sampler   as WebGPU's
+  ShaderModule::from_wgsl(&device, &str) the browser takes the WGSL as it is, its validator is the
+       only one (lib/wgsl is not in the bundle; scan below reads names, overrides and bindings for
+       what the API promises).  from_spirv: Unsupported
+  Push constants: WGSL `var<immediate> x: T;` becomes `@group(3) @binding(0) var<uniform> x: T;`
+       (one block, a uniform layout), group 3 of a pipeline layout with push constants: at most
+       three groups of its own then.  web/gpu.js puts them into a ring behind a dynamic offset.
+  Pipeline constants: WebGPU's `constants`, the key the id as text; an override without @id (ids from
+       0x10000: docs/GPU.md "Pipeline-Konstanten") by its name.  Unknown or doubled ids are Invalid.
+  device.create_bind_group_layout(&[Binding])   WebGPU wants more than Binding says (a texture's view
+       dimension and sample type, a storage texture's format, a sampler's kind).  So the layout is made
+       late: from the first bind group's resources, or from the WGSL of the first pipeline that uses
+       it, whichever comes first
+
+A browser's errors come later than the call (web_dev.rs); what can be known here is Invalid at once.
+```
+
+- **`struct Buffer(pub(crate) Rc<BufInner>)`**
+  GPU memory for data: vertices, indices, storage, uniforms, indirect arguments
+
+**`impl Buffer`**
+
+- **`fn size(&self) -> u64`**
+- **`fn usage(&self) -> BufferUsage`**
+- **`fn memory(&self) -> MemoryKind`**
+- **`fn write<T: Pod>(&self, offset: u64, data: &[T]) -> Result<()>`**
+  data into an Upload buffer at offset: the GPU sees it in the next submission (queue.writeBuffer)
+- **`fn read<T: Pod>(&self, offset: u64, out: &mut [T]) -> Result<()>`**
+  a Readback buffer's contents at offset into out: Err(NotReady) until the submission that copied
+  into it has finished and the browser has mapped it
+
+**`impl Device`**
+
+- **`fn create_buffer(&self, desc: &BufferDesc) -> Result<Buffer>`**
+
+- **`struct TextureView(pub(crate) Rc<ViewInner>)`**
+  a range of a texture's mips and layers as shaders and render passes see it
+
+**`impl TextureView`**
+
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  width and height of the view's first mip
+
+- **`struct Texture`**
+  an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
+
+**`impl Texture`**
+
+- **`fn view(&self) -> &TextureView`**
+  the view of everything (its natural dimension)
+- **`fn width(&self) -> u32`**
+- **`fn height(&self) -> u32`**
+- **`fn depth(&self) -> u32`**
+- **`fn layers(&self) -> u32`**
+- **`fn mips(&self) -> u32`**
+- **`fn format(&self) -> Format`**
+- **`fn usage(&self) -> TextureUsage`**
+- **`fn create_view(&self, d: &ViewDesc) -> Result<TextureView>`**
+  a view of some mips / layers (counts 0: to the end)
+
+**`impl Device`**
+
+- **`fn create_texture(&self, desc: &TextureDesc) -> Result<Texture>`**
+- **`fn create_sampler(&self, d: &SamplerDesc) -> Result<Sampler>`**
+
+- **`struct Sampler(pub(crate) Rc<SamplerInner>)`**
+  how textures are filtered and addressed
+
+- **`struct ShaderModule(pub(crate) Rc<ShaderInner>)`**
+  shader code: WGSL, as the browser takes it
+
+**`impl ShaderModule`**
+
+- **`fn from_spirv(_device: &Device, _code: &[u32]) -> Result<ShaderModule>`**
+  the browser takes WGSL: ShaderModule::from_wgsl
+- **`fn from_wgsl(device: &Device, source: &str) -> Result<ShaderModule>`**
+  a module from WGSL source, which the browser compiles and validates (its errors come later:
+  web_dev.rs); `var<immediate>` becomes the uniform block behind push constants
+- **`fn entry_points(&self) -> Vec<(u32, &str)>`**
+  the entry points: (model as SPIR-V numbers it: 0 vertex, 4 fragment, 5 compute, name)
+- **`fn constants(&self) -> Vec<(u32, shader::reflect::Kind, f64)>`**
+  the pipeline-overridable constants the module declares: (id, kind, default value)
+
+- **`struct BindGroupLayout(pub(crate) Rc<BglInner>)`**
+  the bindings of one bind group (@group)
+
+- **`struct PipelineLayout(pub(crate) Rc<PlInner>)`**
+  the bind group layouts and push constants of pipelines
+
+- **`struct BindGroup(pub(crate) Rc<BgInner>)`**
+  resources bound for shaders
+
+**`impl Device`**
+
+- **`fn create_bind_group_layout(&self, bindings: &[Binding]) -> Result<BindGroupLayout>`**
+- **`fn create_pipeline_layout(&self, desc: &PipelineLayoutDesc) -> Result<PipelineLayout>`**
+  groups: at most BIND_GROUPS_MAX, and with push constants at most 3 (the last is theirs)
+- **`fn create_bind_group(&self, desc: &BindGroupDesc) -> Result<BindGroup>`**
+- **`fn create_bindless(&self, _desc: &BindlessDesc) -> Result<Bindless>`**
+  (level Voll)
+
+- **`struct Bindless`**
+  a large table of textures, samplers and buffers (level Voll: never in the browser)
+
+**`impl Bindless`**
+
+- **`fn group(&self) -> &BindGroup`**
+- **`fn layout(&self) -> &BindGroupLayout`**
+- **`fn counts(&self) -> [u32; 4]`**
+- **`fn set_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+- **`fn set_sampler(&self, _slot: u32, _s: &Sampler) -> Result<()>`**
+- **`fn set_buffer(&self, _slot: u32, _buf: &Buffer, _offset: u64, _size: u64) -> Result<()>`**
+- **`fn set_storage_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+
+- **`struct ComputePipeline(pub(crate) Rc<PipeInner>)`**
+  a compute shader with its layout
+
+- **`struct RenderPipeline(pub(crate) Rc<PipeInner>)`**
+  vertex + fragment shaders with their fixed state and target formats
+
+**`impl Device`**
+
+- **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
+- **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
+  (a required subgroup size: not built in the browser; size 0 is the plain pipeline)
+- **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
+- **`fn create_timestamps(&self, _count: u32) -> Result<Timestamps>`**
+  (not built in the browser: Features::timestamps is false; WebGPU has them only at the start and
+  the end of a pass)
+
+- **`struct Timestamps`**
+  GPU timestamps (not built in the browser)
+
+**`impl Timestamps`**
+
+- **`fn count(&self) -> u32`**
+- **`fn read_ticks(&self, _first: u32, _n: u32) -> Result<Vec<u64>>`**
+- **`fn read_ms(&self, _first: u32, _n: u32) -> Result<Vec<f64>>`**
+
+### `gpu/web_swap.rs`
+
+Source: [`lib/gpu/web_swap.rs`](../lib/gpu/web_swap.rs)
+
+```text
+web_swap -- a canvas as a swapchain in the browser (through web/gpu.js)
+
+  Surface::native(&instance, nw, window)   the OffscreenCanvas plat::win_gpu_child brought from the
+       page (lib/plat/web_gpu.rs); Surface::new asks for it, NotReady until it is here
+  device.create_swapchain(&surface, &SwapchainDesc)   getContext("webgpu"), configure: the format the
+       browser prefers (bgra8unorm or rgba8unorm), opaque, sRGB; copy_src adds COPY_SRC; srgb a view in
+       the -srgb format.  The present mode and the image count are not ours: the browser composes the
+       newest image at its next frame, present_mode() says Mailbox
+  sc.try_acquire()   getCurrentTexture.  NotReady never: the image is there at once, and a second
+       frame in one turn of the worker's event loop draws over the first, which nobody saw
+  sc.present(frame, [cmd, ..])   queue.submit.  There is no present: the browser takes the image when
+       the worker returns to its event loop (OffscreenCanvas of a worker: no main thread involved)
+
+A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
+```
+
+- **`struct Surface(pub(crate) Rc<SurfInner>)`**
+  a canvas as a target for swapchains
+
+**`impl Surface`**
+
+- **`fn track_size(&self)`**
+  (Linux: the window's size for a rebuild on a worker; the browser knows it)
+- **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
+  the canvas of plat window `window` (NotReady: it is on its way from the page)
+- **`fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the canvas of plat::win_gpu_child, whose size is that of plat window `window`
+
+- **`struct Frame`**
+  a frame being drawn
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- (never in the browser)
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window has no area
+
+**`impl Frame`**
+
+- **`fn index(&self) -> u32`**
+  (the browser has one current image)
+- **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  images shown on a canvas
+
+**`impl Device`**
+
+- **`fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain>`**
+
+**`impl Swapchain`**
+
+- **`fn rebuild(&mut self) -> Result<()>`**
+  the canvas takes the window's size now
+- **`fn try_acquire(&mut self) -> Result<TryAcquire>`**
+  the image to draw into (the same one until the worker returns to its event loop)
+- **`fn acquire(&mut self) -> Result<Option<Frame>>`**
+  the image to draw into; None while the window has no area
+- **`fn view(&self, _frame: &Frame) -> &TextureView`**
+  the frame's image as a render target
+- **`fn texture(&self, _frame: &Frame) -> &Texture`**
+  the frame's image (copies: SwapchainDesc::copy_src)
+- **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, _frame: Frame, cmds: I) -> Result<SubmitId>`**
+  submit the frame's commands; the browser shows the image when the worker's turn ends
+- **`fn prepare(&mut self) -> Result<bool>`**
+  (Linux: the display has answered for the images; here nothing to wait for)
+- **`fn flush(&self) -> Result<bool>`**
+  (Linux: a frame reaches the window after the GPU finished it; here the browser does that)
+- **`fn busy(&self) -> bool`**
+  (Linux: a frame is on its way to the window; here never)
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again: retry (the caller's time)
+- **`fn damage(&self, _rects: Option<&[[i32; 4]]>)`**
+  (Linux: what the next image changes, for the compositor; here the whole image counts)
+- **`fn resize(&mut self)`**
+  the next acquire takes the window's size
+- **`fn set_present_mode(&mut self, _m: PresentMode)`**
+  (the browser's: no present modes)
+- **`fn present_mode(&self) -> PresentMode`**
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  the images' size
+- **`fn image_count(&self) -> usize`**
 
 ## shader
 
@@ -29021,7 +29479,7 @@ REQUEST_UNSAVED: u32 = 22
   - `fn surface_gone(&mut self) -> bool`
     (Android) the surface of the GPU output went away -> a frame waits for the host's canvas.
   - `fn gpu_test(&mut self, _op: u32) -> Option<String>`
-    (Android, tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
+    (Android, the browser; tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
 
 - **`fn install(app: Box<dyn WebApplication>) -> bool`**
   Install the owned runtime. Returns false if an app is already registered.
@@ -29208,9 +29666,9 @@ REQUEST_UNSAVED: u32 = 22
   (Android) frames shown so far, through the platform or the GPU (present_time).
 
 - **`extern "C" fn jfgui_gpu_test(op: u32) -> u32`**
-  (Android, tests) the GPU output: its counters as a line (GalleryGpuInstrumentation); op: 1 lose
-  the device, 2 settle, 3 the next frame draws everything.  -> the length, the bytes in the
-  response buffer.
+  (Android, the browser; tests) the GPU output: its counters as a line (GalleryGpuInstrumentation,
+  apps/gallery/tests/gpu_web.mjs); op: 1 lose the device, 2 settle, 3 the next frame draws everything.
+  -> the length, the bytes in the response buffer.
 
 - **`extern "C" fn jfgui_tick(time_ms: u32)`**
   Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
@@ -29385,6 +29843,9 @@ Android's Bitmap): the frames' B, G, R, x is swapped once, while copying the dir
 rectangles in, and the host copies rows without touching pixels.  One window over the
 whole canvas without popups is the canvas itself (no composition); otherwise the windows
 and popups are composited into the canvas buffer.
+(G4d) The GPU output: window 0 shows on a canvas of its own above this one (web_gpu.rs), the canvas
+here rests with its last frame; what leaves it comes back whole, and the canvas above goes only after
+that frame (flush).
 (L7) Full screen: window 0 asks the page for the browser's Fullscreen API (REQUEST_FULLSCREEN;
 it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 back: refused without the user's gesture, left with Esc); a tool window covers the canvas
@@ -29702,6 +30163,97 @@ not a dangling pointer.
 ```rust
 // the script command `gpu` (a script's real windows) has nothing to work with here: scripts run on
 // the desktop, this target has its own test (apps/androidGallery/tests/android_gpu.py)
+WT_NOANIM: u32 = 0
+WT_FROM_POINT: u32 = 0
+```
+
+- **`fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64`**
+
+- **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
+
+- **`fn gpu_wait(_deadline_us: u64)`**
+
+### `plat/web_gpu.rs`
+
+Source: [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs)
+
+```text
+web_gpu -- what the UI's output through the GPU needs of the browser (lib/ui/gpu_out.rs, lib/gpu
+web_*.rs, web/gpu.js, web/loader.js; docs/GPU.md "Ausgabe im Browser")
+
+  win_gpu_child(w)                   a canvas above the page's #screen as an OffscreenCanvas in this
+                                     worker, the analogue of Android's SurfaceView: only for window 0
+                                     while nothing else shows on #screen (tool windows and popups are
+                                     composed on the CPU, below it).  None: the page was asked, the canvas
+                                     is on its way; each surface takes a new one
+  win_gpu_child_later(w)             no canvas now, it comes: no reason to give up, nothing to poll for
+  win_gpu_child_alone(w)             the window still shows on it alone
+  win_gpu_child_show(w, show)        show: the frame is on the canvas, #screen rests with its last frame
+                                     under it.  hide: the frame is on its way to #screen, the page
+                                     takes the canvas away after it (after_flush): no gap, no wrong frame
+  win_release_kept(w)                the copy of the window for #screen goes, and the worker's pooled
+                                     pixel buffers with it
+
+A canvas that has shown nothing yet shows nothing: until the first frame reaches the compositor the
+page's #screen is seen through it, the same pixels (the switch needs no message and no timing).  A
+new period on the GPU takes a new canvas, so it can never show an old frame.  The worker's thread is the
+only one that touches any of this: there are no job threads here, in none of the three bundles (the
+compute workers of the threads bundle cannot own WebGPU objects); gpu_out.rs runs its jobs on this
+thread when the browser has answered.
+```
+
+```rust
+/// (browser) the output wants a canvas above #screen; the page answers with jfgui_gpu_canvas
+REQUEST_GPU_CANVAS: u32 = 28
+/// (browser) the canvas above #screen goes (after the frame that replaces it)
+REQUEST_GPU_HIDE: u32 = 29
+/// (browser) the canvas above #screen shows: the worker's pixel buffers for the page may go
+REQUEST_GPU_SHOWN: u32 = 30
+```
+
+- **`extern "C" fn jfgui_gpu_canvas(handle: u32)`**
+  (worker.js) the page's canvas, as a number of web/gpu.js's table
+
+- **`struct NativeWindow`**
+  a target for swapchains: the OffscreenCanvas of the page's canvas, a number of web/gpu.js's table
+
+**`impl NativeWindow`**
+
+- **`fn take(self) -> u32`**
+  the number, once (lib/gpu's Surface owns it then)
+
+- **`fn gpu_out_state(_state: u32)`**
+  how the output came up: nothing keeps it across runs here
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+  the canvas for window w; None: see win_gpu_child_later
+
+- **`fn win_gpu_child_later(w: i32) -> bool`**
+  no canvas for window w now, but it may come: the page or the next frame wakes the loop
+
+- **`fn win_gpu_child_alone(w: i32) -> bool`**
+  the window still shows on its canvas alone: nothing else came on #screen
+
+- **`fn win_gpu_child_show(w: i32, show: bool)`**
+  show: the window shows on the canvas above; hide: on #screen, the canvas above goes after that frame
+
+- **`fn win_release_kept(w: i32)`**
+  the frame is on the canvas above: the copy for #screen goes (it comes back whole)
+
+- **`fn win_in_sizemove() -> bool`**
+  no modal size loop here
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  the browser chooses the GPU
+
+- **`fn win_remote_session() -> bool`**
+  no remote sessions to look for here
+
+```rust
+// the script command `gpu` (a script's real windows) has nothing to work with here: scripts run on the
+// desktop, this target has its own test (apps/gallery/tests/gpu_web.mjs)
 WT_NOANIM: u32 = 0
 WT_FROM_POINT: u32 = 0
 ```
