@@ -86,6 +86,12 @@ pub(crate) struct Net {
     pub exp: crate::workspace::experiments::Exp,
 }
 
+/// a script's `sync` waits for the runs of the panel Experimente and the workers of the Akademie
+/// (ui.sync_hook_set keeps one plain fn)
+fn jobs_pending() -> bool {
+    jfn_run::sweeps_pending() || crate::workspace::academy::install::pending()
+}
+
 impl Net {
     pub(crate) fn new() -> Net {
         let syms = Rc::new(Symbols::new());
@@ -120,8 +126,7 @@ impl Net {
     /// line (--open FILE, or a .jfnet path)
     pub(crate) fn init(&mut self, ui: &mut Ui) -> bool {
         icons::install(ui);
-        // a script's `sync` waits for the runs of the panel Experimente
-        ui.sync_hook_set(Some(jfn_run::sweeps_pending));
+        ui.sync_hook_set(Some(jobs_pending));
         let mono = ui.text.load_mem(MONO, 0);
         if mono >= 0 {
             ui.mono_font_set(mono as u32);
@@ -156,7 +161,6 @@ impl Net {
             self.doc.sim.with_engine("traffic", move |e| e.ping_many(k));
         }
         self.academy.setup(ui.headless(), plat::arg_value("--academy-dir"));
-        ui.sync_hook_set(Some(crate::workspace::academy::install::pending));
         // the start page: after_load above took it down, a file that did not open leaves its message
         crate::workspace::startpage::startup(self, ui, &args);
         true
