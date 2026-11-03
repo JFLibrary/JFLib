@@ -1,0 +1,103 @@
+#!args --verify-dirty --start-page --academy-dir mem://ak3s/academy --academy-gate --academy-folder apps/JFNetworker/tests/fixtures
+# the pictures of installing courses: the start page's way there, the empty list, a list that offers courses, a worker
+# with its progress, a refusal with what to do, installed courses with their buttons, the questions; light and dark,
+# 100 and 150 %, narrow; in build/jfnetworker/install_<view>.png.  The narrow window must not scroll sideways.  Ids: as
+# in academy_install.uis.
+size 1280 800
+theme light
+shot build/jfnetworker/install_start_light_100.png
+cmd 1005
+# ---- the empty list
+shot build/jfnetworker/install_empty_light_100.png
+theme dark
+shot build/jfnetworker/install_empty_dark_100.png
+scale 150
+shot build/jfnetworker/install_empty_dark_150.png
+theme light
+scale 100
+size 800 520
+shot build/jfnetworker/install_empty_narrow.png
+size 1280 800
+# ---- a refusal says what to do
+click button:"Nach Kursen suchen"
+sync
+shot build/jfnetworker/install_refused_light_100.png
+size 800 520
+shot build/jfnetworker/install_refused_narrow.png
+size 1280 800
+# ---- what a folder offers
+click button:"Aus Ordner installieren …"
+shot build/jfnetworker/install_folder_light_100.png
+click text:"academy_src"
+click button:"Ordner auswählen"
+sync
+shot build/jfnetworker/install_offer_light_100.png
+theme dark
+shot build/jfnetworker/install_offer_dark_100.png
+theme light
+size 800 520
+shot build/jfnetworker/install_offer_narrow.png
+size 1280 800
+# ---- a worker with its progress
+focus #148738
+key enter
+sync
+cmd 1039 3
+sync
+shot build/jfnetworker/install_progress_light_100.png
+theme dark
+shot build/jfnetworker/install_progress_dark_100.png
+scale 150
+shot build/jfnetworker/install_progress_dark_150.png
+scale 100
+theme light
+size 800 520
+shot build/jfnetworker/install_progress_narrow.png
+size 1280 800
+cmd 1039 1
+sync
+# ---- a bad course: the check's words
+focus #148736
+key enter
+sync
+cmd 1039 2
+sync
+shot build/jfnetworker/install_bad_light_100.png
+# ---- installed courses with their buttons, an update on offer
+click button:"Aus Ordner installieren …"
+click text:"academy_src2"
+click button:"Ordner auswählen"
+sync
+shot build/jfnetworker/install_update_light_100.png
+theme dark
+shot build/jfnetworker/install_update_dark_100.png
+theme light
+scale 150
+shot build/jfnetworker/install_update_light_150.png
+scale 100
+size 800 520
+shot build/jfnetworker/install_update_narrow.png
+size 1280 800
+# ---- the questions
+click #148224
+shot build/jfnetworker/install_remove_light_100.png
+theme dark
+shot build/jfnetworker/install_remove_dark_100.png
+theme light
+click button:"Abbrechen"
+click button:"Kurs: Grundkurs"
+click button:"Beginnen"
+click link:"Mehr dazu"
+shot build/jfnetworker/install_link_light_100.png
+click button:"Abbrechen"
+key esc
+key esc
+key esc
+# ---- the start page with a course
+shot build/jfnetworker/install_start_course_100.png
+# ---- the settings
+cmd 216
+focus #166945967
+shot build/jfnetworker/install_settings_light_100.png
+click button:"Schließen"
+expect_nowarn

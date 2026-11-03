@@ -59,13 +59,16 @@ shot build/jfnetworker/academy_other_language.png
 click button:"Close"
 expect "Diese Lektion gibt es noch nicht in Ihrer Sprache" missing
 click button:"Weiter"
-# ---- links and pictures: a step: link goes; a step that does not exist, a file and the web are refused;
+# ---- links and pictures: a step: link goes; a step that does not exist and a file are refused, the web asks;
 # a picture outside the course shows its alt text and reads nothing
 expect text:"Schritt 3 von 7" exists
 expect image:"Ein Bild außerhalb des Kurses" exists
 expect image:"Ein Bild, das fehlt" exists
 click link:"Weblink"
-expect "Der Link „https://example.org/“ geht nicht auf" exists
+expect dialog:"Diese Adresse öffnen?" exists
+expect text:"https://example.org/" exists
+click button:"Abbrechen"
+expect dialog:"Diese Adresse öffnen?" missing
 expect text:"Schritt 3 von 7" exists
 click link:"falscher Schritt"
 expect "Der Link „step:gibt-es-nicht“ geht nicht auf" exists

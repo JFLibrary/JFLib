@@ -59,6 +59,9 @@ fn mem(t: &mut T) {
     t.check(plat::mkdir("mem://d/e") && names("mem://") == ["a/", "d/"], "vfs: mem:// mkdir and listing");
     t.check(!plat::delete("mem://a/b"), "vfs: a folder with files is not deleted");
     t.check(plat::rename("mem://a/b/c.txt", "mem://d/c2.txt") && names("mem://d") == ["c2.txt", "e/"], "vfs: mem:// rename");
+    t.check(plat::rename("mem://d/e", "mem://f/g") && plat::write_file("mem://f/g/h/i.txt", b"x") && plat::rename("mem://f/g", "mem://f/j") && plat::file_exists("mem://f/g") == 0 && plat::read_file("mem://f/j/h/i.txt").as_deref() == Some(&b"x"[..]), "vfs: mem:// rename of a folder with what is below it");
+    t.check(!plat::rename("mem://f/j", "mem://f/j/h/k") && !plat::rename("mem://f/j", "mem://a") && !plat::rename("mem://f/j", "mem://d/c2.txt"), "vfs: no folder into itself or onto what exists");
+    t.check(plat::delete("mem://f/j/h/i.txt") && plat::delete("mem://f/j/h") && plat::delete("mem://f/j") && plat::delete("mem://f") && plat::mkdir("mem://d/e"), "vfs: mem:// the moved folder goes as any other");
     t.check(plat::delete("mem://d/c2.txt") && plat::delete("mem://d/e") && plat::delete("mem://d"), "vfs: mem:// delete");
     t.check(!plat::write_file("mem://", b"x") && !plat::write_file("mem://a", b"x"), "vfs: no file over the root or a folder");
     t.check(!plat::rename("mem://a/b", "config://b"), "vfs: no rename across mounts");

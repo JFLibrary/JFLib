@@ -28,7 +28,8 @@
 // which takes it down.
 //
 // learn() lists what there is to learn from: the courses of the Akademie (workspace/academy, AK1) as a
-// group of their own, then the labs and assessments; there is no group without anything in it.
+// group of their own with the way to its list, also while no course is installed; then the labs and
+// assessments; there is no other group without anything in it.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -529,11 +530,22 @@ fn learn(n: &mut Net, ui: &mut Ui, w: i32) {
 // the courses of the Akademie: their line, their cards with what the learner has done
 fn course_group(n: &mut Net, ui: &mut Ui, w: i32) {
     let cards = n.academy.cards();
-    if cards.is_empty() {
+    let installing = n.academy.can_install();
+    if cards.is_empty() && !installing {
         return;
     }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Akademie: Kurse mit Lektionen zum Lesen und Laboren im Simulator."));
+    if installing {
+        // the way to more of them: the Akademie's list, where nothing goes online without a click
+        ui.box_begin(0, BOX_H, 0);
+        ui.next_flags(ST_COMPACT);
+        ui.next_icon(IC_DOWNLOAD);
+        if ui.button(ID_AI_SP_MORE, if cards.is_empty() { t("Kurse installieren …") } else { t("Alle Kurse …") }) & EV_ACT != 0 {
+            ui.cmd_run(CMD_ACADEMY, 0);
+        }
+        ui.box_end();
+    }
     let cols = columns(w, &[2], LEARN_MIN_W);
     for (r, row) in cards.chunks(cols as usize).enumerate() {
         ui.next_size(-1, 0);

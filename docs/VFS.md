@@ -110,7 +110,8 @@ permissions like the path itself).
 - `File::create_new` is exclusive inside this process on mounts without OS files, and
   `File::open_temp(Some("mem://dir"))` returns a file in memory that has no name at all.
 - `write_file` replaces a `mem://` file the way it does on disk: an open handle keeps the old
-  bytes; `delete` and `rename` leave open handles alone.
+  bytes; `delete` and `rename` leave open handles alone. `rename` moves a `mem://` folder with
+  everything below it, as on disk, but onto nothing that exists.
 - `plat::fs` exists on Windows and Linux. On mounts without OS files it has no links (`read_link` is `None`, `symlink` and
   `hard_link` fail), no owners or modes (`set_mode` / `set_owner` fail on Linux, `set_attrs` on
   Windows; the calls that do nothing on an OS succeed), no `free_space`. `stat` reports Linux

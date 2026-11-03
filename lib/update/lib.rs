@@ -14,7 +14,8 @@
 //                                start_download() (a background thread, plat::wake() when
 //                                done), status() (phase, progress, error), cancel(), staged()
 //   state(&cfg), newer(a, b), target(), Manifest::parse, verify
-//   install(&cfg) -> Packaged     how the program is installed (plat::pkg::packaged; cfg.exe
+//   fetch::{get, download, join, Progress}   its HTTP(S) for other downloads of an app (fetch.rs)
+//   install(&cfg) -> Packaged    how the program is installed (plat::pkg::packaged; cfg.exe
 //                                set: Plain), which decides what an update is:
 //     Plain     exe / bundle / package entries of update.json (below)
 //     AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
@@ -65,7 +66,7 @@ extern crate alloc;
 
 mod appimage;
 mod apply;
-mod fetch;
+pub mod fetch;
 mod manifest;
 mod pgp;
 
@@ -144,8 +145,12 @@ pub enum Error {
     Config(String),
     /// the app's PERMISSIONS do not allow the host (net.connect)
     Denied(String),
-    /// connection, TLS or protocol failure
+    /// connection or protocol failure
     Net(String),
+    /// the TLS layer refused: the certificate or the handshake
+    Tls(String),
+    /// the answer is over the limit fetch::get was given
+    TooLarge(String),
     /// the server answered with another status than 200 / 206
     Http(u16),
     /// the signature of update.json matches no trusted key
@@ -184,7 +189,7 @@ impl core::fmt::Display for Error {
         match self {
             Error::Config(s) => write!(f, "Update nicht eingerichtet: {}", s),
             Error::Denied(h) => write!(f, "Verbindung zu {} von den Berechtigungen der App (net.connect) nicht erlaubt", h),
-            Error::Net(s) => write!(f, "Netzwerkfehler: {}", s),
+            Error::Net(s) | Error::Tls(s) | Error::TooLarge(s) => write!(f, "Netzwerkfehler: {}", s),
             Error::Http(s) => write!(f, "Der Update-Server antwortet {}", s),
             Error::Signature => f.write_str("Die Signatur des Update-Manifests passt zu keinem vertrauenswürdigen Schlüssel"),
             Error::Manifest(s) => write!(f, "Ungültiges Update-Manifest: {}", s),

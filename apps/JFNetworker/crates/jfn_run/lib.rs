@@ -8,7 +8,10 @@
 //                                    [--golden F] [--series F] | check PROJECT | course DIR |
 //                                    decode HEX | gen N [--out F] | sweep FILE [PROJECT]
 //                                    [--threads N] [--csv F] [--detail F] [--report F] [--golden F]
-//                                    [--name N] [--timing]
+//                                    [--name N] [--timing] | course-install SOURCE COURSE --into DIR |
+//                                    course-list SOURCE | course-remove COURSE --into DIR (install.rs)
+//   install                          installing courses, from the web or a folder, for the window and
+//                                    for jfn-sim (install.rs)
 //   sweep(&args) -> i32              jfn-sim sweep (SA2): an experiment (a .jfnex file with its project,
 //                                    or a project with its section) at full speed: the table goes to
 //                                    stdout, the same bytes for any number of threads
@@ -21,6 +24,7 @@
 //                                    the file, its lessons in every language with their pictures and
 //                                    links, its labs with `check`'s findings; a line per finding,
 //                                    errors are what keeps the course from being offered
+//   course_findings(dir, id)         the same as records, for a folder not named after the course
 //   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
 //   rewind(&args) -> i32             jfn-sim rewind PROJECT [SECONDS] [--traffic K]: the
 //                                    keyframes of a run (K1) and how long restores take (times
@@ -38,6 +42,8 @@
 #![forbid(unsafe_code)]
 
 extern crate alloc;
+
+pub mod install;
 
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
@@ -95,7 +101,7 @@ pub fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--report" => o.report = Some(value()?),
             "--golden" => o.golden = Some(value()?),
             "--series" => o.series = Some(value()?),
-            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" | "--sweep" | "--threads" | "--csv" | "--detail" | "--name" => {
+            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" | "--academy-folder" | "--sweep" | "--threads" | "--csv" | "--detail" | "--name" => {
                 value()?;
             }
             k if k.starts_with('-') => {}
@@ -294,10 +300,24 @@ pub fn check_project(proj: &Project) -> (Vec<String>, usize) {
 /// what is wrong with the course in folder `dir` (without a trailing '/'): its lines, how many of
 /// them keep it from being offered.  The labs get what `check` finds as well.
 pub fn check_course(dir: &str) -> (Vec<String>, usize) {
+    let (found, labs) = course_findings(dir, base_name(dir));
+    let mut errors = found.iter().filter(|p| p.fatal).count();
+    let mut lines: Vec<String> = found.iter().map(|p| format!("{}{}\n", if p.fatal { "Fehler: " } else { "Hinweis: " }, p.msg.text())).collect();
+    for (file, more, e) in labs {
+        lines.extend(more.into_iter().map(|l| format!("{}: {}", file, l)));
+        errors += e;
+    }
+    (lines, errors)
+}
+
+/// what is wrong with the course `id` in folder `dir`, whatever that folder is called (the installer checks it
+/// before it gets its name): the findings of the course, then per lab what `check` finds (its file, its
+/// lines, how many of them are errors)
+pub fn course_findings(dir: &str, id: &str) -> (Vec<jfn_model::academy::Problem>, Vec<(String, Vec<String>, usize)>) {
     use jfn_model::academy::{fault_issues, lab_issues, load, quiz_issues, safe_path, StepKind, COURSE_FILE, LANGS};
     let read = |rel: &str| plat::read_file(&format!("{}/{}", dir, rel)).map(|b| String::from_utf8_lossy(&b).into_owned());
     let exists = |rel: &str| plat::file_exists(&format!("{}/{}", dir, rel)) == 1;
-    let (course, mut found) = load(base_name(dir), read(COURSE_FILE).as_deref(), &exists);
+    let (course, mut found) = load(id, read(COURSE_FILE).as_deref(), &exists);
     let mut labs = Vec::new();
     // a path that was refused is not read
     for s in course.iter().flat_map(|c| c.steps()).filter(|s| safe_path(&s.file).is_ok()) {
@@ -325,14 +345,14 @@ pub fn check_course(dir: &str) -> (Vec<String>, usize) {
             None => {}
         }
     }
-    let mut errors = found.iter().filter(|p| p.fatal).count();
-    let mut lines: Vec<String> = found.iter().map(|p| format!("{}{}\n", if p.fatal { "Fehler: " } else { "Hinweis: " }, p.msg.text())).collect();
-    for (file, p) in labs {
-        let (more, e) = check_project(&p);
-        lines.extend(more.into_iter().map(|l| format!("{}: {}", file, l)));
-        errors += e;
-    }
-    (lines, errors)
+    let checked = labs
+        .into_iter()
+        .map(|(file, p)| {
+            let (lines, errors) = check_project(&p);
+            (file, lines, errors)
+        })
+        .collect();
+    (found, checked)
 }
 
 /// jfn-sim course DIR: the lines of check_course and a last line; 0: nothing keeps it from being offered
@@ -390,7 +410,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n  jfn-sim sweep DATEI [PROJEKT] [--threads N] [--csv F] [--detail F] [--report F] [--golden F] [--name N] [--timing]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim course-install QUELLE KURS|all --into ORDNER [--index DATEI] [--stop-after BYTES]\n  jfn-sim course-list QUELLE [--into ORDNER] [--index DATEI]\n  jfn-sim course-remove KURS --into ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n  jfn-sim sweep DATEI [PROJEKT] [--threads N] [--csv F] [--detail F] [--report F] [--golden F] [--name N] [--timing]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -416,6 +436,9 @@ pub fn main(args: &[String]) -> i32 {
                 2
             }
         },
+        Some("course-install") => install::cli_install(&args[2..]),
+        Some("course-list") => install::cli_list(&args[2..]),
+        Some("course-remove") => install::cli_remove(&args[2..]),
         Some("decode") if args.len() > 2 => decode(&args[2..].join(" ")),
         Some("gen") => generate(&args[2..]),
         Some("rewind") => rewind(&args[2..]),

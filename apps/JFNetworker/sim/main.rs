@@ -4,6 +4,8 @@
 //   jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F]
 //   jfn-sim check PROJEKT
 //   jfn-sim course ORDNER     a course's folder: its file, lessons, pictures, links, labs (AK1)
+//   jfn-sim course-install QUELLE KURS|all --into ORDNER   a course from an address or a folder (AK3)
+//   jfn-sim course-list QUELLE [--into ORDNER] / course-remove KURS --into ORDNER
 //   jfn-sim decode HEX
 //   jfn-sim gen N [--out F]   a synthetic campus of N devices (jfn_model::synth)
 //   jfn-sim rewind P [S] [--traffic K]   keyframes of a run and restore times (K1)

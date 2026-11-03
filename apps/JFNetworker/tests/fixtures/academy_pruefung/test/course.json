@@ -1,0 +1,17 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": ["Ein Test", "A test"],
+  "summary": ["Nur eine Prüfung, für tests/academy_quit.uis.", "An exam only, for tests/academy_quit.uis."],
+  "level": "beginner",
+  "minutes": 1,
+  "units": [
+    {
+      "title": ["Teil eins", "Part one"],
+      "steps": [
+        {"id": "pruefung", "kind": "exam", "title": ["Die Prüfung", "The exam"], "file": "quiz/pruefung.json"}
+      ]
+    }
+  ]
+}

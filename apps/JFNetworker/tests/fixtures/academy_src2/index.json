@@ -1,0 +1,22 @@
+{
+  "format": "jfn-academy",
+  "version": 1,
+  "courses": [
+    {
+      "id": "grund",
+      "title": ["Grundkurs", "Basic course"],
+      "summary": ["Ein kleiner Kurs für die Tests.", "A small course for the tests."],
+      "level": "beginner",
+      "minutes": 10,
+      "version": 2,
+      "files": [
+        {"path": "course.json", "size": 964, "sha256": "1f4b3f869d8a7af39f5ba8aecb1de30449841548e0ce28bba3dad8ed204b0f04"},
+        {"path": "de/eins.md", "size": 46, "sha256": "603b9d204b3eb67ed65b08ca807e7f87acc014385edff3769751dd75f52c8598"},
+        {"path": "de/zwei.md", "size": 40, "sha256": "f2548d55463f0ca18cd6a8915455d2233b67b17e3a7a840de902c5960e075793"},
+        {"path": "en/eins.md", "size": 44, "sha256": "3361fc90600a2fd9e078bff42a2a745e91f78b9acfd44c587405e048a4a20a7a"},
+        {"path": "en/zwei.md", "size": 39, "sha256": "6d06d12e804fb9b3584d6076f6c089f99c4f3545add8cf9ccbaeb3c338ed9035"},
+        {"path": "labs/netz.jfnet", "size": 3779, "sha256": "3d2253e1b678e2ecef9c9ef128de4515b1c7ecd573f7505d4a6cd198a09bef4a"}
+      ]
+    }
+  ]
+}
