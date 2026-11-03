@@ -88,6 +88,8 @@
 // and state, what the page reads, every course below --academy-dir).
 // quiztest.rs: quizzes, tests and fault hunts (group quiz: jfn_model::quiz, a lab's start faults and locks,
 // a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
+// installtest.rs: installing courses (group install: jfn_run::install, the list and its refusals, a source that
+// fails, cancels and resumes, updates and uninstalling, every file of --academy-dir against its index).
 
 use alloc::format;
 use alloc::string::String;
@@ -207,9 +209,11 @@ mod academytest;
 mod quiztest;
 #[path = "sweeptest.rs"]
 mod sweeptest;
+#[path = "installtest.rs"]
+mod installtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 64] = [
+    let groups: [(&'static str, fn(&mut T)); 65] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -274,6 +278,7 @@ pub fn run() -> i32 {
         ("firewall", firewalltest::run),
         ("quiz", quiztest::run),
         ("sweep", sweeptest::run),
+        ("install", installtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

@@ -150,6 +150,7 @@ impl Net {
             self.doc.sim.with_engine("traffic", move |e| e.ping_many(k));
         }
         self.academy.setup(ui.headless(), plat::arg_value("--academy-dir"));
+        ui.sync_hook_set(Some(crate::workspace::academy::install::pending));
         // the start page: after_load above took it down, a file that did not open leaves its message
         crate::workspace::startpage::startup(self, ui, &args);
         true

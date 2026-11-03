@@ -4,7 +4,8 @@
 //                       app::prefs' schema in a scroll view; a change takes effect at once
 //                       (grid and its step -- the open project takes the step --, snapping,
 //                       minimap, the speed, motion, language, the autosave interval) and the
-//                       file is written when the dialog closes
+//                       file is written when the dialog closes; below it the answers to the
+//                       program's questions (ui.permissions_page)
 //   shortcuts(n, ui)    every key of the app by area: the commands with their accelerators
 //                       (from the command table, in the current language) and the keys of the
 //                       canvas, the consoles, the simulation, the window, the IDE and a
@@ -31,6 +32,12 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
         ui.next_size(-1, 0);
         ui.box_begin(0, BOX_V | pad(4), 0);
         let changed = ui.settings_page(ID_SETTINGS_PAGE, &mut n.prefs.s);
+        // what the program asked and may keep: the Akademie's connection, with its way back
+        ui.spacer(12);
+        ui.text(TS_SUBTITLE, t("Berechtigungen"));
+        ui.spacer(4);
+        ui.next_size(-1, 0);
+        ui.permissions_page(ID_AI_PERM);
         ui.box_end();
         ui.scroll_end();
         if changed {

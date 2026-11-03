@@ -1,0 +1,28 @@
+{
+  "format": "jfn-academy",
+  "version": 1,
+  "courses": [
+    {
+      "id": "beispiel",
+      "title": ["Beispielkurs: das erste Netz", "Sample course: your first network"],
+      "summary": ["Was ein Netz ist, wozu Adressen dienen, ein erstes Labor im Simulator, dann ein Quiz, eine Fehlersuche und ein Test.", "What a network is, what addresses are for, a first lab in the simulator, then a quiz, a fault hunt and a test."],
+      "level": "beginner",
+      "minutes": 40,
+      "version": 2,
+      "sample": true,
+      "files": [
+        {"path": "course.json", "size": 2222, "sha256": "943aabac305e00d4b6e46d1834f0c331e1f04c0414b76bb0cb53ae3fcee35a39"},
+        {"path": "de/01-netz.md", "size": 805, "sha256": "1d7f42a8214d12169a02cf3d1fdb5dd56453e1bbc62c70c03e62acb8d62d3900"},
+        {"path": "de/02-adressen.md", "size": 781, "sha256": "1757e93f8dc4d09a5bd8f9a17e5f1faa85ddeeb680c2e8efbacb221f464bc0a6"},
+        {"path": "en/01-netz.md", "size": 753, "sha256": "0c2a6aab06e8837ea142e141294efb479f16a7e09ae84828f37281c556894efb"},
+        {"path": "en/02-adressen.md", "size": 765, "sha256": "5328818163fa554a6ed73af355e5f2713412fe26119ffa350b8a57992ba4f005"},
+        {"path": "img/adressen.svg", "size": 1348, "sha256": "b4b67602f5d439c894618adfd1caa89d1121db74eba44e2f880398b4f70317ea"},
+        {"path": "img/netz.svg", "size": 1447, "sha256": "3957d0876ccf1818241431e96d580c887db1f9172be68f02e3c003a4764f4a29"},
+        {"path": "labs/erstes-netz.jfnet", "size": 3779, "sha256": "3d2253e1b678e2ecef9c9ef128de4515b1c7ecd573f7505d4a6cd198a09bef4a"},
+        {"path": "labs/fehlersuche.jfnet", "size": 11291, "sha256": "5f994aba7947ee65a3635c81d87b47082b641e7f70954bf6c02a64ca565cca79"},
+        {"path": "quiz/pruefung.json", "size": 4013, "sha256": "b768e2dc5baf299b9856d86fe7b459c96c6964cdfcf6e46b68dfce0d2bee9c47"},
+        {"path": "quiz/wissen.json", "size": 4578, "sha256": "db6cd031de51d76674c81c328a2baf9ae7fa9339f95f18441db77d72253f3253"}
+      ]
+    }
+  ]
+}

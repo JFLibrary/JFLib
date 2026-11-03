@@ -11,8 +11,9 @@
 //   image(dir, addr) -> Option<bytes> a lesson's picture: only what jfn_model::academy::image_file allows
 //   read_progress(path) / write_progress(path, &progress)   missing or corrupt: empty
 //
-// AK3 installs into the same folders and lists them again; index.json and its checksums are its business.
-// A folder whose name starts with a dot is not a course (AK3 can fill one and rename it when it is complete).
+// jfn_run::install installs into the same folders, install.rs lists them again; index.json and its checksums
+// are their business.  A folder whose name starts with a dot is not a course: the installer fills one and
+// renames it when it is complete.
 
 use alloc::format;
 use alloc::string::String;
@@ -64,6 +65,8 @@ pub(crate) struct Entry {
     /// None: its course.json cannot be read
     pub course: Option<Course>,
     pub problems: Vec<Problem>,
+    /// the bytes of its files together
+    pub bytes: u64,
 }
 
 impl Entry {
@@ -96,7 +99,22 @@ pub(crate) fn entry(root: &str, id: &str) -> Entry {
     let dir = format!("{}/{}", root, id);
     let text = read_text(&format!("{}/{}", dir, COURSE_FILE), COURSE_MAX);
     let (course, problems) = academy::load(id, text.as_deref(), &|rel| plat::file_exists(&format!("{}/{}", dir, rel)) == 1);
-    Entry { id: String::from(id), dir, course, problems }
+    let bytes = tree_bytes(&dir);
+    Entry { id: String::from(id), dir, course, problems, bytes }
+}
+
+// the bytes of the files below a folder; links are no files of a course
+fn tree_bytes(dir: &str) -> u64 {
+    let mut sum = 0u64;
+    for e in plat::fs::read_dir(dir).unwrap_or_default() {
+        let path = format!("{}/{}", dir, e.name);
+        sum = sum.saturating_add(match e.kind {
+            plat::fs::FileKind::Dir => tree_bytes(&path),
+            plat::fs::FileKind::File => plat::fs::stat(&path).map_or(0, |m| m.size),
+            _ => 0,
+        });
+    }
+    sum
 }
 
 /// the courses below `root`, by the names of their folders

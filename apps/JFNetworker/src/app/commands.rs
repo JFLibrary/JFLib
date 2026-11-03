@@ -40,7 +40,8 @@
 // first), Datei › Projektinfo … edits the project's description and author; while the page shows, only
 // what makes sense without a project stays enabled.
 // The Akademie (AK1, AK2, workspace/academy): Datei › Akademie … shows its courses; Esc and Alt+Left go back
-// while its page shows; TIMER_QUIZ moves a test's countdown.
+// while its page shows; TIMER_QUIZ moves a test's countdown, TIMER_AI_JOB what a worker installing a course has
+// done (AK3, workspace/academy/install.rs: CMD_AI_*).
 
 use jfn_model::CableKind;
 use ui::*;
@@ -496,6 +497,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             return false;
         }
         UIC_CLOSE => {
+            if crate::workspace::academy::quiz::ask_quit(n, ui) {
+                return true; // a test is under way: the question first
+            }
             if !n.doc.dirty() {
                 return false; // the window closes
             }
@@ -521,7 +525,11 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             file::save(n, ui);
         }
         CMD_SAVE_AS => file::save_as(n, ui),
-        CMD_QUIT => file::request(n, ui, After::Quit),
+        CMD_QUIT => {
+            if !crate::workspace::academy::quiz::ask_quit(n, ui) {
+                file::request(n, ui, After::Quit);
+            }
+        }
         CMD_FILE_DONE => file::chosen(n, ui, arg != 0),
         CMD_ASK_ANSWER => file::answer(n, ui, arg != 0),
         _ if (CMD_RECENT0..CMD_RECENT0 + RECENT_MAX as u32).contains(&id) => {
@@ -609,6 +617,10 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             crate::workspace::academy::quiz::timer(n, ui);
             return true;
         }
+        UIC_TIMER if arg == TIMER_AI_JOB => {
+            crate::workspace::academy::install::timer(n, ui);
+            return true;
+        }
         UIC_TIMER if arg == TIMER_ASSESS => {
             crate::workspace::assess::timer(n, ui);
             return true;
@@ -628,6 +640,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_START_PAGE..=CMD_SP_FORGET => return crate::workspace::startpage::command(n, ui, id, arg),
         // the Akademie (workspace/academy)
         CMD_ACADEMY..=CMD_AK_RETRY => return crate::workspace::academy::command(n, ui, id, arg),
+        CMD_AI_SEARCH..=CMD_AI_GATE => return crate::workspace::academy::install::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

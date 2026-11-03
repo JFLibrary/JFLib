@@ -791,3 +791,47 @@ pub(crate) const ID_DG_PICK: u32 = 0x0002_3820;
 /// for jfn_model::quiz::QUESTIONS_MAX questions of ANSWERS_MAX answers
 pub(crate) const ID_QZ_Q: u32 = 0x0002_3900;
 pub(crate) const QZ_SLOTS: u32 = 28;
+
+// ---- AK3: installing courses (commands 1020 .. 1039, widgets 0x0002_4000 .. 0x0002_47FF, timers 0x1D1 .. 0x1D3;
+// 1031 .. 1038 and 0x1D2, 0x1D3 are not used)
+/// Nach Kursen suchen; Jetzt installieren of the empty list; a course of the list (arg: its place in the list);
+/// Aktualisieren (arg: the place of the course); the question before uninstalling (arg: the same), its answer;
+/// Aus Ordner installieren, the folder chosen, back to the server's list; Abbrechen; a web link after its
+/// question; `cmd 1039 N` lets N files through the gate of a script (install.rs)
+pub(crate) const CMD_AI_SEARCH: u32 = 1020;
+pub(crate) const CMD_AI_ALL: u32 = 1021;
+pub(crate) const CMD_AI_GET: u32 = 1022;
+pub(crate) const CMD_AI_UPDATE: u32 = 1023;
+pub(crate) const CMD_AI_REMOVE_ASK: u32 = 1024;
+pub(crate) const CMD_AI_REMOVE: u32 = 1025;
+pub(crate) const CMD_AI_FOLDER: u32 = 1026;
+pub(crate) const CMD_AI_FOLDER_DONE: u32 = 1027;
+pub(crate) const CMD_AI_FOLDER_CLOSE: u32 = 1028;
+pub(crate) const CMD_AI_CANCEL: u32 = 1029;
+pub(crate) const CMD_AI_LINK: u32 = 1030;
+pub(crate) const CMD_AI_GATE: u32 = 1039;
+/// what a worker has done moves
+pub(crate) const TIMER_AI_JOB: u32 = 0x1D1;
+/// the page's buttons, the worker's Abbrechen and bar, the way there on the start page, the two questions, the
+/// answers in the settings
+pub(crate) const ID_AI_SEARCH: u32 = 0x0002_4000;
+pub(crate) const ID_AI_ALL: u32 = 0x0002_4001;
+pub(crate) const ID_AI_FOLDER: u32 = 0x0002_4002;
+pub(crate) const ID_AI_FOLDER_CLOSE: u32 = 0x0002_4003;
+pub(crate) const ID_AI_CANCEL: u32 = 0x0002_4004;
+pub(crate) const ID_AI_PROGRESS: u32 = 0x0002_4005;
+pub(crate) const ID_AI_SP_MORE: u32 = 0x0002_4006;
+pub(crate) const ID_AI_REMOVE_DLG: u32 = 0x0002_4010;
+pub(crate) const ID_AI_LINK_DLG: u32 = 0x0002_4020;
+pub(crate) const ID_AI_PERM: u32 = 0x0002_4030;
+/// per course (+ its place): Aktualisieren, Deinstallieren; per entry of the list (+ its place): Jetzt installieren
+pub(crate) const ID_AI_UPDATE: u32 = 0x0002_4100;
+pub(crate) const ID_AI_REMOVE: u32 = 0x0002_4300;
+pub(crate) const ID_AI_GET: u32 = 0x0002_4500;
+/// the note of the last worker: its close button
+pub(crate) const ID_AI_NOTE_CLOSE: u32 = 0x0002_4007;
+/// the question before leaving with a test under way (quiz.rs)
+pub(crate) const ID_AI_QUIT_DLG: u32 = 0x0002_4040;
+/// Aufgabe erstellen: a new diagnosis, its cause, Diagnose hinzufügen (workspace/author.rs)
+pub(crate) const ID_AI_DIAG_NEW: u32 = 0x0002_4050;
+pub(crate) const ID_AI_DIAG_ADD: u32 = 0x0002_4051;

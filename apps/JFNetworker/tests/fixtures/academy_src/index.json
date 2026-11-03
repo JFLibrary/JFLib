@@ -1,0 +1,58 @@
+{
+  "format": "jfn-academy",
+  "version": 1,
+  "courses": [
+    {
+      "id": "defekt",
+      "title": ["Defekter Kurs", "Broken course"],
+      "summary": ["Sein Labor fehlt.", "Its lab is missing."],
+      "level": "beginner",
+      "minutes": 10,
+      "version": 1,
+      "files": [
+        {"path": "course.json", "size": 536, "sha256": "0e7de762f19a37da4a771b846924d0af2aa4bb544240da38103ccace02051c28"},
+        {"path": "de/x.md", "size": 9, "sha256": "7d62b3e4ddd0ccf7afcd6257da7051ff11369a6d58801f8f88e032c6e6f3ee63"}
+      ]
+    },
+    {
+      "id": "falsch",
+      "title": ["Falsche Prüfsumme", "Wrong checksum"],
+      "summary": ["Die Liste stimmt nicht.", "The list is wrong."],
+      "level": "beginner",
+      "minutes": 10,
+      "version": 1,
+      "files": [
+        {"path": "course.json", "size": 552, "sha256": "6eed3c516e55cf06d731bb5989920d1283a6e28b7b1e72f2e88915561975afea"},
+        {"path": "de/x.md", "size": 15, "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+      ]
+    },
+    {
+      "id": "grund",
+      "title": ["Grundkurs", "Basic course"],
+      "summary": ["Ein kleiner Kurs für die Tests.", "A small course for the tests."],
+      "level": "beginner",
+      "minutes": 10,
+      "version": 1,
+      "files": [
+        {"path": "course.json", "size": 763, "sha256": "3ac618f69a431365a8ffdb4591a1052cb70ece4256accb6c24bd959c1c8c5407"},
+        {"path": "de/eins.md", "size": 70, "sha256": "0b79ff41793b939a2433dbfe11eee1bfb1885295ea7cdb586888d28e3c2bc3f8"},
+        {"path": "en/eins.md", "size": 72, "sha256": "fdf654609d242ee704741fdf9b2fe3525fa91388ba12abead82b2ce97725321a"},
+        {"path": "labs/netz.jfnet", "size": 3779, "sha256": "3d2253e1b678e2ecef9c9ef128de4515b1c7ecd573f7505d4a6cd198a09bef4a"}
+      ]
+    },
+    {
+      "id": "zweit",
+      "title": ["Noch ein Kurs", "One more course"],
+      "summary": ["Ein Beispiel.", "A sample."],
+      "level": "advanced",
+      "minutes": 5,
+      "version": 3,
+      "sample": true,
+      "files": [
+        {"path": "course.json", "size": 549, "sha256": "afc19bdaf46f02e3c331e709fa4f2751b3e22ada5e937896936e73c3aa14c141"},
+        {"path": "de/eins.md", "size": 27, "sha256": "ca14d80e9711d2b63cba11bd9120769668d2d56e02f0e7cb729970e3eca7b41a"},
+        {"path": "en/eins.md", "size": 24, "sha256": "b71c4016df16b01dbea3663d32287953255a890acc2e50e559c6fa35b5d95778"}
+      ]
+    }
+  ]
+}

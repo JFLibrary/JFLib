@@ -2028,7 +2028,6 @@ Fortgeschrittene	Intermediate
 Erfahrene	Advanced
 {} Min.	{} min
 Der Link „{}“ geht nicht auf	The link “{}” does not open
-Er führt zu keinem Schritt dieses Kurses. Links ins Web gehen hier noch nicht auf.	It leads to no step of this course. Links to the web do not open here yet.
 Der Fortschritt wurde nicht gespeichert	The progress was not saved
 Kursübersicht	Course overview
 Alle Kurse	All courses
@@ -2214,3 +2213,98 @@ noch {} von {} Versuchen	{} of {} attempts left
 Üben: Prüfen Sie jede Frage, so oft Sie wollen. Die Erklärung kommt gleich dazu.	Practice: check each question as often as you like. The explanation comes with it.
 „{}“ nach oben	Move “{}” up
 „{}“ nach unten	Move “{}” down
+Das ließ sich nicht starten	This could not be started
+Es konnte kein weiterer Thread gestartet werden. Versuchen Sie es noch einmal.	No further thread could be started. Please try again.
+Die Adresse der Kurse stimmt nicht	The address of the courses is wrong
+Unter Einstellungen › Akademie lässt sie sich ändern und auf die Vorgabe zurücksetzen.	You can change it under Settings › Academy and reset it to the default there.
+Keine Verbindung zum Kursserver	No connection to the course server
+Prüfen Sie die Internetverbindung und versuchen Sie es noch einmal. Installierte Kurse bleiben nutzbar. Einen HTTP-Proxy kann das Programm nicht nutzen; ohne Netz bleibt „Aus Ordner installieren“.	Check the internet connection and try again. Installed courses stay usable. The program cannot use an HTTP proxy; without a network, “Install from folder” remains.
+Die Übertragung brach ab	The transfer broke off
+Versuchen Sie es noch einmal. Was schon angekommen ist, bleibt, und es geht dort weiter.	Try again. What has arrived stays, and it goes on from there.
+Die Verbindung wurde nicht erlaubt	The connection was not allowed
+Ohne Erlaubnis lädt das Programm keine Kurse. Beim nächsten Klick fragt es wieder; eine Antwort, die für immer gilt, lässt sich unter Einstellungen zurücksetzen. Ohne Netz bleibt „Aus Ordner installieren“.	Without permission the program loads no courses. It asks again at the next click; an answer that holds for good can be reset under Settings. Without a network, “Install from folder” remains.
+Dieser Host ist nicht erlaubt	This host is not allowed
+Unter Einstellungen › Akademie lässt sich die Adresse auf die Vorgabe zurücksetzen.	You can reset the address to the default under Settings › Academy.
+Das Programm erkennt das Zertifikat des Servers nicht an. Prüfen Sie die Uhrzeit des Rechners. Ein Netz, das TLS aufbricht, geht nur, wenn seine Wurzel im System liegt.	The program does not accept the server's certificate. Check the computer's clock. A network that breaks TLS open works only with its root in the system.
+Die sichere Verbindung kam nicht zustande	The secure connection failed
+Die Kursliste passt nicht zu den Dateien. Versuchen Sie es später noch einmal; was vorher da war, bleibt.	The course list does not fit the files. Try again later; what was there before stays.
+Eine Datei fehlt an der Quelle	A file is missing at the source
+Die Kursliste ist nicht in Ordnung	The course list is not in order
+Installierte Kurse bleiben nutzbar. Autoren erzeugen die Liste mit tools/academy_index.py.	Installed courses stay usable. Authors create the list with tools/academy_index.py.
+Eine Datei passt nicht zur Kursliste	A file does not fit the course list
+Sie wurde verworfen, was vorher da war, bleibt. Versuchen Sie es noch einmal; bleibt es dabei, stimmen Liste und Dateien an der Quelle nicht überein.	It was discarded; what was there before stays. Try again; if it stays like this, list and files do not match at the source.
+Das Programm nimmt so große Kurse nicht an. Was vorher da war, bleibt.	The program does not take courses this large. What was there before stays.
+Das ist zu groß	This is too large
+Dieser Kurs ist nicht in Ordnung	This course is not in order
+Er wurde nicht installiert, was vorher da war, bleibt. Das sagt die Prüfung:	It was not installed; what was there before stays. The check says:
+Die Dateien ließen sich nicht schreiben	The files could not be written
+Prüfen Sie den freien Platz und die Rechte des Ordners. Was vorher da war, bleibt.	Check the free space and the folder's rights. What was there before stays.
+Es läuft schon eine Installation	An installation is already running
+Vielleicht in einem anderen Fenster des Programms. Warten Sie, bis sie fertig ist.	Perhaps in another window of the program. Wait until it has finished.
+Abgebrochen	Cancelled
+Was schon angekommen ist, bleibt, und beim nächsten Mal geht es dort weiter. Was vorher da war, ist unverändert.	What has arrived stays, and next time it goes on from there. What was there before is unchanged.
+Die Kursliste ist geladen	The course list is loaded
+Sie nennt {} Kurse, davon {} noch nicht installiert.	It names {} courses, {} of them not installed yet.
+Alles aus der Kursliste ist schon da.	Everything on the course list is here already.
+Nichts zu installieren	Nothing to install
+Der Kurs steht unter Meine Kurse.	The course is under My courses.
+„{}“ ist installiert	“{}” is installed
+Sie stehen unter Meine Kurse.	They are under My courses.
+{} Kurse sind installiert	{} courses are installed
+Ihr Fortschritt bleibt erhalten und gilt wieder, wenn Sie den Kurs erneut installieren.	Your progress is kept and counts again when you install the course again.
+„{}“ ist deinstalliert	“{}” is uninstalled
+Dieser Kurs hat sich geändert	This course has changed
+Er wurde neu eingelesen; die Seite zeigt wieder den Anfang des Kurses. Ihr Fortschritt bleibt.	It was read again; the page is back at the start of the course. Your progress stays.
+Der Browser ließ sich nicht öffnen	The browser could not be opened
+Die Kursliste wird geladen	Loading the course list
+Der Ordner wird gelesen	Reading the folder
+Der Kurs wird deinstalliert	Uninstalling the course
+„{}“ wird installiert	Installing “{}”
+„{}“ wird installiert (Kurs {} von {})	Installing “{}” (course {} of {})
+Datei {} von {} · {} von {}	File {} of {} · {} of {}
+Der Kurs wird geprüft …	Checking the course …
+Der Kurs kommt an seinen Platz …	Putting the course in place …
+Wird abgebrochen …	Cancelling …
+Nach Kursen suchen	Look for courses
+Lädt die aktuelle Kursliste; erst dieser Klick verbindet das Programm mit dem Kursserver.	Loads the current course list; only this click connects the program to the course server.
+Aus Ordner installieren …	Install from folder …
+Für Autoren und ohne Netz: ein Ordner mit index.json und den Ordnern der Kurse.	For authors and without a network: a folder with index.json and the courses' folders.
+Jetzt installieren	Install now
+Lädt die Kurse von GitHub. Das Programm verbindet sich erst nach diesem Klick und fragt vorher.	Loads the courses from GitHub. The program connects only after this click, and asks first.
+Version {} verfügbar	version {} available
+neuer als die Kursliste	newer than the course list
+nicht in der Kursliste	not on the course list
+Version {}	Version {}
+Aktualisieren	Update
+Erneut installieren	Install again
+Deinstallieren	Uninstall
+Beispiel	Sample
+angefangen, es geht dort weiter	started, it goes on from there
+Verfügbar	Available
+Ordner schließen	Close folder
+Aus dem Ordner {}	From the folder {}
+Noch keine Kursliste geladen. Erst „Nach Kursen suchen“ verbindet das Programm mit dem Kursserver; installierte Kurse brauchen kein Netz.	No course list loaded yet. Only “Look for courses” connects the program to the course server; installed courses need no network.
+Alle Kurse dieser Kursliste sind installiert.	All courses of this course list are installed.
+Kurs deinstallieren?	Uninstall the course?
+„{}“ wird von diesem Rechner entfernt. Ihr Fortschritt bleibt erhalten und gilt wieder, wenn Sie den Kurs erneut installieren.	“{}” is removed from this computer. Your progress is kept and counts again when you install the course again.
+Das offene Labor dieses Kurses bleibt als Projekt geöffnet, nur ohne die Leiste des Kurses.	The open lab of this course stays open as a project, only without the course's bar.
+Diese Adresse öffnen?	Open this address?
+Dieser Link führt aus dem Programm heraus in Ihren Browser:	This link leads out of the program into your browser:
+Er führt zu keinem Schritt dieses Kurses.	It leads to no step of this course.
+Meine Kurse	My courses
+Berechtigungen	Permissions
+Alle Kurse …	All courses …
+Kurse installieren …	Install courses …
+Adresse der Kurse	Address of the courses
+Von hier lädt „Nach Kursen suchen“ die Kursliste und die Kurse. Erlaubt ist nur der Host raw.githubusercontent.com; der Knopf daneben führt zur Vorgabe zurück.	“Look for courses” loads the course list and the courses from here. Only the host raw.githubusercontent.com is allowed; the button beside it leads back to the default.
+Kurse der Akademie laden	Load courses of the Academy
+Programm wirklich beenden?	Really quit the program?
+Ein Test läuft noch. Seine Antworten gehen beim Beenden verloren, und der Versuch zählt nicht.	A test is still running. Its answers are lost when you quit, and the attempt does not count.
+Weiterarbeiten	Keep working
+die Ursache, z. B. R1 oder PC1 - SW1	the cause, e.g. R1 or PC1 - SW1
+Diagnose hinzufügen	Add diagnosis
+Nennen Sie ein Gerät oder die beiden Enden eines Kabels: R1 oder PC1 - SW1.	Name a device or the two ends of a cable: R1 or PC1 - SW1.
+Das Gerät {} gibt es im Projekt nicht.	The device {} does not exist in the project.
+Zwischen {} und {} gibt es kein Kabel.	There is no cable between {} and {}.
+Ursache	Cause
+Neue Diagnose	New diagnosis
