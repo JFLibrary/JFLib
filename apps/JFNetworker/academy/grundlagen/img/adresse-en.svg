@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="130" viewBox="0 0 620 130">
+  <title>An address with its parts</title>
+  <rect x="1" y="1" width="618" height="128" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="22" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="40" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="58" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="76" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="94" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="112" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="130" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="148" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="166" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="184" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="202" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="220" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="238" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="256" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="274" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="292" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="310" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="328" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="346" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="364" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="382" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="400" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="418" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="436" y="40" width="16" height="34" rx="1" fill="#CFE0F1" stroke="#3A6EA5" stroke-width="1.5"/>
+  <rect x="454" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="472" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="490" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="508" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="526" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="544" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="562" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <rect x="580" y="40" width="16" height="34" rx="1" fill="#F6ECDD" stroke="#A9702A" stroke-width="1.5"/>
+  <text x="238" y="30" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#3A6EA5" font-weight="bold">network part</text>
+  <text x="526" y="30" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#A9702A" font-weight="bold">host part</text>
+  <text x="93" y="94" font-family="monospace" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">192</text>
+  <text x="237" y="94" font-family="monospace" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">168</text>
+  <text x="381" y="94" font-family="monospace" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">1</text>
+  <text x="525" y="94" font-family="monospace" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">20</text>
+  <text x="310" y="118" font-family="sans-serif" font-size="13" text-anchor="middle" fill="#2B3640">/24: 24 bits network, 8 bits host</text>
+</svg>

@@ -1,0 +1,685 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Montagmorgen",
+  "description": "Kurs Fehlersuche: mehrere Fehler auf einmal, mit Zeitgrenze.",
+  "seed": 1,
+  "next_id": 16,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.2.5\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.2.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 150,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r2",
+      "x": 300,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "R2",
+      "model": "jf-r2",
+      "x": 450,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "SW2",
+      "model": "jf-s24",
+      "x": 600,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "NS1",
+      "model": "server-1u",
+      "x": 750,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname NS1\nip addr add 10.0.2.53/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "firma.lab",
+                "ttl": 300,
+                "records": [
+                  "www A 10.0.2.80",
+                  "ns A 10.0.2.53"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 8,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 750,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.2.80/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Intranet der Firma\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 9,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 5,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 14,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 15,
+      "a": {
+        "dev": 8,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 375,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Montagmorgen",
+      "Monday morning"
+    ],
+    "summary": [
+      "Am Wochenende wurde umgebaut. Niemand kommt mehr an die Webseite. Sie haben eine Viertelstunde, und es ist mehr als ein Fehler.",
+      "There was a rebuild over the weekend. Nobody can get to the web page any more. You have a quarter of an hour, and there is more than one fault."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Am Wochenende wurde umgebaut, und das Protokoll der Arbeiten fehlt. Heute früh kommt niemand mehr an die Webseite www.firma.lab. Die PCs stehen links, die Server rechts, dazwischen R1 und R2. Sie haben 15 Minuten, und es ist mehr als ein Fehler im Spiel.",
+        "There was a rebuild over the weekend, and the record of the work is missing. This morning, nobody can get to the web page www.firma.lab any more. The PCs stand on the left, the servers on the right, with R1 and R2 in between. You have 15 minutes, and more than one fault is at work."
+      ],
+      [
+        "Reparieren Sie alles, was Sie finden, und beantworten Sie die drei Fragen der Diagnose. Das Ergebnis sehen Sie erst beim Abgeben; läuft die Zeit ab, zählt, was bis dahin steht.",
+        "Repair everything you find and answer the three questions of the diagnosis. You see the result only when you hand in; if time runs out, what stands by then counts."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Von unten nach oben: Erst die Kabel und Ports, dann die Wege, zuletzt die Namen. Eine Fehlermeldung ändert sich, wenn Sie einen Fehler behoben haben; achten Sie darauf.",
+        "From the bottom up: first the cables and ports, then the paths, the names last. An error message changes when you have fixed a fault; pay attention to that."
+      ],
+      [
+        "Schreiben Sie auf, was Sie geändert haben. Eine Änderung, ein Test.",
+        "Write down what you have changed. One change, one test."
+      ],
+      [
+        "Über zwei frische Router kann eine Anfrage beim ersten Mal scheitern, weil jeder Router erst per ARP fragt und das Paket dabei verwirft. Wiederholen Sie einen Test, bevor Sie ihm glauben; auch beim Namen: Erst ein Ping an die Adresse des Namensservers macht den Weg frei.",
+        "Across two fresh routers, a request can fail the first time, because each router first asks by ARP and drops the packet in doing so. Repeat a test before you believe it, for names as well: a ping to the name server's address clears the way first."
+      ]
+    ],
+    "assess": {
+      "feedback": "end",
+      "time_limit_s": 900,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches www.firma.lab"
+          ],
+          "points": 3,
+          "text": [
+            "PC1 erreicht www.firma.lab",
+            "PC1 reaches www.firma.lab"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.2.80",
+            "PC2 reaches www.firma.lab"
+          ],
+          "points": 2,
+          "text": [
+            "PC2 erreicht den Webserver auch über den Namen",
+            "PC2 reaches the web server by name as well"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "R2 route 10.0.1.0/24",
+            "cable R2 GigabitEthernet0/0/1 up"
+          ],
+          "points": 2,
+          "text": [
+            "R2 kennt den Weg zurück und hat Verbindung zu den Servern",
+            "R2 knows the way back and has a link to the servers"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R2",
+          "id": 5,
+          "port": "GigabitEthernet0/0/1",
+          "peer": "SW2",
+          "peer_id": 6,
+          "peer_port": "GigabitEthernet1/0/3",
+          "points": 1,
+          "text": [
+            "Welches Kabel war gezogen?",
+            "Which cable was pulled?"
+          ],
+          "explain": [
+            "Das Kabel zwischen R2 und SW2. show ip interface brief auf R2 zeigt die Schnittstelle Gi0/0/1 als down.",
+            "The cable between R2 and SW2. show ip interface brief on R2 shows the interface Gi0/0/1 as down."
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R2",
+          "id": 5,
+          "points": 1,
+          "text": [
+            "Welchem Router fehlte eine Route?",
+            "Which router lacked a route?"
+          ],
+          "explain": [
+            "R2 kannte den Weg zurück ins Netz 10.0.1.0/24 nicht. Das fällt erst auf, wenn das Kabel wieder steckt: Dann kommt das Echo an, nur die Antwort nicht zurück.",
+            "R2 did not know the way back to the network 10.0.1.0/24. That only shows once the cable is back in: then the echo arrives, and only the reply does not come back."
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "PC1",
+          "id": 1,
+          "points": 1,
+          "text": [
+            "Welcher Host fragte den falschen Namensserver?",
+            "Which host asked the wrong name server?"
+          ],
+          "explain": [
+            "PC1 fragte 10.0.2.5 statt 10.0.2.53. Auch das zeigt sich erst zuletzt: Der Fehler in der obersten Schicht ist erst sichtbar, wenn die unteren Schichten tragen. PC2 kam zum Vergleich durch.",
+            "PC1 asked 10.0.2.5 instead of 10.0.2.53. That too only shows last: the fault in the top layer becomes visible only when the lower layers carry. PC2 got through for comparison."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.2.53\" > /etc/resolv.conf\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.2.53\" > /etc/resolv.conf\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 150,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "R1",
+            "model": "jf-r2",
+            "x": 300,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "R2",
+            "model": "jf-r2",
+            "x": 450,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nip route 10.0.1.0 255.255.255.0 10.0.12.1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 6,
+            "name": "SW2",
+            "model": "jf-s24",
+            "x": 600,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 7,
+            "name": "NS1",
+            "model": "server-1u",
+            "x": 750,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname NS1\nip addr add 10.0.2.53/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [
+              {
+                "kind": "dns-server",
+                "name": "named",
+                "disabled": false,
+                "config": {
+                  "zones": [
+                    {
+                      "origin": "firma.lab",
+                      "ttl": 300,
+                      "records": [
+                        "www A 10.0.2.80",
+                        "ns A 10.0.2.53"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "comment": ""
+          },
+          {
+            "id": 8,
+            "name": "WEB1",
+            "model": "server-1u",
+            "x": 750,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname WEB1\nip addr add 10.0.2.80/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [
+              {
+                "kind": "http-server",
+                "name": "web",
+                "disabled": false,
+                "config": {
+                  "workers": 4,
+                  "time_ms": 2,
+                  "routes": [
+                    {
+                      "path": "/",
+                      "body": "Intranet der Firma\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 9,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 10,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 11,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 12,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 5,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 13,
+            "a": {
+              "dev": 5,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 6,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 14,
+            "a": {
+              "dev": 7,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 6,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 15,
+            "a": {
+              "dev": 8,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 6,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [
+      "link R2 GigabitEthernet0/0/1"
+    ],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

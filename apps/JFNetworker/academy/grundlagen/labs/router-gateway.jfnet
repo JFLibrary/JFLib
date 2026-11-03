@@ -1,0 +1,249 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Zwei Netze, ein Router",
+  "description": "Kurs Grundlagen: der Router verbindet zwei Netze.",
+  "seed": 1,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.1.0.10/24 dev eth0\nip route add default via 10.1.0.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.1.0.11/24 dev eth0\nip route add default via 10.1.0.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 180,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 360,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.1.0.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC3",
+      "model": "pc",
+      "x": 540,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 10.2.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 270,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Zwei Netze, ein Router",
+      "Two networks, one router"
+    ],
+    "summary": [
+      "PC3 sitzt in einem zweiten Netz. Richten Sie die zweite Schnittstelle des Routers ein, geben Sie PC3 sein Gateway und sehen Sie sich den Weg an.",
+      "PC3 sits in a second network. Set up the router's second interface, give PC3 its gateway and look at the way there."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 und PC2 sind im Netz 10.1.0.0/24, PC3 ist im Netz 10.2.0.0/24. Dazwischen steht R1. Seine erste Schnittstelle läuft schon, die zweite ist abgeschaltet und hat keine Adresse. PC3 kennt noch kein Gateway.",
+        "PC1 and PC2 are in the network 10.1.0.0/24, PC3 is in the network 10.2.0.0/24. R1 stands between them. Its first interface is running, the second is shut down and has no address. PC3 knows no gateway yet."
+      ],
+      [
+        "R1 soll im zweiten Netz die Adresse 10.2.0.1 haben. Wenn PC1 und PC3 einander erreichen, zeigt traceroute auf PC1 den Weg dorthin.",
+        "R1 is to have the address 10.2.0.1 in the second network. Once PC1 and PC3 reach each other, traceroute on PC1 shows the way there."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "R1 ist im Netz 10.2.0.0/24",
+          "R1 is in the network 10.2.0.0/24"
+        ],
+        "checks": [
+          "R1 route 10.2.0.0/24 via connected"
+        ],
+        "hints": [
+          [
+            "In der Konsole von R1: enable, dann configure terminal, dann interface GigabitEthernet0/0/1.",
+            "In the console of R1: enable, then configure terminal, then interface GigabitEthernet0/0/1."
+          ],
+          [
+            "Dort: ip address 10.2.0.1 255.255.255.0 und no shutdown, zum Schluss end.",
+            "There: ip address 10.2.0.1 255.255.255.0 and no shutdown, finally end."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC3 kennt sein Gateway 10.2.0.1",
+          "PC3 knows its gateway 10.2.0.1"
+        ],
+        "checks": [
+          "PC3 route 0.0.0.0/0 via 10.2.0.1"
+        ],
+        "hints": [
+          [
+            "Auf PC3: ip route add default via 10.2.0.1",
+            "On PC3: ip route add default via 10.2.0.1"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC1 und PC3 erreichen einander",
+          "PC1 and PC3 reach each other"
+        ],
+        "checks": [
+          "PC1 reaches 10.2.0.10",
+          "PC3 reaches 10.1.0.10"
+        ],
+        "hints": [
+          [
+            "Beide Richtungen brauchen ihr Gateway: PC1 hat seins, PC3 bekommt es im Schritt davor.",
+            "Both directions need their gateway: PC1 has its own, PC3 gets it in the step before."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Sie haben den Weg mit traceroute angesehen",
+          "You have looked at the way with traceroute"
+        ],
+        "checks": [
+          "PC1 output contains \"traceroute to 10.2.0.10\"",
+          "PC1 output contains \"10.1.0.1\""
+        ],
+        "hints": [
+          [
+            "Auf PC1: traceroute 10.2.0.10",
+            "On PC1: traceroute 10.2.0.10"
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}

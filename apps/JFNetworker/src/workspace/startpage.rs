@@ -165,6 +165,8 @@ pub(crate) struct Page {
     read: bool,
     /// the first card takes the keyboard when the page next shows
     focus_first: bool,
+    /// frames that still start at the top: bringing that card into view must not scroll the heading away
+    at_top: u8,
     /// the command table's flags were overridden (states)
     dimmed: Cell<bool>,
     /// Datei › Projektinfo …: open, the description takes the keyboard next, what is typed
@@ -187,6 +189,7 @@ impl Page {
             assess: Vec::new(),
             read: false,
             focus_first: true,
+            at_top: 0,
             dimmed: Cell::new(false),
             info_open: Shared::new(0),
             info_focus: false,
@@ -366,6 +369,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     if core::mem::take(&mut n.shell.page.focus_first) {
         // a recovery offer comes first, it must not get lost; else the first card
         ui.focus(if n.autosave.offer.is_some() { ID_RECOVER_OK } else { ID_SP_NEW });
+        n.shell.page.at_top = 2;
     }
     ui.focus_pane_begin(ID_SP_PANE);
     ui.next_size(-1, -1);
@@ -405,6 +409,10 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_end();
     ui.box_end();
     ui.scroll_end();
+    if n.shell.page.at_top > 0 {
+        n.shell.page.at_top -= 1;
+        ui.scroll_to(ID_SP_SCROLL, -1, 0);
+    }
     ui.box_end();
     ui.focus_pane_end();
 }

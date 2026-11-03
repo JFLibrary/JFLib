@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="220" viewBox="0 0 620 220">
+  <title>Two VLANs on one switch</title>
+  <rect x="1" y="1" width="618" height="218" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="20" y="14" width="270" height="192" rx="10" fill="#E3EEF8" stroke="#3A6EA5" stroke-width="2" stroke-dasharray="8 5"/>
+  <rect x="330" y="14" width="270" height="192" rx="10" fill="#F6ECDD" stroke="#A9702A" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="155" y="36" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#3A6EA5" font-weight="bold">VLAN 10</text>
+  <text x="465" y="36" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#A9702A" font-weight="bold">VLAN 20</text>
+  <path d="M90 92 L280 158" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M210 92 L300 158" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M410 92 L320 158" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M530 92 L340 158" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <rect x="60" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="66" y="54" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="78" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="180" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="186" y="54" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="198" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="380" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="386" y="54" width="48" height="24" rx="1" fill="#F6ECDD" stroke="#F6ECDD" stroke-width="0"/>
+  <rect x="398" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="500" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="506" y="54" width="48" height="24" rx="1" fill="#F6ECDD" stroke="#F6ECDD" stroke-width="0"/>
+  <rect x="518" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <rect x="264" y="154" width="92" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="274" y="164" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="294" y="164" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="314" y="164" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="334" y="164" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="314" y="164" width="12" height="12" rx="1" fill="#A9702A" stroke="#A9702A" stroke-width="0"/>
+  <rect x="334" y="164" width="12" height="12" rx="1" fill="#A9702A" stroke="#A9702A" stroke-width="0"/>
+</svg>

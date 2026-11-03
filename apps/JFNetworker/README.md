@@ -322,6 +322,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `academy_quit.uis` | Beenden mit einem laufenden Test fragt vorher, auch von einer anderen Seite aus |
 | `author_diagnosis.uis` | eine Diagnose in „Aufgabe erstellen“: was abgelehnt wird, ein Gerät, ein Kabel, ihre Zeile, ihre Bearbeitung, wieder entfernen |
 | `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `course_grundlagen.uis` | der Kurs Grundlagen, wie ein Lernender ihn durchklickt: Karte, Gliederung, eine Lektion mit Bild, ein Link zur nächsten, ein Link zum Labor, das Labor mit neuem Kabel und an den Konsolen gelöst, Weiter im Kurs ins Quiz, das Quiz bis zum Bestehen, das nächste Labor, was worauf wartet, Englisch |
+| `course_fehlersuche.uis` | der Kurs Fehlersuche: eine Lektion mit Bild; die erste Fehlersuche unverändert mit falscher Antwort abgegeben, Neu beginnen, neues Kabel, die richtige Antwort, die Erklärung; die nächste an der Konsole des Switches gelöst, mit `--More--`; Englisch |
+| `courses_shots.uis` | die Bilder der echten Kurse: Liste, Gliederung, Lektion mit Zeichnung und mit Konsolenausgabe, Labor, Quiz, Fehlersuche; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/courses_*.png`) |
+| `model.uis`, Gruppe `courses` | der Beweis, dass die Kurse gehen (siehe [Akademie](#akademie)): zu jedem Schritt jedes Kurses, der kein Beispiel ist, eine Zeile in `src/coursetest.rs`. Ein Labor wird an denselben Konsolen gelöst wie vom Lernenden, eine Fehlersuche repariert und benannt, ein Quiz beantwortet; was eine Lektion zeigt, wird getippt und verglichen; Namensregel und beide Sprachen in jedem Text jeder Art |
 | `model.uis`, Gruppe `install` | die Kursliste und jede Ablehnung mit ihrer genauen Meldung (`..`, absolute Pfade, zu groß, doppelt, falsches Format); eine Quelle im Speicher, die halb abbricht, abbricht und weitermacht; nicht gelistete Dateien werden nie geholt; falsche Größe und Prüfsumme; ein Update, das scheitert, lässt den alten Kurs stehen; was ein Absturz hinterlässt; Deinstallieren behält den Fortschritt; Versionen; die Einstellung; die Kursliste nach einer Änderung; mit `--academy-dir` jede Datei gegen `index.json`, jeder Kurs mit den Prüfungen von `jfn-sim course`, der Beispielkurs aus seinem Ordner von vorn bis hinten |
 | `tools/academy_e2e.py` (von Hand, kein Teil von `build_rs.py test`) | echtes HTTP mit `jfn-sim` gegen einen Server auf diesem Rechner: falsche Prüfsumme, eine Übertragung, die abbricht und mit Range weitergeht, Abbrechen, Umleitung, 404, kaputte und zu große Liste, ein Update, das scheitert. Das Fenster darf localhost nicht erreichen und keinen Server starten, darum läuft das nicht als `.uis` |
 | `model.uis`, Gruppe `quiz` | das Quizformat und jede Meldung, was es prüft (keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt, eine fehlende Sprache), die Bewertung jeder Art mit Teilpunkten, Mustern und Toleranz, die Reihenfolge aus dem Seed, Versuche und Zeitgrenze, was in den Fortschritt geht, `requires`; `start_faults` und `lock` samt ihren Standardwerten (ein altes Labor bleibt, wie es war), die Diagnose, die Prüfung, dass etwas nicht gehen darf, Determinismus und Zurückspulen mit Startfehlern; die Fehlersuche des Beispielkurses mit und ohne ihre Lösung |
@@ -5013,7 +5017,46 @@ Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `sa
 `Folder`, `read_index`, `install`, `uninstall`, `recover`, `Counters`, `Failure`, `Kind`), `update::fetch`, `workspace/academy` (`Academy`,
 `store::place`, `store::list`, `quiz.rs`, `install.rs`).
 
-Noch offen: die Kurse selbst (AK4).
+**Die Kurse.** [`academy/grundlagen`](academy/grundlagen) (Einsteiger, 24 Schritte, etwa 4 Stunden) führt vom Kabel bis zum
+Namen: Hosts, Switch, Rahmen, ARP; Adressen und Maske; Router und Gateway; DHCP; DNS; dann ein Labor über alles und
+ein Test. [`academy/fehlersuche`](academy/fehlersuche) (Fortgeschrittene, 20 Schritte, gut 3 Stunden) lehrt eine Methode und
+übt sie an elf kaputten Netzen, vom gezogenen Kabel bis zu mehreren Fehlern gegen die Uhr, mit einem Test am Ende.
+„Jetzt installieren“ nimmt beide mit; [`academy/beispiel`](academy/beispiel) zeigt nur das Format.
+
+**Der Beweis, dass ein Kurs geht.** `jfn-sim course` lässt keine Zeit laufen und bewertet nichts. Darum gehört zu jedem Schritt
+jedes Kurses, der kein Beispiel ist, eine Zeile in der Tabelle `ROWS` in [`src/coursetest.rs`](src/coursetest.rs) (Selbsttest-Gruppe
+`courses`, mit `--academy-dir`). Sie steht nicht im Kursordner, weil jede Datei dort zu den Lernenden geht. Ein Schritt ohne
+Zeile lässt den Selbsttest scheitern, eine Zeile ohne Schritt auch.
+
+| Zeile | was sie beweist |
+|---|---|
+| `Proof::Lesson` | eine Lektion ohne Konsole |
+| `Proof::Shows(netz, vorher)` | eine Lektion mit Blöcken ```` ```console ````: Das Netz (ein Pfad im Kurs) läuft, `vorher` geschieht ungesehen, dann wird jede Zeile, die mit dem Prompt eines Geräts beginnt, dort getippt, und die Zeilen danach müssen genau das sein, was die Konsole ausgibt (`…` steht für beliebig viele Zeilen) |
+| `Proof::Solve(schritte)` | ein Labor: am Anfang kein Ziel; dann die Lösung an denselben Konsolen, die auch Lernende benutzen, und mit Kabeln, wie die Zeichenfläche sie zieht; alle Ziele erreicht; die Prüfungen gelten auch später noch |
+| `Proof::Hunt { repair, test, right, wrong }` | eine Fehlersuche: unberührt unter der Grenze, auch mit der richtigen Diagnose; ein ausgeschaltetes Gerät, welches auch immer, bringt nichts; repariert ohne oder mit falscher Diagnose unter der Grenze, die falsche kostet die Punkte; repariert mit der richtigen 100 %; das Zielnetz hält alle Kriterien außer der Diagnose; alles ist gesperrt, was die Antwort zeigt. `test` ist, was Lernende nach der Reparatur ausprobieren: Geprüft wird auf einer Kopie der Engine, ein Router, der erst per ARP fragen muss, verwirft aber das erste Paket, und über zwei frische Router scheitert eine Namensauflösung beim ersten Mal |
+| `Proof::Answers(texte)` | ein Quiz oder Test: die richtigen Antworten (je Textfrage ein Text aus der Tabelle) ergeben 100, falsche unter der Grenze, jede Frage erklärt sich |
+
+Für jede Lektion gilt außerdem: Ein Code-Stück im Fließtext, das mit einem Befehlswort beginnt (`ping 10.0.0.2`, `show ip route`),
+wird auf den Geräten von `tests/fixtures/course_commands.jfnet` getippt und muss angenommen werden. Also immer ein echtes
+Beispiel, kein Platzhalter. Ein Block ist ```` ```console ```` (bewiesen) oder ```` ```text ```` (keine Befehle). Für alles gilt die
+Namensregel, beide Sprachen in jedem Text, Deutsch, das sich wie Deutsch liest, und Englisch wie Englisch; jede Datei im Kursordner
+muss von einem Schritt oder einer Lektion benutzt werden.
+
+Zitierte Ausgaben schreibt niemand von Hand: Einen Block nur mit den Befehlszeilen anlegen, dann
+
+```bash
+JFNetworker --selftest --only=courses --academy-dir apps/JFNetworker/academy --course-fill OUT
+```
+
+`OUT/<kurs>/<sprache>/<datei>` enthält jede Lektion mit dem, was die Konsolen wirklich ausgegeben haben. Lange Ausgaben kürzt man
+danach von Hand auf ihre wichtigen Zeilen und `…`. Ändert sich der Simulator so, dass eine zitierte Ausgabe nicht mehr stimmt, meldet
+der Selbsttest die Stelle mit beiden Fassungen; dann `course_version` erhöhen.
+
+**Beim Schreiben:** Ein Router verwirft das erste Paket, solange er per ARP fragt: `ping -c 1` über einen frischen Router zeigt
+Verlust, und das ist echt. Eine Konsole mit IOS-artiger Zeile hält lange Ausgaben im Fenster bei `--More--` an (im Selbsttest nicht), in
+einem Skript also `key space` tippen. Ein Dienst wie der Namensserver wird in einem Labor vorgegeben; was Lernende tippen sollen, muss
+sich tippen lassen. Eine doppelte Adresse zeigt sich erst, wenn jemand per ARP gefragt hat, also prüft die Bewertung die neue Adresse.
+Unter `lock.faults` lässt sich nur reparieren, was im Abschnitt zur Fehlersuche steht.
 
 ## Performance
 

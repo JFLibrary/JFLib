@@ -1,0 +1,439 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Im falschen VLAN",
+  "description": "Kurs Fehlersuche: ein Port im falschen VLAN.",
+  "seed": 1,
+  "next_id": 12,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.10.11/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.10.12/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 0,
+      "y": 240,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.10.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nvlan 10\n name Buero\n!\nvlan 20\n name Technik\n!\ninterface GigabitEthernet1/0/1\n switchport mode access\n switchport access vlan 10\n!\ninterface GigabitEthernet1/0/2\n switchport mode access\n switchport access vlan 20\n!\ninterface GigabitEthernet1/0/3\n switchport mode access\n switchport access vlan 10\n!\ninterface GigabitEthernet1/0/4\n switchport mode access\n switchport access vlan 20\n!\ninterface GigabitEthernet1/0/5\n switchport mode access\n switchport access vlan 20\n!\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC3",
+      "model": "pc",
+      "x": 400,
+      "y": 40,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 10.0.10.13/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "PC4",
+      "model": "pc",
+      "x": 400,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname PC4\nip addr add 10.0.10.14/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/5"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 140,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Im falschen VLAN",
+      "In the wrong VLAN"
+    ],
+    "summary": [
+      "PC2 gehört zum Büro und erreicht den Server des Büros nicht, die Technik dagegen schon. Die Technik muss aber vom Büro getrennt bleiben.",
+      "PC2 belongs to the office and does not reach the office server, but it does reach the technicians. The technicians must stay separated from the office, though."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Auf SW1 gibt es zwei VLANs: 10 fürs Büro (PC1, PC2, SRV1) und 20 für die Technik (PC3, PC4). Alle Adressen liegen hier im selben Bereich, nur die VLANs trennen die Gruppen. PC2 erreicht den Server SRV1 unter 10.0.10.10 nicht, dafür aber PC3.",
+        "SW1 has two VLANs: 10 for the office (PC1, PC2, SRV1) and 20 for the technicians (PC3, PC4). All addresses lie in the same range here, and only the VLANs keep the groups apart. PC2 does not reach the server SRV1 at 10.0.10.10, but it does reach PC3."
+      ],
+      [
+        "Reparieren Sie das so, dass die Technik vom Büro getrennt bleibt, nennen Sie das Gerät und geben Sie ab.",
+        "Repair this so that the technicians stay separated from the office, name the device and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Adressen und Kabel sehen richtig aus. Wer entscheidet, welche Ports einander hören? Auf SW1 nach enable: show vlan brief.",
+        "Addresses and cables look right. Who decides which ports hear each other? On SW1, after enable: show vlan brief."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.10.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC2 erreicht den Server",
+            "PC2 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC3 not reaches 10.0.10.10",
+            "PC3 reaches 10.0.10.14"
+          ],
+          "points": 3,
+          "text": [
+            "Die Technik bleibt draußen: PC3 erreicht PC4, aber nicht den Server",
+            "The technicians stay out: PC3 reaches PC4, but not the server"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "SW1",
+          "id": 4,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "Der Port von PC2 (Gi1/0/2) stand in VLAN 20. show vlan brief zeigt es sofort. Ein VLAN ist wie ein eigener Switch: Dass PC2 die Technik erreichte und das Büro nicht, passte genau dazu. switchport access vlan 10 am Port behebt es. Wer alle Ports in ein VLAN legt, repariert PC2, reißt aber die Trennung ein.",
+            "The port of PC2 (Gi1/0/2) was in VLAN 20. show vlan brief shows it at once. A VLAN is like a switch of its own: that PC2 reached the technicians and not the office fitted this exactly. switchport access vlan 10 on the port fixes it. Whoever puts all ports into one VLAN repairs PC2, but tears down the separation."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.10.11/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 120,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.10.12/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 0,
+            "y": 240,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.10.10/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 200,
+            "y": 120,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nvlan 10\n name Buero\n!\nvlan 20\n name Technik\n!\ninterface GigabitEthernet1/0/1\n switchport mode access\n switchport access vlan 10\n!\ninterface GigabitEthernet1/0/2\n switchport mode access\n switchport access vlan 10\n!\ninterface GigabitEthernet1/0/3\n switchport mode access\n switchport access vlan 10\n!\ninterface GigabitEthernet1/0/4\n switchport mode access\n switchport access vlan 20\n!\ninterface GigabitEthernet1/0/5\n switchport mode access\n switchport access vlan 20\n!\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "PC3",
+            "model": "pc",
+            "x": 400,
+            "y": 40,
+            "off": false,
+            "startup_config": "hostname PC3\nip addr add 10.0.10.13/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 6,
+            "name": "PC4",
+            "model": "pc",
+            "x": 400,
+            "y": 200,
+            "off": false,
+            "startup_config": "hostname PC4\nip addr add 10.0.10.14/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 7,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 8,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 9,
+            "a": {
+              "dev": 3,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 10,
+            "a": {
+              "dev": 5,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/4"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 11,
+            "a": {
+              "dev": 6,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/5"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

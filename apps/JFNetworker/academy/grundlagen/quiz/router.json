@@ -1,0 +1,211 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: Router und Gateway",
+    "Quiz: router and gateway"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Was bleibt gleich, wenn ein Router ein Paket weiterleitet?",
+        "What stays the same when a router forwards a packet?"
+      ],
+      "explain": [
+        "Der Rahmen endet am Router, ein neuer beginnt: Die MAC-Adressen ändern sich. Die IP-Adressen nennen Anfang und Ende des ganzen Weges; die TTL sinkt um eins.",
+        "The frame ends at the router and a new one begins: the MAC addresses change. The IP addresses name the start and end of the whole way; the TTL drops by one."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Quell- und Ziel-IP-Adresse",
+            "Source and destination IP address"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Quell- und Ziel-MAC-Adresse",
+            "Source and destination MAC address"
+          ]
+        },
+        {
+          "text": [
+            "Die TTL",
+            "The TTL"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Nach welcher MAC-Adresse fragt ein Host per ARP, wenn das Ziel in einem anderen Netz liegt?",
+        "Which MAC address does a host ask for by ARP when the destination lies in another network?"
+      ],
+      "explain": [
+        "Der Rahmen geht nur bis zum Router, darum braucht der Host dessen MAC-Adresse.",
+        "The frame goes only as far as the router, so the host needs its MAC address."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Nach der des Gateways",
+            "The gateway's"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Nach der des Ziels",
+            "The destination's"
+          ],
+          "explain": [
+            "Das Ziel antwortet auf die Anfrage gar nicht: Sie erreicht es nie.",
+            "The destination never answers the request: it never reaches it."
+          ]
+        },
+        {
+          "text": [
+            "Nach gar keiner, er sendet einen Broadcast",
+            "None at all, it sends a broadcast"
+          ],
+          "explain": [
+            "Ein Broadcast bliebe im eigenen Netz.",
+            "A broadcast would stay in its own network."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "Mit welchem Befehl tragen Sie auf einem Linux-artigen Host `10.2.0.1` als Standard-Gateway ein?",
+        "Which command enters `10.2.0.1` as the default gateway on a Linux-like host?"
+      ],
+      "explain": [
+        "`ip route add default via 10.2.0.1`",
+        "`ip route add default via 10.2.0.1`"
+      ],
+      "accept": [
+        "ip +r(oute)? +add +(default|0\\.0\\.0\\.0/0) +via +10\\.2\\.0\\.1"
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Eine Routingtabelle enthält `10.0.0.0/8`, `10.9.0.0/16` und `0.0.0.0/0`. Welcher Eintrag gilt für `10.9.3.4`?",
+        "A routing table holds `10.0.0.0/8`, `10.9.0.0/16` and `0.0.0.0/0`. Which entry applies to `10.9.3.4`?"
+      ],
+      "explain": [
+        "Alle drei passen. Es gewinnt der längste Präfix, also der genaueste Eintrag.",
+        "All three fit. The longest prefix wins, the most exact entry."
+      ],
+      "answers": [
+        {
+          "text": [
+            "10.9.0.0/16",
+            "10.9.0.0/16"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "10.0.0.0/8",
+            "10.0.0.0/8"
+          ]
+        },
+        {
+          "text": [
+            "0.0.0.0/0",
+            "0.0.0.0/0"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Wie findet `traceroute` die Router auf dem Weg?",
+        "How does `traceroute` find the routers on the way?"
+      ],
+      "explain": [
+        "Es erhöht die TTL Schritt für Schritt. Wer sie auf null bringt, meldet das und verrät sich damit.",
+        "It raises the TTL step by step. Whoever brings it to zero reports that and so gives itself away."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Mit Paketen, deren TTL wächst",
+            "With packets whose TTL grows"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Es liest die Routingtabellen der Router",
+            "It reads the routers' routing tables"
+          ],
+          "explain": [
+            "Dazu hätte es keinen Zugriff.",
+            "It would have no access to those."
+          ]
+        },
+        {
+          "text": [
+            "Es fragt per Broadcast nach allen Routern",
+            "It asks for all routers by broadcast"
+          ],
+          "explain": [
+            "Ein Broadcast bleibt im eigenen Netz.",
+            "A broadcast stays in its own network."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Auf dem Router steht `administratively down` bei einer Schnittstelle. Was fehlt?",
+        "The router shows `administratively down` for an interface. What is missing?"
+      ],
+      "explain": [
+        "Die Schnittstelle ist abgeschaltet. `no shutdown` schaltet sie ein.",
+        "The interface is shut down. `no shutdown` switches it on."
+      ],
+      "answers": [
+        {
+          "text": [
+            "no shutdown",
+            "no shutdown"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Ein Kabel",
+            "A cable"
+          ],
+          "explain": [
+            "Ohne Kabel stünde dort `down`, ohne `administratively`.",
+            "Without a cable it would say `down`, without `administratively`."
+          ]
+        },
+        {
+          "text": [
+            "Ein Gateway",
+            "A gateway"
+          ]
+        }
+      ]
+    }
+  ]
+}

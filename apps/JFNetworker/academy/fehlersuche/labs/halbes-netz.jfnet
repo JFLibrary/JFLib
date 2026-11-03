@@ -1,0 +1,391 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Die Hälfte der Clients",
+  "description": "Kurs Fehlersuche: eine Maske, die nur das halbe Netz erreicht.",
+  "seed": 1,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.0.130/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "PC3",
+      "model": "pc",
+      "x": 0,
+      "y": 240,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 10.0.0.200/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.20/25 dev eth0\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 140,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Die Hälfte der Clients",
+      "Half of the clients"
+    ],
+    "summary": [
+      "PC1 erreicht den Server, PC2 und PC3 nicht. Alle hängen am selben Switch, alle haben Adressen im selben Netz.",
+      "PC1 reaches the server, PC2 and PC3 do not. All hang off the same switch, and all have addresses in the same network."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Alle Geräte sollen im Netz 10.0.0.0/24 sein. PC1 erreicht den Server SRV1 unter 10.0.0.20, PC2 und PC3 bekommen keine Antwort. Eine Fehlermeldung sehen sie auch nicht.",
+        "All devices are meant to be in the network 10.0.0.0/24. PC1 reaches the server SRV1 at 10.0.0.20, while PC2 and PC3 get no answer. They see no error message either."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie, nennen Sie das Gerät und geben Sie ab. Die Adressen bleiben, wie sie sind.",
+        "Find the cause, repair it, name the device and hand in. The addresses stay as they are."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Was haben PC2 und PC3 gemeinsam, was PC1 nicht hat? Schreiben Sie die Adressen untereinander.",
+        "What do PC2 and PC3 have in common that PC1 does not? Write the addresses below each other."
+      ],
+      [
+        "Stille statt einer Fehlermeldung heißt: Die Anfrage geht los, aber keine Antwort kommt. Prüfen Sie, wie die andere Seite die Welt sieht: ip route auf SRV1.",
+        "Silence instead of an error message means that the request leaves, but no answer comes. Check how the other side sees the world: ip route on SRV1."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.0.20"
+          ],
+          "points": 3,
+          "text": [
+            "PC2 erreicht den Server",
+            "PC2 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC3 reaches 10.0.0.20"
+          ],
+          "points": 2,
+          "text": [
+            "PC3 erreicht den Server",
+            "PC3 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "SRV1 route 10.0.0.0/24 via connected"
+          ],
+          "points": 2,
+          "text": [
+            "SRV1 ist im ganzen Netz /24",
+            "SRV1 is in the whole network /24"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "SRV1",
+          "id": 5,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "Der Server hatte /25 statt /24. Für ihn endet das Netz bei 10.0.0.127. PC2 und PC3 liegen darüber, also schickte er ihnen keine Antwort. Die Hosts selbst waren richtig eingerichtet. ip addr auf SRV1 zeigt es, wenn man auf beiden Seiten nachsieht.",
+            "The server had /25 instead of /24. For it, the network ends at 10.0.0.127. PC2 and PC3 lie above that, so it sent them no answer. The hosts themselves were set up correctly. ip addr on SRV1 shows it, if you look at both ends."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.0.10/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 120,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.0.130/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "PC3",
+            "model": "pc",
+            "x": 0,
+            "y": 240,
+            "off": false,
+            "startup_config": "hostname PC3\nip addr add 10.0.0.200/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 200,
+            "y": 120,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 400,
+            "y": 120,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.0.20/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 6,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 8,
+            "a": {
+              "dev": 3,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 9,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet1/0/4"
+            },
+            "b": {
+              "dev": 5,
+              "port": "eth0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

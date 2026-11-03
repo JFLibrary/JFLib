@@ -1,0 +1,170 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: DHCP",
+    "Quiz: DHCP"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "order",
+      "points": 2,
+      "stem": [
+        "In welcher Reihenfolge laufen die vier Nachrichten?",
+        "In what order do the four messages run?"
+      ],
+      "explain": [
+        "Der Client sucht, der Server bietet an, der Client wählt, der Server bestätigt.",
+        "The client searches, the server offers, the client chooses, the server confirms."
+      ],
+      "order": [
+        [
+          "Discover",
+          "Discover"
+        ],
+        [
+          "Offer",
+          "Offer"
+        ],
+        [
+          "Request",
+          "Request"
+        ],
+        [
+          "Ack",
+          "Ack"
+        ]
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Warum ist der Request ein Broadcast, obwohl der Client den Server schon kennt?",
+        "Why is the Request a broadcast, although the client already knows the server?"
+      ],
+      "explain": [
+        "So erfahren auch andere Server, deren Angebot nicht gewählt wurde, dass sie es zurückziehen können.",
+        "That way other servers, whose offer was not chosen, also learn that they can withdraw it."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Damit andere Server ihr Angebot zurückziehen",
+            "So that other servers withdraw their offers"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Weil der Switch sonst den Port nicht lernt",
+            "Because the switch would not learn the port otherwise"
+          ],
+          "explain": [
+            "Den Port lernt er schon beim Discover.",
+            "It already learned the port at the Discover."
+          ]
+        },
+        {
+          "text": [
+            "Weil ein Router ihn weitergeben soll",
+            "Because a router is to pass it on"
+          ],
+          "explain": [
+            "Router geben Broadcasts gerade nicht weiter.",
+            "Routers precisely do not pass on broadcasts."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Was kann ein Client vom DHCP-Server bekommen?",
+        "What can a client get from the DHCP server?"
+      ],
+      "explain": [
+        "Adresse und Maske sowieso, das Gateway mit `default-router`, den Namensserver mit `dns-server`. Eine MAC-Adresse hat der Client selbst.",
+        "Address and mask anyway, the gateway with `default-router`, the name server with `dns-server`. The client has its own MAC address."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Eine IP-Adresse mit Maske",
+            "An IP address with a mask"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Das Gateway",
+            "The gateway"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Den Namensserver",
+            "The name server"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Eine MAC-Adresse",
+            "A MAC address"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Wozu dient `ip dhcp excluded-address`?",
+        "What is `ip dhcp excluded-address` for?"
+      ],
+      "explain": [
+        "Der Pool vergibt sonst das ganze Netz. Router, Server und Drucker mit festen Adressen sollen nicht vergeben werden.",
+        "Otherwise the pool hands out the whole network. Routers, servers and printers with fixed addresses must not be handed out."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Der Pool vergibt diese Adressen nie",
+            "The pool never hands out these addresses"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Diese Geräte bekommen keine Adresse",
+            "These devices get no address"
+          ]
+        },
+        {
+          "text": [
+            "Der Server antwortet nur diesen Adressen",
+            "The server answers only these addresses"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "number",
+      "points": 1,
+      "stem": [
+        "Der Client hat eine Lease von 24 Stunden. Nach wie vielen Stunden fragt er üblicherweise nach Verlängerung?",
+        "The client has a lease of 24 hours. After how many hours does it usually ask for a renewal?"
+      ],
+      "explain": [
+        "Bei der Hälfte der Zeit. Klappt es dann nicht, versucht er es später noch einmal, bevor die Lease abläuft.",
+        "At half the time. If that does not work, it tries again later before the lease runs out."
+      ],
+      "value": 12,
+      "tolerance": 0
+    }
+  ]
+}
