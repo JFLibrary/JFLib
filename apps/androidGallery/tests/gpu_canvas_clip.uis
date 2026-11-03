@@ -1,0 +1,32 @@
+#!args --verify-dirty
+# a canvas from tiles under a scrolling parent's clip (lib/ui/gpu_out.rs, quad_blit; docs/GPU.md "Leinwände"):
+# the page scrolls under its header, the image view's top goes below it.  Where the GPU draws the canvas the
+# framebuffer gets its pixels later (gp_settle), and only what shows of it: every presented image is read
+# back and compared.  Found in the browser (apps/gallery/tests/gpu_web.mjs).  Without a GPU `gpu` prints a
+# SKIP once and does nothing.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 960 900
+theme light
+click #900
+click menuitem:"Bild & Leinwand"
+expect #9000 exists
+gpu on
+gpu expect gpu
+gpu expect same
+# over the big picture: the page moves, the view's top goes under the header
+wheel 480,800 -120
+gpu expect same
+wheel 480,800 -120
+wheel 480,800 -120
+gpu expect same
+wheel 480,800 120
+wheel 480,800 -120
+gpu expect same
+# a gesture on what shows of it
+drag 480,300 440,280
+gpu expect apart 1
+gpu expect same
+# (--verify-dirty redraws everything: without the clip the framebuffer differs under the header)
+expect_nowarn
+gpu off

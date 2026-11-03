@@ -31,7 +31,8 @@ const server=createServer(async (request,response)=>{
   } catch(error) {response.writeHead(404).end(String(error));}
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const base=`http://127.0.0.1:${server.address().port}/index.html`;
+// (gpu=0: the test reads #screen, which rests while the GPU output shows: docs/GPU.md "Ausgabe im Browser")
+const base=`http://127.0.0.1:${server.address().port}/index.html?gpu=0`;
 
 let checks=0;
 const ok=(cond,what)=>{assert.ok(cond,what);checks++;};

@@ -6,13 +6,15 @@ Vulkan und WebGPU (Instanz, Adapter, Gerät, Warteschlange, Ressourcen, Pipeline
 Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird pro Ziel beim
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
-Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)).
+Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)),
+WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)).
 `vulkan-1.dll`, `libvulkan.so.1` bzw. `libvulkan.so` wird zur Laufzeit geladen, das Programm startet also auch auf
-Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: WebGPU im Browser,
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
 später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
-Windows, Linux und Android zeigt die GPU das Ergebnis
+Windows, Linux, Android und im Browser zeigt die GPU das Ergebnis
 (G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux),
-unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android);
+unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android),
+im Browser auf einer eigenen Leinwand über `#screen`: G4d, [Ausgabe im Browser](#ausgabe-im-browser);
 `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
 und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
@@ -29,9 +31,10 @@ und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bild
 | Fläche, Thread und `libvulkan.so` unter Android | [`lib/plat/android_gpu.rs`](../lib/plat/android_gpu.rs), [`android/GalleryActivity.java`](../android/GalleryActivity.java), [`android/bridge.c`](../android/bridge.c) |
 | Puffer der GPU am Fenster (Linux) | [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs), [`linux_wl_gpu.rs`](../lib/plat/linux_wl_gpu.rs) (zwp_linux_dmabuf_v1), [`linux_x11_gpu.rs`](../lib/plat/linux_x11_gpu.rs) (DRI3, Present) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
+| WebGPU im Browser | [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs), [`web_res.rs`](../lib/gpu/web_res.rs), [`web_cmd.rs`](../lib/gpu/web_cmd.rs), [`web_swap.rs`](../lib/gpu/web_swap.rs), die Seite des Browsers: [`web/gpu.js`](../web/gpu.js); die Leinwand: [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs), [`web/loader.js`](../web/loader.js) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
-| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py) |
+| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py); Browser: [`apps/gallery/tests/gpu_web.mjs`](../apps/gallery/tests/gpu_web.mjs), [`apps/webgputest`](../apps/webgputest/main.rs), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) |
 
 ## Ein Beispiel
 
@@ -70,7 +73,8 @@ rb.read(0, &mut out)?;
 
 - **Instanz und Adapter**: `Instance::new()` / `with(&InstanceDesc)`, `adapters()` (alle GPUs,
   diskrete zuerst; `AdapterInfo::missing` nennt, warum eine unbrauchbar ist), `adapter()`,
-  `adapters_low_power(display)` (für die Ausgabe der UI; `low_power_rank`).
+  `adapters_low_power(display)` (für die Ausgabe der UI; `low_power_rank`), `prepare()` (im Browser
+  kommen Adapter und Gerät später, anderswo sofort `true`).
   `AdapterInfo`: Name, Hersteller, Gerätekennung, Art, Treibername und -version, API-Version.
   `adapter.features()`, `limits()`, `level()`, `can_present(&surface)`,
   `create_device(&DeviceDesc)`.
@@ -80,7 +84,8 @@ rb.read(0, &mut out)?;
 - **Ressourcen**: `create_buffer` (`MemoryKind::Device` / `Upload` / `Readback`; die beiden
   letzten sind dauerhaft abgebildet: `write`, `read`), `create_texture` (2D, 2D-Array, Würfel,
   Würfel-Array, 3D, Mip-Stufen, Tiefenformate, BC1..BC7 wenn vorhanden; `view()`,
-  `create_view(&ViewDesc)`), `create_sampler`, `ShaderModule::from_spirv`.
+  `create_view(&ViewDesc)`), `create_sampler`, `ShaderModule::from_spirv`, im Browser
+  `ShaderModule::from_wgsl`.
 - **Bindungen**: `create_bind_group_layout(&[Binding])`, `create_pipeline_layout` (höchstens
   4 Gruppen, höchstens 128 Byte Push-Konstanten), `create_bind_group`; auf Stufe Voll
   `create_bindless` (eine große Tabelle: Bindung 0 Texturen, 1 Sampler, 2 Speicherpuffer,
@@ -132,8 +137,8 @@ Sie gelten für jedes Backend und für den WGSL-Übersetzer:
 - **Bindungen**: Gruppe g, Bindung b einer Pipeline-Struktur = WGSL `@group(g) @binding(b)` =
   SPIR-V `DescriptorSet g`, `Binding b`. Höchstens 4 Gruppen.
 - **Push-Konstanten**: ein Block ab Offset 0, für alle Stufen sichtbar, höchstens
-  `PUSH_CONSTANTS_MAX` = 128 Byte. Ein späteres WebGPU-Backend bildet sie über einen kleinen
-  Uniform-Puffer nach.
+  `PUSH_CONSTANTS_MAX` = 128 Byte. Das WebGPU-Backend bildet sie über einen kleinen
+  Uniform-Puffer nach ([Ausgabe im Browser](#ausgabe-im-browser)).
 - **Zustände von Texturen** (`Layout`): `Undefined`, `General`, `CopySrc`, `CopyDst`,
   `Sampled`, `ColorTarget`, `DepthTarget`, `DepthRead`, `Present`. Der Aufrufer sagt, in
   welchem Zustand eine Textur ist und in welchen sie soll (`texture_barrier(t, vorher,
@@ -164,8 +169,8 @@ let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
   (0x10000 + Index, außerhalb von 0 … 65535, die WGSL für `@id` erlaubt), und
   `wgsl::Output::constants` macht aus WebGPU-artigen Schlüsseln (Name oder Zahl) die Liste
   `(Nummer, Wert)` für jede Spezialisierungskonstante des Moduls, abgeleitete Overrides fertig
-  ausgerechnet (docs/WGSL.md „Overrides“); ein späteres WebGPU-Backend setzt den Schlüssel
-  selbst.
+  ausgerechnet (docs/WGSL.md „Overrides“); das WebGPU-Backend setzt den Schlüssel selbst (die
+  Nummer als Text, ab 0x10000 den Namen, den es im WGSL gelesen hat).
 - **Der Wert ist ein `f64`** wie in WebGPU und wird so umgewandelt wie dort: `bool` ist wahr außer
   bei 0 und NaN; `i32` / `u32` (und die anderen Ganzzahlen) werden zur Null hin abgeschnitten und
   müssen endlich und im Bereich liegen; `f32` / `f16` / `f64` werden gerundet und müssen endlich
@@ -257,7 +262,7 @@ Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a), un
 Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
-Skript verlangt mit `gpu on` anderes. Andere Ziele und statische Linux-Programme linken nichts davon
+Skript verlangt mit `gpu on` anderes. Statische Linux-Programme linken nichts davon
 (`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
 
 **Der Weg eines Fensters.**
@@ -526,7 +531,7 @@ ui.canvas_gpu(CanvasDesc {
 ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln darüber gehen
 ```
 
-`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
+`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
 `image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
 
 **Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
@@ -778,6 +783,137 @@ Was das heißt:
 
 **Nicht gebaut:** Vorab-Drehen der Bilder (`preTransform`, die Rechtecke und der Shader gedreht; das nähme dem Compositor die GPU-Komposition quer ab), Freigeben des Bitmaps auf dem GPU-Pfad (18 MiB, kostet einen Rückweg, der es erst wieder anlegt), eine Grenze für schwache Telefone (`isLowRamDevice`), GPU-Komposition für Werkzeugfenster.
 
+### Ausgabe im Browser
+
+Derselbe Presenter wie überall (`lib/ui/gpu_out.rs`, G4d), mit denselben Stufen, Rückfällen, Ebenen, Bildern und Leinwänden; darunter liegt WebGPU statt Vulkan. Die Oberfläche rastert weiter auf der CPU, im selben Worker wie bisher. Die Seite des Browsers: [`web/gpu.js`](../web/gpu.js), [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs), [`web_res.rs`](../lib/gpu/web_res.rs), [`web_cmd.rs`](../lib/gpu/web_cmd.rs), [`web_swap.rs`](../lib/gpu/web_swap.rs), [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs).
+
+**Wo das Programm läuft.** In allen drei Bündeln (`scalar`, `simd`, `threads`) läuft die App in einem Worker (`web/worker.js`), nicht auf der Seite. Die Seite (`web/loader.js`) nimmt Eingaben und malt, was der Worker schickt, mit `putImageData` in `#screen`. Im Bündel `threads` kommen Rechen-Worker dazu, dieselbe WASM-Datei im selben geteilten Speicher: Dort rastern Bänder, die UI betritt nur der App-Worker. `navigator.gpu` und `OffscreenCanvas` gibt es im Worker. WebGPU-Objekte gehören aber dem Thread, der sie angelegt hat, und lassen sich nicht weiterreichen. Also liegt alles auf dem App-Worker, es gibt in keinem Bündel einen Job-Thread für die GPU; die Typen des Backends halten `Rc`, der Compiler lässt sie nicht in die Rechen-Worker. Was „Job“ heißt, geschieht auf demselben Thread, sobald der Browser geantwortet hat. Warten geht dort nicht: Die Antwort des Browsers braucht die Ereignisschleife des Workers.
+
+**Was die Bündel unterscheidet**, wenn es um die GPU geht, ist nur der Speicher: Im Bündel `threads` ist er ein `SharedArrayBuffer`. `queue.writeTexture` und `writeBuffer` nehmen ihn in Chrome 156 (eigens geprüft); wirft ein Browser dort `TypeError`, gehen die Bytes ab da über eine Kopie (`copyShared` in `gpu.js`). In Firefox 159 läuft das Bündel `threads` ebenfalls (ein Lauf, jedes Bild zurückgelesen); welchen der beiden Wege es nimmt, ist nicht festgehalten. `TextDecoder` nimmt ihn nicht, Texte werden vorher kopiert.
+
+**`lib/gpu` im Browser.** Dieselben Typen und Methoden.
+
+| Die API | im Browser |
+| --- | --- |
+| Instanz, Adapter, Gerät | `requestAdapter` und `requestDevice` antworten später: `Instance::new()` fragt, `prepare()` sagt, ob die Antwort da ist (anderswo sofort `true`), bis dahin `NotReady`. Ein Adapter, `low-power` erbeten; der Browser sagt nicht, ob integriert oder diskret; ein Software-Adapter (`isFallbackAdapter`) gilt als `Cpu` und fehlt in `adapters_low_power`. WebGPU gibt je Adapter ein Gerät: ein neues Gerät braucht eine neue `Instance` |
+| Stufe | immer Basis. Bindless, `draw_indexed_indirect_multi`, `_count`: `Unsupported` bzw. `Invalid` |
+| Shader | `ShaderModule::from_wgsl`: Der Browser übersetzt und prüft. `from_spirv` ist `Unsupported`. `entry_points()` und `constants()` liest ein kleiner Scanner aus dem Text (`scan` in `web_res.rs`), er urteilt über nichts |
+| Push-Konstanten | ein Uniform-Puffer hinter einem dynamischen Offset, Gruppe 3 jeder Pipeline mit Push-Konstanten; `var<immediate> x: T;` wird beim Anlegen zu `@group(3) @binding(0) var<uniform> x: T;`. Also ein Block mit Uniform-Layout und höchstens drei eigene Gruppen (vier und Push-Konstanten: `Unsupported`). Je Draw mit neuen Werten ein Platz von 256 Byte (`minUniformBufferOffsetAlignment`), der Ring wächst von selbst. Chrome 156 nimmt `var<immediate>` schon selbst an; das ist hier nicht benutzt, die anderen Browser zählen |
+| Pipeline-Konstanten | `constants: Record<string, number>`, Schlüssel die Nummer als Text, ab 0x10000 der Name. Fremde und doppelte Nummern `Invalid` wie überall; Wertebereiche prüft der Browser, später |
+| Kopien | `bytes_per_row` muss ein Vielfaches von 256 sein (außer bei einer einzigen Zeile), sonst `Invalid` aus `finish()`. `write_texture_rects` kennt die Regel nicht: `queue.writeTexture` nimmt jede Zeilenlänge und liest direkt aus dem WASM-Speicher, ohne Staging-Ring |
+| Bindungen | WebGPU will mehr wissen, als `Binding` sagt (Dimension und Art einer Textur, Format einer Speichertextur, Art eines Samplers). Das Layout entsteht deshalb spät: aus den Ressourcen der ersten Bindungsgruppe oder aus dem WGSL der ersten Pipeline |
+| Barrieren, Layouts | wirkungslos, WebGPUs Regeln tun das; die Aufrufe bleiben für denselben Code |
+| Aufzeichnen | Wörter in einem `Vec<u32>`, erst `Queue::submit` macht in einem einzigen Aufruf nach JavaScript daraus einen `GPUCommandEncoder` (`submit` in `gpu.js`) |
+| Warten | geht nicht. `wait(id, _)` antwortet sofort (`false`: noch nicht), `wait_idle` und `Queue::read_buffer` sind `Unsupported`. `Buffer::read` eines Readback-Puffers sagt `NotReady`, bis die Übergabe fertig und der Puffer abgebildet ist; `is_done` fragt |
+| Puffer | Upload: `write` ist `queue.writeBuffer`. Readback: nur Kopien dürfen hinein (`MAP_READ` geht nur mit `COPY_DST`), eine andere Verwendung ist `Unsupported` |
+| Fehler | Was hier zu erkennen ist, ist sofort `Invalid`. Was der Browser findet, kommt später als `uncapturederror` und wird von `submit`, `try_acquire`, `poll` zurückgegeben: Validierung `Invalid`, Speicher `OutOfMemory` |
+| Swapchain | `getContext("webgpu")` auf einem `OffscreenCanvas`: das bevorzugte Format, deckend, sRGB. Darstellungsmodus und Bilderzahl gehören dem Browser, `present_mode()` sagt `Mailbox`. `try_acquire` ist `getCurrentTexture`, nie `NotReady`. Ein `present` gibt es nicht: Das Bild geht los, wenn der Worker zur Ereignisschleife zurückkehrt, ohne die Seite. Deshalb zeichnet `gp_tick` je Runde des Workers einmal |
+| Zeitstempel, Subgroup-Größe | nicht gebaut (`Features::timestamps` ist `false`, WebGPU kennt sie nur am Anfang und Ende eines Durchgangs) |
+
+**Ein WGSL-Prüfer im Bündel?** Nein, der des Browsers reicht: Er urteilt ohnehin, und unser Urteil wäre nur eine zweite Meinung über Texte, die im Programm stehen. `lib/wgsl` kostete im Bündel `simd` 576 386 Byte mehr (+15 %; gzip +203 480) nur für `wgsl::check`, mit dem Weg nach SPIR-V 800 743 Byte. Einmal gemessen, Wegwerf-Code. Es ist eine eigene Frage, sobald Programme zur Laufzeit fremdes WGSL laden; heute steht jede Zeile WGSL im Programm und wird von `uigputest --test shaders` gegen `lib/wgsl` geprüft.
+
+**Zwei Leinwände.** `#screen` bleibt der CPU-Pfad und nimmt alle Eingaben. Die Swapchain liegt auf einer zweiten Leinwand `#gpu` darüber (`pointer-events: none`), als `OffscreenCanvas` im Worker, das Gegenstück zum `SurfaceView` unter Android. Eine Leinwand ohne Bild zeigt nichts: Bis ihr erstes Bild beim Compositor ist, sieht man `#screen` darunter, dieselben Pixel, ohne Nachricht und ohne Zeitabstimmung. Jede Zeit auf der GPU hat eine neue Leinwand (`transferControlToOffscreen` geht einmal, und so kann keine ein altes Bild zeigen). `#input` und der Baum der Barrierefreiheit liegen darüber wie bisher.
+
+| Stufe | Was geschieht |
+| --- | --- |
+| CPU | wie bisher: Worker kopiert, `postMessage`, `putImageData`. So geht das erste Bild jedes Laufs |
+| Job | `Instance::new` (ohne `navigator.gpu`: Schluss, nichts am DOM geändert), `gpu.js` wird geladen, `requestAdapter` und `requestDevice` laufen; das Programm läuft weiter über den CPU-Pfad. Hier 250–420 ms nach dem ersten Bild, der größte Teil `requestAdapter` (in einem Lauf für sich: 336 ms, `requestDevice` 55 ms). Dann die Leinwand von der Seite (`REQUEST_GPU_CANVAS`), dann Pipelines und Swapchain auf diesem Thread |
+| kleines Bild | 8 × 8 Pixel durch alle drei Pipelines und die Push-Konstanten, zurückgelesen und verglichen (`probe_start`). Ein Browser, dessen WebGPU anders zeichnet, zeigt nie ein Bild |
+| Wechsel | das ganze Bild in die Textur, ein Bild; die Kopie für `#screen` und die Pixelpuffer des Workers gehen. `#screen` ruht mit seinem letzten Bild |
+| GPU | wie überall, eine Runde des Workers ein Bild. Im Leerlauf nichts |
+| zurück | das ganze Bild an `#screen` (`gp_leave`), danach erst nimmt die Seite `#gpu` weg (`after_flush`): Bis dahin liegt das alte Bild darüber, nie eine Lücke |
+
+Größe: wie überall jedes Bild über die CPU, 100 ms nach dem letzten eine neue Leinwand. Bis dahin streckt der Browser beide gleich. Werkzeugfenster und Popups aus einem Fenster setzt `web_windows.rs` auf `#screen` zusammen, also darunter: Solange eins zu sehen ist, ist Fenster 0 auf dem CPU-Pfad (`win_gpu_child_alone`), wie unter Android.
+
+**Rückfälle.** Keins davon ändert etwas am Bild, alle sind in `gpu_web.mjs` geprüft.
+
+| Was | Was geschieht |
+| --- | --- |
+| kein `navigator.gpu`, `gpu.js` nicht zu laden, kein Adapter, ein Software-Adapter | CPU-Pfad für den ganzen Lauf, ohne Meldung. Keine Leinwand |
+| `requestDevice` scheitert | CPU-Pfad, neuer Versuch nach 2 s, 4 s, … |
+| der Browser verwirft einen Shader, das kleine Bild stimmt nicht | CPU-Pfad für den ganzen Lauf; die leere Leinwand geht |
+| Gerät verloren (`device.lost`, auch zwischen zwei Bildern: `gp_tick` schaut) | das Bild über `#screen`, die Leinwand weg, neue Instanz nach 2 s, 4 s, …, neue Leinwand. Chrome zeigt nach `device.destroy()` weiter das letzte Bild, also keine Lücke; ob das bei einem echten Treiber-Reset so ist, ist nicht geprüft |
+| ein Aufruf wirft in `gpu.js` | gefangen (sonst stünde der Worker), gilt als interner Fehler des Geräts |
+
+**Die Vorgabe** steht in einer Zeile: `DEFAULT_ON_BROWSER` in `gpu_out.rs`. `?gpu=0` und `?gpu=1` in der Adresse überschreiben sie, `?gpuenv=jfgui_GPU_VERIFY=1,..` setzt Variablen `jfgui_GPU_*`. Läufe mit `?agent=1` bleiben ohne `?gpu=1` auf dem CPU-Pfad, wie Skripte: Die Browser-Tests lesen `#screen`.
+
+**Messungen.** GeForce RTX 2070 SUPER, Ryzen 5 3600, Chrome 156 kopflos (mit der echten GPU: Adapter `nvidia turing`), eigenes Profil, Release-Build, Bündel `simd`, 1920 × 1000, je **drei Läufe** im Wechsel, gezeigt die Spanne der Läufe; parallel bauten andere Sitzungen. Werkzeug: [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs). „Worker“ ist die Zeit eines Stapels im App-Worker (Rastern, Kopieren, Hochladen, Aufzeichnen; Median), „Seite“ `TaskDuration` des Haupt-Threads je Schritt (CDP, enthält die kleinen `evaluate` des Werkzeugs), „verspätet“ ein Bild der Anzeige, das den letzten Stapel noch unfertig fand: neue Eingaben mussten warten. Das Rollen läuft mit dem Spiegel der Barrierefreiheit (dem Standard), der die Seite in beiden Spalten rund 10–15 ms je Schritt kostet. Ohne ihn (`?a11y=0`, drei Läufe, unter Last): Seite bisher 3,2–9,6 ms, GPU 1,7–2,1 ms; Worker bisher 2,0–5,9 ms, GPU 4,6–6,5 ms. „Verspätet“ steht aus einem zweiten Satz von drei Läufen mit berichtigtem Zähler; in diesem Satz bauten neun `rustc` anderer Sitzungen, die Streuung ist groß und je Weg gab es einen schlechten Lauf (Worker bis 88 ms bisher, bis 263 ms GPU).
+
+| Messung | bisher (`?gpu=0`) | GPU (`?gpu=1`) |
+| --- | ---: | ---: |
+| Laden → erstes Bild (ms) | 307–661 | 313–435 |
+| Laden → GPU zeigt (ms) | – | 639–800 |
+| ganzes Bild: Worker, Median (p95) (ms) | 4,1–7,3 (4,9–10,8) | 3,9–5,1 (4,7–6,1) |
+| ganzes Bild: Seite (ms) | 1,9–2,8 | 1,4–1,6 |
+| ganzes Bild: verspätet (von Bildern der Anzeige) | 0–47 von 139–410 | 2–31 von 158–329 |
+| kleine Änderung (Hover, 49 KB): Worker, Median (p95) (ms) | 1,1–1,5 (1,6–2,6) | 1,8–2,1 (2,4–3,9) |
+| kleine Änderung: Seite (ms) | 1,4–1,9 | 1,4–1,6 |
+| kleine Änderung: verspätet | 0–16 von 258–491 | 1–34 von 297–807 |
+| Rollen: Worker, Median (p95, schlechtester) (ms) | 5,0–10,2 (10–15, 11–18) | 4,3–6,2 (9–15, 23–43) |
+| Rollen: Seite (ms) | 12,8–15,7 | 16,6–21,9 |
+| Rollen: Bilder in 120 Schritten | 176–238 | 262–281 |
+| Rollen: verspätet | 128–491 von 420–719 | 259–760 von 553–900 |
+| Leinwand ziehen (Muster, 928 × 320): Worker, Median (p95, schlechtester) (ms) | 2,1–2,6 (2,7–3,9, 3–15) | 2,5–2,6 (3,4–3,8, 16–21) |
+| Leinwand ziehen: Seite (ms) | 2,7–3,8 | 2,5–2,7 |
+| Leinwand ziehen: verspätet | 0 von 260–660 | 0–183 von 258–540 |
+| Leinwand ziehen: zur Seite bzw. zur GPU (MB in 120 Schritten) | 316 | 39 |
+| Leerlauf 10 s: Bilder | 0 | 0 |
+| Leerlauf 10 s: CPU aller Prozesse des Browsers (ms; Schritte von 15,6 ms) | 578–828 | 500–891 |
+| Speicher aller Prozesse, privat / Working Set (MiB) | 363–365 / 628–630 | 454–461 / 780–790 |
+| davon GPU-Prozess, privat (MiB) | 89 | 175–179 |
+| davon Renderer, privat (MiB) | 201–205 | 207–211 |
+| `measureUserAgentSpecificMemory` (MB; ohne GPU) | 18,2–18,5 | 10,7–11,2 |
+| `memory_reserved()`: was das Programm erbeten hat (MiB) | 0 | 7,3 |
+
+Bis zum Bildschirm lässt sich kopflos nicht messen: Chrome setzt dort auf Verlangen zusammen, sein Trace hat für die meisten Bilder keinen `Display::DrawAndSwap`. Deshalb ein echtes Fenster, ohne Aktivierung, nicht zuoberst festgehalten, je eines für Chrome und Firefox; 60 Hover-Wechsel je Lauf (ausgelöst in der Seite, keine echte Maus), ein Thread liest die Fläche des Knopfs vom Bildschirm (`BitBlt`, je Lesen rund 6 ms: es wartet auf DWM und misst nicht bis zum Licht; 165 Hz). Wegwerf-Werkzeug. Die Uhr der Seite ist über die Schleife gegen die des Werkzeugs abgeglichen.
+
+| Ereignis → Bildschirm, Median (p95) (ms) | bisher | GPU | |
+| --- | ---: | ---: | --- |
+| Chrome 156 | 18,9–19,3 (21–65) | 9,3–12,5 (15,5–16,9) | zwei Läufe je Weg; ein dritter GPU-Lauf lag unter einem anderen Fenster (7 von 60 gesehen), bisher: 44 von 60 in einem Lauf |
+| Firefox 159 | 21,0–23,2 (57–96) | 8,7–14,4 (18–25) | drei bzw. zwei Läufe; ein dritter GPU-Lauf gestört (45 von 60 gesehen, keine Zahl) |
+
+Das Bündel `threads` (drei Läufe, Worker Median): ganzes Bild 5,9–6,8 gegen 4,2–5,0 ms, kleine Änderung 1,4 gegen 2,0–2,1 ms, Rollen 6,1–7,1 gegen 4,8–5,8 ms; die Seite wie oben. Es verhält sich wie `simd`. `scalar` ist nicht gemessen.
+
+Was das heißt:
+
+- **Pixelgleich, auch auf dem echten Bildschirm.** Unten.
+- **Das Bild kommt früher an**, 7–10 ms in beiden Browsern: Es geht vom Worker zum Compositor und nicht über `postMessage`, den Haupt-Thread und sein nächstes Bild. Das ist die eine Zahl, die sich Nutzern zeigt, und sie ist am wenigsten sicher gemessen (wenige Läufe, das Lesen hat 6 ms Korn).
+- **Der Worker zahlt für kleine Änderungen 0,6 ms mehr** (Aufrufe nach JavaScript, ein Render-Durchgang), bei ganzen Bildern weniger (keine Kopie ins RGBA des Canvas, kein `postMessage`). Die Seite spart bei ganzen Bildern 1 ms.
+- **Beim Rollen** kommen mehr Bilder durch (262–281 statt 176–238). Dafür gibt es Ausreißer: Bis 43 ms hängt der Worker in `writeTexture`, wenn der GPU-Prozess im Rückstand ist; der alte Weg hat sie nicht (11–18 ms), und unter fremder Last verspäten sich auf dem GPU-Weg mehr Bilder. Beim Rollen geht fast das ganze Bild hoch, 7–8 MB je Schritt, wie auf dem alten Weg zur Seite. Der teuerste Posten bleibt in beiden Spalten der Spiegel der Barrierefreiheit.
+- **Leinwände**: Das Hochladen sinkt auf ein Achtel. Bei diesem billigen Muster gewinnt der Worker nichts; was unter Windows 30 ms kostet (ein Foto, ein Diagramm), kostet auch hier nur noch die Kacheln ([Leinwände](#leinwände)), gemessen ist das im Browser nicht.
+- **Der Preis ist Speicher**: rund 95 MiB privat mehr, fast alles im GPU-Prozess (Dawn, Swapchain, Texturen), die Pixelpuffer des Workers gehen dafür. GPU-Speicher sagt der Browser nicht.
+- **Im Leerlauf** kein Unterschied: kein Bild, gleiche CPU.
+- **Empfehlung: an** (`DEFAULT_ON_BROWSER = true`), der Rückfall ist sauber und die beiden Browser, die hier gehen, zeigen dasselbe Bild früher. Der Preis sind 95 MiB, 200 KB WASM (70 KB gzip) und Ausreißer beim Rollen. Das Risiko liegt in dem, was nicht geprüft ist: ein Browser, dessen WebGPU richtig rechnet, dessen Leinwand aber nichts zeigt, bliebe auf einem stehenden Bild; das merkt der Rückfall nicht.
+
+| Größe, gallery, Release (Byte) | vor G4d | jetzt | + | gzip vor G4d | gzip jetzt |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `scalar` | 3 617 267 | 3 834 060 | 216 793 | 1 357 042 | 1 430 723 |
+| `simd` | 3 556 661 | 3 772 009 | 215 348 | 1 343 295 | 1 412 115 |
+| `threads` | 3 521 562 | 3 702 658 | 181 096 | 1 336 180 | 1 404 051 |
+
+Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe startet. Keine Vulkan-Zeichenkette in den Bündeln (`Vulkan`, `vulkan`, `vkCreate`, `VK_`: 0).
+
+**Pixelvergleich.** Was die Tests vergleichen, ist die Zusammensetzung des Browsers, nicht nur die Textur.
+
+| Was | Wie | Ergebnis |
+| --- | --- | --- |
+| Bildschirm GPU gegen Bildschirm bisher, Schritt für Schritt (erstes Bild, Hover, Menü auf, Menü zu, neue Größe; bei `simd` auch 200 %, „Bild & Leinwand“ nach Ziehen und Rollen) | `page.screenshot`, Chrome kopflos, alle drei Bündel | 0 Pixel anders |
+| Bildschirm gegen Framebuffer (`ui.render`), auch auf dem Rückweg nach verlorenem Gerät und auf dem neuen Gerät | ebenso | 0 Pixel anders |
+| jedes gezeigte Bild gegen den Framebuffer, Byte für Byte | `jfgui_GPU_VERIFY` im Browser: zurückgelesen, verglichen, wenn der Browser geantwortet hat | 0 anders |
+| während der Umschaltung | 5–6 Aufnahmen, die erste vor dem Wechsel | 0 anders als bisher, keine schwarz |
+| echtes Fenster, Chrome 156 | `BitBlt` der Leinwand vom Bildschirm, bisher gegen GPU | 0 von 672 072 Pixeln in drei von vier vergleichbaren Läufen; im vierten lag ein anderes Fenster darüber |
+| echtes Fenster, Firefox 159 | ebenso | 0, 18 und 32 von 618 936 Pixeln; zwischen zwei Läufen desselben Wegs sind es ebenfalls 0 bis 32 (die Ursache ist nicht gesucht; am Weg liegt es also nicht) |
+
+**Gefunden:** `quad_blit` zeichnete eine Leinwand beim Nachzeichnen in den Framebuffer (`gp_settle`, jede Ebene darüber) mit ihrem ganzen Rechteck, ohne den Klipp eines rollenden Elternteils: Unter einer Kopfzeile standen dann ihre Pixel, im Framebuffer, also auf dem Rückweg zum CPU-Pfad auch auf dem Schirm. Das galt auf allen Zielen; gefunden hat es der Vergleich im Browser, unter Windows und Linux prüft es jetzt `apps/androidGallery/tests/gpu_canvas_clip.uis`. Ein Treiberfehler wie beim Xclipse (Push-Konstanten-Array) kam hier nicht vor; auf einem Telefon ist nichts getestet.
+
+**Firefox.** Playwrights Firefox 153 sperrt WebGPU („disabled by blocklist“, kein Adapter), das installierte Firefox 159 kopflos ebenso: Dort prüfen die Tests den Rückfall. In einem echten Fenster hat Firefox 159 einen Adapter und zeigt die Ausgabe (die Zahlen oben, ohne Treiber in der Seite gemessen, weil Playwright es nicht steuern kann). Es nennt seinen Adapter nicht, `GpuOutput::adapter` bleibt dort leer.
+
+**Tests.** `apps/gallery/tests/gpu_web.mjs` (die Ausgabe in allen drei Bündeln, Chrome und Firefox; ohne brauchbares WebGPU `SKIP` und nur der Rückfall; ein verlorenes Gerät über `device.destroy()`, also nachgestellt), `apps/webgputest` mit `tests/api_web.mjs` (die API ohne Fenster: Fehler, Rechen-Shader, Kopien, Zeichnen, Gerät verloren, in jedem Bündel), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) (die Messungen). `.uis`-Skripte laufen im Browser nicht; das Skriptkommando `gpu` gibt es dort nicht.
+
+**Nicht getestet:** Safari, Chrome auf Android und Linux, Firefox außerhalb dieses einen Rechners und ohne die Vorführung oben (Ebenen, Bilder, Leinwände sind in Firefox nicht durchlaufen; `threads` nur minimiert, also ohne Blick auf den Bildschirm), AMD und Intel, Monitore mit HDR oder großem Farbraum, ein echter Treiber-Reset, ein Absturz des GPU-Prozesses, ein Tab im Hintergrund, Ausgabe bei einem Zoom der Seite oder 150 %, ein Telefon.
+
+**Nicht gebaut:** Zeitstempel, `create_compute_pipeline_sized`, Bindless; ein Wächter dagegen, dass die Leinwand nichts zeigt, obwohl alles richtig rechnet; das Skriptkommando `gpu`; Freigeben von `#screen` während der GPU-Zeit (dort bleiben 8 MB für den Rückweg).
+
 ### Was fehlt
 
 - Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
@@ -806,7 +942,7 @@ Was das heißt:
 | Variable | Wirkung |
 | --- | --- |
 | `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
-| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON` und `DEFAULT_ON_LINUX` in `gpu_out.rs`, unter Android `GPU_DEFAULT` in `GalleryActivity` |
+| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON`, `DEFAULT_ON_LINUX` und `DEFAULT_ON_BROWSER` in `gpu_out.rs`, unter Android `GPU_DEFAULT` in `GalleryActivity`. Im Browser kommen die Variablen aus der Adresse: `?gpu=0\|1` und `?gpuenv=jfgui_GPU_NAME=wert,..` (nur Namen `jfgui_GPU_*`) |
 | `jfgui_GPU_RES=cap` / `=full` | (Android, Debug-Builds) die Auflösung, durch die GPU und auf dem CPU-Pfad ([Ausgabe unter Android](#ausgabe-unter-android)) |
 | `jfgui_GPU_TEST_DIE=1` | (Android, Tests) der Arbeitsthread beendet das Programm, wo ein kaputter Treiber abstürzen würde |
 | `jfgui_TEST_LANDSCAPE=1` | (Android, Tests) die Activity bittet um Querformat, keine Einstellung des Systems |
@@ -885,7 +1021,8 @@ für Messungen den Configurator ausschalten.
 | `glibc.uis` | (Linux, gegen glibc gelinkt; sonst `SKIP`) Argumente und Umgebung; Hauptthread und jeder `plat`-Thread mit eigenem Kontrollblock und TLS (FS-Basis = `pthread_self`, eigenes `errno`, eigener `dlerror`-Text); der verlangte Stapel; 300 Threads hinterlassen keine Abbildung; Vulkan auf einem `plat`-Thread von 2 MiB. In Kindprozessen: `exit` von glibc aus `main` und von einem Thread, auch mit laufenden Threads und einem noch offenen Gerät; Absturz auf dem Haupt- und einem `plat`-Thread, Stapelüberlauf und Panik mit Bericht, Code 3 und ohne `at_exit` |
 | `noloader.uis` | `jfgui_GPU_DLL` nennt eine fehlende Datei (Name, Pfad) oder eine Bibliothek, die kein Vulkan-Loader ist: `Err(NoLoader)`; ein Programm ohne Loader startet, `--info` meldet `SKIP`, Code 0 |
 
-Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden.
+Ohne Vulkan oder brauchbare GPU melden die Tests `SKIP` und gelten als bestanden. Im Browser: `apps/webgputest/tests/api_web.mjs`
+und `apps/gallery/tests/gpu_web.mjs` ([Ausgabe im Browser](#ausgabe-im-browser)).
 `gputest --bench` misst die Zahlen unten, `gputest --bench N` die Messszene.
 
 **Texturen in Shadern** (`gputest --test textures`, [`t_texture.rs`](../apps/gputest/t_texture.rs);
@@ -1294,7 +1431,7 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
 - Bindungen ohne Arrays (`count` 1); Arrays gibt es über die Bindless-Tabelle auf Stufe Voll.
 - Kopien von Tiefen-Stencil-Formaten werden abgelehnt.
 - Zeilenlängen für Kopien im Kodierer prüft Vulkan nicht auf 256 Byte; WebGPU verlangt das --
-  für Portabilität `bytes_per_row` als Vielfaches von 256 wählen.
+  für Portabilität `bytes_per_row` als Vielfaches von 256 wählen (das WebGPU-Backend sagt sonst `Invalid`).
 - Ohne `hostQueryReset` (Vulkan 1.1) werden neue Zeitstempel erst in der nächsten Übergabe
   zurückgesetzt; vorher `read_*` aufzurufen ist dort nicht erlaubt.
 - Ein `Frame`, der nie dargestellt wird, lässt die Swapchain beim nächsten `acquire()` neu bauen.

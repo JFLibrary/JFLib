@@ -1,5 +1,5 @@
 // gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows, Linux programs
-// against glibc, Android): every frame takes the platform's path, no Vulkan code is linked
+// against glibc, Android, the browser): every frame takes the platform's path, no GPU code is linked
 
 use super::{App, GpuOutput, Ui};
 

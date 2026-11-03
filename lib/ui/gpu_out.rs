@@ -1,5 +1,6 @@
 // gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc;
-// Android: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android")
+// Android; the browser: docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux", "Ausgabe unter Android",
+// "Ausgabe im Browser")
 //
 // The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 // it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -47,6 +48,18 @@
 // stops): gp_surface_gone, before the host's callback returns.  win_gpu_child says None for a while
 // (the surface is on its way, a tool window or popup shows on the canvas below): win_gpu_child_later,
 // the host wakes the loop.
+//
+// The browser: the same code once more, through WebGPU (lib/gpu web_*.rs, web/gpu.js).  The UI runs in a
+// worker in all three bundles and WebGPU's objects stay on that thread: there are no job threads, the jobs
+// run on this thread when the browser has answered (S::web_start: requestAdapter and requestDevice
+// answer later, the app goes on through the CPU path meanwhile).  The page's #screen is the CPU path and
+// stays below; a canvas above it, an OffscreenCanvas here, is the analogue of the SurfaceView: it shows
+// nothing until its first frame, then covers #screen; each period on the GPU has a new one (plat
+// web_gpu.rs).  Before a device is used, a small picture through all three pipelines is read back and
+// compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  Reading back comes
+// later here: jfgui_GPU_VERIFY compares when the browser has answered (verify_poll).  The shaders go as
+// WGSL (gpu_out.wgsl), no SPIR-V in the bundle.  Runs with ?agent=1 stay on the CPU path like scripts,
+// unless ?gpu=1 asks; no script command here.
 //
 // Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 // and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -103,8 +116,8 @@
 // silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
 // runs: a driver that killed the program does not get a third chance).
 //
-// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX; Android: GalleryActivity
-// always sets it, GPU_DEFAULT there), jfgui_GPU_VERIFY=1 (every presented
+// Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX, DEFAULT_ON_BROWSER; Android:
+// GalleryActivity always sets it, GPU_DEFAULT there; the browser: ?gpu=0|1), jfgui_GPU_VERIFY=1 (every presented
 // image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 // their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
 // jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
@@ -149,6 +162,7 @@
 //   gpu hold MS            real time passes, the windows stay as they are (a look from outside)
 //   gpu print              the counters
 
+#[cfg(not(target_arch = "wasm32"))]
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -182,14 +196,18 @@ const DEFAULT_ON: bool = true;
 /// the same on Linux, measured apart: a weak GPU may answer differently (docs/GPU.md "Ausgabe unter
 /// Linux"); this line decides
 const DEFAULT_ON_LINUX: bool = true;
+/// the same in the browser, where the numbers differ again (docs/GPU.md "Ausgabe im Browser"): the one
+/// switch for it.  A run with ?agent=1 stays on the CPU path unless ?gpu=1 asks: such runs read #screen
+const DEFAULT_ON_BROWSER: bool = true;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md
 /// "Ausgabe der UI")
 const PRESENT: PresentMode = PresentMode::Mailbox;
 /// swapchain images: as fast as three in every measurement, a window's size less GPU memory
 const IMAGES: u32 = 2;
-/// frames closer together than this wait for gp_tick: 250 per second are plenty for a window (us)
-const MIN_PRESENT_US: u64 = 4_000;
+/// frames closer together than this wait for gp_tick: 250 per second are plenty for a window (us).
+/// (The browser: every frame waits for the gp_tick of its turn; the next tick may be 33 ms away.)
+const MIN_PRESENT_US: u64 = if cfg!(target_arch = "wasm32") { 0 } else { 4_000 };
 /// a window's size is settled when it did not change for this long (us)
 const STABLE_US: u64 = 100_000;
 /// a frame that found no free image is tried again after this long (us)
@@ -198,6 +216,7 @@ const RETRY_US: u64 = 2_000;
 const JOB_US: u64 = 8_000;
 /// (a driver compiles shaders on this thread; on Linux a stack has exactly this size, on Windows
 /// this is what is committed at the start: docs/GPU.md "Linux")
+#[cfg(not(target_arch = "wasm32"))]
 const WORKER_STACK: usize = if cfg!(windows) { 2 << 20 } else { 8 << 20 };
 /// the first wait before a new device (ms), its longest
 const RETRY_FIRST_MS: u64 = 2_000;
@@ -256,16 +275,21 @@ const LEVELS_MAX: usize = 6;
 const SHOW_TRIES: u32 = 300;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
-/// wgsl::compile makes of it, --gen-shaders writes them again)
+/// wgsl::compile makes of it, --gen-shaders writes them again); the browser takes the WGSL itself
+#[cfg(not(target_arch = "wasm32"))]
 mod spv {
     include!("gpu_out_spv.rs");
 }
 
 /// the embedded shaders of the output and their source (uigputest: the embedding check)
 pub const GPU_OUT_WGSL: &str = include_str!("gpu_out.wgsl");
+#[cfg(not(target_arch = "wasm32"))]
 pub const GPU_OUT_VS: &[u32] = spv::VS;
+#[cfg(not(target_arch = "wasm32"))]
 pub const GPU_OUT_FS: &[u32] = spv::FS;
+#[cfg(not(target_arch = "wasm32"))]
 pub const GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE;
+#[cfg(not(target_arch = "wasm32"))]
 pub const GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -435,10 +459,11 @@ struct TileDraw {
 }
 
 /// what a quad draws: an image with its steps (Dc::blit_scaled), or a canvas's tiles (copied or
-/// scaled; loose: a difference from the CPU's picture is no failure) with its command's Draw and box
+/// scaled; loose: a difference from the CPU's picture is no failure) with its command's Draw, its box and
+/// what of it shows (x0, y0, x1, y1: a scrolling parent clips it, the frame's clip stack is gone later)
 enum QuadSrc {
     Image { tex: Rc<ImageTex>, src: Rc<Surface>, w: i32, h: i32, step: [u32; 2] },
-    Canvas { f: DrawRef, w: i32, h: i32, tiles: Vec<TileDraw>, copy: bool, loose: bool },
+    Canvas { f: DrawRef, w: i32, h: i32, vis: [i32; 4], tiles: Vec<TileDraw>, copy: bool, loose: bool },
 }
 
 /// an image or a canvas drawn by the GPU in a window's frame: its place, the rectangles of its cells
@@ -499,6 +524,7 @@ struct Win {
     surf: Option<gpu::Surface>, // (after sc: it goes first)
     tex: Option<Tex>,
     rb: Option<Buffer>, // jfgui_GPU_VERIFY: the presented image
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     rb_px: Vec<u8>,
     rb_keep: Option<Vec<u8>>, // `gpu shot`: the image as presented
     full: bool,    // the texture lacks pixels: the whole frame goes up next
@@ -514,6 +540,28 @@ struct Win {
     fail_ms: u64,
     out: GpuOutput,
     sp: Split,
+    #[cfg(target_arch = "wasm32")]
+    verify_wait: Vec<Verify>,
+}
+
+/// (the browser) a presented image on its way back, the framebuffer of that frame beside it
+#[cfg(target_arch = "wasm32")]
+struct Verify {
+    rb: Buffer,
+    fb: Surface,
+    loose: Vec<[i32; 4]>,
+}
+
+/// (the browser) a new device's small picture on its way back
+#[cfg(target_arch = "wasm32")]
+struct Probe {
+    job: u32,
+    win: usize,
+    core: Core,
+    built: Built,
+    rb: Buffer,
+    px: Vec<u8>,
+    at: u64,
 }
 
 struct Core {
@@ -599,6 +647,10 @@ pub(crate) struct S {
     said_ok: bool, // plat::gpu_out_state
     tile_marked: u64, // `gpu expect fills`
     diff_marked: u64, // `gpu expect nodiff`
+    #[cfg(target_arch = "wasm32")]
+    web_inst: Option<Instance>, // adapter and device asked for, on their way
+    #[cfg(target_arch = "wasm32")]
+    probe: Option<Probe>,
 }
 
 impl Default for S {
@@ -649,6 +701,10 @@ impl Default for S {
             said_ok: false,
             tile_marked: 0,
             diff_marked: 0,
+            #[cfg(target_arch = "wasm32")]
+            web_inst: None,
+            #[cfg(target_arch = "wasm32")]
+            probe: None,
         }
     }
 }
@@ -661,6 +717,8 @@ fn wanted() -> bool {
     let on = match plat::env("jfgui_GPU").as_deref() {
         Some("0") | Some("off") => false,
         Some("1") | Some("on") => true,
+        // (a run with ?agent=1 reads #screen, as scripts read the framebuffer of the CPU path)
+        _ if cfg!(target_arch = "wasm32") => DEFAULT_ON_BROWSER && !plat::args().iter().any(|a| a == "--agent"),
         _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX }, // (Android: the host says)
     };
     on && !plat::win_remote_session()
@@ -798,7 +856,110 @@ impl S {
         self.wins.get_mut(i).and_then(|w| w.as_mut())
     }
 
+    /// (the browser) no threads: WebGPU's objects stay on this one, and nothing below waits
+    #[cfg(target_arch = "wasm32")]
+    fn spawn(&mut self, f: impl FnOnce() -> Done + 'static) -> bool {
+        let d = f();
+        self.jobs.done.lock().push(d);
+        true
+    }
+
+    /// (the browser) what S::spawn's job on a thread does elsewhere: adapter and device first, which
+    /// answer later, then the page's canvas, then everything else in one go on this thread, then the small
+    /// picture -> true: nothing more to do for the device in this look
+    #[cfg(target_arch = "wasm32")]
+    fn web_start(&mut self) -> bool {
+        if self.probe.is_some() {
+            self.web_probe();
+            return true;
+        }
+        if !matches!(self.dev, Dev::None | Dev::Starting(WEB_PREPARING)) {
+            return matches!(self.dev, Dev::Starting(_));
+        }
+        let Some((i, pw)) = self.wins.iter().enumerate().find_map(|(i, w)| w.as_ref().filter(|w| w.stage == Stage::Cpu).map(|w| (i, w.pw))) else {
+            return true;
+        };
+        if self.web_inst.is_none() {
+            self.note("start: adapter and device asked for");
+            match Instance::new() {
+                Ok(inst) => {
+                    self.web_inst = Some(inst);
+                    self.dev = Dev::Starting(WEB_PREPARING);
+                }
+                Err(e) => {
+                    self.note(&format!("no device: {e}"));
+                    if let Some(w) = self.win(i) {
+                        w.out.error = Some(format!("{e}"));
+                    }
+                    self.dev = Dev::Never(format!("{e}"));
+                    return true;
+                }
+            }
+        }
+        let inst = self.web_inst.as_ref().map(|x| x.prepare());
+        match inst {
+            Some(Ok(true)) => {}
+            Some(Err(e)) => {
+                self.note(&format!("no device: {e}"));
+                self.web_inst = None;
+                if let Some(w) = self.win(i) {
+                    w.out.error = Some(format!("{e}"));
+                }
+                self.dev = if matches!(e, GpuError::Failed(_)) {
+                    let at = plat::time_us() + self.retry_ms * 1000;
+                    self.retry_ms = (self.retry_ms * 2).min(RETRY_MAX_MS);
+                    Dev::Retry(at)
+                } else {
+                    Dev::Never(format!("{e}")) // no adapter: the CPU path for good
+                };
+                return true;
+            }
+            _ => return true,
+        }
+        // (a tool window on #screen: it can wait; the page's canvas is on its way)
+        let Some(nw) = plat::win_gpu_child(pw) else { return true };
+        let job = self.next_job;
+        self.next_job += 1;
+        let desc = self.desc();
+        let trace = self.trace;
+        let t0 = plat::time_us();
+        let r = build_device(self.web_inst.take(), nw, pw, None, desc, trace);
+        self.note(&format!("device, pipelines, swapchain: {:.2} ms on this thread", ms(t0, plat::time_us())));
+        if let Some(w) = self.win(i) {
+            w.stage = Stage::Job;
+            w.job = job;
+        }
+        self.dev = Dev::Starting(job);
+        match r.and_then(|(core, built)| {
+            let (rb, px) = probe_start(&core)?;
+            Ok(Probe { job, win: i, core, built, rb, px, at: plat::time_us() })
+        }) {
+            Ok(p) => self.probe = Some(p),
+            Err(e) => self.jobs.done.lock().push(Done::Device { job, win: i, r: Err(e) }),
+        }
+        true
+    }
+
+    /// (the browser) has the small picture come back as it should?
+    #[cfg(target_arch = "wasm32")]
+    fn web_probe(&mut self) {
+        let Some(p) = &self.probe else { return };
+        let mut got = vec![0u8; p.px.len()];
+        let r = match p.rb.read(0, &mut got) {
+            Err(GpuError::NotReady) if plat::time_us() < p.at + PROBE_US => return,
+            Err(GpuError::NotReady) => Err(GpuError::Timeout),
+            Err(e) => Err(e),
+            Ok(()) if got == p.px => Ok(()),
+            Ok(()) => Err(GpuError::Unsupported("the browser's WebGPU draws other pixels")),
+        };
+        let Some(p) = self.probe.take() else { return };
+        self.note(&format!("the small picture: {:?}, {:.2} ms", r, ms(p.at, plat::time_us())));
+        let (job, win) = (p.job, p.win);
+        self.jobs.done.lock().push(Done::Device { job, win, r: r.map(|_| (p.core, p.built)) });
+    }
+
     /// the worker threads: one per job, joined when none runs (they end by themselves)
+    #[cfg(not(target_arch = "wasm32"))]
     fn spawn(&mut self, f: impl FnOnce() -> Done + Send + 'static) -> bool {
         let jobs = self.jobs.clone();
         jobs.running.fetch_add(1, Ordering::AcqRel);
@@ -825,6 +986,66 @@ impl S {
 
 // ------------------------------------------------------------------ the worker's jobs
 
+/// (the browser) S::dev while adapter and device are on their way
+#[cfg(target_arch = "wasm32")]
+const WEB_PREPARING: u32 = 0;
+/// (the browser) a new device's small picture comes back within this time, or the device is not used (us)
+#[cfg(target_arch = "wasm32")]
+const PROBE_US: u64 = 5_000_000;
+
+/// (the browser) a small picture through all three pipelines and the push constants, read back (the
+/// rows of 256 bytes WebGPU wants) -> the buffer, the bytes it must hold
+#[cfg(target_arch = "wasm32")]
+fn probe_start(core: &Core) -> gpu::Result<(Buffer, Vec<u8>)> {
+    const N: u32 = 8;
+    const ROW: usize = 256;
+    let dev = &core.dev;
+    let src = dev.create_texture(&TextureDesc::d2(N, N, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED))?;
+    let group = dev.create_bind_group(&BindGroupDesc {
+        layout: &core.bgl,
+        entries: &[BindEntry { binding: 0, resource: Resource::Texture(src.view()) }],
+    })?;
+    let target = dev.create_texture(&TextureDesc::d2(N, N, core.format, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC))?;
+    let rb = dev.create_buffer(&BufferDesc { size: (ROW * N as usize) as u64, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?;
+    // texels B, G, R and a fourth byte that means nothing; what must come out of them
+    let mut px = vec![0u8; (N * N * 4) as usize];
+    let mut want = vec![0u8; ROW * N as usize];
+    for y in 0..N as usize {
+        for x in 0..N as usize {
+            let t = [(x * 30 + 1) as u8, (y * 30 + 2) as u8, ((x ^ y) * 17 + 3) as u8, 0x55];
+            px[(y * N as usize + x) * 4..][..4].copy_from_slice(&t);
+            let rgba = core.format == Format::Rgba8Unorm;
+            let c = if rgba { [t[2], t[1], t[0], 255] } else { [t[0], t[1], t[2], 255] };
+            want[y * ROW + x * 4..][..4].copy_from_slice(&c);
+        }
+    }
+    dev.queue().write_texture_rects(&src, &[[0, 0, N as i32, N as i32]], &px, N * 4, Layout::Undefined, Layout::Sampled)?;
+    let mut e = dev.encoder()?;
+    e.begin_render(&RenderPassDesc {
+        color: &[ColorAttachment { view: target.view(), load: Load::Discard, clear: [0.0; 4], store: true, before: Layout::Undefined, after: Layout::CopySrc }],
+        depth: None,
+    });
+    let half = N / 2;
+    e.set_render_pipeline(&core.pipe);
+    e.set_bind_group(0, &group);
+    e.push_constants(0, &[0i32; 4]);
+    e.set_scissor(0, 0, N, half);
+    e.draw(3, 1, 0, 0);
+    e.set_render_pipeline(&core.pipe_image);
+    e.set_bind_group(0, &group);
+    e.push_constants(0, &[0i32, 0, 65536, 65536]);
+    e.set_scissor(0, half, half, half);
+    e.draw(3, 1, 0, 0);
+    e.set_render_pipeline(&core.pipe_tile);
+    e.set_bind_group(0, &group);
+    e.set_scissor(half, half, half, half);
+    e.draw(3, 1, 0, 0);
+    e.end_render();
+    e.copy_texture_to_buffer(TextureRegion::mip(&target, 0), &rb, DataLayout { offset: 0, bytes_per_row: ROW as u32, rows_per_image: 0 });
+    dev.queue().submit([e.finish()?])?;
+    Ok((rb, want))
+}
+
 /// a swapchain (the old one rebuilt, or a new one on the surface) and the window's texture
 fn build_window(dev: &Device, bgl: &BindGroupLayout, surf: gpu::Surface, old: Option<Swapchain>, desc: &SwapchainDesc) -> gpu::Result<Built> {
     let sc = match old {
@@ -847,13 +1068,16 @@ fn build_window(dev: &Device, bgl: &BindGroupLayout, surf: gpu::Surface, old: Op
 }
 
 /// instance, the adapter for this window, device, pipeline, the first swapchain
-fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, desc: SwapchainDesc, trace: bool) -> gpu::Result<(Core, Built)> {
+fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, desc: SwapchainDesc, trace: bool) -> gpu::Result<(Core, Built)> {
     let t0 = plat::time_us();
     #[cfg(target_os = "android")]
     if env_on("jfgui_GPU_TEST_DIE") {
         rt::os::exit(3); // (android_gpu.py: a driver that kills the program)
     }
-    let inst = Instance::new()?;
+    let inst = match prepared {
+        Some(inst) => inst, // (the browser: it has answered)
+        None => Instance::new()?,
+    };
     let t1 = plat::time_us();
     let surf = gpu::Surface::native(&inst, nw, pw)?;
     let list: Vec<Adapter> = inst.adapters_low_power(display)?;
@@ -865,10 +1089,15 @@ fn build_device(nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, de
     let built = build_window(&dev, &bgl, surf, None, &desc)?;
     let t4 = plat::time_us();
     let format = built.sc.format();
-    let vs = ShaderModule::from_spirv(&dev, spv::VS)?;
-    let fs = ShaderModule::from_spirv(&dev, spv::FS)?;
-    let fs_image = ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?;
-    let fs_tile = ShaderModule::from_spirv(&dev, spv::FS_TILE)?;
+    #[cfg(not(target_arch = "wasm32"))]
+    let (vs, fs, fs_image, fs_tile) = (ShaderModule::from_spirv(&dev, spv::VS)?, ShaderModule::from_spirv(&dev, spv::FS)?,
+                                       ShaderModule::from_spirv(&dev, spv::FS_IMAGE)?, ShaderModule::from_spirv(&dev, spv::FS_TILE)?);
+    // (the browser takes the WGSL as it is)
+    #[cfg(target_arch = "wasm32")]
+    let (vs, fs, fs_image, fs_tile) = {
+        let m = ShaderModule::from_wgsl(&dev, GPU_OUT_WGSL)?;
+        (m.clone(), m.clone(), m.clone(), m)
+    };
     let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 16 })?;
     let pipeline = |fragment: &'_ ShaderModule, entry: &'static str| {
         dev.create_render_pipeline(&RenderPipelineDesc {
@@ -941,8 +1170,19 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
         TryAcquire::Stale => return Ok(Shown::Stale),
     };
     let sc = &*sc;
+    // (the browser: rows of 256 bytes, a buffer per frame, the answer comes later: verify_poll)
+    #[cfg(target_arch = "wasm32")]
+    let rb_frame = match &w.rb {
+        Some(_) => Some(core.dev.create_buffer(&BufferDesc { size: (fb.w as u64 * 4 + 255 & !255) * fb.h as u64, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?),
+        None => None,
+    };
+    #[cfg(target_arch = "wasm32")]
+    let rb_now = rb_frame.as_ref();
+    #[cfg(not(target_arch = "wasm32"))]
+    let rb_now = w.rb.as_ref();
+    let row_bytes = if cfg!(target_arch = "wasm32") { (fb.w as u32 * 4 + 255) & !255 } else { 0 };
     let mut e = core.dev.encoder()?;
-    let after = if w.rb.is_some() { Layout::CopySrc } else { Layout::Present };
+    let after = if rb_now.is_some() { Layout::CopySrc } else { Layout::Present };
     e.begin_render(&RenderPassDesc {
         color: &[ColorAttachment { view: sc.view(&fr), load: Load::Discard, clear: [0.0; 4], store: true, before: Layout::Undefined, after }],
         depth: None,
@@ -1000,9 +1240,9 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
         }
     }
     e.end_render();
-    if let Some(rb) = &w.rb {
+    if let Some(rb) = rb_now {
         let img = sc.texture(&fr);
-        e.copy_texture_to_buffer(TextureRegion::mip(img, 0), rb, DataLayout::default());
+        e.copy_texture_to_buffer(TextureRegion::mip(img, 0), rb, DataLayout { bytes_per_row: row_bytes, ..DataLayout::default() });
         e.texture_barrier(img, Layout::CopySrc, Layout::Present);
         e.barrier(Access::COPY_WRITE, Access::HOST_READ);
     }
@@ -1011,6 +1251,18 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
     w.pending = false;
     w.last_present = plat::time_us();
     w.out.frames += 1;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = id;
+        if let Some(rb) = rb_frame {
+            let mut snap = Surface::new(fb.w, fb.h, FMT_XRGB);
+            let n = snap.px.len();
+            snap.px.copy_from_slice(&fb.px[..n]);
+            let loose = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::Canvas { loose: true, .. })).flat_map(|q| q.rects.iter().copied()).collect();
+            w.verify_wait.push(Verify { rb, fb: snap, loose });
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(rb) = &w.rb {
         core.dev.wait(id, 5_000_000_000)?;
         sc.flush()?;
@@ -1036,6 +1288,37 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
         }
     }
     Ok(Shown::Done)
+}
+
+/// (the browser) presented images that have come back by now: compared as show compares them elsewhere
+#[cfg(target_arch = "wasm32")]
+fn verify_poll(w: &mut Win, core: &Core) {
+    let swap_rb = core.format == Format::Rgba8Unorm;
+    while let Some(v) = w.verify_wait.first_mut() {
+        let row = v.fb.w as usize * 4;
+        let padded = (row + 255) & !255;
+        let mut raw = vec![0u8; padded * v.fb.h as usize];
+        match v.rb.read(0, &mut raw) {
+            Err(GpuError::NotReady) => return,
+            Err(_) => {
+                w.verify_wait.clear();
+                return;
+            }
+            Ok(()) => {}
+        }
+        let mut img: Vec<u8> = Vec::with_capacity(row * v.fb.h as usize);
+        for r in raw.chunks_exact(padded) {
+            img.extend_from_slice(&r[..row]);
+        }
+        loose_compare(&mut img, &v.fb, &v.loose, swap_rb, &mut w.out);
+        let (x, y, bad) = compare(&img, &v.fb, swap_rb);
+        w.out.verified += 1;
+        if bad != 0 {
+            w.out.verify_bad += 1;
+            plat::write_stderr(format!("gpu: the presented image differs from the framebuffer in {bad} pixels, first at {x}, {y}\n").as_bytes());
+        }
+        w.verify_wait.remove(0);
+    }
 }
 
 /// the presented image (rows of w * 4 bytes) against the framebuffer: every colour byte equal and
@@ -1190,9 +1473,11 @@ fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4], text: &mut Text) {
     dc.clip_push(b[0], b[1], b[2] - b[0], b[3] - b[1]);
     match &q.src {
         QuadSrc::Image { src, w, h, .. } => dc.blit_scaled(fb, src, q.x, q.y, *w, *h),
-        QuadSrc::Canvas { f, w, h, .. } => {
+        QuadSrc::Canvas { f, w, h, vis, .. } => {
+            dc.clip_push(vis[0], vis[1], vis[2] - vis[0], vis[3] - vis[1]);
             dc.clip_push(q.x, q.y, *w, *h);
             f.draw(&mut Gfx { dc: &mut dc, sf: fb, text }, [q.x, q.y, *w, *h]);
+            dc.clip_pop();
             dc.clip_pop();
         }
     }
@@ -1273,7 +1558,9 @@ impl Ui {
             return true;
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
-        let soon = t0 < w.last_present + MIN_PRESENT_US && !s.script;
+        // (the browser: the worker's turn may hold several presents, the browser shows only the last
+        // image of a turn: gp_tick draws it, right after this, once)
+        let soon = (t0 < w.last_present + MIN_PRESENT_US && !s.script) || cfg!(target_arch = "wasm32");
         // (what changes on the screen is known without layers, images and canvases)
         let apart = w.sp.drawn || w.sp.active || !w.sp.quads.is_empty();
         let before = core::mem::replace(&mut w.apart_before, apart);
@@ -1338,6 +1625,8 @@ impl Ui {
             fail_ms: 0,
             out: GpuOutput::default(),
             sp: Split::default(),
+            #[cfg(target_arch = "wasm32")]
+            verify_wait: Vec::new(),
         });
         w.pw = pw;
         w.out.cpu_frames += 1;
@@ -1373,6 +1662,12 @@ impl Ui {
         w.size = size;
         w.stable_at = now;
         w.out.leaves += 1;
+        // (the browser: its canvas goes with this frame, the next period on the GPU has a new one)
+        #[cfg(target_arch = "wasm32")]
+        {
+            w.sc = None;
+            w.surf = None;
+        }
         w.out.cpu_frames += 1;
     }
 
@@ -1427,6 +1722,16 @@ impl Ui {
 
     /// the jobs that finished: a device, a window's swapchain
     fn gp_poll(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let s = &mut self.m.gout;
+            s.web_probe();
+            if let Dev::Ready(core) = &s.dev {
+                for w in s.wins.iter_mut().flatten() {
+                    verify_poll(w, core);
+                }
+            }
+        }
         let done = core::mem::take(&mut *self.m.gout.jobs.done.lock());
         for d in done {
             match d {
@@ -1461,6 +1766,9 @@ impl Ui {
                                 w.stage = Stage::Cpu;
                                 w.lost = false;
                                 w.out.error = Some(format!("{e}"));
+                                // (the browser: the page's canvas, which never showed anything, goes)
+                                #[cfg(target_arch = "wasm32")]
+                                plat::win_gpu_child_show(w.pw, false);
                             }
                         }
                     }
@@ -1523,7 +1831,8 @@ impl Ui {
         w.undef = true;
         w.rb = None;
         if verify {
-            let size = tw as u64 * th as u64 * 4;
+            // (the browser: only a sign, show makes a buffer per frame)
+            let size = if cfg!(target_arch = "wasm32") { 4 } else { tw as u64 * th as u64 * 4 };
             w.rb = dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback }).ok();
         }
         w.stage = Stage::Switch;
@@ -1587,6 +1896,15 @@ impl Ui {
             return;
         }
         self.gp_poll();
+        // (the browser tells a lost device, or an error of an earlier call, between frames too)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let e = if let Dev::Ready(core) = &self.m.gout.dev { core.dev.poll().err() } else { None };
+            if let Some(e) = e {
+                self.gp_failed(0, e);
+                return;
+            }
+        }
         let n = self.m.gout.wins.len();
         let now = plat::time_us();
         self.gp_canvas_tick(now);
@@ -1664,6 +1982,10 @@ impl Ui {
             Dev::Retry(at) if at <= now => s.dev = Dev::None,
             _ => {}
         }
+        #[cfg(target_arch = "wasm32")]
+        if s.web_start() {
+            return;
+        }
         if matches!(s.dev, Dev::None) {
             if plat::win_remote_session() {
                 s.dev = Dev::Retry(now + REMOTE_LOOK_US); // this session has no use for it (yet)
@@ -1685,7 +2007,7 @@ impl Ui {
             let trace = s.trace;
             s.note("start: instance, device, swapchain on a worker");
             plat::gpu_out_state(plat::GPU_STATE_TRYING);
-            let ok = s.spawn(move || Done::Device { job, win: i, r: build_device(nw, pw, display, desc, trace) });
+            let ok = s.spawn(move || Done::Device { job, win: i, r: build_device(None, nw, pw, display, desc, trace) });
             if ok {
                 s.dev = Dev::Starting(job);
                 if let Some(w) = s.win(i) {
@@ -2455,7 +2777,7 @@ impl Ui {
             rects.retain(|r| r[2] > 0 && r[3] > 0);
             if !rects.is_empty() {
                 let loose = !(rec.d.exact_pan && copy);
-                quads.push(Quad { x: *x, y: *y, src: QuadSrc::Canvas { f: f.clone(), w: *cw, h: *ch, tiles, copy, loose }, rects });
+                quads.push(Quad { x: *x, y: *y, src: QuadSrc::Canvas { f: f.clone(), w: *cw, h: *ch, vis, tiles, copy, loose }, rects });
             }
         }
         s.tile_sf = sf;
