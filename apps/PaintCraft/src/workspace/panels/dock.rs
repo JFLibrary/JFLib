@@ -13,7 +13,8 @@
 //              Werkzeuge when the main window is low), Verlauf top right, Ebenen bottom right;
 //              the Verlauf hides when it does not fit above the Ebenen, a very small main window
 //              shows only Werkzeuge (left) and Farben (right); a low one lays the Werkzeuge out
-//              in two rows.
+//              in two rows.  A window the user turns on while hidden shows at its place all the
+//              same (a phone is always very small), on top of what is there.
 //   DM_ANCHOR  the user dragged it inside the main window: it keeps its distance from the
 //              nearest horizontal and vertical edge (so it stays at "its" edge on resizes).
 //   DM_FREE    the user dragged it out of the main window (centre outside): it stays where it
@@ -58,6 +59,8 @@ pub(crate) struct DockRec {
     pub(crate) apy: i32,
     /// DR_HIDE: hidden by the layout this frame
     pub(crate) hide: bool,
+    /// the user turned it on: the layout does not hide it (not saved: a new start lays out afresh)
+    pub(crate) want: bool,
 }
 
 /// wnd_dock.s
@@ -91,6 +94,7 @@ pub(crate) fn dock_reset(d: &mut Dock, k: i32) {
     let r = dock_rec(d, k);
     r.mode = DM_AUTO;
     r.apx = i32::MIN;
+    r.want = false;
 }
 
 // dk_wrect(k) -> the WINRECT of window k (the modules' getters)
@@ -213,13 +217,14 @@ pub(crate) fn dock_frame(p: &mut Pn, ui: &mut Ui) {
     }
     let dk = &mut p.dock.dk;
     if tiny {
-        if dk[WND_HISTORY as usize].mode != DM_FREE {
+        if dk[WND_HISTORY as usize].mode != DM_FREE && !dk[WND_HISTORY as usize].want {
             dk[WND_HISTORY as usize].hide = true;
         }
-        if dk[WND_LAYERS as usize].mode != DM_FREE {
+        if dk[WND_LAYERS as usize].mode != DM_FREE && !dk[WND_LAYERS as usize].want {
             dk[WND_LAYERS as usize].hide = true;
         }
     } else if dk[WND_HISTORY as usize].mode == DM_AUTO
+        && !dk[WND_HISTORY as usize].want
         && dk[WND_LAYERS as usize].mode == DM_AUTO
         && crate::workspace::chrome::chrome_wnd_open(&p.chrome, WND_LAYERS).get() != 0
         && t + f.oh[1] + DK_M > ay[2]

@@ -197,11 +197,20 @@ pub(crate) fn sys_settings_host(s: &mut SysSettings) {
 const CALL_BACK: u32 = 55;
 #[cfg(target_os = "android")]
 const CALL_LONG_PRESS: u32 = 56;
+#[cfg(target_os = "android")]
+const CALL_FINISH: u32 = 57;
 
 /// (Android) while on, the back key reaches the app as Esc instead of ending the activity
 #[cfg(target_os = "android")]
 pub(crate) fn back_trap(on: bool) {
     let _ = crate::web::android_host::call(CALL_BACK, &[on as u8]);
+}
+
+/// (Android) the runtime ended (ui.quit): the activity goes and its process with it, a new start
+/// needs a new runtime
+#[cfg(target_os = "android")]
+pub(crate) fn app_finish() {
+    let _ = crate::web::android_host::call(CALL_FINISH, &[]);
 }
 
 // (Android) the finger's gesture reached a widget: plat::touch_reached, jfgui_touch_reached

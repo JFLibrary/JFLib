@@ -14,7 +14,7 @@ pub(crate) fn plug_init(_p: &mut Pn, _ui: &mut Ui) {
     img_all::use_all_codecs();
 }
 pub(crate) fn plug_states(_p: &mut Pn, ui: &mut Ui) {
-    pn_cmd_set(ui, CMD_FX_PLUGIN_ERRORS, CF_DISABLED);
+    pn_cmd_set(ui, CMD_FX_PLUGIN_ERRORS, if cfg!(target_os = "android") { CF_HIDDEN } else { CF_DISABLED });
 }
 pub(crate) fn plug_frame(_p: &mut Pn, ui: &mut Ui) {
     ui.last_reset();

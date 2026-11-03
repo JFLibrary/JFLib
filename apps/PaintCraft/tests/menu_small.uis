@@ -1,0 +1,35 @@
+#!args --config build/tests/pn_menu_small --open apps/PaintCraft/tests/fixtures/p1_plugin.png
+# menu_small.uis -- menus on a small screen (a phone), lib/ui/popup.rs menu_flyout: a menu taller than
+# the window scrolls, and its submenu is drawn all the same (it is built after the menu, outside
+# the menu's scroll view); a submenu that has to overlap its menu lies on top of the later rows.
+size 900 360
+theme light
+wait 16
+click menu:"Effekte"
+wait 16
+move menuitem:"Foto"
+wait 300
+expect menuitem:"Porträt retuschieren…" exists
+move menuitem:"Porträt retuschieren…"
+wait 300
+expect menuitem:"Porträt retuschieren…" hover
+# the row is drawn, hovered (the flyout itself is F9F9F9)
+expect pixel 295 117 #F0F0F0
+key esc
+key esc
+wait 16
+# ---- narrow: the submenu lies over its menu, its second row over the menu's next row
+size 420 800
+wait 16
+click menu:"Datei"
+wait 16
+move menuitem:"Zuletzt geöffnet"
+wait 300
+expect menuitem:"Liste leeren" enabled
+click menuitem:"Liste leeren"
+wait 16
+click menu:"Datei"
+wait 16
+move menuitem:"Zuletzt geöffnet"
+wait 300
+expect menuitem:"Liste leeren" disabled

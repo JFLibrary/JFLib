@@ -134,6 +134,7 @@ pub(crate) struct S {
     surface: Option<Vec<TextSurfaceLine>>,
     surface_start: Option<usize>,
     surface_change: Option<(usize, usize, String)>,
+    ime_frame: Option<u32>, // the frame of the last caret told to the platform (ime_pos)
     // ---- the focused editor (g_ed_*)
     ed_id: u32, // 0 = none
     ed_blur: u32, // box that lost the focus before it was drawn
@@ -198,6 +199,7 @@ impl Default for S {
             surface: None,
             surface_start: None,
             surface_change: None,
+            ime_frame: None,
             ed_id: 0,
             ed_blur: 0,
             ed_caret: 0,
@@ -1262,6 +1264,16 @@ impl Ui {
         self.a11y_caret(px, y, h);
         if !self.headless {
             plat::ime_pos(px, y, h);
+        }
+        self.m.edit.ime_frame = (h > 0).then_some(self.frame);
+    }
+
+    // (frame_end, Android) no text box told its caret this frame after one did: it went away with
+    // its window (a dialog closed) and cannot tell; the keyboard must not come with the next tap
+    #[cfg(target_os = "android")]
+    pub(crate) fn ime_frame_end(&mut self) {
+        if self.m.edit.ime_frame.is_some_and(|f| f != self.frame) {
+            self.ime_off();
         }
     }
 

@@ -1299,6 +1299,9 @@ impl Ui {
         let mut ids = [0u32; MENU_MAX];
         let mut recs = [0u8; MENU_MAX];
         let mut activated = false;
+        // the open submenu with its row: built after this menu, so it lies on top of the later
+        // rows (a phone's submenu overlaps its menu) and outside the scroll view of a tall menu
+        let mut open_sub: Option<(&'static [Mi], u32, [i32; 4])> = None;
         let open = self.flyout_begin(pid, flags);
         if !open {
             self.flyout_end();
@@ -1356,7 +1359,7 @@ impl Ui {
                             self.pp_flag(spid, PPF_FOCUS);
                         }
                     }
-                    self.menu_flyout(sub, spid, FL_RIGHT);
+                    open_sub = Some((sub, spid, self.wp.ctx.last_rect));
                     continue;
                 }
                 Mi::List(base, max, empty) => {
@@ -1455,6 +1458,12 @@ impl Ui {
             }
         }
         self.flyout_end();
+        if let Some((sub, spid, row)) = open_sub {
+            let rect = self.wp.ctx.last_rect;
+            self.wp.ctx.last_rect = row; // what flyout_begin anchors it to
+            self.menu_flyout(sub, spid, FL_RIGHT);
+            self.wp.ctx.last_rect = rect;
+        }
         true
     }
 

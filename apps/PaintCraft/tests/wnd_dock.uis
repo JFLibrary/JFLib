@@ -88,3 +88,16 @@ expect window 24579 closed
 expect window 24577 open
 expect window 24580 open
 shot build/pn_dock_tiny.png desktop
+# ---- a window turned on all the same shows (a phone is always this small): F7 = Ebenen, F6 = Verlauf
+cmd 702
+sync
+expect window 24579 open
+cmd 702
+sync
+expect window 24579 closed
+cmd 702
+sync
+expect window 24579 open
+cmd 701
+sync
+expect window 24578 open

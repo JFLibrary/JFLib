@@ -13,6 +13,7 @@ Bibliothek dazu: [`lib/ui/touch.rs`](../../../lib/ui/touch.rs), [GUIDE §37](../
 | Finger liegt, ohne sich zu bewegen | Der Druck kommt nach 400 ms (ein Punkt des Pinsels), kein Kontextmenü |
 | Werkzeugfenster: oben drücken und halten | In einer Sekunde läuft eine Linie unter der Titelleiste voll, dann folgt das Fenster dem Finger in jede Richtung. Ein schnelles Wischen dort tut nichts |
 | Zoomregler, Zahnrad und andere kleine Knöpfe | Auch ein Finger knapp daneben trifft: Auf dem Hintergrund gewinnt das nächste kleine Bedienelement in 44 DIP Reichweite; mit der Maus ändert sich nichts |
+| Kleine Knöpfe am Rand eines Werkzeugfensters („+“ und Stift im Ebenen-Fenster) | Sie gewinnen gegen den für Finger breiten Griff zum Größenziehen; daneben zieht der Griff wie gewohnt |
 | Zweiter Finger kurz nach dem ersten (unter 200 ms) | Der angefangene Strich wird zurückgenommen, es zählt die Zwei-Finger-Geste. Später stört ein zweiter Finger den Strich nicht |
 
 **Ein Finger und der Stift.** Einstellungen ▸ Stift & Tablett ▸ „Ein Finger auf der Leinwand“:
@@ -75,6 +76,8 @@ Mit dem Finger, ohne Stift:
    knapp einer Sekunde voll, danach folgt das Fenster dem Finger, nach oben, unten, links, rechts. Ist die Zeit
    angenehm, zu lang oder zu kurz (`HOLD_LONG_MS` in `lib/ui/touch.rs`)? Schnell darüberwischen darf nichts bewegen.
 4. **Knöpfe in einem Werkzeugfenster** antippen (Pinsel, Radierer): Das Werkzeug wechselt, das Fenster bleibt liegen.
+   Auch „+“ und den Stift unten im Ebenen-Fenster: Sie legen eine Ebene an und öffnen die Eigenschaften, das Fenster ändert
+   dabei nicht seine Größe.
 5. **Zoomen:** zwei Finger auf die Leinwand und auseinanderziehen. Läuft es flüssig, ohne Stufen? Der Punkt zwischen den
    Fingern bleibt unter den Fingern. Auch mit einem großen Bild (etwa 4000 × 3000) probieren.
 6. **Verschieben:** zwei Finger gemeinsam ziehen, nach rechts, links, oben, unten, auch ohne vorher zu zoomen.

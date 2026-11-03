@@ -22424,6 +22424,10 @@ Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_
   closes; `UIC_ESCAPE` when nothing took it) instead of ending the activity.  Elsewhere nothing:
   there Esc is a key of its own
 
+- **`fn app_finish()`**
+  Android: the runtime ended (ui.quit): the activity goes and its process with it, a new start
+  needs a new runtime.  Elsewhere nothing: there the main loop ends the program
+
 - **`fn touch_primary() -> bool`**
   (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
   `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the

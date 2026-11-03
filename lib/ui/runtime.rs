@@ -118,7 +118,14 @@ impl plat::web::WebApplication for HostRuntime {
         if !enabled { self.sessions.clear(); }
     }
     fn tick(&mut self, time_ms: u32) {
+        #[cfg(target_os = "android")]
+        let running = !self.runtime.finished;
         self.runtime.step(time_ms, &[]);
+        // ui.quit: there nobody ends the activity but the app (the browser's page stays)
+        #[cfg(target_os = "android")]
+        if running && self.runtime.finished {
+            plat::app_finish();
+        }
         self.runtime.ui.present();
         self.runtime.ui.gp_tick();
     }

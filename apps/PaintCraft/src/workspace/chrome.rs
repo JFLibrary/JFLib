@@ -41,12 +41,14 @@ pub(crate) static PN_ZOOM_PRESETS: [u32; ZOOM_PRESETS_N as usize] = [
 ];
 const RANGE_ZSLIDER: Range = Range::new(0, ZOOM_PRESETS_N - 1, 1, 0);
 /// tool bar row 1 (0 = divider)
-static TOOLBAR_ROWS: [u32; 16] = [
+static TOOLBAR_ROWS: [u32; if cfg!(target_os = "android") { 14 } else { 16 }] = [
     CMD_NEW,
     CMD_OPEN,
     CMD_SAVE,
     0,
+    #[cfg(not(target_os = "android"))]
     CMD_PRINT,
+    #[cfg(not(target_os = "android"))]
     0,
     CMD_CUT,
     CMD_COPY,
@@ -119,10 +121,12 @@ pub(crate) fn chrome_wnd_open(c: &Chrome, i: i32) -> Shared<i32> {
     c.wnd_open[i].clone()
 }
 
-/// chrome_states() -- toggles show the window state
+/// chrome_states() -- toggles show the window state (a window the layout hides for lack of room
+/// is not on)
 pub(crate) fn chrome_states(p: &mut Pn, ui: &mut Ui) {
     for (i, f) in p.chrome.wnd_open.iter().enumerate() {
-        crate::app::commands::pn_cmd_set(ui, CMD_WND_TOOLS + i as u32, if f.get() != 0 { CF_CHECKED } else { 0 });
+        let shown = f.get() != 0 && !crate::workspace::panels::dock::dock_hidden(&p.dock, i as i32);
+        crate::app::commands::pn_cmd_set(ui, CMD_WND_TOOLS + i as u32, if shown { CF_CHECKED } else { 0 });
     }
     crate::app::commands::pn_cmd_set(ui, CMD_WND_RESET, 0);
 }
@@ -131,8 +135,12 @@ pub(crate) fn chrome_states(p: &mut Pn, ui: &mut Ui) {
 pub(crate) fn chrome_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
     let k = id.wrapping_sub(CMD_WND_TOOLS);
     if k < WND_COUNT as u32 {
+        // hidden by the layout: asked for, it shows all the same (wnd_dock.rs)
+        let hidden = crate::workspace::panels::dock::dock_hidden(&p.dock, k as i32);
         let f = &p.chrome.wnd_open[k as usize];
-        f.set(f.get() ^ 1);
+        let on = hidden || f.get() == 0;
+        f.set(on as i32);
+        crate::workspace::panels::dock::dock_rec(&mut p.dock, k as i32).want = on;
         return true;
     }
     if id == CMD_WND_RESET {
