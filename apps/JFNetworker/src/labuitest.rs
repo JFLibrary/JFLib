@@ -182,7 +182,7 @@ fn panel(t: &mut T) {
     t.eq("pills: one per kind in order, running when one runs", pills_from(&list).into_iter().collect::<Vec<_>>(), alloc::vec![(1, alloc::vec![(0, true), (5, true)]), (2, alloc::vec![(1, true)]), (4, alloc::vec![(6, false)])]);
     t.eq("sparklines: the first service of their kinds", sparks_from(&list).into_iter().map(|(d, (n, x))| (d, n, x)).collect::<Vec<_>>(), alloc::vec![(1, s("lb"), "requests"), (2, s("a"), "requests")]);
     // the tiles of a KPI as the charts write their values
-    let k = Kpi { dev: 1, svc: s("lb"), kind: "lb", rps_milli: Some(101_750), p50_us: Some(1133), p95_us: Some(1133), p99_us: Some(249_561), err_pm: Some(5), queue: None, inflight: Some(0), hit_pm: None, load_milli: None, keys: None, bytes: None };
+    let k = Kpi { dev: 1, svc: s("lb"), kind: "lb", rps_milli: Some(101_750), p50_us: Some(1133), p95_us: Some(1133), p99_us: Some(249_561), p999_us: None, err_pm: Some(5), queue: None, inflight: Some(0), hit_pm: None, load_milli: None, keys: None, bytes: None };
     let want = [("Anfragen/s", "102"), ("p50", "1,13 ms"), ("p95", "1,13 ms"), ("p99", "250 ms"), ("Fehlerquote", "0,5 %"), ("In Arbeit", "0")];
     t.eq("tiles of a balancer", kpi_tiles(&k, None, ',' as u32), want.iter().map(|(a, b)| (s(a), s(b))).collect::<Vec<_>>());
     let k = Kpi { kind: "kv", rps_milli: Some(44_500), load_milli: Some(72_750), keys: Some(138), bytes: Some(3_400), p50_us: None, p95_us: None, p99_us: None, err_pm: None, inflight: None, ..k };

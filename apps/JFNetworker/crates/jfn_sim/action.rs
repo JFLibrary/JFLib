@@ -1019,7 +1019,11 @@ impl Engine {
         }
         // the services of the project start when the engine runs (a bad one is left out)
         for s in &d.services {
-            let _ = self.service_def(d.id, s);
+            if let Err(e) = self.service_def(d.id, s)
+                && let Some(os) = self.os_mut(ni)
+            {
+                os.refused.push((s.clone(), e.msg()));
+            }
         }
         // the units it has enabled in its files (units.rs)
         self.units_boot(ni);

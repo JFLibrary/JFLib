@@ -15,6 +15,8 @@
 //                                      unit, points (t, value)); series_one(dev, svc, name)
 //   Engine::cable_series(link)         a cable's frames_ab, bytes_ab, frames_ba, bytes_ba per
 //                                      second (a: the end the project names first)
+//   Engine::cable_util(link) -> Vec<(t, ab, ba)>   how much of its bit rate a cable carried each way per
+//                                      interval, in thousandths of a percent (SA3, the Metriken panel)
 //   Engine::series_value(dev, svc, name, agg, from, to)   one value of the samples taken in
 //                                      (from, to] in thousandths (AggOut, else SeriesErr): what
 //                                      "expect ... over 5s" checks (Agg: jfn_model::scenario)
@@ -43,7 +45,14 @@
 //                                      (the part of its cores' time spent in the interval, per
 //                                      mille), running (cores busy), runq (jobs waiting for a core),
 //                                      mem_bytes, swap_bytes, pageins, oom_kills and disk_bytes
-//                                      (counters: rates per second); only such a device has one
+//                                      (counters: rates per second); only such a device has one.
+//                                      For the window also disk_pm (the part of the interval its disk
+//                                      was busy), disk_wait_us (the longest wait for it so far) and
+//                                      disk_backlog_us (what waits for it now): WINDOW_ONLY, they
+//                                      stay out of series_csv and series_size
+//   Engine::lat_hist_between(dev, svc, from, to)   what a service's latency window holds for the
+//                                      span as one histogram (SA3, the bars of the Metriken panel);
+//                                      Kpi::p999_us its 99.9th percentile
 //
 // What a metric becomes: Service::metric_kind (by default metric_kind_of, which goes by the
 // names the built-in services use) makes it a counter, whose series is its rate per second
@@ -474,6 +483,7 @@ pub struct Kpi {
     pub p50_us: Option<i64>,
     pub p95_us: Option<i64>,
     pub p99_us: Option<i64>,
+    pub p999_us: Option<i64>,
     /// errors per thousand requests
     pub err_pm: Option<i64>,
     /// waiting work (queued requests, a queue's depth) and work in flight, at the newest sample
@@ -672,7 +682,19 @@ fn sample_host(rec: &mut Rec, r: &crate::res::Res, disk: &crate::disk::Disk, eve
     for (name, value) in [("pageins", v(r.pageins)), ("oom_kills", v(r.oom_kills)), ("disk_bytes", v(disk.bytes_read + disk.bytes_written))] {
         rec.slot(&mut hint, name, SeriesKind::Rate, base).put(Some(value), stamp, base, keep);
     }
+    // the disk, for the window (WINDOW_ONLY)
+    let busy = v(disk.busy_ns);
+    let x = rec.slot(&mut hint, "disk_pm", SeriesKind::Gauge, base);
+    let spent = x.last.map(|l| (busy - l).max(0));
+    x.last = Some(busy);
+    x.put(spent.map(|s| (s as i128 * 1000 / (every as i128).max(1)).min(1000) as i64), stamp, base, keep);
+    for (name, value) in [("disk_wait_us", v(disk.max_wait / 1000)), ("disk_backlog_us", v(disk.backlog(to) / 1000))] {
+        rec.slot(&mut hint, name, SeriesKind::Gauge, base).put(Some(value), stamp, base, keep);
+    }
 }
+
+/// the series only the window reads: they stay out of the CSV of a scenario's "series FILE"
+const WINDOW_ONLY: [&str; 3] = ["disk_pm", "disk_wait_us", "disk_backlog_us"];
 
 /// a service's metrics and windows at a sample covering [from, to)
 fn sample_service(rec: &mut Rec, svc: &dyn Service, from: Ns, to: Ns, stamp: u64, base: bool, keep: usize) {
@@ -762,6 +784,18 @@ impl Engine {
         s.links.get(&link).map(|r| r.ser.iter().map(|x| s.view(x)).collect()).unwrap_or_default()
     }
 
+    /// how much of its bit rate a cable carried each way per interval, in thousandths of a percent: bytes
+    /// over what the line carries (frames without preamble and gap), as a sweep counts it
+    pub fn cable_util(&self, link: u32) -> Vec<(Ns, i64, i64)> {
+        let Some(kbps) = self.link_rt(link).map(|l| (l.kbps as i128).max(1)) else { return Vec::new() };
+        let of = self.cable_series(link);
+        let points = |name: &str| of.iter().find(|x| x.name == name).map_or(Vec::new(), |x| x.points.clone());
+        let (ab, ba) = (points("bytes_ab"), points("bytes_ba"));
+        // bytes per second * 8 / (kbit/s * 1000) * 100 000
+        let share = |v: i64| (v as i128 * 800 / kbps).clamp(0, 100_000) as i64;
+        ab.iter().zip(ba.iter()).map(|(a, b)| (a.0, share(a.1), share(b.1))).collect()
+    }
+
     /// one value of a series of the samples taken in (from, to]: `agg` Natural gives a rate
     /// over the span, a gauge's mean, a latency's quantile (mean, maximum) of everything the
     /// service's window holds for the span; Min, Max and Mean go over the samples' values
@@ -842,6 +876,7 @@ impl Engine {
             p50_us: lat("p50_us"),
             p95_us: lat("p95_us"),
             p99_us: lat("p99_us"),
+            p999_us: self.lat_hist_between(dev, &rec.name, from, to).and_then(|h| h.quantile(999)).map(|ns| (ns / 1000) as i64),
             err_pm: per_mille(s.change(rec, r.err, from, to), s.change(rec, r.req, from, to)),
             queue: gauge(r.queue),
             inflight: gauge(r.inflight),
@@ -850,6 +885,16 @@ impl Engine {
             keys: gauge(Some("keys")),
             bytes: if rec.find("bytes").is_some_and(|x| x.kind == SeriesKind::Gauge) { gauge(Some("bytes")) } else { None },
         })
+    }
+
+    /// what the latency window of a service holds for the span, as one histogram (its first window of
+    /// times; none: a service without one)
+    pub fn lat_hist_between(&self, dev: u32, svc: &str, from: Ns, to: Ns) -> Option<base::metrics::Hist> {
+        let o = self.os(self.node_index(dev)?)?;
+        let s = o.svc(svc)?.svc.as_ref()?;
+        let wins = s.windows();
+        let w = wins.iter().find(|w| !w.raw)?;
+        Some(w.win.hist_between(from, to))
     }
 
     /// the KPI tiles of every service with series
@@ -903,7 +948,7 @@ impl Engine {
         for (&dev, recs) in &s.svcs {
             let dn = self.node(dev).map(|n| n.name.clone()).unwrap_or_else(|| format!("{}", dev));
             for r in recs {
-                for x in &r.ser {
+                for x in r.ser.iter().filter(|x| !WINDOW_ONLY.contains(&x.name)) {
                     cols.push((format!("{} {} {}", dn, r.name, x.name), x));
                 }
             }

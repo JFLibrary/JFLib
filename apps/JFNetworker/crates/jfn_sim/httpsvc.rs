@@ -913,6 +913,32 @@ pub struct ServerView {
     pub slots: Vec<Slot>,
 }
 
+impl HttpServer {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{mem_into, ms_of, rate_of, us_of, word};
+        let c = &self.serve.cfg;
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("port", Value::u64(c.port as u64));
+        o.insert("workers", Value::u64(self.workers as u64));
+        o.insert("queue", Value::u64(self.queue_max as u64));
+        o.insert("time_ms", ms_of(self.time));
+        o.insert("jitter_ms", ms_of(self.jitter));
+        o.insert("cpu_ms", ms_of(self.cpu));
+        o.insert("serial_us", us_of(self.serial));
+        o.insert("error_rate", rate_of(self.error_ppm));
+        o.insert("error_status", Value::u64(self.error_status as u64));
+        o.insert("keepalive_ms", ms_of(c.keepalive));
+        o.insert("max_requests", Value::u64(c.max_requests as u64));
+        o.insert("header_timeout_ms", ms_of(c.header_timeout));
+        o.insert("max_body", Value::u64(c.max_body));
+        o.insert("backlog", Value::u64(c.backlog as u64));
+        o.insert("server", word(&c.server));
+        mem_into(&mut o, &self.mem);
+        o
+    }
+}
+
 impl Service for HttpServer {
     fn kind(&self) -> &'static str {
         "http-server"
@@ -1038,6 +1064,9 @@ impl Service for HttpServer {
     }
     fn mem(&self) -> u64 {
         self.mem.bytes(self.serve.conns() as u64, 0)
+    }
+    fn lock_busy(&self) -> Ns {
+        self.lock_busy
     }
     fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
         let fresh = from_def_msg("http-server", c)?;
@@ -1761,6 +1790,31 @@ pub struct LoadView {
     pub max: Option<Ns>,
     /// per second: sent, done (answers), errors (HTTP errors and failures)
     pub slots: Vec<Slot>,
+}
+
+impl HttpLoad {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{ms_of, word};
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("mode", word(if self.mode == LoadMode::Open { "open" } else { "closed" }));
+        o.insert("users", Value::u64(self.users as u64));
+        o.insert("think_ms", ms_of(self.think));
+        o.insert("think", word(if self.think_exp { "exp" } else { "fixed" }));
+        o.insert("rps", crate::svcform::thousandths(self.rate_m));
+        o.insert("start_rps", crate::svcform::thousandths(self.start_rate_m));
+        o.insert("arrival", word(if self.poisson { "poisson" } else { "uniform" }));
+        o.insert("ramp_ms", ms_of(self.ramp));
+        o.insert("delay_ms", ms_of(self.delay));
+        o.insert("duration_ms", ms_of(self.duration));
+        o.insert("requests", Value::u64(self.max_requests));
+        o.insert("timeout_ms", ms_of(self.timeout));
+        o.insert("connect_timeout_ms", ms_of(self.connect_timeout));
+        o.insert("keepalive", Value::Bool(self.keepalive));
+        o.insert("max_conns", Value::u64(self.max_conns as u64));
+        o.insert("balance", word(if self.random_target { "random" } else { "round-robin" }));
+        o
+    }
 }
 
 impl Service for HttpLoad {

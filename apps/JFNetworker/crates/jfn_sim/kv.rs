@@ -1066,6 +1066,28 @@ fn us(v: Option<u64>) -> i64 {
     v.map(|x| (x / 1000) as i64).unwrap_or(0)
 }
 
+impl KvNode {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{mem_into, ms_of, us_of, word};
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("port", Value::u64(self.port as u64));
+        o.insert("hb_port", Value::u64(self.hb_port as u64));
+        o.insert("vnodes", Value::u64(self.vnodes as u64));
+        o.insert("rf", Value::u64(self.rf as u64));
+        o.insert("w", Value::u64(self.w as u64));
+        o.insert("r", Value::u64(self.r as u64));
+        o.insert("consistency", word(self.consistency.name()));
+        o.insert("read_repair", Value::Bool(self.read_repair));
+        o.insert("timeout_ms", ms_of(self.timeout));
+        o.insert("heartbeat_ms", ms_of(self.beat));
+        o.insert("down_ms", ms_of(self.down_after));
+        o.insert("cpu_us", us_of(self.cpu));
+        mem_into(&mut o, &self.mem);
+        o
+    }
+}
+
 impl Service for KvNode {
     fn kind(&self) -> &'static str {
         "kv"

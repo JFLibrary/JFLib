@@ -14,6 +14,9 @@
 //   Config::label() / labels()         a configuration in words, its value per axis
 //   patch_hw / patch_config / patch_load / patch_pool / patch_clones   what an axis does to a copy
 //                                      of the project (jfn_sim's experiment.rs calls them)
+//   SavedRun                           a run kept by its name in the project's "runs" (SA3): the name,
+//                                      the date, the experiment as it ran and its results as jfn_sim's
+//                                      Sweep::to_value writes them; KEEP_RUNS, KEEP_POINTS bound them
 //   known_keys(kind)                   the settings of the services this checks by name
 //   set_path(&mut config, path, value) a member of a service's config by its path
 //
@@ -159,6 +162,24 @@ record! {
         pub series: Vec<Series>,
         pub prices: BTreeMap<String, Value>,
         pub cost_exclude: Vec<String>,
+    }
+}
+
+/// runs a project keeps at most, and points (configurations times levels) of one kept run: about
+/// 600 bytes each in the file, so a project grows by at most about 20 MiB through its runs
+pub const KEEP_RUNS: usize = 16;
+pub const KEEP_POINTS: usize = 2000;
+
+record! {
+    /// a run kept by its name (Project::runs)
+    pub struct SavedRun {
+        pub name: String,
+        /// when it ran, "2026-11-03 14:05"
+        pub date: String,
+        /// the experiment as it ran
+        pub experiment: Experiment,
+        /// the results: jfn_sim's Sweep::to_value (without the details of each run)
+        pub result: Value,
     }
 }
 
