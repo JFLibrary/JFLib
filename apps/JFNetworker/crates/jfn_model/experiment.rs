@@ -166,7 +166,7 @@ record! {
 }
 
 /// runs a project keeps at most, and points (configurations times levels) of one kept run: about
-/// 600 bytes each in the file, so a project grows by at most about 20 MiB through its runs
+/// 300 bytes each in the file, so a project grows by about 10 MiB at most through the points of its runs
 pub const KEEP_RUNS: usize = 16;
 pub const KEEP_POINTS: usize = 2000;
 

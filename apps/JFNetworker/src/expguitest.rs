@@ -539,7 +539,8 @@ fn kept(t: &mut T) {
     sweep.points = vec![one; KEEP_POINTS + 1];
     t.eq("too many points", keep_run(&mut doc, &x, &sweep, "gross", "d").err(), Some(format!("Dieser Lauf hat {} Punkte; das Projekt hält höchstens {} je Lauf. Die CSV-Datei hält alles.", KEEP_POINTS + 1, KEEP_POINTS)));
     t.eq("nothing kept then", doc.proj.runs.len(), 0);
-    // a kept run's size in the file: about 600 bytes a point, as jfn_model::experiment says
+    // a kept run's size in the file: about 300 bytes a point, as jfn_model::experiment says, and here few
+    // points with all that comes with any run (the experiment, the configurations)
     let per_point = (text.len() - old.len()) / copy.as_ref().map_or(1, |s| s.points.len());
     t.check(&format!("a point takes {} bytes of the file with all that comes with a run", per_point), per_point < 1200);
 }

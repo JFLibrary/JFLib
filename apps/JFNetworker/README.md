@@ -4459,7 +4459,7 @@ des Projekts und die behaltenen Läufe, rechts drei Seiten. Die Startseite hat d
   (Angebot gegen Erreichtes), Latenz über Durchsatz (p50, p95, p99, p99.9) und die Auslastung von CPU, Sperre, Disk und Kabel für die gewählte Konfiguration, das Knie markiert, das SLO als Linie.
 - **Behalten:** Ein Lauf gehört erst zum Projekt, wenn er einen Namen bekommt. Laufen und Fertigwerden ändern nichts an der Datei und sind kein Rückgängig-Schritt; „Behalten“ ändert die Datei
   (Punkt im Titel, Frage beim Schließen, automatische Sicherung), ist aber ebenfalls kein Rückgängig-Schritt, und das Entfernen fragt vorher. Gespeichert wird im Projekt unter `runs`: Name, Datum,
-  das Experiment, wie es lief, und die Ergebnisse. Ohne behaltene Läufe gibt es den Eintrag nicht, die Datei bleibt Byte für Byte dieselbe. Höchstens 16 Läufe mit je höchstens 2000 Punkten, gut 600 Byte je Punkt, zusammen also rund 20 MiB;
+  das Experiment, wie es lief, und die Ergebnisse. Ohne behaltene Läufe gibt es den Eintrag nicht, die Datei bleibt Byte für Byte dieselbe. Höchstens 16 Läufe mit je höchstens 2000 Punkten, rund 300 Byte je Punkt, zusammen also rund 10 MiB;
   was darüber hinausgeht, lehnt die Seite ab und sagt warum. Die Einzelheiten je Gerät und Lauf (`--detail`) bleiben nicht; CSV und Tabelle eines behaltenen Laufs sind dieselben Bytes wie beim Lauf.
 - **CSV:** „CSV ausgeben …“ schreibt dieselben Bytes wie `jfn-sim sweep --csv` für dasselbe Experiment.
 

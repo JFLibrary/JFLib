@@ -240,3 +240,25 @@ expect dialog:"Lauf entfernen?" exists
 click button:"Entfernen"
 wait 50
 expect text:"Behaltene Läufe (1)" exists
+# ---- a kept run through a file: saved, opened again, there to compare
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/jfnetworker/experiments_saved.jfnet"
+click button:"Speichern"
+wait 100
+expect dialog:"Speichern unter" missing
+cmd 2
+expect dialog:"Öffnen" exists
+click #1048588
+key ctrl+a
+type "experiments_saved.jfnet"
+click button:"Öffnen"
+wait 200
+expect dialog:"Öffnen" missing
+expect text:"Behaltene Läufe (1)" exists
+click tab:"Vergleich"
+wait 50
+expect #151617 exists
+expect text:"sweep_small" exists
