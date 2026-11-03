@@ -8,6 +8,8 @@ button:hover,button[aria-pressed=true] { background:#dce8fc; color:#154f9a }
 #status { margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 #viewport { flex:1; min-height:0; position:relative; overflow:hidden }
 #screen { display:block; width:100%; height:100%; outline:none; touch-action:none }
+/* the GPU output (lib/plat/web_gpu.rs): above #screen, shows nothing before its first frame, takes no pointer */
+#gpu { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none }
 /* the accessibility tree (a11y.js): over the canvas, invisible, no pointer events */
 #a11y { position:absolute; inset:0; overflow:clip; pointer-events:none; opacity:0 }
 #a11y * { position:absolute; box-sizing:border-box; margin:0; padding:0; border:0; min-width:0; min-height:0; background:transparent;

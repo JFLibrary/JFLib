@@ -6,13 +6,15 @@ Vulkan und WebGPU (Instanz, Adapter, Gerät, Warteschlange, Ressourcen, Pipeline
 Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird pro Ziel beim
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
-Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)).
+Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)),
+WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)).
 `vulkan-1.dll`, `libvulkan.so.1` bzw. `libvulkan.so` wird zur Laufzeit geladen, das Programm startet also auch auf
-Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: WebGPU im Browser,
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
 später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
-Windows, Linux und Android zeigt die GPU das Ergebnis
+Windows, Linux, Android und im Browser zeigt die GPU das Ergebnis
 (G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux),
-unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android);
+unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android),
+im Browser auf einer eigenen Leinwand über `#screen`: G4d, [Ausgabe im Browser](#ausgabe-im-browser);
 `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
 und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
@@ -29,9 +31,10 @@ und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bild
 | Fläche, Thread und `libvulkan.so` unter Android | [`lib/plat/android_gpu.rs`](../lib/plat/android_gpu.rs), [`android/GalleryActivity.java`](../android/GalleryActivity.java), [`android/bridge.c`](../android/bridge.c) |
 | Puffer der GPU am Fenster (Linux) | [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs), [`linux_wl_gpu.rs`](../lib/plat/linux_wl_gpu.rs) (zwp_linux_dmabuf_v1), [`linux_x11_gpu.rs`](../lib/plat/linux_x11_gpu.rs) (DRI3, Present) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
+| WebGPU im Browser | [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs), [`web_res.rs`](../lib/gpu/web_res.rs), [`web_cmd.rs`](../lib/gpu/web_cmd.rs), [`web_swap.rs`](../lib/gpu/web_swap.rs), die Seite des Browsers: [`web/gpu.js`](../web/gpu.js); die Leinwand: [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs), [`web/loader.js`](../web/loader.js) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
-| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py) |
+| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py); Browser: [`apps/gallery/tests/gpu_web.mjs`](../apps/gallery/tests/gpu_web.mjs), [`apps/webgputest`](../apps/webgputest/main.rs), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) |
 
 ## Ein Beispiel
 
@@ -70,7 +73,8 @@ rb.read(0, &mut out)?;
 
 - **Instanz und Adapter**: `Instance::new()` / `with(&InstanceDesc)`, `adapters()` (alle GPUs,
   diskrete zuerst; `AdapterInfo::missing` nennt, warum eine unbrauchbar ist), `adapter()`,
-  `adapters_low_power(display)` (für die Ausgabe der UI; `low_power_rank`).
+  `adapters_low_power(display)` (für die Ausgabe der UI; `low_power_rank`), `prepare()` (im Browser
+  kommen Adapter und Gerät später, anderswo sofort `true`).
   `AdapterInfo`: Name, Hersteller, Gerätekennung, Art, Treibername und -version, API-Version.
   `adapter.features()`, `limits()`, `level()`, `can_present(&surface)`,
   `create_device(&DeviceDesc)`.
@@ -80,7 +84,8 @@ rb.read(0, &mut out)?;
 - **Ressourcen**: `create_buffer` (`MemoryKind::Device` / `Upload` / `Readback`; die beiden
   letzten sind dauerhaft abgebildet: `write`, `read`), `create_texture` (2D, 2D-Array, Würfel,
   Würfel-Array, 3D, Mip-Stufen, Tiefenformate, BC1..BC7 wenn vorhanden; `view()`,
-  `create_view(&ViewDesc)`), `create_sampler`, `ShaderModule::from_spirv`.
+  `create_view(&ViewDesc)`), `create_sampler`, `ShaderModule::from_spirv`, im Browser
+  `ShaderModule::from_wgsl`.
 - **Bindungen**: `create_bind_group_layout(&[Binding])`, `create_pipeline_layout` (höchstens
   4 Gruppen, höchstens 128 Byte Push-Konstanten), `create_bind_group`; auf Stufe Voll
   `create_bindless` (eine große Tabelle: Bindung 0 Texturen, 1 Sampler, 2 Speicherpuffer,
@@ -132,8 +137,8 @@ Sie gelten für jedes Backend und für den WGSL-Übersetzer:
 - **Bindungen**: Gruppe g, Bindung b einer Pipeline-Struktur = WGSL `@group(g) @binding(b)` =
   SPIR-V `DescriptorSet g`, `Binding b`. Höchstens 4 Gruppen.
 - **Push-Konstanten**: ein Block ab Offset 0, für alle Stufen sichtbar, höchstens
-  `PUSH_CONSTANTS_MAX` = 128 Byte. Ein späteres WebGPU-Backend bildet sie über einen kleinen
-  Uniform-Puffer nach.
+  `PUSH_CONSTANTS_MAX` = 128 Byte. Das WebGPU-Backend bildet sie über einen kleinen
+  Uniform-Puffer nach ([Ausgabe im Browser](#ausgabe-im-browser)).
 - **Zustände von Texturen** (`Layout`): `Undefined`, `General`, `CopySrc`, `CopyDst`,
   `Sampled`, `ColorTarget`, `DepthTarget`, `DepthRead`, `Present`. Der Aufrufer sagt, in
   welchem Zustand eine Textur ist und in welchen sie soll (`texture_barrier(t, vorher,
@@ -164,8 +169,8 @@ let pipe = dev.create_compute_pipeline(&gpu::ComputePipelineDesc {
   (0x10000 + Index, außerhalb von 0 … 65535, die WGSL für `@id` erlaubt), und
   `wgsl::Output::constants` macht aus WebGPU-artigen Schlüsseln (Name oder Zahl) die Liste
   `(Nummer, Wert)` für jede Spezialisierungskonstante des Moduls, abgeleitete Overrides fertig
-  ausgerechnet (docs/WGSL.md „Overrides“); ein späteres WebGPU-Backend setzt den Schlüssel
-  selbst.
+  ausgerechnet (docs/WGSL.md „Overrides“); das WebGPU-Backend setzt den Schlüssel selbst (die
+  Nummer als Text, ab 0x10000 den Namen, den es im WGSL gelesen hat).
 - **Der Wert ist ein `f64`** wie in WebGPU und wird so umgewandelt wie dort: `bool` ist wahr außer
   bei 0 und NaN; `i32` / `u32` (und die anderen Ganzzahlen) werden zur Null hin abgeschnitten und
   müssen endlich und im Bereich liegen; `f32` / `f16` / `f64` werden gerundet und müssen endlich
@@ -257,7 +262,7 @@ Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a), un
 Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
-Skript verlangt mit `gpu on` anderes. Andere Ziele und statische Linux-Programme linken nichts davon
+Skript verlangt mit `gpu on` anderes. Statische Linux-Programme linken nichts davon
 (`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
 
 **Der Weg eines Fensters.**
@@ -526,7 +531,7 @@ ui.canvas_gpu(CanvasDesc {
 ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln darüber gehen
 ```
 
-`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
+`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
 `image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
 
 **Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
@@ -806,7 +811,7 @@ Was das heißt:
 | Variable | Wirkung |
 | --- | --- |
 | `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
-| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON` und `DEFAULT_ON_LINUX` in `gpu_out.rs`, unter Android `GPU_DEFAULT` in `GalleryActivity` |
+| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON`, `DEFAULT_ON_LINUX` und `DEFAULT_ON_BROWSER` in `gpu_out.rs`, unter Android `GPU_DEFAULT` in `GalleryActivity`. Im Browser kommen die Variablen aus der Adresse: `?gpu=0\|1` und `?gpuenv=jfgui_GPU_NAME=wert,..` (nur Namen `jfgui_GPU_*`) |
 | `jfgui_GPU_RES=cap` / `=full` | (Android, Debug-Builds) die Auflösung, durch die GPU und auf dem CPU-Pfad ([Ausgabe unter Android](#ausgabe-unter-android)) |
 | `jfgui_GPU_TEST_DIE=1` | (Android, Tests) der Arbeitsthread beendet das Programm, wo ein kaputter Treiber abstürzen würde |
 | `jfgui_TEST_LANDSCAPE=1` | (Android, Tests) die Activity bittet um Querformat, keine Einstellung des Systems |
@@ -1294,7 +1299,7 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
 - Bindungen ohne Arrays (`count` 1); Arrays gibt es über die Bindless-Tabelle auf Stufe Voll.
 - Kopien von Tiefen-Stencil-Formaten werden abgelehnt.
 - Zeilenlängen für Kopien im Kodierer prüft Vulkan nicht auf 256 Byte; WebGPU verlangt das --
-  für Portabilität `bytes_per_row` als Vielfaches von 256 wählen.
+  für Portabilität `bytes_per_row` als Vielfaches von 256 wählen (das WebGPU-Backend sagt sonst `Invalid`).
 - Ohne `hostQueryReset` (Vulkan 1.1) werden neue Zeitstempel erst in der nächsten Übergabe
   zurückgesetzt; vorher `read_*` aufzurufen ist dort nicht erlaubt.
 - Ein `Frame`, der nie dargestellt wird, lässt die Swapchain beim nächsten `acquire()` neu bauen.

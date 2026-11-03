@@ -140,10 +140,11 @@ mod hyph;
 pub mod i18n;
 mod ids;
 // the output through a swapchain: Windows and Linux programs against glibc, their windows only
-// (docs/GPU.md "Ausgabe der UI"); static Linux programs, the browser and Android link no Vulkan
-#[cfg(any(windows, jfgui_glibc, target_os = "android"))]
+// (docs/GPU.md "Ausgabe der UI"), Android, the browser (WebGPU: "Ausgabe im Browser"); static Linux
+// programs link nothing of it
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
 mod gpu_out;
-#[cfg(not(any(windows, jfgui_glibc, target_os = "android")))]
+#[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
 #[cfg(any(windows, jfgui_glibc, target_os = "android"))]

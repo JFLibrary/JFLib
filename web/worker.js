@@ -5,6 +5,16 @@ let clockOrigin=performance.timeOrigin || 0;
 const workers=new Set();
 // sound (audio.js): the pump between WASM and the page's worklets, loaded with the first stream
 let audio=null;
+// lib/gpu's WebGPU backend (gpu.js), loaded with the first look at the GPU: this thread owns its objects
+let gpuHost=null, gpuLoad=null;
+function gpuCall(op,args,n) {
+  if(gpuHost) return gpuHost.call(op,args>>>0,n>>>0);
+  if(!navigator.gpu || gpuLoad==="failed") return 0;
+  gpuLoad||=import("./gpu.js").then(x=>{gpuHost=new x.GpuHost(()=>memory,()=>{});if(gpuStart)gpuHost.begin();},error=>{gpuLoad="failed";console.warn("gpu.js:",error);});
+  if(op===0 && new Uint32Array(memory.buffer,args>>>0,1)[0]) gpuStart=true;
+  return 1; // (CALL_PREPARE, the only call before it is there: on the way)
+}
+let gpuStart=false;
 const idleWorkers=[];
 function checkWorkers() { if(failure && Atomics.load(failure,0)) throw new Error("Ein WASM-Rechen-Worker ist fehlgeschlagen."); }
 function failedWorker(error) {
@@ -115,7 +125,10 @@ const imports = { jfgui: {
     }
     postMessage({type:"frame",width,height,buffer,patches},[buffer]);
   },
+  gpu_call: gpuCall,
   request(kind, id, ptr, len) {
+    // the GPU output shows: the pixel buffers for the page wait unused, they go (lib/plat/web_gpu.rs)
+    if(kind===30) {buffers.length=0;pooledBytes=0;return;}
     // Copy before returning to Rust: no async task borrows linear memory.
     const data = bytes(ptr, len).slice().buffer;
     postMessage({type:"service", kind, id, data}, [data]);
@@ -178,6 +191,10 @@ function dispatch(m) {
     case "sensor-state": if(wasm.jfgui_sensor_state) {wasm.jfgui_sensor_state(m.mask>>>0,m.state>>>0);input();} break;
     case "location": if(wasm.jfgui_location) {wasm.jfgui_location(m.state>>>0,m.lat??NaN,m.lon??NaN,m.accuracy??NaN,m.altitude??NaN,m.speed??NaN,m.bearing??NaN,m.age??0,m.source>>>0);input();} break;
     case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
+    // the canvas of the GPU output came (lib/plat/web_gpu.rs)
+    case "gpu-canvas": if(gpuHost) wasm.jfgui_gpu_canvas(gpuHost.canvas(m.canvas)); break;
+    // (a test) the GPU output's counters; 1 lose the device, 2 settle, 3 the next frame draws everything
+    case "gpu-test": {const n=wasm.jfgui_gpu_test(m.op>>>0);postMessage({type:"gpu-test",id:m.id,text:decode.decode(bytes(wasm.jfgui_response(),n).slice())});break;}
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
     case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;
     case "closeSession": {
@@ -266,6 +283,7 @@ self.onmessage = async ({data:m}) => {
       // the page's list: a test's emulated locale does not reach a worker
       const langs = (m.languages && m.languages.length ? m.languages : navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""]).filter(Boolean);
       if (wasm.jfgui_env && langs.length) { const env = encode.encode("LANGUAGE="+langs.join(":")); inbox(env); wasm.jfgui_env(env.length); }
+      for (const value of m.env || []) { const env = encode.encode(value); inbox(env); wasm.jfgui_env(env.length); }
       // the monitors (lib/plat/web_screen.rs) before the app's first frame
       if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
       // the system's settings (system.js, lib/plat/web_system.rs) before the app's first frame
