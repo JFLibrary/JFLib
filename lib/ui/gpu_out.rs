@@ -206,7 +206,7 @@ const PRESENT: PresentMode = PresentMode::Mailbox;
 /// swapchain images: as fast as three in every measurement, a window's size less GPU memory
 const IMAGES: u32 = 2;
 /// frames closer together than this wait for gp_tick: 250 per second are plenty for a window (us).
-/// (The browser: its idle tick is 33 ms away, and it takes the newest image itself.)
+/// (The browser: every frame waits for the gp_tick of its turn; the next tick may be 33 ms away.)
 const MIN_PRESENT_US: u64 = if cfg!(target_arch = "wasm32") { 0 } else { 4_000 };
 /// a window's size is settled when it did not change for this long (us)
 const STABLE_US: u64 = 100_000;
@@ -1558,7 +1558,9 @@ impl Ui {
             return true;
         }
         let rects = if n < 0 { None } else { Some(&self.drects[..n as usize]) };
-        let soon = t0 < w.last_present + MIN_PRESENT_US && !s.script;
+        // (the browser: the worker's turn may hold several presents, the browser shows only the last
+        // image of a turn: gp_tick draws it, right after this, once)
+        let soon = (t0 < w.last_present + MIN_PRESENT_US && !s.script) || cfg!(target_arch = "wasm32");
         // (what changes on the screen is known without layers, images and canvases)
         let apart = w.sp.drawn || w.sp.active || !w.sp.quads.is_empty();
         let before = core::mem::replace(&mut w.apart_before, apart);

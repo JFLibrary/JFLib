@@ -6,8 +6,8 @@
 //        copied into it the browser maps it, Buffer::read says NotReady until then
 //   device.create_texture, texture.create_view, device.create_sampler   as WebGPU's
 //   ShaderModule::from_wgsl(&device, &str) the browser takes the WGSL as it is, its validator is the
-//        only one (lib/wgsl is not in the bundle; web_scan below reads names, overrides and bindings
-//        for what the API promises).  from_spirv: Unsupported
+//        only one (lib/wgsl is not in the bundle; scan below reads names, overrides and bindings for
+//        what the API promises).  from_spirv: Unsupported
 //   Push constants: WGSL `var<immediate> x: T;` becomes `@group(3) @binding(0) var<uniform> x: T;`
 //        (one block, a uniform layout), group 3 of a pipeline layout with push constants: at most
 //        three groups of its own then.  web/gpu.js puts them into a ring behind a dynamic offset.
