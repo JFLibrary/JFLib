@@ -1,9 +1,16 @@
-// fetch -- the updater's HTTP(S): small files with redirects, and downloads that hash while
-// they write and resume an interrupted file with a Range request
+// fetch -- the updater's HTTP(S), public for an app's other downloads: small files with
+// redirects, and downloads that hash while they write and resume an interrupted file with a
+// Range request (docs/UPDATES.md "Downloads without an update")
 //
 //   join(base, href) -> Option<Url>   a manifest's file address
 //   get(cfg, url, max) -> (final url, bytes)
 //   download(cfg, url, part, size, sha256, progress) -> Ok when part holds the whole file
+//
+// Of the Config only app and version (the User-Agent), ca_pem and timeout_ms count, so
+// Config::new(app, version, "", &[]) is enough.  Connections go through netio and plat::net: the
+// app's net.connect rules apply, an `ask` line asks on the calling thread's behalf (not the UI
+// thread, these calls block).  Failures: Error::Denied (the host), Tls, TooLarge (get), Net, Http,
+// Size, Hash, Incomplete (the part stays for the next call), Cancelled, Io.
 
 use alloc::format;
 use alloc::string::String;
@@ -37,6 +44,8 @@ fn client(cfg: &Config) -> Client {
 fn net_err(url: &Url, e: HttpError) -> Error {
     match e {
         HttpError::Net(n) if n.kind == NetErrorKind::Denied => Error::Denied(url.host.clone()),
+        e @ HttpError::Tls(_) => Error::Tls(format!("{}: {}", url, e)),
+        HttpError::TooLarge => Error::TooLarge(format!("{}: {}", url, HttpError::TooLarge)),
         e => Error::Net(format!("{}: {}", url, e)),
     }
 }
