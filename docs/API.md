@@ -101,7 +101,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
-  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs)
+  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs)
 - [plugin](#plugin) -- the PaintCraft plugin ABI for plugins written in Rust
   <br>[lib.rs](#plugin-crate-root) · [abi.rs](#pluginabirs) · [api.rs](#pluginapirs) · [ft.rs](#pluginftrs) · [fx.rs](#pluginfxrs)
 
@@ -26394,7 +26394,7 @@ Security APIs are loaded dynamically from advapi32; no additional static DLL dep
 Source: [`lib/plat/control_ipc_linux.rs`](../lib/plat/control_ipc_linux.rs)
 
 ```text
-Nonblocking Unix sockets restricted to the effective user. Linux x86-64 raw syscalls.
+Nonblocking Unix sockets restricted to the effective user. Linux raw syscalls.
 New code; socket paths never accept external directory or filename input.
 ```
 
@@ -46350,6 +46350,7 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
 
   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
   Linux the raw syscall helpers plat builds on)
+  rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
   rt::sync SpinLock
@@ -46589,6 +46590,33 @@ are bit-identical to ASMLIB.  Rust never fuses a multiply and an add into an FMA
 
 - **`fn cvttd64(x: f64) -> i64`**
   cvttsd2si (64-bit): truncate (i64::MIN for NaN / out of range)
+
+### `rt/kernel.rs` (Linux)
+
+Source: [`lib/rt/kernel.rs`](../lib/rt/kernel.rs)
+
+```text
+kernel -- the Linux kernel ABI, one table per architecture: system call numbers, open flags,
+struct stat, the order of clone's arguments.  Nothing else defines them (build_rs.py lint):
+a wrong number compiles and calls something else (57 is fork on x86-64, close on ARM64), a wrong
+flag means something else (O_NOFOLLOW here is O_LARGEFILE there).  Both tables name the same
+things, line by line; tools/kernel_table_check.py compares them with the kernel's headers.
+Everything is also reached as rt::os::*, which has the helpers for the calls ARM64 does not
+have (poll, fork, dup2, rename).
+
+  SYS_*        system calls; SYS_ARCH_PRCTL only on x86-64
+  O_*          open flags
+  Stat         struct stat; Stat::default() to pass it to fstat / newfstatat
+  clone_args   clone's arguments after flags and stack, in the kernel's order
+
+The same on both architectures: AT_FDCWD, and what is not listed here (AT_* flags, S_IF*, errno
+values, F_*, MAP_*, PROT_*, the clone flags, struct statfs).
+```
+
+```rust
+/// the current directory as the base of a relative path in the *at calls
+AT_FDCWD: usize = -100isize as usize
+```
 
 ### `rt/sync.rs`
 

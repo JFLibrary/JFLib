@@ -96,10 +96,9 @@ pub fn current_exe() -> Option<String> {
 /// readlink("/proc/self/exe")
 #[cfg(not(windows))]
 fn self_exe() -> Option<String> {
-    const SYS_READLINK: usize = 89;
     let mut buf = alloc::vec![0u8; 4096];
     // SAFETY: a NUL-terminated path and a buffer of buf.len() bytes.
-    let n = unsafe { rt::os::syscall6(SYS_READLINK, c"/proc/self/exe".as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0, 0) };
+    let n = unsafe { rt::os::syscall6(rt::os::SYS_READLINKAT, rt::os::AT_FDCWD, c"/proc/self/exe".as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
     if n <= 0 || n as usize >= buf.len() {
         return None;
     }

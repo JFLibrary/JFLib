@@ -246,14 +246,8 @@ mod imp {
 mod imp {
     use super::*;
     use alloc::collections::BTreeMap;
-    use rt::os::syscall3;
+    use rt::os::{syscall3, SYS_CLOSE, SYS_INOTIFY_ADD_WATCH, SYS_INOTIFY_INIT1, SYS_INOTIFY_RM_WATCH, SYS_READ};
 
-    const SYS_READ: usize = 0;
-    const SYS_CLOSE: usize = 3;
-    const SYS_POLL: usize = 7;
-    const SYS_INOTIFY_ADD_WATCH: usize = 254;
-    const SYS_INOTIFY_RM_WATCH: usize = 255;
-    const SYS_INOTIFY_INIT1: usize = 294;
     const IN_NONBLOCK: usize = 0o4000;
     const IN_CLOEXEC: usize = 0o2000000;
     const IN_MODIFY: u32 = 0x2;
@@ -334,7 +328,7 @@ mod imp {
         while !sh.stop.load(Ordering::SeqCst) {
             let mut pfd = [fd.0 as i32, 1i32 /* POLLIN */];
             // SAFETY: one pollfd (fd: i32, events: i16, revents: i16 = the second i32).
-            let r = unsafe { syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 1, 300) };
+            let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, 300) };
             if r <= 0 {
                 continue;
             }

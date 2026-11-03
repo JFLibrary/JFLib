@@ -1,7 +1,8 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher ist nichts davon gebaut oder gelaufen: Die
-Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Die ARM64-Werte (Syscalls, Flags, Layouts, Relocations) sind noch nicht gegen die Kernel-Header geprüft, das gehört an den Anfang von ARM1. Der Eintrag in der Roadmap steht in
+Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher ist außer ARM1 nichts davon gebaut oder gelaufen:
+Die Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1
+gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`), die Relocations noch nicht. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
 
 ## Ziel
@@ -96,6 +97,13 @@ Stellen dieses Plans entspricht, und die x86-Programme bytegleich zu vorher sind
 `sandboxtest`, `lifetest`). Dieser Schritt lässt sich ohne ARM mergen und nützt auch so. Er fasst rund
 40 Dateien an, also vorher prüfen, welche Sessions gerade in `lib/plat` arbeiten, und schnell mergen.
 
+**Umgesetzt:** Die Tabelle ist [`lib/rt/kernel.rs`](../lib/rt/kernel.rs), auch erreichbar als `rt::os::*`. Dort
+stehen außerdem die Helfer `poll`, `fork`, `clone`, `dup2` und `rename`. `tools/kernel_table_check.py` vergleicht
+beide Tabellen mit den Kernel-Headern des Android-NDK, `plattest --test kernel` prüft Flags, `struct stat`, die
+`clone`-Reihenfolge und die Helfer auf dem laufenden Kernel. Die Lint-Regel prüft auch, dass beide Tabellen
+dieselben Namen enthalten. Die Sperrliste der Sandbox enthielt keinen der ersetzten Aufrufe, sie hat auf x86-64
+dieselben Nummern in derselben Reihenfolge wie vorher und kommt jetzt aus der Tabelle.
+
 ### ARM2: `rt` auf Linux ARM64 (M)
 
 - `svc 0` statt `syscall`, `_start`, Thread-Start, `rt/lib.rs` wählt für ARM `portable/cpu.rs`,
@@ -117,7 +125,7 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 - Crash-Berichte: DWARF-Register, `calls_into` erkennt `bl` und `blr`.
 - ELF-Loader: `EM_AARCH64`, `R_AARCH64_RELATIVE`, `ABS64`, `GLOB_DAT`, `JUMP_SLOT`, Befehlscache leeren,
   Seitengröße zur Laufzeit.
-- Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), Sperrliste aus der Tabelle.
+- Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), die Sperrliste kommt schon aus der Tabelle.
 - glibc-Variante: `_start`, `TPIDR_EL0` statt `arch_prctl`.
 - `plat/cpu.rs` (Stack-Zeiger, AVX-Probe) und die Crash-Tests in `plat/lib.rs`, für die es den Zweig für
   Android schon gibt.
@@ -209,6 +217,8 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   `st_mtim` bleiben gleich, `android_files.rs` beschreibt das schon. `linux_sys.rs` und
   `linux_sandbox.rs` rechnen mit festen Stellen.
 - **`clone`:** x86-64 hat `child_tid, tls`, ARM64 `tls, child_tid`.
+- **`dup3`:** Anders als `dup2` lehnt es `old == new` mit `EINVAL` ab. `process::launch` kann dorthin kommen,
+  wenn Standardeingabe geschlossen war. `rt::os::dup2` fängt das ab.
 - **Sandbox offen statt zu:** Eine falsche Nummer in der Sperrliste sperrt still den falschen Aufruf.
 - **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Die eigenen Loader leeren ihn heute nicht, auf
   x86 ist das auch nicht nötig. Geladene Plugins können sonst zufällig abstürzen.

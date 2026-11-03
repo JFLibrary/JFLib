@@ -5,25 +5,11 @@
 use alloc::vec::Vec;
 
 use plat::sandbox::Status;
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, AT_FDCWD, O_CREAT, O_DIRECTORY, O_RDONLY, O_RDWR, SYS_CLOSE, SYS_CONNECT, SYS_EXECVE, SYS_EXIT_GROUP, SYS_OPENAT, SYS_PTRACE, SYS_SOCKET, SYS_WAIT4};
 
 use crate::T;
 
-const SYS_CLOSE: usize = 3;
-const SYS_FORK: usize = 57;
-const SYS_EXECVE: usize = 59;
-const SYS_WAIT4: usize = 61;
-const SYS_PTRACE: usize = 101;
-const SYS_SOCKET: usize = 41;
-const SYS_CONNECT: usize = 42;
-const SYS_OPENAT: usize = 257;
-const SYS_EXIT_GROUP: usize = 231;
 
-const AT_FDCWD: usize = -100i64 as usize;
-const O_RDONLY: usize = 0;
-const O_RDWR: usize = 2;
-const O_CREAT: usize = 0x40;
-const O_DIRECTORY: usize = 0x1_0000;
 
 const EACCES: isize = -13;
 const EPERM: isize = -1;
@@ -120,9 +106,9 @@ fn exec_blocked() -> bool {
     // argv and envp are built before the fork; the child only makes syscalls
     let argv = [sh.as_ptr() as usize, c.as_ptr() as usize, script.as_ptr() as usize, 0];
     let envp = [0usize];
-    // SAFETY: fork has no arguments; the child uses only the preallocated buffers, then execve
+    // SAFETY: the child uses only the preallocated buffers, then execve
     // (denied by seccomp) and exit_group.
-    let pid = unsafe { syscall3(SYS_FORK, 0, 0, 0) };
+    let pid = unsafe { rt::os::fork() };
     if pid < 0 {
         return false;
     }
@@ -153,10 +139,10 @@ pub fn gpu_checks(t: &mut T) {
     }
     let r = open("/dev/dri/renderD128", O_RDWR);
     // (a node only its group may open, WSL: nobody's fault here; the sandbox would refuse the same way)
-    let mut st = [0u64; 18];
+    let mut st = rt::os::Stat::default();
     let path = z("/dev/dri/renderD128");
-    // SAFETY: a NUL-terminated path, room for struct stat (st_mode at 24).
-    let open_to_all = unsafe { syscall3(4, path.as_ptr() as usize, st.as_mut_ptr() as usize, 0) } == 0 && st[3] & 0o006 == 0o006;
+    // SAFETY: a NUL-terminated path, st is a struct stat.
+    let open_to_all = unsafe { syscall6(rt::os::SYS_NEWFSTATAT, AT_FDCWD, path.as_ptr() as usize, &mut st as *mut rt::os::Stat as usize, 0, 0, 0) } == 0 && st.st_mode & 0o006 == 0o006;
     if open_to_all {
         t.check(r != EACCES, &alloc::format!("sandboxtest: a driver can open the render node ({r})"));
     } else {

@@ -79,6 +79,9 @@ Rules checked before every build (`check`):
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
   * own crates use --extern; text_shape's pinned Cargo dependencies are the exception
+  * system call numbers only in lib/rt/kernel.rs, the same names for every architecture: no const
+    SYS_* elsewhere, no number as the first argument of syscall* (a wrong number compiles and
+    calls something else on another architecture, docs/ARM64.md)
 
 Styles: an app is linked with its style (apps/NAME/STYLE or --style) as the crate `style`, and
 with every further style crate its sources name (`style_kde::STYLE`, app_styles) under that
@@ -826,9 +829,35 @@ def build_app_bins(b, app, vdir=None):
 
 
 # ---------------------------------------------------------------- lint
+KERNEL_TABLE = RS / "lib" / "rt" / "kernel.rs"
+KERNEL_X86_ONLY = {"SYS_ARCH_PRCTL"}          # arch_prctl: ARM64 sets the thread pointer without a call
+SYSCALL_NUMBER = re.compile(r"\bsyscall\d*\s*\(\s*(?:/\*.*?\*/\s*)?\d")
+SYS_CONST = re.compile(r"\bconst\s+SYS_\w+\s*:\s*[iu](?:size|\d+)\b")
+
+
+def kernel_lint(f, text):
+    """the system call rules for one source file -> problems"""
+    if f == KERNEL_TABLE:
+        return []
+    found = [(m, "a number as the system call") for m in SYSCALL_NUMBER.finditer(text)]
+    found += [(m, "a system call number outside the table") for m in SYS_CONST.finditer(text)]
+    return [f"{f.relative_to(ROOT)}:{text.count(chr(10), 0, m.start()) + 1}: {why} (lib/rt/kernel.rs)" for m, why in found]
+
+
+def kernel_table_lint():
+    """both tables of lib/rt/kernel.rs name the same things (only x86-64 builds today, so the
+    compiler would not tell) -> problems"""
+    tables = re.split(r'#\[cfg\(target_arch = "\w+"\)\]\s*mod arch', KERNEL_TABLE.read_text(encoding="utf-8"))[1:]
+    if len(tables) != 2:
+        return ["lib/rt/kernel.rs: expected two tables, x86-64 and aarch64"]
+    x86, arm = (set(re.findall(r"pub (?:const (?:fn )?|struct )(\w+)", t)) | set(re.findall(r"pub (st_\w+):", t)) for t in tables)
+    return [f"lib/rt/kernel.rs: {n} only in the x86-64 table" for n in sorted(x86 - arm - KERNEL_X86_ONLY)] + \
+           [f"lib/rt/kernel.rs: {n} only in the aarch64 table" for n in sorted(arm - x86)]
+
+
 def lint():
     """the rules of the module docstring -> list of problems"""
-    bad = []
+    bad = kernel_table_lint()
     libs = all_libs()
     roots = [(n, RS / r, "lib") for n, (r, _) in libs.items()] + \
             [(a, entrypoint(RS / "apps" / a, "app"), "app") for a in apps()] + \
@@ -843,7 +872,9 @@ def lint():
         if kind == "app" and "#![deny(unsafe_code)]" not in head and "#![forbid(unsafe_code)]" not in head:
             bad.append(f"{root.relative_to(ROOT)}: missing #![deny(unsafe_code)]")
         for f in files:
-            for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            text = f.read_text(encoding="utf-8")
+            bad += kernel_lint(f, text)
+            for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
                 if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
@@ -1778,7 +1809,9 @@ def plugin_lint():
         if not is_lib and "#![deny(unsafe_code)]" not in head and "#![forbid(unsafe_code)]" not in head:
             bad.append(f"{root.relative_to(ROOT)}: missing #![deny(unsafe_code)]")
         for f in project_sources(root):
-            for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            text = f.read_text(encoding="utf-8")
+            bad += kernel_lint(f, text)
+            for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
                 if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
@@ -2133,7 +2166,9 @@ def module_lint():
         if d.name not in MOD_RT.values() and "#![deny(unsafe_code)]" not in head and "#![forbid(unsafe_code)]" not in head:
             bad.append(f"{root.relative_to(ROOT)}: missing #![deny(unsafe_code)]")
         for f in project_sources(root):
-            for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            text = f.read_text(encoding="utf-8")
+            bad += kernel_lint(f, text)
+            for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
                 if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")

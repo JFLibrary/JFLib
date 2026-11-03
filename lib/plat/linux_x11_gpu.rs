@@ -17,14 +17,12 @@
 
 use alloc::vec::Vec;
 
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, SYS_FSTAT, SYS_RECVMSG, Stat};
 
 use super::wire::sys_close;
 use super::*;
 use crate::{GpuBufDesc, GpuCaps, GPU_BUF_BUSY, GPU_BUF_FAILED, GPU_BUF_FREE};
 
-const SYS_RECVMSG: usize = 47;
-const SYS_FSTAT: usize = 5;
 const MSG_DONTWAIT: usize = 0x40;
 const MSG_CMSG_CLOEXEC: usize = 0x4000_0000;
 const SOL_SOCKET: u32 = 1;
@@ -169,10 +167,10 @@ impl X11 {
         }
         let fd = core::mem::replace(&mut self.g.in_fd, -1);
         if fd >= 0 {
-            let mut st = [0u64; 18];
-            // SAFETY: struct stat fits (144 bytes on x86-64); a descriptor of ours.
-            if unsafe { syscall6(SYS_FSTAT, fd as usize, st.as_mut_ptr() as usize, 0, 0, 0, 0) } == 0 {
-                self.g.device = Some(st[5]); // st_rdev
+            let mut st = Stat::default();
+            // SAFETY: st is a struct stat; a descriptor of ours.
+            if unsafe { syscall6(SYS_FSTAT, fd as usize, &mut st as *mut Stat as usize, 0, 0, 0, 0) } == 0 {
+                self.g.device = Some(st.st_rdev);
             }
             sys_close(fd);
         }

@@ -126,6 +126,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** `ui.markdown_fit` (how high a document view must be to show a short text without scrolling), `ui.radio_wrap` and `ui.checkbox_wrap` (a mark beside a text that wraps)
 - **JFNetworker:** The Akademie's second part: quizzes and tests as files (`quiz/*.json`: single and multiple choice with partial credit, text patterns, numbers with a tolerance, order; both languages together; `jfn-sim course` names every mistake) on a page of native widgets, with a time limit, attempts and a best result; fault hunts: a `.jfnet` with `start_faults` applied at load as actions, `lock` (Probleme, faults, answer network), the check kind `diagnosis`, graded by handing in; a step's `requires`; the sample course has one of each
 - **ui:** A catalogue can offer the library's languages (`Catalog::with_library_languages`): the library's texts and mirroring follow the user there, the app's own texts show their English column; `t` falls back to the library, then to that column. `AppDesc::translated`, `i18n::menu`, `commands`, `tf` and `list` translate static tables and filled texts
+- **rt:** One table of the Linux kernel ABI per architecture (`rt::kernel`, also as `rt::os::*`): system call numbers, open flags, `Stat`, the order of clone's arguments, x86-64 and ARM64; `plat` and `gpu` define none of it themselves, `build_rs.py check` refuses a number as a system call; `tools/kernel_table_check.py` compares the table with the kernel's headers
 
 ### Changed
 
@@ -150,6 +151,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFNetworker:** The title of JF-FW says what a firewall does today, a router with access lists and NAT; zones and stateful filtering come with milestone F2
 - **build:** The demos (gallery, datagallery, editortest, docktest, dndtest, diagramtest, svgtest, spelltest, fontpicktest, template, androidGallery, mdviewtest, audiotest, prefstest) have English catalogues and no old names in their texts; they follow the user's language in a window, headless runs stay German, and tools that drive real windows, browsers or phones pin German
 - **build:** The browser host's own texts (its bar, its status line) follow the browser's language, and it hands the page's language list to the worker, so a test's emulated locale reaches the app; Arabic and Hebrew stay out of `with_library_languages` in the browser, whose bundle has no font for them
+- **plat:** Linux: the system calls ARM64 does not have are gone on x86-64 too (open, poll, fork, mkdir, unlink, rename, readlink, access, dup2, chmod): `openat`, `ppoll`, `clone`, `mkdirat`, `unlinkat`, `renameat2`, `readlinkat`, `faccessat`, `dup3`, `fchmodat`, helpers `rt::os::{poll, fork, clone, dup2, rename}`
 
 ### Fixed
 
