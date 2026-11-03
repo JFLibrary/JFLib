@@ -127,8 +127,9 @@ const imports = { jfgui: {
   },
   gpu_call: gpuCall,
   request(kind, id, ptr, len) {
-    // the GPU output shows: the pixel buffers for the page wait unused, they go (lib/plat/web_gpu.rs)
-    if(kind===30) {buffers.length=0;pooledBytes=0;return;}
+    // the GPU output shows: the pixel buffers for the page wait unused, they go (lib/plat/web_gpu.rs);
+    // the page watches the canvas from now on (watchGpuCanvas in loader.js)
+    if(kind===30) {buffers.length=0;pooledBytes=0;}
     // Copy before returning to Rust: no async task borrows linear memory.
     const data = bytes(ptr, len).slice().buffer;
     postMessage({type:"service", kind, id, data}, [data]);
@@ -193,6 +194,8 @@ function dispatch(m) {
     case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
     // the canvas of the GPU output came (lib/plat/web_gpu.rs)
     case "gpu-canvas": if(gpuHost) wasm.jfgui_gpu_canvas(gpuHost.canvas(m.canvas)); break;
+    // the page's watcher: that canvas shows nothing
+    case "gpu-blank": wasm.jfgui_gpu_blank(); break;
     // (a test) the GPU output's counters; 1 lose the device, 2 settle, 3 the next frame draws everything
     case "gpu-test": {const n=wasm.jfgui_gpu_test(m.op>>>0);postMessage({type:"gpu-test",id:m.id,text:decode.decode(bytes(wasm.jfgui_response(),n).slice())});break;}
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs

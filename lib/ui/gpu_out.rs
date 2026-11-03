@@ -56,7 +56,9 @@
 // stays below; a canvas above it, an OffscreenCanvas here, is the analogue of the SurfaceView: it shows
 // nothing until its first frame, then covers #screen; each period on the GPU has a new one (plat
 // web_gpu.rs).  Before a device is used, a small picture through all three pipelines is read back and
-// compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  Reading back comes
+// compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  After the switch the
+// page looks at what reached the canvas (watchGpuCanvas in web/loader.js): nothing there, and the CPU path
+// takes over for good (plat::win_gpu_child_blank).  Reading back comes
 // later here: jfgui_GPU_VERIFY compares when the browser has answered (verify_poll).  The shaders go as
 // WGSL (gpu_out.wgsl), no SPIR-V in the bundle.  Runs with ?agent=1 stay on the CPU path like scripts,
 // unless ?gpu=1 asks; no script command here.
@@ -1901,6 +1903,8 @@ impl Ui {
         #[cfg(target_arch = "wasm32")]
         {
             let e = if let Dev::Ready(core) = &self.m.gout.dev { core.dev.poll().err() } else { None };
+            // (and the page's watcher: the canvas shows nothing, a new one would not either)
+            let e = e.or(plat::win_gpu_child_blank().then_some(GpuError::Unsupported("the canvas shows nothing")));
             if let Some(e) = e {
                 self.gp_failed(0, e);
                 return;

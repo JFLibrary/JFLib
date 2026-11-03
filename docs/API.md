@@ -8502,7 +8502,9 @@ answer later, the app goes on through the CPU path meanwhile).  The page's #scre
 stays below; a canvas above it, an OffscreenCanvas here, is the analogue of the SurfaceView: it shows
 nothing until its first frame, then covers #screen; each period on the GPU has a new one (plat
 web_gpu.rs).  Before a device is used, a small picture through all three pipelines is read back and
-compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  Reading back comes
+compared: a browser whose WebGPU draws wrongly never shows a frame (S::web_probe).  After the switch the
+page looks at what reached the canvas (watchGpuCanvas in web/loader.js): nothing there, and the CPU path
+takes over for good (plat::win_gpu_child_blank).  Reading back comes
 later here: jfgui_GPU_VERIFY compares when the browser has answered (verify_poll).  The shaders go as
 WGSL (gpu_out.wgsl), no SPIR-V in the bundle.  Runs with ?agent=1 stay on the CPU path like scripts,
 unless ?gpu=1 asks; no script command here.
@@ -30332,6 +30334,7 @@ web_*.rs, web/gpu.js, web/loader.js; docs/GPU.md "Ausgabe im Browser")
                                      takes the canvas away after it (after_flush): no gap, no wrong frame
   win_release_kept(w)                the copy of the window for #screen goes, and the worker's pooled
                                      pixel buffers with it
+  win_gpu_child_blank()              the page found that the canvas shows nothing (once)
 
 A canvas that has shown nothing yet shows nothing: until the first frame reaches the compositor the
 page's #screen is seen through it, the same pixels (the switch needs no message and no timing).  A
@@ -30352,6 +30355,12 @@ REQUEST_GPU_SHOWN: u32 = 30
 
 - **`extern "C" fn jfgui_gpu_canvas(handle: u32)`**
   (worker.js) the page's canvas, as a number of web/gpu.js's table
+
+- **`extern "C" fn jfgui_gpu_blank()`**
+  (worker.js) the page's watcher (watchGpuCanvas in loader.js): the canvas shows nothing
+
+- **`fn win_gpu_child_blank() -> bool`**
+  the page found that the canvas shows nothing, though everything computes right; asked once
 
 - **`struct NativeWindow`**
   a target for swapchains: the OffscreenCanvas of the page's canvas, a number of web/gpu.js's table
