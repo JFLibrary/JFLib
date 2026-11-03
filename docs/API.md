@@ -31829,7 +31829,9 @@ num -- numbers <-> text                                                  [src/co
                                   string; overflow -> None)
 
 The scaling steps run on the x87 unit like in ASMLIB (rt::x87), so both directions are
-bit-identical to the assembly -- the text of a saved setting included.
+bit-identical to the assembly -- the text of a saved setting included. Where the unit holds
+only doubles (x64 under the emulation of Windows on ARM, docs/ARM64.md), rt::portable::math
+does the same steps without it.
 ```
 
 - **`fn f64_parse(s: &[u8]) -> (f64, usize)`**

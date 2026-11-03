@@ -216,6 +216,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFNetworker:** A lab opened from the start page before the dock's first frame now brings its Aufgabe panel forward; in a lab whose network has nothing scheduled the goals are judged when a console shows its prompt again
 - **ui:** PaintCraft reads `--lang` and `jfgui_LANG` like every app and gives the library its language; its catalogue is complete again
 - **styles:** Classic: the menu bar on a title bar (PaintCraft) is readable: white on the navy half of the gradient, black on the light half and on an inactive window's greys, in both themes; `ui.titlebar_open` tells a style the bar being built
+- **base:** `f64_format` and `f64_parse` are bit-exact again for x64 programs under the emulation of Windows on ARM, whose x87 registers hold only doubles: the portable code then does the same steps
 
 ### Security
 

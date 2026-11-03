@@ -9,7 +9,9 @@
 //                                   string; overflow -> None)
 //
 // The scaling steps run on the x87 unit like in ASMLIB (rt::x87), so both directions are
-// bit-identical to the assembly -- the text of a saved setting included.
+// bit-identical to the assembly -- the text of a saved setting included. Where the unit holds
+// only doubles (x64 under the emulation of Windows on ARM, docs/ARM64.md), rt::portable::math
+// does the same steps without it.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -33,6 +35,42 @@ fn ieq_z(s: &[u8], i: usize, word: &[u8]) -> bool {
         let c = at(s, i + k);
         c != 0 && c | 32 == w
     })
+}
+
+/// whether the x87 unit really has its 64-bit significands and wide exponents: under the emulation
+/// of Windows on ARM its registers hold only doubles, whatever the control word asks for, so
+/// 10^324 overflows and the rounding differs
+#[cfg(not(target_arch = "wasm32"))]
+fn x87_is_real() -> bool {
+    use core::sync::atomic::{AtomicU8, Ordering};
+    static REAL: AtomicU8 = AtomicU8::new(0); // 0: not known yet, 1: yes, 2: no
+    match REAL.load(Ordering::Relaxed) {
+        0 => {
+            let real = rt::x87::scale(5, -324).to_bits() == 1
+                && rt::x87::scale(3, 100).to_bits() == 0x54CB_6E83_B85F_253B;
+            REAL.store(if real { 1 } else { 2 }, Ordering::Relaxed);
+            real
+        }
+        r => r == 1,
+    }
+}
+
+/// rt::x87::scale, or the same steps without the unit
+fn scale(m: u64, e: i32) -> f64 {
+    #[cfg(not(target_arch = "wasm32"))]
+    if !x87_is_real() {
+        return rt::portable::math::scale(m, e);
+    }
+    rt::x87::scale(m, e)
+}
+
+/// rt::x87::scale_round, or the same steps without the unit
+fn scale_round(v: f64, k: i32) -> i64 {
+    #[cfg(not(target_arch = "wasm32"))]
+    if !x87_is_real() {
+        return rt::portable::math::scale_round(v, k);
+    }
+    rt::x87::scale_round(v, k)
 }
 
 /// the number at the start of s: (value, bytes used; 0 = none)  [f64_parse]
@@ -143,7 +181,7 @@ pub fn f64_parse(s: &[u8]) -> (f64, usize) {
             e10 += if eneg { -ed } else { ed };
         } // "e" without digits is not ours
     }
-    let v = if m == 0 { 0.0 } else { rt::x87::scale(m, e10.clamp(-EXP_MAX, EXP_MAX)) };
+    let v = if m == 0 { 0.0 } else { scale(m, e10.clamp(-EXP_MAX, EXP_MAX)) };
     (signed(v), i)
 }
 
@@ -224,7 +262,7 @@ pub fn f64_format(v: f64) -> String {
             let mut budget = 4;
             let n = loop {
                 let k = p as i32 - 1 - e10;
-                let n = rt::x87::scale_round(av, k) as u64;
+                let n = scale_round(av, k) as u64;
                 if n >= POW10_INT[p] {
                     e10 += 1; // the exponent was too small
                 } else if n < POW10_INT[p - 1] {
