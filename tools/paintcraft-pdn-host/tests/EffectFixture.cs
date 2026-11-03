@@ -1,5 +1,6 @@
 // Real v5 effect plugins, independent of the host: what they compute comes from the paint.net API alone.
 // Internal classes on purpose, the published samples are internal too.
+using System.IO;
 using System.Windows.Forms;
 using PaintDotNet;
 using PaintDotNet.AppModel;
@@ -151,6 +152,43 @@ public sealed class ClassicClipboard:Effect
         for(int y=rois[i].Top;y<rois[i].Bottom;y++) for(int x=rois[i].Left;x<rois[i].Right;x++) {
             var c=src.Surface[x,y];
             dst.Surface[x,y]=ColorBgra.FromBgra((byte)(255-c.B),(byte)(255-c.G),(byte)(255-c.R),c.A);
+        }
+    }
+}
+
+// Asks for what PSFilterPdn's dialog asks for when it opens.
+internal sealed class BitmapServices:PropertyBasedBitmapEffect
+{
+    IBitmapSource<ColorBgra32>? source;
+    public BitmapServices():base("Fixture Services","Fixture",BitmapEffectOptions.Create()) {}
+    protected override PropertyCollection OnCreatePropertyCollection()=>new([]);
+    protected override void OnInitializeRenderInfo(IBitmapEffectRenderInfo info)
+    {
+        if(!Directory.Exists(Services.GetService<IUserFilesService>()!.UserFilesPath))throw new InvalidOperationException("user files");
+        var files=Services.GetService<IFileSystemService>()!;
+        var effects=files.GetPluginDirectoryInfos(PluginType.Effect).Select(i=>i.Path).ToArray();
+        if(!files.GetPluginDirectoryRoots().Any() || effects.Length==0 || !effects[0].EndsWith("Effects") || !Directory.Exists(effects[0]))throw new InvalidOperationException("plugin folders");
+        if(Services.GetService<IExceptionDialogService>()==null || Services.GetService<IShellService>()==null)throw new InvalidOperationException("dialog or shell");
+        Checkerboard();
+        source=Environment.GetSourceBitmapBgra32();
+        base.OnInitializeRenderInfo(info);
+    }
+    unsafe void Checkerboard()
+    {
+        var board=Services.GetService<IVisualStylingService>()!.Checkerboard;
+        var size=board.GetRepeatingBitmapSize(CheckerboardTileSize.Small);
+        var buffer=new ColorBgr32[size.Width*size.Height];
+        fixed(ColorBgr32* start=buffer)board.Render(new RegionPtr<ColorBgr32>(start,size.Width,size.Height,size.Width*4),new Point2Int32(0,0),CheckerboardTileSize.Small);
+        if(size.Width<4 || buffer[0].R==buffer[size.Width/2].R)throw new InvalidOperationException("checkerboard");
+    }
+    protected override void OnRender(IBitmapEffectOutput output)
+    {
+        using var target=output.LockBgra32();
+        source!.CopyPixels(target,output.Bounds.Location);
+        var pixels=target.AsRegionPtr();
+        for(int y=0;y<pixels.Height;y++) for(int x=0;x<pixels.Width;x++) {
+            var c=pixels[x,y];
+            pixels[x,y]=ColorBgra32.FromBgra((byte)(255-c.B),(byte)(255-c.G),(byte)(255-c.R),c.A);
         }
     }
 }

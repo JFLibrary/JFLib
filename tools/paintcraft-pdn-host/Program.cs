@@ -51,6 +51,7 @@ internal static class Program
     static int Run(string[] args, byte[] data)
     {
         if(args.Length<1) throw new ArgumentException("Usage: PaintCraft.PdnHost plugin.dll [effect-type] [--defaults] [--gpu software]");
+        Dialogs.Interactive=!args.Contains("--defaults") && !args.Contains("--validate-dialog");
         var assembly=PluginCatalog.Load(args[0]);
         Type[] types;
         try { types=assembly.GetTypes(); }
@@ -183,6 +184,9 @@ internal sealed class EffectInput : IDisposable
 
 internal static class Dialogs
 {
+    // A run without dialogs has no person to answer a plugin's error message.
+    internal static bool Interactive=true;
+
     // show false only builds the editor: --validate-dialog checks a plugin's parameters that way.
     internal static bool Properties(string title,PropertyCollection properties,ControlInfo? labels,bool show)
     {

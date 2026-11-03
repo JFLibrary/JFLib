@@ -113,13 +113,30 @@ internal sealed class HostServices(bool software):IServiceProvider
 {
     const string RenderingGpu="Graphics/RenderingGpuChoice";
     static bool cacheReady;
-    object? settings,direct2D,imaging,directWrite,enumNames,clipboard,palettes;
+    object? settings,direct2D,imaging,directWrite,enumNames,clipboard,palettes,userFiles,fileSystem,errors,shell,styling;
+    // Paint.NET's own files stay as they are: a plugin's settings land here.
+    static string DataFolder(string name)
+    {
+        var dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"PaintCraft","pdn-host",name);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
 
     public object? GetService(Type t)
     {
         if(t==typeof(IEnumLocalizerFactory))return enumNames??=ClosedInterface.Implement(t,(_,a)=>EnumNames((Type)a[0]!));
         if(t==typeof(IClipboardService))return clipboard??=Clipboard();
         if(t==typeof(IPalettesService))return palettes??=Palettes();
+        if(t==typeof(IVisualStylingService))return styling??=VisualStyling();
+        if(t==typeof(IUserFilesService))return userFiles??=ClosedInterface.Implement(t,(member,_)=>member is "get_UserFilesPath" or "TryGetUserFilesPath" ? DataFolder("User Files") : null);
+        if(t==typeof(IFileSystemService))return fileSystem??=ClosedInterface.Implement(t,(member,_)=>member switch {
+            "get_PerUserAppFilesPath"=>DataFolder("App Files"),
+            "GetPluginDirectoryRoots"=>PluginRoots(),
+            "GetPluginDirectoryInfos"=>PluginFolders(),
+            _=>null
+        });
+        if(t==typeof(IExceptionDialogService))return errors??=ClosedInterface.Implement(t,(member,a)=>member=="ShowErrorDialog" ? ShowError(a) : null);
+        if(t==typeof(IShellService))return shell??=ClosedInterface.Implement(t,(member,a)=>member.StartsWith("Launch") ? Open((string)a[1]!) : null);
         if(t==typeof(ISettingsService))return settings??=ClosedInterface.Implement(t,(_,a)=>Setting((string)a[0]!));
         if(t==typeof(PaintDotNet.Direct2D1.IDirect2DFactory))return direct2D??=PaintDotNet.Direct2D1.Direct2DFactory.Create();
         if(t==typeof(IImagingFactory))return imaging??=ImagingFactory.CreateRef();
@@ -158,6 +175,65 @@ internal sealed class HostServices(bool software):IServiceProvider
             var handle=(nint)a[0]!;
             return real.Open(handle==0 ? window.Handle : handle);
         });
+    }
+
+    // Previews lay transparent pixels over a checkerboard: the light one, in the usual tile sizes.
+    static object VisualStyling()
+    {
+        static int Shift(object size)=>size is CheckerboardTileSize.Small ? 3 : 4;
+        var checkerboard=ClosedInterface.Implement(typeof(ICheckerboardVisualStyling),(member,a)=>{
+            if(member=="get_Color1")return SrgbColors.White;
+            if(member=="get_Color2")return SrgbColors.Silver;
+            if(member=="GetRepeatingBitmapSize")return new SizeInt32(2<<Shift(a[0]!),2<<Shift(a[0]!));
+            if(member!="Render")return null;
+            var region=(RegionPtr<ColorBgr32>)a[0]!;
+            var offset=(Point2Int32)a[1]!;
+            int shift=Shift(a[2]!);
+            for(int y=0;y<region.Height;y++) for(int x=0;x<region.Width;x++) {
+                byte level=(byte)((((x+offset.X)>>shift)+((y+offset.Y)>>shift)&1)==0 ? 255 : 192);
+                region[x,y]=ColorBgr32.FromBgr(level,level,level);
+            }
+            return null;
+        });
+        var canvas=ClosedInterface.Implement(typeof(ICanvasVisualStyling),(member,_)=>member=="get_BackgroundColor" ? SrgbColors.Gray : null);
+        return ClosedInterface.Implement(typeof(IVisualStylingService),(member,_)=>member switch {
+            "get_Checkerboard"=>checkerboard,
+            "get_Canvas"=>canvas,
+            _=>null
+        });
+    }
+
+    static List<string> PluginRoots()
+    {
+        var docs=Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var roots=new List<string> {Path.Combine(docs,"PaintCraft App Files"),Path.Combine(docs,"Paint.NET App Files"),Program.Install};
+        // The running plugin's own root first, wherever PaintCraft found it.
+        var folder=Path.GetDirectoryName(PluginCatalog.LoadedFrom);
+        while(folder!=null && Path.GetFileName(folder) is not ("Effects" or "FileTypes"))folder=Path.GetDirectoryName(folder);
+        if(folder!=null)roots.Insert(0,Path.GetDirectoryName(folder)!);
+        return roots.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    static List<PluginDirectoryInfo> PluginFolders()
+    {
+        var folders=new List<PluginDirectoryInfo>();
+        foreach(var root in PluginRoots()) foreach(var (type,name) in new[]{(PluginType.Effect,"Effects"),(PluginType.FileType,"FileTypes"),(PluginType.Shape,"Shapes")})
+            folders.Add((PluginDirectoryInfo)Activator.CreateInstance(typeof(PluginDirectoryInfo),BindingFlags.Instance|BindingFlags.NonPublic,null,[type,Path.Combine(root,name)],null)!);
+        return folders;
+    }
+
+    static object? ShowError(object?[] a)
+    {
+        var text=string.Join("\n\n",a.Skip(1).Select(x=>x is Exception e ? e.GetBaseException().Message : x as string).Where(x=>!string.IsNullOrEmpty(x)));
+        Console.Error.WriteLine(text);
+        if(Dialogs.Interactive)System.Windows.Forms.MessageBox.Show(a[0] as System.Windows.Forms.IWin32Window,text,"PaintCraft – Plugin",System.Windows.Forms.MessageBoxButtons.OK,System.Windows.Forms.MessageBoxIcon.Error);
+        return null;
+    }
+
+    static object Open(string target)
+    {
+        try {System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) {UseShellExecute=true})?.Dispose();return true;}
+        catch(Exception e) when(e is System.ComponentModel.Win32Exception or InvalidOperationException) {return false;}
     }
 
     // paint.net's palette service hangs on its user files. A plugin gets a plain palette of the usual

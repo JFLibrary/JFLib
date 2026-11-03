@@ -214,7 +214,7 @@ expect #9900 text "FF123456"
     seconds = {}
     for kind, extra, pixel in [("BitmapInvert", [], "000000ff"), ("BitmapFloat", [], "000000ff"), ("BitmapForm", [], "000000ff"), ("BitmapPlain", [], "000000ff"),
                                ("ClassicPlain", [], "000000ff"), ("ClassicLocalized", [], "000000ff"), ("ClassicClipboard", [], "000000ff"),
-                               ("BitmapOwnLibrary", [], "000000ff"),
+                               ("BitmapOwnLibrary", [], "000000ff"), ("BitmapServices", [], "000000ff"),
                                ("GpuImage", [], "000000ff"), ("GpuImage", ["--gpu", "software"], "000000ff"), ("GpuDrawing", [], "000000ff"), ("GpuShader", [], "cdcdcdff")]:
         started = time.time()
         result = subprocess.run([*clr, str(fixture), kind, "--defaults", *extra], input=packet, capture_output=True, env=bare, timeout=90)
@@ -242,7 +242,7 @@ expect #9900 text "FF123456"
     assert catalog.returncode == 0, catalog.stderr
     rows = [line.split("\t") for line in catalog.stdout.decode().splitlines()]
     names = {bytes.fromhex(r[3]).decode(): r[4] for r in rows if r[0] == "E"}
-    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 13, names
+    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 14, names
     assert not [r for r in rows if r[0] in "UX"], rows
     assert len([r for r in rows if r[0] == "F"]) == 5, rows
     # Nothing of paint.net is copied next to the host.

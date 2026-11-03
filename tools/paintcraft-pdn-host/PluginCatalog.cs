@@ -13,9 +13,11 @@ using PaintDotNet.Effects;
 // initializer, crash or hang cannot prevent other assemblies from being listed.
 internal static class PluginCatalog
 {
+    internal static string? LoadedFrom;
     internal static Assembly Load(string path)
     {
         path=Path.GetFullPath(path);
+        LoadedFrom=path;
         var dir=Path.GetDirectoryName(path)!;
         Environment.SetEnvironmentVariable("PATH",dir+Path.PathSeparator+Environment.GetEnvironmentVariable("PATH"));
         AssemblyLoadContext.Default.Resolving+=(c,n)=>{

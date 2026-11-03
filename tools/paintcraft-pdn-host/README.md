@@ -101,9 +101,13 @@ test suite):
   library beside the plugin DLL.
 - **WebPFileType 1.6.0:** catalog, encode and decode with alpha through the helper. PaintCraft's own
   WebP codec keeps priority in its dialogs, so the plugin is not used for that extension there.
+- **PSFilterPdn 2.0.11:** found in its own folder with its dependencies skipped; its dialog opens,
+  searches its folder and cancels. **No 8bf filter has been run**: none was available, so its filter
+  process `PSFilterShim.exe`, previews and the checkerboard stayed unused. Rendering without a chosen
+  filter ends in a plugin error, as seen with `--defaults`.
 
 These runs check defaults and that results look right, not that pixels equal Paint.NET's own
-output. Parameter values other than defaults were not swept. PSFilterPdn has not been run.
+output. Parameter values other than defaults were not swept.
 
 The FileType bridge is tested with a separately compiled factory fixture through
 the original Paint.NET API, including distinct read/write extensions, alpha, DPI,
@@ -126,9 +130,13 @@ Boundaries of the v5 path:
 - **Application services.** Classic and v5 effects get `IDirect2DFactory`, `IImagingFactory`,
   `IDirectWriteFactory`, `IEnumLocalizerFactory` (a plugin's enum values keep their names),
   `IClipboardService` (Paint.NET's own, given a window it needs), `IPalettesService` (a fixed palette
-  of 96 colors, not the user's) and the settings below. A plugin requiring another service (shell,
-  file types, user files) gets `null` or Paint.NET's "service not found" error, shown as a plugin
-  error.
+  of 96 colors, not the user's), `IUserFilesService` (a folder of ours under
+  `%LOCALAPPDATA%/PaintCraft/pdn-host`, so a plugin's settings there are not the ones it has in
+  Paint.NET), `IFileSystemService` (the plugin folders above), `IExceptionDialogService` (a message
+  box), `IShellService` (opens links and folders), `IVisualStylingService` (a fixed light
+  checkerboard) and the settings below. A plugin requiring another service (file types) gets `null`
+  or Paint.NET's "service not found" error, shown as a plugin error. An exception in a plugin's own
+  dialog shows the framework's "Unhandled exception" box with Continue.
 - **A plugin's own libraries.** Each plugin gets its own load context in which a library beside its
   DLL wins, except `PaintDotNet*`, `System*`, `Microsoft*` and WPF, which stay shared. This matters:
   Paint.NET's `ComputeSharp.D2D1.dll` is trimmed and lacks what plugin shaders need, so a shader
