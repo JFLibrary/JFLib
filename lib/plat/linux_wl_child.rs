@@ -44,7 +44,8 @@
 //                relative motion minus J (current) or by the relative motion alone (press).
 //                Until then, and without that protocol, "current" holds.  The move hook snaps
 //                (the UI's window_snap); E_WINPOS / E_RESIZE follow; the release of that
-//                button (the pen's up) ends it.  Touch is not handled (no wl_touch)
+//                button (the pen's up, the finger's up) ends it; a finger's positions are taken as
+//                the mouse's model says
 
 use super::proto::*;
 use super::wire::{Args, A};
@@ -464,6 +465,8 @@ impl Wl {
             (-1, self.inp.mx, self.inp.my)
         } else if let Some((k, x, y)) = self.tool_down_on(i) {
             (k as i32, x, y)
+        } else if let Some((k, x, y)) = self.finger_on(i) {
+            (super::input::FINGER_TOOL + k as i32, x, y)
         } else {
             return;
         };
@@ -481,7 +484,7 @@ impl Wl {
                 let ptr = self.inp.ptr;
                 self.drag.rp = self.w.send(self.g.rpm, &RPM_GET_RELATIVE_POINTER, &[A::N(&IFACE_ZWP_RP), A::O(ptr)]);
             }
-        } else {
+        } else if tool < super::input::FINGER_TOOL {
             self.tool_release(tool as usize);
         }
         self.w.flush();

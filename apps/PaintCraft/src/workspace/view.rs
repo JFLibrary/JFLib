@@ -99,6 +99,9 @@ pub(crate) struct DocView {
     pub(crate) fit: bool,
     /// DV_PREVZOOM: zoom before "Ganzes Bild" (Strg+B toggles back)
     pub(crate) prevzoom: u32,
+    /// two fingers placed it: it need not stay centred or inside the margin (until the next zoom by
+    /// other means, the wheel, a scroll bar)
+    pub(crate) free: bool,
     /// DV_FLAGS: reserved
     pub(crate) flags: u32,
     /// DV_CX / DV_CY: document point shown at the centre of the canvas
@@ -177,6 +180,12 @@ pub(crate) struct View {
     pub(crate) accent: u32,
     /// the canvas draw object
     draw: Option<Rc<CanvasDraw>>,
+    /// two fingers on the canvas: the image point between them and the zoom when they came down
+    pinch: Option<(f64, f64, f64)>,
+    /// a pen touched the canvas in this session (one finger: settings, Stift & Tablett)
+    pen_touched: bool,
+    /// the pointer on the canvas is a finger
+    finger: bool,
 }
 
 impl Default for View {
@@ -213,6 +222,9 @@ impl Default for View {
             dpi: 96,
             accent: 0,
             draw: None,
+            pinch: None,
+            pen_touched: false,
+            finger: false,
         }
     }
 }
@@ -385,13 +397,21 @@ fn centre_doc(d: &mut Doc) {
     d.view.cy = d.h as f64 * 0.5;
 }
 
-// place_axis(size, view, &centre, margin) -> (origin relative to the view (px), the image
+// place_axis(size, view, &centre, margin, free) -> (origin relative to the view (px), the image
 // length on screen (ceil)); uses vzf.  The image is centred while it fits, otherwise the
-// centre is clamped so that at most `margin` px show beyond its edges.
-fn place_axis(vzf: f64, size: i32, view: i32, centre: &mut f64, margin: i32) -> (i32, i32) {
+// centre is clamped so that at most `margin` px show beyond its edges.  free (two fingers placed it):
+// neither, a quarter of the view (or the whole image, if smaller) stays in sight.
+fn place_axis(vzf: f64, size: i32, view: i32, centre: &mut f64, margin: i32, free: bool) -> (i32, i32) {
     let img = size as f64 * vzf;
     let len = flr(0.0 - img).wrapping_neg();
     let vw = view as f64;
+    if free {
+        let keep = minsd(img, vw * 0.25);
+        let half = vw * 0.5;
+        let o = minsd(maxsd(half - *centre * vzf, keep - img), vw - keep);
+        *centre = (half - o) / vzf;
+        return (flr(o), len);
+    }
     if !(img > vw) {
         // fits: centred
         let o = flr((vw - img) * 0.5);
@@ -437,6 +457,7 @@ fn view_place(p: &mut Pn, doc: Option<DocId>) {
     }
     if d.view.fit {
         d.view.zoom = fit_zoom(v, d);
+        d.view.free = false;
         centre_doc(d);
     }
     let z = d.view.zoom.clamp(ZMIN, ZMAX);
@@ -444,10 +465,11 @@ fn view_place(p: &mut Pn, doc: Option<DocId>) {
     v.vz = z;
     v.vzf = zf(v);
     let m = v.dp(MARGIN_DIP);
-    let (o, l) = place_axis(v.vzf, d.w, v.cv[2], &mut d.view.cx, m);
+    let free = d.view.free;
+    let (o, l) = place_axis(v.vzf, d.w, v.cv[2], &mut d.view.cx, m, free);
     v.vox = o.wrapping_add(v.cv[0]);
     v.viw = l;
-    let (o, l) = place_axis(v.vzf, d.h, v.cv[3], &mut d.view.cy, m);
+    let (o, l) = place_axis(v.vzf, d.h, v.cv[3], &mut d.view.cy, m, free);
     v.voy = o.wrapping_add(v.cv[1]);
     v.vih = l;
 }
@@ -461,6 +483,7 @@ pub(crate) fn view_zoom_at(p: &mut Pn, zoom: u32, sx: i32, sy: i32) {
     let v = &p.view;
     let d = p.doc.dm(doc);
     d.view.fit = false;
+    d.view.free = false;
     let old = d.view.zoom;
     d.view.zoom = z;
     if old == 0 {
@@ -510,6 +533,9 @@ pub(crate) fn view_pan_begin(p: &mut Pn, sx: i32, sy: i32) {
         v.pan_cx = d.view.cx;
         v.pan_cy = d.view.cy;
         v.panning = true;
+    }
+    if p.view.finger && let Some(doc) = doc_active(&p.doc) {
+        p.doc.dm(doc).view.free = true; // a finger moves it in every direction
     }
 }
 
@@ -741,7 +767,14 @@ pub(crate) fn view_frame(p: &mut Pn, ui: &mut Ui) {
     let user = doc.map_or(0, |d| d.0 as usize);
     let inp = ui.canvas(ID_CANVAS, dr, user, ver).clone();
     canvas_register(p, ui, doc);
-    if view_input(p, ui, &inp) {
+    // a finger: it may start a two-finger gesture, so the press only once it moved or rested; two
+    // fingers are the view's
+    ui.touch_take(TF_BOTH | TF_SLOP | TF_TWO | TF_REST);
+    let two = ui.touch_two();
+    let pinching = two.is_some();
+    view_pinch(p, ui, two);
+    // (a press taken back for the two fingers still gets its release)
+    if (!pinching || two.is_some_and(|t| t.taken_back)) && view_input(p, ui, &inp) {
         view_place(p, doc);
         ui.repass();
     }
@@ -765,6 +798,51 @@ pub(crate) fn view_frame(p: &mut Pn, ui: &mut Ui) {
         view_ruler(p, ui, vr[0], vr[1], vr[2], true);
     }
     ui.box_end();
+}
+
+// view_pinch(two) -- two fingers: the image point that was between them stays between them, the zoom
+// goes with their distance, so one gesture zooms and pans in every direction without a step
+fn view_pinch(p: &mut Pn, ui: &mut Ui, two: Option<TwoFingers>) {
+    let Some(t) = two else {
+        p.view.pinch = None;
+        return;
+    };
+    let Some(doc) = p.view.vdoc else { return };
+    if t.taken_back {
+        crate::tools::tool_cancel_live(p, ui); // the stroke's first millimetres were this gesture
+    }
+    if t.began || p.view.pinch.is_none() {
+        let v = &p.view;
+        let z = if v.vzf > 0.0 { v.vzf } else { 1.0 };
+        p.view.panning = false;
+        p.view.pinch = Some((t.start_x.wrapping_sub(p.view.vox) as f64 / z, t.start_y.wrapping_sub(p.view.voy) as f64 / z, p.view.vz as f64));
+    }
+    let Some((ix, iy, z0)) = p.view.pinch else { return };
+    let z = (cvttd(minsd(maxsd(z0 * t.scale, ZOOM_MIN as f64), ZOOM_MAX as f64) + 0.5) as u32).max(1);
+    let zn = z as f64 / 10000.0;
+    let cv = p.view.cv;
+    let (ox, oy, oz) = (p.view.vox, p.view.voy, p.view.vz);
+    let d = p.doc.dm(doc);
+    d.view.fit = false;
+    d.view.free = true;
+    d.view.zoom = z;
+    // the origin that keeps the point there; the view's centre from it
+    d.view.cx = ix + (cv[2] as f64 * 0.5 - t.x.wrapping_sub(cv[0]) as f64) / zn;
+    d.view.cy = iy + (cv[3] as f64 * 0.5 - t.y.wrapping_sub(cv[1]) as f64) / zn;
+    view_place(p, Some(doc));
+    if ox != p.view.vox || oy != p.view.voy || oz != p.view.vz {
+        ui.repass();
+    }
+}
+
+// one finger moves the view instead of painting (settings, Stift & Tablett): by default once a pen
+// touched the canvas, because then the pen is what paints
+fn finger_pans(p: &Pn) -> bool {
+    match p.st.st.finger {
+        1 => false,
+        2 => true,
+        _ => p.view.pen_touched,
+    }
 }
 
 // after the canvas command: it shows the image through the view, a move comes from tiles while it
@@ -831,7 +909,11 @@ fn view_input(p: &mut Pn, ui: &mut Ui, inp: &UiInput) -> bool {
         p.view.cur_y = y;
         p.view.cur_ok = true;
     }
-    // panning: Space + left drag, middle drag
+    p.view.finger = inp.ptype == PTR_TOUCH;
+    if inp.pressed != 0 && inp.ptype.wrapping_sub(PTR_PEN) <= PTR_ERASER - PTR_PEN {
+        p.view.pen_touched = true;
+    }
+    // panning: Space + left drag, middle drag, a finger if it is for that
     if p.view.panning {
         if inp.btn & (1 << p.view.pan_btn) != 0 {
             view_pan_move(p, px, py);
@@ -843,7 +925,7 @@ fn view_input(p: &mut Pn, ui: &mut Ui, inp: &UiInput) -> bool {
         if inp.pressed & (1 << BTN_MIDDLE) != 0 {
             p.view.pan_btn = BTN_MIDDLE;
             go = true;
-        } else if inp.pressed & (1 << BTN_LEFT) != 0 && space_held(&p.view, ui) {
+        } else if inp.pressed & (1 << BTN_LEFT) != 0 && (space_held(&p.view, ui) || inp.ptype == PTR_TOUCH && finger_pans(p)) {
             p.view.pan_btn = BTN_LEFT;
             go = true;
         }
@@ -853,6 +935,9 @@ fn view_input(p: &mut Pn, ui: &mut Ui, inp: &UiInput) -> bool {
     }
     let wy = inp.wheel_y;
     let mut tool = false;
+    if wy != 0 || inp.wheel_x != 0 {
+        p.doc.dm(doc).view.free = false; // (a wheel works in the usual limits)
+    }
     if wy != 0 {
         if mods & MOD_CTRL != 0 {
             // Strg + wheel: one preset per notch around the pointer
@@ -910,12 +995,13 @@ fn scroll_bars(p: &mut Pn, ui: &mut Ui, doc: DocId) {
     let cv = v.cv;
     // horizontal
     if v.viw > cv[2] {
-        v.hpos = m + cv[0] - v.vox;
+        v.hpos = (m + cv[0] - v.vox).clamp(0, cw - cv[2]); // (two fingers may have placed it further)
         ui.next_rect_px(cv[0], cv[1] + cv[3] - bar, cv[2] - bar, bar);
         if ui.scrollbar(ID_HSCROLL, &mut v.hpos, cw, cv[2], false) & EV_ACT != 0 {
             // new origin = margin - pos
             let o = (m - v.hpos) as f64;
             let vzf = v.vzf;
+            p.doc.dm(doc).view.free = false;
             p.doc.dm(doc).view.cx = (cv[2] as f64 * 0.5 - o) / vzf;
             view_place(p, Some(doc));
             ui.repass();
@@ -924,11 +1010,12 @@ fn scroll_bars(p: &mut Pn, ui: &mut Ui, doc: DocId) {
     let v = &mut p.view;
     let cv = v.cv;
     if v.vih > cv[3] {
-        v.vpos = m + cv[1] - v.voy;
+        v.vpos = (m + cv[1] - v.voy).clamp(0, ch - cv[3]);
         ui.next_rect_px(cv[0] + cv[2] - bar, cv[1], bar, cv[3] - bar);
         if ui.scrollbar(ID_VSCROLL, &mut v.vpos, ch, cv[3], true) & EV_ACT != 0 {
             let o = (m - v.vpos) as f64;
             let vzf = v.vzf;
+            p.doc.dm(doc).view.free = false;
             p.doc.dm(doc).view.cy = (cv[3] as f64 * 0.5 - o) / vzf;
             view_place(p, Some(doc));
             ui.repass();

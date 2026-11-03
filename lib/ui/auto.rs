@@ -28,6 +28,10 @@
 //   finger [N] down S | move S | up | cancel   one raw finger event (`wait` between them): it stays
 //                   down across other commands; N: the finger's id (default 0), for a second one;
 //                   cancel: the system took it
+//   pinch S D0 D1 [MS]   two fingers around S, D0 DIP apart, go to D1 DIP apart in MS ms (default 300),
+//                   then they lift
+//   pan2 S DX DY [MS]   two fingers around S (80 DIP apart) move by DX, DY (DIP) in MS ms (default 300),
+//                   then they lift
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
@@ -706,12 +710,12 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 52] = [
+        const CMDS: [&str; 54] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
-            "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "gpu",
+            "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -824,6 +828,8 @@ impl Ui {
             "swipe" => self.sc_swipe(app, a),
             "flick" => self.sc_flick(app, a),
             "finger" => self.sc_finger(app, a),
+            "pinch" => self.sc_two(app, a, true),
+            "pan2" => self.sc_two(app, a, false),
             "key" => self.sc_key(app, a),
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
@@ -1589,6 +1595,44 @@ impl Ui {
         self.finger_at(app, typ, x, y);
     }
 
+    // pinch S D0 D1 [MS] / pan2 S DX DY [MS]: two fingers, ids 0 and 1, at the same time
+    fn sc_two(&mut self, app: &mut dyn App, a: &[u8], pinch: bool) {
+        let (s, r) = self.resolve(a);
+        if s.is_none() {
+            self.sel_fail();
+            return;
+        }
+        let c = [self.sc.sel_x, self.sc.sel_y];
+        let (p0, r) = parse_int(r);
+        let (p1, r) = parse_int(r);
+        let q = skip_ws(r);
+        let ms = if q.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(q).0 } else { 300 }.max(1);
+        let dpi = self.win_dpi(self.sc.sel_win);
+        // the half distance at the start and the end, the way of the point between them
+        let (h0, h1, way) = if pinch {
+            (dp_at(p0, dpi) / 2, dp_at(p1, dpi) / 2, [0, 0])
+        } else {
+            (dp_at(40, dpi), dp_at(40, dpi), [dp_at(p0, dpi), dp_at(p1, dpi)])
+        };
+        self.two_at(app, plat::E_DOWN, c, h0);
+        let steps = (ms / 8).max(1);
+        for i in 1..=steps {
+            self.advance_time(app, ms * i / steps - ms * (i - 1) / steps);
+            let h = h0 + (h1 - h0) * i / steps;
+            self.two_at(app, plat::E_MOVE, [c[0] + way[0] * i / steps, c[1] + way[1] * i / steps], h);
+        }
+        self.two_at(app, plat::E_UP, [c[0] + way[0], c[1] + way[1]], h1);
+    }
+
+    // both fingers, h px left and right of c
+    fn two_at(&mut self, app: &mut dyn App, typ: u8, c: [i32; 2], h: i32) {
+        for (id, sign) in [(0u32, -1), (1, 1)] {
+            self.sc.finger_id = id;
+            self.finger_at(app, typ, c[0] + sign * h, c[1]);
+        }
+        self.sc.finger_id = 0;
+    }
+
     // wheel S DY [shift|ctrl|alt]...: the words hold those modifiers during the wheel event
     // (not during the move to S)
     fn sc_wheel(&mut self, app: &mut dyn App, a: &[u8]) {
@@ -1928,6 +1972,14 @@ impl Ui {
             let name = got.map_or("none", plat::audio::sound_name);
             if !want.starts_with(name.as_bytes()) || (want.len() > name.len() && want[name.len()] > b' ') {
                 self.fail(alloc::format!("sound {name}").as_bytes());
+            }
+            return;
+        }
+        if let Some(r) = word_eq(a, "keyboard") {
+            // the on-screen keyboard a finger asked for: shown | hidden (touch.rs)
+            let on = self.m.touch.kb_on;
+            if word_eq(skip_ws(r), "shown").is_some() != on {
+                self.fail(if on { b"keyboard shown" } else { b"keyboard hidden" });
             }
             return;
         }

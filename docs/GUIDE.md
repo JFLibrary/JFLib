@@ -1578,7 +1578,9 @@ in DIP):
 | `tap S`, `longpress S [MS]` | a finger: down and up at S; resting MS ms (default 600) in between |
 | `swipe S1 S2 [MS] [hold]` | a finger from S1 to S2 at an even speed in MS ms (default 300, a sample every 8 ms), then it lifts with that speed (a fling starts, `wait` runs it); `hold`: it rests 100 ms first (no fling) |
 | `flick S DX DY [MS]` | a quick swipe from S by DX, DY (DIP) in MS ms (default 60) |
-| `finger down S`, `finger move S`, `finger up`, `finger cancel` | one raw finger event: it stays down across other commands; `cancel`: the system took it |
+| `finger [N] down S`, `finger [N] move S`, `finger [N] up`, `finger [N] cancel` | one raw finger event: it stays down across other commands; `N` its id (default 0), for a second one; `cancel`: the system took it |
+| `pinch S D0 D1 [MS]` | two fingers around S, D0 DIP apart, go to D1 DIP apart in MS ms (default 300), then they lift |
+| `pan2 S DX DY [MS]` | two fingers around S, 80 DIP apart, move by DX, DY (DIP) in MS ms (default 300), then they lift |
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
@@ -5092,7 +5094,8 @@ On Android, `plat::back_trap(on)` makes the back key an Esc for the app (a page 
 One gesture recogniser for every host ([`lib/ui/touch.rs`](../lib/ui/touch.rs), no platform in it, the
 fling's physics included): hosts only forward raw fingers, so a script on the virtual clock tests the
 same code on any platform. On Android every tool but a mouse is a finger, in the browser `pointerType`
-touch. Windows and Linux report no fingers yet: there only scripts drive it.
+touch, on Windows `WM_POINTER` of `PT_TOUCH`, on Wayland `wl_touch`, on X11 the touch events of XInput 2.2
+(below, "On the desktop").
 
 **A new host** calls one function for every finger, in the order they happen:
 
@@ -5112,13 +5115,15 @@ What a finger does:
 
 | Gesture | Effect |
 | --- | --- |
-| Touch and lift within the slop (8 DIP) | a click at once: press and release in one frame, so a scroll that starts instead shows no press |
+| Touch and lift within the slop (8 DIP) | a click at once, where it came down: press and release in one frame, so a scroll that starts instead shows no press, and a finger that rolls off the button within the slop still clicks it |
+| Touch on the background near a small widget | the widget is meant (below, "Touch targets") |
 | Moves along an axis, on a widget that takes that axis | the widget gets press and moves like a mouse's (below) |
 | Moves, a scroll view around the widget can roll along that axis | the pan: the positions move by the finger's pixels, unsmoothed. The direction is locked (a view that scrolls both ways stays free unless the finger starts along an axis: rails). From the innermost view each takes what it can, the rest goes to the next. The slop's way is not lost and causes no jump: it is caught up over the next 16 DIP |
 | Lifts with speed (50 to 8000 DIP/s; least squares over the last 100 ms, none if it rested 40 ms) | the fling: along `OverScroller`'s curve and friction, handing over along the same views, ends at the last one's limit |
 | Touches during a fling | stops it; no click, and if it moves on it rolls again |
 | Rests 100 ms | the widget hovers (a tooltip can follow); after 400 ms the right button (so `ui.context_menu` works), and on Android the system's long-press feedback; if it then moves, the same decision as above |
-| A second finger | takes nothing from the first: while nothing is decided it is no tap and no long press any more; when the first one lifts, a pan goes on with the other one, a press ends, the rest does nothing until the last one lifts |
+| A second finger | takes nothing from the first: while nothing is decided it is no tap and no long press any more; when the first one lifts, a pan goes on with the other one, a press ends, the rest does nothing until the last one lifts. A widget with `TF_TWO` gets the two for itself (`ui.touch_two`) |
+| A finger while a pen is near | nothing: a pen that is down or hovers, and 500 ms after it left, makes a finger a palm (no event, no finger mode); a pen that comes down ends the fingers on the screen |
 | The system takes it (`Cancel`) | a press is released outside everything, no click, no fling |
 
 On Android the slop, the velocities and the long-press time are the device's (`ViewConfiguration`).
@@ -5141,12 +5146,45 @@ boxes say (the page "Container" of `apps/androidGallery` shows it):
 | `TF_H`, `TF_V`, `TF_BOTH` | a finger moving along this axis (both: the press comes with the touch) |
 | `TF_SLOP` | with `TF_BOTH`: the press only once the finger moved (a canvas waits for a second finger) |
 | `TF_HOLD` | only after resting for the long-press time, then the press comes and the drag starts (no right button); until then the finger rolls what is around it; a tap still clicks |
-| `TF_TWO` | a second finger is its own: no press, no click, a pass whenever a finger moves; `ui.touch_fingers()` has them (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for its own pan and zoom |
+| `TF_HOLD_LONG` | with `TF_HOLD`: a second instead of the long-press time (a panel's title bar) |
+| `TF_REST` | a finger that rests presses like one that moved, no right button (a canvas: a dab; there is no context menu to reach) |
+| `TF_TWO` | two fingers are its own: no press, no click (a press younger than 200 ms is taken back), a pass whenever a finger moves; `ui.touch_two()` below, or `ui.touch_fingers()` (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for anything else |
 | `TF_DECLINE` | no drag at all, a tap still clicks: the finger rolls what is around it or does nothing |
 | `0` | nothing special: the finger rolls what is around it, with nothing to roll it drags the widget |
 
-`WF_TOUCH_HOLD` asks the same of a window's title bar (`TF_HOLD`: a tool panel that only moves after a
-press and hold).
+**Two fingers:** a widget says `TF_TWO`, usually with `TF_BOTH | TF_SLOP` so that one finger waits to see
+whether a second one comes, and reads the gesture right after the widget, every frame:
+
+```rust
+let inp = ui.canvas(ID_CANVAS, draw, user, version).clone();
+ui.touch_take(TF_BOTH | TF_SLOP | TF_TWO | TF_REST);
+if let Some(t) = ui.touch_two() {
+    if t.began {
+        // the image point under (t.start_x, t.start_y) and the zoom now are the anchor
+    }
+    // zoom = anchor zoom * t.scale, and the anchor's point goes to (t.x, t.y): zoom and pan in one
+}
+```
+
+`TwoFingers` has `x`, `y` (the point between them), `start_x`, `start_y` (where it was when this pair came down),
+`scale` (their distance against the one at the start), `began` (the first read of this pair) and `taken_back`:
+the first finger's press went out less than 200 ms ago and was taken back for this pair, so undo what it began
+(its release comes through as usual). A stroke older than that goes on, and `touch_two` stays `None` until
+it ends. When one of the two lifts the gesture is over; another finger makes a new pair. PaintCraft's view
+(`apps/PaintCraft/src/workspace/view.rs`) is the full example.
+
+**Touch targets:** a widget smaller than 44 DIP in a direction is hit by a finger as if it were 44 DIP wide
+around its middle, but only from the background (a title bar, an empty bar, no hit box at all). An exact hit on another
+widget stays what it is, so neighbours do not take from each other; a covered widget is not reached; grips and
+splitters have their own width. The widget sees the finger moved by that distance, so a slider does not jump. A mouse
+sees none of this and nothing is drawn differently.
+
+**Windows:** the title bar of every window (`window_begin`, dialogs) moves it with the finger in all
+directions, from where the finger came down. `WF_TOUCH_HOLD` asks for a press and hold first (`TF_HOLD |
+TF_HOLD_LONG`): for a panel that lies over something a finger works on, as PaintCraft's tool windows do. A line along
+the bar's lower edge shows how far the hold is (`ui.touch_hold_part(id)` for a bar of your own). So: a dialog's or a
+free window's bar moves at once, a panel over a canvas after the hold, the main window's bar is the system's where it
+has one (on Windows: moves, snaps, double tap).
 
 What can be rolled: `ui.scroll_begin`, lists, data views, `ui.vlist_begin`, `ui.md_view`, the text
 views and editors, the console (row by row). `SC_NOWHEEL` views are not. A widget of your own with its
@@ -5157,10 +5195,30 @@ no hit box, the room they would take stays, so nothing jumps. `ui.touch_mode()` 
 one: the last pointer event came from a finger; on Android and in a browser with `pointer: coarse`
 from the first frame on. A real mouse (DeX, USB, also its wheel on Android) brings them back.
 
-**Windows:** the title bar of every window (`window_begin`, dialogs) moves it with the finger in all
-directions, from where the finger came down. `plat::reach_clamp` keeps the title bar on the screen and
-48 DIP of the window at each side. With a finger the resize band is wider at the sides and the bottom
-(14 DIP, 32 DIP corners; on top it stays thin, that is the title bar's).
+`plat::reach_clamp` keeps the title bar on the screen and 48 DIP of the window at each side. With a finger the
+resize band is wider at the sides and the bottom (14 DIP, 32 DIP corners; on top it stays thin, that is the
+title bar's); on Windows too, where the mouse has the system's frame.
+
+**On the desktop:** no mouse emulation, no double events.
+
+- *Windows* (`lib/plat/win_touch.rs`): fingers through `WM_POINTER*`, with their coalesced samples and time stamps;
+  handled messages never reach `DefWindowProc`, which would make mouse messages, Ctrl + wheel from a pinch and a right
+  click from a press and hold. A contact is wide, and the system gives it to a window frame it touches: a finger
+  over a border (`WM_NCPOINTER*`) belongs to the window whose client area is under its centre. A window moved or sized
+  by a finger follows it through `plat::begin_move` / `begin_resize`, with `window_snap` as for the system's move; the
+  system's press-and-hold and tap visuals are off for our windows. A slate posture (`SM_CONVERTIBLESLATEMODE`) counts as
+  `plat::touch_primary()`. The system's mouse moves after a window changed under the hidden cursor are not a mouse.
+- *Wayland* (`linux_wl_input.rs`): `wl_touch`, for the window of its surface (a popup's: its owner), at the window's
+  scale. `xdg_toplevel.move` and `resize` get the finger's serial, so the compositor follows it; child windows follow
+  through the library's drag.
+- *X11* (`linux_x11_xi.rs`): `XI_TouchBegin` / `Update` / `End` of the master devices, on a server with XI 2.2; a
+  window that selects them gets no emulated pointer. The window manager's moveresize follows only a pointer, so the
+  library moves such a window itself, in root coordinates.
+
+**The on-screen keyboard:** a finger's press that gives a text field the focus asks for it, the focus leaving that
+field takes it away (`plat::touch_keyboard`; a scroll or a mouse asks for nothing). Windows: `InputPane` through
+`IInputPaneInterop`. Wayland: `text-input-v3` follows the focus by itself, so the compositor decides. Android and the
+browser have their own way (below); X11 has nobody to ask. Scripts: `expect keyboard shown`.
 
 **Frames:** while a finger is down or a fling runs `frame_delay` is 0 (a frame on every vsync, on the
 browser's `requestAnimationFrame`); all samples of a frame make one pass. Idle it sleeps as before.
@@ -5176,6 +5234,10 @@ so a touch does not open the system's keyboard; on Android the keyboard follows 
 scroll.
 
 Test it: `apps/androidGallery/tests/touch.uis` and `touch_rtl.uis`, `apps/mdviewtest/tests/touch.uis`,
-`apps/editortest/tests/touch.uis`, `apps/termtest/tests/touch.uis` (scripts, Windows and Linux),
-`touch_web.mjs` (Chromium's touch emulation), `android_touch.py` (emulator or phone: `input motionevent`
-and `input swipe`, positions from `uiautomator dump`).
+`apps/editortest/tests/touch.uis`, `apps/termtest/tests/touch.uis`, `apps/desktest/tests/touch.uis` (two fingers,
+the hold, the keyboard), `apps/PaintCraft/tests/touch.uis` (scripts, Windows and Linux), `touch_web.mjs` (Chromium's
+touch emulation), `android_touch.py` (emulator or phone: `input motionevent` and `input swipe`, positions from
+`uiautomator dump`). The platform's part: `plattest --test touch` (fakes of the pointer API on Windows, fed `wl_touch`
+and XInput 2.2 events on Linux) and `python tools/touchcheck.py` (Windows: a real window and real contacts through
+`InjectTouchInput`, no touch screen needed; it skips with a message when the desktop is locked or the window covered).
+What to try on a real tablet: `apps/PaintCraft/docs/TOUCH.md`.

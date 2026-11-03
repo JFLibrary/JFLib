@@ -1,13 +1,15 @@
-// linux_x11_xi -- (PN1) X11 pen tablets through XInput 2 (raw protocol)
+// linux_x11_xi -- (PN1) X11 pen tablets and fingers through XInput 2 (raw protocol)
 //                                                              [src/plat/linux/x11_xi.s]
 //
-//   xi_init()                  QueryExtension "XInputExtension", XIQueryVersion 2.0, the
+//   xi_init()                  QueryExtension "XInputExtension", XIQueryVersion 2.2, the
 //                              valuator label atoms ("Abs Pressure", "Abs Tilt X / Y"),
 //                              XI_HierarchyChanged on the root window, the device list
 //   xi_select(window)          XISelectEvents Motion / ButtonPress / ButtonRelease of the pen
-//                              devices on one of our windows (every window)
-//   xi_event(ev)               a GenericEvent of XInput: pen samples, device changes
+//                              devices, and the fingers of every master device, on one of our
+//                              windows (every window)
+//   xi_event(ev)               a GenericEvent of XInput: pen samples, fingers, device changes
 //                              (-> xi_deferred re-reads the list)
+//   xi_finger_drag(w, edges) -> a finger is down on window w and the window follows it from now on
 //   xi_deferred()              device list again, windows re-selected
 //   xi_data(time) -> data      pen data (Event::data) for a core pointer event of that time,
 //                              0 = a mouse event
@@ -23,6 +25,13 @@
 // buttons 2 / 3 (the driver's mapping).  Replies and events are not trusted: every length is
 // checked against the packet.
 //
+// Fingers (a server with XI 2.2): a window that selects XI_TouchBegin / Update / End of the master devices
+// gets them instead of the emulated pointer, implicitly grabbed by the window they began on, in px like the
+// pointer's; each goes to plat::finger, its slot is its id.  The window manager's moveresize follows only a
+// pointer, so a title bar or a resize band under a finger is moved here (root coordinates, ConfigureWindow,
+// E_WINPOS / E_RESIZE pushed because a move we asked for is not reported back); no snapping (the hook
+// asks this backend for the owner's place, and a window manager's moves do not snap on X11 either).
+//
 // Deviation: x11_xi_deferred re-selected on every record, also on missing windows (a read
 // through a null record pointer in the assembly); here only existing windows are re-selected.
 
@@ -35,6 +44,11 @@ const XI_QUERY_DEVICE: u32 = 48;
 const XI_BUTTON_PRESS: u32 = 4; // event types
 const XI_MOTION: u32 = 6;
 const XI_HIERARCHY: u32 = 11;
+const XI_TOUCH_BEGIN: u32 = 18;
+const XI_TOUCH_UPDATE: u32 = 19;
+const XI_TOUCH_END: u32 = 20;
+const XI_TOUCH_MASK: u32 = (1 << XI_TOUCH_BEGIN) | (1 << XI_TOUCH_UPDATE) | (1 << XI_TOUCH_END);
+const XI_ALL_MASTER: u32 = 1;
 const XI_SLAVE_POINTER: u32 = 3; // XIDeviceInfo.use
 const XI_VALUATOR: u32 = 2; // class type
 const XI_PEN_MASK: u32 = (1 << 4) | (1 << 5) | (1 << 6);
@@ -62,15 +76,16 @@ impl X11 {
             return;
         }
         let op = r[9] as u32; // major opcode
-        // XIQueryVersion 2.0
+        // XIQueryVersion 2.2 (the server answers with what it has; fingers need 2.2)
         let (o, seq) = self.req(op | XI_QUERY_VERSION << 8, 8);
         wr16(&mut self.out, o, 2);
-        wr16(&mut self.out, o + 2, 0);
+        wr16(&mut self.out, o + 2, 2);
         let Some(r) = self.reply(seq) else { return };
         if rd16(&r, 8) < 2 {
             return;
         }
         self.xi_op = op;
+        self.xi_touch = rd16(&r, 8) > 2 || rd16(&r, 10) >= 2;
         // the valuator labels (only if they exist: no device has them otherwise)
         let mut seqs = [0u32; 3];
         for (i, n) in ATOM_NAMES.iter().enumerate() {
@@ -190,7 +205,13 @@ impl X11 {
 
     /// x11_xi_select(window): the pen devices' events on one of our windows
     pub(super) fn xi_select(&mut self, win: u32) {
-        if win == 0 || self.xi_op == 0 || self.xi_ndev == 0 {
+        if win == 0 || self.xi_op == 0 {
+            return;
+        }
+        if self.xi_touch {
+            self.select_one(win, XI_ALL_MASTER, XI_TOUCH_MASK);
+        }
+        if self.xi_ndev == 0 {
             return;
         }
         let n = (self.xi_ndev as usize).min(XD_MAX);
@@ -211,6 +232,10 @@ impl X11 {
         let et = rd16(b, 8) as u32; // evtype
         if et == XI_HIERARCHY {
             self.xi_want = true;
+            return;
+        }
+        if (XI_TOUCH_BEGIN..=XI_TOUCH_END).contains(&et) {
+            self.xi_finger(b, et);
             return;
         }
         if et.wrapping_sub(XI_BUTTON_PRESS) > XI_MOTION - XI_BUTTON_PRESS {
@@ -267,6 +292,109 @@ impl X11 {
         let d = self.xi_dev[k];
         self.xi_data = crate::evq_pen_data(d.lastp as i32, d.typ, d.tx, d.ty);
         self.xi_valid = true;
+    }
+
+    // a finger's event (XIDeviceEvent): detail = the touch's id, event = the window it began on
+    fn xi_finger(&mut self, b: &[u8], et: u32) {
+        if b.len() < 60 {
+            return;
+        }
+        let w = self.find(rd32(b, 24));
+        if w < 0 {
+            return;
+        }
+        let tid = rd32(b, 16);
+        let fixed = |o: usize| (rd32(b, o) as i32) >> 16; // FP1616
+        let (x, y, root) = (fixed(40), fixed(44), [fixed(32), fixed(36)]);
+        let age = crate::evq::finger_age(&mut self.xi_clock, rd32(b, 12));
+        let slot = self.xi_fingers.iter().position(|f| f.used && f.tid == tid);
+        let phase = match et {
+            XI_TOUCH_BEGIN => {
+                if let Some(k) = slot {
+                    self.xi_finger_push(k, crate::FingerPhase::Cancel, x, y, 0); // (it never ended)
+                    self.xi_fingers[k].used = false;
+                }
+                let Some(k) = self.xi_fingers.iter().position(|f| !f.used) else { return };
+                self.xi_fingers[k] = XFinger { used: true, tid, win: w, root };
+                self.xi_finger_push(k, crate::FingerPhase::Down, x, y, age);
+                return;
+            }
+            XI_TOUCH_UPDATE => crate::FingerPhase::Move,
+            _ => crate::FingerPhase::Up,
+        };
+        let Some(k) = slot else { return };
+        self.xi_fingers[k].root = root;
+        let dragged = self.xi_drag.on && self.xi_drag.slot == k;
+        if phase == crate::FingerPhase::Move {
+            if dragged {
+                self.xi_drag_to(root);
+            } else {
+                self.xi_finger_push(k, phase, x, y, age);
+            }
+            return;
+        }
+        if dragged {
+            self.xi_drag.on = false;
+        }
+        self.xi_finger_push(k, phase, x, y, age);
+        self.xi_fingers[k].used = false;
+    }
+
+    fn xi_finger_push(&mut self, k: usize, phase: crate::FingerPhase, x: i32, y: i32, age: u32) {
+        let win = (self.xi_fingers[k].win & (PW_MAX as i32 - 1)) as u8;
+        let mut e = crate::finger_event(win, phase, k as u8, x, y, age);
+        e.mods = self.mods as u8;
+        crate::evq_push(e);
+    }
+
+    /// a finger is down on window w: from now on the window follows it (edges 0 moves, else the
+    /// resize at those edges) -> false: no finger, the window manager's way
+    pub(super) fn xi_finger_drag(&mut self, w: i32, edges: u32) -> bool {
+        let Some(k) = self.xi_fingers.iter().position(|f| f.used && f.win == w) else { return false };
+        let Some(rect) = self.win_get_rect(w) else { return false };
+        self.xi_drag = XDrag { on: true, slot: k, win: w, edges, start: self.xi_fingers[k].root, rect };
+        true
+    }
+
+    // the finger of a drag is at this root point
+    fn xi_drag_to(&mut self, root: [i32; 2]) {
+        let d = self.xi_drag;
+        let (dx, dy) = (root[0] - d.start[0], root[1] - d.start[1]);
+        let [mut x, mut y, mut cw, mut ch] = d.rect;
+        if d.edges == 0 {
+            x += dx;
+            y += dy;
+            if let Some(a) = self.win_work_area(d.win) {
+                let p = crate::reach_clamp([x - a[0], y - a[1]], cw, [a[2], a[3]], 96);
+                (x, y) = (p[0] + a[0], p[1] + a[1]);
+            }
+        } else {
+            let m = 32; // (the window's own minimum comes with its size hints)
+            if d.edges & crate::EDGE_LEFT != 0 {
+                let n = (cw - dx).max(m);
+                x += cw - n;
+                cw = n;
+            }
+            if d.edges & crate::EDGE_RIGHT != 0 {
+                cw = (cw + dx).max(m);
+            }
+            if d.edges & crate::EDGE_TOP != 0 {
+                let n = (ch - dy).max(m);
+                y += ch - n;
+                ch = n;
+            }
+            if d.edges & crate::EDGE_BOTTOM != 0 {
+                ch = (ch + dy).max(m);
+            }
+        }
+        self.win_set_rect(d.win, x, y, cw, ch);
+        let ev = self.evwin;
+        self.evwin = d.win;
+        self.push(crate::E_WINPOS, 0, x, y, 0);
+        if d.edges != 0 {
+            self.push(crate::E_RESIZE, 0, cw, ch, 0);
+        }
+        self.evwin = ev;
     }
 
     /// x11_xi_data(time) -> pen data of the slave event with that time, 0 = none; a sample

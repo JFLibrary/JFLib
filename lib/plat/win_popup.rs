@@ -52,6 +52,10 @@ const SW_HIDE: i32 = 0;
 const PQ_RADIUS_DIP: i32 = 8;
 const IDC_ARROW: usize = 32512;
 const MA_NOACTIVATE: isize = 3;
+const PA_NOACTIVATE: isize = 3;
+const WM_POINTERUPDATE: u32 = 0x0245;
+const WM_POINTERACTIVATE: u32 = 0x024B;
+const WM_POINTERCAPTURECHANGED: u32 = 0x024C;
 const TME_LEAVE: u32 = 2;
 const WM_PAINT: u32 = 0x000F;
 const WM_ERASEBKGND: u32 = 0x0014;
@@ -174,6 +178,7 @@ pub fn popup(slot: u32, owner: i32, rect: Option<[i32; 4]>, f: Option<&Frame>) {
         }
         q.hwnd.set(h);
         q.ownhwnd.set(oh);
+        super::touch::feedback_off(h);
         q.w.set(0);
         q.track.set(false);
         top = true;
@@ -315,6 +320,13 @@ unsafe extern "system" fn pq_proc(hwnd: isize, msg: u32, wp: usize, lp: isize) -
         return 1;
     }
     let Some(q) = q else { return def() };
+    // a finger: pushed for the owner like the rest of the popup's input (its screen point)
+    if (WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED).contains(&msg) && super::pen::pointer_type(wp as u16 as u32) == Some(super::pen::WIN_PT_TOUCH) {
+        if msg == WM_POINTERACTIVATE {
+            return PA_NOACTIVATE;
+        }
+        return if super::touch::pointer(q.ownhwnd.get(), msg, wp as u16 as u32, q.owner.get()) { 0 } else { def() };
+    }
     let (x, y) = lp_xy(lp);
     match msg {
         WM_PAINT => {

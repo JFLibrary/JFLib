@@ -224,7 +224,7 @@ pub(crate) fn wcol_frame(p: &mut Pn, ui: &mut Ui) {
     }
     let open = crate::workspace::chrome::chrome_wnd_open(&p.chrome, WND_COLORS);
     let rect = p.wcol.rect.clone();
-    if ui.window_begin(WINID_COLORS, crate::preferences::localization::tr("Farben"), Some(&open), WF_TOOL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_COLORS, crate::preferences::localization::tr("Farben"), Some(&open), WF_TOOL | WF_AUTOHEIGHT | WF_TOUCH_HOLD, Some(&rect)) {
         ui.box_begin(0, BOX_H | BOX_XSTART | (WC_PAD << PAD_SHIFT), WC_COLGAP);
         wc_left(p, ui);
         if p.wcol.more {
