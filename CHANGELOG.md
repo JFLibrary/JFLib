@@ -162,6 +162,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** The demos (gallery, datagallery, editortest, docktest, dndtest, diagramtest, svgtest, spelltest, fontpicktest, template, androidGallery, mdviewtest, audiotest, prefstest) have English catalogues and no old names in their texts; they follow the user's language in a window, headless runs stay German, and tools that drive real windows, browsers or phones pin German
 - **build:** The browser host's own texts (its bar, its status line) follow the browser's language, and it hands the page's language list to the worker, so a test's emulated locale reaches the app; Arabic and Hebrew stay out of `with_library_languages` in the browser, whose bundle has no font for them
 - **plat:** Linux: the system calls ARM64 does not have are gone on x86-64 too (open, poll, fork, mkdir, unlink, rename, readlink, access, dup2, chmod): `openat`, `ppoll`, `clone`, `mkdirat`, `unlinkat`, `renameat2`, `readlinkat`, `faccessat`, `dup3`, `fchmodat`, helpers `rt::os::{poll, fork, clone, dup2, rename}`
+- **gpu:** Validation with jfgui_GPU_VALIDATE now also checks what shaders read and write through their bindings (syncval_shader_accesses_heuristic, off in the layer by default): a missing barrier between two shaders no longer goes unreported
 
 ### Fixed
 

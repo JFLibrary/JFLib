@@ -22,8 +22,9 @@
 //        instance of the process (tests fail on errors)
 //
 // Validation (jfgui_GPU_VALIDATE=1 or InstanceDesc::validate): VK_LAYER_KHRONOS_validation when
-// it is installed (the Vulkan SDK; never required), with synchronization validation
-// (VK_EXT_layer_settings "validate_sync", else VK_EXT_validation_features); warnings and errors
+// it is installed (the Vulkan SDK; never required), with synchronization validation, also of what
+// shaders access (VK_EXT_layer_settings "validate_sync" and "syncval_shader_accesses_heuristic", else
+// VK_EXT_validation_features, which knows only the first); warnings and errors
 // go to stderr as "gpu: validation error: ...".  Without the layer a note is printed once and
 // everything runs as without the variable.  jfgui_GPU_DEBUG=1: the messenger alone (driver
 // messages, info level and up).
@@ -225,19 +226,22 @@ impl Instance {
         if features_ext {
             names.push(b"VK_EXT_validation_features\0".as_ptr());
         }
-        // synchronization validation: "validate_sync" of the layer (or the older feature list)
+        // synchronization validation: "validate_sync" of the layer (or the older feature list), with what
+        // shaders read and write through their bindings ("syncval_shader_accesses_heuristic": without it
+        // the layer does not look at those, and a missing barrier between two shaders goes unreported)
         let on: vk::Bool32 = 1;
-        let setting = vk::LayerSettingEXT {
+        let setting = |name: &'static [u8]| vk::LayerSettingEXT {
             p_layer_name: LAYER_VALIDATION.as_ptr(),
-            p_setting_name: b"validate_sync\0".as_ptr(),
+            p_setting_name: name.as_ptr(),
             type_: vk::LAYER_SETTING_TYPE_BOOL32_EXT,
             value_count: 1,
             p_values: &on as *const u32 as *const c_void,
         };
+        let setting_list = [setting(b"validate_sync\0"), setting(b"syncval_shader_accesses_heuristic\0")];
         let settings = vk::LayerSettingsCreateInfoEXT {
             s_type: vk::STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
-            setting_count: 1,
-            p_settings: &setting,
+            setting_count: setting_list.len() as u32,
+            p_settings: setting_list.as_ptr(),
             ..vk::Zero::zero()
         };
         let sync = vk::VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;

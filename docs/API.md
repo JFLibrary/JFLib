@@ -18929,8 +18929,9 @@ vk_inst -- Vulkan instance and adapters
        instance of the process (tests fail on errors)
 
 Validation (jfgui_GPU_VALIDATE=1 or InstanceDesc::validate): VK_LAYER_KHRONOS_validation when
-it is installed (the Vulkan SDK; never required), with synchronization validation
-(VK_EXT_layer_settings "validate_sync", else VK_EXT_validation_features); warnings and errors
+it is installed (the Vulkan SDK; never required), with synchronization validation, also of what
+shaders access (VK_EXT_layer_settings "validate_sync" and "syncval_shader_accesses_heuristic", else
+VK_EXT_validation_features, which knows only the first); warnings and errors
 go to stderr as "gpu: validation error: ...".  Without the layer a note is printed once and
 everything runs as without the variable.  jfgui_GPU_DEBUG=1: the messenger alone (driver
 messages, info level and up).
@@ -20016,7 +20017,8 @@ commands without a barrier against the frames still on the GPU.
 
 - **`struct Transform`**
   where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis
-  (not negative: a mirrored instance would turn its faces inside out)
+  (not negative: a mirrored instance would turn its faces inside out; 0 on some of the axes leaves
+  faces without a normal, they come out black)
   - `pos: [f64; 3]`
   - `rot: [f32; 4]`
   - `scale: [f32; 3]`

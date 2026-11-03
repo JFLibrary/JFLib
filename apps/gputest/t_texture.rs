@@ -221,6 +221,8 @@ fn fetch(t: &mut T, dev: &Device) {
             let (w, h) = ((d.width >> m).max(1), (d.height >> m).max(1));
             e.push_constants(0, &[w, h, d.layers, m, base]);
             e.dispatch(w.div_ceil(8), h.div_ceil(8), d.layers);
+            // (each mip has its own range; the validation layer looks at the whole buffer)
+            e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
             base += w * h * d.layers * 4;
         }
         e.barrier(Access::COMPUTE_WRITE, Access::COPY_READ);

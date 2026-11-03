@@ -13,16 +13,19 @@
 // temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
 // commands without a barrier against the frames still on the GPU.
 
+use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::sync::atomic::Ordering;
 
 use gpu::*;
 
 use crate::math::{self, V3};
-use crate::{CHANGE_WORDS, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer};
+use crate::{CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis
-/// (not negative: a mirrored instance would turn its faces inside out)
+/// (not negative: a mirrored instance would turn its faces inside out; 0 on some of the axes leaves
+/// faces without a normal, they come out black)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform {
     pub pos: [f64; 3],
@@ -207,6 +210,7 @@ pub(crate) struct FrameSlot {
 /// instances, camera and sun of one scene of a Renderer
 pub struct Scene {
     dev: Device,
+    pub(crate) counts: Arc<Counts>,
     pub(crate) slots: Vec<Slot>,
     free: Vec<u32>,
     dirty: Vec<u32>,
@@ -239,6 +243,10 @@ pub struct Scene {
     frame: u64,
     pub(crate) slot: usize,
     pub(crate) prepared: bool,
+    /// a prepare has run since the last submission (what it sent has not reached the GPU)
+    sent: bool,
+    /// instances came or changed their mesh since prepare
+    pub(crate) stale: bool,
     waited: bool,
     pub(crate) changed: u32,
     pub(crate) full_up: Option<Buffer>,
@@ -275,8 +283,8 @@ fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, li
 
 /// the record of a slot: its bounding sphere relative to origin, safe against what f32 rounds (nothing
 /// visible may go missing), and its instance words
-fn records(s: &Slot, r: &Renderer, origin: V3) -> Result<([f32; 4], [u32; INSTANCE_WORDS])> {
-    let Some(m) = r.meshes.get(s.mesh as usize) else { return Err(GpuError::Invalid("Scene: an instance of a mesh this Renderer does not have")) };
+fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORDS]) {
+    let m = &r.meshes[s.mesh as usize];
     let t = &s.t;
     let rot = math::rotation(t.rot);
     let (sx, sy, sz) = (t.scale[0] as f64, t.scale[1] as f64, t.scale[2] as f64);
@@ -295,7 +303,7 @@ fn records(s: &Slot, r: &Renderer, origin: V3) -> Result<([f32; 4], [u32; INSTAN
                                c[0][2] * sx * mc[0] + c[1][2] * sy * mc[1] + c[2][2] * sz * mc[2]]);
     let big = center[0].abs().max(center[1].abs()).max(center[2].abs());
     let radius = m.radius * sx.max(sy).max(sz) * (1.0 + 2e-6) + big * 5e-7;
-    Ok(([center[0] as f32, center[1] as f32, center[2] as f32, radius as f32], words))
+    ([center[0] as f32, center[1] as f32, center[2] as f32, radius as f32], words)
 }
 
 /// the sphere of a free slot: its first plane test rejects it
@@ -323,6 +331,7 @@ impl Scene {
             frames.push(FrameSlot { stage, changes: None, scatter_group: None, readback: None, last: None });
         }
         Ok(Scene {
+            counts: r.counts.clone(),
             slots: Vec::new(),
             free: Vec::new(),
             dirty: Vec::new(),
@@ -354,6 +363,8 @@ impl Scene {
             frame: 0,
             slot: 0,
             prepared: false,
+            sent: false,
+            stale: false,
             waited: false,
             changed: 0,
             full_up: None,
@@ -376,6 +387,22 @@ impl Scene {
             return Err(GpuError::Invalid("Transform: a quaternion of length 0"));
         }
         Ok(())
+    }
+
+    fn check_mesh(&self, m: MeshId) -> Result<()> {
+        if m.0 < self.counts.meshes.load(Ordering::Relaxed) {
+            Ok(())
+        } else {
+            Err(GpuError::Invalid("Scene: a mesh its Renderer does not have"))
+        }
+    }
+
+    fn check_material(&self, m: MaterialId) -> Result<()> {
+        if m.0 < self.counts.materials.load(Ordering::Relaxed) {
+            Ok(())
+        } else {
+            Err(GpuError::Invalid("Scene: a material its Renderer does not have"))
+        }
     }
 
     fn list_for(&mut self, mesh: u32) -> u32 {
@@ -413,6 +440,9 @@ impl Scene {
     /// a new instance, on a place that came free if there is one
     pub fn add(&mut self, i: Instance) -> Result<InstanceId> {
         Scene::check_transform(&i.transform)?;
+        self.check_mesh(i.mesh)?;
+        self.check_material(i.material)?;
+        self.stale = true;
         let list = self.enter_list(i.mesh.0);
         let slot = match self.free.pop() {
             Some(f) => f,
@@ -468,6 +498,7 @@ impl Scene {
     }
 
     pub fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()> {
+        self.check_material(m)?;
         let i = self.get(id)?;
         self.slots[i].material = m.0;
         self.mark(id.slot);
@@ -475,7 +506,9 @@ impl Scene {
     }
 
     pub fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()> {
+        self.check_mesh(m)?;
         let i = self.get(id)?;
+        self.stale = true;
         let old = self.slots[i].list as usize;
         self.lists[old].count -= 1;
         let list = self.enter_list(m.0);
@@ -664,7 +697,7 @@ impl Scene {
         let mut places = Vec::with_capacity(self.lists.len());
         let mut draws = Vec::with_capacity(self.lists.len());
         for l in &mut self.lists {
-            let Some(m) = r.meshes.get(l.mesh as usize) else { return Err(GpuError::Invalid("Scene: an instance of a mesh this Renderer does not have")) };
+            let m = &r.meshes[l.mesh as usize];
             l.first = first;
             l.wide = m.wide;
             places.push(first);
@@ -693,6 +726,10 @@ impl Scene {
     /// every slot, from a temporary buffer: spheres, list_of, instances
     fn upload_all(&mut self, r: &Renderer) -> Result<()> {
         let n = self.slots.len();
+        if n == 0 {
+            self.full_dirty = false;
+            return Ok(());
+        }
         const CHUNK: usize = 4096;
         let size = n as u64 * 84;
         let up = self.dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Upload })?;
@@ -705,10 +742,7 @@ impl Scene {
             for s in chunk.iter_mut() {
                 s.dirty = false;
                 if s.live {
-                    let (sphere, w) = records(s, r, origin)?;
-                    if s.material as usize >= r.material_count() {
-                        return Err(GpuError::Invalid("Scene: an instance of a material this Renderer does not have"));
-                    }
+                    let (sphere, w) = records(s, r, origin);
                     spheres.push(sphere);
                     lists.push(s.list);
                     words.push(w);
@@ -747,10 +781,7 @@ impl Scene {
             let mut row = [0u32; CHANGE_WORDS];
             row[0] = i;
             if s.live {
-                if s.material as usize >= r.material_count() {
-                    return Err(GpuError::Invalid("Scene: an instance of a material this Renderer does not have"));
-                }
-                let (sphere, w) = records(s, r, origin)?;
+                let (sphere, w) = records(s, r, origin);
                 row[1] = s.list;
                 for j in 0..4 {
                     row[4 + j] = sphere[j].to_bits();
@@ -787,12 +818,19 @@ impl Scene {
 
     /// the frame's data for Renderer::record: waits for this slot's last frame, sends what changed
     pub fn prepare(&mut self, r: &mut Renderer) -> Result<()> {
+        if !Arc::ptr_eq(&self.counts, &r.counts) {
+            return Err(GpuError::Invalid("Scene::prepare: another Renderer than its own"));
+        }
         self.wait_slot()?;
-        // the last prepare never reached a submission: what it sent is lost
-        if self.prepared {
+        // the last prepare never reached a submission, or failed half way: what it sent is lost
+        if self.sent {
             self.full_dirty = true;
             self.lists_dirty = true;
+            r.resend_materials();
         }
+        self.sent = true;
+        self.prepared = false;
+        self.stale = false;
         let slot = (self.frame % self.frames.len() as u64) as usize;
         self.slot = slot;
         self.upload = UploadInfo::default();
@@ -835,6 +873,7 @@ impl Scene {
         self.frames[slot].last = Some((id, self.frame));
         self.frame += 1;
         self.prepared = false;
+        self.sent = false;
         self.waited = false;
     }
 }

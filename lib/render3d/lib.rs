@@ -28,8 +28,10 @@
 
 extern crate alloc;
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::Cell;
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use gpu::*;
 
@@ -148,6 +150,13 @@ impl Material {
     }
 }
 
+/// how many meshes and materials a Renderer has: its scenes judge ids by them at once, and know by this
+/// object whose they are
+pub(crate) struct Counts {
+    pub(crate) meshes: AtomicU32,
+    pub(crate) materials: AtomicU32,
+}
+
 /// one growing buffer of a pool: a new one takes over, the GPU copies the old contents across
 pub(crate) struct Pool {
     pub(crate) buf: Buffer,
@@ -177,7 +186,7 @@ impl Pool {
             let mut e = dev.encoder()?;
             e.barrier(Access::COPY_WRITE, Access::COPY_READ);
             e.copy_buffer(&self.buf, 0, &buf, 0, self.size * self.used as u64);
-            e.barrier(Access::COPY_WRITE, Access::COPY_READ | Access::COPY_WRITE | Access::INDEX_VERTEX);
+            e.barrier(Access::COPY_WRITE, Access::COPY_READ | Access::COPY_WRITE | Access::INDEX_VERTEX | Access::GRAPHICS_READ);
             dev.queue().submit([e.finish()?])?;
         }
         self.buf = buf;
@@ -206,6 +215,7 @@ pub struct Renderer {
     indices32: Pool,
     pub(crate) meshes: Vec<MeshInfo>,
     materials: Vec<[u32; MATERIAL_WORDS]>,
+    pub(crate) counts: Arc<Counts>,
     pub(crate) material_buf: Buffer,
     /// counts the material and vertex buffers (a scene's bindings follow)
     pub(crate) bindings_gen: u32,
@@ -289,6 +299,7 @@ impl Renderer {
             indices32: Pool::new(dev, BufferUsage::INDEX, 4, 1 << 8)?,
             meshes: Vec::new(),
             materials: Vec::new(),
+            counts: Arc::new(Counts { meshes: AtomicU32::new(0), materials: AtomicU32::new(0) }),
             material_buf: dev.create_buffer(&BufferDesc { size: 64 * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
             bindings_gen: 0,
             material_cap: 64,
@@ -383,6 +394,7 @@ impl Renderer {
         };
         self.vertices.used += nv;
         self.meshes.push(MeshInfo { first_index: first, indices: ni, base_vertex: base, vertices: nv, wide, center, radius: math::sqrt(r2) });
+        self.counts.meshes.store(self.meshes.len() as u32, Ordering::Relaxed);
         Ok(MeshId(self.meshes.len() as u32 - 1))
     }
 
@@ -394,6 +406,7 @@ impl Renderer {
         let i = self.materials.len() as u32;
         self.materials.push(m.words());
         self.mark_material(i);
+        self.counts.materials.store(i + 1, Ordering::Relaxed);
         Ok(MaterialId(i))
     }
 
@@ -409,8 +422,11 @@ impl Renderer {
         self.material_dirty = Some(self.material_dirty.map_or((i, i + 1), |(a, b)| (a.min(i), b.max(i + 1))));
     }
 
-    pub(crate) fn material_count(&self) -> usize {
-        self.materials.len()
+    /// (Scene::prepare) what the last prepare sent may not have reached a frame: the whole table again
+    pub(crate) fn resend_materials(&mut self) {
+        if !self.materials.is_empty() {
+            self.material_dirty = Some((0, self.materials.len() as u32));
+        }
     }
 
     /// a depth buffer the renderer keeps, for frames recorded with depth None
@@ -448,8 +464,15 @@ impl Renderer {
     /// one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
     /// colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
     pub fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()> {
+        if !Arc::ptr_eq(&s.counts, &self.counts) {
+            return Err(GpuError::Invalid("record: a scene of another Renderer"));
+        }
         if !s.prepared {
             return Err(GpuError::Invalid("record: Scene::prepare comes first"));
+        }
+        // (what went up does not hold them: the visibility shader would read and write beyond its buffers)
+        if s.stale {
+            return Err(GpuError::Invalid("record: instances came or changed their mesh after Scene::prepare"));
         }
         if color.view.format() != self.desc.color {
             return Err(GpuError::Invalid("record: the colour target is not in the renderer's format"));
@@ -520,7 +543,7 @@ impl Renderer {
         if let (Some(ts), true) = (&s.ts, s.stats_on) {
             e.timestamp(ts, s.slot as u32 * 4 + 2);
         }
-        e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::INDEX_VERTEX | Access::COPY_READ);
+        e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
         if let (true, Some(rb), true) = (s.stats_on, &f.readback, lists > 0) {
             e.copy_buffer(&s.view.draws, 0, rb, 0, lists * DRAW_BYTES);
         }

@@ -1008,7 +1008,12 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 Das Vulkan SDK ist nur ein Entwicklungswerkzeug; zur Laufzeit braucht `lib/gpu` nichts davon.
 Mit installiertem SDK (Schicht `VK_LAYER_KHRONOS_validation`) schaltet `jfgui_GPU_VALIDATE=1`
 oder `InstanceDesc { validate: true, .. }` die Validierung ein, samt Synchronisationsprüfung
-(`VK_EXT_layer_settings` „validate_sync“, sonst `VK_EXT_validation_features`). Meldungen gehen
+(`VK_EXT_layer_settings` „validate_sync“ und „syncval_shader_accesses_heuristic“, sonst
+`VK_EXT_validation_features`, das nur das Erste kennt). Die zweite Einstellung ist in der Schicht
+aus; ohne sie sieht die Prüfung nicht, was Shader über ihre Bindungen lesen und schreiben, und eine
+fehlende Barriere zwischen Rechen- und Vertex-Shader bleibt unbemerkt (so geschehen bei G5a, auf der
+NVIDIA-Karte ohne sichtbare Folge). Sie schließt aus dem SPIR-V auf die Zugriffe und kann Falsches
+melden. Meldungen gehen
 über `VK_EXT_debug_utils` als `gpu: validation error: ...` auf stderr;
 `gpu::validation_messages()` zählt Fehler und Warnungen. Ohne die Schicht erscheint einmal ein
 Hinweis und alles läuft wie ohne die Variable.
@@ -1019,8 +1024,9 @@ build\win\gputest.exe --test all          (oder: gputest --test all --validate)
 ```
 
 `tests/validate.uis` lässt jeden Test einmal mit Validierung laufen; ein Validierungsfehler
-lässt ihn scheitern. Der Test `syncval` baut absichtlich eine fehlende Barriere ein und erwartet,
-dass die Synchronisationsprüfung sie meldet -- so ist sicher, dass sie wirklich an ist.
+lässt ihn scheitern. Der Test `syncval` baut absichtlich zwei fehlende Barrieren ein, eine zwischen
+Kopien und eine zwischen zwei Dispatches, und erwartet, dass die Synchronisationsprüfung sie meldet
+-- so ist sicher, dass sie wirklich an ist.
 Die selbst geschriebenen SPIR-V-Module von gputest sind mit `spirv-val --target-env vulkan1.1`
 und `vulkan1.3` geprüft.
 

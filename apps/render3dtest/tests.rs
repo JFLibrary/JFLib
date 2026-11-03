@@ -905,17 +905,87 @@ fn errors(t: &mut T) {
             t.ok(inv(r.record(&mut e, &s, cb, Some(da))), "a colour target in another format: Invalid");
         }
     }
-    // a mesh and a material the renderer does not have: from prepare
+    // a mesh and a material the renderer does not have: at once, and nothing stays behind
     let Some(mut s2) = t.res(Scene::new(&r), "Scene::new") else { return };
-    let _ = s2.add(render3d::Instance { mesh: MeshId(99), material: mat, transform: Transform::at([0.0; 3]) });
-    t.ok(inv(s2.prepare(&mut r)), "an instance of a mesh not there: prepare = Invalid");
-    let Some(mut s3) = t.res(Scene::new(&r), "Scene::new") else { return };
-    let _ = s3.add(render3d::Instance { mesh, material: MaterialId(99), transform: Transform::at([0.0; 3]) });
-    t.ok(inv(s3.prepare(&mut r)), "an instance of a material not there: prepare = Invalid");
-    // an empty scene: a clear, nothing else
+    let here = Transform::at([0.0; 3]);
+    t.ok(inv(s2.add(render3d::Instance { mesh: MeshId(99), material: mat, transform: here }).map(|_| ())), "an instance of a mesh not there: Invalid");
+    t.ok(inv(s2.add(render3d::Instance { mesh: MeshId(u32::MAX), material: mat, transform: here }).map(|_| ())), "the largest mesh id: Invalid, nothing allocated for it");
+    t.ok(inv(s2.add(render3d::Instance { mesh, material: MaterialId(99), transform: here }).map(|_| ())), "an instance of a material not there: Invalid");
+    t.ok(s2.is_empty() && s2.lists().is_empty(), "refused instances leave nothing in the scene");
+    let Some(id) = t.res(s2.add(render3d::Instance { mesh, material: mat, transform: here }), "add") else { return };
+    t.ok(inv(s2.set_mesh(id, MeshId(99))), "set_mesh to a mesh not there: Invalid");
+    t.ok(inv(s2.set_material(id, MaterialId(99))), "set_material to a material not there: Invalid");
+    // a mesh and a material that come after the scene count
+    let Some(later) = t.res(r.add_mesh(&c.data()), "add_mesh") else { return };
+    let Some(later_m) = t.res(r.add_material(&Material::color(0.5, 0.5, 0.5)), "add_material") else { return };
+    t.res(s2.set_mesh(id, later), "set_mesh to a later mesh");
+    t.res(s2.set_material(id, later_m), "set_material to a later material");
+    // a scene is its renderer's
+    let Some(mut r2) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return };
+    t.ok(inv(s2.prepare(&mut r2)), "prepare with another renderer: Invalid");
+    if t.res(s2.prepare(&mut r), "prepare with its own renderer").is_some() {
+        if let Some(mut e) = t.res(dev.encoder(), "encoder") {
+            let ca = ColorAttachment { view: off.color.view(), load: Load::Clear, clear: CLEAR, store: true, before: Layout::Undefined, after: Layout::CopySrc };
+            let da = DepthAttachment { view: off.depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: true, before: Layout::Undefined, after: Layout::Sampled };
+            t.ok(inv(r2.record(&mut e, &s2, ca, Some(da))), "record with another renderer: Invalid");
+        }
+    }
+    // an empty scene: a clear, nothing else; also with an origin, and after a prepare without a frame
     let Some(mut s4) = t.res(Scene::new(&r), "Scene::new") else { return };
     if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene") {
         t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene: the clear colour");
+    }
+    s4.set_origin([1e7, 0.0, 0.0]);
+    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene with an origin") {
+        t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene with an origin: the clear colour");
+    }
+    t.res(s4.prepare(&mut r), "prepare of an empty scene");
+    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s4, "an empty scene after a prepare without a frame") {
+        t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), "an empty scene after a prepare without a frame: the clear colour");
+    }
+    // instances that come after prepare: what went up does not hold them, the next prepare takes them
+    let cam = Camera::look_at([0.0, 0.0, 6.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY);
+    let Some(mut s5) = t.res(Scene::new(&r), "Scene::new") else { return };
+    s5.set_camera(&cam);
+    let Some(one) = t.res(s5.add(render3d::Instance { mesh, material: mat, transform: Transform::at([-2.0, 0.0, 0.0]) }), "add") else { return };
+    let Some(_) = shot(t, &dev, &mut off, &mut r, &mut s5, "before") else { return };
+    let refused = |t: &mut T, r: &Renderer, s: &Scene, off: &Off, what: &str| {
+        if let Some(mut e) = t.res(dev.encoder(), "encoder") {
+            let ca = ColorAttachment { view: off.color.view(), load: Load::Clear, clear: CLEAR, store: true, before: Layout::CopySrc, after: Layout::CopySrc };
+            let da = DepthAttachment { view: off.depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: true, before: Layout::Sampled, after: Layout::Sampled };
+            t.ok(inv(r.record(&mut e, s, ca, Some(da))), what);
+        }
+    };
+    t.res(s5.prepare(&mut r), "prepare");
+    t.res(s5.add(render3d::Instance { mesh: later, material: mat, transform: Transform::at([2.0, 0.0, 0.0]) }), "add after prepare");
+    refused(t, &r, &s5, &off, "an instance added after prepare: record = Invalid");
+    t.res(s5.prepare(&mut r), "prepare");
+    t.res(s5.set_mesh(one, later), "set_mesh after prepare");
+    refused(t, &r, &s5, &off, "a mesh changed after prepare: record = Invalid");
+    let Some(got) = shot(t, &dev, &mut off, &mut r, &mut s5, "after them") else { return };
+    let Some(mut fresh) = t.res(Scene::new(&r), "Scene::new") else { return };
+    fresh.set_camera(&cam);
+    for x in [-2.0, 2.0] {
+        t.res(fresh.add(render3d::Instance { mesh: later, material: mat, transform: Transform::at([x, 0.0, 0.0]) }), "add");
+    }
+    if let Some(want) = shot(t, &dev, &mut off, &mut r, &mut fresh, "built anew") {
+        let (n, m) = diff(&got, &want);
+        t.ok(n == 0 && want.chunks_exact(4).any(|p| p[0..3] != CLEAR8), &format!("the next prepare takes them: against a scene built anew: {n} pixels differ (largest {m})"));
+    }
+    // a material row that a frame recorded and never sent is sent again
+    let Some(mut s6) = t.res(Scene::new(&r), "Scene::new") else { return };
+    s6.set_camera(&cam);
+    t.res(s6.add(render3d::Instance { mesh, material: mat, transform: Transform::at([0.0; 3]) }), "add");
+    let Some(_) = shot(t, &dev, &mut off, &mut r, &mut s6, "before the row") else { return };
+    t.res(r.set_material(mat, &Material::color(0.0, 1.0, 0.0)), "set_material");
+    t.res(s6.prepare(&mut r), "prepare");
+    if let Some(mut e) = t.res(dev.encoder(), "encoder") {
+        let ca = ColorAttachment { view: off.color.view(), load: Load::Clear, clear: CLEAR, store: true, before: Layout::CopySrc, after: Layout::CopySrc };
+        let da = DepthAttachment { view: off.depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: true, before: Layout::Sampled, after: Layout::Sampled };
+        t.res(r.record(&mut e, &s6, ca, Some(da)), "a frame recorded and dropped");
+    }
+    if let Some(img) = shot(t, &dev, &mut off, &mut r, &mut s6, "after the dropped frame") {
+        t.ok(img.chunks_exact(4).any(|p| p[1] > 0 && p[0] == 0 && p[2] == 0), "a row of the table in a frame never submitted: it still arrives");
     }
     // lost: every call says so
     dev.test_lose();

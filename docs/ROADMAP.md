@@ -1740,7 +1740,7 @@ Fensterrand hinaus.
   etwas angekommen ist; sonst geht der Lauf über den alten Weg. Was der Compositor daraus macht, sieht er nicht. Nicht getestet: Safari, Chrome auf
   Android und Linux, Telefone, AMD, Intel, ein echter Treiber-Reset, ein Tab im Hintergrund. Nicht gebaut: Zeitstempel,
   Bindless.
-- **P2** · *erledigt* (2026-11-03) · G5a: der Kern der 3D-Engine ([RENDER3D.md](RENDER3D.md)): `lib/render3d` mit Szene, Meshes in
+- **P2** · *erledigt* (2026-11-04) · G5a: der Kern der 3D-Engine ([RENDER3D.md](RENDER3D.md)): `lib/render3d` mit Szene, Meshes in
   gemeinsamen Puffern, Material-Tabelle (sichtbar: die Grundfarbe), Instanzen, Kamera, Sonne, Sichtbarkeit im Rechen-Shader und
   einer Instanzliste je Mesh; auf Voll ein Multi-Draw, auf Basis und im Browser ein indirekter Befehl je Liste, aus denselben
   WGSL-Quellen. Reverse-Z, Positionen `f64` auf der CPU und `f32` relativ zu einem Ursprung auf der GPU, nur Geändertes geht hoch.
@@ -1748,8 +1748,10 @@ Fensterrand hinaus.
   Würfel stehen dabei still; Sichtbarkeit 0,063 statt 0,133 ms, Zeichnen gleich. Gefunden: 32-Bit-Indizes kosten dort ein Drittel bis die Hälfte,
   feste Vertex-Attribute rund drei Viertel mehr als 16 Bit und Speicherpuffer. Bilder gegen einen Strahlenwerfer auf der CPU; Voll, Basis
   und Chrome 156 (alle Bündel) zeigen dieselben Bilder, 0 von 57 600 Pixeln anders. Nicht getestet: andere GPUs, Linux, Android,
-  Firefox. Nicht gebaut: Meshes entfernen, negative Skalierung, orthografische Kamera, Durchsichtigkeit.
-- **P2** · *fehlt* · G5b: Texturen und glTF-Import.
+  Firefox. Nicht gebaut: Meshes entfernen, negative Skalierung, orthografische Kamera, Durchsichtigkeit. In der Durchsicht gefunden und
+  behoben: eine fehlende Barriere zwischen Sichtbarkeit und Vertex-Shader, die weder die Bilder noch die Validierung zeigten; die
+  Synchronisationsprüfung sieht seitdem auch, was Shader lesen und schreiben ([GPU.md](GPU.md#validierung)).
+- **P2** · *fehlt* · G5b: Texturen und glTF-Import, dazu gespiegelte Instanzen (negative Skalierung), weil glTF-Knoten sie haben können.
 - **P2** · *fehlt* · G5c: PBR, Licht, Schatten.
 - **P2** · *fehlt* · G5d: Verdeckung über eine Hi-Z-Pyramide, Detailstufen, zweite Warteschlange.
 - **P2** · *fehlt* · G5e: 3D-Ansicht in der UI, Linux, Android, Browser in einem echten Fenster, Messungen auf anderen GPUs.

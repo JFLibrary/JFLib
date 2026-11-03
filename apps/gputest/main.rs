@@ -469,6 +469,20 @@ fn syncval(t: &mut T) {
     t.expected += e1 - e0;
     out(&format!("  (the {} validation error(s) above are expected)", e1 - e0));
     t.ok(e1 > e0, "synchronization validation reports a missing barrier");
+    // the same between two dispatches: only what the shaders access through their bindings shows it
+    let Some(fp) = t_compute::Fill::new(t, dev) else { return };
+    let Some(bg) = fp.group(t, dev, &dst) else { return };
+    let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
+    e.set_compute_pipeline(&fp.pipe);
+    e.set_bind_group(0, &bg);
+    e.push_constants(0, &[256u32, 1, 0]);
+    e.dispatch(4, 1, 1);
+    e.dispatch(4, 1, 1); // no barrier: write after write, in the shader
+    run_wait(t, dev, e.finish(), "hazard between shaders");
+    let (e2, _) = gpu::validation_messages();
+    t.expected += e2 - e1;
+    out(&format!("  (the {} validation error(s) above are expected)", e2 - e1));
+    t.ok(e2 > e1, "synchronization validation reports a missing barrier between two shaders");
 }
 
 fn run() -> i32 {
