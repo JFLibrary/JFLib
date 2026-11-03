@@ -46,6 +46,9 @@ internal static class ModernEffects
         bool validate=args.Contains("--validate-dialog");
         bool show=!args.Contains("--defaults") && !validate;
         bool configurable=(effect.Options as EffectOptionsBase)?.IsConfigurable ?? true;
+        token=null;
+        // Such an effect runs without a token and may not even have properties to ask for.
+        if(!configurable)return true;
         var properties=effect switch {
             PropertyBasedBitmapEffect e=>e.CreatePropertyCollection(),
             PropertyBasedGpuImageEffect e=>e.CreatePropertyCollection(),
@@ -56,10 +59,8 @@ internal static class ModernEffects
         if(properties!=null) {
             token=new PropertyBasedEffectConfigToken(properties);
             bool any=properties.Any(p=>!p.ReadOnly);
-            return !((show || validate) && configurable && any) || Dialogs.Properties(effect.EffectInfo.Name,properties,ParameterLabels.For(effect,properties),show);
+            return !((show || validate) && any) || Dialogs.Properties(effect.EffectInfo.Name,properties,ParameterLabels.For(effect,properties),show);
         }
-        token=null;
-        if(!configurable)return true;
         using var form=effect.CreateConfigForm();
         // Only this hands the form its effect and initial token; setting it fills the controls.
         form.SetEffect(effect);
@@ -112,12 +113,13 @@ internal sealed class HostServices(bool software):IServiceProvider
 {
     const string RenderingGpu="Graphics/RenderingGpuChoice";
     static bool cacheReady;
-    object? settings,direct2D,imaging,directWrite,enumNames,clipboard;
+    object? settings,direct2D,imaging,directWrite,enumNames,clipboard,palettes;
 
     public object? GetService(Type t)
     {
         if(t==typeof(IEnumLocalizerFactory))return enumNames??=ClosedInterface.Implement(t,(_,a)=>EnumNames((Type)a[0]!));
         if(t==typeof(IClipboardService))return clipboard??=Clipboard();
+        if(t==typeof(IPalettesService))return palettes??=Palettes();
         if(t==typeof(ISettingsService))return settings??=ClosedInterface.Implement(t,(_,a)=>Setting((string)a[0]!));
         if(t==typeof(PaintDotNet.Direct2D1.IDirect2DFactory))return direct2D??=PaintDotNet.Direct2D1.Direct2DFactory.Create();
         if(t==typeof(IImagingFactory))return imaging??=ImagingFactory.CreateRef();
@@ -142,11 +144,42 @@ internal sealed class HostServices(bool software):IServiceProvider
         });
     }
 
-    // paint.net's own service for effects; it only wraps the system clipboard.
+    // paint.net's own service for effects, given a window: the application always has one, and
+    // without it the service retries for 12 seconds before it reports an empty clipboard.
     static object? Clipboard()
     {
         var type=Assembly.Load("paintdotnet").GetType("PaintDotNet.Effects.ClipboardServiceForEffects");
-        return type==null ? null : Activator.CreateInstance(type,true);
+        if(type==null)return null;
+        var real=(IClipboardService)Activator.CreateInstance(type,true)!;
+        var window=new System.Windows.Forms.NativeWindow();
+        window.CreateHandle(new System.Windows.Forms.CreateParams());
+        return ClosedInterface.Implement(typeof(IClipboardService),(member,a)=>{
+            if(member!="Open")return null;
+            var handle=(nint)a[0]!;
+            return real.Open(handle==0 ? window.Handle : handle);
+        });
+    }
+
+    // paint.net's palette service hangs on its user files. A plugin gets a plain palette of the usual
+    // 96 colors instead: a gray ramp, then saturated hues.
+    static object Palettes()
+    {
+        var colors=new List<ColorBgra>();
+        for(int i=0;i<16;i++)colors.Add(ColorBgra.FromBgr((byte)(i*17),(byte)(i*17),(byte)(i*17)));
+        for(int i=0;i<80;i++) {
+            double h=i*6.0/80,f=h-Math.Floor(h);
+            byte up=(byte)(255*f),down=(byte)(255*(1-f));
+            colors.Add((int)h switch {
+                0=>ColorBgra.FromBgr(0,up,255),
+                1=>ColorBgra.FromBgr(0,255,down),
+                2=>ColorBgra.FromBgr(up,255,0),
+                3=>ColorBgra.FromBgr(255,down,0),
+                4=>ColorBgra.FromBgr(255,0,up),
+                _=>ColorBgra.FromBgr(down,0,255)
+            });
+        }
+        IReadOnlyList<ColorBgra> palette=colors;
+        return ClosedInterface.Implement(typeof(IPalettesService),(member,_)=>member is "get_DefaultPalette" or "get_CurrentPalette" ? palette : null);
     }
 
     object Setting(string path)

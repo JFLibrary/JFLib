@@ -244,8 +244,8 @@ PNAPI plugins and adds compatible entries to menus/file filters in the backgroun
 
 Paint.NET's slider controls, other application services and complete file-type save
 dialogs are not implemented: parameters appear in a plain property list with the plugin's
-labels. v5 effects are tested with our own fixtures, not yet with third-party
-plugins. Native Linux PaintCraft can invoke the same
+labels. BoltBait's pack, the published GPU samples and WebP were run through the host once
+by hand; see the matrix for what that covers. Native Linux PaintCraft can invoke the same
 host through Wine with explicit configuration. The tested setups use WineHQ 11.21 or
 Wine 11.19 and the experimental Paint.NET-on-Wine package; Fedora's wine 11.20 Staging
 package does not work. The regular Windows

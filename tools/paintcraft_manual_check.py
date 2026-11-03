@@ -12,6 +12,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -161,7 +162,7 @@ def modern_plugins(out, cases, run):
     script = ROOT / "apps/PaintCraft/tests/integration/pdn_modern.uis"
     run("win", "modern-effects", script.read_text(encoding="utf-8"), [*plugins, "--pdn-defaults"])
     # WARP, for machines and sessions without a usable GPU, gives the same black
-    run("win", "modern-software", MENU + 'click menuitem:"Fixture GPU Image"\nsync\ncmd 901 65537\nexpect #9900 text "FF000000"\n',
+    run("win", "modern-software", MENU + 'click menuitem:"Fixture GPU Image"\nsync 60000\ncmd 901 65537\nexpect #9900 text "FF000000"\n',
         [*plugins, "--pdn-defaults", "--pdn-gpu", "software"])
 
     # The search of a normal start does not block; effects and formats arrive with its end.
@@ -169,7 +170,7 @@ def modern_plugins(out, cases, run):
     image.write_bytes(struct.pack("<5I", 0x54465354, 1, 1, 0xff123456, 0))
     run("win", "modern-background", f'''size 1280 800
 theme light
-sync
+sync 60000
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 expect menuitem:"Fixture GPU Image" enabled
@@ -180,7 +181,7 @@ click #65548
 key ctrl+a
 type "{image.as_posix()}"
 click button:"Öffnen"
-sync
+sync 60000
 expect #9913 value 1
 cmd 901 0
 expect #9900 text "FF123456"
@@ -210,18 +211,27 @@ expect #9900 text "FF123456"
     bare["PATH"] = os.path.join(os.environ["SystemRoot"], "System32")
     install = os.environ.get("PAINTDOTNET_DIR") or os.path.join(os.environ["ProgramFiles"], "paint.net")
     clr = [str(exe), "--pdn-clr", install, str(host)]
+    seconds = {}
     for kind, extra, pixel in [("BitmapInvert", [], "000000ff"), ("BitmapFloat", [], "000000ff"), ("BitmapForm", [], "000000ff"), ("BitmapPlain", [], "000000ff"),
                                ("ClassicPlain", [], "000000ff"), ("ClassicLocalized", [], "000000ff"), ("ClassicClipboard", [], "000000ff"),
+                               ("BitmapOwnLibrary", [], "000000ff"),
                                ("GpuImage", [], "000000ff"), ("GpuImage", ["--gpu", "software"], "000000ff"), ("GpuDrawing", [], "000000ff"), ("GpuShader", [], "cdcdcdff")]:
+        started = time.time()
         result = subprocess.run([*clr, str(fixture), kind, "--defaults", *extra], input=packet, capture_output=True, env=bare, timeout=90)
         assert result.returncode == 0, (kind, result.stderr)
+        seconds[kind] = time.time() - started
         assert len(result.stdout) == 12 + w * h * 4 and result.stdout[12:16].hex() == pixel, (kind, extra, result.stdout[:16].hex())
+    # paint.net's clipboard retries for 12 seconds when it has no window to open with; measured
+    # against a plain effect, because a busy machine slows every process
+    assert seconds["ClassicClipboard"] < seconds["ClassicPlain"] + 8, seconds
     for kind in ["BitmapInvert", "BitmapForm", "GpuImage", "ClassicPlain", "ClassicLocalized"]:
         result = subprocess.run([*clr, str(fixture), kind, "--validate-dialog"], capture_output=True, env=bare, stdin=subprocess.DEVNULL, timeout=90)
         assert result.returncode == 0 and not result.stdout, (kind, result.stderr)
         assert kind != "BitmapForm" or b"form-filled:255" in result.stderr, result.stderr
         # the plugin's own words and order, without what it leaves out of its UI
         assert kind != "BitmapInvert" or (b"parameter:Mask=Fixture-Maske" in result.stderr and b"Unlisted" not in result.stderr), result.stderr
+        # colors and coordinates as a person can read and type them
+        assert kind != "BitmapInvert" or (b"[Int32] #FF8000" in result.stderr and b"; 0" in result.stderr), result.stderr
         assert kind != "ClassicLocalized" or "parameter:Channels=Fixture-Kanäle".encode() in result.stderr, result.stderr
     # A damaged image never leaves result bytes behind.
     result = subprocess.run([*clr, str(fixture), "BitmapInvert", "--defaults"], input=packet[:40], capture_output=True, env=bare, timeout=90)
@@ -232,7 +242,7 @@ expect #9900 text "FF123456"
     assert catalog.returncode == 0, catalog.stderr
     rows = [line.split("\t") for line in catalog.stdout.decode().splitlines()]
     names = {bytes.fromhex(r[3]).decode(): r[4] for r in rows if r[0] == "E"}
-    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 12, names
+    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 13, names
     assert not [r for r in rows if r[0] in "UX"], rows
     assert len([r for r in rows if r[0] == "F"]) == 5, rows
     # Nothing of paint.net is copied next to the host.

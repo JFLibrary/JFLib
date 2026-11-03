@@ -1,6 +1,7 @@
 # v5 effects of tools/paintcraft-pdn-host/tests/EffectFixture.cs through Effekte > Paint.NET-Plugins.
 # The runner names the fixture folder: --pdn-plugins <root> --pdn-isolated --pdn-defaults
 # (tools/paintcraft_manual_check.py --pdn-host). The DLL lies in a subfolder of Effects.
+# Every effect starts a process: on a busy machine that outlasts sync's default 10 seconds.
 size 1280 800
 theme light
 cmd 901 65537
@@ -10,7 +11,7 @@ expect #9900 text "FFFFFFFF"
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture Bitmap"
-sync
+sync 60000
 expect window 24800 closed
 cmd 901 65537
 expect #9900 text "FF000000"
@@ -27,7 +28,7 @@ key ctrl+z
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture GPU Image"
-sync
+sync 60000
 expect window 24800 closed
 cmd 901 65537
 expect #9900 text "FF000000"
@@ -40,28 +41,28 @@ expect #9900 text "FFFFFFFF"
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture Bitmap Float"
-sync
+sync 60000
 cmd 901 65537
 expect #9900 text "FF000000"
 key ctrl+z
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture Bitmap Form"
-sync
+sync 60000
 cmd 901 65537
 expect #9900 text "FF000000"
 key ctrl+z
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture Bitmap Plain"
-sync
+sync 60000
 cmd 901 65537
 expect #9900 text "FF000000"
 key ctrl+z
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture GPU Drawing"
-sync
+sync 60000
 cmd 901 65537
 expect #9900 text "FF000000"
 key ctrl+z
@@ -70,7 +71,7 @@ key ctrl+z
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture GPU Shader"
-sync
+sync 60000
 cmd 901 65537
 expect #9900 text "FFCDCDCD"
 key ctrl+z
@@ -83,7 +84,7 @@ cmd 981 1
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture Bitmap"
-sync
+sync 60000
 cmd 901 655370
 expect #9900 text "FFFFFFFF"
 cmd 901 7864480
@@ -96,7 +97,7 @@ expect #9900 text "FFFFFFFF"
 click menu:"Effekte"
 click menuitem:"Paint.NET-Plugins"
 click menuitem:"Fixture GPU Image"
-sync
+sync 60000
 cmd 901 655370
 expect #9900 text "FFFFFFFF"
 cmd 901 7864480
@@ -115,7 +116,7 @@ click menuitem:"Fixture Slow Bitmap"
 expect window 24800 open
 wait 800
 click #0x90020
-sync
+sync 60000
 expect window 24800 closed
 cmd 901 65537
 expect #9900 text "FFFFFFFF"
@@ -125,7 +126,7 @@ click menuitem:"Fixture Slow GPU"
 expect window 24800 open
 wait 800
 click #0x90020
-sync
+sync 60000
 expect window 24800 closed
 cmd 901 65537
 expect #9900 text "FFFFFFFF"

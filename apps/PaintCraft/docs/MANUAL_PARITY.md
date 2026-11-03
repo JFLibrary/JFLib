@@ -58,7 +58,9 @@ BoltBait Pastel und Oil Painting+, einschließlich Editoraufbau für die beiden
 BoltBait-Effekte. Ordnererkennung und Menüaufruf werden zusätzlich mit der
 unveränderten Pastel-DLL getestet. Die Download-Fixtures bleiben im ignorierten Build-Ordner.
 Bitmap- und GPU-Effekte sind mit selbst gebauten Fixtures über das Menü getestet
-(`tests/integration/pdn_modern.uis`), noch nicht mit fremden Plugins.
+(`tests/integration/pdn_modern.uis`). Einmal von Hand liefen außerdem alle 47 Effekte von
+BoltBaits Pack 6.11, die 20 GPU-Samples und WebP lesend und schreibend, mit Standardwerten; die
+Ergebnisse sind nicht pixelgenau gegen paint.net selbst verglichen.
 
 Der Startscan berücksichtigt Effects/FileTypes/Shapes im nativen/portablen Root,
 Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files, die lokale Paint.NET-

@@ -22,7 +22,20 @@ internal static class PluginCatalog
             var p=Path.Combine(dir,n.Name+".dll");
             return File.Exists(p)?c.LoadFromAssemblyPath(p):null;
         };
-        return AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+        return new PluginContext(dir).LoadFromAssemblyPath(path);
+    }
+    // A plugin's own copy of a library wins: paint.net's ComputeSharp, for one, is trimmed to what
+    // paint.net uses and lacks what plugin shaders need. paint.net and the framework stay shared,
+    // because their types cross the boundary.
+    sealed class PluginContext(string dir):AssemblyLoadContext(Path.GetFileName(dir))
+    {
+        static readonly string[] Shared=["PaintDotNet","System","Microsoft","Presentation","WindowsBase","Accessibility"];
+        protected override Assembly? Load(AssemblyName name)
+        {
+            if(Shared.Any(s=>name.Name!.StartsWith(s,StringComparison.OrdinalIgnoreCase)))return null;
+            var path=Path.Combine(dir,name.Name+".dll");
+            return File.Exists(path) ? LoadFromAssemblyPath(path) : null;
+        }
     }
     // All types, not only exported ones: effect classes of the v5 samples are internal. A plugin
     // with an unloadable optional helper type still works, so load errors only count without effects.

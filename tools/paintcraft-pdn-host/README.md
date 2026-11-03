@@ -86,17 +86,24 @@ integer and floating-point output, `BitmapEffect<TToken>` with its own form, a p
 `BitmapEffect`, `PropertyBasedGpuImageEffect` (a built-in Direct2D effect and Paint.NET's
 own `PdnBrightnessContrastEffect`, a registered pixel shader) and
 `PropertyBasedGpuDrawingEffect`, on the default GPU and on WARP, with selection,
-undo/redo and cancel. **No third-party v5 plugin has been run yet**, and no plugin's own
-ComputeSharp shader: both need a separate check before claiming compatibility. The v5
-path has not been tried under Wine either.
+undo/redo and cancel. The v5 path has not been tried under Wine.
 
-Before that path existed, BoltBait's pack 6.11 was measured on Paint.NET 5.1.12 (2026-11-02):
-15 of its 18 classic effects ran with default settings and kept to the selection. Flip
-Horizontal failed asking for a dialog it does not have, Gaussian Blur+ for `IEnumLocalizerFactory`,
-and Paste Alpha for the clipboard service. The host handles all three now, checked with fixtures
-that make the same calls, **not yet with those DLLs**. Its 28 GPU effects are unmeasured.
-`IFileTypeFactory2` works with a fixture now, but WebPFileType 1.6.0, which was missing for lack
-of it, has not been run again; it also names `IFileTypesService`, which the host does not offer.
+Real plugins, run once by hand on Paint.NET 5.1.12 (2026-11-03; downloads are not part of the
+test suite):
+
+- **BoltBait's pack 6.11:** all 47 effects (19 classic, 28 GPU) render with default settings on the
+  whole image and in a selection, none changes pixels outside it, and all GPU effects also run
+  on WARP (rounding differs by a step in some pixels). All editors build; a full catalog takes 3 s
+  on an idle machine. 11 of them also ran through the menu with undo, and one with a
+  selection and redo. Paste Alpha and From Clipboard read a real clipboard image.
+- **PdnGpuEffectSamples:** all 20 samples render, including those with their own ComputeSharp pixel
+  shaders. They target Paint.NET 5.2 and were built for 5.1 with `ComputeSharp.D2D1` 3.1.0, the
+  library beside the plugin DLL.
+- **WebPFileType 1.6.0:** catalog, encode and decode with alpha through the helper. PaintCraft's own
+  WebP codec keeps priority in its dialogs, so the plugin is not used for that extension there.
+
+These runs check defaults and that results look right, not that pixels equal Paint.NET's own
+output. Parameter values other than defaults were not swept. PSFilterPdn has not been run.
 
 The FileType bridge is tested with a separately compiled factory fixture through
 the original Paint.NET API, including distinct read/write extensions, alpha, DPI,
@@ -110,15 +117,22 @@ Boundaries of the v5 path:
 
 - **Parameters without IndirectUI's controls.** The host reads a plugin's `OnCreateConfigUI`
   through the internal `ControlInfo.Initialize` and shows its labels, descriptions, value names
-  and order in the plain PropertyGrid, with the range as text. Paint.NET's own controls stay out
-  of reach (they need `PdnSynchronizationContext` and more of the application), so there are no
-  sliders, color wheels or sections. When a plugin's UI code fails, its internal names appear. An
-  effect whose own `OnCreateConfigForm` builds on those controls fails with that error.
+  and order in the plain PropertyGrid, with the range as text, colors as `#RRGGBB` with a color
+  dialog, and coordinates as `x; y`. Paint.NET's own controls stay out of reach (they need
+  `PdnSynchronizationContext` and more of the application), so there are no sliders, color
+  wheels, sections or tabs, and links are left out. A label the plugin leaves empty shows the
+  internal name; so do all of them when its UI code fails. An effect whose own
+  `OnCreateConfigForm` builds on those controls fails with that error.
 - **Application services.** Classic and v5 effects get `IDirect2DFactory`, `IImagingFactory`,
   `IDirectWriteFactory`, `IEnumLocalizerFactory` (a plugin's enum values keep their names),
-  `IClipboardService` and the settings below. A plugin requiring another service (palettes,
-  shell, file types, user files) gets `null` or Paint.NET's "service not found" error, shown as a
-  plugin error.
+  `IClipboardService` (Paint.NET's own, given a window it needs), `IPalettesService` (a fixed palette
+  of 96 colors, not the user's) and the settings below. A plugin requiring another service (shell,
+  file types, user files) gets `null` or Paint.NET's "service not found" error, shown as a plugin
+  error.
+- **A plugin's own libraries.** Each plugin gets its own load context in which a library beside its
+  DLL wins, except `PaintDotNet*`, `System*`, `Microsoft*` and WPF, which stay shared. This matters:
+  Paint.NET's `ComputeSharp.D2D1.dll` is trimmed and lacks what plugin shaders need, so a shader
+  plugin must bring or merge its own copy. Such a copy must fit Paint.NET's public types.
 - **Parts that are not public API.** The GPU renderer asks `ISettingsService` for
   `Graphics/RenderingGpuChoice` and needs the internal `GpuChoice` and `GpuInfoCacheService`.
   These interfaces are closed with an internal member, so `ModernEffects.cs` generates their

@@ -19,11 +19,13 @@ internal sealed class BitmapInvert:PropertyBasedBitmapEffect
     IBitmapSource<ColorBgra32>? source;
     int mask;
     public BitmapInvert():base("Fixture Bitmap","Fixture",BitmapEffectOptions.Create() with {IsConfigurable=true}) {}
-    protected override PropertyCollection OnCreatePropertyCollection()=>new([new Int32Property("Mask",255,0,255),new Int32Property("Unlisted",1,0,9)]);
+    protected override PropertyCollection OnCreatePropertyCollection()=>new([new Int32Property("Mask",255,0,255),new Int32Property("Unlisted",1,0,9),
+        new Int32Property("Tint",0xFF8000,0,0xFFFFFF),new DoubleVectorProperty("Point",Pair.Create(0.5,0.25),Pair.Create(-1.0,-1.0),Pair.Create(1.0,1.0))]);
     // Named here, and left out of the dialog like a plugin's internal value.
     protected override ControlInfo OnCreateConfigUI(PropertyCollection properties)
     {
-        var ui=CreateDefaultConfigUI(properties.Where(p=>p.Name=="Mask"));
+        var ui=CreateDefaultConfigUI(properties.Where(p=>p.Name!="Unlisted"));
+        ui.SetPropertyControlType("Tint",PropertyControlType.ColorWheel);
         ui.SetPropertyControlValue("Mask",ControlInfoPropertyNames.DisplayName,"Fixture-Maske");
         ui.SetPropertyControlValue("Mask",ControlInfoPropertyNames.Description,"Die umgekehrten Bits");
         return ui;
@@ -112,6 +114,9 @@ public sealed class ClassicLocalized:PropertyBasedEffect
     {
         var names=Services.GetService<IEnumLocalizerFactory>()!.Create(typeof(Channels)).GetLocalizedEnumValues();
         if(names.Count!=2 || names[0].LocalizedName!="All" || !Channels.Nothing.Equals(names[1].EnumValue))throw new InvalidOperationException("enum names");
+        // ... and a palette, as Text Fun Factory does.
+        var palettes=Services.GetService<IPalettesService>()!;
+        if(palettes.CurrentPalette.Count==0 || palettes.DefaultPalette.Count==0)throw new InvalidOperationException("palette");
         return new([StaticListChoiceProperty.CreateForEnum("Channels",Channels.All,false)]);
     }
     protected override ControlInfo OnCreateConfigUI(PropertyCollection properties)
@@ -146,6 +151,26 @@ public sealed class ClassicClipboard:Effect
         for(int y=rois[i].Top;y<rois[i].Bottom;y++) for(int x=rois[i].Left;x<rois[i].Right;x++) {
             var c=src.Surface[x,y];
             dst.Surface[x,y]=ColorBgra.FromBgra((byte)(255-c.B),(byte)(255-c.G),(byte)(255-c.R),c.A);
+        }
+    }
+}
+
+// Needs its own library of a name paint.net also ships, as a plugin with its own ComputeSharp does.
+internal sealed class BitmapOwnLibrary:PropertyBasedBitmapEffect
+{
+    IBitmapSource<ColorBgra32>? source;
+    public BitmapOwnLibrary():base("Fixture Own Library","Fixture",BitmapEffectOptions.Create()) {}
+    protected override PropertyCollection OnCreatePropertyCollection()=>new([]);
+    protected override void OnInitializeRenderInfo(IBitmapEffectRenderInfo info) {source=Environment.GetSourceBitmapBgra32();base.OnInitializeRenderInfo(info);}
+    protected override void OnRender(IBitmapEffectOutput output)
+    {
+        int mask=K4os.Compression.LZ4.FixtureLibrary.Mask;
+        using var target=output.LockBgra32();
+        source!.CopyPixels(target,output.Bounds.Location);
+        var pixels=target.AsRegionPtr();
+        for(int y=0;y<pixels.Height;y++) for(int x=0;x<pixels.Width;x++) {
+            var c=pixels[x,y];
+            pixels[x,y]=ColorBgra32.FromBgra((byte)(c.B^mask),(byte)(c.G^mask),(byte)(c.R^mask),c.A);
         }
     }
 }

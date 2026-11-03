@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.IO;
 using System.ComponentModel;
+using System.Drawing.Design;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using PaintDotNet;
@@ -50,13 +51,7 @@ internal static class Program
     static int Run(string[] args, byte[] data)
     {
         if(args.Length<1) throw new ArgumentException("Usage: PaintCraft.PdnHost plugin.dll [effect-type] [--defaults] [--gpu software]");
-        var plugin=Path.GetFullPath(args[0]);
-        var pluginDir=Path.GetDirectoryName(plugin)!;
-        AssemblyLoadContext.Default.Resolving += (c,n) => {
-            var path=Path.Combine(pluginDir,n.Name+".dll");
-            return File.Exists(path) ? c.LoadFromAssemblyPath(path) : null;
-        };
-        var assembly=AssemblyLoadContext.Default.LoadFromAssemblyPath(plugin);
+        var assembly=PluginCatalog.Load(args[0]);
         Type[] types;
         try { types=assembly.GetTypes(); }
         catch(ReflectionTypeLoadException e) { types=e.Types.Where(t=>t!=null).Cast<Type>().ToArray(); }
@@ -93,15 +88,17 @@ internal static class Program
         if(effect is PropertyBasedEffect property) token=new PropertyBasedEffectConfigToken(property.CreatePropertyCollection());
         if(token is PropertyBasedEffectConfigToken propertyToken && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
             if(!Dialogs.Properties(effect.Name,propertyToken.Properties,ParameterLabels.For(effect,propertyToken.Properties),!args.Contains("--validate-dialog")))return 2;
-        } else if(token is not PropertyBasedEffectConfigToken && effect.Options.Flags.HasFlag(EffectFlags.Configurable) && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
+        } else if(token is not PropertyBasedEffectConfigToken && effect.Options.Flags.HasFlag(EffectFlags.Configurable)) {
+            // Also for --defaults: without a dialog there is no token, and such a plugin needs one.
             using var dialog=effect.CreateConfigDialog();
             if(dialog!=null) {
                 dialog.Effect=effect;
                 if(token!=null)dialog.EffectToken=token;
-                if(!args.Contains("--validate-dialog") && dialog.ShowDialog()!=DialogResult.OK)return 2;
+                if(!args.Contains("--defaults") && !args.Contains("--validate-dialog") && dialog.ShowDialog()!=DialogResult.OK)return 2;
                 token=dialog.EffectToken;
             }
         }
+        if(!input.HasPixels)return 0;
         using var sa=new RenderArgs(input.Src);using var da=new RenderArgs(input.Dst);
         effect.SetRenderInfo(token,da,sa);
         var scans=input.Region.GetRegionScansReadOnlyInt();
@@ -193,7 +190,12 @@ internal static class Dialogs
         using var dialog=new Form {Text="PaintCraft – "+title,Width=580,Height=600,StartPosition=FormStartPosition.CenterScreen};
         var shown=new PluginProperties(properties,labels);
         var grid=new PropertyGrid {Dock=DockStyle.Fill,SelectedObject=shown,ToolbarVisible=false,PropertySort=PropertySort.NoSort};
-        if(!show)foreach(PropertyDescriptor p in shown.GetProperties())Console.Error.WriteLine($"parameter:{p.Name}={p.DisplayName}");
+        // --validate-dialog: each parameter must show its value and take the shown text back.
+        if(!show)foreach(PropertyDescriptor p in shown.GetProperties()) {
+            var text=p.Converter.ConvertToString(p.GetValue(shown));
+            if(!p.IsReadOnly && p.Converter.CanConvertFrom(typeof(string)))p.SetValue(shown,p.Converter.ConvertFromString(text!));
+            Console.Error.WriteLine($"parameter:{p.Name}={p.DisplayName} [{p.PropertyType.Name}] {text}");
+        }
         var buttons=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=40,FlowDirection=FlowDirection.RightToLeft};
         var ok=new Button {Text="Anwenden",DialogResult=DialogResult.OK};
         var cancel=new Button {Text="Abbrechen",DialogResult=DialogResult.Cancel};
@@ -217,7 +219,8 @@ sealed class PluginProperties(PropertyCollection values,ControlInfo? labels) : C
         }
         if(labels!=null)Walk(labels);
         var order=names.Count>0 ? names.Select(n=>values.FirstOrDefault(p=>p.Name==n)).OfType<Property>() : values;
-        return order.Select(p=>(PropertyDescriptor)new PluginProperty(p,labels?.FindControlForPropertyName(p.Name))).ToArray();
+        // Tab pages and links are controls of paint.net's dialog, nothing to set here.
+        return order.Where(p=>p.ValueType!=typeof(Uri) && p.ValueType.Name!="TabContainerState").Select(p=>(PropertyDescriptor)new PluginProperty(p,labels?.FindControlForPropertyName(p.Name))).ToArray();
     });
     public override PropertyDescriptorCollection GetProperties()=>GetProperties(null);
     public override PropertyDescriptorCollection GetProperties(Attribute[]? attributes)=>new(shown.Value);
@@ -227,11 +230,11 @@ sealed class PluginProperty(Property value,PropertyControlInfo? control) : Prope
 {
     string Text(string name)=>control?.ControlProperties.FirstOrDefault(p=>p.Name==name)?.Value as string ?? "";
     // Check boxes often carry their label as the description and no display name.
-    public override string DisplayName=>Text("DisplayName") is {Length:>0} name ? name : Text("Description") is {Length:>0} text ? text : value.Name;
+    public override string DisplayName=>Text("DisplayName").Trim() is {Length:>0} name ? name : Text("Description").Trim() is {Length:>0} text ? text : value.Name;
     public override string Description
     {
         get {
-            var range=value.ValueType!=typeof(bool) && value.GetType().GetProperty("MinValue") is {} min && value.GetType().GetProperty("MaxValue") is {} max
+            var range=value.ValueType!=typeof(bool) && !IsColor && value.GetType().GetProperty("MinValue") is {} min && value.GetType().GetProperty("MaxValue") is {} max
                 ? $"{min.GetValue(value)} bis {max.GetValue(value)}" : "";
             return Text("DisplayName").Length>0 && Text("Description").Length>0 ? (Text("Description")+" "+range).Trim() : range;
         }
@@ -244,7 +247,49 @@ sealed class PluginProperty(Property value,PropertyControlInfo? control) : Prope
     public override void SetValue(object? component,object? newValue){value.Value=newValue!;OnValueChanged(component,EventArgs.Empty);}
     public override void ResetValue(object component)=>SetValue(component,value.DefaultValue);
     public override bool ShouldSerializeValue(object component)=>false;
-    public override TypeConverter Converter=>value is StaticListChoiceProperty choices ? new ChoicesConverter(choices.ValueChoices,control) : base.Converter;
+    // Plugins store most colors as an int and let the color wheel show it.
+    bool IsColor=>value.ValueType==typeof(int) && control?.ControlType.Value is PropertyControlType.ColorWheel;
+    public override TypeConverter Converter=>value switch {
+        StaticListChoiceProperty choices=>new ChoicesConverter(choices.ValueChoices,control),
+        _ when IsColor=>new ColorConverter(),
+        _ when value.ValueType==typeof(Pair<double,double>)=>new PairConverter(),
+        _=>base.Converter
+    };
+    public override object? GetEditor(Type editorBaseType)=>IsColor && editorBaseType==typeof(UITypeEditor) ? new ColorEditor() : base.GetEditor(editorBaseType);
+}
+// #RRGGBB; what the upper byte means is the plugin's business, and an edit keeps it.
+sealed class ColorConverter : TypeConverter
+{
+    public override bool CanConvertFrom(ITypeDescriptorContext? context,Type sourceType)=>sourceType==typeof(string);
+    public override object? ConvertTo(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object? value,Type destinationType)=>
+        destinationType==typeof(string) && value is int color ? "#"+(color&0xFFFFFF).ToString("X6") : base.ConvertTo(context,culture,value,destinationType);
+    public override object? ConvertFrom(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object value)
+    {
+        int upper=context?.PropertyDescriptor?.GetValue(context.Instance) is int old ? old&unchecked((int)0xFF000000) : 0;
+        return upper|Convert.ToInt32(value.ToString()!.Trim().TrimStart('#'),16)&0xFFFFFF;
+    }
+}
+sealed class ColorEditor : UITypeEditor
+{
+    public override UITypeEditorEditStyle GetEditStyle(ITypeDescriptorContext? context)=>UITypeEditorEditStyle.Modal;
+    public override object? EditValue(ITypeDescriptorContext? context,IServiceProvider provider,object? value)
+    {
+        int old=value is int color ? color : 0;
+        using var dialog=new ColorDialog {FullOpen=true,Color=System.Drawing.Color.FromArgb(old|unchecked((int)0xFF000000))};
+        return dialog.ShowDialog()==DialogResult.OK ? old&unchecked((int)0xFF000000)|dialog.Color.ToArgb()&0xFFFFFF : value;
+    }
+}
+sealed class PairConverter : TypeConverter
+{
+    public override bool CanConvertFrom(ITypeDescriptorContext? context,Type sourceType)=>sourceType==typeof(string);
+    public override object? ConvertTo(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object? value,Type destinationType)=>
+        destinationType==typeof(string) && value is Pair<double,double> pair ? string.Create(culture,$"{pair.First}; {pair.Second}") : base.ConvertTo(context,culture,value,destinationType);
+    public override object? ConvertFrom(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object value)
+    {
+        var parts=value.ToString()!.Split(';');
+        if(parts.Length!=2)throw new FormatException("Zwei Werte mit ; getrennt, zum Beispiel 0,5; 0,25");
+        return Pair.Create(double.Parse(parts[0],culture),double.Parse(parts[1],culture));
+    }
 }
 sealed class ChoicesConverter(object[] choices,PropertyControlInfo? control) : TypeConverter
 {
