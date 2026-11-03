@@ -1732,8 +1732,8 @@ Fensterrand hinaus.
 - **P2** · *erledigt* (2026-11-03) · G4d: Ausgabe im Browser ([GPU.md](GPU.md#ausgabe-im-browser)): `lib/gpu` läuft über
   WebGPU hinter derselben API, Shader gehen direkt als WGSL (`ShaderModule::from_wgsl`), kein SPIR-V und kein Vulkan in den
   Bündeln. Die UI zeigt ihr Bild wie auf den anderen Zielen mit Ebenen, Bildern und Leinwänden auf einer Leinwand über
-  `#screen`; das Programm wartet nicht auf WebGPU, ohne brauchbares WebGPU bleibt alles beim alten Weg. Standardmäßig an
-  (`DEFAULT_ON_BROWSER`), `?gpu=0|1` in der Adresse. Bis auf rund 95 MiB mehr Speicher und Ausreißer beim Rollen gewinnt der
+  `#screen`; das Programm wartet nicht auf WebGPU, ohne brauchbares WebGPU bleibt alles beim alten Weg. Auf dem Desktop standardmäßig
+  an (`DEFAULT_ON_BROWSER`), Telefone und Tablets bleiben beim alten Weg, bis eins getestet ist; `?gpu=0|1` in der Adresse. Bis auf rund 95 MiB mehr Speicher und Ausreißer beim Rollen gewinnt der
   Weg: rund 7–10 ms früher auf dem Schirm, ein Achtel der Daten beim Ziehen einer Leinwand. Nebenbei: Die Leinwand liegt
   jetzt bei jeder Skalierung auf ganzen Gerätepixeln, auch der alte Weg war bei 110, 125 und 175 % weich. Geprüft in
   Chrome 156 (alle Bündel) und Firefox 159 (echtes Fenster, ohne Ebenen, Bilder, Leinwände). Nicht getestet: Safari, Chrome auf

@@ -438,7 +438,9 @@ try {
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
 // the GPU output's switches from the address (docs/GPU.md "Ausgabe im Browser"): ?gpu=0|1, ?gpuenv=NAME=value,..
-const env=[];if(params.get("gpu"))env.push(`jfgui_GPU=${params.get("gpu")}`);
+// phones and tablets stay on the old path until one has been tested (an iPad calls itself a Mac)
+const handheld=navigator.userAgentData?.mobile||/Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent)||(/Mac/.test(navigator.platform)&&navigator.maxTouchPoints>1);
+const env=[];if(params.get("gpu"))env.push(`jfgui_GPU=${params.get("gpu")}`);else if(handheld)env.push("jfgui_GPU=0");
 for(const pair of (params.get("gpuenv")||"").split(",")) if(/^jfgui_GPU_[A-Z_]+=[\w.]*$/.test(pair)) env.push(pair);
 lastScreens=screenLine(screen,true); // the first frame knows the monitor already
 send({type:"start",env,languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});

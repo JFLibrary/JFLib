@@ -197,7 +197,8 @@ const DEFAULT_ON: bool = true;
 /// Linux"); this line decides
 const DEFAULT_ON_LINUX: bool = true;
 /// the same in the browser, where the numbers differ again (docs/GPU.md "Ausgabe im Browser"): the one
-/// switch for it.  A run with ?agent=1 stays on the CPU path unless ?gpu=1 asks: such runs read #screen
+/// switch for it.  A run with ?agent=1 stays on the CPU path unless ?gpu=1 asks: such runs read #screen.
+/// Phones and tablets stay there too until one has been tested: web/loader.js sets jfgui_GPU=0
 const DEFAULT_ON_BROWSER: bool = true;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md

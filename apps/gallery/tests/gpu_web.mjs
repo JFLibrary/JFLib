@@ -12,6 +12,7 @@
 //     pixels, gpu.js not to be had: the old path, no canvas above #screen, no error on the page
 //   - a lost device (device.destroy() from the test: a simulation, no driver reset): back to the
 //     old path without a wrong frame, then a new device and a new canvas
+//   - the default without ?gpu: on on the desktop; phones and tablets the old path, ?gpu=1 brings it
 // In a browser without a working WebGPU (Playwright's Firefox here: its build blocks WebGPU) the part
 // that needs one says SKIP and the fallback test is what remains.
 //   python build_rs.py app gallery --target web --release
@@ -170,6 +171,40 @@ async function steps(page,prefix,check) {
   return out;
 }
 const hasCanvas=page=>page.evaluate(()=>!!document.querySelector('#gpu'));
+
+// ---- the default without ?gpu and ?agent: the desktop on, phones and tablets the old path (web/loader.js)
+async function defaults(browser) {
+  const android=model=>`Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browser.version()} ${model}Safari/537.36`;
+  const shows=async (options,query,ms,init)=>{
+    const context=await browser.newContext({locale:'de-DE',...options});
+    try {
+      const page=await context.newPage();
+      if(init) await page.addInitScript(init);
+      const started=Date.now();
+      await page.goto(`${origin}/plain/index.html?theme=light&compute=simd${query}`);
+      await page.waitForFunction(()=>document.querySelector('#gpu'),null,{timeout:ms}).catch(()=>{});
+      return {on:await hasCanvas(page),ms:Date.now()-started};
+    } finally {await context.close();}
+  };
+  const desktop=await shows({viewport:{width:800,height:600}},'',15000);
+  say(desktop.on,`the desktop without ?gpu: the canvas above #screen after ${desktop.ms} ms`);
+  // (as long as the desktop took three times over: a phone that were to show it would have by then)
+  const wait=Math.max(3000,desktop.ms*3);
+  const phone={userAgent:android('Mobile '),isMobile:true,hasTouch:true,viewport:{width:412,height:800}};
+  const handhelds=[
+    ['an Android phone',phone],
+    ['an Android tablet',{userAgent:android(''),hasTouch:true,viewport:{width:800,height:1200}}],
+    ['an iPhone',{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',isMobile:true,hasTouch:true,viewport:{width:390,height:800}}],
+    ['an iPad calling itself a Mac',{userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',hasTouch:true,viewport:{width:800,height:1100}},
+      ()=>{Object.defineProperty(navigator,'platform',{get:()=>'MacIntel'});Object.defineProperty(navigator,'maxTouchPoints',{get:()=>5});}],
+  ];
+  for(const [what,options,init] of handhelds) {
+    const r=await shows(options,'',wait,init);
+    say(!r.on,`${what} without ?gpu: nothing above #screen after ${r.ms} ms`);
+  }
+  const asked=await shows(phone,'&gpu=1',15000);
+  say(asked.on,`an Android phone with ?gpu=1: the canvas above #screen after ${asked.ms} ms`);
+}
 
 // ---- the fallback: each way to have no WebGPU, the old path, nothing above #screen
 async function fallback(browser,engine) {
@@ -357,7 +392,7 @@ try {
       let any=false;
       for(const mode of modes) for(const scale of mode==='simd'?[1,1.25,1.5,2]:[1]) any=await path(browser,engine,mode,scale)||any;
       if(!any) console.log(`SKIP ${engine}: the path without a working WebGPU; the fallback is what this browser tests`);
-      else await canvasAndImage(browser,engine);
+      else {await canvasAndImage(browser,engine);if(engine==='chromium')await defaults(browser);}
       await fallback(browser,engine);
     } finally {await browser.close();}
   }
