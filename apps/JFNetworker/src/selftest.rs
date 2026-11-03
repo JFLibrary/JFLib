@@ -77,6 +77,9 @@
 // of doc/edits.rs, the scene of canvas/paint.rs).
 // startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
 // setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// expguitest.rs: the lab in the window (group expgui: the forms of the services and the JSON they write,
+// live or restart as predicted, presets when placing, runs with progress and cancel, kept runs in the
+// file, the CSV, the overload warning, the bars of the Metriken panel).
 // sweeptest.rs: parameter sweeps (group sweep: jfn_model::experiment, jfn_sim::experiment, jfn_run's
 // threads, Service::reconfigure, the scenario's steps for changes under load).
 // hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
@@ -88,6 +91,8 @@
 // and state, what the page reads, every course below --academy-dir).
 // quiztest.rs: quizzes, tests and fault hunts (group quiz: jfn_model::quiz, a lab's start faults and locks,
 // a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
+// installtest.rs: installing courses (group install: jfn_run::install, the list and its refusals, a source that
+// fails, cancels and resumes, updates and uninstalling, every file of --academy-dir against its index).
 
 use alloc::format;
 use alloc::string::String;
@@ -207,9 +212,13 @@ mod academytest;
 mod quiztest;
 #[path = "sweeptest.rs"]
 mod sweeptest;
+#[path = "installtest.rs"]
+mod installtest;
+#[path = "expguitest.rs"]
+mod expguitest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 64] = [
+    let groups: [(&'static str, fn(&mut T)); 66] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -274,6 +283,8 @@ pub fn run() -> i32 {
         ("firewall", firewalltest::run),
         ("quiz", quiztest::run),
         ("sweep", sweeptest::run),
+        ("install", installtest::run),
+        ("expgui", expguitest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

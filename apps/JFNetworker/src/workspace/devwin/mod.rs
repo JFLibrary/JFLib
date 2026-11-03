@@ -26,6 +26,7 @@
 //                meets, as forms that type command lines (ids ID_FW0 + 0x800 k ..)
 //   services.rs  Dienste: what runs on the device, switched on and off
 //   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
+//   svcform.rs   the same as a form for the lab's kinds, and the dialog "Dienst hinzufügen"
 //   desktop.rs   Desktop of hosts: the programs in windows of their own, icons, a taskbar with
 //                Start, full screen, the clock, Einstellungen (ids ID_DESK0 + 0x1000 k ..)
 //   progs.rs     the desktop's IP-Konfiguration and Webbrowser
@@ -60,6 +61,7 @@ pub(crate) mod fwzones;
 pub(crate) mod desktop;
 pub(crate) mod services;
 pub(crate) mod svcedit;
+pub(crate) mod svcform;
 pub(crate) mod scripts;
 pub(crate) mod files;
 pub(crate) mod email;

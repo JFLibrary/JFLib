@@ -8,7 +8,10 @@
 //                                    [--golden F] [--series F] | check PROJECT | course DIR |
 //                                    decode HEX | gen N [--out F] | sweep FILE [PROJECT]
 //                                    [--threads N] [--csv F] [--detail F] [--report F] [--golden F]
-//                                    [--name N] [--timing]
+//                                    [--name N] [--timing] | course-install SOURCE COURSE --into DIR |
+//                                    course-list SOURCE | course-remove COURSE --into DIR (install.rs)
+//   install                          installing courses, from the web or a folder, for the window and
+//                                    for jfn-sim (install.rs)
 //   sweep(&args) -> i32              jfn-sim sweep (SA2): an experiment (a .jfnex file with its project,
 //                                    or a project with its section) at full speed: the table goes to
 //                                    stdout, the same bytes for any number of threads
@@ -16,11 +19,19 @@
 //                                    of levels, levels first, so that at most as many warm engines
 //                                    are held as there are threads; results by their place, so
 //                                    the order the threads finish in leaves no trace
+//   SweepJob::start(exp, project, name, threads) -> Option<SweepJob>   the same in the background (SA3): the
+//                                    plan is made and run on threads of their own, from these copies;
+//                                    done() / total() the runs finished, cancel(), finished(), take() ->
+//                                    SweepOut (Done, Refused, Cancelled: no half result comes back)
+//   sweeps_pending() -> bool         a job of any window is under way (ui.sync_hook_set)
+//   run_sweep_ctl(&plan, threads, &ctl) -> Option<Sweep>   run_sweep with SweepCtl: counts the runs,
+//                                    None when it was cancelled
 //   check_project(&project) -> (lines, errors)   what `check` finds, without printing it
 //   check_course(dir) -> (lines, errors)   jfn-sim course: a course's folder (jfn_model::academy):
 //                                    the file, its lessons in every language with their pictures and
 //                                    links, its labs with `check`'s findings; a line per finding,
 //                                    errors are what keeps the course from being offered
+//   course_findings(dir, id)         the same as records, for a folder not named after the course
 //   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
 //   rewind(&args) -> i32             jfn-sim rewind PROJECT [SECONDS] [--traffic K]: the
 //                                    keyframes of a run (K1) and how long restores take (times
@@ -39,17 +50,21 @@
 
 extern crate alloc;
 
+pub mod install;
+
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use jfn_model::experiment::Experiment;
 use jfn_model::project::Project;
 use jfn_model::scenario::{self, Scenario, Step, StepKind};
-use jfn_sim::experiment::{Fig, Plan, Status, Sweep};
+use jfn_model::msg::Msg;
+use jfn_sim::experiment::{Fig, Plan, Status, Stop, Sweep};
 use jfn_sim::Engine;
 use plat::sync::Mutex;
 
@@ -95,7 +110,7 @@ pub fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--report" => o.report = Some(value()?),
             "--golden" => o.golden = Some(value()?),
             "--series" => o.series = Some(value()?),
-            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" | "--sweep" | "--threads" | "--csv" | "--detail" | "--name" => {
+            "--script" | "--shot" | "--style" | "--lang" | "--academy-dir" | "--academy-folder" | "--sweep" | "--threads" | "--csv" | "--detail" | "--name" => {
                 value()?;
             }
             k if k.starts_with('-') => {}
@@ -294,10 +309,24 @@ pub fn check_project(proj: &Project) -> (Vec<String>, usize) {
 /// what is wrong with the course in folder `dir` (without a trailing '/'): its lines, how many of
 /// them keep it from being offered.  The labs get what `check` finds as well.
 pub fn check_course(dir: &str) -> (Vec<String>, usize) {
+    let (found, labs) = course_findings(dir, base_name(dir));
+    let mut errors = found.iter().filter(|p| p.fatal).count();
+    let mut lines: Vec<String> = found.iter().map(|p| format!("{}{}\n", if p.fatal { "Fehler: " } else { "Hinweis: " }, p.msg.text())).collect();
+    for (file, more, e) in labs {
+        lines.extend(more.into_iter().map(|l| format!("{}: {}", file, l)));
+        errors += e;
+    }
+    (lines, errors)
+}
+
+/// what is wrong with the course `id` in folder `dir`, whatever that folder is called (the installer checks it
+/// before it gets its name): the findings of the course, then per lab what `check` finds (its file, its
+/// lines, how many of them are errors)
+pub fn course_findings(dir: &str, id: &str) -> (Vec<jfn_model::academy::Problem>, Vec<(String, Vec<String>, usize)>) {
     use jfn_model::academy::{fault_issues, lab_issues, load, quiz_issues, safe_path, StepKind, COURSE_FILE, LANGS};
     let read = |rel: &str| plat::read_file(&format!("{}/{}", dir, rel)).map(|b| String::from_utf8_lossy(&b).into_owned());
     let exists = |rel: &str| plat::file_exists(&format!("{}/{}", dir, rel)) == 1;
-    let (course, mut found) = load(base_name(dir), read(COURSE_FILE).as_deref(), &exists);
+    let (course, mut found) = load(id, read(COURSE_FILE).as_deref(), &exists);
     let mut labs = Vec::new();
     // a path that was refused is not read
     for s in course.iter().flat_map(|c| c.steps()).filter(|s| safe_path(&s.file).is_ok()) {
@@ -325,14 +354,14 @@ pub fn check_course(dir: &str) -> (Vec<String>, usize) {
             None => {}
         }
     }
-    let mut errors = found.iter().filter(|p| p.fatal).count();
-    let mut lines: Vec<String> = found.iter().map(|p| format!("{}{}\n", if p.fatal { "Fehler: " } else { "Hinweis: " }, p.msg.text())).collect();
-    for (file, p) in labs {
-        let (more, e) = check_project(&p);
-        lines.extend(more.into_iter().map(|l| format!("{}: {}", file, l)));
-        errors += e;
-    }
-    (lines, errors)
+    let checked = labs
+        .into_iter()
+        .map(|(file, p)| {
+            let (lines, errors) = check_project(&p);
+            (file, lines, errors)
+        })
+        .collect();
+    (found, checked)
 }
 
 /// jfn-sim course DIR: the lines of check_course and a last line; 0: nothing keeps it from being offered
@@ -390,7 +419,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n  jfn-sim sweep DATEI [PROJEKT] [--threads N] [--csv F] [--detail F] [--report F] [--golden F] [--name N] [--timing]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim course ORDNER\n  jfn-sim course-install QUELLE KURS|all --into ORDNER [--index DATEI] [--stop-after BYTES]\n  jfn-sim course-list QUELLE [--into ORDNER] [--index DATEI]\n  jfn-sim course-remove KURS --into ORDNER\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n  jfn-sim sweep DATEI [PROJEKT] [--threads N] [--csv F] [--detail F] [--report F] [--golden F] [--name N] [--timing]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -416,6 +445,9 @@ pub fn main(args: &[String]) -> i32 {
                 2
             }
         },
+        Some("course-install") => install::cli_install(&args[2..]),
+        Some("course-list") => install::cli_list(&args[2..]),
+        Some("course-remove") => install::cli_remove(&args[2..]),
         Some("decode") if args.len() > 2 => decode(&args[2..].join(" ")),
         Some("gen") => generate(&args[2..]),
         Some("rewind") => rewind(&args[2..]),
@@ -531,6 +563,31 @@ struct SweepWork {
     plan: Plan,
     queue: Mutex<SweepQueue>,
     figs: Mutex<Vec<Option<Fig>>>,
+    ctl: Arc<SweepCtl>,
+}
+
+/// what a sweep under way tells and takes: how many runs are done, cancel
+#[derive(Debug, Default)]
+pub struct SweepCtl {
+    done: AtomicUsize,
+    cancel: Arc<AtomicBool>,
+}
+
+impl SweepCtl {
+    pub fn new() -> SweepCtl {
+        SweepCtl::default()
+    }
+    /// the runs finished so far
+    pub fn done(&self) -> usize {
+        self.done.load(Ordering::Relaxed)
+    }
+    /// the workers stop at the next whole second of virtual time
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::Relaxed);
+    }
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
 }
 
 /// takes work until there is none: levels before boots, which bounds the warm engines held
@@ -538,6 +595,9 @@ fn sweep_worker(w: &SweepWork) {
     let (seeds, levels) = (w.plan.seeds.len(), w.plan.levels.len());
     let boots = w.plan.cfgs.len() * seeds;
     loop {
+        if w.ctl.cancelled() {
+            return;
+        }
         let (level, boot) = {
             let mut q = w.queue.lock();
             match q.levels.pop_front() {
@@ -558,6 +618,7 @@ fn sweep_worker(w: &SweepWork) {
                 let f = w.plan.run_level(&mut e, l);
                 drop(e);
                 w.figs.lock()[w.plan.index(c, s, l)] = Some(f);
+                w.ctl.done.fetch_add(1, Ordering::Relaxed);
             }
             (None, Some(b)) => {
                 let (c, s) = (b / seeds, b % seeds);
@@ -576,6 +637,7 @@ fn sweep_worker(w: &SweepWork) {
                             figs[w.plan.index(c, s, l)] = Some(Fig { status: Status::Failed, ..Fig::default() });
                         }
                         drop(figs);
+                        w.ctl.done.fetch_add(levels, Ordering::Relaxed);
                         w.queue.lock().booting -= 1;
                     }
                 }
@@ -588,7 +650,23 @@ fn sweep_worker(w: &SweepWork) {
 
 /// the sweep on `threads` threads (this one among them; where no thread starts, on those that did)
 pub fn run_sweep(plan: &Plan, threads: usize) -> Sweep {
-    let work = Arc::new(SweepWork { plan: plan.clone(), queue: Mutex::new(SweepQueue { next_boot: 0, levels: VecDeque::new(), booting: 0 }), figs: Mutex::new(alloc::vec![None; plan.runs()]) });
+    plan.collect(run_figs(plan, threads, &Arc::new(SweepCtl::new())))
+}
+
+/// run_sweep that counts its runs and can be cancelled: None when it was
+pub fn run_sweep_ctl(plan: &Plan, threads: usize, ctl: &Arc<SweepCtl>) -> Option<Sweep> {
+    let mut p = plan.clone();
+    p.stop = Stop(Some(ctl.cancel.clone()));
+    let figs = run_figs(&p, threads, ctl);
+    if ctl.cancelled() {
+        return None;
+    }
+    Some(plan.collect(figs))
+}
+
+/// the runs on `threads` threads, each result at its place
+fn run_figs(plan: &Plan, threads: usize, ctl: &Arc<SweepCtl>) -> Vec<Option<Fig>> {
+    let work = Arc::new(SweepWork { plan: plan.clone(), queue: Mutex::new(SweepQueue { next_boot: 0, levels: VecDeque::new(), booting: 0 }), figs: Mutex::new(alloc::vec![None; plan.runs()]), ctl: ctl.clone() });
     let mut handles = Vec::new();
     for _ in 1..threads.max(1) {
         let w = work.clone();
@@ -600,8 +678,98 @@ pub fn run_sweep(plan: &Plan, threads: usize) -> Sweep {
     for h in handles {
         h.join();
     }
-    let figs = core::mem::take(&mut *work.figs.lock());
-    plan.collect(figs)
+    core::mem::take(&mut *work.figs.lock())
+}
+
+/// how a job ended
+#[derive(Debug)]
+pub enum SweepOut {
+    Done(Sweep),
+    /// the experiment does not fit the project (Plan::new)
+    Refused(Vec<Msg>),
+    /// cancelled: nothing comes back
+    Cancelled,
+}
+
+/// jobs under way, of every window (ui.sync_hook_set takes a plain fn)
+static JOBS: AtomicU32 = AtomicU32::new(0);
+
+/// a job is still under way (the sync hook of test scripts)
+pub fn sweeps_pending() -> bool {
+    JOBS.load(Ordering::Acquire) > 0
+}
+
+/// a sweep on threads of its own; dropping it cancels it and waits for its threads
+pub struct SweepJob {
+    ctl: Arc<SweepCtl>,
+    total: usize,
+    out: Arc<Mutex<Option<SweepOut>>>,
+    thread: Option<plat::Thread>,
+}
+
+impl SweepJob {
+    /// the job runs from these copies, so nothing that changes afterwards touches it; None when no
+    /// thread can be started
+    pub fn start(exp: Experiment, project: Project, name: String, threads: usize) -> Option<SweepJob> {
+        let levels = if exp.load.rps.is_empty() { exp.load.users.len() } else { exp.load.rps.len() };
+        let total = exp.configs().len() * exp.seeds_or(project.seed).len() * levels;
+        let ctl = Arc::new(SweepCtl::new());
+        let out: Arc<Mutex<Option<SweepOut>>> = Arc::new(Mutex::new(None));
+        let (c, o) = (ctl.clone(), out.clone());
+        JOBS.fetch_add(1, Ordering::AcqRel);
+        let thread = plat::thread_spawn(
+            SWEEP_STACK,
+            Box::new(move || {
+                let res = match Plan::new(&exp, &project, &name) {
+                    Err(found) => SweepOut::Refused(found),
+                    Ok(_) if c.cancelled() => SweepOut::Cancelled,
+                    Ok(plan) => match run_sweep_ctl(&plan, threads, &c) {
+                        Some(s) => SweepOut::Done(s),
+                        None => SweepOut::Cancelled,
+                    },
+                };
+                *o.lock() = Some(res);
+                JOBS.fetch_sub(1, Ordering::AcqRel);
+            }),
+        );
+        if thread.is_none() {
+            JOBS.fetch_sub(1, Ordering::AcqRel);
+            return None;
+        }
+        Some(SweepJob { ctl, total, out, thread })
+    }
+    /// the runs finished so far
+    pub fn done(&self) -> usize {
+        self.ctl.done()
+    }
+    /// the runs of the whole job
+    pub fn total(&self) -> usize {
+        self.total
+    }
+    /// the job ends at the next whole second of virtual time, without a result
+    pub fn cancel(&self) {
+        self.ctl.cancel();
+    }
+    pub fn cancelled(&self) -> bool {
+        self.ctl.cancelled()
+    }
+    /// how it ended, once it has
+    pub fn take(&mut self) -> Option<SweepOut> {
+        let out = self.out.lock().take()?;
+        if let Some(t) = self.thread.take() {
+            t.join();
+        }
+        Some(out)
+    }
+}
+
+impl Drop for SweepJob {
+    fn drop(&mut self) {
+        self.ctl.cancel();
+        if let Some(t) = self.thread.take() {
+            t.join();
+        }
+    }
 }
 
 /// what a sweep is given

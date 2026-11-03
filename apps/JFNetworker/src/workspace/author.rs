@@ -15,7 +15,8 @@
 //                                   von mehreren with the other values), texts in both languages
 //                                 3 Verbindungsprüfungen -- checks in the .scn syntax ("PC1
 //                                   reaches 10.0.2.10") with points, refused with the reason
-//                                   when they do not parse
+//                                   when they do not parse; a diagnosis: the device or cable that
+//                                   is the cause of a fault ("R1", "PC1 - SW1"; diagnosis_item)
 //                                 4 Texte -- title, one line for the list, introduction, each in
 //                                   German and English; the topic
 //                                 5 Bewertung -- feedback (each item, the score only, nothing until
@@ -89,6 +90,9 @@ pub(crate) struct Author {
     pub new_check: String,
     pub new_points: i32,
     pub new_err: String,
+    /// a new diagnosis: its cause, why it was refused
+    pub new_diag: String,
+    pub diag_err: String,
     /// the texts of the task (German, English), the topic (0 net, 1 ds)
     pub title: [String; 2],
     pub summary: [String; 2],
@@ -120,6 +124,8 @@ impl Author {
             new_check: String::new(),
             new_points: 2,
             new_err: String::new(),
+            new_diag: String::new(),
+            diag_err: String::new(),
             title: [String::new(), String::new()],
             summary: [String::new(), String::new()],
             intro: [String::new(), String::new()],
@@ -249,7 +255,7 @@ pub(crate) fn draft(n: &Net) -> Option<Assess> {
     // the tree's items in the order of the tree, then the checks
     let pos = |d: &Draft| a.cands.iter().position(|c| c.key == item_key(&d.item)).unwrap_or(usize::MAX);
     let mut items: Vec<&Draft> = a.items.iter().collect();
-    items.sort_by_key(|d| (d.item.kind() == Some(ItemKind::Check), pos(d)));
+    items.sort_by_key(|d| (matches!(d.item.kind(), Some(ItemKind::Check | ItemKind::Diagnosis)), pos(d)));
     // a default text names the devices as the project (the start network) does now
     let items = items
         .into_iter()
@@ -583,7 +589,7 @@ fn editor(n: &mut Net, ui: &mut Ui, en: bool, checks: bool) {
         return;
     };
     let kind = a.items[i].item.kind();
-    if (kind == Some(ItemKind::Check)) != checks {
+    if matches!(kind, Some(ItemKind::Check | ItemKind::Diagnosis)) != checks {
         return;
     }
     // the buffers belong to the current item
@@ -647,6 +653,12 @@ fn editor(n: &mut Net, ui: &mut Ui, en: bool, checks: bool) {
                 crate::workspace::error_text(ui, &tf("„{}“ ist kein gültiger Wert.", &[&b]), 0);
             }
         }
+    } else if kind == Some(ItemKind::Diagnosis) {
+        // the answer: what the task's text never says; another one is a new item
+        field(ui, "Ursache"); // i18n
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_WRAP, &cause_text(&a.items[i].item));
+        ui.box_end();
     } else {
         field(ui, "Prüfung");
         ui.next_size(-1, 0);
@@ -700,7 +712,11 @@ fn checks(n: &mut Net, ui: &mut Ui) {
     let en = tr::en();
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Prüfungen in der Sprache der Szenarien, z. B. „PC1 reaches 10.0.2.10“ (ein Ping kommt an) oder „R1 route 10.0.3.0/24“; mehrere mit „;“ gelten zusammen."));
-    let list: Vec<(usize, String, u32)> = n.author.items.iter().enumerate().filter(|(_, d)| d.item.kind() == Some(ItemKind::Check)).map(|(i, d)| (i, String::from(d.item.text.get(en)), d.item.points)).collect();
+    let row = |d: &Draft| {
+        let text = d.item.text.get(en);
+        if d.item.kind() == Some(ItemKind::Diagnosis) { format!("{} → {}", text, cause_text(&d.item)) } else { String::from(text) }
+    };
+    let list: Vec<(usize, String, u32)> = n.author.items.iter().enumerate().filter(|(_, d)| matches!(d.item.kind(), Some(ItemKind::Check | ItemKind::Diagnosis))).map(|(i, d)| (i, row(d), d.item.points)).collect();
     let mut select = None;
     let mut remove = None;
     for (k, (i, text, points)) in list.iter().enumerate().take(AUTHOR_CHECKS) {
@@ -735,6 +751,35 @@ fn checks(n: &mut Net, ui: &mut Ui) {
         let e = a.new_err.clone();
         crate::workspace::error_text(ui, &e, 0);
     }
+    // a diagnosis: for a network with a fault, the learner names its cause (its points: the field above)
+    field(ui, "Neue Diagnose"); // i18n
+    ui.next_size(-1, 0);
+    if ui.textbox(ID_AI_DIAG_NEW, Some(t("die Ursache, z. B. R1 oder PC1 - SW1")), &mut a.new_diag, 200) & EV_ACT != 0 {
+        a.diag_err.clear();
+    }
+    ui.box_end();
+    ui.box_begin(0, BOX_H, 0);
+    ui.next_icon(IC_ADD);
+    let add_diag = ui.button(ID_AI_DIAG_ADD, t("Diagnose hinzufügen")) & EV_ACT != 0;
+    ui.box_end();
+    if !a.diag_err.is_empty() {
+        let e = a.diag_err.clone();
+        crate::workspace::error_text(ui, &e, 0);
+    }
+    if add_diag {
+        match diagnosis_item(&a.new_diag, a.new_points.max(0) as u32, &n.doc.proj) {
+            Ok(it) => {
+                a.items.push(draft_of(it, &n.doc.proj));
+                a.cur = Some(a.items.len() - 1);
+                a.buf = None;
+                a.new_diag.clear();
+                a.diag_err.clear();
+                a.touch();
+            }
+            Err(e) => a.diag_err = e,
+        }
+        ui.repass();
+    }
     if add {
         let list: Vec<String> = a.new_check.split(';').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect();
         match list.iter().map(|c| scenario::parse_expectation(c)).find_map(Result::err) {
@@ -764,6 +809,33 @@ fn checks(n: &mut Net, ui: &mut Ui) {
         a.touch();
         ui.repass();
     }
+}
+
+/// a diagnosis from what the author typed: a device ("R1") or the cable between two ("PC1 - SW1"), with its points
+/// -> the item, or why not
+pub(crate) fn diagnosis_item(text: &str, points: u32, p: &Project) -> Result<Item, String> {
+    let names: Vec<&str> = text.split(" - ").map(str::trim).collect();
+    if text.trim().is_empty() || names.len() > 2 {
+        return Err(String::from(t("Nennen Sie ein Gerät oder die beiden Enden eines Kabels: R1 oder PC1 - SW1.")));
+    }
+    let find = |name: &str| p.devices.iter().find(|d| d.name.eq_ignore_ascii_case(name)).ok_or_else(|| tf("Das Gerät {} gibt es im Projekt nicht.", &[name]));
+    let dev = find(names[0])?;
+    let mut it = Item { what: String::from(ItemKind::Diagnosis.as_str()), dev: dev.name.clone(), id: dev.id, points, ..Item::default() };
+    if let Some(other) = names.get(1) {
+        let peer = find(other)?;
+        let joins = |l: &&jfn_model::project::Link| (l.a.dev == dev.id && l.b.dev == peer.id) || (l.a.dev == peer.id && l.b.dev == dev.id);
+        if !p.links.iter().any(|l| joins(&l)) {
+            return Err(tf("Zwischen {} und {} gibt es kein Kabel.", &[&dev.name, &peer.name]));
+        }
+        it.peer = peer.name.clone();
+        it.peer_id = peer.id;
+    }
+    Ok(it)
+}
+
+// what a diagnosis names: "R1", "PC1 - SW1"
+fn cause_text(it: &Item) -> String {
+    if it.peer.trim().is_empty() { it.dev.clone() } else { format!("{} - {}", it.dev, it.peer) }
 }
 
 // the score of the project now against the draft (graded again after a change of the project,
