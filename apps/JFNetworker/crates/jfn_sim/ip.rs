@@ -24,8 +24,9 @@
 //                                 towards it, which lookup resolves one step further
 //   join(iface, group, on) / joined   IPv4 multicast groups an interface listens to (224.0.0.9
 //                                 for RIPv2); packets to other groups are not for the device
-//   acls / nat                    the device's access lists (acl.rs) and address translation
-//                                 (nat.rs); an interface that goes away takes its part along
+//   acls / nat / fw               the device's access lists (acl.rs), address translation
+//                                 (nat.rs) and zone firewall (fw.rs); an interface that goes
+//                                 away takes its part along
 //   v6                            the IPv6 part on the same interfaces (ip6.rs), reset and
 //                                 forgotten with them
 //
@@ -225,6 +226,9 @@ pub struct IpStack {
     pub acls: crate::acl::Acls,
     /// address translation: interfaces, rules, translations (nat.rs)
     pub nat: crate::nat::Nat,
+    /// the zone firewall: zones, policies, sessions (fw.rs; firewall models, off until an interface
+    /// has a zone)
+    pub fw: crate::fw::Firewall,
     /// the IPv6 part on the same interfaces (ip6.rs; off until configured)
     pub v6: crate::ip6::Ip6,
 }
@@ -323,6 +327,7 @@ impl IpStack {
             groups: Vec::new(),
             acls: crate::acl::Acls::default(),
             nat: crate::nat::Nat::default(),
+            fw: crate::fw::Firewall::default(),
             v6: crate::ip6::Ip6::new(model.cli == CliStyle::Linux),
         })
     }
@@ -408,6 +413,7 @@ impl IpStack {
         // its access lists and its side of NAT go with it
         self.acls.unbind(iface);
         self.nat.unbind(iface);
+        self.fw.unbind(iface);
         // and its IPv6 part
         self.v6.forget(iface);
     }
@@ -418,6 +424,7 @@ impl IpStack {
         self.reasm.clear();
         self.icmp_rate = IcmpRate::new();
         self.nat.reset();
+        self.fw.reset();
         self.acls.clear_counters(None);
         self.v6.reset();
     }

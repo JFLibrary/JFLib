@@ -512,7 +512,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
 /// recording) in the mode it had
 fn reset(n: &mut Net) {
     let sim = n.sim.sim_mode;
-    n.doc.sim = crate::doc::sim::Sim::new(&n.doc.proj);
+    n.doc.sim = crate::doc::sim::Sim::again(&n.doc.proj, &n.doc.born);
     loaded(n, true);
     if sim {
         set_mode(n, true);

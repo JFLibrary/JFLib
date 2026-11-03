@@ -83,6 +83,7 @@ fn format_t(t: &mut T) {
         goals: vec![Goal { text: Text::new("Ziel", "Goal"), checks: vec![s("PC1 route 0.0.0.0/0")], hints: vec![Text::new("Hinweis", "Hint")] }],
         hints: vec![Text::new("Allgemein", "General")],
         assess: None,
+        ..Lab::default()
     };
     p.lab = Some(lab.clone());
     let text = p.to_text();

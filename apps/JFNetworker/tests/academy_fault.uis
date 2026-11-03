@@ -1,0 +1,147 @@
+#!args --verify-dirty --start-page --academy-dir apps/JFNetworker/academy
+# a fault hunt of the Akademie with the sample course: a broken network that holds a pulled cable from the
+# moment it opens (Lab::start_faults) and a wrong gateway; what it hides (the panel Probleme, the faults in the
+# inspector, Alle Fehler beheben, the author's panel, the faults' lane of the timeline); the score as it goes,
+# the diagnosis not counting until it is handed in; the fix (a new cable, the gateway at the console); the
+# diagnosis by clicking the cable; handing in, the result, back to the course; Neu beginnen from its file; a
+# diagnosis by the list, wrong; Simulation zurücksetzen brings the fault back.  Ids: 136196 the step in the
+# outline, 49153 "Prüfen", 63810 "Abgeben", 145424 the list of a diagnosis, 145440 Auf der Zeichenfläche
+# wählen, 145414 Neu beginnen, 135217 Zurück zum Kurs, 135218 Weiter im Kurs, 42 the tool Verbinden.
+size 1280 800
+theme light
+cmd 1005
+key enter
+click #136196
+# ---- what it opens with: the cable carries nothing from the start, nothing tells
+expect button:"Zurück zum Kurs" exists
+expect text:"Fehlersuche: der Server antwortet nicht · Beispielkurs: das erste Netz" exists
+expect tab:"Aufgabe" exists
+expect text:"Der Server antwortet nicht" exists
+expect button:"Worum es geht" exists
+expect text:"Diagnose" exists
+expect text:"Welches Kabel war defekt?" exists
+expect text:"Die Antwort zählt erst beim Abgeben." exists
+expect listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, unten" exists
+wait 1000
+# ---- what it hides
+expect tab:"Probleme" missing
+expect tab:"Terminal" exists
+click menu:"Ansicht"
+click menuitem:"Bereiche"
+expect menuitem:"Probleme" disabled
+key esc
+key esc
+click menu:"Simulation"
+expect menuitem:"Alle Fehler beheben" disabled
+key esc
+click menu:"Werkzeuge"
+expect menuitem:"Aufgabe erstellen …" disabled
+key esc
+# the inspector: no fault card on the project, a device or the cable
+click tab:"Eigenschaften"
+expect text:"Aktive Fehler" missing
+expect button:"Alle wiederherstellen" missing
+click listitem:"R1"
+expect text:"Fehler einspielen" missing
+expect button:"Ausschalten" missing
+click listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, unten"
+expect text:"Fehler einspielen" missing
+expect button:"Kabel ziehen" missing
+expect "Wiederherstellen" missing
+key esc
+click tab:"Aufgabe"
+# the Ereignisse panel: no line and no lane about it
+click tab:"Ereignisse"
+expect "beginnt" missing
+expect "Fehler 1" missing
+click tab:"Terminal"
+# ---- the score as it goes: only what holds so far; no list of items in this feedback
+expect text:"Diese Aufgabe zeigt nur die Punktzahl, nicht die einzelnen Kriterien." exists
+click #49153
+wait 2500
+expect text:"2 von 10 Punkten · 20 %" exists
+# ---- the gateway of PC1, at its console
+dblclick listitem:"PC1"
+type "ip route del default\n"
+type "ip route add default via 10.0.1.1\n"
+wait 3000
+click #49153
+wait 2500
+expect text:"4 von 10 Punkten · 40 %" exists
+# ---- the cable: delete it, connect the two again
+click listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, unten"
+key delete
+expect listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, unten" missing
+cmd 42
+drag listitem:"R1" listitem:"SRV1" 8 shift
+key esc
+expect text:"5 Geräte · 4 Kabel" exists
+wait 3000
+click #49153
+wait 2500
+expect text:"8 von 10 Punkten · 80 %" exists
+# ---- the diagnosis by a click: while it waits it says so; the answer does not change the score
+click button:"Auf der Zeichenfläche wählen"
+expect text:"Klicken Sie auf das Gerät oder Kabel, das die Ursache ist." exists
+expect button:"Wahl abbrechen" exists
+click listitem:"R1"
+wait 100
+expect button:"Wahl abbrechen" missing
+expect #145424 text "R1"
+click button:"Auf der Zeichenfläche wählen"
+expect listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, aktiv" exists
+click listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, aktiv"
+wait 100
+expect #145424 text "R1 Gi0/0/1 – SRV1 eth0"
+click #49153
+wait 2500
+expect text:"8 von 10 Punkten · 80 %" exists
+# ---- handing in: the question, then the result: the diagnosis with its explanation
+click #63810
+expect dialog:"Jetzt abgeben?" exists
+click button:"Abbrechen"
+click #63810
+click button:"Abgeben"
+expect dialog:"Jetzt abgeben?" missing
+expect text:"Abgegeben: die Bewertung ist endgültig." exists
+expect text:"10 von 10 Punkten · 100 %" exists
+expect text:"Richtig: R1 Gi0/0/1 – SRV1 eth0" exists
+expect text:"Das Kabel zwischen R1 und SRV1 trug nichts: Die Schnittstelle Gi0/0/1 von R1 hatte keine Verbindung. Das falsche Gateway auf PC1 war der zweite Fehler; es liegt an seiner Konfiguration, nicht an einem Kabel." exists
+expect text:"Kriterien" exists
+expect #145424 missing
+expect button:"Neu beginnen" exists
+# ---- back to the course: done, with its result; Weiter im Kurs goes past the locked test
+click button:"Zurück zum Kurs"
+expect button:"Fehlersuche: der Server antwortet nicht, erledigt, bestes Ergebnis 100 %" exists
+expect text:"1 von 6 Schritten erledigt" exists
+key esc
+click button:"Weiter im Kurs"
+expect text:"1 von 6 Schritten erledigt" exists
+key esc
+# ---- Neu beginnen: from its file, after the question about what changed: broken again
+click button:"Neu beginnen"
+expect dialog:"Änderungen speichern?" exists
+click button:"Verwerfen"
+wait 1000
+expect listitem:"Kabel R1 Gi0/0/1 – SRV1 eth0, Kupfer, gekreuzt, unten" exists
+expect text:"Abgegeben: die Bewertung ist endgültig." missing
+expect #145424 text "Keine Antwort gewählt"
+expect tab:"Probleme" missing
+# ---- the diagnosis by the list, wrong; a fault hunt that does not pass stays as it was: done before
+click #145424
+click "PC1"
+expect #145424 text "PC1"
+click #63810
+click button:"Abgeben"
+expect text:"2 von 10 Punkten · 20 %" exists
+expect text:"Ihre Antwort: PC1" exists
+click button:"Zurück zum Kurs"
+expect button:"Fehlersuche: der Server antwortet nicht, erledigt, bestes Ergebnis 100 %" exists
+key esc
+# ---- another free lab: nothing of this lock is left
+cmd 1
+expect tab:"Probleme" exists
+click menu:"Werkzeuge"
+expect menuitem:"Aufgabe erstellen …" enabled
+key esc
+expect_nowarn

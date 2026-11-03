@@ -5,7 +5,14 @@
 // in ASMLIB.  Medium runs (up to 1 MB, rounded to a power of two of pages) are kept in a
 // cache when freed (at most CACHE_MAX bytes) and handed out again: worker threads that
 // allocate scratch per item then do not pay a VirtualAlloc / mmap, page faults and a free
-// each time.  One spin lock makes it safe for threads.
+// each time.
+//
+// Threads: the small blocks live in SHARDS heaps with a spin lock each; a thread takes the one its
+// stack address leads to, so threads that allocate all the time (a simulation on worker threads does
+// so for every frame) rarely meet.  Any heap may free any block, as blocks of a class are all alike.
+// A thread that only frees would fill its heap while another one only allocates: so before a heap asks
+// for a new chunk it takes what the others hold of that class, as far as their locks are free.  The
+// cache of page runs has a lock of its own.
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
@@ -18,32 +25,44 @@ const CHUNK: usize = 64 * 1024;
 const PAGE: usize = 4096;
 const MID: usize = 9; // cached page runs: PAGE << k bytes, k = 0..8 (4 KB .. 1 MB)
 const CACHE_MAX: usize = 32 << 20; // bytes of page runs the cache keeps at most
+const SHARDS: usize = 64; // heaps of small blocks (a power of two: few threads share one by chance)
 
 struct Heap {
     free: [*mut u8; CLASSES],
     chunk: *mut u8,
     chunk_left: usize,
+}
+
+/// a heap of small blocks on its own cache line
+#[repr(align(64))]
+struct Shard {
+    lock: AtomicBool,
+    heap: core::cell::UnsafeCell<Heap>,
+}
+
+struct Runs {
     mid: [*mut u8; MID], // cached runs (header word 1 = the next run)
     mid_bytes: usize,
 }
 
 pub struct Alloc {
-    lock: AtomicBool,
-    heap: core::cell::UnsafeCell<Heap>,
+    shards: [Shard; SHARDS],
+    runs_lock: AtomicBool,
+    runs: core::cell::UnsafeCell<Runs>,
 }
 
 unsafe impl Sync for Alloc {}
 
 #[global_allocator]
 static ALLOC: Alloc = Alloc {
-    lock: AtomicBool::new(false),
-    heap: core::cell::UnsafeCell::new(Heap {
-        free: [core::ptr::null_mut(); CLASSES],
-        chunk: core::ptr::null_mut(),
-        chunk_left: 0,
-        mid: [core::ptr::null_mut(); MID],
-        mid_bytes: 0,
-    }),
+    shards: [const {
+        Shard {
+            lock: AtomicBool::new(false),
+            heap: core::cell::UnsafeCell::new(Heap { free: [core::ptr::null_mut(); CLASSES], chunk: core::ptr::null_mut(), chunk_left: 0 }),
+        }
+    }; SHARDS],
+    runs_lock: AtomicBool::new(false),
+    runs: core::cell::UnsafeCell::new(Runs { mid: [core::ptr::null_mut(); MID], mid_bytes: 0 }),
 };
 
 /// the cache bucket of a page run of `total` bytes (rounded up to PAGE << k), None = too large
@@ -66,18 +85,41 @@ fn class_of(size: usize) -> Option<usize> {
     None
 }
 
-impl Alloc {
-    fn lock(&self) {
-        while self
-            .lock
-            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_err()
-        {
-            core::hint::spin_loop();
-        }
+fn lock(l: &AtomicBool) {
+    while l.compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        core::hint::spin_loop();
     }
-    fn unlock(&self) {
-        self.lock.store(false, Ordering::Release);
+}
+
+fn unlock(l: &AtomicBool) {
+    l.store(false, Ordering::Release);
+}
+
+impl Alloc {
+    /// the heap of this thread: by where its stack is, in steps of 1 MiB (a thread that crosses one
+    /// only changes heaps, and threads with smaller stacks may share one)
+    #[inline]
+    fn shard(&self) -> usize {
+        let probe = 0u8;
+        let a = core::ptr::addr_of!(probe) as usize >> 20;
+        a.wrapping_mul(0x9E37_79B9_7F4A_7C15_u64 as usize) >> (usize::BITS - SHARDS.trailing_zeros())
+    }
+
+    /// what another heap holds of a class, as a list (null: nothing, or their locks are taken); the
+    /// caller holds the lock of heap `me`, and no lock is waited for here
+    fn steal(&self, me: usize, c: usize) -> *mut u8 {
+        for (i, s) in self.shards.iter().enumerate() {
+            if i == me || s.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+                continue;
+            }
+            // SAFETY: the lock gives exclusive access to that heap's state.
+            let list = unsafe { core::mem::replace(&mut (*s.heap.get()).free[c], core::ptr::null_mut()) };
+            unlock(&s.lock);
+            if !list.is_null() {
+                return list;
+            }
+        }
+        core::ptr::null_mut()
     }
 }
 
@@ -87,16 +129,22 @@ impl Alloc {
         let size = layout.size().max(layout.align());
         match class_of(size) {
             Some(c) if layout.align() <= 16 => {
-                self.lock();
+                let me = self.shard();
+                let s = &self.shards[me];
+                lock(&s.lock);
                 // SAFETY: the lock gives exclusive access to the heap state.
-                let h = unsafe { &mut *self.heap.get() };
-                let p = h.free[c];
+                let h = unsafe { &mut *s.heap.get() };
+                let bytes = 16usize << c;
+                let mut p = h.free[c];
+                // no block and no room for one: first what the others freed
+                if p.is_null() && h.chunk_left < bytes {
+                    p = self.steal(me, c);
+                }
                 let r = if !p.is_null() {
                     // SAFETY: a free block stores the next pointer in its first word.
                     h.free[c] = unsafe { *(p as *mut *mut u8) };
                     p
                 } else {
-                    let bytes = 16usize << c;
                     if h.chunk_left < bytes {
                         // the rest of the old chunk goes to the free lists
                         while h.chunk_left >= 16 {
@@ -125,7 +173,7 @@ impl Alloc {
                         q
                     }
                 };
-                self.unlock();
+                unlock(&s.lock);
                 (r, true)
             }
             _ if layout.align() > 64 => {
@@ -155,11 +203,11 @@ impl Alloc {
                 let mut total = (size + 64 + PAGE - 1) & !(PAGE - 1);
                 if let Some(k) = mid_of(total) {
                     total = PAGE << k;
-                    self.lock();
+                    lock(&self.runs_lock);
                     // SAFETY: exclusive access under the lock; a cached run keeps its byte
                     // count in header word 0 and the next cached run in word 1.
                     let p = unsafe {
-                        let h = &mut *self.heap.get();
+                        let h = &mut *self.runs.get();
                         let p = h.mid[k];
                         if !p.is_null() {
                             h.mid[k] = *(p as *mut *mut u8).add(1);
@@ -167,7 +215,7 @@ impl Alloc {
                         }
                         p
                     };
-                    self.unlock();
+                    unlock(&self.runs_lock);
                     if !p.is_null() {
                         // SAFETY: the run is at least PAGE bytes; its header is word 0.
                         return (unsafe { p.add(64) }, true);
@@ -198,14 +246,15 @@ unsafe impl GlobalAlloc for Alloc {
         let size = layout.size().max(layout.align());
         match class_of(size) {
             Some(c) if layout.align() <= 16 => {
-                self.lock();
+                let s = &self.shards[self.shard()];
+                lock(&s.lock);
                 // SAFETY: exclusive access under the lock; the block is at least 16 bytes.
                 unsafe {
-                    let h = &mut *self.heap.get();
+                    let h = &mut *s.heap.get();
                     *(ptr as *mut *mut u8) = h.free[c];
                     h.free[c] = ptr;
                 }
-                self.unlock();
+                unlock(&s.lock);
             }
             _ if layout.align() > 64 => unsafe {
                 // SAFETY: ptr came from the over-aligned path of alloc.
@@ -218,8 +267,8 @@ unsafe impl GlobalAlloc for Alloc {
                 let base = ptr.sub(64);
                 let total = *(base as *mut usize);
                 if let Some(k) = mid_of(total).filter(|&k| PAGE << k == total) {
-                    self.lock();
-                    let h = &mut *self.heap.get();
+                    lock(&self.runs_lock);
+                    let h = &mut *self.runs.get();
                     let keep = h.mid_bytes + total <= CACHE_MAX;
                     if keep {
                         // SAFETY: exclusive access under the lock; header word 1 links the run.
@@ -227,7 +276,7 @@ unsafe impl GlobalAlloc for Alloc {
                         h.mid[k] = base;
                         h.mid_bytes += total;
                     }
-                    self.unlock();
+                    unlock(&self.runs_lock);
                     if keep {
                         return;
                     }

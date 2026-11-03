@@ -28,7 +28,7 @@ const COURSE: &str = r#"{
       {"id": "a", "kind": "lesson", "title": ["A", "A"], "file": "a.md"},
       {"id": "b", "kind": "lab", "title": ["B", "B"], "file": "labs/b.jfnet"}]},
     {"title": ["Zwei", "Two"], "steps": [
-      {"id": "q", "kind": "quiz", "title": ["Q", "Q"], "file": "quiz/q.json"},
+      {"id": "q", "kind": "quiz", "title": ["Q", "Q"], "file": ""},
       {"id": "c", "kind": "lesson", "title": ["C", "C"], "file": "c.md"},
       {"id": "x", "kind": "exam", "title": ["X", "X"], "file": ""}]}]
 }"#;
@@ -157,16 +157,20 @@ fn problems_t(t: &mut T) {
     t.eq("an unknown step kind", fatal(&c.issues()), alloc::vec![s("Schritt 1: die Art „vortrag“ gibt es nicht (lesson, lab, quiz, fault, exam).")]);
     t.eq("it has no kind", c.step_at(0).and_then(Step::kind), None);
     t.check("it cannot be opened", !c.step_at(0).is_some_and(Step::ready));
-    // the kinds of AK2 are known, and not ready
+    // every kind can be opened; a quiz, a test or a fault hunt without a file is only announced
     t.check("a quiz is known", course().step_at(2).and_then(Step::kind) == Some(StepKind::Quiz));
-    t.check("a quiz waits", !course().step_at(2).is_some_and(Step::ready));
-    t.eq("ready are lesson and lab", StepKind::ALL.iter().filter(|k| k.ready()).count(), 2);
+    t.check("a quiz without a file waits", !course().step_at(2).is_some_and(Step::ready));
+    t.eq("every kind is ready", StepKind::ALL.iter().filter(|k| k.ready()).count(), 5);
     // a bad path gives its message, with the step
     let c = with(&|c| c.units[0].steps[0].file = s("../../geheim.md"));
     t.eq("a bad path", fatal(&c.issues()), alloc::vec![s("Schritt 1: Der Pfad „../../geheim.md“ führt mit „..“ aus dem Ordner des Kurses.")]);
     t.eq("no file is looked for there", texts(&c.file_issues(&|_| false)).iter().filter(|x| x.contains("geheim")).count(), 0);
     let c = with(&|c| c.units[1].steps[0].file = s("/absolut.json"));
     t.eq("a quiz's path too", fatal(&c.issues()), alloc::vec![s("Schritt 3: Der Pfad „/absolut.json“ ist absolut; erlaubt sind nur Pfade im Ordner des Kurses.")]);
+    let c = with(&|c| c.units[1].steps[0].file = s("quiz/q.txt"));
+    t.eq("a quiz's ending", fatal(&c.issues()), alloc::vec![s("Schritt 3: die Datei quiz/q.txt endet nicht auf .json.")]);
+    let c = with(&|c| c.units[1].steps[0].file = s("quiz/q.json"));
+    t.eq("a quiz's file missing", fatal(&c.file_issues(&|_| false)).iter().filter(|x| x.contains("quiz/q.json")).count(), 1);
     let c = with(&|c| c.units[0].steps[0].file = s(""));
     t.eq("a lesson without a file", fatal(&c.issues()), alloc::vec![s("Schritt 1: Der Pfad ist leer.")]);
     let c = with(&|c| c.units[0].steps[1].file = s("labs/b.txt"));
@@ -280,7 +284,7 @@ fn progress_t(t: &mut T) {
     t.check("the state in words", text.contains("\"state\": \"done\""));
     let back = Progress::from_text(&text);
     t.check("round trip", back.is_done("k", "a"));
-    t.eq("round trip: the record", back.courses["k"].steps["a"].clone(), StepRecord { state: StepMark::Done, when: 1_700_000_000, best: 0 });
+    t.eq("round trip: the record", back.courses["k"].steps["a"].clone(), StepRecord { state: StepMark::Done, when: 1_700_000_000, best: 0, tries: 0 });
     t.eq("written the same", back.to_text(), text);
     // corrupt, missing, of another kind or newer: empty, never a crash
     for bad in ["", "{", "kein json", "[1,2,3]", "null", "42", "{\"format\": \"jfn\", \"version\": 1}", "{\"version\": 1}", "{\"format\": \"jfn-progress\", \"version\": 9, \"courses\": {\"k\": {}}}", "\u{0}\u{1}\u{2}"] {
@@ -297,7 +301,7 @@ fn progress_t(t: &mut T) {
     let mut new = course();
     new.course_version = 4;
     new.units[0].steps.remove(0);
-    new.units[1].steps.insert(0, Step { id: s("neu"), kind: s("lesson"), title: jfn_model::Text::new("N", "N"), file: s("n.md") });
+    new.units[1].steps.insert(0, Step { id: s("neu"), kind: s("lesson"), title: jfn_model::Text::new("N", "N"), file: s("n.md"), ..Step::default() });
     let q2 = Progress::from_text(&q.to_text());
     t.eq("c stays done in the new version", q2.done_count(&new, "k"), 1);
     t.eq("the step that went keeps its entry", q2.is_done("k", "a"), true);

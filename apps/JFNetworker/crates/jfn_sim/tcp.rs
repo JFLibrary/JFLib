@@ -64,7 +64,7 @@
 // socket on :: takes both families (os.rs: ANY); a connection to a link-local address needs
 // the interface of its source and is not offered by the socket calls.
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -536,6 +536,9 @@ pub struct TcpStack {
     pub stats: TcpStats,
     /// (local address, local port, remote address, remote port) -> connection
     tuples: BTreeMap<(IpAddr, u16, IpAddr, u16), u32>,
+    /// every connection with a timer at its earliest deadline: a device may hold thousands (60 s of
+    /// TIME-WAIT after every connection that ended), and each segment asks for the next deadline
+    timers: BTreeSet<(Ns, u32)>,
     next_id: u32,
     /// IPv4 and IPv6 packets the device sent to itself; the TCP timer delivers them
     loopq: VecDeque<Vec<u8>>,
@@ -551,6 +554,7 @@ impl TcpStack {
             listeners: BTreeMap::new(),
             stats: TcpStats::default(),
             tuples: BTreeMap::new(),
+            timers: BTreeSet::new(),
             next_id: 1,
             loopq: VecDeque::new(),
             armed: None,
@@ -670,6 +674,8 @@ pub struct Tcb {
     /// timeouts in a row for the same data
     pub retries: u8,
     segs: VecDeque<Sent>,
+    /// its place in TcpStack::timers
+    queued: Option<Ns>,
     // timers: the virtual time they fire at
     t_rto: Option<Ns>,
     t_persist: Option<Ns>,
@@ -848,6 +854,7 @@ impl Tcb {
             rto: cfg.rto_init,
             retries: 0,
             segs: VecDeque::new(),
+            queued: None,
             t_rto: None,
             t_persist: None,
             t_delack: None,
@@ -2242,6 +2249,17 @@ impl Engine {
         let listener = tcb.listener;
         if let Some(tcp) = self.tcp_mut(ni) {
             tcp.stats.add(&stats);
+            // its place among the deadlines
+            let next = tcb.next_timer();
+            if next != tcb.queued {
+                if let Some(t) = tcb.queued {
+                    tcp.timers.remove(&(t, id));
+                }
+                if let Some(t) = next {
+                    tcp.timers.insert((t, id));
+                }
+                tcb.queued = next;
+            }
             tcp.conns.insert(id, tcb);
         }
         self.tcp_apply(ni, id, ends, listener, out, cause);
@@ -2288,6 +2306,9 @@ impl Engine {
         let Some(c) = tcp.conns.remove(&id) else {
             return;
         };
+        if let Some(t) = c.queued {
+            tcp.timers.remove(&(t, id));
+        }
         let key = (c.local.0, c.local.1, c.remote.0, c.remote.1);
         if tcp.tuples.get(&key) == Some(&id) {
             tcp.tuples.remove(&key);
@@ -2321,7 +2342,7 @@ impl Engine {
         let Some(tcp) = self.tcp_mut(ni) else {
             return;
         };
-        let next = if tcp.loopq.is_empty() { tcp.conns.values().filter_map(|c| c.next_timer()).min() } else { Some(now) };
+        let next = if tcp.loopq.is_empty() { tcp.timers.first().map(|x| x.0) } else { Some(now) };
         let Some(t) = next else {
             return;
         };
@@ -2354,7 +2375,12 @@ impl Engine {
             }
         }
         let due: Vec<u32> = match self.tcp(ni) {
-            Some(tcp) => tcp.conns.values().filter(|c| c.next_timer().is_some_and(|t| t <= now)).map(|c| c.id).collect(),
+            Some(tcp) => {
+                // by number, as they always went
+                let mut ids: Vec<u32> = tcp.timers.range(..=(now, u32::MAX)).map(|x| x.1).collect();
+                ids.sort_unstable();
+                ids
+            }
             None => return,
         };
         for id in due {

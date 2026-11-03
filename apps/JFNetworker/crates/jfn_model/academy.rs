@@ -18,6 +18,8 @@
 //                                                path relative to the course's folder)
 //   course.lesson_issues(step, text, &exists)    a lesson's pictures and links
 //   lab_issues(step, text) -> Vec<Problem>       a lab step's file: a project with a lab and goals
+//   fault_issues(step, text) -> Vec<Problem>     a fault hunt's file: a project with a lab it grades (AK2)
+//   quiz_issues(step, kind, text) -> Vec<Problem>   a quiz's or test's file (quiz.rs, AK2)
 //   Problem { fatal, msg }                       fatal: the course cannot be offered; else a note (a
 //                                                lesson in one language only)
 //   safe_path(p) -> Result<(), Msg>              relative, without "..", inside the course's folder
@@ -26,15 +28,19 @@
 //   lesson_refs(md) -> Vec<MdRef> / link_to(target) -> LinkTo   a lesson's pictures and links, and
 //                                                where a link leads
 //   lesson_files(file, lang) -> [(path, lang); 2]   the lesson's files, the language asked for first
-//   step.kind() -> Option<StepKind> / StepKind::ready()   lessons and labs work today (AK1); quizzes,
-//                                                fault hunts and exams are recognised (AK2)
+//   step.kind() -> Option<StepKind> / step.ready()   every kind can be opened (AK2); a quiz, a fault hunt
+//                                                or an exam without a file is announced, not written yet
 //   course.steps() / step_at(i) / index_of(id) / next_ready(i) / prev_ready(i) / ready_count()
 //                                                the steps in order, across the units
 //   Progress::from_text(text) -> Progress        corrupt or newer: empty, never an error
 //   progress.to_text() / is_done(course, step) / mark_done(course, step, when) / clear(course)
-//   progress.states(&course, id) -> Vec<StepState>   Done, Current (the first open step), Open, NotYet
+//   progress.record(course, step, percent, when) / note_best(course, step, percent) / best_of(course, step)
+//   / tries_of(course, step)                     a test's result: the best per cent, how many were handed in
+//   progress.states(&course, id) -> Vec<StepState>   Done, Current (the first open step), Open, NotYet,
+//                                                Locked (a step it `requires` is open)
 //   progress.done_count(&course, id) / next_open(&course, id)
 //
+// A step's `requires` names earlier steps that must be done before it opens (default: none).
 // A step's `file` is relative to the course's folder ("labs/x.jfnet"), a lesson's to the folder of
 // its language ("01-netz.md" -> de/01-netz.md, en/01-netz.md): a new language is a new folder.  A
 // lesson's pictures are relative to the course's folder ("img/x.svg").  Its links are step:ID, lab:ID
@@ -58,6 +64,7 @@ use crate::lab::Text;
 use crate::msg;
 use crate::msg::Msg;
 use crate::project::{file_limits, Project};
+use crate::quiz::Quiz;
 
 /// `format` of index.json, of course.json and of progress.json
 pub const INDEX_FORMAT: &str = "jfn-academy";
@@ -87,8 +94,8 @@ wire_enum! {
 }
 
 wire_enum! {
-    /// what a step is: a lesson to read, a lab with goals, and what AK2 brings (a quiz, a network to
-    /// repair, a written test)
+    /// what a step is: a lesson to read, a lab with goals, a quiz to practise, a network to repair, a
+    /// written test
     pub enum StepKind {
         Lesson = "lesson",
         Lab = "lab",
@@ -99,8 +106,12 @@ wire_enum! {
 }
 
 impl StepKind {
-    /// this program can open it
+    /// this program can open it (a newer course may name a kind it does not know: that is no kind at all)
     pub fn ready(self) -> bool {
+        true
+    }
+    /// it needs a file before it can be offered (the others may be announced with no file yet)
+    pub fn needs_file(self) -> bool {
         matches!(self, StepKind::Lesson | StepKind::Lab)
     }
 }
@@ -148,6 +159,8 @@ record! {
         pub kind: String,
         pub title: Text,
         pub file: String,
+        /// earlier steps that must be done before this one opens
+        pub requires: Vec<String>,
     }
 }
 
@@ -182,21 +195,21 @@ pub struct Problem {
     pub msg: Msg,
 }
 
-fn fatal(msg: Msg) -> Problem {
+pub(crate) fn fatal(msg: Msg) -> Problem {
     Problem { fatal: true, msg }
 }
 
-fn note(msg: Msg) -> Problem {
+pub(crate) fn note(msg: Msg) -> Problem {
     Problem { fatal: false, msg }
 }
 
 // the JSON of a file (a byte order mark is no error)
-fn parse(text: &str) -> Result<Value, Msg> {
+pub(crate) fn parse(text: &str) -> Result<Value, Msg> {
     let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
     json::parse_with_limits(text.as_bytes(), file_limits()).map_err(|e| msg!("Die Datei ist kein gültiges JSON ({} an Byte {}).", e.kind, e.offset))
 }
 
-fn version_ok(v: u32) -> Result<(), Msg> {
+pub(crate) fn version_ok(v: u32) -> Result<(), Msg> {
     if v == 0 || v > VERSION {
         return Err(msg!("Die Datei hat die Version {}; dieses Programm liest Version 1 bis {}.", v, VERSION));
     }
@@ -348,14 +361,43 @@ pub fn lab_issues(step: &str, text: &str) -> Vec<Problem> {
     v
 }
 
+/// a fault hunt's file: a project that loads, with a lab that grades (handing in decides, not goals)
+pub fn fault_issues(step: &str, text: &str) -> Vec<Problem> {
+    let p = match Project::from_text(text) {
+        Ok(p) => p,
+        Err(e) => return alloc::vec![fatal(msg!("Schritt {}: {}", step, e.msg))],
+    };
+    let Some(lab) = &p.lab else {
+        return alloc::vec![fatal(msg!("Schritt {}: die Datei hat keine Aufgabe.", step))];
+    };
+    let mut v: Vec<Problem> = lab.issues(&p).into_iter().map(|m| fatal(msg!("Schritt {}: {}", step, m))).collect();
+    if lab.assess.is_none() {
+        v.push(fatal(msg!("Schritt {}: eine Fehlersuche wird bewertet; die Datei hat keine Kriterien (assess).", step)));
+    }
+    v
+}
+
+/// a quiz's or test's file; a time limit or a limit of attempts means nothing in practice
+pub fn quiz_issues(step: &str, kind: StepKind, text: &str) -> Vec<Problem> {
+    let q = match Quiz::from_text(text) {
+        Ok(q) => q,
+        Err(m) => return alloc::vec![fatal(msg!("Schritt {}: {}", step, m))],
+    };
+    let mut v: Vec<Problem> = q.issues().into_iter().map(|p| Problem { fatal: p.fatal, msg: msg!("Schritt {}: {}", step, p.msg) }).collect();
+    if kind == StepKind::Quiz && (q.minutes > 0 || q.attempts > 0) {
+        v.push(note(msg!("Schritt {}: Zeitlimit und Versuche gelten nur in einem Test (kind „exam“).", step)));
+    }
+    v
+}
+
 impl Step {
     /// its kind; None: one this program does not know
     pub fn kind(&self) -> Option<StepKind> {
         StepKind::parse(&self.kind)
     }
-    /// this program can open it
+    /// this program can open it: a known kind with its file (a quiz without a file is only announced)
     pub fn ready(&self) -> bool {
-        self.kind().is_some_and(StepKind::ready)
+        self.kind().is_some_and(|k| k.ready() && (k.needs_file() || !self.file.is_empty()))
     }
 }
 
@@ -430,14 +472,17 @@ impl Course {
             if seen.contains(&s.id.as_str()) {
                 v.push(fatal(msg!("Die Kennung {} kommt doppelt vor.", s.id)));
             }
+            for r in s.requires.iter().filter(|r| !seen.contains(&r.as_str())) {
+                v.push(fatal(msg!("Schritt {}: der verlangte Schritt {} steht nicht davor.", s.id, r)));
+            }
             seen.push(&s.id);
         }
         v
     }
 
     /// the files of the steps: every lesson in every language (one language missing: a note, the
-    /// other shows), every lab; `exists` takes a path relative to the course's folder.  The steps of
-    /// AK2 are not looked at yet.
+    /// other shows), every lab, quiz, test and fault hunt with a file; `exists` takes a path relative to
+    /// the course's folder
     pub fn file_issues(&self, exists: &dyn Fn(&str) -> bool) -> Vec<Problem> {
         let mut v = Vec::new();
         for s in self.steps().filter(|s| safe_path(&s.file).is_ok()) {
@@ -453,6 +498,7 @@ impl Course {
                     }
                 }
                 Some(StepKind::Lab) if !exists(&s.file) => v.push(fatal(msg!("Schritt {}: die Datei {} fehlt.", s.id, s.file))),
+                Some(StepKind::Quiz | StepKind::Exam | StepKind::Fault) if !s.file.is_empty() && !exists(&s.file) => v.push(fatal(msg!("Schritt {}: die Datei {} fehlt.", s.id, s.file))),
                 _ => {}
             }
         }
@@ -522,8 +568,8 @@ fn step_issues(s: &Step, k: usize) -> Vec<Problem> {
         v.push(fatal(msg!("Schritt {}: die Art „{}“ gibt es nicht (lesson, lab, quiz, fault, exam).", k, s.kind)));
         return v;
     };
-    // AK2's steps may wait for their files, but no path of a course leaves its folder
-    if kind.ready() || !s.file.is_empty() {
+    // a quiz, a test or a fault hunt may wait for its file, but no path of a course leaves its folder
+    if kind.needs_file() || !s.file.is_empty() {
         if let Err(m) = safe_path(&s.file) {
             v.push(fatal(msg!("Schritt {}: {}", k, m)));
             return v;
@@ -531,10 +577,10 @@ fn step_issues(s: &Step, k: usize) -> Vec<Problem> {
     }
     let wanted = match kind {
         StepKind::Lesson => Some(".md"),
-        StepKind::Lab => Some(".jfnet"),
-        _ => None,
+        StepKind::Lab | StepKind::Fault => Some(".jfnet"),
+        StepKind::Quiz | StepKind::Exam => Some(".json"),
     };
-    if let Some(end) = wanted.filter(|e| !s.file.ends_with(e)) {
+    if let Some(end) = wanted.filter(|e| !s.file.is_empty() && !s.file.ends_with(e)) {
         v.push(fatal(msg!("Schritt {}: die Datei {} endet nicht auf {}.", k, s.file, end)));
     }
     v
@@ -592,8 +638,10 @@ record! {
         pub state: StepMark,
         /// when it was done (seconds since 1970)
         pub when: i64,
-        /// the best result of a test in per cent (AK2; 0: none)
+        /// the best result of a test in per cent (0: none, or `tries` say it was 0 %)
         pub best: u32,
+        /// how many attempts of a test were handed in
+        pub tries: u32,
     }
 }
 
@@ -620,8 +668,10 @@ pub enum StepState {
     /// the first step that is open: where "Weiter" goes
     Current,
     Open,
-    /// the program cannot open it yet (AK2)
+    /// announced, its file is not written yet
     NotYet,
+    /// a step it requires is open
+    Locked,
 }
 
 impl Progress {
@@ -656,6 +706,43 @@ impl Progress {
         true
     }
 
+    /// an attempt handed in: one more try, the best result (`when`: seconds since 1970, if it is the
+    /// first thing known of the step)
+    pub fn record(&mut self, course: &str, step: &str, percent: u32, when: i64) {
+        let r = self.courses.entry(String::from(course)).or_default().steps.entry(String::from(step)).or_default();
+        r.tries = r.tries.saturating_add(1);
+        r.best = r.best.max(percent);
+        if r.when == 0 {
+            r.when = when;
+        }
+    }
+
+    /// what practice reached so far -> this changed something
+    pub fn note_best(&mut self, course: &str, step: &str, percent: u32) -> bool {
+        if percent == 0 || self.best_of(course, step).is_some_and(|b| b >= percent) {
+            return false;
+        }
+        let r = self.courses.entry(String::from(course)).or_default().steps.entry(String::from(step)).or_default();
+        r.best = percent;
+        true
+    }
+
+    /// the best result (None: no result yet)
+    pub fn best_of(&self, course: &str, step: &str) -> Option<u32> {
+        let r = self.courses.get(course)?.steps.get(step)?;
+        (r.best > 0 || r.tries > 0).then_some(r.best)
+    }
+
+    /// how many attempts were handed in
+    pub fn tries_of(&self, course: &str, step: &str) -> u32 {
+        self.courses.get(course).and_then(|c| c.steps.get(step)).map_or(0, |r| r.tries)
+    }
+
+    /// a step it requires is not done
+    pub fn locked(&self, c: &Course, id: &str, s: &Step) -> bool {
+        s.requires.iter().any(|r| !self.is_done(id, r) && c.index_of(r).is_some())
+    }
+
     /// nothing of the course counts any more -> this changed something
     pub fn clear(&mut self, course: &str) -> bool {
         self.courses.remove(course).is_some()
@@ -670,6 +757,8 @@ impl Progress {
                     StepState::Done
                 } else if !s.ready() {
                     StepState::NotYet
+                } else if self.locked(c, id, s) {
+                    StepState::Locked
                 } else if current {
                     StepState::Open
                 } else {
@@ -687,6 +776,6 @@ impl Progress {
 
     /// the first step that is open
     pub fn next_open(&self, c: &Course, id: &str) -> Option<usize> {
-        c.steps().position(|s| s.ready() && !self.is_done(id, &s.id))
+        c.steps().position(|s| s.ready() && !self.is_done(id, &s.id) && !self.locked(c, id, s))
     }
 }

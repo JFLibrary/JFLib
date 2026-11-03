@@ -21,7 +21,10 @@
 //                                         score, End nothing; once it ended, both
 //   loaded(n) / tick(n, ui) / check(n) / timer(n, ui)   the window's (task.rs and the frame call
 //                                         them; TIMER_ASSESS brings the window back for them)
-//   card(n, ui, check_button) / items(n, ui)   the score card and the items (task.rs's panel)
+//   card(n, ui, check_button) / items(n, ui)   the score card and the items (task.rs's panel); a
+//                                         diagnosis item (AK2) is a question in the panel whatever
+//                                         the feedback: a list of devices and cables, or a click on
+//                                         the canvas (Run::picking); it counts when handed in
 //   submit(n) / command(n, ui, id) / states(n, ui)   "Abgeben" (CMD_ASSESS_SUBMIT)
 //   dialog(n, ui)                         "Jetzt abgeben?" before handing in
 //   points_text(k) / clock_text(us)       "20 Punkte", "14:05"
@@ -34,10 +37,11 @@
 
 use alloc::format;
 use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use jfn_model::lab::{Assess, Feedback};
+use jfn_model::lab::{Assess, Feedback, ItemKind};
 use jfn_model::Project;
-use jfn_sim::assess::{item_text, Grader, Score};
+use jfn_sim::assess::{item_text, pick_text, Grader, Pick, Score};
 use jfn_sim::{Engine, Ns};
 use ui::*;
 
@@ -82,10 +86,16 @@ pub(crate) struct Run {
     pub end: Option<End>,
     /// the question before handing in is open
     pub ask: Shared<i32>,
+    /// per item: what the learner named for a diagnosis; the one that takes the next click on the canvas
+    pub picks: Vec<Option<Pick>>,
+    pub picking: Option<usize>,
+    /// it is handed in even without a time limit: "Abgeben" shows (a diagnosis, a fault hunt)
+    pub hand_in: bool,
 }
 
 impl Run {
     pub(crate) fn new(a: &Assess, clock: u64) -> Run {
+        let diagnosis = a.items.iter().any(|i| i.kind() == Some(ItemKind::Diagnosis));
         Run {
             grader: Grader::new(a),
             feedback: a.feedback,
@@ -100,6 +110,9 @@ impl Run {
             explain: false,
             end: None,
             ask: Shared::new(0),
+            picks: alloc::vec![None; a.items.len()],
+            picking: None,
+            hand_in: diagnosis,
         }
     }
 
@@ -169,7 +182,7 @@ impl Run {
 
     /// the items against the project and its engine now
     pub(crate) fn grade(&mut self, p: &Project, e: &Engine, out: &dyn Fn(u32) -> String, rev: u32, ver: u32, clock: u64) {
-        self.score = Some(self.grader.grade(p, e, out));
+        self.score = Some(self.grader.grade_picks(p, e, out, &self.picks, self.end.is_some()));
         self.at = Some(e.now());
         self.clock_at = clock;
         self.rev = rev;
@@ -184,9 +197,10 @@ impl Run {
         }
         // out of time: it ends at the limit, whenever the window noticed it
         let at_us = if timeout { self.started_us + self.limit_us } else { clock };
-        self.grade(p, e, out, rev, ver, clock);
         self.end = Some(End { at_us, virt: e.now(), timeout });
+        self.grade(p, e, out, rev, ver, clock);
         self.explain = true;
+        self.picking = None;
     }
 }
 
@@ -212,9 +226,24 @@ pub(crate) fn loaded(n: &mut Net) {
     };
 }
 
+// the click on the canvas a diagnosis waits for: one device or cable selected
+fn picked(n: &mut Net, ui: &mut Ui) {
+    let Some(k) = n.task.assess.as_ref().and_then(|r| r.picking) else { return };
+    let mut sel = n.canvas.st.sel.iter();
+    let (Some(&id), None) = (sel.next(), sel.next()) else { return };
+    let p = &n.doc.proj;
+    let pick = if p.device(id as u32).is_some() { Some(Pick::Dev(id as u32)) } else { p.link(id as u32).map(|l| Pick::Cable(l.a.clone(), l.b.clone())) };
+    if let (Some(x), Some(run)) = (pick, n.task.assess.as_mut()) {
+        run.picks[k] = Some(x);
+        run.picking = None;
+        ui.repass();
+    }
+}
+
 /// every frame (task.rs's tick): graded when due, ended when the time is up; the timer when
 /// the window must look again
 pub(crate) fn tick(n: &mut Net, ui: &mut Ui) {
+    picked(n, ui);
     let Some(run) = n.task.assess.as_mut() else { return };
     let clock = plat::task::now_us();
     let (rev, ver) = (n.doc.rev, n.doc.sim.ver);
@@ -288,6 +317,7 @@ pub(crate) fn card(n: &mut Net, ui: &mut Ui, check_button: bool) {
     let left = run.remaining(clock);
     let feedback = run.feedback;
     let at = run.at;
+    let hand_in = run.hand_in;
     let mut act_check = false;
     let mut act_submit = false;
     // ---- the card: the score, "Prüfen" / "Abgeben", the time
@@ -352,6 +382,16 @@ pub(crate) fn card(n: &mut Net, ui: &mut Ui, check_button: bool) {
             if let (Some(at), true) = (at, shows_score) {
                 ui.text(TS_CAPTION | TX_TERTIARY, &tf("geprüft bei t = {}", &[&tr::msg(&jfn_model::msg::dur(at.min(i64::MAX as u64) as i64))]));
             }
+            if hand_in && feedback != Feedback::End {
+                ui.box_begin(0, BOX_H, 0);
+                ui.next_flags(ST_SUBTLE | ST_COMPACT);
+                ui.next_icon(IC_UPLOAD);
+                if ui.button(ID_AS_SUBMIT, t("Abgeben")) & EV_ACT != 0 {
+                    act_submit = true;
+                }
+                ui.tooltip(t("Die Arbeit abgeben: danach zählt die Bewertung, wie sie jetzt ist"));
+                ui.box_end();
+            }
         }
     }
     if !shows_items && feedback == Feedback::Score && end.is_none() {
@@ -372,6 +412,7 @@ pub(crate) fn card(n: &mut Net, ui: &mut Ui, check_button: bool) {
 /// the items as the feedback mode allows: a mark, the text, the points and (after "Prüfen", or
 /// once it ended) what a wrong one found
 pub(crate) fn items(n: &mut Net, ui: &mut Ui) {
+    diagnoses(n, ui);
     let Some(run) = n.task.assess.as_ref() else { return };
     if !run.shows_items() {
         return;
@@ -380,8 +421,13 @@ pub(crate) fn items(n: &mut Net, ui: &mut Ui) {
     let score = run.score.clone();
     let explain = run.explain || run.end.is_some();
     let items = run.grader.items().to_vec();
-    ui.text(TS_BODY_STRONG, t("Kriterien"));
+    if items.iter().any(|i| i.kind() != Some(ItemKind::Diagnosis)) {
+        ui.text(TS_BODY_STRONG, t("Kriterien"));
+    }
     for (i, it) in items.iter().enumerate().take(ASSESS_ITEMS) {
+        if it.kind() == Some(ItemKind::Diagnosis) {
+            continue;
+        }
         let g = score.as_ref().and_then(|s| s.items.get(i));
         let held = g.is_some_and(|g| g.held);
         let text = if it.text.is_empty() { tr::msg(&item_text(it)) } else { String::from(it.text.get(en)) };
@@ -419,6 +465,90 @@ pub(crate) fn items(n: &mut Net, ui: &mut Ui) {
     }
 }
 
+// the diagnoses: the question, a list of what there is, a click on the canvas; once handed in the mark,
+// the answer, the explanation
+fn diagnoses(n: &mut Net, ui: &mut Ui) {
+    let Some(run) = n.task.assess.as_ref() else { return };
+    let en = tr::en();
+    let list: Vec<(usize, jfn_model::lab::Item)> = run.grader.items().iter().enumerate().filter(|(_, i)| i.kind() == Some(ItemKind::Diagnosis)).map(|(k, i)| (k, i.clone())).collect();
+    if list.is_empty() {
+        return;
+    }
+    let ended = run.end.is_some();
+    let score = run.score.clone();
+    // what can be named: every device, every cable
+    let p = &n.doc.proj;
+    let mut what: Vec<Pick> = p.devices.iter().map(|d| Pick::Dev(d.id)).collect();
+    what.extend(p.links.iter().map(|l| Pick::Cable(l.a.clone(), l.b.clone())));
+    let mut names: Vec<String> = alloc::vec![String::from(t("Keine Antwort gewählt"))];
+    names.extend(what.iter().map(|x| pick_text(p, x)));
+    ui.text(TS_BODY_STRONG, t("Diagnose"));
+    for (d, (k, it)) in list.into_iter().enumerate().take(DIAGNOSES) {
+        let d = d as u32;
+        let Some(run) = n.task.assess.as_ref() else { return };
+        let pick = run.picks.get(k).cloned().flatten();
+        let question = if it.text.is_empty() { tr::msg(&item_text(&it)) } else { String::from(it.text.get(en)) };
+        let waiting = run.picking == Some(k);
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_V, 4);
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_WRAP, &question);
+        if ended {
+            let g = score.as_ref().and_then(|s| s.items.get(k));
+            let held = g.is_some_and(|g| g.held);
+            ui.next_size(-1, 0);
+            ui.box_begin(0, BOX_H, 6);
+            mark(ui, if held { IC_CHECK_CIRCLE_FILL } else { IC_CANCEL_CIRCLE }, if held { T_OK } else { T_CRIT }, 18);
+            ui.next_size(-1, 0);
+            let answer = match (held, &pick) {
+                (true, Some(x)) => tf("Richtig: {}", &[&pick_text(&n.doc.proj, x)]),
+                _ => g.map_or(String::new(), |g| tr::msg(&g.found)),
+            };
+            ui.text(TS_BODY | TX_WRAP, &answer);
+            ui.box_end();
+            if !it.explain.is_empty() {
+                ui.next_size(-1, 0);
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, it.explain.get(en));
+            }
+        } else {
+            let mut sel = pick.as_ref().and_then(|x| what.iter().position(|w| w == x)).map_or(0, |i| i as i32 + 1);
+            let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+            ui.next_size(-1, 0);
+            if ui.combobox(ID_DG_LIST + d, &mut sel, &refs) & EV_ACT != 0
+                && let Some(run) = n.task.assess.as_mut()
+            {
+                run.picks[k] = if sel <= 0 { None } else { what.get(sel as usize - 1).cloned() };
+                run.picking = None;
+                ui.repass();
+            }
+            ui.box_begin(0, BOX_H, 0);
+            ui.next_flags(ST_SUBTLE | ST_COMPACT);
+            ui.next_icon(IC_FLAG);
+            let label = if waiting { t("Wahl abbrechen") } else { t("Auf der Zeichenfläche wählen") };
+            if ui.button(ID_DG_PICK + d, label) & EV_ACT != 0 {
+                if let Some(run) = n.task.assess.as_mut() {
+                    run.picking = if waiting { None } else { Some(k) };
+                }
+                if !waiting {
+                    n.canvas.tool = crate::workspace::canvas::tools::Tool::Select;
+                    n.canvas.st.sel.clear();
+                }
+                ui.repass();
+            }
+            ui.box_end();
+            if waiting {
+                ui.next_size(-1, 0);
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Klicken Sie auf das Gerät oder Kabel, das die Ursache ist."));
+            }
+        }
+        ui.box_end();
+    }
+    if !ended {
+        ui.next_size(-1, 0);
+        ui.text(TS_CAPTION | TX_TERTIARY | TX_WRAP, t("Die Antwort zählt erst beim Abgeben."));
+    }
+}
+
 /// "Jetzt abgeben?" (at the end of the frame)
 pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
     let Some(ask) = n.task.assess.as_ref().map(|r| r.ask.clone()) else { return };
@@ -431,6 +561,9 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
     }
     ui.dialog_end();
 }
+
+/// the diagnoses of an assessment the panel shows at most (their ids)
+const DIAGNOSES: usize = 16;
 
 /// the assessment's commands: Abgeben (after its question)
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {

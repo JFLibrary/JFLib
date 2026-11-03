@@ -59,10 +59,10 @@ shot build/jfnetworker/models_palette_folded.png
 # the firewalls say what they do
 move button:"JF-FW2"
 wait 900
-expect text:"Kleine Firewall (Router mit ACLs und NAT) 1G WAN, 4× 1G LAN · Ports: 1× 1G, 4× 1G, Konsole" exists
+expect text:"Kleine Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 1G WAN, 4× 1G LAN · Ports: 1× 1G, 4× 1G, Konsole" exists
 move button:"JF-FW8"
 wait 900
-expect text:"Rechenzentrums-Firewall (Router mit ACLs und NAT) 8× 10G SFP+, 4× 100G QSFP28 · Ports: 8× 10G SFP+, 4× 100G QSFP28, Konsole" exists
+expect text:"Rechenzentrums-Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 10G SFP+, 4× 100G QSFP28 · Ports: 8× 10G SFP+, 4× 100G QSFP28, Konsole" exists
 move button:"JF-AP7"
 wait 900
 expect text:"WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist) · Ports: 1× 5G (PoE-gespeist), 1× Funk 1.3G, 1× Funk 5.7G, 1× Funk 11.5G, Konsole" exists
