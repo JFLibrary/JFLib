@@ -1866,6 +1866,16 @@ Fensterrand hinaus.
 - **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend` ohne libc ist eigener
   Aufwand); heute macOS nur über das Web.
 - **P2** · *fehlt* · Native iOS-Version.
+- **P2** · *fehlt* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
+  den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
+  - Zu tun: Syscall-Nummern, Flags und Kernel-Layouts an einer Stelle (265 Stellen, geht schon ohne
+    ARM), Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
+    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete.
+  - NEON für `lib/simd` ist darin ARM6 und bringt auch Android etwas; die Arbeit nützt später auch
+    macOS und iOS auf ARM.
+  - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
+    braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter
   Speicher, System-Zwischenablage ([VFS.md](VFS.md) „Android“, GUIDE §5, §7, §8,
   [apps/androidGallery/README.md](../apps/androidGallery/README.md)).

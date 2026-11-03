@@ -626,6 +626,7 @@ For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
 | [Changelog](CHANGELOG.md) | What changed in each release of the library |
 | [Roadmap](docs/ROADMAP.md) | What the library still lacks, with priorities (German) |
 | [Linux test plan](docs/LINUX_TESTPLAN.md) | What is checked on real Linux desktops and what is still to check on KDE, GNOME and X11 (German) |
+| [ARM64 plan](docs/ARM64.md) | The planned port to ARM64 on Windows and Linux: milestones, traps, how it is tested (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [PaintCraft plugins](plugins/README.md) | Native plugins and plugin builds |
