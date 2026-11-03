@@ -1,0 +1,318 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "PC2 ist allein",
+  "description": "Kurs Fehlersuche: ein abgeschalteter Port.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.11/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.0.12/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\ninterface GigabitEthernet1/0/2\n shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "PC2 ist allein",
+      "PC2 is on its own"
+    ],
+    "summary": [
+      "PC2 erreicht niemanden, das Kabel wurde schon getauscht, und das hat nichts geholfen.",
+      "PC2 reaches nobody. The cable has already been swapped, and that did not help."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC2 erreicht weder den Server noch PC1. Ein Kollege hat das Kabel schon getauscht, ohne Erfolg. PC1 und der Server erreichen einander.",
+        "PC2 reaches neither the server nor PC1. A colleague has already swapped the cable, without success. PC1 and the server reach each other."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie, nennen Sie unter Diagnose das Gerät und geben Sie ab.",
+        "Find the cause, repair it, name the device under Diagnosis and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Das Kabel ist neu, aber sagt der Anschluss von PC2 auch, dass die Gegenseite lebt? ip -br link auf PC2 zeigt es.",
+        "The cable is new, but does the socket of PC2 also say that the other end is alive? ip -br link on PC2 shows it."
+      ],
+      [
+        "Fragen Sie die andere Seite des Kabels: Auf SW1 nach enable zeigt show interfaces GigabitEthernet1/0/2 den Zustand des Ports.",
+        "Ask the other end of the cable: on SW1, after enable, show interfaces GigabitEthernet1/0/2 shows the state of the port."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.0.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC2 erreicht den Server",
+            "PC2 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.0.11"
+          ],
+          "points": 3,
+          "text": [
+            "PC2 erreicht PC1",
+            "PC2 reaches PC1"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "SW1",
+          "id": 3,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "Der Port Gi1/0/2 auf SW1 war abgeschaltet: show interfaces sagt administratively down, und bei einem gezogenen Kabel stünde dort nur down. Darum half das neue Kabel nichts. no shutdown in der Konfiguration des Ports schaltet ihn ein.",
+            "The port Gi1/0/2 on SW1 was shut down: show interfaces says administratively down, and with a pulled cable it would say just down. That is why the new cable did not help. no shutdown in the port's configuration switches it on."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.0.11/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.0.12/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 200,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW1\n!\ninterface GigabitEthernet1/0/2\n no shutdown\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 400,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "b": {
+              "dev": 4,
+              "port": "eth0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

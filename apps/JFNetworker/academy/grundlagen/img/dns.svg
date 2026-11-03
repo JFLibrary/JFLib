@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="230" viewBox="0 0 560 230">
+  <title>A question to the name server and the ping that follows</title>
+  <rect x="1" y="1" width="558" height="228" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="40" y="88" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="46" y="94" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="58" y="124" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="70" y="152" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC1</text>
+  <rect x="394" y="26" width="52" height="56" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M402 40 L438 40" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M402 54 L438 54" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M402 68 L438 68" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <text x="500" y="58" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">NS1</text>
+  <rect x="394" y="146" width="52" height="56" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M402 160 L438 160" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M402 174 L438 174" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M402 188 L438 188" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <text x="500" y="178" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">WEB1</text>
+  <path d="M110 88 L369.143 45.7693" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M380.0 44.0 L368.2 39.8 L370.1 51.7 Z" fill="#A9702A"/>
+  <text x="238" y="42" font-family="monospace" font-size="13" text-anchor="middle" fill="#A9702A" font-weight="bold">www.schule.lab ?</text>
+  <path d="M382 70 L122.904 104.546" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M112.0 106.0 L123.7 110.5 L122.1 98.6 Z" fill="#2F7D4F"/>
+  <text x="260" y="112" font-family="monospace" font-size="13" text-anchor="middle" fill="#2F7D4F" font-weight="bold">10.30.0.80</text>
+  <path d="M112 132 L369.121 170.376" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M380.0 172.0 L370.0 164.4 L368.2 176.3 Z" fill="#3A6EA5"/>
+  <text x="236" y="180" font-family="monospace" font-size="13" text-anchor="middle" fill="#3A6EA5" font-weight="bold">ping 10.30.0.80</text>
+</svg>

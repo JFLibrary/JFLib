@@ -93,6 +93,8 @@
 // a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
 // installtest.rs: installing courses (group install: jfn_run::install, the list and its refusals, a source that
 // fails, cancels and resumes, updates and uninstalling, every file of --academy-dir against its index).
+// coursetest.rs: the courses can be done (group courses: per step of every course that is no sample, a lab solved
+// at the console, a fault hunt repaired and diagnosed, a quiz answered, what a lesson shows typed and compared).
 
 use alloc::format;
 use alloc::string::String;
@@ -216,9 +218,11 @@ mod sweeptest;
 mod installtest;
 #[path = "expguitest.rs"]
 mod expguitest;
+#[path = "coursetest.rs"]
+mod coursetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 66] = [
+    let groups: [(&'static str, fn(&mut T)); 67] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -285,6 +289,7 @@ pub fn run() -> i32 {
         ("sweep", sweeptest::run),
         ("install", installtest::run),
         ("expgui", expguitest::run),
+        ("courses", coursetest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     let args = plat::args();

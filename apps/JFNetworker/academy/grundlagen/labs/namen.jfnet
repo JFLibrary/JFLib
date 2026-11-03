@@ -1,0 +1,252 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Namen statt Nummern",
+  "description": "Kurs Grundlagen: der Namensserver und seine Einträge.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.30.0.10/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 200,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "NS1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname NS1\nip addr add 10.30.0.53/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "schule.lab",
+                "ttl": 300,
+                "records": [
+                  "www A 10.30.0.80",
+                  "ns A 10.30.0.53",
+                  "start CNAME www"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.30.0.80/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Willkommen auf der Seite der Schule!\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 200,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Namen statt Nummern",
+      "Names instead of numbers"
+    ],
+    "summary": [
+      "PC1 kennt noch keinen Namensserver. Tragen Sie ihn ein, fragen Sie ihn mit dig und holen Sie die Webseite über ihren Namen.",
+      "PC1 knows no name server yet. Enter it, ask it with dig and fetch the web page by its name."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Im Netz 10.30.0.0/24 stehen der Namensserver NS1 unter 10.30.0.53 und der Webserver WEB1 unter 10.30.0.80. NS1 kennt die Zone schule.lab mit den Einträgen www und start.",
+        "The network 10.30.0.0/24 holds the name server NS1 at 10.30.0.53 and the web server WEB1 at 10.30.0.80. NS1 knows the zone schule.lab with the records www and start."
+      ],
+      [
+        "PC1 erreicht beide über ihre Adressen, aber Namen kann er noch nicht auflösen. Das ändern Sie jetzt.",
+        "PC1 reaches both by their addresses, but cannot resolve names yet. That is what you change now."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "PC1 erreicht www.schule.lab über den Namen",
+          "PC1 reaches www.schule.lab by its name"
+        ],
+        "checks": [
+          "PC1 reaches www.schule.lab"
+        ],
+        "hints": [
+          [
+            "cat /etc/resolv.conf auf PC1 bleibt leer: Es gibt keinen Namensserver.",
+            "cat /etc/resolv.conf on PC1 stays empty: there is no name server."
+          ],
+          [
+            "Auf PC1: echo \"nameserver 10.30.0.53\" > /etc/resolv.conf",
+            "On PC1: echo \"nameserver 10.30.0.53\" > /etc/resolv.conf"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "dig hat Ihnen den Eintrag von www gezeigt",
+          "dig has shown you the record of www"
+        ],
+        "checks": [
+          "PC1 output contains \"ANSWER SECTION\"",
+          "PC1 output contains \"www.schule.lab.\""
+        ],
+        "hints": [
+          [
+            "Auf PC1: dig www.schule.lab",
+            "On PC1: dig www.schule.lab"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "dig hat Ihnen den Alias start gezeigt",
+          "dig has shown you the alias start"
+        ],
+        "checks": [
+          "PC1 output contains \"CNAME\""
+        ],
+        "hints": [
+          [
+            "Auf PC1: dig start.schule.lab",
+            "On PC1: dig start.schule.lab"
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Die Webseite kommt über ihren Namen",
+          "The web page comes by its name"
+        ],
+        "checks": [
+          "PC1 output contains \"Willkommen\""
+        ],
+        "hints": [
+          [
+            "Auf PC1: curl http://www.schule.lab/",
+            "On PC1: curl http://www.schule.lab/"
+          ]
+        ]
+      }
+    ],
+    "hints": [],
+    "assess": null
+  }
+}
