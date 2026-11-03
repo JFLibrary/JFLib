@@ -7,8 +7,10 @@
 //                              reader asks them through plat::a11y::request: click, toggle,
 //                              select, set a slider and a text, focus, a disabled button, the
 //                              pointer click for a widget whose record id differs from its hit
-//                              box; the changes between two trees (plat::a11y::diff); the role
-//                              names of the bridges in German and English
+//                              box and where that click must not go (a record out of view, cut
+//                              off, under an open popup, a link's box of another id); the changes
+//                              between two trees (plat::a11y::diff); the role names of the bridges
+//                              in German and English
 //   plattest --test a11y-bus   (Linux; tools/platshared/atspi_bus.py starts it on a fake session
 //                              and accessibility bus) the demo in a real window with the AT-SPI2
 //                              bridge; the fake screen reader reads the tree and acts, then
@@ -381,6 +383,116 @@ pub fn t_a11y(t: &mut T) {
     t.check(names() == ("toggle switch", "heading", "frame"), "a11y: role names in English after the language changed");
     ui::i18n::set_language(ui::i18n::LANG_DE);
     t.check(names() == ("Umschalter", "Überschrift", "Rahmen"), "a11y: role names in German again");
+    t_reach(t);
+}
+
+const ID_VIEW: u32 = 0x400;
+const ID_LOW_HIT: u32 = 0x401;
+const ID_LOW: u32 = 0x402;
+const ID_AFTER_VIEW: u32 = 0x403;
+const ID_CUT_HIT: u32 = 0x404;
+const ID_CUT: u32 = 0x405;
+const ID_AFTER_CUT: u32 = 0x406;
+const ID_DOC: u32 = 0x407;
+const ID_DROP: u32 = 0x408;
+const ID_ITEM: u32 = 0x409;
+
+/// records whose id is not their hit box, and what lies next to them: where their pointer click
+/// goes (the counters: presses each widget got)
+#[derive(Default)]
+struct Reach {
+    low: i32,
+    after_view: i32,
+    cut: i32,
+    after_cut: i32,
+    doc: i32,
+}
+
+impl App for Reach {
+    fn frame(&mut self, ui: &mut Ui) {
+        // below the fold of a small view: the record's middle on the button after the view
+        ui.next_size(-1, 40);
+        ui.scroll_begin(ID_VIEW, ui::SC_V);
+        ui.place(ui.dp(120), ui.dp(44));
+        let r = ui.place(ui.dp(120), ui.dp(28));
+        self.low += (ui.hit_rect(ID_LOW_HIT, r[0], r[1], r[2], r[3], ui::HB_FOCUS) & ui::EV_ACT != 0) as i32;
+        ui.sem(ui::K_BUTTON, ID_LOW, Some("Unten"), 0);
+        ui.scroll_end();
+        ui.next_size(-1, 0);
+        self.after_view += (ui.button(ID_AFTER_VIEW, "Nach der Ansicht") & ui::EV_ACT != 0) as i32;
+        // cut off by a box that cannot scroll: a record with an id, a link without one
+        ui.next_size(-1, 28);
+        ui.box_begin(0, ui::BOX_V | ui::BOX_CLIP, 0);
+        ui.place(ui.dp(120), ui.dp(32));
+        let r = ui.place(ui.dp(120), ui.dp(28));
+        self.cut += (ui.hit_rect(ID_CUT_HIT, r[0], r[1], r[2], r[3], ui::HB_FOCUS) & ui::EV_ACT != 0) as i32;
+        ui.sem(ui::K_BUTTON, ID_CUT, Some("Abgeschnitten"), 0);
+        ui.sem(ui::K_LINK, 0, Some("Abgeschnittener Verweis"), 0);
+        ui.box_end();
+        ui.next_size(-1, 0);
+        self.after_cut += (ui.button(ID_AFTER_CUT, "Nach dem Ausschnitt") & ui::EV_ACT != 0) as i32;
+        // a link of a document: no id, its box has the document's
+        let r = ui.place(ui.dp(120), ui.dp(24));
+        self.doc += (ui.hit_rect(ID_DOC, r[0], r[1], r[2], r[3], ui::HB_FOCUS) & ui::EV_ACT != 0) as i32;
+        ui.sem(ui::K_LINK, 0, Some("Verweis"), 0);
+        // an open popup takes every press
+        ui.dropdown_button(ID_DROP, "Mehr");
+        if ui.flyout_begin(ID_DROP, ui::FL_BELOW) {
+            ui.menu_item(ID_ITEM, "Eintrag");
+        }
+        ui.flyout_end();
+        for (k, v) in [self.low, self.after_view, self.cut, self.after_cut, self.doc].into_iter().enumerate() {
+            REACH[k].store(v, SeqCst);
+        }
+    }
+}
+
+static REACH: [AtomicI32; 5] = [const { AtomicI32::new(0) }; 5];
+
+// a click no widget takes goes where it reaches the record, or nowhere
+fn t_reach(t: &mut T) {
+    let presses = || REACH.iter().map(|v| v.load(SeqCst)).collect::<Vec<i32>>();
+    let rt = match ui::Runtime::new(&DESC, Reach::default(), &style::STYLE) {
+        Ok(rt) => rt,
+        Err(_) => {
+            t.check(false, "a11y reach: the window starts headless");
+            return;
+        }
+    };
+    let mut r = Run { rt, now: 0 };
+    let s = r.tree();
+    let middle = |n: &Node| (n.rect[0] + n.rect[2] / 2, n.rect[1] + n.rect[3] / 2);
+    let holds = |n: &Node, p: (i32, i32)| p.0 >= n.rect[0] && p.0 < n.rect[0] + n.rect[2] && p.1 >= n.rect[1] && p.1 < n.rect[1] + n.rect[3];
+    let (low, after_view) = (find(&s, Role::Button, "Unten"), find(&s, Role::Button, "Nach der Ansicht"));
+    t.check(low.zip(after_view).is_some_and(|(l, a)| holds(a, middle(l))), "a11y reach: the middle of the record out of view lies on the next button");
+    let (cut, after_cut) = (find(&s, Role::Button, "Abgeschnitten"), find(&s, Role::Button, "Nach dem Ausschnitt"));
+    t.check(cut.zip(after_cut).is_some_and(|(c, a)| holds(a, middle(c))), "a11y reach: the middle of the cut off record lies on the next button");
+
+    // out of view: the view brings it in, the press is its own
+    r.act(low, Act::Click);
+    r.step(&[]);
+    t.check(presses() == [1, 0, 0, 0, 0], &format!("a11y reach: a record out of view is scrolled in and pressed ({:?})", presses()));
+    t.check(find(&r.tree(), Role::Button, "Unten").zip(find(&s, Role::Button, "Unten")).is_some_and(|(now, was)| now.rect[1] < was.rect[1]), "a11y reach: the view scrolled");
+    // cut off, with an id and without: the press would be the next button's, so there is none
+    r.act(cut, Act::Click);
+    r.step(&[]);
+    t.check(presses() == [1, 0, 0, 0, 0], &format!("a11y reach: no press for a record that is cut off ({:?})", presses()));
+    r.act(find(&s, Role::Link, "Abgeschnittener Verweis"), Act::Click);
+    r.step(&[]);
+    t.check(presses() == [1, 0, 0, 0, 0], &format!("a11y reach: no press for a link that is cut off ({:?})", presses()));
+    // a link without an id: the box of the document that draws it
+    r.act(find(&s, Role::Link, "Verweis"), Act::Click);
+    r.step(&[]);
+    t.check(presses() == [1, 0, 0, 0, 1], &format!("a11y reach: a link is pressed through the box of its document ({:?})", presses()));
+    // an open popup: no press (it would only close it), nothing scrolls
+    let drop = find(&s, Role::Combo, "Mehr").or_else(|| find(&s, Role::Button, "Mehr"));
+    r.act(drop, Act::Click);
+    r.step(&[]);
+    t.expect_i(r.rt.ui().popup_count() as i64, 1, "a11y reach: the popup is open");
+    r.act(find(&r.tree(), Role::Link, "Verweis"), Act::Click);
+    r.step(&[]);
+    t.expect_i(r.rt.ui().popup_count() as i64, 1, "a11y reach: a click under it does not close it");
+    t.check(presses() == [1, 0, 0, 0, 1], &format!("a11y reach: no press under an open popup ({:?})", presses()));
 }
 
 // the browser's and Android's mirror (plat::a11y::wire): a full update, nothing when nothing

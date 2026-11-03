@@ -468,19 +468,24 @@ fn heights(t: &mut T) {
 }
 
 // the view in a headless runtime as screen readers get it (ui/a11y.rs): headings with their
-// level inside the document's group, the paragraph a label, the link a link
+// level inside the document's group, the paragraph a label, the link a link; a click on the link
+// (no id of its own: a pointer click through the document's box)
 fn a11y(t: &mut T) {
-    use plat::a11y::Role;
+    use plat::a11y::{Act, Request, Role};
     t.group = "a11y";
-    struct View(MdViewState);
+    struct View(MdViewState, alloc::rc::Rc<core::cell::RefCell<Option<String>>>);
     impl App for View {
         fn frame(&mut self, ui: &mut Ui) {
             ui.next_size(-1, -1);
-            ui.markdown_view(1, &mut self.0, "# Eins\n\nEin [Link](https://example.org).\n\n### Drei\n\n<h5>Fünf</h5>", MV_NO_FRAME);
+            let ev = ui.markdown_view(1, &mut self.0, "# Eins\n\nEin [Link](https://example.org).\n\n### Drei\n\n<h5>Fünf</h5>", MV_NO_FRAME);
+            if ev.link.is_some() {
+                *self.1.borrow_mut() = ev.link;
+            }
         }
     }
     const D: AppDesc = AppDesc { title: "a11y", w: 480, h: 320, ..AppDesc::NONE };
-    let Ok(mut rt) = ui::Runtime::new(&D, View(MdViewState::new()), &style::STYLE) else {
+    let opened = alloc::rc::Rc::new(core::cell::RefCell::new(None));
+    let Ok(mut rt) = ui::Runtime::new(&D, View(MdViewState::new(), opened.clone()), &style::STYLE) else {
         t.check(false, "the view starts headless");
         return;
     };
@@ -496,6 +501,11 @@ fn a11y(t: &mut T) {
     );
     t.check(w.nodes.iter().any(|n| n.role == Role::Label && n.name == "Ein Link."), "a paragraph is a label");
     t.check(w.nodes.iter().any(|n| n.role == Role::Link && n.name == "Link"), "a link");
+    let key = w.nodes.iter().find(|n| n.role == Role::Link && n.name == "Link").map_or(0, |n| n.key);
+    plat::a11y::request(Request { win: 0, key, act: Act::Click });
+    rt.step(100, &[plat::Event { typ: plat::E_WAKE, ..Default::default() }]);
+    rt.step(150, &[]);
+    t.eq(opened.borrow().clone(), Some(String::from("https://example.org")), "a screen reader's click opens the link");
 }
 
 fn forms(t: &mut T) {

@@ -18,14 +18,14 @@ agent = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(agent)
 
 
-def launch(exe, enabled):
+def launch(exe, enabled, size="1000x800"):
     options = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=ROOT)
     if os.name == "nt":
         startup = subprocess.STARTUPINFO()
         startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
         options.update(startupinfo=startup, creationflags=0x08000000)
-    args = [str(exe), "--auto-close", "30000" if enabled else "2500", "--size", "1000x800"]
+    args = [str(exe), "--auto-close", "30000" if enabled else "2500", "--size", size]
     if enabled:
         args.append("--agent")
     return subprocess.Popen(args, **options)
@@ -106,6 +106,47 @@ def click_with_last_revision(client, gallery_cli):
     return checks
 
 
+def click_reaches(exe):
+    """A window too small for the page, a second window, an open popup: ui.click only reports a hit."""
+    checks = 0
+    process = launch(exe, True, "800x540")
+    try:
+        with agent.Connection(wait_endpoint(process)) as client:
+            state = lambda: client.request("state/inspect", {"limit": 500})["result"]
+            widget = lambda id: next(w for w in state()["widgets"] if w["id"] == id)
+            # the middle of the text box is below the view: the page scrolls, the click and the text arrive
+            revision = state()["revision"]
+            before = widget(700)["rect"]
+            revision = call(client, "ui.click", {"id": 700}, revision)["revision"]
+            assert state()["focus"] == 700 and widget(700)["rect"][1] < before[1], (state()["focus"], before, widget(700))
+            call(client, "ui.type", {"text": "Hallo"}, revision)
+            assert widget(700)["label"] == "Hallo"
+            checks += 1
+            # an open popup would take the press: refused, it stays open, then its own row works
+            revision = call(client, "ui.click", {"id": next(w["id"] for w in state()["widgets"] if w["label"] == "Stärke")}, state()["revision"])["revision"]
+            base = next(w["id"] for w in state()["widgets"] if w["label"] == "Standard")
+            refused = client.request("actions/execute", {"action": "ui.click", "input": {"id": base}, "expectedRevision": revision})
+            assert refused["error"]["data"]["code"] == "unavailable" and refused["error"]["data"]["details"]["reason"] == "popup", refused
+            row = next(w["id"] for w in state()["widgets"] if w["label"] == "Schließen")
+            call(client, "ui.click", {"id": row}, revision)
+            checks += 1
+            # a second window: the press goes to its platform window
+            tool = next(w["id"] for w in state()["widgets"] if w["label"] == "Werkzeugfenster")
+            call(client, "ui.click", {"id": tool}, state()["revision"])
+            deadline = time.monotonic() + 5
+            while not any(w["id"] == 7601 for w in state()["widgets"]) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            slider = widget(7601)
+            assert slider["window"] != 0
+            call(client, "ui.click", {"id": 7601, "window": slider["window"]}, state()["revision"])
+            assert widget(7601)["value"] != slider["value"], (slider, widget(7601))
+            checks += 1
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
+    return checks
+
+
 def close_cleanly(process):
     process.wait(timeout=35)
     assert process.returncode == 0, process.stderr.read().decode(errors="replace")
@@ -165,6 +206,7 @@ def main():
             return json.loads(done.stdout)
         with agent.Connection(addresses[0]) as gallery:
             checks += click_with_last_revision(gallery, gallery_cli)
+        checks += click_reaches(exes[0])
         with agent.Connection(addresses[1]) as kritzel:
             initial = call(kritzel, "image.inspect")
             original = initial["value"]

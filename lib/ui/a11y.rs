@@ -11,7 +11,8 @@
 // Widgets: behave asks a11y_click(id) (a pending click, toggle, select or open acts like
 // Space on the focused widget: EV_ACT); the sliders ask a11y_value(id), the text boxes
 // a11y_text(id) for a new value (both public for widgets of an app's own).  A click no widget took in its passes becomes a pointer
-// click in the middle of the record.
+// click where the press reaches the record (a11y_aim), after the scroll views brought it into view; there is
+// none when the middle lies on something else.
 //
 // The tree: every record of a window becomes a node in the record order -- roles from the
 // kinds (K_*), states from SS_* (a check box with value 2 is mixed), a heading's level from its
@@ -50,8 +51,8 @@ const SYN_POPUP: u64 = 2 << 40;
 #[derive(Default)]
 pub(crate) struct S {
     started: bool,
-    /// a click for (window, id) and the record's rectangle (the fallback click)
-    click: Option<(u8, u32, [i32; 4])>,
+    /// a click for (window, id) and which record of that id it is (the fallback click)
+    click: Option<(u8, u32, usize)>,
     value: Option<(u8, u32, i32)>,
     text: Option<(u8, u32, String)>,
     /// a selection for (window, text box): anchor, caret in characters (waits for the focus)
@@ -487,16 +488,18 @@ impl Ui {
     /// is published while assistive technology listens (the first window frame starts the
     /// platform bridge)
     pub(crate) fn a11y_frame(&mut self) {
-        if let Some((win, _, r)) = self.m.a11y.click.take() {
+        if let Some(point) = self.a11y_click_record().and_then(|rec| self.a11y_aim(&rec)) {
+            let win = self.m.a11y.click.map_or(0, |c| c.0);
             let pw = if self.headless { win as i32 } else { self.uiw_pw(win as u32) };
-            if pw >= 0 && r[2] > 0 && r[3] > 0 {
-                let ev = plat::Event { win: pw as u8, x: r[0] + r[2] / 2, y: r[1] + r[3] / 2, btn: plat::BTN_LEFT, ..Default::default() };
+            if pw >= 0 {
+                let ev = plat::Event { win: pw as u8, x: point.0, y: point.1, btn: plat::BTN_LEFT, ..Default::default() };
                 for typ in [plat::E_MOVE, plat::E_DOWN, plat::E_UP] {
                     plat::evq_push(plat::Event { typ, ..ev });
                 }
                 plat::wake();
             }
         }
+        self.m.a11y.click = None;
         self.m.a11y.value = None;
         self.m.a11y.text = None;
         self.a11y_select();
@@ -516,6 +519,50 @@ impl Ui {
         }
     }
 
+    // the record of the click waiting for a widget, as of the last pass
+    fn a11y_click_record(&self) -> Option<Sem> {
+        let (win, id, nth) = self.m.a11y.click?;
+        self.sems.iter().filter(|s| s.win == win && s.id == id).nth(nth - 1).cloned()
+    }
+
+    /// (runtime, after the passes) a click no widget took, its record's middle not on it: the
+    /// scroll views bring the record into view in further passes -> those are needed
+    pub(crate) fn a11y_reveal(&mut self) -> bool {
+        let Some(rec) = self.a11y_click_record().filter(|r| r.id != 0) else { return false };
+        match self.agent_aim(&rec, false) {
+            Err(miss) if miss.reason != "popup" => {
+                self.agent.reveal = Some((rec.win, rec.id));
+                true
+            }
+            _ => false,
+        }
+    }
+
+    // Where a click no widget took is pressed: where a click from outside would be (agent_aim),
+    // or in the middle of a record without a hit box of its own when the widget on top there
+    // draws it: that box lies inside the record (a link of a document, an app's own widget with
+    // another id), or holds it and is no control of its own (a row of a popup's list).  Else
+    // none: the middle lies on something else, and a press would go there.
+    fn a11y_aim(&self, rec: &Sem) -> Option<(i32, i32)> {
+        if rec.rect[2] <= 0 || rec.rect[3] <= 0 {
+            return None;
+        }
+        let miss = match self.agent_aim(rec, true) {
+            Ok(point) => return Some(point),
+            Err(miss) => miss,
+        };
+        let (x, y) = miss.point.filter(|_| miss.reason == "no_input" && miss.by != 0)?;
+        let p = self.uiw_parts(rec.win as u32)?;
+        // hit boxes are logical
+        let w = p.rt.fb.w;
+        let (lx, r) = if self.rtl { (w - 1 - x, [w - rec.rect[0] - rec.rect[2], rec.rect[1], rec.rect[2], rec.rect[3]]) } else { (x, rec.rect) };
+        let h = p.ctx.hits[p.ctx.hit_cur ^ 1].iter().rev().find(|h| h.id == miss.by && h.layer == rec.layer && lx >= h.x0 && lx < h.x1 && y >= h.y0 && y < h.y1)?;
+        let inside = h.x0 >= r[0] && h.y0 >= r[1] && h.x1 <= r[0] + r[2] && h.y1 <= r[1] + r[3];
+        let holds = h.x0 <= r[0] && h.y0 <= r[1] && h.x1 >= r[0] + r[2] && h.y1 >= r[1] + r[3];
+        let control = self.sems.iter().any(|s| s.id == miss.by && s.win == rec.win && !matches!(s.kind, K_BOX | K_LIST | K_CANVAS));
+        (inside || (holds && !control)).then_some((x, y))
+    }
+
     /// (runtime, E_WAKE) take the actions of the assistive technology: a node of the last
     /// pass that is enabled and not behind a modal dialog; the next passes carry them out
     pub(crate) fn a11y_poll(&mut self) {
@@ -532,7 +579,7 @@ impl Ui {
                 continue;
             }
             match r.act {
-                Act::Click => self.m.a11y.click = Some((win, id, s.rect)),
+                Act::Click => self.m.a11y.click = Some((win, id, nth)),
                 Act::Focus => {
                     if win as u32 != self.uiw_cur {
                         self.uiw_activate(win as u32);

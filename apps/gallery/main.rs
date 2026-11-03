@@ -180,6 +180,7 @@ impl App for Gal {
         sec_list::page_begin(g, ui);
         ui.box_begin(0, BOX_V | PAD_24, 12);
         ui.text(TS_TITLE, t("JFLib Galerie"));
+        sec_list::hit_cases(g, ui); // test hook 9062: what a click from outside cannot reach
         ui.text(TS_BODY | TX_SECONDARY, t("Die Steuerelemente von JFLib auf einer Seite zum Ausprobieren."));
 
         // ---- buttons

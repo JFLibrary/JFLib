@@ -80,7 +80,7 @@ const CST_LIMIT: usize = 1536; // at most this many commands with a state
 const MENU_MAX: usize = 250;
 const MB_MAX: usize = 16; // menus per menu bar (fixed: wider than any window; more: limit_hit)
 const LAB_MAX: usize = 256;
-const CATCH_ID: u32 = 0x7FFE_0C0C; // hit box under the popups (light dismiss)
+pub(crate) const CATCH_ID: u32 = 0x7FFE_0C0C; // hit box under the popups (light dismiss)
 const CTX_SALT: u32 = 0x00C0_FFEE;
 const BOXID_XOR: u32 = 0x6C00_0000; // flyout content box id = popup id ^ BOXID_XOR
 const FLS_XOR: u32 = 0x0100_0000; // (U3) scroll view of a tall flyout = content box id ^ FLS_XOR

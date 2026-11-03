@@ -133,7 +133,35 @@ python tools/jfgui-agent.py call ENDPOINT ui.type --input-json '{"text":"Hallo"}
 ```
 
 Die zweite Revision steht in der Antwort auf den Klick. Ein Konflikt (`revision_conflict`) verändert
-nichts; dann den Zustand neu lesen. Stapel laufen geordnet;
+nichts; dann den Zustand neu lesen.
+
+`ui.click` meldet `activated` nur, wenn der Druck das Widget auch trifft. Geprüft wird mit demselben
+Treffertest, den der Druck selbst durchläuft (`hit_find_list`, letzter Durchlauf des Fensters): er
+kennt Clipping, Ebenen, offene Popups und modale Schichten. Liegt die Mitte des Rechtecks nicht auf
+dem Widget, holen die Scrollansichten darum es zuerst in den sichtbaren Bereich, wie beim
+Tastaturfokus. Eine eigene Scroll-Aktion gibt es nicht, und ein Widget in einer zu kleinen Ansicht
+wäre für einen Client sonst kaum erreichbar. Reicht das nicht, wird auf den sichtbaren Teil seiner
+Trefferfläche geklickt; in der Mitte einer Liste liegt eine ihrer Zeilen, und die zählt als Teil der
+Liste. Knoten eines Diagramms haben keine eigene Trefferfläche: Sie gelten als getroffen, wenn in ihrer
+Mitte die Zeichenfläche oben liegt, die sie selbst auswertet. Bleibt nichts übrig, antwortet die Aktion
+mit `unavailable`, es wird nichts gedrückt:
+
+| `details.reason` | Bedeutung |
+| --- | --- |
+| `clipped` | außerhalb des sichtbaren Bereichs, keine Scrollansicht holt es herein (zu kleines Fenster, abgeschnittener Bereich) |
+| `covered` | etwas anderes liegt darüber; `details.by` nennt es, wenn es eine ID hat |
+| `popup` | ein offenes Popup nimmt den Druck und schließt sich; erst schließen (`ui.key` mit Esc) |
+| `no_input` | der Eintrag hat keine eigene Trefferfläche (Text, Fortschritt, Farbfeld als Ganzes, Einträge mit der ID 0) |
+| `disabled` | das Widget ist deaktiviert |
+| `modal` | ein modaler Dialog oder ein modales Fenster sperrt es |
+| `window` | sein Fenster wird nicht angezeigt |
+
+`details` nennt außerdem `id`, `window`, `rect` und den geprüften `point` (Fensterpixel). Das Scrollen
+bleibt auch nach einer Ablehnung bestehen; es bewegt nur `uiRevision`. Zeilen von Popups außerhalb des
+Fensters und Widgets zweiter Fenster (`window` aus `ui.state`) gehen denselben Weg. Ob ein anderes
+Betriebssystemfenster davor liegt, prüft `ui.click` nicht, denn die Eingabe erreicht das Zielfenster direkt.
+
+Stapel laufen geordnet;
 ein atomarer Stapel wird vor Ausführung abgelehnt, wenn keine passende gemeinsame
 Transaktion registriert ist. Aufgabe, Fortschritt und Abbruch sind gemeinsame Verträge;
 lange App-Operationen müssen ihre Unterbrechungspunkte und Commit-Prüfungen implementieren.

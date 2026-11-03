@@ -140,7 +140,7 @@
 //   perm answer once|always|deny|never|dialog|none   perm timeout MS   perm store FILE|none
 //   perm reload   perm wait [MS]   perm reset   perm expect open|none|RULE ANSWER
 //   agent on|off   agent call|write ACTION [JSON]   agent keep   agent id S
-//   agent expect ok|error CODE|same|moved
+//   agent expect ok|error CODE|reason WORD [ID]|same|moved
 // The live inspector (inspect.rs):
 //   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
 //   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look
