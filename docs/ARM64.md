@@ -100,17 +100,16 @@ lehnen `--arch aarch64` ab, bis ARM2 den Test-Runner bringt, `--target web` und 
   `text_shape` baut über Cargo für beide Ziele.
 - **Nebenprobe:** `.github/workflows/arm64-emulation.yml` startet nur per Hand. Der Workflow baut `coretest`, `plattest`
   und `gallery` auf x64 und lässt ihre Skripte auf x64 und auf `windows-11-arm` (Cobalt 100) laufen, dort unter
-  Emulation. Auf x64 sind 85 von 85 grün, unter Emulation 83 von 85, darunter alle 42 der `gallery`, die auch
-  richtig zeichnet. Als Zwischenlösung taugt die x64-Version also, außer wo Zahlen genau stimmen müssen. Nicht
-  geprüft: der Release-Bau, andere Programme, ein echtes Gerät.
-  - `plattest/ini.uis` scheitert an der Emulation. Ihre x87-Register halten nur Doubles, also 53 Bit Mantisse und
-    den Exponenten eines Double, auch wenn das Kontrollwort 64 Bit verlangt. Das trifft `rt::x87` und damit
-    `f64_format` und `f64_parse`: `5e-324` wird zu `0e-293`, `1e-300` zu `2.3372036854775808e-292`. Eine Nachrechnung
-    mit reinen Doubles trifft alle zehn Texte aus dem Lauf. Nach ihr, auf dem Runner nicht gemessen, stimmen kurze
-    Zahlen fast immer (41 Fehler bei 400 000 Umwandlungen bis 12 Stellen). Zufallszahlen mit voller Genauigkeit
-    kommen zwischen 1e-5 und 1e22 zu rund 6 % nicht bitgleich zurück, außerhalb zu 8 bis 20 %; über 1e100 und unter
-    1e-50 weicht auch der Text selbst zu über 80 % ab. `pow`, `exp2`, `log2`, `sin`, `cos` und `atan2` dürften dort
-    ebenfalls ungenauer rechnen, gemessen ist das nicht; `coretest` bleibt grün.
+  Emulation. Auf x64 sind 85 von 85 grün, unter Emulation 84 von 85, darunter alle 42 der `gallery`, die auch
+  richtig zeichnet. Als Zwischenlösung taugt die x64-Version also. Nicht geprüft: der Release-Bau, andere Programme,
+  ein echtes Gerät.
+  - Die x87-Register der Emulation halten nur Doubles, also 53 Bit Mantisse und den Exponenten eines Double, auch
+    wenn das Kontrollwort 64 Bit verlangt. Daran scheiterte zuerst `plattest/ini.uis`: `5e-324` wurde zu `0e-293`,
+    `1e-300` zu `2.3372036854775808e-292`. Eine Nachrechnung mit reinen Doubles traf alle zehn Texte aus dem Lauf.
+    Jetzt prüft `lib/base/num.rs` die Einheit beim ersten Gebrauch und nimmt ohne echtes x87 `rt::portable::math`,
+    damit ist `ini.uis` auch unter Emulation grün. Auf der Einheit bleiben dort `log10_round`, dessen Abweichung
+    `f64_format` selbst korrigiert, und `pow`, `exp2`, `log2`, `sin`, `cos` und `atan2`. Diese dürften ungenauer
+    rechnen, gemessen ist das nicht; `coretest` bleibt grün.
   - `plattest/screen.uis` scheitert am Runner. Über dem ganzen Bildschirm liegt dort die Windows-Einrichtung
     („Choose privacy settings“, Bild `desktop.png` des Laufs) und verdeckt das Testfenster. Aufnahme und Farbwahl
     lassen sich so auf diesem Runner nicht prüfen.
