@@ -27,4 +27,6 @@ gpu expect same
 drag 480,300 440,280
 gpu expect apart 1
 gpu expect same
+# (--verify-dirty redraws everything: without the clip the framebuffer differs under the header)
+expect_nowarn
 gpu off

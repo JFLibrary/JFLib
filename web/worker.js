@@ -283,7 +283,8 @@ self.onmessage = async ({data:m}) => {
       // the page's list: a test's emulated locale does not reach a worker
       const langs = (m.languages && m.languages.length ? m.languages : navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""]).filter(Boolean);
       if (wasm.jfgui_env && langs.length) { const env = encode.encode("LANGUAGE="+langs.join(":")); inbox(env); wasm.jfgui_env(env.length); }
-      for (const value of m.env || []) { const env = encode.encode(value); inbox(env); wasm.jfgui_env(env.length); }
+      // the GPU output's switches from the address (loader.js)
+      if (wasm.jfgui_env) for (const value of m.env || []) { const env = encode.encode(value); inbox(env); wasm.jfgui_env(env.length); }
       // the monitors (lib/plat/web_screen.rs) before the app's first frame
       if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
       // the system's settings (system.js, lib/plat/web_system.rs) before the app's first frame
