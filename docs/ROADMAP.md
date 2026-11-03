@@ -1872,8 +1872,8 @@ Fensterrand hinaus.
   - Zu tun: Syscall-Nummern, Flags und Kernel-Layouts an einer Stelle (265 Stellen, geht schon ohne
     ARM), Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
     ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete.
-  - NEON für `lib/simd` ist darin ARM6 und bringt auch Android etwas; die Arbeit nützt später auch
-    macOS und iOS auf ARM.
+  - NEON für `lib/simd` (ARM6) ist erledigt und wirkt auf Android schon jetzt; die Arbeit nützt später
+    auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter
@@ -1941,9 +1941,12 @@ Fensterrand hinaus.
     von 24 auf 11 ms, verpasste Vsyncs von 159 auf 0 bis 1, `nativeRender` von etwa 12 auf etwa 6 ms.
   - Skriptbefehle `tap`, `longpress`, `swipe`, `flick`, `finger`; geprüft mit `touch.uis` (mehrere
     Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
-  - Offen: NEON für `lib/simd` (auf ARM rechnet der Rasterer skalar, dort liegt ein großer Teil der
-    verbleibenden 6 ms); die Bilder gehen zweimal durch den Speicher (Fenster, dann Bitmap), vom
-    GPU-Weg abgesehen; Zoom mit zwei Fingern (die Naht steht: `TF_TWO`, `ui.touch_fingers`); Ziehen
+  - NEON für `lib/simd` (2026-11-03, [ARM64.md](ARM64.md) ARM6): `nativeRender` im Median von 5,7 auf
+    5,2 ms, auf „Werte & Farben“ von 6,9 auf 6,3 ms bei 6 statt 17 % ruckelnden Bildern, dieselben Pixel.
+  - Offen: Die größten Posten liegen nicht in `lib/simd` (`simpleperf`, Startseite): die Bilder gehen
+    zweimal durch den Speicher (Fenster, dann Bitmap; `memmove` 32 %), vom GPU-Weg abgesehen;
+    `to_rgba` 17 % (ein Release-Bau vektorisiert es, ein Entwicklungsbau nicht); `rt::fx::sqrt` und
+    `cvt` auf ARM portabel statt `fsqrt` und `fcvtns` (6 %); Zoom mit zwei Fingern (die Naht steht: `TF_TWO`, `ui.touch_fingers`); Ziehen
     und Ablegen braucht in rollenden Sichten einen Griff (`ui.touch_drag`); Windows und Linux melden
     noch keine Finger (dort `plat::finger` rufen, die Maus-Emulation des Systems abschalten); der
     Browser auf einem echten Telefon ist nur in Chromiums Emulation geprüft.

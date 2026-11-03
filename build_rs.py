@@ -1037,7 +1037,7 @@ class Builder:
         if not self.release:
             cmd += incremental_flags(self.dir / "inc" / name)
         compile_rlib(cmd, RS / root, out, [(d, self.rlib(d)) for d in deps], self.piped, ready)
-        if self.target in ("win", "linux") and compute_crate(name) and name != "simd":
+        if self.target in ("win", "linux", "android") and compute_crate(name) and name != "simd":
             check_intrinsics(name, out)
         self.stamp(name, digest)
         return True

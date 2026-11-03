@@ -6,10 +6,23 @@ from `RustLib/`. The comparison uses Node's standard WebAssembly engine and buil
 it does not install any JavaScript packages.
 
 The same Rust test corpus serializes every scalar `Simd` operation and compares it with
-SSE2 and AVX2 on native hardware. It covers lane layout, saturation, wrapping arithmetic,
-large shifts, shuffles, pixel packs, memory helpers, IEEE conversions and square roots,
-decimal scaling, allocator reuse, and supported transcendental error bounds. The browser
-run must produce the exact same final digest. Additional browser checks exercise virtual
+SSE2 and AVX2 on native x86-64 hardware and with NEON on ARM64. It covers lane layout,
+saturation, wrapping arithmetic, large shifts, shuffles, pixel packs, memory helpers at odd
+addresses, IEEE conversions and square roots, float arithmetic on raw bits (every pair of a
+table of signed zeros, denormals, infinities and quiet and signalling NaNs, with SSE's NaN
+rules as the expected result), decimal scaling, allocator reuse, and supported transcendental
+error bounds. A failure names the operation with its input and both results. The browser
+run and the ARM64 run must produce the exact same final digest.
+
+ARM64 runs from `adb shell` on a device (`lib/rt` has no Linux ARM64 before ARM2 of
+[ARM64.md](../../docs/ARM64.md)); the x86-64 emulator runs SSE2 again, no NEON:
+
+```text
+python build_rs.py app portabletest --target android --android-abi arm64-v8a
+python apps/portabletest/tests/android.py --serial SERIAL --digest DIGEST_OF_THE_NATIVE_RUN
+```
+
+Additional browser checks exercise virtual
 files, temporary-versus-durable save status, locks, and disabled-by-default agent access.
 The request tests distinguish durable persistence, exported downloads, quota errors,
 denied access and cancellation. They reject duplicate acknowledgements and prevent

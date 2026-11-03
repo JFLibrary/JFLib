@@ -79,8 +79,8 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
 
 - `rt` verwendet unter Android Bionic für ausgerichtete Allokationen und Logcat für
   Diagnoseausgaben. Es gibt keine feste Annahme über die Speicher-Seitengröße.
-- ARM64 verwendet die vorhandenen portablen Float-/Math- und skalaren SIMD-Implementierungen.
-  Spezifische NEON-Kernel sind noch nicht umgesetzt.
+- ARM64 verwendet die vorhandenen portablen Float-/Math-Implementierungen und für `lib/simd` NEON
+  (`lib/simd/neon.rs`, Bit für Bit die Ergebnisse von SSE2).
 - Der bestehende Host-Adapter in `lib/plat/web*.rs` wird für Android nativ kompiliert:
   Ereignisse, Fenster-Komposition und der besitzende UI-Laufzeitkern sind derselbe Code.
 - `android/bridge.c` kopiert die geänderten Zeilen (schon R, G, B, A; bei einem einzelnen
@@ -423,9 +423,16 @@ Entwicklungsbau (ein Release-Bau ist kaum schneller, die Zeit liegt in `gfx` und
 | Abstand der Bilder (Median) | 16,6 ms | 8,3 ms |
 
 `nativeRender` nachher: etwa 1,9 ms bringen die Bilder durch den Speicher (`jfgui_present_us`), der
-Rest ist Aufbau und Zeichnen ohne SIMD (auf ARM rechnet `lib/simd` skalar). Die Seite „Werte &
-Farben“ mit ihren Verläufen bleibt bei 7 ms und verfehlt manchmal einen Vsync (23 % ruckelnd, 12 ms im
-Median).
+Rest ist Aufbau und Zeichnen, damals noch ohne SIMD. Die Seite „Werte & Farben“ mit ihren Verläufen
+blieb bei 7 ms und verfehlte manchmal einen Vsync (23 % ruckelnd, 12 ms im Median).
+
+Mit NEON (`lib/simd/neon.rs`, 03.11.2026) sind es 5,2 ms auf der Startseite und 6,3 ms auf „Werte &
+Farben“ (17 % → 6 % ruckelnd); Tabelle, Profil und was noch offen ist in
+[ARM64.md](../../docs/ARM64.md) unter ARM6. `tests/android_perf.py` wiederholt diese Messung:
+
+```powershell
+python apps/androidGallery/tests/android_perf.py --serial SERIAL --apk BUILD.apk --page colors
+```
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 
@@ -451,10 +458,10 @@ gezeichnet. Die sichtbare Eingabe wurde zusätzlich mit der Samsung-Tastatur gep
 ## Darstellung messen (seit 22.10.2026)
 
 ```powershell
-adb -s DEVICE_SERIAL shell am instrument -w -r org.jflib.gallery/.GalleryPresentInstrumentation
+adb -s DEVICE_SERIAL shell am instrument -w -r [-e page NAME] org.jflib.gallery/.GalleryPresentInstrumentation
 ```
 
-Misst 30 ganze Bilder (`nativeRender` mit neuer Fläche: alles wird neu gezeigt, nichts neu
+Misst auf der Startseite (oder der Seite `NAME` aus [`nav.rs`](nav.rs)) 30 ganze Bilder (`nativeRender` mit neuer Fläche: alles wird neu gezeigt, nichts neu
 gerechnet) und 30 Bilder mit Zeigerbewegungen, prüft, dass die Bitmap nach Teilbildern einer
 vollen Darstellung gleicht, und meldet einen Hash der Bitmap (gleich in jedem Build, der
 dieselben Pixel zeigt). x86_64-Emulator (Android 15, 1080 × 2400, Dichte 420, Bitmap
