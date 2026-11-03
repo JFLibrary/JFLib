@@ -43,6 +43,11 @@ What it does:
    built with the variants and installed next to the exe: one extra-file entry (kind 5) of
    the setup -- installed into the program folder, listed in `install.ini`, removed by
    `uninstall.exe` -- and `/usr/lib/<deb>/` in the .deb.
+5. **Plugin host** (pdn-host): where the .NET SDK and paint.net exist, PaintCraft's host for
+   original paint.net plugins goes to `pdn-host/` of the Windows program folder, signed with
+   the modules. It is our own assembly only; paint.net's files are never copied. A build
+   machine without them prints a note and packages PaintCraft without it, and its menu then
+   says that the host is missing (`tools/paintcraft-pdn-host/README.md`).
 
 `--impl asm` does the same with `legacy/build.py` and the assembly setup stub (the frozen
 reference; it needs the assembly toolchain). Both modes produce the same payload format and

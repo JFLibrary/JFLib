@@ -63,8 +63,9 @@ static MOD_STATES: [ModFn; 20] = [
 ];
 
 /// mod_frame
-static MOD_FRAME: [ModFn; 22] = [
+static MOD_FRAME: [ModFn; 23] = [
     crate::integrations::services::frame,
+    crate::integrations::paint_dot_net::catalog::frame,
     crate::integrations::paint_dot_net::host::frame,
     crate::integrations::gmic::frame,
     crate::tools::brushes::custom::frame,

@@ -91,6 +91,7 @@ final class GalleryHost {
         if (kind >= GallerySecrets.CALL_SECRET_AVAILABLE && kind <= GallerySecrets.CALL_SECRET_DELETE)
             return app == null ? null : GallerySecrets.call(app, kind, in);
         if (kind == GalleryAudio.CALL_SOUND) return app == null ? null : GalleryAudio.call(app, in);
+        if (kind == GalleryActivity.CALL_GPU) return GalleryActivity.gpuCall(in);
         if (kind >= GallerySystem.CALL_FIRST && kind <= GallerySystem.CALL_LAST) return GallerySystem.call(kind, in);
         Context context = activity;
         if (context == null) return null;

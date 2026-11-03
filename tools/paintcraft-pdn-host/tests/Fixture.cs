@@ -7,9 +7,14 @@ public sealed class FixtureFactory : IFileTypeFactory
 {
     public FileType[] GetFileTypeInstances()=>[new FixtureType(false),new FixtureType(true)];
 }
-sealed class FixtureType(bool broken) : FileType(broken?"Broken fixture":"Craft test image",new FileTypeOptions {
-    LoadExtensions=broken?[".pcbad"]:[".pcfixture",".pcread"],
-    SaveExtensions=broken?[]:[".pcfixture",".pcwrite"]
+// The newer factory, as WebP uses it: its file types get the host's services.
+public sealed class FixtureFactory2 : IFileTypeFactory2
+{
+    public FileType[] GetFileTypeInstances(IFileTypeHost host)=>host.Services!=null?[new FixtureType(false,".pcfactory2")]:throw new ArgumentNullException(nameof(host));
+}
+sealed class FixtureType(bool broken,string only=null) : FileType(only!=null?"Craft test image 2":broken?"Broken fixture":"Craft test image",new FileTypeOptions {
+    LoadExtensions=only!=null?[only]:broken?[".pcbad"]:[".pcfixture",".pcread"],
+    SaveExtensions=only!=null?[only]:broken?[]:[".pcfixture",".pcwrite"]
 })
 {
     protected override Document OnLoad(Stream stream)

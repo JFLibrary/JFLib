@@ -11,7 +11,8 @@
     <Compile Include="PluginCatalog.cs" />
     <Compile Include="FileTypeBridge.cs" />
     <Compile Include="HostWatchdog.cs" />
-    <Reference Include="PaintDotNet.Data;PaintDotNet.Core;PaintDotNet.Effects.Core;PaintDotNet.Base;PaintDotNet.Primitives;PaintDotNet.PropertySystem;PaintDotNet.Framework;PaintDotNet.Windows.Framework;PaintDotNet.ObjectModel;PaintDotNet.ComponentModel;System.Resources.Extensions;System.Runtime.Serialization.Formatters">
+    <Compile Include="ModernEffects.cs" />
+    <Reference Include="PaintDotNet.Data;PaintDotNet.Core;PaintDotNet.Effects.Core;PaintDotNet.Base;PaintDotNet.Primitives;PaintDotNet.PropertySystem;PaintDotNet.Framework;PaintDotNet.Fundamentals;PaintDotNet.Windows;PaintDotNet.Windows.Core;PaintDotNet.Windows.Framework;PaintDotNet.ObjectModel;PaintDotNet.ComponentModel;System.Resources.Extensions;System.Runtime.Serialization.Formatters">
       <HintPath>$(PaintDotNetDir)\%(Identity).dll</HintPath><Private>false</Private>
     </Reference>
   </ItemGroup>

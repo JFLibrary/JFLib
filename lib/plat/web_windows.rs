@@ -46,6 +46,7 @@ struct Display {
     damage: Vec<[i32; 4]>,
     composite: Vec<u8>, // the canvas (R, G, B, A rows) when more than one surface shows
     composed: bool,     // it holds the last composition (the single-window path skips it)
+    gpu: bool,          // (Android) window 0 shows on the surface above: the canvas rests
     cursor: u32,
     pointer: (i32, i32),
     /// where the pointer last went down
@@ -68,6 +69,7 @@ static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
     damage: Vec::new(),
     composite: Vec::new(),
     composed: false,
+    gpu: false,
     cursor: CUR_ARROW,
     pointer: (0, 0),
     press: (0, 0),
@@ -87,6 +89,25 @@ pub(super) fn viewport(width: i32, height: i32, dpi: i32) {
     display.width = width.clamp(1, 16384);
     display.height = height.clamp(1, 16384);
     display.dpi = dpi.clamp(48, 480);
+}
+/// (Android) nothing but window 0 shows on the canvas: it may show on the surface above it
+#[cfg(target_os = "android")]
+pub(super) fn only_main() -> bool {
+    let d = DISPLAY.lock();
+    d.popups.iter().all(Option::is_none) && d.windows.iter().skip(1).flatten().all(|w| !w.shown)
+}
+/// (Android) window 0 shows on the surface (the canvas rests, it holds nothing to show), or on the
+/// canvas again (the frame that takes it there is whole)
+#[cfg(target_os = "android")]
+pub(super) fn gpu_shows(on: bool) {
+    DISPLAY.lock().gpu = on;
+}
+/// (Android) the canvas's copy of a window on the surface goes
+#[cfg(target_os = "android")]
+pub(super) fn release_pixels(id: i32) {
+    if let Some(w) = window_mut(&mut DISPLAY.lock(), id) {
+        w.pixels = Vec::new();
+    }
 }
 /// The window typed text goes to (as keys do): the active one while it is shown and enabled.
 pub(super) fn text_target() -> Option<u8> {
@@ -562,6 +583,11 @@ pub(super) fn flush() {
 }
 fn flush_to() {
     let mut d = DISPLAY.lock();
+    if d.gpu {
+        d.dirty = false;
+        d.damage.clear();
+        return;
+    }
     if !d.dirty && d.damage.is_empty() {
         return;
     }

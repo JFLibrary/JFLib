@@ -67,46 +67,43 @@ pub const CS_FILL: &[u32] = &[
     0x10038, // OpFunctionEnd
 ];
 
-/// compute, 16 threads, one workgroup: v[i] = w[i] -- the indirect arguments from push constants
-/// set 0 binding 0: buffer { uint v[]; }; push constants { uint w[16]; }
+/// compute, one thread: v[i] = w -- one word of the indirect arguments from push constants
+/// set 0 binding 0: buffer { uint v[]; }; push constants { uint i; uint w; }
+/// (one word per dispatch: an index that varies into a push-constant array, v[i] = w[i] with
+/// i = gl_GlobalInvocationID.x, reads w[0] on the Samsung Xclipse 540, driver 24.0.560)
 pub const CS_ARGS: &[u32] = &[
     0x07230203, 0x00010300, 0, 26, 0, // magic, SPIR-V 1.3, generator, id bound, schema
     0x20011, 1, // OpCapability Shader
     0x3000e, 0, 1, // OpMemoryModel Logical GLSL450
-    0x6000f, 5, 1, 1852399981, 0, 2, // OpEntryPoint GLCompute %main "main" %gid
-    0x60010, 1, 17, 16, 1, 1, // OpExecutionMode %main LocalSize 16 1 1
-    0x40047, 2, 11, 28, // OpDecorate %gid BuiltIn GlobalInvocationId
+    0x5000f, 5, 1, 1852399981, 0, // OpEntryPoint GLCompute %main "main"
+    0x60010, 1, 17, 1, 1, 1, // OpExecutionMode %main LocalSize 1 1 1
     0x40047, 3, 6, 4, // OpDecorate %rta ArrayStride 4
     0x50048, 4, 0, 35, 0, // OpMemberDecorate %B 0 Offset 0
     0x30047, 4, 2, // OpDecorate %B Block
     0x40047, 5, 34, 0, // OpDecorate %buf DescriptorSet 0
     0x40047, 5, 33, 0, // OpDecorate %buf Binding 0
-    0x40047, 6, 6, 4, // OpDecorate %arr ArrayStride 4
     0x50048, 7, 0, 35, 0, // OpMemberDecorate %P 0 Offset 0
+    0x50048, 7, 1, 35, 4, // OpMemberDecorate %P 1 Offset 4
     0x30047, 7, 2, // OpDecorate %P Block
     0x20013, 8, // %void = OpTypeVoid
     0x30021, 9, 8, // %fn = OpTypeFunction %void
     0x40015, 10, 32, 0, // %uint = OpTypeInt 32 0
-    0x40017, 11, 10, 3, // %v3uint = OpTypeVector %uint 3
-    0x40020, 12, 1, 11, // %ptr_in_v3 = OpTypePointer Input %v3uint
-    0x4003b, 12, 2, 1, // %gid = OpVariable %ptr_in_v3 Input
     0x3001d, 3, 10, // %rta = OpTypeRuntimeArray %uint
     0x3001e, 4, 3, // %B = OpTypeStruct %rta
     0x40020, 13, 12, 4, // %ptr_sb_B = OpTypePointer StorageBuffer %B
     0x4003b, 13, 5, 12, // %buf = OpVariable %ptr_sb_B StorageBuffer
     0x40020, 14, 12, 10, // %ptr_sb_u = OpTypePointer StorageBuffer %uint
     0x4002b, 10, 15, 0, // %c0 = OpConstant %uint 0
-    0x4002b, 10, 16, 16, // %c16 = OpConstant %uint 16
-    0x4001c, 6, 10, 16, // %arr = OpTypeArray %uint %c16
-    0x3001e, 7, 6, // %P = OpTypeStruct %arr
+    0x4002b, 10, 16, 1, // %c1 = OpConstant %uint 1
+    0x4001e, 7, 10, 10, // %P = OpTypeStruct %uint %uint
     0x40020, 17, 9, 7, // %ptr_pc_P = OpTypePointer PushConstant %P
     0x4003b, 17, 18, 9, // %pc = OpVariable %ptr_pc_P PushConstant
     0x40020, 19, 9, 10, // %ptr_pc_u = OpTypePointer PushConstant %uint
     0x50036, 8, 1, 0, 9, // %main = OpFunction %void None %fn
     0x200f8, 20, // %entry = OpLabel
-    0x4003d, 11, 21, 2, // %g = OpLoad %v3uint %gid
-    0x50051, 10, 22, 21, 0, // %i = OpCompositeExtract %uint %g 0
-    0x60041, 19, 23, 18, 15, 22, // %pw = OpAccessChain %ptr_pc_u %pc %c0 %i
+    0x50041, 19, 21, 18, 15, // %pi = OpAccessChain %ptr_pc_u %pc %c0
+    0x4003d, 10, 22, 21, // %i = OpLoad %uint %pi
+    0x50041, 19, 23, 18, 16, // %pw = OpAccessChain %ptr_pc_u %pc %c1
     0x4003d, 10, 24, 23, // %w = OpLoad %uint %pw
     0x60041, 14, 25, 5, 15, 22, // %pv = OpAccessChain %ptr_sb_u %buf %c0 %i
     0x3003e, 25, 24, // OpStore %pv %w

@@ -202,6 +202,8 @@ pub(crate) struct S {
     accel_order: u32,
     /// rows of the Mi::List menus by base id (the app's STRLIST buffers)
     pub(crate) lists: Vec<(u32, Vec<String>)>,
+    /// what an empty Mi::List says instead of its placeholder (by base id; "": the placeholder)
+    pub(crate) list_empty: Vec<(u32, String)>,
 }
 
 /// per-window state (ui_popup_wb0 .. ui_popup_wb1: popup stack, flyouts, menu bar, tooltip)
@@ -1252,6 +1254,22 @@ impl Ui {
         0
     }
 
+    /// the disabled row an empty Mi::List with this base id shows instead of its placeholder
+    /// ("": the placeholder again), for a list that can be empty for different reasons
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn menu_list_empty(&mut self, base: u32, text: &str) {
+        let _src = self.src_scope();
+        let l = &mut self.m.popup.list_empty;
+        match l.iter_mut().find(|e| e.0 == base) {
+            Some(e) => {
+                if e.1 != text {
+                    e.1 = String::from(text);
+                }
+            }
+            None => l.push((base, String::from(text))),
+        }
+    }
+
     /// the rows of the Mi::List menus with this base id (row k: id base + k; the asm app's
     /// STRLIST buffer); the list ends at the first empty string
     #[cfg_attr(jfgui_dev, track_caller)]
@@ -1366,6 +1384,8 @@ impl Ui {
                         }
                         k += 1;
                     }
+                    let reason = self.m.popup.list_empty.iter().find(|e| e.0 == base && !e.1.is_empty()).map(|e| e.1.clone());
+                    let empty = reason.as_deref().unwrap_or(empty);
                     if k == 0 && !empty.is_empty() {
                         self.mitem(rid, empty, 0, None, MIF_DISABLED); // (P1) "": no row
                     }

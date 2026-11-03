@@ -1,0 +1,81 @@
+#!args --verify-dirty
+# Space and Enter in a focused grid and tree (lib/ui/data.rs): their scroll views open with
+# HB_OWNKEYS, so behave leaves both keys to them (without it behave took them as the view's
+# own EV_ACT, and grid_keys and the tree never saw them).  Grid: Space takes the current row
+# out of the selection or puts it back, Enter opens the row (EV_DOUBLE: the toast "Job
+# öffnen").  Tree: Space toggles the current node's check box (TreeEv::check, indeterminate
+# becomes checked), Enter opens the node (TreeEv::activated: the toast "Eintrag öffnen").
+# The details card shows the selected job with the smallest key; "Jetzt starten" needs a
+# selected job.
+size 1440 2400
+wait 50
+
+# the rows sorted by name: row 3 (#1004) "Entwicklung VM-Images" (key 3, failed), row 4
+# (#1005) "Laptop-Flotte Dokumente" (key 6, running)
+click #1005
+expect #1000 focused
+expect #1000 value 4
+expect text:"Die Sicherung läuft gerade." exists
+key shift+up
+expect #1000 value 3
+expect #1004 selected
+expect #1005 selected
+expect text:"Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut." exists
+# Space: the current row leaves the selection (the details show the other job); again: back
+key space
+expect #1000 value 3
+expect #1005 selected
+expect text:"Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut." missing
+expect text:"Die Sicherung läuft gerade." exists
+key space
+expect #1000 value 3
+expect #1004 selected
+expect #1005 selected
+expect text:"Das Repository war nicht erreichbar. Prüfen Sie die Verbindung und starten Sie den Job erneut." exists
+expect_nowarn
+# the only selected row: Space leaves no job selected, again selects it
+key down
+expect #1000 value 4
+expect #1005 selected
+expect "Jetzt starten" enabled
+key space
+expect #1000 value 4
+expect "Jetzt starten" disabled
+key space
+expect #1005 selected
+expect "Jetzt starten" enabled
+# Enter opens the current row; the selection stays
+expect "Job öffnen" missing
+key enter
+wait 20
+expect "Job öffnen" exists
+expect #1000 value 4
+expect #1005 selected
+expect_nowarn
+
+# the tree: "Temp" (#20007, row 6) with an unchecked box (#0x20004E27)
+click #20007
+expect #20000 focused
+expect #20000 value 6
+expect #0x20004E27 unchecked
+key space
+expect #0x20004E27 checked
+expect #0x20004E27 value 1
+key space
+expect #0x20004E27 unchecked
+expect #0x20004E27 value 0
+# "D:\Daten" (#20001, row 0) is indeterminate: Space checks it
+key home
+expect #20000 value 0
+expect #0x20004E21 value 2
+key space
+expect #0x20004E21 value 1
+expect #0x20004E27 value 0
+expect_nowarn
+# Enter opens the current node
+expect "Eintrag öffnen" missing
+key enter
+wait 20
+expect "Eintrag öffnen" exists
+expect #20000 value 0
+expect_nowarn

@@ -204,10 +204,10 @@ expect #9900 text "FFFF0000"
         catalog = subprocess.run(['dotnet', str(host), '--catalog', '--isolated', '--root', str(root),
                                   '--root', str(root)], capture_output=True, env=env, check=True).stdout.decode()
         rows = [line.split('\t') for line in catalog.splitlines()]
-        assert len([r for r in rows if r[0] == 'F']) == 4, catalog
+        assert len([r for r in rows if r[0] == 'F']) == 5, catalog
         assert len([r for r in rows if r[0] == 'X']) == 1, catalog
         caps = {bytes.fromhex(r[5]).decode(): int(r[4]) for r in rows if r[0] == 'F'}
-        assert caps == {'pcfixture': 3, 'pcread': 1, 'pcwrite': 2, 'pcbad': 1}
+        assert caps == {'pcfixture': 3, 'pcread': 1, 'pcwrite': 2, 'pcbad': 1, 'pcfactory2': 3}
         pixels = struct.pack('<4I', 0xff123456, 0x80775533, 0xffabcdef, 0xffffffff)
         data = struct.pack('<3I', 0x54465354, 2, 2) + pixels
         source = cases / 'image.pcfixture'
@@ -245,6 +245,9 @@ expect #9900 text "FF123456"
         assert decoded == struct.pack('<6I', 0x4d494350, 2, 2, 144 << 16, 192 << 16, 1) + pixels
         encoded = subprocess.run(command + ['--encode'], input=decoded, capture_output=True, env=env, check=True).stdout
         assert encoded == data
+        newer = ['dotnet', str(host), str(fixture), 'FixtureFactory2#0']
+        assert subprocess.run(newer + ['--decode'], input=data, capture_output=True, env=env, check=True).stdout == decoded
+        assert subprocess.run(newer + ['--encode'], input=decoded, capture_output=True, env=env, check=True).stdout == data
         for damaged in [b'', b'PCIM', struct.pack('<6I', 0x4d494350, 0xffffffff, 2, 0, 0, 1)]:
             result = subprocess.run(command + ['--encode'], input=damaged, capture_output=True, env=env)
             assert result.returncode != 0 and not result.stdout

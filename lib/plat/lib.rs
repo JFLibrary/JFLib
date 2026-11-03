@@ -273,6 +273,11 @@ pub use pool::*;
 mod win;
 #[cfg(windows)]
 pub use win::*;
+// a managed program on the runtime another application ships; values of HKLM
+#[cfg(windows)]
+mod win_clr;
+#[cfg(windows)]
+pub use win_clr::*;
 
 #[cfg(target_os = "linux")]
 mod linux;

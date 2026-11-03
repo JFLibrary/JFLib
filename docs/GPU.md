@@ -6,12 +6,13 @@ Vulkan und WebGPU (Instanz, Adapter, Gerät, Warteschlange, Ressourcen, Pipeline
 Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird pro Ziel beim
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
-Stand: Vulkan unter Windows und unter Linux ([Linux](#linux)).
-`vulkan-1.dll` bzw. `libvulkan.so.1` wird zur Laufzeit geladen, das Programm startet also auch auf
-Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: Android, WebGPU im Browser,
+Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)).
+`vulkan-1.dll`, `libvulkan.so.1` bzw. `libvulkan.so` wird zur Laufzeit geladen, das Programm startet also auch auf
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant: WebGPU im Browser,
 später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
-Windows und Linux zeigt die GPU das Ergebnis
-(G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux);
+Windows, Linux und Android zeigt die GPU das Ergebnis
+(G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux),
+unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android);
 `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
 und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
 
@@ -25,11 +26,12 @@ und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bild
 | Puffer, Texturen, Sampler, Shader, Bindungen, Bindless, Pipelines, Zeitstempel | [`lib/gpu/vk_res.rs`](../lib/gpu/vk_res.rs) |
 | Befehle aufzeichnen | [`lib/gpu/vk_cmd.rs`](../lib/gpu/vk_cmd.rs) |
 | Fensterflächen und Swapchains | [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs); unter Linux dieselben Typen über dmabuf: [`vk_dmabuf.rs`](../lib/gpu/vk_dmabuf.rs) |
+| Fläche, Thread und `libvulkan.so` unter Android | [`lib/plat/android_gpu.rs`](../lib/plat/android_gpu.rs), [`android/GalleryActivity.java`](../android/GalleryActivity.java), [`android/bridge.c`](../android/bridge.c) |
 | Puffer der GPU am Fenster (Linux) | [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs), [`linux_wl_gpu.rs`](../lib/plat/linux_wl_gpu.rs) (zwp_linux_dmabuf_v1), [`linux_x11_gpu.rs`](../lib/plat/linux_x11_gpu.rs) (DRI3, Present) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
-| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis) |
+| Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py) |
 
 ## Ein Beispiel
 
@@ -111,7 +113,7 @@ rb.read(0, &mut out)?;
   ersten gelesenen Zeitstempel des Geräts, damit `f64` jeden Takt behält); `Err(NotReady)`,
   solange nicht alle geschrieben und fertig sind.
 - **Fenster**: `Surface::new(&instance, plat_fenster)`, `Surface::native(&instance, griffe,
-  plat_fenster)` (ein Kindfenster), `create_swapchain(&surface, &SwapchainDesc)`, `acquire()`
+  plat_fenster)` (ein Kindfenster; Android: das `ANativeWindow` des `SurfaceView`), `create_swapchain(&surface, &SwapchainDesc)`, `acquire()`
   (`None`, solange das Fenster minimiert ist oder keine Fläche hat), `try_acquire()` (wartet nie,
   baut nie neu: `Frame`, `NotReady`, `Stale`, `NoArea`), `rebuild()` (auch auf einem anderen
   Thread), `view(&frame)`, `texture(&frame)`, `present(frame, [cmd, ..])`, `resize()`,
@@ -249,8 +251,8 @@ zurücklesen.
 ## Ausgabe der UI
 
 Die UI rastert weiter auf der CPU und bleibt pixelgleich; der Framebuffer ist die Wahrheit. Unter
-Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a), unter Linux derselbe Code
-([Ausgabe unter Linux](#ausgabe-unter-linux), G4b; dort auch, was anders ist): die
+Windows zeigt die GPU ihn ([`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G3a), unter Linux und Android derselbe Code
+([Ausgabe unter Linux](#ausgabe-unter-linux), G4b; [Ausgabe unter Android](#ausgabe-unter-android), G4c; dort auch, was anders ist): die
 Änderungsrechtecke, die die Laufzeit ohnehin berechnet, gehen in eine Textur je Fenster, ein
 Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle Fenster teilen ein
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
@@ -524,7 +526,7 @@ ui.canvas_gpu(CanvasDesc {
 ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln darüber gehen
 ```
 
-`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, unter Linux, Android und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
+`ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen und im Browser, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
 `image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
 
 **Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
@@ -687,6 +689,95 @@ Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB
 
 **Nicht getestet:** AMD, die ganze GNOME-Oberfläche und andere Compositors, X11 ohne Xwayland, eine zweite GPU, die schläft, ein echter Treiber-Reset, die Validierungsschicht (auf keinem der Linux-Rechner installiert), `Expose` unter den Puffern (trat nicht auf), Vulkan 1.1.
 
+### Ausgabe unter Android
+
+Derselbe Presenter wie unter Windows und Linux (`lib/ui/gpu_out.rs`, G4c), mit denselben Stufen, Rückfällen, Ebenen, Bildern und Leinwänden; `cfg` nur beim Laden von `libvulkan.so` und beim Anlegen der Fläche. Die Oberfläche rastert weiter auf der CPU, Windows- und Linux-Verhalten bleibt, wie es war. Die Plattform-Seite: [`lib/plat/android_gpu.rs`](../lib/plat/android_gpu.rs), [`android/GalleryActivity.java`](../android/GalleryActivity.java), [`android/bridge.c`](../android/bridge.c).
+
+**`lib/gpu` auf Android.** `libvulkan.so` wird mit `dlopen` geladen, nicht gelinkt: Ein `DT_NEEDED` beendete auf einem Gerät ohne die Bibliothek das ganze Programm beim Laden, so gibt es `NoLoader`. Android 8 hat nur den Loader 1.0, das Programm sieht das vor jedem Treiberaufruf (`a Vulkan 1.1 loader`). Instanz, Adapter und Gerät wie überall, Stufe Basis, wo nur das da ist; `VK_KHR_android_surface` und ein echter `VkSwapchainKHR` ([`vk_swap.rs`](../lib/gpu/vk_swap.rs)).
+
+**Zwei Wege in einem Fenster.** Die View mit ihrem Bitmap (`GalleryView`) bleibt der CPU-Pfad und nimmt alle Eingaben, die Tastatur und die Barrierefreiheit. Die Swapchain liegt auf einem `SurfaceView` darüber, dem Gegenstück zum Kindfenster unter Windows:
+
+- `setZOrderOnTop(true)`: über dem Inhalt des Fensters. Eine Fläche ohne Puffer zeigt der Compositor nicht: Bis zum ersten `present` sieht man die View darunter, dieselben Pixel, ohne Lücke und ohne Schwarz (unter dem Fenster läge eine schwarze Hintergrundebene, und die View müsste durchsichtig werden, bevor man weiß, ob der Puffer angekommen ist).
+- Im Baum liegt der `SurfaceView` **unter** der View, also bekommt die View die Finger; für die Barrierefreiheit ist er unwichtig.
+- Deckend (`RGBX_8888`): Der Compositor verdeckt das Fenster, statt zu mischen.
+- Die Fläche existiert, solange der `SurfaceView` sichtbar ist. Zurück zum CPU-Pfad heißt deshalb: das Bild ins Bitmap, `INVISIBLE`, Fläche und Swapchain gehen mit. Die Swapchain wird unter Android nie neu gebaut, sondern neu angelegt.
+
+| Stufe | Was geschieht |
+| --- | --- |
+| CPU | `plat::win_present`, Kopie ins Bitmap (`jfgui_host_present`), `invalidate`, HWUI zeichnet. So geht das erste Bild jedes Laufs; der Worker startet danach |
+| Job | Instanz, Gerät, Pipeline, Swapchain auf einem Thread (`plat::gpu_thread_spawn`, ein echter pthread; `plat::thread_spawn` bleibt hier `None`, Pools und Tasks dieses Ziels sind kooperativ). Der Thread endet danach. Xclipse 540: Instanz 7–10 ms, Adapter 0,5–1, Gerät 3–10, Swapchain und Textur 17–37, Pipeline 31–63 |
+| Wechsel | das ganze Bild in die Textur, ein `present`, die Fläche zeigt sich von selbst; die Kopie von `Window.pixels` geht (`win_release_kept`) |
+| GPU | wie überall. `nativeRender` gibt 2 zurück, das Bitmap ruht, kein `invalidate`. Hat HWUI nichts zu tun, wacht sein Thread nicht auf |
+| zurück | das ganze Bild ins Bitmap (`gp_leave`, dann `flush` in demselben `jfgui_tick`), `INVISIBLE` per `post` (`setVisibility` ruft `surfaceDestroyed` sofort, während Rust die App hält) |
+
+**Lebenszyklus.**
+
+| Ereignis | Was geschieht |
+| --- | --- |
+| Pause ohne Stopp (ein Dialog, ein zweites Fenster im Vordergrund) | die Fläche bleibt, keine Bilder, nichts wird gebaut |
+| Stopp (`Home`, eine andere App): `surfaceDestroyed` | noch im Callback: das Bild ins Bitmap (das Fenster kann vor dem nächsten Bild wieder zu sehen sein), Swapchain weg (`gp_surface_gone`, wartet auf die Warteschlange). Der `SurfaceView` bleibt sichtbar: Die Fläche kommt beim Zurückkehren von selbst, Stufe Gpu rund 200 ms später |
+| Ein Job läuft, während die Fläche geht | `ANativeWindow_acquire` hält das Fenster, `Win::lost` wirft das Ergebnis weg; der Treiber bekommt Fehler, keinen hängenden Zeiger |
+| Größe (Tastatur, Drehen, mehrere Fenster, Einklappen) | jedes Bild der Änderung ein CPU-Bild, 100 ms nach dem letzten neue Fläche, neue Swapchain: auf dem Telefon rund 200 ms bis zur Stufe Gpu. Bis der `SurfaceView` weg ist, kann die alte Fläche ein Bild lang gestreckt über dem neuen Bitmap liegen (auf API 26–30 ohne BLAST umgekehrt das alte Bitmap zu sehen sein); nicht einzeln gemessen |
+| Drehen | das Bild bleibt aufrecht (`VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR`), der Compositor dreht. `SUBOPTIMAL` bei jedem `present` heißt dann nur das und führt zu nichts; eine neue Größe sieht `window_size` (Android meldet dafür nie `OUT_OF_DATE`). Preis unten |
+| Werkzeugfenster, Popups aus einem Fenster | werden auf der Leinwand der Plattform zusammengesetzt, also unter der Fläche: solange eins zu sehen ist, ist Fenster 0 auf dem CPU-Pfad (`win_gpu_child_alone`). Danach zurück |
+| Gerät verloren | wie überall: alles zurück, neues Gerät nach 2 s, 4 s, … (auf dem Xclipse in 20 ms gebaut) |
+
+**Rückfälle.** Eine App darf Vulkan nicht im Manifest verlangen (`tools/android.py` bricht dann ab, `android_gpu.py` prüft die APK). Ohne Vulkan 1.1 in den Features des Systems (`FEATURE_VULKAN_HARDWARE_VERSION`) wird der Treiber gar nicht erst geladen. Kein Loader, kein brauchbarer Adapter (auch: Vulkan 1.2 ohne dynamisches Rendern, so `-gpu swiftshader_indirect` im Emulator): CPU-Pfad für den ganzen Lauf, ohne Meldung, mit der Auflösung, die der CPU-Pfad hat.
+
+**Ein kaputter Treiber.** Absturz im Treiber lässt sich nicht abfangen. Deshalb steht in `files/gpu-state`, was das System gezeigt hat (`Build.FINGERPRINT`, dann `ok`, `never` oder `trying N`): vor dem ersten Treiberaufruf `trying N+1`, nach dem ersten gezeigten Bild `ok`. Zwei Läufe, die in dieser Spanne enden, und der dritte bleibt auf dem CPU-Pfad; `never` heißt: Dieser Stand des Systems kann es nicht, der Treiber wird nicht mehr angefasst. Ein neues System versucht es neu. Also höchstens zwei Abstürze statt eines kaputten Programms. Geprüft mit `jfgui_GPU_TEST_DIE=1`.
+
+**Was die Auflösung begrenzte.** `GalleryView.onSizeChanged` hatte zwei Grenzen: höchstens 2 Pixel je DIP (`2 / density`) und 2048 Pixel auf der längeren Seite; auf dem A56 (450 dpi) zählt die erste: 768 × 1496 bei 192 dpi statt 1080 × 2104 bei 270 dpi, HWUI skaliert hoch. Dazu 4096 Pixel in `bridge.c` für das Bitmap. **Durch die GPU gelten nur noch die 4096** (`scale()`, auch ein Bild auf dem CPU-Pfad wird währenddessen so groß); der CPU-Pfad behält beide, die Messung unten sagt warum. Die Auflösung steht vor dem ersten Bild fest und wechselt nur, wenn die GPU sich als unbrauchbar herausstellt (`GPU_STATE_NEVER`: neues Bitmap, einmal neu gelegt); über das Ende des Laufs hinaus sagt das `gpu-state`. `jfgui_GPU_RES=cap` gibt der GPU dieselbe Begrenzung wie dem CPU-Pfad (`setFixedSize`, der Compositor skaliert).
+
+**Die Vorgabe** steht in zwei Zeilen in `GalleryActivity`: `GPU_DEFAULT` und `GPU_FULL_RESOLUTION`. Die Java-Seite muss es vor dem ersten Bild wissen und setzt `jfgui_GPU` immer selbst.
+
+**Messungen.** Samsung SM-A566B (Exynos 1580, Xclipse 540, Treiber 24.0.560, Vulkan 1.3.279, Stufe Voll), Android 16, 120 Hz, View 1080 × 2104; Release-Build; je **drei Läufe**, gezeigt die Spanne der Läufe, Reihenfolge wechselnd. **Android Studios Spiegelung lief die ganze Zeit** (`studio.screen.sharing`, ein eigener Bildschirm, dessen Komposition auf der GPU läuft): Alles, was auf dem Bildschirm endet, ist davon betroffen, in allen Spalten; die Werte des UI-Threads kaum. Die Akkulaufzeit lässt sich hier nicht messen. Werkzeug: `am instrument -e phase bench` (`GalleryGpuInstrumentation`). „Bis zum Bildschirm“ kommt aus `dumpsys SurfaceFlinger --frametimeline` (`--latency` antwortet unter Android 16 nicht), an die Uhr gebunden über das Token eines Bildes in `gfxinfo framestats`.
+
+| Messung | CPU, begrenzt (bisher) | CPU, volle Auflösung | GPU, begrenzt | GPU, volle Auflösung |
+| --- | ---: | ---: | ---: | ---: |
+| Start (`am start -W`, ms) | 291–341 | 314–337 | 297–335 | 293–316 |
+| Start der Ausgabe → Swapchain (ms) | – | – | 91–92 | 113–127 |
+| Leerlauf 10 s: Bilder | 0 | 0 | 0 | 0 |
+| Leerlauf 10 s: CPU (ms) | 120–160 | 140–170 | 160–180 | 160–170 |
+| Leerlauf 10 s: Kontextwechsel gesamt / UI-Thread | 88–101 / 85–87 | 91–96 / 80–81 | 88–96 / 79–85 | 85–89 / 79–83 |
+| Threads | 26–27 | 26–27 | 27–28 | 27–28 |
+| Speicher, PSS (MiB) | 84–104 | 113–127 | 133–139 | 199–203 |
+| davon Graphics (MiB) | 37–43 | 52–64 | 66–72 | 119 |
+| `memory_reserved()` im Leerlauf / nach einer Leinwand (MiB) | 0 | 0 | 4,4 / 23–26 | 8,8 / 34 |
+| ganzes Bild: UI-Thread, Median (ms) | 17,5–17,8 | 24,1–25,6 | 19,1–23,9 | 26,2–26,4 |
+| ganzes Bild: bis zum Bildschirm, Median (ms) | 38–39 | 47–49 | 32–36 | 39–41 |
+| kleine Änderung (Checkbox): UI-Thread, Median (ms) | 0,9–1,3 | 0,7–1,6 | 9,0–9,2 | 9,0–9,5 |
+| kleine Änderung: bis zum Bildschirm, Median (p95) (ms) | 45–48 (58–75) | 45–50 (57–72) | 36–38 (49–58) | 38–41 (49–50) |
+| Finger rollt: UI-Thread, Median (p95) (ms) | 5,7–5,9 (8,1–9,8) | 8,9–10,8 (12–16) | 5,3–9,3 (9,8–13) | 7,7–8,1 (11–13) |
+| Finger rollt: je Bild (ms) | 9,6–9,7 | 13,3–17,9 | 9,3–15,8 | 9,8–10,2 |
+| Finger rollt: gezeigt von 120, verspätet | 120, 0–2 | 120, 3–17 | 120, 0–2 | 120, 0–2 |
+| Leinwand ziehen: UI-Thread, Median (p95) (ms) | 3,2–3,3 (5,3–6,7) | 6,6–7,2 (8,9–11) | 1,5–1,6 (2,9–4,4) | 1,7–1,8 (2,9–3,4) |
+| Leinwand ziehen: je Bild (ms) | 9,1–9,7 | 13,1–14,8 | 9,2–9,4 | 9,2–9,4 |
+| Leinwand ziehen: verspätet von 120 | 3–7 | 51–77 | 4–7 | 0–3 |
+
+Die Spalte „GPU, begrenzt“ rollte in einem Lauf mit 120 Hz und in zweien mit 60 Hz (Samsungs Bildrate, eine Stimme des Compositors, Ursache nicht geklärt); das ist die Streuung, kein Unterschied in der Arbeit. Ein Lauf quer (nur je einer): Der Compositor dreht die aufrechte Fläche nicht in der Hardware (`dumpsys SurfaceFlinger`: `CLIENT`, `ROT_90`), er komponiert auf der GPU. GPU, volle Auflösung, quer: ganzes Bild 45,6 ms bis zum Bildschirm, gezeigt beim Rollen 98 von 120; CPU, begrenzt, quer: 40,1 ms, 118 von 120.
+
+Was das heißt:
+
+- **Der CPU-Pfad behält seine Grenze.** Volle Auflösung über das Bitmap verliert fast alles: Rollen im Schnitt 13–18 ms je Bild statt 9,7, die Leinwand 51–77 verspätete von 120, denn jede Änderung lädt in HWUI das ganze Bitmap neu hoch (der Kommentar in `bridge.c`).
+- **Die GPU macht Eingaben nicht langsamer**, kleine Änderungen sogar rund 8 ms früher auf dem Bildschirm (keine Runde über View und `RenderThread`), obwohl der UI-Thread dafür 9 ms statt 1 ms zahlt: 8 ms davon stecken in `gp_present` (Hochladen, `acquire`, Übergabe, `present`, nach einer Ruhepause; die Ursache im Treiber ist nicht gesucht). Solange die Bilder dicht folgen, verschwindet das: gleiche Rollzeiten bei gleicher Auflösung und 120 Hz (bei 60 Hz, in zwei Läufen, kam es zurück: 9 ms). Die Leinwand kostet die Hälfte.
+- **Volle Auflösung kostet CPU, wie vorhergesagt, aber sie reicht auf diesem Telefon.** Die CPU rastert doppelt so viele Pixel: Ein ganzes Bild 26 statt 18 ms auf dem UI-Thread, Rollen 7,7–8,1 statt 5,7–5,9 ms. 120 Hz hält es noch, mit wenig Luft (8,3 ms Budget, p95 11–13 ms; verspätet wie vorher 0–2 von 120). Ein schwächeres Telefon rollt mit voller Auflösung langsamer als jetzt: Das ist nicht gemessen und eine echte Frage.
+- **Der Preis ist Speicher.** Volle Auflösung durch die GPU braucht 199–203 MiB PSS statt 84–104, davon 119 statt 37–43 MiB Graphics. Darin stecken, aus den Größen geschätzt und nicht einzeln gemessen: die drei Puffer des Fensters, das nichts mehr zeigt (30 MiB), das ruhende Bitmap samt HWUIs Textur (18 MiB), Framebuffer, Textur, mindestens drei Bilder der Swapchain. Mit Begrenzung sind es 133–139 MiB.
+- **Im Leerlauf** kostet es nichts Messbares: 0 Bilder, gleiche Kontextwechsel. Die etwa 8 Wechsel je Sekunde auf dem UI-Thread sind der alte Blick alle 250 ms (`jfgui_frame_delay`) in allen Spalten; kein Thread von uns (der eine zusätzliche gehört dem Treiber).
+- **Empfehlung: GPU an, volle Auflösung an** (`GPU_DEFAULT`, `GPU_FULL_RESOLUTION`). Das Bild ist schärfer (270 statt 192 dpi), Eingaben kommen früher an, das Rollen hält 120 Hz. Wer den Speicher scheut oder schwache Telefone zuerst sieht: `GPU_FULL_RESOLUTION = false` kostet 65 MiB weniger und rollt, wie es heute rollt.
+
+| Größe, arm64-v8a, Release (`jetzt` mit der neuen Seite der Galerie) | vor G4c | jetzt |
+| --- | ---: | ---: |
+| APK (Bytes) | 3 845 324 | 4 103 372 |
+| `libjfgui_android.so` (Bytes) | 3 631 888 | 3 873 080 |
+
+**Auf dem Telefon gefunden:** `gputest --test indirect` schlug auf dem Xclipse fehl, die Dreiecke fehlten. Der Rechen-Shader, der die Argumente schrieb, las `w[i]` mit veränderlichem `i` aus einem Array in Push-Konstanten, und der Treiber (24.0.560) liefert dafür immer `w[0]`, auf gültigem SPIR-V; der Shader schreibt jetzt ein Wort je Aufruf. `lib/wgsl` und `gpu_out.wgsl` indizieren so nichts; ein WGSL-Programm könnte es, das Back-End weiß davon nichts. Und zwei Sperren im Presenter, die nur Windows und Linux nannten (`dirty.rs`): Ebenen wären still in der Grundtextur gelandet; `android_gpu.py` hat sie gefunden.
+
+**Tests.** `apps/androidGallery/tests/android_gpu.py` (Emulator oder Telefon, `--package` neben einer installierten Galerie; `GalleryGpuInstrumentation`, die Seite „Bild & Leinwand“) und `apps/gputest/tests/android.py` (`gputest` ist hier ein Programm für `adb shell`, ohne Fläche: Was ein Fenster braucht, ist `SKIP`, die Swapchain testet `android_gpu.py`). Beide laufen in `build_rs.py test`, wenn `jfgui_TEST_ANDROID=SERIAL` gesetzt ist, und ersetzen dort eine installierte Galerie (ihre Daten bleiben bis auf `files/gpu-state`); sonst nennt die Suite sie nur. Ohne Gerät `SKIP`. Der Emulator bietet Vulkan nur mit `-gpu host` (Vulkan 1.3 über gfxstream, Adapter der RTX 2070); `-gpu swiftshader_indirect` hat Vulkan 1.2 ohne dynamisches Rendern, also den Rückfall, und auch das ist ein Testlauf wert.
+
+**Nicht getestet:** ein Telefon mit Vulkan 1.1 oder Android 8 und 9, Adreno und Mali, ein echter Treiber-Reset (`test_lose` spielt ihn vor), ein Treiber, der wirklich abstürzt (das Beenden ist nachgestellt), die Pause ohne Stopp für sich, der geteilte Bildschirm und Faltgeräte (der Weg über die neue Größe ist geprüft: Tastatur und Drehen auf dem Telefon, ein freies Fenster mit `am task resize` im Emulator), Bildschirmleser mit echtem TalkBack auf dem GPU-Pfad, ein Lauf ohne die Spiegelung von Android Studio, die Akkulaufzeit.
+
+**Nicht gebaut:** Vorab-Drehen der Bilder (`preTransform`, die Rechtecke und der Shader gedreht; das nähme dem Compositor die GPU-Komposition quer ab), Freigeben des Bitmaps auf dem GPU-Pfad (18 MiB, kostet einen Rückweg, der es erst wieder anlegt), eine Grenze für schwache Telefone (`isLowRamDevice`), GPU-Komposition für Werkzeugfenster.
+
 ### Was fehlt
 
 - Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
@@ -715,7 +806,11 @@ Speicher, rund 40 MiB RSS (meist geteilte Seiten des Treibers) und 25 bis 50 MiB
 | Variable | Wirkung |
 | --- | --- |
 | `jfgui_GPU=0` (oder `off`) | GPU aus: `Instance::new` gibt `Err(Disabled)`, die UI bleibt auf dem CPU-Pfad |
-| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON` und `DEFAULT_ON_LINUX` in `gpu_out.rs` |
+| nicht gesetzt, `jfgui_GPU=1` (oder `on`) | die UI-Fenster zeigen ihre Bilder über die Swapchain ([Ausgabe der UI](#ausgabe-der-ui)); ohne die Variable entscheiden `DEFAULT_ON` und `DEFAULT_ON_LINUX` in `gpu_out.rs`, unter Android `GPU_DEFAULT` in `GalleryActivity` |
+| `jfgui_GPU_RES=cap` / `=full` | (Android, Debug-Builds) die Auflösung, durch die GPU und auf dem CPU-Pfad ([Ausgabe unter Android](#ausgabe-unter-android)) |
+| `jfgui_GPU_TEST_DIE=1` | (Android, Tests) der Arbeitsthread beendet das Programm, wo ein kaputter Treiber abstürzen würde |
+| `jfgui_TEST_LANDSCAPE=1` | (Android, Tests) die Activity bittet um Querformat, keine Einstellung des Systems |
+| `jfgui_ANDROID_PACKAGE=name` | (Bauen) die APK unter einem anderen Paket, neben einer installierten Galerie |
 | `jfgui_GPU_DMABUF=0` / `=refuse` | (Linux, Tests) der Bildschirm nimmt keine GPU-Puffer / lehnt sie ab |
 | `jfgui_GPU_WORKER_KB=n` | Stapel des Arbeitsthreads der UI-Ausgabe (um zu sehen, was ein Treiber braucht) |
 | `jfgui_WL_FEEDBACK=1` | (Wayland, Messungen) `wp_presentation`: wann ein Commit auf dem Bildschirm war (`plat::gpu_test_presented`, `uigputest --bench latency`) |
@@ -766,7 +861,8 @@ für Messungen den Configurator ausschalten.
 ## Tests
 
 `python -u build_rs.py test gputest` führt `apps/gputest/tests/*.uis` aus, unter Windows und Linux
-(dort gegen glibc, ohne die Fenstertests: [Linux](#linux)):
+(dort gegen glibc, ohne die Fenstertests: [Linux](#linux)); unter Android `apps/gputest/tests/android.py`
+([Ausgabe unter Android](#ausgabe-unter-android)):
 
 | Skript | Prüft |
 | --- | --- |
@@ -1186,8 +1282,7 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
 
 ## Bekannte Lücken
 
-- Unter Android noch kein Weg zu `libvulkan.so` (G4c); das Backend
-  übersetzt dort, `Instance::new` gibt `NoLoader`. Unter Linux lief noch keine Validierung und
+- Unter Android keine Validierung (die Schicht liegt keiner APK bei). Unter Linux lief noch keine Validierung und
   noch keine ältere glibc als 2.39 ([Linux](#linux)); nur Intel und KWin als Treiber und Compositor ([Ausgabe unter Linux](#ausgabe-unter-linux)).
 - Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
   `move` und `cull` neben dem Zeichnen laufen lassen).
@@ -1204,7 +1299,7 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
   zurückgesetzt; vorher `read_*` aufzurufen ist dort nicht erlaubt.
 - Ein `Frame`, der nie dargestellt wird, lässt die Swapchain beim nächsten `acquire()` neu bauen.
 - Die Pfade für Vulkan 1.1 und 1.2 (Erweiterungen statt Kern) sind geschrieben, aber mangels
-  solcher Hardware hier nicht getestet.
+  solcher Hardware hier nicht getestet (der Emulator mit SwiftShader meldet 1.2, ihm fehlt dynamisches Rendern).
 
 ## Für den WGSL-Übersetzer (`lib/shader`)
 

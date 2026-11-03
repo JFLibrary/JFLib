@@ -45,8 +45,8 @@ von Gesichtern und keine identische Implementierung von TR Portrait Retouch.
 ## Originale Paint.NET-DLLs
 
 Die vom Nutzer zusätzlich gewünschte DLL-Ausführung ist für klassische
-`PaintDotNet.Effects.Effect`-Plugins und `FileType`/`IFileTypeFactory` umgesetzt. Der native Windows-Pfad benötigt .NET 9 und eine vorhandene
-Paint.NET-5.1-Installation; Linux nutzt den separaten Host unter Wine mit dem unten
+`PaintDotNet.Effects.Effect`-Plugins, `BitmapEffect`, `GpuEffect` und `FileType`/`IFileTypeFactory` umgesetzt. Der native Windows-Pfad benötigt eine vorhandene
+Paint.NET-5.1-Installation und nutzt deren Laufzeit, ein eigenes .NET ist nicht nötig; Linux nutzt den separaten Host unter Wine mit dem unten
 beschriebenen Paint.NET-on-Wine-Paket. Paint.NET-Assemblies werden nicht
 mitgeliefert. [Build, Benutzung und Kompatibilitätsmatrix](../../../tools/paintcraft-pdn-host/README.md).
 
@@ -57,13 +57,18 @@ Nachbau von Paint.NETs IndirectUI. Getestet wurden Original-DLLs für Invertiere
 BoltBait Pastel und Oil Painting+, einschließlich Editoraufbau für die beiden
 BoltBait-Effekte. Ordnererkennung und Menüaufruf werden zusätzlich mit der
 unveränderten Pastel-DLL getestet. Die Download-Fixtures bleiben im ignorierten Build-Ordner.
+Bitmap- und GPU-Effekte sind mit selbst gebauten Fixtures über das Menü getestet
+(`tests/integration/pdn_modern.uis`). Einmal von Hand liefen außerdem alle 47 Effekte von
+BoltBaits Pack 6.11, die 20 GPU-Samples und WebP lesend und schreibend, mit Standardwerten; die
+Ergebnisse sind nicht pixelgenau gegen paint.net selbst verglichen.
 
 Der Startscan berücksichtigt Effects/FileTypes/Shapes im nativen/portablen Root,
 Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files, die lokale Paint.NET-
 Installation sowie freigeschaltete AdditionalPluginDirectoryRoots mit expandierten
 Umgebungsvariablen. Archive müssen entpackt werden, neue Plugins benötigen einen
-Neustart. Jede DLL wird isoliert geprüft; Fehler und nicht unterstützte moderne
-Effekte erscheinen in den Einstellungen. Die Dateifilter erhalten getrennte
+Neustart. Die Suche läuft bei einem normalen Start im Hintergrund und liest auch Unterordner;
+jede DLL wird isoliert geprüft. Fehler erscheinen in den Einstellungen, und das
+leere Menü nennt den Grund. Die Dateifilter erhalten getrennte
 Lese-/Schreib-Endungen. Die acht nativen PNAPI-Formatkennungen bleiben unverändert;
 32 zusätzliche Kennungen stehen dem externen Codec-Host zur Verfügung.
 
@@ -202,7 +207,9 @@ Host und Katalog-Kinder bei ausbleibenden Lebenszeichen; sie deckt auch Wine-
 Prozesse ab, die wineserver außerhalb der Unix-Prozessgruppe gestartet hat.
 
 Geprüft wurde Wine 11.19 unter Ubuntu 24.04/WSL mit dem speziellen
-Paint.NET-on-Wine-Paket 5.200.9775.2252 und dessen gebündelter .NET-11-Laufzeit.
+Paint.NET-on-Wine-Paket 5.200.9775.2252 und dessen gebündelter .NET-11-Laufzeit, später
+WineHQ 11.21 unter Fedora 44 mit 5.200.9793.3533; Fedoras Paket wine 11.20 Staging läuft nicht
+(Einzelheiten in der Host-Anleitung).
 Die normale Windows-Installation 5.1 scheiterte unter Wine an der Direct2D-
 Farbprofilinitialisierung. Der Helper lässt sich mit dem neuen
 `tools/paintcraft-pdn-host/deploy_wine.py` in ein privates entpacktes Wine-Paket
@@ -256,7 +263,7 @@ Browser-Abnahme. Ergebnisdateien liegen unter `build/paintcraft-next/`, insbeson
 
 ## Noch offen
 
-- Vollständige Paint.NET-Bitmap-/GPU-API, Host-Services, fremde Speicher-Dialoge,
+- Paint.NETs IndirectUI-Regler, weitere Host-Services, fremde Speicher-Dialoge,
   Metadaten-/Ebenentransport über den DLL-Host sowie breitere interaktive Abnahmen
   fremder Plugins unter Windows und Wine.
 - Vollständige Photoshop-Dokumenttreue: editierbare Masken/Gruppen/Texte/Smart Objects,
