@@ -165,7 +165,9 @@ internal sealed class HostServices(bool software):IServiceProvider
     // without it the service retries for 12 seconds before it reports an empty clipboard.
     static object? Clipboard()
     {
-        var type=Assembly.Load("paintdotnet").GetType("PaintDotNet.Effects.ClipboardServiceForEffects");
+        var app=Assembly.Load("paintdotnet");
+        // renamed in 5.2
+        var type=app.GetType("PaintDotNet.Effects.ClipboardServiceForEffects") ?? app.GetType("PaintDotNet.AppModel.ClipboardServiceForPlugins");
         if(type==null)return null;
         var real=(IClipboardService)Activator.CreateInstance(type,true)!;
         var window=new System.Windows.Forms.NativeWindow();
@@ -217,8 +219,12 @@ internal sealed class HostServices(bool software):IServiceProvider
     static List<PluginDirectoryInfo> PluginFolders()
     {
         var folders=new List<PluginDirectoryInfo>();
-        foreach(var root in PluginRoots()) foreach(var (type,name) in new[]{(PluginType.Effect,"Effects"),(PluginType.FileType,"FileTypes"),(PluginType.Shape,"Shapes")})
-            folders.Add((PluginDirectoryInfo)Activator.CreateInstance(typeof(PluginDirectoryInfo),BindingFlags.Instance|BindingFlags.NonPublic,null,[type,Path.Combine(root,name)],null)!);
+        // internal, and 5.2 added an install category to it: filled by type, the rest stays default
+        var create=typeof(PluginDirectoryInfo).GetConstructors(BindingFlags.Instance|BindingFlags.NonPublic).Single();
+        foreach(var root in PluginRoots()) foreach(var (type,name) in new[]{(PluginType.Effect,"Effects"),(PluginType.FileType,"FileTypes"),(PluginType.Shape,"Shapes")}) {
+            var path=Path.Combine(root,name);
+            folders.Add((PluginDirectoryInfo)create.Invoke(create.GetParameters().Select(p=>p.ParameterType==typeof(PluginType) ? type : p.ParameterType==typeof(string) ? path : Activator.CreateInstance(p.ParameterType)).ToArray()));
+        }
         return folders;
     }
 

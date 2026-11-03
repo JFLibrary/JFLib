@@ -143,6 +143,11 @@ impl Invocation {
             }
             env.push((String::from("WINEPREFIX"), prefix));
             env.push((String::from("WINEDEBUG"), String::from("-all")));
+            // as Paint.NET-on-Wine's own start script: Wine's d3dcompiler cannot reflect the
+            // shaders of GPU effects, the package brings Microsoft's
+            if plat::env("WINEDLLOVERRIDES").is_none() {
+                env.push((String::from("WINEDLLOVERRIDES"), String::from("mshtml=;d3dcompiler_47=n")));
+            }
             if let Some(install) = option("--pdn-install", "PAINTDOTNET_DIR") {
                 env.push((String::from("PAINTDOTNET_DIR"), map(&install)?));
             }
