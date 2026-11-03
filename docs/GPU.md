@@ -817,7 +817,7 @@ Derselbe Presenter wie überall (`lib/ui/gpu_out.rs`, G4d), mit denselben Stufen
 | Stufe | Was geschieht |
 | --- | --- |
 | CPU | wie bisher: Worker kopiert, `postMessage`, `putImageData`. So geht das erste Bild jedes Laufs |
-| Job | `Instance::new` (ohne `navigator.gpu`: Schluss, nichts am DOM geändert), `gpu.js` wird geladen, `requestAdapter` und `requestDevice` laufen; das Programm läuft weiter über den CPU-Pfad. Hier 330–370 ms nach dem ersten Bild, fast alles `requestAdapter`. Dann die Leinwand von der Seite (`REQUEST_GPU_CANVAS`), dann Pipelines und Swapchain auf diesem Thread |
+| Job | `Instance::new` (ohne `navigator.gpu`: Schluss, nichts am DOM geändert), `gpu.js` wird geladen, `requestAdapter` und `requestDevice` laufen; das Programm läuft weiter über den CPU-Pfad. Hier 250–420 ms nach dem ersten Bild, der größte Teil `requestAdapter` (in einem Lauf für sich: 336 ms, `requestDevice` 55 ms). Dann die Leinwand von der Seite (`REQUEST_GPU_CANVAS`), dann Pipelines und Swapchain auf diesem Thread |
 | kleines Bild | 8 × 8 Pixel durch alle drei Pipelines und die Push-Konstanten, zurückgelesen und verglichen (`probe_start`). Ein Browser, dessen WebGPU anders zeichnet, zeigt nie ein Bild |
 | Wechsel | das ganze Bild in die Textur, ein Bild; die Kopie für `#screen` und die Pixelpuffer des Workers gehen. `#screen` ruht mit seinem letzten Bild |
 | GPU | wie überall, eine Runde des Workers ein Bild. Im Leerlauf nichts |
