@@ -1292,6 +1292,11 @@ Ein Fenster in 4K ist auf diesem 1080p-Monitor nicht möglich; 4K wurde ohne Fen
   0 = near; die Kamera hier (near 0,1, far 900) reicht nur, weil die Würfel weit auseinander
   liegen.
 
+G5a hat davon die Hälfte umgesetzt ([RENDER3D.md](RENDER3D.md), mit Messungen): kompakte Kugeln, fertige Matrix,
+Instanzlisten je Mesh, nur Geändertes hochladen, Reverse-Z. Die Zeichenzeit blieb dabei gleich, das Quaternion je Ecke war
+also nicht der Engpass. Zwei Dinge fielen erst dort auf: 32-Bit-Indizes und feste Vertex-Attribute kosten auf dieser GPU viel
+mehr, als man erwartet.
+
 **WGSL gegen SPIR-V** (G2c: die sechs Shader aus `lib/wgsl/bench`, von `lib/wgsl` übersetzt,
 gegen die handgeschriebenen; dieselben Messbedingungen, gleichzeitig ein Release-Build in einem
 anderen Prozess; Median aus drei Läufen je Konfiguration, abwechselnd, Spanne der GPU-Gesamtzeit

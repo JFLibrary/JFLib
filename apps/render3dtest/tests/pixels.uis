@@ -1,0 +1,3 @@
+#!args --test pixels
+# simple scenes against a ray caster on the CPU: colour, lighting, normals of a scaled ball, back faces,
+# the depth buffer with reverse Z, also 100 000 away; on Voll and on a device limited to Basis

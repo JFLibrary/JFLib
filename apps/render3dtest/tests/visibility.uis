@@ -1,0 +1,3 @@
+#!args --test visibility
+# the lists of the compute shader against the exact test on the CPU (seeds fixed), spheres exactly at each
+# face of the frustum, culled against all drawn; Voll and Basis

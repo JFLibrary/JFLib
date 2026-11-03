@@ -1,0 +1,3 @@
+#!args --test changes
+# adding, moving, removing, places used again, materials and meshes changed: the image = a scene built
+# anew; only what changed goes up, both ways of uploading; Voll and Basis

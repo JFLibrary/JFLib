@@ -1,0 +1,2 @@
+#!args --test shaders
+# the embedded SPIR-V = wgsl::compile of lib/render3d/*.wgsl, word for word

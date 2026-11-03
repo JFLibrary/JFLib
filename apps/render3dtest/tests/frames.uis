@@ -1,0 +1,3 @@
+#!args --test frames
+# frames in flight with their own cameras and changes against each drawn alone; the renderer's own depth
+# buffer; Voll and Basis

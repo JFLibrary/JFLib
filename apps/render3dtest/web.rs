@@ -1,0 +1,228 @@
+// web -- render3dtest in the browser (tests/engine_web.mjs reads the console): the engine over WebGPU, from
+// the same WGSL, on the app's worker.  The gallery's three images go out as hex lines, compared with those
+// of the Vulkan path on the same machine by the test; the counts of the lists against the exact test on
+// the CPU.  Nothing can wait here: every frame is submitted at once, the read-backs are looked at per tick.
+
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
+use gpu::*;
+use render3d::{InstanceId, MeshId, Renderer, RendererDesc, Scene};
+
+use crate::common::*;
+use crate::cpu;
+
+/// the instances the camera can see, by the exact test on the CPU: (certainly visible, in doubt)
+fn exact_visible(r: &Renderer, s: &Scene, specs: &[Spec]) -> (u32, u32) {
+    let c = s.camera();
+    let cam = cpu::RefCamera::new(c.eye, c.forward, c.up, c.fov_y, c.aspect, c.near, c.far);
+    let (mut yes, mut maybe) = (0, 0);
+    for spec in specs {
+        let Some(m) = r.mesh_info(MeshId(spec.mesh)) else { continue };
+        let (center, radius) = cpu::world_sphere(m.center, m.radius, spec.pos, spec.rot, spec.scale);
+        match cam.sphere_test(center, radius, s.origin()) {
+            cpu::Seen::Yes => yes += 1,
+            cpu::Seen::Doubt => maybe += 1,
+            cpu::Seen::No => {}
+        }
+    }
+    (yes, maybe)
+}
+
+fn hex_line(name: &str, bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut s = String::with_capacity(bytes.len() * 2 + name.len() + 8);
+    s.push_str(&format!("img {name} "));
+    for b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 15) as usize] as char);
+    }
+    s
+}
+
+fn say(s: &str) {
+    rt::os::write_stdout(format!("{s}\n").as_bytes());
+}
+
+/// the visible counts of a frame, read back once the browser has answered
+struct Counted {
+    name: &'static str,
+    rb: Buffer,
+    lists: usize,
+    want: (u32, u32),
+}
+
+struct Probe {
+    step: u32,
+    inst: Option<Instance>,
+    dev: Option<Device>,
+    keep: Vec<(&'static str, Off)>,
+    scenes: Vec<Scene>,
+    renderer: Option<Renderer>,
+    counts: Vec<Counted>,
+    ok: u32,
+    bad: u32,
+    t0: u64,
+}
+
+impl Probe {
+    fn yes(&mut self, ok: bool, what: &str) {
+        if ok {
+            self.ok += 1;
+            say(&format!("ok   {what}"));
+        } else {
+            self.bad += 1;
+            say(&format!("FAIL {what}"));
+        }
+    }
+
+    fn end(&mut self) {
+        say(&format!("render3dtest: {} ok, {} failed, {:.1} ms", self.ok, self.bad, (plat::time_us() - self.t0) as f64 / 1000.0));
+        self.step = u32::MAX;
+    }
+
+    /// a frame of the gallery into a target of its own, with the lists' counts copied out
+    fn frame(&mut self, dev: &Device, r: &mut Renderer, s: &mut Scene, name: &'static str, specs: &[Spec]) -> Result<()> {
+        let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+        off.submit(r, s)?;
+        let lists = s.lists().len();
+        let rb = dev.create_buffer(&BufferDesc { size: lists as u64 * 20, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?;
+        let mut e = dev.encoder()?;
+        e.copy_buffer(s.draws_buffer(), 0, &rb, 0, lists as u64 * 20);
+        dev.queue().submit([e.finish()?])?;
+        self.counts.push(Counted { name, rb, lists, want: exact_visible(r, s, specs) });
+        self.keep.push((name, off));
+        Ok(())
+    }
+
+    fn gallery(&mut self, dev: &Device) -> Result<()> {
+        let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+        say(&format!("renderer: multi-draw {}, at most {} instances", r.multi_draw(), r.max_instances()));
+        self.yes(!r.multi_draw(), "the browser's level Basis: one indirect draw per list");
+        let (meshes, materials) = gallery_fill(&mut r)?;
+        let (mut s, mut ids): (Scene, Vec<InstanceId>) = gallery_scene(&r, meshes, materials, [0.0; 3])?;
+        let specs = gallery_specs(meshes, materials, GALLERY_N, [0.0; 3]);
+        self.frame(dev, &mut r, &mut s, "mix", &specs)?;
+        self.yes(s.upload_info().full, "the first frame sends everything at once");
+        gallery_change(&mut s, &mut ids, meshes, materials)?;
+        let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+        off.submit(&mut r, &mut s)?;
+        let info = s.upload_info();
+        self.yes(info.changed > 0 && !info.full, &format!("the changes go through the scatter shader: {} slots", info.changed));
+        self.keep.push(("changed", off));
+        let far = [1e7, -3e6, 2e7];
+        let (mut f, _) = gallery_scene(&r, meshes, materials, far)?;
+        let specs_far = gallery_specs(meshes, materials, GALLERY_N, far);
+        self.frame(dev, &mut r, &mut f, "far", &specs_far)?;
+        self.scenes.push(s);
+        self.scenes.push(f);
+        self.renderer = Some(r);
+        Ok(())
+    }
+
+    fn step(&mut self) -> Result<()> {
+        match self.step {
+            0 => {
+                match Instance::new() {
+                    Ok(i) => self.inst = Some(i),
+                    Err(e) => {
+                        say(&format!("SKIP render3dtest: {e}"));
+                        self.step = u32::MAX;
+                        return Ok(());
+                    }
+                }
+                self.step = 1;
+            }
+            1 => {
+                let Some(inst) = self.inst.clone() else { return Ok(()) };
+                match inst.prepare() {
+                    Ok(false) => return Ok(()),
+                    Ok(true) => {}
+                    Err(e) => {
+                        say(&format!("SKIP render3dtest: {e}"));
+                        self.step = u32::MAX;
+                        return Ok(());
+                    }
+                }
+                let a = inst.adapter()?;
+                let dev = a.create_device(&DeviceDesc::DEFAULT)?;
+                let (i, l, f) = (a.info(), dev.limits(), dev.features());
+                say(&format!("adapter: {} ({}), level {:?}, storage binding {} MiB, indirect-first-instance {}", i.name, i.backend, dev.level(), l.max_storage_binding >> 20, f.draw_indirect_first_instance));
+                self.gallery(&dev)?;
+                self.dev = Some(dev);
+                self.step = 2;
+            }
+            2 => {
+                let Some(dev) = self.dev.clone() else { return Ok(()) };
+                dev.poll()?;
+                while let Some(c) = self.counts.first() {
+                    let mut w = alloc::vec![0u32; c.lists * 5];
+                    match c.rb.read(0, &mut w) {
+                        Err(GpuError::NotReady) => return Ok(()),
+                        r => r?,
+                    }
+                    let total: u32 = (0..c.lists).map(|i| w[i * 5 + 1]).sum();
+                    let what = format!("{}: the lists hold {total}, the exact test on the CPU says {} (+{} within a hair of a face)", c.name, c.want.0, c.want.1);
+                    let good = total >= c.want.0 && total <= c.want.0 + c.want.1;
+                    say(&format!("count {} {total}", c.name));
+                    self.yes(good, &what);
+                    self.counts.remove(0);
+                }
+                while let Some((name, off)) = self.keep.first() {
+                    let img = match off.read() {
+                        Err(GpuError::NotReady) => return Ok(()),
+                        r => r?,
+                    };
+                    // long lines in pieces: consoles and the bridge have limits
+                    let line: String = hex_line(name, &img);
+                    for (i, piece) in line.as_bytes().chunks(16000).enumerate() {
+                        let text = core::str::from_utf8(piece).unwrap_or("");
+                        say(&format!("part {i} {text}"));
+                    }
+                    say("part end");
+                    self.keep.remove(0);
+                }
+                dev.poll()?;
+                self.yes(dev.poll().is_ok(), "the browser found no validation error in all of it");
+                self.end();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl plat::web::WebApplication for Probe {
+    fn frame_delay(&self) -> u32 {
+        0
+    }
+    fn tick(&mut self, _time_ms: u32) {
+        if self.step == u32::MAX {
+            return;
+        }
+        if plat::time_us() > self.t0 + 60_000_000 {
+            self.yes(false, "the browser's answers did not come in 60 s");
+            self.end();
+            return;
+        }
+        if let Err(e) = self.step() {
+            let what = format!("step {}: {e}", self.step);
+            self.yes(false, &what);
+            self.end();
+        }
+    }
+    fn control(&mut self, _line: &[u8]) -> Option<String> {
+        None
+    }
+}
+
+pub fn start() -> i32 {
+    let t0 = plat::time_us();
+    let p = Probe { step: 0, inst: None, dev: None, keep: Vec::new(), scenes: Vec::new(), renderer: None, counts: Vec::new(), ok: 0, bad: 0, t0 };
+    if !plat::web::install(Box::new(p)) {
+        return 2;
+    }
+    0
+}

@@ -190,6 +190,8 @@ LIBS = {
     "script": ("lib/script/lib.rs", ["rt", "agent_core"]),  # JFNetworker's .jfs scripts (SK3: json via agent_core)
     # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
     "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
+    # G5a: the core of the 3D engine on gpu (docs/RENDER3D.md)
+    "render3d": ("lib/render3d/lib.rs", ["gpu"]),
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
