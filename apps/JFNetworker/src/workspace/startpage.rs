@@ -62,12 +62,13 @@ pub(crate) struct Template {
 }
 
 // i18n: name text
-pub(crate) const TEMPLATES: [Template; 5] = [
+pub(crate) const TEMPLATES: [Template; 6] = [
     Template { file: "heimnetz.jfnet", name: "Heimnetz", text: "Heimrouter mit WLAN und DHCP, dazu PC, Drucker, Laptop und Smartphone." },
     Template { file: "buero-vlans.jfnet", name: "Büro mit VLANs", text: "VLANs für Büro, Technik und Server, ein Router am Trunk, DHCP und DNS." },
     Template { file: "campus.jfnet", name: "Campus", text: "Zwei Gebäude mit L3-Switches, OSPF zum Router, DHCP über Relays, DNS." },
     Template { file: "rechenzentrum.jfnet", name: "Rechenzentrum (Leaf-Spine)", text: "Zwei Spines, vier Leafs, acht Server; geroutet mit OSPF über gleich gute Wege." },
     Template { file: "webdienst.jfnet", name: "Webdienst hinter Loadbalancer", text: "Ein Loadbalancer verteilt die Anfragen auf drei Webserver und prüft sie." },
+    Template { file: "groesser-oder-mehr.jfnet", name: "Größer oder mehr?", text: "Ein Webdienst mit Datenbank: ein immer größerer Server gegen immer mehr kleine, als Experiment im Bereich Experimente." },
 ];
 
 /// the page's content at most (DIP)

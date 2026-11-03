@@ -24,6 +24,7 @@
 // page (ST1, workspace/startpage.rs) takes the place of toolbar, dock and status bar while it is on;
 // the menu bar, the dialogs and the timers stay.  So does the page of the Akademie (AK1,
 // workspace/academy), above the start page and the project; a lab of a course has its bar over the canvas.
+// Experimente (bottom, SA3: workspace/experiments) defines and runs parameter sweeps, hidden until asked for.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -103,6 +104,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_TASK, t("Aufgabe"), IC_FLAG).at(DOCK_RIGHT, 0) },
         DockPanel::new(P_METRICS, t("Metriken"), JN_METRICS).at(DOCK_BOTTOM, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(if lock.answer { 0 } else { P_AUTHOR }, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_EXPERIMENTS, t("Experimente"), JN_METRICS).at(DOCK_BOTTOM, 0) },
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
@@ -130,6 +132,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             P_LOG => crate::workspace::logview::panel(n, ui),
             P_TASK => crate::workspace::task::panel(n, ui),
             P_METRICS => crate::workspace::metrics::panel(n, ui),
+            P_EXPERIMENTS => crate::workspace::experiments::panel(n, ui),
             P_AUTHOR if !lock.answer => crate::workspace::author::panel(n, ui),
             _ => {}
         }
@@ -155,6 +158,7 @@ fn dialogs(n: &mut Net, ui: &mut Ui) {
     crate::workspace::task::dialog(n, ui);
     crate::workspace::assess::dialog(n, ui);
     sim::resume_dialog(n, ui);
+    crate::workspace::experiments::tick(n, ui);
     n.sim_timer(ui);
     sim::timer(n, ui);
 }

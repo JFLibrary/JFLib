@@ -61,6 +61,7 @@
 //   res      the hardware of a device: CPU cores with a run queue, RAM with swap (SA1)
 //   experiment  a parameter sweep (SA2): configurations and load levels from one warm state, on
 //            clones of the engine at full speed; results, knee, cost, CSV
+//   svcform  what the window's forms ask of the lab's services: their settings, what they lack (SA3)
 //   units    services as units on Linux hosts: unit files, enable, restart policies
 //   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
@@ -310,6 +311,7 @@ pub mod supp;
 pub mod imapd;
 pub mod res;
 pub mod experiment;
+pub mod svcform;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};

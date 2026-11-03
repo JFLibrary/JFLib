@@ -161,7 +161,7 @@ pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
             (t("Datei und Bearbeiten"), cmd_rows(ui, &[CMD_NEW, CMD_OPEN, CMD_SAVE, CMD_SAVE_AS, CMD_QUIT, CMD_UNDO, CMD_REDO, CMD_DELETE, CMD_SELECT_ALL, CMD_RENAME, CMD_GROUP, CMD_UNGROUP])),
             (t("Werkzeuge"), cmd_rows(ui, &[CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE, CMD_LABEL, CMD_TOOL_PDU, CMD_SETTINGS])),
             (t("Ansicht"), cmd_rows(ui, &[CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_FIT, CMD_VIEW_LOGICAL, CMD_VIEW_PHYS, CMD_PHYS_UP, CMD_PHYS_BACK])),
-            (t("Bereiche"), cmd_rows(ui, &[CMD_FOCUS_CANVAS, CMD_PANEL0, CMD_PANEL0 + 1, CMD_PANEL0 + 2, CMD_PANEL0 + 3, CMD_PANEL0 + 4, CMD_PANEL0 + 5, CMD_PANEL0 + 6, CMD_PANEL0 + 7, CMD_METRICS])),
+            (t("Bereiche"), cmd_rows(ui, &[CMD_FOCUS_CANVAS, CMD_PANEL0, CMD_PANEL0 + 1, CMD_PANEL0 + 2, CMD_PANEL0 + 3, CMD_PANEL0 + 4, CMD_PANEL0 + 5, CMD_PANEL0 + 6, CMD_PANEL0 + 7, CMD_METRICS, CMD_EXPERIMENTS])),
             (t("Simulation"), cmd_rows(ui, &[CMD_SIM_MODE, CMD_SIM_REALTIME, CMD_SIM_PLAY, CMD_SIM_STEP, CMD_SIM_BACK])),
             (t("Topologie"), key_rows(&CANVAS_KEYS)),
             (t("Konsolen"), key_rows(&CONSOLE_KEYS)),

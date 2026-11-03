@@ -641,7 +641,6 @@ Ein Labor ist ein Projekt mit einer Aufgabe: das Netz zum Start, Ziele, die der 
 Keine Labore gefunden.	No labs found.
 Einstellungen …	Settings …
 Einstellungen schließen	Close settings
-Die Einstellungen von {} als JSON. Übernehmen prüft sie und startet {} mit ihnen neu.	The settings of {} as JSON. Apply checks them and restarts {} with them.
 Zeile {}, Spalte {}: kein gültiges JSON ({}).	Line {}, column {}: not valid JSON ({}).
 Die Einstellungen sind ein JSON-Objekt: { … }.	The settings are a JSON object: { … }.
 Loadbalancer	Load balancer
@@ -2308,3 +2307,353 @@ Das Gerät {} gibt es im Projekt nicht.	The device {} does not exist in the proj
 Zwischen {} und {} gibt es kein Kabel.	There is no cable between {} and {}.
 Ursache	Cause
 Neue Diagnose	New diagnosis
+E&xperimente	E&xperiments
+Gilt sofort: {} läuft weiter, ohne Neustart.	Takes effect at once: {} keeps running, no restart.
+{} startet dafür neu.	{} restarts for this.
+Die Einstellungen von {} als JSON. Übernehmen prüft sie.	The settings of {} as JSON. Apply checks them.
+Schlüssel auf einem Ring	key on a ring
+der Reihe nach	in turn
+nach Gewicht	by weight
+wenigste offene Anfragen	fewest open requests
+HTTP (je Anfrage)	HTTP (per request)
+TCP (je Verbindung)	TCP (per connection)
+TCP-Verbindung	TCP connection
+geschlossen: Nutzer warten	closed: users wait
+offen: feste Rate	open: a fixed rate
+gleichmäßig	even
+zufällig (Poisson)	random (Poisson)
+fest	fixed
+zufällig (exponentiell)	random (exponential)
+zufällig	random
+schwach: ein Knoten	weak: one node
+stark: Mehrheit	strong: a majority
+MiB	MiB
+So viel hält er immer im RAM, wenn das Gerät Hardware simuliert.	It always holds this much in RAM when the device simulates hardware.
+Speicher des Dienstes	Memory of the service
+KiB	KiB
+So viel kostet jede offene Verbindung zusätzlich.	Each open connection costs this much on top.
+Speicher je Verbindung	Memory per connection
+So viel hält er für seine Daten dazu.	It holds this much for its data on top.
+Speicher für Daten	Memory for data
+Anfragen	Requests
+Hier nimmt der Webserver Verbindungen an.	The web server accepts connections here.
+CPU je Anfrage	CPU per request
+Rechenzeit einer Anfrage auf einem Referenzkern; sie zählt nur mit simulierter Hardware.	Computing time of a request on a reference core; it only counts with simulated hardware.
+So lange wartet eine Anfrage auf etwas anderes und belegt dabei keine CPU.	A request waits this long for something else and takes no CPU meanwhile.
+Wartezeit je Anfrage	Waiting time per request
+So viele Anfragen laufen gleichzeitig; 0 heißt ohne Grenze.	This many requests run at the same time; 0 means no limit.
+So viele warten auf einen Worker, die nächste bekommt sofort 503; 0 heißt ohne Grenze.	This many wait for a worker, the next one gets 503 at once; 0 means no limit.
+Dieser Teil läuft nur nacheinander und setzt die obere Grenze des Durchsatzes.	This part only runs one at a time and sets the upper limit of the throughput.
+Sperre je Anfrage	Lock per request
+µs	µs
+Dieser Anteil der Anfragen bekommt eine Fehlerantwort.	This share of the requests gets an error answer.
+Fehlerrate	Error rate
+Seltener gebraucht	Needed less often
+Bis zu so viel kommt zufällig zur Wartezeit dazu.	Up to this much is added to the waiting time at random.
+Streuung der Wartezeit	Spread of the waiting time
+Dieser HTTP-Status geht mit der Fehlerrate zurück.	This HTTP status goes back with the error rate.
+Fehlerstatus	Error status
+So lange bleibt eine Verbindung ohne Anfrage offen.	A connection stays open this long without a request.
+Verbindung offen halten	Keep a connection open
+Anfragen je Verbindung	Requests per connection
+Danach schließt der Server die Verbindung; 0 heißt ohne Grenze.	Then the server closes the connection; 0 means no limit.
+So lange darf das Lesen des Anfragekopfs dauern.	Reading the request header may take this long.
+Zeit für den Kopf	Time for the header
+Byte	bytes
+Größere Anfragen weist der Server ab.	The server refuses larger requests.
+Größte Anfrage	Largest request
+So viele neue Verbindungen warten auf ihre Annahme; 0 heißt die Vorgabe des Systems.	This many new connections wait to be accepted; 0 means the system's default.
+Wartende Verbindungen	Waiting connections
+Dieser Name steht in den Antworten.	This name stands in the answers.
+Server-Kopfzeile	Server header
+Ein absoluter Pfad des Geräts: was keine Route nimmt, kommt von dort.	An absolute path of the device: what no route takes comes from there.
+Ordner für Dateien	Folder for files
+Wohin die Anfragen gehen: ein Gerät wählen oder eine Adresse eintippen.	Where the requests go: choose a device or type an address.
+Art der Last	Kind of load
+Geschlossen: eine feste Zahl Nutzer, jeder wartet auf seine Antwort. Offen: eine feste Rate, egal wie schnell die Antworten kommen.	Closed: a fixed number of users, each waits for its answer. Open: a fixed rate, however fast the answers come.
+Bei geschlossener Last: so viele fragen gleichzeitig.	With a closed load: this many ask at the same time.
+Bei geschlossener Last: so lange wartet ein Nutzer vor der nächsten Anfrage.	With a closed load: a user waits this long before the next request.
+Denkzeit	Think time
+Bei offener Last: so viele Anfragen je Sekunde.	With an open load: this many requests per second.
+Keine Antwort bis dahin zählt als Fehler. Kurz unter Überlast kann das den Durchsatz bis auf 0 drücken.	No answer by then counts as an error. A short one under overload can push the throughput down to 0.
+Zeitgrenze	Time limit
+Darüber warten Anfragen beim Generator; 0 heißt ohne Grenze.	Above this, requests wait at the generator; 0 means no limit.
+Verbindungen je Ziel	Connections per target
+Ankünfte	Arrivals
+Bei offener Last: gleichmäßig oder zufällig verteilt.	With an open load: evenly or randomly spread.
+Art der Denkzeit	Kind of think time
+Fest oder zufällig um den Mittelwert.	Fixed or random around the mean.
+Mehrere Ziele	Several targets
+Wie die Anfragen sich auf die Ziele verteilen.	How the requests spread over the targets.
+Anlaufzeit	Ramp-up
+Über diese Zeit steigt die Rate an.	The rate rises over this time.
+Rate am Anfang	Rate at the start
+Von hier aus steigt die Rate während der Anlaufzeit.	The rate rises from here during the ramp-up.
+So lange wartet der Generator nach dem Start des Geräts.	The generator waits this long after the device starts.
+Start nach	Starts after
+Danach hört er auf; 0 heißt ohne Ende.	Then it stops; 0 means no end.
+Anfragen insgesamt	Requests in all
+Danach hört er auf; 0 heißt ohne Grenze.	Then it stops; 0 means no limit.
+So lange darf eine neue Verbindung dauern; 0 heißt nur die Zeitgrenze.	A new connection may take this long; 0 means only the time limit.
+Zeit für den Aufbau	Time to connect
+Aus: jede Anfrage baut eine neue Verbindung auf.	Off: each request opens a new connection.
+Verbindungen weiter nutzen	Reuse connections
+Verteilen	Distributing
+An diese Server verteilt der Load Balancer: ein Gerät wählen oder eine Adresse eintippen.	The load balancer distributes to these servers: choose a device or type an address.
+HTTP verteilt jede Anfrage, TCP jede Verbindung.	HTTP distributes each request, TCP each connection.
+Hier nimmt er Anfragen an.	It accepts requests here.
+Verfahren	Method
+Wie er das nächste Backend wählt.	How it chooses the next backend.
+Prüfung der Backends	Checking the backends
+Woran er merkt, dass ein Backend nicht mehr antwortet.	How it notices that a backend no longer answers.
+Diesen Pfad fragt die HTTP-Prüfung ab.	The HTTP check asks for this path.
+Pfad der Prüfung	Path of the check
+Beim Ring: path, client oder header:NAME.	With the ring: path, client or header:NAME.
+Beim Ring: so oft steht jedes Backend darauf; mehr verteilt gleichmäßiger.	With the ring: each backend stands on it this often; more spreads more evenly.
+Punkte je Backend	Points per backend
+So oft versucht er ein anderes Backend, wenn eines nicht erreichbar ist.	It tries another backend this often when one cannot be reached.
+Wiederholungen	Retries
+So lange wartet er auf ein Backend, dann antwortet er 504.	It waits this long for a backend, then it answers 504.
+So lange darf eine Verbindung zum Backend dauern.	A connection to the backend may take this long.
+Auslaufen	Draining
+So lange darf ein entferntes Backend zu Ende arbeiten.	A removed backend may finish its work for this long.
+Darüber nimmt er dieses Backend nicht; 0 heißt ohne Grenze.	Above this it does not take this backend; 0 means no limit.
+Verbindungen je Backend	Connections per backend
+Aus: jede Anfrage baut eine neue Verbindung zum Backend auf.	Off: each request opens a new connection to the backend.
+Backend nennen	Name the backend
+Die Antwort sagt in X-Served-By, wer sie gemacht hat.	The answer says in X-Served-By who made it.
+Auch ein Load Balancer kann der Engpass sein.	A load balancer can be the bottleneck too.
+Prüfen alle	Check every
+So oft prüft er jedes Backend.	It checks each backend this often.
+Keine Antwort bis dahin zählt als gescheitert.	No answer by then counts as failed.
+Prüfungen	checks
+So viele Prüfungen in Folge müssen gelingen.	This many checks in a row must succeed.
+Wieder da nach	Back after
+Ausgefallen nach	Down after
+So viele Prüfungen in Folge müssen scheitern.	This many checks in a row must fail.
+Alle Knoten des Speichers, dieser eingeschlossen: ein Gerät wählen oder eine Adresse eintippen.	All nodes of the store, this one included: choose a device or type an address.
+Auf so vielen Knoten liegt jeder Schlüssel.	Each key lies on this many nodes.
+Kopien je Schlüssel	Copies per key
+Konsistenz	Consistency
+Stark wartet auf eine Mehrheit der Kopien, schwach nur auf eine.	Strong waits for a majority of the copies, weak for only one.
+Schreibquorum	Write quorum
+So viele Kopien müssen ein Schreiben bestätigen; 0 heißt die Mehrheit.	This many copies must confirm a write; 0 means the majority.
+Lesequorum	Read quorum
+So viele Kopien müssen beim Lesen antworten; 0 heißt die Mehrheit.	This many copies must answer a read; 0 means the majority.
+Hier nehmen die Knoten Anfragen an.	The nodes accept requests here.
+Beim Lesen reparieren	Repair when reading
+Veraltete Kopien bekommen nach einem Lesen den neuesten Wert.	Stale copies get the newest value after a read.
+Punkte je Knoten	Points per node
+So oft steht jeder Knoten auf dem Ring; mehr verteilt gleichmäßiger.	Each node stands on the ring this often; more spreads more evenly.
+So lange wartet ein Knoten auf das Quorum, dann antwortet er 503.	A node waits this long for the quorum, then it answers 503.
+Lebenszeichen alle	Heartbeat every
+So oft melden sich die Knoten beieinander.	The nodes report to each other this often.
+So lange ohne Lebenszeichen gilt ein Knoten als weg.	After this long without a heartbeat a node counts as gone.
+Port der Lebenszeichen	Port of the heartbeats
+Über diesen UDP-Port sprechen die Knoten.	The nodes talk over this UDP port.
+Rechenzeit einer Anfrage; sie zählt nur mit simulierter Hardware.	Computing time of a request; it only counts with simulated hardware.
+Backend	Backend
+Wer die Antworten macht: ein Gerät wählen oder eine Adresse eintippen.	Who makes the answers: choose a device or type an address.
+Hier nimmt der Cache Anfragen an.	The cache accepts requests here.
+So viele Antworten hält er, die am längsten unbenutzten gehen zuerst.	It holds this many answers; those unused the longest go first.
+Gültig für	Valid for
+So lange gilt eine Antwort als frisch.	An answer counts as fresh this long.
+So lange braucht eine Antwort aus dem Cache.	An answer from the cache takes this long.
+Zeit für einen Treffer	Time for a hit
+So viel hält er höchstens.	It holds this much at most.
+Cache-Control beachten	Obey Cache-Control
+Das Backend darf sagen, was wie lange gilt.	The backend may say what is valid for how long.
+Gleiche Anfragen bündeln	Collapse equal requests
+Während ein Eintrag geladen wird, warten gleiche Anfragen auf ihn.	While an entry is loading, equal requests wait for it.
+So lange wartet er auf das Backend.	It waits this long for the backend.
+Hier nimmt die Queue Nachrichten an.	The queue accepts messages here.
+Durch Kommas getrennt; ein Thema entsteht auch mit seiner ersten Nachricht.	Separated by commas; a topic also comes into being with its first message.
+Themen	Topics
+Ohne Bestätigung bis dahin kommt eine Nachricht noch einmal.	Without a confirmation by then a message comes again.
+Unsichtbar für	Invisible for
+Danach legt die Queue eine Nachricht beiseite.	Then the queue puts a message aside.
+Zustellungen	Deliveries
+Darüber antwortet sie 429; 0 heißt ohne Grenze.	Above this it answers 429; 0 means no limit.
+Wartende Nachrichten	Waiting messages
+Auf die Disk schreiben	Write to the disk
+Nachrichten überstehen dann einen Neustart, kosten aber Zeit auf der Disk.	Messages then survive a restart, but they cost time on the disk.
+Arbeit	Work
+Woher die Aufträge kommen: ein Gerät wählen oder eine Adresse eintippen.	Where the jobs come from: choose a device or type an address.
+Aus diesem Thema nimmt er Nachrichten.	It takes messages from this topic.
+An so vielen Nachrichten arbeitet er zugleich.	It works on this many messages at once.
+Gleichzeitig	At the same time
+So lange braucht eine Nachricht, ohne CPU zu belegen.	A message takes this long without taking CPU.
+Wartezeit je Nachricht	Waiting time per message
+CPU je Nachricht	CPU per message
+Rechenzeit einer Nachricht; sie zählt nur mit simulierter Hardware.	Computing time of a message; it only counts with simulated hardware.
+Bis zu so viel kommt zufällig dazu.	Up to this much is added at random.
+Dieser Anteil geht unerledigt zurück in die Queue.	This share goes back to the queue undone.
+So lange hält eine Abfrage die Verbindung, wenn nichts ansteht.	A poll holds the connection this long when nothing is waiting.
+Warten auf Arbeit	Waiting for work
+Pause nach leerer Abfrage	Pause after an empty poll
+So lange wartet er, bevor er neu fragt.	It waits this long before it asks again.
+So lange wartet er auf die Queue.	It waits this long for the queue.
+{}: das ist keine ganze Zahl.	{}: that is not a whole number.
+{}: das ist keine Zahl.	{}: that is not a number.
+{} hat noch keine IPv4-Adresse: erst im Reiter Konfiguration eine vergeben.	{} has no IPv4 address yet: give it one in the Configuration tab first.
+Gerät wählen …	Choose a device …
+{} (noch keine Adresse)	{} (no address yet)
+http://Adresse/	http://address/
+Gewicht	Weight
+Standard ({})	Default ({})
+an	on
+Standard: {}	Default: {}
+Das ist eine Ansicht der Vergangenheit: hier ändert sich nichts. „Zurück zu live“ macht die Einstellungen wieder änderbar.	This is a view of the past: nothing changes here. “Back to live” makes the settings changeable again.
+Ein leeres Feld nimmt die Vorgabe des Dienstes.	An empty field takes the service's default.
+Noch nichts geändert.	Nothing changed yet.
+Als JSON bearbeiten	Edit as JSON
+Antwortet auf HTTP-Anfragen, mit Rechenzeit, Wartezeit und Fehlerrate.	Answers HTTP requests, with computing time, waiting time and an error rate.
+Erzeugt Last: Nutzer, die warten, oder eine feste Rate.	Makes load: users who wait, or a fixed rate.
+Verteilt Anfragen oder Verbindungen auf mehrere Backends.	Distributes requests or connections over several backends.
+Ein Schlüssel-Wert-Speicher über mehrere Knoten, mit Kopien und Quoren.	A key-value store over several nodes, with copies and quorums.
+Hält Antworten eines Backends und antwortet schneller.	Holds answers of a backend and answers faster.
+Hält Nachrichten, bis ein Worker sie abgeholt und bestätigt hat.	Holds messages until a worker has fetched and confirmed them.
+Holt Nachrichten aus einer Queue und arbeitet sie ab.	Fetches messages from a queue and works them off.
+Dienst hinzufügen …	Add a service …
+Dienst hinzufügen	Add a service
+{} startet dafür neu. Danach folgt das Formular.	{} restarts for this. The form comes next.
+Der Dienst braucht einen Namen.	The service needs a name.
+{} hat schon einen Dienst „{}“.	{} already has a service “{}”.
+Letzter Lauf ({})	Last run ({})
+Der Durchsatz bricht unter Überlast ein	The throughput breaks down under overload
+Das Modell rechnet hier richtig: Abgelaufene Anfragen beschäftigen den Server weiter, ihre Verbindungen schließen, und die Ports des Clients gehen aus. Um die Kapazität zu sehen, geben Sie dem Lastgenerator eine lange Zeitgrenze und begrenzen seine Verbindungen je Ziel.	The model is right here: requests that timed out keep the server busy, their connections close, and the client runs out of ports. To see the capacity, give the load generator a long time limit and limit its connections per target.
+Angeboten	Offered
+Sperre	Lock
+SLO {}	SLO {}
+Noch nichts zu vergleichen: Der Vergleich zeigt den letzten Lauf und die behaltenen Läufe.	Nothing to compare yet: the comparison shows the last run and the kept runs.
+– keiner –	– none –
+CSV von A …	CSV of A …
+Das Knie ist die höchste Laststufe, bis zu der alle Stufen das SLO halten. „Begrenzt durch“ nennt, was an der ersten Stufe danach am stärksten belegt war.	The knee is the highest load level up to which all levels hold the SLO. “Limited by” names what was busiest at the first level after it.
+Kosten, Hardware und Dienstzeiten sind Annahmen des Modells, keine Preise und Messungen echter Systeme: Das Ergebnis zeigt die Form, nicht die Zahl.	Costs, hardware and service times are assumptions of the model, not prices and measurements of real systems: the result shows the shape, not the number.
+Was das Modell nicht abdeckt	What the model does not cover
+Das Modell rechnet mit festen Kosten je Anfrage, CPU-Kernen mit Warteschlange, Sperren, Speicher, Platten und Kabeln. Es kennt keine Speicherbereinigung, keine CPU-Caches und NUMA, kein Thermal-Throttling, keine Abfragepläne und keine Ausfälle durch Fehler im Code. Ein Seed ist ein möglicher Verlauf, mehrere zeigen die Streuung. Ein echtes System knickt früher oder später ab: Vertrauen Sie der Reihenfolge der Varianten, nicht ihren absoluten Werten.	The model works with fixed costs per request, CPU cores with a queue, locks, memory, disks and cables. It knows no garbage collection, no CPU caches and NUMA, no thermal throttling, no query plans and no failures from bugs in code. One seed is one possible course, several show the spread. A real system bends earlier or later: trust the order of the variants, not their absolute values.
+Knie	Knee
+Maximum/s	Maximum/s
+begrenzt durch	limited by
+€/1000 am Knie	€/1000 at the knee
+€/h	€/h
+Konfiguration der Latenzen	Configuration of the latencies
+x: angebotene Last (Anfragen/s)	x: offered load (requests/s)
+x: gesendete Anfragen/s	x: requests sent/s
+Solange die Kurve der Linie „Angeboten“ folgt, kommt alles an. Wo sie flach wird, ist die Kapazität erreicht.	As long as the curve follows the line “Offered”, everything gets through. Where it goes flat, the capacity is reached.
+Sättigung	Saturation
+Latenz über Durchsatz	Latency over throughput
+Latenzen gelten nur für beantwortete Anfragen: Lesen Sie p99 zusammen mit den Fehlern, abgelaufene Anfragen haben keine Latenz.	Latencies only cover answered requests: read p99 together with the errors, requests that timed out have no latency.
+x: erreichte Antworten/s	x: answers reached/s
+Was zuerst 100 % erreicht, begrenzt die Konfiguration.	What reaches 100 % first limits the configuration.
+Begrenzt durch: {}	Limited by: {}
+– wählen –	– choose –
+„{}“ ist keine ganze Zahl.	“{}” is not a whole number.
+Links ein Experiment wählen oder ein neues anlegen.	Choose an experiment on the left or make a new one.
+Wofür es gut ist	What it is good for
+Ein Lastgenerator des Projekts läuft jede Konfiguration durch diese Stufen. Sie müssen streng steigen.	A load generator of the project takes every configuration through these levels. They must rise strictly.
+Generator	Generator
+Art der Stufen	Kind of levels
+Anfragen/s (offen)	Requests/s (open)
+Nutzer (geschlossen)	Users (closed)
+Stufen	Levels
+Zeit (virtuell)	Time (virtual)
+Warmlauf	Warm-up
+Übergang je Stufe	Settling per level
+Messung je Stufe	Measuring per level
+Seeds	Seeds
+leer: der des Projekts	empty: the project's
+Was als gut genug gilt (SLO)	What counts as good enough (SLO)
+Das Knie ist die höchste Stufe, bis zu der alle Stufen diese Grenzen halten. Leer heißt keine Grenze; ohne jede Grenze gibt es kein Knie.	The knee is the highest level up to which all levels hold these limits. Empty means no limit; without any limit there is no knee.
+Achsen aller Reihen	Axes of all series
+Reihen	Series
+Eine Reihe ist eine Familie von Konfigurationen, etwa „größer“ und „mehr“; jede bekommt das Kreuzprodukt ihrer Achsen.	A series is a family of configurations, say “bigger” and “more”; each gets the cross product of its axes.
+Name der Reihe	Name of the series
+Reihe {} entfernen	Remove series {}
+Reihe hinzufügen	Add a series
+Kosten: Annahmen	Costs: assumptions
+Diese Preise sind angenommen, keine Angebote eines Anbieters. Ein leeres Feld nimmt die Annahme in seiner Vorgabe.	These prices are assumed, not offers of a provider. An empty field takes the assumption it shows.
+Geräte, durch Kommas getrennt	Devices, separated by commas
+Zählt nicht mit	Does not count
+Ein Kern	One core
+Faktor über 16 Kerne	Factor above 16 cores
+Faktor über 32 Kerne	Factor above 32 cores
+1 GiB RAM	1 GiB of RAM
+1 GiB Festplatte	1 GiB of hard disk
+1 GiB SATA-SSD	1 GiB of SATA SSD
+1 GiB NVMe	1 GiB of NVMe
+1 GiB schnelle NVMe	1 GiB of fast NVMe
+Grundgebühr je Host	Base fee per host
+Ein Switch	One switch
+Router oder Firewall	Router or firewall
+Preis	Price
+Passt zum Projekt: {} Läufe.	Fits the project: {} runs.
+Weitere Achsen zeigt die Seite nicht; sie bleiben im Experiment.	The page does not show further axes; they stay in the experiment.
+Achse hinzufügen	Add an axis
+Einstellung	Setting
+Name der Spalte	Name of the column
+Achse entfernen	Remove the axis
+Gruppe: {}	Group: {}
+Gilt für	Applies to
+Je Zeile eine Hardware: eine Vorlage, darauf Kerne, Tempo (1 ist der Referenzkern) und RAM in GiB. Was leer bleibt, kommt von der Vorlage oder vom Gerät.	One hardware per row: a template, on it cores, speed (1 is the reference core) and RAM in GiB. What stays empty comes from the template or the device.
+Wert entfernen	Remove the value
+Wert hinzufügen	Add a value
+oder ein Pfad, etwa routes.0.cpu_ms	or a path, say routes.0.cpu_ms
+Woher	From where
+Aus einem Pool	From a pool
+Kopien eines Geräts	Copies of a device
+Pool	Pool
+Anzahlen	Counts
+Ein Lauf braucht einen Namen.	A run needs a name.
+Einen Lauf „{}“ gibt es schon.	There already is a run “{}”.
+Das Projekt hält schon {} Läufe; entfernen Sie erst einen.	The project already holds {} runs; remove one first.
+Dieser Lauf hat {} Punkte; das Projekt hält höchstens {} je Lauf. Die CSV-Datei hält alles.	This run has {} points; the project holds at most {} per run. The CSV file holds everything.
+{} lässt sich nicht lesen.	{} cannot be read.
+{} lässt sich nicht schreiben.	{} cannot be written.
+Lauf entfernen?	Remove the run?
+„{}“ geht aus dem Projekt, mit seinen Ergebnissen. Das lässt sich nicht rückgängig machen.	“{}” leaves the project, with its results. This cannot be undone.
+Abgebrochen: von diesem Lauf bleibt nichts.	Cancelled: nothing stays of this run.
+Es lässt sich kein Thread starten; hier läuft kein Experiment.	No thread can be started; no experiment runs here.
+Ein Experiment vergleicht Konfigurationen desselben Projekts unter steigender Last: größer oder mehr, wie weit trägt es, was begrenzt es, was kostet es.	An experiment compares configurations of one project under rising load: bigger or more, how far it carries, what limits it, what it costs.
+Noch kein Experiment	No experiment yet
+Lauf	Run
+Experimente	Experiments
+Einlesen …	Read in …
+Ausgeben …	Write out …
+Experiment entfernen	Remove the experiment
+Behaltene Läufe ({})	Kept runs ({})
+Ein Lauf bleibt nur, wenn Sie ihn unter einem Namen behalten.	A run only stays when you keep it under a name.
+Lauf {} entfernen	Remove run {}
+Speichergrenze	Memory limit
+Startet nicht	Does not start
+hält	holds
+hält nicht	does not hold
+Threads	Threads
+Ein Lauf rechnet auf einer Kopie des Projekts. Was Sie währenddessen ändern, wirkt erst im nächsten Lauf, und die laufende Simulation bleibt unberührt.	A run works on a copy of the project. What you change meanwhile only counts in the next run, and the running simulation stays untouched.
+Starten geht, sobald der Aufbau keine Befunde mehr hat.	Start works as soon as the set-up has no findings left.
+{} von {} Läufen fertig	{} of {} runs done
+Ein Lauf ist eine Konfiguration mit einem Seed auf einer Laststufe.	A run is one configuration with one seed at one load level.
+Noch kein Lauf in dieser Sitzung; behaltene Läufe stehen im Vergleich.	No run in this session yet; kept runs are in the comparison.
+Lauf von {}: {}	Run of {}: {}
+Name des Laufs	Name of the run
+Behalten	Keep
+CSV ausgeben …	Write CSV …
+Ohne Namen ist der Lauf weg, wenn das Projekt schließt. Das Projekt hält höchstens {} Läufe mit je {} Punkten, ohne die Einzelheiten je Gerät.	Without a name the run is gone when the project closes. The project holds at most {} runs of {} points each, without the details per device.
+erreicht/s	reached/s
+SLO	SLO
+Engpass	Bottleneck
+Speichergrenze: diese Stufe hielt mehr als 1 GiB und endete, wo sie war. Ein Generator ohne Grenze der Verbindungen öffnet unter Überlast je Anfrage eine neue; „Verbindungen je Ziel“ begrenzt das.	Memory limit: this level held more than 1 GiB and ended where it was. A generator without a limit of connections opens a new one per request under overload; “Connections per target” limits that.
+Startet nicht: diese Konfiguration kam nicht hoch; ihre Stufen haben keine Zahlen.	Does not start: this configuration did not come up; its levels have no figures.
+Behalten als „{}“. Das Projekt hat sich damit geändert; Speichern schreibt den Lauf in die Datei.	Kept as “{}”. The project has changed with it; Save writes the run into the file.
+Disk belegt	Disk busy
+Warten auf die Disk	Waiting for the disk
+Längste Wartezeit	Longest wait
+Rückstand	Backlog
+Alle Kabel	All cables
+bis {}	up to {}
+Verteilung der Latenz	Spread of the latency
+Auslastung der Kabel	Use of the cables
+Was jedes Kabel in den letzten {} s von seiner Bitrate trug, je Richtung; die Rahmen ohne Präambel und Lücke.	What each cable carried of its bit rate in the last {} s, per direction; frames without preamble and gap.
+Größer oder mehr?	Bigger or more?
+Ein Webdienst mit Datenbank: ein immer größerer Server gegen immer mehr kleine, als Experiment im Bereich Experimente.	A web service with a database: an ever bigger server against ever more small ones, as an experiment in the area Experiments.
+Die Einstellungen von {} als JSON. Übernehmen prüft sie und startet {} mit ihnen neu.	The settings of {} as JSON. Apply checks them and restarts {} with them.

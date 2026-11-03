@@ -471,6 +471,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `sweep` | Experimente: die Datei und jede Meldung einer falschen Achse; was jede Achse am Projekt ändert; ein Klon gegen einen frischen Start auf jeder Stufe; CSV, Tabelle und Details bei 1, 3 und 8 Threads und zwischen zwei Läufen gleich; das Knie, Durchsatz, CPU, Sperre, Platte und Kabel gegen die Formeln; der leise Mitschnitt ändert keine Zahl; `Service::reconfigure` jedes Dienstes unter Last ohne Neustart; das Fenster startet nur neu, wenn es muss; die neuen Schritte; die Wiederholung aus Keyframes |
 | `scen_live_changes.uis` | das Golden-Szenario Änderungen unter Last Byte für Byte (`fixtures/live_changes.jfnet`): Rate, Nutzer, Backends, Gewicht, Verfahren, Leeren, Einstellungen eines Webservers, KV, Cache |
 | `sweep_small.uis` | ein kurzer Sweep ohne Fenster durch das GUI-Programm: seine Tabelle Byte für Byte (`experiments/sweep_small.jfnex`, `.report`) auf zwei Threads |
+| `model.uis`, Gruppe `expgui` | das Labor im Fenster: jedes Formular gegen das JSON, das es schreibt, fremde Einträge bleiben, Ablehnungen wörtlich, die Vorgaben aus den Diensten; im Lauf oder mit Neustart wie angesagt für jede Art; Vorgaben beim Platzieren mit Rückgängig, geladene Dateien bleiben; Läufe mit Fortschritt und Abbruch, Ergebnis Byte für Byte wie `run_sweep` bei 1 und 3 Threads; behaltene Läufe durch Speichern und Laden, alte Dateien Byte für Byte; die Grenzen; die Warnung bei Überlast; Balken, p99.9, Disk und Kabel der Metriken |
+| `lab_forms.uis`, `lab_forms_en.uis` | Dienste im Fenster auf `fixtures/lab_forms.jfnet`: jede Art hinzufügen, was fehlt, Geräte wählen, Formular und JSON, Ablehnung, im Lauf oder mit Neustart, Rückgängig, Vergangenheit nur lesen, Platzieren mit Dienst und Probleme, Tastatur, Englisch |
+| `experiments_panel.uis` | der Bereich Experimente: `sweep_small` per Klick definiert, Befunde live, Lauf gleich dem Golden-Bericht, zwei Läufe behalten und verglichen, CSV und `.jfnex` durch den Dateidialog, Abbruch, Entfernen mit Frage |
+| `experiments_shots.uis` | die Bilder dazu auf der Vorlage „Größer oder mehr?“ hell, dunkel, schmal, 100 und 150 %, mit Formular und Metriken (`build/jfnetworker/exp_*.png`) |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 | `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
 | `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
@@ -604,6 +608,8 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 | Kurse installieren | [`crates/jfn_run/install.rs`](crates/jfn_run/install.rs), [`src/workspace/academy/install.rs`](src/workspace/academy/install.rs), [`tools/academy_index.py`](../../tools/academy_index.py), [`tools/academy_e2e.py`](../../tools/academy_e2e.py), [`academy/index.json`](academy/index.json), [`PERMISSIONS`](PERMISSIONS), [`PERMISSIONS.jfn-sim`](PERMISSIONS.jfn-sim), [`src/installtest.rs`](src/installtest.rs) | der Weg eines Kurses ohne Fenster (Quelle, Prüfung, an seinen Platz), die Liste auf der Seite der Akademie, ihr Arbeits-Thread, die Rückfragen; die Kursliste erzeugen; der Selbsttest (Gruppe `install`) |
 | Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
+| Dienste im Fenster | [`src/workspace/devwin/svcform.rs`](src/workspace/devwin/svcform.rs), [`svcedit.rs`](src/workspace/devwin/svcedit.rs), [`crates/jfn_sim/svcform.rs`](crates/jfn_sim/svcform.rs), [`src/expguitest.rs`](src/expguitest.rs) |
+| Experimente im Fenster | [`src/workspace/experiments`](src/workspace/experiments/mod.rs), [`src/workspace/metrics.rs`](src/workspace/metrics.rs), `SweepJob` in [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) |
 | Experimente | [`crates/jfn_model/experiment.rs`](crates/jfn_model/experiment.rs), [`crates/jfn_sim/experiment.rs`](crates/jfn_sim/experiment.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`run_sweep`), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs) (`Prices`), [`src/sweeptest.rs`](src/sweeptest.rs) |
 
 ### Gerätekatalog
@@ -1409,6 +1415,25 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
 
 ### Das Labor im Fenster
 
+- **Dienste ohne JSON** (Gerätefenster, Reiter Dienste; [`devwin/svcform.rs`](src/workspace/devwin/svcform.rs)):
+  „Dienst hinzufügen …“ legt einen Webserver, Lastgenerator, Load Balancer, KV-Knoten, Cache, eine Queue oder einen
+  Worker an, „Einstellungen …“ zeigt ihre Formulare: Beschriftungen mit Einheit und einer Zeile Hilfe, das Seltene
+  eingeklappt. Ein Backend oder Ziel wird unter den Geräten des Projekts gewählt (daraus wird die Adresse, die der Dienst
+  braucht, mit dem Port seines Dienstes) oder eingetippt. Ein Formular ändert nur, was sich darin geändert hat; jeder andere
+  Eintrag der Konfiguration bleibt an seiner Stelle, ein leeres Feld nimmt den Eintrag heraus. „Als JSON bearbeiten“ zeigt,
+  was das Formular bisher hat, und bleibt der Weg für alles andere; `script` und die übrigen Arten haben nur diesen.
+  Geprüft wird an einer Stelle: `Engine::service_def` auf einem nackten Gerät, die Ablehnung steht wörtlich am Formular.
+  Vorgaben stehen nur in den Diensten: Das Formular fragt sie (`jfn_sim::svcform::defaults`). Vor dem Übernehmen sagt es, ob der
+  Dienst die Änderung im Lauf annimmt oder das Gerät neu startet (`live_steps`, `can_reconfigure`), und tut dann genau das;
+  Übernehmen ist ein Schritt der Rückgängig-Liste, in einer Ansicht der Vergangenheit lässt sich nichts ändern.
+- **Vorgaben beim Platzieren** (`catalog::preset_service`, `edits::add_placed`): Load Balancer, DB-Shard (vorerst `kv`), Cache,
+  Message Queue und Traffic-Generator aus der Palette bringen im selben Rückgängig-Schritt ihren Dienst mit. Das gilt nur beim
+  Platzieren im Fenster: Eine geladene Datei bekommt nichts dazu. Fehlt noch etwas (Backends, ein Ziel, Knoten), startet der
+  Dienst nicht und sendet nichts; seine Karte und der Bereich Probleme sagen, was fehlt (`svcform::missing`,
+  `ProblemKind::ServiceNotStarted`), und das Formular ist einen Klick entfernt. Das gilt auch für jeden anderen Dienst eines
+  Projekts, den die Engine nicht starten kann: Er wurde schon immer weggelassen, jetzt steht es im Bereich Probleme.
+- **Experimente** (Bereich unten, Strg+Umschalt+E oder Ansicht › Bereiche; siehe
+  [Experimente: Parameter-Sweeps](#experimente-parameter-sweeps)).
 - **Metriken** (Bereich unten, Strg+Umschalt+M oder Ansicht › Bereiche;
   [`src/workspace/metrics.rs`](src/workspace/metrics.rs)): links ein Baum der Dienste aller
   Geräte (je Gerät seine Dienste mit Art, Name und Zustand: läuft, gestoppt, aus, ohne Strom),
@@ -1427,7 +1452,12 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
   Fehler oder die Wahl ändern; dazwischen zeichnen die Diagramme nicht neu. Tastatur: Baum
   (Pfeile, links und rechts klappen zu und auf), Zeitraum und jedes Diagramm sind Tab-Stopps;
   im Diagramm wandern die Pfeiltasten über die Punkte, und Screenreader hören Punkt und
-  Zusammenfassung.
+  Zusammenfassung. Dazu kommt, was der Simulator ohnehin sammelt: eine Kachel für p99.9 und Balken
+  der Latenzen über den Zeitraum aus dem Histogramm des Dienstes (`Engine::lat_hist_between`, kein Ereignis dafür);
+  beim Eintrag Hardware eines Geräts, wie stark seine Disk belegt ist, die längste Wartezeit auf sie und was gerade wartet
+  (Reihen `disk_pm`, `disk_wait_us`, `disk_backlog_us`, die nicht in die CSV eines Szenarios gehen, damit Golden-Dateien gleich
+  bleiben); und ganz unten im Baum „Kabel“ › „Alle Kabel“: je Kabel und Richtung sein Anteil an der Bitrate über die letzten 5 s,
+  das meistbelegte zuerst, mit einem Diagramm der belegtesten (`Engine::cable_util`).
 - **Auf der Zeichenfläche** ([`canvas/lab.rs`](src/workspace/canvas/lab.rs)): Dienst-Pillen
   oben an den Geräten (LB, KV, Cache, Q, Worker, HTTP, DNS, DHCP, Skript; eine je Art, ein
   gestoppter Dienst blass, höchstens drei, dann „+n“), ab 50 % wie die Namen; ab 75 %
@@ -4425,7 +4455,33 @@ kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ih
 
 Ein Experiment vergleicht Konfigurationen eines Projekts unter steigender Last: mehr Kerne gegen mehr Server, ein anderer
 Algorithmus, mehr Worker. Es läuft kopflos und mit voller Geschwindigkeit, nie in Echtzeit, und sein Ergebnis ist Byte für Byte gleich,
-egal auf wie vielen Threads und auf welchem Rechner. Eine Oberfläche dafür kommt mit dem nächsten Schritt; heute läuft es so:
+egal auf wie vielen Threads und auf welchem Rechner. Es geht im Fenster und auf der Befehlszeile, mit denselben Zahlen.
+
+**Im Fenster** ([`src/workspace/experiments`](src/workspace/experiments/mod.rs); Ansicht › Bereiche › Experimente, Strg+Umschalt+E). Links die Experimente
+des Projekts und die behaltenen Läufe, rechts drei Seiten. Die Startseite hat dazu die Vorlage „Größer oder mehr?“, das Projekt und das Experiment der Studie unten.
+
+- **Aufbau:** alles ohne JSON. Der Lastgenerator mit seinen Stufen, die Zeiten und Seeds, das SLO; Achsen aller Reihen und Reihen mit eigenen
+  Achsen: Hardware eines Geräts oder einer Gruppe (je Zeile eine Vorlage, Kerne, Tempo, RAM), eine Einstellung eines Dienstes (aus `known_keys`, oder ein Pfad wie
+  `routes.0.cpu_ms`) mit ihren Werten, die Backends eines Load Balancers (die ersten N eines Pools oder Kopien eines Geräts). Aufgeklappt die Preise, jede Vorgabe als Annahme gekennzeichnet.
+  Ganz oben stehen die Befunde von `Experiment::problems` mit ihrem Wortlaut, während getippt wird, oder „Passt zum Projekt: N Läufe“. Eine Änderung ist ein Schritt der Rückgängig-Liste,
+  ein Feld zählt, wenn es den Fokus abgibt. „Einlesen …“ und „Ausgeben …“ lesen und schreiben `.jfnex`-Dateien.
+- **Lauf:** „Starten“ rechnet auf eigenen Threads (Vorgabe: alle Kerne bis auf einen) und auf einer Kopie des Projekts, das Fenster bleibt bedienbar, die laufende Simulation unberührt, und
+  Änderungen wirken erst im nächsten Lauf. Die Seite zeigt fertige von allen Läufen; „Abbrechen“ endet spätestens an der nächsten vollen Sekunde virtueller Zeit und hinterlässt nichts.
+  Danach eine Zeile je Konfiguration und Stufe; Status in Worten („Speichergrenze“, „Startet nicht“).
+- **Vergleich:** ein Lauf oder zwei (A, B): je Konfiguration Knie, Maximum, was begrenzt, Kosten je Stunde und je 1000 Anfragen, bei zwei Läufen untereinander; drei Diagramme: die Sättigung aller Konfigurationen
+  (Angebot gegen Erreichtes), Latenz über Durchsatz (p50, p95, p99, p99.9) und die Auslastung von CPU, Sperre, Disk und Kabel für die gewählte Konfiguration, das Knie markiert, das SLO als Linie.
+- **Behalten:** Ein Lauf gehört erst zum Projekt, wenn er einen Namen bekommt. Laufen und Fertigwerden ändern nichts an der Datei und sind kein Rückgängig-Schritt; „Behalten“ ändert die Datei
+  (Punkt im Titel, Frage beim Schließen, automatische Sicherung), ist aber ebenfalls kein Rückgängig-Schritt, und das Entfernen fragt vorher. Gespeichert wird im Projekt unter `runs`: Name, Datum,
+  das Experiment, wie es lief, und die Ergebnisse. Ohne behaltene Läufe gibt es den Eintrag nicht, die Datei bleibt Byte für Byte dieselbe. Höchstens 16 Läufe mit je höchstens 2000 Punkten, rund 300 Byte je Punkt, zusammen also rund 10 MiB;
+  was darüber hinausgeht, lehnt die Seite ab und sagt warum. Die Einzelheiten je Gerät und Lauf (`--detail`) bleiben nicht; CSV und Tabelle eines behaltenen Laufs sind dieselben Bytes wie beim Lauf.
+- **CSV:** „CSV ausgeben …“ schreibt dieselben Bytes wie `jfn-sim sweep --csv` für dasselbe Experiment.
+
+**Ein Ergebnis lesen.** Das Knie ist die höchste Stufe, bis zu der alle Stufen das SLO halten: Bis dahin trägt die Konfiguration, was gefordert ist. Das Maximum ist, was sie unter Überlast noch schafft, oft deutlich mehr, aber mit langen Warteschlangen.
+„Begrenzt durch“ nennt, was an der ersten Stufe über dem Knie am stärksten belegt war; die Auslastung zeigt, was als Nächstes käme. Latenzen gelten nur für Antworten: Eine abgelaufene Anfrage hat keine Latenz und zählt als Fehler, also gehört p99 immer zusammen mit den Fehlern gelesen.
+Fällt der Durchsatz unter die Hälfte einer niedrigeren Stufe, während Anfragen in die Zeitgrenze laufen, warnt die Seite: Das ist richtig gerechnet (abgelaufene Anfragen beschäftigen den Server weiter, ihre Verbindungen schließen, die Ports gehen aus), zeigt aber nicht die Kapazität; dafür gehören eine lange Zeitgrenze und eine Grenze der Verbindungen in den Generator, wie in der Studie unten.
+Kosten, Hardware und Dienstzeiten sind Annahmen: Vertrauen Sie der Form und der Reihenfolge der Varianten, nicht den absoluten Zahlen. Die Abschnitte unten nennen, was das Modell nicht abdeckt.
+
+**Auf der Befehlszeile:**
 
 ```bash
 jfn-sim sweep tests/experiments/scale_up_vs_out.jfnex tests/experiments/scale_up_vs_out.jfnet --threads 4 --csv ergebnis.csv
@@ -4536,7 +4592,7 @@ es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Po
 etwas über die gewählten Stufen: Das Knie liegt nie zwischen zwei Stufen, und eine Messung von 20 s sieht keine seltenen Ereignisse.
 
 Für Programme: `jfn_model::experiment::{Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level}`, `Experiment::{from_text, problems, configs, levels}`, `jfn_sim::experiment::{Plan, Sweep, Point, ConfigOut, Fig}` mit `Plan::{new, warm, measure, run_level, run_all, collect}` und `Sweep::{table, csv, detail_csv}`,
-`jfn_run::run_sweep(&plan, threads)`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
+`jfn_run::run_sweep(&plan, threads)`, im Fenster `jfn_run::{SweepJob, SweepOut, SweepCtl, run_sweep_ctl, sweeps_pending}` und `Sweep::{to_value, from_value, overloads}`, `jfn_model::experiment::{SavedRun, KEEP_RUNS, KEEP_POINTS}`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
 
 **Tempo:** Windows, Entwicklungs-Build, 12 logische Kerne, Rechner von anderen Läufen belegt. Die Studie oben (9 Konfigurationen, 7 Stufen, je 25 s, bis 6400/s, rund 2,1 Millionen gemessene Antworten und 98 Millionen gemessene Ereignisse):
 

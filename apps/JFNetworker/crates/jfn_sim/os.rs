@@ -74,6 +74,8 @@
 //                             writes them for services (OsApi::file_*) and the command lines
 //   Os::res                   its CPU and RAM (res.rs; None: it costs nothing); Service::mem: the
 //                             bytes a service holds, asked after each of its calls
+//   Service::lock_busy        the time its lock was held so far (a sweep's figure; by default none)
+//   Os::refused               the project's services it could not start, with the reason (problems.rs)
 //   Service::reconfigure      takes a new config while it runs, without a restart; by default it
 //                             cannot (http-server, http-load, lb, cache, worker can, for what they
 //                             can use at once).  Engine::can_reconfigure asks a copy of it,
@@ -338,6 +340,10 @@ pub trait Service: Send {
     fn windows(&self) -> Vec<crate::series::LatWindow<'_>> {
         Vec::new()
     }
+    /// the time its lock was held so far (a sweep's figure, experiment.rs; none: 0)
+    fn lock_busy(&self) -> Ns {
+        0
+    }
     /// it got another name (Engine::rename_service) and goes on; one that keeps a copy of its
     /// name (a script tags its log lines with it) takes the new one
     fn renamed(&mut self, name: &str) {
@@ -525,6 +531,8 @@ impl Clock {
 /// the operating system part of a device
 #[derive(Clone, Debug)]
 pub struct Os {
+    /// the project's services it could not start, with the reason (problems.rs says so)
+    pub refused: Vec<(jfn_model::project::ServiceDef, jfn_model::msg::Msg)>,
     /// IOS behaviour (else Linux)
     pub ios: bool,
     pub socks: Vec<Sock>,
@@ -562,6 +570,7 @@ impl Os {
         let offset = g.range(-2000, 2000) * 1_000_000;
         let drift = g.range(-30_000, 30_000);
         Os {
+            refused: Vec::new(),
             ios,
             socks: Vec::new(),
             svcs: Vec::new(),

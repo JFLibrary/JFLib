@@ -1823,3 +1823,10 @@ Die Kursliste ist kein UTF-8-Text.	The course list is no UTF-8 text.
 Der Kurs {} hat {} Fehler.	The course {} has {} errors.
 Die Kursdatei nennt die Version {}, die Kursliste die Version {}.	The course file says version {}, the course list version {}.
 Eine andere Installation läuft gerade in diesem Ordner.	Another installation is running in this folder.
+{}: bei {} sinkt der Durchsatz auf {}/s (vorher {}/s), {} Anfragen liefen in die Zeitgrenze.	{}: at {} the throughput falls to {}/s (before: {}/s), {} requests ran into the time limit.
+Der Dienst {} läuft nicht. {}	The service {} is not running. {}
+Noch keine Backends: der Load Balancer hat niemanden, an den er verteilen kann.	No backends yet: the load balancer has nobody to distribute to.
+Noch kein Ziel: der Lastgenerator sendet nichts.	No target yet: the load generator sends nothing.
+Noch keine Knoten: der KV-Speicher weiß nicht, wer dazugehört.	No nodes yet: the KV store does not know who belongs to it.
+Noch kein Backend: der Cache kann nichts nachladen.	No backend yet: the cache cannot fetch anything.
+Noch keine Queue: der Worker holt nichts ab.	No queue yet: the worker fetches nothing.

@@ -19,6 +19,7 @@
 // window opens on (new projects and templates, recent projects, labs), the project's info.
 // academy/: the Akademie (AK1, AK2): courses from files, their outline, lessons and labs, quizzes, tests and
 // fault hunts, the progress.
+// experiments/: the panel Experimente (SA3): parameter sweeps without JSON, their runs, comparisons.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -31,6 +32,7 @@ pub(crate) mod shell;
 pub(crate) mod terminal;
 pub(crate) mod sim;
 pub(crate) mod task;
+pub(crate) mod experiments;
 pub(crate) mod metrics;
 pub(crate) mod assess;
 pub(crate) mod author;

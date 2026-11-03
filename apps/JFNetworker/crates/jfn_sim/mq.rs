@@ -448,6 +448,20 @@ fn us(v: Option<u64>) -> i64 {
     v.map(|x| (x / 1000) as i64).unwrap_or(0)
 }
 
+impl Queue {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::ms_of;
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("port", Value::u64(self.port as u64));
+        o.insert("visibility_ms", ms_of(self.visibility));
+        o.insert("max_deliveries", Value::u64(self.max_deliveries as u64));
+        o.insert("max_depth", Value::u64(self.max_depth));
+        o.insert("durable", Value::Bool(self.durable));
+        o
+    }
+}
+
 impl Service for Queue {
     fn kind(&self) -> &'static str {
         "mq"
@@ -798,6 +812,25 @@ pub struct WorkerView {
     /// taken to acknowledged
     pub p50: Option<Ns>,
     pub p99: Option<Ns>,
+}
+
+impl Worker {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{mem_into, ms_of, rate_of, word};
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("topic", word(&self.topic));
+        o.insert("concurrency", Value::u64(self.concurrency as u64));
+        o.insert("time_ms", ms_of(self.time));
+        o.insert("cpu_ms", ms_of(self.cpu));
+        o.insert("jitter_ms", ms_of(self.jitter));
+        o.insert("error_rate", rate_of(self.error_ppm));
+        o.insert("wait_ms", ms_of(self.wait));
+        o.insert("idle_ms", ms_of(self.idle));
+        o.insert("timeout_ms", ms_of(self.timeout));
+        mem_into(&mut o, &self.mem);
+        o
+    }
 }
 
 impl Service for Worker {

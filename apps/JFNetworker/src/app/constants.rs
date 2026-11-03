@@ -835,3 +835,86 @@ pub(crate) const ID_AI_QUIT_DLG: u32 = 0x0002_4040;
 /// Aufgabe erstellen: a new diagnosis, its cause, Diagnose hinzufügen (workspace/author.rs)
 pub(crate) const ID_AI_DIAG_NEW: u32 = 0x0002_4050;
 pub(crate) const ID_AI_DIAG_ADD: u32 = 0x0002_4051;
+// ---- SA3: the lab in the window (commands 1040 .. 1059, widgets 0x0002_2400 .. 0x0002_27FF and
+// 0x0002_4800 .. 0x0002_57FF, timers 0x1D4 .. 0x1D7, the dock panel P_EXPERIMENTS)
+/// the panel Experimente comes forward; its file dialog chose a file
+pub(crate) const CMD_EXPERIMENTS: u32 = 1040;
+pub(crate) const CMD_EXP_FILE_DONE: u32 = 1041;
+/// the panel Experimente (bottom, hidden until asked for)
+pub(crate) const P_EXPERIMENTS: u32 = 17;
+/// a run's progress reaches the window
+pub(crate) const TIMER_EXP: u32 = 0x1D4;
+/// a service's form (devwin/svcform.rs): Übernehmen, Abbrechen, Als JSON bearbeiten, the expander of
+/// its rarer settings (+ its group); "Dienst hinzufügen …" of window k (+ k); the dialog with its kind
+/// and name; a field (+ 2 i, a device's choice + 2 i + 1), a row of its list (+ 8 r: its device, address,
+/// remove, name, port, weight), Hinzufügen
+pub(crate) const ID_SF_APPLY: u32 = 0x0002_2400;
+pub(crate) const ID_SF_CANCEL: u32 = 0x0002_2401;
+pub(crate) const ID_SF_JSON: u32 = 0x0002_2402;
+pub(crate) const ID_SF_RARE: u32 = 0x0002_2404;
+pub(crate) const ID_SVC_ADD0: u32 = 0x0002_2410;
+pub(crate) const ID_SA_DLG: u32 = 0x0002_2420;
+pub(crate) const ID_SA_KIND: u32 = 0x0002_2421;
+pub(crate) const ID_SA_NAME: u32 = 0x0002_2422;
+pub(crate) const ID_SF_FIELD: u32 = 0x0002_2500;
+pub(crate) const ID_SF_ROW: u32 = 0x0002_2600;
+pub(crate) const ID_SF_ROW_ADD: u32 = 0x0002_2700;
+/// the panel Experimente (workspace/experiments): the split, the pages, the list and its buttons,
+/// a page's scroll view; Lauf: Starten, Abbrechen, Threads, the progress, the name of a run, Behalten, CSV
+pub(crate) const ID_EX_SPLIT: u32 = 0x0002_4800;
+pub(crate) const ID_EX_PAGE: u32 = 0x0002_4804;
+pub(crate) const ID_EX_NEW: u32 = 0x0002_4810;
+pub(crate) const ID_EX_IMPORT: u32 = 0x0002_4811;
+pub(crate) const ID_EX_EXPORT: u32 = 0x0002_4812;
+pub(crate) const ID_EX_REMOVE: u32 = 0x0002_4813;
+/// its file dialog: ID_EX_FD .. + 0x3FFF (a file dialog takes a block like ID_FILEDLG)
+pub(crate) const ID_EX_FD: u32 = 0x0012_0000;
+pub(crate) const ID_EX_ASK: u32 = 0x0002_4815;
+pub(crate) const ID_EX_RUN_SCROLL: u32 = 0x0002_4818;
+pub(crate) const ID_EX_POINTS_X: u32 = 0x0002_481A;
+pub(crate) const ID_EX_START: u32 = 0x0002_4820;
+pub(crate) const ID_EX_CANCEL: u32 = 0x0002_4821;
+pub(crate) const ID_EX_THREADS: u32 = 0x0002_4822;
+pub(crate) const ID_EX_PROGRESS: u32 = 0x0002_4823;
+pub(crate) const ID_EX_KEEP_NAME: u32 = 0x0002_4824;
+pub(crate) const ID_EX_KEEP: u32 = 0x0002_4825;
+pub(crate) const ID_EX_CSV: u32 = 0x0002_4826;
+/// the list of experiments (rows + 1 + i, at most 60); a kept run's buttons (+ 2 k, + 2 k + 1)
+pub(crate) const ID_EX_LIST: u32 = 0x0002_4840;
+pub(crate) const ID_EX_RUNS: u32 = 0x0002_4880;
+/// Aufbau: its scroll view, the fields of the head, of the load and times, the SLO (+ 5), the prices (+ k)
+pub(crate) const ID_EX_DEF_SCROLL: u32 = 0x0002_48C0;
+pub(crate) const ID_EX_NAME: u32 = 0x0002_48C1;
+pub(crate) const ID_EX_TITLE: u32 = 0x0002_48C2;
+pub(crate) const ID_EX_LOAD_DEV: u32 = 0x0002_48C3;
+pub(crate) const ID_EX_LOAD_SVC: u32 = 0x0002_48C4;
+pub(crate) const ID_EX_LOAD_KIND: u32 = 0x0002_48C5;
+pub(crate) const ID_EX_LEVELS: u32 = 0x0002_48C8;
+pub(crate) const ID_EX_WARMUP: u32 = 0x0002_48C9;
+pub(crate) const ID_EX_SETTLE: u32 = 0x0002_48CA;
+pub(crate) const ID_EX_MEASURE: u32 = 0x0002_48CB;
+pub(crate) const ID_EX_SEEDS: u32 = 0x0002_48CC;
+pub(crate) const ID_EX_SLO: u32 = 0x0002_48D0;
+pub(crate) const ID_EX_ADD_AXIS: u32 = 0x0002_48D5;
+pub(crate) const ID_EX_ADD_SERIES: u32 = 0x0002_48D6;
+pub(crate) const ID_EX_PRICES_X: u32 = 0x0002_48D7;
+pub(crate) const ID_EX_EXCLUDE: u32 = 0x0002_48D8;
+pub(crate) const ID_EX_PRICE: u32 = 0x0002_48E0;
+/// a series (+ 8 s: its name, remove, Achse hinzufügen), an axis (+ k * ID_EX_AXIS_STEP: define.rs)
+pub(crate) const ID_EX_SERIES: u32 = 0x0002_4900;
+pub(crate) const ID_EX_AXIS: u32 = 0x0002_4A00;
+pub(crate) const ID_EX_AXIS_STEP: u32 = 0x60;
+/// Vergleich: its scroll view, A, B, the CSV, the configuration, the help, the charts (+ k), its table
+/// (rows + 1 + i, at most 180); the table of a run (rows + 1 + i, at most 1500)
+pub(crate) const ID_EX_CMP_SCROLL: u32 = 0x0002_5000;
+pub(crate) const ID_EX_CMP_A: u32 = 0x0002_5001;
+pub(crate) const ID_EX_CMP_B: u32 = 0x0002_5002;
+pub(crate) const ID_EX_CMP_CSV: u32 = 0x0002_5003;
+pub(crate) const ID_EX_CMP_CFG: u32 = 0x0002_5004;
+pub(crate) const ID_EX_CMP_HELP: u32 = 0x0002_5005;
+pub(crate) const ID_EX_CMP_CHART: u32 = 0x0002_5010;
+/// the Metriken panel: the bars of the latencies, the chart of the cables
+pub(crate) const ID_MET_BARS: u32 = 0x0002_5020;
+pub(crate) const ID_MET_CABLES: u32 = 0x0002_5021;
+pub(crate) const ID_EX_CMP_GRID: u32 = 0x0002_5040;
+pub(crate) const ID_EX_POINTS: u32 = 0x0002_5100;
