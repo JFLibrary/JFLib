@@ -90,23 +90,25 @@ async function framebufferPng(page) {
   return png;
 }
 // two PNGs in one page -> the pixels that differ (the first: its place), the largest difference
-const diffPngs=(page,a,b)=>page.evaluate(async ([a64,b64])=>{
+const diffPngs=(page,a,b,top=0)=>page.evaluate(async ([a64,b64,top])=>{
   const load=async s=>{
     const bm=await createImageBitmap(new Blob([Uint8Array.from(atob(s),c=>c.charCodeAt(0))],{type:'image/png'}));
     const c=new OffscreenCanvas(bm.width,bm.height),x=c.getContext('2d',{colorSpaceConversion:'none'});x.drawImage(bm,0,0);
     return {w:bm.width,h:bm.height,d:x.getImageData(0,0,bm.width,bm.height).data};
   };
   const p=await load(a64),q=await load(b64);
-  if(p.w!==q.w||p.h!==q.h) return {size:[p.w,p.h,q.w,q.h],pixels:-1};
-  let n=0,first=null,top=0;
+  if(p.w!==q.w||p.h+top!==q.h) return {size:[p.w,p.h,q.w,q.h],pixels:-1};
+  let n=0,first=null,most=0;
+  const at=top*q.w*4;
   for(let i=0;i<p.d.length;i+=4) {
-    const d=Math.max(Math.abs(p.d[i]-q.d[i]),Math.abs(p.d[i+1]-q.d[i+1]),Math.abs(p.d[i+2]-q.d[i+2]));
-    if(d){if(!first)first=[(i/4)%p.w,Math.floor(i/4/p.w)];n++;if(d>top)top=d;}
+    const d=Math.max(Math.abs(p.d[i]-q.d[i+at]),Math.abs(p.d[i+1]-q.d[i+1+at]),Math.abs(p.d[i+2]-q.d[i+2+at]));
+    if(d){if(!first)first=[(i/4)%p.w,Math.floor(i/4/p.w)];n++;if(d>most)most=d;}
   }
-  return {pixels:n,first,top,size:[p.w,p.h]};
-},[a.toString('base64'),b.toString('base64')]);
+  return {pixels:n,first,top:most,size:[p.w,p.h]};
+},[a.toString('base64'),b.toString('base64'),top]);
 // the composed screen at the canvas, at its own pixels, once it has come to rest (hover fades, tooltips)
-const shotOf=async page=>page.screenshot({clip:await page.locator('#screen').boundingBox(),scale:'device'});
+// (the whole page: a clip at a fractional place, 38.39 px at 125 %, comes a row short)
+const shotOf=page=>page.screenshot({scale:'device'});
 const screenPng=async page=>{
   await counters(page); // (a turn of the worker: it has seen everything sent so far, also on a busy machine)
   await settle(page);
@@ -126,7 +128,8 @@ const compareScreen=async (page,what)=>{
     const before=await screenPng(page);
     const fb=await framebufferPng(page);
     const shot=await screenPng(page);
-    r=await diffPngs(page,fb,shot);
+    const rows=await page.evaluate(()=>Math.round(document.querySelector('#screen').getBoundingClientRect().top*devicePixelRatio));
+    r=await diffPngs(page,fb,shot,rows);
     if(r.pixels===0||before.equals(shot)) break;
   }
   say(r.pixels===0,`${what}: screen = framebuffer ${JSON.stringify(r)}`);
@@ -157,8 +160,10 @@ async function steps(page,prefix,check) {
   await page.keyboard.press('Escape');
   await page.mouse.move(box.x+500,box.y+300);
   await step('menu closed');
-  await page.setViewportSize({width:1001,height:713});
-  await page.waitForFunction(()=>document.querySelector('#screen').width===Math.round(document.querySelector('#screen').clientWidth*devicePixelRatio));
+  const [width,devicePixelRatio]=await page.evaluate(()=>[document.querySelector('#screen').width,window.devicePixelRatio]);
+  // (whole device pixels, as a real window has at any scale)
+  await page.setViewportSize(Number.isInteger(devicePixelRatio)?{width:1001,height:713}:{width:1000,height:712});
+  await page.waitForFunction(w=>document.querySelector('#screen').width!==w,width);
   await page.waitForTimeout(300);
   await page.mouse.move(box.x+200,box.y+200);
   await step('new size');
@@ -350,7 +355,7 @@ try {
     try {
       console.log(`--- ${engine} ${browser.version()}`);
       let any=false;
-      for(const mode of modes) for(const scale of mode==='simd'?[1,2]:[1]) any=await path(browser,engine,mode,scale)||any;
+      for(const mode of modes) for(const scale of mode==='simd'?[1,1.25,1.5,2]:[1]) any=await path(browser,engine,mode,scale)||any;
       if(!any) console.log(`SKIP ${engine}: the path without a working WebGPU; the fallback is what this browser tests`);
       else await canvasAndImage(browser,engine);
       await fallback(browser,engine);

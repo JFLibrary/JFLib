@@ -243,6 +243,43 @@ impl Probe {
         Ok(())
     }
 
+    // more values of the push block in one submission than web/gpu.js's ring holds at first (64)
+    fn many_pushes(&mut self, dev: &Device) -> Result<()> {
+        const COUNT: usize = 200;
+        let align = (dev.limits().min_storage_offset_alignment as usize).max(4);
+        let bgl = dev.create_bind_group_layout(&[Binding { binding: 0, kind: BindingKind::StorageBuffer, stages: Stages::COMPUTE }])?;
+        let layout = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 8 })?;
+        let module = ShaderModule::from_wgsl(dev, COMPUTE)?;
+        let pipe = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &layout, shader: ShaderStage::new(&module, "main") })?;
+        let size = (COUNT * align) as u64;
+        let buf = dev.create_buffer(&BufferDesc { size, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?;
+        let rb = dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?;
+        let mut groups = Vec::new();
+        for i in 0..COUNT {
+            groups.push(dev.create_bind_group(&BindGroupDesc { layout: &bgl, entries: &[BindEntry { binding: 0, resource: Resource::Buffer { buffer: &buf, offset: (i * align) as u64, size: 4 } }] })?);
+        }
+        let mut e = dev.encoder()?;
+        e.set_compute_pipeline(&pipe);
+        for (i, group) in groups.iter().enumerate() {
+            e.set_bind_group(0, group);
+            e.push_constants(0, &[1000u32 + i as u32, 1]);
+            e.dispatch(1, 1, 1);
+        }
+        e.barrier(Access::COMPUTE_WRITE, Access::COPY_READ);
+        e.copy_buffer(&buf, 0, &rb, 0, size);
+        dev.queue().submit([e.finish()?])?;
+        self.later.push(Later {
+            what: "200 push values in one submission: each dispatch sees its own",
+            rb,
+            size: size as usize,
+            check: Box::new(move |b| (0..COUNT).all(|i| {
+                let at = i * align;
+                u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]) == 1100 + i as u32
+            })),
+        });
+        Ok(())
+    }
+
     // copies: buffers, rows of 256 bytes, rectangles of a frame
     fn copies(&mut self, dev: &Device) -> Result<()> {
         let up = dev.create_buffer(&BufferDesc { size: 256 * 8, usage: BufferUsage::NONE, memory: MemoryKind::Upload })?;
@@ -474,6 +511,7 @@ impl Probe {
                     self.first(&dev, &a)?;
                     self.misuse(&dev)?;
                     self.compute(&dev)?;
+                    self.many_pushes(&dev)?;
                     self.copies(&dev)?;
                     self.render(&dev)?;
                     self.dev = Some(dev);

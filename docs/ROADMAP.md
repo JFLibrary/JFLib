@@ -1729,7 +1729,16 @@ Fensterrand hinaus.
   Rollen), `preTransform` ist nicht gebaut. Nicht getestet: Adreno, Mali, Vulkan 1.1, Android 8 und 9, schwache
   Telefone, ein echter Treiber-Reset, ein echter Treiberabsturz, TalkBack auf dem GPU-Pfad, ein Lauf ohne die
   Spiegelung von Android Studio, die Akkulaufzeit.
-- **P2** · *fehlt* · G4d: Browser (WebGPU, Shader direkt als WGSL).
+- **P2** · *erledigt* (2026-11-03) · G4d: Ausgabe im Browser ([GPU.md](GPU.md#ausgabe-im-browser)): `lib/gpu` läuft über
+  WebGPU hinter derselben API, Shader gehen direkt als WGSL (`ShaderModule::from_wgsl`), kein SPIR-V und kein Vulkan in den
+  Bündeln. Die UI zeigt ihr Bild wie auf den anderen Zielen mit Ebenen, Bildern und Leinwänden auf einer Leinwand über
+  `#screen`; das Programm wartet nicht auf WebGPU, ohne brauchbares WebGPU bleibt alles beim alten Weg. Standardmäßig an
+  (`DEFAULT_ON_BROWSER`), `?gpu=0|1` in der Adresse. Bis auf rund 95 MiB mehr Speicher und Ausreißer beim Rollen gewinnt der
+  Weg: rund 7–10 ms früher auf dem Schirm, ein Achtel der Daten beim Ziehen einer Leinwand. Nebenbei: Die Leinwand liegt
+  jetzt bei jeder Skalierung auf ganzen Gerätepixeln, auch der alte Weg war bei 110, 125 und 175 % weich. Geprüft in
+  Chrome 156 (alle Bündel) und Firefox 159 (echtes Fenster, ohne Ebenen, Bilder, Leinwände). Nicht getestet: Safari, Chrome auf
+  Android und Linux, Telefone, AMD, Intel, ein echter Treiber-Reset, ein Tab im Hintergrund. Nicht gebaut: Zeitstempel,
+  Bindless, ein Wächter gegen eine Leinwand, die nichts zeigt, obwohl alles richtig rechnet.
 - **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
   Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,

@@ -67,7 +67,13 @@ document.addEventListener("visibilitychange",()=>{
 });
 const complete=(id,status)=>id && send({type:"complete",id,status});
 const errorCode=error=>error?.name==="QuotaExceededError" ? -2 : error?.name==="NotAllowedError" || error?.name==="SecurityError" ? -1 : -5;
-function sizes() { return {width:Math.max(1,Math.round(canvas.clientWidth*devicePixelRatio)), height:Math.max(1,Math.round(canvas.clientHeight*devicePixelRatio)), dpi:Math.round(96*devicePixelRatio)}; }
+// The canvas lies on whole device pixels at any scale, or the browser resamples the picture: the host bar
+// ends on one (38 px at 125 % are 47.5), and the size comes from the edges as the browser snaps them
+// (clientWidth is whole CSS pixels: 1001 of 1000.67 at 150 % would be a pixel too many).
+const hostbar=document.querySelector("#hostbar");
+function snapHostbar() {hostbar.style.height=`${Math.round(38*devicePixelRatio)/devicePixelRatio}px`;}
+snapHostbar();
+function sizes() { const r=canvas.getBoundingClientRect(), d=devicePixelRatio; return {width:Math.max(1,Math.round(r.right*d)-Math.round(r.left*d)), height:Math.max(1,Math.round(r.bottom*d)-Math.round(r.top*d)), dpi:Math.round(96*d)}; }
 function report(message) { status.textContent=L(message); }
 async function storage() {
   return openFilesStorage();
@@ -259,7 +265,7 @@ async function screens() {
 }
 screen.addEventListener?.("change",screens);
 new ResizeObserver(resize).observe(canvas);
-window.addEventListener("resize",resize);
+window.addEventListener("resize",()=>{snapHostbar();resize();});
 // (L7) full screen entered or left (Esc, the browser's own controls): the app's state follows
 document.addEventListener("fullscreenchange",()=>{if(started)send({type:"fullscreen",on:!!document.fullscreenElement});});
 async function importFiles(files) {

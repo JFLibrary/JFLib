@@ -90,15 +90,20 @@ export class GpuHost {
   // one submission: the words of web_cmd.rs (the OP_ numbers there)
   submit(d,p,n) {
     const w=new Uint32Array(this.memory().buffer,p,n), f=new Float32Array(this.memory().buffer,p,n), o=this.objs;
-    const enc=d.device.createCommandEncoder(), ring=d.ring;
-    let pass=null, computing=false, slot=0, full=false, compute=null;
+    const enc=d.device.createCommandEncoder();
+    let ring=d.ring, pass=null, computing=false, slot=0, compute=null;
     const groups=[], reads=new Set(), push=new Uint8Array(PUSH_BYTES);
     let pushed=false, dirty=false;
     const endPass=()=>{if(pass) {pass.end();pass=null;computing=false;}};
     const place=()=>{
       if(!dirty) return;
       dirty=false;
-      if((slot+1)*d.stride>ring.cpu.length) {full=true;return;} // (this submission asked for more: the next ring is larger)
+      // the ring is full: its values go up (before the submission, as the last ring's below), a larger one takes over
+      if((slot+1)*d.stride>ring.cpu.length) {
+        d.queue.writeBuffer(ring.buffer,0,ring.cpu,0,slot*d.stride);
+        this.pushRing(d,ring.cpu.length/d.stride*4);
+        ring=d.ring;slot=0;
+      }
       ring.cpu.set(push,slot*d.stride);
       pass.setBindGroup(3,ring.group,[slot*d.stride]);
       slot++;
@@ -176,7 +181,6 @@ export class GpuHost {
     endPass();
     if(slot) d.queue.writeBuffer(ring.buffer,0,ring.cpu,0,slot*d.stride);
     d.queue.submit([enc.finish()]);
-    if(full) this.pushRing(d,ring.cpu.length/d.stride*4);
     for(const b of reads) this.fetch(b);
     return ++d.last;
   }

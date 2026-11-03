@@ -897,7 +897,7 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 
 | Was | Wie | Ergebnis |
 | --- | --- | --- |
-| Bildschirm GPU gegen Bildschirm bisher, Schritt für Schritt (erstes Bild, Hover, Menü auf, Menü zu, neue Größe; bei `simd` auch 200 %, „Bild & Leinwand“ nach Ziehen und Rollen) | `page.screenshot`, Chrome kopflos, alle drei Bündel | 0 Pixel anders |
+| Bildschirm GPU gegen Bildschirm bisher, Schritt für Schritt (erstes Bild, Hover, Menü auf, Menü zu, neue Größe; bei `simd` auch 125, 150 und 200 %, „Bild & Leinwand“ nach Ziehen und Rollen) | `page.screenshot`, Chrome kopflos, alle drei Bündel | 0 Pixel anders |
 | Bildschirm gegen Framebuffer (`ui.render`), auch auf dem Rückweg nach verlorenem Gerät und auf dem neuen Gerät | ebenso | 0 Pixel anders |
 | jedes gezeigte Bild gegen den Framebuffer, Byte für Byte | `jfgui_GPU_VERIFY` im Browser: zurückgelesen, verglichen, wenn der Browser geantwortet hat | 0 anders |
 | während der Umschaltung | 5–6 Aufnahmen, die erste vor dem Wechsel | 0 anders als bisher, keine schwarz |
@@ -906,11 +906,17 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 
 **Gefunden:** `quad_blit` zeichnete eine Leinwand beim Nachzeichnen in den Framebuffer (`gp_settle`, jede Ebene darüber) mit ihrem ganzen Rechteck, ohne den Klipp eines rollenden Elternteils: Unter einer Kopfzeile standen dann ihre Pixel, im Framebuffer, also auf dem Rückweg zum CPU-Pfad auch auf dem Schirm. Das galt auf allen Zielen; gefunden hat es der Vergleich im Browser, unter Windows und Linux prüft es jetzt `apps/androidGallery/tests/gpu_canvas_clip.uis`. Ein Treiberfehler wie beim Xclipse (Push-Konstanten-Array) kam hier nicht vor; auf einem Telefon ist nichts getestet.
 
+**Ganze Gerätepixel.** Bei 125 % endet die 38 px hohe Host-Leiste bei 47,5 Gerätepixeln, und `clientWidth` zählt ganze CSS-Pixel. Schon der alte Weg zeigte deshalb bei 110, 125 und 175 % ein umgerechnetes Bild (17 000 bis 39 000 Pixel anders als der Framebuffer, die Schrift weicher), und `#gpu` wich davon noch einmal ab. Jetzt endet die Leiste auf einem ganzen Gerätepixel, die Größe der Leinwand kommt aus ihren Kanten, gerundet wie vom Browser, und `image-rendering: pixelated` zeigt den Puffer 1:1, auch wo CSS den Ort nicht genau sagen kann (48 Gerätepixel sind bei 125 % 38,39 px). `gpu_web.mjs` zählt bei 100, 125, 150 und 200 % 0 Pixel, beide Wege gegeneinander und gegen den Framebuffer. Bei 110 und 175 % lief nur ein Hilfsskript einmal von Hand: beide Wege gleich, gegen den Framebuffer 91 und 215 Pixel um höchstens 3, wie es dieses Skript auch bei 100 % sieht. Fenstergrößen mit gebrochenen Gerätepixeln (1001 px bei 125 %, nur unter Playwright möglich) sind ausgenommen.
+
+**Gefunden bei der Durchsicht.** Mehr als 64 Push-Werte in einer Übergabe ließen die Aufrufe danach still den letzten Wert sehen, das Bild wäre bis zur nächsten Änderung falsch geblieben. Jetzt übernimmt mitten in der Übergabe ein größerer Ring (`webgputest`: 200 Werte, vorher ein Fehlschlag).
+
+**Absturz des GPU-Prozesses.** Einmal von Hand: Der GPU-Prozess eines eigenen, kopflosen Chrome wurde beendet. Chrome startete einen neuen, die Seite meldete `GPU device lost`, und innerhalb von 3 s lief die Ausgabe auf einem neuen Gerät und einer neuen Leinwand (`leaves=1`, `switches=2`). Das ist kein Teil der Tests.
+
 **Firefox.** Playwrights Firefox 153 sperrt WebGPU („disabled by blocklist“, kein Adapter), das installierte Firefox 159 kopflos ebenso: Dort prüfen die Tests den Rückfall. In einem echten Fenster hat Firefox 159 einen Adapter und zeigt die Ausgabe (die Zahlen oben, ohne Treiber in der Seite gemessen, weil Playwright es nicht steuern kann). Es nennt seinen Adapter nicht, `GpuOutput::adapter` bleibt dort leer.
 
 **Tests.** `apps/gallery/tests/gpu_web.mjs` (die Ausgabe in allen drei Bündeln, Chrome und Firefox; ohne brauchbares WebGPU `SKIP` und nur der Rückfall; ein verlorenes Gerät über `device.destroy()`, also nachgestellt), `apps/webgputest` mit `tests/api_web.mjs` (die API ohne Fenster: Fehler, Rechen-Shader, Kopien, Zeichnen, Gerät verloren, in jedem Bündel), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) (die Messungen). `.uis`-Skripte laufen im Browser nicht; das Skriptkommando `gpu` gibt es dort nicht.
 
-**Nicht getestet:** Safari, Chrome auf Android und Linux, Firefox außerhalb dieses einen Rechners und ohne die Vorführung oben (Ebenen, Bilder, Leinwände sind in Firefox nicht durchlaufen; `threads` nur minimiert, also ohne Blick auf den Bildschirm), AMD und Intel, Monitore mit HDR oder großem Farbraum, ein echter Treiber-Reset, ein Absturz des GPU-Prozesses, ein Tab im Hintergrund, Ausgabe bei einem Zoom der Seite oder 150 %, ein Telefon.
+**Nicht getestet:** Safari, Chrome auf Android und Linux, Firefox außerhalb dieses einen Rechners und ohne die Vorführung oben (Ebenen, Bilder, Leinwände sind in Firefox nicht durchlaufen; `threads` nur minimiert, also ohne Blick auf den Bildschirm), AMD und Intel, Monitore mit HDR oder großem Farbraum, ein echter Treiber-Reset, ein Tab im Hintergrund, der Zoom der Seite in einem echten Fenster, ein Telefon.
 
 **Nicht gebaut:** Zeitstempel, `create_compute_pipeline_sized`, Bindless; ein Wächter dagegen, dass die Leinwand nichts zeigt, obwohl alles richtig rechnet; das Skriptkommando `gpu`; Freigeben von `#screen` während der GPU-Zeit (dort bleiben 8 MB für den Rückweg).
 
