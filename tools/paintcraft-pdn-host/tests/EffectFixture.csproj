@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net9.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems><NoWarn>$(NoWarn);CS0618</NoWarn>
     <PaintDotNetDir Condition="'$(PaintDotNetDir)' == ''">C:\Program Files\paint.net</PaintDotNetDir>
   </PropertyGroup>
   <ItemGroup>

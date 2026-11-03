@@ -205,7 +205,9 @@ Host und Katalog-Kinder bei ausbleibenden Lebenszeichen; sie deckt auch Wine-
 Prozesse ab, die wineserver außerhalb der Unix-Prozessgruppe gestartet hat.
 
 Geprüft wurde Wine 11.19 unter Ubuntu 24.04/WSL mit dem speziellen
-Paint.NET-on-Wine-Paket 5.200.9775.2252 und dessen gebündelter .NET-11-Laufzeit.
+Paint.NET-on-Wine-Paket 5.200.9775.2252 und dessen gebündelter .NET-11-Laufzeit, später
+WineHQ 11.21 unter Fedora 44 mit 5.200.9793.3533; Fedoras Paket wine 11.20 Staging läuft nicht
+(Einzelheiten in der Host-Anleitung).
 Die normale Windows-Installation 5.1 scheiterte unter Wine an der Direct2D-
 Farbprofilinitialisierung. Der Helper lässt sich mit dem neuen
 `tools/paintcraft-pdn-host/deploy_wine.py` in ein privates entpacktes Wine-Paket

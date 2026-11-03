@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using PaintDotNet;
 using PaintDotNet.Effects;
+using PaintDotNet.IndirectUI;
 using PaintDotNet.PropertySystem;
 
 internal static class Program
@@ -14,6 +15,8 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        // PaintCraft reads diagnostics as UTF-8; without a console .NET would use the ANSI code page.
+        Console.SetError(new StreamWriter(Console.OpenStandardError(),new System.Text.UTF8Encoding(false)) {AutoFlush=true});
         var dir = Environment.GetEnvironmentVariable("PAINTDOTNET_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "paint.net");
         Install=dir;
         AssemblyLoadContext.Default.Resolving += (c,n) => {
@@ -82,13 +85,14 @@ internal static class Program
     static int RunClassic(Type selected,EffectInput input,string[] args)
     {
         using var effect=(Effect)Activator.CreateInstance(selected,true)!;
+        effect.Services=new HostServices(false);
         #pragma warning disable CS0618 // This bridge intentionally hosts the classic API.
         effect.EnvironmentParameters=input.Environment();
         #pragma warning restore CS0618
         EffectConfigToken? token=null;
         if(effect is PropertyBasedEffect property) token=new PropertyBasedEffectConfigToken(property.CreatePropertyCollection());
         if(token is PropertyBasedEffectConfigToken propertyToken && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
-            if(!Dialogs.Properties(selected.Name,propertyToken.Properties,!args.Contains("--validate-dialog")))return 2;
+            if(!Dialogs.Properties(effect.Name,propertyToken.Properties,ParameterLabels.For(effect,propertyToken.Properties),!args.Contains("--validate-dialog")))return 2;
         } else if(token is not PropertyBasedEffectConfigToken && effect.Options.Flags.HasFlag(EffectFlags.Configurable) && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
             using var dialog=effect.CreateConfigDialog();
             if(dialog!=null) {
@@ -183,11 +187,13 @@ internal sealed class EffectInput : IDisposable
 internal static class Dialogs
 {
     // show false only builds the editor: --validate-dialog checks a plugin's parameters that way.
-    internal static bool Properties(string title,PropertyCollection properties,bool show)
+    internal static bool Properties(string title,PropertyCollection properties,ControlInfo? labels,bool show)
     {
         Application.EnableVisualStyles();
         using var dialog=new Form {Text="PaintCraft – "+title,Width=580,Height=600,StartPosition=FormStartPosition.CenterScreen};
-        var grid=new PropertyGrid {Dock=DockStyle.Fill,SelectedObject=new PluginProperties(properties),ToolbarVisible=false};
+        var shown=new PluginProperties(properties,labels);
+        var grid=new PropertyGrid {Dock=DockStyle.Fill,SelectedObject=shown,ToolbarVisible=false,PropertySort=PropertySort.NoSort};
+        if(!show)foreach(PropertyDescriptor p in shown.GetProperties())Console.Error.WriteLine($"parameter:{p.Name}={p.DisplayName}");
         var buttons=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=40,FlowDirection=FlowDirection.RightToLeft};
         var ok=new Button {Text="Anwenden",DialogResult=DialogResult.OK};
         var cancel=new Button {Text="Abbrechen",DialogResult=DialogResult.Cancel};
@@ -200,14 +206,36 @@ internal static class Dialogs
 
 // Paint.NET's IndirectUI is initialized by its application, not its public plugin API.
 // Present typed PropertySystem values without relying on private initialization hooks.
-sealed class PluginProperties(PropertyCollection values) : CustomTypeDescriptor
+sealed class PluginProperties(PropertyCollection values,ControlInfo? labels) : CustomTypeDescriptor
 {
+    // The plugin's order; a property it leaves out of its UI keeps its value, as in paint.net.
+    readonly Lazy<PropertyDescriptor[]> shown=new(()=>{
+        var names=new List<string>();
+        void Walk(ControlInfo c) {
+            if(c is PropertyControlInfo p)names.Add(p.Property.Name);
+            foreach(var child in c.ChildControls)Walk(child);
+        }
+        if(labels!=null)Walk(labels);
+        var order=names.Count>0 ? names.Select(n=>values.FirstOrDefault(p=>p.Name==n)).OfType<Property>() : values;
+        return order.Select(p=>(PropertyDescriptor)new PluginProperty(p,labels?.FindControlForPropertyName(p.Name))).ToArray();
+    });
     public override PropertyDescriptorCollection GetProperties()=>GetProperties(null);
-    public override PropertyDescriptorCollection GetProperties(Attribute[]? attributes)=>new(values.Select(p=>(PropertyDescriptor)new PluginProperty(p)).ToArray());
+    public override PropertyDescriptorCollection GetProperties(Attribute[]? attributes)=>new(shown.Value);
     public override object GetPropertyOwner(PropertyDescriptor? pd)=>this;
 }
-sealed class PluginProperty(Property value) : PropertyDescriptor(value.Name,Array.Empty<Attribute>())
+sealed class PluginProperty(Property value,PropertyControlInfo? control) : PropertyDescriptor(value.Name,Array.Empty<Attribute>())
 {
+    string Text(string name)=>control?.ControlProperties.FirstOrDefault(p=>p.Name==name)?.Value as string ?? "";
+    // Check boxes often carry their label as the description and no display name.
+    public override string DisplayName=>Text("DisplayName") is {Length:>0} name ? name : Text("Description") is {Length:>0} text ? text : value.Name;
+    public override string Description
+    {
+        get {
+            var range=value.ValueType!=typeof(bool) && value.GetType().GetProperty("MinValue") is {} min && value.GetType().GetProperty("MaxValue") is {} max
+                ? $"{min.GetValue(value)} bis {max.GetValue(value)}" : "";
+            return Text("DisplayName").Length>0 && Text("Description").Length>0 ? (Text("Description")+" "+range).Trim() : range;
+        }
+    }
     public override Type ComponentType=>typeof(PluginProperties);
     public override Type PropertyType=>value.ValueType;
     public override bool IsReadOnly=>value.ReadOnly;
@@ -216,13 +244,15 @@ sealed class PluginProperty(Property value) : PropertyDescriptor(value.Name,Arra
     public override void SetValue(object? component,object? newValue){value.Value=newValue!;OnValueChanged(component,EventArgs.Empty);}
     public override void ResetValue(object component)=>SetValue(component,value.DefaultValue);
     public override bool ShouldSerializeValue(object component)=>false;
-    public override TypeConverter Converter=>value is StaticListChoiceProperty choices ? new ChoicesConverter(choices.ValueChoices) : base.Converter;
+    public override TypeConverter Converter=>value is StaticListChoiceProperty choices ? new ChoicesConverter(choices.ValueChoices,control) : base.Converter;
 }
-sealed class ChoicesConverter(object[] choices) : TypeConverter
+sealed class ChoicesConverter(object[] choices,PropertyControlInfo? control) : TypeConverter
 {
+    string Label(object? choice)=>choice==null ? "" : control?.GetValueDisplayName(choice) ?? choice.ToString() ?? "";
     public override bool GetStandardValuesSupported(ITypeDescriptorContext? context)=>true;
     public override bool GetStandardValuesExclusive(ITypeDescriptorContext? context)=>true;
     public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext? context)=>new(choices);
     public override bool CanConvertFrom(ITypeDescriptorContext? context,Type sourceType)=>sourceType==typeof(string);
-    public override object? ConvertFrom(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object value)=>choices.FirstOrDefault(x=>x.ToString()==value.ToString()) ?? base.ConvertFrom(context,culture,value);
+    public override object? ConvertFrom(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object value)=>choices.FirstOrDefault(x=>Label(x)==value.ToString()) ?? base.ConvertFrom(context,culture,value);
+    public override object? ConvertTo(ITypeDescriptorContext? context,System.Globalization.CultureInfo? culture,object? value,Type destinationType)=>destinationType==typeof(string) ? Label(value) : base.ConvertTo(context,culture,value,destinationType);
 }

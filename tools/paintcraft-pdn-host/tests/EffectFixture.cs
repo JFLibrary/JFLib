@@ -2,11 +2,14 @@
 // Internal classes on purpose, the published samples are internal too.
 using System.Windows.Forms;
 using PaintDotNet;
+using PaintDotNet.AppModel;
+using PaintDotNet.Clipboard;
 using PaintDotNet.Direct2D1;
 using PaintDotNet.Direct2D1.Effects;
 using PaintDotNet.Effects;
 using PaintDotNet.Effects.Gpu;
 using PaintDotNet.Imaging;
+using PaintDotNet.IndirectUI;
 using PaintDotNet.PropertySystem;
 using PaintDotNet.Rendering;
 using IDeviceContext=PaintDotNet.Direct2D1.IDeviceContext;
@@ -16,7 +19,15 @@ internal sealed class BitmapInvert:PropertyBasedBitmapEffect
     IBitmapSource<ColorBgra32>? source;
     int mask;
     public BitmapInvert():base("Fixture Bitmap","Fixture",BitmapEffectOptions.Create() with {IsConfigurable=true}) {}
-    protected override PropertyCollection OnCreatePropertyCollection()=>new([new Int32Property("Mask",255,0,255)]);
+    protected override PropertyCollection OnCreatePropertyCollection()=>new([new Int32Property("Mask",255,0,255),new Int32Property("Unlisted",1,0,9)]);
+    // Named here, and left out of the dialog like a plugin's internal value.
+    protected override ControlInfo OnCreateConfigUI(PropertyCollection properties)
+    {
+        var ui=CreateDefaultConfigUI(properties.Where(p=>p.Name=="Mask"));
+        ui.SetPropertyControlValue("Mask",ControlInfoPropertyNames.DisplayName,"Fixture-Maske");
+        ui.SetPropertyControlValue("Mask",ControlInfoPropertyNames.Description,"Die umgekehrten Bits");
+        return ui;
+    }
     protected override void OnInitializeRenderInfo(IBitmapEffectRenderInfo info) {source=Environment.GetSourceBitmapBgra32();base.OnInitializeRenderInfo(info);}
     protected override void OnSetToken(PropertyBasedEffectConfigToken? token) {mask=token!.GetProperty<Int32Property>("Mask")!.Value;base.OnSetToken(token);}
     protected override void OnRender(IBitmapEffectOutput output)
@@ -82,6 +93,53 @@ internal sealed class BitmapPlain:BitmapEffect
 public sealed class ClassicPlain:Effect
 {
     public ClassicPlain():base("Fixture Classic Plain",(System.Drawing.Image)null!,"Fixture",new EffectOptions()) {}
+    public override void Render(EffectConfigToken? token,RenderArgs dst,RenderArgs src,System.Drawing.Rectangle[] rois,int start,int length)
+    {
+        for(int i=start;i<start+length;i++)
+        for(int y=rois[i].Top;y<rois[i].Bottom;y++) for(int x=rois[i].Left;x<rois[i].Right;x++) {
+            var c=src.Surface[x,y];
+            dst.Surface[x,y]=ColorBgra.FromBgra((byte)(255-c.B),(byte)(255-c.G),(byte)(255-c.R),c.A);
+        }
+    }
+}
+
+// Asks for the enum names in OnCreatePropertyCollection, as Gaussian Blur+ does, and names its choices.
+public sealed class ClassicLocalized:PropertyBasedEffect
+{
+    public enum Channels {All,Nothing}
+    public ClassicLocalized():base("Fixture Classic Localized",(System.Drawing.Image)null!,"Fixture",new EffectOptions {Flags=EffectFlags.Configurable}) {}
+    protected override PropertyCollection OnCreatePropertyCollection()
+    {
+        var names=Services.GetService<IEnumLocalizerFactory>()!.Create(typeof(Channels)).GetLocalizedEnumValues();
+        if(names.Count!=2 || names[0].LocalizedName!="All" || !Channels.Nothing.Equals(names[1].EnumValue))throw new InvalidOperationException("enum names");
+        return new([StaticListChoiceProperty.CreateForEnum("Channels",Channels.All,false)]);
+    }
+    protected override ControlInfo OnCreateConfigUI(PropertyCollection properties)
+    {
+        var ui=CreateDefaultConfigUI(properties);
+        ui.SetPropertyControlValue("Channels",ControlInfoPropertyNames.DisplayName,"Fixture-Kanäle");
+        ui.FindControlForPropertyName("Channels")!.SetValueDisplayName(Channels.All,"Alle Kanäle");
+        return ui;
+    }
+    protected override void OnRender(System.Drawing.Rectangle[] rois,int start,int length)
+    {
+        for(int i=start;i<start+length;i++)
+        for(int y=rois[i].Top;y<rois[i].Bottom;y++) for(int x=rois[i].Left;x<rois[i].Right;x++) {
+            var c=SrcArgs.Surface[x,y];
+            DstArgs.Surface[x,y]=ColorBgra.FromBgra((byte)(255-c.B),(byte)(255-c.G),(byte)(255-c.R),c.A);
+        }
+    }
+}
+
+// Reads the clipboard in OnSetRenderInfo, as Paste Alpha does. No image on it is a normal case.
+public sealed class ClassicClipboard:Effect
+{
+    public ClassicClipboard():base("Fixture Classic Clipboard",(System.Drawing.Image)null!,"Fixture",new EffectOptions()) {}
+    protected override void OnSetRenderInfo(EffectConfigToken? token,RenderArgs dst,RenderArgs src)
+    {
+        using var surface=Services.GetService<IClipboardService>()!.TryGetSurface();
+        base.OnSetRenderInfo(token,dst,src);
+    }
     public override void Render(EffectConfigToken? token,RenderArgs dst,RenderArgs src,System.Drawing.Rectangle[] rois,int start,int length)
     {
         for(int i=start;i<start+length;i++)

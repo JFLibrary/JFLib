@@ -211,14 +211,18 @@ expect #9900 text "FF123456"
     install = os.environ.get("PAINTDOTNET_DIR") or os.path.join(os.environ["ProgramFiles"], "paint.net")
     clr = [str(exe), "--pdn-clr", install, str(host)]
     for kind, extra, pixel in [("BitmapInvert", [], "000000ff"), ("BitmapFloat", [], "000000ff"), ("BitmapForm", [], "000000ff"), ("BitmapPlain", [], "000000ff"),
+                               ("ClassicPlain", [], "000000ff"), ("ClassicLocalized", [], "000000ff"), ("ClassicClipboard", [], "000000ff"),
                                ("GpuImage", [], "000000ff"), ("GpuImage", ["--gpu", "software"], "000000ff"), ("GpuDrawing", [], "000000ff"), ("GpuShader", [], "cdcdcdff")]:
         result = subprocess.run([*clr, str(fixture), kind, "--defaults", *extra], input=packet, capture_output=True, env=bare, timeout=90)
         assert result.returncode == 0, (kind, result.stderr)
         assert len(result.stdout) == 12 + w * h * 4 and result.stdout[12:16].hex() == pixel, (kind, extra, result.stdout[:16].hex())
-    for kind in ["BitmapInvert", "BitmapForm", "GpuImage", "ClassicPlain"]:
+    for kind in ["BitmapInvert", "BitmapForm", "GpuImage", "ClassicPlain", "ClassicLocalized"]:
         result = subprocess.run([*clr, str(fixture), kind, "--validate-dialog"], capture_output=True, env=bare, stdin=subprocess.DEVNULL, timeout=90)
         assert result.returncode == 0 and not result.stdout, (kind, result.stderr)
         assert kind != "BitmapForm" or b"form-filled:255" in result.stderr, result.stderr
+        # the plugin's own words and order, without what it leaves out of its UI
+        assert kind != "BitmapInvert" or (b"parameter:Mask=Fixture-Maske" in result.stderr and b"Unlisted" not in result.stderr), result.stderr
+        assert kind != "ClassicLocalized" or "parameter:Channels=Fixture-Kanäle".encode() in result.stderr, result.stderr
     # A damaged image never leaves result bytes behind.
     result = subprocess.run([*clr, str(fixture), "BitmapInvert", "--defaults"], input=packet[:40], capture_output=True, env=bare, timeout=90)
     assert result.returncode == 1 and not result.stdout, result.stderr
@@ -228,9 +232,9 @@ expect #9900 text "FF123456"
     assert catalog.returncode == 0, catalog.stderr
     rows = [line.split("\t") for line in catalog.stdout.decode().splitlines()]
     names = {bytes.fromhex(r[3]).decode(): r[4] for r in rows if r[0] == "E"}
-    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 10, names
+    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 12, names
     assert not [r for r in rows if r[0] in "UX"], rows
-    assert len([r for r in rows if r[0] == "F"]) == 4, rows
+    assert len([r for r in rows if r[0] == "F"]) == 5, rows
     # Nothing of paint.net is copied next to the host.
     copied = [f.name for f in host.parent.iterdir() if f.name.lower().startswith("paintdotnet")]
     assert not copied, copied

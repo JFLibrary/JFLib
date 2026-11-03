@@ -2,7 +2,7 @@
 
 This Windows helper executes **unmodified Paint.NET effect plugins** of both
 generations (the classic `Effect` and the v5 `BitmapEffect` / `GpuEffect` with
-their PropertyBased forms) and `FileType` / `IFileTypeFactory` plugins. PaintCraft
+their PropertyBased forms) and `FileType` / `IFileTypeFactory` / `IFileTypeFactory2` plugins. PaintCraft
 distinguishes managed PE assemblies from native PNAPI DLLs before choosing the
 loader. PropertyBased effects use a typed PropertyGrid editor backed by their
 original PropertySystem values and rules. Other effects may provide their own
@@ -90,6 +90,14 @@ undo/redo and cancel. **No third-party v5 plugin has been run yet**, and no plug
 ComputeSharp shader: both need a separate check before claiming compatibility. The v5
 path has not been tried under Wine either.
 
+Before that path existed, BoltBait's pack 6.11 was measured on Paint.NET 5.1.12 (2026-11-02):
+15 of its 18 classic effects ran with default settings and kept to the selection. Flip
+Horizontal failed asking for a dialog it does not have, Gaussian Blur+ for `IEnumLocalizerFactory`,
+and Paste Alpha for the clipboard service. The host handles all three now, checked with fixtures
+that make the same calls, **not yet with those DLLs**. Its 28 GPU effects are unmeasured.
+`IFileTypeFactory2` works with a fixture now, but WebPFileType 1.6.0, which was missing for lack
+of it, has not been run again; it also names `IFileTypesService`, which the host does not offer.
+
 The FileType bridge is tested with a separately compiled factory fixture through
 the original Paint.NET API, including distinct read/write extensions, alpha, DPI,
 round trips, malformed packets and a broken neighbouring DLL. It imports a
@@ -100,14 +108,17 @@ fixture does not establish compatibility with every third-party file-type DLL.
 
 Boundaries of the v5 path:
 
-- **Parameters without IndirectUI.** Its controls are set up by Paint.NET's application
-  (`ControlInfo.ControlsAssembly` stays null without it), so `OnCreateConfigUI` is not used:
-  every property appears in the plain PropertyGrid under its internal name, without the
-  plugin's sliders, labels or sections. An effect whose own `OnCreateConfigForm` builds on
-  IndirectUI fails with that error.
-- **Application services.** Only `IDirect2DFactory`, `IImagingFactory`, `IDirectWriteFactory`
-  and the settings below exist. A plugin requiring another service (palettes, shapes, user
-  files) gets Paint.NET's "service not found" error, shown as a plugin error.
+- **Parameters without IndirectUI's controls.** The host reads a plugin's `OnCreateConfigUI`
+  through the internal `ControlInfo.Initialize` and shows its labels, descriptions, value names
+  and order in the plain PropertyGrid, with the range as text. Paint.NET's own controls stay out
+  of reach (they need `PdnSynchronizationContext` and more of the application), so there are no
+  sliders, color wheels or sections. When a plugin's UI code fails, its internal names appear. An
+  effect whose own `OnCreateConfigForm` builds on those controls fails with that error.
+- **Application services.** Classic and v5 effects get `IDirect2DFactory`, `IImagingFactory`,
+  `IDirectWriteFactory`, `IEnumLocalizerFactory` (a plugin's enum values keep their names),
+  `IClipboardService` and the settings below. A plugin requiring another service (palettes,
+  shell, file types, user files) gets `null` or Paint.NET's "service not found" error, shown as a
+  plugin error.
 - **Parts that are not public API.** The GPU renderer asks `ISettingsService` for
   `Graphics/RenderingGpuChoice` and needs the internal `GpuChoice` and `GpuInfoCacheService`.
   These interfaces are closed with an internal member, so `ModernEffects.cs` generates their
@@ -156,9 +167,25 @@ Direct2D implementation. The regular Windows Paint.NET 5.1 package failed its
 Direct2D color-profile initialization in our Wine test. Merely installing Wine
 around that package is therefore insufficient.
 
-The tested combination is Ubuntu 24.04 / WSL, Wine **11.19**, Paint.NET-on-Wine
-**5.200.9775.2252** with its bundled .NET 11 runtime, and the helper built against
-the Windows 5.1 API described above. The experimental Paint.NET builds expire;
+Tested with the helper built against the Windows 5.1 API, Paint.NET-on-Wine's bundled .NET 11
+runtime and classic effects (2026-11-03 unless noted; the v5 path was not part of this):
+
+- **Fedora 44, WineHQ 11.21, Paint.NET-on-Wine 5.200.9793.3533: works.** Same catalog as on
+  Windows, 12 effects byte-identical to Windows over the whole image and a selection; menu, undo,
+  redo and cancel without leftover processes; the real dialogs of Pastel and BBChart. Only
+  under Wine, `Dimensions` fails with `Font 'Arial' cannot be found`, and `Complementary Colors`
+  and `Polygon / Stars` differ in pixels (cause not known).
+- **Ubuntu 26.04, its Wine 10.0: works** for Pastel, Oil Painting+ and Edge Detect, byte-identical;
+  the host alone, without windows or PaintCraft.
+- **Ubuntu 24.04 / WSL, Wine 11.19, Paint.NET-on-Wine 5.200.9775.2252: works** (earlier test).
+- **Fedora's package wine 11.20 Staging: does not work.** It stops with `Cannot get symbol
+  u_charsToUChars from libicuuc` (its prefix has `icuuc.dll` and `icuin.dll` but no `icu.dll`, unlike
+  WineHQ 11.21). With `DOTNET_SYSTEM_GLOBALIZATION_USENLS=1` it fails later: `Bgra32 is not a
+  supported pixel format` with 9793, `Unable to load DLL 'd2d1'` with 9775. Whether this is
+  Fedora's build or 11.20 itself is open.
+
+The release notes of 9793 say GPU effects with ComputeSharp.D2D1 now run under Wine; that is not
+tested here. The experimental Paint.NET builds expire 12 weeks after they were built;
 follow their release instructions and retest after updating. Neither Wine nor
 Paint.NET is bundled with PaintCraft.
 

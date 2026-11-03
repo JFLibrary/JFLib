@@ -62,6 +62,10 @@ internal static class PluginCatalog
                     var types=((IFileTypeFactory)Activator.CreateInstance(t,true)!).GetFileTypeInstances();
                     for(int i=0;i<types.Length;i++) FileRow(path,t.FullName+"#"+i,types[i]);
                     found=true;
+                } else if(typeof(IFileTypeFactory2).IsAssignableFrom(t)) {
+                    var types=((IFileTypeFactory2)Activator.CreateInstance(t,true)!).GetFileTypeInstances(new FileTypeHost());
+                    for(int i=0;i<types.Length;i++) FileRow(path,t.FullName+"#"+i,types[i]);
+                    found=true;
                 } else if(typeof(FileType).IsAssignableFrom(t)) {
                     FileRow(path,t.FullName!, (FileType)Activator.CreateInstance(t,true)!);found=true;
                 }
@@ -142,7 +146,7 @@ internal static class PluginCatalog
             var executable=Environment.ProcessPath ?? "dotnet";
             var name=Path.GetFileNameWithoutExtension(executable);
             bool dotnet=name.Equals("dotnet",StringComparison.OrdinalIgnoreCase);
-            var start=new ProcessStartInfo(executable) {UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+            var start=new ProcessStartInfo(executable) {UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardErrorEncoding=Encoding.UTF8};
             if(dotnet) start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
             else if(!name.Equals("PaintCraft.PdnHost",StringComparison.OrdinalIgnoreCase)) {
                 // PaintCraft started this helper on paint.net's own runtime and does so again.

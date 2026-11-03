@@ -234,7 +234,7 @@ build, use the `FileTypes` directory beside that build's executable.
 
 The Windows setup includes a host that runs `Effect`/`PropertyBasedEffect`,
 `BitmapEffect` and `GpuEffect` plugins with their PropertyBased forms, and
-`FileType`/`IFileTypeFactory` plugins. It needs a local paint.net 5.1 installation and
+`FileType`, `IFileTypeFactory` and `IFileTypeFactory2` plugins. It needs a local paint.net 5.1 installation and
 uses that installation's own runtime, so no separate .NET is required; Paint.NET assemblies
 are not redistributed. Extract plugins into `Effects` (or a subfolder), `FileTypes` or
 `Shapes` and restart. The scanner identifies managed assemblies separately from native
@@ -242,12 +242,13 @@ PNAPI plugins and adds compatible entries to menus/file filters in the backgroun
 **Effekte > Paint.NET-Plugins** says when something is missing. See the
 [host setup and compatibility matrix](../../tools/paintcraft-pdn-host/README.md).
 
-Plugin sliders and forms built on IndirectUI, other Paint.NET application services and
-complete file-type save dialogs are not implemented: parameters appear in a plain
-property list. v5 effects are tested with our own fixtures, not yet with third-party
+Paint.NET's slider controls, other application services and complete file-type save
+dialogs are not implemented: parameters appear in a plain property list with the plugin's
+labels. v5 effects are tested with our own fixtures, not yet with third-party
 plugins. Native Linux PaintCraft can invoke the same
-host through Wine with explicit configuration. The tested setup uses Wine 11.19
-and the experimental Paint.NET-on-Wine 5.200.9775.2252 package. The regular Windows
+host through Wine with explicit configuration. The tested setups use WineHQ 11.21 or
+Wine 11.19 and the experimental Paint.NET-on-Wine package; Fedora's wine 11.20 Staging
+package does not work. The regular Windows
 Paint.NET build failed its Direct2D initialization under Wine in this test.
 The bridge includes path translation, catalog discovery, codecs, cancellation
 and a heartbeat watchdog. See the [Linux setup](../../tools/paintcraft-pdn-host/README.md#linuxwine-setup)

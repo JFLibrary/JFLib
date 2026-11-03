@@ -56,7 +56,7 @@ internal static class ModernEffects
         if(properties!=null) {
             token=new PropertyBasedEffectConfigToken(properties);
             bool any=properties.Any(p=>!p.ReadOnly);
-            return !((show || validate) && configurable && any) || Dialogs.Properties(effect.EffectInfo.Name,properties,show);
+            return !((show || validate) && configurable && any) || Dialogs.Properties(effect.EffectInfo.Name,properties,ParameterLabels.For(effect,properties),show);
         }
         token=null;
         if(!configurable)return true;
@@ -112,15 +112,41 @@ internal sealed class HostServices(bool software):IServiceProvider
 {
     const string RenderingGpu="Graphics/RenderingGpuChoice";
     static bool cacheReady;
-    object? settings,direct2D,imaging,directWrite;
+    object? settings,direct2D,imaging,directWrite,enumNames,clipboard;
 
     public object? GetService(Type t)
     {
+        if(t==typeof(IEnumLocalizerFactory))return enumNames??=ClosedInterface.Implement(t,(_,a)=>EnumNames((Type)a[0]!));
+        if(t==typeof(IClipboardService))return clipboard??=Clipboard();
         if(t==typeof(ISettingsService))return settings??=ClosedInterface.Implement(t,(_,a)=>Setting((string)a[0]!));
         if(t==typeof(PaintDotNet.Direct2D1.IDirect2DFactory))return direct2D??=PaintDotNet.Direct2D1.Direct2DFactory.Create();
         if(t==typeof(IImagingFactory))return imaging??=ImagingFactory.CreateRef();
         if(t==typeof(PaintDotNet.DirectWrite.IDirectWriteFactory))return directWrite??=PaintDotNet.DirectWrite.DirectWriteFactory.CreateRef();
         return null;
+    }
+
+    // paint.net translates its own enums; a plugin's values keep their names, as without a translation.
+    static object EnumNames(Type type)
+    {
+        object Name(object value)=>ClosedInterface.Implement(typeof(ILocalizedEnumValue),(member,_)=>member switch {
+            "get_EnumType"=>type,
+            "get_EnumValue"=>value,
+            "get_LocalizedName"=>value.ToString(),
+            _=>null
+        });
+        return ClosedInterface.Implement(typeof(IEnumLocalizer),(member,a)=>member switch {
+            "get_EnumType"=>type,
+            "GetLocalizedEnumValue"=>Name(a[0]!),
+            "GetLocalizedEnumValues"=>Enum.GetValues(type).Cast<object>().Select(v=>(ILocalizedEnumValue)Name(v)).ToList(),
+            _=>null
+        });
+    }
+
+    // paint.net's own service for effects; it only wraps the system clipboard.
+    static object? Clipboard()
+    {
+        var type=Assembly.Load("paintdotnet").GetType("PaintDotNet.Effects.ClipboardServiceForEffects");
+        return type==null ? null : Activator.CreateInstance(type,true);
     }
 
     object Setting(string path)
@@ -154,6 +180,36 @@ internal sealed class HostServices(bool software):IServiceProvider
         Directory.CreateDirectory(dir);
         initialize.Invoke(null,[ClosedInterface.Implement(initialize.GetParameters()[0].ParameterType,(_,_)=>dir)]);
         cacheReady=true;
+    }
+}
+
+// What a plugin says about its parameters. IndirectUI describes them once it knows where its controls
+// live; the controls themselves need paint.net's application, so the host only reads the description.
+internal static class ParameterLabels
+{
+    static bool ready;
+
+    internal static PaintDotNet.IndirectUI.ControlInfo? For(object effect,PropertyCollection properties)
+    {
+        try {
+            if(!ready) {
+                typeof(PaintDotNet.IndirectUI.ControlInfo).GetMethod("Initialize",BindingFlags.Static|BindingFlags.NonPublic)?.Invoke(null,[Assembly.Load("paintdotnet")]);
+                ready=true;
+            }
+            return effect switch {
+                PropertyBasedEffect e=>e.CreateConfigUI(properties),
+                PropertyBasedBitmapEffect e=>e.CreateConfigUI(properties),
+                PropertyBasedGpuImageEffect e=>e.CreateConfigUI(properties),
+                PropertyBasedGpuDrawingEffect e=>e.CreateConfigUI(properties),
+                PropertyBasedGpuEffect e=>e.CreateConfigUI(properties),
+                _=>null
+            };
+        }
+        // A plugin's UI code may want more of the application: its plain names still work.
+        catch(Exception e) {
+            Console.Error.WriteLine("Keine Beschriftungen: "+e.GetBaseException().Message);
+            return null;
+        }
     }
 }
 
