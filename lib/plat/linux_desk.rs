@@ -246,7 +246,7 @@ pub(crate) fn desktop_id() -> String {
     // set by GLib for the process it launched (children inherit it: the PID tells them apart)
     if let (Some(file), Some(pid)) = (crate::env("GIO_LAUNCHED_DESKTOP_FILE"), crate::env("GIO_LAUNCHED_DESKTOP_FILE_PID")) {
         // SAFETY: getpid has no arguments.
-        let me = unsafe { rt::os::syscall6(39, 0, 0, 0, 0, 0, 0) };
+        let me = unsafe { rt::os::syscall6(rt::os::SYS_GETPID, 0, 0, 0, 0, 0, 0) };
         if pid.trim().parse::<isize>().ok() == Some(me) {
             if let Some(id) = clean(&file[file.rfind('/').map_or(0, |k| k + 1)..]) {
                 return id;

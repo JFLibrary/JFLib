@@ -449,8 +449,6 @@ pub fn drives() -> Vec<String> {
 }
 
 const SPAWN_ARGS: usize = 32; // argv entries at most (argv[0] included)
-const SYS_FORK: usize = 57;
-const SYS_EXECVE: usize = 59;
 
 /// fork; the child execs /proc/self/exe with argv[0], the arguments (at most 31) and the
 /// current environment (exit 127 when that fails) -> 0 / -1  [plat_spawn_self]
@@ -509,12 +507,12 @@ fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
     // SAFETY: fork has no arguments; the child only calls execve with the NUL-terminated
     // strings and 0-terminated pointer arrays built above, then exit_group.
     unsafe {
-        let pid = rt::os::syscall3(SYS_FORK, 0, 0, 0);
+        let pid = rt::os::fork();
         if pid < 0 {
             return -1;
         }
         if pid == 0 {
-            rt::os::syscall3(SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
+            rt::os::syscall3(rt::os::SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
             rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 127, 0, 0);
             loop {}
         }

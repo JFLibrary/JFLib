@@ -203,7 +203,7 @@ pub fn setenv(name: &str, value: Option<&str>) -> bool {
 
 pub fn sleep_ms(ms: u32) {
     // SAFETY: poll with no descriptors = a sleep.
-    unsafe { syscall3(SYS_POLL, 0, 0, ms as usize) };
+    unsafe { rt::os::poll(0, 0, ms as i32) };
 }
 
 // a program linked against glibc (build_rs.py section "glibc"): its start, exit, dlopen

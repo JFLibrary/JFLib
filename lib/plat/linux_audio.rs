@@ -31,7 +31,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
-use rt::os::syscall6;
+use rt::os::{syscall6, SYS_CLOSE, SYS_EVENTFD2, SYS_READ, SYS_WRITE};
 use rt::sync::SpinLock;
 
 use super::{AudioError, D_LOST, D_RUNNING, Feed, SOUND_DEFAULT, SOUND_ERROR, SOUND_INFO, SOUND_NOTIFY, SOUND_QUESTION, SOUND_WARNING, Sound};
@@ -41,11 +41,6 @@ use crate::{Sem, Thread, thread_spawn};
 pub(crate) mod pulse;
 use pulse::{Conn, Packet};
 
-const SYS_READ: usize = 0;
-const SYS_WRITE: usize = 1;
-const SYS_CLOSE: usize = 3;
-const SYS_POLL: usize = 7;
-const SYS_EVENTFD2: usize = 290;
 
 struct Ctl {
     /// kicks: state changes, closing
@@ -369,7 +364,7 @@ fn run(mut feed: Feed, ctl: Arc<Ctl>, name: String) {
 fn wait(fds: &[i32], ms: i32) {
     let mut pfd: Vec<u64> = fds.iter().map(|&fd| fd as u32 as u64 | (1u64 << 32)).collect();
     // SAFETY: pollfd records (fd, events POLLIN, revents) for our descriptors.
-    unsafe { syscall6(SYS_POLL, pfd.as_mut_ptr() as usize, pfd.len(), ms as isize as usize, 0, 0, 0) };
+    unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, pfd.len(), ms) };
 }
 
 pub(crate) fn available() -> bool {

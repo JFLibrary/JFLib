@@ -22,12 +22,11 @@ use alloc::boxed::Box;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use alloc::string::String;
-use rt::os::{syscall3, syscall6};
+use rt::os::{syscall3, syscall6, SYS_INOTIFY_ADD_WATCH, SYS_INOTIFY_INIT1, SYS_READ, SYS_RT_SIGACTION};
 
 use crate::linux_dbus::{Conn, Msg, T_SIGNAL, Value};
 use crate::{E_POWER, E_SESSION_END, E_SETTINGS, Event, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_OTHER, SET_THEME};
 
-const SYS_RT_SIGACTION: usize = 13;
 const SIGTERM: usize = 15;
 const SA_RESTORER: usize = 0x0400_0000;
 const SA_RESTART: usize = 0x1000_0000;
@@ -108,7 +107,7 @@ fn watch() {
         }
         let mut pfd = fds.map(|fd| fd as u32 as u64 | (1u64 << 32));
         // SAFETY: three pollfd records (a negative fd is skipped).
-        unsafe { syscall6(7, pfd.as_mut_ptr() as usize, 3, usize::MAX, 0, 0, 0) };
+        unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 3, -1) };
     }
 }
 
@@ -134,7 +133,7 @@ impl Files {
     fn new() -> Option<Files> {
         let home = crate::config_dir()?;
         // SAFETY: no pointers.
-        let fd = unsafe { syscall3(294 /* inotify_init1 */, IN_NONBLOCK | IN_CLOEXEC, 0, 0) };
+        let fd = unsafe { syscall3(SYS_INOTIFY_INIT1, IN_NONBLOCK | IN_CLOEXEC, 0, 0) };
         if fd < 0 {
             return None;
         }
@@ -154,7 +153,7 @@ impl Files {
         };
         let z: alloc::vec::Vec<u8> = dir.bytes().chain(core::iter::once(0)).collect();
         // SAFETY: a NUL-terminated path.
-        let wd = unsafe { syscall3(254 /* inotify_add_watch */, self.fd, z.as_ptr() as usize, IN_MASK as usize) };
+        let wd = unsafe { syscall3(SYS_INOTIFY_ADD_WATCH, self.fd, z.as_ptr() as usize, IN_MASK as usize) };
         self.wd[k] = if wd < 0 { -1 } else { wd as i32 };
     }
 
@@ -164,7 +163,7 @@ impl Files {
         let mut hit = false;
         loop {
             // SAFETY: the buffer is writable for its length.
-            let n = unsafe { syscall3(0 /* read */, self.fd, buf.as_mut_ptr() as usize, buf.len()) };
+            let n = unsafe { syscall3(SYS_READ, self.fd, buf.as_mut_ptr() as usize, buf.len()) };
             if n <= 0 {
                 return hit;
             }

@@ -657,7 +657,7 @@ mod sys {
 #[cfg(target_os = "linux")]
 mod sys {
     use super::{NetError, NetErrorKind, NetResult};
-    use rt::os::{syscall3, syscall6};
+    use rt::os::{syscall3, syscall6, O_NONBLOCK, SYS_ACCEPT4, SYS_BIND, SYS_CLOSE, SYS_CONNECT, SYS_FCNTL, SYS_GETPEERNAME, SYS_GETSOCKNAME, SYS_GETSOCKOPT, SYS_IOCTL, SYS_LISTEN, SYS_RECVFROM, SYS_SENDTO, SYS_SETSOCKOPT, SYS_SHUTDOWN, SYS_SOCKET};
 
     pub type Raw = usize;
     pub const AF_INET: i32 = 2;
@@ -674,22 +674,6 @@ mod sys {
     const SOCK_CLOEXEC: usize = 0x80000;
     const MSG_NOSIGNAL: usize = 0x4000;
 
-    const SYS_POLL: usize = 7;
-    const SYS_CLOSE: usize = 3;
-    const SYS_SOCKET: usize = 41;
-    const SYS_CONNECT: usize = 42;
-    const SYS_SENDTO: usize = 44;
-    const SYS_RECVFROM: usize = 45;
-    const SYS_SHUTDOWN: usize = 48;
-    const SYS_BIND: usize = 49;
-    const SYS_LISTEN: usize = 50;
-    const SYS_GETSOCKNAME: usize = 51;
-    const SYS_GETPEERNAME: usize = 52;
-    const SYS_SETSOCKOPT: usize = 54;
-    const SYS_GETSOCKOPT: usize = 55;
-    const SYS_FCNTL: usize = 72;
-    const SYS_ACCEPT4: usize = 288;
-    const SYS_IOCTL: usize = 16;
     const SIOCGIFCONF: usize = 0x8912;
     const SIOCGIFINDEX: usize = 0x8933;
     const EINTR: isize = 4;
@@ -808,7 +792,7 @@ mod sys {
     pub fn set_nonblocking(s: Raw, on: bool) -> NetResult<()> {
         // SAFETY: F_GETFL on an owned descriptor.
         let fl = call(|| unsafe { syscall3(SYS_FCNTL, s, 3, 0) })?;
-        let fl = if on { fl | 0x800 } else { fl & !0x800 };
+        let fl = if on { fl | O_NONBLOCK } else { fl & !O_NONBLOCK };
         // SAFETY: F_SETFL on an owned descriptor.
         call(|| unsafe { syscall3(SYS_FCNTL, s, 4, fl) }).map(|_| ())
     }
@@ -878,7 +862,7 @@ mod sys {
     pub fn poll(fds: &mut [PollFd], ms: i32) -> NetResult<usize> {
         let (p, n) = (fds.as_mut_ptr() as usize, fds.len());
         // SAFETY: fds is a valid array.
-        call(|| unsafe { syscall3(SYS_POLL, p, n, ms as isize as usize) })
+        call(|| unsafe { rt::os::poll(p, n, ms) })
     }
 }
 

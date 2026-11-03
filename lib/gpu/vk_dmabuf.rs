@@ -54,8 +54,6 @@ use crate::*;
 
 const DRM_FORMAT_MOD_INVALID: u64 = 0x00FF_FFFF_FFFF_FFFF;
 const FORMAT_FEATURE_TRANSFER_SRC_BIT: u32 = 0x4000;
-const SYS_FCNTL: usize = 72;
-const SYS_POLL: usize = 7;
 const F_DUPFD_CLOEXEC: usize = 1030;
 const POLLOUT: u16 = 4;
 /// images of a swapchain without SwapchainDesc::min_images
@@ -522,7 +520,7 @@ impl Swapchain {
                 continue;
             }
             // SAFETY: a descriptor of ours, duplicated.
-            let dup = unsafe { rt::os::syscall3(SYS_FCNTL, self.images[k].fd as usize, F_DUPFD_CLOEXEC, 3) };
+            let dup = unsafe { rt::os::syscall3(rt::os::SYS_FCNTL, self.images[k].fd as usize, F_DUPFD_CLOEXEC, 3) };
             if dup < 0 {
                 return Err(GpuError::Unsupported("no descriptor for a buffer"));
             }
@@ -553,7 +551,7 @@ impl Swapchain {
         }
         let mut p = PollFd { fd, events: POLLOUT, revents: 0 };
         // SAFETY: one pollfd, no wait.
-        let r = unsafe { rt::os::syscall3(SYS_POLL, &mut p as *mut PollFd as usize, 1, 0) };
+        let r = unsafe { rt::os::poll(&mut p as *mut PollFd as usize, 1, 0) };
         r == 1
     }
 

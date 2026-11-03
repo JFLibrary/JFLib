@@ -1866,14 +1866,15 @@ Fensterrand hinaus.
 - **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend` ohne libc ist eigener
   Aufwand); heute macOS nur über das Web.
 - **P2** · *fehlt* · Native iOS-Version.
-- **P2** · *fehlt* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
+- **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
   den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
-  - Zu tun: Syscall-Nummern, Flags und Kernel-Layouts an einer Stelle (265 Stellen, geht schon ohne
-    ARM), Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
-    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete.
-  - NEON für `lib/simd` ist darin ARM6 und bringt auch Android etwas; die Arbeit nützt später auch
-    macOS und iOS auf ARM.
+  - Erledigt: Syscall-Nummern, Flags und Kernel-Layouts in einer Tabelle pro Architektur
+    ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1; auf ARM noch nicht gelaufen), NEON für `lib/simd`
+    (ARM6), das auf Android schon jetzt wirkt.
+  - Zu tun: Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
+    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete. Die Arbeit nützt später auch macOS und iOS
+    auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter
@@ -1941,9 +1942,13 @@ Fensterrand hinaus.
     von 24 auf 11 ms, verpasste Vsyncs von 159 auf 0 bis 1, `nativeRender` von etwa 12 auf etwa 6 ms.
   - Skriptbefehle `tap`, `longpress`, `swipe`, `flick`, `finger`; geprüft mit `touch.uis` (mehrere
     Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
-  - Offen: NEON für `lib/simd` (auf ARM rechnet der Rasterer skalar, dort liegt ein großer Teil der
-    verbleibenden 6 ms); die Bilder gehen zweimal durch den Speicher (Fenster, dann Bitmap), vom
-    GPU-Weg abgesehen; Ziehen und Ablegen braucht in rollenden Sichten einen Griff (`ui.touch_drag`); der
+  - NEON für `lib/simd` (2026-11-03, [ARM64.md](ARM64.md) ARM6): `nativeRender` im Median von 5,7 auf
+    5,2 ms, auf „Werte & Farben“ von 6,9 auf 6,3 ms bei 6 statt 17 % ruckelnden Bildern, dieselben Pixel.
+    Dazu `rt::fx` mit `fsqrt` und `fcvtns` (`lib/rt/aarch64/fx.rs`): noch einmal rund 0,5 ms je Bild.
+  - Offen: Die größten Posten liegen nicht in `lib/simd` (`simpleperf`, Startseite): die Bilder gehen
+    zweimal durch den Speicher (Fenster, dann Bitmap; `memmove` 32 %), vom GPU-Weg abgesehen;
+    `to_rgba` 17 % (ein Release-Bau vektorisiert es, ein Entwicklungsbau nicht); Ziehen und Ablegen
+    braucht in rollenden Sichten einen Griff (`ui.touch_drag`); der
     Browser auf einem echten Telefon ist nur in Chromiums Emulation geprüft.
 - **P2** · *erledigt, auf dem Gerät noch zu prüfen* (2026-11-01) · Finger auf dem Desktop, angestoßen von PaintCraft auf einem
   Surface ([GUIDE §37](GUIDE.md), [`lib/plat/win_touch.rs`](../lib/plat/win_touch.rs),

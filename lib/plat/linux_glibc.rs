@@ -53,7 +53,6 @@ unsafe extern "C" {
 #[repr(C, align(8))]
 pub(super) struct PthreadAttr(pub(super) [u8; 56]);
 
-const SYS_ARCH_PRCTL: usize = 158;
 const ARCH_GET_FS: usize = 0x1003;
 const RTLD_NOW: i32 = 2;
 
@@ -165,7 +164,7 @@ pub fn glibc_thread_ids() -> (usize, usize, usize) {
     // SAFETY: arch_prctl writes the FS base to fs; the two libc calls have no preconditions on a
     // thread started by glibc.
     unsafe {
-        rt::os::syscall3(SYS_ARCH_PRCTL, ARCH_GET_FS, &mut fs as *mut usize as usize, 0);
+        rt::os::syscall3(rt::os::SYS_ARCH_PRCTL, ARCH_GET_FS, &mut fs as *mut usize as usize, 0);
         (fs, pthread_self(), __errno_location() as usize)
     }
 }

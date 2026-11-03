@@ -13,31 +13,7 @@ use rt::os::*;
 use super::{env, time_us};
 use crate::{FO_READ, FO_RW, FO_WRITE};
 
-const SYS_PREAD64: usize = 17;
-const SYS_PWRITE64: usize = 18;
-const SYS_FSYNC: usize = 74;
-const SYS_FCHMOD: usize = 91;
-const SYS_FCHOWN: usize = 93;
-const SYS_READLINK: usize = 89;
-const SYS_GETCWD: usize = 79;
-const SYS_RENAME: usize = 82;
-const SYS_GETDENTS64: usize = 217;
-const SYS_OPENAT: usize = 257;
-const SYS_MKDIRAT: usize = 258;
-const SYS_NEWFSTATAT: usize = 262;
-const SYS_UNLINKAT: usize = 263;
-const SYS_GETPID: usize = 39;
-const AT_FDCWD: usize = -100isize as usize;
 const AT_REMOVEDIR: usize = 0x200;
-const O_WRONLY: usize = 1;
-const O_RDWR: usize = 2;
-const O_CREAT: usize = 0x40;
-const O_EXCL: usize = 0x80;
-const O_TRUNC: usize = 0x200;
-const O_DIRECTORY: usize = 0x10000;
-const O_CLOEXEC: usize = 0x80000;
-const O_NOFOLLOW: usize = 0x20000;
-const O_TMPFILE: usize = 0x410000; // __O_TMPFILE | O_DIRECTORY
 const EPERM: isize = 1;
 const EINTR: isize = 4;
 const EEXIST: isize = 17;
@@ -58,24 +34,24 @@ fn path_z(path: &str) -> Vec<u8> {
 
 /// struct stat of a path: (st_mode, st_size), None when it cannot be read
 fn stat_at(dirfd: usize, name: *const u8) -> Option<(u32, i64)> {
-    let mut st = [0u64; 18]; // 144 bytes
-    // SAFETY: name is NUL-terminated; st holds a struct stat.
-    if unsafe { syscall6(SYS_NEWFSTATAT, dirfd, name as usize, st.as_mut_ptr() as usize, 0, 0, 0) } != 0 {
+    let mut st = Stat::default();
+    // SAFETY: name is NUL-terminated; st is a struct stat.
+    if unsafe { syscall6(SYS_NEWFSTATAT, dirfd, name as usize, &mut st as *mut Stat as usize, 0, 0, 0) } != 0 {
         return None;
     }
-    Some(((st[3] & 0xFFFF_FFFF) as u32, st[6] as i64)) // st_mode at 24, st_size at 48
+    Some((st.st_mode, st.st_size))
 }
 
 /// (st_dev, st_ino) of a path (links followed), None when it cannot be read: the identity
 /// fontdb uses to visit a directory once  [fd_visit_once]
 pub fn dev_ino(path: &str) -> Option<(u64, u64)> {
     let p = path_z(path);
-    let mut st = [0u64; 18]; // 144 bytes
-    // SAFETY: p is NUL-terminated; st holds a struct stat.
-    if unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, st.as_mut_ptr() as usize, 0, 0, 0) } != 0 {
+    let mut st = Stat::default();
+    // SAFETY: p is NUL-terminated; st is a struct stat.
+    if unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, &mut st as *mut Stat as usize, 0, 0, 0) } != 0 {
         return None;
     }
-    Some((st[0], st[1]))
+    Some((st.st_dev, st.st_ino))
 }
 
 /// drop trailing '/' (but keep "/")
@@ -193,7 +169,7 @@ pub(crate) fn delete_raw(path: &str) -> bool {
 pub(crate) fn rename_raw(old: &str, new: &str) -> bool {
     let (o, n) = (path_z(old), path_z(new));
     // SAFETY: NUL-terminated paths.
-    unsafe { syscall3(SYS_RENAME, o.as_ptr() as usize, n.as_ptr() as usize, 0) == 0 }
+    unsafe { rt::os::rename(o.as_ptr() as usize, n.as_ptr() as usize) == 0 }
 }
 
 /// f(name, is_dir, size_lo) for every entry except "." and ".." (links followed)  [plat_dir_list]
@@ -301,7 +277,7 @@ fn link_target(path: &str) -> Option<String> {
         let z = path_z(&cur);
         let mut buf = [0u8; 4096];
         // SAFETY: NUL-terminated path and a writable buffer of the given size.
-        let n = unsafe { syscall3(SYS_READLINK, z.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len()) };
+        let n = unsafe { syscall6(SYS_READLINKAT, AT_FDCWD, z.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
         if n == -22 || n == -2 { return Some(cur); } // EINVAL: not a link; ENOENT: nothing there
         if n <= 0 || n as usize >= buf.len() { return None; }
         let t = core::str::from_utf8(&buf[..n as usize]).ok()?;
@@ -325,11 +301,11 @@ impl OsAtomic {
         let path = link_target(path)?;
         let path = path.as_str();
         let dst = path_z(path);
-        let mut st = [0u64; 18];
-        // SAFETY: NUL-terminated path and storage for the x86-64 stat structure.
-        let status = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, dst.as_ptr() as usize, st.as_mut_ptr() as usize, 0, 0, 0) };
+        let mut st = Stat::default();
+        // SAFETY: NUL-terminated path and storage for the stat structure.
+        let status = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, dst.as_ptr() as usize, &mut st as *mut Stat as usize, 0, 0, 0) };
         let mode = match status {
-            0 if st[3] as u32 & S_IFMT == S_IFREG => Some(st[3] as usize & 0o777),
+            0 if st.st_mode & S_IFMT == S_IFREG => Some(st.st_mode as usize & 0o777),
             -2 => None, // ENOENT: new files retain the usual umask-controlled mode
             _ => return None,
         };
@@ -345,7 +321,7 @@ impl OsAtomic {
                 if fd == -EEXIST { continue; }
                 return None;
             }
-            let owner = (st[3] as usize >> 32, st[4] as usize & 0xFFFF_FFFF); // st_uid at 28, st_gid at 32
+            let owner = (st.st_uid as usize, st.st_gid as usize);
             return Some(OsAtomic { f: Some(OsFile(fd as i32)), tmp, dst, mode, owner });
         }
         None
@@ -370,7 +346,7 @@ impl OsAtomic {
         ok &= f.sync();
         drop(f);
         // SAFETY: both paths are NUL-terminated.
-        if ok && unsafe { syscall3(SYS_RENAME, self.tmp.as_ptr() as usize, self.dst.as_ptr() as usize, 0) } == 0 {
+        if ok && unsafe { rt::os::rename(self.tmp.as_ptr() as usize, self.dst.as_ptr() as usize) } == 0 {
             self.tmp.clear();
             return true;
         }
@@ -402,7 +378,7 @@ impl OsFileLock {
         if !matches!(file_exists_checked_raw(path), Some(0 | 1)) { return None; }
         let file = OsFile::open_raw(path, FO_RW)?;
         // SAFETY: file owns a valid descriptor. flock(LOCK_EX | LOCK_NB) never blocks.
-        let result = unsafe { syscall3(73, file.0 as usize, 6, 0) };
+        let result = unsafe { syscall3(SYS_FLOCK, file.0 as usize, 6, 0) };
         if result == 0 { Some(Self { _file: file }) } else { None }
     }
 }
@@ -411,11 +387,11 @@ impl OsFileLock {
 pub(crate) fn file_exists_checked_raw(path: &str) -> Option<u32> {
     if path.is_empty() || path.contains('\0') { return None; }
     let p = path_z(path);
-    let mut st = [0u64; 18];
-    // SAFETY: p is NUL-terminated and st holds the x86-64 Linux stat structure.
-    let result = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, st.as_mut_ptr() as usize, 0, 0, 0) };
+    let mut st = Stat::default();
+    // SAFETY: p is NUL-terminated and st is the stat structure.
+    let result = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, &mut st as *mut Stat as usize, 0, 0, 0) };
     match result {
-        0 => match st[3] as u32 & S_IFMT { S_IFDIR => Some(2), S_IFREG => Some(1), _ => None },
+        0 => match st.st_mode & S_IFMT { S_IFDIR => Some(2), S_IFREG => Some(1), _ => None },
         -2 | -20 => Some(0), // ENOENT, ENOTDIR
         _ => None,
     }
@@ -543,12 +519,12 @@ impl OsFile {
     }
 
     pub fn size(&self) -> Option<u64> {
-        let mut st = [0u64; 18];
-        // SAFETY: st holds a struct stat.
-        if unsafe { syscall3(SYS_FSTAT, self.0 as usize, st.as_mut_ptr() as usize, 0) } != 0 {
+        let mut st = Stat::default();
+        // SAFETY: st is a struct stat.
+        if unsafe { syscall3(SYS_FSTAT, self.0 as usize, &mut st as *mut Stat as usize, 0) } != 0 {
             return None;
         }
-        Some(st[6])
+        Some(st.st_size as u64)
     }
 
     /// write cached data to the disk (fsync)
@@ -560,7 +536,7 @@ impl OsFile {
     /// cut or extend the file to `len` bytes (ftruncate)
     pub fn set_len(&self, len: u64) -> bool {
         // SAFETY: our descriptor.
-        unsafe { syscall3(77, self.0 as usize, len as usize, 0) == 0 }
+        unsafe { syscall3(SYS_FTRUNCATE, self.0 as usize, len as usize, 0) == 0 }
     }
 }
 
