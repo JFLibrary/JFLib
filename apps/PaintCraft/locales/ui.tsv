@@ -261,6 +261,11 @@ Preset anwenden	Apply preset	Appliquer le préréglage
 Lizenz der Brush-Factory-Spitzen	Brush Factory tip license	Licence des pointes Brush Factory
 Farbfluss bei überlappenden Abdrücken aufbauen	Accumulate flow for overlapping dabs	Accumuler le flux des empreintes superposées
 Maximale Strichdeckung (0–255)	Maximum stroke coverage (0–255)	Couverture maximale du trait (0–255)
+Ein Finger auf der Leinwand	One finger on the canvas	Un doigt sur le canevas
+Automatisch: malt, bis ein Stift benutzt wurde	Automatic: paints until a pen has been used	Automatique : peint jusqu’à l’utilisation d’un stylet
+Malt mit dem aktuellen Werkzeug	Paints with the current tool	Peint avec l’outil actuel
+Verschiebt die Ansicht	Moves the view	Déplace la vue
+Zwei Finger zoomen und verschieben die Ansicht immer. Solange der Stift auf dem Bildschirm oder nah darüber ist, zählen Finger nicht: Der Handballen malt nicht und verschiebt nichts.	Two fingers always zoom and move the view. While the pen is on the screen or close above it, fingers do not count: the palm of your hand neither paints nor moves anything.	Deux doigts zooment et déplacent toujours la vue. Tant que le stylet est sur l’écran ou juste au-dessus, les doigts ne comptent pas : la paume ne peint rien et ne déplace rien.
 G’MIC-Qt…	G’MIC-Qt…	G’MIC-Qt…
 Bokeh…	Bokeh…	Bokeh…
 Quantize…	Quantize…	Quantification…

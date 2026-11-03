@@ -48,9 +48,11 @@ pub const HB_GRAB_V: u32 = 0x80000;
 // finger moving along this axis is the widget's (not the scroll view's around it); with both the
 // press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
 // resting for the long-press time: a panel that starts to move then, until then the finger goes
-// to what is around it); TF_TWO a second finger is the widget's: no press, no click, it reads
-// ui.touch_fingers (pan and zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing
-// special (the finger rolls what is around it, with nothing to roll it drags the widget).
+// to what is around it); TF_HOLD_LONG the same after a second (a panel's title bar; ui.touch_hold_part
+// shows it); TF_REST a finger that rests presses like one that moved, no context menu (a canvas); TF_TWO
+// a second finger is the widget's: no press, no click, it reads ui.touch_two or ui.touch_fingers (pan and
+// zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing special (the finger rolls what is
+// around it, with nothing to roll it drags the widget).
 pub const TF_V: u32 = 1;
 pub const TF_H: u32 = 2;
 pub const TF_BOTH: u32 = 3;
@@ -58,6 +60,8 @@ pub const TF_HOLD: u32 = 4;
 pub const TF_TWO: u32 = 8;
 pub const TF_SLOP: u32 = 16;
 pub const TF_DECLINE: u32 = 32;
+pub const TF_REST: u32 = 64;
+pub const TF_HOLD_LONG: u32 = 128;
 
 // ------------------------------------------------------------------ semantic kinds and states
 pub const K_BOX: u16 = 0;

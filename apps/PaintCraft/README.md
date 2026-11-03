@@ -246,9 +246,9 @@ Paint.NET's slider controls, other application services and complete file-type s
 dialogs are not implemented: parameters appear in a plain property list with the plugin's
 labels. BoltBait's pack, the published GPU samples and WebP were run through the host once
 by hand; see the matrix for what that covers. Native Linux PaintCraft can invoke the same
-host through Wine with explicit configuration. The tested setups use WineHQ 11.21 or
-Wine 11.19 and the experimental Paint.NET-on-Wine package; Fedora's wine 11.20 Staging
-package does not work. The regular Windows
+host through Wine with explicit configuration, for classic and GPU effects alike. The fully
+tested setup uses WineHQ 11.21 and the experimental Paint.NET-on-Wine package; Fedora's wine
+11.20 Staging package does not work. The regular Windows
 Paint.NET build failed its Direct2D initialization under Wine in this test.
 The bridge includes path translation, catalog discovery, codecs, cancellation
 and a heartbeat watchdog. See the [Linux setup](../../tools/paintcraft-pdn-host/README.md#linuxwine-setup)
@@ -288,8 +288,8 @@ their original language. See [text behavior and tests](docs/TEXT.md).
   all blend modes, CMYK/Lab and PSB export remain open.
 - **HDR and precision:** document pixels, Undo, tools/effects and display remain
   8-bit SDR. High-depth decoding is a conversion, not 16/32-bit editing or HDR output.
-- **Original plugins:** modern Bitmap/GPU APIs and application-specific host services remain open;
-  the classic Linux/Wine bridge is implemented and tested.
+- **Original plugins:** Paint.NET's own parameter controls, live preview and some application services
+  remain open, on Windows and through the Linux/Wine bridge alike.
 - **Creative plugins:** G'MIC currently receives one active 8-bit layer; Brush Factory
   advanced preset dynamics and full Brush Factory API compatibility remain incomplete.
 - **Text/IME:** Windows IMM and Wayland text-input-v3 are wired up; automated tests

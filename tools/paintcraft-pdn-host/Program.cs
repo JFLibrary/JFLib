@@ -40,6 +40,7 @@ internal static class Program
                 data=buffer.ToArray();
             }
             if(args.Contains("--catalog")) return PluginCatalog.Scan(args,dir);
+            WineMode.Apply(dir);
             if(args.Contains("--inspect")) return PluginCatalog.Inspect(args[0]);
             if(args.Contains("--decode") || args.Contains("--encode")) return FileTypeBridge.Run(args,data);
             return Run(args,data);

@@ -86,7 +86,7 @@ integer and floating-point output, `BitmapEffect<TToken>` with its own form, a p
 `BitmapEffect`, `PropertyBasedGpuImageEffect` (a built-in Direct2D effect and Paint.NET's
 own `PdnBrightnessContrastEffect`, a registered pixel shader) and
 `PropertyBasedGpuDrawingEffect`, on the default GPU and on WARP, with selection,
-undo/redo and cancel. The v5 path has not been tried under Wine.
+undo/redo and cancel. For the same path under Wine see [Linux/Wine setup](#linuxwine-setup).
 
 Real plugins, run once by hand on Paint.NET 5.1.12 (2026-11-03; downloads are not part of the
 test suite):
@@ -163,7 +163,8 @@ GPU as on the CPU, and can do what any program can.
 The current API dependency was tested with assembly version `5.112.9563.32325`
 (Paint.NET 5.1.12, .NET 9). Paint.NET updates can change these APIs; rebuild and retest
 the host after such an update. Only a Paint.NET folder with `coreclr.dll` runs without an
-installed .NET; the Microsoft Store edition has not been tried.
+installed .NET; the Microsoft Store edition has not been tried. Under Wine the helper also runs
+on the 5.2 Beta in the Paint.NET-on-Wine package; 5.2 under Windows has not been tried.
 
 ## Can Windows DLLs run on Linux?
 
@@ -184,32 +185,49 @@ tablet input, or every plugin-owned dialog and application service.
 
 Use a private Wine prefix and the experimental
 [Paint.NET-on-Wine package](https://github.com/paintdotnet/Paint.NET-on-Wine).
-The developer currently requires Wine 11.15 or newer and provides a managed
-Direct2D implementation. The regular Windows Paint.NET 5.1 package failed its
-Direct2D color-profile initialization in our Wine test. Merely installing Wine
-around that package is therefore insufficient.
+The package replaces what Wine lacks with managed implementations. `paintdotnet.exe` installs them at
+its start when `PaintDotNet.Configuration.json` says `EnableWineMode`; the helper starts instead of that
+program and does the same (`WineMode.cs`: managed imaging and Direct2D, DWriteCore, the alternate WARP
+lookup). As the package's `paintdotnet.sh` does, PaintCraft sets `WINEDLLOVERRIDES=mshtml=;d3dcompiler_47=n`
+unless the variable is already set: Wine's own d3dcompiler cannot reflect the shaders of GPU effects.
+The regular Windows Paint.NET 5.1 package failed its Direct2D color-profile initialization in our Wine
+test. Merely installing Wine around that package is therefore insufficient. The package's minimum of
+Wine 11.20 is checked by `paintdotnet.exe`, not by the helper; a prefix set up with
+`wineboot -i` and `winecfg -v win11` is enough for it, DXVK is not needed (one GPU effect gave the
+same pixels with and without it).
 
-Tested with the helper built against the Windows 5.1 API, Paint.NET-on-Wine's bundled .NET 11
-runtime and classic effects (2026-11-03 unless noted; the v5 path was not part of this):
+Tested on 2026-11-03 with the helper built against the Windows 5.1 API, the package's bundled
+.NET 11 runtime and default settings, against the same plugins on Windows (WARP for GPU effects):
 
-- **Fedora 44, WineHQ 11.21, Paint.NET-on-Wine 5.200.9793.3533: works.** Same catalog as on
-  Windows, 12 effects byte-identical to Windows over the whole image and a selection; menu, undo,
-  redo and cancel without leftover processes; the real dialogs of Pastel and BBChart. Only
-  under Wine, `Dimensions` fails with `Font 'Arial' cannot be found`, and `Complementary Colors`
-  and `Polygon / Stars` differ in pixels (cause not known).
-- **Ubuntu 26.04, its Wine 10.0: works** for Pastel, Oil Painting+ and Edge Detect, byte-identical;
-  the host alone, without windows or PaintCraft.
-- **Ubuntu 24.04 / WSL, Wine 11.19, Paint.NET-on-Wine 5.200.9775.2252: works** (earlier test).
+- **Fedora 44, WineHQ 11.21, Paint.NET-on-Wine 5.200.9793.3533: works.** Same catalog as on Windows
+  (19 classic, 28 GPU, PSFilterPdn, WebP). No effect changes pixels outside a selection.
+  - **Classic:** 15 byte-identical. `Complementary Colors` and `Polygon / Stars` differ in what they
+    draw as text and lines. `Paste Alpha` runs with an empty clipboard; a real clipboard image was not
+    tried. `Dimensions` fails with `Font 'Arial' cannot be found`, the prefix has no such font.
+  - **GPU:** 20 byte-identical or within one step in some pixels, as on WARP against a GPU. `Flames`
+    differs by up to 5 steps, `Feather Object` and `Feather Selection` by more in about 2000 pixels
+    without a difference to see. `Level Horizon` differs in the glyphs it draws. `Calendar`,
+    `Meme Maker` and `Text Fun Factory` use other fonts and break their text differently, which shows.
+    `From Clipboard` runs with an empty clipboard.
+  - **PaintCraft:** through the menu Drop Shadow+, Transparency, Vignette+ (undo, redo), Pastel (the
+    same checksum as on Windows), Flip Horizontal, and cancelling a GPU effect without leftover
+    processes. A catalog takes about 30 s on a Pentium G4560T, in the background on a normal start.
+  - **Dialogs**, on a KWin without a screen: Vignette+, Drop Shadow+, Pastel and BBChart open and apply;
+    PSFilterPdn opens and cancels, no 8bf filter was run. WebP encodes and decodes through the helper.
+- **Ubuntu 26.04, its Wine 10.0: works** for Pastel (byte-identical), Vignette+ and Transparency
+  (within one step); the host alone, without windows or PaintCraft.
+- **Ubuntu 24.04 / WSL, Wine 11.19, Paint.NET-on-Wine 5.200.9775.2252: works** for classic effects
+  (an earlier test, before the v5 path).
 - **Fedora's package wine 11.20 Staging: does not work.** It stops with `Cannot get symbol
   u_charsToUChars from libicuuc` (its prefix has `icuuc.dll` and `icuin.dll` but no `icu.dll`, unlike
   WineHQ 11.21). With `DOTNET_SYSTEM_GLOBALIZATION_USENLS=1` it fails later: `Bgra32 is not a
-  supported pixel format` with 9793, `Unable to load DLL 'd2d1'` with 9775. Whether this is
-  Fedora's build or 11.20 itself is open.
+  supported pixel format` or `Unable to load DLL 'd2d1'`. Whether this is Fedora's build or 11.20
+  itself is open.
 
-The release notes of 9793 say GPU effects with ComputeSharp.D2D1 now run under Wine; that is not
-tested here. The experimental Paint.NET builds expire 12 weeks after they were built;
+The experimental Paint.NET builds expire 12 weeks after they were built;
 follow their release instructions and retest after updating. Neither Wine nor
-Paint.NET is bundled with PaintCraft.
+Paint.NET is bundled with PaintCraft. Linux packages do not contain the helper either: it is built on
+Windows against a Paint.NET installation and deployed as below.
 
 After building the Windows helper, deploy its files into your **private unpacked**
 Paint.NET-on-Wine directory. This copies only `PaintCraft.PdnHost.dll`, its optional

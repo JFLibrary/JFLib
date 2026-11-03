@@ -98,7 +98,7 @@ pub(crate) fn whist_frame(p: &mut Pn, ui: &mut Ui) {
     }
     let open = crate::workspace::chrome::chrome_wnd_open(&p.chrome, WND_HISTORY);
     let rect = p.whist.rect.clone();
-    if ui.window_begin(WINID_HISTORY, crate::preferences::localization::tr("Verlauf"), Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
+    if ui.window_begin(WINID_HISTORY, crate::preferences::localization::tr("Verlauf"), Some(&open), WF_TOOL | WF_RESIZABLE | WF_TOUCH_HOLD, Some(&rect)) {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_FIXED, 0);
         wh_message(p, ui);

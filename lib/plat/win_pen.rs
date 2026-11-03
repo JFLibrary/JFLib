@@ -8,10 +8,10 @@
 //   pen_api_set(Some(api))   (test aid) the pointer API through the given functions instead
 //        of user32's (plattest's fakes); None = back to user32 (loaded again on first use)
 //
-// Only pointers of type PT_PEN are handled.  EnableMouseInPointer is never called, so the
-// mouse keeps sending WM_MOUSEMOVE / WM_*BUTTON*; touch and every pointer the API cannot
-// describe go on to DefWindowProc, which turns them into mouse messages as before.  A handled
-// pen message produces no mouse message.  With pen input off (pen_enable(false)) nothing is
+// Pointers of type PT_PEN are handled here, fingers (PT_TOUCH) in win_touch.rs.  EnableMouseInPointer
+// is never called, so the mouse keeps sending WM_MOUSEMOVE / WM_*BUTTON*; every pointer the API cannot
+// describe goes on to DefWindowProc, which turns it into mouse messages as before.  A handled
+// pen message produces no mouse message.  With pen input off (pen_enable(false)) no pen is
 // handled: pens arrive as the system's mouse emulation.
 //   WM_POINTERUPDATE   every coalesced sample since the last message (GetPointerPenInfoHistory,
 //                      oldest first, at most PEN_HIST) -> E_MOVE with pen data
@@ -31,7 +31,8 @@ use super::{HTCLIENT, Point, SendMessageW, ScreenToClient, UiThread, dll_proc, s
 use crate::{BTN_LEFT, BTN_RIGHT, E_DOWN, E_LEAVE, E_MOVE, E_UP, PRESSURE_ONE, PTR_ERASER, PTR_PEN, evq_pen_data,
             pen_enabled};
 
-const WIN_PT_PEN: u32 = 3; // POINTER_INPUT_TYPE
+pub(super) const WIN_PT_TOUCH: u32 = 2; // POINTER_INPUT_TYPE
+const WIN_PT_PEN: u32 = 3;
 pub const PEN_HIST: usize = 16; // samples per WM_POINTERUPDATE
 const PPI_SIZE: usize = 120; // POINTER_PEN_INFO (x64)
 const PFL_SECONDBUTTON: u32 = 0x20;
@@ -205,15 +206,21 @@ fn real_devs(count: &mut u32, types: Option<&mut [u32]>) -> bool {
     }
 }
 
+/// GetPointerType(id) (None: failed)
+pub(super) fn pointer_type(id: u32) -> Option<u32> {
+    pen_api().ptype.and_then(|f| f(id))
+}
+
 /// a pointer message of window w -> handled  [win_pointer]
 pub(super) fn win_pointer(hwnd: isize, msg: u32, wp: usize, w: i32) -> bool {
-    if !pen_enabled() {
-        return false;
-    }
     let api = pen_api();
     let Some(ptype) = api.ptype else { return false };
     let id = wp as u16 as u32; // pointer id
-    if ptype(id) != Some(WIN_PT_PEN) {
+    let kind = ptype(id);
+    if kind == Some(WIN_PT_TOUCH) {
+        return super::touch::pointer(hwnd, msg, id, w);
+    }
+    if !pen_enabled() || kind != Some(WIN_PT_PEN) {
         return false;
     }
     let s = st();

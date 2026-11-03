@@ -238,8 +238,8 @@ worker pool + `sync`, X / Standardfarben), `tools_picker.uis`, `tools_view.uis`,
 * **Eraser end**: tool.s `tool_input` — pen input of type `PTR_ERASER` over the canvas (no button
   held from an earlier frame) selects the Radierer and remembers the tool before; pen-tip input
   brings it back (only while the Radierer is still selected).  Mouse input changes nothing.
-* **Einstellungen ▸ Stift & Tablett**: "Windows-Tinte" (pen input on / off), detected devices
-  (docs/SETTINGS.md).
+* **Einstellungen ▸ Stift & Tablett**: "Windows-Tinte" (pen input on / off), detected devices,
+  what one finger does on the canvas (docs/SETTINGS.md, docs/TOUCH.md: the pen comes first, a palm does nothing).
 * **Test**: `tests/tools_pressure.uis` (aliased dabs, width 40): 50 % = 20 px, mouse = 40 px,
   rising 10 → 100 %, switch off = 40 px, eraser end → Radierer and back, Radierer with 50 %,
   Windows-Tinte off = 40 px; both targets, also `--verify-dirty`.
