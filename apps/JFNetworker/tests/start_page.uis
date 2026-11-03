@@ -6,7 +6,7 @@
 # file dialog, as in the menu); a lab and an assessment; Tab through the cards and Enter; the
 # Projektinfo dialog into the inspector; the setting.  --recent= gives a headless run its recent
 # files: one path alone is granted by the command line, several joined with | are not.  Ids:
-# 129040 "Leeres Projekt", 129041 .. 129045 the templates, 129056 + i the recent rows, 129072 + i
+# 129040 "Leeres Projekt", 129041 .. 129046 the templates, 129056 + i the recent rows, 129072 + i
 # their removal, 129026 Öffnen …, 129280 + i the cards of Lernen, 1000 Datei › Startseite, 1001
 # Projektinfo.  start_page_shots.uis has the pictures, start_page_recover.uis the recovery bar.
 size 1280 800
@@ -22,6 +22,7 @@ expect button:"Vorlage: Büro mit VLANs" exists
 expect button:"Vorlage: Campus" exists
 expect button:"Vorlage: Rechenzentrum (Leaf-Spine)" exists
 expect button:"Vorlage: Webdienst hinter Loadbalancer" exists
+expect button:"Vorlage: Größer oder mehr?" exists
 expect text:"Heimrouter mit WLAN und DHCP, dazu PC, Drucker, Laptop und Smartphone." exists
 expect tab:"Geräte" missing
 expect text:"0 Geräte · 0 Kabel" missing
@@ -146,9 +147,12 @@ key tab
 key tab
 expect #129045 focused
 key tab
+expect #129046 focused
+key tab
 expect #129026 focused
 key tab
 expect #129056 focused
+key shift+tab
 key shift+tab
 key shift+tab
 expect #129045 focused

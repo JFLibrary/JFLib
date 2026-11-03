@@ -7,7 +7,7 @@ Simulationsmodus Schritt für Schritt mit Paketansicht, und später Dienste, mit
 horizontal skalierte Systeme aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches,
 Queues, Lastgeneratoren, eigene Skripte).
 
-**Stand (2026-11-02): Die Phasen 1 bis 6 sind fertig, Phase 7 läuft** (siehe [Fahrplan](#fahrplan)).
+**Stand (2026-11-03): Die Phasen 1 bis 6 sind fertig, Phase 7 läuft** (siehe [Fahrplan](#fahrplan)).
 
 - **Topologie-Editor:** 49 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
   per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem oder vorher gewähltem
@@ -200,7 +200,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   steht über der Seite und hat dann die Tastatur. Datei › Startseite führt zurück (mit der Frage nach
   ungespeicherten Änderungen), die Einstellung „Beim Start anzeigen“ schaltet die Seite ab.
 - **Akademie** (Startseite › Lernen oder Datei › Akademie …): Kurse aus Dateien mit Lektionen zum Lesen,
-  Laboren im Simulator, Quiz, Tests und Fehlersuche; ihr Fortschritt bleibt erhalten (siehe [Akademie](#akademie)).
+  Laboren im Simulator, Quiz, Tests und Fehlersuche; ihr Fortschritt bleibt erhalten. Kurse lassen sich mit einem Klick
+  von GitHub oder aus einem Ordner installieren, aktualisieren und entfernen (siehe [Akademie](#akademie)).
 - **Projektinfo** (Datei › Projektinfo …): Beschreibung und Autor des Projekts, gespeichert in der
   Datei, sichtbar oben in den Eigenschaften des Projekts; ein Rückgängig-Schritt.
 - **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
@@ -270,6 +271,10 @@ build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lab_shards.jfnet --sce
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
 build/win/jfn-sim.exe course apps/JFNetworker/academy/beispiel   # ein Kurs: seine Datei, Lektionen, Bilder, Links, Labore
 build/win/JFNetworker.exe --academy-dir apps/JFNetworker/academy # die Kurse aus diesem Ordner statt aus data://academy
+python tools/academy_index.py                                    # die Kursliste academy/index.json aus den Ordnern (--check: ist sie aktuell?)
+build/win/jfn-sim.exe course-list apps/JFNetworker/academy       # was eine Quelle anbietet (ein Ordner oder eine Adresse)
+build/win/jfn-sim.exe course-install apps/JFNetworker/academy beispiel --into build/kurse   # ein Kurs in einen Ordner, den es schon gibt
+python tools/academy_e2e.py                                      # Installieren über echtes HTTP gegen einen Server auf diesem Rechner
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
 build/win/jfn-sim.exe rewind apps/JFNetworker/tests/fixtures/lab_window.jfnet 60   # Keyframes und Zeit zum Zurückspulen
@@ -312,7 +317,13 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `academy_quiz.uis` | Quiz und Test im Beispielkurs: Üben mit Erklärungen (falsch, neuer Versuch, teilweise richtig, Text, Zahl, Reihenfolge; das beste Ergebnis in der Gliederung, erledigt, sobald bestanden), ein Test, der auf das Quiz wartet, sein Anfang, ein Versuch mit Zeit, die Frage vor dem Abgeben, das Ergebnis mit Punkten je Frage, ein neuer Versuch, die Zeit, die auf einer anderen Seite abläuft, keine Versuche mehr; Englisch; die Tastatur; Zurücksetzen gibt die Versuche zurück |
 | `academy_fault.uis` | die Fehlersuche im Beispielkurs: das kaputte Netz, was es verbirgt (Probleme, Fehler im Inspektor, Alle Fehler beheben, Aufgabe erstellen, die Fehlerspur der Zeitleiste), die Punkte unterwegs, die Reparatur (ein neues Kabel, das Gateway an der Konsole), die Diagnose per Klick und per Liste, Abgeben, zurück zum Kurs, Neu beginnen |
 | `academy_quiz_shots.uis` | die Bilder von Quiz, Test und Fehlersuche; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/quiz_*.png`, `fault_*.png`) |
+| `academy_install.uis` | Kurse installieren mit einem Ordner als Quelle, über denselben Weg wie aus dem Netz, nach `mem://`: der Weg von der Startseite, die Verbindung ohne Antwort abgelehnt, ein anderer Host und der Weg zurück, ein Ordner ohne Liste, Fortschritt Datei für Datei, Abbrechen und Weitermachen, ein abgelehnter Kurs, eine falsche Prüfsumme, ein Link ins Web mit seiner Frage, ein Update (abgebrochen, dann fertig, während der Kurs offen ist), Deinstallieren mit offenem Labor, der Fortschritt bleibt, die Tastatur, Englisch |
+| `academy_install_shots.uis` | die Bilder dazu; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/install_*.png`) |
+| `academy_quit.uis` | Beenden mit einem laufenden Test fragt vorher, auch von einer anderen Seite aus |
+| `author_diagnosis.uis` | eine Diagnose in „Aufgabe erstellen“: was abgelehnt wird, ein Gerät, ein Kabel, ihre Zeile, ihre Bearbeitung, wieder entfernen |
 | `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `model.uis`, Gruppe `install` | die Kursliste und jede Ablehnung mit ihrer genauen Meldung (`..`, absolute Pfade, zu groß, doppelt, falsches Format); eine Quelle im Speicher, die halb abbricht, abbricht und weitermacht; nicht gelistete Dateien werden nie geholt; falsche Größe und Prüfsumme; ein Update, das scheitert, lässt den alten Kurs stehen; was ein Absturz hinterlässt; Deinstallieren behält den Fortschritt; Versionen; die Einstellung; die Kursliste nach einer Änderung; mit `--academy-dir` jede Datei gegen `index.json`, jeder Kurs mit den Prüfungen von `jfn-sim course`, der Beispielkurs aus seinem Ordner von vorn bis hinten |
+| `tools/academy_e2e.py` (von Hand, kein Teil von `build_rs.py test`) | echtes HTTP mit `jfn-sim` gegen einen Server auf diesem Rechner: falsche Prüfsumme, eine Übertragung, die abbricht und mit Range weitergeht, Abbrechen, Umleitung, 404, kaputte und zu große Liste, ein Update, das scheitert. Das Fenster darf localhost nicht erreichen und keinen Server starten, darum läuft das nicht als `.uis` |
 | `model.uis`, Gruppe `quiz` | das Quizformat und jede Meldung, was es prüft (keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt, eine fehlende Sprache), die Bewertung jeder Art mit Teilpunkten, Mustern und Toleranz, die Reihenfolge aus dem Seed, Versuche und Zeitgrenze, was in den Fortschritt geht, `requires`; `start_faults` und `lock` samt ihren Standardwerten (ein altes Labor bleibt, wie es war), die Diagnose, die Prüfung, dass etwas nicht gehen darf, Determinismus und Zurückspulen mit Startfehlern; die Fehlersuche des Beispielkurses mit und ohne ihre Lösung |
 | `model.uis`, Gruppe `academy` | das Format (ein guter Kurs und eine gute Kursliste, neuere Version, falsches Format, Pfade, die hinausführen, eine Lektion in einer Sprache, eine unbekannte Art, was eine Lektion verlinkt), der Fortschritt (hin und zurück, kaputte Datei, neue Kursversion), Reihenfolge und Zustände, wo ein Lauf sucht, was die Seite liest und was sie ablehnt; jeder Kurs unter `--academy-dir` (darum nennt `model.uis` den Ordner): seine Dateien in beiden Sprachen, seine Labore mit dem, was `jfn-sim check` findet, ungelöst und gelöst, die Namensregel |
 | `model.uis`, Gruppe `startpage` | die fünf Vorlagen (`assets/templates`): die Liste, keine Probleme, Texte in beiden Sprachen, und jede läuft: Hosts erreichen, was sie sollen, per DHCP, DNS, OSPF mit zwei gleich guten Wegen und über den Loadbalancer; die Einstellung, wann die Seite erscheint, die Zeilen von Zuletzt, Zeiten, die Projektinfo in der Datei und als Rückgängig-Schritt, eine alte Datei ohne sie, ein leeres Projekt ohne Timer |
@@ -460,6 +471,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `sweep` | Experimente: die Datei und jede Meldung einer falschen Achse; was jede Achse am Projekt ändert; ein Klon gegen einen frischen Start auf jeder Stufe; CSV, Tabelle und Details bei 1, 3 und 8 Threads und zwischen zwei Läufen gleich; das Knie, Durchsatz, CPU, Sperre, Platte und Kabel gegen die Formeln; der leise Mitschnitt ändert keine Zahl; `Service::reconfigure` jedes Dienstes unter Last ohne Neustart; das Fenster startet nur neu, wenn es muss; die neuen Schritte; die Wiederholung aus Keyframes |
 | `scen_live_changes.uis` | das Golden-Szenario Änderungen unter Last Byte für Byte (`fixtures/live_changes.jfnet`): Rate, Nutzer, Backends, Gewicht, Verfahren, Leeren, Einstellungen eines Webservers, KV, Cache |
 | `sweep_small.uis` | ein kurzer Sweep ohne Fenster durch das GUI-Programm: seine Tabelle Byte für Byte (`experiments/sweep_small.jfnex`, `.report`) auf zwei Threads |
+| `model.uis`, Gruppe `expgui` | das Labor im Fenster: jedes Formular gegen das JSON, das es schreibt, fremde Einträge bleiben, Ablehnungen wörtlich, die Vorgaben aus den Diensten; im Lauf oder mit Neustart wie angesagt für jede Art; Vorgaben beim Platzieren mit Rückgängig, geladene Dateien bleiben; Läufe mit Fortschritt und Abbruch, Ergebnis Byte für Byte wie `run_sweep` bei 1 und 3 Threads; behaltene Läufe durch Speichern und Laden, alte Dateien Byte für Byte; die Grenzen; die Warnung bei Überlast; Balken, p99.9, Disk und Kabel der Metriken |
+| `lab_forms.uis`, `lab_forms_en.uis` | Dienste im Fenster auf `fixtures/lab_forms.jfnet`: jede Art hinzufügen, was fehlt, Geräte wählen, Formular und JSON, Ablehnung, im Lauf oder mit Neustart, Rückgängig, Vergangenheit nur lesen, Platzieren mit Dienst und Probleme, Tastatur, Englisch |
+| `experiments_panel.uis` | der Bereich Experimente: `sweep_small` per Klick definiert, Befunde live, Lauf gleich dem Golden-Bericht, zwei Läufe behalten und verglichen, CSV und `.jfnex` durch den Dateidialog, Abbruch, Entfernen mit Frage |
+| `experiments_shots.uis` | die Bilder dazu auf der Vorlage „Größer oder mehr?“ hell, dunkel, schmal, 100 und 150 %, mit Formular und Metriken (`build/jfnetworker/exp_*.png`) |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 | `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
 | `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
@@ -591,7 +606,10 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Firewall-Reiter | [`src/workspace/devwin/firewall.rs`](src/workspace/devwin/firewall.rs), [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs) (`Acls::probe`), [`src/doc/console.rs`](src/doc/console.rs) (`run_lines_running`), [`src/fwguitest.rs`](src/fwguitest.rs) | Regeln, NAT und Test im Gerätefenster als Formulare über den Befehlen, sein Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_model/quiz.rs`](crates/jfn_model/quiz.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`, `quiz.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs), [`src/quiztest.rs`](src/quiztest.rs) | Quiz und Tests als Dateien, ihre Bewertung und ihre Seite; Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
+| Kurse installieren | [`crates/jfn_run/install.rs`](crates/jfn_run/install.rs), [`src/workspace/academy/install.rs`](src/workspace/academy/install.rs), [`tools/academy_index.py`](../../tools/academy_index.py), [`tools/academy_e2e.py`](../../tools/academy_e2e.py), [`academy/index.json`](academy/index.json), [`PERMISSIONS`](PERMISSIONS), [`PERMISSIONS.jfn-sim`](PERMISSIONS.jfn-sim), [`src/installtest.rs`](src/installtest.rs) | der Weg eines Kurses ohne Fenster (Quelle, Prüfung, an seinen Platz), die Liste auf der Seite der Akademie, ihr Arbeits-Thread, die Rückfragen; die Kursliste erzeugen; der Selbsttest (Gruppe `install`) |
 | Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
+| Dienste im Fenster | [`src/workspace/devwin/svcform.rs`](src/workspace/devwin/svcform.rs), [`svcedit.rs`](src/workspace/devwin/svcedit.rs), [`crates/jfn_sim/svcform.rs`](crates/jfn_sim/svcform.rs), [`src/expguitest.rs`](src/expguitest.rs) |
+| Experimente im Fenster | [`src/workspace/experiments`](src/workspace/experiments/mod.rs), [`src/workspace/metrics.rs`](src/workspace/metrics.rs), `SweepJob` in [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) |
 | Experimente | [`crates/jfn_model/experiment.rs`](crates/jfn_model/experiment.rs), [`crates/jfn_sim/experiment.rs`](crates/jfn_sim/experiment.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`run_sweep`), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs) (`Prices`), [`src/sweeptest.rs`](src/sweeptest.rs) |
 
 ### Gerätekatalog
@@ -1397,6 +1415,25 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
 
 ### Das Labor im Fenster
 
+- **Dienste ohne JSON** (Gerätefenster, Reiter Dienste; [`devwin/svcform.rs`](src/workspace/devwin/svcform.rs)):
+  „Dienst hinzufügen …“ legt einen Webserver, Lastgenerator, Load Balancer, KV-Knoten, Cache, eine Queue oder einen
+  Worker an, „Einstellungen …“ zeigt ihre Formulare: Beschriftungen mit Einheit und einer Zeile Hilfe, das Seltene
+  eingeklappt. Ein Backend oder Ziel wird unter den Geräten des Projekts gewählt (daraus wird die Adresse, die der Dienst
+  braucht, mit dem Port seines Dienstes) oder eingetippt. Ein Formular ändert nur, was sich darin geändert hat; jeder andere
+  Eintrag der Konfiguration bleibt an seiner Stelle, ein leeres Feld nimmt den Eintrag heraus. „Als JSON bearbeiten“ zeigt,
+  was das Formular bisher hat, und bleibt der Weg für alles andere; `script` und die übrigen Arten haben nur diesen.
+  Geprüft wird an einer Stelle: `Engine::service_def` auf einem nackten Gerät, die Ablehnung steht wörtlich am Formular.
+  Vorgaben stehen nur in den Diensten: Das Formular fragt sie (`jfn_sim::svcform::defaults`). Vor dem Übernehmen sagt es, ob der
+  Dienst die Änderung im Lauf annimmt oder das Gerät neu startet (`live_steps`, `can_reconfigure`), und tut dann genau das;
+  Übernehmen ist ein Schritt der Rückgängig-Liste, in einer Ansicht der Vergangenheit lässt sich nichts ändern.
+- **Vorgaben beim Platzieren** (`catalog::preset_service`, `edits::add_placed`): Load Balancer, DB-Shard (vorerst `kv`), Cache,
+  Message Queue und Traffic-Generator aus der Palette bringen im selben Rückgängig-Schritt ihren Dienst mit. Das gilt nur beim
+  Platzieren im Fenster: Eine geladene Datei bekommt nichts dazu. Fehlt noch etwas (Backends, ein Ziel, Knoten), startet der
+  Dienst nicht und sendet nichts; seine Karte und der Bereich Probleme sagen, was fehlt (`svcform::missing`,
+  `ProblemKind::ServiceNotStarted`), und das Formular ist einen Klick entfernt. Das gilt auch für jeden anderen Dienst eines
+  Projekts, den die Engine nicht starten kann: Er wurde schon immer weggelassen, jetzt steht es im Bereich Probleme.
+- **Experimente** (Bereich unten, Strg+Umschalt+E oder Ansicht › Bereiche; siehe
+  [Experimente: Parameter-Sweeps](#experimente-parameter-sweeps)).
 - **Metriken** (Bereich unten, Strg+Umschalt+M oder Ansicht › Bereiche;
   [`src/workspace/metrics.rs`](src/workspace/metrics.rs)): links ein Baum der Dienste aller
   Geräte (je Gerät seine Dienste mit Art, Name und Zustand: läuft, gestoppt, aus, ohne Strom),
@@ -1415,7 +1452,12 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
   Fehler oder die Wahl ändern; dazwischen zeichnen die Diagramme nicht neu. Tastatur: Baum
   (Pfeile, links und rechts klappen zu und auf), Zeitraum und jedes Diagramm sind Tab-Stopps;
   im Diagramm wandern die Pfeiltasten über die Punkte, und Screenreader hören Punkt und
-  Zusammenfassung.
+  Zusammenfassung. Dazu kommt, was der Simulator ohnehin sammelt: eine Kachel für p99.9 und Balken
+  der Latenzen über den Zeitraum aus dem Histogramm des Dienstes (`Engine::lat_hist_between`, kein Ereignis dafür);
+  beim Eintrag Hardware eines Geräts, wie stark seine Disk belegt ist, die längste Wartezeit auf sie und was gerade wartet
+  (Reihen `disk_pm`, `disk_wait_us`, `disk_backlog_us`, die nicht in die CSV eines Szenarios gehen, damit Golden-Dateien gleich
+  bleiben); und ganz unten im Baum „Kabel“ › „Alle Kabel“: je Kabel und Richtung sein Anteil an der Bitrate über die letzten 5 s,
+  das meistbelegte zuerst, mit einem Diagramm der belegtesten (`Engine::cable_util`).
 - **Auf der Zeichenfläche** ([`canvas/lab.rs`](src/workspace/canvas/lab.rs)): Dienst-Pillen
   oben an den Geräten (LB, KV, Cache, Q, Worker, HTTP, DNS, DHCP, Skript; eine je Art, ein
   gestoppter Dienst blass, höchstens drei, dann „+n“), ab 50 % wie die Namen; ab 75 %
@@ -2264,7 +2306,8 @@ für Prüfungen, die manipulationssicher sein müssen.**
   Konfiguration, die ein neues Gerät nicht hat, die Kabel): ein Häkchen bewertet eine
   Einstellung, darunter stehen ihre Punkte, der Vergleich (mit den weiteren Werten) und der
   Text in beiden Sprachen (bis zu einem eigenen der des Kriteriums). 3 Verbindungsprüfungen mit
-  Punkten (eine, die sich nicht lesen lässt, wird mit dem Grund abgelehnt). 4 Titel, Kurztext
+  Punkten (eine, die sich nicht lesen lässt, wird mit dem Grund abgelehnt), dazu Diagnosen für ein
+  Netz mit Fehler: das Gerät oder Kabel, das die Ursache ist (`R1`, `PC1 - SW1`). 4 Titel, Kurztext
   für die Liste, Einleitung, Thema. 5 Rückmeldung und Zeit in Minuten. 6 „Ausgangsnetz
   erzeugen“ nimmt dem Ziel, was die Kriterien prüfen (Adressen, Routen, VLANs, Modi und Zeilen
   aus den Konfigurationen; ein Interface, das eingeschaltet sein soll, wird ausgeschaltet;
@@ -4412,7 +4455,33 @@ kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ih
 
 Ein Experiment vergleicht Konfigurationen eines Projekts unter steigender Last: mehr Kerne gegen mehr Server, ein anderer
 Algorithmus, mehr Worker. Es läuft kopflos und mit voller Geschwindigkeit, nie in Echtzeit, und sein Ergebnis ist Byte für Byte gleich,
-egal auf wie vielen Threads und auf welchem Rechner. Eine Oberfläche dafür kommt mit dem nächsten Schritt; heute läuft es so:
+egal auf wie vielen Threads und auf welchem Rechner. Es geht im Fenster und auf der Befehlszeile, mit denselben Zahlen.
+
+**Im Fenster** ([`src/workspace/experiments`](src/workspace/experiments/mod.rs); Ansicht › Bereiche › Experimente, Strg+Umschalt+E). Links die Experimente
+des Projekts und die behaltenen Läufe, rechts drei Seiten. Die Startseite hat dazu die Vorlage „Größer oder mehr?“, das Projekt und das Experiment der Studie unten.
+
+- **Aufbau:** alles ohne JSON. Der Lastgenerator mit seinen Stufen, die Zeiten und Seeds, das SLO; Achsen aller Reihen und Reihen mit eigenen
+  Achsen: Hardware eines Geräts oder einer Gruppe (je Zeile eine Vorlage, Kerne, Tempo, RAM), eine Einstellung eines Dienstes (aus `known_keys`, oder ein Pfad wie
+  `routes.0.cpu_ms`) mit ihren Werten, die Backends eines Load Balancers (die ersten N eines Pools oder Kopien eines Geräts). Aufgeklappt die Preise, jede Vorgabe als Annahme gekennzeichnet.
+  Ganz oben stehen die Befunde von `Experiment::problems` mit ihrem Wortlaut, während getippt wird, oder „Passt zum Projekt: N Läufe“. Eine Änderung ist ein Schritt der Rückgängig-Liste,
+  ein Feld zählt, wenn es den Fokus abgibt. „Einlesen …“ und „Ausgeben …“ lesen und schreiben `.jfnex`-Dateien.
+- **Lauf:** „Starten“ rechnet auf eigenen Threads (Vorgabe: alle Kerne bis auf einen) und auf einer Kopie des Projekts, das Fenster bleibt bedienbar, die laufende Simulation unberührt, und
+  Änderungen wirken erst im nächsten Lauf. Die Seite zeigt fertige von allen Läufen; „Abbrechen“ endet spätestens an der nächsten vollen Sekunde virtueller Zeit und hinterlässt nichts.
+  Danach eine Zeile je Konfiguration und Stufe; Status in Worten („Speichergrenze“, „Startet nicht“).
+- **Vergleich:** ein Lauf oder zwei (A, B): je Konfiguration Knie, Maximum, was begrenzt, Kosten je Stunde und je 1000 Anfragen, bei zwei Läufen untereinander; drei Diagramme: die Sättigung aller Konfigurationen
+  (Angebot gegen Erreichtes), Latenz über Durchsatz (p50, p95, p99, p99.9) und die Auslastung von CPU, Sperre, Disk und Kabel für die gewählte Konfiguration, das Knie markiert, das SLO als Linie.
+- **Behalten:** Ein Lauf gehört erst zum Projekt, wenn er einen Namen bekommt. Laufen und Fertigwerden ändern nichts an der Datei und sind kein Rückgängig-Schritt; „Behalten“ ändert die Datei
+  (Punkt im Titel, Frage beim Schließen, automatische Sicherung), ist aber ebenfalls kein Rückgängig-Schritt, und das Entfernen fragt vorher. Gespeichert wird im Projekt unter `runs`: Name, Datum,
+  das Experiment, wie es lief, und die Ergebnisse. Ohne behaltene Läufe gibt es den Eintrag nicht, die Datei bleibt Byte für Byte dieselbe. Höchstens 16 Läufe mit je höchstens 2000 Punkten, rund 300 Byte je Punkt, zusammen also rund 10 MiB;
+  was darüber hinausgeht, lehnt die Seite ab und sagt warum. Die Einzelheiten je Gerät und Lauf (`--detail`) bleiben nicht; CSV und Tabelle eines behaltenen Laufs sind dieselben Bytes wie beim Lauf.
+- **CSV:** „CSV ausgeben …“ schreibt dieselben Bytes wie `jfn-sim sweep --csv` für dasselbe Experiment.
+
+**Ein Ergebnis lesen.** Das Knie ist die höchste Stufe, bis zu der alle Stufen das SLO halten: Bis dahin trägt die Konfiguration, was gefordert ist. Das Maximum ist, was sie unter Überlast noch schafft, oft deutlich mehr, aber mit langen Warteschlangen.
+„Begrenzt durch“ nennt, was an der ersten Stufe über dem Knie am stärksten belegt war; die Auslastung zeigt, was als Nächstes käme. Latenzen gelten nur für Antworten: Eine abgelaufene Anfrage hat keine Latenz und zählt als Fehler, also gehört p99 immer zusammen mit den Fehlern gelesen.
+Fällt der Durchsatz unter die Hälfte einer niedrigeren Stufe, während Anfragen in die Zeitgrenze laufen, warnt die Seite: Das ist richtig gerechnet (abgelaufene Anfragen beschäftigen den Server weiter, ihre Verbindungen schließen, die Ports gehen aus), zeigt aber nicht die Kapazität; dafür gehören eine lange Zeitgrenze und eine Grenze der Verbindungen in den Generator, wie in der Studie unten.
+Kosten, Hardware und Dienstzeiten sind Annahmen: Vertrauen Sie der Form und der Reihenfolge der Varianten, nicht den absoluten Zahlen. Die Abschnitte unten nennen, was das Modell nicht abdeckt.
+
+**Auf der Befehlszeile:**
 
 ```bash
 jfn-sim sweep tests/experiments/scale_up_vs_out.jfnex tests/experiments/scale_up_vs_out.jfnet --threads 4 --csv ergebnis.csv
@@ -4523,7 +4592,7 @@ es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Po
 etwas über die gewählten Stufen: Das Knie liegt nie zwischen zwei Stufen, und eine Messung von 20 s sieht keine seltenen Ereignisse.
 
 Für Programme: `jfn_model::experiment::{Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level}`, `Experiment::{from_text, problems, configs, levels}`, `jfn_sim::experiment::{Plan, Sweep, Point, ConfigOut, Fig}` mit `Plan::{new, warm, measure, run_level, run_all, collect}` und `Sweep::{table, csv, detail_csv}`,
-`jfn_run::run_sweep(&plan, threads)`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
+`jfn_run::run_sweep(&plan, threads)`, im Fenster `jfn_run::{SweepJob, SweepOut, SweepCtl, run_sweep_ctl, sweeps_pending}` und `Sweep::{to_value, from_value, overloads}`, `jfn_model::experiment::{SavedRun, KEEP_RUNS, KEEP_POINTS}`, `catalog::Prices`, `Service::reconfigure`, `Engine::can_reconfigure`, `Action::ServiceConfig`, `Trace::set_quiet`. Geprüft in der Selbsttest-Gruppe `sweep` ([`src/sweeptest.rs`](src/sweeptest.rs)), mit `scen_live_changes.uis` und `sweep_small.uis`.
 
 **Tempo:** Windows, Entwicklungs-Build, 12 logische Kerne, Rechner von anderen Läufen belegt. Die Studie oben (9 Konfigurationen, 7 Stufen, je 25 s, bis 6400/s, rund 2,1 Millionen gemessene Antworten und 98 Millionen gemessene Ereignisse):
 
@@ -4570,7 +4639,8 @@ bleibt gesperrt, bis die verlangten Schritte erledigt sind, und „Weiter“ geh
 **Der Ordner eines Kurses:**
 
 ```
-academy/index.json              die Kursliste zum Installieren (wird erzeugt; das Programm liest bisher die Ordner)
+academy/index.json              die Kursliste einer Quelle (erzeugt mit tools/academy_index.py; was installiert ist, zeigen die Ordner)
+academy/last-index.json         die zuletzt geladene Kursliste (schreibt das Programm, damit die Liste auch offline da ist)
 academy/progress.json           der Fortschritt (schreibt das Programm)
 academy/<kurs>/course.json      der Kurs; der Ordnername ist seine Kennung
 academy/<kurs>/de/*.md          die Lektionen auf Deutsch
@@ -4605,6 +4675,7 @@ academy/<kurs>/img/*            die Bilder (png, jpg, gif, bmp, svg)
 |---|---|
 | `format`, `version` | `"jfn-course"` und die Version des Formats; eine neuere lehnt das Programm mit einer Meldung ab |
 | `course_version` | die Version des Inhalts (in `index.json` das `version` des Kurses) |
+| `sample` | `true`: ein Beispiel, das nur das Format zeigt; „Jetzt installieren“ nimmt es nicht mit, die Liste bietet es einzeln an |
 | `title`, `summary` | Text in beiden Sprachen: `["Deutsch", "English"]` oder `{"de": …, "en": …}` |
 | `level` | `beginner`, `intermediate` oder `advanced` |
 | `minutes` | die ungefähre Dauer |
@@ -4623,7 +4694,8 @@ mit seinen Meldungen und schadet keinem anderen.
 (`![Was das Bild zeigt](img/netz.svg)`; der Text in den Klammern ist der Name für Screenreader), das Programm
 liest nur Bilder aus diesem Ordner; ein SVG trägt seinen eigenen hellen Hintergrund, damit es auch im dunklen
 Thema lesbar bleibt. Links: `[Text](step:ID)` führt zu einem Schritt des Kurses, `[Text](lab:ID)` zu einem
-Labor; Links ins Web lehnt die Ansicht vorerst mit einer Meldung ab.
+Labor; ein Link ins Web öffnet erst nach einer Frage, die die Adresse zeigt, im Browser. Bilder kommen nie von
+außen, sondern nur aus dem Kursordner.
 
 **Ein Labor** ist eine `.jfnet`-Datei mit `lab` und mindestens einem Ziel (siehe
 [Labore und Aufgaben](#labore-und-aufgaben)), Titel, Einleitung, Ziele und Hinweise in beiden Sprachen. Die Ziele
@@ -4736,14 +4808,68 @@ Schalter gar keine Kurse: Tests berühren die Daten des Benutzers nicht.
 Fehlersuchen mit dem, was `jfn-sim check` findet; Rückgabe 1, wenn etwas den Kurs verhindert), mit `JFNetworker --academy-dir OBERORDNER` ansehen. Der
 Selbsttest prüft jeden Kurs unter `apps/JFNetworker/academy/`.
 
-Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `safe_path`, `image_file`, `lesson_refs`,
-`link_to`, `lab_issues`, `fault_issues`, `quiz_issues`), `jfn_model::quiz` (`Quiz`, `Question`, `Reply`, `Attempt`, `Plan`,
-`Score`), `jfn_model::lab` (`Lock`, `Lab::start_faults`, `Item::explain`), `jfn_sim::runner::start_actions`,
-`jfn_sim::assess` (`Pick`, `grade_picks`), `jfn_run::check_course`, `workspace/academy` (`Academy`, `store::place`,
-`store::list`, `quiz.rs`).
+**Kurse installieren.** Die Seite der Akademie (Datei › Akademie … oder auf der Startseite unter Lernen) zeigt „Meine
+Kurse“ mit Version, Größe und Stand und darunter „Verfügbar“: was die zuletzt geladene Kursliste sonst noch anbietet,
+mit Version und Größe. Das Programm verbindet sich nur nach einem Klick, nie beim Start:
 
-Noch offen: Installieren aus dem Netz mit Index und Prüfsummen (AK3),
-die Kurse selbst (AK4).
+- **Jetzt installieren** in der leeren Liste lädt die Kursliste und alle Kurse, die kein Beispiel sind (nennt die
+  Liste nur Beispiele, diese); neben einem Kurs der Liste installiert es diesen einen.
+- **Nach Kursen suchen** lädt nur die Kursliste. Mit dem ersten Klick kommt die Frage nach der Verbindung
+  (`ask net.connect raw.githubusercontent.com:443` in `PERMISSIONS`); die Antwort „für immer“ lässt sich in den
+  Einstellungen unter Berechtigungen zurücksetzen. Die letzte Liste bleibt in `data://academy/last-index.json`, so
+  zeigt die Seite sie auch ohne Netz. Installierte Kurse brauchen nie ein Netz.
+- **Aktualisieren** erscheint, wenn die Liste eine neuere Version nennt (`version` gegen `course_version`).
+- **Deinstallieren** fragt vorher. Der Fortschritt steht nicht im Kursordner und bleibt: Kommt der Kurs wieder, gilt er
+  wieder.
+- **Aus Ordner installieren …** ist für Autoren und für Rechner ohne Netz: ein Ordner mit `index.json` und den
+  Ordnern der Kurse, durch denselben Code wie aus dem Netz. Die Liste zeigt dann diesen Ordner, bis „Ordner schließen“;
+  aus ihm lässt sich derselbe Kurs auch erneut installieren.
+
+Während der Arbeit steht auf der Seite Datei n von m, Bytes und „Abbrechen“; das Fenster bleibt bedienbar, die Arbeit
+läuft in einem eigenen Thread weiter, auch wenn die Seite wechselt. Die **Adresse** ist eine Einstellung (Einstellungen ›
+Akademie › Adresse der Kurse, mit dem Knopf zurück zur Vorgabe
+`https://raw.githubusercontent.com/JFLibrary/JFLib/main/apps/JFNetworker/academy/`). Ein eigenes Repository später liegt auf
+demselben Host, die Regel gilt also weiter; einen anderen Host lehnt das Programm ohne Frage und mit klarer Meldung
+ab. `netio` kennt keinen HTTP-Proxy, und ein Netz, das TLS aufbricht, geht nur mit seiner Wurzel im System.
+
+**So kommt ein Kurs an:** Die Kursliste wird gelesen und auf ihre Grenzen geprüft (4 MiB, 512 Kurse, je Kurs 4096 Dateien
+und 512 MiB, je Datei 64 MiB; Pfade und Kennungen wie oben). Ein Ordner `.<kurs>.part` neben den Kursen füllt sich, nur
+mit dem, was die Liste nennt, und jede Datei wird auf Größe und SHA-256 geprüft. Dann prüft das Programm den Ordner wie
+`jfn-sim course`. Erst danach wird er umbenannt, eine alte Version weicht erst in diesem Moment. Ein Abbruch, ein
+Absturz oder ein Fehler lässt also das Alte nutzbar; was schon angekommen ist, bleibt liegen und geht beim nächsten Mal
+weiter (über HTTP mit Range). Ein Ordner mit Punkt am Anfang ist nie ein Kurs. Was schiefgeht, sagt die Seite als eine von
+wenigen Arten mit dem, was zu tun ist: keine Verbindung, Verbindung nicht erlaubt, anderer Host, TLS, Datei fehlt, Kursliste
+kaputt, falsche Prüfsumme, zu groß, Kurs nicht in Ordnung, Platte.
+
+**Ein Kurs ändert sich, während er offen ist:** Dateien werden ganz gelesen und nicht offen gehalten, ein Umbenennen
+nimmt also keiner Seite etwas weg. Danach liest das Programm die Kurse neu und findet alles über die Kennungen wieder.
+Eine Lektion des geänderten Kurses geht zurück auf seine Gliederung (mit Hinweis), ist er weg, auf die Liste der Kurse;
+eine Seite eines anderen Kurses bleibt. Ein offenes Labor bleibt das Projekt im Speicher; es behält seine Leiste, solange
+es den Schritt noch gibt, sonst ist es ein freies Projekt. Solange die Seite eines Quiz zu sehen ist oder ein Test
+läuft, wartet das neue Lesen, damit keine Antworten verloren gehen. Das Beenden mit einem laufenden Test fragt vorher.
+
+**Einen Kurs veröffentlichen:** Den Ordner unter `apps/JFNetworker/academy/` anlegen und mit `jfn-sim course ORDNER`
+prüfen, `course_version` erhöhen, wenn sich etwas geändert hat, dann `python tools/academy_index.py` (schreibt
+`academy/index.json`: Kurse nach Kennung, Dateien nach Pfad, LF, Prüfsummen der Bytes auf der Platte) und alles
+committen. `.gitattributes` hält die Dateien mit `-text` byteweise gleich. `--check` meldet eine veraltete Liste; ein Kurs,
+der ohne neue Liste geändert wurde, lässt auch den Selbsttest scheitern (`model.uis`, Gruppe `install`). Ausprobieren: `Aus
+Ordner installieren …` oder `jfn-sim course-install ORDNER KURS --into ZIEL` (`ZIEL` muss es geben; `all` statt `KURS`
+nimmt alle). Eine Quelle ist einfach ein Ordner oder eine Adresse mit `index.json` und den Kursordnern darunter.
+
+**Vertrauen, offen gesagt:** Ein Kurs ist durch das TLS von GitHub und die Prüfsummen seiner Kursliste geschützt, nicht
+durch eine Signatur: Wer das Repository oder den Ordner ändern kann, kann auch die Liste ändern. Kurse können nichts außerhalb des
+Simulators ausführen: Die Lektionen sind Markdown ohne Skripte, Labore und ihre Skripte laufen nur in den simulierten
+Geräten, und geschrieben werden nur die Dateien der Liste unterhalb des Kursordners. Die Lösung eines Tests steht lesbar in
+seiner Datei; das ist Selbststudium und keine sichere Prüfung.
+
+Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `safe_path`, `image_file`, `lesson_refs`,
+`link_to`, `lab_issues`, `fault_issues`, `quiz_issues`, `standing`), `jfn_model::quiz` (`Quiz`, `Question`, `Reply`, `Attempt`, `Plan`,
+`Score`), `jfn_model::lab` (`Lock`, `Lab::start_faults`, `Item::explain`), `jfn_sim::runner::start_actions`,
+`jfn_sim::assess` (`Pick`, `grade_picks`), `jfn_run::check_course`, `jfn_run::course_findings`, `jfn_run::install` (`Source`, `Web`,
+`Folder`, `read_index`, `install`, `uninstall`, `recover`, `Counters`, `Failure`, `Kind`), `update::fetch`, `workspace/academy` (`Academy`,
+`store::place`, `store::list`, `quiz.rs`, `install.rs`).
+
+Noch offen: die Kurse selbst (AK4).
 
 ## Performance
 
@@ -4815,7 +4941,7 @@ Geste).
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) ✓ · B4 CSS-Teilmenge, Cookies, HTTPS mit echtem TLS 1.3 im Simulator, Entwickleransicht ✓ (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 | 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
-| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche ✓ · F2 Zonen und Stateful ✓ · Akademie: AK1 Kursformat und Kursansicht ✓, AK2 Tests und Fehlersuche ✓, AK3 Installieren, AK4 Inhalte · Architektur-Labor: SA1 CPU und RAM je Gerät ✓, SA2 Sweeps ✓, SA3 bis SA7 (Experimente, Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
+| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche ✓ · F2 Zonen und Stateful ✓ · Akademie: AK1 Kursformat und Kursansicht ✓, AK2 Tests und Fehlersuche ✓, AK3 Installieren ✓, AK4 Inhalte · Architektur-Labor: SA1 CPU und RAM je Gerät ✓, SA2 Sweeps ✓, SA3 Labor im Fenster und Experimente ✓, SA4 bis SA7 (Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

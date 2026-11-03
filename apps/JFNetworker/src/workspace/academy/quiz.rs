@@ -8,8 +8,10 @@
 //                       countdown's timer (TIMER_QUIZ)
 //   timer(n, ui)        TIMER_QUIZ: a frame
 //   command(n, id)      CMD_QZ_START, CMD_QZ_HAND_IN, CMD_QZ_AGAIN
-//   dialog(n, ui)       "Jetzt abgeben?"
+//   dialog(n, ui)       "Jetzt abgeben?", "Programm wirklich beenden?"
 //   drop_course(n, c)   Fortschritt zurücksetzen: what this session has of a course's quizzes goes
+//   running(a)          an attempt at a test is under way (install.rs waits for it)
+//   ask_quit(n, ui)     leaving the program with an attempt under way: the question first
 //
 // Two modes by the step's kind.  A quiz (practice) shows its questions at once: "Prüfen" per question says
 // right or wrong and gives the explanation at once, a retry is free, a question keeps the best it reached;
@@ -152,6 +154,28 @@ pub(crate) fn open(n: &mut Net, i: usize) {
 /// Fortschritt zurücksetzen: what this session has of the course's quizzes goes
 pub(crate) fn drop_course(n: &mut Net, course: usize) {
     n.academy.quizzes.retain(|p| p.course != course);
+}
+
+/// leaving the program: with an attempt at a test under way the question first (its answers live in this session
+/// only) -> the question is up, nothing else happens now
+pub(crate) fn ask_quit(n: &mut Net, ui: &mut Ui) -> bool {
+    let a = &mut n.academy;
+    if core::mem::take(&mut a.quit_ok) || !running(a) {
+        return false;
+    }
+    a.ask_quit.set(1);
+    ui.repass();
+    true
+}
+
+/// a page without a quiz (selftest: Academy::relist clears them)
+pub(crate) fn blank_page() -> Page {
+    Page { course: 0, step: 0, exam: false, quiz: None, problems: Vec::new(), at: None, stems: Vec::new(), notes: Vec::new(), checked: Vec::new(), best: Vec::new(), ask: Shared::new(0), runs: 0 }
+}
+
+/// an attempt at a test is under way, on this page or another (practice has nothing to lose: it counts per question)
+pub(crate) fn running(a: &crate::workspace::academy::Academy) -> bool {
+    a.quizzes.iter().any(|p| p.exam && p.at.as_ref().is_some_and(|x| x.end.is_none()))
 }
 
 // ---------------------------------------------------------------- what counts
@@ -780,6 +804,16 @@ fn solution(ui: &mut Ui, x: &Question, r: &Reply, shown: &[usize], en: bool) {
 
 /// "Jetzt abgeben?"
 pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
+    let open = n.academy.ask_quit.clone();
+    if ui.dialog_begin(ID_AI_QUIT_DLG, t("Programm wirklich beenden?"), &open) {
+        ui.next_size(400, 0);
+        ui.text(TS_BODY | TX_WRAP, t("Ein Test läuft noch. Seine Antworten gehen beim Beenden verloren, und der Versuch zählt nicht."));
+        if ui.dialog_buttons(Some(t("Beenden")), None, Some(t("Weiterarbeiten"))) == DLG_PRIMARY {
+            n.academy.quit_ok = true;
+            ui.cmd_run(CMD_QUIT, 0);
+        }
+    }
+    ui.dialog_end();
     let Some(k) = shown(n) else { return };
     let ask = n.academy.quizzes[k].ask.clone();
     if ui.dialog_begin(ID_QZ_ASK, t("Test abgeben?"), &ask) {

@@ -15,6 +15,7 @@
 //   groups(kind) / Group     the charts of a kind of service: a title, how its values read,
 //                            the names of its series
 //   kpi_tiles(kpi, share, sep)   the tiles of a KPI as (label, value) in the language
+//   rebin(buckets) -> Vec<(upper, count)>   a histogram's buckets as bars of 1, 2, 5 times a power of ten
 //
 // The tree: every configured service of every device (Engine::service_list) in the order of
 // the project; a device is a node with its services below ("Loadbalancer lb", its state at the
@@ -29,7 +30,12 @@
 // charts write them (LcUnit: latencies in ms or µs, data in kB or MB).
 //
 // A device with hardware (SA1, jfn_sim's res.rs) has a row of its own after its services, "Hardware":
-// tiles and charts of its CPU, run queue, memory and disk (the series named HOST).
+// tiles and charts of its CPU, run queue, memory and disk (the series named HOST): how busy the disk is,
+// the longest wait for it, what waits for it now.  A service with a latency window has a tile for p99.9
+// and bars of its latencies over the chosen span (Engine::lat_hist_between, read from the window: no
+// event of its own).  The last row of the tree, "Kabel" with "Alle Kabel": the cables of the project with
+// how much of their bit rate they carried each way over the last 5 s, the busiest first, and a chart
+// of the busiest (Engine::cable_util).
 //
 // Time: real time follows the newest samples; the simulation mode ends the charts at the
 // moment it shows (also a view of the past), and the tiles cover the 5 s before it
@@ -72,6 +78,9 @@ const TILE_W: i32 = 88;
 const CHART_MIN_W: i32 = 300;
 const CHART_H: i32 = 180;
 const PANEL_H: i32 = 400;
+/// the cables the row Alle Kabel lists and draws at most
+const CABLE_ROWS: usize = 40;
+const CABLE_CURVES: usize = 6;
 
 /// how the values of a chart read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,11 +207,13 @@ static G_POP3: [Group; 3] = [
 ];
 
 // i18n: title
-static G_HOST: [Group; 4] = [
+static G_HOST: [Group; 6] = [
     Group { title: "CPU", show: Show::Pct, names: &["cpu_pm"] },
     Group { title: "Warteschlange", show: Show::Num, names: &["runq", "running"] },
     Group { title: "Speicher", show: Show::Bytes, names: &["mem_bytes", "swap_bytes"] },
     Group { title: "Disk", show: Show::Bytes, names: &["disk_bytes"] },
+    Group { title: "Disk belegt", show: Show::Pct, names: &["disk_pm"] },
+    Group { title: "Warten auf die Disk", show: Show::Lat, names: &["disk_wait_us", "disk_backlog_us"] },
 ];
 
 static G_IMAP: [Group; 3] = [
@@ -325,6 +336,9 @@ pub(crate) fn series_label(name: &str) -> String {
         None if name == "mem_bytes" => String::from(t("Im RAM")),
         None if name == "swap_bytes" => String::from(t("Im Swap")),
         None if name == "disk_bytes" => String::from(t("Disk/s")),
+        None if name == "disk_pm" => String::from(t("Belegt")),
+        None if name == "disk_wait_us" => String::from(t("Längste Wartezeit")),
+        None if name == "disk_backlog_us" => String::from(t("Rückstand")),
         None => String::from(name),
     }
 }
@@ -361,13 +375,14 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "telnetd" => t("Telnet-Server"),
         "sshd" => t("SSH-Server"),
         "host" => t("Hardware"),
+        "cables" => t("Alle Kabel"),
         _ => kind,
     }
 }
 
 /// a row of the tree, the head of the charts: "Loadbalancer lb"; a device's hardware has no name
 fn svc_label(kind: &str, name: &str) -> String {
-    if kind == "host" { String::from(kind_name(kind)) } else { tf("{} {}", &[kind_name(kind), name]) }
+    if matches!(kind, "host" | "cables") { String::from(kind_name(kind)) } else { tf("{} {}", &[kind_name(kind), name]) }
 }
 
 /// what the requests of a kind of service are called on its first tile
@@ -390,7 +405,7 @@ pub(crate) fn kpi_tiles(k: &Kpi, share: Option<i64>, sep: u32) -> Vec<(String, S
     if let Some(v) = k.rps_milli {
         out.push((String::from(rate_label(k.kind)), num(v as f64 / 1000.0)));
     }
-    for (name, v) in [("p50", k.p50_us), ("p95", k.p95_us), ("p99", k.p99_us)] {
+    for (name, v) in [("p50", k.p50_us), ("p95", k.p95_us), ("p99", k.p99_us), ("p99.9", k.p999_us)] {
         if let Some(v) = v {
             out.push((String::from(name), lat(v)));
         }
@@ -422,9 +437,57 @@ pub(crate) fn kpi_tiles(k: &Kpi, share: Option<i64>, sep: u32) -> Vec<(String, S
     out
 }
 
+/// a histogram's buckets (smallest value, width, count) as bars: the upper limit of each and its count,
+/// limits of 1, 2 and 5 times a power of ten, from the first bucket's to the last one's
+pub(crate) fn rebin(buckets: &[(u64, u64, u64)]) -> Vec<(u64, u64)> {
+    let Some(last) = buckets.iter().map(|b| b.0 + b.1).max() else { return Vec::new() };
+    let first = buckets.iter().map(|b| b.0 + b.1).min().unwrap_or(1);
+    let mut limits = Vec::new();
+    let mut decade = 1u64;
+    'each: loop {
+        for m in [1u64, 2, 5] {
+            let Some(l) = decade.checked_mul(m) else { break 'each };
+            if l >= first {
+                limits.push(l);
+            }
+            if l >= last {
+                break 'each;
+            }
+        }
+        decade = match decade.checked_mul(10) {
+            Some(d) => d,
+            None => break,
+        };
+    }
+    let mut out: Vec<(u64, u64)> = limits.iter().map(|&l| (l, 0)).collect();
+    for b in buckets {
+        // a bucket counts for the first limit at or above its end
+        if let Some(x) = out.iter_mut().find(|x| x.0 >= b.0 + b.1) {
+            x.1 += b.2;
+        } else if let Some(x) = out.last_mut() {
+            x.1 += b.2;
+        }
+    }
+    out
+}
+
+/// a cable in the panel: its ends, its bit rate, how much it carried each way lately (thousandths of a
+/// percent), the busier way over time
+struct CableRow {
+    name: String,
+    kbps: u32,
+    ab: i64,
+    ba: i64,
+    buf: SeriesBuf,
+}
+
 /// what the charts and tiles show of the chosen service, and what it was read for
 struct Data {
     key: (u32, String, u64, Option<Ns>, i32, u64, bool),
+    /// the bars of the latencies over the span
+    bars: Vec<(u64, u64)>,
+    /// the cables (the row Alle Kabel)
+    cables: Vec<CableRow>,
     /// the series: name, points (x: ns of virtual time; latencies in s)
     series: Vec<(&'static str, SeriesBuf)>,
     kpi: Option<Kpi>,
@@ -526,8 +589,16 @@ fn by_device(n: &Net) -> Vec<(u32, Vec<SvcBrief>)> {
             all.entry(d.id).or_default().push(SvcBrief { dev: d.id, name: String::from(jfn_sim::res::HOST), kind: "host", enabled: true, running: true });
         }
     }
-    n.doc.proj.devices.iter().filter_map(|d| all.remove(&d.id).map(|v| (d.id, v))).collect()
+    let mut out: Vec<(u32, Vec<SvcBrief>)> = n.doc.proj.devices.iter().filter_map(|d| all.remove(&d.id).map(|v| (d.id, v))).collect();
+    // the cables: the last row, beside the services of a project that has any
+    if !out.is_empty() && !n.doc.proj.links.is_empty() {
+        out.push((CABLES, alloc::vec![SvcBrief { dev: CABLES, name: String::from("_cables"), kind: "cables", enabled: true, running: true }]));
+    }
+    out
 }
+
+/// the row of the cables stands where a device's would (no device has this id)
+const CABLES: u32 = u32::MAX;
 
 /// the Metriken panel
 pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
@@ -592,14 +663,21 @@ fn tree(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     let off = unpowered(n);
     let mut items: Vec<(u64, u16, bool, String, String, u32, usize)> = Vec::new();
     for (d, v) in devs {
-        let name = n.doc.proj.device(*d).map_or_else(|| format!("{}", d), |x| x.name.clone());
+        let name = if *d == CABLES { String::from(t("Kabel")) } else { n.doc.proj.device(*d).map_or_else(|| format!("{}", d), |x| x.name.clone()) };
         // (its hardware is no service)
         let k = v.iter().filter(|s| s.kind != "host").count();
-        let count = if k == 1 { String::from(t("1 Dienst")) } else { tf("{} Dienste", &[&k.to_string()]) };
+        let count = if *d == CABLES {
+            n.doc.proj.links.len().to_string()
+        } else if k == 1 {
+            String::from(t("1 Dienst"))
+        } else {
+            tf("{} Dienste", &[&k.to_string()])
+        };
         items.push((dev_key(*d), 0, true, name, count, *d, 0));
         if n.metrics.tree.expanded.contains(&dev_key(*d)) {
             for (k, s) in v.iter().enumerate() {
-                items.push((svc_key(*d, k), 1, false, svc_label(s.kind, &s.name), String::from(svc_state(&off, s).0), *d, k));
+                let state = if s.kind == "cables" { "" } else { svc_state(&off, s).0 };
+                items.push((svc_key(*d, k), 1, false, svc_label(s.kind, &s.name), String::from(state), *d, k));
             }
         }
         if items.len() >= ROWS_MAX {
@@ -666,10 +744,11 @@ fn refresh(n: &mut Net) {
     let mut series = Vec::new();
     for v in eng.series(dev, &svc) {
         let lat = matches!(v.kind, jfn_sim::SeriesKind::Lat(_)) && v.name.ends_with("_us");
+        let lat = lat || matches!(v.name, "disk_wait_us" | "disk_backlog_us");
         let mut b = SeriesBuf::new(v.points.len().max(1));
         for &(t, x) in &v.points {
-            // (cpu_pm reads as percent)
-            b.push(t as f64, if lat { x as f64 * 1e-6 } else if v.name == "cpu_pm" { x as f64 / 10.0 } else { x as f64 });
+            // (cpu_pm and disk_pm read as percent)
+            b.push(t as f64, if lat { x as f64 * 1e-6 } else if matches!(v.name, "cpu_pm" | "disk_pm") { x as f64 / 10.0 } else { x as f64 });
         }
         series.push((v.name, b));
     }
@@ -692,7 +771,25 @@ fn refresh(n: &mut Net) {
             (m.at as f64, t1 as f64, tf("Fehler {}: {}", &[&m.id.to_string(), &crate::app::tr::msg(&m.msg)]))
         })
         .collect();
-    n.metrics.data = Some(Data { key, series, kpi, share, marks });
+    // the bars of the latencies over the span of the charts; the cables
+    let bars = eng.lat_hist_between(dev, &svc, from, end).map_or(Vec::new(), |h| rebin(&h.buckets()));
+    let mut cables = Vec::new();
+    if dev == CABLES {
+        for l in &n.doc.proj.links {
+            let util = eng.cable_util(l.id);
+            let Some(rt) = eng.link_rt(l.id) else { continue };
+            let lately: Vec<&(Ns, i64, i64)> = util.iter().filter(|u| u.0 > end.saturating_sub(KPI_SPAN) && u.0 <= end).collect();
+            let n_ = lately.len().max(1) as i64;
+            let (ab, ba) = (lately.iter().map(|u| u.1).sum::<i64>() / n_, lately.iter().map(|u| u.2).sum::<i64>() / n_);
+            let mut buf = SeriesBuf::new(util.len().max(1));
+            for u in &util {
+                buf.push(u.0 as f64, u.1.max(u.2) as f64 / 1000.0);
+            }
+            cables.push(CableRow { name: crate::workspace::canvas::cables::ends_text(&n.doc.proj, l), kbps: rt.kbps, ab, ba, buf });
+        }
+        cables.sort_by_key(|c| core::cmp::Reverse(c.ab.max(c.ba)));
+    }
+    n.metrics.data = Some(Data { key, bars, cables, series, kpi, share, marks });
 }
 
 // the tiles of a device's hardware at moment `to`: its CPU over the last seconds, how many wait, its
@@ -714,6 +811,12 @@ fn host_tiles(e: &jfn_sim::Engine, dev: u32, to: Ns, sep: u32) -> Vec<(String, S
     if let Some(v) = val("swap_bytes").filter(|&v| v > 0.0) {
         out.push((String::from(t("Im Swap")), jfn_sim::disk::size_text(v as u64)));
     }
+    if let Some(v) = val("disk_pm") {
+        out.push((String::from(t("Disk belegt")), LcUnit::Num("%").text(v / 10.0, sep)));
+    }
+    if let Some(v) = val("disk_backlog_us").filter(|&v| v > 0.0) {
+        out.push((String::from(t("Rückstand")), LcUnit::Secs.text(v * 1e-6, sep)));
+    }
     if let Some(r) = e.res_of(dev) {
         out.push((String::from(t("Kerne")), num(r.hw.cores as f64)));
     }
@@ -725,6 +828,10 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     refresh(n);
     let Some((dev, svc)) = n.metrics.sel.clone() else { return };
     let Some(brief) = devs.iter().find(|x| x.0 == dev).and_then(|x| x.1.iter().find(|s| s.name == svc)).cloned() else { return };
+    if brief.kind == "cables" {
+        cables(n, ui);
+        return;
+    }
     let sep = ui.decimal_sep();
     ui.next_size(-1, -1);
     ui.scroll_begin(ID_MET_SCROLL, SC_V | pad(8));
@@ -820,6 +927,53 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
         }
         ui.box_end();
     }
+    // the bars of the latencies
+    if !data.bars.is_empty() {
+        let labels: Vec<String> = data.bars.iter().map(|b| tf("bis {}", &[&LcUnit::Secs.text(b.0 as f64 * 1e-9, sep)])).collect();
+        let refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
+        let counts: Vec<f32> = data.bars.iter().map(|b| b.1 as f32).collect();
+        ui.text(TS_BODY_STRONG, t("Verteilung der Latenz"));
+        ui.next_size(-1, CHART_H);
+        let _ = ui.bar_chart(ID_MET_BARS, &refs, &[BarSeries { label: t("Antworten"), values: &counts, color: 0 }], false);
+    }
+    ui.box_end();
+    ui.scroll_end();
+}
+
+// the row Alle Kabel: the busiest first, a chart of the busiest
+fn cables(n: &mut Net, ui: &mut Ui) {
+    let sep = ui.decimal_sep();
+    ui.next_size(-1, -1);
+    ui.scroll_begin(ID_MET_SCROLL, SC_V | pad(8));
+    ui.box_begin(0, BOX_V, 8);
+    ui.text(TS_BODY_STRONG, t("Auslastung der Kabel"));
+    ui.next_size(-1, 0);
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &tf("Was jedes Kabel in den letzten {} s von seiner Bitrate trug, je Richtung; die Rahmen ohne Präambel und Lücke.", &[&(KPI_SPAN / SEC).to_string()]));
+    let Some(data) = n.metrics.data.as_ref() else {
+        ui.box_end();
+        ui.scroll_end();
+        return;
+    };
+    let pct = |x: i64| LcUnit::Num("%").text(x as f64 / 1000.0, sep);
+    for c in data.cables.iter().take(CABLE_ROWS) {
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_ELLIPSIS, &c.name);
+        ui.next_size(90, 0);
+        ui.text(TS_CAPTION | TX_SECONDARY, &LcUnit::Si("bit/s").text(c.kbps as f64 * 1000.0, sep));
+        ui.next_size(160, 0);
+        ui.text(TS_BODY, &tf("{} / {}", &[&pct(c.ab), &pct(c.ba)]));
+        ui.box_end();
+    }
+    if data.cables.len() > CABLE_ROWS {
+        ui.text(TS_CAPTION | TX_TERTIARY, &tf("… und {} weitere", &[&(data.cables.len() - CABLE_ROWS).to_string()]));
+    }
+    let busiest: Vec<&CableRow> = data.cables.iter().take(CABLE_CURVES).collect();
+    let series: Vec<LcSeries> = busiest.iter().map(|c| LcSeries::new(&c.name, &c.buf).unit(LcUnit::Num("%"))).collect();
+    let span_ns = (SPANS[n.metrics.span.clamp(0, SPANS.len() as i32 - 1) as usize].0 * SEC) as f64;
+    let chart = LineChart::new(&series).x_axis(LX_NANOS).name(t("Auslastung der Kabel")).y_range(0.0, f64::NAN).follow(span_ns);
+    ui.next_size(-1, CHART_H);
+    let _ = ui.line_chart(ID_MET_CABLES, &chart);
     ui.box_end();
     ui.scroll_end();
 }

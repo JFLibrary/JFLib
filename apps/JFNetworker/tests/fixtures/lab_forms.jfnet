@@ -1,0 +1,187 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Dienste im Formular",
+  "description": "",
+  "seed": 7,
+  "next_id": 20,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 400,
+      "y": 60,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "HOST1",
+      "model": "server-1u",
+      "x": 100,
+      "y": 240,
+      "off": false,
+      "startup_config": "ip addr add 10.0.0.11/24 dev eth1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 300,
+      "y": 240,
+      "off": false,
+      "startup_config": "ip addr add 10.0.0.12/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "port": 8080,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "*",
+                "method": "",
+                "body": "ok"
+              }
+            ],
+            "eigenes": "bleibt"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "MQ1",
+      "model": "server-1u",
+      "x": 500,
+      "y": 240,
+      "off": false,
+      "startup_config": "ip addr add 10.0.0.13/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "mq",
+          "name": "mq",
+          "disabled": false,
+          "config": {
+            "topics": [
+              "jobs"
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "HOST2",
+      "model": "server-1u",
+      "x": 700,
+      "y": 240,
+      "off": false,
+      "startup_config": "ip addr add 10.0.0.14/24 dev eth1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 10,
+      "a": {
+        "dev": 2,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "Gi1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 0,
+      "delay_ns": 0,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "Gi1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 0,
+      "delay_ns": 0,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 4,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "Gi1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 0,
+      "delay_ns": 0,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 5,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "Gi1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 0,
+      "delay_ns": 0,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 0,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

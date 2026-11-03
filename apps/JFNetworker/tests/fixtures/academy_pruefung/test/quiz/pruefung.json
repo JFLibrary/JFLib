@@ -1,0 +1,16 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "pass": 100,
+  "questions": [
+    {
+      "kind": "single",
+      "stem": ["Verbindet ein Switch Geräte?", "Does a switch connect devices?"],
+      "explain": ["Das ist seine Aufgabe.", "That is its job."],
+      "answers": [
+        {"text": ["Ja", "Yes"], "right": true},
+        {"text": ["Nein", "No"]}
+      ]
+    }
+  ]
+}

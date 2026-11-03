@@ -1,0 +1,87 @@
+#!args --verify-dirty --open apps/JFNetworker/assets/templates/groesser-oder-mehr.jfnet
+# the pictures of the lab in the window, light and dark, narrow, 100 and 150 %
+# (build/jfnetworker/exp_<view>_<theme>_<scale>.png): the panel Experimente on the template "Größer oder mehr?"
+# with a short run of its experiment, its comparison; a service's form; the Metriken panel with its new
+# rows.  Ids: Starten 149536; levels 149704, warm-up 149705, settling 149706, measuring 149707; the Metriken
+# tree 47104
+size 1500 1000
+theme light
+wait 2000
+key ctrl+shift+e
+expect tab:"Experimente" selected
+# a short run: two levels, little time, so that the suite stays quick
+click #149704
+key ctrl+a
+type "400, 3200"
+click #149705
+key ctrl+a
+type "1"
+click #149706
+key ctrl+a
+type "0"
+click #149707
+key ctrl+a
+type "1"
+click #149697
+wait 100
+shot build/jfnetworker/exp_define_light_100.png
+theme dark
+shot build/jfnetworker/exp_define_dark_100.png
+theme light
+click tab:"Lauf"
+click #149536
+wait 100
+shot build/jfnetworker/exp_running_light_100.png
+sync 300000
+wait 300
+shot build/jfnetworker/exp_run_light_100.png
+click tab:"Vergleich"
+wait 200
+shot build/jfnetworker/exp_compare_light_100.png
+theme dark
+shot build/jfnetworker/exp_compare_dark_100.png
+scale 150
+wait 100
+shot build/jfnetworker/exp_compare_dark_150.png
+theme light
+shot build/jfnetworker/exp_compare_light_150.png
+scale 100
+size 1000 900
+wait 200
+shot build/jfnetworker/exp_compare_light_narrow.png
+click tab:"Aufbau"
+wait 100
+shot build/jfnetworker/exp_define_light_narrow.png
+size 1500 1000
+wait 100
+# ---- a service's form
+dblclick listitem:"LB" shift
+click tab:"Dienste"
+click button:"Einstellungen …"
+wait 100
+shot build/jfnetworker/exp_form_light_100.png window 26624
+theme dark
+shot build/jfnetworker/exp_form_dark_100.png window 26624
+scale 150 window 26624
+wait 100
+shot build/jfnetworker/exp_form_dark_150.png window 26624
+scale 100 window 26624
+theme light
+click #140289
+close window 26624
+wait 100
+# ---- the Metriken panel: bars of the latencies and p99.9, a device's disk, the cables
+key ctrl+shift+m
+wait 8000
+click listitem:"Lastgenerator load"
+wait 100
+expect text:"p99.9" exists
+expect text:"Verteilung der Latenz" exists
+shot build/jfnetworker/exp_metrics_load_light_100.png
+focus #47104
+key end
+wait 100
+expect text:"Auslastung der Kabel" exists
+shot build/jfnetworker/exp_metrics_cables_light_100.png
+theme dark
+shot build/jfnetworker/exp_metrics_cables_dark_100.png

@@ -1294,6 +1294,35 @@ fn us(v: Option<u64>) -> i64 {
     v.map(|x| (x / 1000) as i64).unwrap_or(0)
 }
 
+impl Lb {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{mem_into, ms_of, us_of, word};
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("mode", word(if self.mode == LbMode::Http { "http" } else { "tcp" }));
+        o.insert("port", Value::u64(self.port as u64));
+        o.insert("algorithm", word(self.algo.name()));
+        o.insert("vnodes", Value::u64(self.vnodes as u64));
+        o.insert("retries", Value::u64(self.retries as u64));
+        o.insert("timeout_ms", ms_of(self.timeout));
+        o.insert("connect_timeout_ms", ms_of(self.connect_timeout));
+        o.insert("drain_ms", ms_of(self.drain));
+        o.insert("max_conns", Value::u64(self.max_conns as u64));
+        o.insert("keepalive", Value::Bool(self.keepalive));
+        o.insert("tag", Value::Bool(self.tag));
+        o.insert("cpu_us", us_of(self.cpu));
+        mem_into(&mut o, &self.mem);
+        let h = &self.health;
+        let kind = match h.kind {
+            CheckKind::None => "none",
+            CheckKind::Tcp => "tcp",
+            CheckKind::Http => "http",
+        };
+        o.insert("health", Value::object([("type", word(kind)), ("path", word(&h.path)), ("interval_ms", ms_of(h.interval)), ("timeout_ms", ms_of(h.timeout)), ("rise", Value::u64(h.rise as u64)), ("fall", Value::u64(h.fall as u64))]));
+        o
+    }
+}
+
 impl Service for Lb {
     fn kind(&self) -> &'static str {
         "lb"

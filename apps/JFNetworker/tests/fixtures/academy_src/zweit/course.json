@@ -1,0 +1,35 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 3,
+  "sample": true,
+  "title": [
+    "Noch ein Kurs",
+    "One more course"
+  ],
+  "summary": [
+    "Ein Beispiel.",
+    "A sample."
+  ],
+  "level": "advanced",
+  "minutes": 5,
+  "units": [
+    {
+      "title": [
+        "Teil eins",
+        "Part one"
+      ],
+      "steps": [
+        {
+          "id": "eins",
+          "kind": "lesson",
+          "title": [
+            "Eine Lektion",
+            "A lesson"
+          ],
+          "file": "eins.md"
+        }
+      ]
+    }
+  ]
+}

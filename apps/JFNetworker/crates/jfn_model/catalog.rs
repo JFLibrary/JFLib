@@ -1323,6 +1323,23 @@ impl Prices {
     pub const ASSUMED: Prices = Prices { core: 30_000, big: 1_500_000, huge: 2_000_000, ram_gb: 4_000, hdd_gb: 40, sata_gb: 100, nvme_gb: 200, nvme_fast_gb: 400, host: 20_000, switch: 10_000, router: 30_000 };
     /// the names an experiment may give figures for
     pub const KEYS: &'static [&'static str] = &["core", "big", "huge", "ram_gb", "hdd_gb", "sata_gb", "nvme_gb", "nvme_fast_gb", "host", "switch", "router"];
+    /// one figure by its name, read
+    pub fn get(&self, key: &str) -> u64 {
+        match key {
+            "core" => self.core,
+            "big" => self.big,
+            "huge" => self.huge,
+            "ram_gb" => self.ram_gb,
+            "hdd_gb" => self.hdd_gb,
+            "sata_gb" => self.sata_gb,
+            "nvme_gb" => self.nvme_gb,
+            "nvme_fast_gb" => self.nvme_fast_gb,
+            "host" => self.host,
+            "switch" => self.switch,
+            "router" => self.router,
+            _ => 0,
+        }
+    }
     /// one figure by its name
     pub fn set(&mut self, key: &str, v: u64) {
         match key {
@@ -1365,4 +1382,18 @@ impl Prices {
             },
         }
     }
+}
+
+/// the service a tile of the palette brings when it is placed in the window (SA3): (kind, name).  A
+/// file that is loaded gets nothing from here
+pub fn preset_service(model: &str) -> Option<(&'static str, &'static str)> {
+    Some(match model {
+        "load-balancer" => ("lb", "lb"),
+        // (SA4 brings a database service)
+        "database" => ("kv", "kv"),
+        "cache" => ("cache", "cache"),
+        "queue" => ("mq", "mq"),
+        "traffic-gen" => ("http-load", "load"),
+        _ => return None,
+    })
 }

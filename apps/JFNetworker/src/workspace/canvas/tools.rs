@@ -128,7 +128,7 @@ pub(crate) fn place(n: &mut Net, ui: &mut Ui, model: usize, at: [f32; 2]) -> Opt
         return place_note(n, ui, at);
     }
     let [x, y] = origin(n, at);
-    match edits::add_device(&mut n.doc.proj, m.id, x, y) {
+    match edits::add_placed(&mut n.doc.proj, m.id, x, y) {
         Ok((id, e)) => {
             n.doc.record(e);
             n.canvas.select_only(id);

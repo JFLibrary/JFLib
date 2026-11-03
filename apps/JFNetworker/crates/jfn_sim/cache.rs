@@ -401,6 +401,25 @@ fn us(v: Option<u64>) -> i64 {
     v.map(|x| (x / 1000) as i64).unwrap_or(0)
 }
 
+impl Cache {
+    /// its settings in the units of its config (svcform.rs)
+    pub(crate) fn settings(&self) -> Value {
+        use crate::svcform::{mem_into, ms_of, us_of};
+        let mut o = agent_core::jmap::empty_object();
+        o.insert("port", Value::u64(self.port as u64));
+        o.insert("entries", Value::u64(self.store.max_len as u64));
+        o.insert("max_kb", Value::u64(self.store.max_weight / 1024));
+        o.insert("ttl_ms", ms_of(self.ttl));
+        o.insert("cache_control", Value::Bool(self.cache_control));
+        o.insert("hit_us", us_of(self.hit_time));
+        o.insert("collapse", Value::Bool(self.collapse));
+        o.insert("timeout_ms", ms_of(self.timeout));
+        o.insert("connect_timeout_ms", ms_of(self.connect_timeout));
+        mem_into(&mut o, &self.mem);
+        o
+    }
+}
+
 impl Service for Cache {
     fn kind(&self) -> &'static str {
         "cache"
