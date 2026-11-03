@@ -2,16 +2,42 @@
 use alloc::vec::Vec;
 use simd::Simd;
 
-pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> {
+/// the bytes of a run and where each operation's begin (what a failed comparison names)
+pub(super) struct Results {
+    pub bytes: Vec<u8>,
+    ops: Vec<(usize, &'static str)>,
+}
+
+impl Results {
+    /// the operation that wrote byte `at`: its name and its bytes
+    pub fn op_at(&self, at: usize) -> (&'static str, &[u8]) {
+        let k = self.ops.partition_point(|op| op.0 <= at) - 1;
+        let end = self.ops.get(k + 1).map_or(self.bytes.len(), |op| op.0);
+        (self.ops[k].1, &self.bytes[self.ops[k].0..end])
+    }
+}
+
+pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Results {
     let a = s.load(bytes);
     let b = s.load(other);
-    let mut output = Vec::new();
+    let mut out = Results { bytes: Vec::new(), ops: Vec::new() };
+    macro_rules! put {
+        ($name:expr, $bytes:expr) => {{
+            out.ops.push((out.bytes.len(), $name));
+            out.bytes.extend_from_slice($bytes);
+        }};
+    }
     macro_rules! emit {
         ($v:expr) => {{
             let mut result = [0u8; 32];
             s.store(&mut result, $v);
-            output.extend_from_slice(&result[..S::BYTES]);
+            put!(stringify!($v), &result[..S::BYTES]);
         }};
+    }
+    macro_rules! emit_u32 {
+        ($v:expr) => {
+            put!(stringify!($v), &($v as u32).to_le_bytes())
+        };
     }
     emit!(s.add8(a, b));
     emit!(s.sub8(a, b));
@@ -60,6 +86,10 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.srl16::<31>(a));
     emit!(s.srl16::<32>(a));
     emit!(s.srl16::<63>(a));
+    emit!(s.srl16::<64>(a));
+    emit!(s.srl16::<127>(a));
+    emit!(s.srl16::<128>(a));
+    emit!(s.srl16::<255>(a));
     emit!(s.sll16::<0>(a));
     emit!(s.sll16::<1>(a));
     emit!(s.sll16::<7>(a));
@@ -68,6 +98,10 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.sll16::<31>(a));
     emit!(s.sll16::<32>(a));
     emit!(s.sll16::<63>(a));
+    emit!(s.sll16::<64>(a));
+    emit!(s.sll16::<127>(a));
+    emit!(s.sll16::<128>(a));
+    emit!(s.sll16::<255>(a));
     emit!(s.sra16::<0>(a));
     emit!(s.sra16::<1>(a));
     emit!(s.sra16::<7>(a));
@@ -76,6 +110,10 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.sra16::<31>(a));
     emit!(s.sra16::<32>(a));
     emit!(s.sra16::<63>(a));
+    emit!(s.sra16::<64>(a));
+    emit!(s.sra16::<127>(a));
+    emit!(s.sra16::<128>(a));
+    emit!(s.sra16::<255>(a));
     emit!(s.srl32::<0>(a));
     emit!(s.srl32::<1>(a));
     emit!(s.srl32::<7>(a));
@@ -84,6 +122,10 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.srl32::<31>(a));
     emit!(s.srl32::<32>(a));
     emit!(s.srl32::<63>(a));
+    emit!(s.srl32::<64>(a));
+    emit!(s.srl32::<127>(a));
+    emit!(s.srl32::<128>(a));
+    emit!(s.srl32::<255>(a));
     emit!(s.sll32::<0>(a));
     emit!(s.sll32::<1>(a));
     emit!(s.sll32::<7>(a));
@@ -92,6 +134,10 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.sll32::<31>(a));
     emit!(s.sll32::<32>(a));
     emit!(s.sll32::<63>(a));
+    emit!(s.sll32::<64>(a));
+    emit!(s.sll32::<127>(a));
+    emit!(s.sll32::<128>(a));
+    emit!(s.sll32::<255>(a));
     emit!(s.sra32::<0>(a));
     emit!(s.sra32::<1>(a));
     emit!(s.sra32::<7>(a));
@@ -100,46 +146,129 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.sra32::<31>(a));
     emit!(s.sra32::<32>(a));
     emit!(s.sra32::<63>(a));
+    emit!(s.sra32::<64>(a));
+    emit!(s.sra32::<127>(a));
+    emit!(s.sra32::<128>(a));
+    emit!(s.sra32::<255>(a));
     emit!(s.bsll::<0>(a));
     emit!(s.bsll::<1>(a));
+    emit!(s.bsll::<2>(a));
+    emit!(s.bsll::<3>(a));
+    emit!(s.bsll::<4>(a));
+    emit!(s.bsll::<5>(a));
+    emit!(s.bsll::<6>(a));
     emit!(s.bsll::<7>(a));
+    emit!(s.bsll::<8>(a));
+    emit!(s.bsll::<9>(a));
+    emit!(s.bsll::<10>(a));
+    emit!(s.bsll::<11>(a));
+    emit!(s.bsll::<12>(a));
+    emit!(s.bsll::<13>(a));
+    emit!(s.bsll::<14>(a));
     emit!(s.bsll::<15>(a));
     emit!(s.bsll::<16>(a));
     emit!(s.bsll::<31>(a));
     emit!(s.bsll::<32>(a));
     emit!(s.bsll::<63>(a));
+    emit!(s.bsll::<64>(a));
+    emit!(s.bsll::<127>(a));
+    emit!(s.bsll::<128>(a));
+    emit!(s.bsll::<255>(a));
     emit!(s.bsrl::<0>(a));
     emit!(s.bsrl::<1>(a));
+    emit!(s.bsrl::<2>(a));
+    emit!(s.bsrl::<3>(a));
+    emit!(s.bsrl::<4>(a));
+    emit!(s.bsrl::<5>(a));
+    emit!(s.bsrl::<6>(a));
     emit!(s.bsrl::<7>(a));
+    emit!(s.bsrl::<8>(a));
+    emit!(s.bsrl::<9>(a));
+    emit!(s.bsrl::<10>(a));
+    emit!(s.bsrl::<11>(a));
+    emit!(s.bsrl::<12>(a));
+    emit!(s.bsrl::<13>(a));
+    emit!(s.bsrl::<14>(a));
     emit!(s.bsrl::<15>(a));
     emit!(s.bsrl::<16>(a));
     emit!(s.bsrl::<31>(a));
     emit!(s.bsrl::<32>(a));
     emit!(s.bsrl::<63>(a));
+    emit!(s.bsrl::<64>(a));
+    emit!(s.bsrl::<127>(a));
+    emit!(s.bsrl::<128>(a));
+    emit!(s.bsrl::<255>(a));
     emit!(s.shuf16::<0>(a));
+    emit!(s.shuf16::<1>(a));
+    emit!(s.shuf16::<2>(a));
+    emit!(s.shuf16::<3>(a));
+    emit!(s.shuf16::<4>(a));
+    emit!(s.shuf16::<8>(a));
+    emit!(s.shuf16::<12>(a));
+    emit!(s.shuf16::<16>(a));
+    emit!(s.shuf16::<32>(a));
+    emit!(s.shuf16::<48>(a));
+    emit!(s.shuf16::<64>(a));
+    emit!(s.shuf16::<128>(a));
+    emit!(s.shuf16::<192>(a));
     emit!(s.shuf16::<27>(a));
     emit!(s.shuf16::<57>(a));
     emit!(s.shuf16::<78>(a));
+    emit!(s.shuf16::<177>(a));
+    emit!(s.shuf16::<216>(a));
     emit!(s.shuf16::<228>(a));
     emit!(s.shuf16::<255>(a));
     emit!(s.shuf32::<0>(a));
+    emit!(s.shuf32::<1>(a));
+    emit!(s.shuf32::<2>(a));
+    emit!(s.shuf32::<3>(a));
+    emit!(s.shuf32::<4>(a));
+    emit!(s.shuf32::<8>(a));
+    emit!(s.shuf32::<12>(a));
+    emit!(s.shuf32::<16>(a));
+    emit!(s.shuf32::<32>(a));
+    emit!(s.shuf32::<48>(a));
+    emit!(s.shuf32::<64>(a));
+    emit!(s.shuf32::<128>(a));
+    emit!(s.shuf32::<192>(a));
     emit!(s.shuf32::<27>(a));
     emit!(s.shuf32::<57>(a));
     emit!(s.shuf32::<78>(a));
+    emit!(s.shuf32::<177>(a));
+    emit!(s.shuf32::<216>(a));
     emit!(s.shuf32::<228>(a));
     emit!(s.shuf32::<255>(a));
     emit!(s.shufps::<0>(a, b));
+    emit!(s.shufps::<1>(a, b));
+    emit!(s.shufps::<2>(a, b));
+    emit!(s.shufps::<3>(a, b));
+    emit!(s.shufps::<4>(a, b));
+    emit!(s.shufps::<8>(a, b));
+    emit!(s.shufps::<12>(a, b));
+    emit!(s.shufps::<16>(a, b));
+    emit!(s.shufps::<32>(a, b));
+    emit!(s.shufps::<48>(a, b));
+    emit!(s.shufps::<64>(a, b));
+    emit!(s.shufps::<128>(a, b));
+    emit!(s.shufps::<192>(a, b));
     emit!(s.shufps::<27>(a, b));
     emit!(s.shufps::<57>(a, b));
     emit!(s.shufps::<78>(a, b));
+    emit!(s.shufps::<177>(a, b));
+    emit!(s.shufps::<216>(a, b));
     emit!(s.shufps::<228>(a, b));
     emit!(s.shufps::<255>(a, b));
     emit!(s.srl16x(a, 0));
     emit!(s.srl16x(a, 1));
+    emit!(s.srl16x(a, 7));
+    emit!(s.srl16x(a, 8));
     emit!(s.srl16x(a, 15));
     emit!(s.srl16x(a, 16));
     emit!(s.srl16x(a, 31));
     emit!(s.srl16x(a, 255));
+    emit!(s.srl16x(a, 256));
+    emit!(s.srl16x(a, 65536));
+    emit!(s.srl16x(a, u32::MAX));
     emit!(s.zero());
     emit!(s.splat8(127));
     emit!(s.splat16(0x91fa));
@@ -152,7 +281,7 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     // particular AVX2's cast leaves its upper half unspecified; never inspect it.
     let mut raw = [0u8; 32];
     s.store_raw(&mut raw, s.load_raw(bytes));
-    output.extend_from_slice(&raw[..S::BYTES]);
+    put!("store_raw(load_raw)", &raw[..S::BYTES]);
     emit!(s.widen_px(a));
     emit!(s.load_px(bytes));
     emit!(s.bcast_px(bytes));
@@ -160,29 +289,34 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     emit!(s.packuswb_px(a));
     emit!(s.cvt_i32_f32(a));
     emit!(s.cvt_i32_f64(a));
-    output.extend_from_slice(&(s.movemask8(a)).to_le_bytes());
-    output.extend_from_slice(&(s.movemask32(a)).to_le_bytes());
-    output.extend_from_slice(&(s.to_i32(a) as u32).to_le_bytes());
-    output.extend_from_slice(&(s.ptest_raw(a, b)).to_le_bytes());
-    output.extend_from_slice(&(s.ptestz_raw(a, b) as u32).to_le_bytes());
-    output.extend_from_slice(&(s.ptest_raw(s.zero(), b)).to_le_bytes());
-    output.extend_from_slice(&(s.ptest_raw(s.splat8(255), b)).to_le_bytes());
+    emit_u32!(s.movemask8(a));
+    emit_u32!(s.movemask32(a));
+    emit_u32!(s.to_i32(a));
+    emit_u32!(s.ptest_raw(a, b));
+    emit_u32!(s.ptestz_raw(a, b));
+    emit_u32!(s.ptest_raw(s.zero(), b));
+    emit_u32!(s.ptest_raw(s.splat8(255), b));
+    emit_u32!(s.ptest_raw(a, a));
+    emit_u32!(s.ptestz_raw(a, a));
+    // only the raw pixels count, not the bytes above them
+    emit_u32!(s.ptest_raw(s.bsll::<8>(a), b));
+    emit_u32!(s.ptestz_raw(s.bsll::<8>(a), s.bsll::<8>(b)));
 
     let mut buf = [0u8; 64];
     s.store_px(&mut buf, a);
-    output.extend_from_slice(&buf[..S::BYTES / 2]);
+    put!("store_px", &buf[..S::BYTES / 2]);
     s.store_raw(&mut buf, a);
-    output.extend_from_slice(&buf[..S::BYTES / 2]);
+    put!("store_raw", &buf[..S::BYTES / 2]);
     s.store_lanes2(&mut buf, a, b);
-    output.extend_from_slice(&buf[..S::BYTES * 2]);
+    put!("store_lanes2", &buf[..S::BYTES * 2]);
     let (lo, hi) = s.load_lanes2(&buf);
     emit!(lo);
     emit!(hi);
     let mut split_a = [0u8; 8];
     let mut split_b = [0u8; 8];
     s.store_raw_lanes(&mut split_a, &mut split_b, a);
-    output.extend_from_slice(&split_a);
-    output.extend_from_slice(&split_b);
+    put!("store_raw_lanes a", &split_a);
+    put!("store_raw_lanes b", &split_b);
     let mut ints16 = [0i16; 16];
     let mut uints16 = [0u16; 16];
     let mut ints32 = [0i32; 8];
@@ -231,5 +365,46 @@ pub(super) fn run<S: Simd>(s: S, bytes: &[u8; 32], other: &[u8; 32]) -> Vec<u8> 
     let (first, last) = floats.split_at_mut(4);
     s.store_f32_lanes(first, last, bf);
     emit!(s.load_f32(&floats));
-    output
+
+    // the floats on their raw bits: NaNs, infinities, denormals and signed zeros, what no i32
+    // converts to and where the instruction sets' rules differ
+    emit!(s.addf(a, b));
+    emit!(s.subf(a, b));
+    emit!(s.mulf(a, b));
+    emit!(s.divf(a, b));
+    emit!(s.minf(a, b));
+    emit!(s.maxf(a, b));
+    emit!(s.cmpltf(a, b));
+    emit!(s.sqrtf(a));
+    emit!(s.cvtt_f32_i32(a));
+    emit!(s.cvtr_f32_i32(a));
+    emit!(s.addd(a, b));
+    emit!(s.subd(a, b));
+    emit!(s.muld(a, b));
+    emit!(s.divd(a, b));
+    emit!(s.mind(a, b));
+    emit!(s.maxd(a, b));
+    emit!(s.cmpltd(a, b));
+    emit!(s.sqrtd(a));
+    emit!(s.cvtt_f64_i32(a));
+
+    // memory at an odd address (no backend may ask for an alignment)
+    let mut moved = [0u8; 96];
+    moved[1..33].copy_from_slice(bytes);
+    moved[33..65].copy_from_slice(other);
+    emit!(s.load(&moved[1..]));
+    emit!(s.load_px(&moved[1..]));
+    emit!(s.bcast_px(&moved[1..]));
+    emit!(s.load_lane32(&moved[1..]));
+    let (lo, hi) = s.load_lanes2(&moved[1..]);
+    emit!(lo);
+    emit!(hi);
+    let mut shifted = [0u8; 96];
+    s.store(&mut shifted[3..], a);
+    s.store_px(&mut shifted[35..], b);
+    put!("store, store_px at an odd address", &shifted);
+    s.store_lanes2(&mut shifted[1..], a, b);
+    s.store_raw(&mut shifted[67..], b);
+    put!("store_lanes2, store_raw at an odd address", &shifted);
+    out
 }

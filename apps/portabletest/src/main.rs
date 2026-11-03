@@ -1,5 +1,6 @@
-// Deterministic portability checks: every scalar vector operation against native SSE2
-// and AVX2, exact IEEE conversions/square roots/decimal scaling, and math error bounds.
+// Deterministic portability checks: every scalar vector operation against native SSE2 and
+// AVX2, NEON or SIMD128, exact IEEE conversions/square roots/decimal scaling, and math error
+// bounds.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -29,102 +30,194 @@ fn digest(hash: &mut u64, bytes: &[u8]) {
     }
 }
 
-fn compare_vectors(actual: &[u8], expected: &[u8], backend: &str, case: usize) {
-    if let Some(at) = actual.iter().zip(expected).position(|(a, b)| a != b) {
+fn compare_vectors(scalar: &vectors::Results, native: &vectors::Results, backend: &str, case: usize, input: (&[u8; 32], &[u8; 32])) {
+    if let Some(at) = scalar.bytes.iter().zip(&native.bytes).position(|(a, b)| a != b) {
+        let (op, expected) = scalar.op_at(at);
         panic!(
-            "{backend} case {case} byte {at}: scalar={} native={}",
-            actual[at], expected[at]
+            "{backend} case {case} byte {at} in {op}:\n  scalar={expected:02x?}\n  native={:02x?}\n  a={:02x?}\n  b={:02x?}",
+            native.op_at(at).1, input.0, input.1
         );
     }
-    assert_eq!(actual.len(), expected.len());
+    assert_eq!(scalar.bytes.len(), native.bytes.len());
+}
+
+// lanes where the backends' rules differ: saturation, overflow, shifted-out signs, ...
+const EDGE16: [u16; 14] = [
+    0, 1, 0x7f, 0x80, 0xff, 0x100, 0x7fff, 0x8000, 0x8001, 0xff00, 0xff7f, 0xff80, 0xfffe, 0xffff,
+];
+const EDGE32: [u32; 14] = [
+    0, 1, 0x7fff, 0x8000, 0xffff, 0x10000, 0x7fffffff, 0x80000000, 0x80000001, 0xffff7fff, 0xffff8000, 0xffff0000,
+    0xfffffffe, 0xffffffff,
+];
+// ... and float: signed zeros, denormals, what rounds across the i32 range, infinities, quiet and
+// signalling NaNs with both signs and with a payload
+const EDGE_F32: [u32; 32] = [
+    0, 0x80000000, 1, 0x80000001, 0x007fffff, 0x807fffff, 0x00800000, 0x80800000, 0x3f000000, 0xbf000000,
+    0x3f800000, 0xbf800000, 0x3fc00000, 0xbfc00000, 0x40200000, 0xc0200000, 0x4effffff, 0x4f000000, 0xcf000000,
+    0xcf000001, 0x7f7fffff, 0xff7fffff, 0x7f800000, 0xff800000, 0x7fc00000, 0xffc00000, 0x7fc01234, 0xffc05678,
+    0x7f800001, 0xff800001, 0x7fa01234, 0xffa05678,
+];
+const EDGE_F64: [u64; 28] = [
+    0, 1 << 63, 1, (1 << 63) | 1, 0x000fffffffffffff, 0x0010000000000000, 0x3fe0000000000000, 0xbfe0000000000000,
+    0x3ff0000000000000, 0xbff0000000000000, 0x41dfffffffe00000, 0x41dfffffffffc000, 0x41e0000000000000,
+    0xc1e0000000000000, 0xc1e0000000100000, 0xc1e0000000200000, 0x43e0000000000000, 0xc3e0000000000000,
+    0x7fefffffffffffff, 0xffefffffffffffff, 0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000000000,
+    0xfff8000000000000, 0x7ff8000000001234, 0xfff8000056780000, 0x7ff0000000000001, 0xfff4000000005678,
+];
+
+fn check_case(a: &[u8; 32], b: &[u8; 32], case: usize, hash: &mut u64) {
+    let scalar = vectors::run(simd::Scalar, a, b);
+    let scalar256 = vectors::run(simd::Scalar256, a, b);
+    let backend = if cfg!(target_arch = "aarch64") { "NEON" } else if cfg!(target_arch = "wasm32") { "SIMD128" } else { "SSE2" };
+    compare_vectors(&scalar, &vectors::run(simd::Sse2, a, b), backend, case, (a, b));
+    #[cfg(target_arch = "x86_64")]
+    if let Some(avx2) = simd::Avx2::new() {
+        compare_vectors(&scalar256, &vectors::run(avx2, a, b), "AVX2", case, (a, b));
+    }
+    digest(hash, &scalar.bytes);
+    digest(hash, &scalar256.bytes);
+}
+
+// 32 bytes as lanes of N bytes, each one given by its number
+fn fill<const N: usize>(lane: impl Fn(usize) -> [u8; N]) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    for (l, bytes) in out.chunks_exact_mut(N).enumerate() {
+        bytes.copy_from_slice(&lane(l));
+    }
+    out
 }
 
 fn vector_checks(hash: &mut u64) {
     let mut seed = 0x313273a653871541;
-    for case in 0..512 {
-        let mut a = [0u8; 32];
-        let mut b = [0u8; 32];
+    let mut case = 0;
+    let mut check = |a: [u8; 32], b: [u8; 32], hash: &mut u64| {
+        check_case(&a, &b, case, hash);
+        case += 1;
+    };
+    // all bits clear or set, then at random
+    check([0; 32], [255; 32], hash);
+    check([255; 32], [0; 32], hash);
+    for _ in 0..512 {
+        let (mut a, mut b) = ([0u8; 32], [0u8; 32]);
         for i in 0..32 {
-            a[i] = if case == 0 {
-                0
-            } else if case == 1 {
-                255
-            } else {
-                next(&mut seed) as u8
-            };
-            b[i] = if case < 2 {
-                255 - a[i]
-            } else {
-                next(&mut seed) as u8
-            };
+            a[i] = next(&mut seed) as u8;
+            b[i] = next(&mut seed) as u8;
         }
-        let scalar = vectors::run(simd::Scalar, &a, &b);
-        let scalar256 = vectors::run(simd::Scalar256, &a, &b);
-        compare_vectors(&scalar, &vectors::run(simd::Sse2, &a, &b), "baseline/SIMD128", case);
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            compare_vectors(&scalar, &vectors::run(simd::Sse2, &a, &b), "SSE2", case);
-            if let Some(avx2) = simd::Avx2::new() {
-                compare_vectors(&scalar256, &vectors::run(avx2, &a, &b), "AVX2", case);
-            }
+        check(a, b, hash);
+    }
+    // the integer lanes at random among their edges
+    for _ in 0..512 {
+        let (r0, r1) = (next(&mut seed), next(&mut seed));
+        let pick = |r: u64, lane: usize, n: usize| ((r >> (lane * 4 % 64)) % n as u64) as usize;
+        check(
+            fill(|l| EDGE16[pick(r0, l, EDGE16.len())].to_le_bytes()),
+            fill(|l| EDGE16[pick(r1, l, EDGE16.len())].to_le_bytes()),
+            hash,
+        );
+        let (r0, r1) = (next(&mut seed), next(&mut seed));
+        check(
+            fill(|l| EDGE32[pick(r0, l, EDGE32.len())].to_le_bytes()),
+            fill(|l| EDGE32[pick(r1, l, EDGE32.len())].to_le_bytes()),
+            hash,
+        );
+    }
+    // the float lanes: every pair of edges
+    for i in 0..EDGE_F32.len() {
+        for j in 0..EDGE_F32.len() {
+            check(
+                fill(|l| EDGE_F32[(i + l) % EDGE_F32.len()].to_le_bytes()),
+                fill(|l| EDGE_F32[(j + l) % EDGE_F32.len()].to_le_bytes()),
+                hash,
+            );
         }
-        digest(hash, &scalar);
-        digest(hash, &scalar256);
+    }
+    for i in 0..EDGE_F64.len() {
+        for j in 0..EDGE_F64.len() {
+            check(
+                fill(|l| EDGE_F64[(i + l) % EDGE_F64.len()].to_le_bytes()),
+                fill(|l| EDGE_F64[(j + l) % EDGE_F64.len()].to_le_bytes()),
+                hash,
+            );
+        }
+    }
+}
+
+// the portable scalar operations against the native ones
+fn check_f32(bits: u32, hash: &mut u64) {
+    let x = f32::from_bits(bits);
+    let results = [fx::cvtt(x) as u32, fx::cvt(x) as u32, fx::sqrt(x).to_bits(), fx::floor_i(x) as u32, fx::ceil_i(x) as u32];
+    #[cfg(not(target_arch = "wasm32"))]
+    assert_eq!(
+        results,
+        [
+            rt::fx::cvtt(x) as u32,
+            rt::fx::cvt(x) as u32,
+            rt::fx::sqrt(x).to_bits(),
+            rt::fx::floor_i(x) as u32,
+            rt::fx::ceil_i(x) as u32
+        ],
+        "f32 {bits:08x}"
+    );
+    for value in results {
+        digest(hash, &value.to_le_bytes());
+    }
+}
+
+fn check_f64(bits: u64, hash: &mut u64) {
+    let x = f64::from_bits(bits);
+    let results = [
+        fx::cvttd(x) as u64,
+        fx::cvtd(x) as u64,
+        fx::cvttd64(x) as u64,
+        fx::cvtd64(x) as u64,
+        fx::sqrtd(x).to_bits(),
+    ];
+    #[cfg(not(target_arch = "wasm32"))]
+    assert_eq!(
+        results,
+        [
+            rt::fx::cvttd(x) as u64,
+            rt::fx::cvtd(x) as u64,
+            rt::fx::cvttd64(x) as u64,
+            rt::fx::cvtd64(x) as u64,
+            rt::fx::sqrtd(x).to_bits()
+        ],
+        "f64 {bits:016x}"
+    );
+    for value in results {
+        digest(hash, &value.to_le_bytes());
     }
 }
 
 fn float_checks(hash: &mut u64) {
-    let edges = [
-        0, 1, 0x80000000, 0x007fffff, 0x00800000, 0x3f000000, 0x3fc00000, 0x40200000, 0xbfc00000,
-        0xc0200000, 0x4effffff, 0x4f000000, 0xcf000000, 0xcf000001, 0x7f800000, 0xff800000,
-        0x7fc01234, 0x7f800001,
-    ];
+    // the edges and the values right next to them
+    for bits in EDGE_F32 {
+        for b in [bits.wrapping_sub(1), bits, bits.wrapping_add(1)] {
+            check_f32(b, hash);
+        }
+    }
+    for bits in EDGE_F64 {
+        for b in [bits.wrapping_sub(1), bits, bits.wrapping_add(1)] {
+            check_f64(b, hash);
+        }
+    }
     let mut seed = 0x984813dc02179452;
-    for i in 0..20000 {
-        let bits = if i < edges.len() {
-            edges[i]
-        } else {
-            next(&mut seed) as u32
-        };
-        let x = f32::from_bits(bits);
-        let results = [fx::cvtt(x) as u32, fx::cvt(x) as u32, fx::sqrt(x).to_bits()];
-        #[cfg(not(target_arch = "wasm32"))]
-        assert_eq!(
-            results,
-            [
-                rt::fx::cvtt(x) as u32,
-                rt::fx::cvt(x) as u32,
-                rt::fx::sqrt(x).to_bits()
-            ],
-            "f32 {bits:08x}"
-        );
-        for value in results {
-            digest(hash, &value.to_le_bytes());
-        }
-        let bits = next(&mut seed);
-        let x = f64::from_bits(bits);
-        let results = [
-            fx::cvttd(x) as u64,
-            fx::cvtd(x) as u64,
-            fx::cvttd64(x) as u64,
-            fx::cvtd64(x) as u64,
-            fx::sqrtd(x).to_bits(),
-        ];
-        #[cfg(not(target_arch = "wasm32"))]
-        assert_eq!(
-            results,
-            [
-                rt::fx::cvttd(x) as u64,
-                rt::fx::cvtd(x) as u64,
-                rt::fx::cvttd64(x) as u64,
-                rt::fx::cvtd64(x) as u64,
-                rt::fx::sqrtd(x).to_bits()
-            ],
-            "f64 {bits:016x}"
-        );
-        for value in results {
-            digest(hash, &value.to_le_bytes());
-        }
+    for _ in 0..20000 {
+        // any bits (few of them inside the range of an i32)
+        check_f32(next(&mut seed) as u32, hash);
+        check_f64(next(&mut seed), hash);
+        // inside the range of an i32, with a fraction of 0 to 16 bits; every power of two down
+        // to 2^-16 of a random integer has its ties, ...
+        let (i, k) = (next(&mut seed) as u32 as i32, next(&mut seed) % 17);
+        let scale = 1.0 / (1u32 << k) as f64;
+        check_f32(((i as f64 * scale) as f32).to_bits(), hash);
+        check_f64((i as f64 * scale).to_bits(), hash);
+        // ... and exact ties around small integers and the bounds
+        let (small, top) = ((i >> 20) as f64, (i >> 24) as f64);
+        check_f32(((small + 0.5) as f32).to_bits(), hash);
+        check_f64((small + 0.5).to_bits(), hash);
+        check_f64((2147483647.5 + top).to_bits(), hash);
+        check_f64((-2147483648.5 + top).to_bits(), hash);
     }
     assert_eq!(fx::minss(0.0, -0.0).to_bits(), (-0.0f32).to_bits());
     assert_eq!(fx::maxsd(f64::NAN, 3.0), 3.0);

@@ -1,6 +1,6 @@
 // simd -- SSE2 / AVX2 registers behind one safe interface, so a kernel is written once and
 // runs on both instruction sets with bit-identical results (the assembly's BMV = 0 / 1
-// macros)
+// macros); ARM64 and the browser in place of Sse2: neon.rs, wasm.rs
 //
 //   trait Simd       a register type V and its operations, named after the SSE2 instructions;
 //                    Sse2 (128-bit registers) and Avx2 (256-bit registers used as two
@@ -33,13 +33,13 @@ mod native;
 pub use native::{Sse2, Avx2};
 mod scalar;
 pub use scalar::{Scalar, Scalar256};
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-mod wasm;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-pub use wasm::{Wasm128, Wasm128 as Sse2};
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[cfg(target_arch = "aarch64")] mod neon;
+#[cfg(target_arch = "aarch64")] pub use neon::{Neon128, Neon128 as Sse2};
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))] mod wasm;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))] pub use wasm::{Wasm128, Wasm128 as Sse2};
+#[cfg(any(target_arch = "aarch64", all(target_arch = "wasm32", target_feature = "simd128")))]
 pub use scalar::Scalar256 as Avx2;
-#[cfg(not(any(target_arch = "x86_64", all(target_arch = "wasm32", target_feature = "simd128"))))]
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", all(target_arch = "wasm32", target_feature = "simd128"))))]
 pub use scalar::{Scalar as Sse2, Scalar256 as Avx2};
 
 pub use rt::cpu::CPU_AVX2;
@@ -83,14 +83,17 @@ pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
     dst[head + body..].copy_from_slice(&src[head + body..]);
 }
 
-/// copy_stream without streaming stores (other targets)
+/// copy_stream without streaming stores (other targets).  ARM64 needs nothing of its own: stnp
+/// is only a hint and its loose ordering would want a barrier, while a copy like this one
+/// writes whole lines in a row, which ARM cores notice and then stop allocating in their caches.
 #[cfg(not(target_arch = "x86_64"))]
 pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
     let n = dst.len().min(src.len());
     dst[..n].copy_from_slice(&src[..n]);
 }
 
-/// the streaming stores of this thread become visible to others (sfence)
+/// the streaming stores of this thread become visible to others (sfence); nothing to do on other
+/// targets: without such stores the release of whatever hands dst on is enough
 #[inline]
 pub fn stream_fence() {
     // SAFETY: sfence is part of the x86-64 baseline (SSE); it only orders stores.
@@ -123,7 +126,8 @@ pub fn dispatch_sse2<K: Kernel>(k: K) -> K::Out {
     k.run(Sse2)
 }
 
-/// Run a kernel with SIMD128 when enabled by the WASM bundle, otherwise scalar registers.
+/// Run a kernel with NEON on ARM64, with SIMD128 when enabled by the WASM bundle, otherwise
+/// scalar registers.
 #[cfg(not(target_arch = "x86_64"))]
 #[inline]
 pub fn dispatch<K: Kernel>(k: K) -> K::Out { k.run(Sse2) }
