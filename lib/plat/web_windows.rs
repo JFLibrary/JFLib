@@ -5,6 +5,9 @@
 // rectangles in, and the host copies rows without touching pixels.  One window over the
 // whole canvas without popups is the canvas itself (no composition); otherwise the windows
 // and popups are composited into the canvas buffer.
+// (G4d) The GPU output: window 0 shows on a canvas of its own above this one (web_gpu.rs), the canvas
+// here rests with its last frame; what leaves it comes back whole, and the canvas above goes only after
+// that frame (flush).
 // (L7) Full screen: window 0 asks the page for the browser's Fullscreen API (REQUEST_FULLSCREEN;
 // it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 // back: refused without the user's gesture, left with Esc); a tool window covers the canvas
@@ -46,7 +49,7 @@ struct Display {
     damage: Vec<[i32; 4]>,
     composite: Vec<u8>, // the canvas (R, G, B, A rows) when more than one surface shows
     composed: bool,     // it holds the last composition (the single-window path skips it)
-    gpu: bool,          // (Android) window 0 shows on the surface above: the canvas rests
+    gpu: bool,          // window 0 shows on the surface above (Android) or the canvas above: this one rests
     cursor: u32,
     pointer: (i32, i32),
     /// where the pointer last went down
@@ -90,20 +93,17 @@ pub(super) fn viewport(width: i32, height: i32, dpi: i32) {
     display.height = height.clamp(1, 16384);
     display.dpi = dpi.clamp(48, 480);
 }
-/// (Android) nothing but window 0 shows on the canvas: it may show on the surface above it
-#[cfg(target_os = "android")]
+/// nothing but window 0 shows on the canvas: it may show on the surface above it
 pub(super) fn only_main() -> bool {
     let d = DISPLAY.lock();
     d.popups.iter().all(Option::is_none) && d.windows.iter().skip(1).flatten().all(|w| !w.shown)
 }
-/// (Android) window 0 shows on the surface (the canvas rests, it holds nothing to show), or on the
-/// canvas again (the frame that takes it there is whole)
-#[cfg(target_os = "android")]
+/// window 0 shows on the surface (the canvas rests, it holds nothing to show), or on the canvas again
+/// (the frame that takes it there is whole)
 pub(super) fn gpu_shows(on: bool) {
     DISPLAY.lock().gpu = on;
 }
-/// (Android) the canvas's copy of a window on the surface goes
-#[cfg(target_os = "android")]
+/// the canvas's copy of a window on the surface goes
 pub(super) fn release_pixels(id: i32) {
     if let Some(w) = window_mut(&mut DISPLAY.lock(), id) {
         w.pixels = Vec::new();
@@ -580,6 +580,8 @@ pub(super) fn flush() {
     let t0 = time_us();
     flush_to();
     present_account(t0, false);
+    #[cfg(target_arch = "wasm32")]
+    super::web_gpu::after_flush(); // (the browser: the canvas above goes after the frame that replaces it)
 }
 fn flush_to() {
     let mut d = DISPLAY.lock();

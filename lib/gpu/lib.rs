@@ -1,8 +1,9 @@
 // gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-// and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows, on Linux,
+// and WebGPU over one backend per target (docs/GPU.md).  Backends now: Vulkan on Windows, on Linux,
 // there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
-// loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: WebGPU
-// in the browser, Metal; they provide the same types and methods.
+// loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
+// browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs).
+// Planned: Metal; it provides the same types and methods.
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -10,6 +11,8 @@
 //   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
 //                    index into adapters() or a part of the name)
 //   instance.adapters_low_power(display)          the GPUs for showing windows, frugal ones first
+//   instance.prepare() -> Result<bool>             adapter and device are there (false: the browser's
+//                    answer is on its way; never waits; true at once elsewhere)
 //   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
 //   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
 //   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
@@ -81,26 +84,56 @@ extern crate alloc;
 
 use alloc::string::String;
 
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_cmd;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_dev;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_ffi;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_inst;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_load;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_mem;
+#[cfg(not(target_arch = "wasm32"))]
 mod vk_res;
-#[cfg(not(jfgui_glibc))]
+#[cfg(not(any(jfgui_glibc, target_arch = "wasm32")))]
 mod vk_swap;
 // Linux: images without a VkSurface, handed to the window by plat as dma-bufs; the same types
 #[cfg(jfgui_glibc)]
 #[path = "vk_dmabuf.rs"]
 mod vk_swap;
+// the browser: WebGPU through web/gpu.js, the same types; no Vulkan code in a wasm bundle
+#[cfg(target_arch = "wasm32")]
+mod web_cmd;
+#[cfg(target_arch = "wasm32")]
+mod web_dev;
+#[cfg(target_arch = "wasm32")]
+mod web_res;
+#[cfg(target_arch = "wasm32")]
+mod web_swap;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
+#[cfg(not(target_arch = "wasm32"))]
 pub use vk_dev::{Device, Queue};
+#[cfg(not(target_arch = "wasm32"))]
 pub use vk_inst::{Adapter, Instance, low_power_rank, validation_messages};
+#[cfg(not(target_arch = "wasm32"))]
 pub use vk_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
                  ShaderModule, Texture, TextureView, Timestamps};
+#[cfg(not(target_arch = "wasm32"))]
 pub use vk_swap::{Frame, Surface, Swapchain, TryAcquire};
+#[cfg(target_arch = "wasm32")]
+pub use web_cmd::{CommandBuffer, CommandEncoder};
+#[cfg(target_arch = "wasm32")]
+pub use web_dev::{Adapter, Device, Instance, Queue, low_power_rank, validation_messages};
+#[cfg(target_arch = "wasm32")]
+pub use web_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
+                  ShaderModule, Texture, TextureView, Timestamps};
+#[cfg(target_arch = "wasm32")]
+pub use web_swap::{Frame, Surface, Swapchain, TryAcquire};
 
 pub type Result<T> = core::result::Result<T, GpuError>;
 
@@ -117,7 +150,7 @@ pub enum GpuError {
     /// the GPU is switched off (jfgui_GPU=0)
     Disabled,
     /// the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
-    /// missing file, or a Linux program not linked against glibc)
+    /// missing file, a Linux program not linked against glibc, a browser without navigator.gpu)
     NoLoader,
     /// no usable GPU (or jfgui_GPU_ADAPTER matched none)
     NoAdapter,
@@ -143,7 +176,10 @@ impl core::fmt::Display for GpuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             GpuError::Disabled => f.write_str("GPU disabled (jfgui_GPU=0)"),
+            #[cfg(not(target_arch = "wasm32"))]
             GpuError::NoLoader => f.write_str("no GPU API installed (Vulkan loader missing)"),
+            #[cfg(target_arch = "wasm32")]
+            GpuError::NoLoader => f.write_str("no WebGPU in this browser"),
             GpuError::NoAdapter => f.write_str("no usable GPU"),
             GpuError::Unsupported(w) => write!(f, "not supported: {w}"),
             GpuError::Invalid(w) => write!(f, "invalid use: {w}"),

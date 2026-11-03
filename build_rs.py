@@ -193,10 +193,10 @@ LIBS = {
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
-# what a library crate needs on one target only: G3a, G4b, G4c, the UI's output through the GPU (Windows;
-# Linux in the build against glibc, section "glibc"; Android; the browser and the static Linux build do
-# not link Vulkan code: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"], ("ui", "android"): ["shader", "gpu"]}
+# what a library crate needs on one target only: G3a, G4b, G4c, G4d, the UI's output through the GPU
+# (Windows; Linux in the build against glibc, section "glibc"; Android; the browser: WebGPU, no Vulkan code
+# in its bundles; the static Linux build links nothing of it: lib/ui/gpu_out_off.rs)
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"], ("ui", "android"): ["shader", "gpu"], ("ui", "web"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -1488,7 +1488,7 @@ def web_assets(name, directory):
 def _web_assets(name, directory):
     """Shared browser host, emitted beside each app; the GUI stays entirely in WASM."""
     source = ROOT / "web"
-    for filename in ("loader.js", "worker.js", "bridge.js", "storage.js", "secrets.js", "handles.js", "a11y.js", "audio.js", "system.js", "notify.js", "sensors.js", "host.css"):
+    for filename in ("loader.js", "worker.js", "gpu.js", "bridge.js", "storage.js", "secrets.js", "handles.js", "a11y.js", "audio.js", "system.js", "notify.js", "sensors.js", "host.css"):
         shutil.copyfile(source / filename, directory / filename)
     html = (source / "index.html").read_text(encoding="utf-8").replace("{{APP}}", name)
     (directory / "index.html").write_bytes(html.encode("utf-8"))

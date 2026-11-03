@@ -354,6 +354,9 @@ landet es wie Firefox dort).
   Teilbilder gegen erzwungene Vollkomposition, mit `--base` dieselben Pixel wie der ältere
   Build; danach in Chromium und Firefox (100/200 %) Canvas (`getImageData`) gleich
   Framebuffer (`ui.render`) nach Hover, Menü auf/zu und neuer Größe.
+- `apps/gallery/tests/gpu_web.mjs BUILD`, `apps/webgputest/tests/api_web.mjs BUILD`,
+  `tools/tests/web_gpu_bench.mjs BUILD`: die Ausgabe über WebGPU (GPU.md „Ausgabe im Browser“). Läufe mit
+  `?agent=1` bleiben ohne `?gpu=1` auf dem Weg über `#screen`; wer ohne `?agent=1` `#screen` liest, setzt `?gpu=0`.
 - `tools/tests/web_responsiveness.mjs BUILD [BASELINE_WEB]`: Chromium/Firefox, fünf
   GUI-Apps, Canvas-Reset-Zähler, schnelle Hover-Folgen, künstlich verzögerter Worker,
   Begrenzung auf einen laufenden Stapel und 200-Prozent-DPI. Der optionale Vergleich

@@ -28,7 +28,7 @@ document.documentElement.lang=german?"de":"en";
 for(const el of [document.querySelector("#open"),controlButton,status])el.textContent=L(el.textContent);
 for(const el of [document.querySelector("#hostbar"),canvas,input])el.setAttribute("aria-label",L(el.getAttribute("aria-label")));
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
-let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null, unsaved=false;
+let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null, unsaved=false, gpuCanvas=null;
 window.addEventListener("beforeunload",e=>{ if(unsaved) {e.preventDefault();e.returnValue="";} });
 // sound (audio.js, lib/plat/web_audio.rs): loaded with the first stream
 let audio=null;
@@ -67,7 +67,13 @@ document.addEventListener("visibilitychange",()=>{
 });
 const complete=(id,status)=>id && send({type:"complete",id,status});
 const errorCode=error=>error?.name==="QuotaExceededError" ? -2 : error?.name==="NotAllowedError" || error?.name==="SecurityError" ? -1 : -5;
-function sizes() { return {width:Math.max(1,Math.round(canvas.clientWidth*devicePixelRatio)), height:Math.max(1,Math.round(canvas.clientHeight*devicePixelRatio)), dpi:Math.round(96*devicePixelRatio)}; }
+// The canvas lies on whole device pixels at any scale, or the browser resamples the picture: the host bar
+// ends on one (38 px at 125 % are 47.5), and the size comes from the edges as the browser snaps them
+// (clientWidth is whole CSS pixels: 1001 of 1000.67 at 150 % would be a pixel too many).
+const hostbar=document.querySelector("#hostbar");
+function snapHostbar() {hostbar.style.height=`${Math.round(38*devicePixelRatio)/devicePixelRatio}px`;}
+snapHostbar();
+function sizes() { const r=canvas.getBoundingClientRect(), d=devicePixelRatio; return {width:Math.max(1,Math.round(r.right*d)-Math.round(r.left*d)), height:Math.max(1,Math.round(r.bottom*d)-Math.round(r.top*d)), dpi:Math.round(96*d)}; }
 function report(message) { status.textContent=L(message); }
 async function storage() {
   return openFilesStorage();
@@ -98,6 +104,7 @@ function activate(on) {
   if(on) {
     window.jfguiAgent=Object.freeze({
       request:rpc,
+      gpuTest:op=>controlRequest({type:"gpu-test",op}),
       closeSession,
       connect(port) {
         if(!(port instanceof MessagePort) || !enabled) throw new Error("Eine explizite MessagePort-Verbindung ist erforderlich.");
@@ -258,7 +265,7 @@ async function screens() {
 }
 screen.addEventListener?.("change",screens);
 new ResizeObserver(resize).observe(canvas);
-window.addEventListener("resize",resize);
+window.addEventListener("resize",()=>{snapHostbar();resize();});
 // (L7) full screen entered or left (Esc, the browser's own controls): the app's state follows
 document.addEventListener("fullscreenchange",()=>{if(started)send({type:"fullscreen",on:!!document.fullscreenElement});});
 async function importFiles(files) {
@@ -344,6 +351,16 @@ async function service(m) {
       if(data[0]===1 && !document.fullscreenElement) {if(!viewport.requestFullscreen) send({type:"fullscreen",on:false}); else viewport.requestFullscreen().catch(()=>send({type:"fullscreen",on:!!document.fullscreenElement}));}
       else if(data[0]!==1 && document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
     }
+    // the GPU output's canvas (lib/plat/web_gpu.rs): above #screen, shows nothing before its first frame;
+    // each period on the GPU has a new one, so none can show an old frame.  It goes after the frame that replaces it
+    else if(m.kind===28) {
+      gpuCanvas?.remove();
+      gpuCanvas=document.createElement("canvas");gpuCanvas.id="gpu";gpuCanvas.setAttribute("aria-hidden","true");
+      canvas.after(gpuCanvas);
+      const offscreen=gpuCanvas.transferControlToOffscreen();
+      worker.postMessage({type:"gpu-canvas",canvas:offscreen},[offscreen]);
+    }
+    else if(m.kind===29) {gpuCanvas?.remove();gpuCanvas=null;}
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
     // a change of the secret store (secrets.js): encrypted and committed in order
@@ -383,6 +400,8 @@ worker.onmessage=({data:m})=>{
   else if(m.type==="batch-complete") {inFlight=false;if(m.busy&&!outgoing.length)send({type:"tick"});schedule();}
   else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();system.ready();if(shadow)send({type:"a11y",on:true});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
   else if(m.type==="service") service(m);
+  // (a test) the GPU output's counters
+  else if(m.type==="gpu-test") {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);p.resolve(m.text);}}
   else if(m.type==="rpc" || (m.type==="error" && m.id)) {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.type==="error"?p.reject(new Error(m.message)):p.resolve(m.result);}}
   else if(m.type==="error") {report(m.message);console.error(m.message);}
   else if(m.type==="log") { (m.stream===2?console.error:console.log)(m.text); }
@@ -418,6 +437,11 @@ try {
   if(store) {secretStore=store;initialSecrets=encodeSecrets(store.entries);for(const e of store.entries)e.value?.fill(0);store.entries=null;}
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
+// the GPU output's switches from the address (docs/GPU.md "Ausgabe im Browser"): ?gpu=0|1, ?gpuenv=NAME=value,..
+// phones and tablets stay on the old path until one has been tested (an iPad calls itself a Mac)
+const handheld=navigator.userAgentData?.mobile||/Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent)||(/Mac/.test(navigator.platform)&&navigator.maxTouchPoints>1);
+const env=[];if(params.get("gpu"))env.push(`jfgui_GPU=${params.get("gpu")}`);else if(handheld)env.push("jfgui_GPU=0");
+for(const pair of (params.get("gpuenv")||"").split(",")) if(/^jfgui_GPU_[A-Z_]+=[\w.]*$/.test(pair)) env.push(pair);
 lastScreens=screenLine(screen,true); // the first frame knows the monitor already
-send({type:"start",languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
+send({type:"start",env,languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
 initialSecrets?.fill(0); // postMessage copied them

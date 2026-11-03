@@ -336,7 +336,7 @@ try {
         page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
         await page.addInitScript(()=>{window.__jfguiReady=false;addEventListener('jfgui-ready',()=>window.__jfguiReady=true);});
         try {
-          const initial=await ready(page,`${base}/${app}/?theme=light`);
+          const initial=await ready(page,`${base}/${app}/?theme=light&gpu=0`);
           assert.equal(await page.evaluate(()=>typeof window.jfguiAgent),'undefined','default exposes no control API');
           await page.locator('#control').click();
           await until(()=>raw(page,'agent/info'),v=>v?.result?.controlEnabled===true,'explicit control activation');

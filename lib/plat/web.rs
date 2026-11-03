@@ -64,6 +64,12 @@ pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 mod android_gpu;
 #[cfg(target_os = "android")]
 pub use android_gpu::*;
+// the GPU output in the browser: a canvas above the one of web_windows.rs (docs/GPU.md "Ausgabe im Browser")
+#[cfg(target_arch = "wasm32")]
+#[path = "web_gpu.rs"]
+pub(crate) mod web_gpu;
+#[cfg(target_arch = "wasm32")]
+pub use web_gpu::*;
 #[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;
@@ -216,7 +222,7 @@ pub trait WebApplication {
     fn set_control_enabled(&mut self, _enabled: bool) {}
     /// (Android) the surface of the GPU output went away -> a frame waits for the host's canvas.
     fn surface_gone(&mut self) -> bool { false }
-    /// (Android, tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
+    /// (Android, the browser; tests) the GPU output: 0 its counters, 1 lose the device, 2 settle, 3 a full frame.
     fn gpu_test(&mut self, _op: u32) -> Option<String> { None }
 }
 struct AppSlot(UnsafeCell<Option<Box<dyn WebApplication>>>);
@@ -871,10 +877,9 @@ pub extern "C" fn jfgui_present_us() -> f64 {
 pub extern "C" fn jfgui_present_frames() -> u64 {
     crate::present_time().0
 }
-/// (Android, tests) the GPU output: its counters as a line (GalleryGpuInstrumentation); op: 1 lose
-/// the device, 2 settle, 3 the next frame draws everything.  -> the length, the bytes in the
-/// response buffer.
-#[cfg(target_os = "android")]
+/// (Android, the browser; tests) the GPU output: its counters as a line (GalleryGpuInstrumentation,
+/// apps/gallery/tests/gpu_web.mjs); op: 1 lose the device, 2 settle, 3 the next frame draws everything.
+/// -> the length, the bytes in the response buffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_gpu_test(op: u32) -> u32 {
     let text = with_app(|app| app.gpu_test(op)).flatten().unwrap_or_default();

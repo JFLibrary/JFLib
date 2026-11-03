@@ -350,6 +350,11 @@ impl Instance {
         Ok(by_rank(pds.into_iter().map(|pd| probe(sh, pd)).map(|a| (rank(a.info.kind), a)).collect()))
     }
 
+    /// (the browser: adapter and device come asynchronously; here they are there)
+    pub fn prepare(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     /// the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
     pub fn adapter(&self) -> Result<Adapter> {
         let list = self.adapters()?;
