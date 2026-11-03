@@ -7,7 +7,8 @@
 //                                              MIF_TWOCOL)] + label [+ 24 + accelerator]
 //                                              + 28, at least 100 DIP; navy highlight
 //   menu_sep_size / menu_sep                   8 DIP, an etched line
-//   menubar_item_size / menubar_item           label + 14, 20 high; thin frames
+//   menubar_item_size / menubar_item           label + 14, 20 high; thin frames; on a title
+//                                              bar the text fits its gradient
 //   dropdown_size / dropdown, split_size / split   raised button faces, small down arrow
 //   combo_size / combo                         white sunken field, raised arrow button
 //   tooltip_size / tooltip                     pale yellow box with a black line
@@ -188,6 +189,19 @@ fn menu_item(ui: &mut Ui, sp: &Sp) {
 
 // ------------------------------------------------------------------ menu bar
 
+// menubar_text(r): T_TEXT, on a title bar the colour its gradient needs (it is the same in
+// every theme): white on the navy half, black on the light half and on an inactive window's
+// greys (where the two meet, each has about 4.5 : 1)
+fn menubar_text(ui: &Ui, r: [i32; 4]) -> u32 {
+    match ui.titlebar_open() {
+        None => ui.color(T_TEXT),
+        Some((bar, active)) => {
+            let mid = r[0].wrapping_sub(bar[0]).wrapping_add(r[2] >> 1);
+            if active && mid < bar[2] >> 1 { 0xFFFF_FFFF } else { 0xFF00_0000 }
+        }
+    }
+}
+
 /// sty_menubar_item: thin sunken while its menu is open, thin raised on hover / as the
 /// current item, label 7 DIP from the left, mnemonic underline (value >= 0)
 fn menubar_item(ui: &mut Ui, sp: &Sp) {
@@ -197,7 +211,7 @@ fn menubar_item(ui: &mut Ui, sp: &Sp) {
     } else if sp.ev & EV_HOVER != 0 || sp.flags & 2 != 0 {
         frame(ui, r, FR_THIN_RAISED);
     }
-    let c = ui.color(T_TEXT);
+    let c = menubar_text(ui, r);
     ui.ts_font(TS_BODY);
     let mut x = ui.dp(7).wrapping_add(sp.x);
     text_at(ui, x, r, sp.label, c, TS_BODY);

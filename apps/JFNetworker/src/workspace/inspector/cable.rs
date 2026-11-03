@@ -1,5 +1,6 @@
-// cable -- the inspector of a cable: its ends, kind ("Automatisch" or a chosen one), speed,
-// delay, loss, plug and route, its state and packets per second from the simulator
+// cable -- the inspector of a cable: its ends, kind ("Automatisch" or a chosen one, its limits in
+// the tooltip), category, colour, speed, delay, loss, plug and route, its state and packets per
+// second from the simulator
 //
 //   frame(n, ui, id)
 //
@@ -14,7 +15,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_model::project::Route;
-use jfn_model::{cable, ifname, CableKind};
+use jfn_model::{cable, ifname, CableColor, CableGrade, CableKind};
 use ui::*;
 
 use super::{field_begin, row, rows_begin};
@@ -105,7 +106,9 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
         cables::set_kind(n, kind);
         ui.repass();
     }
+    ui.tooltip(&crate::app::tr::msg(&cable::limits_msg(l.cable, l.grade)));
     ui.box_end();
+    grade_and_color(n, ui, &l);
     // speed, delay, loss (a console cable carries no frames: none)
     if l.cable != CableKind::Console {
         quality(n, ui, &l);
@@ -117,6 +120,42 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     // its length and the limit of its medium (the physical view, last: workspace/phys/props.rs)
     crate::workspace::phys::props::cable(n, ui, id);
+}
+
+// the category (copper and fibre, its limits in the tooltip) and the colour for the eye
+fn grade_and_color(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
+    let id = l.id;
+    let grades: Vec<CableGrade> = CableGrade::ALL.iter().copied().filter(|&g| g != CableGrade::Unset && g.fits(l.cable)).collect();
+    if !grades.is_empty() {
+        let names: Vec<&str> = core::iter::once(t("Ohne Angabe")).chain(grades.iter().map(|g| g.name())).collect();
+        let mut sel = grades.iter().position(|&g| g == l.grade).map_or(0, |i| i as i32 + 1);
+        ui.box_begin(0, BOX_V, 4);
+        ui.text(TS_BODY | TX_SECONDARY, t("Kategorie"));
+        ui.next_size(-1, 0);
+        if ui.combobox(ID_INS_GRADE, &mut sel, &names) & EV_ACT != 0 {
+            let to = if sel <= 0 { CableGrade::Unset } else { grades.get(sel as usize - 1).copied().unwrap_or_default() };
+            if let Some(e) = edits::link_edit(&n.doc.proj, id, "Kategorie ändern", |x| x.grade = to) {
+                n.doc.apply(e);
+            }
+            ui.repass();
+        }
+        ui.tooltip(&crate::app::tr::msg(&cable::limits_msg(l.cable, l.grade)));
+        ui.box_end();
+    }
+    let names: Vec<&str> = CableColor::ALL.iter().map(|c| t(c.title())).collect();
+    let mut sel = CableColor::ALL.iter().position(|&c| c == l.color).unwrap_or(0) as i32;
+    ui.box_begin(0, BOX_V, 4);
+    ui.text(TS_BODY | TX_SECONDARY, t("Kabelfarbe"));
+    ui.next_size(-1, 0);
+    if ui.combobox(ID_INS_CABLE_COLOR, &mut sel, &names) & EV_ACT != 0 {
+        let to = CableColor::ALL.get(sel as usize).copied().unwrap_or_default();
+        if let Some(e) = edits::link_edit(&n.doc.proj, id, "Kabelfarbe ändern", |x| x.color = to) {
+            n.doc.apply(e);
+        }
+        ui.repass();
+    }
+    ui.tooltip(t("Nur zum Unterscheiden: den Zustand zeigen die LEDs."));
+    ui.box_end();
 }
 
 fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {

@@ -97,6 +97,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from build_rs import APP_MODULES, module_file, app_notices  # noqa: E402  (jxl-module)
 from build_rs import app_bin_files  # noqa: E402  (app-bins)
+from build_rs import app_glibc, set_static_ui  # noqa: E402  (section "glibc")
 from tools.host_exec import linux_path, run_linux
 STYLES = {"rs": ROOT / "styles", "asm": ROOT.parent / "legacy" / "ASMLIB" / "styles"}  # <style>/INFO
 WSL = ["wsl.exe", "-d", "Ubuntu-24.04"]
@@ -137,6 +138,9 @@ def rs_mode(profile):
     return ["--release"] if profile == "release" else ["--profile", profile]
 
 
+STATIC_ARGS = []       # --static
+
+
 def build_variants_rs(app, styles, work, targets, rsout, profile):
     """--impl rs: one build_rs.py run into the shared rsout for every style and target (the
     libraries built once, both targets side by side, the style variants linked in parallel:
@@ -144,7 +148,7 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
     build.py would place it (jxl-module: and the app's modules next to it)"""
     tgt = "both" if len(targets) == 2 else targets[0]
     run([sys.executable, "build_rs.py", "app", app, "--target", tgt, "--style", ",".join(styles),
-         *rs_mode(profile), "--out", rsout])
+         *rs_mode(profile), "--out", rsout, *STATIC_ARGS])
     for s in styles:
         for t in targets:
             src = ROOT / rsout / t / s if len(styles) > 1 else ROOT / rsout / t
@@ -357,7 +361,7 @@ def make_deb(app, meta, styles, dist, work, impl="rs", rsout=None):
     (deb / "control").write_bytes(lf(
         f"Package: {pkg}\nVersion: {ver}\nArchitecture: amd64\nSection: {meta.get('section', 'graphics')}\nPriority: optional\n"
         f"Maintainer: jfguiLib Test <test@localhost>\nInstalled-Size: {size // 1024 + 64}\n"
-        "Depends: debconf (>= 0.5) | debconf-2.0\n"
+        "Depends: debconf (>= 0.5) | debconf-2.0" + (", libc6\nRecommends: libvulkan1, mesa-vulkan-drivers\n" if app_glibc(app) else "\n") +
         f"Description: {meta.get('summary', display)}\n {desc}\n .\n"
         f" Enthaelt das Programm in {len(styles)} Stilen; die Auswahl erfolgt bei der Installation.\n"))
     (deb / "templates").write_bytes(lf(
@@ -518,7 +522,13 @@ def main():
                     help="comma-separated: " + ",".join(FORMATS) + " or all (default setup,deb)")
     ap.add_argument("--appimage-runtime", help="AppImage: this runtime file instead of apps/appimagert "
                                                "(default jfgui_APPIMAGE_RUNTIME)")
+    ap.add_argument("--static", action="store_true",
+                    help="Linux: the program static, without the GPU and without glibc (build_rs.py --static): "
+                         "for systems such as Alpine")
     a = ap.parse_args()
+    if a.static:
+        set_static_ui(True)
+        STATIC_ARGS.append("--static")
     formats = formats_of(a.formats, a.no_win, a.no_deb)
     meta = kv_file(ROOT / "apps" / a.app / "PACKAGE")
     styles = (a.styles.split(",") if a.styles else meta.get("styles", "winui").split())
@@ -596,7 +606,8 @@ def make_job(app, meta, styles, dist, work, impl, rsout, targets):
         bins={t: app_bins(app, t, impl) for t in ("win", "linux")},
         cross={"linux": cross_files(app, meta, rsout if impl == "rs" else None, "win") if "linux" in targets else [],
                "win": cross_files(app, meta, rsout if impl == "rs" else None, "linux") if "win" in targets else []},
-        notices=package_notices(styles, impl), units=unit_files(pkg, meta), runtime=None, appimage_runtime=None)
+        notices=package_notices(styles, impl), units=unit_files(pkg, meta), runtime=None, appimage_runtime=None,
+        glibc=app_glibc(app))
 
 
 def build_runtime(rsout, profile):

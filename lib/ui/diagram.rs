@@ -39,7 +39,9 @@
 // DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
 // frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
 // its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
-// DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
+// DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).  A DN_HITMIN node
+// (a line of text) is hit in a box of at least 16 x 16 DIP around it, so it stays selectable at
+// low zoom.
 //
 // Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 // ports at a position relative to their node's top left corner, edges from key a to key b
@@ -56,7 +58,9 @@
 // (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 // port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 // (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
-// (Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
+// (Shift: sideways), Ctrl + wheel zooms at the pointer.  A double click on the background with
+// DG_SELECT (no Shift, no Ctrl) reports DEv::DoubleClick at the second press; a press that became
+// a drag (a marquee) or a key between the clicks makes none.  Keys while the canvas has the focus:
 // arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
 // a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
 // the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
@@ -71,7 +75,9 @@
 // wheel turns until MOVING_MS after the last one, a drag of nodes or a waypoint)
 // DgFrame::moving asks for less detail; a full paint follows the gesture.  Content that moves
 // every frame (packets) is best drawn after diagram() with ui.draw_* inside
-// ui.clip_push(st.vp.rect).
+// ui.clip_push(st.vp.rect).  With a GPU a pan or a wheel zoom comes from tiles of the full paint
+// (canvas.rs, DiagramState::gpu, "diagram"; the first ones are copied from the backing store), no
+// less detail then; the CPU paints what lies under overlays and, a moment after it ends, the view.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
@@ -80,6 +86,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::ops::Range;
 
+use crate::canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
 use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::consts::*;
 use crate::keys::*;
@@ -107,6 +114,7 @@ pub const DN_TOGGLE: u32 = 8; // a collapse button (DEv::Toggle), see dg_toggle_
 pub const DN_STEP: u32 = 16; // moves by whole grid steps (its corner keeps its offset to the grid)
 pub const DN_RESIZE: u32 = 32; // selected: a handle at the bottom right corner resizes it
 pub const DN_OUTLINE: u32 = 64; // an outline in the overview (DN_FRAME nodes are always)
+pub const DN_HITMIN: u32 = 128; // hit in a box of at least 16 x 16 DIP around it (a small text)
 /// port flags (DPort::flags)
 pub const DPT_HIDDEN: u32 = 1; // neither shown nor hit
 pub const DPT_USED: u32 = 2; // shown filled (connected)
@@ -115,6 +123,7 @@ const CELL: f32 = 256.0; // bucket size (world units)
 const CELLS_MAX: i64 = 4096; // a query over more buckets looks at everything
 const SPAN_MAX: i64 = 64; // an item over more buckets goes to the always-checked list
 const DRAG_DIP: i32 = 4;
+const HITMIN_DIP: i32 = 16;
 const STUB: f32 = 16.0; // orthogonal routes leave a port straight for this many units
 const EPS: f32 = 0.01;
 /// a view gesture of wheel turns (or the minimap) lasts this long after the last one (ms)
@@ -342,6 +351,9 @@ pub enum DEv {
     Delete,
     /// a click on the background, or anywhere with DG_PLACE (snapped then); world units
     Click { at: [f32; 2] },
+    /// a double click on the background with DG_SELECT (no Shift, no Ctrl): the world point of
+    /// the second press, not snapped; neither a Click nor a marquee follows it
+    DoubleClick { at: [f32; 2] },
     /// zoom or centre changed
     ViewChanged,
     /// a click on the collapse button of a DN_TOGGLE node
@@ -503,17 +515,23 @@ pub struct DiagramState {
     pending_sel: bool,
     g: Gesture,
     ix: Index,
-    last_hit: DHit,
+    // what the last press that can start a double click hit (None: no such press; DHit::None
+    // alone is the background)
+    last_hit: Option<DHit>,
     last_ms: u32,
     last_px: [i32; 2],
     visible: Vec<u32>,
-    paint_obj: Option<(u64, DrawRef)>,
+    paint_obj: Option<(u64, Rc<Wrap>)>,
     mini_obj: Option<(u64, DrawRef)>,
     mini_ext: Option<[f32; 4]>,
     /// the canvas as painted last (Wrap)
     store: Rc<RefCell<Backing>>,
     /// the view moves until this ms (wheel turns, the minimap)
     moving_until: u32,
+    /// how the view's pan and zoom use the GPU (canvas.rs)
+    pub gpu: CanvasGpu,
+    /// the widget's id (the tiles' canvas)
+    id: u32,
 }
 
 impl Default for DiagramState {
@@ -541,7 +559,7 @@ impl DiagramState {
             pending_sel: false,
             g: Gesture::Idle,
             ix: Index::default(),
-            last_hit: DHit::None,
+            last_hit: None,
             last_ms: 0,
             last_px: [0; 2],
             visible: Vec::new(),
@@ -550,6 +568,8 @@ impl DiagramState {
             mini_ext: None,
             store: Rc::new(RefCell::new(Backing::default())),
             moving_until: 0,
+            gpu: CanvasGpu::Zoom,
+            id: 0,
         }
     }
 
@@ -699,6 +719,13 @@ impl DiagramState {
                 if !on_bar && !(within(b) && !inner) {
                     continue;
                 }
+            } else if n.flags & DN_HITMIN != 0 {
+                // up to the reach of the query above
+                let min = w(HITMIN_DIP);
+                let (gx, gy) = (((min - r[2]) * 0.5).clamp(0.0, pr), ((min - r[3]) * 0.5).clamp(0.0, pr));
+                if !(p[0] >= r[0] - gx && p[1] >= r[1] - gy && p[0] < r[0] + r[2] + gx && p[1] < r[1] + r[3] + gy) {
+                    continue;
+                }
             } else if !within(0.0) {
                 continue;
             }
@@ -783,7 +810,7 @@ impl DiagramState {
                 if i.btn & (1 << BTN_LEFT) == 0 {
                     self.click(m, i.tool, hit, at, mods, was, out)
                 } else if far {
-                    self.last_hit = DHit::None; // a drag is no first click
+                    self.last_hit = None; // a drag is no first click
                     self.drag(m, i.tool, hit, at, mods)
                 } else {
                     Gesture::Press { hit, px, at, mods, was }
@@ -811,11 +838,15 @@ impl DiagramState {
         // (behave's EV_DOUBLE also counts a press after a drag)
         let hit = self.hover;
         let near = (i.px[0] - self.last_px[0]).abs() <= i.lim * 2 && (i.px[1] - self.last_px[1]).abs() <= i.lim * 2;
-        if same(hit, self.last_hit) && near && i.now.wrapping_sub(self.last_ms) <= i.dbl {
-            self.last_hit = DHit::None;
+        if self.last_hit.is_some_and(|l| same(hit, l)) && near && i.now.wrapping_sub(self.last_ms) <= i.dbl {
+            self.last_hit = None;
             match hit {
                 DHit::Waypoint(e, k) => {
                     out.push(DEv::WaypointDelete { edge: e, idx: k });
+                    return Gesture::Hold;
+                }
+                DHit::None if i.tool == DG_SELECT && i.mods & (MOD_SHIFT | MOD_CTRL) == 0 => {
+                    out.push(DEv::DoubleClick { at: i.p });
                     return Gesture::Hold;
                 }
                 // buttons and handles take every click as one of their own
@@ -826,7 +857,7 @@ impl DiagramState {
                 }
             }
         } else {
-            self.last_hit = hit;
+            self.last_hit = Some(hit);
             self.last_ms = i.now;
             self.last_px = i.px;
         }
@@ -1762,6 +1793,11 @@ pub fn dg_stroke_edge(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], width: f32, 
 struct Backing {
     hash: u64,
     sf: Surface,
+    // what it holds, in full detail or not, through which view, in which rectangle
+    content: u64,
+    full: bool,
+    view: CanvasView,
+    rect: [i32; 4],
 }
 
 /// a route (world points) as 1 px anti-aliased lines in argb (Xiaolin Wu): a fraction of
@@ -1846,7 +1882,10 @@ struct Wrap {
     grid: f32,
     dark: bool,
     moving: bool,
+    // the view or nodes move now: a small part is painted directly, the store stays
+    direct: bool,
     hash: u64,
+    content: u64,
     store: Rc<RefCell<Backing>>,
 }
 
@@ -1862,6 +1901,11 @@ impl Draw for Wrap {
             self.paint_all(g, r);
             return;
         };
+        let small = ((k[2] - k[0]) as i64 * (k[3] - k[1]) as i64) * 2 < v[2] as i64 * v[3] as i64;
+        if self.direct && small && b.hash != self.hash {
+            self.paint_all(g, r);
+            return;
+        }
         if b.hash != self.hash || b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
             if b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
                 b.sf = Surface::new(w, h, FMT_XRGB);
@@ -1873,29 +1917,88 @@ impl Draw for Wrap {
                 self.paint_all(g, r);
                 return;
             }
-            let Backing { hash, sf } = &mut *b;
+            let Backing { hash, sf, content, full, view, rect } = &mut *b;
             g.dc.begin(sf);
             g.dc.clip_push(v[0], v[1], v[2], v[3]);
             self.paint_all(&mut Gfx { dc: &mut *g.dc, sf, text: &mut *g.text }, v);
             g.dc.end();
             *hash = self.hash;
+            *content = self.content;
+            *full = !self.moving;
+            *view = view_of(&self.vp);
+            *rect = v;
         }
         // a canvas the window moved (a mirrored window's island) shows the same pixels there
         g.dc.blit(g.sf, &b.sf, r[0] - v[0], r[1] - v[1]);
     }
 }
 
+// the canvas's content through a viewport: world point (u, v) at (ox + u * scale, oy + v * scale)
+fn view_of(vp: &Viewport) -> CanvasView {
+    let s = vp.scale();
+    let (mx, my) = vp.mid();
+    CanvasView { scale: s, ox: mx - vp.cx * s, oy: my - vp.cy * s }
+}
+
+impl CanvasContent for Wrap {
+    // a tile: as far as the backing store holds it in full detail at this scale, whole pixels away
+    // (a gesture's first tiles: no paint), its pixels; the rest painted
+    fn draw_view(&self, g: &mut Gfx, t: CanvasView, rect: [i32; 4]) {
+        let dpi = self.vp.dpi.max(1) as f64;
+        let mut vp = self.vp;
+        vp.rect = rect;
+        vp.zoom = (t.scale * 96.0 / dpi) as f32;
+        let (mx, my) = vp.mid();
+        vp.cx = (mx - t.ox) / t.scale;
+        vp.cy = (my - t.oy) / t.scale;
+        let mut cut = None;
+        if let Ok(b) = self.store.try_borrow() {
+            let (dx, dy) = (b.view.ox - t.ox, b.view.oy - t.oy);
+            let (rx, ry) = (fl((dx + 0.5) as f32) as f64, fl((dy + 0.5) as f32) as f64);
+            let usable = b.full && b.content == self.content && !b.sf.px.is_empty() && b.view.scale == t.scale;
+            if usable && (dx - rx).abs() < 1.0 / 64.0 && (dy - ry).abs() < 1.0 / 64.0 {
+                let (rx, ry) = (rx as i32, ry as i32);
+                let s = b.rect;
+                let (x0, y0) = ((s[0] - rx).max(rect[0]), (s[1] - ry).max(rect[1]));
+                let (x1, y1) = ((s[0] + s[2] - rx).min(rect[0] + rect[2]), (s[1] + s[3] - ry).min(rect[1] + rect[3]));
+                if x0 < x1 && y0 < y1 {
+                    g.dc.clip_push(x0, y0, x1 - x0, y1 - y0);
+                    g.dc.blit(g.sf, &b.sf, -rx, -ry);
+                    g.dc.clip_pop();
+                    cut = Some([x0, y0, x1, y1]);
+                }
+            }
+        }
+        let Some([x0, y0, x1, y1]) = cut else {
+            self.paint_view(g, &vp, rect, false);
+            return;
+        };
+        let (rx1, ry1) = (rect[0] + rect[2], rect[1] + rect[3]);
+        for s in [[rect[0], rect[1], rect[2], y0 - rect[1]], [rect[0], y1, rect[2], ry1 - y1], [rect[0], y0, x0 - rect[0], y1 - y0], [x1, y0, rx1 - x1, y1 - y0]] {
+            if s[2] > 0 && s[3] > 0 {
+                g.dc.clip_push(s[0], s[1], s[2], s[3]);
+                self.paint_view(g, &vp, rect, false);
+                g.dc.clip_pop();
+            }
+        }
+    }
+}
+
 impl Wrap {
-    // background, the app's paint under the grid, grid and the app's paint in r (the clip says
-    // what needs pixels)
+    // the canvas in r (the clip says what needs pixels)
     fn paint_all(&self, g: &mut Gfx, r: [i32; 4]) {
+        self.paint_view(g, &self.vp, r, self.moving);
+    }
+
+    // background, the app's paint under the grid, grid and the app's paint in r through vp
+    fn paint_view(&self, g: &mut Gfx, vp: &Viewport, r: [i32; 4], moving: bool) {
         let k = g.dc.clip;
         let bg = canvas_bg(&self.theme);
         g.dc.set_color(bg);
         g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
-        let a = self.vp.to_world(k[0] as f32, k[1] as f32);
-        let b = self.vp.to_world(k[2] as f32, k[3] as f32);
-        let f = DgFrame { vp: self.vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark, moving: self.moving };
+        let a = vp.to_world(k[0] as f32, k[1] as f32);
+        let b = vp.to_world(k[2] as f32, k[3] as f32);
+        let f = DgFrame { vp: *vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark, moving };
         // what lies under the grid (a backdrop image)
         if let Some(p) = &self.paint {
             p.paint_under(g, &f);
@@ -1903,7 +2006,7 @@ impl Wrap {
         if self.grid > 0.0 {
             let div = self.theme[(T_DIVIDER / 4) as usize];
             let minor = over(bg, (div & 0x00FF_FFFF) | ((div >> 25) << 24));
-            dg_paint_grid(g, &self.vp, self.grid, minor, over(bg, div));
+            dg_paint_grid(g, vp, self.grid, minor, over(bg, div));
         }
         if let Some(p) = &self.paint {
             p.paint(g, &f);
@@ -2034,6 +2137,7 @@ impl Ui {
         let _ = self.take_flags();
         let r = self.place(0, 0);
         let dpi = self.wp.rt.dpi;
+        st.id = id;
         st.vp.rect = r;
         st.vp.dpi = dpi;
         st.vp.zoom = clampz(st.vp.zoom);
@@ -2110,9 +2214,13 @@ impl Ui {
         if wheel {
             self.animating = true;
         }
-        let moving = wheel || matches!(st.g, Gesture::Pan { .. } | Gesture::Move { .. } | Gesture::Waypoint { .. } | Gesture::Resize { .. });
-        let (h, obj) = self.dg_paint_obj(st, m, paint, ver, moving);
-        self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj), 0, h as u32);
+        let view_moves = wheel || matches!(st.g, Gesture::Pan { .. });
+        let moving = view_moves || matches!(st.g, Gesture::Move { .. } | Gesture::Waypoint { .. } | Gesture::Resize { .. });
+        let (h, obj, content) = self.dg_paint_obj(st, m, paint, ver, moving, view_moves);
+        self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj.clone()), 0, h as u32);
+        let view = view_of(&st.vp);
+        let gpu = st.gpu;
+        self.canvas_gpu(CanvasDesc { id, name: "diagram", rect: r, view, ver: (content ^ content >> 32) as u32, content: obj, gpu, exact_pan: false });
         let ring = self.wp.ctx.focus == id && self.wp.ctx.focus_visible;
         self.dg_overlay(st, m, tool, ring);
         self.clip_pop();
@@ -2155,6 +2263,10 @@ impl Ui {
 
     // the keys of a focused diagram
     fn dg_keys(&mut self, st: &mut DiagramState, m: &DModel, enter: bool, out: &mut Vec<DEv>) {
+        // a key after a click on the background: the next click is a click of its own
+        if st.last_hit == Some(DHit::None) && !self.wp.ctx.keyq.is_empty() {
+            st.last_hit = None;
+        }
         let r = st.vp.rect;
         let idle = matches!(st.g, Gesture::Idle);
         // Esc: the gesture, else the selection
@@ -2279,38 +2391,45 @@ impl Ui {
     }
 
     // the cached render-time object of the canvas (a new one when anything it shows changed)
-    fn dg_paint_obj(&mut self, st: &mut DiagramState, m: &DModel, paint: Option<Rc<dyn DgPaint>>, ver: u32, moving: bool) -> (u64, DrawRef) {
+    fn dg_paint_obj(&mut self, st: &mut DiagramState, m: &DModel, paint: Option<Rc<dyn DgPaint>>, ver: u32, direct: bool, view_moves: bool) -> (u64, Rc<Wrap>, u64) {
         let mut fonts = [(0u32, 0i32); 7];
         for (ts, f) in fonts.iter_mut().enumerate() {
             self.ts_font(ts as u32);
             *f = self.text.get_font();
         }
         let vp = st.vp;
+        // what the canvas shows, wherever it lies
         let mut h = Fnv::new();
         h.u64(ver as u64 | (m.ver as u64) << 32);
         h.u64(Rc::as_ptr(&st.ix.geo) as usize as u64);
         h.u64(paint.as_ref().map_or(0, |p| Rc::as_ptr(p) as *const () as usize as u64));
-        h.u64(vp.zoom.to_bits() as u64 | (vp.dpi as u64) << 32);
-        h.u64(vp.cx.to_bits());
-        h.u64(vp.cy.to_bits());
-        h.u64(vp.rect[0] as u32 as u64 | (vp.rect[1] as u32 as u64) << 32);
-        h.u64(vp.rect[2] as u32 as u64 | (vp.rect[3] as u32 as u64) << 32);
-        h.u64(st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32 | (moving as u64) << 33);
+        h.u64(vp.dpi as u64);
+        h.u64(st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32);
         for &c in self.theme.iter() {
             h.u64(c as u64);
         }
         for &(f, s) in &fonts {
             h.u64(f as u64 | (s as u32 as u64) << 32);
         }
+        let content = h.0;
+        // a move of the view that comes from tiles shows the full detail wherever the CPU has to
+        // paint a part; else the moving view has less of it
+        let moving = direct && !(view_moves && st.gpu != CanvasGpu::Cpu && self.gp_canvas_steady(st.id, (content ^ content >> 32) as u32));
+        h.u64(vp.zoom.to_bits() as u64);
+        h.u64(vp.cx.to_bits());
+        h.u64(vp.cy.to_bits());
+        h.u64(vp.rect[0] as u32 as u64 | (vp.rect[1] as u32 as u64) << 32);
+        h.u64(vp.rect[2] as u32 as u64 | (vp.rect[3] as u32 as u64) << 32);
+        h.u64(moving as u64);
         let hash = h.0;
         if let Some((k, d)) = &st.paint_obj {
             if *k == hash {
-                return (hash, d.clone());
+                return (hash, d.clone(), content);
             }
         }
-        let d: DrawRef = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: st.grid, dark: self.theme_dark, moving, hash, store: st.store.clone() });
+        let d = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: st.grid, dark: self.theme_dark, moving, direct, hash, content, store: st.store.clone() });
         st.paint_obj = Some((hash, d.clone()));
-        (hash, d)
+        (hash, d, content)
     }
 
     // a polyline (world) as recorded lines w px wide

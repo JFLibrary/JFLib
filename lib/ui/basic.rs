@@ -13,6 +13,8 @@
 //   tool_button(id, icon, label, &mut sel, mine) -> EV   selects sel = mine (tool palettes)
 //   checkbox(id, label, &mut v) -> EV      v: 0, 1, 2 = indeterminate
 //   radio(id, label, &mut v, mine) -> EV   v = mine when clicked
+//   checkbox_wrap / radio_wrap             the same with a label that wraps (next_size(-1, 0)): a mark
+//                                          beside a long text, a click on the text counts
 //   switch(id, label, &mut v) -> EV        toggle switch
 //   slider(id, &mut v, &range) -> EV       EV_ACT while the value changes, EV_COMMIT on release
 //   progress(id, v, max)                   progress bar
@@ -32,6 +34,7 @@ use alloc::vec::Vec;
 use super::cmd::DrawRef;
 use super::consts::*;
 use super::keys::*;
+use super::value::part_id;
 use super::{Sp, Ui};
 use gfx::Surface;
 
@@ -583,6 +586,62 @@ impl Ui {
         }
         self.sem(K_CHECKBOX, id, Some(label), *v);
         ev
+    }
+
+    /// ui_checkbox_wrap(id, label, &mut v) -> EV_*: a check box for a text that may be long: the
+    /// mark, beside it the label wrapped at the width the layout gives (next_size(-1, 0)); a click
+    /// on the text toggles too; the record is the check box's, named by the text
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn checkbox_wrap(&mut self, id: u32, label: &str, v: &mut i32) -> u32 {
+        let _src = self.src_scope();
+        self.box_begin(0, BOX_H, 6);
+        let mut ev = self.checkbox(id, "", v);
+        self.sem_label_last(label);
+        if self.wrap_label(id, label) {
+            *v = if *v == 1 { 0 } else { 1 };
+            ev |= EV_ACT;
+            self.repass();
+        }
+        self.box_end();
+        ev
+    }
+
+    /// ui_radio_wrap(id, label, &mut v, mine) -> EV_*: a radio for a text that may be long, as
+    /// checkbox_wrap
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn radio_wrap(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32 {
+        let _src = self.src_scope();
+        self.box_begin(0, BOX_H, 6);
+        let mut ev = self.radio(id, "", v, mine);
+        self.sem_label_last(label);
+        if self.wrap_label(id, label) && *v != mine {
+            *v = mine;
+            ev |= EV_ACT;
+            self.repass();
+        }
+        self.box_end();
+        ev
+    }
+
+    // the record just made gets this label
+    fn sem_label_last(&mut self, label: &str) {
+        let label = cstr(label);
+        if let Some(s) = self.sems.last_mut() {
+            s.label = Some(String::from(label));
+        }
+    }
+
+    // the wrapped label of a mark: no record of its own; a click on it goes to the mark -> it was clicked
+    fn wrap_label(&mut self, id: u32, label: &str) -> bool {
+        let n = self.sems.len();
+        self.next_size(-1, 0);
+        self.text(TS_BODY | TX_WRAP, label);
+        self.sems.truncate(n);
+        let clicked = self.behave(part_id(id, 1), 0) & EV_ACT != 0;
+        if clicked {
+            self.focus_quiet(id);
+        }
+        clicked
     }
 
     /// ui_radio(id, label, &mut v, mine) -> EV_*: v = mine when clicked; the radios of one

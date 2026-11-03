@@ -195,9 +195,6 @@ Abbrechen	Cancel	Annuler
 Schließen	Close	Fermer
 Öffnen	Open	Ouvrir
 Speichern	Save	Enregistrer
-Ja	Yes	Oui
-Nein	No	Non
-Übernehmen	Apply	Appliquer
 Zurücksetzen	Reset	Réinitialiser
 Standard	Default	Par défaut
 Hell	Light	Clair
@@ -221,13 +218,9 @@ Schatten um das Bild	Image shadow	Ombre de l’image
 Arbeitsfläche zurücksetzen	Reset workspace	Réinitialiser l’espace de travail
 Breite:	Width:	Largeur :
 Höhe:	Height:	Hauteur :
-Auflösung:	Resolution:	Résolution :
-Name:	Name:	Nom :
 Sichtbar	Visible	Visible
-Deckkraft:	Opacity:	Opacité :
 Mischmodus:	Blend mode:	Mode de fusion :
 Neues Bild	New image	Nouvelle image
-Bildgröße ändern	Resize image	Redimensionner l’image
 Leinwandgröße	Canvas size	Taille du canevas
 Ebeneneigenschaften	Layer properties	Attributs du calque
 Pinselspitze…	Brush tip…	Pointe du pinceau…
@@ -273,3 +266,214 @@ Automatisch: malt, bis ein Stift benutzt wurde	Automatic: paints until a pen has
 Malt mit dem aktuellen Werkzeug	Paints with the current tool	Peint avec l’outil actuel
 Verschiebt die Ansicht	Moves the view	Déplace la vue
 Zwei Finger zoomen und verschieben die Ansicht immer. Solange der Stift auf dem Bildschirm oder nah darüber ist, zählen Finger nicht: Der Handballen malt nicht und verschiebt nichts.	Two fingers always zoom and move the view. While the pen is on the screen or close above it, fingers do not count: the palm of your hand neither paints nor moves anything.	Deux doigts zooment et déplacent toujours la vue. Tant que le stylet est sur l’écran ou juste au-dessus, les doigts ne comptent pas : la paume ne peint rien et ne déplace rien.
+G’MIC-Qt…	G’MIC-Qt…	G’MIC-Qt…
+Bokeh…	Bokeh…	Bokeh…
+Quantize…	Quantize…	Quantification…
+Median…	Median…	Médiane…
+Vignette…	Vignette…	Vignette…
+&Suchen…	&Search…	&Rechercher…
+&Forum	&Forum	&Forum
+&Zuletzt geöffnet	&Recent Files	Fichiers &récents
+Üb&ernehmen	&Apply	A&ppliquer
+Auswahl einfügen	Paste selection	Coller la sélection
+&Palette	&Palette	&Palette
+Paint.NET-Plugins	Paint.NET plugins	Plugins Paint.NET
+Farbe	Color	Couleur
+Foto	Photo	Photo
+Künstlerisch	Artistic	Artistique
+Objekt	Object	Objet
+Rauschen	Noise	Bruit
+Rendern	Render	Rendu
+Stilisieren	Stylize	Styliser
+Weichzeichnen	Blur	Flou
+Verzerren	Distort	Déformer
+(Keine kompatiblen Effekte gefunden)	(No compatible effects found)	(Aucun effet compatible trouvé)
+PaintCraft wurde unerwartet beendet	PaintCraft quit unexpectedly	PaintCraft s’est arrêté de manière inattendue
+In die Zwischenablage kopieren	Copy to clipboard	Copier dans le presse-papiers
+Ordner der Absturzberichte öffnen	Open crash reports folder	Ouvrir le dossier des rapports d’incident
+PaintCraft neu starten	Restart PaintCraft	Redémarrer PaintCraft
+Beenden	Quit	Quitter
+Leinwand nicht ändern	Keep the canvas size	Ne pas modifier le canevas
+Drag & Drop	Drag and drop	Glisser-déposer
+Aktuell:	Current:	Actuel :
+Neu:	New:	Nouveau :
+Import…	Import…	Importer…
+Export…	Export…	Exporter…
+Priorität:	Priority:	Priorité :
+Tiefenkompensierung verwenden	Use black point compensation	Utiliser la compensation du point noir
+Konvertieren	Convert	Convertir
+Zuweisen	Assign	Attribuer
+Verlauf-Test	History test	Test de l’historique
+Zusammenfassen	Flatten	Aplatir
+Ausgeblendete Ebenen löschen?	Delete hidden layers?	Supprimer les calques masqués ?
+Als Ebene importieren	Import as layer	Importer comme calque
+Weiche Auswahlkante	Feather selection	Contour progressif
+Radius in Bildpixeln:	Radius in image pixels:	Rayon en pixels de l’image :
+Anwenden	Apply	Appliquer
+X:	X:	X :
+Y:	Y:	Y :
+Randomisieren	Randomize	Aléatoire
+Transferzuordnung:	Transfer map:	Transfert :
+Rot	Red	Rouge
+Grün	Green	Vert
+Blau	Blue	Bleu
+Tipp: Ein Rechtsklick auf einen	Tip: right-click a	Astuce : un clic droit sur un
+Kurvenpunkt löscht ihn.	curve point to delete it.	point de courbe le supprime.
+Ausgangsgamma:	Output gamma:	Gamma de sortie :
+R	R	R
+G	G	V
+B	B	B
+Bild öffnen	Open image	Ouvrir l’image
+Das Bild wird im Browserspeicher gesichert …	Saving the image in browser storage …	Enregistrement de l’image dans le stockage du navigateur …
+Änderungen speichern?	Save changes?	Enregistrer les modifications ?
+Nicht speichern	Don’t save	Ne pas enregistrer
+G’MIC-Qt	G’MIC-Qt	G’MIC-Qt
+G’MIC bearbeitet die aktive Ebene in einem eigenen Fenster. Ein gleich großes Ergebnis wird durch die Auswahl übernommen; mehrere oder anders große Ergebnisse öffnen ein neues Bild.	G’MIC edits the active layer in a window of its own. A result of the same size is applied through the selection; several results, or one of another size, open a new image.	G’MIC modifie le calque actif dans sa propre fenêtre. Un résultat de même taille est appliqué via la sélection ; plusieurs résultats, ou un résultat de taille différente, ouvrent une nouvelle image.
+Das Plugin wird in einem eigenen Prozess ausgeführt. Seine Einstellungen erscheinen in einem separaten Fenster.	The plugin runs in a process of its own. Its settings appear in a separate window.	Le plugin s’exécute dans son propre processus. Ses paramètres apparaissent dans une fenêtre séparée.
+Papierformat	Paper size	Format du papier
+Druckgröße	Print size	Taille d’impression
+Zentrieren	Center	Centrer
+Rand:	Margin:	Marge :
+mm	mm	mm
+Drucken…	Print…	Imprimer…
+Das Gerät wird über WIA (Windows) oder SANE scanimage (Linux) angesprochen. Erst eine vollständige Aufnahme wird als neues Bild geöffnet.	The device is addressed through WIA (Windows) or SANE scanimage (Linux). Only a complete capture opens as a new image.	L’appareil est piloté par WIA (Windows) ou SANE scanimage (Linux). Seule une acquisition complète s’ouvre comme nouvelle image.
+Schriften werden eingelesen…	Loading fonts…	Chargement des polices…
+Seitenverhältnis beibehalten	Keep aspect ratio	Conserver les proportions
+Pixelgröße	Pixel size	Taille en pixels
+Größe ändern	Resize	Redimensionner
+Optionen	Options	Options
+Gammakorrektur anwenden	Apply gamma correction	Appliquer la correction gamma
+Anker	Anchor	Ancre
+Name	Name	Nom
+PaintCraft	PaintCraft	PaintCraft
+Neu	New	Nouveau
+Rotationszoom	Rotate/Zoom	Rotation/Zoom
+Kippen / Rotieren	Tilt / rotate	Incliner / pivoter
+Winkel:	Angle:	Angle :
+Verschieben	Pan	Déplacer
+Zoom	Zoom	Zoom
+Original als Hintergrund	Original as background	Original en arrière-plan
+Qualität	Quality	Qualité
+Speicheroptionen	Save options	Options d’enregistrement
+Standardwerte	Defaults	Valeurs par défaut
+Bit-Tiefe	Bit depth	Profondeur de bits
+Verlustfrei	Lossless	Sans perte
+Chroma-Subsampling	Chroma subsampling	Sous-échantillonnage de la chrominance
+Preset	Preset	Préréglage
+Tempo der BC6H/BC7-Kompression	BC6H/BC7 compression speed	Vitesse de compression BC6H/BC7
+Komprimieren (RLE)	Compress (RLE)	Compresser (RLE)
+Komprimierung	Compression	Compression
+Fehlermetrik	Error metric	Mesure d’erreur
+Cubemap aus Kreuz-Layout	Cube map from cross layout	Cube map à partir d’une disposition en croix
+Mip Maps generieren	Generate mip maps	Générer les mip maps
+Resampling	Resampling	Rééchantillonnage
+Zeilensprung	Interlacing	Entrelacement
+Standard folgt der Einstellung des Betriebssystems (heller oder dunkler App-Modus).	Default follows the operating system’s setting (light or dark app mode).	Par défaut suit le réglage du système d’exploitation (mode d’application clair ou sombre).
+Sechs Hexadezimalziffern (RRGGBB), leer = Standardakzentfarbe.	Six hexadecimal digits (RRGGBB), empty = default accent color.	Six chiffres hexadécimaux (RRVVBB), vide = couleur d’accentuation par défaut.
+Hier legen Sie fest, mit welchem Werkzeug PaintCraft startet und welche Werte die Werkzeugleiste anfangs zeigt.	Choose the tool PaintCraft starts with and the values the tool bar shows at first.	Choisissez l’outil de démarrage de PaintCraft et les valeurs affichées au début par la barre d’outils.
+Standardtool:	Default tool:	Outil par défaut :
+Standardeinstellungen der Symbolleiste	Tool bar defaults	Réglages par défaut de la barre d’outils
+Aktuelle Werkzeugleiste übernehmen	Use the current tool bar	Reprendre la barre d’outils actuelle
+Die Rückgängig-Schritte aller geöffneten Bilder teilen sich ein Speicherbudget. Wird es überschritten, werden ältere Schritte komprimiert, in eine Auslagerungsdatei verschoben und zuletzt verworfen.	The undo steps of all open images share one memory budget. When it is exceeded, older steps are compressed, moved to a swap file and finally discarded.	Les étapes d’annulation de toutes les images ouvertes partagent un budget de mémoire. En cas de dépassement, les étapes anciennes sont compressées, déplacées dans un fichier d’échange, puis supprimées.
+Speicherbudget (MB):	Memory budget (MB):	Budget de mémoire (Mo) :
+Ordner der Auslagerungsdatei:	Swap file folder:	Dossier du fichier d’échange :
+Leer = Temp-Ordner des Systems. Ein anderer Ordner gilt, sobald die Auslagerungsdatei angelegt wird (spätestens nach einem Neustart).	Empty = the system’s temp folder. Another folder applies once the swap file is created (after a restart at the latest).	Vide = dossier temporaire du système. Un autre dossier s’applique dès la création du fichier d’échange (au plus tard après un redémarrage).
+Rendering-Gerät:	Rendering device:	Périphérique de rendu :
+PaintCraft berechnet Werkzeuge, Korrekturen und Effekte auf der CPU (SIMD-Kernel auf mehreren Threads); eine GPU wird nicht verwendet.	PaintCraft computes tools, adjustments and effects on the CPU (SIMD kernels on several threads); no GPU is used.	PaintCraft calcule les outils, corrections et effets sur le processeur (noyaux SIMD sur plusieurs threads) ; aucun GPU n’est utilisé.
+Befehlssätze:	Instruction sets:	Jeux d’instructions :
+Die Kernel werden beim Start nach dem Prozessor gewählt; --simd sse2 auf der Kommandozeile erzwingt die Basis-Kernel.	The kernels are chosen by processor at start; --simd sse2 on the command line forces the base kernels.	Les noyaux sont choisis selon le processeur au démarrage ; --simd sse2 sur la ligne de commande force les noyaux de base.
+Worker-Threads:	Worker threads:	Threads de travail :
+Status	Status	État
+Die Farbdarstellung von PaintCraft erfolgt in sRGB.	PaintCraft displays colors in sRGB.	PaintCraft affiche les couleurs en sRGB.
+Erweiterte Farben von Windows (HDR, großer Farbraum) nutzt PaintCraft nicht; die Anzeige erfolgt immer in sRGB. Farbprofile von Bildern: Bild > Farbprofil…	PaintCraft does not use Windows’ advanced color (HDR, wide gamut); it always displays in sRGB. Color profiles of images: Image > Color Profile…	PaintCraft n’utilise pas les couleurs avancées de Windows (HDR, gamut étendu) ; l’affichage est toujours en sRGB. Profils de couleur des images : Image > Profil de couleur…
+Beim Programmstart prüfen, ob es eine neuere Version gibt	Check for a newer version at start	Rechercher une version plus récente au démarrage
+Auch Testversionen (Beta) von PaintCraft anbieten	Also offer test versions (beta) of PaintCraft	Proposer aussi les versions de test (bêta) de PaintCraft
+Jetzt prüfen	Check now	Vérifier maintenant
+Veröffentlichungen öffnen	Open releases	Ouvrir les publications
+Die Prüfung benötigt Python 3 und fragt GitHub über HTTPS nach PaintCraft-Veröffentlichungen ab. Automatische Prüfung ist standardmäßig aus. Installation erfolgt von Hand.	The check needs Python 3 and asks GitHub over HTTPS for PaintCraft releases. Automatic checking is off by default. Installation is done by hand.	La vérification nécessite Python 3 et interroge GitHub en HTTPS sur les publications de PaintCraft. La vérification automatique est désactivée par défaut. L’installation se fait à la main.
+Windows-Tinte	Windows Ink	Windows Ink
+Damit werten Stifte und Grafiktabletts den Andruck aus und werden mit hoher Rate abgetastet. Macht ein Gerät Probleme, hilft es oft, die Option auszuschalten.	With it, pens and graphics tablets report pressure and are sampled at a high rate. If a device has problems, turning the option off often helps.	Avec cette option, les stylets et tablettes graphiques transmettent la pression et sont échantillonnés à haute fréquence. Si un périphérique pose problème, désactiver l’option aide souvent.
+Unten stehen die Angaben zur Diagnose.	The diagnostic details are below.	Les informations de diagnostic figurent ci-dessous.
+Native DLL-/SO-Plugins sind im Browser nicht verfügbar.	Native DLL/SO plugins are not available in the browser.	Les plugins natifs DLL/SO ne sont pas disponibles dans le navigateur.
+Integrierte Effekte, Dateiformate und Formen sind weiterhin verfügbar.	Built-in effects, file formats and shapes remain available.	Les effets, formats de fichier et formes intégrés restent disponibles.
+Alle Plugins wurden fehlerfrei geladen.	All plugins loaded without errors.	Tous les plugins ont été chargés sans erreur.
+Diese Plugins ließen sich nicht laden oder wurden nach einem Fehler abgeschaltet:	These plugins could not be loaded or were turned off after an error:	Ces plugins n’ont pas pu être chargés ou ont été désactivés après une erreur :
+Plugins werden beim Start aus den Ordnern Effects, FileTypes und Shapes neben PaintCraft geladen (Windows: *.dll, Linux: *.so).	Plugins are loaded at start from the folders Effects, FileTypes and Shapes next to PaintCraft (Windows: *.dll, Linux: *.so).	Les plugins sont chargés au démarrage depuis les dossiers Effects, FileTypes et Shapes à côté de PaintCraft (Windows : *.dll, Linux : *.so).
+Originale Paint.NET-DLLs werden unter Windows zusätzlich aus Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation erkannt. Nach dem Kopieren neu starten. ZIP-Dateien zuerst entpacken; Abhängigkeiten neben der DLL belassen. Moderne Bitmap-/GPU-Plugins werden als noch nicht unterstützt angezeigt.	Original Paint.NET DLLs are also found on Windows in Documents/PaintCraft App Files, Documents/Paint.NET App Files and the Paint.NET installation. Restart after copying. Unpack ZIP files first; keep dependencies next to the DLL. Modern bitmap/GPU plugins are shown as not supported yet.	Sous Windows, les DLL Paint.NET d’origine sont aussi détectées dans Documents/PaintCraft App Files, Documents/Paint.NET App Files et l’installation de Paint.NET. Redémarrez après la copie. Décompressez d’abord les fichiers ZIP ; laissez les dépendances à côté de la DLL. Les plugins modernes bitmap/GPU sont indiqués comme pas encore pris en charge.
+Geladene Plugins	Loaded plugins	Plugins chargés
+(keine)	(none)	(aucun)
+Paletten	Palettes	Palettes
+Hex.:	Hex:	Hex :
+Horizontal	Horizontal	Horizontal
+Vertikal	Vertical	Vertical
+Diagonal fallend	Diagonal down	Diagonale descendante
+Diagonal steigend	Diagonal up	Diagonale montante
+Kreuz	Cross	Croix
+Diagonale Kreuze	Diagonal crosses	Croix diagonales
+05 Prozent	5 percent	5 pour cent
+10 Prozent	10 percent	10 pour cent
+20 Prozent	20 percent	20 pour cent
+25 Prozent	25 percent	25 pour cent
+30 Prozent	30 percent	30 pour cent
+40 Prozent	40 percent	40 pour cent
+50 Prozent	50 percent	50 pour cent
+60 Prozent	60 percent	60 pour cent
+70 Prozent	70 percent	70 pour cent
+75 Prozent	75 percent	75 pour cent
+80 Prozent	80 percent	80 pour cent
+90 Prozent	90 percent	90 pour cent
+Diagonal fallend, fein	Diagonal down, fine	Diagonale descendante, fine
+Diagonal steigend, fein	Diagonal up, fine	Diagonale montante, fine
+Diagonal fallend, dicht	Diagonal down, dense	Diagonale descendante, dense
+Diagonal steigend, dicht	Diagonal up, dense	Diagonale montante, dense
+Diagonal fallend, breit	Diagonal down, wide	Diagonale descendante, large
+Diagonal steigend, breit	Diagonal up, wide	Diagonale montante, large
+Vertikal, fein	Vertical, fine	Vertical, fin
+Horizontal, fein	Horizontal, fine	Horizontal, fin
+Vertikal, eng	Vertical, narrow	Vertical, étroit
+Horizontal, eng	Horizontal, narrow	Horizontal, étroit
+Vertikal, dicht	Vertical, dense	Vertical, dense
+Horizontal, dicht	Horizontal, dense	Horizontal, dense
+Diagonal fallend, gestrichelt	Diagonal down, dashed	Diagonale descendante, tiretée
+Diagonal steigend, gestrichelt	Diagonal up, dashed	Diagonale montante, tiretée
+Horizontal, gestrichelt	Horizontal, dashed	Horizontal, tireté
+Vertikal, gestrichelt	Vertical, dashed	Vertical, tireté
+Konfetti (klein)	Confetti (small)	Confettis (petits)
+Konfetti (groß)	Confetti (large)	Confettis (grands)
+Zickzack	Zigzag	Zigzag
+Wellen	Waves	Vagues
+Diagonale Ziegel	Diagonal bricks	Briques diagonales
+Horizontale Ziegel	Horizontal bricks	Briques horizontales
+Gewebe	Weave	Tissage
+Karo	Plaid	Écossais
+Rasen	Divot	Gazon
+Gepunktetes Gitter	Dotted grid	Grille pointillée
+Gepunktete Rauten	Dotted diamonds	Losanges pointillés
+Dachziegel	Shingles	Bardeaux
+Gitter	Trellis	Treillis
+Kugeln	Spheres	Sphères
+Kariert (klein)	Small grid	Petite grille
+Schachbrett (klein)	Checkerboard (small)	Damier (petit)
+Schachbrett (groß)	Checkerboard (large)	Damier (grand)
+Rauten	Diamonds	Losanges
+Gefüllte Rauten	Solid diamonds	Losanges pleins
+Rechteckige Auswahl mit gedrückter Maustaste aufziehen. Mit Umschalt wird sie quadratisch.	Drag to draw a rectangular selection. Hold Shift to make it square.	Faites glisser pour tracer une sélection rectangulaire. Maj la rend carrée.
+Ziehen bewegt den ausgewählten Inhalt, die Anfasser skalieren ihn. Mit der rechten Maustaste gezogen dreht er sich.	Drag to move the selected content, the handles scale it. Dragging with the right mouse button rotates it.	Faites glisser pour déplacer le contenu sélectionné, les poignées le mettent à l’échelle. Le bouton droit le fait pivoter.
+Mit gedrückter Maustaste eine freie Auswahlform umfahren.	Drag around a freeform selection shape.	Faites glisser pour entourer une forme de sélection libre.
+Ziehen bewegt die Auswahlkontur, die Anfasser skalieren oder drehen sie. Umschalt hält beim Skalieren die Proportionen und lässt den Winkel einrasten; Alt skaliert in alle Richtungen gleich.	Drag to move the selection outline, the handles scale or rotate it. Shift keeps the proportions while scaling and snaps the angle; Alt scales equally in all directions.	Faites glisser pour déplacer le contour de la sélection, les poignées le mettent à l’échelle ou le font pivoter. Maj conserve les proportions et aimante l’angle ; Alt met à l’échelle de la même façon dans toutes les directions.
+Elliptische Auswahl mit gedrückter Maustaste aufziehen. Mit Umschalt wird sie kreisrund.	Drag to draw an elliptical selection. Hold Shift to make it a circle.	Faites glisser pour tracer une sélection elliptique. Maj la rend circulaire.
+Links: hineinzoomen, rechts: herauszoomen, Mitte: Ansicht schieben	Left: zoom in, right: zoom out, middle: pan the view	Gauche : zoom avant, droite : zoom arrière, milieu : déplacer la vue
+Ein Klick wählt zusammenhängende Pixel ähnlicher Farbe aus. Mit Umschalt zählen passende Pixel im ganzen Bild.	Click to select connected pixels of a similar color. With Shift, matching pixels in the whole image count.	Un clic sélectionne les pixels contigus de couleur similaire. Avec Maj, les pixels correspondants de toute l’image comptent.
+Mit gedrückter Maustaste ziehen, um die Ansicht des Bildes zu verschieben	Drag to pan the view of the image	Faites glisser pour déplacer la vue de l’image
+Linksklick füllt eine zusammenhängende Fläche mit der Primärfarbe, Rechtsklick mit der Sekundärfarbe. Mit Umschalt wird jede passende Stelle im ganzen Bild gefüllt.	Left-click fills a connected area with the primary color, right-click with the secondary color. With Shift, every matching spot in the whole image is filled.	Un clic gauche remplit une zone contiguë avec la couleur primaire, un clic droit avec la couleur secondaire. Avec Maj, chaque zone correspondante de toute l’image est remplie.
+Mit gedrückter Maustaste Richtung und Länge des Verlaufs ziehen. Umschalt lässt den Winkel in Stufen einrasten.	Drag to set the direction and length of the gradient. Shift snaps the angle in steps.	Faites glisser pour définir la direction et la longueur du dégradé. Maj aimante l’angle par paliers.
+Mit der linken Maustaste malt der Pinsel in der Primärfarbe, mit der rechten in der Sekundärfarbe.	The left mouse button paints in the primary color, the right one in the secondary color.	Le bouton gauche peint avec la couleur primaire, le bouton droit avec la couleur secondaire.
+Entfernt die Pixel unter der Werkzeugspitze	Removes the pixels under the tool’s tip	Supprime les pixels sous la pointe de l’outil
+Zeichnet pixelgenaue Freihandlinien: links in der Primärfarbe, rechts in der Sekundärfarbe	Draws pixel-exact freehand lines: left in the primary color, right in the secondary color	Trace des lignes à main levée au pixel près : à gauche avec la couleur primaire, à droite avec la couleur secondaire
+Linksklick nimmt die Farbe unter dem Mauszeiger als Primärfarbe auf, Rechtsklick als Sekundärfarbe. Mit Strg zählt das Gesamtbild aller Ebenen.	Left-click picks the color under the pointer as the primary color, right-click as the secondary color. With Ctrl, the merged image of all layers counts.	Un clic gauche prélève la couleur sous le pointeur comme couleur primaire, un clic droit comme couleur secondaire. Avec Ctrl, l’image fusionnée de tous les calques compte.
+Strg+Klick legt die Quelle fest. Danach mit gedrückter linker Maustaste malen, um von dort zu kopieren.	Ctrl+click sets the source. Then paint with the left mouse button to copy from there.	Ctrl+clic définit la source. Peignez ensuite avec le bouton gauche pour copier depuis cet endroit.
+Ersetzt beim Malen Farben: mit der linken Maustaste durch die Primärfarbe, mit der rechten durch die Sekundärfarbe.	Replaces colors while painting: the left mouse button with the primary color, the right one with the secondary color.	Remplace les couleurs en peignant : le bouton gauche par la couleur primaire, le bouton droit par la couleur secondaire.
+Ein Klick setzt die Schreibmarke, danach einfach lostippen. Der Text erscheint in der Primärfarbe.	Click to place the cursor, then just type. The text appears in the primary color.	Un clic place le curseur, puis tapez simplement. Le texte apparaît avec la couleur primaire.
+Linke Maustaste zeichnet in der Primärfarbe, rechte in der Sekundärfarbe. Umschalt rastet die Richtung ein, Alt zeichnet von der Mitte aus.	The left mouse button draws in the primary color, the right one in the secondary color. Shift snaps the direction, Alt draws from the center.	Le bouton gauche dessine avec la couleur primaire, le bouton droit avec la couleur secondaire. Maj aimante la direction, Alt dessine depuis le centre.
+Mit gedrückter Maustaste eine Form aufziehen. Umschalt hält die Proportionen fest, Alt zeichnet von der Mitte aus.	Drag to draw a shape. Shift keeps the proportions, Alt draws from the center.	Faites glisser pour tracer une forme. Maj conserve les proportions, Alt dessine depuis le centre.
+Am Anfasser lässt sich der Text verschieben. Mit gedrückter Strg-Taste verschwinden Anfasser und Schreibmarke.	Drag the handle to move the text. Hold Ctrl to hide the handle and the cursor.	La poignée déplace le texte. En maintenant Ctrl, la poignée et le curseur disparaissent.

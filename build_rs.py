@@ -29,10 +29,11 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
   python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, lib/VERSION, docs/api/X.Y.Z.txt
                                                                 (tools/changelog.py)
-  python build_rs.py site [--out DIR] [--check]              the website: landing page, docs and API reference from
-                                                                the Markdown -> build/site/ (tools/site.py); --check
-                                                                builds into a temporary folder and checks links,
-                                                                anchors, images and the HTML (the suite runs it)
+  python build_rs.py site [--out DIR] [--check]              the docs of the website: guides, API reference, changelog
+                                                                and roadmap from the Markdown -> build/site/
+                                                                (tools/site.py); --check builds into a temporary folder
+                                                                and checks links, anchors, images and the HTML (the
+                                                                suite runs it)
   python build_rs.py i18n [APP|lib] [--update] [--unused]    the translatable texts against the catalogues
                                                                 (tools/i18n_check.py): missing, untranslated, unused,
                                                                 placeholders and plural forms; --update adds the
@@ -54,6 +55,13 @@ everything.
 Output folders (--out overrides): build/<target> for development builds, build/release/<target>
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
 other).  The assembly reference builds into legacy/build (legacy/build.py).
+
+Linux: command-line and server programs are one static file without libc.  A program that names
+ui links dynamically against glibc and nothing else (section "glibc"; every GPU driver is a glibc
+library; its libraries in <out>/linux/.glibc, the program itself next to the others in <out>/linux):
+also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  An app with a file
+apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
+systems without glibc, such as Alpine).
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
 crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
@@ -176,9 +184,10 @@ LIBS = {
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
 }
-# what a library crate needs on one target only: G3a, the UI's output through the GPU (the other
-# targets do not link Vulkan code: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"]}
+# what a library crate needs on one target only: G3a, G4b, the UI's output through the GPU (Windows;
+# Linux in the build against glibc, section "glibc"; the other targets and the static Linux build do
+# not link Vulkan code: lib/ui/gpu_out_off.rs)
+TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"]}
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -864,11 +873,73 @@ PROFILES = {
 # ---------------------------------------------------------------- end r13-measure
 
 
+# ---------------------------------------------------------------- glibc
+# Every Linux GPU driver is a glibc library, so a program that uses the GPU needs glibc in its
+# process (docs/GPU.md "Linux").  A program that names ui (its windows go through the GPU, lib/ui/
+# gpu_out.rs) or an app with a file apps/NAME/GLIBC is built that way: dynamically linked against
+# glibc and nothing else, every crate with --cfg jfgui_glibc (lib/plat/linux_glibc.rs: the process
+# start, pthread threads, exit, dlopen).  Everything else stays static without libc, and so does
+# an app with a file apps/NAME/STATIC or any UI program under --static (gpu_out_off.rs: no Vulkan
+# code; its windows through shared memory only; for systems without glibc).
+#
+# Nothing has to be installed for it: Builder.glibc_stubs writes the three libraries to link against
+# from GLIBC_STUBS (one function "ret" per name, rustc --emit=obj, then ld.lld -shared with a version
+# script).  They only name what the program imports and at which version; at run time the system's
+# libraries are used.  Every symbol is asked for at GLIBC_2.2.5, the oldest version x86-64 has:
+# glibc up to 2.33 has these functions in libdl and libpthread under that version; 2.34 moved them
+# into libc, keeps that version as a compatibility symbol there and libdl / libpthread as empty files,
+# so the same binary starts on both.  The program imports no data, only functions (no copy
+# relocations), and exports nothing: rt's memcpy never replaces the drivers'.
+GLIBC_INTERP = "/lib64/ld-linux-x86-64.so.2"
+GLIBC_VERSION = "GLIBC_2.2.5"
+GLIBC_STUBS = {                                     # in the order a C program names them: libc last
+    "libpthread.so.0": ["pthread_attr_destroy", "pthread_attr_init", "pthread_attr_setstack", "pthread_create", "pthread_join"],
+    "libdl.so.2": ["dlopen", "dlsym", "dlclose", "dlerror"],
+    "libc.so.6": ["__libc_start_main", "__cxa_atexit", "__errno_location", "exit", "gnu_get_libc_version", "pthread_self"],
+}
+
+
+STATIC_UI = False          # --static
+
+
+def set_static_ui(on):
+    """--static: the UI programs of this run are linked static (no GPU)"""
+    global STATIC_UI
+    STATIC_UI = on
+
+
+def app_glibc(name):
+    """the app is linked against glibc on Linux: apps/NAME/GLIBC; a program that names ui unless
+    apps/NAME/STATIC or --static says otherwise"""
+    d = ROOT / "apps" / name
+    if (d / "GLIBC").is_file():
+        return True
+    if STATIC_UI or (d / "STATIC").is_file():
+        return False
+    return entrypoint(d, "app", False) is not None and "ui" in app_crates(name)
+
+
+def glibc_stub_text():
+    """what the stubs and the link depend on (part of a program's digest)"""
+    return f"glibc {GLIBC_INTERP} {GLIBC_VERSION} {sorted(GLIBC_STUBS.items())}"
+# ---------------------------------------------------------------- end glibc
+
+
 # ---------------------------------------------------------------- build
 class Builder:
-    def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a"):
+    def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None):
         self.target = target
+        self.out = out
+        self.profile_name = profile
         self.dir = out / target
+        self.public = self.dir                # where the programs go
+        self.glibc = glibc_base is not None   # section "glibc": this Builder makes its programs
+        self.base = glibc_base or self        # the static Builder (the modules, BINS)
+        self.twin = None
+        self.twin_lock = threading.Lock()
+        self.stub_lock = threading.Lock()
+        if self.glibc:
+            self.dir = self.dir / ".glibc"
         self.android_abi = android_abi
         self.android_output = self.dir
         if target == "android":
@@ -918,6 +989,8 @@ class Builder:
             # (ui/inspect_edit.rs), hot reload (ui/hotreload.rs, `watch`; desktop targets only)
             if name == "ui":
                 f += ["--cfg", "jfgui_dev"]
+        if self.glibc:
+            f += ["--cfg", "jfgui_glibc"]
         if self.target == "web" and self.web_mode != "scalar":
             f += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
         if self.target == "web" and self.web_mode == "threads":
@@ -1008,7 +1081,7 @@ class Builder:
         independent ones in parallel (once per run: the app builds that run in parallel find
         them ready)"""
         with self.lib_lock:
-            libs = all_libs(self.target)
+            libs = all_libs("linux-glibc" if self.glibc else self.target)
             need = set()
 
             def add(n):
@@ -1060,12 +1133,16 @@ class Builder:
         <dir>/<style>/NAME[.exe], with a copy of the app's modules next to it"""
         if self.target not in app_targets(name):
             return None
+        if self.target == "linux" and not self.glibc and app_glibc(name):
+            return self.glibc_twin().build_app(name, style, variant)
         scrate = f"style_{style}"
         crates = app_crates(name)
         extra = app_styles(name)                       # further styles to switch to at run time
-        self.build_libs(crates + sorted({scrate, *extra}))
+        # a program of the glibc build without a UI does not build the UI for a style it never names
+        styled = not self.glibc or "ui" in crates
+        deps = crates + (sorted({scrate, *extra}) if styled else [])
+        self.build_libs(deps)
         root = entrypoint(RS / "apps" / name, "app")
-        deps = crates + sorted({scrate, *extra})
         if self.target == "android":
             from tools.android import build_apk
             return build_apk(self, name, style, variant, root, crates + extra, run_cmd,
@@ -1073,19 +1150,20 @@ class Builder:
         lto = self.profile["lto"] if self.release and self.profile else "fat"      # r13-measure
         perms, assets, boot = self.boot_inputs(name)     # permissions, vfs: manifest and assets
         digest = self.src_hash(root, deps, extra=style + ("" if lto == "fat" else f" lto={lto}")
-                               + (" wasm-variant-link-v1" if self.target == "web" else "") + boot)
+                               + (" wasm-variant-link-v1" if self.target == "web" else "") + boot
+                               + (" " + glibc_stub_text() if self.glibc else ""))
         key = "app_" + name + (f"@{style}" if variant else "")
-        vdir = self.dir / style if variant else self.dir
+        vdir = self.public / style if variant else self.public
         if self.target == "web":
             vdir = (self.web_public / style if variant else self.web_public) / name
         vdir.mkdir(parents=True, exist_ok=True)
-        for s in sorted({style, *(c[len("style_"):] for c in extra)}):
+        for s in sorted({style, *(c[len("style_"):] for c in extra)}) if styled else []:
             copy_style_notices(name, s, vdir)
         copy_library_notices(vdir)
         web_suffix = ("." + self.web_mode if self.web_mode != "scalar" else "") + ".wasm"
         exe = vdir / (name + (".exe" if self.target == "win" else web_suffix if self.target == "web" else ""))
         if self.up_to_date(key, digest, exe):
-            build_app_modules(self, name, vdir)           # jxl-module: its modules next to it
+            build_app_modules(self.base, name, vdir)      # jxl-module: its modules next to it
             if self.target == "web":
                 web_assets(name, vdir)
             return exe
@@ -1106,9 +1184,10 @@ class Builder:
             cmd += incremental_flags(self.dir / "inc" / key)
         for d in crates:
             cmd += ["--extern", f"{d}={self.rlib(d)}"]
-        cmd += ["--extern", f"style={self.rlib(scrate)}"]
-        for c in extra:
-            cmd += ["--extern", f"{c}={self.rlib(c)}"]
+        if styled:
+            cmd += ["--extern", f"style={self.rlib(scrate)}"]
+            for c in extra:
+                cmd += ["--extern", f"{c}={self.rlib(c)}"]
         cmd += self.native_link_args(name, exe, "WINDOWS")
         boot_args, env = self.boot_args(name, perms, assets)
         cmd += boot_args
@@ -1126,8 +1205,10 @@ class Builder:
         if pdb.exists():
             pdb.unlink()
         self.stamp(key, digest)
-        build_app_modules(self, name, vdir)               # jxl-module: its modules next to it
-        build_app_bins(self, name, vdir)                  # app-bins: its further executables next to it
+        if self.target == "linux":                        # section "glibc": the other build's file is gone
+            ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
+        build_app_modules(self.base, name, vdir)          # jxl-module: its modules next to it
+        build_app_bins(self.base, name, vdir)             # app-bins: its further executables next to it
         if self.target == "web":
             web_assets(name, vdir)
         return exe
@@ -1143,6 +1224,13 @@ class Builder:
             if res:
                 args += ["-C", f"link-arg={res}"]
             return args
+        if self.target == "linux" and self.glibc:
+            # no -static and no crt-static: a dynamic executable at a fixed address, like the static
+            # ones (the .map lists its addresses); --no-as-needed: all three libraries stay named
+            args = ["-nostdlib", f"--dynamic-linker={GLIBC_INTERP}", "-e", "_start", "--gc-sections", "-z", "noexecstack",
+                    f"-Map={exe}.map", "--no-as-needed"] + [str(s) for s in self.glibc_stubs()]
+            return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"] + \
+                   [x for a in args for x in ("-C", "link-arg=" + a)]
         if self.target == "linux":
             return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static",
                     "-C", "target-feature=+crt-static", "-C", "link-arg=-static", "-C", "link-arg=-nostdlib",
@@ -1150,17 +1238,53 @@ class Builder:
                     "-C", "link-arg=-z", "-C", "link-arg=noexecstack", "-C", f"link-arg=-Map={exe}.map"]
         return []
 
+    def glibc_twin(self):
+        """section "glibc": the Builder of the programs linked against glibc (once per Builder):
+        its crates in <dir>/.glibc, its programs next to the static ones"""
+        with self.twin_lock:
+            if self.twin is None:
+                self.twin = Builder(self.target, self.out, self.release, self.jobs, self.profile_name, glibc_base=self)
+            return self.twin
+
+    def glibc_stubs(self):
+        """section "glibc": the libraries to link against -> their paths, in the order of GLIBC_STUBS"""
+        stub = self.dir / "glibc-stubs"
+        paths = [stub / lib for lib in GLIBC_STUBS]
+        text = glibc_stub_text()
+        with self.stub_lock:
+            if self.up_to_date("glibc_stubs", text, paths[0]) and all(p.exists() for p in paths):
+                return paths
+            stub.mkdir(parents=True, exist_ok=True)
+            names = sorted(n for symbols in GLIBC_STUBS.values() for n in symbols)
+            lines = [x for n in names for x in (f".globl {n}", f".type {n},@function", f"{n}:")] + ["ret"]
+            src = stub / "stub.rs"
+            src.write_text("#![no_std]\ncore::arch::global_asm!(\n" + "".join(f'    "{ln}",\n' for ln in lines) + ");\n",
+                           encoding="utf-8")
+            obj = stub / "stub.o"
+            run_cmd(["rustc", "--edition", "2024", "--target", TRIPLE["linux"], "--crate-type", "lib", "--crate-name", "glibc_stub",
+                     "-C", "panic=abort", "-C", "codegen-units=1", "--emit=obj", "-o", obj, src])
+            for lib, symbols in GLIBC_STUBS.items():
+                script = stub / (lib + ".map")
+                script.write_text(GLIBC_VERSION + " {\n  global:\n" + "".join(f"    {n};\n" for n in symbols) + "  local: *;\n};\n",
+                                  encoding="utf-8")
+                run_cmd([tool("ld.lld"), "-shared", f"--soname={lib}", f"--version-script={script}", "-o", stub / lib, obj])
+            self.stamp("glibc_stubs", text)
+        return paths
+
     def build_bin(self, app, name, root, kind):
         """app-bins: one executable of apps/APP/BINS -> <dir>/NAME[.exe] (cli: no style, console
-        subsystem; gui: the app's style)"""
+        subsystem; gui: the app's style; on Linux against glibc like the app's GUI, section "glibc")"""
+        if self.target == "linux" and not self.glibc and kind == "gui" and app_glibc(app):
+            return self.glibc_twin().build_bin(app, name, root, kind)
         crates = source_crates(root)
         style = app_style(app) if kind == "gui" else None
         deps = crates + ([f"style_{style}"] if style else [])
         self.build_libs(deps)
-        exe = self.dir / bin_file(name, self.target)
+        exe = self.public / bin_file(name, self.target)
         key = f"bin_{app}_{name}"
         perms, assets, boot = self.boot_inputs(app, name)   # permissions, vfs: as the app's exe
-        digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot)
+        digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot
+                               + (" " + glibc_stub_text() if self.glibc else ""))
         if self.up_to_date(key, digest, exe):
             return exe
         cmd = ["rustc"] + self.flags() + ["--crate-type", "bin", "--crate-name", name.replace("-", "_").lower(),
@@ -1181,6 +1305,8 @@ class Builder:
         if pdb.exists():
             pdb.unlink()
         self.stamp(key, digest)
+        if self.target == "linux":                        # section "glibc": the other build's file is gone
+            ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
         return exe
 
     def app_res(self, name):
@@ -1327,7 +1453,8 @@ def build_apps(builders, names, styles=None):
     variant = len(styles or []) > 1
 
     def libs(b):
-        mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)]
+        mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)
+                and not (b.target == "linux" and app_glibc(n))]       # section "glibc": their own crates
         crates = {c for n, _ in mine for c in app_crates(n) + app_styles(n)} | {f"style_{s}" for _, s in mine}
         return b.build_libs(sorted(crates)) if mine else []
     with ThreadPoolExecutor(max(1, 2 * len(builders) * len(names))) as ex:
@@ -1482,7 +1609,7 @@ def run_tests(builders, out, quick):
     print((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip())
     if r.returncode:
         fails.append("tools/i18n_check.py --check")
-    # the website (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
+    # the website's docs (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
     # builds byte-identical; a temporary folder below build/
     r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
                        capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
@@ -2156,6 +2283,8 @@ def main():
     ap.add_argument("--web-mode", choices=["auto", "scalar", "simd", "threads"], default="auto",
                     help="browser bundle: auto builds scalar, SIMD128 and shared-memory worker variants")
     ap.add_argument("--release", action="store_true")
+    ap.add_argument("--static", action="store_true",
+                    help="Linux: the UI programs static, without the GPU (section glibc; for systems without glibc)")
     ap.add_argument("--profile", choices=sorted(PROFILES),   # r13-measure: implies --release
                     help="release variant: size (z for UI crates, 2 for compute + app, LTO) or o2 (2, no LTO)")
     ap.add_argument("--out", help="output folder (default build; --release: build/release; --profile P: build/P)")
@@ -2179,6 +2308,7 @@ def main():
     ap.add_argument("--update", action="store_true", help="i18n: add the missing texts to the app's catalogue (untranslated)")
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
+    set_static_ui(a.static)                         # section "glibc"
     if a.cmd == "ide":
         write_ide()
         return 0

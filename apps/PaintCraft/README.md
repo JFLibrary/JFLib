@@ -101,6 +101,9 @@ is not reused by normal Save. Other codecs reporting high-depth/HDR input also
 use this protective import behavior. A simple supported 8-bit PSD can be edited
 and saved directly. PSD export refuses blend modes it cannot represent.
 
+On Windows a pan of the canvas comes from GPU textures, byte for byte what the
+CPU draws ([GPU.md](../../docs/GPU.md)); everything else draws on the CPU.
+
 The editing canvas uses 8-bit color channels. A codec's ability to read a
 higher-bit-depth source does not make PaintCraft an HDR editor. Animated and
 multi-page formats are used as individual images; the app has no animation or
@@ -268,6 +271,7 @@ painting in every version of that plugin is not covered by the automated tests.
 
 Choose **Settings > User interface > Language**, or launch with
 `--language de`, `--language en` or `--language fr`. The selection is saved.
+`--lang` and `jfgui_LANG` choose it as in every JFLib app.
 English and French cover menus and many common controls; untranslated labels,
 status/error messages, shared dialogs and third-party plugin UIs may remain in
 their original language. See [text behavior and tests](docs/TEXT.md).

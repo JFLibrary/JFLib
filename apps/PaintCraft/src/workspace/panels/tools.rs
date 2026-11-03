@@ -123,6 +123,11 @@ fn wt_button(p: &mut Pn, ui: &mut Ui, i: i32) {
     let ev = ui.tool_button(ID_WTOOLS_FIRST + i as u32, icon, WT_TIPS[i as usize], &mut p.wtools.cur, i);
     if ev & EV_ACT != 0 {
         ui.cmd_run(CMD_TOOL0 + i as u32, 0);
+        // chosen with the pointer: the keys go to the tool again (the arrows would only walk
+        // through these buttons); the keyboard walk of Ctrl+F6 stays here
+        if !ui.focus_ring(ev) {
+            ui.focus_quiet(0);
+        }
     }
 }
 

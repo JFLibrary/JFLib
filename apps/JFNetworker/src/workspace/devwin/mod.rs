@@ -1,6 +1,7 @@
 // devwin -- the device windows (a double click with Shift, the context menu, the inspector):
-// a tool window per device with the tabs Übersicht, Schnittstellen, Konfiguration, Dienste,
-// CLI and, for hosts, Desktop; Dateien for devices with files
+// a tool window per device with the tabs Übersicht, Schnittstellen, Konfiguration, Firewall
+// (IOS-like devices that route), Dienste, CLI and, for hosts, Desktop; Dateien for devices with
+// files
 //
 //   DevWins::new()          none open
 //   open(n, ui, dev)        the device's window (one that is open comes to the front; at most
@@ -21,6 +22,8 @@
 // programs and what they show); a new or loaded project starts without any.
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
+//   firewall.rs  Firewall: access lists, what protects which interface, NAT, which rule a packet
+//                meets, as forms that type command lines (ids ID_FW0 + 0x800 k ..)
 //   services.rs  Dienste: what runs on the device, switched on and off
 //   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
 //   desktop.rs   Desktop of hosts: the programs in windows of their own, icons, a taskbar with
@@ -52,6 +55,8 @@
 // into full screen (every tab can be shown that way).
 
 pub(crate) mod config;
+pub(crate) mod firewall;
+pub(crate) mod fwzones;
 pub(crate) mod desktop;
 pub(crate) mod services;
 pub(crate) mod svcedit;
@@ -75,7 +80,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_model::catalog::{self, CliStyle, F_HOST};
+use jfn_model::catalog::{self, CliStyle, F_HOST, F_ROUTER};
 use jfn_model::ifname;
 use ui::*;
 
@@ -93,6 +98,7 @@ pub(crate) enum Tab {
     Overview,
     Ifaces,
     Config,
+    Firewall,
     Services,
     Cli,
     Desktop,
@@ -106,6 +112,7 @@ impl Tab {
             Tab::Overview => "Übersicht",
             Tab::Ifaces => "Schnittstellen",
             Tab::Config => "Konfiguration",
+            Tab::Firewall => "Firewall",
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
@@ -114,13 +121,17 @@ impl Tab {
     }
 }
 
-/// the tabs device `dev` has (CLI with a command line, Desktop for hosts)
-fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
+/// the tabs device `dev` has (CLI with a command line, Firewall on an IOS-like device that
+/// routes, Desktop for hosts)
+pub(crate) fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
     let m = n.doc.proj.model_of(dev);
     let mut v = alloc::vec![Tab::Overview, Tab::Ifaces];
     let cli = m.is_some_and(|m| m.cli != CliStyle::None);
     if cli {
         v.push(Tab::Config);
+    }
+    if m.is_some_and(|m| m.has(F_ROUTER) && m.cli == CliStyle::Ios) {
+        v.push(Tab::Firewall);
     }
     v.push(Tab::Services);
     if cli {
@@ -143,6 +154,8 @@ pub(crate) struct DevWin {
     rect: Shared<WinRect>,
     ifs: GridState,
     pub cfg: config::Form,
+    /// the Firewall tab's state
+    pub fw: firewall::Form,
     pub desk: desktop::Desk,
     /// opened at (the oldest gives its place up)
     age: u32,
@@ -251,6 +264,7 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
         rect,
         ifs: GridState::default(),
         cfg: config::Form::new(),
+        fw: firewall::Form::new(),
         desk,
         age: w.clock,
         ide: crate::workspace::ide::Pane::new(dev),
@@ -334,6 +348,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         Tab::Overview => overview(n, ui, id, dev),
         Tab::Ifaces => ifaces(n, ui, k, dev),
         Tab::Config => config::tab(n, ui, k, id + 0x20, dev),
+        Tab::Firewall => firewall::tab(n, ui, k, dev),
         Tab::Services => services::tab(n, ui, k, id + 0x60, dev),
         Tab::Cli => {
             ui.next_size(-1, -1);

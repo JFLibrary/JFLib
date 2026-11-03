@@ -1,0 +1,2 @@
+#!args --test canvasoff
+# jfgui_GPU=0: the same canvas on the CPU path: no tiles, the framebuffer in every frame

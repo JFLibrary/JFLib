@@ -41,7 +41,7 @@ const SLOT_N: usize = 3;
 const POOL_N: usize = 4;
 const ORPH_N: usize = 8; // busy buffers of retired pools {buffer, pool}
 const PR_MAX: usize = 16; // pending rectangles (x0, y0, x1, y1)
-const FRAME_SAFETY: u64 = 1_000_000; // us to wait for wl_callback.done
+pub(crate) const FRAME_SAFETY: u64 = 1_000_000; // us to wait for wl_callback.done
 const SHM_XRGB8888: u32 = 1;
 const SLOT_MIN_SECONDARY: u64 = 262144; // smallest slot of a secondary window
 
@@ -82,8 +82,8 @@ pub(crate) struct Wp {
     newest: Option<usize>, // the buffer of the last commit
     st: [Reg; SLOT_N],     // per buffer: where it differs from the latest frame
     frame_cb: u32,         // outstanding wl_callback (0 = none)
-    frame_wait: bool,      // presents wait for it (or FRAME_SAFETY)
-    frame_t0: u64,
+    pub frame_wait: bool,  // presents wait for it (or FRAME_SAFETY)
+    pub frame_t0: u64,
     cur_pool: u32,
     sent_scale: i32,
     sent_gw: i32,
@@ -94,6 +94,8 @@ pub(crate) struct Wp {
     slots: [Slot; SLOT_N],
     pools: [Pool; POOL_N],
     orph: [(u32, u32); ORPH_N],
+    #[cfg(jfgui_glibc)]
+    pub gpu: super::gpu::WpGpu, // GPU buffers instead of these (linux_wl_gpu.rs)
 }
 
 impl Wp {
@@ -129,6 +131,8 @@ impl Wl {
     pub(crate) fn win_present(&mut self, w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
         let Some(i) = self.rec(w) else { return };
         let wp = &mut self.wp[i];
+        #[cfg(jfgui_glibc)]
+        wp.gpu.leave();
         let (sw, sh) = (f.w.max(0), f.h.max(0));
         // a new size: everything (the buffers and the pending boxes are of the old one)
         let fresh = !wp.sfok || sw != wp.sf_w || sh != wp.sf_h;
@@ -279,6 +283,11 @@ impl Wl {
             if self.rec(i as i32).is_none() || !self.win[i].shown || !self.win[i].configured {
                 continue;
             }
+            #[cfg(jfgui_glibc)]
+            if self.wp[i].gpu.active {
+                next = next.min(self.gpu_service(i, now));
+                continue;
+            }
             let mapped = self.win[i].mapped;
             let wp = &mut self.wp[i];
             // mapped again (or first map without a present yet): the whole last frame
@@ -308,6 +317,8 @@ impl Wl {
         for s in wp.slots.iter_mut() {
             s.busy = false;
         }
+        #[cfg(jfgui_glibc)]
+        wp.gpu.unmapped();
         wp.frame_cb = 0;
         wp.frame_wait = false;
         wp.sent_gw = 0; // geometry and scale are sent again
@@ -335,6 +346,8 @@ impl Wl {
     /// the window is destroyed: its buffers, pools and mappings go  [wl_present_free]
     pub(crate) fn present_free(&mut self, w: usize) {
         let i = w & (PW_MAX - 1);
+        #[cfg(jfgui_glibc)]
+        self.gpu_free_all(i);
         for k in 0..SLOT_N {
             let s = self.wp[i].slots[k];
             if s.buf != 0 {
@@ -520,6 +533,24 @@ impl Wl {
                 k
             }
         };
+        self.surface_state(i, w, h);
+        let buf = self.wp[i].slots[k].buf;
+        let boxes: Vec<[i32; 4]> = if self.wp[i].over { vec![self.wp[i].bx] } else { self.wp[i].pr[..self.wp[i].prn].to_vec() };
+        self.wp[i].slots[k].busy = true;
+        self.wp[i].newest = Some(k);
+        self.wp[i].back = None;
+        self.present_drop(i);
+        self.commit_buffer(i, buf, &boxes, now);
+    }
+
+    /// what a w x h buffer of window i needs before its commit: the configure's acknowledgement,
+    /// window geometry, buffer scale, viewport -> false: at this integer scale the size is no multiple
+    pub(crate) fn surface_state(&mut self, i: usize, w: i32, h: i32) -> bool {
+        let r = self.win[i];
+        let s = ((r.s120 as u32 / 120) as i32).max(1);
+        if !r.frac && ((w as u32) % s as u32 != 0 || (h as u32) % s as u32 != 0) {
+            return false;
+        }
         // configure acknowledgement (only with a buffer of the configured size)
         let matches = w == r.pw && h == r.ph;
         if matches {
@@ -569,10 +600,14 @@ impl Wl {
                 self.w.send(r.vp, &VIEWPORT_SET_SOURCE, &[A::I(z), A::I(z), A::I(sw), A::I(sh)]);
             }
         }
-        let buf = self.wp[i].slots[k].buf;
+        true
+    }
+
+    /// attach + damage (boxes x0, y0, x1, y1) + frame callback + commit  [end of present_do]
+    pub(crate) fn commit_buffer(&mut self, i: usize, buf: u32, boxes: &[[i32; 4]], now: u64) {
+        let r = self.win[i];
         self.w.send(r.surf, &SURFACE_ATTACH, &[A::O(buf), A::I(0), A::I(0)]);
         // damage
-        let boxes: Vec<[i32; 4]> = if self.wp[i].over { vec![self.wp[i].bx] } else { self.wp[i].pr[..self.wp[i].prn].to_vec() };
         for b in boxes {
             self.w.send(r.surf, &SURFACE_DAMAGE_BUFFER, &[A::I(b[0]), A::I(b[1]), A::I(b[2] - b[0]), A::I(b[3] - b[1])]);
         }
@@ -585,17 +620,23 @@ impl Wl {
         }
         self.wp[i].frame_wait = true;
         self.wp[i].frame_t0 = now;
+        #[cfg(jfgui_glibc)]
+        self.gpu_feedback(r.surf, now);
         self.w.send(r.surf, &SURFACE_COMMIT, &[]);
         self.w.flush();
-        self.wp[i].slots[k].busy = true;
-        self.wp[i].newest = Some(k);
-        self.wp[i].back = None;
         let first = !self.win[i].mapped;
         self.win[i].mapped = true;
-        self.present_drop(i);
         if first {
             self.act_mapped(i);
         }
+    }
+
+    /// (linux_wl_gpu.rs) GPU buffers show window i from now on: what waits here is over
+    #[cfg(jfgui_glibc)]
+    pub(crate) fn present_gpu_begin(&mut self, i: usize) {
+        self.wp[i].back = None;
+        self.wp[i].stg.clear();
+        self.present_drop(i);
     }
 
     /// the pending damage is done (presented or dropped)
@@ -624,6 +665,8 @@ pub(crate) fn wlh_frame_done(wl: &mut Wl, id: u32, _a: &Args, u: u64) {
     if id == wp.frame_cb {
         wp.frame_cb = 0;
         wp.frame_wait = false;
+        #[cfg(jfgui_glibc)]
+        super::gpu::frame_done(wl, u as usize & (PW_MAX - 1));
     }
 }
 

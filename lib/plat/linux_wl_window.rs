@@ -906,6 +906,11 @@ impl Wl {
             if n != 0 {
                 return n;
             }
+            // (linux_wl_gpu.rs) a frame that waited for the compositor may go on
+            #[cfg(jfgui_glibc)]
+            if core::mem::take(&mut self.dm.wake) {
+                return 0;
+            }
             let ms: i32;
             if deadline == 0 || (deadline != u64::MAX && now >= deadline) {
                 // no waiting, but always read what the compositor sent once per call (frame
@@ -965,6 +970,20 @@ pub(crate) fn wlh_global(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     if iface == b"zwp_text_input_manager_v3" && wl.ime.manager==0 {
         wl.ime.manager=wl.w.send(wl.g.reg,&REGISTRY_BIND,&[A::U(name),A::B(&super::ime::MANAGER,1)]);
         wl.ime_setup(); return;
+    }
+    // (the GPU's buffers; below version 3 there are no modifiers: the CPU path)
+    #[cfg(jfgui_glibc)]
+    if iface == b"zwp_linux_dmabuf_v1" {
+        if wl.dm.mgr == 0 && ver >= 3 {
+            wl.dm.ver = ver.min(4);
+            wl.dm.mgr = wl.w.send(wl.g.reg, &REGISTRY_BIND, &[A::U(name), A::B(&super::gpu::IFACE_DMABUF, wl.dm.ver)]);
+        }
+        return;
+    }
+    #[cfg(jfgui_glibc)]
+    if iface == b"wp_presentation" {
+        wl.gpu_feedback_setup(name, ver); // (a bench says when a frame reached the screen)
+        return;
     }
     if iface == b"wl_output" {
         let Some(k) = wl.outs.iter().position(|o| o.id == 0) else { return };

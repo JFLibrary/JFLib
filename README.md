@@ -655,17 +655,19 @@ repository, that corresponds to the repository root.
 ### The documentation as a website
 
 ```sh
-python build_rs.py site            # -> build/site/index.html, opens from the file system
+python build_rs.py site            # -> build/site/index.html
 python build_rs.py site --check    # build into a temporary folder and check links, anchors, images
 ```
 
 `site` ([`tools/site.py`](tools/site.py), Python standard library only) turns this README, the
-guides listed above, the changelog, the roadmap and the API reference into a static website: a
-landing page, one page per section of the developer guide and per crate of the API reference, a
-search over titles, headings and API items, and light and dark themes. The test suite runs the
-check. Nothing is published automatically. One way to publish it is GitHub Pages: a workflow
-that runs `python build_rs.py site` and hands `build/site/` to `actions/upload-pages-artifact`
-and `actions/deploy-pages`; any static web host can serve the folder as well.
+guides listed above, the changelog, the roadmap and the API reference into the docs of the
+[JFLib website](https://github.com/JFLibrary/jflibWebsite): a start page, one page per section of
+the developer guide and per crate of the API reference, a search over titles, headings and API
+items, and the website's look in light and dark. The test suite runs the check. The website's
+repository holds its start page, features and apps, and its build puts these docs into its folder
+`docs/`, from the JFLib commit in its `jflib.lock`. Top bar and footer link to the website one
+folder up, where the fonts are as well; built on its own the docs use the system's fonts, and those
+links lead nowhere.
 
 ## License
 

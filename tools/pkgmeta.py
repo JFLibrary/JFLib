@@ -168,13 +168,15 @@ class Job:
     next to the program), bins {target: [name]} (the further programs), cross {package target:
     [(name, bytes)]} (the other system's agents), notices {relative Path: source}, units [(name,
     text)]; perms (default: permissions(app)); runtime / appimage_runtime (AppImage); signing
-    (package.py's Signing, optional).  made / skip / note collect the report, sign_done /
-    sign_skip the signatures."""
+    (package.py's Signing, optional); glibc: the program needs the system's glibc (a program
+    with a UI, build_rs.py section "glibc": the packages name it, and Flatpak the GPU).  made /
+    skip / note collect the report, sign_done / sign_skip the signatures."""
 
     def __init__(self, **kw):
         self.__dict__.update(kw)
         if "perms" not in kw:
             self.perms = permissions(self.app)
+        self.glibc = kw.get("glibc", False)
         self.done, self.skipped, self.notes = [], [], []
         self.signed, self.unsigned = [], []         # without a Signing (sign_done / sign_skip)
 

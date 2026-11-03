@@ -128,7 +128,7 @@ try {
 
       // ---------------------------------------------------------------- settings
       {
-        const context=await browser.newContext({viewport:{width:420,height:900}});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         const {page,errors,click,see,text}=await open(context);
         await see('Design: hell (System: hell)','the light scheme at the start');
         await see('Kontrast: normal  Bewegung: normal','no contrast, animations on');
@@ -178,14 +178,14 @@ try {
 
       // ---------------------------------------------------------------- notifications
       {
-        const context=await browser.newContext({viewport:{width:420,height:900}});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         await context.grantPermissions(['notifications'],{origin});
         const {page,errors,click,see}=await open(context,{quietErrors:engine==='firefox'});
         await see('Benachrichtigung: noch keine','none yet');
         await click('Benachrichtigung');
         await see('Benachrichtigung: #1 gezeigt','granted: shown');
         const first=await page.evaluate(()=>window.__notes.map(n=>({title:n.title,body:n.body})));
-        ok(first.length===1 && first[0].title==='jfgui Galerie' && first[0].body==='Benachrichtigung Nummer 1',`${engine}: a real Notification with the app's title and body: ${JSON.stringify(first)}`);
+        ok(first.length===1 && first[0].title==='JFLib Galerie' && first[0].body==='Benachrichtigung Nummer 1',`${engine}: a real Notification with the app's title and body: ${JSON.stringify(first)}`);
         await page.evaluate(()=>window.__notes[0].note.dispatchEvent(new Event('click')));
         await see('Benachrichtigung: #1 geklickt','the click reaches the app (UIC_NOTE)');
         await click('Benachrichtigung');
@@ -200,7 +200,7 @@ try {
       }
       if(engine==='chromium') {
         // not asked yet: the page asks from the click (headless Chromium answers "denied")
-        const context=await browser.newContext({viewport:{width:420,height:900}});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         const {page,click,see}=await open(context);
         ok(await page.evaluate(()=>Notification.permission)==='default','not asked yet');
         await click('Benachrichtigung');
@@ -213,7 +213,7 @@ try {
       {
         // denied before: nothing reaches the page
         const denied=engine==='firefox' ? await launch({'permissions.default.desktop-notification':2}) : browser;
-        const context=await denied.newContext({viewport:{width:420,height:900}});
+        const context=await denied.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         if(engine==='chromium') await permission(context,'notifications','denied');
         const {page,click,see,errors}=await open(context);
         ok(await page.evaluate(()=>Notification.permission)==='denied',`${engine}: denied`);
@@ -227,7 +227,7 @@ try {
 
       // ---------------------------------------------------------------- the screen kept on, the lifecycle
       {
-        const context=await browser.newContext({viewport:{width:420,height:900}});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         if(engine==='chromium') await permission(context,'screen-wake-lock','granted');
         const {page,click,see,has,until,errors}=await open(context);
         const lock=()=>page.evaluate(()=>document.body.dataset.wakeLock||'');
@@ -254,7 +254,7 @@ try {
       }
       {
         // a browser without the Screen Wake Lock: not possible
-        const context=await browser.newContext({viewport:{width:420,height:900}});
+        const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:900}});
         const {click,see}=await open(context,{noWakeLock:true});
         await click('Bildschirm anlassen');
         await see('Bildschirm an: nein (nicht möglich)','without navigator.wakeLock plat::inhibit answers None');

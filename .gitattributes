@@ -1,6 +1,8 @@
 # app:// assets (apps/NAME/assets) are built into the program byte for byte: no line-ending
 # conversion on checkout
 apps/*/assets/** -text
+# the courses of JFNetworker's Akademie: their index holds the checksums of these bytes
+apps/JFNetworker/academy/** -text
 # the WGSL corpus (tools/wgsl_corpus): expected.json holds byte offsets into the .wgsl files, and
 # some files test line breaks themselves: no line-ending conversion
 tools/wgsl_corpus/** -text

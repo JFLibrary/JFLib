@@ -11,7 +11,8 @@
 // Simulation: Echtzeit / Simulationsmodus, Abspielen (F6), Schritt vor (F7) und zurück
 // (Shift+F7), Zurück zu live, Von hier fortsetzen (K1: after its question), Tempo, PDUs, Nur
 // Auswahl, Zurücksetzen (workspace/sim);
-// Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
+// Werkzeuge: the tools with their single keys (V, H, C, N, P), Beschriftung einfügen (T, at the
+// middle of the view: canvas/labels.rs) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
 // a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, IDE of a host,
@@ -35,6 +36,11 @@
 // Hintergrund entfernen, the context menu of the picture.
 // The desktop of hosts (V2, devwin/desktop.rs): Vollbild (F11) puts the active device window
 // into full screen and back, without one the main window.
+// The start page (ST1, workspace/startpage.rs): Datei › Startseite goes back to it (the save question
+// first), Datei › Projektinfo … edits the project's description and author; while the page shows, only
+// what makes sense without a project stays enabled.
+// The Akademie (AK1, AK2, workspace/academy): Datei › Akademie … shows its courses; Esc and Alt+Left go back
+// while its page shows; TIMER_QUIZ moves a test's countdown.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -46,7 +52,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 110] = [
+pub(crate) static CMDS: [Command; 121] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -157,6 +163,17 @@ pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
     Command::new(CMD_TERM_SESSION, "Neue &Sitzung", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE, "Seriell, erstes Ende D&CE", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 1, "Seriell, erstes Ende D&TE", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 2, "Te&lefonkabel (RJ11)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 3, "Koa&xialkabel", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 4, "&Direktkabel (DAC)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_CABLE_MORE + 5, "Akti&ves Glasfaserkabel (AOC)", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_LABEL, "Beschriftung einfügen", IC_FONT, 0, b'T' as u32, 0),
+    Command::new(CMD_START_PAGE, "S&tartseite", IC_HOME, 0, 0, 0),
+    Command::new(CMD_PROJECT_INFO, "Projekt&info …", IC_INFO, 0, 0, 0),
+    Command::new(CMD_ACADEMY, "&Akademie …", IC_OFFICE_READ_MODE, 0, 0, 0),
+    Command::new(CMD_AK_BACK, "In der Akademie zurück", IC_BACK, MOD_ALT, VK_LEFT, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -167,14 +184,17 @@ pub(crate) static MENUBAR: [Mi; 6] = [
     Mi::Menu("&Werkzeuge", &M_TOOLS),
     Mi::Menu("&Hilfe", &M_HELP),
 ];
-static M_FILE: [Mi; 11] = [
+static M_FILE: [Mi; 14] = [
+    Mi::Cmd(CMD_START_PAGE),
     Mi::Cmd(CMD_NEW),
     Mi::Cmd(CMD_OPEN),
     Mi::Cmd(CMD_LAB_OPEN),
+    Mi::Cmd(CMD_ACADEMY),
     Mi::Sub("&Zuletzt geöffnet", &M_RECENT),
     Mi::Sep,
     Mi::Cmd(CMD_SAVE),
     Mi::Cmd(CMD_SAVE_AS),
+    Mi::Cmd(CMD_PROJECT_INFO),
     Mi::Sep,
     Mi::Sub("E&xportieren", &M_EXPORT),
     Mi::Sep,
@@ -296,11 +316,12 @@ static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0 + 5),
 ];
 /// the tools (their single keys) and the settings
-static M_TOOLS: [Mi; 9] = [
+static M_TOOLS: [Mi; 10] = [
     Mi::Cmd(CMD_TOOL_SELECT),
     Mi::Cmd(CMD_TOOL_HAND),
     Mi::Cmd(CMD_TOOL_CONNECT),
     Mi::Cmd(CMD_TOOL_NOTE),
+    Mi::Cmd(CMD_LABEL),
     Mi::Cmd(CMD_TOOL_PDU),
     Mi::Sep,
     Mi::Cmd(CMD_SETTINGS),
@@ -348,7 +369,7 @@ pub(crate) static M_GROUP: [Mi; 9] = [
 ];
 /// the context menu of the background picture (G1, while it is not locked)
 pub(crate) static M_BACKDROP: [Mi; 5] = [Mi::Cmd(CMD_BG_LOCK), Mi::Cmd(CMD_BG_FIT), Mi::Cmd(CMD_BG_OPEN), Mi::Sep, Mi::Cmd(CMD_BG_REMOVE)];
-static M_CABLE_KIND: [Mi; 10] = [
+static M_CABLE_KIND: [Mi; 16] = [
     Mi::Cmd(CMD_CABLE0),
     Mi::Sep,
     Mi::Cmd(CMD_CABLE0 + 1),
@@ -359,6 +380,12 @@ static M_CABLE_KIND: [Mi; 10] = [
     Mi::Cmd(CMD_CABLE0 + 6),
     Mi::Cmd(CMD_CABLE0 + 7),
     Mi::Cmd(CMD_CABLE0 + 8),
+    Mi::Cmd(CMD_CABLE_MORE),
+    Mi::Cmd(CMD_CABLE_MORE + 1),
+    Mi::Cmd(CMD_CABLE_MORE + 2),
+    Mi::Cmd(CMD_CABLE_MORE + 3),
+    Mi::Cmd(CMD_CABLE_MORE + 4),
+    Mi::Cmd(CMD_CABLE_MORE + 5),
 ];
 
 fn flag(on: bool, f: u32) -> u32 {
@@ -367,6 +394,9 @@ fn flag(on: bool, f: u32) -> u32 {
 
 /// enabled / checked per command (every frame, before the widgets)
 pub(crate) fn states(n: &Net, ui: &mut Ui) {
+    if crate::workspace::startpage::states(n, ui) {
+        return;
+    }
     let h = &n.doc.hist;
     let sel = !n.canvas.st.sel.is_empty();
     let any = !n.doc.proj.devices.is_empty() || !n.doc.proj.notes.is_empty();
@@ -379,14 +409,18 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_SNAP, flag(n.prefs.snap, CF_CHECKED));
     ui.cmd_state(CMD_MINIMAP, flag(n.prefs.minimap, CF_CHECKED));
     ui.cmd_state(CMD_WLAN_RANGES, flag(n.canvas.wl.ranges, CF_CHECKED));
+    // (a lab that hides the panel Probleme has no such command: Lab::lock, AK2)
+    let hide_problems = crate::workspace::task::lock(n).problems;
     for (k, &p) in PANELS.iter().enumerate() {
-        ui.cmd_state(CMD_PANEL0 + k as u32, flag(n.shell.dock.visible(p), CF_CHECKED));
+        let off = hide_problems && p == P_PROBLEMS;
+        ui.cmd_state(CMD_PANEL0 + k as u32, if off { CF_DISABLED } else { flag(n.shell.dock.visible(p), CF_CHECKED) });
     }
     let t = n.canvas.tool;
     ui.cmd_state(CMD_TOOL_SELECT, flag(t == Tool::Select, CF_CHECKED));
     ui.cmd_state(CMD_TOOL_HAND, flag(t == Tool::Hand, CF_CHECKED));
-    ui.cmd_state(CMD_TOOL_CONNECT, flag(t == Tool::Connect, CF_CHECKED));
+    ui.cmd_state(CMD_TOOL_CONNECT, flag(matches!(t, Tool::Connect(_)), CF_CHECKED));
     ui.cmd_state(CMD_TOOL_NOTE, flag(t == Tool::Note, CF_CHECKED));
+    ui.cmd_state(CMD_LABEL, flag(n.phys.on, CF_DISABLED));
     crate::workspace::sim::states(n, ui);
     cables::states(n, ui);
     terminal::states(n, ui);
@@ -422,6 +456,10 @@ fn focus_panel(n: &mut Net, ui: &mut Ui, p: u32) {
 
 /// App::command
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
+    // what is being typed into a label counts before a command acts (Ctrl+S, closing the window)
+    if id <= UIC_CLOSE {
+        canvas::labels::flush(n, ui);
+    }
     // the physical view's commands, and while it is shown zoom, Löschen, Umbenennen ...
     if let Some(r) = crate::workspace::phys::command(n, ui, id, arg) {
         return r;
@@ -468,8 +506,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             n.save_prefs(ui);
             return false;
         }
+        UIC_ESCAPE if n.academy.on && arg == 0 => crate::workspace::academy::back(n, ui),
         UIC_ESCAPE => {
-            if !matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Connect | Tool::Pdu) {
+            if !matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Connect(_) | Tool::Pdu) {
                 return false;
             }
             n.canvas.tool = Tool::Select;
@@ -522,8 +561,13 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         _ if (CMD_PANEL0..CMD_PANEL0 + PANELS.len() as u32).contains(&id) => focus_panel(n, ui, PANELS[(id - CMD_PANEL0) as usize]),
         CMD_TOOL_SELECT => tools::set(n, Tool::Select),
         CMD_TOOL_HAND => tools::set(n, Tool::Hand),
-        CMD_TOOL_CONNECT => tools::set(n, Tool::Connect),
+        // (the kind the palette chose stays)
+        CMD_TOOL_CONNECT => {
+            let kind = if let Tool::Connect(k) = n.canvas.tool { k } else { None };
+            tools::set(n, Tool::Connect(kind));
+        }
         CMD_TOOL_NOTE => tools::set(n, Tool::Note),
+        CMD_LABEL => canvas::labels::open_centre(n, ui),
         CMD_ABOUT => n.shell.about.set(1),
         CMD_FOCUS_CANVAS => ui.focus(ID_CANVAS),
         CMD_SETTINGS => n.settings_open.set(1),
@@ -535,9 +579,12 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_ROUTE_CURVE => cables::set_route(n, jfn_model::project::Route::Curve),
         CMD_DISCONNECT => cables::disconnect_selection(n),
         CMD_POWER => cables::toggle_power(n),
-        _ if (CMD_CABLE0..=CMD_CABLE0 + CableKind::ALL.len() as u32).contains(&id) => {
+        _ if (CMD_CABLE0..=CMD_CABLE0 + CABLE_KINDS0 as u32).contains(&id) => {
             let k = (id - CMD_CABLE0) as usize;
             cables::set_kind(n, if k == 0 { None } else { Some(CableKind::ALL[k - 1]) });
+        }
+        _ if (CMD_CABLE_MORE..CMD_CABLE_MORE + (CableKind::ALL.len() - CABLE_KINDS0) as u32).contains(&id) => {
+            cables::set_kind(n, Some(CableKind::ALL[CABLE_KINDS0 + (id - CMD_CABLE_MORE) as usize]));
         }
         CMD_CONSOLE..=CMD_LOG_CLEAR => return terminal::command(n, ui, id),
         // the simulation mode (workspace/sim)
@@ -558,6 +605,10 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // assessments (A1): handing in, the author's panel, the countdown
         CMD_ASSESS_SUBMIT => return crate::workspace::assess::command(n, ui, id),
         CMD_AUTHOR | CMD_AUTHOR_TARGET | CMD_AUTHOR_START | CMD_AUTHOR_SAVE => return crate::workspace::author::command(n, ui, id),
+        UIC_TIMER if arg == TIMER_QUIZ => {
+            crate::workspace::academy::quiz::timer(n, ui);
+            return true;
+        }
         UIC_TIMER if arg == TIMER_ASSESS => {
             crate::workspace::assess::timer(n, ui);
             return true;
@@ -573,6 +624,10 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_DESK_FULL => crate::workspace::devwin::fullscreen(n, ui),
         // a further command-line session as a tab of the Terminal panel (X1e)
         CMD_TERM_SESSION => return terminal::command(n, ui, id),
+        // the start page and the project's info (workspace/startpage.rs)
+        CMD_START_PAGE..=CMD_SP_FORGET => return crate::workspace::startpage::command(n, ui, id, arg),
+        // the Akademie (workspace/academy)
+        CMD_ACADEMY..=CMD_AK_RETRY => return crate::workspace::academy::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

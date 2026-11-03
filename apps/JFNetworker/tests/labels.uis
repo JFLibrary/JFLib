@@ -1,0 +1,340 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# slim labels on the canvas (canvas/labels.rs, H3): a double click on free space opens the input
+# right there; Enter takes it as one undo step, Esc leaves nothing behind, a click elsewhere
+# takes it, an empty one is never stored, Shift+Enter gives a new line; a double click or F2 edits
+# in place; the inspector; moving, deleting, undo, redo, saving and loading as a note; a sticker
+# next to it stays as it was; a marquee and the other tools start none; the keyboard's way (T) at
+# the middle of the view, beside what lies there; low zoom.  labels_rtl.uis: a mirrored window.
+# #128000 is the input, #20483 and #20484 the inspector's text and Übernehmen.
+theme light
+expect text:"3 Geräte · 2 Kabel" exists
+expect button:"Rückgängig" disabled
+expect text:"gespeichert" exists
+# ---- Esc leaves nothing behind: no note, no step, not even unsaved
+dblclick 400,300
+expect #128000 exists
+expect #128000 focused
+expect #128000 text ""
+type "Weg"
+expect #128000 text "Weg"
+key esc
+expect #128000 missing
+expect canvas:"Topologie" focused
+expect listitem:"Beschriftung: Weg" missing
+expect button:"Rückgängig" disabled
+expect text:"gespeichert" exists
+wait 600
+# ---- Enter takes it: the box is its text at the point clicked
+dblclick 400,300
+expect #128000 rect 401 291 * 20
+type "Erster Stock"
+key enter
+expect #128000 missing
+expect listitem:"Beschriftung: Erster Stock" exists
+expect listitem:"Beschriftung: Erster Stock" selected
+expect listitem:"Beschriftung: Erster Stock" rect 400 290 77 22
+expect canvas:"Topologie" focused
+# create and first text are one step
+key ctrl+z
+expect listitem:"Beschriftung: Erster Stock" missing
+expect button:"Rückgängig" disabled
+key ctrl+y
+expect listitem:"Beschriftung: Erster Stock" exists
+expect listitem:"Beschriftung: Erster Stock" selected
+# ---- a click elsewhere takes it, the click keeps its own meaning
+wait 600
+dblclick 700,160
+type "Serverraum"
+click 900,540
+expect #128000 missing
+expect listitem:"Beschriftung: Serverraum" exists
+expect text:"Nichts ausgewählt" exists
+key ctrl+z
+expect listitem:"Beschriftung: Serverraum" missing
+key ctrl+y
+wait 600
+dblclick 500,160
+type "Noch eine"
+click listitem:"PC1"
+expect listitem:"Beschriftung: Noch eine" exists
+expect listitem:"PC1" selected
+key ctrl+z
+expect listitem:"Beschriftung: Noch eine" missing
+wait 600
+click 900,540
+wait 600
+# ---- an empty one is never stored: not by a click elsewhere, not by Enter, not as spaces
+dblclick 320,500
+expect #128000 exists
+click 900,540
+expect #128000 missing
+expect text:"Nichts ausgewählt" exists
+wait 600
+dblclick 320,500
+key enter
+expect #128000 missing
+wait 600
+dblclick 320,500
+type "   "
+key enter
+expect #128000 missing
+expect listitem:"Beschriftung" missing
+# (the last step is still the Serverraum's)
+key ctrl+z
+expect listitem:"Beschriftung: Serverraum" missing
+key ctrl+y
+wait 600
+# ---- Shift+Enter gives a new line, the box two lines high; Ctrl+Enter takes it as well
+dblclick 880,480
+type "Zeile 1"
+key shift+enter
+type "Zeile 2"
+expect #128000 text "Zeile 1\nZeile 2"
+expect #128000 rect 881 471 * 40
+key ctrl+enter
+expect #128000 missing
+expect listitem:"Beschriftung: Zeile 1" exists
+expect listitem:"Beschriftung: Zeile 1" selected
+expect listitem:"Beschriftung: Zeile 1" rect 880 470 * 42
+# ---- a double click on one edits it in place: the text selected, Esc gives up
+wait 600
+dblclick listitem:"Beschriftung: Erster Stock"
+expect #128000 exists
+expect #128000 text "Erster Stock"
+expect #128000 focused
+expect #128000 rect 401 291 * 20
+type "Zweiter Stock"
+shot build/jfnetworker/labels_edit.png
+key esc
+expect #128000 missing
+expect listitem:"Beschriftung: Erster Stock" exists
+expect listitem:"Beschriftung: Erster Stock" selected
+# ... Enter opens it again, the new text takes its box along, one step
+key enter
+expect #128000 exists
+type "Zweiter Stock, Ostflügel"
+key enter
+expect listitem:"Beschriftung: Zweiter Stock, Ostflügel" exists
+expect listitem:"Beschriftung: Zweiter Stock, Ostflügel" rect 400 290 * 22
+key ctrl+z
+expect listitem:"Beschriftung: Erster Stock" rect 400 290 77 22
+key ctrl+y
+expect listitem:"Beschriftung: Zweiter Stock, Ostflügel" exists
+# ---- F2 as well
+key f2
+expect #128000 text "Zweiter Stock, Ostflügel"
+type "Stock 2"
+key enter
+expect listitem:"Beschriftung: Stock 2" exists
+expect listitem:"Beschriftung: Stock 2" selected
+# ---- an emptied one goes, undo brings it back
+key f2
+key delete
+key enter
+expect listitem:"Beschriftung: Stock 2" missing
+key ctrl+z
+expect listitem:"Beschriftung: Stock 2" exists
+# ---- the inspector: its page, a new text with its box, never empty
+click listitem:"Beschriftung: Stock 2"
+expect text:"Beschriftung" exists
+expect #20483 text "Stock 2"
+expect #20484 disabled
+click #20483
+key ctrl+a
+type "Stock drei"
+click #20484
+expect listitem:"Beschriftung: Stock drei" rect 400 290 * 22
+key ctrl+z
+expect listitem:"Beschriftung: Stock 2" exists
+expect #20483 text "Stock 2"
+click #20483
+key ctrl+a
+key delete
+expect #20484 disabled
+type "Stock 2"
+wait 600
+# ---- it moves (snapped) and deletes as a note, each a step
+click 900,540
+wait 600
+click listitem:"Beschriftung: Stock 2"
+wait 600
+drag listitem:"Beschriftung: Stock 2" 500,380
+expect listitem:"Beschriftung: Stock 2" selected
+key ctrl+z
+expect listitem:"Beschriftung: Stock 2" rect 400 290 * 22
+key ctrl+y
+key right
+key ctrl+z
+key delete
+expect listitem:"Beschriftung: Stock 2" missing
+key ctrl+z
+expect listitem:"Beschriftung: Stock 2" exists
+expect listitem:"Beschriftung: Stock 2" selected
+key ctrl+y
+expect listitem:"Beschriftung: Stock 2" missing
+key ctrl+z
+# Tab walks them with the devices
+click 900,540
+key ctrl+9
+key tab
+expect listitem:"Beschriftung: Stock 2" focused
+key esc
+# ---- a marquee starts none, a click after it neither
+wait 600
+click 900,540
+drag 300,100 420,160
+click 300,100
+expect #128000 missing
+wait 600
+# ---- with another tool a double click starts none
+key h
+dblclick 300,100
+expect #128000 missing
+key v
+wait 600
+key c
+dblclick 300,100
+expect #128000 missing
+key v
+wait 600
+# ---- a sticker next to it stays what it was: tool N, a card, its flyout
+key n
+click 300,420
+type "Karte"
+click button:"Übernehmen"
+expect listitem:"Notiz: Karte" rect * * 200 80
+expect listitem:"Beschriftung: Stock 2" exists
+wait 600
+click 900,540
+dblclick listitem:"Notiz: Karte"
+expect #12305 exists
+key esc
+expect #12305 missing
+expect listitem:"Notiz: Karte" exists
+wait 600
+# ---- the keyboard's way: T at the middle of the view, not behind a device, the next one below
+click 900,540
+key ctrl+9
+key t
+expect #128000 focused
+type "Mitte"
+key enter
+expect listitem:"Beschriftung: Mitte" selected
+key t
+type "Darunter"
+key enter
+expect listitem:"Beschriftung: Darunter" selected
+# ... the menu has it
+click menu:"Werkzeuge"
+expect menuitem:"Beschriftung einfügen" exists
+key esc
+key esc
+key ctrl+z
+key ctrl+z
+# ---- typing does not reach the tools
+wait 600
+dblclick 860,240
+type "vhcnt"
+expect #128000 text "vhcnt"
+expect button:"Auswahl" exists
+key esc
+# ---- saved and loaded: labels are labels, the sticker a sticker
+click 900,540
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/jfn_labels.jfnet"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"gespeichert" exists
+# what is being typed goes along: Ctrl+S takes it first
+wait 600
+dblclick 860,240
+type "Vor dem Speichern"
+key ctrl+s
+expect #128000 missing
+expect listitem:"Beschriftung: Vor dem Speichern" exists
+expect text:"gespeichert" exists
+cmd 1
+expect text:"0 Geräte · 0 Kabel" exists
+expect listitem:"Beschriftung: Vor dem Speichern" missing
+cmd 70
+expect listitem:"Beschriftung: Vor dem Speichern" exists
+expect listitem:"Beschriftung: Stock 2" rect 470 360 * 22
+expect listitem:"Beschriftung: Zeile 1" rect 880 470 * 42
+expect listitem:"Notiz: Karte" rect * * 200 80
+expect text:"gespeichert" exists
+wait 600
+dblclick listitem:"Beschriftung: Serverraum"
+expect #128000 text "Serverraum"
+key esc
+wait 600
+click 900,540
+expect text:"gespeichert" exists
+wait 600
+# ---- zoomed: the box goes with the text; 150 %, 50 %
+cmd 22
+cmd 20
+cmd 20
+expect listitem:"Beschriftung: Stock 2" exists
+wait 600
+dblclick listitem:"Beschriftung: Stock 2"
+expect #128000 text "Stock 2"
+expect #128000 focused
+key esc
+cmd 22
+cmd 21
+cmd 21
+cmd 21
+wait 600
+dblclick listitem:"Beschriftung: Stock 2"
+expect #128000 text "Stock 2"
+key esc
+wait 600
+# ---- at another display scale the box is the same; after another font it follows the text
+click 900,540
+cmd 22
+wait 600
+scale 150
+dblclick 480,180
+type "Erster Stock"
+key enter
+scale 100
+expect listitem:"Beschriftung: Erster Stock" rect * * 77 21
+expect listitem:"Beschriftung: Serverraum" rect * * 75 22
+theme file apps/JFNetworker/tests/fixtures/big_text.theme
+expect listitem:"Beschriftung: Serverraum" rect * * 113 32
+theme none
+expect listitem:"Beschriftung: Serverraum" rect * * 75 22
+key ctrl+z
+expect listitem:"Beschriftung: Erster Stock" missing
+wait 600
+# ---- small labels stay selectable at low zoom, a click just beside one too (10 %: a bar)
+click 900,540
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+expect text:"10 %" exists
+shot build/jfnetworker/labels_zoom.png
+expect listitem:"Beschriftung: Serverraum" rect 637 303 8 2
+wait 600
+click listitem:"Beschriftung: Serverraum"
+expect listitem:"Beschriftung: Serverraum" selected
+wait 600
+click 900,540
+expect text:"Nichts ausgewählt" exists
+wait 600
+click 641,298
+expect listitem:"Beschriftung: Serverraum" selected
+wait 600
+click 900,540
+wait 600
+click 641,290
+expect text:"Nichts ausgewählt" exists
+expect_nowarn

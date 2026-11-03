@@ -2,27 +2,39 @@
 // the check of the target while a cable is drawn and the port choice at the pointer
 //
 //   Drag                            the cable being drawn: where from, the target under the
-//                                   pointer, whether a free pair of ports fits
+//                                   pointer, whether a free pair of ports fits, why a chosen
+//                                   kind does not
 //   drag(n, from, over)             DEv::ConnectDrag
 //   finish(n, ui, from, to, quick)  DEv::Connect: Shift at the release, or a drag from a port dot
 //                                   to a port dot, connects at once (the best pair); else the
 //                                   port choice opens at the pointer
 //   overlay(n, ui)                  the target's outline while drawing: accent when a pair
-//                                   fits, else red with the tooltip "Kein passender Port"; the
-//                                   ring of end A chosen with the keyboard
+//                                   fits, else red with the tooltip "Kein passender Port" (a
+//                                   chosen kind: its reason); the ring of end A chosen with the
+//                                   keyboard
 //   key_pick(n, ui, dev)            Enter on a device with the tool: end A, then end B opens
 //                                   the port choice below B (Enter on A again gives it up)
 //   popover(n, ui)                  the port choice: device A | device B with every port (kind,
 //                                   name, speed, state), the best pair chosen, the cable
 //                                   ("Automatisch: Kupfer, gerade" or a kind that fits), Enter
 //                                   connects
-//   best(p, a, pa, b, pb)           the best free pair: jfn_model::suggest_ports, or with a port
-//                                   fixed on a side (a port dot) its ranking for the rest
+//   best(p, a, pa, b, pb, kind)     the best free pair: jfn_model::suggest_ports (a chosen kind:
+//                                   suggest_ports_for), or with a port fixed on a side (a port
+//                                   dot) its ranking for the rest
+//   refusal(p, a, pa, b, pb, kind)  why a chosen kind joins no free pair of two devices
+//   drop_refusal(n)                 its warning goes with the tool that asked for it
+//   rows(p, d, other, kind)         the ports the choice shows of device d
+//   offered(a, b, held)             the kinds the choice's list offers beside "Automatisch"
 //
 // The cable follows the ports (jfn_model::cable_kind) unless the user chose one; a new link is
 // selected and is one undo step.  Occupied ports show their far end and cannot be chosen, ports
 // that fit no free port of the other device say what they would need; choosing a port the
 // other side's choice does not fit takes the best partner for it there.
+//
+// A kind chosen in the palette (Tool::Connect(Some(kind))): the choice shows only the ports it
+// plugs into, offers only pairs it fits and holds that kind.  What it fits nowhere is refused:
+// red at the target with the reason, at the release a warning with it and no port choice.  A wrong
+// copper kind fits, it shows its fault as a real one does.
 
 use alloc::format;
 use alloc::string::String;
@@ -33,25 +45,30 @@ use jfn_model::{cable, ifname, CableKind, PortRef, Project};
 use ui::*;
 
 use super::paint::{key_port, DEV_H, DEV_W};
+use super::tools::Tool;
 use crate::app::constants::*;
 use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 use crate::workspace::icons::port_icon;
 
+/// the title of the warning for a chosen kind that joins nothing
+const REFUSED: &str = "Dieses Kabel passt hier nicht";
 /// the row height of the port lists (DIP), the rows they show at most, their width
 const ROW_H: u32 = 26;
 const ROWS: i32 = 9;
 const LIST_W: i32 = 300;
 
 /// a cable being drawn
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Drag {
     pub from: u64,
     /// the target under the pointer (a node or port key, 0: none)
     pub over: u64,
     /// a free pair of ports fits
     pub fits: bool,
+    /// why the kind chosen in the palette does not fit the target
+    pub why: Option<String>,
 }
 
 /// a port of the choice
@@ -69,14 +86,24 @@ impl Row {
     }
 }
 
+/// the kinds the list of the choice offers beside "Automatisch" for two ports: those that fit,
+/// the right one only while it is the kind held (the palette's choice of it)
+pub(crate) fn offered(a: &PortSpec, b: &PortSpec, held: Option<CableKind>) -> Vec<CableKind> {
+    let right = cable::cable_kind(a, b).ok();
+    CableKind::ALL.iter().copied().filter(|&k| (Some(k) != right || held == Some(k)) && cable::cable_fits(k, a, b).is_ok()).collect()
+}
+
 /// the port choice of two devices
 pub(crate) struct Choice {
     pub dev: [u32; 2],
     pub rows: [Vec<Row>; 2],
     /// the chosen row of each side (-1: none)
     pub sel: [i32; 2],
-    /// 0: Automatisch, k: the kinds that fit the pair, k - 1
-    pub cable: i32,
+    /// the kind chosen in the list (None: Automatisch); held while the ports change, it counts
+    /// for the pairs it fits
+    pub cable: Option<CableKind>,
+    /// the kind chosen in the palette: only pairs it fits are offered
+    pub only: Option<CableKind>,
     opened: bool,
     /// opened from the keyboard: below this box (px) instead of at the pointer
     anchor: Option<[i32; 4]>,
@@ -92,10 +119,30 @@ fn port_of(key: u64) -> Option<u16> {
     key_port(key).map(|(_, i)| i)
 }
 
+/// the kind the palette chose for the tool
+fn chosen(n: &Net) -> Option<CableKind> {
+    match n.canvas.tool {
+        Tool::Connect(k) => k,
+        _ => None,
+    }
+}
+
+// the two ports take a cable: the right one for them, or the kind chosen
+fn pair_fits(a: &PortSpec, b: &PortSpec, kind: Option<CableKind>) -> bool {
+    match kind {
+        Some(k) => cable::cable_fits(k, a, b).is_ok(),
+        None => cable::cable_kind(a, b).is_ok(),
+    }
+}
+
 // how good a pair is: radio to an access point, data links, other radios, console cables last;
-// then the speed, then the lowest port numbers (jfn_model's suggest_ports)
-fn rank(a: &PortSpec, b: &PortSpec, ap: bool) -> Option<(u8, u32, i32)> {
-    let k = cable::cable_kind(a, b).ok()?;
+// then the speed, then the lowest port numbers (jfn_model's suggest_ports); a chosen kind counts
+// for the pairs it fits
+fn rank(a: &PortSpec, b: &PortSpec, ap: bool, kind: Option<CableKind>) -> Option<(u8, u32, i32)> {
+    if !pair_fits(a, b, kind) {
+        return None;
+    }
+    let k = kind.or(cable::cable_kind(a, b).ok())?;
     let class = match k {
         CableKind::Wireless if ap => 3,
         CableKind::Wireless => 1,
@@ -105,15 +152,18 @@ fn rank(a: &PortSpec, b: &PortSpec, ap: bool) -> Option<(u8, u32, i32)> {
     Some((class, cable::link_kbps(a, b), -(a.index as i32 + b.index as i32)))
 }
 
-/// the best free pair of ports between devices a and b (port indices); a port given on a side
-/// is taken there
-pub(crate) fn best(p: &Project, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>) -> Option<(u16, u16)> {
+/// the best free pair of ports between devices a and b (port indices) for a kind (None: the right
+/// one for the pair); a port given on a side is taken there
+pub(crate) fn best(p: &Project, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>, kind: Option<CableKind>) -> Option<(u16, u16)> {
     if a == b {
         return None;
     }
     // nothing fixed: jfn_model's rule for a quick connection
     if pa.is_none() && pb.is_none() {
-        let (x, y) = p.suggest_ports(a, b)?;
+        let (x, y) = match kind {
+            Some(k) => p.suggest_ports_for(a, b, k)?,
+            None => p.suggest_ports(a, b)?,
+        };
         let index = |d: u32, name: &str| p.model_of(d)?.port(name).map(|s| s.index);
         return Some((index(a, &x)?, index(b, &y)?));
     }
@@ -123,7 +173,7 @@ pub(crate) fn best(p: &Project, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>
     let mut top: Option<((u8, u32, i32), u16, u16)> = None;
     for x in &fa {
         for y in &fb {
-            if let Some(k) = rank(x, y, ap) {
+            if let Some(k) = rank(x, y, ap, kind) {
                 if top.is_none_or(|t| k > t.0) {
                     top = Some((k, x.index, y.index));
                 }
@@ -133,14 +183,48 @@ pub(crate) fn best(p: &Project, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>
     top.map(|t| (t.1, t.2))
 }
 
+/// why a chosen kind joins no free pair of the two devices: the target first, then the start
+pub(crate) fn refusal(p: &Project, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>, kind: CableKind) -> String {
+    let name = |d: u32| p.device(d).map_or_else(String::new, |d| d.name.clone());
+    for (d, fixed) in [(b, pb), (a, pa)] {
+        let free: Vec<PortSpec> = p.free_ports(d).into_iter().filter(|x| fixed.is_none_or(|i| x.index == i)).collect();
+        let Some(first) = free.first() else { return tf("{} hat keinen freien Port", &[&name(d)]) };
+        if !free.iter().any(|x| cable::accepts(kind, x.media)) {
+            return crate::app::tr::msg(&cable::Why::CableDoesNotFit(kind, first.media).msg());
+        }
+    }
+    tf("{} verbindet keine freien Ports von {} und {}.", &[t(kind.title()), &name(a), &name(b)])
+}
+
 /// DEv::ConnectDrag: the target under the pointer and whether it fits
 pub(crate) fn drag(n: &mut Net, from: u64, over: u64) {
-    let same = n.canvas.conn.is_some_and(|c| c.from == from && c.over == over);
+    let same = n.canvas.conn.as_ref().is_some_and(|c| c.from == from && c.over == over);
     if same {
         return;
     }
-    let fits = over != 0 && best(&n.doc.proj, dev_of(from), port_of(from), dev_of(over), port_of(over)).is_some();
-    n.canvas.conn = Some(Drag { from, over, fits });
+    let kind = chosen(n);
+    let p = &n.doc.proj;
+    let (a, pa, b, pb) = (dev_of(from), port_of(from), dev_of(over), port_of(over));
+    let fits = over != 0 && best(p, a, pa, b, pb, kind).is_some();
+    let why = kind.filter(|_| over != 0 && !fits && a != b).map(|k| refusal(p, a, pa, b, pb, k));
+    n.canvas.conn = Some(Drag { from, over, fits, why });
+}
+
+// a chosen kind joins nothing: a warning with the reason
+fn refuse(n: &mut Net, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>, kind: CableKind) {
+    let why = refusal(&n.doc.proj, a, pa, b, pb, kind);
+    n.file.msg = Some((IB_WARNING, String::from(t(REFUSED)), why));
+}
+
+fn is_refusal(n: &Net) -> bool {
+    n.file.msg.as_ref().is_some_and(|m| m.1 == t(REFUSED))
+}
+
+/// the warning of a refused cable goes with the tool that asked for it (every frame)
+pub(crate) fn drop_refusal(n: &mut Net) {
+    if is_refusal(n) && !matches!(n.canvas.tool, Tool::Connect(Some(_))) {
+        n.file.msg = None;
+    }
 }
 
 /// DEv::Connect: at once (Shift, or port dot to port dot), else the port choice
@@ -152,11 +236,13 @@ pub(crate) fn finish(n: &mut Net, ui: &mut Ui, from: u64, to: u64, quick: bool) 
     // the widget's quick: dragged out of a port dot; a dot to a dot needs no choice either
     let _ = quick;
     if shift || (pa.is_some() && pb.is_some()) {
-        match best(&n.doc.proj, a, pa, b, pb) {
-            Some((x, y)) => {
-                connect(n, ui, a, x, b, y, None);
+        let kind = chosen(n);
+        match (best(&n.doc.proj, a, pa, b, pb, kind), kind) {
+            (Some((x, y)), _) => {
+                connect(n, ui, a, x, b, y, kind);
             }
-            None => {
+            (None, Some(k)) => refuse(n, a, pa, b, pb, k),
+            (None, None) => {
                 let name = |d: u32| n.doc.proj.device(d).map_or_else(String::new, |d| d.name.clone());
                 n.file.msg = Some((IB_WARNING, String::from(t("Kein passender Port")), tf("{} und {} haben keine freien Ports, die zusammenpassen.", &[&name(a), &name(b)])));
             }
@@ -169,15 +255,22 @@ pub(crate) fn finish(n: &mut Net, ui: &mut Ui, from: u64, to: u64, quick: bool) 
 
 /// the port choice of devices a and b (with a port fixed on a side: the dot it started at)
 pub(crate) fn open(n: &mut Net, ui: &mut Ui, a: u32, pa: Option<u16>, b: u32, pb: Option<u16>) {
+    let kind = chosen(n);
     let p = &n.doc.proj;
     if p.device(a).is_none() || p.device(b).is_none() || a == b {
         return;
     }
-    let rows = [rows(p, a, b), rows(p, b, a)];
-    let pair = best(p, a, pa, b, pb).or_else(|| best(p, a, None, b, None));
+    let rows = [rows(p, a, b, kind), rows(p, b, a, kind)];
+    let pair = best(p, a, pa, b, pb, kind).or_else(|| best(p, a, None, b, None, kind));
+    // a chosen kind that joins nothing here: no choice, the reason
+    if let (Some(k), None) = (kind, pair) {
+        refuse(n, a, pa, b, pb, k);
+        ui.repass();
+        return;
+    }
     let pos = |side: usize, i: Option<u16>| i.and_then(|i| rows[side].iter().position(|r| r.spec.index == i)).map_or(-1, |k| k as i32);
     let sel = [pos(0, pair.map(|x| x.0)), pos(1, pair.map(|x| x.1))];
-    n.canvas.choice = Some(Choice { dev: [a, b], rows, sel, cable: 0, opened: false, anchor: None });
+    n.canvas.choice = Some(Choice { dev: [a, b], rows, sel, cable: kind, only: kind, opened: false, anchor: None });
     ui.repass();
 }
 
@@ -208,8 +301,9 @@ pub(crate) fn key_pick(n: &mut Net, ui: &mut Ui, d: u32) {
     ui.repass();
 }
 
-// the rows of device `d`'s ports, checked against the free ports of device `other`
-fn rows(p: &Project, d: u32, other: u32) -> Vec<Row> {
+/// the rows of device `d`'s ports, checked against the free ports of device `other`; a kind
+/// (None: the right one for each pair) shows only the ports it plugs into
+pub(crate) fn rows(p: &Project, d: u32, other: u32, kind: Option<CableKind>) -> Vec<Row> {
     let free: Vec<PortSpec> = p.free_ports(other);
     let other_name = p.device(other).map_or_else(String::new, |x| x.name.clone());
     let mut medias: Vec<&'static str> = Vec::new();
@@ -220,12 +314,13 @@ fn rows(p: &Project, d: u32, other: u32) -> Vec<Row> {
     }
     p.ports(d)
         .into_iter()
+        .filter(|(spec, _)| kind.is_none_or(|k| cable::accepts(k, spec.media)))
         .map(|(spec, link)| {
             let peer = link.and_then(|l| p.link(l)).map(|l| {
                 let (od, op) = if l.a.dev == d && ifname::same(&l.a.port, &spec.name) { (l.b.dev, &l.b.port) } else { (l.a.dev, &l.a.port) };
                 format!("{} {}", p.device(od).map_or("?", |x| x.name.as_str()), ifname::short(op))
             });
-            let why = if peer.is_some() || free.iter().any(|f| cable::cable_kind(&spec, f).is_ok()) {
+            let why = if peer.is_some() || free.iter().any(|f| pair_fits(&spec, f, kind)) {
                 None
             } else if free.is_empty() {
                 Some(tf("{} hat keinen freien Port", &[&other_name]))
@@ -248,17 +343,21 @@ impl Choice {
         Some((&a.spec, &b.spec))
     }
 
-    /// the cable kinds that fit the chosen pair (the right one first)
+    /// the right kind for the chosen pair ("Automatisch")
+    fn right(&self) -> Option<CableKind> {
+        let (a, b) = self.pair()?;
+        cable::cable_kind(a, b).ok()
+    }
+
+    /// the kinds the list offers for the chosen pair
     fn kinds(&self) -> Vec<CableKind> {
-        let Some((a, b)) = self.pair() else { return Vec::new() };
-        let Ok(right) = cable::cable_kind(a, b) else { return Vec::new() };
-        let mut v = alloc::vec![right];
-        for &k in CableKind::ALL {
-            if k != right && cable::cable_fits(k, a, b).is_ok() {
-                v.push(k);
-            }
-        }
-        v
+        self.pair().map_or_else(Vec::new, |(a, b)| offered(a, b, self.cable))
+    }
+
+    /// the kind to connect with: the one held when it fits the pair
+    fn cable_now(&self) -> Option<CableKind> {
+        let (a, b) = self.pair()?;
+        self.cable.filter(|&k| cable::cable_fits(k, a, b).is_ok())
     }
 
     /// side `s` chose row `i`: when the other side's port does not fit it, the best partner
@@ -266,14 +365,14 @@ impl Choice {
         self.sel[s] = i;
         let o = 1 - s;
         let fits = match (self.rows[s].get(i as usize), self.rows[o].get(self.sel[o] as usize)) {
-            (Some(x), Some(y)) => y.usable() && cable::cable_kind(&x.spec, &y.spec).is_ok(),
+            (Some(x), Some(y)) => y.usable() && pair_fits(&x.spec, &y.spec, self.only),
             _ => false,
         };
         if fits {
             return;
         }
         let Some(x) = self.rows[s].get(i as usize).map(|r| r.spec.index) else { return };
-        let pair = if s == 0 { best(p, self.dev[0], Some(x), self.dev[1], None) } else { best(p, self.dev[0], None, self.dev[1], Some(x)).map(|(a, b)| (b, a)) };
+        let pair = if s == 0 { best(p, self.dev[0], Some(x), self.dev[1], None, self.only) } else { best(p, self.dev[0], None, self.dev[1], Some(x), self.only).map(|(a, b)| (b, a)) };
         if let Some((_, y)) = pair {
             self.sel[o] = self.rows[o].iter().position(|r| r.spec.index == y).map_or(-1, |k| k as i32);
         }
@@ -290,6 +389,9 @@ pub(crate) fn connect(n: &mut Net, ui: &mut Ui, a: u32, x: u16, b: u32, y: u16, 
         Ok((id, e)) => {
             n.doc.record(e);
             n.canvas.select_only(id);
+            if is_refusal(n) {
+                n.file.msg = None;
+            }
             ui.repass();
             Some(id)
         }
@@ -304,7 +406,7 @@ pub(crate) fn connect(n: &mut Net, ui: &mut Ui, a: u32, x: u16, b: u32, y: u16, 
 /// the target's outline while a cable is drawn (after ui.diagram, inside its clip)
 pub(crate) fn overlay(n: &Net, ui: &mut Ui) {
     // end A chosen with Enter: an accent ring until end B
-    if let Some(rect) = n.canvas.kb_from.filter(|_| n.canvas.tool == super::tools::Tool::Connect).and_then(|d| n.canvas.scene.rect(d as u64)) {
+    if let Some(rect) = n.canvas.kb_from.filter(|_| matches!(n.canvas.tool, Tool::Connect(_))).and_then(|d| n.canvas.scene.rect(d as u64)) {
         let vp = n.canvas.st.vp;
         let q = vp.rect_to_screen(rect);
         let (pad, t, rad) = (ui.dp(5), ui.dp(2), ui.dp(5));
@@ -314,7 +416,7 @@ pub(crate) fn overlay(n: &Net, ui: &mut Ui) {
         ui.cmd_rrect(q[0] as i32 - pad, q[1] as i32 - pad, q[2] as i32 + pad * 2, q[3] as i32 + pad * 2, rad, t, 0, col, col);
         ui.clip_pop();
     }
-    let Some(c) = n.canvas.conn else { return };
+    let Some(c) = n.canvas.conn.as_ref() else { return };
     if c.over == 0 {
         return;
     }
@@ -334,9 +436,9 @@ pub(crate) fn overlay(n: &Net, ui: &mut Ui) {
 /// the tooltip of the target that does not fit (right after ui.diagram: the canvas is the last
 /// widget) -> shown
 pub(crate) fn tooltip(c: &super::Canvas, ui: &mut Ui) -> bool {
-    match c.conn {
+    match c.conn.as_ref() {
         Some(c) if c.over != 0 && !c.fits => {
-            ui.tooltip_part(t("Kein passender Port"), c.over);
+            ui.tooltip_part(c.why.as_deref().unwrap_or(t("Kein passender Port")), c.over);
             true
         }
         _ => false,
@@ -454,28 +556,35 @@ pub(crate) fn popover(n: &mut Net, ui: &mut Ui) {
                 }
             }
             ui.box_end();
-            // the cable: Automatisch (the right one for the pair) or a kind that fits
+            // the cable: Automatisch (the right one for the pair) or a kind that fits; the list
+            // holds the kind, not its place: another pair may offer other kinds
             let Some(c) = n.canvas.choice.as_mut() else {
                 ui.box_end();
                 ui.flyout_end();
                 return;
             };
             let kinds = c.kinds();
-            if c.cable as usize > kinds.len() {
-                c.cable = 0;
-            }
+            let right = c.right();
             let mut items: Vec<String> = Vec::new();
-            match kinds.first() {
+            match right {
                 Some(k) => items.push(tf("Automatisch: {}", &[t(k.title())])),
                 None => items.push(String::from(t("Automatisch"))),
             }
             items.extend(kinds.iter().map(|k| String::from(t(k.title()))));
             let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
+            let now = c.cable_now();
+            let mut sel = now.and_then(|k| kinds.iter().position(|&x| x == k)).map_or(0, |i| i as i32 + 1);
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
             ui.text(TS_BODY | TX_SECONDARY, t("Kabel"));
             ui.next_size(260, 0);
-            ui.next_flags(if kinds.is_empty() { ST_DISABLED } else { 0 });
-            ui.combobox(ID_CONN_CABLE, &mut c.cable, &refs);
+            ui.next_flags(if right.is_none() { ST_DISABLED } else { 0 });
+            if ui.combobox(ID_CONN_CABLE, &mut sel, &refs) & EV_ACT != 0 {
+                c.cable = if sel > 0 { kinds.get(sel as usize - 1).copied() } else { None };
+                ui.repass();
+            }
+            if let Some(k) = now.or(right) {
+                ui.tooltip(&crate::app::tr::msg(&cable::limits_msg(k, jfn_model::CableGrade::Unset)));
+            }
             ui.spacer(-1);
             let ok = c.pair().is_some();
             if ui.button(ID_CONN_CANCEL, t("Abbrechen")) & EV_ACT != 0 {
@@ -500,9 +609,7 @@ pub(crate) fn popover(n: &mut Net, ui: &mut Ui) {
         1 => {
             let pick = n.canvas.choice.as_ref().and_then(|c| {
                 let (a, b) = c.pair()?;
-                let kinds = c.kinds();
-                let cable = if c.cable > 0 { kinds.get(c.cable as usize - 1).copied() } else { None };
-                Some((c.dev, a.index, b.index, cable))
+                Some((c.dev, a.index, b.index, c.cable_now()))
             });
             ui.popup_close();
             n.canvas.choice = None;

@@ -1,0 +1,28 @@
+#!args --verify-dirty --start-page --autosave-dir build/jfn_start_autosave
+# the recovery offer on the start page (after start_page_crash.uis and start_page_later.uis): the bar
+# stands above the page and has the keyboard; Wiederherstellen takes the page down with the project
+# back, unsaved; Verwerfen on the way back to the page leaves nothing for a next start.  Id: 41508
+# Wiederherstellen (0xA224).
+shot build/jfn_start_autosave/page.png
+theme light
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" exists
+expect button:"Wiederherstellen" exists
+expect button:"Verwerfen" exists
+expect button:"Später" exists
+expect button:"Leeres Projekt" exists
+expect tab:"Geräte" missing
+expect #41508 focused
+shot build/jfnetworker/start_page_recover.png
+click button:"Wiederherstellen"
+expect button:"Leeres Projekt" missing
+expect tab:"Geräte" exists
+expect "„two_pcs.jfnet“ wiederhergestellt" exists
+expect text:"2 Geräte · 1 Kabel" exists
+expect text:"geändert" exists
+# it ends clean: back to the page with Verwerfen, nothing stays for a next start
+cmd 1000
+expect dialog:"Änderungen speichern?" exists
+click button:"Verwerfen"
+expect button:"Leeres Projekt" exists
+expect "Ungespeicherte Änderungen" missing
+expect_nowarn

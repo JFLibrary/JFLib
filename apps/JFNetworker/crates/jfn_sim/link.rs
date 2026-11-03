@@ -338,7 +338,7 @@ impl Engine {
         let t_rx = end + l.delay_ns + over.delay + jitter;
         let (from, to) = (l.ends[d as usize], l.ends[1 - d as usize]);
         let id = l.id;
-        let serial = l.cable == CableKind::Serial;
+        let serial = l.cable.is_serial();
         let dev_of = |e: &Engine, n: usize| match e.nodes.get(n) {
             Some(Some(node)) => node.dev,
             _ => 0,
@@ -357,7 +357,7 @@ impl Engine {
             link: id,
             from: (fd, from.1),
             to: (td, to.1),
-            mask: if serial && frame.len() > 4 { decode::ip_mask(&frame[4..]) } else { decode::proto_mask(&frame) },
+            mask: if self.trace.is_quiet() { 0 } else if serial && frame.len() > 4 { decode::ip_mask(&frame[4..]) } else { decode::proto_mask(&frame) },
             drop: if lost { Some(crate::trace::HopDrop::Loss) } else { None },
             bytes: frame.clone(),
             cause,
@@ -399,7 +399,7 @@ impl Engine {
             return;
         };
         let assoc = crate::wlan::is_assoc_id(l.id);
-        let serial = l.cable == CableKind::Serial;
+        let serial = l.cable.is_serial();
         let (ni, pi) = l.ends[1 - d as usize];
         if l.epoch != epoch || !up {
             self.trace.mark_lost(hop);

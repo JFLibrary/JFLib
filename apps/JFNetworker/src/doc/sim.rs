@@ -3,13 +3,19 @@
 // and the engine's reports arrive
 //
 //   Sim::new(&project)            an engine for the project (Engine::from_project; when the
-//                                 engine refuses a part it runs without it, `errors` says why)
+//                                 engine refuses a part it runs without it, `errors` says why);
+//                                 the faults its lab starts with go in as inputs (AK2), so the
+//                                 recording replays them
+//   again(&project, &born)        Simulation zurücksetzen: the same, but a start fault of a cable
+//                                 only where the cable is one of `born`, the project's when it
+//                                 loaded (a cable the learner put in since is not pulled again)
 //   start()                       realtime from now on the task clock (a script run's virtual
 //                                 clock: tests repeat exactly)
 //   sync(&project)                the engine follows the project: what differs from what it
 //                                 was told becomes Actions -- devices come and go (a removed one
 //                                 keeps its running configuration for an undo), names, power;
-//                                 cables come and go, kind, plug, speed, delay, jitter, loss; a
+//                                 cables come and go, kind, category, plug, speed, delay, jitter,
+//                                 loss; the project's "Auto-MDI-X aus" (Action::StrictMdix); a
 //                                 device whose model, configuration or services changed starts
 //                                 again with them (keeping the project's name whatever its
 //                                 configuration's "hostname" says)
@@ -36,6 +42,8 @@
 //                                 its files too (Action::Files, before the services: a script
 //                                 that starts from a file reads it; also in sync: files never
 //                                 restart a device)
+//   sync                          a service's new config goes in without a restart where it can
+//                                 (live_steps, Service::reconfigure); else the device restarts
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
@@ -50,6 +58,10 @@
 // (jfn_model::phys::length: by hand or from the places; Action::CableLen, and Connect carries it
 // in Link::len_m), the delay that follows from it (phys::delay_ns; Action::Impair) and the
 // optics of the devices' cages (Action::Optic, no restart).
+//
+// The hardware (SA1, jfn_sim's res.rs): sync tells the engine "Hardware simulieren" of the project
+// (Action::Metered, no restart) and a device's own figures (Action::Resize: a reboot of
+// res::RESIZE_DOWN, or what hw_down says for the next change: 0 is live).
 //
 // Doc calls sync after every change of the project (edits, undo, redo), so undo and redo send
 // the opposite actions and project and engine never part.  Everything runs on the UI thread
@@ -113,11 +125,13 @@ struct MDev {
     files: Vec<jfn_model::files::File>,
     /// the optics in its cages (no restart)
     optics: BTreeMap<String, jfn_model::Optic>,
+    /// its own hardware (Action::Resize)
+    hw: Option<jfn_model::catalog::Hw>,
 }
 
 impl MDev {
     fn of(d: &Device) -> MDev {
-        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y), files: d.files.clone(), optics: d.optics.clone() }
+        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y), files: d.files.clone(), optics: d.optics.clone(), hw: d.hw.clone() }
     }
 
     /// the device must start again: another model, configuration or services
@@ -139,12 +153,14 @@ struct MLink {
     down: bool,
     /// the length the project resolves (by hand or from the places; phys.rs)
     len_m: u32,
+    /// its category (phys.rs)
+    grade: jfn_model::CableGrade,
 }
 
 impl MLink {
     /// a link as the engine runs it: its resolved length and the delay that follows (phys.rs)
     fn of(l: &Link, len_m: u32, delay_ns: u64) -> MLink {
-        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down, len_m }
+        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down, len_m, grade: l.grade }
     }
 }
 
@@ -155,6 +171,8 @@ struct Told {
     links: BTreeMap<u32, MLink>,
     stash: BTreeMap<u32, String>,
     scale: u32,
+    strict: bool,
+    metered: bool,
 }
 
 /// a snapshot of an engine for the canvas and the inspector
@@ -202,6 +220,29 @@ struct Past {
     gone: bool,
     /// the present's snapshot while the past one is shown
     live: Option<Shot>,
+}
+
+/// the actions that give a running device's services their new settings without a restart
+/// (Service::reconfigure), None when one of them cannot: the same services, some of them with another
+/// config or switched; `can` asks the engine for a service's new config
+pub(crate) fn live_steps(dev: u32, old: &[ServiceDef], new: &[ServiceDef], can: &dyn Fn(&ServiceDef) -> bool) -> Option<Vec<Action>> {
+    if old.len() != new.len() {
+        return None;
+    }
+    let mut acts = Vec::new();
+    for b in new {
+        let a = old.iter().find(|a| a.name == b.name && a.kind == b.kind)?;
+        if a.config != b.config {
+            if !can(b) {
+                return None;
+            }
+            acts.push(Action::ServiceConfig { dev, svc: b.name.clone(), config: b.config.clone() });
+        }
+        if a.disabled != b.disabled {
+            acts.push(Action::ServiceRun { dev, name: b.name.clone(), on: !b.disabled });
+        }
+    }
+    Some(acts)
 }
 
 /// a project's link with the length and delay its places give it (what Action::Connect takes)
@@ -315,6 +356,12 @@ pub(crate) struct Sim {
     dirty: bool,
     /// the task clock at the last snapshot (µs)
     shot_at: u64,
+    /// "Auto-MDI-X aus" as the engine was told (Project::strict_mdix)
+    strict: bool,
+    /// "Hardware simulieren" as the engine was told (Project::metered)
+    metered: bool,
+    /// the downtime of the next change of a device's hardware (0: live); then RESIZE_DOWN again
+    pub hw_down: Ns,
     /// the scale the engine was told (Project::dip_per_m)
     scale: u32,
     /// the WLAN associations of the last snapshot, a key that changes with them
@@ -329,11 +376,22 @@ pub(crate) struct Sim {
 impl Sim {
     /// an engine for the project, paused until start()
     pub(crate) fn new(p: &Project) -> Sim {
+        Sim::build(p, None)
+    }
+
+    /// Simulation zurücksetzen: the same; the faults the lab starts with come back, on the cables of
+    /// `born` only
+    pub(crate) fn again(p: &Project, born: &[u32]) -> Sim {
+        Sim::build(p, Some(born))
+    }
+
+    fn build(p: &Project, born: Option<&[u32]>) -> Sim {
         let (eng, whole) = match Engine::from_project(p) {
             Ok(e) => (e, true),
             Err(_) => {
                 let mut e = Engine::new(p.seed);
                 e.strict_mdix = p.strict_mdix;
+                e.metered = p.metered;
                 (e, false)
             }
         };
@@ -355,6 +413,9 @@ impl Sim {
             soon: true,
             dirty: false,
             shot_at: 0,
+            strict: p.strict_mdix,
+            metered: p.metered,
+            hw_down: jfn_sim::res::RESIZE_DOWN,
             scale: if whole { p.dip_per_m } else { 0 },
             wlan: Rc::new(Vec::new()),
             wlan_key: 0,
@@ -377,6 +438,16 @@ impl Sim {
         }
         // keyframes and inputs from here on (K1)
         s.drv.rewind_on(Budget::default());
+        // the faults the lab starts with (AK2); what cannot be resolved is the lab's issue (Lab::issues)
+        for a in jfn_sim::runner::start_actions(p, &s.drv.eng).0 {
+            let fresh = match &a {
+                Action::Fault { fault: jfn_sim::Fault::Unplug { link } | jfn_sim::Fault::Impair { link, .. }, .. } => born.is_some_and(|b| !b.contains(link)),
+                _ => false,
+            };
+            if !fresh {
+                let _ = s.drv.send(Cmd::Apply(a), plat::task::now_us());
+            }
+        }
         s.note_told();
         s.snapshot();
         s
@@ -430,6 +501,23 @@ impl Sim {
     pub(crate) fn sync(&mut self, p: &Project) {
         self.catch_up();
         let before = self.topo;
+        // "Hardware simulieren" (first: a new device takes it)
+        if self.metered != p.metered && self.act(Action::Metered { on: p.metered }).is_ok() {
+            self.metered = p.metered;
+        }
+        // a service's new settings, if it can take them while it runs (Service::reconfigure)
+        let changed: Vec<u32> = self.devs.iter().filter(|(id, m)| p.device(**id).is_some_and(|d| m.services != d.services && m.model == d.model && m.startup == d.startup_config)).map(|(id, _)| *id).collect();
+        for id in changed {
+            let (Some(d), Some(m)) = (p.device(id), self.devs.get(&id)) else { continue };
+            let eng = &self.drv.eng;
+            let Some(steps) = live_steps(id, &m.services, &d.services, &|b: &ServiceDef| eng.can_reconfigure(id, &b.name, &b.config)) else { continue };
+            for a in steps {
+                let _ = self.act(a);
+            }
+            if let Some(m) = self.devs.get_mut(&id) {
+                m.services = d.services.clone();
+            }
+        }
         // devices that are gone, or start again with another model, configuration or services
         let out: Vec<(u32, bool)> = self
             .devs
@@ -479,6 +567,10 @@ impl Sim {
             if m.files != d.files && self.act(Action::Files { dev: d.id, files: d.files.clone() }).is_ok() {
                 now.files = d.files.clone();
             }
+            // its own hardware (res.rs: a reboot unless hw_down says otherwise)
+            if m.hw != d.hw && self.act(Action::Resize { dev: d.id, hw: d.hw.clone(), downtime: self.hw_down }).is_ok() {
+                now.hw = d.hw.clone();
+            }
             // the optics in its cages (phys.rs, no restart)
             if m.optics != d.optics {
                 let ports: alloc::collections::BTreeSet<String> = m.optics.keys().chain(d.optics.keys()).cloned().collect();
@@ -492,9 +584,14 @@ impl Sim {
             }
             self.devs.insert(d.id, now);
         }
+        self.hw_down = jfn_sim::res::RESIZE_DOWN;
         // the scale of the canvas (the ranges of the radios)
         if self.scale != p.dip_per_m && self.act(Action::Scale { dip_per_m: p.dip_per_m }).is_ok() {
             self.scale = p.dip_per_m;
+        }
+        // "Auto-MDI-X aus"
+        if self.strict != p.strict_mdix && self.act(Action::StrictMdix { on: p.strict_mdix }).is_ok() {
+            self.strict = p.strict_mdix;
         }
         // new links; kind, plug and quality; the lengths and delays of the places (phys.rs)
         let tree = jfn_model::Tree::of(p);
@@ -535,6 +632,9 @@ impl Sim {
             }
             if m.len_m != len && self.act(Action::CableLen { link: l.id, len_m: len }).is_ok() {
                 now.len_m = len;
+            }
+            if m.grade != l.grade && self.act(Action::CableGrade { link: l.id, grade: l.grade }).is_ok() {
+                now.grade = l.grade;
             }
             self.links.insert(l.id, now);
         }
@@ -939,6 +1039,8 @@ impl Sim {
             self.links = t.links.clone();
             self.stash = t.stash.clone();
             self.scale = t.scale;
+            self.strict = t.strict;
+            self.metered = t.metered;
         }
         self.reports.clear();
         self.rates.clear();
@@ -1013,7 +1115,7 @@ impl Sim {
 
     // what the engine was told, when it changed (resume goes back to it)
     fn note_told(&mut self) {
-        if self.told.last().is_some_and(|(_, t)| t.devs == self.devs && t.links == self.links && t.stash == self.stash && t.scale == self.scale) {
+        if self.told.last().is_some_and(|(_, t)| t.devs == self.devs && t.links == self.links && t.stash == self.stash && t.scale == self.scale && t.strict == self.strict) {
             return;
         }
         let k = self.drv.pos().inputs;
@@ -1022,6 +1124,6 @@ impl Sim {
         if let Some(i) = self.told.iter().rposition(|(n, _)| *n <= first) {
             self.told.drain(..i);
         }
-        self.told.push((k, Rc::new(Told { devs: self.devs.clone(), links: self.links.clone(), stash: self.stash.clone(), scale: self.scale })));
+        self.told.push((k, Rc::new(Told { devs: self.devs.clone(), links: self.links.clone(), stash: self.stash.clone(), scale: self.scale, strict: self.strict, metered: self.metered })));
     }
 }

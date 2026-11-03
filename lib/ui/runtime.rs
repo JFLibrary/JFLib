@@ -421,7 +421,8 @@ impl Ui {
     // ------------------------------------------------------------------ queries
 
     /// ui_fb: the live window's framebuffer.  While its frames go through the GPU a big image may be
-    /// drawn only there: Ui::gpu_settle() first when the pixels matter
+    /// drawn only there, the view of a canvas while it moves (canvas.rs) too: Ui::gpu_settle() first
+    /// when the pixels matter
     pub fn fb(&self) -> &Surface {
         &self.wp.rt.fb
     }

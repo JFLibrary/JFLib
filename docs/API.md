@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
-  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs)
+  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
@@ -159,9 +159,9 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
-- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
+- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
@@ -174,7 +174,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
-- [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`
+- [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
@@ -226,13 +226,19 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
 
 - **`const NONE: AppDesc = AppDesc { title: "", flags: 0, w: 0, h: 0, min_w: 0, min_ ...`**
   every field empty / zero
+- **`fn translated(&self) -> AppDesc`**
+  a copy in the UI language (after i18n::set_catalog): the title, the command table's and
+  the menu bar's labels
 
 - **`trait App`**
   the app's callbacks (APP_DESC on_init, on_frame, on_command)
   - `fn actions(&self) -> &'static [agent_core::ActionSpec]`
     Optional domain actions, in addition to the universal UI action catalogue.
   - `fn action_revision(&self) -> Option<u64>`
-    Domain revision; None uses the UI runtime's monotonically increasing frame revision.
+    Domain revision. None uses the UI runtime's own: it moves with the controls (their set,
+    labels, values and states, the focus, an open modal dialog, the title, enabled commands)
+    and with every agent call that changes something, not with frames or the pointer, and it
+    knows nothing of a change the user makes to the app's data.
   - `fn action_available(&self, _spec: &agent_core::ActionSpec) -> Result<(), agent_core::ActionError>`
     Dynamic domain constraints such as read-only files or an absent selection.
   - `fn action(&mut self, _ui: &mut Ui, _spec: &agent_core::ActionSpec, _input: &agent_core::Value, _context: &agent_core::ActionContext) -> Result<agent_core::ActionResult, agent_core::ActionError>`
@@ -285,6 +291,22 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `image_uploads: u64`
   - `image_hits: u64`
   - `image_evicted: u64`
+  - `canvas_apart: u32` -- canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
+    in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
+    and the time that took (us), tiles evicted, gestures ended by the CPU's picture
+  - `canvas_quads: u32`
+  - `canvas_frames: u64`
+  - `canvas_tiles: u32`
+  - `canvas_bytes: u64`
+  - `canvas_fills: u64`
+  - `canvas_fill_us: u64`
+  - `canvas_evicted: u64`
+  - `canvas_settles: u64`
+  - `canvas_diff_frames: u64` -- jfgui_GPU_VERIFY: where the tiles' picture differed from the CPU's during a gesture: frames,
+    pixels, the sum of the largest channel difference per pixel, the largest one
+  - `canvas_diff_px: u64`
+  - `canvas_diff_sum: u64`
+  - `canvas_diff_max: u32`
   - `render_us: u64` -- time in the window's renders and presents (us)
   - `present_us: u64`
   - `switches: u32` -- switches to the swapchain, and back to the CPU path
@@ -371,7 +393,8 @@ event carries its window (Event::win).
 
 - **`fn fb(&self) -> &Surface`**
   ui_fb: the live window's framebuffer.  While its frames go through the GPU a big image may be
-  drawn only there: Ui::gpu_settle() first when the pixels matter
+  drawn only there, the view of a canvas while it moves (canvas.rs) too: Ui::gpu_settle() first
+  when the pixels matter
 - **`fn client_size(&self) -> (i32, i32)`**
   ui_client_size: client area in DIP
 - **`fn anim_off(&self) -> bool`**
@@ -603,6 +626,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn focus(&mut self, id: u32)`**
   ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
   looked up in whichever window emits it in the next pass (that window is activated).
+- **`fn focus_quiet(&mut self, id: u32)`**
+  the keyboard focus to a widget of this window without the focus ring: the keyboard goes
+  back to it after a pointer gesture (a ring only follows keyboard navigation)
 - **`fn focused(&self) -> u32`**
   ui_focused: id of the focused widget (0 = none)
 - **`fn key(&mut self, vk: u32) -> bool`**
@@ -768,6 +794,8 @@ basic -- the basic widgets                                           [src/ui/ui_
   tool_button(id, icon, label, &mut sel, mine) -> EV   selects sel = mine (tool palettes)
   checkbox(id, label, &mut v) -> EV      v: 0, 1, 2 = indeterminate
   radio(id, label, &mut v, mine) -> EV   v = mine when clicked
+  checkbox_wrap / radio_wrap             the same with a label that wraps (next_size(-1, 0)): a mark
+                                         beside a long text, a click on the text counts
   switch(id, label, &mut v) -> EV        toggle switch
   slider(id, &mut v, &range) -> EV       EV_ACT while the value changes, EV_COMMIT on release
   progress(id, v, max)                   progress bar
@@ -816,6 +844,13 @@ Label strings are copied, so they may live in scratch buffers.
 - **`fn checkbox(&mut self, id: u32, label: &str, v: &mut i32) -> u32`**
   ui_checkbox(id, label, &mut v) -> EV_\*: v 0, 1, 2 = indeterminate (Space toggles,
   Enter is the dialog's)
+- **`fn checkbox_wrap(&mut self, id: u32, label: &str, v: &mut i32) -> u32`**
+  ui_checkbox_wrap(id, label, &mut v) -> EV_\*: a check box for a text that may be long: the
+  mark, beside it the label wrapped at the width the layout gives (next_size(-1, 0)); a click
+  on the text toggles too; the record is the check box's, named by the text
+- **`fn radio_wrap(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32`**
+  ui_radio_wrap(id, label, &mut v, mine) -> EV_\*: a radio for a text that may be long, as
+  checkbox_wrap
 - **`fn radio(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32`**
   ui_radio(id, label, &mut v, mine) -> EV_\*: v = mine when clicked; the radios of one
   variable are one Tab stop, the arrows select inside (kbnav.rs)
@@ -2707,13 +2742,19 @@ Places: a side holds tab groups (left / right: one above the other, bottom: side
 with splitters between them and towards the document area; a collapsed side is a rail of
 icon buttons.  Left and right are the start and the end side: the layout is logical, so a
 mirrored (RTL) window shows the left side at the right like everything else.
-Dragging a tab (or the empty part of a tab strip: the whole group) shows drop markers at the
-three edges of the area (a new group on that side) and on the group under the pointer (as a
-tab, before, after it); a release over a tab strip inserts it there; anywhere else -- also
-outside the window -- the panel floats in a tool window at the pointer (WF_TOOL, window ids
-id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the same way onto the main
-window's markers (the pointer stays with the floating window); its pin button or a double
-click docks it where it came from, its close button hides its panels.  Esc cancels a drag.
+A press on a tab (or on the empty part of a tab strip: the whole group) can drag only after it
+was held for DOCK_HOLD_MS: then the tab shows it (DOCK_TAB_HOLD, the move cursor; a timer gives
+the pass while the pointer rests), and the drag starts when the pointer moves past the usual
+threshold from where it is at that moment.  Movement during the hold cancels nothing and never
+counts (a slip or a tremor starts nothing), a release without a drag is a click if it is over
+the tab.  Clicks, double clicks, the menu and the splitters need no hold.
+A drag shows drop markers at the three edges of the area (a new group on that side) and on the
+group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
+there; anywhere else -- also outside the window -- the panel floats in a tool window at the
+pointer (WF_TOOL, window ids id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the
+same way onto the main window's markers (the pointer stays with the floating window); its pin
+button or a double click docks it where it came from, its close button hides its panels.  Esc
+cancels a hold and a drag (the release is no click then).
 Keyboard: the tab strip of a group is one focus stop (Left / Right / Home / End switch tabs,
 the menu key or Shift+F10 open the group's menu with every move), Ctrl+PgDn / Ctrl+PgUp switch
 tabs while the focus is anywhere in the group, DockState::focus(id) brings a panel forward
@@ -2746,6 +2787,13 @@ DOCK_MK_RIGHT: i32 = 1
 DOCK_MK_TOP: i32 = 2
 DOCK_MK_BOTTOM: i32 = 3
 DOCK_MK_CENTER: i32 = 4
+/// a press on a tab or on the empty part of a tab strip can drag only after this many ms with
+/// the button down, so that a slip of the hand during a click neither moves nor floats a panel;
+/// clicks, double clicks (they float), the menu and the splitters need no hold
+DOCK_HOLD_MS: u32 = 300
+/// StyleShell::dock_tab, sp.flags: the press was held long enough, the tab can be moved now (a
+/// press on the strip's empty part: every tab of the group, they would all move)
+DOCK_TAB_HOLD: u32 = 1
 ```
 
 - **`struct DockPanel<'a>`**
@@ -3231,11 +3279,17 @@ i18n -- languages, translation catalogues, regional formats and messages
                                       the current language (the source when missing)
   month_name(m) / month_short(m) / weekday_short(d)   calendar names of the UI language
                                       (m 1..12, d 0 = Mon)
+  Catalog::with_library_languages()   also offer the languages of the library's own texts;
+                                      the app's texts show their English column in them
   set_catalog(catalog) / t(s)         the app's catalogue for the whole process: t(s) is the
-                                      text in the current language (German source when
-                                      missing).  Unless set_language came first, the column
-                                      is negotiated with the user's languages
+                                      text in the current language (the library's text, then
+                                      the English column, then the German source when the
+                                      cell is missing).  Unless set_language came first, the
+                                      column is negotiated with the user's languages
+  commands(table) / menu(table)       a static command table or menu in the current language
+                                      (a copy made once per table and language)
   fill(text, args)                    "{}" placeholders replaced in order
+  tf(s, args) / list(&TABLE)          t with its "{}" filled; a table of texts through t
   msg(text, args)                     named / numbered placeholders, plurals, select,
                                       numbers and dates in the user's format (i18n_msg.rs)
   locale(), Locale, fmt_*, plural     regional formats and plural rules (i18n_locale.rs)
@@ -3311,6 +3365,11 @@ LANG_EN: u32 = 1
 - **`fn from_tsv(text: &'static str) -> Catalog`**
   parse a TSV catalogue (first line: the language codes); "\\n" and "\\t" escapes in the
   cells are not interpreted
+- **`fn with_library_languages(mut self) -> Catalog`**
+  also offer the languages of the library's own texts (library_languages): there the
+  library's texts follow the user and Arabic and Hebrew mirror the window, while the app's
+  own texts show their English column.  The browser bundle has no font for Arabic and
+  Hebrew: there they stay out, the user gets English instead of empty boxes
 - **`fn languages(&self) -> &[String]`**
   the language codes of the columns ("de", "en", ...)
 - **`fn tr<'a>(&'a self, s: &'a str) -> &'a str`**
@@ -3325,7 +3384,19 @@ LANG_EN: u32 = 1
 
 - **`fn t(s: &'static str) -> &'static str`**
   the app's text in the current language: the installed catalogue, then the library's own
-  texts, then the German source
+  texts, then the catalogue's English column, then the German source
+
+- **`fn commands(src: &'static [Command]) -> &'static [Command]`**
+  a command table (static, German) in the current language, made once per table and language
+
+- **`fn menu(src: &'static [Mi]) -> &'static [Mi]`**
+  a menu (static, German) in the current language, made once per menu and language
+
+- **`fn tf(s: &'static str, args: &[&str]) -> String`**
+  the app's text in the current language with its "{}" placeholders filled in order
+
+- **`fn list(items: &[&'static str]) -> Vec<&'static str>`**
+  a table of the app's texts in the current language (combo boxes, tabs)
 
 - **`fn fill(text: &str, args: &[&str]) -> String`**
   replace the "{}" placeholders of a text in order
@@ -3673,7 +3744,7 @@ caption buttons, the chrome of secondary windows, edge grips       [src/ui/ui_ch
   edge_grips()   resize handles for frameless windows on Linux (the runtime calls it;
        also for resizable secondary windows with the library frame); the caption buttons
        win over them where they are
-  titlebar_begin(title, icon) / titlebar_end()
+  titlebar_begin(title, icon) / titlebar_end() / titlebar_open()
        custom title bar row (style: SM_TB_H, SM_TB_H_LARGE with next_flags(ST_LARGE)):
        icon + title, then the caller's widgets; empty parts are an HB_DRAG region, the end
        adds the caption buttons (HB_MIN / HB_MAX / HB_CLOSE; with SM_CAP_LEFT the begin puts
@@ -3721,6 +3792,11 @@ close +3); status bar 0xFFFF7410, 0xFFFF7411; edge grips 0xFFFF7430..
 - **`fn titlebar_end(&mut self)`**
   ui_titlebar_end: caption buttons at the right end (unless the style puts them at the
   left: SM_CAP_LEFT)
+- **`fn titlebar_open(&self) -> Option<([i32; 4], bool)>`**
+  The title bar being built, between `titlebar_begin` and `titlebar_end` (None elsewhere
+  and on an overlay, which paints no bar): its rectangle (px) and whether the window is
+  active.  For a style whose bar has the same colours in every theme (classic): a widget
+  drawn right on it cannot use the theme's T_TEXT.
 
 ### File dialog
 
@@ -3891,7 +3967,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   style NAME                    another style linked into the app (Ui::set_style)
   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
   rclick S        dblclick S [shift|ctrl|alt]...
-                  drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
+                  drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
+                  drag ... hold MS   the button rests MS ms before the first move (like
+                  `wait`: timers and animations run), the hold a dock tab asks for (its drag
+                  counts from where the pointer is then, so the moves must leave that place)
                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
                   following pointer events (touch: they are a finger, as in the next lines)
@@ -4016,7 +4095,8 @@ Windows (ID = the app's window id, 0 / main = the main window):
 Permissions and agent control (auto_perm.rs):
   perm answer once|always|deny|never|dialog|none   perm timeout MS   perm store FILE|none
   perm reload   perm wait [MS]   perm reset   perm expect open|none|RULE ANSWER
-  agent on|off   agent call ACTION [JSON]   agent expect ok|error CODE
+  agent on|off   agent call|write ACTION [JSON]   agent keep   agent id S
+  agent expect ok|error CODE|same|moved
 The live inspector (inspect.rs):
   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look
@@ -4410,7 +4490,9 @@ there before the rectangles are drawn.
 
 While a window's frames go through the GPU (gpu_out.rs, W::split) the pass also keeps the hash
 of every cell after each layer (W::through: what changed in which layer) and notes the big
-images of the base layer and which cells they end up on top of (W::top, W::imgs).
+images of the base layer and which cells they end up on top of (W::top, W::imgs).  A canvas whose
+view comes from tiles (canvas.rs, W::canv) is noted the same way; its hash stands only for where
+it lies: what it shows there is the GPU's.
 ```
 
 **`impl Ui`**
@@ -4580,7 +4662,8 @@ the widget families are being ported; a finished style overrides every function.
     the tab strip of a dock group (rect = the strip, SM_DOCK_HDR high), value as dock_group
   - `fn dock_tab_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32)`
     a tab of a dock group: label, icon, ev, value 1 = the shown panel, value2 1 = the focus
-    is in the group; size -> (w, h), the core takes w (a tab is as high as the strip)
+    is in the group, flags DOCK_TAB_HOLD = held long enough to be dragged (show it through
+    the tokens); size -> (w, h), the core takes w (a tab is as high as the strip)
   - `fn dock_tab(&self, ui: &mut Ui, sp: &Sp)`
   - `fn dock_rail(&self, ui: &mut Ui, sp: &Sp)`
     the rail of a collapsed dock side (rect), flags DOCK_LEFT / DOCK_RIGHT / DOCK_BOTTOM
@@ -6407,7 +6490,9 @@ frame) or in its top right corner: a click there reports DEv::Toggle (no selecti
 DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
 frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
 its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
-DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
+DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).  A DN_HITMIN node
+(a line of text) is hit in a box of at least 16 x 16 DIP around it, so it stays selectable at
+low zoom.
 
 Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 ports at a position relative to their node's top left corner, edges from key a to key b
@@ -6424,7 +6509,9 @@ under the pointer, the topmost node (a DN_TOGGLE node's button first), the neare
 (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
-(Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
+(Shift: sideways), Ctrl + wheel zooms at the pointer.  A double click on the background with
+DG_SELECT (no Shift, no Ctrl) reports DEv::DoubleClick at the second press; a press that became
+a drag (a marquee) or a key between the clicks makes none.  Keys while the canvas has the focus:
 arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
 a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
 the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
@@ -6439,7 +6526,9 @@ every dirty rectangle copies its part out of it.  Skip what lies outside DgFrame
 wheel turns until MOVING_MS after the last one, a drag of nodes or a waypoint)
 DgFrame::moving asks for less detail; a full paint follows the gesture.  Content that moves
 every frame (packets) is best drawn after diagram() with ui.draw_* inside
-ui.clip_push(st.vp.rect).
+ui.clip_push(st.vp.rect).  With a GPU a pan or a wheel zoom comes from tiles of the full paint
+(canvas.rs, DiagramState::gpu, "diagram"; the first ones are copied from the backing store), no
+less detail then; the CPU paints what lies under overlays and, a moment after it ends, the view.
 ```
 
 ```rust
@@ -6460,6 +6549,7 @@ DN_TOGGLE: u32 = 8  // a collapse button (DEv::Toggle), see dg_toggle_rect
 DN_STEP: u32 = 16  // moves by whole grid steps (its corner keeps its offset to the grid)
 DN_RESIZE: u32 = 32  // selected: a handle at the bottom right corner resizes it
 DN_OUTLINE: u32 = 64  // an outline in the overview (DN_FRAME nodes are always)
+DN_HITMIN: u32 = 128  // hit in a box of at least 16 x 16 DIP around it (a small text)
 /// port flags (DPort::flags)
 DPT_HIDDEN: u32 = 1  // neither shown nor hit
 DPT_USED: u32 = 2  // shown filled (connected)
@@ -6557,6 +6647,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `Context(DHit, [i32; 2])` -- right click, Shift+F10 or the menu key: at = window px (logical, for popups)
   - `Delete` -- Del with a selection: delete st.sel
   - `Click { at: [f32; 2] }` -- a click on the background, or anywhere with DG_PLACE (snapped then); world units
+  - `DoubleClick { at: [f32; 2] }` -- a double click on the background with DG_SELECT (no Shift, no Ctrl): the world point of
+    the second press, not snapped; neither a Click nor a marquee follows it
   - `ViewChanged` -- zoom or centre changed
   - `Toggle(u64)` -- a click on the collapse button of a DN_TOGGLE node
   - `Resize { key: u64, rect: [f32; 4], done: bool }` -- the resize handle of a DN_RESIZE node was dragged: its new box x, y, w, h (world, the
@@ -6627,6 +6719,7 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `name: String` -- the canvas' name for screen readers (its K_CANVAS record; empty: none)
   - `frame_bar: f32` -- the height of a DN_FRAME node's title bar in world units (its hit area, its record, the
     side of its DN_TOGGLE button)
+  - `gpu: CanvasGpu` -- how the view's pan and zoom use the GPU (canvas.rs)
 
 **`impl DiagramState`**
 
@@ -7169,6 +7262,9 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
        (st.set_markdown / set_html / set_doc)
+  ui.markdown_fit(&mut MdViewState, text, w_px, MV_*) -> DIP     how high a view w_px wide must be to
+       show the whole text without scrolling: for a short text among other widgets (a question
+       in a form); every block is laid out now; give next_size(-1, h) to markdown_view
   MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
        activated); link: the activated link's target (a click on it, Enter on the focused
        one); hover: the target of the link under the pointer; field: a form field the user
@@ -7375,6 +7471,9 @@ MI_APP: u8 = 2
 
 - **`fn markdown_view(&mut self, id: u32, st: &mut MdViewState, text: &str, flags: u32) -> MdEv`**
   ui_markdown_view(id, &mut st, text, MV_\*) -> MdEv (see the module header of md_view.rs)
+- **`fn markdown_fit(&mut self, st: &mut MdViewState, text: &str, w_px: i32, flags: u32) -> i32`**
+  ui_markdown_fit(&mut st, text, w_px, MV_\*) -> the height in DIP a view w_px wide needs for the whole
+  text (see the module header)
 - **`fn html_view(&mut self, id: u32, st: &mut MdViewState, html: &str, flags: u32) -> MdEv`**
   ui_html_view(id, &mut st, html, MV_\*) -> MdEv: the HTML counterpart of markdown_view
 - **`fn doc_view(&mut self, id: u32, st: &mut MdViewState, flags: u32) -> MdEv`**
@@ -7776,6 +7875,8 @@ imgview -- SVG pictures and the image viewer (ROADMAP §6)
        currentColor black, IV_TEXT_COLOR: the text colour).  Transparent parts over a
        checkerboard (IV_NO_CHECKER: the view's background); the theme decides its colours
        (light, dark, high contrast: plain background).
+       With a GPU the view's zoom and pan come from tiles while they run (canvas.rs, st.gpu: "image"),
+       the CPU draws the picture a moment later.
   ImageViewState { zoom, cx, cy, fit, label }: zoom 1.0 = 100 % (a bitmap pixel on one
        screen pixel, an SVG at its intrinsic size in DIP); (cx, cy) the image point at the
        view's centre; fit: the zoom follows the view.  st.set_fit() / set_actual() /
@@ -7829,6 +7930,7 @@ IV_TEXT_COLOR: u32 = 32  // an SVG's currentColor is the text colour (else black
   - `cy: f64`
   - `fit: bool` -- the zoom follows the view: the whole image, centred
   - `label: String` -- the accessible name (empty: the SVG's title, else "Bild")
+  - `gpu: CanvasGpu` -- how the view's zoom and pan use the GPU (canvas.rs)
 
 **`impl ImageViewState`**
 
@@ -8333,12 +8435,13 @@ ID_HASH_BASE: u32 = 0x0800_0000
 - **`fn id_scope<R>(&mut self, n: u32, f: impl FnOnce(&mut Ui) -> R) -> R`**
   id_push(n), f(ui), id_pop()
 
-#### `ui/gpu_out.rs` (Windows)
+#### `ui/gpu_out.rs`
 
 Source: [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs)
 
 ```text
-gpu_out -- UI windows on the screen through a swapchain (Windows; docs/GPU.md "Ausgabe der UI")
+gpu_out -- UI windows on the screen through a swapchain (Windows; Linux in programs against glibc:
+docs/GPU.md "Ausgabe der UI", "Ausgabe unter Linux")
 
 The UI rasterizes on the CPU as ever, the framebuffer stays the truth.  This module only shows
 it: the dirty rectangles the runtime computed go into a texture of the window, a triangle draws
@@ -8366,6 +8469,17 @@ starts after the first frame, so the first frame never waits for them.
 
 The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
 window GDI stays invisible there, also after the swapchain is gone.
+
+Linux: the same code.  A Swapchain there is a set of dma-bufs lib/gpu makes itself (vk_dmabuf.rs,
+no VkSurface: that would want libwayland or libxcb), plat attaches them with its own protocol code
+(linux_gpuout.rs); shared memory and dma-bufs take turns on one wl_surface or X window, so there is
+no child and win_gpu_child only says what the display accepts.  The differences this code sees: a
+frame reaches the window after the GPU has finished it (flush, busy: the loop looks every ms while
+one is on its way), the next one starts when the display has answered the last (next_look: no
+polling, the answer ends the wait; the frame stays in the texture and its newest state is drawn
+then), the compositor gets the frame's rectangles (damage), a worker may not ask the window system
+(Surface::track_size).  What cannot be read back is said by the tests: no client reads a Wayland
+window, Xwayland's GetImage of a flipped window lags one frame.
 
 Presents never wait: Swapchain::try_acquire.  A frame without a free image stays in the texture
 and is shown by gp_tick or with the next frame (gp_deadline: 2 ms); so is a frame less than 4 ms
@@ -8401,36 +8515,69 @@ CPU neither draws nor uploads them (Split::owed: the framebuffer lacks them; gp_
 before anybody reads it).  Everything else, also the cells at the image's edge or with something
 on top of it, goes the usual way.
 
+Canvases (G3c, canvas.rs).  While a canvas's view moves and its content stays, its content comes
+from tiles: TILE x TILE px textures of the content at one scale (a Level), drawn once by
+CanvasContent::draw_view on this thread (at most FILL_US per frame) and kept under a budget with
+LRU eviction.  The render pass draws them with the transform: by copy (fs) at the level's scale
+and whole pixels away, else bilinear (fs_tile).  In the cells the canvas ends up on top of (also
+those it only partly covers, with the scissor at its edge) the CPU neither draws nor uploads it:
+its command's hash stands only for where it lies (dirty.rs), Split::owed and Split::stale as for
+images, gp_settle runs its Draw before anybody reads the framebuffer.  Cells with something over
+it and cells without their tiles go the CPU's way: its Draw, the overlay, the upload.  SETTLE_US
+after the last move gp_tick asks for a frame, the canvas is no longer apart, the CPU draws what
+the view shows: at rest the picture is the CPU path's.  A frame that changes the content (new
+CanvasDesc::ver, ui.canvas_gpu_damage) ends the gesture at once and costs no tile; a tile is only
+drawn when a view moves over it.  Nothing of it exists before the first move, and nothing SETTLE
++ CANVAS_UNUSED_US after the last one.  Right-to-left windows draw canvases on the CPU.
+
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
-usable adapter or surface: the CPU path for good, silently.
+usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
+silently.
 
-Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
+Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
 their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
-jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget); lib/gpu's
-jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui_GPU_CANVAS=0 (no
+canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
+jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (they also zoom from
+tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
+jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
+lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
-Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
-without a GPU, it prints a SKIP once and does nothing):
-  gpu on                 a real window per UI window (shown without activation) with
-                         the output, every presented image compared with the framebuffer, a
-                         render after every input edge; waits for the swapchain
+Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
+Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+  gpu on [fast]          a real window per UI window (shown without activation) with
+                         the output, every presented image compared with the framebuffer (fast:
+                         not compared, for measurements), a render after every input edge; waits
+                         for the swapchain; a canvas stays apart until `gpu settle` or `same`
   gpu off                windows closed
   gpu wait [MS]          until the scoped windows are on the swapchain (after `size`, `gpu lose`)
   gpu expect gpu|cpu     the main window's stage
-  gpu expect same        every window presents once more: the image read back = the framebuffer
-                         byte for byte (x byte: 255), and no frame differed since the last check
+  gpu settle             every canvas goes back to the CPU's picture now
+  gpu expect same        every canvas settled, every window presents once more: the image read
+                         back = the framebuffer byte for byte (x byte: 255), and no frame differed
+                         since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-                         top of ours is a note, not a failure)
-  gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
+                         top of ours is a note, not a failure); X11: what the server holds for the
+                         window; Wayland: a note, no client can read it
+  gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
   gpu expect upload N    at most N bytes uploaded since the last check
   gpu expect base N      at most N bytes of them to the base texture since the last check
   gpu expect raster N    at most N pixels of the base layer drawn since the last check
   gpu expect layers N    N layers above the base have a texture now
   gpu expect images N    N image textures exist
+  gpu expect apart N     N canvases of the window come from tiles now
+  gpu expect tiles N     N canvas tiles exist
+  gpu expect fills N     at most N tiles were drawn since the last check
+  gpu expect nodiff      no pixel of a canvas's tiles differed from the CPU's since the last
+                         `same` or `nodiff`
   gpu budget BYTES       the images' budget
+  gpu tilebudget BYTES   the tiles' budget
+  gpu shot FILE          the image the window presents now (read back: also what a gesture's
+                         tiles show; `shot` writes the framebuffer)
   gpu lose               the device behaves as lost from now on (Device::test_lose)
+  gpu hold MS            real time passes, the windows stay as they are (a look from outside)
   gpu print              the counters
 ```
 
@@ -8443,6 +8590,12 @@ without a GPU, it prints a SKIP once and does nothing):
   path, a new device follows
 - **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
   (test aid) the bytes image textures may take
+- **`fn gpu_test_canvas_budget(&mut self, bytes: u64)`**
+  (test aid) the bytes canvas tiles may take
+- **`fn gpu_test_canvas_unused(&mut self, ms: u64)`**
+  (test aid) the tiles go this long (ms) after the last move
+- **`fn gpu_canvas_settle(&mut self)`**
+  every canvas whose view comes from tiles goes back to the CPU's picture with the next frame
 - **`fn gpu_settle(&mut self)`**
   the pixels of the images the GPU draws into the framebuffers (Ui::fb reads them then)
 
@@ -8451,8 +8604,8 @@ without a GPU, it prints a SKIP once and does nothing):
 Source: [`lib/ui/gpu_out_off.rs`](../lib/ui/gpu_out_off.rs)
 
 ```text
-gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows only for now):
-every frame takes the platform's path, no Vulkan code is linked
+gpu_out_off -- the UI's GPU output on targets without it (gpu_out.rs: Windows and Linux programs
+against glibc): every frame takes the platform's path, no Vulkan code is linked
 ```
 
 **`impl Ui`**
@@ -8460,11 +8613,88 @@ every frame takes the platform's path, no Vulkan code is linked
 - **`fn gpu_output(&self, _win: u32) -> GpuOutput`**
   what window `win` (a UI window index, 0 = main) shows through: here the platform's path
 - **`fn gpu_test_lose(&mut self)`**
-  (test aid) on Windows: the device behaves as lost from now on
+  (test aid) where the GPU shows windows: the device behaves as lost from now on
 - **`fn gpu_settle(&mut self)`**
-  on Windows: the pixels of the GPU's images into the framebuffer
+  where the GPU shows windows: the pixels of the GPU's images into the framebuffer
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
-  (test aid) on Windows: the bytes image textures may take
+  (test aid) where the GPU shows windows: the bytes image textures may take
+- **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
+  (test aid) where the GPU shows windows: the bytes canvas tiles may take
+- **`fn gpu_test_canvas_unused(&mut self, _ms: u64)`**
+  (test aid) where the GPU shows windows: the tiles go this long (ms) after the last move
+- **`fn gpu_canvas_settle(&mut self)`**
+  where the GPU shows windows: every canvas whose view comes from tiles goes back to the CPU's picture now
+
+#### `ui/canvas.rs`
+
+Source: [`lib/ui/canvas.rs`](../lib/ui/canvas.rs)
+
+```text
+canvas -- a canvas whose zoom and pan go through GPU textures (G3c; docs/GPU.md "Leinwände")
+
+The CPU stays the truth: a canvas records its Cmd::Custom as ever (ui.canvas, ui.cmd_custom), its
+Draw paints what the view shows.  Right after it the widget tells the library what that drawing
+is made of:
+
+  ui.canvas_gpu_wanted() -> bool     is it worth building a CanvasDesc?  (Never on other targets,
+                                     without a GPU output, in headless runs.)
+  ui.canvas_gpu(CanvasDesc { .. })   the custom command recorded last shows this content through
+                                     this view
+  ui.canvas_gpu_damage(id, r)        the content rectangle r (x0, y0, x1, y1, content units)
+                                     changed: its tiles are drawn again when they are needed
+
+While the view moves and the content stays, the content comes from tiles (TILE x TILE px GPU
+textures, drawn once by CanvasContent::draw_view, kept under a budget) that the render pass draws
+with the transform: no raster, no upload of the view.  A short time after the last change the
+view is drawn once more by the CPU: at rest the picture is byte for byte the CPU path's.  An edit
+goes the CPU's way as without a GPU and costs no tile.
+
+Everywhere else, and with CanvasGpu::Cpu, ui.canvas_gpu does nothing and the Draw paints every
+frame; the widget's code stays the same on every target.
+```
+
+- **`enum CanvasGpu`**
+  how a canvas may use the GPU while its view moves
+  - `Cpu` -- the CPU path in every frame, as without a GPU
+  - `Pan` -- moves by whole pixels at the same scale come from the tiles; another scale is drawn by the
+    CPU at once.  Pixel-exact when the content's raster does not depend on its place
+  - `Zoom` -- also zoom: the tiles are scaled while the gesture runs (a little soft or coarse), the CPU
+    draws the picture sharp a moment after it
+
+- **`struct CanvasView`**
+  the view of a canvas: the content point (u, v) shows at the window pixel position
+  (ox + u \* scale, oy + v \* scale)
+  - `scale: f64`
+  - `ox: f64`
+  - `oy: f64`
+
+- **`trait CanvasContent`**
+  what a canvas shows, drawable through any view (at render time)
+  - `fn draw_view(&self, g: &mut Gfx, v: CanvasView, rect: [i32; 4])`
+    draw the content through view v into g (origin 0, the clip says what needs pixels, rect = the
+    target's rectangle): what the canvas's Draw paints there at this view, without what lies
+    over it, every pixel opaque
+
+- **`struct CanvasDesc`**
+  a canvas for ui.canvas_gpu
+  - `id: u32` -- its identity in the window (the tiles live as long as it is drawn; ui.canvas_gpu_damage)
+  - `name: &'static str` -- its name for jfgui_GPU_CANVAS_CPU / jfgui_GPU_CANVAS_PAN ("image", "diagram", ...)
+  - `rect: [i32; 4]` -- the window rectangle x, y, w, h the content fills, opaque (inside the custom command's box)
+  - `view: CanvasView`
+  - `ver: u32` -- stands for everything the content shows: another value drops its tiles
+  - `content: Rc<dyn CanvasContent>`
+  - `gpu: CanvasGpu`
+  - `exact_pan: bool` -- the raster does not depend on the place: a move by whole pixels must match byte for byte
+    (jfgui_GPU_VERIFY fails on a difference; else it is counted, GpuOutput::canvas_diff_\*)
+
+**`impl Ui`**
+
+- **`fn canvas_gpu_wanted(&self) -> bool`**
+  is the GPU output there to use a CanvasDesc?  A widget without one saves building it
+- **`fn canvas_gpu(&mut self, d: CanvasDesc)`**
+  the custom command recorded last shows this content through this view (module header)
+- **`fn canvas_gpu_damage(&mut self, id: u32, r: [f64; 4])`**
+  the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go
 
 #### `ui/inspect.rs`
 
@@ -9998,6 +10228,46 @@ POP_ROWS: usize = 10
   - `Rename(TextPos)` -- rename the word at the position (F2)
   - `Format` -- format the document (Shift+Alt+F)
   - `Breakpoint(usize)` -- a click in the breakpoints' column of line (from 0)
+
+#### `ui/action_card.rs`
+
+Source: [`lib/ui/action_card.rs`](../lib/ui/action_card.rs)
+
+```text
+action_card -- a card or a list row that does one thing when it is chosen: a template on a
+start page, a recent file, a lesson
+
+  ui.action_card(id, name, &CardDesc) -> EV_*   EV_ACT when it was clicked, or Enter or Space
+                                                while it has the keyboard
+
+CardDesc says what it shows: a title (with an icon and a badge beside it), a text below (wrapped,
+or one line cut with "…"), a caption at the far end, and above them a picture area (`picture_h`
+DIP, 0: none) with the app's drawing, without one the icon large and centred.  `name` is what
+screen readers and scripts call it (K_BUTTON); the texts follow as records of their own.
+
+next_size sets the width (natural: 200 DIP); the height follows the content, and in a row of
+cards they all take the row's height.  next_flags: ST_SUBTLE a list row (no card at rest, the
+hover fill alone), ST_CHECKED selected, ST_DISABLED no input (the texts in the disabled colour).
+The card is one Tab stop; a button of its own (remove from a list) goes beside it, not into it.
+```
+
+- **`struct CardDesc<'a>`**
+  what an action card shows (ui.action_card); ..Default::default() for the parts it has not
+  - `title: &'a str`
+  - `icon: u32` -- beside the title; with a picture area and no drawing, large in that area (0: none)
+  - `text: &'a str` -- below the title ("": none)
+  - `one_line: bool` -- title and text stay on one line, cut with "…" (lists); else they wrap
+  - `badge: Option<(u32, &'a str)>` -- a BADGE_\* kind and its label, beside the title
+  - `aside: &'a str` -- a caption at the far end ("": none)
+  - `picture_h: i32` -- the height of the picture area above the texts (DIP; 0: none)
+  - `draw: Option<DrawRef>` -- what it shows and the version of that drawing (render time, as cmd_custom)
+  - `draw_ver: u32`
+
+**`impl Ui`**
+
+- **`fn action_card(&mut self, id: u32, name: &str, d: &CardDesc) -> u32`**
+  action_card(id, name, &desc) -> EV_\*: a card or list row that does one thing (the top of
+  action_card.rs); next_size sets its width, next_flags ST_SUBTLE, ST_CHECKED, ST_DISABLED
 
 ## agent_core
 
@@ -11913,7 +12183,8 @@ fontconf -- generic families, substitutes and choices per language: a light font
                                    system-ui, emoji, math (also fontconfig's sans and mono)
 
 FontDb::resolve(&conf, family, lang, weight, italic) (fontdb.rs) finds the first installed
-candidate; for a name nothing installed matches, the candidates of sans-serif.
+candidate with Latin letters (without any, the first installed one); for a name nothing
+installed matches, the candidates of sans-serif.
 
 Rules, fontconfig's semantics in short: an alias for F puts its <prefer> families right
 before F (so a later alias's prefer list follows an earlier one), its <accept> families
@@ -11922,7 +12193,8 @@ right after F (a later list before an earlier one), its <default> families at th
 (eq) and they hold; its family edits prepend (before F), prepend_first, append (after F),
 append_last or assign (in place of F).  Other matches (charset, spacing, prgname, target
 font: hinting) are skipped.  The families in the list that have rules of their own are
-expanded in place (4 levels).  Layers: the files' rules first, the built-in ones after them;
+expanded in place (4 levels), only their <default> and append_last families go to the end
+of the whole list.  Layers: the files' rules first, the built-in ones after them;
 names compare ASCII-case-insensitively, each once.  Languages: "ja" matches ja and ja-JP;
 zh-Hans / zh-CN / zh-SG / plain zh also match zh-cn, zh-Hant / zh-TW zh-tw, zh-HK / zh-MO
 zh-hk and zh-tw.  <include> follows files and folders (*.conf in name order) relative to
@@ -12010,13 +12282,13 @@ match styles, cache the result                                      [src/text/fo
   save_cache(path) / load_cache(path) -> 0 / -1
 
 Families group faces by the legacy family name (name ID 1); names prefer German, then
-English.  Cache file (little endian): "FDB1", u32 version 3, u32 files, u32 faces, u32
+English.  Cache file (little endian): "FDB1", u32 version 4, u32 files, u32 faces, u32
 pool bytes, u64 FNV-1a hash of everything after the 28-byte header; files {u32 path, u32
 size, u32 first face, u32 faces}; faces {u32 file, u32 face index, u16 weight, u16 flags,
 u32 family, u32 style, u32 full, u32 typo family, u32 0}; pool of NUL-terminated UTF-8
 strings (offsets above point into it).  Entries are validated by path and file size.
 Version 3: CFF2 faces count (a version 2 cache lists CFF2-only files without faces, so it
-is not read).
+is not read).  Version 4: FDFF_NOLATIN.
 ```
 
 ```rust
@@ -12030,6 +12302,8 @@ FDFF_VAR: u16 = 32
 FDFF_SYMBOL: u16 = 64
 /// CFF2 outlines (FDFF_CFF is set as well)
 FDFF_CFF2: u16 = 128
+/// the cmap lacks A or a: a font for another script (see FontDb::resolve)
+FDFF_NOLATIN: u16 = 256
 ```
 
 - **`struct FdFace`**
@@ -12076,7 +12350,10 @@ FDFF_CFF2: u16 = 128
 - **`fn resolve(&self, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> Option<(usize, u32, String)>`**
   the first installed candidate of conf for family in lang (generic families,
   substitutes, the language's choices), else sans-serif's -> (face index, FS_SYN_\* flags,
-  the family name found)
+  the family name found).  A substitute without Latin letters (FDFF_NOLATIN) only counts
+  when nothing else fits, except for emoji and math: fontconfig ranks the language above
+  such a rule's family, and Fedora's rules put Noto Sans Arabic first in sans-serif and
+  monospace.  Another script's characters come from fallback.rs
 - **`fn load_resolved(&mut self, text: &mut Text, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> (i32, String)`**
   resolve and load -> (font id / ERR_\*, the family found)
 - **`fn load(&mut self, text: &mut Text, family: &str, weight: u32, italic: bool) -> i32`**
@@ -17731,9 +18008,10 @@ FXW_NEDGE: i32 = 7
 
 ```text
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
-and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows
-(vulkan-1.dll loaded at run time; vk_*.rs).  Planned: Vulkan on Linux and Android, WebGPU
-in the browser, Metal; they provide the same types and methods.
+and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows and on
+Linux, there in programs linked against glibc (vulkan-1.dll, libvulkan.so.1 loaded at run time;
+vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs).  Planned: Android, WebGPU in the browser, Metal; they provide
+the same types and methods.
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -17769,11 +18047,15 @@ in the browser, Metal; they provide the same types and methods.
   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
   queue.write_buffer / write_texture / write_texture_rects / write_texture_rects_at (staged in
                    a ring, before the next submit), read_buffer (waits)
-  Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
-  Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
+  Surface::new(&instance, plat_window)            a plat window (Windows: HWND; Linux: what its
+                                                  display accepts, plat::win_gpu_child)
+  Surface::native(&instance, handles, plat_window)  a window given by its handles (a child);
+                   track_size(): the size for a rebuild on a worker (Linux)
   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
                    view(&frame), texture(&frame), present(frame, [cmd, ..]), resize(),
-                   try_acquire() (never waits or rebuilds), rebuild()
+                   try_acquire() (never waits or rebuilds), rebuild(), and for the same code on
+                   every target flush(), busy(), next_look(retry) (a frame reaches a Linux window
+                   after the GPU has finished it: vk_dmabuf.rs), damage(rects)
 
 Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
 with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
@@ -17820,7 +18102,8 @@ COLOR_TARGETS_MAX: usize = 8
 - **`enum GpuError`**
   what went wrong
   - `Disabled` -- the GPU is switched off (jfgui_GPU=0)
-  - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll, or jfgui_GPU_DLL names a missing file)
+  - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
+    missing file, or a Linux program not linked against glibc)
   - `NoAdapter` -- no usable GPU (or jfgui_GPU_ADAPTER matched none)
   - `Unsupported(&'static str)` -- the adapter or this backend lacks something (a feature, a format, the level)
   - `Invalid(&'static str)` -- a call the API does not allow (sizes, alignments, states, order)
@@ -18504,8 +18787,8 @@ The timeline: one timeline semaphore per device; every submit signals the next v
 (SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
 submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 latest submit and is destroyed once that value is reached -- earlier if no submit is
-pending; while the upload command buffer is open (it may name the resource) with the value
-of the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
+pending; a buffer or image, which the open upload command buffer may name, with the value of
+the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
 reused once their submission completed.  Uploads: the data goes into the staging ring, the
 copies into one upload command buffer that ends with a global barrier (copy writes -> every
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
@@ -18590,8 +18873,8 @@ Source: [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs)
 vk_inst -- Vulkan instance and adapters
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>
-       jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL or vulkan-1.dll
-       (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
+       jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL, vulkan-1.dll or
+       libvulkan.so.1 (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
        Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
        present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
   instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
@@ -18658,6 +18941,8 @@ messages, info level and up).
 - **`fn limits(&self) -> &Limits`**
 - **`fn level(&self) -> Level`**
   the highest level a device of this adapter supports
+- **`fn can_present(&self, surface: &crate::Surface) -> bool`**
+  a device of this adapter can show images on the surface
 - **`fn can_present(&self, surface: &crate::Surface) -> bool`**
   a device of this adapter can show images on the surface
 
@@ -18890,35 +19175,21 @@ The window must not be presented by the CPU (plat::win_present) at the same time
 window that never presents keeps nothing of its own to paint (win_api.rs WM_PAINT).
 ```
 
-- **`struct Surface(pub(crate) Arc<SurfShared>)`**
-  a window as a target for swapchains
-
 **`impl Surface`**
 
+- **`fn track_size(&self)`**
+  (Linux: the window's size for a rebuild on a worker; here the driver knows it)
 - **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
   the surface of plat window `window` (an index of plat::win_create)
 - **`fn native(instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
   the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
   whose size and state are those of plat window `window`
 
-- **`struct Frame`**
-  an acquired swapchain image (present it with Swapchain::present)
-
-- **`enum TryAcquire`**
-  what Swapchain::try_acquire found
-  - `Frame(Frame)`
-  - `NotReady` -- no image is free yet, or the frame slot's previous submission still runs: try again later
-  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
-  - `NoArea` -- the window is minimised or has no area
-
 **`impl Frame`**
 
 - **`fn index(&self) -> u32`**
   the image's index in the swapchain
 - **`fn size(&self) -> (u32, u32)`**
-
-- **`struct Swapchain`**
-  the images a window shows, presented in turn
 
 **`impl Device`**
 
@@ -18939,6 +19210,16 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
   the frame's image (copies: SwapchainDesc::copy_src)
 - **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, frame: Frame, cmds: I) -> Result<SubmitId>`**
   submit the frame's commands (they leave the image in Layout::Present) and show it
+- **`fn prepare(&mut self) -> Result<bool>`**
+  (Linux: the display has answered for the images; here nothing to wait for)
+- **`fn flush(&self) -> Result<bool>`**
+  (Linux: a frame reaches the window after the GPU finished it; here present has done that)
+- **`fn busy(&self) -> bool`**
+  (Linux: a frame is on its way to the window; here never)
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again: retry (the caller's time)
+- **`fn damage(&self, _rects: Option<&[[i32; 4]]>)`**
+  (Linux: what the next image changes, for the compositor; here the whole image counts)
 - **`fn resize(&mut self)`**
   rebuild at the next acquire (the window's size is also checked at every acquire)
 - **`fn set_present_mode(&mut self, m: PresentMode)`**
@@ -18948,6 +19229,127 @@ window that never presents keeps nothing of its own to paint (win_api.rs WM_PAIN
 - **`fn size(&self) -> (u32, u32)`**
   the images' size (0, 0 while the window has no area)
 - **`fn image_count(&self) -> usize`**
+
+### `gpu/vk_dmabuf.rs`
+
+Source: [`lib/gpu/vk_dmabuf.rs`](../lib/gpu/vk_dmabuf.rs)
+
+```text
+vk_dmabuf -- the swapchain of a Linux program: images without a VkSurface (programs against glibc;
+docs/GPU.md "Ausgabe unter Linux")
+
+Vulkan's Wayland surface wants a pointer from libwayland-client, the X11 one from libxcb.  JFLib
+speaks both protocols itself and has neither.  So the GPU draws into images of its own, exported as
+dma-bufs, and plat hands them to the window (lib/plat/linux_gpuout.rs).  For the caller this is the
+same as vk_swap.rs: Surface, create_swapchain, try_acquire, view, present, rebuild.
+
+  Surface::native(&instance, plat::win_gpu_child(w), w)   what the display of window w accepts
+  surface.track_size()              (the window loop's thread) the window's size for a rebuild on a
+                                    worker: only that thread may ask plat
+  device.create_swapchain(&surface, &SwapchainDesc)       any thread
+       min_images images (0: 3), XRGB8888 (else XBGR8888, ARGB8888, ABGR8888) as B8G8R8A8 /
+       R8G8B8A8, single-plane modifiers the device can export and the display accepts: the driver
+       picks (VkImageDrmFormatModifierListCreateInfoEXT), a dedicated allocation, dma-buf
+  sc.try_acquire()                  never waits, never rebuilds; registers the images with plat at
+       its first call; looks at the frame before (flush); then NotReady while one is on its way or
+       the display has not answered the last commit (the frame stays in the caller's texture and
+       its newest state is drawn then: nothing queues up) or no image is free
+  sc.present(frame, [cmd, ..])      submits; the image goes to the window when the GPU has finished
+  sc.flush() -> still on its way    that look at the timeline: the frame goes to the window (the
+       window loop calls it, a frame is rarely done before present returns)
+  sc.busy()                         a frame is on its way: flush soon
+  sc.next_look(retry)               when a frame that found NotReady should try again
+  sc.damage(rects)                  what the next presented image changes against the last one (None:
+       all; without any call: all).  What the compositor has to draw again, nothing else
+  sc.acquire()                      waits (pumping the display, events stay queued) and rebuilds
+  sc.rebuild()                      any thread, without waiting: the old images die with the frames
+       that use them
+
+Why the image can never be wrong on the screen: linux_gpuout.rs.  Here: an image goes to plat only
+after its submission reached the timeline; an image is drawn into only when plat says FREE and a
+poll of its dma-buf for POLLOUT says no fence of another reader is left.  Queue ownership goes to
+VK_QUEUE_FAMILY_FOREIGN_EXT at the end of every frame and comes back at the start of the next.
+Compression (modifiers with more than one plane) is left out: the window system does not gain
+enough from it for the checks each driver wants at the hand-over.
+
+Threads: plat's display calls only on the thread of the window loop (linux_disp.rs).  So a worker's
+rebuild and any drop only note the buffers that go (RETIRED), try_acquire and flush free them.
+```
+
+- **`struct Surface(pub(crate) Arc<SurfShared>)`**
+  a window as a target for swapchains
+
+**`impl Surface`**
+
+- **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
+  the surface of plat window `window`
+- **`fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the surface from what plat::win_gpu_child said about plat window `window` (any thread)
+- **`fn track_size(&self)`**
+  (the window loop's thread) the window's size now: what a rebuild on a worker makes
+
+- **`struct Frame`**
+  an acquired image (present it with Swapchain::present)
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no image is free yet, or the display has not answered the last frame: try again later
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window is minimised or has no area
+
+**`impl Frame`**
+
+- **`fn index(&self) -> u32`**
+  the image's index in the swapchain
+- **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  the images a window shows, presented in turn
+
+**`impl Device`**
+
+- **`fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain>`**
+
+**`impl Swapchain`**
+
+- **`fn rebuild(&mut self) -> Result<()>`**
+  the images for the size the window has now, without waiting (any thread)
+- **`fn flush(&self) -> Result<bool>`**
+  the frame on its way: finished by the GPU -> it goes to the window; -> still on its way
+- **`fn busy(&self) -> bool`**
+  a frame is on its way to the window: flush soon
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again: soon when the GPU is drawing; when the
+  display's answer is overdue if it has not given it (the answer itself ends the wait earlier);
+  else retry, the caller's time
+- **`fn prepare(&mut self) -> Result<bool>`**
+  the images to the display, its answer there (the window loop's thread)
+- **`fn damage(&self, rects: Option<&[[i32; 4]]>)`**
+  what the next presented image changes against the last one: rectangles x, y, w, h (None: all)
+- **`fn try_acquire(&mut self) -> Result<TryAcquire>`**
+  the next image to draw into, without waiting and without rebuilding (see TryAcquire)
+- **`fn acquire(&mut self) -> Result<Option<Frame>>`**
+  the next image to draw into, rebuilt when stale; waits (the display is pumped, events stay
+  queued); None while the window is minimised or has no area
+- **`fn view(&self, frame: &Frame) -> &TextureView`**
+  the frame's image as a render target (Undefined at the start, Present at the end)
+- **`fn texture(&self, frame: &Frame) -> &Texture`**
+  the frame's image (copies: SwapchainDesc::copy_src)
+- **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, frame: Frame, cmds: I) -> Result<SubmitId>`**
+  submit the frame's commands (they leave the image in Layout::Present); it goes to the window
+  when the GPU has finished it (flush)
+- **`fn resize(&mut self)`**
+  rebuild at the next acquire (the window's size is also checked at every acquire)
+- **`fn set_present_mode(&mut self, m: PresentMode)`**
+  another present mode from the next acquire on
+- **`fn present_mode(&self) -> PresentMode`**
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  the images' size (0, 0 while the window has no area)
+- **`fn image_count(&self) -> usize`**
+- **`fn drm_format(&self) -> (u32, u64)`**
+  the images' DRM format and modifier (tests, traces)
 
 ## shader
 
@@ -21983,7 +22385,9 @@ four crates that may contain `unsafe` (rt, simd, plat, plugin); nothing unsafe l
 
 ### `plat` crate root
 
-Re-exports: `rt::os::{exit, write_stderr, write_stdout}`
+Re-exports: `rt::os::exit`
+
+Re-exports: `rt::os::{write_stderr, write_stdout}`
 
 Re-exports: `rt::{VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -26873,6 +27277,7 @@ win_gpuout -- the child window a window's GPU output draws on (lib/ui's presente
   win_in_sizemove()                    the modal move / size loop runs
   win_display_adapter(w) -> (vendor id, device id)   the GPU that drives the window's monitor
   win_remote_session()                 this is a Remote Desktop session
+  gpu_wait(deadline_us)                pump the messages until then (Linux: linux_gpuout.rs)
 
 Why a child: once a swapchain has presented on a window, what GDI draws on that window stays
 invisible, also after the swapchain and its surface are destroyed (measured: DWM keeps showing
@@ -26902,8 +27307,10 @@ the focus.  It is destroyed together with its parent.
   (gpu) window w's copy for WM_PAINT is not needed while the child shows the window (the next
   win_present makes a new one)
 
-- **`fn win_in_sizemove() -> bool`**
+- **`fn gpu_wait(deadline_us: u64)`**
   the modal move / size loop of a window runs (the program's own loop waits for its end)
+
+- **`fn win_in_sizemove() -> bool`**
 
 - **`fn win_remote_session() -> bool`**
   this program runs in a Remote Desktop session (the GPU output stays off)
@@ -27555,7 +27962,7 @@ handler (win_crash.rs).
 Source: [`lib/plat/linux.rs`](../lib/plat/linux.rs)
 
 ```text
-linux -- Linux platform: raw syscalls, no libc        [src/plat/linux/plat_linux.s, lx_sys.s]
+linux -- Linux platform: raw syscalls, no libc (the build for GPU drivers: linux_glibc.rs)        [src/plat/linux/plat_linux.s, lx_sys.s]
 
 _start reads argc / argv / envp from the initial stack, calls the app's jfgui_main and
 exits with its result.  Files and paths: linux_sys.rs; threads, wake-up, system
@@ -27809,6 +28216,7 @@ The modules follow the assembly files:
                                                                             [wl_clip.s]
   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
   linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
+  linux_wl_gpu.rs      zwp_linux_dmabuf_v1: the GPU's buffers on a surface (programs against glibc)
 
 State: the assembly's globals are one record (Wl) owned by this module, created on the
 first use (the synthetic tests use it without a connection).  Every entry point (the
@@ -27992,6 +28400,7 @@ bug and panics.  Files:
   linux_x11_wire.rs     connection, authentication, setup, requests, replies, errors
   linux_x11_window.rs   window records, hints, WM messages, DPI, state, events, wait
   linux_x11_present.rs  MIT-SHM (memfd / SysV) or PutImage, per window
+  linux_x11_gpu.rs      DRI3 and Present: the GPU's buffers on a window (programs against glibc)
   linux_x11_input.rs    core keyboard / pointer input, keysyms, the core keymap (built into
                         the key table of linux_xkb.rs: xkb_begin / xkb_set_key / xkb_key)
   linux_x11_xi.rs       XInput 2 pens
@@ -28257,7 +28666,7 @@ pread / pwrite, so several threads may use one File at the same time.
 Source: [`lib/plat/linux_thread.rs`](../lib/plat/linux_thread.rs)
 
 ```text
-linux_thread -- Linux threads (clone + futex), semaphores, the wake-up of the UI thread,
+linux_thread -- Linux threads (clone + futex; linked against glibc: pthread_create, at the end of this file), semaphores, the wake-up of the UI thread,
 system information, the date                       [src/plat/linux/lx_thread.s, plat_linux.s]
 
 A thread's stack is an mmap with a PROT_NONE guard page below it; the thread record sits
@@ -28307,6 +28716,11 @@ socket, wait_events polls it alone (headless).
 
 - **`fn date() -> (Date, bool)`**
   the date and time in UTC (no time zone database); the flag is true (UTC)  [plat_date]
+
+**`impl Thread`**
+
+- **`fn join(self)`**
+  wait until the thread has ended, then free its stack  [plat_thread_join]
 
 ### `plat/linux_print.rs` (Linux)
 
@@ -28363,6 +28777,220 @@ the assembly's checks); lib_sym reads the protected image like the assembly.
 
 - **`fn lib_sym(h: &Lib, name: &str) -> usize`**
   the address of the defined dynamic symbol name, or 0  [plat_lib_sym]
+
+### `plat/linux_glibc.rs` (Linux)
+
+Source: [`lib/plat/linux_glibc.rs`](../lib/plat/linux_glibc.rs)
+
+```text
+linux_glibc -- a program linked against glibc (--cfg jfgui_glibc; build_rs.py section "glibc",
+docs/GPU.md "Linux"): every Linux GPU driver is a glibc library
+
+  _start, glibc_main          the process start through __libc_start_main (ld.so has set up the
+                              main thread's TLS and run libc's initialisers by then), then what
+                              linux_entry does in a static program
+  exit(code)                  plat::exit: glibc's exit (atexit handlers, the destructors of the
+                              loaded libraries, stdio); so does returning from the program's main.
+                              Crash reports end in rt::os::exit as everywhere: exit_group, no
+                              destructor runs inside a signal handler
+  at_exit(f)                  f at that normal end, before the handlers registered earlier
+  dl_open / dl_sym / dl_close / dl_error    the system's dynamic linker (lib/gpu: libvulkan.so.1);
+                              plugins keep their own loader (linux_elfload.rs: they import nothing)
+  glibc_version()             the running libc ("2.43")
+  glibc_thread_ids()          the calling thread's FS base, pthread_self, &errno (gputest --test glibc)
+
+Threads: linux_thread.rs, its last part: pthread_create on the same mapping as in a static
+program.  Everything else of plat stays raw system calls next to glibc, which is fine: they do
+not touch errno or glibc's state.  The fault handlers (linux_crash.rs, linux_guard.rs) use
+rt_sigaction directly and leave glibc's two internal signals alone.  A driver's own threads have
+no alternate signal stack, the report runs on their stack; Mesa's block every signal but SIGSEGV
+and SIGSYS, so another fault there (SIGILL in llvmpipe's JIT code) ends the process at once, by the
+kernel, without a report.  The allocator (rt::mem) has its own mappings and takes no TLS, so a
+driver's thread may call back into it (debug messages); a child after a raw fork only makes system
+calls until its exec.  plat::setenv changes JFLib's list, which plat::env and child processes see;
+a driver's getenv reads the start environment.
+```
+
+- **`fn exit(code: i32) -> !`**
+  end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
+  from any thread, not from a signal handler
+
+- **`fn at_exit(f: fn())`**
+  run f at the normal end of the process (plat::exit, or the program's main returns), not after
+  a crash; before the handlers registered earlier
+
+- **`fn dl_open(name: &str) -> Option<usize>`**
+  open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
+  and run its initialisers -> its handle
+
+- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+  the address of a symbol of a library from dl_open (0: none); name ends in NUL
+
+- **`fn dl_close(handle: usize)`**
+  close a library from dl_open
+
+- **`fn dl_error() -> String`**
+  why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
+
+- **`fn glibc_version() -> String`**
+  the version of the running glibc ("2.43")
+
+- **`fn glibc_thread_ids() -> (usize, usize, usize)`**
+  the calling thread's FS base, pthread_self() and the address of errno: its thread control block
+  and thread-local storage (a raw clone would have 0 and the creator's)
+
+### `plat/linux_gpuout.rs` (Linux)
+
+Source: [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs)
+
+```text
+linux_gpuout -- what lib/gpu's images need from the window system: dmabuf buffers on a window,
+through JFLib's own Wayland and X11 code (programs against glibc only; docs/GPU.md "Ausgabe unter
+Linux").  No libwayland, no libxcb: Vulkan's surfaces would want a pointer from them, so the GPU
+draws into images of its own and this code hands them to the window.
+
+  win_gpu_child(w) -> NativeWindow   what the display accepts for window w (format + modifier
+                                     pairs, its render device) and the window's size: None = the
+                                     CPU path.  The name is the Windows presenter's, whose child
+                                     window this stands for; a Linux window needs no child: one
+                                     wl_surface or X window takes shared memory and dmabufs in turn
+  win_gpu_child_show, win_release_kept, win_in_sizemove, win_display_adapter, win_remote_session
+                                     nothing to do or know here
+  gpu_buf_new(w, &GpuBufDesc) -> handle     a buffer of window w from its planes (takes the fds);
+                                     0: refused.  On Wayland its answer comes later: PENDING first
+  gpu_buf_state(w, handle) -> GPU_BUF_*     FREE: nobody reads it, it is not the one on the window
+  gpu_buf_free(w, handle)            the buffer goes (also while it is on the window: what it shows
+                                     stays, as long as nobody writes the memory)
+  gpu_can_show(w) -> bool            a new frame is welcome now: the last commit has been answered
+                                     (the frame callback, PresentCompleteNotify; 1 s at most)
+  gpu_show(w, handle, rects)         the buffer, finished by the GPU, goes on the window (at once, or
+                                     as soon as the window can take it); rects: what changed against
+                                     the last one, None = all.  From now on window w shows through
+                                     buffers, until the next win_present.
+  gpu_next_look(w) -> time_us        when a frame that cannot go on yet should look again; the wait
+                                     returns earlier when the answer comes
+  gpu_wait(deadline_us)              pump the display until the deadline, also with events queued
+                                     (they stay queued; a plain wait would not read the socket)
+
+Only the thread of the window loop calls these (the backends are single-threaded: linux_disp.rs).
+
+No wrong frame can show:
+  * a buffer goes to the window only after the GPU has finished it (lib/gpu: Swapchain::flush
+    looks at the timeline without waiting).  So nothing depends on implicit sync: at the attach no
+    fence is pending on the buffer, on any compositor, kernel or driver.
+  * a buffer is drawn into only after the compositor gave it back (wl_buffer.release,
+    PresentIdleNotify) and no read of it is pending on its dma-buf (poll POLLOUT: the compositor's
+    GPU may still be reading it when the release arrives), and never while it is the newest.
+  * win_present ends the buffers' turn: a frame still on its way is dropped, shared memory shows
+    the whole frame.
+Test aids: win_test_image(w) reads what the window system holds where it can (X11: GetImage).
+```
+
+```rust
+/// a buffer's state (gpu_buf_state)
+GPU_BUF_PENDING: u32 = 0
+GPU_BUF_FREE: u32 = 1
+GPU_BUF_BUSY: u32 = 2
+GPU_BUF_FAILED: u32 = 3
+```
+
+- **`struct GpuCaps`**
+  what a display accepts as buffers
+  - `device: Option<u64>` -- the device it renders with (dev_t of a node of the DRM device), when it says so
+  - `formats: Vec<(u32, u64)>` -- DRM fourcc and modifier
+
+- **`struct GpuPlane`**
+  a plane of a buffer: a dma-buf (owned: closed once sent), its offset and row pitch
+  - `fd: i32`
+  - `offset: u32`
+  - `stride: u32`
+
+- **`struct GpuBufDesc`**
+  a buffer of memory the GPU drew into
+  - `w: i32`
+  - `h: i32`
+  - `fourcc: u32`
+  - `modifier: u64`
+  - `planes: Vec<GpuPlane>`
+
+- **`struct NativeWindow`**
+  the Linux form of the handles lib/gpu gets for a window (Windows: HWND, HINSTANCE)
+  - `caps: GpuCaps`
+  - `size: (i32, i32)`
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+
+- **`fn win_gpu_child_show(_w: i32, _show: bool)`**
+
+- **`fn win_release_kept(_w: i32)`**
+
+- **`fn win_in_sizemove() -> bool`**
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  the GPU that drives the window's monitor: not known here, the display's device decides (GpuCaps)
+
+- **`fn win_remote_session() -> bool`**
+
+- **`fn gpu_buf_new(w: i32, d: &GpuBufDesc) -> u32`**
+
+- **`fn gpu_buf_state(w: i32, h: u32) -> u32`**
+
+- **`fn gpu_buf_free(w: i32, h: u32)`**
+
+- **`fn gpu_can_show(w: i32) -> bool`**
+
+- **`fn gpu_show(w: i32, h: u32, rects: Option<&[[i32; 4]]>)`**
+
+- **`fn gpu_next_look(w: i32) -> u64`**
+
+- **`fn gpu_wait(deadline_us: u64)`**
+
+*test aids, as on Windows*
+
+```rust
+WT_PIXEL: u32 = 1
+WT_REDRAW: u32 = 2
+WT_MOVE: u32 = 3
+WT_DPI: u32 = 4
+WT_POPUP_RECT: u32 = 7
+WT_NOANIM: u32 = 16
+WT_FROM_POINT: u32 = 17
+WT_SHOW: u32 = 18
+```
+
+- **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
+  (tests)
+  ```text
+  WT_PIXEL      the colour the window system holds at client pixel a[0], a[1] of window w: X11
+                GetImage, Wayland the last shared memory buffer; -1: no way to know (Wayland on
+                GPU buffers: a client cannot read a window back)
+  WT_MOVE       a[0], a[1], a[2], a[3]: the window's rectangle; win_set_rect reports nothing back
+                here, the event a size change has on Windows comes from this aid
+  WT_DPI        a[0]: the dpi as if the compositor preferred that scale (Wayland with a viewport,
+                else -1: X11 has one dpi for the display and no second size)
+  WT_SHOW       a[0] = 7 minimised, 4 back: X11 through the window manager; Wayland can minimise, but
+                no client can undo that: 4 does what the compositor's next activation does here
+  WT_POPUP_RECT popup slot w is shown: 1, else -1
+  WT_NOANIM, WT_FROM_POINT  nothing to turn off; nobody tells a client what lies on top of its
+                window: it counts as ours
+  ```
+
+- **`fn win_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) what the window system holds for window w: (w, h, rows of w \* 4 bytes): X11 reads it
+  back (GetImage; also a buffer on the window), Wayland has no way to: None
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
+  (tests) a part of the screen: no client on Linux can read it without asking the user
+
+- **`fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize`**
+  (tests) nothing to send to: Windows' messages
+
+- **`fn win_test_usage() -> (u64, u64, u64)`**
+  (tests) (CPU time of this process so far in us, its resident bytes, its anonymous resident bytes)
+
+- **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
+  (bench: jfgui_WL_FEEDBACK=1 on Wayland) the commits since the last call and when each reached the
+  screen (wp_presentation): (time of the commit, time on the screen; 0: discarded), time_us
 
 ### `plat/web.rs`
 
@@ -32247,11 +32875,14 @@ line and column, a stack trace).  The limits (fuel per invocation, heap, call de
 end it at once and cannot be caught.
 
 Collector: mark and sweep over the heap arena, from the stack, the globals, host values,
-pinned values, the last result and objects a native made during its call.  It runs only in
-run(), when an allocation crosses the threshold (twice the live bytes after the last
-collection, at least 256 KiB, at most the heap limit).  Values the host keeps between runs
-must be pinned (pin / unpin) or be reachable from the script.  Values the host passes in
-are checked (valid()): a stale value of a freed object gives an error or None, not a crash.
+pinned values, the last result, objects a native made during its call and objects the host
+made since the last run.  It runs when an allocation crosses the threshold (twice the live
+bytes after the last collection, at least 256 KiB, at most the heap limit), the host's own
+allocations between runs included: a callback that allocates nothing itself would never
+collect what the host made for it.  Values the host keeps between runs must be pinned (pin /
+unpin) or be reachable from the script; a value it took out of a pin or a map is only safe
+while the pin or the map still holds it.  Values the host passes in are checked (valid()): a
+stale value of a freed object gives an error or None, not a crash.
 
 Modules (module.rs): import(path) links a module's code into the VM's own (`code` starts as
 the program's and grows with each module; `units` are the program and its modules with
@@ -32387,6 +33018,9 @@ drives exec one instruction at a time (exec_debug) and checks between them where
   m.key
 - **`fn map_entries(&self, m: Value) -> Vec<(Value, Value)>`**
   the entries of a map in order
+- **`fn limit_text(&self) -> Value`**
+  "Speichergrenze erreicht" as a permanent str: what a host can still give a callback when
+  the heap has no room for anything else; it takes none and is always valid
 - **`fn new_str(&mut self, s: &str) -> Result<Value, Error>`**
   a new str (valid until the next run unless the script keeps it or it is pinned)
 - **`fn new_bytes(&mut self, b: &[u8]) -> Result<Value, Error>`**

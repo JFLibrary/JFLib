@@ -1,0 +1,480 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Campus",
+  "description": "Zwei Gebäude mit L3-Switches, OSPF zum Router, DHCP über Relays, DNS.",
+  "seed": 23,
+  "next_id": 26,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 380,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\nip dhcp excluded-address 10.20.10.1 10.20.10.49\nip dhcp excluded-address 10.20.20.1 10.20.20.49\nip dhcp excluded-address 10.30.10.1 10.30.10.49\nip dhcp excluded-address 10.30.20.1 10.30.20.49\n!\nip dhcp pool A_STAFF\n network 10.20.10.0 255.255.255.0\n default-router 10.20.10.1\n dns-server 10.10.100.10\n domain-name campus.lab\n!\nip dhcp pool A_STUD\n network 10.20.20.0 255.255.255.0\n default-router 10.20.20.1\n dns-server 10.10.100.10\n domain-name campus.lab\n!\nip dhcp pool B_STAFF\n network 10.30.10.0 255.255.255.0\n default-router 10.30.10.1\n dns-server 10.10.100.10\n domain-name campus.lab\n!\nip dhcp pool B_STUD\n network 10.30.20.0 255.255.255.0\n default-router 10.30.20.1\n dns-server 10.10.100.10\n domain-name campus.lab\n!\ninterface GigabitEthernet0/0/1\n description Servernetz\n ip address 10.10.100.1 255.255.255.0\n no shutdown\n!\ninterface TenGigabitEthernet0/1/0\n description Gebaeude A\n ip address 10.10.0.1 255.255.255.252\n ip ospf network point-to-point\n no shutdown\n!\ninterface TenGigabitEthernet0/1/1\n description Gebaeude B\n ip address 10.10.0.5 255.255.255.252\n ip ospf network point-to-point\n no shutdown\n!\nrouter ospf 1\n router-id 10.10.0.1\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 640,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.10.100.10/24 dev eth0\nip route add default via 10.10.100.1\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "campus.lab",
+                "ttl": 300,
+                "records": [
+                  "www A 10.10.100.10",
+                  "srv1 CNAME www"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Willkommen auf dem Campus, {client}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "MLS1",
+      "model": "jf-s24l3",
+      "x": 160,
+      "y": 150,
+      "off": false,
+      "startup_config": "hostname MLS1\n!\nip routing\n!\nvlan 10\n name Staff\n!\nvlan 20\n name Students\n!\ninterface GigabitEthernet1/0/1\n description zum Access-Switch\n switchport trunk allowed vlan 1,10,20\n switchport mode trunk\n!\ninterface TenGigabitEthernet1/1/1\n description zu R1\n no switchport\n ip address 10.10.0.2 255.255.255.252\n ip ospf network point-to-point\n!\ninterface Vlan10\n ip address 10.20.10.1 255.255.255.0\n ip helper-address 10.10.100.1\n!\ninterface Vlan20\n ip address 10.20.20.1 255.255.255.0\n ip helper-address 10.10.100.1\n!\nrouter ospf 1\n router-id 10.10.0.2\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "MLS2",
+      "model": "jf-s24l3",
+      "x": 600,
+      "y": 150,
+      "off": false,
+      "startup_config": "hostname MLS2\n!\nip routing\n!\nvlan 10\n name Staff\n!\nvlan 20\n name Students\n!\ninterface GigabitEthernet1/0/1\n description zum Access-Switch\n switchport trunk allowed vlan 1,10,20\n switchport mode trunk\n!\ninterface TenGigabitEthernet1/1/1\n description zu R1\n no switchport\n ip address 10.10.0.6 255.255.255.252\n ip ospf network point-to-point\n!\ninterface Vlan10\n ip address 10.30.10.1 255.255.255.0\n ip helper-address 10.10.100.1\n!\ninterface Vlan20\n ip address 10.30.20.1 255.255.255.0\n ip helper-address 10.10.100.1\n!\nrouter ospf 1\n router-id 10.10.0.6\n network 10.0.0.0 0.255.255.255 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 290,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nvlan 10\n name Staff\n!\nvlan 20\n name Students\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/3\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/24\n description zum L3-Switch\n switchport trunk allowed vlan 1,10,20\n switchport mode trunk\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 600,
+      "y": 290,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nvlan 10\n name Staff\n!\nvlan 20\n name Students\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/3\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/24\n description zum L3-Switch\n switchport trunk allowed vlan 1,10,20\n switchport mode trunk\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "PC1",
+      "model": "pc",
+      "x": 20,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname PC1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 8,
+      "name": "PC2",
+      "model": "pc",
+      "x": 160,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 9,
+      "name": "Laptop1",
+      "model": "laptop",
+      "x": 300,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname Laptop1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 10,
+      "name": "PC3",
+      "model": "pc",
+      "x": 460,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname PC3\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 11,
+      "name": "PC4",
+      "model": "pc",
+      "x": 600,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname PC4\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 12,
+      "name": "Laptop2",
+      "model": "laptop",
+      "x": 740,
+      "y": 430,
+      "off": false,
+      "startup_config": "hostname Laptop2\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 13,
+      "a": {
+        "dev": 3,
+        "port": "TenGigabitEthernet1/1/1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "TenGigabitEthernet0/1/0"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 14,
+      "a": {
+        "dev": 4,
+        "port": "TenGigabitEthernet1/1/1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "TenGigabitEthernet0/1/1"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 15,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 16,
+      "a": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 17,
+      "a": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 18,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 19,
+      "a": {
+        "dev": 8,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 20,
+      "a": {
+        "dev": 9,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 21,
+      "a": {
+        "dev": 10,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 22,
+      "a": {
+        "dev": 11,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 23,
+      "a": {
+        "dev": 12,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 24,
+      "x": 0,
+      "y": 530,
+      "w": 380,
+      "h": 40,
+      "text": "Gebäude A: 10.20.10.0/24 (Staff), 10.20.20.0/24 (Students)"
+    },
+    {
+      "id": 25,
+      "x": 440,
+      "y": 530,
+      "w": 380,
+      "h": 40,
+      "text": "Gebäude B: 10.30.10.0/24 (Staff), 10.30.20.0/24 (Students)"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 10
+}

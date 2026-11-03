@@ -1,0 +1,61 @@
+#!args --verify-dirty
+# ui.action_card (lib/ui/action_card.rs): a click and Enter and Space choose a card, a disabled one
+# takes nothing and no Tab stop, Tab walks the cards in their order, the records are buttons by their
+# names, a selected card says so, the texts are records of their own; shots light, dark and at 150 %.
+# Ids: 100 .. 103 the cards, 104 the disabled one, 110 and 111 the rows.
+size 760 620
+theme light
+expect button:"Karte mit Bild" exists
+expect button:"Karte mit Symbol" exists
+expect button:"Karte mit Plakette" exists
+expect button:"kurz.txt" exists
+expect text:"Die Zeichnung der App steht in der Fläche über den Texten." exists
+expect text:"Heute 14:05" exists
+expect text:"Gewählt: [0, 0, 0, 0, 0, 0, 0]" exists
+expect button:"Gewählte Karte" checked
+expect button:"Karte mit Bild" unchecked
+expect button:"Abgeschaltete Karte" disabled
+# the pointer
+click button:"Karte mit Bild"
+expect text:"Gewählt: [1, 0, 0, 0, 0, 0, 0]" exists
+expect #100 focused
+click button:"Karte mit Symbol"
+expect text:"Gewählt: [1, 1, 0, 0, 0, 0, 0]" exists
+click button:"lang.txt"
+expect text:"Gewählt: [1, 1, 0, 0, 0, 0, 1]" exists
+# a disabled card takes nothing
+click button:"Abgeschaltete Karte"
+expect text:"Gewählt: [1, 1, 0, 0, 0, 0, 1]" exists
+# the keyboard: Tab in their order past the disabled one, Enter and Space
+focus #100
+key enter
+expect text:"Gewählt: [2, 1, 0, 0, 0, 0, 1]" exists
+key tab
+expect #101 focused
+key space
+expect text:"Gewählt: [2, 2, 0, 0, 0, 0, 1]" exists
+key tab
+expect #102 focused
+key tab
+expect #103 focused
+key enter
+expect text:"Gewählt: [2, 2, 0, 1, 0, 0, 1]" exists
+key tab
+expect #110 focused
+key enter
+expect text:"Gewählt: [2, 2, 0, 1, 0, 1, 1]" exists
+key shift+tab
+expect #103 focused
+key tab
+shot build/cardtest_light.png
+theme dark
+move 300,100
+wait 50
+shot build/cardtest_dark.png
+scale 150
+shot build/cardtest_dark_150.png
+scale 100
+theme light
+size 420 620
+shot build/cardtest_narrow.png
+expect_nowarn

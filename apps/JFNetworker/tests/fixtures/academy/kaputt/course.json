@@ -1,0 +1,42 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": [
+    "Kaputt",
+    "Broken"
+  ],
+  "summary": [
+    "Ein Pfad führt hinaus.",
+    "A path leads out."
+  ],
+  "minutes": 1,
+  "units": [
+    {
+      "title": [
+        "Eins",
+        "One"
+      ],
+      "steps": [
+        {
+          "id": "raus",
+          "kind": "lesson",
+          "title": [
+            "Hinaus",
+            "Out"
+          ],
+          "file": "../../../secret.md"
+        },
+        {
+          "id": "art",
+          "kind": "vortrag",
+          "title": [
+            "Unbekannt",
+            "Unknown"
+          ],
+          "file": "a.md"
+        }
+      ]
+    }
+  ]
+}

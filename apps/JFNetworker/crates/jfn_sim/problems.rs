@@ -30,6 +30,7 @@
 //                       on the device (files.rs)
 //   CableTooLong        a cable longer than its medium allows at its speed (phys.rs, P1)
 //   OpticMismatch       the optics of a fibre's ends do not fit each other or the fibre
+//   CableGrade          a cable's category does not carry the speed of its ports (phys.rs, H2)
 //   MailMxNowhere       an MX record whose host has no address in any zone (error), or no SMTP
 //                       server runs at its address (warning; smtpd.rs)
 //   MailOpenRelay       an SMTP server that relays for every sender ("open_relay", warning)
@@ -43,6 +44,12 @@
 //   Dot1xNoServer       a port under "authentication port-control auto" with no method list or no
 //                       server behind it: it stays closed (error; dot1x.rs)
 //   Dot1xOff            such a port without "dot1x system-auth-control": it stays open (warning)
+//   FwNoZone            an interface with an address and no zone on a firewall that has zones: what
+//                       goes between it and a zone is dropped (warning; fw.rs)
+//   FwNoPair            a zone with interfaces and no zone pair with a policy to or from another zone:
+//                       nothing leaves or enters it (warning)
+//   FwPairNoPolicy      a zone pair without a service policy: it drops everything (warning)
+//   FwPolicyUnused      a policy no zone pair uses (warning)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -136,6 +143,16 @@ pub enum ProblemKind {
     Dot1xNoServer,
     /// a port asks for 802.1X but the device has it switched off
     Dot1xOff,
+    /// a cable whose category does not carry the speed of its ports (phys.rs)
+    CableGrade,
+    /// an interface without a zone on a firewall that has zones (fw.rs)
+    FwNoZone,
+    /// a zone without a zone pair with a policy
+    FwNoPair,
+    /// a zone pair without a policy
+    FwPairNoPolicy,
+    /// a policy no zone pair uses
+    FwPolicyUnused,
 }
 
 /// a problem of the set-up
@@ -293,6 +310,7 @@ impl Engine {
         self.snmp_problems(&mut out);
         self.script_problems(&mut out);
         self.dot1x_problems(&mut out);
+        self.fw_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }
@@ -697,6 +715,50 @@ impl Engine {
                     };
                     out.push(Problem { kind: ProblemKind::DuplicateIpv6, severity: Severity::Error, dev, port, link: None, others, text: m.text(), msg: m });
                 }
+            }
+        }
+    }
+}
+
+impl Engine {
+    /// what looks wrong on a firewall that has zones (fw.rs)
+    fn fw_problems(&self, out: &mut Vec<Problem>) {
+        use crate::fw::SELF_ZONE;
+        for (&dev, &ni) in &self.dev_idx {
+            let Some(st) = self.stack(ni) else {
+                continue;
+            };
+            let fw = &st.fw;
+            let warn = |kind: ProblemKind, port: Option<u16>, m: Msg| problem(kind, Severity::Warning, dev, port, None, Vec::new(), m);
+            for name in fw.policies.keys() {
+                if !fw.pairs.values().any(|x| x.policy.as_deref() == Some(name.as_str())) {
+                    out.push(warn(ProblemKind::FwPolicyUnused, None, msg!("Die Richtlinie {} gilt für kein Zonenpaar und wirkt deshalb nicht.", name)));
+                }
+            }
+            if fw.members.is_empty() {
+                continue;
+            }
+            for (i, f) in st.ifaces.iter().enumerate().filter(|(_, f)| !f.hidden && !f.is_loopback() && !f.addrs.is_empty()) {
+                if !fw.members.contains_key(&(i as u16)) {
+                    let port = match f.kind {
+                        IfKind::Port(p) | IfKind::Sub { port: p, .. } => Some(p),
+                        _ => None,
+                    };
+                    out.push(warn(ProblemKind::FwNoZone, port, msg!("{} hat eine Adresse, aber keine Zone: Verkehr zwischen ihr und den Zonen wird verworfen.", label(f))));
+                }
+            }
+            for name in fw.zones.keys() {
+                if !fw.members.values().any(|z| z == name) {
+                    continue;
+                }
+                let others = fw.zones.keys().any(|o| o != name && fw.members.values().any(|z| z == o));
+                let linked = fw.pairs.values().any(|p| p.policy.is_some() && (p.src == *name || p.dst == *name) && p.src != SELF_ZONE && p.dst != SELF_ZONE);
+                if others && !linked {
+                    out.push(warn(ProblemKind::FwNoPair, None, msg!("Zone {} hat kein Zonenpaar mit Richtlinie: nichts kommt aus ihr heraus oder in sie hinein.", name)));
+                }
+            }
+            for (name, p) in fw.pairs.iter().filter(|(_, p)| p.policy.is_none() && p.src != SELF_ZONE && p.dst != SELF_ZONE) {
+                out.push(warn(ProblemKind::FwPairNoPolicy, None, msg!("Das Zonenpaar {} ({} nach {}) hat keine Richtlinie und verwirft alles.", name, p.src, p.dst)));
             }
         }
     }

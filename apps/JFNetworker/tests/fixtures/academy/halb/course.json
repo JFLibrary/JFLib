@@ -1,0 +1,96 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": [
+    "Halb fertig",
+    "Half done"
+  ],
+  "summary": [
+    "Für die Tests: was noch fehlt und was nicht geht.",
+    "For the tests: what is missing and what does not work."
+  ],
+  "level": "advanced",
+  "minutes": 5,
+  "units": [
+    {
+      "title": [
+        "Lesen",
+        "Reading"
+      ],
+      "steps": [
+        {
+          "id": "nur-de",
+          "kind": "lesson",
+          "title": [
+            "Nur auf Deutsch",
+            "German only"
+          ],
+          "file": "nur-de.md"
+        },
+        {
+          "id": "nur-en",
+          "kind": "lesson",
+          "title": [
+            "Nur auf Englisch",
+            "English only"
+          ],
+          "file": "nur-en.md"
+        },
+        {
+          "id": "links",
+          "kind": "lesson",
+          "title": [
+            "Links und Bilder",
+            "Links and pictures"
+          ],
+          "file": "links.md"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Prüfen",
+        "Testing"
+      ],
+      "steps": [
+        {
+          "id": "quiz",
+          "kind": "quiz",
+          "title": [
+            "Ein Quiz",
+            "A quiz"
+          ],
+          "file": ""
+        },
+        {
+          "id": "suche",
+          "kind": "fault",
+          "title": [
+            "Eine Fehlersuche",
+            "A fault hunt"
+          ],
+          "file": ""
+        },
+        {
+          "id": "pruefung",
+          "kind": "exam",
+          "title": [
+            "Eine Prüfung",
+            "An exam"
+          ],
+          "file": ""
+        },
+        {
+          "id": "schluss",
+          "kind": "lesson",
+          "title": [
+            "Zum Schluss",
+            "At the end"
+          ],
+          "file": "schluss.md"
+        }
+      ]
+    }
+  ]
+}

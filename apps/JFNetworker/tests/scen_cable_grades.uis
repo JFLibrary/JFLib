@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/cable_grades.jfnet --scenario apps/JFNetworker/tests/scen/cable_grades.scn --golden apps/JFNetworker/tests/scen/cable_grades.report
+# golden scenario: categories of cables against their limits, serial lines with a chosen end, DAC and AOC.  The GUI program runs
+# tests/scen/cable_grades.scn on tests/fixtures/cable_grades.jfnet without a window and ends with the report, which must equal
+# tests/scen/cable_grades.report byte for byte on every target (the script itself is not run)

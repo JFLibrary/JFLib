@@ -9,7 +9,8 @@
 //          "backends": [{"name": "web1", "addr": "10.0.2.11", "port": 80, "weight": 1}],
 //          "health": {"type": "http", "path": "/", "interval_ms": 2000, "timeout_ms": 1000,
 //          "rise": 2, "fall": 3}, "retries": 1, "timeout_ms": 10000, "connect_timeout_ms": 1000,
-//          "drain_ms": 30000, "max_conns": 0, "keepalive": true, "tag": true}
+//          "drain_ms": 30000, "max_conns": 0, "keepalive": true, "tag": true, "cpu_us": 50, "mem_mb": 16,
+//          "conn_kb": 64}
 //
 // Algorithms ("algorithm"): "round-robin" takes the backends in turn; "least-conn" the one
 // with the fewest requests (HTTP) or connections (TCP) in flight, in turn among equals;
@@ -39,6 +40,13 @@
 // backend with its state, checks and latencies (the lab); lbctl shows it on the console.  The
 // time series (series.rs) take p50_us, p95_us, p99_us of each interval from the window.  The
 // status line is a message for the app's catalogue (status_msg; status() is its German text).
+//
+// On a device with hardware (res.rs) every HTTP request costs "cpu_us" at a reference core before a
+// backend is picked: a balancer can be the bottleneck.  The bytes of a TCP pipe cost no CPU.
+//
+// Service::reconfigure takes a whole new config while it runs, all but its mode, port and kind of
+// health check: backends that are new start now, those that are gone drain first, another address
+// of a backend needs another name.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -242,6 +250,8 @@ enum LTimer {
     Connect(u32),
     /// the drain time of a backend is over
     Drain(usize),
+    /// a request's CPU work is done (res.rs)
+    Gate(u64),
 }
 
 /// an HTTP request on its way to a backend
@@ -281,6 +291,10 @@ struct Pipe {
 /// the load balancer
 #[derive(Clone, Debug)]
 pub struct Lb {
+    /// a request's CPU work, the requests that wait for it, what it holds (res.rs)
+    pub cpu: Ns,
+    gate: crate::res::CpuGate<ReqIn>,
+    pub mem: crate::res::SvcMem,
     pub mode: LbMode,
     pub port: u16,
     pub algo: Algo,
@@ -331,6 +345,9 @@ fn hop_by_hop(name: &str) -> bool {
 }
 
 impl Lb {
+    /// the CPU work of a request at a reference core unless the config says otherwise (res.rs)
+    const CPU: Ns = 50 * crate::kernel::US;
+
     pub fn new(mode: LbMode, port: u16) -> Lb {
         let cfg = ServeCfg { port, server: String::new(), max_requests: 0, max_body: 64 << 20, ..ServeCfg::default() };
         Lb {
@@ -347,6 +364,9 @@ impl Lb {
             max_conns: 0,
             keepalive: true,
             tag: true,
+            cpu: Lb::CPU,
+            gate: crate::res::CpuGate::default(),
+            mem: crate::res::SvcMem::default(),
             backends: Vec::new(),
             ring: Ring::new(),
             turn: 0,
@@ -530,6 +550,18 @@ impl Lb {
 
     fn arrive(&mut self, os: &mut OsApi, r: ReqIn) {
         self.requests += 1;
+        // its work on the request first: the backend is picked after it (res.rs)
+        let (now, at) = (os.now(), os.cpu(self.cpu));
+        if at > now {
+            let id = self.gate.hold(r);
+            self.wheel.add(at, LTimer::Gate(id));
+            return;
+        }
+        self.pass(os, r);
+    }
+
+    /// a backend for the request, or 503
+    fn pass(&mut self, os: &mut OsApi, r: ReqIn) {
         let key = self.key_of(&r);
         match self.pick(key, &[]) {
             Some(b) => self.forward(os, r, key, b, Vec::new()),
@@ -557,7 +589,9 @@ impl Lb {
         h.add("X-Forwarded-For", &xff);
         let url = Url { host: format!("{}", be.addr), port: be.port, target: r.head.target.clone() };
         let req = Req { method: r.head.method.clone(), url, version: Version::Http11, headers: h, body: r.body.clone(), timeout: self.timeout, connect_timeout: self.connect_timeout, reuse: self.keepalive, keep_body: true };
-        os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        if os.recording() {
+            os.note(Note::LbPick { backend: be.name.clone(), algo: self.algo.name() });
+        }
         let aid = self.agent.submit(os, req);
         let be = &mut self.backends[b];
         be.active += 1;
@@ -1034,6 +1068,11 @@ impl Lb {
         let now = os.now();
         for (_, t) in self.wheel.due(now) {
             match t {
+                LTimer::Gate(id) => {
+                    if let Some(r) = self.gate.take(id) {
+                        self.pass(os, r);
+                    }
+                }
                 LTimer::Check(i) => {
                     if self.backends.get(i).is_some_and(|b| !b.gone()) && self.health.kind != CheckKind::None {
                         self.start_check(os, i);
@@ -1266,6 +1305,7 @@ impl Service for Lb {
         self.agent.reset();
         self.checker.reset();
         self.wheel.clear();
+        self.gate.clear();
         self.fwd.clear();
         self.by_agent.clear();
         self.hchecks.clear();
@@ -1329,6 +1369,7 @@ impl Service for Lb {
         self.agent.reset();
         self.checker.reset();
         self.wheel.clear();
+        self.gate.clear();
         self.fwd.clear();
         self.by_agent.clear();
         self.hchecks.clear();
@@ -1340,6 +1381,72 @@ impl Service for Lb {
             b.active = 0;
             b.checking = false;
         }
+    }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let fresh = from_def_msg(c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<Lb>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "lb"));
+        };
+        if self.mode != f.mode || self.port != f.port {
+            return Err(msg!("Modus und Port eines Load Balancers ändern sich nur mit einem Neustart."));
+        }
+        if self.health.kind != f.health.kind {
+            return Err(msg!("Die Art der Prüfungen ändert sich nur mit einem Neustart."));
+        }
+        // what happens to the backends, seen before anything changes
+        let mut ops = Vec::new();
+        for b in &f.backends {
+            match self.backends.iter().find(|x| !x.gone() && x.name.eq_ignore_ascii_case(&b.name)) {
+                Some(x) if x.addr != b.addr || x.port != b.port => return Err(msg!("Das Backend {} hat eine andere Adresse: es braucht einen anderen Namen.", b.name.clone())),
+                Some(x) if x.weight != b.weight => ops.push(LbOp::Weight { name: b.name.clone(), weight: b.weight }),
+                Some(_) => {}
+                None => ops.push(LbOp::Add { name: b.name.clone(), addr: b.addr, port: b.port, weight: b.weight }),
+            }
+        }
+        for x in self.backends.iter().filter(|x| !x.gone()) {
+            if !f.backends.iter().any(|b| b.name.eq_ignore_ascii_case(&x.name)) {
+                ops.push(LbOp::Remove { name: x.name.clone() });
+            }
+        }
+        if self.algo != f.algo {
+            self.set_algo(f.algo);
+        }
+        self.hash_key = f.hash_key.clone();
+        let rering = self.vnodes != f.vnodes;
+        self.vnodes = f.vnodes;
+        self.health.path = f.health.path.clone();
+        self.health.interval = f.health.interval;
+        self.health.timeout = f.health.timeout;
+        self.health.rise = f.health.rise;
+        self.health.fall = f.health.fall;
+        self.retries = f.retries;
+        self.timeout = f.timeout;
+        self.connect_timeout = f.connect_timeout;
+        self.drain = f.drain;
+        self.max_conns = f.max_conns;
+        self.keepalive = f.keepalive;
+        self.tag = f.tag;
+        self.cpu = f.cpu;
+        self.mem = f.mem;
+        if rering {
+            self.rering();
+        }
+        match os {
+            Some(os) => {
+                for op in ops {
+                    self.change(os, op)?;
+                }
+            }
+            None => {
+                for op in ops {
+                    self.change_stopped(op)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn mem(&self) -> u64 {
+        self.mem.bytes((self.serve.conns() + self.agent.conns() + 2 * self.pipes.len()) as u64, 0)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -1438,6 +1545,8 @@ pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     lb.connect_timeout = ms("connect_timeout_ms", 1000).max(MS);
     lb.drain = ms("drain_ms", 30_000);
     lb.max_conns = num("max_conns", 0).min(1_000_000) as u32;
+    lb.cpu = c.get("cpu_us").and_then(|v| decimal(v, crate::kernel::US)).unwrap_or(Lb::CPU);
+    lb.mem = crate::res::SvcMem::of(c, 16, 64);
     lb.keepalive = c.get("keepalive").and_then(|v| v.as_bool()).unwrap_or(true);
     lb.tag = c.get("tag").and_then(|v| v.as_bool()).unwrap_or(true);
     if let Some(h) = c.get("health") {

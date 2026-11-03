@@ -65,6 +65,9 @@ impl Drop for SurfShared {
 pub struct Surface(pub(crate) Arc<SurfShared>);
 
 impl Surface {
+    /// (Linux: the window's size for a rebuild on a worker; here the driver knows it)
+    pub fn track_size(&self) {}
+
     /// the surface of plat window `window` (an index of plat::win_create)
     pub fn new(instance: &Instance, window: i32) -> Result<Surface> {
         #[cfg(windows)]
@@ -537,6 +540,34 @@ impl Swapchain {
         }
         Ok(SubmitId(value))
     }
+
+    /// (Linux: the display has answered for the images; here nothing to wait for)
+    #[inline]
+    pub fn prepare(&mut self) -> Result<bool> {
+        Ok(true)
+    }
+
+    /// (Linux: a frame reaches the window after the GPU finished it; here present has done that)
+    #[inline]
+    pub fn flush(&self) -> Result<bool> {
+        Ok(false)
+    }
+
+    /// (Linux: a frame is on its way to the window; here never)
+    #[inline]
+    pub fn busy(&self) -> bool {
+        false
+    }
+
+    /// when a frame that found NotReady should try again: retry (the caller's time)
+    #[inline]
+    pub fn next_look(&self, retry: u64) -> u64 {
+        retry
+    }
+
+    /// (Linux: what the next image changes, for the compositor; here the whole image counts)
+    #[inline]
+    pub fn damage(&self, _rects: Option<&[[i32; 4]]>) {}
 
     /// rebuild at the next acquire (the window's size is also checked at every acquire)
     pub fn resize(&mut self) {

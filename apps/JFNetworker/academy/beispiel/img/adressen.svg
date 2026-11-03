@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="200" viewBox="0 0 560 200">
+  <title>Zwei getrennte Netze</title>
+  <rect x="1" y="1" width="558" height="198" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <!-- the first network with two hosts -->
+  <rect x="24" y="24" width="300" height="152" rx="10" fill="#E3EEF8" stroke="#3A6EA5" stroke-width="3" stroke-dasharray="10 6"/>
+  <rect x="56" y="70" width="80" height="48" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="64" y="78" width="64" height="32" fill="#CFE0F1"/>
+  <rect x="80" y="118" width="32" height="8" fill="#44515E"/>
+  <rect x="212" y="70" width="80" height="48" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="220" y="78" width="64" height="32" fill="#CFE0F1"/>
+  <rect x="236" y="118" width="32" height="8" fill="#44515E"/>
+  <path d="M136 94 L212 94" fill="none" stroke="#3A6EA5" stroke-width="4"/>
+  <!-- the second network with one host -->
+  <rect x="356" y="24" width="180" height="152" rx="10" fill="#F6ECDD" stroke="#A9702A" stroke-width="3" stroke-dasharray="10 6"/>
+  <rect x="406" y="70" width="80" height="48" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="3"/>
+  <rect x="414" y="78" width="64" height="32" fill="#F1DFC3"/>
+  <rect x="430" y="118" width="32" height="8" fill="#44515E"/>
+</svg>

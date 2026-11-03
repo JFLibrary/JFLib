@@ -44,6 +44,7 @@
 //                                                      are used, their hit counters (acl.rs)
 //   Nat                                                address translation: interfaces, pools,
 //                                                      rules, timeouts, clearing (nat.rs)
+//   Fw                                                 the zone firewall (fw.rs)
 //   Ip6                                                IPv6: routing, addresses, the link-local
 //                                                      one, autoconfiguration, advertisements,
 //                                                      routes, neighbors (ip6.rs, nd.rs); IPv6
@@ -68,6 +69,10 @@
 //                                                      do not fit keep a cable down); Connect
 //                                                      takes Link::len_m as the cable's length
 //                                                      (0: unknown), AddDevice the device's optics
+//   CableGrade / StrictMdix                            a cable's category (phys.rs; Connect takes
+//                                                      Link::grade), the project's "Auto-MDI-X aus"
+//                                                      (H2: a wrong copper cable holds its link
+//                                                      down; every link looks again)
 //   MailSend / MailFetch                               the E-Mail program of a host sends a
 //                                                      message or fetches the new ones of its
 //                                                      account (mailc.rs: a job of its own,
@@ -86,6 +91,11 @@
 //   ScriptDebug                                        the debugger of a script service: stop,
 //                                                      go on, steps, breakpoints in virtual time
 //                                                      (scriptsvc.rs, DebugOp)
+//   Resize / Metered                                   other hardware for a device, with a reboot
+//                                                      or live; the project's "Hardware simulieren"
+//                                                      (res.rs)
+//   ServiceConfig                                      a service takes a new config while it runs
+//                                                      (Service::reconfigure: lab.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -256,6 +266,8 @@ pub enum Action {
     /// address translation (nat.rs): the side of an interface, pools, rules, timeouts,
     /// clearing translations or counters
     Nat { dev: u32, act: crate::nat::NatAct },
+    /// the zone firewall (fw.rs): zones, members, classes, policies, zone pairs, timers, clearing
+    Fw { dev: u32, op: crate::fw::FwOp },
     /// a change of the IPv6 configuration (ip6.rs, nd.rs)
     Ip6 { dev: u32, set: crate::ip6::Ip6Set },
     /// a change of OSPF's configuration, or "clear ip ospf process" (ospf.rs)
@@ -279,6 +291,10 @@ pub enum Action {
     Files { dev: u32, files: Vec<jfn_model::files::File> },
     /// the length of a cable in metres (0: unknown, never too long; phys.rs)
     CableLen { link: u32, len_m: u32 },
+    /// the category of a cable (Unset: none; phys.rs)
+    CableGrade { link: u32, grade: jfn_model::cable::CableGrade },
+    /// a wrong copper cable holds its link down (Project::strict_mdix)
+    StrictMdix { on: bool },
     /// the transceiver in a port's optics cage (phys.rs)
     Optic { dev: u32, port: String, optic: jfn_model::catalog::Optic },
     /// the E-Mail program of a device sends a message (mailc.rs)
@@ -304,6 +320,15 @@ pub enum Action {
     Supplicant { dev: u32, conf: String },
     /// the E-Mail program's next step with its IMAP server (mailc.rs)
     MailImap { dev: u32, op: crate::mailc::ImapOp },
+    /// other hardware for a device (None: its model's in a metered project, else none): with a
+    /// downtime it reboots (res::RESIZE_DOWN by default), with none the running system takes it
+    /// (res.rs)
+    Resize { dev: u32, hw: Option<jfn_model::catalog::Hw>, downtime: u64 },
+    /// "Hardware simulieren" of the project (Project::metered, res.rs)
+    Metered { on: bool },
+    /// a service takes its whole config anew without a restart (Service::reconfigure; refused with
+    /// the reason when it cannot, and then nothing has changed)
+    ServiceConfig { dev: u32, svc: String, config: agent_core::jmap::Value },
 }
 
 /// why an action was refused (German text through Display)
@@ -681,6 +706,7 @@ impl Engine {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 self.nat_apply(ni, dev, act)
             }
+            Action::Fw { dev, op } => self.fw_apply(dev, op),
             Action::Ip6 { dev, set } => self.ip6_apply(dev, set),
             Action::Ospf { dev, set } => self.ospf_apply(dev, set),
             // WLAN (wlan.rs)
@@ -688,6 +714,12 @@ impl Engine {
             Action::Wlan { dev, wlan } => self.wlan_set(dev, wlan),
             Action::Scale { dip_per_m } => self.wlan_set_scale(dip_per_m),
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
+            // the hardware of a device (res.rs)
+            Action::Resize { dev, hw, downtime } => self.res_resize(dev, hw, downtime),
+            Action::Metered { on } => {
+                self.res_metered(on);
+                Ok(())
+            }
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
             Action::MailImap { dev, op } => self.mail_job(dev, crate::mailc::MailJob::Imap(op)),
@@ -704,6 +736,14 @@ impl Engine {
             }
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
+            Action::CableGrade { link, grade } => self.set_cable_grade(link, grade),
+            Action::StrictMdix { on } => {
+                self.strict_mdix = on;
+                for li in 0..self.links.len() {
+                    self.refresh_link(li);
+                }
+                Ok(())
+            }
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
             // the E-Mail program (mailc.rs)
             Action::MailSend { dev, draft } => self.mail_job(dev, crate::mailc::MailJob::Send(draft)),
@@ -971,6 +1011,8 @@ impl Engine {
         self.nodes.push(Some(node));
         let ni = self.nodes.len() - 1;
         self.dev_idx.insert(d.id, ni);
+        // its hardware, before its disk is used (res.rs)
+        self.res_boot(ni, d.hw.as_ref(), m.id);
         // its files (files.rs), before the services that serve them
         if let Some(os) = self.os_mut(ni) {
             os.files.load(&d.files);
@@ -1051,8 +1093,9 @@ impl Engine {
                 node.ports[p as usize].link = Some(li);
             }
         }
-        // its length and what follows from it (phys.rs); one that never comes up says why
-        self.phys_init(li, l.len_m);
+        // its length and category and what follows from them (phys.rs); one that never comes up
+        // says why
+        self.phys_init(li, l.len_m, l.grade);
         self.refresh_link(li);
         if self.phys_bad(li) {
             self.phys_down(li);

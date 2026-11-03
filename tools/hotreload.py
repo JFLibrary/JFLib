@@ -82,7 +82,7 @@ def watch_files(name, style=None):
     files = set(project_sources(entrypoint(app, "app"), assets=True))
     for _, root, _ in b.app_bins(name):
         files.update(project_sources(root, assets=True))
-    files.update(p for p in app.iterdir() if p.is_file() and (p.name in ("PERMISSIONS", "PACKAGE", "STYLE", "BINS", "TARGETS")
+    files.update(p for p in app.iterdir() if p.is_file() and (p.name in ("PERMISSIONS", "PACKAGE", "STYLE", "BINS", "TARGETS", "GLIBC")
                                                                or p.name.startswith("PERMISSIONS.")))
     for d in ("assets", "res"):
         if (app / d).is_dir():

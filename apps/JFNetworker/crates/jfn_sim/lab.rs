@@ -2,7 +2,8 @@
 //
 //   Engine::lab_apply(Action)      Fault, Heal, HealAll (fault.rs); LbBackend, LbAlgorithm
 //                                  (lb.rs); KvSet (kv.rs); CacheClear (cache.rs); WorkerSet
-//                                  (mq.rs)
+//                                  (mq.rs); ServiceConfig (Service::reconfigure)
+//   Engine::can_reconfigure(dev, svc, &config)   a copy of the service could take this config
 //   Engine::service_list()         every configured service of every device in brief (SvcBrief:
 //                                  device, name, kind, enabled, running), without numbers or
 //                                  status -- cheap enough for the badges of 500 devices
@@ -52,12 +53,35 @@ impl Engine {
         out.map_err(ActErr::Refused)
     }
 
+    /// Action::ServiceConfig: a service of any kind takes a new config; a running one gets its OsApi
+    fn service_config(&mut self, dev: u32, name: &str, config: &agent_core::jmap::Value) -> Result<(), ActErr> {
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
+        let s = os.svc(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let (id, running) = (s.id, s.running);
+        let mut out: Result<(), Msg> = Ok(());
+        if running {
+            self.svc_call(ni, id, None, |s, api| out = s.reconfigure(config, Some(api)));
+        } else if let Some(s) = self.os_mut(ni).and_then(|o| o.svcs.iter_mut().find(|s| s.id == id)).and_then(|s| s.svc.as_mut()) {
+            out = s.reconfigure(config, None);
+        }
+        out.map_err(ActErr::Refused)
+    }
+
+    /// a copy of the service could take this config without a restart (doc/sim.rs asks before it
+    /// restarts a device)
+    pub fn can_reconfigure(&self, dev: u32, name: &str, config: &agent_core::jmap::Value) -> bool {
+        let svc = self.node_index(dev).and_then(|ni| self.os(ni)).and_then(|o| o.svc(name)).and_then(|s| s.svc.as_ref());
+        svc.is_some_and(|s| s.clone_box().reconfigure(config, None).is_ok())
+    }
+
     /// the actions of the lab (from svcact.rs's os_apply)
     pub(crate) fn lab_apply(&mut self, a: Action) -> Result<(), ActErr> {
         match a {
             Action::Fault { fault, dur } => self.fault_start(fault, dur).map(|_| ()),
             Action::Heal { id } => self.fault_heal(id),
             Action::HealAll => self.fault_heal_all(),
+            Action::ServiceConfig { dev, svc, config } => self.service_config(dev, &svc, &config),
             Action::LbBackend { dev, svc, op } => self.lab_change::<crate::lb::Lb>(dev, &svc, |lb, api| match api {
                 Some(api) => lb.change(api, op),
                 None => lb.change_stopped(op),

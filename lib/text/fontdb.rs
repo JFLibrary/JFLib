@@ -35,13 +35,13 @@
 //   save_cache(path) / load_cache(path) -> 0 / -1
 //
 // Families group faces by the legacy family name (name ID 1); names prefer German, then
-// English.  Cache file (little endian): "FDB1", u32 version 3, u32 files, u32 faces, u32
+// English.  Cache file (little endian): "FDB1", u32 version 4, u32 files, u32 faces, u32
 // pool bytes, u64 FNV-1a hash of everything after the 28-byte header; files {u32 path, u32
 // size, u32 first face, u32 faces}; faces {u32 file, u32 face index, u16 weight, u16 flags,
 // u32 family, u32 style, u32 full, u32 typo family, u32 0}; pool of NUL-terminated UTF-8
 // strings (offsets above point into it).  Entries are validated by path and file size.
 // Version 3: CFF2 faces count (a version 2 cache lists CFF2-only files without faces, so it
-// is not read).
+// is not read).  Version 4: FDFF_NOLATIN.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -62,6 +62,8 @@ pub const FDFF_VAR: u16 = 32;
 pub const FDFF_SYMBOL: u16 = 64;
 /// CFF2 outlines (FDFF_CFF is set as well)
 pub const FDFF_CFF2: u16 = 128;
+/// the cmap lacks A or a: a font for another script (see FontDb::resolve)
+pub const FDFF_NOLATIN: u16 = 256;
 
 const DEPTH_MAX: u32 = 8;
 const PATH_CAP: usize = 4096;
@@ -69,11 +71,12 @@ const HDR_READ: usize = 4096;
 const TTC_MAX: u32 = 64;
 const NT_MAX: u32 = 1024;
 const NAME_MAX: u32 = 1 << 20;
+const CMAP_MAX: u32 = 1 << 20;
 const FILES_MAX: usize = 20000;
 const LOADED_MAX: usize = 256;
 const CACHE_MAGIC: u32 = 0x3142_4446; // "FDB1"
 const CACHE_HDR: usize = 28;
-const CACHE_VERSION: u32 = 3;
+const CACHE_VERSION: u32 = 4;
 const VISIT_MAX: usize = 4096;
 const TAG_TTCF: u32 = 0x7474_6366;
 const TAG_TRUE: u32 = 0x7472_7565;
@@ -88,6 +91,7 @@ const T_CFF2: u32 = 0x4346_4632;
 const T_COLR: u32 = 0x434F_4C52;
 const T_CBDT: u32 = 0x4342_4454;
 const T_FVAR: u32 = 0x6676_6172;
+const T_CMAP: u32 = 0x636D_6170;
 const FVAR_MAX: u32 = 1 << 20;
 static NAME_WANT: [u32; 4] = [FN_FAMILY, FN_STYLE, FN_FULL, FN_TYPO_FAMILY];
 
@@ -262,6 +266,54 @@ fn be16(d: &[u8], o: usize) -> u32 {
 
 fn be32(d: &[u8], o: usize) -> u32 {
     u32::from_be_bytes([d[o], d[o + 1], d[o + 2], d[o + 3]])
+}
+
+// does a cmap table map both A and a?  Its first Unicode subtable of format 4 or 12, else its
+// Mac Roman one of format 0 or 6; none of them (a symbol font) or one past CMAP_MAX: nothing
+// known, so yes
+fn cmap_latin(f: &plat::File, off: u32, len: u32) -> bool {
+    let mut b = alloc::vec![0u8; len.min(CMAP_MAX) as usize];
+    let got = read_at(f, off as u64, &mut b);
+    if got < 4 {
+        return true;
+    }
+    b.truncate(got as usize);
+    for mac in [false, true] {
+        for i in 0..be16(&b, 2) as usize {
+            let r = 4 + i * 8;
+            if r + 8 > b.len() {
+                break;
+            }
+            let (pid, eid, s) = (be16(&b, r), be16(&b, r + 2), be32(&b, r + 4) as usize);
+            let kind = if mac { pid == 1 && eid == 0 } else { pid == 0 || (pid == 3 && (eid == 1 || eid == 10)) };
+            if !kind || s.saturating_add(16) > b.len() {
+                continue;
+            }
+            let mapped = |cp: u32| match be16(&b, s) {
+                0 if mac => Some(b.get(s + 6 + cp as usize).is_some_and(|&g| g != 0)),
+                6 if mac => {
+                    let (first, n) = (be16(&b, s + 6), be16(&b, s + 8));
+                    let g = s + 10 + cp.wrapping_sub(first) as usize * 2;
+                    Some(cp >= first && cp - first < n && g + 2 <= b.len() && be16(&b, g) != 0)
+                }
+                4 if !mac => {
+                    let seg = be16(&b, s + 6) as usize / 2;
+                    (0..seg).map(|k| (s + 14 + k * 2, s + 16 + seg * 2 + k * 2)).take_while(|&(_, st)| st + 2 <= b.len())
+                        .find(|&(e, _)| be16(&b, e) >= cp).map(|(_, st)| be16(&b, st) <= cp)
+                }
+                12 if !mac => {
+                    let n = be32(&b, s + 12) as usize;
+                    Some((0..n).map(|k| s + 16 + k * 12).take_while(|&g| g + 8 <= b.len())
+                        .any(|g| be32(&b, g) <= cp && cp <= be32(&b, g + 4)))
+                }
+                _ => None,
+            };
+            if let (Some(upper), Some(lower)) = (mapped(0x41), mapped(0x61)) {
+                return upper && lower;
+            }
+        }
+    }
+    true
 }
 
 fn le32(d: &[u8], o: usize) -> u32 {
@@ -476,7 +528,7 @@ impl FontDb {
 
     // parse one face's tables and add it  [fd_face]
     fn face_rec(&mut self, f: &plat::File, dir: u32, face: u32, file: u32) {
-        let (mut name, mut os2, mut head) = ((0u32, 0u32), (0u32, 0u32), (0u32, 0u32));
+        let (mut name, mut os2, mut head, mut cmap) = ((0u32, 0u32), (0u32, 0u32), (0u32, 0u32), (0u32, 0u32));
         let mut flags = 0u16;
         let mut outl = false;
         // table directory
@@ -496,6 +548,7 @@ impl FontDb {
                 T_NAME => name = (off, len),
                 T_OS2 => os2 = (off, len),
                 T_HEAD => head = (off, len),
+                T_CMAP => cmap = (off, len),
                 T_GLYF => outl = true,
                 T_CFF => {
                     flags |= FDFF_CFF;
@@ -586,6 +639,9 @@ impl FontDb {
             if mac_style & 2 != 0 {
                 flags |= FDFF_ITALIC;
             }
+        }
+        if cmap.1 != 0 && !cmap_latin(f, cmap.0, cmap.1) {
+            flags |= FDFF_NOLATIN;
         }
         let mut r = FaceRec { file, face, weight: weight as u16, flags, ..Default::default() };
         r.fam = pool_put(&mut self.pool, &names[0]);
@@ -731,18 +787,26 @@ impl FontDb {
 
     /// the first installed candidate of conf for family in lang (generic families,
     /// substitutes, the language's choices), else sans-serif's -> (face index, FS_SYN_* flags,
-    /// the family name found)
+    /// the family name found).  A substitute without Latin letters (FDFF_NOLATIN) only counts
+    /// when nothing else fits, except for emoji and math: fontconfig ranks the language above
+    /// such a rule's family, and Fedora's rules put Noto Sans Arabic first in sans-serif and
+    /// monospace.  Another script's characters come from fallback.rs
     pub fn resolve(&self, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> Option<(usize, u32, String)> {
         let mut tried = conf.candidates(family, lang);
         if !is_generic(family) {
             tried.extend(conf.candidates("sans-serif", lang));
         }
+        let any_script = ["emoji", "math"].iter().any(|g| family.trim().eq_ignore_ascii_case(g));
+        let mut spare = None;
         for f in tried.iter().filter(|f| !is_generic(f)) {
             if let Some((i, syn)) = self.find(f, weight, italic) {
-                return Some((i, syn, self.faces[i].family.clone()));
+                if any_script || self.faces[i].flags & FDFF_NOLATIN == 0 || f.trim().eq_ignore_ascii_case(family.trim()) {
+                    return Some((i, syn, self.faces[i].family.clone()));
+                }
+                spare = spare.or(Some((i, syn)));
             }
         }
-        None
+        spare.map(|(i, syn)| (i, syn, self.faces[i].family.clone()))
     }
 
     /// resolve and load -> (font id / ERR_*, the family found)

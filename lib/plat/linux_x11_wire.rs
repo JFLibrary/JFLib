@@ -29,6 +29,7 @@ use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 
+#[cfg_attr(jfgui_glibc, allow(unused_imports))]
 use rt::os::{syscall3, syscall6};
 
 use super::*;
@@ -717,7 +718,11 @@ impl X11 {
             if room == 0 {
                 return 0;
             }
+            // (linux_x11_gpu.rs: with the descriptors of a reply)
+            #[cfg(jfgui_glibc)]
+            let r = self.gpu_recv(room);
             // SAFETY: inb[in_len..] has room bytes.
+            #[cfg(not(jfgui_glibc))]
             let r = unsafe {
                 syscall6(SYS_RECVFROM, self.fd as usize, self.inb.as_mut_ptr() as usize + self.in_len, room, MSG_DONTWAIT, 0, 0)
             };

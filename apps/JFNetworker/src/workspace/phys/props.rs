@@ -8,7 +8,7 @@
 //                        rack or desk, its rack unit, "Im Plan zeigen"; the optic of each optics
 //                        cage (SR or LR)
 //   cable(n, ui, id)     length (automatic or by hand, and the rule's value), the limit of its
-//                        medium at its speed with the standard, too long or optics that do not
+//                        medium at its speed with the standard, a category that does not carry it, too long or optics that do not
 //                        fit; the length by hand ("0" or Automatisch: automatic again)
 //
 // Every change is one undo step (doc/phys.rs); a refusal shows below the fields.  Decimal
@@ -275,6 +275,7 @@ pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
     rows_begin(ui);
     row(ui, t("Länge"), &if f.len.auto { tf("{} m (automatisch)", &[&f.len.m.to_string()]) } else { tf("{} m (von Hand; automatisch {} m)", &[&f.len.m.to_string(), &auto.to_string()]) });
     row(ui, t("Grenze"), &match f.reach {
+        Some(r) if !r.carries() => tf("trägt {} nicht", &[r.std]),
         Some(r) => tf("{} m ({})", &[&r.max_m.to_string(), r.std]),
         None => String::from(t("keine")),
     });
@@ -291,6 +292,8 @@ pub(crate) fn cable(n: &mut Net, ui: &mut Ui, id: u32) {
         && let Some(r) = f.reach
     {
         crate::workspace::error_text(ui, &tf("Zu lang: {} m, erlaubt {} m. Die Leitung bleibt aus.", &[&f.len.m.to_string(), &r.max_m.to_string()]), 0);
+    } else if let Some(std) = f.slow {
+        crate::workspace::error_text(ui, &tf("{}-Kabel trägt {} nicht. Die Leitung bleibt aus.", &[l.grade.name(), std]), 0);
     } else if let Some(o) = f.optics {
         let text = match o {
             phys::OpticFault::Mismatch(x, y) => tf("Die Optiken passen nicht: {} und {}. Die Leitung bleibt aus.", &[x.short(), y.short()]),

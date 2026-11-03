@@ -15,7 +15,10 @@
 // handing in); author.rs: the panel that makes one from the project (A1).  phys/: the physical
 // view beside the canvas (P1): places, floor plans, racks, cable lengths.  ide/: the IDE of a
 // host (IDE1): Explorer, tabs, language services, find in files, run as a process or a
-// service, the debugger, tests; its device window's IDE tab hosts it.
+// service, the debugger, tests; its device window's IDE tab hosts it.  startpage.rs: the page the
+// window opens on (new projects and templates, recent projects, labs), the project's info.
+// academy/: the Akademie (AK1, AK2): courses from files, their outline, lessons and labs, quizzes, tests and
+// fault hunts, the progress.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -33,6 +36,8 @@ pub(crate) mod assess;
 pub(crate) mod author;
 pub(crate) mod phys;
 pub(crate) mod ide;
+pub(crate) mod startpage;
+pub(crate) mod academy;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -48,6 +53,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // the lab's goals follow the simulation (workspace/task.rs), an assessment grades
     task::tick(n);
     assess::tick(n, ui);
+    academy::tick(n, ui);
     shell::frame(n, ui);
     terminal::windows(n, ui);
     devwin::frame(n, ui);

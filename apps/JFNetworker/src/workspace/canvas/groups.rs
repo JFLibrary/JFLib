@@ -123,7 +123,10 @@ fn with_name(r: [f32; 4], name: &str) -> [f32; 4] {
     [cx - w * 0.5, r[1] - PILL_H, cx + w * 0.5, r[1] + r[3] + NAME_H]
 }
 
-fn note_rect(n: &jfn_model::Note) -> [f32; 4] {
+pub(crate) fn note_rect(n: &jfn_model::Note) -> [f32; 4] {
+    if n.style == jfn_model::NoteStyle::Label {
+        return [n.x as f32, n.y as f32, n.w.max(4) as f32, n.h.max(4) as f32];
+    }
     [n.x as f32, n.y as f32, n.w.max(40) as f32, n.h.max(24) as f32]
 }
 
@@ -386,7 +389,7 @@ pub(crate) fn update(n: &mut Net) {
     }
     n.canvas.grp.seen = seen;
     let mut probs: BTreeMap<u32, (u32, u32)> = BTreeMap::new();
-    if !n.canvas.scene.clusters.is_empty() {
+    if !n.canvas.scene.clusters.is_empty() && !crate::workspace::task::lock(n).problems {
         let list = n.doc.sim.problems();
         let hidden = &n.canvas.scene.hidden;
         for x in list.iter() {

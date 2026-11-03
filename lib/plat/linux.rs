@@ -1,4 +1,4 @@
-// linux -- Linux platform: raw syscalls, no libc        [src/plat/linux/plat_linux.s, lx_sys.s]
+// linux -- Linux platform: raw syscalls, no libc (the build for GPU drivers: linux_glibc.rs)        [src/plat/linux/plat_linux.s, lx_sys.s]
 //
 // _start reads argc / argv / envp from the initial stack, calls the app's jfgui_main and
 // exits with its result.  Files and paths: linux_sys.rs; threads, wake-up, system
@@ -77,7 +77,7 @@ unsafe extern "Rust" {
     fn jfgui_main() -> i32;
 }
 
-core::arch::global_asm!(
+#[cfg(not(jfgui_glibc))] core::arch::global_asm!(
     ".globl _start",
     "_start:",
     "    xor ebp, ebp",
@@ -88,7 +88,7 @@ core::arch::global_asm!(
     entry = sym linux_entry,
 );
 
-extern "C" fn linux_entry(sp: *const usize) -> ! {
+#[cfg(not(jfgui_glibc))] extern "C" fn linux_entry(sp: *const usize) -> ! {
     // SAFETY: written once before anything reads it, on the only thread.
     unsafe { START_SP = sp };
     crash::crash_init();
@@ -205,3 +205,10 @@ pub fn sleep_ms(ms: u32) {
     // SAFETY: poll with no descriptors = a sleep.
     unsafe { syscall3(SYS_POLL, 0, 0, ms as usize) };
 }
+
+// a program linked against glibc (build_rs.py section "glibc"): its start, exit, dlopen
+#[cfg(jfgui_glibc)]
+#[path = "linux_glibc.rs"]
+mod glibc;
+#[cfg(jfgui_glibc)]
+pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, exit, glibc_thread_ids, glibc_version}; #[cfg(jfgui_glibc)] #[path = "linux_gpuout.rs"] pub(crate) mod gpuout; #[cfg(jfgui_glibc)] pub use gpuout::*;

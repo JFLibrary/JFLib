@@ -51,7 +51,8 @@ pub(crate) const CMD_ROUTE_CURVE: u32 = 92;
 pub(crate) const CMD_DISCONNECT: u32 = 93;
 /// switch the selected devices on or off
 pub(crate) const CMD_POWER: u32 = 94;
-/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k]
+/// the kind of the selected cables: + 0 "Automatisch", + 1 + k CableKind::ALL[k] for the first
+/// CABLE_KINDS0, the others from CMD_CABLE_MORE (cable_cmd)
 pub(crate) const CMD_CABLE0: u32 = 100;
 
 // ---- timers (App::command(UIC_TIMER, id))
@@ -646,3 +647,147 @@ pub(crate) const TIMER_PAGE: u32 = 0x1C8;
 // timers 0x1CC .. 0x1CF; the commands and timers are not used)
 /// the developer view, the lock and the warning in device window k: ID_DEV0 + 0x80 k (devwin/devtools.rs)
 pub(crate) const ID_DEV0: u32 = 0x0001_E800;
+// ---- H2: the choice of cables (commands 970 .. 989, widgets 0x0001_F000 .. 0x0001_F3FF, no timers)
+/// the kinds CMD_CABLE0 has room for; CMD_CABLE_MORE + k is CableKind::ALL[CABLE_KINDS0 + k]
+pub(crate) const CABLE_KINDS0: usize = 8;
+pub(crate) const CMD_CABLE_MORE: u32 = 970;
+/// the command that gives the selected cables CableKind::ALL[k]
+pub(crate) const fn cable_cmd(k: usize) -> u32 {
+    if k < CABLE_KINDS0 { CMD_CABLE0 + 1 + k as u32 } else { CMD_CABLE_MORE + (k - CABLE_KINDS0) as u32 }
+}
+/// the palette's Kabel part: its expander, its tiles as one Tab stop, the tiles (+ 0
+/// "Automatisch", + 1 + k CableKind::ALL[k])
+pub(crate) const ID_CABLE_PART: u32 = 0x0001_F000;
+pub(crate) const ID_CABLE_GROUP: u32 = 0x0001_F001;
+pub(crate) const ID_CABLE_TILE: u32 = 0x0001_F010;
+/// the inspector of a cable: its category and colour; of the project: "Auto-MDI-X aus"
+pub(crate) const ID_INS_GRADE: u32 = 0x0001_F040;
+pub(crate) const ID_INS_CABLE_COLOR: u32 = 0x0001_F041;
+pub(crate) const ID_PROJ_MDIX: u32 = 0x0001_F042;
+// ---- H3: labels on the canvas (commands 990 .. 999, widgets 0x0001_F400 .. 0x0001_F4FF; no timers)
+/// Beschriftung einfügen: the input at the middle of the view (T)
+pub(crate) const CMD_LABEL: u32 = 990;
+/// the input of a label on the canvas (canvas/labels.rs)
+pub(crate) const ID_LABEL_BOX: u32 = 0x0001_F400;
+// ---- ST1: the start page (commands 1000 .. 1019, widgets 0x0001_F800 .. 0x0001_FFFF, timers 0x1D0 ..
+// 0x1D3; the timers are not used)
+/// Datei › Startseite (asks about unsaved changes first), Datei › Projektinfo …
+pub(crate) const CMD_START_PAGE: u32 = 1000;
+pub(crate) const CMD_PROJECT_INFO: u32 = 1001;
+/// the page chose a template (arg: its index in startpage::TEMPLATES), a lab or assessment (arg: its
+/// index in the page's list); a missing recent file leaves the list (arg: its index)
+pub(crate) const CMD_SP_TEMPLATE: u32 = 1002;
+pub(crate) const CMD_SP_LEARN: u32 = 1003;
+pub(crate) const CMD_SP_FORGET: u32 = 1004;
+/// the page as a pane, its scroll view, "Öffnen …"
+pub(crate) const ID_SP_PANE: u32 = 0x0001_F800;
+pub(crate) const ID_SP_SCROLL: u32 = 0x0001_F801;
+pub(crate) const ID_SP_OPEN: u32 = 0x0001_F802;
+/// the cards of Neu: + 0 the empty project, + 1 + k template k
+pub(crate) const ID_SP_NEW: u32 = 0x0001_F810;
+/// the rows of Zuletzt (+ i) and the buttons that take a missing file off the list (+ i)
+pub(crate) const ID_SP_RECENT: u32 = 0x0001_F820;
+pub(crate) const ID_SP_FORGET: u32 = 0x0001_F830;
+/// the Projektinfo dialog, its description (a text box of many lines: + 1 .. 3 are its own), its author
+pub(crate) const ID_SP_INFO: u32 = 0x0001_F840;
+pub(crate) const ID_SP_INFO_DESC: u32 = 0x0001_F844;
+pub(crate) const ID_SP_INFO_AUTHOR: u32 = 0x0001_F848;
+/// the cards of Lernen (+ i: the labs, then the assessments; the block up to 0x0001_FFFF is theirs, so
+/// the courses of AK1 can follow)
+pub(crate) const ID_SP_LEARN: u32 = 0x0001_F900;
+// ---- SA1: the hardware of a device (commands 1040 .. 1049, widgets 0x0002_2000 .. 0x0002_23FF, timers
+// 0x1D4 .. 0x1D7; the commands and timers are not used)
+/// "Hardware simulieren" on the project's page
+pub(crate) const ID_PROJ_METERED: u32 = 0x0002_2000;
+/// the hardware card of a device (inspector/hardware.rs)
+pub(crate) const ID_HW_OWN: u32 = 0x0002_2001;
+pub(crate) const ID_HW_PRESET: u32 = 0x0002_2002;
+pub(crate) const ID_HW_CORES: u32 = 0x0002_2003;
+pub(crate) const ID_HW_SPEED: u32 = 0x0002_2004;
+pub(crate) const ID_HW_RAM: u32 = 0x0002_2005;
+pub(crate) const ID_HW_SWAP: u32 = 0x0002_2006;
+pub(crate) const ID_HW_DISK_GB: u32 = 0x0002_2007;
+pub(crate) const ID_HW_DISK: u32 = 0x0002_2008;
+pub(crate) const ID_HW_LIVE: u32 = 0x0002_2009;
+pub(crate) const ID_HW_RESET: u32 = 0x0002_200A;
+pub(crate) const ID_HW_APPLY: u32 = 0x0002_200B;
+/// the fault card of a device with hardware: a slower CPU, a memory hog (inspector/faults.rs)
+pub(crate) const ID_FLT_CPU_X: u32 = 0x0002_2010;
+pub(crate) const ID_FLT_CPU: u32 = 0x0002_2011;
+pub(crate) const ID_FLT_MEM_GB: u32 = 0x0002_2012;
+pub(crate) const ID_FLT_MEM: u32 = 0x0002_2013;
+// ---- F1: the Firewall tab (commands 1020 .. 1039, widgets 0x0002_0000 .. 0x0002_0FFF; no timers, the
+// commands are not used)
+/// the Firewall tab of device window k: ID_FW0 + 0x800 k (devwin/firewall.rs has the block's layout)
+pub(crate) const ID_FW0: u32 = 0x0002_0000;
+// ---- AK1: the Akademie (commands 1005 .. 1019, widgets 0x0002_1000 .. 0x0002_1FFF, the rest of the block
+// of ID_SP_LEARN for the start page; the timers 0x1D0 .. 0x1D3 are not used)
+/// Datei › Akademie …; back (Esc, Alt+Left, the button of a page); a course from the start page and from the
+/// list of courses (arg: its index in the list); a step (arg: its place in the course); the next open step;
+/// a lesson's Vorheriger Schritt and Weiter; the lab's bar; the answer to resetting the progress
+pub(crate) const CMD_ACADEMY: u32 = 1005;
+pub(crate) const CMD_AK_BACK: u32 = 1006;
+pub(crate) const CMD_SP_COURSE: u32 = 1007;
+pub(crate) const CMD_AK_COURSE: u32 = 1008;
+pub(crate) const CMD_AK_STEP: u32 = 1009;
+pub(crate) const CMD_AK_CONTINUE: u32 = 1010;
+pub(crate) const CMD_AK_PREV: u32 = 1011;
+pub(crate) const CMD_AK_NEXT: u32 = 1012;
+pub(crate) const CMD_AK_BAR_BACK: u32 = 1013;
+pub(crate) const CMD_AK_BAR_NEXT: u32 = 1014;
+pub(crate) const CMD_AK_RESET: u32 = 1015;
+/// the cards of the courses on the start page (+ i)
+pub(crate) const ID_SP_COURSE: u32 = 0x0001_FC00;
+/// the page as a pane, its scroll view, back, "Weiter", the progress, the reset and its dialog
+pub(crate) const ID_AK_PANE: u32 = 0x0002_1000;
+pub(crate) const ID_AK_SCROLL: u32 = 0x0002_1001;
+pub(crate) const ID_AK_BACK: u32 = 0x0002_1002;
+pub(crate) const ID_AK_CONTINUE: u32 = 0x0002_1003;
+pub(crate) const ID_AK_PROGRESS: u32 = 0x0002_1004;
+pub(crate) const ID_AK_RESET: u32 = 0x0002_1005;
+pub(crate) const ID_AK_HOME_SCROLL: u32 = 0x0002_1006;
+pub(crate) const ID_AK_RESET_DLG: u32 = 0x0002_1010;
+/// a lesson: the document, Vorheriger Schritt, Weiter, the note about the other language
+pub(crate) const ID_AK_LESSON: u32 = 0x0002_1020;
+pub(crate) const ID_AK_PREV: u32 = 0x0002_1021;
+pub(crate) const ID_AK_NEXT: u32 = 0x0002_1022;
+pub(crate) const ID_AK_NOTE: u32 = 0x0002_1023;
+/// the bar over the canvas in a course's lab: a pane, Zurück zum Kurs, Weiter im Kurs
+pub(crate) const ID_AK_BAR: u32 = 0x0002_1030;
+pub(crate) const ID_AK_BAR_BACK: u32 = 0x0002_1031;
+pub(crate) const ID_AK_BAR_NEXT: u32 = 0x0002_1032;
+/// the cards of the list of courses (+ i), the steps of a course (+ its place in the course)
+pub(crate) const ID_AK_CARD: u32 = 0x0002_1100;
+pub(crate) const ID_AK_STEP: u32 = 0x0002_1400;
+
+// ---------------------------------------------------------------- F2: the zone firewall
+/// the parts Zonen and Sitzungen of the Firewall tab: ID_FW2 + 0x400 k (window k), the layout in the
+/// head of fwzones.rs; together 0x0002_3000..0x0002_37FF
+pub const ID_FW2: u32 = 0x0002_3000;
+
+// ---- AK2: quizzes, tests and fault hunts (commands 1016 .. 1019 and 1050 .. 1059, widgets 0x0002_3800 ..
+// 0x0002_3FFF, timers 0x1D0 .. 0x1D3; 1050 .. 1059 and 0x1D1 .. 0x1D3 are not used)
+/// a test's next attempt; the answer to handing it in; practice from the start; a fault hunt from its file
+pub(crate) const CMD_QZ_START: u32 = 1016;
+pub(crate) const CMD_QZ_HAND_IN: u32 = 1017;
+pub(crate) const CMD_QZ_AGAIN: u32 = 1018;
+pub(crate) const CMD_AK_RETRY: u32 = 1019;
+/// a test's countdown
+pub(crate) const TIMER_QUIZ: u32 = 0x1D0;
+/// the page's scroll view, Test beginnen / Neuer Versuch, Abgeben, its question, Alle Fragen von vorn, the bar
+/// of the points; Neu beginnen on a fault hunt's bar
+pub(crate) const ID_QZ_SCROLL: u32 = 0x0002_3800;
+pub(crate) const ID_QZ_START: u32 = 0x0002_3801;
+pub(crate) const ID_QZ_HAND: u32 = 0x0002_3802;
+pub(crate) const ID_QZ_ASK: u32 = 0x0002_3803;
+pub(crate) const ID_QZ_AGAIN: u32 = 0x0002_3804;
+pub(crate) const ID_QZ_PROGRESS: u32 = 0x0002_3805;
+pub(crate) const ID_AK_BAR_RETRY: u32 = 0x0002_3806;
+/// a diagnosis in the Aufgabe panel (+ its place among them): the list of devices and cables, Auf der
+/// Zeichenfläche wählen
+pub(crate) const ID_DG_LIST: u32 = 0x0002_3810;
+pub(crate) const ID_DG_PICK: u32 = 0x0002_3820;
+/// the widgets of a quiz's questions: + the question's place in the file * QZ_SLOTS + a slot (quiz.rs); room
+/// for jfn_model::quiz::QUESTIONS_MAX questions of ANSWERS_MAX answers
+pub(crate) const ID_QZ_Q: u32 = 0x0002_3900;
+pub(crate) const QZ_SLOTS: u32 = 28;

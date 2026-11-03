@@ -7,10 +7,15 @@
 //   grader.grade(&project, &engine, out) -> Score   out(dev): what the device printed (the
 //                                         checks' "output contains"); a config item grades a
 //                                         running configuration once (kept until it changes)
+//   grader.grade_picks(&project, &engine, out, &picks, reveal) -> Score   the same with what the
+//                                         learner named for the diagnosis items (AK2); they count
+//                                         only with `reveal` (handed in), before that they are open
+//   Pick::{Dev(id), Cable(a, b)} / pick_right(&item, &project, &engine, &pick) / pick_text(&project, &pick)
 //   Score { points, total, items }        percent() (rounded down), held()
-//   Graded { held, points, max, found, verdicts }   found: what the item found when it does
-//                                         not hold (a Msg for the app's catalogue); verdicts:
-//                                         a check item's expectations as goal.rs judged them
+//   Graded { held, points, max, found, verdicts, open }   found: what the item found when it
+//                                         does not hold (a Msg for the app's catalogue); verdicts:
+//                                         a check item's expectations as goal.rs judged them; open:
+//                                         a diagnosis that is not graded yet
 //   item_text(&item) -> Msg               the default text of an item (German template)
 //   item_key(&item) -> u64                what an item looks at (not what it expects), stable
 //   config_pairs(text) -> Vec<(block, line)>   a configuration's lines with their blocks
@@ -92,6 +97,43 @@ pub struct Graded {
     pub found: Msg,
     /// a check item: its expectations as goal.rs judged them now
     pub verdicts: Vec<Verdict>,
+    /// a diagnosis before handing in: it counts nothing yet and says nothing
+    pub open: bool,
+}
+
+/// what a learner named for a diagnosis: a device, or a cable by its ends (a cable that was replaced
+/// since stays the same answer)
+#[derive(Clone, Debug, PartialEq)]
+pub enum Pick {
+    Dev(u32),
+    Cable(PortRef, PortRef),
+}
+
+/// the device or cable a diagnosis item means is what the learner named
+pub fn pick_right(it: &Item, p: &Project, e: &Engine, pick: &Pick) -> bool {
+    let Some(dev) = find_dev(p, e, it.id, &it.dev) else {
+        return false;
+    };
+    let cable = it.peer_id != 0 || !it.peer.trim().is_empty();
+    match pick {
+        Pick::Dev(d) => !cable && *d == dev,
+        Pick::Cable(a, b) => {
+            let Some(peer) = find_dev(p, e, it.peer_id, &it.peer).filter(|_| cable) else {
+                return false;
+            };
+            let end = |r: &PortRef, d: u32, port: &str| r.dev == d && (port.trim().is_empty() || ifname::same(&r.port, port));
+            (end(a, dev, &it.port) && end(b, peer, &it.peer_port)) || (end(b, dev, &it.port) && end(a, peer, &it.peer_port))
+        }
+    }
+}
+
+/// what the learner named, as a text: "R1", "R1 Gi0/0/1 \u{2013} SW1 Gi1/0/1"
+pub fn pick_text(p: &Project, pick: &Pick) -> String {
+    let name = |d: u32| p.device(d).map_or_else(String::new, |x| x.name.clone());
+    match pick {
+        Pick::Dev(d) => name(*d),
+        Pick::Cable(a, b) => format!("{} {} \u{2013} {} {}", name(a.dev), ifname::short(&a.port), name(b.dev), ifname::short(&b.port)),
+    }
 }
 
 /// the grade of the whole assessment
@@ -336,9 +378,24 @@ impl Grader {
 
     /// every item against the project and its engine now
     pub fn grade(&self, p: &Project, e: &Engine, out: &dyn Fn(u32) -> String) -> Score {
+        self.grade_picks(p, e, out, &[], false)
+    }
+
+    /// the same with what the learner named for the diagnosis items (per item; `reveal`: handed in,
+    /// they count now)
+    pub fn grade_picks(&self, p: &Project, e: &Engine, out: &dyn Fn(u32) -> String, picks: &[Option<Pick>], reveal: bool) -> Score {
         let mut s = Score { points: 0, total: self.total(), items: Vec::with_capacity(self.items.len()) };
         for k in 0..self.items.len() {
-            let mut g = self.grade_item(k, p, e, out);
+            let mut g = if self.items[k].kind() == Some(ItemKind::Diagnosis) {
+                let pick = picks.get(k).and_then(Option::as_ref);
+                match (reveal, pick) {
+                    (false, _) => Graded { open: true, ..Graded::default() },
+                    (true, None) => Graded { found: msg!("keine Antwort"), ..Graded::default() },
+                    (true, Some(x)) => Graded { held: pick_right(&self.items[k], p, e, x), found: msg!("Ihre Antwort: {}", pick_text(p, x)), ..Graded::default() },
+                }
+            } else {
+                self.grade_item(k, p, e, out)
+            };
             g.max = self.items[k].points;
             g.points = if g.held { g.max } else { 0 };
             if g.held {
@@ -458,7 +515,7 @@ impl Grader {
                 seen.insert(key, (ok, found.clone()));
                 held(ok, found)
             }
-            ItemKind::Check => held(false, Msg::default()),
+            ItemKind::Check | ItemKind::Diagnosis => held(false, Msg::default()),
         }
     }
 
@@ -485,7 +542,8 @@ impl Grader {
         let ok = kinds.is_empty()
             || kinds.iter().any(|k| match it.cmp {
                 Compare::Exact => k.trim() == l.cable.as_str(),
-                _ => CableKind::parse(k.trim()) == Some(l.cable),
+                // (a task that asks for a serial line takes either chosen end)
+                _ => CableKind::parse(k.trim()).is_some_and(|w| w == l.cable || (w == CableKind::Serial && l.cable.is_serial())),
             });
         Graded { held: ok, found: msg!("falsches Kabel: {}", phrase(l.cable.title())), ..Graded::default() }
     }
@@ -683,6 +741,8 @@ pub fn item_text(it: &Item) -> Msg {
             Some([Expect::Reach { dev, host, negate: true }]) => msg!("{} erreicht {} nicht", dev, host),
             _ => Msg::plain(it.checks.join("; ")),
         },
+        // (never the answer)
+        ItemKind::Diagnosis => msg!("Welches Gerät oder Kabel ist die Ursache?"),
     }
 }
 
@@ -1014,7 +1074,7 @@ fn neutral_name(p: &Project, model: Option<&'static Model>, avoid: &str) -> Stri
 /// setting, a name)
 fn strip(p: &mut Project, it: &Item) {
     let Some(kind) = it.kind() else { return };
-    if kind == ItemKind::Check {
+    if matches!(kind, ItemKind::Check | ItemKind::Diagnosis) {
         return;
     }
     if kind == ItemKind::Cable {

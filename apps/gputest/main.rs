@@ -1,4 +1,4 @@
-// gputest -- self tests and measurements of lib/gpu (Vulkan on Windows; docs/GPU.md)
+// gputest -- self tests and measurements of lib/gpu (Vulkan on Windows and Linux; docs/GPU.md)
 //
 //   gputest --info                  adapters, driver, API version, level, features, limits
 //   gputest --test NAME [--validate]
@@ -48,6 +48,9 @@
 //                    the subgroup and quad functions against a CPU reference (t_wgsl3.rs);
 //                    SPIR-V 1.6 and 1.3 (a Basis device)
 //        bench_smoke short runs of the scene's frame loop (offscreen, a window) with --verify
+//        glibc       (Linux) the process start, threads and exit of a program linked against glibc
+//                    (t_glibc.rs)
+//        noloader    a missing Vulkan loader: Err(NoLoader), the program starts (t_glibc.rs)
 //        all         every test above
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
 //                   validation); a validation error fails the test.  Without the layer: a note,
@@ -64,7 +67,8 @@
 //                                   median and p99, a RESULT line for scripts
 //
 // Without Vulkan or a usable GPU every test prints "SKIP" and passes (the error paths are
-// tested with jfgui_GPU_DLL).  Exit code 1 when a check failed.  build_rs.py test gputest runs
+// tested with jfgui_GPU_DLL); on Linux the tests that need a window do, for now (G4b: no surfaces
+// there, Features::swapchain is false).  Exit code 1 when a check failed.  build_rs.py test gputest runs
 // tests/*.uis (the script itself is ignored: --script).  The window is a plain plat window
 // with its own event loop that is never given to plat::win_present, so the CPU presentation
 // never paints over the swapchain (plat::win_native, win_api.rs).
@@ -85,6 +89,7 @@ mod measure;
 mod scene;
 mod shaders;
 mod t_compute;
+mod t_glibc;
 mod t_render;
 mod t_scene;
 mod t_spec;
@@ -330,13 +335,7 @@ fn errors(t: &mut T) {
     let r = Instance::new();
     plat::setenv("jfgui_GPU", None);
     t.ok(matches!(r, Err(GpuError::Disabled)), "jfgui_GPU=0: Instance::new = Err(Disabled)");
-    // a missing loader, by name and by path
-    for name in ["jfgui-no-such-vulkan.dll", "C:\\jfgui-no-such-dir\\vulkan-1.dll"] {
-        plat::setenv("jfgui_GPU_DLL", Some(name));
-        let r = Instance::new();
-        plat::setenv("jfgui_GPU_DLL", None);
-        t.ok(matches!(r, Err(GpuError::NoLoader)), &format!("jfgui_GPU_DLL={name}: Err(NoLoader)"));
-    }
+    t_glibc::noloader(t); // a missing loader, by name and by path
     let Some(g) = setup(t) else { return };
     // adapter selection
     for (sel, want_ok) in [("no-such-gpu-xyz", false), ("99", false), ("0", true)] {
@@ -459,6 +458,9 @@ fn run() -> i32 {
     let args = plat::args();
     let validate = args.iter().any(|a| a == "--validate");
     let mut t = T { fails: 0, validate, expected: 0 };
+    if let Some(kind) = plat::arg_value("--glibc-child") {
+        return t_glibc::glibc_child(&kind);
+    }
     if validate {
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));
     }
@@ -475,7 +477,7 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 16] = [
+    let tests: [(&str, fn(&mut T)); 18] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -492,6 +494,8 @@ fn run() -> i32 {
         ("scene", t_scene::scene),
         ("wgsl", t_wgsl::wgsl),
         ("bench_smoke", t_scene::bench_smoke),
+        ("glibc", t_glibc::glibc),
+        ("noloader", t_glibc::noloader),
     ];
     let mut ran = false;
     for (name, f) in tests {

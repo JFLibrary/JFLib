@@ -78,7 +78,7 @@ try {
   for(const engine of engines) {
     const browser=await launchWasm(pw[engine],{...(engine==='chromium'?chromiumOptions():{}),headless:!args.includes('--headed')});
     try {
-      const context=await browser.newContext({viewport:{width:420,height:1400}});
+      const context=await browser.newContext({locale:'de-DE',viewport:{width:420,height:1400}});
       const chromium=engine==='chromium';
       if(chromium) await context.addInitScript(stubs);
       const page=await context.newPage();

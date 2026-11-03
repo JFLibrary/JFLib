@@ -1,0 +1,111 @@
+#!args --verify-dirty
+# the palette with the models of wave 17 (workspace/palette.rs, jfn_model/catalog.rs): the new tiles
+# in their categories, the search over names, descriptions and ids, JF-S8 placed by a drag with its
+# description and no command line, the tooltip of a firewall that says what it does; shots light
+# and dark at 100 and 150 % (build/jfnetworker/models_palette_<theme>_<scale>.png).  Ids: 16385 the
+# search box.
+size 1280 800
+theme light
+# the network devices are open from the start
+expect button:"Netzwerk (17)" open
+expect button:"JF-S24P" exists
+expect button:"JF-S8" exists
+expect button:"JF-S8P" exists
+expect button:"JF-S24" exists
+expect button:"JF-S48P" exists
+expect button:"JF-S24M" exists
+expect button:"JF-S24L3" exists
+expect button:"JF-S48X" exists
+expect button:"JF-S48Y" exists
+expect button:"JF-S32C" exists
+expect button:"JF-R4" exists
+expect button:"JF-R2" exists
+expect button:"JF-R8" exists
+expect button:"Heimrouter" exists
+expect button:"Hub" exists
+expect button:"Repeater" exists
+expect button:"Bridge" exists
+# the view the window opens with
+shot build/jfnetworker/models_palette_light_100.png
+theme dark
+shot build/jfnetworker/models_palette_dark_100.png
+scale 150
+shot build/jfnetworker/models_palette_dark_150.png
+theme light
+shot build/jfnetworker/models_palette_light_150.png
+scale 100
+# a drag from the palette: SW1 at world (-100, -100), its box at (-140, -120)
+drag button:"JF-S8" 530,220
+expect listitem:"SW1" exists
+expect listitem:"SW1" rect 490 200 64 48
+expect listitem:"SW1" selected
+expect text:"1 Gerät · 0 Kabel" exists
+expect text:"Tisch-Switch 8× 1G, unmanaged (ohne Befehlszeile)" exists
+expect text:"8× 1G" exists
+expect text:"keine" exists
+key ctrl+z
+expect text:"0 Geräte · 0 Kabel" exists
+# the other categories
+click button:"Endgeräte (9)"
+click button:"Netzwerk (17)"
+click button:"Sicherheit (3)"
+expect button:"JF-FW" exists
+expect button:"JF-FW2" exists
+expect button:"JF-FW8" exists
+click button:"WLAN und WAN (6)"
+expect button:"JF-AP6E" exists
+expect button:"JF-AP7" exists
+shot build/jfnetworker/models_palette_folded.png
+# the firewalls say what they do
+move button:"JF-FW2"
+wait 900
+expect text:"Kleine Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 1G WAN, 4× 1G LAN · Ports: 1× 1G, 4× 1G, Konsole" exists
+move button:"JF-FW8"
+wait 900
+expect text:"Rechenzentrums-Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 10G SFP+, 4× 100G QSFP28 · Ports: 8× 10G SFP+, 4× 100G QSFP28, Konsole" exists
+move button:"JF-AP7"
+wait 900
+expect text:"WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist) · Ports: 1× 5G (PoE-gespeist), 1× Funk 1.3G, 1× Funk 5.7G, 1× Funk 11.5G, Konsole" exists
+move 640,790
+# the search: by a word of the description, by a name, by an id
+click #16385
+type "spine"
+expect button:"Netzwerk (1)" open
+expect button:"JF-S32C" exists
+expect button:"JF-S48Y" missing
+key ctrl+a
+type "leaf"
+expect button:"JF-S48Y" exists
+key ctrl+a
+type "PoE++"
+expect button:"JF-S24M" exists
+expect button:"Netzwerk (1)" open
+key ctrl+a
+type "filial"
+expect button:"JF-R2" exists
+key ctrl+a
+type "repeater"
+expect button:"Repeater" exists
+expect button:"Netzwerk (1)" open
+key ctrl+a
+type "bridge"
+expect button:"Bridge" exists
+expect button:"Netzwerk (1)" open
+key ctrl+a
+type "802.11be"
+expect button:"JF-AP7" exists
+expect button:"WLAN und WAN (1)" open
+key ctrl+a
+type "firewall"
+expect button:"Sicherheit (3)" open
+key ctrl+a
+type "jf-s48"
+expect button:"Netzwerk (3)" open
+expect button:"JF-S48P" exists
+expect button:"JF-S48X" exists
+expect button:"JF-S48Y" exists
+shot build/jfnetworker/models_palette_search.png
+key ctrl+a
+key backspace
+expect button:"Netzwerk (17)" exists
+expect_nowarn

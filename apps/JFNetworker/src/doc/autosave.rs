@@ -2,7 +2,8 @@
 //
 //   Autosave                    this session's copy (folder, id, lock), the timer, the offer
 //   frame(n, ui)                every frame: the timer (TIMER_AUTOSAVE, the interval of the
-//                               settings; 0 switches it off)
+//                               settings; 0 switches it off; none below the start page, whose
+//                               empty project has nothing to keep)
 //   tick(n)                     the timer went off: a copy when the project has unsaved changes
 //                               the last copy does not have
 //   flush(n)                    UIC_SUSPEND / UIC_SESSION_END: a copy now, whatever the interval
@@ -11,7 +12,8 @@
 //   discard(n)                  Verwerfen before quitting: the same, and the exit keeps nothing
 //   startup(n, ui)              copies of sessions that are not running any more: the newest
 //                               one is offered in the recovery bar above the canvas
-//   bar(n, ui)                  the recovery bar above the canvas: Wiederherstellen, Verwerfen,
+//   bar(n, ui)                  the recovery bar above the canvas or on the start page:
+//                               Wiederherstellen, Verwerfen,
 //                               × (later: the copy stays for the next start)
 //   recover(n, ui) / drop(n)    its buttons (CMD_RECOVER, CMD_RECOVER_DROP)
 //
@@ -130,7 +132,7 @@ fn prepare(n: &mut Net, ui: &Ui) {
 /// the timer: set while autosave is on, again when its interval changed
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     prepare(n, ui);
-    let ms = n.prefs.autosave_s.saturating_mul(1000);
+    let ms = if n.shell.start { 0 } else { n.prefs.autosave_s.saturating_mul(1000) };
     if ms != n.autosave.armed_ms {
         n.autosave.armed_ms = ms;
         if ms > 0 {
@@ -141,7 +143,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
 
 /// TIMER_AUTOSAVE: a copy when there is something new to keep; the timer goes on
 pub(crate) fn tick(n: &mut Net, ui: &mut Ui) {
-    if n.prefs.autosave_s == 0 {
+    if n.prefs.autosave_s == 0 || n.shell.start {
         n.autosave.armed_ms = 0;
         return;
     }

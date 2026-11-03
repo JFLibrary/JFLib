@@ -39,7 +39,7 @@ const DISTRIBUTED: u32 = 0x9E_9047; // olive amber
 const END: u32 = 0x8A_929C; // neutral
 
 /// the sheet's order: (symbol, category, tint); symbols not named here follow
-const CATALOG: [(&str, &str, u32); 26] = [
+const CATALOG: [(&str, &str, u32); 30] = [
     ("pc", "Endgerät", END),
     ("laptop", "Endgerät", END),
     ("smartphone", "Endgerät", END),
@@ -50,10 +50,14 @@ const CATALOG: [(&str, &str, u32); 26] = [
     ("iot_camera", "Endgerät", END),
     ("smart_tv", "Endgerät", END),
     ("switch_l2", "Netzwerk", NETWORK),
+    ("switch_desk", "Netzwerk", NETWORK),
     ("switch_l3", "Netzwerk", NETWORK),
     ("router", "Netzwerk", NETWORK),
     ("home_router", "Netzwerk", NETWORK),
+    ("repeater", "Netzwerk", NETWORK),
+    ("bridge", "Netzwerk", NETWORK),
     ("firewall_ngfw", "Sicherheit", SECURITY),
+    ("firewall_desk", "Sicherheit", SECURITY),
     ("ap_wifi6e", "WLAN/WAN", WIRELESS),
     ("modem_ont", "WLAN/WAN", WIRELESS),
     ("cloud_internet", "WLAN/WAN", WIRELESS),

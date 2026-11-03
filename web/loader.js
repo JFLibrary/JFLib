@@ -10,6 +10,23 @@ const fileInput=document.querySelector("#files"), controlButton=document.querySe
 const viewport=document.querySelector("#viewport"), a11yRoot=document.querySelector("#a11y");
 const app=document.body.dataset.app, params=new URLSearchParams(location.search), worker=new Worker("worker.js",{type:"module"});
 const ctx=canvas.getContext("2d",{alpha:false}), text=new TextDecoder();
+// the host's own texts: German in a German browser, English elsewhere (the app's come from its catalogue)
+const german=/^de\b/i.test(navigator.languages?.[0]||navigator.language||"");
+const HOST_EN={
+  "Browserdienste":"Browser services","Datei öffnen":"Open file","Wird geladen …":"Loading …","Anwendungsfläche":"Application area","Texteingabe":"Text input",
+  "Agentensteuerung aktivieren":"Turn on agent control","Agentensteuerung abschalten":"Turn off agent control","Agentensteuerung aktiv":"Agent control on",
+  "Agentensteuerung aus":"Agent control off","Agent verbunden":"Agent connected","Agenten-Bridge verbunden":"Agent bridge connected",
+  "In die Datei geschrieben: ":"Written to the file: ","Im Browserspeicher gesichert":"Saved in browser storage","Geheimnis nicht gespeichert: ":"Secret not saved: ",
+  "Anwendung beendet":"App ended","Gespeicherte Dateien sind lesbar; dauerhafte Datenübernahme derzeit nicht verfügbar.":"Saved files are readable; keeping them permanently is not available right now.",
+  "Browserspeicher nicht verfügbar; Dateien bleiben temporär.":"Browser storage is not available; files stay temporary.",
+  "Download angefordert":"Download requested",
+  "Kein passendes WASM-Bundle vorhanden.":"No suitable WASM bundle is available.","Paralleles WASM benötigt Cross-Origin-Isolation und SharedArrayBuffer.":"Parallel WASM needs cross-origin isolation and SharedArrayBuffer.",
+  "Rechen-Worker konnte nicht starten.":"The compute worker could not start.","Zwischenablage zu groß.":"The clipboard is too large.","Zwischenablage nicht importiert.":"The clipboard was not imported.",
+};
+const L=s=>german?s:(HOST_EN[s]||s);
+document.documentElement.lang=german?"de":"en";
+for(const el of [document.querySelector("#open"),controlButton,status])el.textContent=L(el.textContent);
+for(const el of [document.querySelector("#hostbar"),canvas,input])el.setAttribute("aria-label",L(el.getAttribute("aria-label")));
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
 let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null, unsaved=false;
 window.addEventListener("beforeunload",e=>{ if(unsaved) {e.preventDefault();e.returnValue="";} });
@@ -51,7 +68,7 @@ document.addEventListener("visibilitychange",()=>{
 const complete=(id,status)=>id && send({type:"complete",id,status});
 const errorCode=error=>error?.name==="QuotaExceededError" ? -2 : error?.name==="NotAllowedError" || error?.name==="SecurityError" ? -1 : -5;
 function sizes() { return {width:Math.max(1,Math.round(canvas.clientWidth*devicePixelRatio)), height:Math.max(1,Math.round(canvas.clientHeight*devicePixelRatio)), dpi:Math.round(96*devicePixelRatio)}; }
-function report(message) { status.textContent=message; }
+function report(message) { status.textContent=L(message); }
 async function storage() {
   return openFilesStorage();
 }
@@ -76,7 +93,7 @@ const rpc=(request,{session="page"}={})=>controlRequest({type:"rpc",request,sess
 const closeSession=session=>controlRequest({type:"closeSession",session});
 function activate(on) {
   enabled=on; controlButton.setAttribute("aria-pressed",String(on));
-  controlButton.textContent=on ? "Agentensteuerung abschalten" : "Agentensteuerung aktivieren";
+  controlButton.textContent=L(on ? "Agentensteuerung abschalten" : "Agentensteuerung aktivieren");
   if(started) send({type:"agent",enabled:on});
   if(on) {
     window.jfguiAgent=Object.freeze({
@@ -284,7 +301,7 @@ async function service(m) {
       // a file of the user's own: written back into it
       if(m.kind===1 && path.startsWith("/handles/")) {
         if(!handleStore) {complete(m.id,-3);return;}
-        await handles.writeBack(handleStore,path,bytes);complete(m.id,0);report("In die Datei geschrieben: "+path.split("/").pop());
+        await handles.writeBack(handleStore,path,bytes);complete(m.id,0);report(L("In die Datei geschrieben: ")+path.split("/").pop());
       }
       else if(m.kind===1) {await persist(path,bytes);complete(m.id,0);report("Im Browserspeicher gesichert");}
       else {const url=URL.createObjectURL(new Blob([bytes]));const link=document.createElement("a");link.href=url;link.download=path.split("/").pop()||"document";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);complete(m.id,1);report("Download angefordert");}
@@ -332,7 +349,7 @@ async function service(m) {
     // a change of the secret store (secrets.js): encrypted and committed in order
     else if(m.kind===13) {
       if(!secretStore) {data.fill(0);complete(m.id,-3);return;}
-      secretStore.change(data).then(()=>complete(m.id,2),error=>{complete(m.id,errorCode(error));report("Geheimnis nicht gespeichert: "+error.message);});
+      secretStore.change(data).then(()=>complete(m.id,2),error=>{complete(m.id,errorCode(error));report(L("Geheimnis nicht gespeichert: ")+error.message);});
     }
     else if(m.kind===11) {
       // the differences of the accessibility tree; a mirror that went wrong asks for all anew
@@ -369,7 +386,7 @@ worker.onmessage=({data:m})=>{
   else if(m.type==="rpc" || (m.type==="error" && m.id)) {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.type==="error"?p.reject(new Error(m.message)):p.resolve(m.result);}}
   else if(m.type==="error") {report(m.message);console.error(m.message);}
   else if(m.type==="log") { (m.stream===2?console.error:console.log)(m.text); }
-  else if(m.type==="exit") report(`Anwendung beendet (${m.code})`);
+  else if(m.type==="exit") report(`${L("Anwendung beendet")} (${m.code})`);
 };
 worker.onerror=e=>report(e.message);
 // Idle ticks drive caret blink, animations and cooperative jobs without building a queue.
@@ -402,5 +419,5 @@ try {
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
 lastScreens=screenLine(screen,true); // the first frame knows the monitor already
-send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
+send({type:"start",languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
 initialSecrets?.fill(0); // postMessage copied them

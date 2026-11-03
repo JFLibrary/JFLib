@@ -8,12 +8,12 @@ size 1440 960
 theme dark
 theme contrast
 wait 50
-click "Metriken"
+click "Metrics"
 cmd 9202 0
 wait 50
-expect #32026 text "Warteschlange – لا توجد بيانات"
+expect #32026 text "Queue – لا توجد بيانات"
 expect text:"لا توجد بيانات" exists
-expect #32022 text "Fehlerquote – Fehlerquote: الحالية 0.574 %, الأدنى 0.254 %, الأقصى 37.8 %"
+expect #32022 text "Error rate – Error rate: الحالية 0.574 %, الأدنى 0.254 %, الأقصى 37.8 %"
 # the latency chart sits in the right half: 800 ms at the left of its plot, the SLO tag at
 # the right end of its line
 expect #32020 rect 619 340 535 198
@@ -23,7 +23,7 @@ expect text:"SLO 250 ms" rect 1073 457 73 16
 move 1033,420
 expect text:"1:45" exists
 expect text:"p95: 88.1 ms" exists
-expect text:"Zeiger: p99 bei 1:45.0" exists
+expect text:"Pointer: p99 at 1:45.0" exists
 # the keys act as drawn: Left the earlier point
 move 700,150
 focus #32020

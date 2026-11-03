@@ -1,0 +1,155 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Netze und Adressen",
+    "Networks and addresses"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Was tut ein **Switch**, wenn ein Rahmen ankommt?",
+        "What does a **switch** do when a frame arrives?"
+      ],
+      "explain": [
+        "Ein Switch merkt sich, an welchem Port welche MAC-Adresse hängt, und schickt den Rahmen nur dorthin. IP-Adressen sieht er nicht an.",
+        "A switch learns which MAC address sits behind which port and sends the frame only there. It does not look at IP addresses."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Er schickt ihn an den Port, hinter dem die Ziel-MAC-Adresse hängt.",
+            "It sends it to the port behind which the destination MAC address sits."
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Er sucht in seiner Routing-Tabelle das nächste Netz.",
+            "It looks up the next network in its routing table."
+          ],
+          "explain": [
+            "Das tut ein Router.",
+            "That is what a router does."
+          ]
+        },
+        {
+          "text": [
+            "Er verteilt ihm eine neue IP-Adresse.",
+            "It hands it a new IP address."
+          ],
+          "explain": [
+            "Adressen verteilt ein DHCP-Server.",
+            "A DHCP server hands out addresses."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Welche dieser Adressen liegen im Netz `192.168.5.0/24`?",
+        "Which of these addresses lie in the network `192.168.5.0/24`?"
+      ],
+      "explain": [
+        "Bei `/24` zählen die ersten drei Zahlen: Sie müssen `192.168.5` lauten.",
+        "With `/24` the first three numbers count: they must read `192.168.5`."
+      ],
+      "answers": [
+        {
+          "text": [
+            "192.168.5.7",
+            "192.168.5.7"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "192.168.5.200",
+            "192.168.5.200"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "192.168.6.5",
+            "192.168.6.5"
+          ],
+          "explain": [
+            "Die dritte Zahl ist 6, nicht 5: ein anderes Netz.",
+            "The third number is 6, not 5: another network."
+          ]
+        },
+        {
+          "text": [
+            "10.0.0.5",
+            "10.0.0.5"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "Ein PC hat die Adresse `10.1.2.3/24`. Wie heißt sein Netz, mit Präfixlänge geschrieben?",
+        "A PC has the address `10.1.2.3/24`. What is its network, written with the prefix length?"
+      ],
+      "explain": [
+        "Der Hostteil wird null: aus `10.1.2.3/24` wird das Netz `10.1.2.0/24`.",
+        "The host part becomes zero: `10.1.2.3/24` is in the network `10.1.2.0/24`."
+      ],
+      "accept": [
+        "10\\.1\\.2\\.0 ?/ ?24"
+      ]
+    },
+    {
+      "kind": "number",
+      "points": 1,
+      "stem": [
+        "Wie viele Adressen stehen in einem `/24`-Netz für Hosts bereit?",
+        "How many addresses does a `/24` network have for hosts?"
+      ],
+      "explain": [
+        "Von den 256 Adressen gehen die Netzadresse und die Broadcast-Adresse ab: 254.",
+        "Of the 256 addresses, the network address and the broadcast address are taken: 254."
+      ],
+      "value": 254,
+      "tolerance": 0
+    },
+    {
+      "kind": "order",
+      "points": 1,
+      "stem": [
+        "PC1 pingt PC2 im selben Netz und kennt dessen MAC-Adresse noch nicht. In welcher Reihenfolge läuft das ab?",
+        "PC1 pings PC2 in the same network and does not know its MAC address yet. In what order does this happen?"
+      ],
+      "explain": [
+        "Erst die MAC-Adresse erfragen (ARP), dann erst geht das Echo auf die Reise.",
+        "First ask for the MAC address (ARP); only then does the echo set off."
+      ],
+      "order": [
+        [
+          "PC1 fragt per ARP nach der MAC-Adresse von PC2",
+          "PC1 asks for the MAC address of PC2 by ARP"
+        ],
+        [
+          "PC2 nennt per ARP seine MAC-Adresse",
+          "PC2 gives its MAC address by ARP"
+        ],
+        [
+          "PC1 schickt die Echo-Anfrage",
+          "PC1 sends the echo request"
+        ],
+        [
+          "PC2 schickt die Echo-Antwort",
+          "PC2 sends the echo reply"
+        ]
+      ]
+    }
+  ]
+}

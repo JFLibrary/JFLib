@@ -202,7 +202,7 @@ pub fn role(m: &Model) -> Role {
 /// the bands an access point of the model sends on (B_* bits)
 pub fn ap_bands(m: &Model) -> u8 {
     match m.id {
-        "jf-ap6e" => B_24 | B_5 | B_6,
+        "jf-ap6e" | "jf-ap7" => B_24 | B_5 | B_6,
         _ if role(m) == Role::Ap => B_24 | B_5,
         _ => 0,
     }
@@ -221,7 +221,7 @@ pub fn client_bands(m: &Model) -> u8 {
 /// how far an access point of the model reaches on a band (metres, indoors)
 pub fn range_m(m: &Model, band: Band) -> u32 {
     let (a, b, c) = match m.id {
-        "jf-ap6e" => (50, 35, 25),
+        "jf-ap6e" | "jf-ap7" => (50, 35, 25),
         "home-router" => (40, 30, 20),
         _ => (40, 30, 20),
     };

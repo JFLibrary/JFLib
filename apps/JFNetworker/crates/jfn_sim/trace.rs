@@ -3,6 +3,8 @@
 //
 //   Trace::hops() / hop(id) / hops_after(id)      frames in send order; ids are consecutive
 //   Trace::events() / events_of(hop)              decisions in time order
+//   Trace::set_quiet()                            keeps none of them from now on, only their
+//                                                 numbers (a sweep: experiment.rs)
 //   Note::describe(port, iface) -> German text     "MAC 02:4a:.. an Gi1/0/1 gelernt (VLAN 1)"
 //   Note::message(port, iface) -> Msg             the same as a template with arguments, for
 //                                                 the app's catalogue (jfn_model::msg)
@@ -494,8 +496,12 @@ pub enum Note {
     Ssh(crate::sshtrace::SshNote),
     /// a decision of TLS: tlssim.rs
     Tls(crate::tlssim::TlsNote),
+    /// the memory of the device is full: this service is killed (res.rs)
+    OomKill { svc: String, bytes: u64 },
     /// a decision of 802.1X (dot1xtrace.rs)
     Dot1x(crate::dot1xtrace::DNote),
+    /// the zone firewall (fw.rs, fwtrace.rs)
+    Fw(crate::fwtrace::FwNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -626,7 +632,9 @@ impl Note {
             Note::Unit { .. } | Note::Deploy { .. } => 7,
             Note::Ssh(_) => 7,
             Note::Tls(_) => 7,
+            Note::OomKill { .. } => 3,
             Note::Dot1x(_) => 2,
+            Note::Fw(_) => 3,
             _ => 2,
         }
     }
@@ -775,6 +783,7 @@ impl Note {
             || matches!(self, Note::Ssh(n) if n.is_drop())
             || matches!(self, Note::Tls(n) if n.is_drop())
             || matches!(self, Note::Dot1x(n) if n.is_drop())
+            || matches!(self, Note::Fw(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1218,7 +1227,9 @@ impl Note {
             Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
             Note::Ssh(n) => n.message(),
             Note::Tls(n) => n.message(),
+            Note::OomKill { svc, bytes } => msg!("Speicher voll: Dienst {} mit {} beendet", svc, crate::disk::size_text(*bytes)),
             Note::Dot1x(n) => n.message(),
+            Note::Fw(n) => n.message(),
         }
     }
 }
@@ -1381,6 +1392,8 @@ pub struct Trace {
     max_flight: Ns,
     /// frames that waited in a queue, with their batch (they leave later than their batch)
     late: VecDeque<(HopId, u64)>,
+    /// keeps no frames and no decisions, only their numbers (set_quiet: a sweep, experiment.rs)
+    quiet: bool,
 }
 
 impl Default for Trace {
@@ -1404,11 +1417,26 @@ impl Trace {
             outside: true,
             max_flight: 0,
             late: VecDeque::new(),
+            quiet: false,
         }
+    }
+    /// keeps no frames and no decisions from now on, and forgets those it has: no figure of a run
+    /// depends on them, only what reads the recording back (expect hops, a capture, the simulation
+    /// mode) sees nothing (experiment.rs)
+    pub fn set_quiet(&mut self) {
+        self.quiet = true;
+        self.clear();
+    }
+    /// it keeps nothing (a frame's protocols need not be worked out for it)
+    pub(crate) fn is_quiet(&self) -> bool {
+        self.quiet
     }
     pub(crate) fn push_hop(&mut self, mut h: Hop) -> HopId {
         h.id = self.next_hop;
         self.next_hop += 1;
+        if self.quiet {
+            return h.id;
+        }
         if self.hops.len() >= self.max_hops {
             self.hops.pop_front();
         }
@@ -1427,6 +1455,9 @@ impl Trace {
     pub(crate) fn push_event(&mut self, mut e: DevEvent) {
         e.seq = self.next_ev;
         self.next_ev += 1;
+        if self.quiet {
+            return;
+        }
         e.batch = self.stamp(e.t);
         if self.events.len() >= self.max_events {
             self.events.pop_front();
@@ -1692,7 +1723,9 @@ impl Note {
             Note::Aaa(n) => n.mask(),
             Note::Ssh(n) => n.mask(),
             Note::Tls(n) => n.mask(),
+            Note::OomKill { .. } => 0,
             Note::Dot1x(n) => n.mask(),
+            Note::Fw(n) => n.mask(),
             _ => 0,
         }
     }
@@ -1787,6 +1820,7 @@ impl Trace {
             outside: self.outside,
             max_flight: self.max_flight,
             late: self.late.iter().filter(|l| l.0 >= first).copied().collect(),
+            quiet: self.quiet,
         }
     }
 

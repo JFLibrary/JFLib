@@ -2,7 +2,9 @@
 
 Stand 2026-10-30, Branch `linux-wayland-fixes` (Commits `1069f11`, `e0f2cd4`); ergänzt am
 2026-10-31 um das, was seitdem auf `main` kam (Abschnitt 7), und um die Übergabe an eine
-Sitzung auf dem Linux-Rechner (Abschnitt 8). Die
+Sitzung auf dem Linux-Rechner (Abschnitt 8); am 2026-11-01 um den Lauf auf Fedora KDE (1a); am
+2026-11-02 um `lib/gpu` ohne Fenster auf demselben Rechner (1b) und um die Ausgabe der UI über die GPU
+(1c). Die
 Linux-Überarbeitung lief zuerst nur in einer Cloud-Umgebung (headless GNOME 46, sway, Weston,
 Xvfb mit openbox), dann auf dem KDE-Rechner (Plasma 6.6.6, Wayland, ein Monitor eDP-1 mit
 125 %, Layout de, keine Eingabemethode). Dieser Plan hält fest, was dort geprüft ist und was
@@ -28,6 +30,118 @@ noch fehlt, getrennt nach dem Rechner, auf dem es sich prüfen lässt.
   (rootloses Xwayland, XTEST ohne Portal-Freigabe, Bildschirm war gesperrt).
 - **Schriften**: Ubuntus Noto CJK ist statisches CFF; das CFF2-Problem betrifft diesen Rechner
   nicht.
+
+---
+
+## 1a. Erledigt auf Fedora 44 KDE Plasma (2026-11-01)
+
+Rechner: Fedora 44, Plasma und KWin 6.6.4, Wayland, ein Monitor 1920×1080 bei 100 %, Pentium
+G4560T, 7,6 GB RAM, Intel HD 610 mit Mesa 26.0.3. Zweig `linux-tests-minipc-2026-11-01`, Stand
+`539cbf0`. Die Skripte sind kopflos (`--script`); echte Fenster liefen über `--agent`, KWin-Skripte
+(nur auf den eigenen Prozessen) und `spectacle` (nur das aktive Fenster).
+
+- **Gesamtsuite** 543/544 mit `build/rwref` und den jfWord-Testdateien. Offen ist nur
+  `plattest/screen.uis` (X11-Pipette und -Hotkey unter rootlosem Xwayland, auch entsperrt; siehe 4).
+- **Behobener Fehler, Schriften**: `sans-serif`, `serif` und `monospace` lieferten Noto Sans Arabic
+  bzw. Noto Naskh Arabic, weil Fedoras Regeln sie voranstellen. fontconfig reiht die Sprache vor
+  solche Regeln, `FontDb::resolve` nahm die erste installierte Schrift. Folgen: Kästchen in der
+  Vorschau von fontpicktest, Hex-Ansicht, Terminal und Code ohne feste Breite und mit doppelt hohen
+  Zeilen (`datagallery/hexview.uis`). Jetzt zählen Schriften ohne A oder a in der cmap
+  (`FDFF_NOLATIN`, Cache-Version 4) nur als letzte Wahl, und `<default>` steht wie in fontconfig am
+  Ende der ganzen Liste. Die Reihenfolge entspricht nun `fc-match -s monospace`. Grenze: Mit `ar`
+  als Sprache wählt die Library ebenfalls die lateinische Schrift; Arabisch kommt aus `fallback.rs`.
+- **Behobener Fehler, PaintCraft**: Geöffnete Dateien kamen nicht in `recently-used.xbel`, die App
+  führte nur ihre eigene Liste. Jetzt ja, und „Liste leeren“ entfernt nur ihre Einträge
+  (`apps/PaintCraft/tests/recent_xbel_check.py`). KDEs `recentlyused:/` zeigt die Datei.
+- **CFF2 mit der echten Schrift** (`NotoSansCJK-VF.ttc`): fünf Schnitte mit Flag `0xa8`, Achse `wght`
+  100–900 und sieben benannte Instanzen; Standard und `wght=900` richtig gezeichnet; Vergleich mit
+  HarfBuzz: 1171 Glyphen, 0 Abweichungen, größte Distanz 0,00049 Einheiten. Laden 8,8 ms,
+  65 535 Konturen × 3 in 760 ms, 2000 Glyphen bei 16 px in 15,7 ms, Speicher beim Rendern 34 MiB.
+  Schriftdialog mit Regler für die Strichstärke geöffnet, Text in einer Instanz nicht verglichen.
+- **GPU**: `gallery` enthielt damals keinen Vulkan-Code. `jfgui_GPU=1`, `=0` und ohne Schalter lieferten
+  dasselbe Bild. `lib/gpu` selbst: Abschnitt 1b, die Ausgabe: Abschnitt 1c.
+- **Dekorationen**: KWin zeichnet den Rahmen, mit `jfgui_CSD=1` die App; je eine Titelleiste im Bild.
+- **Fenster**: Maximieren und Minimieren vom Desktop, gleiche Größe danach.
+- **Vollbild** (`desktest`): F11 und Knopf, aus maximiert und zurück, vom Desktop aus gesteuert (die
+  App folgt). Werkzeugfenster sind Subsurfaces und tun hier wie in GUIDE §35 beschrieben nichts.
+- **Popups**: bei 100 % und `jfgui_SCALE=1`; passt die Liste nicht ins Fenster, wird sie ein
+  `xdg_popup`, klappt am unteren Rand nach oben um und bleibt über KDEs Leiste.
+- **KDE-Dateidialog**: `.png`, `.PNG`, `.jpg`, `.JPG` sichtbar, `text.txt` nicht, Filter lesbar.
+- **Tray**: Symbol beim Watcher angemeldet, `Activate` kommt an, Fenster danach aktiv.
+- **Zweiter Start** (PaintCraft mit Datei): Der zweite Prozess endet, das minimierte Fenster kommt
+  aktiv zurück, die Datei ist offen.
+- **Zwischenablage hinein**: Text mit Umlauten, € und CJK über `wl-copy` per Strg+V in der App.
+- **Hot-Reload**: neu gebaut und gestartet in 16 s, gleiche Größe, Inspektor wieder offen. Die
+  Position geht verloren, weil Wayland sie einer App nicht verrät.
+- **Klang**: Stream `audiotest` / „Ton-Generator“ in PipeWire am Analog-Ausgang, 27,8 ms Latenz,
+  0 Aussetzer (nicht angehört).
+- **Wach halten**: Portal-Anfrage und `systemd-inhibit --list` zeigen es, danach frei. KDEs
+  `PolicyAgent.ListInhibitions` bleibt leer.
+- **plattest**: `--test all` 212/212; `recent` 43, `trash` 34, `autostart` 17, `power` 5, `secret` 36
+  (KWallet), `settings` 32, `a11y` 59, `audio` 82 ohne Fehler. `linuxtest --test activate` und `clip`
+  ohne Fehler.
+- **Leerlauf-CPU** (Abschnitt 6): 19 von 21 Apps 0 ms je Sekunde, `buildManager` 6 ms, `editortest`
+  3 ms.
+- **RPM**: `package.py Kritzel --formats rpm` baut (2,1 MB), nicht installiert.
+
+**Offen auf diesem Rechner**, braucht jemanden am Gerät oder sudo:
+
+1. Text aus der App kopieren (Strg+C, Einfügen in Kate): Die Agent-Tasten haben keine Eingabe-Serial
+   für `set_selection`, der Test blieb deshalb ohne Ergebnis.
+2. Theme live (Abschnitt 2, Punkt 5); Skalierung 125 % und 150 % (`jfgui_SCALE` kennt nur ganze
+   Zahlen).
+3. Paletten in PaintCraft und Titelleiste mit echter Maus und Stift ziehen; Malen flüssig.
+4. Aktion einer Benachrichtigung, Tray-Menü, Drag & Drop mit Dolphin, Klipper mit Bildern.
+5. Tottasten, AltGr, Tastenwiederholung, GlobalShortcuts-Portal; Pipette und Screenshot-Portal.
+6. Klang anhören, Ausgabegerät wechseln; Orca und KWin-Lupe; Autostart mit Ab- und Anmelden.
+7. „Im Editor öffnen“ des Inspektors (nicht geprüft); Bild und Text im Schriftdialog vergleichen.
+8. RPM installieren und starten; AppImage (`squashfs-tools` fehlt); Flatpak: `flatpak-builder` zieht
+   hier ein KDE-Update mit, das an einem Dateikonflikt zwischen `kf6-kmime` und `kmime` scheitert.
+
+**Gefunden und behoben**: `--agent` an echten Fenstern. Die Revision war der Bildzähler
+(`lib/ui/agent.rs`), jede Anfrage zeichnet selbst ein Bild, ändernde Aufrufe scheiterten daher mit
+„The application state changed after it was inspected“. Jetzt bewegt sie sich nur, wenn sich die
+Bedienelemente ändern oder eine Agentenaktion etwas geändert hat
+(`apps/gallery/tests/agent_revision.uis`, `apps/agenttest/tests/gui_ipc_check.py`, auch auf diesem
+Rechner). Ein Testlauf mit `--agent` braucht also keine geratene Revision mehr.
+
+---
+
+## 1b. `lib/gpu` ohne Fenster auf Fedora 44 (2026-11-02, G4a)
+
+Derselbe Rechner, Mesa 26.0.3, glibc 2.43; `gputest` gegen glibc gelinkt, auf Windows gebaut und mit
+`scp` kopiert. Keine Fenster, die Fenstertests melden `SKIP`. Einzelheiten, Funde und Zahlen stehen
+in [GPU.md](GPU.md) „Linux“. `uigputest` war damals nur für Windows (seitdem: 1c).
+
+- **HD Graphics 610**: `gputest --test all` bestanden, in 7–13 s, mit `glibc` (Start, Threads, Ende,
+  Abstürze) und `noloader`. Messszene: 100 000 Würfel in 1080p 108 Bilder/s, 1 Mio. 14 Bilder/s.
+- **llvmpipe** (`jfgui_GPU_ADAPTER=llvmpipe`): Mesa 26.0.3 mit LLVM 22.1 ist auf diesem Prozessor
+  ohne AVX und BMI kaputt, Abstürze in `libLLVM`, falsche Ergebnisse, `SIGILL`. Bestanden nur
+  `copies`, `upload`, `bindless`, `noloader`. Auf WSL (LLVM 20, AVX2) läuft dasselbe Programm.
+- **Nicht da**: `VK_LAYER_KHRONOS_validation`, also keine Validierung. `vulkaninfo` und `gdb` sind da.
+- **Hinweis**: Treiber schreiben ihren Shader-Cache nach `~/.cache/mesa_shader_cache`; für Läufe in
+  einem eigenen Ordner `MESA_SHADER_CACHE_DIR` setzen.
+
+---
+
+## 1c. Ausgabe der UI über die GPU auf Fedora 44 (2026-11-02, G4b)
+
+Derselbe Rechner: Intel HD 610, Mesa 26.0.3, KWin 6.6 Wayland, Xwayland; auf Windows gebaut, mit `scp` kopiert. Zahlen,
+Funde und Empfehlung: [GPU.md](GPU.md) „Ausgabe unter Linux“.
+
+**Wie getestet.** Fast alles auf einem eigenen KWin ohne Bildschirm: `kwin_wayland --virtual --xwayland --socket NAME` mit eigenem
+`XDG_RUNTIME_DIR`, `XDG_CONFIG_HOME` und `dbus-run-session`, kein Fenster auf irgendeinem Bildschirm, echte GPU, dmabuf, Xwayland. Mit
+`KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1` nimmt `spectacle -b -n -f` darin den ganzen (leeren) Bildschirm auf; so lässt sich auch unter Wayland
+der zusammengesetzte Bildschirm gegen `shot` vergleichen. Sparsam auf dem echten Desktop: je einmal `uigputest --test switch|windows|layers` und `gallery/tests/gpu_output.uis` für Wayland und X11, Latenz einige Fenster.
+
+- **Bestanden, Wayland und X11, eigener KWin**: `gputest --test window`; alle Tests von `uigputest` (`switch`, `resize`, `minimize`, `dpi` (nur Wayland, X11: SKIP), `windows`, `off`, `noloader`, `nodmabuf`, `refused`, `lose`, `idle`, `csd`, `shaders`, `adapter`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`; `monitors` SKIP, ein Monitor); `gallery/tests/gpu_output.uis`, `gpu_layers.uis`, `gpu_layers_rtl.uis`. Jedes gezeigte Bild aus der GPU zurückgelesen: keins anders.
+- **Bildschirm gegen Framebuffer**, `spectacle` auf dem eigenen KWin: 0 Pixel anders, mit Menü, nach dem Schließen, nach Teil-Updates; Wayland und X11, Wayland auch bei Maßstab 1,5.
+- **Echter Desktop**: wie oben bestanden, Wayland und X11.
+- **Sandbox**: `sandboxtest` (`sandbox strict`): HD 610 arbeitet darunter.
+- **Laptop mit zwei GPUs**: ThinkPad mit Iris Xe und NVIDIA T500, [GPU.md](GPU.md) „Ausgabe unter Linux“: wählt auf dem echten Desktop die Intel-GPU; auf einem eigenen KWin auf der NVIDIA bestehen die GPU-Tests auch mit dem proprietären Treiber.
+- **Mutter 50.1**, ohne Bildschirm auf demselben Laptop: `dbus-run-session -- mutter --headless --wayland --virtual-monitor 1920x1080 --wayland-display NAME`, den X11-Bildschirm nennt sein Log („public X11 display“). GPU-Tests bestehen unter Wayland und über Xwayland; Mutter lässt minimierte Fenster abgebildet, `WCMD_RESTORE` geht deshalb auch über `_NET_ACTIVE_WINDOW`.
+- **Offen**: die ganze GNOME-Oberfläche und andere Compositors, AMD, echtes X11 ohne Xwayland, ein Fenster, das der Benutzer minimiert und wieder holt (Wayland sagt es dem Client nicht; der Test-Weg ist eine Hilfe), `Expose` unter den Puffern, die Validierungsschicht (nicht installiert), Pakete mit GPU auf einem echten System installiert.
+- **Hinweis**: `GetImage` eines geflippten Fensters unter Xwayland liefert das Bild davor; die Komposition zeigt das letzte. KWins eigene GPU-Zeit ist nicht lesbar (Datei-Capability, `fdinfo` gesperrt).
 
 ---
 
@@ -69,7 +183,8 @@ dann, ohne dass die Library schuld ist.
 **Einrichtung**
 
 - Automatische Anmeldung an, Bildschirmsperre und automatische Bereitschaft aus.
-- `sudo dnf install git python3 lld openssh-server`, dann `sudo systemctl enable --now sshd`.
+- `sudo dnf install git python3 gcc lld openssh-server`, dann `sudo systemctl enable --now sshd`
+  (`gcc`: cargo linkt die Proc-Macros von `lib/text_shape` mit `cc`).
 - rustup, dann `rustup toolchain install 1.98`.
 - In der Claude-App als SSH-Verbindung eintragen (oder Hostname und Benutzer nennen).
 - Das Repo ist öffentlich: `git clone https://github.com/JFLibrary/JFLib.git` (in einem
@@ -130,8 +245,7 @@ GNOME und KDE auf Fedora haben keine X11-Sitzung mehr; Xfce läuft auf X11.
 
 ## 5. Offen ohne passenden Rechner (mit Jakob abstimmen)
 
-- CFF2-Schriften: gelesen seit 2026-11-01, mit einer echten Schrift noch nicht geprüft
-  (siehe 3).
+- CFF2-Schriften: seit 2026-11-01 mit der echten Schrift geprüft (1a); unter GNOME noch nicht.
 - Die eigene Titelleiste zeigt immer alle Knöpfe (siehe 3).
 - Resize-Zone über den Titelleisten-Knöpfen (siehe 3).
 - DNS-Server auf IPv6-Link-Local-Adressen scheitern.
@@ -140,6 +254,11 @@ GNOME und KDE auf Fedora haben keine X11-Sitzung mehr; Xfce läuft auf X11.
 - Windows: F-03 und F-04 ungetestet, ebenso die Windows-Seite der Token-Übergabe in
   `lib/plat/instance.rs`. Braucht einen Windows-Rechner mit Build.
 - `portal_bus` und die PaintCraft-Plugin-Skripte brauchen `build/rwref`.
+- Programme gegen glibc auf einer alten glibc (Debian 11, Ubuntu 20.04, RHEL 8: vor 2.34):
+  `gputest --test glibc` und `--test noloader` dort, die Datei von hier kopiert. Bisher lief sie nur auf
+  2.39 und 2.43; alle Importe tragen `GLIBC_2.2.5`, und `libdl` / `libpthread` stehen in `DT_NEEDED`,
+  gerade dafür. Ebenso `lib/gpu` auf NVIDIA und AMD unter Linux, und einmal mit
+  `VK_LAYER_KHRONOS_validation`.
 
 ---
 
@@ -198,11 +317,12 @@ Xwayland, PulseAudio-Server von WSLg) oder gegen Fake-Busse lief.
    benannten Instanzen, Text in einer Instanz sieht aus wie im Dialog. **CFF2**
    (Noto CJK VF): die Schritte in Abschnitt 3.
 6. **Pakete** (PACKAGING.md „Other formats“; Fedora: `rpm-build`, `rpm-sign`):
-   `python3 tools/package.py updatetest --formats rpm,flatpak,appimage` mit Signatur
+   `python3 tools/package.py Kritzel --formats rpm,flatpak,appimage` mit Signatur
    (`--sign`, Testschlüssel). Das RPM mit `sudo dnf install ./build/dist/…rpm` installieren,
    aus dem Startmenü starten, Dateizuordnung prüfen, mit `dnf remove` entfernen. Das Flatpak
    für den Nutzer installieren, starten, Dateidialog über das Portal, Update auf die nächste
-   Version. Das AppImage per Doppelklick und im Terminal starten (ohne FUSE), danach das
+   Version (`updatetest` hat keine `PACKAGE`-Datei, `--no-deb` lässt alle Linux-Formate weg, das
+   AppImage braucht `squashfs-tools`, das Flatpak `flatpak-builder`). Das AppImage per Doppelklick und im Terminal starten (ohne FUSE), danach das
    Update der App selbst (`updatetest`). Danach alles wieder entfernen.
 7. **Klang über echtes PipeWire** (`audiotest`, spielt hörbar ab): Wiedergabe, der Name des
    Streams in der Lautstärkeregelung des Desktops, Ausgabegerät während der Wiedergabe wechseln.

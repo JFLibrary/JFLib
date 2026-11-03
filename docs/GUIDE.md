@@ -79,7 +79,7 @@ const ID_RESET: u32 = 101;
 const CMD_RESET: u32 = 1;
 
 const DESC: AppDesc = AppDesc {
-    title: "jfgui Template",
+    title: "JFLib Template",
     flags: AF_RESIZABLE,
     w: 480,
     h: 320,
@@ -140,6 +140,8 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
 | `apps/NAME/tests/*.uis` | test scripts (`apps/NAME/tests/*.uis` for scripts that only the Rust build has) |
 | `apps/NAME/STYLE` | one word: the app's style (default `winui`) |
 | `apps/NAME/TARGETS` | e.g. `win linux web`: explicit supported targets; owned GUI apps default to native plus web, native CLI probes to Windows/Linux |
+| `apps/NAME/GLIBC` | on Linux this program links dynamically against glibc even without `ui`: it uses the GPU, and every Linux GPU driver is a glibc library (`gputest`; a program that names `ui` does so anyway; GPU.md "Linux") |
+| `apps/NAME/STATIC` | on Linux this program stays static although it names `ui`: no GPU, shared memory only (`plattest`, `linuxtest`; `build_rs.py ... --static` does that for one run, for systems without glibc such as Alpine) |
 | `apps/NAME/res/app.ico`, `app_{48,128,256}.png` | exe icon, Linux icons (`tools/mkicon.py`) |
 | `apps/NAME/PACKAGE` | packaging metadata (PACKAGING.md); `version=` is the app's own version (`rt::app_version!()`, VERSIONING.md) |
 | `apps/NAME/PERMISSIONS`, `BINS`, `assets/` | what it may do (PERMISSIONS.md), further programs (section 16), files built in as `app://` (VFS.md) |
@@ -172,7 +174,9 @@ Every app crate gets every library crate (`ui`, `gfx`, `text`, `plat`, `base`, `
 are incremental (about 1.5 s after an edit in `ui`). Use `--out build/<name>` when several
 agents build at the same time.
 
-**Platforms need no app code.** The same source builds a Windows exe and a static Linux ELF.
+**Platforms need no app code.** The same source builds a Windows exe and a Linux ELF: static for
+command-line programs, linked against glibc and nothing else for programs with a UI (the GPU drivers
+are glibc libraries; without a GPU they draw as before; `--static` makes them static, for systems without glibc).
 On Linux the library picks the display backend at start-up: Wayland when `WAYLAND_DISPLAY` is
 set, else X11 via `DISPLAY` (`jfgui_BACKEND=x11|wayland` forces one). Apps call only `ui`,
 `gfx`, `img_core`, `text`, `fx` and the neutral `plat` helpers (files, clock, threads). The only
@@ -577,6 +581,22 @@ if self.tab == 0 {
   `next_flags(CUR_* << HB_CURSOR_SHIFT)`. `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
+  id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
+  `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
+  `CanvasView { scale, ox, oy }` (window px = o + content * scale), opaque, what the `Draw` paints at
+  that view; `ver` stands for everything it shows, `ui.canvas_gpu_damage(id, r)` reports a changed
+  content rectangle. With the GPU output, while the view moves and the content stays, the
+  picture comes from tiles (256 x 256 textures, drawn once, kept under a budget) that the GPU
+  draws with the transform; a moment after the last move the CPU draws it, so at rest it is the
+  CPU path's byte for byte. `gpu`: `CanvasGpu::Pan` only moves by whole pixels at the same scale (exact
+  when the raster does not depend on the place), `Zoom` also scales the tiles while a zoom runs
+  (soft for a moment), `Cpu` never. On other targets, without a GPU and in headless runs it does
+  nothing: the code is the same, the `Draw` paints every frame. Everything over the canvas
+  (selection, handles, anything recorded after it) stays recorded commands. `image_view`
+  (`ImageViewState::gpu`) and `diagram` (`DiagramState::gpu`) do this themselves. While a canvas is
+  apart `ui.fb()` lacks its view: `ui.gpu_settle()` first, outside a pass. Details and numbers: GPU.md
+  "Leinwände".
 * Direct pixel work (paint programs): `gfx::Surface::new(w, h, FMT_PARGB)`, a `gfx::Dc`
   (`fill`, `blit`, `blit_scaled`, clip and origin), `gfx::path` / `raster` / `stroke` for
   anti-aliased vector paths, `gfx::blendmode`, `gfx::tmask` (selection masks), `gfx::flood`,
@@ -1515,7 +1535,7 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`, `jfgui_GPU=0`
-  (nothing of the GPU anywhere; on Windows the windows show their frames through a swapchain by default;
+  (nothing of the GPU anywhere; on Windows and Linux the windows show their frames through the GPU by default;
   GPU.md "Ausgabe der UI"; `jfgui_GPU_VERIFY=1` reads every presented image back and compares it,
   `jfgui_GPU_TRACE=1` prints its stages, `jfgui_GPU_LAYERS=0` keeps one texture per window,
   `jfgui_GPU_IMAGES=0` keeps images on the CPU, `jfgui_GPU_IMAGE_MB=n` their budget), `jfgui_TEST_NOACTIVATE=1` (a test's window appears without
@@ -1549,7 +1569,7 @@ in DIP):
 | Command | Effect |
 |---|---|
 | `click S [l\|r]`, `rclick S`, `dblclick S`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer |
-| `drag S1 S2 [steps] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons |
+| `drag S1 S2 [steps] [hold MS] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons; `hold MS`: the button rests MS ms before the first move, on the virtual clock like `wait` (a dock tab asks for it) |
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
 | `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events (`touch`: they are a finger, §37) |
 | `tap S`, `longpress S [MS]` | a finger: down and up at S; resting MS ms (default 600) in between |
@@ -1579,7 +1599,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
-| `gpu on\|off`, `gpu wait [MS]`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N` | (Windows, else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer, a render after every input edge. `wait`: until the windows are on the swapchain again. `lose`: the device behaves as lost. `budget`: what image textures may take. `same`: every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist |
+| `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu hold MS`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, Linux with the GPU; else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `hold`: real time passes, the windows stay as they are (a look from outside). `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note; X11: what the server holds; Wayland: a note, no client can read a window); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
@@ -1654,9 +1674,10 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
-* **Presenting through the GPU** (Windows, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
-  UI"): the first frames, every frame of a resize and every window after a failure go the way below;
-  otherwise the rectangles go into a texture and a swapchain on a child window shows it, without
+* **Presenting through the GPU** (Windows and Linux, by default, `jfgui_GPU=0` turns it off, `lib/ui/gpu_out.rs`, GPU.md "Ausgabe der
+  UI", "Ausgabe unter Linux"): the first frames, every frame of a resize and every window after a failure go the way below;
+  otherwise the rectangles go into a texture and a swapchain shows it (Windows: on a child window; Linux: dma-bufs on the
+  window itself, through JFLib's own Wayland and X11 code, no libwayland or libxcb), without
   ever waiting for the display. The layers above the base have textures of their own: a popup that
   closes or moves costs nothing of what lies below it. Big opaque `draw_image`s that keep being
   redrawn become textures; `Ui::fb()` may lack their pixels then, `Ui::gpu_settle()` draws them (GPU.md "Ebenen und
@@ -1772,6 +1793,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `command_bar(id, &[CmdItem]) -> Option<u32>` | primary and secondary commands; what does not fit goes into an overflow menu |
 | `split_begin(id, pos, vertical)`, `split_next`, `split_end(&mut pos)` | two panes with a draggable splitter (master / detail) |
 | `page_header`, `breadcrumb`, `key_value`, `empty_state`, `link` | page titles, paths, label / value rows, empty pages with a call to action, text links |
+| `action_card(id, name, &CardDesc)` | a card or list row that does one thing when chosen (a template on a start page, a recent file): title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area with the app's drawing; `next_size` its width, `ST_SUBTLE` a list row, `ST_CHECKED`, `ST_DISABLED`; one Tab stop, a button record named `name`; in a row of cards all take the row's height ([`ui/action_card.rs`](../lib/ui/action_card.rs)) |
 | `segmented(id, &mut sel, items)` | segmented control (filters, schedule kinds) |
 | `wizard_steps(id, steps, current, states)` | the step list of a full-page wizard |
 | `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last |
@@ -1816,13 +1838,20 @@ self.dock.focus(P_PROPS);
   and should never change (the saved layout names them); panels the app no longer describes
   are kept in the layout but not shown.
 * Each group has a tab strip with a menu (float / dock to a side / collapse / hide), a
-  collapse and a hide button. Dragging a tab, or the empty part of a strip (the whole group),
-  shows drop markers at the three edges of the area and on the group under the pointer (as a
-  tab, before, after); a release over a strip inserts the tab there, anywhere else -- also
-  outside the window -- the panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 ..
-  ID + DOCK_FLOAT_MAX`, six at most). A floating window's tabs drag back onto the markers, its
-  pin button or a double click docks it where it came from, its close button hides its
-  panels. Esc cancels a drag. Painters: `StyleShell::dock_*` (stock ones from the tokens).
+  collapse and a hide button. A press on a tab, or on the empty part of a strip (the whole
+  group), can drag only after the button was held for `DOCK_HOLD_MS` (300 ms), so that a slip
+  of the hand during a click neither moves nor floats a panel: from then on the tab shows it
+  (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`; on a strip
+  every tab of the group), and the drag starts when the pointer moves past the usual threshold
+  from where it is at that moment. Movement during the hold cancels nothing and never counts (a
+  slip or a tremor starts nothing), a release without a drag is a click if it is over the tab;
+  clicks, double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
+  three edges of the area and on the group under the pointer (as a tab, before, after); a
+  release over a strip inserts the tab there, anywhere else -- also outside the window -- the
+  panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 .. ID + DOCK_FLOAT_MAX`, six at
+  most). A floating window's tabs drag back onto the markers, its pin button or a double click
+  docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
+  (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
   `dock_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
@@ -1831,9 +1860,12 @@ self.dock.focus(P_PROPS);
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
-* Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`); a floating window is `window 501`, and
-  `window any` + `drag tab:"…" X,Y` drags its tab onto a marker of the main window.
+* Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`). A plain `drag` lasts 128 ms and never gets
+  past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
+  (a `move` during the hold does not count towards the drag).
+  A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
+  tab onto a marker of the main window.
   PaintCraft keeps its own placement of floating palettes inside the main window
   (`apps/PaintCraft/src/workspace/panels/dock.rs`), a different model.
 
@@ -1907,8 +1939,14 @@ page). The library's own texts (file dialog, shortcut names, date picker, tree, 
 bar) follow the catalogue's language: German, English, French, Spanish, Italian, Dutch,
 Polish, Arabic and Hebrew (`i18n::library_languages()`), every other language gets English.
 An app without a catalogue stays German; one whose texts are language-neutral can install a
-catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`, as
-`datagallery` does) to let the library follow the user.
+catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`) to let the
+library follow the user. `Catalog::with_library_languages()` adds the library's languages to a
+catalogue: there the library's texts follow the user and Arabic and Hebrew mirror the window,
+while the app's own texts show their English column (the demos, `apps/gallery`). In the browser
+Arabic and Hebrew stay out: the bundle has no font for them, those users get English. A static
+command table and menus follow with `DESC.translated()` (title, command labels, menu bar) and
+`i18n::menu(table)` (a context menu); write
+`ui::main!({ i18n::set_catalog(..); ui::launch(&DESC.translated(), ..) })`.
 
 **Checking the catalogues**: `python build_rs.py i18n` ([`tools/i18n_check.py`](../tools/i18n_check.py))
 extracts the translatable texts of every app with a catalogue (`apps/NAME/**/locales/*.tsv`)
@@ -1933,7 +1971,7 @@ source order; existing rows are never changed, and the app keeps showing German 
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
 languages in a comment (`# languages: de en fr`, PaintCraft's). The suite runs
 `i18n --check`: it fails on errors and on gaps in the catalogues that are complete
-(BackupCraft, JFNetworker, the library) and only counts the others (PaintCraft's).
+(`COMPLETE`: all of them today, the library too) and only counts the others.
 
 **Sorting and case** follow the user's format locale, as Windows' `CompareStringEx` does:
 `i18n::collate(a, b)` orders base letters, then accents, then case ("a" < "A" < "ä" < "b"),
@@ -3059,6 +3097,16 @@ for ev in evs {
   (`DEv::Click` at a snapped point). Middle drag, Space + drag and the wheel pan, Ctrl + wheel
   zooms at the pointer; arrows nudge, Del, Ctrl+A, Esc, Tab, Enter, Ctrl + plus / minus / 0
   work while the canvas has the focus.
+* A double click on a node, port or edge is `DEv::Activate`, one on the background with
+  `DG_SELECT` (no Shift, no Ctrl) `DEv::DoubleClick { at }` with the world point of the second
+  press, not snapped: no marquee and no second `Click` follow it, and a press that became a drag
+  (a marquee) or a key between the clicks makes none. The time is the theme's
+  `double_click_ms`. `DN_HITMIN` gives a small node, a line of text say, a hit box of at least
+  16 x 16 DIP around it, so it stays selectable at low zoom. To type right on the canvas, place a `ui.textbox_presented` over it
+  with `ui.next_rect_px` (in a mirrored window its logical x is `ui.rtl_map(x + w - 1, r[0], r[2])`,
+  the canvas is not mirrored) and give the keyboard back with `ui.focus_quiet(id)` after a pointer
+  gesture: it is
+  `ui.focus` without the focus ring. JFNetworker's labels do this (`canvas/labels.rs`).
 * Painting: the `DgPaint` runs at render time with a `DgFrame` (`vp`: world <-> px, `clip`: the
   world part to paint, `geo.routes`: the polyline of every edge, the theme's colours and fonts,
   `moving`). Cull with `f.visible(rect)` / `f.route_visible(route,
@@ -3738,7 +3786,10 @@ impl Host for MyHost {
   scripts send a packet then: `apps/JFNetworker/crates/jfn_sim/scriptsvc.rs`).
 * Values (`Value`, 16 bytes) refer to the VM's heap. A value the host keeps beyond the next
   `run` must be pinned (`pin` / `pinned` / `unpin`), e.g. a request handler; `valid(v)` tells
-  a stale one, and the API returns `None` or an error instead of crashing on it.
+  a stale one, and the API returns `None` or an error instead of crashing on it. The host's own
+  allocations between runs can collect too (a callback that allocates nothing itself must not
+  fill the heap with its arguments): what the host made since the last `run` stays until the next
+  one, a value it took out of a pin or a map only while the pin or the map still holds it.
 * Fuel: one per instruction, more for copying (string and list concatenation, literals, map
   iteration). `run(host, fuel)` stops before the next instruction once `fuel` is used (it may
   use a little more: `last_fuel()`). `Limits::fuel` caps one invocation over all its runs, so

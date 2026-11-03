@@ -1,0 +1,106 @@
+#!args --verify-dirty
+# the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from tiles, byte
+# for byte what the CPU draws (blit_scaled's mapping does not depend on the place); a zoom step and a
+# stroke go the CPU's way, the stroke's tiles are drawn again when the view next moves over them.
+# At the end the same with jfgui_GPU_CANVAS_ZOOM: scaled tiles until the CPU's picture follows.  Every
+# presented image is read back and compared.  Without a GPU `gpu` prints a SKIP once.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 1400 900
+theme light
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect apart 0
+gpu expect tiles 0
+# a stroke before anything else: nothing for the GPU to keep
+drag 400,300 600,380 12
+gpu expect apart 0
+gpu expect tiles 0
+gpu expect same
+# ---- a zoom step: the CPU at once
+wheel 700,450 120 ctrl
+gpu expect apart 0
+wheel 700,450 120 ctrl
+wheel 700,450 120 ctrl
+gpu expect apart 0
+gpu expect same
+gpu expect tiles 0
+# ---- a pan: tiles, not one byte differs
+wheel 700,450 -120
+gpu expect apart 1
+gpu expect nodiff
+wheel 700,450 -120
+wheel 700,450 -120 shift
+gpu expect apart 1
+gpu expect nodiff
+gpu print
+gpu expect same
+gpu expect apart 0
+# ---- a stroke: its tiles go, the next pan shows it
+drag 500,400 800,500 12
+gpu expect apart 0
+gpu expect same
+wheel 700,450 120
+gpu expect apart 1
+gpu expect nodiff
+gpu expect same
+# ---- a stroke while a pan is apart: the CPU draws at once
+wheel 700,450 120
+gpu expect apart 1
+drag 600,300 700,400 12
+gpu expect apart 0
+gpu expect same
+# ---- a menu over the canvas
+click "Datei"
+gpu expect layers 1
+gpu expect same
+key esc
+gpu expect same
+# ---- other zoom levels: the picture stays exact in a pan
+wheel 700,450 -120 ctrl
+gpu expect same
+wheel 700,450 -120
+gpu expect apart 1
+gpu expect nodiff
+gpu expect same
+wheel 700,450 -120 ctrl
+gpu expect same
+wheel 700,450 -120 ctrl
+gpu expect same
+wheel 700,450 120 shift
+gpu expect same
+# ---- the tiles' budget: nothing is kept above it, the rest goes the CPU's way
+gpu tilebudget 1000000
+wheel 700,450 120
+gpu expect nodiff
+gpu expect same
+gpu tilebudget 134217728
+# ---- a lost device
+gpu lose
+drag 500,400 520,420 4
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect tiles 0
+wheel 700,450 120
+gpu expect nodiff
+gpu expect same
+gpu print
+gpu off
+# ---- the switch: a zoom step from scaled tiles, then the CPU's picture
+system env jfgui_GPU_CANVAS_ZOOM kritzel
+gpu on
+gpu expect gpu
+gpu expect same
+wheel 700,450 120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu expect apart 0
+wheel 700,450 -120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu off
+system env jfgui_GPU_CANVAS_ZOOM -
+expect_nowarn gpu
+quit

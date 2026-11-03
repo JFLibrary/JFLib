@@ -2,7 +2,8 @@
 // the canvas, the inspector and the simulator's panels, the status bar, the info dialog
 //
 //   Shell::new()        the dock layout (the user's, else the default) and the dialog flag
-//   frame(n, ui)        the whole window, once per frame
+//   frame(n, ui)        the whole window, once per frame; a lab that locks the problems or its answer
+//                       (Lab::lock, AK2) has no panel Probleme or Aufgabe erstellen, not even in a menu
 //
 // Dock: Geräte (left), Eigenschaften and PDUs (right; PDUs shows with the simulation mode),
 // Terminal / Ereignisse / Paket / Protokoll / Probleme (bottom, one group).  Terminal (the
@@ -19,7 +20,10 @@
 // services with KPI tiles and charts of their time series.  Aufgabe erstellen (right, A1:
 // workspace/author.rs) makes an assessment from the project; the question before handing one
 // in is workspace/assess.rs's dialog.  The physical view (P1, workspace/phys) takes the dock's
-// centre while it is shown; the toolbar's switch Logisch | Physisch follows the view group.
+// centre while it is shown; the toolbar's switch Logisch | Physisch follows the view group.  The start
+// page (ST1, workspace/startpage.rs) takes the place of toolbar, dock and status bar while it is on;
+// the menu bar, the dialogs and the timers stay.  So does the page of the Akademie (AK1,
+// workspace/academy), above the start page and the project; a lab of a course has its bar over the canvas.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -39,6 +43,9 @@ use crate::workspace::{canvas, inspector, palette, sim};
 pub(crate) struct Shell {
     pub dock: DockState,
     pub about: Shared<i32>,
+    /// the start page shows (workspace/startpage.rs) and what it keeps
+    pub start: bool,
+    pub page: crate::workspace::startpage::Page,
     /// the window title last set
     title: String,
     /// the chosen row of the problems list
@@ -47,7 +54,7 @@ pub(crate) struct Shell {
 
 impl Shell {
     pub(crate) fn new() -> Shell {
-        Shell { dock: DockState::new(), about: Shared::new(0), title: String::new(), prob_sel: -1 }
+        Shell { dock: DockState::new(), about: Shared::new(0), start: false, page: crate::workspace::startpage::Page::new(), title: String::new(), prob_sel: -1 }
     }
 }
 
@@ -56,7 +63,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     n.syms.update(ui);
     commands::states(n, ui);
     // Ctrl+Shift+Z redoes as well (outside text fields, which have their own undo)
-    if ui.modal_active() == 0 && ui.popup_count() == 0 {
+    if ui.modal_active() == 0 && ui.popup_count() == 0 && !n.academy.on {
         match ui.undo_keys() {
             Some(true) => ui.cmd_run(CMD_UNDO, 0),
             Some(false) => ui.cmd_run(CMD_REDO, 0),
@@ -69,7 +76,21 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | BOX_FIXED, 0);
     ui.menubar(None);
+    if n.academy.on {
+        crate::workspace::academy::frame(n, ui);
+        ui.box_end();
+        dialogs(n, ui);
+        return;
+    }
+    if n.shell.start {
+        crate::workspace::startpage::frame(n, ui);
+        ui.box_end();
+        dialogs(n, ui);
+        return;
+    }
     toolbar(n, ui);
+    let lock = crate::workspace::task::lock(n);
+    let hide_problems = lock.problems;
     let panels = [
         DockPanel::new(P_DEVICES, t("Geräte"), JN_DEVICES).at(DOCK_LEFT, 0),
         DockPanel::new(P_PROPS, t("Eigenschaften"), IC_SETTINGS).at(DOCK_RIGHT, 0),
@@ -77,26 +98,31 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         DockPanel::new(P_EVENTS, t("Ereignisse"), IC_BULLETED_LIST).at(DOCK_BOTTOM, 0),
         DockPanel::new(P_PACKET, t("Paket"), JN_PACKET).at(DOCK_BOTTOM, 0),
         DockPanel::new(P_LOG, t("Protokoll"), IC_HISTORY).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_PROBLEMS, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
+        DockPanel::new(if hide_problems { 0 } else { P_PROBLEMS }, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, t("PDUs"), IC_MAIL).at(DOCK_RIGHT, 1) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_TASK, t("Aufgabe"), IC_FLAG).at(DOCK_RIGHT, 0) },
         DockPanel::new(P_METRICS, t("Metriken"), JN_METRICS).at(DOCK_BOTTOM, 0),
-        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_AUTHOR, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(if lock.answer { 0 } else { P_AUTHOR }, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
+    crate::workspace::task::front(n, ui);
     while let Some(p) = ui.dock_next(&mut n.shell.dock) {
         match p {
             // the physical view instead of the canvas (workspace/phys)
-            DOCK_CENTER if n.phys.on => crate::workspace::phys::frame(n, ui),
+            DOCK_CENTER if n.phys.on => {
+                crate::workspace::academy::bar(n, ui);
+                crate::workspace::phys::frame(n, ui);
+            }
             DOCK_CENTER => {
+                crate::workspace::academy::bar(n, ui);
                 sim::hint(n, ui);
                 canvas::frame(n, ui);
                 sim::anim::overlay(n, ui);
             }
             P_DEVICES => palette::frame(n, ui),
             P_PROPS => inspector::frame(n, ui),
-            P_PROBLEMS => problems(n, ui),
+            P_PROBLEMS if !hide_problems => problems(n, ui),
             P_TERMINAL => crate::workspace::terminal::panel(n, ui),
             P_EVENTS => sim::events::frame(n, ui),
             P_PACKET => sim::packet::frame(n, ui),
@@ -104,16 +130,23 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             P_LOG => crate::workspace::logview::panel(n, ui),
             P_TASK => crate::workspace::task::panel(n, ui),
             P_METRICS => crate::workspace::metrics::panel(n, ui),
-            P_AUTHOR => crate::workspace::author::panel(n, ui),
+            P_AUTHOR if !lock.answer => crate::workspace::author::panel(n, ui),
             _ => {}
         }
     }
     ui.dock_end(&mut n.shell.dock);
     statusbar(n, ui);
     ui.box_end();
+    dialogs(n, ui);
+}
+
+// the dialogs and the timers, every frame (below the start page too)
+fn dialogs(n: &mut Net, ui: &mut Ui) {
     file::dialogs(n, ui);
     about(n, ui);
     crate::workspace::settings::dialog(n, ui);
+    crate::workspace::startpage::info_dialog(n, ui);
+    crate::workspace::academy::dialog(n, ui);
     crate::workspace::settings::shortcuts(n, ui);
     crate::doc::autosave::frame(n, ui);
     sim::pdu::dialog(n, ui);
@@ -128,7 +161,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
 
 // "JFNetworker – Büro.jfnet" with a dot while there are unsaved changes
 fn title(n: &mut Net, ui: &mut Ui) {
-    let s = format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" });
+    let s = if n.academy.on {
+        format!("JFNetworker – {}", t("Akademie"))
+    } else if n.shell.start {
+        String::from("JFNetworker")
+    } else { format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" }) };
     if s != n.shell.title {
         ui.set_title(&s);
         n.shell.title = s;
@@ -192,7 +229,7 @@ fn statusbar(n: &mut Net, ui: &mut Ui) {
     if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note) {
         ui.text(TS_CAPTION | TX_TERTIARY, t("Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet"));
     }
-    if n.canvas.tool == Tool::Connect {
+    if matches!(n.canvas.tool, Tool::Connect(_)) {
         match n.canvas.kb_from.and_then(|d| n.doc.proj.device(d)) {
             Some(a) => ui.text(TS_CAPTION | TX_TERTIARY, &tf("Ende A: {} – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab", &[&a.name])),
             None => ui.text(TS_CAPTION | TX_TERTIARY, t("Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet")),

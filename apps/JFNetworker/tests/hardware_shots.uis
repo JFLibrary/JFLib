@@ -1,0 +1,27 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/hw_basic.jfnet
+# pictures of the hardware of a device (inspector/hardware.rs, metrics.rs), light and dark at 100 and
+# 150 %: the project's page with "Hardware simulieren"; a host's card with its figures, the assumptions
+# and a preset; the Hardware row of the Metriken panel under load.  build/jfnetworker/hardware_*.png
+size 1280 1000
+theme light
+shot build/jfnetworker/hardware_project_light.png
+theme dark
+shot build/jfnetworker/hardware_project_dark.png
+theme light
+wait 6000
+click listitem:"WEB1"
+wait 100
+expect text:"Hardware" exists
+key ctrl+shift+m
+wait 100
+click #47110
+wait 100
+expect text:"WEB1 · Hardware" exists
+shot build/jfnetworker/hardware_light.png
+theme dark
+shot build/jfnetworker/hardware_dark.png
+scale 150
+shot build/jfnetworker/hardware_dark_150.png
+theme light
+shot build/jfnetworker/hardware_light_150.png
+scale 100

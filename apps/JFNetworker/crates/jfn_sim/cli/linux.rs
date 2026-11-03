@@ -152,6 +152,9 @@ impl Engine {
             }
             "ss" => self.sh_ss(ni, &args),
             "top" => self.sh_top(ni, &args),
+            // only a device with hardware has them (res.rs)
+            "free" if self.os(ni).is_some_and(|o| o.res.is_some()) => self.sh_free(ni),
+            "lscpu" if self.os(ni).is_some_and(|o| o.res.is_some()) => self.sh_lscpu(ni),
             "dig" => self.sh_dig(ni, &args),
             "host" => self.sh_host(ni, &args),
             "nslookup" => self.sh_nslookup(ni, &args),
@@ -165,6 +168,7 @@ impl Engine {
             "dhclient" => self.sh_dhclient(ni, &args),
             "cat" => self.sh_cat(ni, &args),
             "iw" => self.sh_iw(ni, &args),
+            "ufw" => self.sh_ufw(ni, &args),
             // with "> FILE" into a file (files.rs)
             "echo" => self.sh_echo(ni, &args),
             "ls" => self.sh_ls(ni, &args),
@@ -1019,6 +1023,8 @@ impl Engine {
         if st.forwarding != default {
             s.push_str(&format!("sysctl -w net.ipv4.ip_forward={}\n", if st.forwarding { 1 } else { 0 }));
         }
+        // the host firewall (cli/ufw.rs)
+        s.push_str(&super::ufw::config(&st.fw.host));
         for (i, f) in st.ifaces.iter().enumerate() {
             if f.hidden {
                 continue;

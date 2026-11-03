@@ -291,7 +291,7 @@ def main():
         no_dialog()
         d.sh("am", "force-stop", PKG)
         d.run("shell", "run-as", PKG, "rm", "-f", STATE, check=False)
-        launch(["--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", page])
+        launch(["--es", "jfgui_LANG", "de", "--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", page])
         s = wait(lambda s: s.get("selftest") == "sensors" and s.get("page", "").lower() == page, f"page {page}", 30)
         if not ok(s is not None, f"the gallery runs on the page {page}"):
             raise RuntimeError("the app did not start (a debug APK?)")
@@ -494,7 +494,7 @@ def main():
             time.sleep(0.3)
         ok(not foreground(), "the back key on the start page: the app goes")
         d.sh("am", "force-stop", PKG)
-        launch(["--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", "menus"])
+        launch(["--es", "jfgui_LANG", "de", "--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", "menus"])
         n = find(label("Hier lange drücken"), '"Hier lange drücken"', 30)
         if ok(n is not None, "the page with the context menu"):
             x, y = center(n)
@@ -502,7 +502,7 @@ def main():
             ok(find(label("Eigenschaften"), "the context menu", 10) is not None, "a long press opens the context menu")
         # a vertical swipe scrolls, but drags on a row's handle (ui.touch_drag; more in android_touch.py)
         d.sh("am", "force-stop", PKG)
-        launch(["--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", "lists"])
+        launch(["--es", "jfgui_LANG", "de", "--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", "lists"])
         row1, row3 = find(label("Ebene 1"), '"Ebene 1"', 30), find(label("Ebene 3"), '"Ebene 3"', 10)
         if ok(row1 is not None and row3 is not None, "the page with the rows"):
             density = int(re.search(r"(\d+)\s*$", d.sh("wm", "density").strip()).group(1)) / 160

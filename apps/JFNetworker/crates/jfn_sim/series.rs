@@ -39,6 +39,11 @@
 //   LatWindow::raw(&window, stats)     a window of a service's own numbers, not times in ns (a
 //                                      script's metrics.observe): its series keep them as they
 //                                      are, without a unit
+//   a device with hardware (res.rs)    a record of its own, named HOST ("_host", kind "host"): cpu_pm
+//                                      (the part of its cores' time spent in the interval, per
+//                                      mille), running (cores busy), runq (jobs waiting for a core),
+//                                      mem_bytes, swap_bytes, pageins, oom_kills and disk_bytes
+//                                      (counters: rates per second); only such a device has one
 //
 // What a metric becomes: Service::metric_kind (by default metric_kind_of, which goes by the
 // names the built-in services use) makes it a counter, whose series is its rate per second
@@ -560,11 +565,24 @@ impl Engine {
         let base = s.taken == 0;
         s.taken += 1;
         let stamp = s.taken;
-        let (keep, from) = (s.cfg.keep, at.saturating_sub(s.cfg.every));
+        let (keep, from, every) = (s.cfg.keep, at.saturating_sub(s.cfg.every), s.cfg.every);
         for (&dev, &ni) in &self.dev_idx {
             let Some(os) = self.os(ni) else {
                 continue;
             };
+            // a device with hardware: its own series first (res.rs)
+            if let Some(r) = os.res.as_deref() {
+                let recs = s.svcs.entry(dev).or_default();
+                let ri = match recs.iter().position(|x| x.name == crate::res::HOST) {
+                    Some(i) => i,
+                    None => {
+                        recs.push(Rec { id: 0, name: String::from(crate::res::HOST), kind: "host", stamp, ser: Vec::new() });
+                        recs.len() - 1
+                    }
+                };
+                recs[ri].stamp = stamp;
+                sample_host(&mut recs[ri], r, &os.disk, every, at, stamp, base, keep);
+            }
             if !os.svcs.iter().any(|x| !x.console && x.svc.is_some()) {
                 continue;
             }
@@ -633,6 +651,26 @@ impl Engine {
             }
         }
         s.links.retain(|_, r| r.stamp == stamp);
+    }
+}
+
+/// a device's hardware at a sample covering the interval before `to`
+#[allow(clippy::too_many_arguments)]
+fn sample_host(rec: &mut Rec, r: &crate::res::Res, disk: &crate::disk::Disk, every: Ns, to: Ns, stamp: u64, base: bool, keep: usize) {
+    let mut hint = 0;
+    // the core time spent in the interval; `last` keeps what was spent up to the previous sample
+    let done = r.done_at(to).min(i64::MAX as u64) as i64;
+    let x = rec.slot(&mut hint, "cpu_pm", SeriesKind::Gauge, base);
+    let spent = x.last.map(|l| (done - l).max(0));
+    x.last = Some(done);
+    let of = (every as i128 * r.hw.cores as i128).max(1);
+    x.put(spent.map(|v| (v as i128 * 1000 / of).min(1000) as i64), stamp, base, keep);
+    let v = |x: u64| x.min(i64::MAX as u64) as i64;
+    for (name, value) in [("running", v(r.running(to))), ("runq", v(r.waiting(to))), ("mem_bytes", v(r.used().min(r.ram()))), ("swap_bytes", v(r.over()))] {
+        rec.slot(&mut hint, name, SeriesKind::Gauge, base).put(Some(value), stamp, base, keep);
+    }
+    for (name, value) in [("pageins", v(r.pageins)), ("oom_kills", v(r.oom_kills)), ("disk_bytes", v(disk.bytes_read + disk.bytes_written))] {
+        rec.slot(&mut hint, name, SeriesKind::Rate, base).put(Some(value), stamp, base, keep);
     }
 }
 
@@ -847,7 +885,7 @@ impl Engine {
     }
 
     /// "R1 Gi0/0/1 – SW1 Gi1/0/1"
-    fn cable_label(&self, link: u32) -> String {
+    pub(crate) fn cable_label(&self, link: u32) -> String {
         let Some(l) = self.link_rt(link) else {
             return format!("Kabel {}", link);
         };

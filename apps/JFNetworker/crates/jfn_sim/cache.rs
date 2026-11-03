@@ -21,8 +21,11 @@
 // p95_us, p99_us (arrival to answer), hit_p50_us, miss_p50_us.  Engine::cache_view for the
 // lab, cachectl on the console.  The time series (series.rs) take p50_us .. p99_us,
 // hit_p50_us .. hit_p99_us and miss_p50_us .. miss_p99_us of each interval from the windows.
+// Service::reconfigure takes a whole new config while it runs, all but its port and backend (what
+// it holds stays; over a smaller limit the oldest answers go with the next one kept).
 // The status line is a message for the app's catalogue (status_msg; status() is its German
-// text).
+// text).  On a device with hardware (res.rs) hit_us is CPU work at a reference core, and what the
+// cache holds is memory ("mem_mb", "conn_kb" on top of it); without hardware hit_us is a plain time.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -110,6 +113,8 @@ pub struct Cache {
     hit_lat: Window,
     miss_lat: Window,
     seen: Ns,
+    /// what it holds besides its answers (res.rs)
+    pub mem: crate::res::SvcMem,
 }
 
 fn hop_by_hop(name: &str) -> bool {
@@ -156,6 +161,7 @@ impl Cache {
             hit_lat: Window::new(300, SEC),
             miss_lat: Window::new(300, SEC),
             seen: 0,
+            mem: crate::res::SvcMem::default(),
         }
     }
     /// entries kept now
@@ -237,7 +243,8 @@ impl Cache {
             self.hits += 1;
             os.note(Note::CacheHit { key });
             let rep = Cache::reply_of(&c, true, now);
-            self.wheel.add(now + self.hit_time, (r.id, rep, r.at));
+            let at = os.cpu_or_timer(self.hit_time);
+            self.wheel.add(at, (r.id, rep, r.at));
             return;
         }
         self.misses += 1;
@@ -463,6 +470,28 @@ impl Service for Cache {
     fn windows(&self) -> Vec<LatWindow<'_>> {
         alloc::vec![LatWindow::new(&self.lat, LAT), LatWindow::new(&self.hit_lat, HIT_LAT), LatWindow::new(&self.miss_lat, MISS_LAT)]
     }
+    fn reconfigure(&mut self, c: &Value, _os: Option<&mut OsApi>) -> Result<(), Msg> {
+        let fresh = from_def_msg(c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<Cache>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "cache"));
+        };
+        if self.port != f.port || self.backend != f.backend {
+            return Err(msg!("Port und Backend eines Caches ändern sich nur mit einem Neustart."));
+        }
+        self.store.max_len = f.store.max_len;
+        self.store.max_weight = f.store.max_weight;
+        self.ttl = f.ttl;
+        self.cache_control = f.cache_control;
+        self.hit_time = f.hit_time;
+        self.collapse = f.collapse;
+        self.timeout = f.timeout;
+        self.connect_timeout = f.connect_timeout;
+        self.mem = f.mem;
+        Ok(())
+    }
+    fn mem(&self) -> u64 {
+        self.mem.bytes((self.serve.conns() + self.agent.conns()) as u64, self.store.weight())
+    }
     fn status(&self) -> String {
         self.status_msg().text()
     }
@@ -505,6 +534,7 @@ pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     k.collapse = c.get("collapse").and_then(|v| v.as_bool()).unwrap_or(true);
     k.timeout = ms("timeout_ms", 5000);
     k.connect_timeout = ms("connect_timeout_ms", 1000).max(MS);
+    k.mem = crate::res::SvcMem::of(c, 16, 64);
     Ok(Box::new(k))
 }
 

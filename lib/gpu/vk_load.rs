@@ -1,24 +1,31 @@
 // vk_load -- the Vulkan loader library, opened at run time
 //
+//   LOADER                             the library's name on this target
 //   Lib::open(name) -> Result<Lib>     Windows: LoadLibraryExW (name "vulkan-1.dll" from
 //                                      System32 only; a path from jfgui_GPU_DLL from its own
-//                                      folder), then vkGetInstanceProcAddr
+//                                      folder), then vkGetInstanceProcAddr.  Linux, in a program
+//                                      linked against glibc (build_rs.py section "glibc"): dlopen
+//                                      (name "libvulkan.so.1" as ld.so searches it, or a path)
 //   lib.gipa(instance, name) -> Pfn    vkGetInstanceProcAddr
 //
-// The program does not import vulkan-1.dll: it starts on machines without Vulkan and gets
+// The program does not import the library: it starts on machines without Vulkan and gets
 // GpuError::NoLoader there.  plat's plugin loader (win_lib.rs) maps DLLs without resolving
 // their imports, which the Vulkan loader needs -- this is a normal LoadLibrary.  Error dialogs
-// for missing DLLs are suppressed for the call (SetThreadErrorMode).  Other targets: NoLoader
-// until their loaders exist (Linux / Android: libvulkan.so through a dynamic linker).
+// for missing DLLs are suppressed for the call (SetThreadErrorMode).  Other targets, and a static
+// Linux program, which has no libc for a driver to run on: NoLoader (Android: libvulkan.so still
+// to come).
 
 use crate::vk_ffi as vk;
 use crate::{GpuError, Result};
 
 type Gipa = unsafe extern "system" fn(vk::Instance, *const u8) -> vk::Pfn;
 
+/// the Vulkan loader's name (jfgui_GPU_DLL replaces it)
+pub(crate) const LOADER: &str = if cfg!(windows) { "vulkan-1.dll" } else { "libvulkan.so.1" };
+
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) struct Lib {
-    #[cfg(windows)]
+    #[cfg(any(windows, jfgui_glibc))]
     module: isize,
     gipa: Gipa,
 }
@@ -93,7 +100,30 @@ impl Drop for Lib {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(jfgui_glibc)]
+impl Lib {
+    pub fn open(name: &str) -> Result<Lib> {
+        let module = plat::dl_open(name).ok_or(GpuError::NoLoader)?;
+        let p = plat::dl_sym(module, b"vkGetInstanceProcAddr\0");
+        if p == 0 {
+            plat::dl_close(module);
+            return Err(GpuError::NoLoader);
+        }
+        // SAFETY: vkGetInstanceProcAddr has this prototype (vulkan_core.h).
+        let gipa = unsafe { core::mem::transmute::<usize, Gipa>(p) };
+        Ok(Lib { module: module as isize, gipa })
+    }
+}
+
+#[cfg(jfgui_glibc)]
+impl Drop for Lib {
+    fn drop(&mut self) {
+        // the instance that used the loader is destroyed before (InstShared field order)
+        plat::dl_close(self.module as usize);
+    }
+}
+
+#[cfg(not(any(windows, jfgui_glibc)))]
 impl Lib {
     pub fn open(_name: &str) -> Result<Lib> {
         Err(GpuError::NoLoader)

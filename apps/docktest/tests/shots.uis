@@ -5,6 +5,7 @@ shot build/dock/light.png
 theme dark
 shot build/dock/dark.png
 down tab:"Eigenschaften"
+wait 320
 move 600,300
 move 130,328
 shot build/dock/dark_markers.png

@@ -11,7 +11,8 @@
 //                             of the interface and the translation from outside come between
 //                             the checks of a packet and its way to the device or onward;
 //                             ip_output translates and applies the outbound list after the
-//                             route lookup, ip_send does the rest (acl.rs, nat.rs: the order)
+//                             route lookup, ip_send does the rest (fw.rs: the whole order); on
+//                             a firewall with zones they decide between routing and NAT
 //   icmp_error                RFC 1812 4.3.2.7 rules; limited as Linux (50 at once, 1000/s,
 //                             6 at once per destination, then 1/s) or IOS (an unreachable
 //                             every 500 ms) does
@@ -340,6 +341,10 @@ impl Engine {
         let dev = self.dev_of(ni);
         let dst = v.dst();
         if self.is_local(ni, iface, dst) {
+            // the zones decide about what comes to the device itself (fw.rs)
+            if self.fw_on(ni) && !self.fw_in(ni, iface, v.packet(), Some(hop)) {
+                return;
+            }
             if v.is_fragment() {
                 self.reassemble(ni, iface, v, hop);
             } else {
@@ -536,6 +541,16 @@ impl Engine {
                 return;
             }
             self.note(dev, cause, Note::IpRouted { dst, gw: nh.gw, iface: nh.iface });
+        }
+        // the zones and sessions: the way is known, the source not yet translated (fw.rs)
+        if self.fw_on(ni) {
+            let from = match origin {
+                Origin::Forwarded { iface } => Some(iface),
+                Origin::Local { .. } => None,
+            };
+            if !self.fw_out(ni, from, nh.iface, &pkt, cause) {
+                return;
+            }
         }
         if !self.stack(ni).is_some_and(|s| !s.acls.bound.is_empty() || s.nat.active()) {
             self.ip_send(ni, nh, pkt, None, origin, cause);

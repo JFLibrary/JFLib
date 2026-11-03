@@ -1,0 +1,47 @@
+#!args --rtl --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# labels in a mirrored window (canvas/labels.rs, ui/rtl.rs): the canvas keeps its drawing, so a
+# double click opens the input under the pointer and the label lies where it was clicked; a click
+# in the input stays there, a click beside it takes the text.  Shots light.  (--rtl is an argument
+# of the start, so this is a script of its own beside labels.uis.)
+theme light
+expect canvas:"Topologie" rect 286 70 728 500
+# ---- at the point clicked, text from left to right as drawn
+dblclick 500,180
+expect #128000 exists
+expect #128000 focused
+type "Rechts nach links"
+expect #128000 text "Rechts nach links"
+shot build/jfnetworker/labels_rtl_input.png
+# a click into the input stays there
+click #128000
+expect #128000 exists
+key enter
+expect listitem:"Beschriftung: Rechts nach links" exists
+expect listitem:"Beschriftung: Rechts nach links" selected
+shot build/jfnetworker/labels_rtl.png
+# ---- edited in place at the same spot
+wait 600
+dblclick listitem:"Beschriftung: Rechts nach links"
+expect #128000 text "Rechts nach links"
+key esc
+# ---- a click elsewhere takes it
+wait 600
+click 900,500
+wait 600
+dblclick 900,500
+type "Zweite"
+click 980,540
+expect #128000 missing
+expect listitem:"Beschriftung: Zweite" exists
+expect text:"Nichts ausgewählt" exists
+# ---- moved by a drag as drawn; undo, redo
+wait 600
+click listitem:"Beschriftung: Zweite"
+wait 600
+key right
+key ctrl+z
+key ctrl+z
+expect listitem:"Beschriftung: Zweite" missing
+key ctrl+y
+expect listitem:"Beschriftung: Zweite" exists
+expect_nowarn

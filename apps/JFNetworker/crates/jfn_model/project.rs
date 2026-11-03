@@ -5,8 +5,10 @@
 //   rename / move_device / remove_device -> (Device, links) / insert_device (undo, paste)
 //   connect(a, b, cable) -> link id               ports by any spelling; the right cable when
 //                                                 `cable` is None, else checked with cable_fits
-//   disconnect(id) -> Link / insert_link (undo)    add_note / remove_note
+//   disconnect(id) -> Link / insert_link (undo)    add_note / add_label / remove_note
 //   suggest_ports(a, b)                           the free port pair a quick connect would take
+//   suggest_ports_for(a, b, kind)                 the same for a cable the user chose: only pairs
+//                                                 it fits, the fastest first
 //   ports / free_ports / link_at / find / model_of / bounds
 //   check() -> Vec<Issue>                         consistency (names, ports, cables, ids)
 //   to_text() / from_text(text)                   the .jfnet file: indented JSON
@@ -62,12 +64,28 @@
 // length (7 m between two devices in one room without a spot, 4 m to one on the ceiling, 3 m
 // to the cloud), nothing else changes.
 //
+// A cable's "grade" and "color" (H2, cable.rs): its category (Cat5e .. OS2, "" none: the limits
+// of its kind as before) and a colour for the eye ("": its kind's own).  Older files have neither.
+//
 // Groups and the background (G1): the project's "groups" (group.rs: named frames around
 // devices, notes and groups, each collapsible into one cluster symbol; [] without) and
 // "background" (background.rs: a picture under the canvas, the file's bytes as base64 with its
 // place, scale, opacity and lock; null without).  Both are view data the simulator never sees;
 // a group's id comes from the same counter as devices, links and notes.  Older files have
 // neither and look as before.
+//
+// A note's "style" (H3): "sticker", a card that wraps its text inside its box, or "label", a slim
+// text without a card, its box measured by the app when the text is set.  A file without it (and
+// an unknown value) means the sticker.
+// The project's info (ST1): "description" says what it is about, "author" who made it ("" without);
+// older files have no author.
+//
+// Hardware (SA1, the simulator's res.rs): the project's "metered" (every device gets the figures of
+// its model: catalog::hw_of) and a device's "hw" (figures of its own).  Neither is written at its
+// default, so a project that does not use them stays the same file.
+//
+// Experiments (SA2, experiment.rs): the project's "experiments", parameter sweeps kept with it; not
+// written while there are none.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -79,7 +97,7 @@ use agent_core::jmap::{Json, Value};
 use agent_core::json::{self, Limits};
 use agent_core::{record, wire_enum};
 
-use crate::cable::{self, CableKind, Why};
+use crate::cable::{self, CableColor, CableGrade, CableKind, Why};
 use crate::catalog::{self, Model, PortSpec, F_AP, F_ANNOTATION};
 use crate::ifname;
 use crate::lab::Lab;
@@ -152,6 +170,9 @@ record! {
         pub phys: crate::phys::Spot,
         /// the optics plugged into its cages other than the model's (full port name -> optic)
         pub optics: BTreeMap<String, crate::catalog::Optic>,
+        /// the hardware it has, by hand (the simulator's res.rs; None: its model's in a metered
+        /// project)
+        pub hw: Option<crate::catalog::Hw>,
     }
 }
 
@@ -176,6 +197,18 @@ record! {
         /// its length in metres set by hand (0: automatic from the places of both ends,
         /// phys::length)
         pub len_m: u32,
+        /// its category (Unset: none; phys::reach_graded)
+        pub grade: CableGrade,
+        /// a colour the user gave it (Plain: its kind's own)
+        pub color: CableColor,
+    }
+}
+
+wire_enum! {
+    /// how a note looks on the canvas
+    pub enum NoteStyle {
+        Sticker = "sticker",
+        Label = "label",
     }
 }
 
@@ -188,6 +221,8 @@ record! {
         pub w: i32,
         pub h: i32,
         pub text: String,
+        /// a card or a slim text
+        pub style: NoteStyle,
     }
 }
 
@@ -238,6 +273,13 @@ record! {
         pub groups: Vec<crate::group::Group>,
         /// the picture under the logical canvas (background.rs; None: none)
         pub background: Option<crate::background::Background>,
+        /// who made it (Datei › Projektinfo; "": nobody named)
+        pub author: String,
+        /// "Hardware simulieren": devices have CPU and RAM (the simulator's res.rs), by catalog::hw_of
+        /// unless they have figures of their own
+        pub metered: bool,
+        /// parameter sweeps kept with the project (experiment.rs; empty: none, and no member in the file)
+        pub experiments: Vec<crate::experiment::Experiment>,
     }
 }
 
@@ -317,6 +359,22 @@ impl LoadErr {
 impl fmt::Display for LoadErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.text)
+    }
+}
+
+/// the members of the hardware at their default stay out of the file: a project without them
+/// stays the same file
+fn no_default_hw(v: &mut Value) {
+    let Value::Object(o) = v else { return };
+    o.retain(|(k, x)| !(k == "metered" && *x == Value::Bool(false)) && !(k == "experiments" && *x == Value::Array(Vec::new())));
+    for (k, x) in o.iter_mut() {
+        if let ("devices", Value::Array(ds)) = (k.as_str(), x) {
+            for d in ds.iter_mut() {
+                if let Value::Object(m) = d {
+                    m.retain(|(k, x)| !(k == "hw" && *x == Value::Null));
+                }
+            }
+        }
     }
 }
 
@@ -608,14 +666,43 @@ impl Project {
         }
         best.map(|(_, x, y)| (String::from(x), String::from(y)))
     }
+    /// the free port pair a cable the user chose joins: the fastest it fits, the lowest port
+    /// numbers on a tie
+    pub fn suggest_ports_for(&self, a: u32, b: u32, kind: CableKind) -> Option<(String, String)> {
+        if a == b {
+            return None;
+        }
+        let fa = self.free_ports(a);
+        let fb = self.free_ports(b);
+        let mut best: Option<((u32, i32), &str, &str)> = None;
+        for pa in &fa {
+            for pb in &fb {
+                if cable::cable_fits(kind, pa, pb).is_err() {
+                    continue;
+                }
+                let key = (cable::link_kbps(pa, pb), -(pa.index as i32 + pb.index as i32));
+                if best.as_ref().is_none_or(|b| key > b.0) {
+                    best = Some((key, &pa.name, &pb.name));
+                }
+            }
+        }
+        best.map(|(_, x, y)| (String::from(x), String::from(y)))
+    }
 
     // ---------------------------------------------------------------- notes
 
     pub fn add_note(&mut self, x: i32, y: i32, text: &str) -> u32 {
         let id = self.alloc_id();
-        self.notes.push(Note { id, x, y, w: 200, h: 80, text: String::from(text) });
+        self.notes.push(Note { id, x, y, w: 200, h: 80, text: String::from(text), style: NoteStyle::Sticker });
         id
     }
+    /// a label: its text and its box w x h (measured by the app, world units) -> its id
+    pub fn add_label(&mut self, x: i32, y: i32, w: i32, h: i32, text: &str) -> u32 {
+        let id = self.alloc_id();
+        self.notes.push(Note { id, x, y, w, h, text: String::from(text), style: NoteStyle::Label });
+        id
+    }
+
     pub fn remove_note(&mut self, id: u32) -> Option<Note> {
         let i = self.notes.iter().position(|n| n.id == id)?;
         Some(self.notes.remove(i))
@@ -676,6 +763,9 @@ impl Project {
             if l.kbps == 0 {
                 v.push(Issue::new(false, None, Some(l.id), msg!("Die Verbindung hat keine Geschwindigkeit.")));
             }
+            if !l.grade.fits(l.cable) {
+                v.push(Issue::new(false, None, Some(l.id), msg!("Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.", l.grade.name(), msg::phrase(l.cable.title()))));
+            }
         }
         if self.next_id <= self.max_id() {
             v.push(Issue::new(false, None, None, msg!("Die nächste freie Nummer ist zu klein.")));
@@ -707,7 +797,9 @@ impl Project {
 
     /// the project as the text of a .jfnet file (indented JSON, LF line ends)
     pub fn to_text(&self) -> String {
-        let mut s = json::stringify_pretty(&self.to_json(), file_limits(), 2).unwrap_or_default();
+        let mut v = self.to_json();
+        no_default_hw(&mut v);
+        let mut s = json::stringify_pretty(&v, file_limits(), 2).unwrap_or_default();
         s.push('\n');
         s
     }

@@ -33,7 +33,7 @@ expect text:"Ende: Text ziehen keine (5)" exists
 expect text:"Abgelegt: Text+Frucht -> Text-Ziel (verschieben)" exists
 # ... basket A does
 drag #401 356,114
-expect text:"Abgelegt: Text \"Hallo aus jfgui\" -> Korb A" exists
+expect text:"Abgelegt: Text \"Hallo aus JFLib\" -> Korb A" exists
 expect text:"Ende: Text ziehen verschieben (6)" exists
 # Esc cancels a drag: the cherry stays on the shelf
 down #103
@@ -45,7 +45,7 @@ expect text:"Ende: Kirsche keine (7)" exists
 expect text:"Ziehen: -  Über: -" exists
 up
 expect #103 rect 24 88 67 32
-expect text:"Abgelegt: Text \"Hallo aus jfgui\" -> Korb A" exists
+expect text:"Abgelegt: Text \"Hallo aus JFLib\" -> Korb A" exists
 # a short move (< 4 DIP) is a click, no drag
 drag #103 59,105
 expect text:"Ende: Kirsche keine (7)" exists
@@ -67,7 +67,7 @@ expect #103 rect 314 88 67 32
 # dragged out and dropped somewhere else: copied there, nothing changes here
 down #401
 move 780,300
-dragout expect text "Hallo aus jfgui"
+dragout expect text "Hallo aus JFLib"
 dragout end copy
 expect text:"Ende: Text ziehen kopieren (9)" exists
 up

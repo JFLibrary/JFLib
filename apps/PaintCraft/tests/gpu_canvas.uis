@@ -1,0 +1,108 @@
+#!args --verify-dirty
+# the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from tiles, byte
+# for byte what the CPU draws (the view's tables start at the image's corner), at every zoom; a zoom
+# step and a stroke go the CPU's way, a stroke's tiles are drawn again when the view next moves over
+# them; a selection, a tool's overlay or the pixel grid keep the canvas on the CPU.  At the end the
+# same with jfgui_GPU_CANVAS_ZOOM: scaled tiles until the CPU's picture follows.  Every presented
+# image is read back and compared.  Without a GPU `gpu` prints a SKIP once and does nothing.
+system env jfgui_GPU_VALIDATE 1
+system env jfgui_GPU_RETRY_MS 100
+size 1280 800
+theme light
+gpu on
+gpu expect gpu
+gpu expect same
+gpu expect apart 0
+gpu expect tiles 0
+# ---- a stroke before anything else: nothing for the GPU to keep
+drag 500,300 640,380 8
+gpu expect apart 0
+gpu expect tiles 0
+gpu expect same
+# ---- bigger than the view: a pan, not one byte differs
+key ctrl+plus ctrl+plus ctrl+plus
+gpu expect same
+gpu expect apart 0
+wheel 640,448 -120
+gpu expect apart 1
+gpu expect nodiff
+wheel 640,448 -120 shift
+wheel 640,448 -120
+gpu expect apart 1
+gpu expect nodiff
+gpu print
+gpu expect same
+gpu expect apart 0
+# ---- a zoom step: the CPU at once
+wheel 640,448 120 ctrl
+gpu expect apart 0
+wheel 640,448 120 ctrl
+gpu expect apart 0
+gpu expect same
+# ---- a stroke: its tiles go, the next pan shows it
+drag 500,400 700,500 8
+gpu expect apart 0
+gpu expect same
+wheel 640,448 120
+gpu expect apart 1
+gpu expect same
+# ---- a stroke while a pan is apart: the CPU draws at once
+wheel 640,448 120
+gpu expect apart 1
+drag 500,300 600,350 8
+gpu expect apart 0
+gpu expect same
+# ---- below 100 %: the mip levels, bilinear; a pan still exact when it can pan
+key ctrl+minus ctrl+minus ctrl+minus ctrl+minus ctrl+minus
+gpu expect same
+wheel 640,448 -120 ctrl
+gpu expect same
+key ctrl+plus ctrl+plus
+gpu expect same
+# ---- a menu over the canvas
+click "Datei"
+gpu expect layers 1
+gpu expect same
+key esc
+gpu expect same
+# ---- the pixel grid keeps the canvas on the CPU
+key ctrl+0
+key ctrl+plus ctrl+plus ctrl+plus ctrl+plus ctrl+plus ctrl+plus ctrl+plus ctrl+plus
+gpu expect same
+wheel 640,448 -120
+gpu expect same
+# ---- the tiles' budget: nothing is kept above it, the rest goes the CPU's way
+gpu tilebudget 1000000
+wheel 640,448 120
+gpu expect same
+gpu tilebudget 134217728
+# ---- a lost device
+gpu lose
+drag 500,400 540,440 8
+gpu wait
+gpu expect gpu
+gpu expect same
+gpu expect tiles 0
+key ctrl+0
+key ctrl+plus ctrl+plus ctrl+plus
+gpu expect same
+wheel 640,448 120
+gpu expect apart 1
+gpu expect same
+gpu print
+gpu off
+# ---- the switch: a zoom from scaled tiles, then the CPU's picture
+system env jfgui_GPU_CANVAS_ZOOM paintcraft
+gpu on
+gpu expect gpu
+gpu expect same
+# (the first frame that moves it after a new start may go the CPU's way)
+wheel 640,448 120 ctrl
+wheel 640,448 120 ctrl
+gpu expect apart 1
+gpu expect same
+gpu expect apart 0
+gpu off
+system env jfgui_GPU_CANVAS_ZOOM -
+expect_nowarn gpu
+quit

@@ -7,7 +7,7 @@
 // build on (log reports, saved configurations through undo and redo); campustest.rs the
 // campus of the acceptance (tests/fixtures/campus.jfnet); uitest.rs what U5 adds around the
 // window (contrast, settings, autosave, the English catalogue).  Prints "FAIL group: name"
-// lines and a summary; exit code 1 on a failure.
+// lines and a summary; exit code 1 on a failure.  "--only=GROUP" runs one group alone.
 //
 // msgtest.rs: the texts of model and simulator as messages (jfn_model::msg) and their English.
 // scripttest.rs: scripts as services in the hosts (group script, jfn_sim::scriptsvc).
@@ -68,6 +68,26 @@
 // part of radiusd and wlan, cli/dot1x.rs).
 // imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
 // mailc.rs and cli/mail.rs).
+// modelstest.rs: the device models of wave 17 at work (group models: the ports of each, a ping
+// through each new switch, routing, a serial line, ACLs and NAT on the firewalls, the repeater,
+// the bridge, the access point).
+// cablestest.rs: the choice of cables (group cables: jfn_model::cable, phys::reach_graded, the
+// engine's categories and Auto-MDI-X, what canvas/connect.rs and paint.rs decide).
+// labelstest.rs: the slim labels of the canvas (group labels: a note's style in the file, the steps
+// of doc/edits.rs, the scene of canvas/paint.rs).
+// startpagetest.rs: the start page (group startpage: the templates of assets/templates running, the
+// setting, when the page shows, the recent rows, the project's info in the file, an idle simulator).
+// sweeptest.rs: parameter sweeps (group sweep: jfn_model::experiment, jfn_sim::experiment, jfn_run's
+// threads, Service::reconfigure, the scenario's steps for changes under load).
+// hardwaretest.rs: CPU and RAM of devices (group hardware: jfn_sim::res against the closed forms of
+// queueing theory, what the services pay, memory, resizes, determinism, scenario steps).
+// firewalltest.rs: the zone firewall (group firewall: zones, sessions, NAT and lists with them).
+// fwguitest.rs: the Firewall tab (group fwgui: what its forms type, rows back from the engine, moves,
+// the Test part against packets sent for real, the steps of console::run_lines_running).
+// academytest.rs: the Akademie (group academy: jfn_model::academy, the progress in its file, step order
+// and state, what the page reads, every course below --academy-dir).
+// quiztest.rs: quizzes, tests and fault hunts (group quiz: jfn_model::quiz, a lab's start faults and locks,
+// a diagnosis, the check that something must fail, the sample course's fault hunt with and without its fix).
 
 use alloc::format;
 use alloc::string::String;
@@ -133,6 +153,8 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "cablestest.rs"]
+mod cablestest;
 #[path = "mailtest.rs"]
 mod mailtest;
 #[path = "groupstest.rs"]
@@ -165,11 +187,29 @@ mod pagescripttest;
 mod dot1xtest;
 #[path = "imaptest.rs"]
 mod imaptest;
+#[path = "labelstest.rs"]
+mod labelstest;
 #[path = "webdevtest.rs"]
 mod webdevtest;
+#[path = "modelstest.rs"]
+mod modelstest;
+#[path = "startpagetest.rs"]
+mod startpagetest;
+#[path = "hardwaretest.rs"]
+mod hardwaretest;
+#[path = "fwguitest.rs"]
+mod fwguitest;
+#[path = "firewalltest.rs"]
+mod firewalltest;
+#[path = "academytest.rs"]
+mod academytest;
+#[path = "quiztest.rs"]
+mod quiztest;
+#[path = "sweeptest.rs"]
+mod sweeptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 54] = [
+    let groups: [(&'static str, fn(&mut T)); 64] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -224,9 +264,24 @@ pub fn run() -> i32 {
         ("snmpv3", snmpv3test::run),
         ("dot1x", dot1xtest::run),
         ("imap", imaptest::run),
+        ("models", modelstest::run),
+        ("cables", cablestest::run),
+        ("labels", labelstest::run),
+        ("startpage", startpagetest::run),
+        ("hardware", hardwaretest::run),
+        ("fwgui", fwguitest::run),
+        ("academy", academytest::run),
+        ("firewall", firewalltest::run),
+        ("quiz", quiztest::run),
+        ("sweep", sweeptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
+    let args = plat::args();
+    let only = args.iter().find_map(|a| a.strip_prefix("--only="));
     for (name, f) in groups {
+        if only.is_some_and(|o| o != name) {
+            continue;
+        }
         let mut t = T { group: name, ok: 0, failed: 0 };
         f(&mut t);
         plat::write_stdout(format!("{:<10} {} ok, {} failed\n", name, t.ok, t.failed).as_bytes());

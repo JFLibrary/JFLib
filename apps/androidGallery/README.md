@@ -1,6 +1,6 @@
-# jfgui Pocket Gallery für Android
+# JFLib Pocket Gallery für Android
 
-Kleine native Test-App mit den vorhandenen jfguiLib-Widgets: Buttons mit Klickzähler,
+Kleine native Test-App mit den vorhandenen JFLib-Widgets: Buttons mit Klickzähler,
 Checkbox, Schalter, Slider, Fortschrittsanzeige, Akzentfarben, hellem/dunklem Design,
 Unicode-Textfeld und einer Karte „Dateien & Zwischenablage“ (Öffnen, Speichern unter, Ordner
 über den System-Picker, eine Notiz, die einen Neustart überlebt, ein Startzähler, Kopieren und

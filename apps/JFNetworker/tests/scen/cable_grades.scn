@@ -1,0 +1,39 @@
+# Kategorien und Enden: Cat5e trägt 10GBASE-T nicht, Cat6 schafft 55 m, Cat6a 100 m; Seriell mit
+# gewähltem Ende sagt, welches Ende DCE ist; DAC und AOC stehen beim Medientyp und kennen ihre Grenze
+DC1: enable
+DC1: show interfaces TenGigabitEthernet1/0/1
+expect DC1 output contains "A Cat5e cable does not carry 10GBASE-T: no link"
+expect cable DC1 Te1/0/1 down
+DC1: show interfaces TenGigabitEthernet1/0/2
+expect DC1 output contains "Cable is 60 m long, 10GBASE-T allows 55 m: no link"
+expect cable DC1 Te1/0/2 down
+DC1: show interfaces TenGigabitEthernet1/0/3
+expect DC1 output contains "media type is RJ45 Cat6a"
+expect cable DC1 Te1/0/3 up
+cable DC1 Te1/0/3 length 120
+expect cable DC1 Te1/0/3 down
+cable DC1 Te1/0/3 length 100
+expect cable DC1 Te1/0/3 up
+R1: enable
+R1: show interfaces Serial0/2/0
+expect R1 output contains "Serial cable end: DCE"
+R1: show interfaces Serial0/2/1
+expect R1 output contains "Serial cable end: DTE"
+R2: enable
+R2: show interfaces Serial0/2/0
+expect R2 output contains "Serial cable end: DTE"
+R2: show interfaces Serial0/2/1
+expect R2 output contains "Serial cable end: DCE"
+SW1: enable
+SW1: show interfaces TenGigabitEthernet1/1/1
+expect SW1 output contains "media type is 10G SFP+ DAC"
+expect cable SW1 Te1/1/1 up
+cable SW1 Te1/1/1 length 8
+expect cable SW1 Te1/1/1 down
+SW1: show interfaces TenGigabitEthernet1/1/1
+expect SW1 output contains "Cable is 8 m long, SFP+ DAC allows 7 m: no link"
+SW1: show interfaces TenGigabitEthernet1/1/2
+expect SW1 output contains "media type is 10G SFP+ AOC"
+SW1: show interfaces TenGigabitEthernet1/1/3
+expect SW1 output contains "media type is 10G SFP+ OM4"
+expect cable SW1 Te1/1/3 up

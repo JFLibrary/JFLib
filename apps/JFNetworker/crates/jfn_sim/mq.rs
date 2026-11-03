@@ -1,6 +1,7 @@
 // mq -- a message queue and the workers that take from it: topics with at-least-once
 // delivery (a message stays until it is acknowledged; one not acknowledged within its
-// visibility timeout comes again), acknowledgements, redelivery, dead letters, depth
+// visibility timeout comes again), acknowledgements, redelivery, dead letters, depth; a worker's
+// Service::reconfigure takes a new config while it runs, all but its queue and topic
 //
 //   kind    config (JSON; every member may be left out but the worker's "queue")
 //   mq      {"port": 9000, "visibility_ms": 5000, "max_deliveries": 5, "max_depth": 0,
@@ -562,6 +563,9 @@ enum WTimer {
 /// a worker that takes messages from a queue
 #[derive(Clone, Debug)]
 pub struct Worker {
+    /// its CPU work per message at a reference core, what it holds (res.rs); time_ms stays waiting
+    pub cpu: Ns,
+    pub mem: crate::res::SvcMem,
     pub queue: Url,
     pub topic: String,
     pub concurrency: u32,
@@ -592,6 +596,8 @@ pub struct Worker {
 impl Worker {
     pub fn new(queue: Url, topic: &str) -> Worker {
         Worker {
+            cpu: 0,
+            mem: crate::res::SvcMem::default(),
             queue,
             topic: String::from(topic),
             concurrency: 1,
@@ -661,7 +667,7 @@ impl Worker {
                 Ok(r) if r.head.status == 200 => {
                     let id = r.head.header("x-message-id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
                     let j = if self.jitter > 0 { self.rng.range(0, self.jitter as i64) as Ns } else { 0 };
-                    let until = now + self.time + j;
+                    let until = os.cpu(self.cpu) + self.time + j;
                     self.taken += 1;
                     if let Some(t) = self.taken_at.get_mut(slot) {
                         *t = now;
@@ -827,6 +833,33 @@ impl Service for Worker {
         }
         self.wheel.arm(os);
     }
+    fn mem(&self) -> u64 {
+        self.mem.bytes(self.agent.conns() as u64, 0)
+    }
+    fn reconfigure(&mut self, c: &Value, os: Option<&mut OsApi>) -> Result<(), jfn_model::msg::Msg> {
+        let fresh = from_def_msg("worker", c)?;
+        let Some(f) = fresh.as_any().downcast_ref::<Worker>() else {
+            return Err(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", "worker"));
+        };
+        if self.queue != f.queue || self.topic != f.topic {
+            return Err(msg!("Warteschlange und Thema eines Workers ändern sich nur mit einem Neustart."));
+        }
+        self.cpu = f.cpu;
+        self.mem = f.mem;
+        self.jitter = f.jitter;
+        self.wait = f.wait;
+        self.idle = f.idle;
+        self.timeout = f.timeout;
+        match os {
+            Some(os) => self.set(os, Some(f.concurrency), Some(f.time), Some(f.error_ppm)),
+            None => {
+                self.concurrency = f.concurrency;
+                self.time = f.time;
+                self.error_ppm = f.error_ppm;
+            }
+        }
+        Ok(())
+    }
     fn stop(&mut self, _os: &mut OsApi) {
         // the messages it worked on stay unacknowledged: the queue hands them out again
         self.agent.reset();
@@ -910,6 +943,8 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, jfn_model
             let mut w = Worker::new(url, c.get("topic").and_then(|v| v.as_str()).unwrap_or("jobs"));
             w.concurrency = num("concurrency", 1).clamp(1, 10_000) as u32;
             w.time = ms("time_ms", 50);
+            w.cpu = ms("cpu_ms", 0);
+            w.mem = crate::res::SvcMem::of(c, 16, 64);
             w.jitter = ms("jitter_ms", 0);
             w.error_ppm = c.get("error_rate").and_then(rate_ppm).unwrap_or(0);
             w.wait = ms("wait_ms", 1000);

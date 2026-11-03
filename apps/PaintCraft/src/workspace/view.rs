@@ -35,7 +35,10 @@
 // composite over the checkerboard (k_view_row); below 100 % the premultiplied mip level
 // 2^-L with zoom * 2^L <= 100 % is shown 1:1 or bilinearly filtered (k_view_row_pm); rows
 // are rendered in bands on the worker threads.  Pixel changes only damage their area
-// (ui.canvas_damage); zoom / scroll / size changes redraw the canvas.
+// (ui.canvas_damage); zoom / scroll / size changes redraw the canvas.  While the view moves it comes
+// from tiles while it pans (ui.canvas_gpu, lib/ui/canvas.rs; canvas_register): the image as
+// render_image draws it, whole pixels away the same bytes; with the pixel grid, a selection or a
+// tool's overlay, which the draw callback paints with the image, it stays on the CPU.
 //
 // The canvas is a ui::Draw object holding a Weak of the app (Pn lives in an Rc<RefCell>); at
 // render time it borrows Pn and draws as the asm's callback does.  The transforms read the
@@ -72,6 +75,11 @@ const WS_LIGHT: u32 = 0xFFDADADA; // workspace background
 const WS_DARK: u32 = 0xFF181818;
 const GRID_COLOR: u32 = 0x55808080;
 const OVL_MAX: usize = 8;
+/// how the canvas's moves use the GPU (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from
+/// tiles, byte for byte what the CPU draws.  A zoom step goes the CPU's way at once: it costs 6 ms, a
+/// scaled tile would be softer for a moment; jfgui_GPU_CANVAS_ZOOM=paintcraft scales them all the
+/// same, jfgui_GPU_CANVAS_CPU=paintcraft keeps all of it on the CPU
+const CANVAS_GPU: CanvasGpu = CanvasGpu::Pan;
 const BAND_ROWS: i32 = 32; // rows per render work item
 const BAND_MAX: i32 = 64;
 static SHADOW_ALPHA: [u8; 6] = [0x04, 0x06, 0x08, 0x0B, 0x10, 0x18];
@@ -117,6 +125,14 @@ impl Draw for CanvasDraw {
     }
 }
 
+impl CanvasContent for CanvasDraw {
+    fn draw_view(&self, g: &mut Gfx, t: CanvasView, rect: [i32; 4]) {
+        let Some(rc) = self.p.upgrade() else { return };
+        let Ok(mut p) = rc.try_borrow_mut() else { return };
+        tile_draw(&mut p, g, t, rect);
+    }
+}
+
 /// the state of view.s (its g_* globals)
 pub(crate) struct View {
     /// g_vdoc: the document on screen
@@ -151,6 +167,8 @@ pub(crate) struct View {
     vtest: u32,
     /// g_vver: bumped by view_invalidate
     vver: u32,
+    /// the workspace's colour
+    ws: u32,
     hpos: i32,
     vpos: i32,
     /// g_vptr_x / g_vptr_y: pointer (absolute px)
@@ -196,6 +214,7 @@ impl Default for View {
             pan_cy: 0.0,
             vtest: 0,
             vver: 0,
+            ws: WS_LIGHT,
             hpos: 0,
             vpos: 0,
             ptr_x: 0,
@@ -727,7 +746,8 @@ pub(crate) fn view_frame(p: &mut Pn, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | BOX_CLIP | BOX_FIXED, 0);
     p.view.cv = ui.box_rect();
-    box_fill(ui, if p.st.st.workspace != 0 {p.st.st.workspace | 0xFF000000} else if ui.theme_dark() { WS_DARK } else { WS_LIGHT });
+    p.view.ws = if p.st.st.workspace != 0 {p.st.st.workspace | 0xFF000000} else if ui.theme_dark() { WS_DARK } else { WS_LIGHT };
+    box_fill(ui, p.view.ws);
     view_place(p, doc);
     if doc.is_some() && p.st.st.canvas_shadow != 0 {
         draw_shadow(&p.view, ui);
@@ -746,6 +766,7 @@ pub(crate) fn view_frame(p: &mut Pn, ui: &mut Ui) {
     let dr: Option<DrawRef> = p.view.draw.clone().map(|d| d as DrawRef);
     let user = doc.map_or(0, |d| d.0 as usize);
     let inp = ui.canvas(ID_CANVAS, dr, user, ver).clone();
+    canvas_register(p, ui, doc);
     // a finger: it may start a two-finger gesture, so the press only once it moved or rested; two
     // fingers are the view's
     ui.touch_take(TF_BOTH | TF_SLOP | TF_TWO | TF_REST);
@@ -757,10 +778,15 @@ pub(crate) fn view_frame(p: &mut Pn, ui: &mut Ui) {
         view_place(p, doc);
         ui.repass();
     }
+    if let Some((x, y, r)) = crate::tools::tool_ring(p).filter(|_| ui.canvas_gpu_wanted()) {
+        let r = (r >> 8) + 3;
+        ui.cmd_custom(x - r, y - r, r * 2 + 1, r * 2 + 1, None, 0, 0);
+    }
     // changed image pixels: redraw only their screen area
     if let Some(doc) = doc {
         if let Some(r) = comp_damage_take(p.doc.dm(doc)) {
             view_damage_doc(&p.view, ui, doc, r[0], r[1], r[2], r[3]);
+            ui.canvas_gpu_damage(ID_CANVAS, [r[0] as f64, r[1] as f64, r[2] as f64, r[3] as f64]);
         }
         scroll_bars(p, ui, doc);
     }
@@ -816,6 +842,46 @@ fn finger_pans(p: &Pn) -> bool {
         1 => false,
         2 => true,
         _ => p.view.pen_touched,
+    }
+}
+
+// after the canvas command: it shows the image through the view, a move comes from tiles while it
+// runs.  What the draw callback paints over the image keeps the canvas on the CPU; the brush ring,
+// which stays with the pointer, only the cells it lies in (after the tool's input, view_frame: a
+// command there, the canvas is not on top)
+fn canvas_register(p: &mut Pn, ui: &mut Ui, doc: Option<DocId>) {
+    if !ui.canvas_gpu_wanted() {
+        return;
+    }
+    let (Some(doc), Some(draw)) = (doc, p.view.draw.clone()) else { return };
+    let Some(d) = p.doc.get(doc) else { return };
+    let v = &p.view;
+    if (v.grid && v.vz >= GRID_ZOOM) || crate::document::selection::sel_active(d) || crate::tools::tool_has_overlay(p) {
+        return;
+    }
+    let mut ver = 0x811C_9DC5u32;
+    for x in [v.vver, doc.0 as u32, d.w as u32, d.h as u32, ui.dpi() as u32, p.st.st.checker0, p.st.st.checker1, p.st.st.workspace, ui.theme_dark() as u32] {
+        ver = ver.wrapping_mul(0x0100_0193).wrapping_add(x);
+    }
+    let view = CanvasView { scale: v.vz as f64 / ZOOM_100 as f64, ox: v.vox as f64, oy: v.voy as f64 };
+    let rect = [v.vox, v.voy, v.viw, v.vih];
+    ui.canvas_gpu(CanvasDesc { id: ID_CANVAS, name: "paintcraft", rect, view, ver, content: draw, gpu: CANVAS_GPU, exact_pan: true });
+}
+
+// a tile: the workspace, the image through view t (no grid, no overlays: canvas_register)
+fn tile_draw(p: &mut Pn, g: &mut Gfx, t: CanvasView, rect: [i32; 4]) {
+    let Some(doc) = p.view.vdoc else { return };
+    let Some(d) = p.doc.get(doc) else { return };
+    let (w, h) = (d.w, d.h);
+    g.dc.set_color(p.view.ws);
+    g.dc.fill(g.sf, rect[0], rect[1], rect[2], rect[3]);
+    let zoom = (t.scale * ZOOM_100 as f64 + 0.5) as u32;
+    let len = |n: i32| flr(0.0 - n as f64 * t.scale).wrapping_neg();
+    let (ox, oy) = (t.ox as i32, t.oy as i32);
+    let (x0, x1) = (ox.max(rect[0]), ox.wrapping_add(len(w)).min(rect[0] + rect[2]));
+    let (y0, y1) = (oy.max(rect[1]), oy.wrapping_add(len(h)).min(rect[1] + rect[3]));
+    if x0 < x1 && y0 < y1 {
+        render_image(p, g, doc, x0, x1, y0, y1, zoom, (ox, oy), false);
     }
 }
 
@@ -1049,7 +1115,8 @@ fn view_draw(p: &mut Pn, g: &mut Gfx) {
     let y1 = v.voy.wrapping_add(v.vih).min(clip[3]);
     let n = x1 - x0;
     if n > 0 && y1 > y0 {
-        render_image(p, g, doc, x0, x1, y0, y1);
+        let (zoom, o) = (v.vz, (v.vox, v.voy));
+        render_image(p, g, doc, x0, x1, y0, y1, zoom, o, true);
     }
     // overlays
     let cv = p.view.cv;
@@ -1060,9 +1127,10 @@ fn view_draw(p: &mut Pn, g: &mut Gfx) {
     }
 }
 
-// the image part of view_draw: sources, tables, bands, grid
-fn render_image(p: &mut Pn, g: &mut Gfx, doc: DocId, x0: i32, x1: i32, y0: i32, y1: i32) {
-    let zoom = p.view.vz;
+// the image part of view_draw: sources, tables, bands, grid (zoom: 1/100 %, o: the target pixel of
+// image pixel 0, 0)
+#[allow(clippy::too_many_arguments)]
+fn render_image(p: &mut Pn, g: &mut Gfx, doc: DocId, x0: i32, x1: i32, y0: i32, y1: i32, zoom: u32, o: (i32, i32), grid: bool) {
     // source: level L, the largest with zoom * 2^L <= 100 %
     let mut level = 0i32;
     if zoom < Z100 {
@@ -1093,8 +1161,8 @@ fn render_image(p: &mut Pn, g: &mut Gfx, doc: DocId, x0: i32, x1: i32, y0: i32, 
         x1,
         y0,
         y1,
-        ox: v.vox,
-        oy: v.voy,
+        ox: o.0,
+        oy: o.1,
         zoom,
         mode: 0,
         rows: 0,
@@ -1128,7 +1196,9 @@ fn render_image(p: &mut Pn, g: &mut Gfx, doc: DocId, x0: i32, x1: i32, y0: i32, 
         };
         let _ = plat::parallel_for(nb, &job);
     }
-    draw_grid(&p.view, g, &j, y1);
+    if grid {
+        draw_grid(&p.view, g, &j, y1);
+    }
 }
 
 // view_tables(n) -- per column table and bands of the job

@@ -90,7 +90,8 @@
 //                        repeated name: its last value); res.send(status, body, headers),
 //                        res.json(status, value, headers), even from a later callback; a
 //                        handler that returns a str, bytes, a list, a map or a status (int)
-//                        without using res answers with it, one that fails answers 500
+//                        without using res answers with it, one that fails or cannot start (the
+//                        heap has no room for the request, its frame not on the stack) answers 500
 //   http.request(url | {url, method, headers, body, timeout_ms}, fn(err, resp))
 //                        resp {status, headers, body}; names go through the resolver, the
 //                        timeout is 30 s unless given (0: none)
@@ -122,6 +123,12 @@
 // errors NAME), the device's log and the trace; one in the top-level code, or any with
 // stop_on_error, ends the service (OsApi::halt).  Stop and power off end the program and its
 // memory; the disk keeps what it stored, the numbers stay.
+//
+// On a device with hardware (res.rs) every slice takes its turn on a core with the device's other
+// work, and the time of an instruction follows the speed of the cores: ns_per_op is at a reference
+// core.  A turn that comes later shifts the callback's CPU time as the debugger's Continue does, so
+// its effects keep their order and only happen later.  "mem_mb", "conn_kb", "data_mb" and its heap
+// are what it holds.
 //
 // Metrics: the script's own first, then calls, errors, fuel, busy_us, queued, max_queued,
 // dropped, rejected, timers, conns, heap_kb.
@@ -214,11 +221,13 @@ pub struct ScriptCfg {
     pub stop_on_error: bool,
     /// it runs for a unit (units.rs): it ends when nothing is left to do, print goes to the log
     pub unit: bool,
+    /// what it holds besides its heap (res.rs)
+    pub mem: crate::res::SvcMem,
 }
 
 impl Default for ScriptCfg {
     fn default() -> ScriptCfg {
-        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false, unit: false }
+        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false, unit: false, mem: crate::res::SvcMem::default() }
     }
 }
 
@@ -546,6 +555,8 @@ struct Inv {
     req: Option<u64>,
     then: Then,
     top: bool,
+    /// the CPU time of an instruction on this device (res.rs: the cores' speed)
+    ps: u64,
 }
 
 /// a callback to start
@@ -558,11 +569,13 @@ struct Call {
     /// a pin the call makes unnecessary (one-shot callbacks)
     unpin: Option<Pin>,
     top: bool,
+    /// its results did not fit the heap: the error to report when it starts (results())
+    lost: Option<script::Error>,
 }
 
 impl Call {
     fn new(f: Value, args: Vec<Value>, during: &'static str) -> Call {
-        Call { f, args, during, req: None, then: Then::Nothing, unpin: None, top: false }
+        Call { f, args, during, req: None, then: Then::Nothing, unpin: None, top: false, lost: None }
     }
 }
 
@@ -685,6 +698,8 @@ struct Run {
     disk: BTreeMap<u64, DiskOp>,
     /// the debugger stopped the callback on the CPU (Status::Paused): the moment of its CPU time
     paused: Option<Ns>,
+    /// the turn on a core the next slice waits for (res.rs): when, which core
+    turn: Option<(Ns, usize)>,
 }
 
 /// a script as a service
@@ -979,6 +994,25 @@ fn reply_from(vm: &mut Vm, v: Value) -> Option<Reply> {
     }
 }
 
+/// a value of the disk as the script sees it: only the heap's limit stops it (nil for a text that
+/// is no JSON)
+fn stored(vm: &mut Vm, t: &str) -> Result<Value, script::Error> {
+    match vm.json_decode(t) {
+        Err(e) if e.kind == ErrorKind::Heap => Err(e),
+        r => Ok(r.unwrap_or(Value::Nil)),
+    }
+}
+
+/// the arguments of a one-shot callback and what to report: results that do not fit the heap
+/// reach it as an err, the limit's text (something may wait for this callback, a request's res
+/// that nothing else can answer)
+fn results(vm: &Vm, made: Result<Vec<Value>, script::Error>) -> (Vec<Value>, Option<script::Error>) {
+    match made {
+        Ok(a) => (a, None),
+        Err(e) => (vec![vm.limit_text()], Some(e)),
+    }
+}
+
 // ---------------------------------------------------------------- the host side of a run
 
 /// what a script calls while it runs: the running program without its VM, the record, the
@@ -986,7 +1020,6 @@ fn reply_from(vm: &mut Vm, v: Value) -> Option<Reply> {
 struct Api<'a, 'b> {
     run: &'a mut Run,
     book: &'a mut Book,
-    def: &'a Def,
     os: &'a mut OsApi<'b>,
     inv: Inv,
 }
@@ -994,7 +1027,7 @@ struct Api<'a, 'b> {
 impl Api<'_, '_> {
     /// the moment of CPU time the script is at
     fn at(&self, cx: &Cx) -> Ns {
-        self.inv.start.saturating_add(cpu(cx.fuel(), self.def.cfg.ps_per_op))
+        self.inv.start.saturating_add(cpu(cx.fuel(), self.inv.ps))
     }
     fn effect(&mut self, cx: &Cx, e: Effect) {
         let t = self.at(cx);
@@ -1454,7 +1487,7 @@ impl script::Host for Api<'_, '_> {
         let data = self.os.file_read(&p).map_err(fs_why)?;
         let now = self.os.now();
         let wait = self.os.disk_read(data.len() as u64).saturating_sub(now);
-        cx.charge(wait.saturating_mul(1000) / self.def.cfg.ps_per_op.max(1));
+        cx.charge(wait.saturating_mul(1000) / self.inv.ps.max(1));
         String::from_utf8(data).map_err(|_| String::from("die Datei ist kein UTF-8-Text"))
     }
 }
@@ -1468,6 +1501,7 @@ impl Run {
             rng,
             queue: VecDeque::new(),
             inv: None,
+            turn: None,
             busy_until: 0,
             halting: false,
             effects: VecDeque::new(),
@@ -1659,6 +1693,9 @@ impl Run {
                 return false;
             }
             if self.inv.is_some() {
+                if !self.take_turn(os) {
+                    return false;
+                }
                 self.slice(book, def, os);
                 continue;
             }
@@ -1667,6 +1704,31 @@ impl Run {
             };
             self.dispatch(book, def, os, p, cause);
         }
+    }
+
+    /// a device with hardware: the next slice waits for its turn on a core (res.rs).  True when it
+    /// may run now; its callback's CPU time then goes on from here, as after the debugger's stop
+    fn take_turn(&mut self, os: &mut OsApi) -> bool {
+        let now = os.now();
+        if self.turn.is_none() {
+            let Some(t) = os.cpu_turn() else {
+                return true;
+            };
+            self.turn = Some(t);
+        }
+        let Some((at, _)) = self.turn else {
+            return true;
+        };
+        if at > now {
+            self.busy_until = at;
+            return false;
+        }
+        let used = self.vm.as_ref().map_or(0, |v| v.call_fuel());
+        if let Some(inv) = self.inv.as_mut() {
+            let was = inv.start.saturating_add(cpu(used, inv.ps));
+            inv.start = inv.start.saturating_add(now.saturating_sub(was));
+        }
+        true
     }
 
     /// the service's timer key at the next deadline: the CPU, the effects, timers, the disk
@@ -1938,11 +2000,26 @@ impl Run {
             Pending::Dns(_) => "dns",
             Pending::Disk(_) => "disk",
         };
+        let req = if let Pending::Http(r) = &p { Some(r.id) } else { None };
         match self.prepare(os, p, cause) {
-            Ok(Some(c)) => self.begin(book, def, os, c, cause),
+            Ok(Some(mut c)) => {
+                if let Some(e) = c.lost.take() {
+                    let now = os.now();
+                    self.fail(book, e, during, now, cause, def.cfg.stop_on_error);
+                }
+                self.begin(book, def, os, c, cause);
+            }
             Ok(None) => {}
             Err(e) => {
                 let now = os.now();
+                // what it made of the event is of no use now (no run takes it off the roots)
+                if let Some(vm) = self.vm.as_mut() {
+                    vm.collect();
+                }
+                // the handler never starts, nothing else would answer it
+                if let Some(id) = req {
+                    self.effects.push_back((now, cause, Effect::Respond(id, Reply::status_page(500))));
+                }
                 self.fail(book, e, during, now, cause, def.cfg.stop_on_error);
             }
         }
@@ -1981,6 +2058,7 @@ impl Run {
                 x.accept_queued = false;
                 let x = *x;
                 let mut fresh = Vec::new();
+                let mut lost = None;
                 while let Some(s) = os.tcp_accept(x.sock) {
                     let row = os.tcp_info(s);
                     let remote = row.as_ref().map_or((IpAddr::V4(Ipv4::UNSPECIFIED), 0), |r| r.remote);
@@ -1988,7 +2066,15 @@ impl Run {
                     self.next += 1;
                     let id = self.next;
                     let peer = format!("{}", remote.0);
-                    let m = vm_map(vm, &[("kind", F::S("tcp")), ("id", F::I(id as i64)), ("peer", F::S(&peer)), ("peer_port", F::I(remote.1 as i64)), ("port", F::I(local as i64))])?;
+                    let m = match vm_map(vm, &[("kind", F::S("tcp")), ("id", F::I(id as i64)), ("peer", F::S(&peer)), ("peer_port", F::I(remote.1 as i64)), ("port", F::I(local as i64))]) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            // no room for its handle: nothing could ever close it
+                            os.tcp_close(s);
+                            lost = Some(e);
+                            continue;
+                        }
+                    };
                     let handle = vm.pin(m);
                     let hv = vm.pinned(x.handlers);
                     let handlers = vm.pin(hv);
@@ -2005,6 +2091,9 @@ impl Run {
                 }
                 for id in fresh.into_iter().rev() {
                     self.queue.push_front((Pending::Accepted(id), cause));
+                }
+                if let Some(e) = lost {
+                    return Err(e);
                 }
                 None
             }
@@ -2032,7 +2121,15 @@ impl Run {
                 if d.is_empty() {
                     return Ok(None);
                 }
-                self.data_call(c, d)?
+                let call = self.data_call(c, d);
+                if call.is_err() {
+                    // what did not fit is gone: the stream cannot go on with a hole
+                    if let Some(x) = self.conns.get_mut(&c) {
+                        x.closed = true;
+                    }
+                    self.effects.push_back((os.now(), cause, Effect::Abort(c)));
+                }
+                call?
             }
             Pending::Ended(c, why) => {
                 let Some(x) = self.conns.get_mut(&c) else {
@@ -2056,7 +2153,8 @@ impl Run {
                     Why::Local | Why::Aborted | Why::Failed => Then::Forget(c),
                 };
                 let (handle, handlers) = (x.handle, x.handlers);
-                let w = vm.new_str(why.word())?;
+                // (no room for the word: nil; the callback and what follows it still happen)
+                let w = vm.new_str(why.word()).unwrap_or(Value::Nil);
                 Some(Call { then, ..Call::new(handler(vm, handlers, "close"), vec![vm.pinned(handle), w], "close") })
             }
             Pending::Http(r) => {
@@ -2080,11 +2178,12 @@ impl Run {
                 let Some(cb) = self.requests.remove(&id) else {
                     return Ok(None);
                 };
-                let (err, resp) = match &d.result {
-                    Ok(r) => (Value::Nil, resp_map(vm, r)?),
-                    Err(f) => (vm.new_str(&f.text())?, Value::Nil),
+                let made = match &d.result {
+                    Ok(r) => resp_map(vm, r).map(|m| vec![Value::Nil, m]),
+                    Err(f) => vm.new_str(&f.text()).map(|t| vec![t, Value::Nil]),
                 };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), vec![err, resp], "request") })
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "request") })
             }
             Pending::Dns(l) => {
                 let Some(id) = self.by_lookup.remove(&l) else {
@@ -2093,19 +2192,21 @@ impl Run {
                 let Some(cb) = self.resolves.remove(&id) else {
                     return Ok(None);
                 };
-                let (err, addrs) = match os.lookup(l).and_then(|x| x.result.clone()) {
+                let looked = os.lookup(l).and_then(|x| x.result.clone());
+                let made: Result<Vec<Value>, script::Error> = (|| match looked {
                     Some(Ok(a)) => {
                         // both families in the order to try them (getaddrinfo)
                         let mut items = Vec::with_capacity(a.sorted.len());
                         for x in &a.sorted {
                             items.push(vm.new_str(&format!("{}", x))?);
                         }
-                        (Value::Nil, vm.new_list(items)?)
+                        Ok(vec![Value::Nil, vm.new_list(items)?])
                     }
-                    Some(Err(e)) => (vm.new_str(e.text())?, Value::Nil),
-                    None => (vm.new_str("keine Antwort")?, Value::Nil),
-                };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), vec![err, addrs], "dns") })
+                    Some(Err(e)) => Ok(vec![vm.new_str(e.text())?, Value::Nil]),
+                    None => Ok(vec![vm.new_str("keine Antwort")?, Value::Nil]),
+                })();
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "dns") })
             }
             Pending::Disk(id) => {
                 let Some(op) = self.disk.remove(&id) else {
@@ -2114,28 +2215,29 @@ impl Run {
                 let Some(cb) = op.cb else {
                     return Ok(None);
                 };
-                let args = match op.out {
-                    DiskOut::Full => vec![vm.new_str("Die Disk ist voll.")?],
+                let made: Result<Vec<Value>, script::Error> = (|| match op.out {
+                    DiskOut::Full => Ok(vec![vm.new_str("Die Disk ist voll.")?]),
                     DiskOut::Value(v) => {
                         let v = match v {
-                            Some(t) => vm.json_decode(&t).unwrap_or(Value::Nil),
+                            Some(t) => stored(vm, &t)?,
                             None => Value::Nil,
                         };
-                        vec![Value::Nil, v]
+                        Ok(vec![Value::Nil, v])
                     }
-                    DiskOut::Had(b) => vec![Value::Nil, Value::Bool(b)],
+                    DiskOut::Had(b) => Ok(vec![Value::Nil, Value::Bool(b)]),
                     DiskOut::Items(items) => {
                         let m = vm.new_map()?;
                         for (k, t) in items {
                             let k = vm.new_str(&k)?;
-                            let v = vm.json_decode(&t).unwrap_or(Value::Nil);
+                            let v = stored(vm, &t)?;
                             vm.map_set(m, k, v)?;
                         }
-                        vec![Value::Nil, m]
+                        Ok(vec![Value::Nil, m])
                     }
-                    DiskOut::Nothing => vec![Value::Nil],
-                };
-                Some(Call { unpin: Some(cb), ..Call::new(vm.pinned(cb), args, "disk") })
+                    DiskOut::Nothing => Ok(vec![Value::Nil]),
+                })();
+                let (args, lost) = results(vm, made);
+                Some(Call { unpin: Some(cb), lost, ..Call::new(vm.pinned(cb), args, "disk") })
             }
         })
     }
@@ -2180,6 +2282,9 @@ impl Run {
                 if let Some(p) = c.unpin {
                     vm.unpin(p);
                 }
+                if let Some(id) = c.req {
+                    self.answer(id, None, now, cause);
+                }
                 self.then(os, c.then, now);
                 self.fail(book, e, c.during, now, cause, def.cfg.stop_on_error);
                 return;
@@ -2188,7 +2293,7 @@ impl Run {
         if let Some(p) = c.unpin {
             vm.unpin(p);
         }
-        self.inv = Some(Inv { start: now, cause, during: c.during, req: c.req, then: c.then, top: c.top });
+        self.inv = Some(Inv { start: now, cause, during: c.during, req: c.req, then: c.then, top: c.top, ps: os.cpu_ps(def.cfg.ps_per_op) });
     }
 
     /// one slice of the callback on the CPU
@@ -2201,8 +2306,9 @@ impl Run {
             return;
         };
         let from = os.now();
+        let turn = self.turn.take();
         let st = {
-            let mut api = Api { run: &mut *self, book: &mut *book, def, os: &mut *os, inv };
+            let mut api = Api { run: &mut *self, book: &mut *book, os: &mut *os, inv };
             vm.run(&mut api, def.cfg.slice)
         };
         let out = vm.take_output();
@@ -2216,7 +2322,7 @@ impl Run {
             }
         }
         // a slice takes 1 ns at least (time goes on), a callback too
-        let at = inv.start.saturating_add(cpu(vm.call_fuel(), def.cfg.ps_per_op));
+        let at = inv.start.saturating_add(cpu(vm.call_fuel(), inv.ps));
         let end = match st {
             Status::Yielded => at.max(from + 1),
             Status::Paused(_) => at.max(from),
@@ -2226,6 +2332,10 @@ impl Run {
         book.stats.busy_ns += end - from;
         book.busy.add(from, end);
         self.busy_until = end;
+        // what the slice took on its core (res.rs)
+        if let Some((_, core)) = turn {
+            os.cpu_charge(core, end - from);
+        }
         let answer = match &st {
             Status::Done(v) if inv.req.is_some() => reply_from(&mut vm, *v),
             _ => None,
@@ -2724,6 +2834,12 @@ impl Service for ScriptService {
         // the log lines and notes of the running program carry the new name
         self.book.name = String::from(name);
     }
+    fn mem(&self) -> u64 {
+        let run = self.run.as_ref();
+        let heap = run.and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes());
+        let conns = run.map_or(0, |r| r.conns.len() + r.serve.as_ref().map_or(0, |s| s.conns()));
+        self.def.cfg.mem.bytes(conns as u64, heap as u64)
+    }
     fn footprint(&self) -> usize {
         // the program's heap and stacks, its pending work (the code is shared)
         let vm = self.run.as_ref().and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes() as usize + 4096);
@@ -2911,6 +3027,7 @@ fn cfg_of(c: &Json) -> Result<ScriptCfg, Msg> {
         cfg.stop_on_error = b;
     }
     cfg.unit = c.get("unit").is_some();
+    cfg.mem = crate::res::SvcMem::of(c, 8, 64);
     if let Some(l) = c.get("limits") {
         let n = |k: &str| l.get(k).and_then(|v| v.as_u64());
         if let Some(f) = n("fuel") {

@@ -71,6 +71,7 @@ pub use diagram::{
     DPT_USED, DR_BEZIER, DR_ORTHO, DR_STRAIGHT,
 };
 pub use diagram::{dg_toggle_rect, DN_FRAME, DN_OUTLINE, DN_RESIZE, DN_STEP, DN_TOGGLE}; // frames, groups, a backdrop (G1)
+pub use diagram::DN_HITMIN; // a small text stays selectable at low zoom
 mod dirty;
 mod dnd;
 // (ROADMAP §6) the editors with a text model of their own: the shared core, rich text, code
@@ -138,14 +139,18 @@ mod hotreload;
 mod hyph;
 pub mod i18n;
 mod ids;
-// the output through a swapchain: Windows, its windows only (docs/GPU.md "Ausgabe der UI")
-#[cfg(windows)]
+// the output through a swapchain: Windows and Linux programs against glibc, their windows only
+// (docs/GPU.md "Ausgabe der UI"); static Linux programs, the browser and Android link no Vulkan
+#[cfg(any(windows, jfgui_glibc))]
 mod gpu_out;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, jfgui_glibc)))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
-#[cfg(windows)]
-pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_VS, GPU_OUT_WGSL};
+#[cfg(any(windows, jfgui_glibc))]
+pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
+// a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
+mod canvas;
+pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
 // ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
@@ -248,7 +253,7 @@ pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{
     DockPanel, DockState, DOCK_BOTTOM, DOCK_CENTER, DOCK_FLOAT, DOCK_FLOAT_MAX, DOCK_LEFT, DOCK_MK_BOTTOM, DOCK_MK_CENTER, DOCK_MK_LEFT,
-    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT,
+    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT, DOCK_HOLD_MS, DOCK_TAB_HOLD,
 };
 // the taskbar button's progress and jump list tasks (ui.taskbar_progress / taskbar_tasks)
 pub use plat::taskbar::{JumpTask, TaskbarProgress};
@@ -316,13 +321,22 @@ impl AppDesc {
     /// every field empty / zero
     pub const NONE: AppDesc =
         AppDesc { title: "", flags: 0, w: 0, h: 0, min_w: 0, min_h: 0, accent: 0, cmds: &[], menubar: &[] };
+
+    /// a copy in the UI language (after i18n::set_catalog): the title, the command table's and
+    /// the menu bar's labels
+    pub fn translated(&self) -> AppDesc {
+        AppDesc { title: i18n::t(self.title), cmds: i18n::commands(self.cmds), menubar: i18n::menu(self.menubar), ..*self }
+    }
 }
 
 /// the app's callbacks (APP_DESC on_init, on_frame, on_command)
 pub trait App {
     /// Optional domain actions, in addition to the universal UI action catalogue.
     fn actions(&self) -> &'static [agent_core::ActionSpec] { &[] }
-    /// Domain revision; None uses the UI runtime's monotonically increasing frame revision.
+    /// Domain revision. None uses the UI runtime's own: it moves with the controls (their set,
+    /// labels, values and states, the focus, an open modal dialog, the title, enabled commands)
+    /// and with every agent call that changes something, not with frames or the pointer, and it
+    /// knows nothing of a change the user makes to the app's data.
     fn action_revision(&self) -> Option<u64> { None }
     /// Dynamic domain constraints such as read-only files or an absent selection.
     fn action_available(&self, _spec: &agent_core::ActionSpec) -> Result<(), agent_core::ActionError> { Ok(()) }
@@ -375,6 +389,8 @@ pub struct WinParts {
     pub(crate) rtl: rtl::W,
     /// the scroll views of the pass, their content grids of the last frame (scrollcopy.rs)
     pub(crate) scopy: scrollcopy::W,
+    /// the canvases of the pass (canvas.rs)
+    pub(crate) canv: canvas::W,
 }
 
 impl WinParts {
@@ -391,6 +407,7 @@ impl WinParts {
             chrome: Default::default(),
             rtl: Default::default(),
             scopy: Default::default(),
+            canv: Default::default(),
         }
     }
 }
@@ -497,6 +514,24 @@ pub struct GpuOutput {
     pub image_uploads: u64,
     pub image_hits: u64,
     pub image_evicted: u64,
+    /// canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
+    /// in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
+    /// and the time that took (us), tiles evicted, gestures ended by the CPU's picture
+    pub canvas_apart: u32,
+    pub canvas_quads: u32,
+    pub canvas_frames: u64,
+    pub canvas_tiles: u32,
+    pub canvas_bytes: u64,
+    pub canvas_fills: u64,
+    pub canvas_fill_us: u64,
+    pub canvas_evicted: u64,
+    pub canvas_settles: u64,
+    /// jfgui_GPU_VERIFY: where the tiles' picture differed from the CPU's during a gesture: frames,
+    /// pixels, the sum of the largest channel difference per pixel, the largest one
+    pub canvas_diff_frames: u64,
+    pub canvas_diff_px: u64,
+    pub canvas_diff_sum: u64,
+    pub canvas_diff_max: u32,
     /// time in the window's renders and presents (us)
     pub render_us: u64,
     pub present_us: u64,
@@ -646,3 +681,6 @@ pub use code_assist::{
 };
 pub use code_doc::{TextEdit, BP_COND, BP_DISABLED, BP_ON};
 pub use code_edit::{CE_BREAKPOINTS, CE_FOLDS};
+// (ST1) a card or list row that does one thing (action_card.rs)
+mod action_card;
+pub use action_card::CardDesc;

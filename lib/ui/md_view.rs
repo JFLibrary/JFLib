@@ -6,6 +6,9 @@
 //   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
 //   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
 //        (st.set_markdown / set_html / set_doc)
+//   ui.markdown_fit(&mut MdViewState, text, w_px, MV_*) -> DIP     how high a view w_px wide must be to
+//        show the whole text without scrolling: for a short text among other widgets (a question
+//        in a form); every block is laid out now; give next_size(-1, h) to markdown_view
 //   MdEv { ev, link, hover, field, submit, click }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
 //        activated); link: the activated link's target (a click on it, Enter on the focused
 //        one); hover: the target of the link under the pointer; field: a form field the user
@@ -1108,6 +1111,44 @@ impl Ui {
         let _src = self.src_scope();
         st.set_markdown(text);
         self.doc_view(id, st, flags)
+    }
+
+    /// ui_markdown_fit(&mut st, text, w_px, MV_*) -> the height in DIP a view w_px wide needs for the whole
+    /// text (see the module header)
+    pub fn markdown_fit(&mut self, st: &mut MdViewState, text: &str, w_px: i32, flags: u32) -> i32 {
+        st.set_markdown(text);
+        let pad = self.dp(if flags & MV_NO_FRAME == 0 { PAD } else { PAD_BARE });
+        let sbw = self.style.scrollbar_thickness(self);
+        let hair = self.hair().max(1);
+        let drtl = if flags & MV_RTL != 0 {
+            true
+        } else if flags & MV_LTR != 0 {
+            false
+        } else {
+            st.auto_rtl.unwrap_or(self.rtl)
+        };
+        // the same column as the view's, so that it finds these layouts
+        let cw = ((w_px - hair * 2).max(1) - pad * 2 - sbw).max(self.dp(80));
+        st.sync();
+        let fc = self.md_faces();
+        let key = (self.wp.rt.dpi, cw, self.layout_scale(), drtl, fc);
+        let n = st.doc.blocks().len();
+        if key != st.lc.key || !st.sized || st.rows.len() != n {
+            if key != st.lc.key {
+                st.lc.lays.clear();
+                st.lc.cols.clear();
+                st.lc.scaled.clear();
+            }
+            st.lc.key = key;
+            st.rows.forget_all();
+            self.md_guess(st, cw, &fc);
+            st.sized = true;
+        }
+        for k in 0..n {
+            self.md_lay(st, k, cw, drtl, &fc);
+        }
+        let total = st.rows.total().clamp(0, i32::MAX as i64 / 2) as i32;
+        self.px2dip(total + hair * 2) + 2
     }
 
     /// ui_html_view(id, &mut st, html, MV_*) -> MdEv: the HTML counterpart of markdown_view

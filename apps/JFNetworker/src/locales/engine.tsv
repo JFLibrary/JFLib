@@ -66,7 +66,7 @@ IoT-Sensor (WLAN 2,4 GHz)	IoT sensor (WLAN 2.4 GHz)
 IP-Kamera	IP camera
 IP-Kamera (1G, PoE)	IP camera (1G, PoE)
 Smart-TV	Smart TV
-Smart-TV (1G, WLAN)	Smart TV (1G, WLAN)
+Smart-TV (1G, WLAN, Koax)	Smart TV (1G, WLAN, coax)
 JF-S24P	JF-S24P
 Access-Switch 24× 1G PoE+, 4× 10G SFP+	Access switch 24× 1G PoE+, 4× 10G SFP+
 JF-S24L3	JF-S24L3
@@ -82,7 +82,7 @@ Heimrouter mit WLAN 802.11ax (1G WAN, 4× 1G LAN)	Home router with WLAN 802.11ax
 Hub	Hub
 Hub 8× 100M (Lehrgerät: jedes Paket an alle)	Hub 8× 100M (for teaching: every frame to every port)
 JF-FW	JF-FW
-Next-Generation-Firewall 8× 1G, 2× 10G SFP+	Next-generation firewall 8× 1G, 2× 10G SFP+
+Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 1G, 2× 10G SFP+	Firewall (router with ACLs and NAT, zones with sessions) 8× 1G, 2× 10G SFP+
 JF-AP6E	JF-AP6E
 WLAN-Access-Point 802.11ax (6 GHz, 2.5G, PoE-gespeist)	WLAN access point 802.11ax (6 GHz, 2.5G, PoE-powered)
 Modem/ONT	Modem/ONT
@@ -1543,3 +1543,259 @@ selbst signiert	self-signed
 unbekannter Aussteller	unknown issuer
 falscher Name	wrong name
 ohne Fehler	no fault
+{} PoE++	{} PoE++
+JF-S8	JF-S8
+Tisch-Switch 8× 1G, unmanaged (ohne Befehlszeile)	Desktop switch 8× 1G, unmanaged (no command line)
+JF-S8P	JF-S8P
+Kompakt-Switch 8× 1G PoE+, 2× 10G SFP+	Compact switch 8× 1G PoE+, 2× 10G SFP+
+JF-S24	JF-S24
+Access-Switch 24× 1G, 4× 10G SFP+	Access switch 24× 1G, 4× 10G SFP+
+JF-S48P	JF-S48P
+Access-Switch 48× 1G PoE+, 4× 10G SFP+	Access switch 48× 1G PoE+, 4× 10G SFP+
+JF-S24M	JF-S24M
+Multi-Gigabit-Switch 24× 2.5G PoE++, 4× 25G SFP28	Multi-gigabit switch 24× 2.5G PoE++, 4× 25G SFP28
+JF-S48Y	JF-S48Y
+Leaf-Switch (L3) 48× 25G SFP28, 8× 100G QSFP28	Leaf switch (L3) 48× 25G SFP28, 8× 100G QSFP28
+JF-S32C	JF-S32C
+Spine-Switch (L3) 32× 100G QSFP28	Spine switch (L3) 32× 100G QSFP28
+JF-R2	JF-R2
+Filial-Router 2× 1G, 2× Seriell	Branch router 2× 1G, 2× serial
+Repeater	Repeater
+Repeater 2× 1G (Schicht 1: verlängert eine Kupferstrecke)	Repeater 2× 1G (layer 1: extends a copper run)
+Bridge	Bridge
+Bridge 2× 1G (Schicht 2: lernt Adressen, ohne Befehlszeile)	Bridge 2× 1G (layer 2: learns addresses, no command line)
+JF-FW2	JF-FW2
+Kleine Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 1G WAN, 4× 1G LAN	Small firewall (router with ACLs and NAT, zones with sessions) 1G WAN, 4× 1G LAN
+JF-FW8	JF-FW8
+Rechenzentrums-Firewall (Router mit ACLs und NAT, Zonen mit Sitzungen) 8× 10G SFP+, 4× 100G QSFP28	Data center firewall (router with ACLs and NAT, zones with sessions) 8× 10G SFP+, 4× 100G QSFP28
+JF-AP7	JF-AP7
+WLAN-Access-Point 802.11be (6 GHz, 5G, PoE-gespeist)	WLAN access point 802.11be (6 GHz, 5G, PoE-powered)
+Farbe der Kabelart	Color of the cable kind
+Türkis	Teal
+Pink	Pink
+Braun	Brown
+Seriell, erstes Ende DCE	Serial, first end DCE
+Seriell, erstes Ende DTE	Serial, first end DTE
+Telefonkabel (RJ11)	Telephone cable (RJ11)
+Koaxialkabel	Coaxial cable
+Direktkabel (DAC)	Direct attach cable (DAC)
+Aktives Glasfaserkabel (AOC)	Active optical cable (AOC)
+Multimode	Multimode
+Singlemode	Single-mode
+Seriell DCE	Serial DCE
+Seriell DTE	Serial DTE
+Telefon	Telephone
+Koax	Coax
+DAC	DAC
+AOC	AOC
+keine Längengrenze	no length limit
+{} m bei {}	{} m at {}
+nicht bei {}	not at {}
+RJ11	RJ11
+{}× RJ11	{}× RJ11
+{}× Koax	{}× coax
+Kabelmodem	Cable modem
+Kabelmodem (Koax, 1G LAN)	Cable modem (coax, 1G LAN)
+DSL-Modem	DSL modem
+DSL-Modem (RJ11, 1G LAN)	DSL modem (RJ11, 1G LAN)
+Die Kategorie {} passt nicht zu {}; es zählen die Grenzen ohne Kategorie.	Category {} does not fit {}; the limits without a category apply.
+{}-Kabel an {} trägt {} nicht; die Leitung bleibt aus.	{} cable on {} does not carry {}; the link stays down.
+{}-Kabel zwischen {} und {} trägt {} nicht; die Leitung bleibt aus.	{} cable between {} and {} does not carry {}; the link stays down.
+
+# SA1: the hardware of a device (catalog.rs, fault.rs, trace.rs)
+Rack-Server S	Rack server S
+Rack-Server S (2× 10GBASE-T, 1G Management)	Rack server S (2× 10GBASE-T, 1G management)
+Rack-Server M	Rack server M
+Rack-Server M (2× 25G SFP28, 1G Management)	Rack server M (2× 25G SFP28, 1G management)
+Rack-Server L	Rack server L
+Rack-Server L (2× 25G SFP28, 1G Management)	Rack server L (2× 25G SFP28, 1G management)
+Rack-Server XL	Rack server XL
+Rack-Server XL (2× 100G QSFP28, 1G Management)	Rack server XL (2× 100G QSFP28, 1G management)
+NAS	NAS
+NAS mit Festplatten (2× 10GBASE-T)	NAS with hard disks (2× 10GBASE-T)
+SATA-SSD	SATA SSD
+NVMe-SSD	NVMe SSD
+schnelle NVMe-SSD	fast NVMe SSD
+{} GiB	{} GiB
+{} MiB	{} MiB
+1 Kern	1 core
+{} Kerne	{} cores
+{}, {} RAM, {} {} GiB	{}, {} RAM, {} {} GiB
+{} mit {} % Tempo, {} RAM, {} {} GiB	{} at {} % speed, {} RAM, {} {} GiB
+CPU von {} langsam: Rechenzeit ×{}	CPU of {} slow: CPU time ×{}
+CPU von {} langsam: Rechenzeit ×{},{}	CPU of {} slow: CPU time ×{}.{}
+Speicherfresser auf {}: {}	Memory hog on {}: {}
+{} startet für neue Hardware neu	{} restarts for new hardware
+{} hat keine simulierte Hardware.	{} has no simulated hardware.
+Der Faktor einer langsamen CPU muss größer als 0 sein.	The factor of a slow CPU must be greater than 0.
+Speicher voll: Dienst {} mit {} beendet	Memory full: service {} with {} killed
+Der Pfad ist leer.	The path is empty.
+Der Pfad „{}“ ist absolut; erlaubt sind nur Pfade im Ordner des Kurses.	The path “{}” is absolute; only paths inside the course's folder are allowed.
+Der Pfad „{}“ führt mit „..“ aus dem Ordner des Kurses.	The path “{}” leads out of the course's folder with “..”.
+Der Pfad „{}“ ist zu lang oder enthält andere Zeichen als Buchstaben, Ziffern und - _ . /	The path “{}” is too long or holds characters other than letters, digits and - _ . /
+Der Pfad „{}“ hat einen leeren oder unzulässigen Teil.	The path “{}” has an empty or invalid part.
+Schritt {}: {}	Step {}: {}
+Schritt {}: die Datei hat keine Aufgabe.	Step {}: the file has no task.
+Schritt {}: das Labor hat keine Ziele, an denen sich sein Ende erkennen lässt.	Step {}: the lab has no goals that would show when it is finished.
+Die Datei enthält keinen Kurs.	The file holds no course.
+Das ist keine Kursdatei.	This is not a course file.
+Der Kurs hat keinen Titel.	The course has no title.
+Der Kurs hat keine Schritte.	The course has no steps.
+Der Kurs hat mehr als {} Schritte.	The course has more than {} steps.
+Der Kurs hat keine Versionsnummer (course_version).	The course has no version number (course_version).
+„{}“ hat keinen englischen Text.	“{}” has no English text.
+Einheit {} hat keinen Titel.	Unit {} has no title.
+Die Kennung {} kommt doppelt vor.	The id {} appears twice.
+Schritt {}: die Lektion {} fehlt in jeder Sprache.	Step {}: the lesson {} is missing in every language.
+Schritt {}: die Lektion {} fehlt im Ordner {}; es erscheint die andere Sprache.	Step {}: the lesson {} is missing in the folder {}; the other language shows.
+Schritt {}: die Datei {} fehlt.	Step {}: the file {} is missing.
+Schritt {}: das Bild {} fehlt.	Step {}: the picture {} is missing.
+Schritt {}: den Schritt {} gibt es nicht.	Step {}: there is no step {}.
+Schritt {}: {} ist kein Labor.	Step {}: {} is not a lab.
+Schritt {}: der Link „{}“ führt nirgendwohin; es gibt step:, lab:, http: und https:.	Step {}: the link “{}” leads nowhere; there are step:, lab:, http: and https:.
+Die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	The id “{}” may hold only small letters, digits, - and _.
+Die Datei {} fehlt oder lässt sich nicht lesen.	The file {} is missing or cannot be read.
+Schritt {}: die Kennung „{}“ darf nur aus kleinen Buchstaben, Ziffern, - und _ bestehen.	Step {}: the id “{}” may hold only small letters, digits, - and _.
+Schritt {} hat keinen Titel.	Step {} has no title.
+Schritt {}: die Art „{}“ gibt es nicht (lesson, lab, quiz, fault, exam).	Step {}: there is no kind “{}” (lesson, lab, quiz, fault, exam).
+Schritt {}: die Datei {} endet nicht auf {}.	Step {}: the file {} does not end in {}.
+Die Datei enthält keine Kursliste.	The file holds no list of courses.
+Das ist keine Kursliste.	This is not a list of courses.
+Kurs {}: {}	Course {}: {}
+Kurs {}: die Prüfsumme von {} ist kein SHA-256.	Course {}: the checksum of {} is no SHA-256.
+# F2: the zone firewall (jfn_sim/fw.rs, fwtrace.rs, problems.rs)
+Zonen gibt es nur auf Firewall-Modellen.	Zones exist on firewall models only.
+Die Zone {} gibt es nicht.	There is no zone {}.
+Der Name self gehört dem Gerät selbst.	The name self belongs to the device itself.
+Die Zone {} hat noch Schnittstellen.	Zone {} still has interfaces.
+Die Zone {} steht noch in einem Zonenpaar.	Zone {} is still part of a zone pair.
+Die Klasse {} steht noch in einer Richtlinie.	Class {} is still part of a policy.
+Die Klasse {} gibt es nicht.	There is no class {}.
+Die Richtlinie {} gilt noch für ein Zonenpaar.	Policy {} still applies to a zone pair.
+Die Richtlinie {} gibt es nicht.	There is no policy {}.
+Ein Zonenpaar verbindet zwei verschiedene Zonen.	A zone pair joins two different zones.
+Von {} nach {} gibt es schon ein Zonenpaar.	There already is a zone pair from {} to {}.
+Das Zonenpaar {} gibt es nicht.	There is no zone pair {}.
+Firewall: {} bleibt in Zone {}, es passiert.	Firewall: {} stays in zone {} and passes.
+Firewall: {} von {} nach {}: das Gerät selbst, keine Richtlinie, es passiert.	Firewall: {} from {} to {}: the device itself, no policy, it passes.
+Firewall: {} zwischen Zone {} und einer Schnittstelle ohne Zone, verworfen.	Firewall: {} between zone {} and an interface without a zone, dropped.
+Firewall: {} von {} nach {}: keine Regel zwischen den Zonen, verworfen.	Firewall: {} from {} to {}: no rule between the zones, dropped.
+Firewall: {} beginnt Sitzung {} ({}, Klasse {}).	Firewall: {} begins session {} ({}, class {}).
+Firewall: {} gehört zu Sitzung {} (Hinweg).	Firewall: {} belongs to session {} (on its way there).
+Firewall: {} gehört zu Sitzung {} (Rückweg).	Firewall: {} belongs to session {} (on its way back).
+Firewall: {} ist ein ICMP-Fehler zu Sitzung {} und passiert.	Firewall: {} is an ICMP error about session {} and passes.
+Firewall: {} passiert ohne Sitzung ({}, Klasse {}).	Firewall: {} passes without a session ({}, class {}).
+Firewall: {} verworfen ({}, Klasse {}).	Firewall: {} dropped ({}, class {}).
+Firewall: {} abgelehnt, der Absender erfährt es ({}, Klasse {}).	Firewall: {} rejected, the sender is told ({}, class {}).
+Firewall: {} beginnt keine Verbindung und gehört zu keiner Sitzung, verworfen ({}).	Firewall: {} begins no connection and belongs to no session, dropped ({}).
+Firewall: {} verworfen, schon {} halboffene Sitzungen ({}).	Firewall: {} dropped, already {} half-open sessions ({}).
+Firewall: {} beendet Sitzung {} (RST).	Firewall: {} ends session {} (RST).
+Firewall: Sitzung {} ({}) ist abgelaufen.	Firewall: session {} ({}) timed out.
+Die Richtlinie {} gilt für kein Zonenpaar und wirkt deshalb nicht.	Policy {} applies to no zone pair and so has no effect.
+{} hat eine Adresse, aber keine Zone: Verkehr zwischen ihr und den Zonen wird verworfen.	{} has an address but no zone: traffic between it and the zones is dropped.
+Zone {} hat kein Zonenpaar mit Richtlinie: nichts kommt aus ihr heraus oder in sie hinein.	Zone {} has no zone pair with a policy: nothing gets out of it or into it.
+Das Zonenpaar {} ({} nach {}) hat keine Richtlinie und verwirft alles.	Zone pair {} ({} to {}) has no policy and drops everything.
+Diese Firewall gibt es nur auf Linux-Geräten.	This firewall exists on Linux devices only.
+Das Quiz hat keine Fragen.	The quiz has no questions.
+Das Quiz hat mehr als {} Fragen.	The quiz has more than {} questions.
+Das ist keine Quizdatei.	This is not a quiz file.
+Der Titel des Quiz fehlt auf {}.	The quiz's title is missing in {}.
+Die Bestehensgrenze (pass) ist {}; höchstens 100 %.	The pass mark (pass) is {}; 100 % at most.
+Die Datei enthält kein Quiz.	The file holds no quiz.
+Englisch	English
+Frage {} braucht mindestens zwei Antworten.	Question {} needs at least two answers.
+Frage {} braucht mindestens zwei Einträge zum Ordnen.	Question {} needs at least two entries to put in order.
+Frage {} hat keine Erklärung.	Question {} has no explanation.
+Frage {} hat keine richtige Antwort.	Question {} has no right answer.
+Frage {} hat mehr als {} Antworten.	Question {} has more than {} answers.
+Frage {} hat mehr als {} Einträge zum Ordnen.	Question {} has more than {} entries to put in order.
+Frage {} hat {} richtige Antworten; bei „single“ ist es genau eine.	Question {} has {} right answers; with “single” it is exactly one.
+Frage {} ist 0 Punkte wert.	Question {} is worth 0 points.
+Frage {} nennt keine akzeptierten Muster (accept).	Question {} names no accepted patterns (accept).
+Frage {}, Antwort {}: der Text fehlt auf {}.	Question {}, answer {}: the text is missing in {}.
+Frage {}, Antwort {}: die Erklärung fehlt auf {}.	Question {}, answer {}: the explanation is missing in {}.
+Frage {}, Eintrag {}: der Text fehlt auf {}.	Question {}, entry {}: the text is missing in {}.
+Frage {}: das Muster „{}“ lässt sich nicht übersetzen: {}	Question {}: the pattern “{}” does not compile: {}
+Frage {}: der Text fehlt auf {}.	Question {}: the text is missing in {}.
+Frage {}: der richtige Wert (value) ist keine Zahl.	Question {}: the right value (value) is not a number.
+Frage {}: die Art „{}“ gibt es nicht (single, multi, text, number, order).	Question {}: there is no kind “{}” (single, multi, text, number, order).
+Frage {}: die Erklärung fehlt auf {}.	Question {}: the explanation is missing in {}.
+Frage {}: die Toleranz (tolerance) ist keine Zahl ab 0.	Question {}: the tolerance (tolerance) is not a number from 0.
+Ihre Antwort: {}	Your answer: {}
+Schritt {}: Zeitlimit und Versuche gelten nur in einem Test (kind „exam“).	Step {}: a time limit and attempts only apply to a test (kind “exam”).
+Schritt {}: der verlangte Schritt {} steht nicht davor.	Step {}: the required step {} does not come before it.
+Schritt {}: eine Fehlersuche wird bewertet; die Datei hat keine Kriterien (assess).	Step {}: a fault hunt is graded; the file has no criteria (assess).
+Startfehler {}: an {} {} steckt kein Kabel.	Start fault {}: no cable is plugged into {} {}.
+Startfehler {}: das Gerät {} gibt es im Projekt nicht.	Start fault {}: the project has no device {}.
+Startfehler {}: „{}“ ist kein Fehler: {}	Start fault {}: “{}” is no fault: {}
+Welches Gerät oder Kabel ist die Ursache?	Which device or cable is the cause?
+Im Pfad fehlt ein Teil: {}	A part of the path is missing: {}
+Im Pfad gibt es kein Element {}.	The path has no element {}.
+„{}“ liegt nicht in einem Objekt.	“{}” does not lie in an object.
+Hardware steht als Objekt da, etwa mit „preset“ oder „cores“.	Hardware is an object, for instance with “preset” or “cores”.
+„{}“ gibt es bei Hardware nicht (preset, cores, speed, ram_gb, swap_gb, disk, disk_gb).	Hardware has no “{}” (preset, cores, speed, ram_gb, swap_gb, disk, disk_gb).
+Das Modell „{}“ hat keine Hardware-Angaben.	The model “{}” has no hardware figures.
+„cores“ ist eine Zahl von 1 bis 1024.	“cores” is a number from 1 to 1024.
+„speed“ ist das Tempo eines Kerns gegen den Referenzkern, etwa 1.5.	“speed” is the speed of a core against the reference core, for instance 1.5.
+„ram_gb“ ist eine Größe in GiB.	“ram_gb” is a size in GiB.
+„swap_gb“ ist eine Größe in GiB.	“swap_gb” is a size in GiB.
+Die Plattenart „{}“ gibt es nicht (sata, nvme, nvme-fast, hdd).	There is no kind of disk “{}” (sata, nvme, nvme-fast, hdd).
+„disk_gb“ ist eine Größe in GiB.	“disk_gb” is a size in GiB.
+Diesen Wert gibt es nicht.	There is no such value.
+Der Pfad „{}“ nennt einen Dienst und seine Einstellung, etwa http-server.workers.	The path “{}” names a service and its setting, for instance http-server.workers.
+{} hat keinen Dienst „{}“.	{} has no service “{}”.
+Das Gerät „{}“ gibt es nicht.	There is no device “{}”.
+{} hat keine IPv4-Adresse.	{} has no IPv4 address.
+{} hängt an {} Kabeln; eine Vorlage hängt an genau einem.	{} hangs on {} cables; a template hangs on exactly one.
+Für die Kopie {} gibt es keine Adresse mehr nach {}.	For copy {} there is no address left after {}.
+Die Adresse {} der Kopie {} hat schon ein anderes Gerät.	Another device already has the address {} of copy {}.
+Das Modell des Geräts {} gibt es nicht.	The model of device {} does not exist.
+Am Gerät {} ist für die Kopie {} kein Port mehr frei.	Device {} has no free port left for copy {}.
+Es fehlt „dev“ oder „group“.	“dev” or “group” is missing.
+Die Gruppe „{}“ gibt es nicht.	There is no group “{}”.
+Die Gruppe „{}“ hat keine Geräte.	The group “{}” has no devices.
+„values“ ist leer.	“values” is empty.
+Die Art „{}“ gibt es nicht (hw, config, backends).	There is no kind “{}” (hw, config, backends).
+{} hat keinen Dienst „{}“ (es gibt: {}).	{} has no service “{}” (there are: {}).
+Ein Dienst der Art {} kennt „{}“ nicht (es gibt: {}).	A service of kind {} does not know “{}” (there are: {}).
+Der Dienst „{}“ ist kein Load Balancer, sondern {}.	The service “{}” is no load balancer but {}.
+„counts“ ist leer.	“counts” is empty.
+Ein Load Balancer braucht mindestens ein Backend; 0 geht nicht.	A load balancer needs at least one backend; 0 will not do.
+Es fehlt „pool“ oder „template“.	“pool” or “template” is missing.
+„pool“ und „template“ schließen sich aus.	“pool” and “template” exclude each other.
+„counts“ verlangt {} Backends, der Pool hat {}.	“counts” asks for {} backends, the pool has {}.
+Die Datei enthält kein Experiment.	The file holds no experiment.
+Das ist keine Experiment-Datei.	This is no experiment file.
+Last: es fehlt „rps“ oder „users“.	Load: “rps” or “users” is missing.
+Last: „rps“ und „users“ schließen sich aus.	Load: “rps” and “users” exclude each other.
+Last: eine Stufe ist 0.	Load: a level is 0.
+Last: die Stufen müssen streng steigen, das Knie gilt sonst nichts.	Load: the levels must rise strictly, or the knee means nothing.
+Last: das Gerät „{}“ gibt es nicht.	Load: there is no device “{}”.
+Last: {} hat keinen Dienst „{}“.	Load: {} has no service “{}”.
+Last: der Dienst „{}“ ist kein Lastgenerator (http-load), sondern {}.	Load: the service “{}” is no load generator (http-load) but {}.
+Zeit: „measure_s“ fehlt.	Time: “measure_s” is missing.
+Zeit: Übergang und Messung zusammen höchstens {} s; so lange halten die Dienste ihre Latenzen.	Time: settling and measuring take {} s at most together; that is how long the services keep their latencies.
+Zeit: ein Seed steht zweimal da; er ergäbe denselben Lauf.	Time: a seed is there twice; it would give the same run.
+SLO: „{}“ ist keine Zahl.	SLO: “{}” is no number.
+Preise: „{}“ gibt es nicht (es gibt: {}).	Prices: there is no “{}” (there are: {}).
+Preise: „{}“ ist keine Zahl (Euro je Stunde).	Prices: “{}” is no number (euros per hour).
+Kosten: das Gerät „{}“ gibt es nicht.	Cost: there is no device “{}”.
+Achse {}: {}	Axis {}: {}
+Eine Reihe hat keinen Namen.	A series has no name.
+Die Reihe „{}“ steht zweimal da.	The series “{}” is there twice.
+Reihe {}, Achse {}: {}	Series {}, axis {}: {}
+Das wären {} Läufe; höchstens {} gehen.	That would be {} runs; {} at most will do.
+Port und Backend eines Caches ändern sich nur mit einem Neustart.	The port and backend of a cache change only with a restart.
+Das Projekt läuft nicht: {}	The project does not run: {}
+Konfiguration {}: {}	Configuration {}: {}
+{}, Dienst {}: {}	{}, service {}: {}
+Port und Warteschlange der Verbindungen ändern sich nur mit einem Neustart.	The port and the queue of connections change only with a restart.
+Das Zertifikat ändert sich nur mit einem Neustart.	The certificate changes only with a restart.
+Die Backends der Routen ändern sich nur mit einem Neustart.	The backends of the routes change only with a restart.
+Offene und geschlossene Last wechseln nur mit einem Neustart.	Open and closed load change over only with a restart.
+Die Dauer eines Laufs ändert sich nur mit einem Neustart.	The duration of a run changes only with a restart.
+Modus und Port eines Load Balancers ändern sich nur mit einem Neustart.	The mode and port of a load balancer change only with a restart.
+Die Art der Prüfungen ändert sich nur mit einem Neustart.	The kind of checks changes only with a restart.
+Das Backend {} hat eine andere Adresse: es braucht einen anderen Namen.	The backend {} has another address: it needs another name.
+Warteschlange und Thema eines Workers ändern sich nur mit einem Neustart.	The queue and topic of a worker change only with a restart.
+Dieser Dienst ändert seine Einstellungen nur mit einem Neustart.	This service changes its settings only with a restart.
