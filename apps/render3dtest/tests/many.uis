@@ -1,0 +1,2 @@
+#!args --test many
+# 160 meshes and 400 materials in a frame against the ray caster, the pools growing; Voll and Basis

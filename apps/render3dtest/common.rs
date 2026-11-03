@@ -1,0 +1,336 @@
+// common -- what the native tests and the browser's share: geometry, an offscreen target, a seeded
+// generator, the scene every path must draw alike (gallery)
+
+use alloc::vec;
+use alloc::vec::Vec;
+
+use gpu::*;
+use render3d::{Camera, Instance, InstanceId, Material, MaterialId, MeshData, MeshId, Renderer, Scene, Sun, Transform};
+
+use crate::cpu;
+
+/// a mesh's data, owned
+pub struct Geo {
+    pub pos: Vec<[f32; 3]>,
+    pub nrm: Vec<[f32; 3]>,
+    pub uv: Vec<[f32; 2]>,
+    pub idx: Vec<u32>,
+}
+
+impl Geo {
+    pub fn data(&self) -> MeshData<'_> {
+        MeshData { positions: &self.pos, normals: &self.nrm, uvs: &self.uv, indices: &self.idx }
+    }
+}
+
+/// the cube -1 ..= 1, four vertices per face, normals per face
+pub fn cube() -> Geo {
+    // (normal, u, v) with u x v = normal: corners -u-v, u-v, u+v, -u+v run counter-clockwise from outside
+    let faces: [([f32; 3], [f32; 3], [f32; 3]); 6] = [
+        ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
+        ([-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]),
+        ([0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]),
+        ([0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]),
+        ([0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]),
+        ([0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]),
+    ];
+    let mut g = Geo { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), idx: Vec::new() };
+    for (f, (n, u, v)) in faces.iter().enumerate() {
+        for (a, b) in [(-1.0f32, -1.0f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+            g.pos.push([n[0] + a * u[0] + b * v[0], n[1] + a * u[1] + b * v[1], n[2] + a * u[2] + b * v[2]]);
+            g.nrm.push(*n);
+            g.uv.push([(a + 1.0) * 0.5, (b + 1.0) * 0.5]);
+        }
+        let f = f as u32 * 4;
+        g.idx.extend_from_slice(&[f, f + 1, f + 2, f, f + 2, f + 3]);
+    }
+    g
+}
+
+/// a square in the xy plane, -1 ..= 1, seen from +z
+pub fn plate() -> Geo {
+    Geo {
+        pos: vec![[-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [1.0, 1.0, 0.0], [-1.0, 1.0, 0.0]],
+        nrm: vec![[0.0, 0.0, 1.0]; 4],
+        uv: vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        idx: vec![0, 1, 2, 0, 2, 3],
+    }
+}
+
+/// a prism with k sides around the y axis, radius 1, height 2 h: a shape per k, so that a wrong first
+/// index or base vertex shows
+pub fn prism(k: u32, h: f32) -> Geo {
+    let mut g = Geo { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), idx: Vec::new() };
+    let at = |i: u32| {
+        let (s, c) = cpu::sincos(i as f64 / k as f64 * core::f64::consts::TAU);
+        (s as f32, c as f32)
+    };
+    for i in 0..k {
+        let ((s0, c0), (s1, c1)) = (at(i), at(i + 1));
+        let (mid_s, mid_c) = cpu::sincos((i as f64 + 0.5) / k as f64 * core::f64::consts::TAU);
+        let n = [mid_s as f32, 0.0, mid_c as f32];
+        let b = g.pos.len() as u32;
+        // the side, counter-clockwise from outside (the angle grows from +z towards +x)
+        g.pos.extend_from_slice(&[[s0, -h, c0], [s1, -h, c1], [s1, h, c1], [s0, h, c0]]);
+        g.nrm.extend_from_slice(&[n; 4]);
+        g.uv.extend_from_slice(&[[0.0; 2]; 4]);
+        g.idx.extend_from_slice(&[b, b + 1, b + 2, b, b + 2, b + 3]);
+        // the caps as fans around the middle
+        let b = g.pos.len() as u32;
+        g.pos.extend_from_slice(&[[0.0, h, 0.0], [s0, h, c0], [s1, h, c1], [0.0, -h, 0.0], [s1, -h, c1], [s0, -h, c0]]);
+        g.nrm.extend_from_slice(&[[0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0]]);
+        g.uv.extend_from_slice(&[[0.0; 2]; 6]);
+        g.idx.extend_from_slice(&[b, b + 1, b + 2, b + 3, b + 4, b + 5]);
+    }
+    g
+}
+
+/// a ball of radius 1 with smooth normals
+pub fn ball(stacks: u32, slices: u32) -> Geo {
+    let mut g = Geo { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), idx: Vec::new() };
+    for j in 0..=stacks {
+        let (sj, cj) = cpu::sincos(j as f64 / stacks as f64 * core::f64::consts::PI);
+        for i in 0..=slices {
+            let (si, ci) = cpu::sincos(i as f64 / slices as f64 * core::f64::consts::TAU);
+            let p = [(sj * si) as f32, cj as f32, (sj * ci) as f32];
+            g.pos.push(p);
+            g.nrm.push(p);
+            g.uv.push([i as f32 / slices as f32, j as f32 / stacks as f32]);
+        }
+    }
+    let row = slices + 1;
+    for j in 0..stacks {
+        for i in 0..slices {
+            let (a, b, c, d) = (j * row + i, j * row + i + 1, (j + 1) * row + i, (j + 1) * row + i + 1);
+            g.idx.extend_from_slice(&[a, c, d, a, d, b]);
+        }
+    }
+    g
+}
+
+/// the same mesh with its indices beyond 65535: unused vertices in front of it (a ray caster's time stays
+/// where it was)
+pub fn beyond_16_bits(g: Geo) -> Geo {
+    const MORE: usize = 70_000;
+    let mut out = Geo { pos: vec![g.pos[0]; MORE], nrm: vec![g.nrm[0]; MORE], uv: vec![g.uv[0]; MORE], idx: Vec::new() };
+    out.pos.extend_from_slice(&g.pos);
+    out.nrm.extend_from_slice(&g.nrm);
+    out.uv.extend_from_slice(&g.uv);
+    out.idx = g.idx.iter().map(|i| i + MORE as u32).collect();
+    out
+}
+
+/// a quaternion: angle radians around a unit axis
+pub fn quat(axis: [f64; 3], angle: f64) -> [f32; 4] {
+    let (s, c) = cpu::sincos(angle * 0.5);
+    [(axis[0] * s) as f32, (axis[1] * s) as f32, (axis[2] * s) as f32, c as f32]
+}
+
+/// a small generator with a fixed seed (the same numbers on every path)
+pub struct Rng(pub u32);
+
+impl Rng {
+    pub fn next(&mut self) -> u32 {
+        self.0 = self.0.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
+        let w = ((self.0 >> ((self.0 >> 28) + 4)) ^ self.0).wrapping_mul(277_803_737);
+        (w >> 22) ^ w
+    }
+
+    /// in [0, 1), 24 bits: exact on every path
+    pub fn unit(&mut self) -> f64 {
+        (self.next() >> 8) as f64 / 16_777_216.0
+    }
+
+    pub fn range(&mut self, a: f64, b: f64) -> f64 {
+        a + (b - a) * self.unit()
+    }
+
+    pub fn below(&mut self, n: u32) -> u32 {
+        self.next() % n
+    }
+}
+
+/// an offscreen target in one colour format, with the read-back of its image
+pub struct Off {
+    pub w: u32,
+    pub h: u32,
+    pub stride: u32,
+    pub color: Texture,
+    pub depth: Texture,
+    pub rb: Buffer,
+    used: bool,
+}
+
+pub const CLEAR: [f32; 4] = [0.2, 0.4, 0.6, 1.0];
+pub const CLEAR8: [u8; 3] = [51, 102, 153];
+
+impl Off {
+    pub fn new(dev: &Device, w: u32, h: u32, format: Format) -> Result<Off> {
+        let stride = (w * 4).div_ceil(256) * 256;
+        Ok(Off {
+            w,
+            h,
+            stride,
+            color: dev.create_texture(&TextureDesc::d2(w, h, format, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC))?,
+            depth: dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?,
+            rb: dev.create_buffer(&BufferDesc { size: stride as u64 * h as u64, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?,
+            used: false,
+        })
+    }
+
+    /// one frame of the scene, with the image copied to the read-back
+    pub fn submit(&mut self, r: &mut Renderer, s: &mut Scene) -> Result<SubmitId> {
+        s.prepare(r)?;
+        let dev = r.device().clone();
+        let mut e = dev.encoder()?;
+        let color = ColorAttachment { view: self.color.view(), load: Load::Clear, clear: CLEAR, store: true,
+                                      before: if self.used { Layout::CopySrc } else { Layout::Undefined }, after: Layout::CopySrc };
+        let depth = DepthAttachment { view: self.depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: true,
+                                      before: if self.used { Layout::Sampled } else { Layout::Undefined }, after: Layout::Sampled };
+        r.record(&mut e, s, color, Some(depth))?;
+        e.copy_texture_to_buffer(TextureRegion::mip(&self.color, 0), &self.rb, DataLayout { offset: 0, bytes_per_row: self.stride, rows_per_image: 0 });
+        e.barrier(Access::COPY_WRITE, Access::HOST_READ);
+        let id = dev.queue().submit([e.finish()?])?;
+        s.submitted(id);
+        self.used = true;
+        Ok(id)
+    }
+
+    /// the image as RGBA rows without padding (the browser: Err(NotReady) until it has answered)
+    pub fn read(&self) -> Result<Vec<u8>> {
+        let mut raw = vec![0u8; self.rb.size() as usize];
+        self.rb.read(0, &mut raw)?;
+        let mut out = Vec::with_capacity((self.w * self.h * 4) as usize);
+        for y in 0..self.h as usize {
+            let at = y * self.stride as usize;
+            out.extend_from_slice(&raw[at..at + self.w as usize * 4]);
+        }
+        Ok(out)
+    }
+}
+
+/// (pixels that differ, the largest difference of a channel)
+pub fn diff(a: &[u8], b: &[u8]) -> (u32, u8) {
+    let (mut n, mut m) = (0, 0u8);
+    if a.len() != b.len() {
+        return (u32::MAX, 255);
+    }
+    for (p, q) in a.chunks_exact(4).zip(b.chunks_exact(4)) {
+        if p != q {
+            n += 1;
+            for k in 0..4 {
+                m = m.max(p[k].abs_diff(q[k]));
+            }
+        }
+    }
+    (n, m)
+}
+
+// ---------------------------------------------------------------- the gallery
+
+pub const GALLERY_W: u32 = 320;
+pub const GALLERY_H: u32 = 180;
+pub const GALLERY_N: u32 = 3000;
+
+/// an instance as the tests describe it: for the engine and for the CPU's reference
+#[derive(Clone, Copy, Debug)]
+pub struct Spec {
+    pub mesh: u32,
+    pub material: u32,
+    pub pos: [f64; 3],
+    pub rot: [f32; 4],
+    pub scale: [f32; 3],
+}
+
+impl Spec {
+    pub fn instance(&self) -> Instance {
+        Instance { mesh: MeshId(self.mesh), material: MaterialId(self.material),
+                   transform: Transform { pos: self.pos, rot: self.rot, scale: self.scale } }
+    }
+}
+
+/// the meshes of the gallery: a cube, a ball, prisms of 3 to 48 sides, among them a mesh with 32-bit indices
+pub fn gallery_geos() -> Vec<Geo> {
+    let mut v = vec![cube(), ball(8, 12)];
+    for k in 3..=48 {
+        v.push(if k == 20 { beyond_16_bits(prism(k, 0.5 + k as f32 / 64.0)) } else { prism(k, 0.5 + k as f32 / 64.0) });
+    }
+    v
+}
+
+/// the colours of the gallery's materials
+pub fn gallery_colors(n: u32) -> Vec<[f32; 3]> {
+    let mut r = Rng(77);
+    (0..n).map(|_| [r.range(0.25, 1.0) as f32, r.range(0.25, 1.0) as f32, r.range(0.25, 1.0) as f32]).collect()
+}
+
+/// n instances in a slab in front of the gallery's camera, at world position `at`
+pub fn gallery_specs(meshes: u32, materials: u32, n: u32, at: [f64; 3]) -> Vec<Spec> {
+    let mut r = Rng(4242);
+    let mut v = Vec::with_capacity(n as usize);
+    for _ in 0..n {
+        let axis = cpu::norm([r.range(-1.0, 1.0), r.range(-1.0, 1.0), r.range(-1.0, 1.0) + 0.01]);
+        let s = r.range(0.2, 0.9) as f32;
+        // (multiples of 1/1024: exact in f32 and f64, wherever the scene lies)
+        let q = |r: &mut Rng, a: f64, b: f64| (r.range(a, b) * 1024.0) as i64 as f64 / 1024.0;
+        v.push(Spec {
+            mesh: r.below(meshes),
+            material: r.below(materials),
+            pos: [at[0] + q(&mut r, -60.0, 60.0), at[1] + q(&mut r, -30.0, 30.0), at[2] + q(&mut r, -70.0, 40.0)],
+            rot: quat(axis, r.range(0.0, 6.0)),
+            scale: [s, s * r.range(0.7, 1.3) as f32, s],
+        });
+    }
+    v
+}
+
+pub fn gallery_camera(at: [f64; 3]) -> Camera {
+    Camera::look_at([at[0] + 7.0, at[1] + 6.0, at[2] + 60.0], [at[0], at[1], at[2] - 10.0], [0.0, 1.0, 0.0], 1.0, GALLERY_W as f64 / GALLERY_H as f64, 0.1, f64::INFINITY)
+}
+
+/// the gallery's renderer contents
+pub fn gallery_fill(r: &mut Renderer) -> Result<(u32, u32)> {
+    let geos = gallery_geos();
+    for g in &geos {
+        r.add_mesh(&g.data())?;
+    }
+    let colors = gallery_colors(96);
+    for c in &colors {
+        r.add_material(&Material::color(c[0], c[1], c[2]))?;
+    }
+    Ok((geos.len() as u32, colors.len() as u32))
+}
+
+/// the gallery's scene at world position `at`, its origin there
+pub fn gallery_scene(r: &Renderer, meshes: u32, materials: u32, at: [f64; 3]) -> Result<(Scene, Vec<InstanceId>)> {
+    let mut s = Scene::new(r)?;
+    s.set_origin(at);
+    s.set_camera(&gallery_camera(at));
+    s.set_sun(&Sun::DEFAULT);
+    let mut ids = Vec::new();
+    for spec in gallery_specs(meshes, materials, GALLERY_N, at) {
+        ids.push(s.add(spec.instance())?);
+    }
+    Ok((s, ids))
+}
+
+/// the gallery's changes between its first and second image: moved, removed, added (their places used again)
+pub fn gallery_change(s: &mut Scene, ids: &mut Vec<InstanceId>, meshes: u32, materials: u32) -> Result<()> {
+    let mut r = Rng(99);
+    for _ in 0..200 {
+        let id = ids[r.below(ids.len() as u32) as usize];
+        let mut t = s.transform(id)?;
+        t.pos[0] += r.range(-3.0, 3.0);
+        t.pos[1] += r.range(-3.0, 3.0);
+        s.set_transform(id, &t)?;
+    }
+    for _ in 0..100 {
+        let k = r.below(ids.len() as u32) as usize;
+        s.remove(ids.swap_remove(k))?;
+    }
+    let extra = gallery_specs(meshes, materials, 50, [20.0, -5.0, 10.0]);
+    for spec in extra {
+        ids.push(s.add(spec.instance())?);
+    }
+    Ok(())
+}

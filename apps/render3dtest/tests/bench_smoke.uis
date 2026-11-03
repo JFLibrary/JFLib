@@ -1,0 +1,2 @@
+#!args --bench 20000 --res 320x180 --frames 20 --warmup 4 --moved 50 --verify --validate
+# a short run of the measurement loop with changes: its lists hold all of gputest's cull_ref

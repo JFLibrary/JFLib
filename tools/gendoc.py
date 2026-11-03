@@ -109,6 +109,8 @@ CRATES = [
     ("fx", "effects and adjustments", "full"),
     ("gpu", "the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, "
      "swapchains (Vulkan on Windows)", "full"),
+    ("render3d", "the core of the 3D engine: meshes, materials, scenes of instances, visibility on the GPU",
+     "full"),
     ("shader", "SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders",
      "full"),
     ("wgsl", "the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the "

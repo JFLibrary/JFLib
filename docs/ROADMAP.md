@@ -1545,8 +1545,8 @@ Fensterrand hinaus.
   - Die UI rastert weiter auf der CPU und bleibt pixelgleich; die GPU übernimmt Ausgabe,
     Ebenen, Bilder und Leinwände. Ohne GPU zeichnet die UI wie heute.
   - Reihenfolge: G1 GPU-Schicht und Messszene (Windows), G2 Shader-Compiler, G3 UI über die
-    GPU, G4 Linux / Android / Browser, G5 3D-Engine-Kern, G6 2D-Renderer für CAD, G7
-    Spiel-Bausteine. Über G5 wird nach der Messung aus G1 entschieden.
+    GPU, G4 Linux / Android / Browser, G5 3D-Engine-Kern (nach der Messung aus G1 entschieden, in
+    den Stufen G5a bis G5e), G6 2D-Renderer für CAD, G7 Spiel-Bausteine.
 - **P2** · *erledigt* (2026-10-31) · G1a: GPU-Schicht `lib/gpu` mit Vulkan unter Windows
   ([GPU.md](GPU.md)). `vulkan-1.dll` wird nur aus System32 geladen (das Programm startet ohne
   Vulkan), die handgeschriebene FFI ist gegen `vulkan_core.h` geprüft (Konstanten, 91
@@ -1740,8 +1740,19 @@ Fensterrand hinaus.
   etwas angekommen ist; sonst geht der Lauf über den alten Weg. Was der Compositor daraus macht, sieht er nicht. Nicht getestet: Safari, Chrome auf
   Android und Linux, Telefone, AMD, Intel, ein echter Treiber-Reset, ein Tab im Hintergrund. Nicht gebaut: Zeitstempel,
   Bindless.
-- **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
-  Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
+- **P2** · *erledigt* (2026-11-03) · G5a: der Kern der 3D-Engine ([RENDER3D.md](RENDER3D.md)): `lib/render3d` mit Szene, Meshes in
+  gemeinsamen Puffern, Material-Tabelle (sichtbar: die Grundfarbe), Instanzen, Kamera, Sonne, Sichtbarkeit im Rechen-Shader und
+  einer Instanzliste je Mesh; auf Voll ein Multi-Draw, auf Basis und im Browser ein indirekter Befehl je Liste, aus denselben
+  WGSL-Quellen. Reverse-Z, Positionen `f64` auf der CPU und `f32` relativ zu einem Ursprung auf der GPU, nur Geändertes geht hoch.
+  Gemessen wie `gputest --bench` (1 Mio. Würfel, 1080p, RTX 2070 SUPER): GPU 1,31 ms je Bild gegen 1,63 ms der nackten Szene, die
+  Würfel stehen dabei still; Sichtbarkeit 0,063 statt 0,133 ms, Zeichnen gleich. Gefunden: 32-Bit-Indizes kosten dort ein Drittel bis die Hälfte,
+  feste Vertex-Attribute rund drei Viertel mehr als 16 Bit und Speicherpuffer. Bilder gegen einen Strahlenwerfer auf der CPU; Voll, Basis
+  und Chrome 156 (alle Bündel) zeigen dieselben Bilder, 0 von 57 600 Pixeln anders. Nicht getestet: andere GPUs, Linux, Android,
+  Firefox. Nicht gebaut: Meshes entfernen, negative Skalierung, orthografische Kamera, Durchsichtigkeit.
+- **P2** · *fehlt* · G5b: Texturen und glTF-Import.
+- **P2** · *fehlt* · G5c: PBR, Licht, Schatten.
+- **P2** · *fehlt* · G5d: Verdeckung über eine Hi-Z-Pyramide, Detailstufen, zweite Warteschlange.
+- **P2** · *fehlt* · G5e: 3D-Ansicht in der UI, Linux, Android, Browser in einem echten Fenster, Messungen auf anderen GPUs.
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
   Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). G7: Spiel-Bausteine
   (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall,

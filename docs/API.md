@@ -62,6 +62,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
+- [render3d](#render3d) -- the core of the 3D engine: meshes, materials, scenes of instances, visibility on the GPU
+  <br>[lib.rs](#render3d-crate-root) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
@@ -19836,6 +19838,297 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 - **`fn size(&self) -> (u32, u32)`**
   the images' size
 - **`fn image_count(&self) -> usize`**
+
+## render3d
+
+*the core of the 3D engine: meshes, materials, scenes of instances, visibility on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
+
+```text
+render3d -- the core of the 3D engine on lib/gpu (G5a; docs/RENDER3D.md): meshes in shared buffers, a
+table of materials, scenes of instances, a camera, a sun, visibility on the GPU and one instance list
+per mesh.  No draw per object anywhere: a frame is one compute dispatch and one indirect draw per
+mesh (level Basis) or one multi-draw for all of them (level Voll).  The same WGSL on every path:
+compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+
+  Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
+  renderer.add_mesh(&MeshData) -> Result<MeshId>              positions, normals, uv, indices into the pools
+  renderer.add_material(&Material) -> Result<MaterialId>, set_material(id, &Material)
+  renderer.set_size(w, h)                                     a depth buffer the renderer keeps (or bring your own)
+  Scene::new(&renderer) -> Result<Scene>
+  scene.add(Instance { mesh, material, transform }) -> Result<InstanceId>, remove(id), set_transform(id, t),
+       set_material(id, m), set_mesh(id, m); set_camera(&Camera), set_sun(&Sun), set_origin(pos)
+  a frame:
+       scene.prepare(&mut renderer)?;                 waits for this slot's last frame, uploads what changed
+       renderer.record(&mut encoder, &scene, color, depth)?;      depth None: the renderer's own
+       let id = queue.submit([encoder.finish()?])?;   (or swapchain.present)
+       scene.submitted(id);
+
+Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
+of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
+linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+origin on the GPU.
+
+Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
+```
+
+### `render3d` crate root
+
+```rust
+/// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
+DEPTH_CLEAR: f32 = 0.0
+/// the most frames the CPU may record ahead of the GPU
+FRAMES_MAX: usize = 3
+/// the WGSL sources and their embedded words (render3dtest: the embedding check)
+CULL_WGSL: &str = include_str!("cull.wgsl")
+SCATTER_WGSL: &str = include_str!("scatter.wgsl")
+DRAW_WGSL: &str = include_str!("draw.wgsl")
+CULL_SPV: &[u32] = spv::CULL
+SCATTER_SPV: &[u32] = spv::SCATTER
+VS_SPV: &[u32] = spv::VS
+FS_SPV: &[u32] = spv::FS
+```
+
+- **`struct RendererDesc`**
+  Renderer::new
+  - `color: Format` -- the format of the colour targets
+  - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX); G1 measured 2 to be enough
+
+**`impl RendererDesc`**
+
+- **`const fn new(color: Format) -> RendererDesc`**
+
+- **`struct MeshData<'a>`**
+  a mesh's data: one normal and one uv per position, three indices per triangle, counter-clockwise from
+  outside.  Copied into the pools (a vertex is 32 bytes; 16-bit indices up to 65536 vertices, of which
+  the GPU is fond); the renderer keeps no copy.
+  - `positions: &'a [[f32; 3]]`
+  - `normals: &'a [[f32; 3]]`
+  - `uvs: &'a [[f32; 2]]`
+  - `indices: &'a [u32]`
+
+- **`struct MeshId(pub u32)`**
+  a mesh of a Renderer
+
+- **`struct MaterialId(pub u32)`**
+  a material of a Renderer
+
+- **`struct MeshInfo`**
+  where a mesh lies in the pools, and its bounding sphere in its own coordinates
+  - `first_index: u32`
+  - `indices: u32`
+  - `base_vertex: u32`
+  - `vertices: u32`
+  - `wide: bool` -- its indices are 32 bits wide: more than 65536 vertices
+  - `center: [f64; 3]`
+  - `radius: f64`
+
+- **`struct Material`**
+  a row of the material table.  G5a shows the base colour (rgb; alpha reaches the target); the other
+  values wait for PBR (G5c), the table has slots for textures (G5b)
+  - `base_color: [f32; 4]` -- linear rgb and alpha
+  - `metallic: f32`
+  - `roughness: f32`
+  - `emissive: [f32; 3]`
+
+**`impl Material`**
+
+- **`const fn color(r: f32, g: f32, b: f32) -> Material`**
+  a dull material of one colour
+
+- **`struct Renderer`**
+  the pipelines of one colour format, the mesh pools and the material table of one device
+
+**`impl Renderer`**
+
+- **`fn new(dev: &Device, desc: &RendererDesc) -> Result<Renderer>`**
+- **`fn device(&self) -> &Device`**
+- **`fn multi_draw(&self) -> bool`**
+  this device draws its lists with one multi-draw (level Voll)
+- **`fn max_instances(&self) -> u32`**
+  the most instances a scene can hold on this device
+- **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
+  a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
+  indices in threes and in range, positions finite.
+- **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
+- **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
+- **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
+  a row of the table; the next frame shows it
+- **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
+  a depth buffer the renderer keeps, for frames recorded with depth None
+- **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
+  one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
+  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+
+### `render3d/math.rs`
+
+Source: [`lib/render3d/math.rs`](../lib/render3d/math.rs)
+
+```text
+math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matrices are in scene.rs)
+```
+
+- **`type V3 = [f64; 3]`**
+
+- **`fn sqrt(x: f64) -> f64`**
+  the square root (x &lt;= 0: 0)
+
+- **`fn tan(x: f64) -> f64`**
+  the tangent of a small angle (a field of view below pi): sine over cosine by their series
+
+- **`fn add(a: V3, b: V3) -> V3`**
+
+- **`fn sub(a: V3, b: V3) -> V3`**
+
+- **`fn mul(a: V3, k: f64) -> V3`**
+
+- **`fn dot(a: V3, b: V3) -> f64`**
+
+- **`fn cross(a: V3, b: V3) -> V3`**
+
+- **`fn len(a: V3) -> f64`**
+
+- **`fn norm(a: V3) -> V3`**
+  a unit vector (zero stays zero)
+
+- **`fn rotation(q: [f32; 4]) -> [V3; 3]`**
+  the rotation matrix's columns of a quaternion (x, y, z, w; any length except 0)
+
+### `render3d/scene.rs`
+
+Source: [`lib/render3d/scene.rs`](../lib/render3d/scene.rs)
+
+```text
+scene -- a scene's instances, camera and sun (lib.rs has the overview, docs/RENDER3D.md the reasons)
+
+On the CPU: one Slot per instance with its f64 position; free places on a list, used again first.
+On the GPU, per slot: spheres (16 bytes, read by cull), list_of (4 bytes, read by cull only for what
+is visible), instances (64 bytes, the finished matrix, read by the vertex shader).  Per list (one per
+mesh in use): a draw record, a first place in the visible list.  Capacities double, a list keeps room
+for its instances, so frames with instances coming and going rewrite no list layout.
+
+What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the
+barrier against the frame before): always the view and the lights of this frame's slot; the changed
+slots through the scatter shader (a run of (slot, record) in the slot's own Upload buffer); more than
+4096 changes and an eighth of the slots at once, a new origin, new capacities: everything, from a
+temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
+commands without a barrier against the frames still on the GPU.
+```
+
+- **`struct Transform`**
+  where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis
+  (not negative: a mirrored instance would turn its faces inside out)
+  - `pos: [f64; 3]`
+  - `rot: [f32; 4]`
+  - `scale: [f32; 3]`
+
+**`impl Transform`**
+
+- **`const fn at(pos: [f64; 3]) -> Transform`**
+
+- **`struct Instance`**
+  what Scene::add takes
+  - `mesh: MeshId`
+  - `material: MaterialId`
+  - `transform: Transform`
+
+- **`struct InstanceId`**
+  an instance of a Scene; dead after remove, also when its place has gone to another one
+  - `slot: u32` -- the place in the instance arrays
+
+- **`struct Camera`**
+  a right-handed perspective camera; reverse Z
+  - `eye: [f64; 3]`
+  - `forward: [f64; 3]` -- unit vectors: where it looks, and up (at right angles)
+  - `up: [f64; 3]`
+  - `fov_y: f64` -- the vertical field of view in radians, width / height
+  - `aspect: f64`
+  - `near: f64`
+  - `far: f64` -- f64::INFINITY: no far plane
+
+**`impl Camera`**
+
+- **`fn look_at(eye: [f64; 3], target: [f64; 3], up: [f64; 3], fov_y: f64, aspect: f64, near: f64, far: f64) -> Camera`**
+  at eye looking at target; `up` says which way is up on the screen
+
+- **`struct Sun`**
+  one sun and an ambient light (linear colours)
+  - `direction: [f64; 3]` -- towards the sun, any length
+  - `color: [f32; 3]`
+  - `ambient: [f32; 3]`
+
+**`impl Sun`**
+
+- **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75; 3], ambie ...`**
+
+- **`struct UploadInfo`**
+  what prepare sent for this frame
+  - `changed: u32` -- slots through the scatter shader
+  - `full: bool` -- every slot, from a temporary buffer
+  - `lists: bool` -- the lists' layout changed
+  - `bytes: u64` -- everything prepare wrote for the GPU, view and lights included
+
+- **`struct ListInfo`**
+  a list of the scene
+  - `mesh: MeshId`
+  - `count: u32` -- the instances of this mesh, and the room for them in the visible list
+  - `capacity: u32`
+  - `first: u32` -- its first place in the visible list
+
+- **`struct FrameStats`**
+  what a finished frame measured (Scene::set_stats)
+  - `frame: u64` -- counts the scene's frames from 0
+  - `visible: u64` -- instances the compute shader found visible
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after culling, after the render pass (no
+    timestamps here: None)
+
+- **`struct Scene`**
+  instances, camera and sun of one scene of a Renderer
+
+**`impl Scene`**
+
+- **`fn new(r: &Renderer) -> Result<Scene>`**
+- **`fn add(&mut self, i: Instance) -> Result<InstanceId>`**
+  a new instance, on a place that came free if there is one
+- **`fn remove(&mut self, id: InstanceId) -> Result<()>`**
+  the instance goes; its place comes free
+- **`fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()>`**
+- **`fn transform(&self, id: InstanceId) -> Result<Transform>`**
+- **`fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()>`**
+- **`fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()>`**
+- **`fn len(&self) -> u32`**
+  instances alive
+- **`fn is_empty(&self) -> bool`**
+- **`fn set_camera(&mut self, c: &Camera)`**
+- **`fn camera(&self) -> &Camera`**
+- **`fn set_sun(&mut self, s: &Sun)`**
+- **`fn set_origin(&mut self, origin: [f64; 3])`**
+  the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
+  digits.  Moving it uploads every instance once
+- **`fn origin(&self) -> [f64; 3]`**
+- **`fn set_culling(&mut self, on: bool)`**
+  false: every live instance is drawn (a test's comparison, a debugging aid)
+- **`fn set_stats(&mut self, on: bool)`**
+  FrameStats of each frame: the instances found visible (a small copy per frame), the GPU's times
+- **`fn upload_info(&self) -> UploadInfo`**
+  what the last prepare sent
+- **`fn lists(&self) -> Vec<ListInfo>`**
+  the lists in order (list i = the i-th draw record of draws_buffer)
+- **`fn draws_buffer(&self) -> &Buffer`**
+  (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list, instance_count second
+- **`fn visible_buffer(&self) -> &Buffer`**
+  (tests, tools) the camera's visible list after a frame's culling: slots, a list's at ListInfo::first
+- **`fn wait_slot(&mut self) -> Result<()>`**
+  wait for the frame that last used this frame's slot, so its data can be written (the window's
+  acquire has usually done so).  prepare does it too; call it first to tell the wait from the work.
+  The browser cannot wait, and needs not: its writes go in queue order
+- **`fn take_stats(&mut self) -> Vec<FrameStats>`**
+  the finished frames' stats since the last call
+- **`fn collect_stats(&mut self)`**
+  after Device::wait_idle: the stats of what was still in flight
+- **`fn prepare(&mut self, r: &mut Renderer) -> Result<()>`**
+  the frame's data for Renderer::record: waits for this slot's last frame, sends what changed
+- **`fn submitted(&mut self, id: SubmitId)`**
+  the frame went to the GPU: Queue::submit's or Swapchain::present's answer
 
 ## shader
 

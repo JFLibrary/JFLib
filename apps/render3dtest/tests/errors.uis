@@ -1,0 +1,2 @@
+#!args --test errors
+# what the API refuses, an empty scene, a lost device

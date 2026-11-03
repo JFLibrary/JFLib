@@ -105,6 +105,7 @@ DOCS = [
     ("docs/AGENT_WEB.md", "Web and agent control", "Reference", "de", "The browser host and the explicit CLI, JSON and MCP interfaces"),
     ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de", "SIMD and parallel jobs in the browser"),
     ("docs/GPU.md", "GPU layer", "Reference", "de", "Direct access to the graphics card: compute, rendering, swapchains"),
+    ("docs/RENDER3D.md", "3D engine", "Reference", "de", "Meshes, materials, scenes of instances, visibility on the GPU"),
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
     ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en", "A small drawing and image-editing app"),
