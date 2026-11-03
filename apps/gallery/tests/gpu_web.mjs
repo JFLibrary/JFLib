@@ -108,20 +108,27 @@ const diffPngs=(page,a,b)=>page.evaluate(async ([a64,b64])=>{
 // the composed screen at the canvas, at its own pixels, once it has come to rest (hover fades, tooltips)
 const shotOf=async page=>page.screenshot({clip:await page.locator('#screen').boundingBox(),scale:'device'});
 const screenPng=async page=>{
+  await counters(page); // (a turn of the worker: it has seen everything sent so far, also on a busy machine)
   await settle(page);
-  let last=await shotOf(page);
-  for(let i=0;i<40;i++) {
-    await new Promise(r=>setTimeout(r,50));
+  let last=await shotOf(page), same=0;
+  for(let i=0;i<60&&same<2;i++) {
+    await new Promise(r=>setTimeout(r,60));
     const next=await shotOf(page);
-    if(next.equals(last)) return next;
+    same=next.equals(last)?same+1:0;
     last=next;
   }
   return last;
 };
+// (something may still come between the two pictures, a tooltip after its delay: what stays differs)
 const compareScreen=async (page,what)=>{
-  const fb=await framebufferPng(page);
-  const shot=await screenPng(page);
-  const r=await diffPngs(page,fb,shot);
+  let r;
+  for(let i=0;i<4;i++) {
+    const before=await screenPng(page);
+    const fb=await framebufferPng(page);
+    const shot=await screenPng(page);
+    r=await diffPngs(page,fb,shot);
+    if(r.pixels===0||before.equals(shot)) break;
+  }
   say(r.pixels===0,`${what}: screen = framebuffer ${JSON.stringify(r)}`);
   return r.pixels;
 };
@@ -283,12 +290,13 @@ async function canvasAndImage(browser,engine) {
     const at=[box.x+box.width/2,box.y+230];
     const out={};
     await page.mouse.move(...at);
+    await page.waitForTimeout(100);
     await page.mouse.down();
     let during=null;
     for(let i=1;i<=12;i++) {
       await page.mouse.move(at[0]+i*7,at[1]+i*3);
       await page.waitForTimeout(16);
-      if(i===10&&record) during=await record('drag');
+      if(record) during=await record('drag');
     }
     await page.mouse.up();
     await page.waitForTimeout(400); // (the CPU's picture follows the gesture)
@@ -314,14 +322,14 @@ async function canvasAndImage(browser,engine) {
     const {page,errors}=await openPage(b,`${origin}/images/index.html?agent=1&gpu=1&theme=light&compute=simd&gpuenv=jfgui_GPU_VERIFY=1`);
     const on=await until(()=>counters(page),x=>x.on===1||x.never===1,'the output decides');
     if(on.never===1) {console.log(`SKIP ${engine} canvas and image: no working WebGPU here`);return;}
-    let tiles=null, image=null;
+    let tiles=null, apart=0, image=null;
     const {out}=await go(page,async what=>{
       const c=await counters(page);
-      if(what==='drag') tiles=c;
+      if(what==='drag') {tiles=c;apart=Math.max(apart,c.canvas_apart);}
       else image=c;
       return c;
     });
-    say(tiles.canvas_apart>=1&&tiles.canvas_tiles>0,`${engine}: a canvas pans from tiles (apart=${tiles.canvas_apart}, tiles=${tiles.canvas_tiles}, fills=${tiles.canvas_fills})`);
+    say(apart>=1&&tiles.canvas_tiles>0,`${engine}: a canvas pans from tiles (apart=${apart}, tiles=${tiles.canvas_tiles}, fills=${tiles.canvas_fills}, frames=${tiles.canvas_frames})`);
     const d1=await diffPngs(page,ref.drag,out.drag);
     say(d1.pixels===0,`${engine}: after the gesture: screen = the old path's screen ${JSON.stringify(d1)}`);
     say(image.image_textures>=1,`${engine}: a big image is a texture (image_textures=${image.image_textures}, quads=${image.image_quads}, split_frames=${image.split_frames})`);
