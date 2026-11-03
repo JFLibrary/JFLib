@@ -2248,11 +2248,56 @@ def build_app_modules(b, app, vdir=None):
         if app not in b.mod_ready:
             for m in APP_MODULES.get(app, []):
                 ModuleBuilder(b, m).build()
+            build_pdn_host(b, app)
             b.mod_ready.add(app)
     if vdir is not None and vdir != b.dir:
         for m in APP_MODULES.get(app, []):
             shutil.copyfile(b.dir / module_file(m, b.target), vdir / module_file(m, b.target))
+        for f in pdn_host_files(app, b.target):
+            if (b.dir / f).exists():
+                (vdir / f).parent.mkdir(exist_ok=True)
+                shutil.copyfile(b.dir / f, vdir / f)
 # ---------------------------------------------------------------- end jxl-module
+
+
+# ---------------------------------------------------------------- pdn-host
+# PaintCraft's host for original paint.net plugins (tools/paintcraft-pdn-host/README.md): our own
+# .NET assembly, built against the paint.net on this machine.  Its references are not copied
+# (Private=false), so nothing of paint.net is redistributed.  Without the .NET SDK or paint.net
+# the app goes without it and its menu says so; a user needs paint.net, not the SDK.
+PDN_HOST = ROOT / "tools" / "paintcraft-pdn-host"
+
+
+def pdn_host_files(app, target):
+    """the host's files relative to the app's folder (tools/package.py); .dll only is enough
+    on paint.net's own runtime, the other two let --pdn-dotnet start it"""
+    if app != "PaintCraft" or target != "win":
+        return []
+    return [f"pdn-host/PaintCraft.PdnHost{e}" for e in (".dll", ".runtimeconfig.json", ".deps.json")]
+
+
+def build_pdn_host(b, app):
+    """the host into <out>/win/pdn-host, unless it is newer than its sources"""
+    files = pdn_host_files(app, b.target)
+    if not files:
+        return
+    dll = b.dir / files[0]
+    sources = [*PDN_HOST.glob("*.cs"), *PDN_HOST.glob("*.csproj"), *PDN_HOST.glob("*.props")]
+    if dll.exists() and max(s.stat().st_mtime for s in sources) <= dll.stat().st_mtime:
+        return
+    install = Path(os.environ.get("PaintDotNetDir") or Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "paint.net")
+    if not shutil.which("dotnet") or not (install / "PaintDotNet.Effects.Core.dll").exists():
+        print(f"[{b.target}] note: no .NET SDK or paint.net here: {app} without its plugin host")
+        return
+    r = subprocess.run(["dotnet", "build", str(PDN_HOST / "PaintCraft.PdnHost.csproj"), "-c", "Release", "-o", str(dll.parent),
+                        f"-p:PaintDotNetDir={install}", "--nologo", "-v:q"],
+                       stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:
+        # another paint.net version may not compile: that costs the plugin host, not the app;
+        # the host of an older build must not pass for this one
+        dll.unlink(missing_ok=True)
+        print(f"[{b.target}] warning: {app}'s plugin host did not build:\n{r.stdout[-2000:]}")
+# ---------------------------------------------------------------- end pdn-host
 
 
 def check_toolchain():

@@ -454,7 +454,7 @@ pub(crate) fn tool_init(p: &mut Pn, ui: &mut Ui) {
 // the UI's `sync` hook: background jobs of the tools, effects and the save options dialog
 fn tool_sync_hook() -> bool {
     crate::effects::FX_SYNC_ASK.store(SYNC_FX.load(Ordering::SeqCst), Ordering::SeqCst); // pn-sys: fx_jobs_pending's restart
-    SYNC_FX.load(Ordering::SeqCst) || SYNC_SAVEOPT.load(Ordering::SeqCst) || SYNC_BK.load(Ordering::SeqCst) || crate::integrations::gmic::BUSY.load(Ordering::Acquire) || crate::integrations::paint_dot_net::host::BUSY.load(Ordering::Acquire) || crate::integrations::services::BUSY.load(Ordering::Acquire) || crate::integrations::file_io::OPEN_BUSY.load(Ordering::Acquire)
+    SYNC_FX.load(Ordering::SeqCst) || SYNC_SAVEOPT.load(Ordering::SeqCst) || SYNC_BK.load(Ordering::SeqCst) || crate::integrations::gmic::BUSY.load(Ordering::Acquire) || crate::integrations::paint_dot_net::host::BUSY.load(Ordering::Acquire) || crate::integrations::paint_dot_net::catalog::SEARCHING.load(Ordering::Acquire) || crate::integrations::services::BUSY.load(Ordering::Acquire) || crate::integrations::file_io::OPEN_BUSY.load(Ordering::Acquire)
 }
 
 /// tool_sync_pending() -> 1 while a tool computes in the background (script `sync`)

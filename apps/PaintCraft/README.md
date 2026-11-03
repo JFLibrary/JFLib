@@ -46,8 +46,8 @@ changes the app's appearance; the [build target](#build-and-run) selects its pla
 - **Workspace:** floating Tools, Colors, History, and Layers panels; zoom, pan,
   rulers, pixel grid, light/dark themes, and the shared JFLib styles.
 - **Extensibility:** native plugins for effects, adjustments, file types, and
-  shapes; standalone G'MIC-Qt integration on Windows/Linux and an optional Windows
-  host for original classic paint.net CPU effects and FileType factories, including
+  shapes; standalone G'MIC-Qt integration on Windows/Linux and a Windows host for
+  original paint.net effects (classic, v5 CPU and GPU) and FileType factories, including
   execution from native Linux PaintCraft through Wine.
 
 ## Supported file formats
@@ -232,15 +232,20 @@ build, use the `FileTypes` directory beside that build's executable.
 
 ### Original paint.net plugins
 
-A separate Windows host can run classic CPU `Effect`/`PropertyBasedEffect` plugins
-and `FileType`/`IFileTypeFactory` plugins. On Windows it requires .NET 9 and a local
-paint.net 5.1 installation; Paint.NET assemblies are not redistributed. Extract
-plugins into `Effects`, `FileTypes` or `Shapes` and restart. The scanner identifies
-managed assemblies separately from native PNAPI plugins and adds compatible
-entries to menus/file filters. See the [host setup and compatibility matrix](../../tools/paintcraft-pdn-host/README.md).
+The Windows setup includes a host that runs `Effect`/`PropertyBasedEffect`,
+`BitmapEffect` and `GpuEffect` plugins with their PropertyBased forms, and
+`FileType`/`IFileTypeFactory` plugins. It needs a local paint.net 5.1 installation and
+uses that installation's own runtime, so no separate .NET is required; Paint.NET assemblies
+are not redistributed. Extract plugins into `Effects` (or a subfolder), `FileTypes` or
+`Shapes` and restart. The scanner identifies managed assemblies separately from native
+PNAPI plugins and adds compatible entries to menus/file filters in the background;
+**Effekte > Paint.NET-Plugins** says when something is missing. See the
+[host setup and compatibility matrix](../../tools/paintcraft-pdn-host/README.md).
 
-Modern Bitmap/GPU effects, arbitrary Paint.NET host services and complete file-type
-save dialogs are not implemented. Native Linux PaintCraft can invoke the same
+Plugin sliders and forms built on IndirectUI, other Paint.NET application services and
+complete file-type save dialogs are not implemented: parameters appear in a plain
+property list. v5 effects are tested with our own fixtures, not yet with third-party
+plugins. Native Linux PaintCraft can invoke the same
 host through Wine with explicit configuration. The tested setup uses Wine 11.19
 and the experimental Paint.NET-on-Wine 5.200.9775.2252 package. The regular Windows
 Paint.NET build failed its Direct2D initialization under Wine in this test.

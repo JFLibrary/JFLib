@@ -208,6 +208,7 @@ def layout(job, style, d):
     (d / "Assets").mkdir(parents=True)
     shutil.copyfile(job.exe[style]["win"], d / f"{job.app}.exe")
     for name, src in job.extra["win"]:
+        (d / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, d / name)
     for name, data in job.cross.get("win", []):
         (d / name).parent.mkdir(parents=True, exist_ok=True)

@@ -597,7 +597,7 @@ fn sd_page_plugins(p: &mut Pn, ui: &mut Ui) {
     sd_para(ui, &crate::integrations::paint_dot_net::catalog::summary());
     for message in crate::integrations::paint_dot_net::catalog::messages() {sd_para(ui,&message);}
     sd_note(ui, crate::preferences::localization::tr("Plugins werden beim Start aus den Ordnern Effects, FileTypes und Shapes neben PaintCraft geladen (Windows: *.dll, Linux: *.so)."));
-    sd_note(ui, crate::preferences::localization::tr("Originale Paint.NET-DLLs werden unter Windows zusätzlich aus Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation erkannt. Nach dem Kopieren neu starten. ZIP-Dateien zuerst entpacken; Abhängigkeiten neben der DLL belassen. Moderne Bitmap-/GPU-Plugins werden als noch nicht unterstützt angezeigt."));
+    sd_note(ui, crate::preferences::localization::tr("Originale Paint.NET-DLLs werden unter Windows zusätzlich aus Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation erkannt, auch in Unterordnern von Effects und FileTypes. Dafür muss Paint.NET 5.1 installiert sein. Nach dem Kopieren neu starten. ZIP-Dateien zuerst entpacken; Abhängigkeiten neben der DLL belassen."));
 }
 
 // sd_plug_card(which) -- a card with the plug_text lines of the loaded plugins (PKC_LOADED) or

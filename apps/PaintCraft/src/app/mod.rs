@@ -56,6 +56,10 @@ impl App for PnApp {
 
 /// the app record and the entry point
 pub(crate) fn run() -> i32 {
+    #[cfg(windows)]
+    if let Some(code) = crate::integrations::paint_dot_net::transport::clr_main() {
+        return code;
+    }
     let p = Rc::new(RefCell::new(Pn::new()));
     p.borrow_mut().me = Rc::downgrade(&p);
     let app = PnApp { p };

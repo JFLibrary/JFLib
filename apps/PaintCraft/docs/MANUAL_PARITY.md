@@ -45,8 +45,8 @@ von Gesichtern und keine identische Implementierung von TR Portrait Retouch.
 ## Originale Paint.NET-DLLs
 
 Die vom Nutzer zusätzlich gewünschte DLL-Ausführung ist für klassische
-`PaintDotNet.Effects.Effect`-Plugins und `FileType`/`IFileTypeFactory` umgesetzt. Der native Windows-Pfad benötigt .NET 9 und eine vorhandene
-Paint.NET-5.1-Installation; Linux nutzt den separaten Host unter Wine mit dem unten
+`PaintDotNet.Effects.Effect`-Plugins, `BitmapEffect`, `GpuEffect` und `FileType`/`IFileTypeFactory` umgesetzt. Der native Windows-Pfad benötigt eine vorhandene
+Paint.NET-5.1-Installation und nutzt deren Laufzeit, ein eigenes .NET ist nicht nötig; Linux nutzt den separaten Host unter Wine mit dem unten
 beschriebenen Paint.NET-on-Wine-Paket. Paint.NET-Assemblies werden nicht
 mitgeliefert. [Build, Benutzung und Kompatibilitätsmatrix](../../../tools/paintcraft-pdn-host/README.md).
 
@@ -57,13 +57,16 @@ Nachbau von Paint.NETs IndirectUI. Getestet wurden Original-DLLs für Invertiere
 BoltBait Pastel und Oil Painting+, einschließlich Editoraufbau für die beiden
 BoltBait-Effekte. Ordnererkennung und Menüaufruf werden zusätzlich mit der
 unveränderten Pastel-DLL getestet. Die Download-Fixtures bleiben im ignorierten Build-Ordner.
+Bitmap- und GPU-Effekte sind mit selbst gebauten Fixtures über das Menü getestet
+(`tests/integration/pdn_modern.uis`), noch nicht mit fremden Plugins.
 
 Der Startscan berücksichtigt Effects/FileTypes/Shapes im nativen/portablen Root,
 Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files, die lokale Paint.NET-
 Installation sowie freigeschaltete AdditionalPluginDirectoryRoots mit expandierten
 Umgebungsvariablen. Archive müssen entpackt werden, neue Plugins benötigen einen
-Neustart. Jede DLL wird isoliert geprüft; Fehler und nicht unterstützte moderne
-Effekte erscheinen in den Einstellungen. Die Dateifilter erhalten getrennte
+Neustart. Die Suche läuft bei einem normalen Start im Hintergrund und liest auch Unterordner;
+jede DLL wird isoliert geprüft. Fehler erscheinen in den Einstellungen, und das
+leere Menü nennt den Grund. Die Dateifilter erhalten getrennte
 Lese-/Schreib-Endungen. Die acht nativen PNAPI-Formatkennungen bleiben unverändert;
 32 zusätzliche Kennungen stehen dem externen Codec-Host zur Verfügung.
 
@@ -256,7 +259,7 @@ Browser-Abnahme. Ergebnisdateien liegen unter `build/paintcraft-next/`, insbeson
 
 ## Noch offen
 
-- Vollständige Paint.NET-Bitmap-/GPU-API, Host-Services, fremde Speicher-Dialoge,
+- Paint.NETs IndirectUI-Regler, weitere Host-Services, fremde Speicher-Dialoge,
   Metadaten-/Ebenentransport über den DLL-Host sowie breitere interaktive Abnahmen
   fremder Plugins unter Windows und Wine.
 - Vollständige Photoshop-Dokumenttreue: editierbare Masken/Gruppen/Texte/Smart Objects,

@@ -9,10 +9,13 @@ using PaintDotNet.PropertySystem;
 
 internal static class Program
 {
+    internal static string Install="";
+
     [STAThread]
     static int Main(string[] args)
     {
         var dir = Environment.GetEnvironmentVariable("PAINTDOTNET_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "paint.net");
+        Install=dir;
         AssemblyLoadContext.Default.Resolving += (c,n) => {
             var path=Path.Combine(dir,n.Name+".dll");
             return File.Exists(path) ? c.LoadFromAssemblyPath(path) : null;
@@ -22,7 +25,7 @@ internal static class Program
         try {
             using var watchdog = HostWatchdog.Start(args);
             byte[] data=Array.Empty<byte>();
-            if(!args.Contains("--list") && !args.Contains("--inspect") && !args.Contains("--catalog")) {
+            if(!args.Contains("--list") && !args.Contains("--inspect") && !args.Contains("--catalog") && !args.Contains("--validate-dialog")) {
                 using var source=Console.OpenStandardInput();
                 using var buffer=new MemoryStream();
                 var block=new byte[65536];int n;
@@ -37,13 +40,13 @@ internal static class Program
             if(args.Contains("--decode") || args.Contains("--encode")) return FileTypeBridge.Run(args,data);
             return Run(args,data);
         }
-        catch(Exception e) { Console.Error.WriteLine(e.ToString()); return 1; }
+        catch(Exception e) { Console.Error.WriteLine(Explain(e)); return 1; }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int Run(string[] args, byte[] data)
     {
-        if(args.Length<1) throw new ArgumentException("Usage: PaintCraft.PdnHost plugin.dll [effect-type] [--defaults]");
+        if(args.Length<1) throw new ArgumentException("Usage: PaintCraft.PdnHost plugin.dll [effect-type] [--defaults] [--gpu software]");
         var plugin=Path.GetFullPath(args[0]);
         var pluginDir=Path.GetDirectoryName(plugin)!;
         AssemblyLoadContext.Default.Resolving += (c,n) => {
@@ -52,11 +55,11 @@ internal static class Program
         };
         var assembly=AssemblyLoadContext.Default.LoadFromAssemblyPath(plugin);
         Type[] types;
-        try { types=assembly.GetExportedTypes(); }
+        try { types=assembly.GetTypes(); }
         catch(ReflectionTypeLoadException e) { types=e.Types.Where(t=>t!=null).Cast<Type>().ToArray(); }
-        var effects=types.Where(t=>!t.IsAbstract && typeof(Effect).IsAssignableFrom(t) && t.GetConstructor(Type.EmptyTypes)!=null).ToArray();
+        var effects=types.Where(t=>typeof(IEffect).IsAssignableFrom(t) && PluginCatalog.CanCreate(t)).ToArray();
         if(args.Contains("--list")) { foreach(var t in effects) Console.WriteLine(t.FullName); return 0; }
-        if(effects.Length==0) throw new NotSupportedException("Diese DLL enthält keinen klassischen Paint.NET-CPU-Effekt. GPU-Effekte und Dateiformat-Plugins benötigen andere Host-APIs.");
+        if(effects.Length==0) throw new NotSupportedException("Diese DLL enthält keinen Paint.NET-Effekt.");
         Type? selected=null;
         if(args.Length>1 && !args[1].StartsWith("--")) selected=effects.Single(t=>t.FullName==args[1]);
         else if(effects.Length==1) selected=effects[0];
@@ -69,44 +72,24 @@ internal static class Program
             if(form.ShowDialog()!=DialogResult.OK) return 2;
             selected=(Type)list.SelectedItem!;
         }
-        using var input=new BinaryReader(new MemoryStream(data,false));
-        if(input.ReadUInt32()!=0x58464350) throw new InvalidDataException("Invalid PCFX header");
-        int w=input.ReadInt32(),h=input.ReadInt32();
-        if(w<1 || h<1 || w>65535 || h>65535 || (long)w*h>100_000_000) throw new InvalidDataException("Image dimensions exceed host limit");
-        var primary=ColorBgra.FromUInt32(input.ReadUInt32());
-        var secondary=ColorBgra.FromUInt32(input.ReadUInt32());
-        float brush=input.ReadSingle();
-        using var src=new Surface(w,h);
-        using var dst=new Surface(w,h);
-        var row=new byte[checked(w*4)];
-        for(int y=0;y<h;y++) {
-            input.BaseStream.ReadExactly(row);
-            unsafe {row.AsSpan().CopyTo(new Span<byte>(src.GetRowPointer(y),row.Length));}
-        }
-        var mask=new byte[checked(w*h)];input.BaseStream.ReadExactly(mask);
-        using var region=new PdnRegion();region.MakeEmpty();
-        for(int y=0;y<h;y++) for(int x=0;x<w;) {
-            while(x<w && mask[y*w+x]==0)x++;
-            int start=x;while(x<w && mask[y*w+x]!=0)x++;
-            if(start<x)region.Union(new Rectangle(start,y,x-start,1));
-        }
-        dst.CopySurface(src);
-        using var effect=(Effect)Activator.CreateInstance(selected!)!;
+        using var input=EffectInput.Read(data,args.Contains("--validate-dialog"));
+        int code=ModernEffects.Handles(selected!) ? ModernEffects.Run(selected!,input,args) : RunClassic(selected!,input,args);
+        // No result bytes are published until the plugin finished successfully.
+        if(code==0 && input.HasPixels)input.WriteResult();
+        return code;
+    }
+
+    static int RunClassic(Type selected,EffectInput input,string[] args)
+    {
+        using var effect=(Effect)Activator.CreateInstance(selected,true)!;
         #pragma warning disable CS0618 // This bridge intentionally hosts the classic API.
-        effect.EnvironmentParameters=(EffectEnvironmentParameters)Activator.CreateInstance(typeof(EffectEnvironmentParameters),primary,secondary,brush,region,src)!;
+        effect.EnvironmentParameters=input.Environment();
         #pragma warning restore CS0618
         EffectConfigToken? token=null;
         if(effect is PropertyBasedEffect property) token=new PropertyBasedEffectConfigToken(property.CreatePropertyCollection());
         if(token is PropertyBasedEffectConfigToken propertyToken && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
-            using var dialog=new Form {Text="PaintCraft – "+selected!.Name,Width=580,Height=600,StartPosition=FormStartPosition.CenterScreen};
-            var grid=new PropertyGrid {Dock=DockStyle.Fill,SelectedObject=new PluginProperties(propertyToken.Properties),ToolbarVisible=false};
-            var buttons=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=40,FlowDirection=FlowDirection.RightToLeft};
-            var ok=new Button {Text="Anwenden",DialogResult=DialogResult.OK};
-            var cancel=new Button {Text="Abbrechen",DialogResult=DialogResult.Cancel};
-            buttons.Controls.Add(cancel);buttons.Controls.Add(ok);dialog.Controls.Add(grid);dialog.Controls.Add(buttons);
-            dialog.AcceptButton=ok;dialog.CancelButton=cancel;
-            if(!args.Contains("--validate-dialog") && dialog.ShowDialog()!=DialogResult.OK)return 2;
-        } else if(token is not PropertyBasedEffectConfigToken && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
+            if(!Dialogs.Properties(selected.Name,propertyToken.Properties,!args.Contains("--validate-dialog")))return 2;
+        } else if(token is not PropertyBasedEffectConfigToken && effect.Options.Flags.HasFlag(EffectFlags.Configurable) && (!args.Contains("--defaults") || args.Contains("--validate-dialog"))) {
             using var dialog=effect.CreateConfigDialog();
             if(dialog!=null) {
                 dialog.Effect=effect;
@@ -115,18 +98,103 @@ internal static class Program
                 token=dialog.EffectToken;
             }
         }
-        using var sa=new RenderArgs(src);using var da=new RenderArgs(dst);
+        using var sa=new RenderArgs(input.Src);using var da=new RenderArgs(input.Dst);
         effect.SetRenderInfo(token,da,sa);
-        var scans=region.GetRegionScansReadOnlyInt();
+        var scans=input.Region.GetRegionScansReadOnlyInt();
         effect.Render(token,da,sa,scans,0,scans.Length);
-        // No result bytes are published until the plugin finished successfully.
-        using var output=new BinaryWriter(Console.OpenStandardOutput());
-        output.Write(0x58464350u);output.Write(w);output.Write(h);
+        return 0;
+    }
+
+    // A paint.net update can change what the helper was built against: name that, not only the member.
+    static string Explain(Exception e)
+    {
+        var cause=e.GetBaseException();
+        return cause is MissingMemberException or TypeLoadException
+            ? $"Diese paint.net-Version passt nicht zum Host (getestet mit 5.1): {cause.Message}\n{e}"
+            : e.ToString();
+    }
+}
+
+// The PCFX packet: the active layer, colors, brush width and selection coverage.
+internal sealed class EffectInput : IDisposable
+{
+    internal int W,H;
+    internal ColorBgra Primary,Secondary;
+    internal float Brush;
+    internal Surface Src=null!,Dst=null!;
+    internal PdnRegion Region=null!;
+    internal bool HasPixels;
+    internal System.Drawing.Rectangle Bounds=>Region.GetBoundsInt();
+
+    internal static EffectInput Read(byte[] data,bool standIn)
+    {
+        var result=new EffectInput();
+        // --validate-dialog constructs an editor without an image: one empty pixel stands in.
+        if(standIn) {
+            result.W=result.H=1;result.Brush=2;result.Src=new Surface(1,1);result.Dst=new Surface(1,1);
+            result.Region=new PdnRegion();result.Region.MakeEmpty();result.Region.Union(new System.Drawing.Rectangle(0,0,1,1));
+            return result;
+        }
+        result.HasPixels=true;
+        using var input=new BinaryReader(new MemoryStream(data,false));
+        if(input.ReadUInt32()!=0x58464350) throw new InvalidDataException("Invalid PCFX header");
+        int w=input.ReadInt32(),h=input.ReadInt32();
+        if(w<1 || h<1 || w>65535 || h>65535 || (long)w*h>100_000_000) throw new InvalidDataException("Image dimensions exceed host limit");
+        result.W=w;result.H=h;
+        result.Primary=ColorBgra.FromUInt32(input.ReadUInt32());
+        result.Secondary=ColorBgra.FromUInt32(input.ReadUInt32());
+        result.Brush=input.ReadSingle();
+        result.Src=new Surface(w,h);
+        result.Dst=new Surface(w,h);
+        var row=new byte[checked(w*4)];
         for(int y=0;y<h;y++) {
-            unsafe {new ReadOnlySpan<byte>(dst.GetRowPointer(y),row.Length).CopyTo(row);}
+            input.BaseStream.ReadExactly(row);
+            unsafe {row.AsSpan().CopyTo(new Span<byte>(result.Src.GetRowPointer(y),row.Length));}
+        }
+        var mask=new byte[checked(w*h)];input.BaseStream.ReadExactly(mask);
+        result.Region=new PdnRegion();result.Region.MakeEmpty();
+        for(int y=0;y<h;y++) for(int x=0;x<w;) {
+            while(x<w && mask[y*w+x]==0)x++;
+            int start=x;while(x<w && mask[y*w+x]!=0)x++;
+            if(start<x)result.Region.Union(new System.Drawing.Rectangle(start,y,x-start,1));
+        }
+        result.Dst.CopySurface(result.Src);
+        return result;
+    }
+
+    // The constructor is marked obsolete with error for plugins; a host has to call it.
+    internal EffectEnvironmentParameters Environment()=>
+        (EffectEnvironmentParameters)Activator.CreateInstance(typeof(EffectEnvironmentParameters),Primary,Secondary,Brush,Region,Src)!;
+
+    internal void WriteResult()
+    {
+        using var output=new BinaryWriter(Console.OpenStandardOutput());
+        output.Write(0x58464350u);output.Write(W);output.Write(H);
+        var row=new byte[checked(W*4)];
+        for(int y=0;y<H;y++) {
+            unsafe {new ReadOnlySpan<byte>(Dst.GetRowPointer(y),row.Length).CopyTo(row);}
             output.Write(row);
         }
-        return 0;
+    }
+
+    public void Dispose() {Src?.Dispose();Dst?.Dispose();Region?.Dispose();}
+}
+
+internal static class Dialogs
+{
+    // show false only builds the editor: --validate-dialog checks a plugin's parameters that way.
+    internal static bool Properties(string title,PropertyCollection properties,bool show)
+    {
+        Application.EnableVisualStyles();
+        using var dialog=new Form {Text="PaintCraft – "+title,Width=580,Height=600,StartPosition=FormStartPosition.CenterScreen};
+        var grid=new PropertyGrid {Dock=DockStyle.Fill,SelectedObject=new PluginProperties(properties),ToolbarVisible=false};
+        var buttons=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=40,FlowDirection=FlowDirection.RightToLeft};
+        var ok=new Button {Text="Anwenden",DialogResult=DialogResult.OK};
+        var cancel=new Button {Text="Abbrechen",DialogResult=DialogResult.Cancel};
+        buttons.Controls.Add(cancel);buttons.Controls.Add(ok);dialog.Controls.Add(grid);dialog.Controls.Add(buttons);
+        dialog.AcceptButton=ok;dialog.CancelButton=cancel;
+        grid.CreateControl();
+        return !show || dialog.ShowDialog()==DialogResult.OK;
     }
 }
 

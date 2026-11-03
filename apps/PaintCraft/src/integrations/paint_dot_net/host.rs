@@ -1,4 +1,4 @@
-// Classic Paint.NET effects execute in a separate Windows or Wine process. The
+// Original Paint.NET effects execute in a separate Windows or Wine process. The
 // document is changed only after a complete, validated response; cancel/crash is inert.
 use crate::app::Pn;
 use crate::document::model::DocId;
@@ -12,9 +12,9 @@ use ui::*;
 pub(crate) const COMMAND: u32 = 444;
 pub(crate) static BUSY: AtomicBool = AtomicBool::new(false);
 const WINDOW: u32 = 0x60E0;
-struct SharedJob {
-    stop: AtomicBool,
-    result: SpinLock<Option<Result<Vec<u8>, String>>>,
+pub(super) struct SharedJob {
+    pub(super) stop: AtomicBool,
+    pub(super) result: SpinLock<Option<Result<Vec<u8>, String>>>,
 }
 pub(crate) struct Host {
     pick: Shared<i32>,
@@ -29,6 +29,9 @@ pub(crate) struct Host {
     mask: Vec<u8>,
     w: i32,
     h: i32,
+    /// the plugin search of a normal start (catalog.rs)
+    pub(super) scan: Option<Arc<SharedJob>>,
+    pub(super) scan_worker: Option<plat::Thread>,
 }
 impl Default for Host {
     fn default() -> Self {
@@ -45,6 +48,8 @@ impl Default for Host {
             mask: Vec::new(),
             w: 0,
             h: 0,
+            scan: None,
+            scan_worker: None,
         }
     }
 }
@@ -54,6 +59,12 @@ impl Drop for Host {
             j.stop.store(true, Ordering::Release);
         }
         if let Some(w) = self.worker.take() {
+            w.join();
+        }
+        if let Some(j) = &self.scan {
+            j.stop.store(true, Ordering::Release);
+        }
+        if let Some(w) = self.scan_worker.take() {
             w.join();
         }
     }
@@ -77,11 +88,11 @@ pub(crate) fn command(p: &mut Pn, ui: &mut Ui, id: u32, _arg: u32) -> bool {
         return true;
     }
     p.pdn.kind = None;
-    if !available() {
+    if let Some(problem) = unavailable() {
         crate::integrations::file_io::fio_error(
             p,
             Some("Paint.NET-Plugins"),
-            "Originale Paint.NET-DLLs benötigen den optionalen .NET-Host. Unter Linux zusätzlich --pdn-wine, --pdn-dotnet und --pdn-install konfigurieren.",
+            crate::preferences::localization::tr(problem),
         );
     } else if plat::arg_value("--pdn-plugin").is_some() {
         start(p, ui);
@@ -195,6 +206,7 @@ fn start(p: &mut Pn, ui: &mut Ui) {
     let path = p.pdn.path.clone();
     let kind = p.pdn.kind.clone().or_else(|| plat::arg_value("--pdn-type"));
     let defaults = plat::args().iter().any(|x| x == "--pdn-defaults");
+    let gpu = super::transport::gpu_choice();
     let job = Arc::new(SharedJob {
         stop: AtomicBool::new(false),
         result: SpinLock::new(None),
@@ -208,6 +220,7 @@ fn start(p: &mut Pn, ui: &mut Ui) {
                 &path,
                 kind.as_deref(),
                 defaults,
+                gpu.as_deref(),
                 &input,
                 &worker_job,
             );
@@ -234,6 +247,7 @@ fn run(
     path: &str,
     kind: Option<&str>,
     defaults: bool,
+    gpu: Option<&str>,
     input: &[u8],
     job: &SharedJob,
 ) -> Result<Vec<u8>, String> {
@@ -243,6 +257,9 @@ fn run(
     }
     if defaults {
         args.push("--defaults");
+    }
+    if let Some(gpu) = gpu {
+        args.extend(["--gpu", gpu]);
     }
     let result = exchange(helper, &args[1..], input, input.len(), 0, || {
         job.stop.load(Ordering::Acquire)
@@ -256,14 +273,14 @@ fn run(
 #[cfg(any(windows, target_os = "linux"))]
 pub(crate) use super::transport::{exchange, helper_path};
 
-fn available() -> bool {
+fn unavailable() -> Option<&'static str> {
     #[cfg(any(windows, target_os = "linux"))]
     {
-        super::transport::configured()
+        super::transport::problem()
     }
     #[cfg(not(any(windows, target_os = "linux")))]
     {
-        false
+        Some("Originale Paint.NET-DLLs sind auf dieser Plattform nicht verfügbar.")
     }
 }
 

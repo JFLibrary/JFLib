@@ -8,7 +8,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import struct
+import subprocess
 import sys
 import zlib
 
@@ -134,8 +136,104 @@ expect #9990 text "2cc39813e097b672"
         if args.pdn_host and target == "win":
             script = ROOT / "apps/PaintCraft/tests/integration/pdn_host.uis"
             run(target, "original-plugin", script.read_text(encoding="utf-8"), build_rs.script_args(script))
+            modern_plugins(out, cases, run)
     (cases / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"{len(results)} cases passed; distinct text rendering, PSD pixels and effect preview/commit equality verified.")
+
+
+MENU = 'size 1280 800\ntheme light\nclick menu:"Effekte"\nclick menuitem:"Paint.NET-Plugins"\n'
+
+
+def modern_plugins(out, cases, run):
+    """v5 effects from a subfolder through the menu, on paint.net's own runtime; what the menu
+    says when something is missing; the search of a normal start"""
+    exe = out / "win" / "PaintCraft.exe"
+    host = out / "win" / "pdn-host" / "PaintCraft.PdnHost.dll"
+    root = cases / "pdn-plugins"
+    shutil.rmtree(root, ignore_errors=True)
+    effects = root / "Effects" / "EffectFixture"
+    filetypes = root / "FileTypes"
+    # only our two fixtures and the helper land here: Private=false keeps paint.net's files out
+    for project, folder in [("EffectFixture", effects), ("Fixture", filetypes)]:
+        subprocess.run(["dotnet", "build", f"tools/paintcraft-pdn-host/tests/{project}.csproj", "-c", "Release", "-o", str(folder),
+                        "--nologo", "-v:q"], check=True, stdin=subprocess.DEVNULL)
+    plugins = ["--pdn-plugins", str(root), "--pdn-isolated"]
+    script = ROOT / "apps/PaintCraft/tests/integration/pdn_modern.uis"
+    run("win", "modern-effects", script.read_text(encoding="utf-8"), [*plugins, "--pdn-defaults"])
+    # WARP, for machines and sessions without a usable GPU, gives the same black
+    run("win", "modern-software", MENU + 'click menuitem:"Fixture GPU Image"\nsync\ncmd 901 65537\nexpect #9900 text "FF000000"\n',
+        [*plugins, "--pdn-defaults", "--pdn-gpu", "software"])
+
+    # The search of a normal start does not block; effects and formats arrive with its end.
+    image = cases / "image.pcfixture"
+    image.write_bytes(struct.pack("<5I", 0x54465354, 1, 1, 0xff123456, 0))
+    run("win", "modern-background", f'''size 1280 800
+theme light
+sync
+click menu:"Effekte"
+click menuitem:"Paint.NET-Plugins"
+expect menuitem:"Fixture GPU Image" enabled
+key esc
+key esc
+cmd 101
+click #65548
+key ctrl+a
+type "{image.as_posix()}"
+click button:"Öffnen"
+sync
+expect #9913 value 1
+cmd 901 0
+expect #9900 text "FF123456"
+''', [*plugins, "--pdn-defaults", "--pdn-background"])
+
+    # The reasons the menu gives instead of effects.
+    empty = cases / "pdn-empty"
+    empty.mkdir(exist_ok=True)
+    for name, text, extra in [
+        ("missing-paintnet", "paint.net 5.1 ist nicht installiert", ["--pdn-install", str(cases / "no-paint.net")]),
+        ("missing-host", "Der Plugin-Host fehlt in dieser Installation", ["--pdn-host", str(cases / "no-host.dll")]),
+        ("no-plugins", "Plugins sind abgeschaltet", ["--no-plugins"]),
+        ("nothing-found", "(Keine kompatiblen Effekte gefunden)", ["--pdn-plugins", str(empty), "--pdn-isolated"]),
+    ]:
+        run("win", name, MENU + f'expect menuitem:"{text}" disabled\n', extra)
+    broken = cases / "pdn-broken" / "Effects"
+    broken.mkdir(parents=True, exist_ok=True)
+    (broken / "broken.dll").write_bytes(b"not a DLL")
+    run("win", "only-errors", MENU + 'expect menuitem:"Keine Effekte geladen, siehe Einstellungen > Plugin-Fehler" disabled\n',
+        ["--pdn-plugins", str(cases / "pdn-broken"), "--pdn-isolated"])
+
+    # The host itself, with no .NET on the PATH: paint.net's runtime is all it needs.
+    fixture = effects / "EffectFixture.dll"
+    w, h = 4, 4
+    packet = struct.pack("<6I", 0x58464350, w, h, 0xffff0000, 0xff0000ff, 0x40000000) + b"\xff" * (w * h * 4) + b"\xff" * (w * h)
+    bare = {k: v for k, v in os.environ.items() if k.upper() != "PATH" and not k.upper().startswith("DOTNET_")}
+    bare["PATH"] = os.path.join(os.environ["SystemRoot"], "System32")
+    install = os.environ.get("PAINTDOTNET_DIR") or os.path.join(os.environ["ProgramFiles"], "paint.net")
+    clr = [str(exe), "--pdn-clr", install, str(host)]
+    for kind, extra, pixel in [("BitmapInvert", [], "000000ff"), ("BitmapFloat", [], "000000ff"), ("BitmapForm", [], "000000ff"), ("BitmapPlain", [], "000000ff"),
+                               ("GpuImage", [], "000000ff"), ("GpuImage", ["--gpu", "software"], "000000ff"), ("GpuDrawing", [], "000000ff"), ("GpuShader", [], "cdcdcdff")]:
+        result = subprocess.run([*clr, str(fixture), kind, "--defaults", *extra], input=packet, capture_output=True, env=bare, timeout=90)
+        assert result.returncode == 0, (kind, result.stderr)
+        assert len(result.stdout) == 12 + w * h * 4 and result.stdout[12:16].hex() == pixel, (kind, extra, result.stdout[:16].hex())
+    for kind in ["BitmapInvert", "BitmapForm", "GpuImage", "ClassicPlain"]:
+        result = subprocess.run([*clr, str(fixture), kind, "--validate-dialog"], capture_output=True, env=bare, stdin=subprocess.DEVNULL, timeout=90)
+        assert result.returncode == 0 and not result.stdout, (kind, result.stderr)
+        assert kind != "BitmapForm" or b"form-filled:255" in result.stderr, result.stderr
+    # A damaged image never leaves result bytes behind.
+    result = subprocess.run([*clr, str(fixture), "BitmapInvert", "--defaults"], input=packet[:40], capture_output=True, env=bare, timeout=90)
+    assert result.returncode == 1 and not result.stdout, result.stderr
+
+    # The catalog re-enters the same way for every DLL and reads the subfolder.
+    catalog = subprocess.run([*clr, "--catalog", "--isolated", "--root", str(root)], capture_output=True, env=bare, stdin=subprocess.DEVNULL, timeout=90)
+    assert catalog.returncode == 0, catalog.stderr
+    rows = [line.split("\t") for line in catalog.stdout.decode().splitlines()]
+    names = {bytes.fromhex(r[3]).decode(): r[4] for r in rows if r[0] == "E"}
+    assert names["Fixture Bitmap"] == "1" and names["Fixture GPU Image"] == "2" and len(names) == 10, names
+    assert not [r for r in rows if r[0] in "UX"], rows
+    assert len([r for r in rows if r[0] == "F"]) == 4, rows
+    # Nothing of paint.net is copied next to the host.
+    copied = [f.name for f in host.parent.iterdir() if f.name.lower().startswith("paintdotnet")]
+    assert not copied, copied
 
 
 if __name__ == "__main__":

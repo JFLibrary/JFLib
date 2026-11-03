@@ -317,7 +317,7 @@ fn new_default(p: &mut Pn) {
 
 // build_filters() -- open_exts ("Alle Bildtypen" + every decodable type) and save_exts
 // (every encodable type, save_fmts[i] = its IMGF_*) from the format table
-fn build_filters(f: &mut Fio) {
+pub(crate) fn build_filters(f: &mut Fio) {
     // append_str: n bytes fit when len + n + 2 <= cap
     let fits = |len: usize, n: usize, cap: usize| len + n + 2 <= cap;
     let (mut olen, mut slen, mut alen) = (0usize, 0usize, 0usize);
