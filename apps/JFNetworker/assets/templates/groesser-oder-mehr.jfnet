@@ -13,7 +13,7 @@
       "name": "GEN",
       "model": "traffic-gen",
       "x": 40,
-      "y": 200,
+      "y": 355,
       "off": false,
       "startup_config": "hostname GEN\nip addr add 10.0.0.1/24 dev eth0\n",
       "services": [
@@ -41,7 +41,7 @@
       "name": "SW1",
       "model": "jf-s48x",
       "x": 220,
-      "y": 200,
+      "y": 355,
       "off": false,
       "startup_config": "hostname SW1\n",
       "services": [],
@@ -52,7 +52,7 @@
       "name": "LB",
       "model": "load-balancer",
       "x": 400,
-      "y": 80,
+      "y": 200,
       "off": false,
       "startup_config": "hostname LB\nip addr add 10.0.0.2/24 dev eth0\n",
       "services": [
@@ -86,7 +86,7 @@
       "name": "DB",
       "model": "database",
       "x": 400,
-      "y": 320,
+      "y": 510,
       "off": false,
       "startup_config": "hostname DB\nip addr add 10.0.0.30/24 dev eth0\n",
       "services": [
@@ -151,7 +151,7 @@
       "name": "WEB2",
       "model": "server-s",
       "x": 620,
-      "y": 100,
+      "y": 130,
       "off": false,
       "startup_config": "hostname WEB2\nip addr add 10.0.0.12/24 dev eth1\n",
       "services": [
@@ -186,7 +186,7 @@
       "name": "WEB3",
       "model": "server-s",
       "x": 620,
-      "y": 160,
+      "y": 220,
       "off": false,
       "startup_config": "hostname WEB3\nip addr add 10.0.0.13/24 dev eth1\n",
       "services": [
@@ -221,7 +221,7 @@
       "name": "WEB4",
       "model": "server-s",
       "x": 620,
-      "y": 220,
+      "y": 310,
       "off": false,
       "startup_config": "hostname WEB4\nip addr add 10.0.0.14/24 dev eth1\n",
       "services": [
@@ -256,7 +256,7 @@
       "name": "WEB5",
       "model": "server-s",
       "x": 620,
-      "y": 280,
+      "y": 400,
       "off": false,
       "startup_config": "hostname WEB5\nip addr add 10.0.0.15/24 dev eth1\n",
       "services": [
@@ -291,7 +291,7 @@
       "name": "WEB6",
       "model": "server-s",
       "x": 620,
-      "y": 340,
+      "y": 490,
       "off": false,
       "startup_config": "hostname WEB6\nip addr add 10.0.0.16/24 dev eth1\n",
       "services": [
@@ -326,7 +326,7 @@
       "name": "WEB7",
       "model": "server-s",
       "x": 620,
-      "y": 400,
+      "y": 580,
       "off": false,
       "startup_config": "hostname WEB7\nip addr add 10.0.0.17/24 dev eth1\n",
       "services": [
@@ -361,7 +361,7 @@
       "name": "WEB8",
       "model": "server-s",
       "x": 620,
-      "y": 460,
+      "y": 670,
       "off": false,
       "startup_config": "hostname WEB8\nip addr add 10.0.0.18/24 dev eth1\n",
       "services": [
