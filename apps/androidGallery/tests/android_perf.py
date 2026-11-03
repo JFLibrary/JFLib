@@ -10,8 +10,10 @@ time; nothing of that is in `nativeRender` on the GPU's path.  The numbers of di
 compare on the same page, with the same battery and temperature (printed), best in turns: --apk installs
 the build first.  Android Studio's screen mirroring runs as a display of its own and skews the frame
 times: a warning says so.  Changes nothing on the device but the app's own state; the app is stopped at
-the end.  The phone must be unlocked, the APK a debug build.  adb comes from ANDROID_SDK_ROOT /
-ANDROID_HOME / %LOCALAPPDATA%\\Android\\Sdk.
+the end.  `input swipe` goes to whatever is in front and the phone is its owner's: this only starts from
+the launcher or the gallery itself, and stops as soon as something else comes to the front (exit code 1).
+The phone must be unlocked, the APK a debug build.  adb comes from ANDROID_SDK_ROOT / ANDROID_HOME /
+%LOCALAPPDATA%\\Android\\Sdk.
 """
 import argparse
 import os
@@ -55,6 +57,17 @@ def main():
     def sh(*args, timeout=120):
         return run("shell", *args, timeout=timeout)
 
+    def in_front():
+        # the focused window of each display: package/activity (the name of the package counts: other
+        # apps of the library share the gallery's activity class)
+        return re.findall(r"mCurrentFocus=Window\{\S+ \S+ ([^/}\s]+)/", sh("dumpsys window | grep mCurrentFocus"))
+
+    def stop_unless(allowed, when):
+        front = in_front()
+        if not any(p == PKG or (allowed == "launcher" and "launcher" in p) for p in front):
+            raise SystemExit(f"STOP {when}: {', '.join(front) or 'nothing'} in front, the phone is in use")
+
+    stop_unless("launcher", "before the start")
     if a.apk:
         print(run("install", "-r", a.apk, timeout=300).strip().splitlines()[-1], flush=True)
     if "studio.screen.sharing" in sh("dumpsys", "display"):
@@ -65,12 +78,14 @@ def main():
         extras += ["--es", "jfgui_PAGE", a.page]
     sh("input", "keyevent", "KEYCODE_WAKEUP")
     for k in range(a.rounds):
+        stop_unless("launcher", f"before round {k + 1}")
         sh("am", "force-stop", PKG)
         sh("am", "start", "-W", "-n", ACTIVITY, *extras, timeout=60)
         time.sleep(3)
         run("logcat", "-c")
         sh("dumpsys", "gfxinfo", PKG, "reset")
         for i in range(a.swipes):
+            stop_unless("gallery", f"before swipe {i + 1}")
             y0, y1 = (h * 3 // 4, h // 4) if i % 2 == 0 else (h // 4, h * 3 // 4)
             sh("input", "swipe", str(w // 2), str(y0), str(w // 2), str(y1), "500")
         time.sleep(1)
