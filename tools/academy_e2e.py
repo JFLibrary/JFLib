@@ -24,7 +24,8 @@ Every request is logged with its Range header, so a resume is seen, not assumed.
 Checked: an install and its bytes, a resume with Range, each refusal with its kind in brackets on stderr and its exit
 code, cancel with --stop-after and what it leaves, an update that fails and keeps the old course, a working update,
 course-list, course-remove, a redirect, a host PERMISSIONS.jfn-sim does not name (no connection is made).
-Writes only below a fresh folder in build/academy_e2e, removed at the end unless --keep.  Exit code: the number of
+Writes only below a fresh folder in the system's temp folder, removed at the end unless --keep (not in the checkout:
+a checkout below /mnt/c in WSL refuses to rename a folder just written).  Exit code: the number of
 failed checks.
 """
 import argparse
@@ -35,6 +36,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -184,14 +186,13 @@ def find_sim():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sim", type=Path, help="the jfn-sim to test")
-    ap.add_argument("--keep", action="store_true", help="keep build/academy_e2e")
+    ap.add_argument("--keep", action="store_true", help="keep the folder in the temp folder")
     a = ap.parse_args()
     sim = a.sim or find_sim()
     if not sim or not Path(sim).is_file():
         print("academy_e2e: no jfn-sim (python build_rs.py app JFNetworker, or --sim PATH)", file=sys.stderr)
         return 2
-    work = ROOT / "build" / "academy_e2e" / str(os.getpid())
-    work.mkdir(parents=True)
+    work = Path(tempfile.mkdtemp(prefix="academy_e2e-"))
 
     v1, v2 = course_files(1), course_files(2)
     channel("good", v1)
