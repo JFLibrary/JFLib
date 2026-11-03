@@ -2256,8 +2256,9 @@ class ModuleBuilder:
 
 def build_app_modules(b, app, vdir=None):
     """the modules of APP_MODULES[app] into the app's folder (Builder b; once per run, also
-    when several style variants link at once), copied next to a variant's exe (vdir)"""
-    if b.target == "web":
+    when several style variants link at once), copied next to a variant's exe (vdir); the browser
+    and Android load none (lib/plat/web_lib.rs)"""
+    if b.target in ("web", "android"):
         return
     with b.mod_lock:
         if app not in b.mod_ready:

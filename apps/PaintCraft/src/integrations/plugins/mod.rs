@@ -1,10 +1,11 @@
-//! Platform-selected native plugin implementation and browser fallback.
-#[cfg(not(target_arch = "wasm32"))]
+//! Platform-selected native plugin implementation and the fallback of the browser and Android
+//! (the plugin ABI is x86-64 "win64": native.rs).
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod native;
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
 mod web;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub(crate) use native::*;
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub(crate) use web::*;
