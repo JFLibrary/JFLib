@@ -137,6 +137,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **JFNetworker:** The Akademie's third part: installing courses, from the web (`index.json` from `tools/academy_index.py`, every file checked for size and SHA-256, no network without a click, the question of `ask net.connect` with that click, the address a setting) or from a folder, through the same code (`jfn_run::install`, also `jfn-sim course-install`, `course-list`, `course-remove`); an old version stays until the new one is complete and checked; updates, uninstalling with the progress kept, resuming; a list of what can be installed that also works offline; external links open only after a question that shows the address; leaving with a test under way asks first; "Aufgabe erstellen" can add a diagnosis
 - **build:** `build_rs.py --arch x86_64|aarch64` (default x86_64): `lib`, `app`, `all` and `plugin` build for `aarch64-pc-windows-msvc` and `aarch64-unknown-linux-gnu` into `win-arm64` and `linux-arm64`; the build stops in `rt` for now, `run`, `test` and `watch` refuse it (docs/ARM64.md)
 - **ui:** `ui.window_title_height(flags)`: a window's title bar, higher with a finger, for what is laid out below it
+- **PaintCraft:** The menus Ansicht, Bild, Ebenen and Korrekturen show a colourful icon for every command, Originalgröße a 1:1 (own artwork in tools/gen_pn_icons.py, which now writes generated.rs itself); code points of its own (PN_*) are drawn in greys on disabled rows, the bar of the Ebenen window uses the same icons
 
 ### Changed
 
