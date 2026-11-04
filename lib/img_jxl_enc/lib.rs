@@ -26,6 +26,12 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+// in a module's build (--cfg jflib_module, docs/CRATES.md) the module runtime goes by the same name
+#[cfg(jflib_module)]
+extern crate modrt as rt;
+#[cfg(jflib_module)]
+extern crate modplat as plat;
+
 extern crate alloc;
 
 // the reader's modules under their old paths (crate::frm, crate::tab, ...)

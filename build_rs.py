@@ -892,7 +892,8 @@ def lint():
             bad += kernel_lint(f, text)
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
+                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate modrt as rt;",
+                                                      "extern crate modplat as plat;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
                 if s.startswith("use std") or " std::" in s.split("//")[0]:
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
@@ -1835,7 +1836,8 @@ def plugin_lint():
             bad += kernel_lint(f, text)
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
+                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate modrt as rt;",
+                                                      "extern crate modplat as plat;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
                 if s.startswith("use std") or " std::" in s.split("//")[0]:
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
@@ -2181,6 +2183,11 @@ def module_lint():
     bad = []
     if not MODULES_RS.is_dir():
         return bad
+    shared = MODULES_RS / "modrt" / "shared"             # copies of files of lib/ (docs/CRATES.md)
+    for copy in sorted(p for p in shared.rglob("*") if p.is_file()):
+        source = ROOT / "lib" / copy.relative_to(shared)
+        if not source.is_file() or source.read_bytes() != copy.read_bytes():
+            bad.append(f"{copy.relative_to(ROOT)}: differs from {source.relative_to(ROOT)}: copy that file over it")
     for d in sorted(p for p in MODULES_RS.iterdir() if p.is_dir() and entrypoint(p, "lib", False)):
         root = entrypoint(d, "lib")
         head = root.read_text(encoding="utf-8")

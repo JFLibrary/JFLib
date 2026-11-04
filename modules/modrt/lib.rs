@@ -6,11 +6,11 @@
 // modules/modplat as `plat`) to every library crate the module contains (simd, gfx,
 // img_core, img_jpeg, img_jxl, img_jxl_enc), so their unchanged sources compile against it:
 //
-//   cpu, crash, fx, sync, x87   the files of lib/rt, included as they are (the same SSE /
+//   cpu, crash, fx, sync, x87   copies of the files of lib/rt in shared/ (the same SSE /
 //                               x87 float semantics, the same CPU feature bits, spin lock)
 //   os                          what rt::os is, through the host: yield_now, exit (a panic),
 //                               write_stdout / write_stderr (the host's log)
-//   modabi                      lib/plat/modabi.rs: the host / module records
+//   modabi                      a copy of lib/plat/modabi.rs: the host / module records
 //   host()                      the host's table (set by the entry)
 //   module_entry!(name, TABLE)  the module's one export: name(&HostTable) -> &TABLE
 //   jxl_table::<W>()            a ModTable whose jxl_encode runs W::encode (JxlWriter) on a
@@ -18,7 +18,10 @@
 //   (global allocator)          the host's allocator (HostTable::alloc / free): blocks move
 //                               between host and module as Vec raw parts
 //   (panic handler)             the message to HostTable::panic: the host's crash report
-//   (memcpy, memset, ...)       lib/plugin/mem.rs (assembly: never an export)
+//   (memcpy, memset, ...)       a copy of lib/plugin/mem.rs (assembly: never an export)
+//
+// shared/ holds byte-equal copies, because a package may not reach outside its folder
+// (docs/CRATES.md); build_rs.py's lint refuses a copy that differs from its source.
 //
 // One of the crates that may contain `unsafe` (it is the module's rt); a module's own code is
 // `#![deny(unsafe_code)]` with module_entry!() as its one exception (as plugin::entry!).
@@ -26,26 +29,26 @@
 
 extern crate alloc;
 
-#[path = "../../lib/rt/cpu.rs"]
+#[path = "shared/rt/cpu.rs"]
 pub mod cpu;
-#[path = "../../lib/rt/crash.rs"]
+#[path = "shared/rt/crash.rs"]
 pub mod crash;
-#[path = "../../lib/rt/fx.rs"]
+#[path = "shared/rt/fx.rs"]
 pub mod fx;
-#[path = "../../lib/rt/portable/fx.rs"]
+#[path = "shared/rt/portable/fx.rs"]
 pub mod scalar_fx;
 /// Portable float contract used by the common scalar SIMD backend in module builds.
 pub mod portable {
     /// Explicit scalar rounding/conversion operations shared with the application runtime.
     pub use crate::scalar_fx as fx;
 }
-#[path = "../../lib/rt/sync.rs"]
+#[path = "shared/rt/sync.rs"]
 pub mod sync;
-#[path = "../../lib/rt/x87.rs"]
+#[path = "shared/rt/x87.rs"]
 pub mod x87;
-#[path = "../../lib/plat/modabi.rs"]
+#[path = "shared/plat/modabi.rs"]
 pub mod modabi;
-#[path = "../../lib/plugin/mem.rs"]
+#[path = "shared/plugin/mem.rs"]
 mod mem;
 
 use alloc::vec::Vec;
