@@ -138,6 +138,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** `build_rs.py --arch x86_64|aarch64` (default x86_64): `lib`, `app`, `all` and `plugin` build for `aarch64-pc-windows-msvc` and `aarch64-unknown-linux-gnu` into `win-arm64` and `linux-arm64`; the build stops in `rt` for now, `run`, `test` and `watch` refuse it (docs/ARM64.md)
 - **ui:** `ui.window_title_height(flags)`: a window's title bar, higher with a finger, for what is laid out below it
 - **PaintCraft:** The menus Ansicht, Bild, Ebenen and Korrekturen show a colourful icon for every command, Originalgröße a 1:1 (own artwork in tools/gen_pn_icons.py, which now writes generated.rs itself); code points of its own (PN_*) are drawn in greys on disabled rows, the bar of the Ebenen window uses the same icons
+- **ui:** `ui::main!` and `rt::main!` also take the manifest and PACKAGE from a file named by a build script (`JFGUI_PERMISSIONS_FILE`, `JFGUI_PACKAGE_FILE`), and a build without `panic = "abort"` ends with a message that names the missing setting (docs/CRATES.md, CR0)
 
 ### Changed
 

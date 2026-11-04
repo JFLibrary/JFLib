@@ -76,18 +76,26 @@ macro_rules! app_version {
 /// Define the common app entry symbol without requiring the GUI crate in headless tools.  It
 /// first hands what build_rs.py built in (boot.rs: the app's name, its manifest, its assets)
 /// to the platform layer, which installs them as ui::main! does; a refused manifest ends the
-/// program with exit code 2.
+/// program with exit code 2.  A Cargo build hands the manifest over as a file
+/// (JFGUI_PERMISSIONS_FILE with --cfg jfgui_manifest), because an environment variable of a build
+/// script holds one line only.
 #[macro_export]
 macro_rules! main {
     ($body:expr) => {
-        #[allow(unsafe_code)]
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
+            #[cfg(jfgui_manifest)]
+            const JF_MANIFEST: Option<&str> = Some(include_str!(env!("JFGUI_PERMISSIONS_FILE")));
+            #[cfg(not(jfgui_manifest))]
+            const JF_MANIFEST: Option<&str> = option_env!("JFGUI_PERMISSIONS");
             #[cfg(jfgui_assets)]
             static ASSETS: &[u8] = include_bytes!(env!("JFGUI_ASSETS"));
             #[cfg(not(jfgui_assets))]
             static ASSETS: &[u8] = &[];
-            let boot = $crate::boot::Boot { app: option_env!("JFGUI_APP"), manifest: option_env!("JFGUI_PERMISSIONS"), assets: ASSETS };
+            let boot = $crate::boot::Boot { app: option_env!("JFGUI_APP"), manifest: JF_MANIFEST, assets: ASSETS };
             if let Err(code) = $crate::boot::start(&boot) {
                 return code;
             }

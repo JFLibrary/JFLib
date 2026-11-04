@@ -279,21 +279,33 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 /// (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
 /// (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
 /// (apps/NAME/PACKAGE as JFGUI_PACKAGE: the switches --register / --register-replace /
-/// --unregister, assoc.rs).
+/// --unregister, assoc.rs).  A Cargo build hands both over as files (JFGUI_PERMISSIONS_FILE with
+/// --cfg jfgui_manifest, JFGUI_PACKAGE_FILE with --cfg jfgui_package), because an environment
+/// variable of a build script holds one line only.
 #[macro_export]
 macro_rules! main {
     ($body:expr) => {
-        #[allow(unsafe_code)]
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
+            #[cfg(jfgui_manifest)]
+            const JF_MANIFEST: Option<&str> = Some(include_str!(env!("JFGUI_PERMISSIONS_FILE")));
+            #[cfg(not(jfgui_manifest))]
+            const JF_MANIFEST: Option<&str> = option_env!("JFGUI_PERMISSIONS");
+            #[cfg(jfgui_package)]
+            const JF_PACKAGE: Option<&str> = Some(include_str!(env!("JFGUI_PACKAGE_FILE")));
+            #[cfg(not(jfgui_package))]
+            const JF_PACKAGE: Option<&str> = option_env!("JFGUI_PACKAGE");
             #[cfg(jfgui_assets)]
             static ASSETS: &[u8] = include_bytes!(env!("JFGUI_ASSETS"));
             #[cfg(not(jfgui_assets))]
             static ASSETS: &[u8] = &[];
-            if let Err(code) = $crate::boot(option_env!("JFGUI_APP"), option_env!("JFGUI_PERMISSIONS"), ASSETS) {
+            if let Err(code) = $crate::boot(option_env!("JFGUI_APP"), JF_MANIFEST, ASSETS) {
                 return code;
             }
-            if let Some(code) = $crate::desk_boot(option_env!("JFGUI_PACKAGE")) {
+            if let Some(code) = $crate::desk_boot(JF_PACKAGE) {
                 return code;
             }
             $body

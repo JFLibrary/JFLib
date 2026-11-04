@@ -205,7 +205,9 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
   (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
   (apps/NAME/PACKAGE as JFGUI_PACKAGE: the switches --register / --register-replace /
-  --unregister, assoc.rs).
+  --unregister, assoc.rs).  A Cargo build hands both over as files (JFGUI_PERMISSIONS_FILE with
+  --cfg jfgui_manifest, JFGUI_PACKAGE_FILE with --cfg jfgui_package), because an environment
+  variable of a build script holds one line only.
 
 - **`struct AppDesc`**
   the app descriptor (APP_DESC): title, AF_\* flags, sizes in DIP, accent 0xRRGGBB.  Write
@@ -31538,7 +31540,7 @@ Source: [`lib/plat/modabi.rs`](../lib/plat/modabi.rs)
 
 ```text
 modabi -- the ABI of loadable modules (jxl-module): the records the host (modhost.rs) and a
-module (the module runtime modules/modrt, which includes this file) exchange
+module (the module runtime modules/modrt, which has a copy of this file) exchange
                                                                       [jxl-module: no asm]
 
 A module is a no_std cdylib linked against nothing (no imports; built and checked like a
@@ -45485,7 +45487,9 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   Define the common app entry symbol without requiring the GUI crate in headless tools.  It
   first hands what build_rs.py built in (boot.rs: the app's name, its manifest, its assets)
   to the platform layer, which installs them as ui::main! does; a refused manifest ends the
-  program with exit code 2.
+  program with exit code 2.  A Cargo build hands the manifest over as a file
+  (JFGUI_PERMISSIONS_FILE with --cfg jfgui_manifest), because an environment variable of a build
+  script holds one line only.
 
 **`mod portable`**
 
