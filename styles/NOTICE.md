@@ -4,7 +4,7 @@ Every font and icon set the styles embed is openly licensed, so all styles may b
 redistributed. The licence files named below must ship with every copy; `build_rs.py` copies
 them next to each app it builds (`licenses/<app>/<style>/`).
 
-- winui and macos text: "JFLib Sans" (`winui/assets/font_reg.bin`, `font_semi.bin`,
+- winui and macos text: "JFLib Sans" (`../lib/style_assets/assets/font_reg.bin`, `font_semi.bin`,
   `font_bold.bin`) is Selawik 1.01, Copyright 2015 Microsoft Corporation, with Reserved Font Name
   "Selawik", under the SIL Open Font License 1.1 (`winui/assets/OFL-Selawik.txt`, copied to
   `macos/assets/`). The SGF1 files are subsets (text charset, no hinting), i.e. a Modified
@@ -24,7 +24,7 @@ them next to each app it builds (`licenses/<app>/<style>/`).
   a copy of kde's). The SGF1 files are subsets with Tahoma's line box (ascender / descender
   2049 / -423 font units instead of 1901 / -483), so the style keeps the baselines it had with
   Tahoma, its former font; the name "DejaVu Sans Condensed" contains none of the reserved names.
-- Icons: the shared icon font `winui/assets/icons.bin` (styles winui, macos, classic and kde)
+- Icons: the shared icon font `../lib/style_assets/assets/icons.bin` (styles winui, macos, classic and kde)
   takes its glyphs from Fluent UI System Icons, Copyright Microsoft Corporation, under the MIT
   licence (https://github.com/microsoft/fluentui-system-icons). Every style that embeds it keeps
   a copy of `LICENSE-FluentSystemIcons.txt` in its `assets/`.

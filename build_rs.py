@@ -191,6 +191,8 @@ LIBS = {
     "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
     # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
     "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
+    # the fonts and icons the library's styles share (docs/STYLES.md)
+    "style_assets": ("lib/style_assets/lib.rs", []),
 }
 # what a library crate needs on one target only: G3a, G4b, G4c, G4d, the UI's output through the GPU
 # (Windows; Linux in the build against glibc, section "glibc"; Android; the browser: WebGPU, no Vulkan code
@@ -1065,7 +1067,7 @@ class Builder:
         h.update(extra.encode())
         # include_bytes! assets of styles
         if "styles" in root.parts:
-            for f in sorted((RS / "styles" / root.parent.name / "assets").glob("*")) + sorted((RS / "styles" / "winui" / "assets").glob("*")):
+            for f in sorted((RS / "styles" / root.parent.name / "assets").glob("*")):
                 h.update(f.read_bytes())
         return h.hexdigest()
 

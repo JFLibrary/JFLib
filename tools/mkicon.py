@@ -6,7 +6,7 @@ icon size, cuts anti-aliased rounded corners and writes
 
   python tools/mkicon.py NAME --glyph E771 --color 1E78E6
 
-The glyph is an IC_* code point (lib/ui/keys.rs) of styles/winui/assets/icons.bin (Fluent UI
+The glyph is an IC_* code point (lib/ui/keys.rs) of lib/style_assets/assets/icons.bin (Fluent UI
 System Icons, tools/icons_fluent.txt); the committed icons are installer E896 2E9E5B, PaintCraft
 E771 1E78E6 and Kritzel EB7E D9822B.  tools/refrender.py (the reference of the library's glyph
 rasterizer) draws them with the layout of the former assembly icongen app: 48 bands from the
@@ -23,7 +23,7 @@ import pngutil  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SIZES = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
 LINUX_SIZES = [48, 128, 256]
-ICONS = ROOT / "styles" / "winui" / "assets" / "icons.bin"
+ICONS = ROOT / "lib" / "style_assets" / "assets" / "icons.bin"
 BANDS = 48                      # gradient bands (top lighter, bottom the colour)
 GLYPH = 72                      # glyph em, % of the side: icongen drew Segoe Fluent Icons at 62 %;
                                 # the Fluent 16 px designs keep a 1 px margin (median 86 % of the

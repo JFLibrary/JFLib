@@ -22,7 +22,7 @@ extracts them (unhinted, font units) into the compact .bin layout of DESIGN.md Â
   python tools/ttf2bin.py --font F.ttf --out I.bin --icons tools/icons.txt [--inc I.inc]
         icon font (flags.b0) containing only the codepoints listed in the icon file
   python tools/ttf2bin.py --font FluentSystemIcons-Regular.ttf --font FluentSystemIcons-Filled.ttf
-         --icons tools/icons.txt --remap tools/icons_fluent.txt --out styles/winui/assets/icons.bin
+         --icons tools/icons.txt --remap tools/icons_fluent.txt --out lib/style_assets/assets/icons.bin
         icon font whose glyphs come from other fonts: the remap table names each icon's source
         glyph (glyph name from the font's .json sidecar or 'post' table, or U+XXXX of the first
         font); the glyph is stored at the icon's codepoint from the icon list (IC_* stay stable)

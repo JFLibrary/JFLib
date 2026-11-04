@@ -164,6 +164,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** The browser host's own texts (its bar, its status line) follow the browser's language, and it hands the page's language list to the worker, so a test's emulated locale reaches the app; Arabic and Hebrew stay out of `with_library_languages` in the browser, whose bundle has no font for them
 - **plat:** Linux: the system calls ARM64 does not have are gone on x86-64 too (open, poll, fork, mkdir, unlink, rename, readlink, access, dup2, chmod): `openat`, `ppoll`, `clone`, `mkdirat`, `unlinkat`, `renameat2`, `readlinkat`, `faccessat`, `dup3`, `fchmodat`, helpers `rt::os::{poll, fork, clone, dup2, rename}`
 - **script:** The name `db` among the predeclared names of the host API (`script::GLOBALS`), for hosts that offer a database
+- **styles:** The fonts and the icon set the styles share moved from `styles/winui/assets` into the new crate `lib/style_assets` (`style_assets::ICONS` and `FONT_*`); winui, macos, classic and kde use its statics, so every style crate can be packed on its own (docs/CRATES.md, CR0)
 
 ### Removed
 

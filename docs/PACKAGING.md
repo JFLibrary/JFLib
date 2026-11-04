@@ -82,7 +82,7 @@ styles=winui classic macos kde
 **Icons**: `python tools/mkicon.py NAME --glyph E771 --color 1E78E6` renders a glyph of the icon
 font on a gradient square in every icon size (16..256 px), cuts anti-aliased rounded corners
 (`tools/pngutil.py`) and writes `app.ico` and the PNGs. The glyph comes from
-`styles/winui/assets/icons.bin` (Fluent UI System Icons, MIT; the styles that use it ship
+`lib/style_assets/assets/icons.bin` (Fluent UI System Icons, MIT; the styles that use it ship
 `LICENSE-FluentSystemIcons.txt`) and is drawn by `tools/refrender.py`, so no build is needed. The
 committed icons are installer `--glyph E896 --color 2E9E5B`, PaintCraft `E771 1E78E6` and paint
 `E790 D9822B`.

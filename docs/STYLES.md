@@ -300,8 +300,9 @@ Each style embeds its own SGF1 fonts from `styles/NAME/assets/` (format and rend
 | `backupcraft` | jfOffice's Inter files (licence copied to `assets/OFL-Inter.txt`) | own vector icons (`icons.rs`, made by `mkicons.py`) through `paint_icon`; the rest from jfOffice's `icons.bin` |
 | `netlab` | jfOffice's Inter files (licence copied to `assets/OFL-Inter.txt`) | own vector icons (`icons.rs`, made by `mkicons.py`) through `paint_icon`; the rest from jfOffice's `icons.bin` |
 
-A style may use another style's file with `include_bytes!("../winui/assets/icons.bin")`;
-`build_rs.py` rebuilds a style when its own or winui's assets change. Icon code points (`IC_*`,
+The fonts and icons several styles share lie in `lib/style_assets` (`style_assets::ICONS`, ...); a
+style may also use another style's file with `include_bytes!("../OTHER/assets/x")`.
+`build_rs.py` rebuilds a style when one of these files changes. Icon code points (`IC_*`,
 `ui::keys`) are semantic: a style's icon font must map all of them.
 
 Convert a TrueType font with
@@ -318,9 +319,9 @@ Selawik lacks 41 code points of the text charset; `--compose` builds them from S
 glyphs and `--donor` takes the rest from Inter, so no character of the charset falls back:
 
 ```
-python tools/ttf2bin.py --font selawk.ttf --out styles/winui/assets/font_reg.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-Regular.ttf
-python tools/ttf2bin.py --font selawksb.ttf --out styles/winui/assets/font_semi.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-SemiBold.ttf
-python tools/ttf2bin.py --font selawkb.ttf --out styles/winui/assets/font_bold.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-SemiBold.ttf
+python tools/ttf2bin.py --font selawk.ttf --out lib/style_assets/assets/font_reg.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-Regular.ttf
+python tools/ttf2bin.py --font selawksb.ttf --out lib/style_assets/assets/font_semi.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-SemiBold.ttf
+python tools/ttf2bin.py --font selawkb.ttf --out lib/style_assets/assets/font_bold.bin --metrics win --compose --donor styles/jfoffice/assets/Inter-SemiBold.ttf
 ```
 
 - Accented letters (Ĉĉ Ĕĕ Ĝĝ Ĥĥ Ĩĩ Ĭĭ Ĵĵ Ŏŏ Ŝŝ Ũũ Ŭŭ) are composites placed the way Selawik
@@ -361,7 +362,7 @@ python tools/ttf2bin.py --font DejaVuSansCondensed-Bold.ttf --out styles/classic
 The shared `icons.bin` takes its glyphs from Fluent UI System Icons (`fonts/` of
 github.com/microsoft/fluentui-system-icons): `python tools/ttf2bin.py --font
 FluentSystemIcons-Regular.ttf --font FluentSystemIcons-Filled.ttf --icons tools/icons.txt --remap
-tools/icons_fluent.txt --out styles/winui/assets/icons.bin`. `tools/icons.txt` keeps the code
+tools/icons_fluent.txt --out lib/style_assets/assets/icons.bin`. `tools/icons.txt` keeps the code
 points (the `IC_*` values, originally those of Segoe Fluent Icons); `tools/icons_fluent.txt`
 names the Fluent glyph stored at each of them (16 px design where one exists, else 20 px). A new
 icon needs a line in both files and its constant in `lib/ui/keys.rs`.

@@ -60,7 +60,7 @@ impl Style for Classic {
 // made by tools/ttf2bin.py --metrics 2049,-423, see docs/STYLES.md) and the WinUI icons
 static FONT_REG_DATA: &[u8] = include_bytes!("assets/font_reg.bin");
 static FONT_BOLD_DATA: &[u8] = include_bytes!("assets/font_bold.bin");
-static FONT_ICON_DATA: &[u8] = include_bytes!("../winui/assets/icons.bin");
+static FONT_ICON_DATA: &[u8] = style_assets::ICONS;
 // family, style, full, typographic family, typographic style  [fonts.s sty_font_names]
 static FONT_NAMES: [[&str; 5]; 4] = [
     ["DejaVu Sans Condensed", "Book", "DejaVu Sans Condensed", "DejaVu Sans", "Condensed"],

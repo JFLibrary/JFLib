@@ -57,10 +57,10 @@ impl Style for WinUi {
 // What Selawik lacks of the text charset is built from its own glyphs (ttf2bin.py --compose);
 // ∞ ● № come from Inter (SIL OFL 1.1, assets/OFL-Inter.txt; --donor).
 // Icons: Segoe Fluent Icons (Microsoft, private builds only -- styles/NOTICE.md)
-static FONT_REG: &[u8] = include_bytes!("assets/font_reg.bin");
-static FONT_SEMI: &[u8] = include_bytes!("assets/font_semi.bin");
-static FONT_BOLD: &[u8] = include_bytes!("assets/font_bold.bin");
-static FONT_ICON: &[u8] = include_bytes!("assets/icons.bin");
+static FONT_REG: &[u8] = style_assets::FONT_REG;
+static FONT_SEMI: &[u8] = style_assets::FONT_SEMI;
+static FONT_BOLD: &[u8] = style_assets::FONT_BOLD;
+static FONT_ICON: &[u8] = style_assets::ICONS;
 // family, style, full, typographic family, typographic style  [fonts.s sty_font_names]
 static FONT_NAMES: [[&str; 5]; 4] = [
     ["JFLib Sans", "Regular", "JFLib Sans", "JFLib Sans", "Regular"],
