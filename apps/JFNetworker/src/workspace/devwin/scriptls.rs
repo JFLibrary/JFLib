@@ -1,4 +1,4 @@
-// scriptls -- the language services of the IDE's editor: lib/script's services (script::ls,
+// scriptls -- the language services of the IDE's editor: apps/jfs/crates/script's services (script::ls,
 // script::fmt) for the code editor of a draft, with the names the simulator's ScriptService
 // gives scripts
 //
@@ -15,7 +15,7 @@
 //                                   top-level lets, for the list beside the editor
 //   rename(doc, pos, to) -> Result<usize, String>   every place of the name at pos renamed as
 //                                   one undo step of the draft -> how many; refused with
-//                                   lib/script's German reason (a keyword, no valid name, a
+//                                   apps/jfs/crates/script's German reason (a keyword, no valid name, a
 //                                   clash, syntax errors)
 //   format(doc, unit) -> Result<bool, String>   the formatted text as one undo step (false:
 //                                   it was formatted already); refused with the first syntax
@@ -86,7 +86,7 @@ fn kind_of(k: ItemKind) -> u8 {
     }
 }
 
-/// lib/script's services with the host's names (see the module comment)
+/// apps/jfs/crates/script's services with the host's names (see the module comment)
 pub(crate) struct Assist<'a> {
     host: Vec<HostItem<'static>>,
     /// the text of an imported file by the path written in import("…")

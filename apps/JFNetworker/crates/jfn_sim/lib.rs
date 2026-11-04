@@ -73,7 +73,7 @@
 //   cache    HTTP cache in front of a backend: LRU with a time to live, hits and misses
 //   mq       message queue (topics, at-least-once, acknowledgements, redelivery, dead
 //            letters) and the workers that take from it
-//   scriptsvc scripts as services: a .jfs program (lib/script) driven by events, its fuel the
+//   scriptsvc scripts as services: a .jfs program (apps/jfs/crates/script) driven by events, its fuel the
 //            CPU time of a single-threaded program; the host API (log, timers, net, dns, http,
 //            disk, metrics); a new source that keeps the disk and numbers (ScriptSource)
 //   series   time series on virtual time: every service's metrics (rates of counters, gauges,

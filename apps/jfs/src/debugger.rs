@@ -1,5 +1,5 @@
 // debugger -- `jfs --debug FILE [ARGS ...]`: a small debugger on the console, its commands on
-// standard input (the VM's debug interface, lib/script/debug.rs)
+// standard input (the VM's debug interface, apps/jfs/crates/script/debug.rs)
 //
 //   break FILE:LINE [if COND] / break LINE [if COND]  (b)   a breakpoint; LINE alone is in the
 //                      script, FILE is a path from the working directory or the script's

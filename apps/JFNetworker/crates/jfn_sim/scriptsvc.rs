@@ -1,4 +1,4 @@
-// scriptsvc -- scripts as services (kind "script"): a .jfs program (lib/script) runs in a
+// scriptsvc -- scripts as services (kind "script"): a .jfs program (apps/jfs/crates/script) runs in a
 // virtual host, driven by the events it asked for, and the fuel it uses is the CPU time of a
 // single-threaded program
 //

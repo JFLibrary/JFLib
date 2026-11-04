@@ -1,6 +1,6 @@
 // highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 // built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-// lib/script) and the colours of the tokens
+// apps/jfs/crates/script) and the colours of the tokens
 //
 //   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
 //   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
@@ -186,7 +186,7 @@ impl Highlighter {
     pub const fn markdown() -> Highlighter {
         Highlighter { g: &MARKDOWN }
     }
-    /// the scripting language of lib/script (.jfs, JFNetworker's scripts)
+    /// the scripting language of apps/jfs/crates/script (.jfs, JFNetworker's scripts)
     pub const fn jfs() -> Highlighter {
         Highlighter { g: &JFS }
     }
@@ -1023,7 +1023,7 @@ pub static MARKDOWN: Grammar = Grammar {
     pairs: "()[]",
 };
 
-// the lexical rules of lib/script/lex.rs: keywords, true / false / nil, one-line strings
+// the lexical rules of apps/jfs/crates/script/lex.rs: keywords, true / false / nil, one-line strings
 // with escapes and ${..} (code inside, nested strings too), numbers with _, 0x, 0b, a
 // fraction and an exponent, // and /* */ comments (not nested)
 const JFS_KEYWORDS: &[&str] = &["let", "fn", "if", "else", "while", "for", "in", "break", "continue", "return", "try", "catch", "throw"];
@@ -1038,7 +1038,7 @@ static JFS_RULES: [Rule; 7] = [
     Rule::Punct("+-*/%=<>!&|?:;,.()[]{}"),
 ];
 
-/// the scripting language of lib/script (.jfs): calls before '(' are functions, the
+/// the scripting language of apps/jfs/crates/script (.jfs): calls before '(' are functions, the
 /// delimiters of ${..} in strings SY_META
 pub static JFS: Grammar = Grammar {
     name: "JFS",

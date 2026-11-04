@@ -116,9 +116,6 @@ CRATES = [
     ("plat", "the platform layer: process, files, threads, windows (Windows and Linux)", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
-    ("script", "the JFNetworker scripting language (.jfs): lexer, parser, editor diagnostics, compiler, a VM "
-     "with fuel and a garbage collector, the standard library (str, list, map, bytes, math, json), float "
-     "arithmetic and math in software", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
     ("compress", "LZ4 block and frame, xxHash32, codec ids", "full"),
     ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",

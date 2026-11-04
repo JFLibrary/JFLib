@@ -3618,7 +3618,7 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
 * Only the visible lines' diagnostics are drawn, an underline is one command however long it
   is: 100 000 lines with 13 000 diagnostics scroll and edit at the speed of a short file
   (`apps/editortest/tests/code_diag.uis`: hover, F8, edits, checking while typing, shots).
-* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights lib/script's language: keywords,
+* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights apps/jfs/crates/script's language: keywords,
   `true` / `false` / `nil`, numbers (`1_000`, `0xFF`, `0b101`, `1.5e-3`), `//` and `/* */`,
   strings with escapes and `${…}` whose code is highlighted too (the delimiters are `SY_META`,
   so their braces match as a bracket pair). A grammar of one's own gets such strings with
@@ -3631,7 +3631,7 @@ hover texts and signature help; every method has a default that offers nothing. 
 app -- go to a definition, rename, format, toggle a breakpoint -- comes back as events.
 
 ```rust
-struct Jfs;                                   // lib/script's services for .jfs
+struct Jfs;                                   // apps/jfs/crates/script's services for .jfs
 impl CodeAssist for Jfs {
     fn complete(&mut self, doc: &CodeDoc, at: TextPos, _explicit: bool) -> Option<CompList> {
         let c = script::ls::complete(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default());
@@ -3700,12 +3700,12 @@ doc.apply_edits(&edits, "Umbenennen");
   the caret put there by the app (`set_selection`, undo) unfolds, folding around the caret
   moves it to the range's first line. Without ranges a row is a line: 100 000 lines stay as
   fast as before (`tests/code_ide.uis` benches 80 000 lines with 10 000 folded functions).
-* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches lib/script's
+* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches apps/jfs/crates/script's
   services on for JFS), `--test model` group `ide`.
 
 ## 29. Scripts: `script` (compiler and VM)
 
-[`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
+[`apps/jfs/crates/script`](../apps/jfs/crates/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
 source into bytecode, a `Vm` runs it with fuel (virtual CPU time), a heap of its own with a
 mark-and-sweep collector and hard limits. Everything is deterministic: no clock, no randomness,
 float arithmetic in software (`script::num`), so a script gives the same bits on every target,
@@ -3819,7 +3819,7 @@ impl Host for MyHost {
   the hardware) and `coretest --only scriptlib` (the standard library); `program.disasm()`
   prints the bytecode.
 
-**The standard library** ([`stdlib.rs`](../lib/script/stdlib.rs) and its neighbours) is part of
+**The standard library** ([`stdlib.rs`](../apps/jfs/crates/script/stdlib.rs) and its neighbours) is part of
 every VM, whatever the host. Methods take the value first, so `s.split(",")` and
 `str.split(s, ",")` are the same call; a map's own field of the same name wins over a map
 method (`map.keys(m)` always reaches the library), and a script may shadow a module with a
@@ -3884,7 +3884,7 @@ let shard = "user:42".hash() % 8                     // FNV-1a, stable everywher
 * math: `abs`, `min`, `max`, `clamp`, `floor`, `ceil`, `round` and `trunc` keep ints as ints
   (`math.floor(7)` is `7`, `math.floor(2.5)` is `2.0`); `round` rounds halves away from zero;
   `min` / `max` take arguments or one list and answer `nan` when one is `nan`. The float
-  functions ([`math.rs`](../lib/script/math.rs)) are fdlibm in its FreeBSD / musl form on
+  functions ([`math.rs`](../apps/jfs/crates/script/math.rs)) are fdlibm in its FreeBSD / musl form on
   `script::num`: errors below 1 ulp, exact where the result is (`math.log2(8)` is `3.0`,
   `math.pow(2, 10)` is `1024.0`), `exp` and `pow` bit for bit like Java's `StrictMath`
   except that `pow` follows C99 where Java answers NaN (`pow(1, nan)`, `pow(-1, inf)` and
@@ -3941,8 +3941,8 @@ column, the source line and the calls; exit code 1 (2 for a wrong command line).
 are example scripts with their expected stdout, stderr, exit code and files
 (`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
 
-**Language services and the formatter** ([`script::ls`](../lib/script/ls.rs),
-[`script::fmt`](../lib/script/fmt.rs)) are what an editor or IDE needs, without editor types:
+**Language services and the formatter** ([`script::ls`](../apps/jfs/crates/script/ls.rs),
+[`script::fmt`](../apps/jfs/crates/script/fmt.rs)) are what an editor or IDE needs, without editor types:
 positions are bytes into the source, results carry `Span`s (lines and columns from 1). They
 work on code that does not parse (what `parse_partial` made of it), so completion and hover
 keep working while a line is half typed.
@@ -4001,7 +4001,7 @@ let tidy = script::fmt::format(src)?;                    // or the syntax errors
   rename and its refusals; completion in scope, after a dot, of an import and on broken code;
   hover; signature help; folding; the outline; the formatter on every syntax form, idempotent,
   the same code).
-**Scripts of one VM** ([`module.rs`](../lib/script/module.rs)), as a page has several `<script>`
+**Scripts of one VM** ([`module.rs`](../apps/jfs/crates/script/module.rs)), as a page has several `<script>`
 elements: `vm.add_script(name, src)` links a further script while the VM is idle, then `run()` runs
 its top-level code with fresh fuel. Their top-level names are one scope: a script sees the `fn`s and
 `let`s of the program and of the scripts before it, the same variables, and a name it declares again
@@ -4021,7 +4021,7 @@ for (name, src) in scripts {
 }
 ```
 
-**Modules** ([`module.rs`](../lib/script/module.rs)): `import(path)` is a function, not
+**Modules** ([`module.rs`](../apps/jfs/crates/script/module.rs)): `import(path)` is a function, not
 syntax. It gives the top-level names of another file as a map -- its `fn`s and `let`s, without
 the names that start with `_` -- with the values they have when the module's code has run:
 
@@ -4052,7 +4052,7 @@ carry a `file`; `Error`'s text names it only where a call is in another file tha
 so messages of single files stay as they were. The program's own host values (`config`) hold
 for its modules too. `script::check` stays per file: a module's members are dynamic.
 
-**The debug interface** ([`debug.rs`](../lib/script/debug.rs)) has no UI; the runner's
+**The debug interface** ([`debug.rs`](../apps/jfs/crates/script/debug.rs)) has no UI; the runner's
 `--debug` and JFNetworker's script services build on it. The compiler keeps a line table
 (`Program::line_table()`: every instruction's function, line, column and whether a statement
 starts there; `break_lines()` lists the lines a breakpoint can stop at), the locals of every

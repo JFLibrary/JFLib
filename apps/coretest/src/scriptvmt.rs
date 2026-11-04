@@ -1,4 +1,4 @@
-// scriptvmt -- checks of lib/script's compiler and VM (SK2): semantics of the language,
+// scriptvmt -- checks of apps/jfs/crates/script's compiler and VM (SK2): semantics of the language,
 // closures, recursion, exceptions across calls, error positions and traces, map order,
 // bit-identical float arithmetic (num against the hardware, exact square roots, vectors from
 // Python), the host interface, the API, the collector under pressure, fuel and the limits,

@@ -165,6 +165,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux: the system calls ARM64 does not have are gone on x86-64 too (open, poll, fork, mkdir, unlink, rename, readlink, access, dup2, chmod): `openat`, `ppoll`, `clone`, `mkdirat`, `unlinkat`, `renameat2`, `readlinkat`, `faccessat`, `dup3`, `fchmodat`, helpers `rt::os::{poll, fork, clone, dup2, rename}`
 - **script:** The name `db` among the predeclared names of the host API (`script::GLOBALS`), for hosts that offer a database
 
+### Removed
+
+- **script:** The script language left the library: `lib/script` is now `apps/jfs/crates/script`, an app-local crate of the `jfs` app that JFNetworker, coretest and editortest still name as `script`; it is no longer part of docs/API.md (docs/CRATES.md, CR0)
+
 ### Fixed
 
 - **JFNetworker:** A device with many TCP connections, TIME-WAIT among them, spent its time looking for the next deadline on every segment; a load generator with thousands of requests in flight looked through its connections for each one. Both find them at once now: such runs take a seventieth to a five-hundredth of the time, with the same reports.

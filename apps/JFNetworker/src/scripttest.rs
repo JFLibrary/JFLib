@@ -542,7 +542,7 @@ fn http(t: &mut T) {
     t.eq("queue: at most one waited", metric(&e, h[0], "slow", "max_queued"), 1);
 }
 
-/// the plan's example (lib/script's scriptt::EXAMPLE) with a record on the disk first
+/// the plan's example (apps/jfs/crates/script's scriptt::EXAMPLE) with a record on the disk first
 const EXAMPLE: &str = r#"let hits = 0
 let cache = {}
 fn key(id) { return "user/" + id }

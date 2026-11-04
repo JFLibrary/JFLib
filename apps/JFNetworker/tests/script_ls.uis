@@ -1,6 +1,6 @@
 #!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
 # the language services in the IDE (SK6, IDE1: workspace/ide/editor.rs and devwin/scriptls.rs on
-# lib/script's script::ls) on SRV1's inline script zaehler, opened from the Explorer: hover over a
+# apps/jfs/crates/script's script::ls) on SRV1's inline script zaehler, opened from the Explorer: hover over a
 # host name with its description, completion of a host global after its namespace (the
 # description under the list), signature help, go to the declaration (F12, Ctrl+click), rename
 # with the flyout of "Name umbenennen" (F2; one undo step of the draft; a refusal), format
