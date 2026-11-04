@@ -173,7 +173,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
-- [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
+- [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
@@ -3671,6 +3671,10 @@ Shared<T> (Rc<Cell<T>>) and the record keeps a clone of it.
 
 **`impl Ui`**
 
+- **`fn window_title_height(&self, flags: u32) -> i32`**
+  uiw_drawable(i): the window exists and is shown (the main window: always)
+  the title bar of a window with these WF_\* flags that draws its own (DIP): the style's, higher
+  with a finger, and the window grows with it (lay out what lies below it with this height)
 - **`fn window_begin(&mut self, id: u32, title: &str, open: Option<&Shared<i32>>, flags: u32, rect: Option<&Shared<WinRect>>) -> bool`**
   ui_window_begin(id, title, open, flags, rect) -> true: the window is shown, emit its
   content now (window_end always follows).  open None = always open; rect None: the
@@ -4946,7 +4950,7 @@ HB_GRAB_V: u32 = 0x80000
 // finger moving along this axis is the widget's (not the scroll view's around it); with both the
 // press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
 // resting for the long-press time: a panel that starts to move then, until then the finger goes
-// to what is around it); TF_HOLD_LONG the same after a second (a panel's title bar; ui.touch_hold_part
+// to what is around it); TF_HOLD_LONG the same after 600 ms (a panel's title bar; ui.touch_hold_part
 // shows it); TF_REST a finger that rests presses like one that moved, no context menu (a canvas); TF_TWO
 // a second finger is the widget's: no press, no click, it reads ui.touch_two or ui.touch_fingers (pan and
 // zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing special (the finger rolls what is
@@ -8458,6 +8462,7 @@ the texture to the swapchain image, the image is presented.  All windows share o
   gp_tick() / gp_deadline()    the window loop: finished jobs, frames that found no free image;
                                the time of the next look (None: nothing to look at, no wake-up)
   gp_window_gone(i)            before window i's plat window is destroyed
+  gp_window_show(i, show)      before window i is hidden or shown again
   gp_shutdown()                window_main's end
   sc_gpu(app, args)            the script command `gpu` (below)
   Ui::gpu_output(win)          what a window shows through (status and counters for tests)
@@ -8471,6 +8476,11 @@ has settled), or an error.  Going back shows the framebuffer through the CPU pat
 hides the child: no gap, no wrong frame.  The first frames of a program are CPU frames: the
 instance, device and swapchain (hundreds of ms the first time) are made on a worker thread that
 starts after the first frame, so the first frame never waits for them.
+
+A hidden window goes back to Cpu too: a swapchain's image does not come back with its window (white
+until the next present, measured on Windows, and a frame that did not change presents nothing).  What
+the CPU path holds does come back, the swapchain follows as after a resize; nothing is built or
+switched for a window nobody sees (unseen: the UI hid it, or the system with its minimised owner).
 
 The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
 window GDI stays invisible there, also after the swapchain is gone.
@@ -9716,8 +9726,8 @@ cursor, touch_grab).
   stroke older than 200 ms goes on, the second finger waits
 - **`fn touch_hold_part(&self, id: u32) -> Option<u32>`**
   ui_touch_hold_part(id) -> how far a finger's press and hold on widget id of this window is, in
-  1/1000 (TF_HOLD_LONG): None without one, 1000 once the drag runs.  Show it: a second is long
-  without a sign
+  1/1000 (TF_HOLD_LONG): None without one, 1000 once the drag runs.  Show it: it is long without
+  a sign
 
 #### `ui/theme_app.rs`
 
@@ -27668,6 +27678,8 @@ win_touch -- fingers on Windows: WM_POINTER* / WM_NCPOINTER* of touch pointers (
   feedback_off(hwnd)      no system visuals for a touch of this window
   touch_api_set(Some(api))   (test aid) the touch calls through the given functions (plattest's
        fakes, like pen_api_set); None = user32's again
+  jfgui_TOUCH_LOG=1          stderr: where each finger came down and whose it became (for a device
+       nobody at the desk has)
   win_touch_primary() -> a tablet in slate posture    win_touch_keyboard(w, show) the on-screen keyboard
 
 Every finger goes to plat::finger: no gesture is decided here (ui/touch.rs).  A handled pointer
@@ -27679,8 +27691,13 @@ Which window a finger belongs to: a contact is wide and the system gives it to a
 touches (measured with InjectTouchInput, a contact 60 px wide): a finger on PaintCraft's zoom slider
 arrived as WM_NCPOINTERDOWN HTBOTTOM on the tool window above it, whose invisible resize border ends
 at the status bar, and resized that window.  So a finger over a border belongs to the window whose
-client area is under its centre (z-order, from the window that got it), with none the system's resize
-goes on.  HTCAPTION: a tool window's title bar is the UI's (press and hold, then begin_drag); the main
+client area is under its centre (z-order, from the window that got it), also a contact the system
+gives to a client area its centre is not in.  With no window there the main window's resize is the
+system's; a tool window's frame never is, its resize band for a finger lies inside it (ui edge_grips).
+The position of such a contact is not where the finger is: the system moves it onto the frame (17 px off
+on the slider above, also ptPixelLocationRaw) and it stays off by that while the contact lives; only the
+contact rectangle tells (Slot::adj).
+HTCAPTION: a tool window's title bar is the UI's (press and hold, then begin_drag); the main
 window's goes to the system (moves, snaps, double tap) unless a small widget is close (a finger that
 misses the gear by a hair).
 
@@ -27697,6 +27714,7 @@ itself cancels comes through as FingerPhase::Cancel.
   - `x: i32` -- ptPixelLocation (screen px)
   - `y: i32`
   - `time: u32` -- dwTime (ms, 0: none)
+  - `middle: Option<[i32; 2]>` -- the middle of rcContact, if it has one (screen px)
 
 - **`struct TouchApi`**
   the touch part of the pointer API (functions that are missing are None)
@@ -30807,6 +30825,9 @@ WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT
 WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT
 WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT
 WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT
+/// (Windows) the window is not shown, whoever hid it: the system hides a tool window while its owner
+/// is minimised
+WST_HIDDEN: u32 = 1 << 11
 // gpu_out_state: how the UI's output through the GPU came up
 /// nothing known, nothing to remember
 GPU_STATE_UNKNOWN: u32 = 2
