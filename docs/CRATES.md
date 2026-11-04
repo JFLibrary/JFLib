@@ -1,7 +1,7 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-04, auf Basis von `main` 8c129982. Im Repo ist davon noch nichts umgesetzt. Die Ergebnisse unter
-„Was schon geprüft ist“ stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
+Stand 2026-11-05. CR0 ist umgesetzt, CR1 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“ stammen
+aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
 
@@ -116,17 +116,18 @@ Zwei Dinge haben diese Versuche ausgeschlossen:
 
 ### CR0: Quellen vorbereiten
 
-Klein. `build_rs.py` baut danach weiter wie heute. Die Punkte hängen nicht voneinander ab.
+**Erledigt am 2026-11-05.** `build_rs.py` baut weiter wie vorher. Die Release-Programme `template`, `jfs`, `PaintCraft`
+und `jxlenc` sind unter Windows byte-gleich groß wie vor CR0, unter Linux wächst nur `jfs` um 144 Byte (längere Pfade
+in den Panic-Orten). Noch wirkungslos sind Punkt 4 und die Datei-Form aus Punkt 5, sie greifen erst mit den Manifesten.
 
 1. **JFScript umziehen.** `git mv lib/script apps/jfs/crates/script`, den Eintrag aus `LIBS` und aus `CRATES` in
    `tools/gendoc.py` streichen. `local_crates()` sieht die Crate dann von allein, auch für JFNetworker, `coretest`
    und `editortest`. Die Pfade in den Kommentaren dieser Apps mitziehen.
 2. **`lib/style_assets` anlegen.** `font_reg.bin`, `font_semi.bin`, `font_bold.bin` und `icons.bin` aus
    `styles/winui/assets` dorthin, die vier Stile nutzen die `pub static`s. Sie liegt in `lib/`, weil `STYLES` jeden
-   Ordner unter `styles/` als Stil zählt. Anzupassen sind `embedded_styles` und die Lizenzkopien, `styles/NOTICE.md`,
-   `docs/STYLES.md`, `docs/PACKAGING.md`, `tools/font_check.py` und `tools/fontdiff.py`.
+   Ordner unter `styles/` als Stil zählt. Die Lizenzdateien liegen als Kopie daneben, jeder Stil behält seine eigenen.
 3. **`modrt` paketfähig machen.** Seine acht Dateien aus `lib/rt`, `lib/plat` und `lib/plugin` liegen außerhalb des
-   Pakets. Sie kommen als Kopie nach `modules/modrt/shared/`, eine Prüfung in `test --quick` hält sie byte-gleich.
+   Pakets. Sie kommen als Kopie nach `modules/modrt/shared/`, `lint()` hält sie byte-gleich.
 4. **Module ohne Tausch der Abhängigkeit.** In `simd`, `gfx`, `img_core`, `img_jpeg`, `img_jxl` und `img_jxl_enc`
    kommt an die Wurzel `#[cfg(jflib_module)] extern crate modrt as rt;`, wo nötig auch für `plat`. `lint()` muss
    das erlauben.
@@ -135,8 +136,9 @@ Klein. `build_rs.py` baut danach weiter wie heute. Die Punkte hängen nicht vone
    `#[allow(unexpected_cfgs)]` und ein `compile_error!` bei `cfg(panic = "unwind")`, das die fehlende Zeile nennt.
    Das `compile_error!` gehört ins Makro, in einer Bibliothek würde es `cargo package` und `cargo doc` stoppen.
 
-**Fertig, wenn:** `python build_rs.py test --quick` grün ist und die Programme gleich groß bleiben, abgesehen von
-den verschobenen Assets.
+**Geprüft:** `build_rs.py test --quick` lief mit 1321 von 1331 Skripten durch. Die zehn anderen: `fonttest/selftest` auf
+beiden Zielen (nur CRLF, mit LF-Kopie grün) und `jfWord/core.uis` mit acht Folgefehlern unter Windows (allein 53 von 53
+grün). Web und Android bauen.
 
 ### CR1: Manifeste
 
