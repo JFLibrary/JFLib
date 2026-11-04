@@ -1,0 +1,93 @@
+{
+  "format": "jfnex",
+  "version": 1,
+  "name": "db_scale",
+  "title": "Was eine Datenbank begrenzt",
+  "project": "db_scale.jfnet",
+  "load": {
+    "dev": "GEN",
+    "svc": "load",
+    "rps": [
+      500,
+      1000,
+      2000,
+      4000,
+      8000,
+      16000
+    ],
+    "warm": 2000
+  },
+  "timing": {
+    "warmup_s": 60,
+    "settle_s": 2,
+    "measure_s": 8,
+    "seeds": [
+      31
+    ]
+  },
+  "slo": {
+    "p99_ms": 100,
+    "errors_pct": 1
+  },
+  "series": [
+    {
+      "name": "Puffer",
+      "axes": [
+        {
+          "kind": "config",
+          "name": "MiB",
+          "dev": "DB",
+          "path": "db.pool_mb",
+          "values": [
+            16,
+            64,
+            256,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E-Mail",
+      "axes": [
+        {
+          "kind": "config",
+          "name": "Pfad",
+          "dev": "GEN",
+          "path": "http-load.mix.0.path",
+          "values": [
+            "/mail/email-{rand:50000}"
+          ]
+        },
+        {
+          "kind": "config",
+          "name": "Index",
+          "dev": "DB",
+          "path": "db.tables.1.indexes",
+          "values": [
+            [
+              "email"
+            ],
+            []
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lesen",
+      "axes": [
+        {
+          "kind": "config",
+          "name": "Gewicht",
+          "dev": "GEN",
+          "path": "http-load.mix.0.weight",
+          "values": [
+            95,
+            45,
+            5
+          ]
+        }
+      ]
+    }
+  ]
+}

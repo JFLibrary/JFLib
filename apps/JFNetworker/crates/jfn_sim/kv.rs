@@ -1389,6 +1389,10 @@ impl KvClient {
         }
         self.ring = r;
     }
+    /// connections per address at most: what waits beyond them waits at this client
+    pub fn set_conns(&mut self, n: usize) {
+        self.agent.max_per_host = n;
+    }
     /// forgets everything (the service stopped)
     pub fn reset(&mut self) {
         self.agent.reset();

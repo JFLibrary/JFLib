@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="170" viewBox="0 0 620 170">
+  <title>Halving the way</title>
+  <rect x="1" y="1" width="618" height="168" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="30" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="36" y="54" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="48" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <path d="M92 70 L158 70" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <circle cx="190" cy="70" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M194 70 L197 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M208.0 70.0 L197.0 64.0 L197.0 76.0 Z" fill="#44515E"/>
+  <path d="M186 70 L183 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M172.0 70.0 L183.0 76.0 L183.0 64.0 Z" fill="#44515E"/>
+  <path d="M190 74 L190 77" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M190.0 88.0 L196.0 77.0 L184.0 77.0 Z" fill="#44515E"/>
+  <path d="M190 66 L190 63" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M190.0 52.0 L184.0 63.0 L196.0 63.0 Z" fill="#44515E"/>
+  <path d="M222 70 L288 70" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <circle cx="320" cy="70" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M324 70 L327 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M338.0 70.0 L327.0 64.0 L327.0 76.0 Z" fill="#44515E"/>
+  <path d="M316 70 L313 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M302.0 70.0 L313.0 76.0 L313.0 64.0 Z" fill="#44515E"/>
+  <path d="M320 74 L320 77" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M320.0 88.0 L326.0 77.0 L314.0 77.0 Z" fill="#44515E"/>
+  <path d="M320 66 L320 63" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M320.0 52.0 L314.0 63.0 L326.0 63.0 Z" fill="#44515E"/>
+  <path d="M352 70 L418 70" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <circle cx="450" cy="70" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M454 70 L457 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M468.0 70.0 L457.0 64.0 L457.0 76.0 Z" fill="#44515E"/>
+  <path d="M446 70 L443 70" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M432.0 70.0 L443.0 76.0 L443.0 64.0 Z" fill="#44515E"/>
+  <path d="M450 74 L450 77" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M450.0 88.0 L456.0 77.0 L444.0 77.0 Z" fill="#44515E"/>
+  <path d="M450 66 L450 63" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M450.0 52.0 L444.0 63.0 L456.0 63.0 Z" fill="#44515E"/>
+  <path d="M482 70 L548 70" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <rect x="540" y="48" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="546" y="54" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="558" y="84" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <path d="M60 120 L309 120" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M320.0 120.0 L309.0 114.0 L309.0 126.0 Z" fill="#2F7D4F"/>
+  <text x="190" y="148" font-family="monospace" font-size="13" text-anchor="middle" fill="#2F7D4F" font-weight="bold">ping ok</text>
+  <path d="M320 120 L439 120" fill="none" stroke="#B23A3A" stroke-width="3" stroke-dasharray="7 5"/>
+  <path d="M450.0 120.0 L439.0 114.0 L439.0 126.0 Z" fill="#B23A3A"/>
+  <text x="385" y="148" font-family="monospace" font-size="13" text-anchor="middle" fill="#B23A3A" font-weight="bold">ping ?</text>
+</svg>

@@ -107,7 +107,8 @@ impl Edit<Project> for AddDevice {
 pub(crate) fn add_placed(p: &mut Project, model: &str, x: i32, y: i32) -> Result<(u32, Box<dyn Edit<Project>>), ProjErr> {
     let id = p.add_device(model, x, y)?;
     if let (Some((kind, name)), Some(d)) = (jfn_model::catalog::preset_service(model), p.device_mut(id)) {
-        d.services.push(jfn_model::ServiceDef { kind: String::from(kind), name: String::from(name), disabled: false, config: agent_core::jmap::empty_object() });
+        let config = jfn_model::catalog::preset_config(model).and_then(|c| agent_core::json::parse(c.as_bytes()).ok()).unwrap_or_else(agent_core::jmap::empty_object);
+        d.services.push(jfn_model::ServiceDef { kind: String::from(kind), name: String::from(name), disabled: false, config });
     }
     let dev = p.device(id).cloned().unwrap_or_default();
     let label = format!("{} hinzufügen", dev.name);

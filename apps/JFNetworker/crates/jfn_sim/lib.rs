@@ -62,6 +62,8 @@
 //   experiment  a parameter sweep (SA2): configurations and load levels from one warm state, on
 //            clones of the engine at full speed; results, knee, cost, CSV
 //   svcform  what the window's forms ask of the lab's services: their settings, what they lack (SA3)
+//   db       the database service: SQL-shaped statements over modelled tables, buffer pool, row locks,
+//            versions, a log with group commit and recovery (SA4); dbsql its statements, dbstore its tables
 //   units    services as units on Linux hosts: unit files, enable, restart policies
 //   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
@@ -312,6 +314,9 @@ pub mod imapd;
 pub mod res;
 pub mod experiment;
 pub mod svcform;
+pub mod db;
+pub mod dbsql;
+pub mod dbstore;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -348,6 +353,7 @@ pub use experiment::{ConfigOut, DevFig, Fig, LinkFig, Plan, Point, Status, SvcFi
 pub use disk::Disk;
 pub use fault::{Fault, FaultMark, LinkOver};
 pub use lb::{Algo, BackendView, Lb, LbMode, LbOp, LbView};
+pub use db::{Db, DbCfg, DbStats, DbView, LockView, TableView, WalKind, WalRec};
 pub use kv::{Consistency, Entry, KvClient, KvDone, KvNode, KvView, ReplicaView, Ver};
 pub use cache::{Cache, CacheView};
 pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};

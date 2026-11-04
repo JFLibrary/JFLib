@@ -1,0 +1,186 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: die Methode",
+    "Quiz: the method"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Welche Frage bringt beim Eingrenzen oft am meisten und wird am häufigsten vergessen?",
+        "Which question often brings the most when narrowing down, and is the one most often forgotten?"
+      ],
+      "explain": [
+        "Was noch geht, schließt ganze Teile des Netzes aus. Wer nur auf das Kaputte schaut, verschenkt diese Auskunft.",
+        "What still works rules out whole parts of the network. Whoever looks only at what is broken gives away this information."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Was geht noch?",
+            "What still works?"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Wie alt ist das Kabel?",
+            "How old is the cable?"
+          ]
+        },
+        {
+          "text": [
+            "Wer hat das Netz gebaut?",
+            "Who built the network?"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "order",
+      "points": 2,
+      "stem": [
+        "In welcher Reihenfolge geht die Schleife der Methode?",
+        "In what order does the method's loop go?"
+      ],
+      "explain": [
+        "Erst eine Vermutung, dann vorhersagen, was sie bedeuten würde, dann lesend prüfen und schließen.",
+        "First a guess, then predict what it would mean, then check by reading and conclude."
+      ],
+      "order": [
+        [
+          "Vermutung aufstellen",
+          "Make a guess"
+        ],
+        [
+          "Vorhersage machen",
+          "Make a prediction"
+        ],
+        [
+          "Prüfen, ohne etwas zu ändern",
+          "Check without changing anything"
+        ],
+        [
+          "Schließen",
+          "Conclude"
+        ]
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Nach einer Änderung bleibt die Fehlermeldung genau dieselbe. Was tun Sie?",
+        "After a change, the error message stays exactly the same. What do you do?"
+      ],
+      "explain": [
+        "Die Änderung hat nichts bewirkt, also gehört sie wieder raus, bevor die nächste Vermutung drankommt.",
+        "The change had no effect, so it comes out again before the next guess gets its turn."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Die Änderung zurücknehmen und weitersuchen",
+            "Take the change back and search on"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Die nächste Einstellung dazu ändern",
+            "Change the next setting as well"
+          ],
+          "explain": [
+            "So wächst das Durcheinander, und Sie verlieren den Überblick über die Ursache.",
+            "That makes the mess grow, and you lose track of the cause."
+          ]
+        },
+        {
+          "text": [
+            "Alle Geräte neu starten",
+            "Restart all devices"
+          ],
+          "explain": [
+            "Das löscht womöglich die Spuren und erklärt nichts.",
+            "That may wipe out the traces and explains nothing."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 2,
+      "stem": [
+        "Ein Ping von PC1 an einen Server zeigt nur die Statistik mit 100 % Verlust, ohne jede Fehlermeldung. Was kommt in Frage?",
+        "A ping from PC1 to a server shows only the statistics with 100 % loss, without any error message. What is possible?"
+      ],
+      "explain": [
+        "Stille heißt: Das Paket ging los, und nichts kam zurück. Ohne Route hätte PC1 sofort `Network is unreachable` gesagt.",
+        "Silence means that the packet left and nothing came back. Without a route, PC1 would have said `Network is unreachable` at once."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Dem Rückweg fehlt eine Route",
+            "The way back lacks a route"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Das Paket geht unterwegs verloren",
+            "The packet is lost on the way"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "PC1 hat weder Route noch Gateway",
+            "PC1 has neither a route nor a gateway"
+          ],
+          "explain": [
+            "Dann hätte PC1 sofort eine Meldung gegeben.",
+            "Then PC1 would have given a message at once."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Warum sollte man nur eine Sache auf einmal ändern?",
+        "Why should you change only one thing at a time?"
+      ],
+      "explain": [
+        "Sonst lässt sich nicht sagen, was geholfen hat, und unnötige Änderungen bleiben im Netz.",
+        "Otherwise you cannot say what helped, and needless changes stay in the network."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Damit klar bleibt, was gewirkt hat",
+            "So that it stays clear what had an effect"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Weil Geräte nur eine Änderung annehmen",
+            "Because devices accept only one change"
+          ]
+        },
+        {
+          "text": [
+            "Weil sonst die Lizenz erlischt",
+            "Because the licence lapses otherwise"
+          ]
+        }
+      ]
+    }
+  ]
+}

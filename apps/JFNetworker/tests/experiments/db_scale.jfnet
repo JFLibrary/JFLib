@@ -1,0 +1,238 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Eine Datenbank unter Last",
+  "description": "GEN schickt Last an WEB1, der fragt die Datenbank DB. Das Projekt simuliert Hardware. Die Tabelle users hat 2 Millionen Zeilen, von denen nur die geänderten wirklich da sind, die Tabelle contacts 50 000. Das Experiment db_scale.jfnex vergleicht die Größe des Puffers, einen Index gegen keinen und den Anteil der Lesezugriffe.",
+  "seed": 31,
+  "next_id": 20,
+  "strict_mdix": false,
+  "metered": true,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 40,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.0.11/"
+            ],
+            "mode": "open",
+            "rps": 100,
+            "arrival": "poisson",
+            "timeout_ms": 600000,
+            "connect_timeout_ms": 1000,
+            "max_conns": 512,
+            "mix": [
+              {
+                "method": "GET",
+                "path": "/read",
+                "weight": 95
+              },
+              {
+                "method": "POST",
+                "path": "/write",
+                "weight": 5
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s48x",
+      "x": 220,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname SW1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-s",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.11/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "cpu_ms": 0.05,
+            "max_requests": 0,
+            "db": {
+              "addr": "10.0.0.30",
+              "port": 7100,
+              "timeout_ms": 600000,
+              "conns": 128
+            },
+            "routes": [
+              {
+                "path": "/read",
+                "backend": "db",
+                "sql": "SELECT * FROM users WHERE id = ?",
+                "param": "draw"
+              },
+              {
+                "path": "/write",
+                "method": "POST",
+                "backend": "db",
+                "sql": "UPDATE users SET balance = balance + 1 WHERE id = ?",
+                "param": "draw",
+                "retries": 3
+              },
+              {
+                "path": "/mail/*",
+                "backend": "db",
+                "sql": "SELECT * FROM contacts WHERE email = ?"
+              }
+            ],
+            "mem_mb": 256,
+            "conn_kb": 64
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "DB",
+      "model": "database",
+      "x": 400,
+      "y": 320,
+      "off": false,
+      "startup_config": "hostname DB\nip addr add 10.0.0.30/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "db",
+          "name": "db",
+          "disabled": false,
+          "config": {
+            "port": 7100,
+            "tables": [
+              {
+                "name": "users",
+                "rows": 2000000,
+                "row_bytes": 400,
+                "key": "id",
+                "dist": "uniform",
+                "columns": [
+                  "balance:int:1000"
+                ]
+              },
+              {
+                "name": "contacts",
+                "rows": 50000,
+                "row_bytes": 400,
+                "key": "id",
+                "columns": [
+                  "email:text"
+                ],
+                "indexes": [
+                  "email"
+                ]
+              }
+            ],
+            "pool_mb": 256,
+            "max_conns": 256,
+            "disk": {
+              "capacity_mb": 200000,
+              "iops": 5000,
+              "mbps": 200,
+              "latency_us": 500
+            },
+            "mem_mb": 512,
+            "conn_kb": 256
+          }
+        }
+      ],
+      "comment": "",
+      "hw": {
+        "cores": 4,
+        "speed_pm": 1000,
+        "ram_mb": 8192,
+        "swap_mb": 1024,
+        "disk": "sata",
+        "disk_gb": 240
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": 10,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

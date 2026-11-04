@@ -160,7 +160,7 @@ fn kpis(t: &mut T) {
 fn panel(t: &mut T) {
     let rows = rows();
     let has = |k: &str| rows.iter().any(|r| r.0 == k);
-    let kinds = ["lb", "kv", "cache", "mq", "worker", "http-server", "http-load", "http-client", "dns-server", "dhcp-server", "script", "ntp"];
+    let kinds = ["lb", "kv", "db", "cache", "mq", "worker", "http-server", "http-load", "http-client", "dns-server", "dhcp-server", "script", "ntp"];
     for k in kinds {
         for g in groups(k) {
             t.check(&format!("chart title {} has a row", g.title), has(g.title));

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="240" viewBox="0 0 560 240">
+  <title>PCs and a server around a switch</title>
+  <rect x="1" y="1" width="558" height="238" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <path d="M110 72 L110 180" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M110 180 L210 180" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M450 72 L450 180" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M450 180 L350 180" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M280 72 L280 164" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <rect x="214" y="164" width="132" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="224" y="174" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="244" y="174" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="264" y="174" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="284" y="174" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="304" y="174" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="324" y="174" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <text x="280" y="218" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SW1</text>
+  <rect x="80" y="32" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="86" y="38" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="98" y="68" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="110" y="24" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC1</text>
+  <rect x="250" y="32" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="256" y="38" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="268" y="68" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="280" y="24" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC2</text>
+  <rect x="424" y="22" width="52" height="56" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M432 36 L468 36" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M432 50 L468 50" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M432 64 L468 64" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <text x="510" y="54" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SRV1</text>
+</svg>

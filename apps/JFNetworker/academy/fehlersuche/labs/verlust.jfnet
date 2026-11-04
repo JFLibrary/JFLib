@@ -1,0 +1,386 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Es geht, aber zäh",
+  "description": "Kurs Fehlersuche: eine Leitung, die Pakete verliert.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.2.80/"
+            ],
+            "mode": "closed",
+            "users": 2,
+            "think_ms": 100,
+            "timeout_ms": 3000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r2",
+      "x": 170,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R2",
+      "model": "jf-r2",
+      "x": 340,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nip route 10.0.1.0 255.255.255.0 10.0.12.1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 510,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.2.80/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Intranet der Firma\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 255,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Es geht, aber zäh",
+      "It works, but slowly"
+    ],
+    "summary": [
+      "Die Webseite kommt, aber oft erst nach einer spürbaren Pause. Nichts ist ausgefallen. Ein einzelner Ping sieht gut aus.",
+      "The web page comes, but often only after a noticeable pause. Nothing has failed. A single ping looks fine."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Auf PC1 läuft eine Messung, die dauernd die Webseite von WEB1 unter 10.0.2.80 abruft. Sie klagt über lange Wartezeiten, zu sehen im Bereich Metriken oder mit curl -s -o /dev/null -w \"%{time_total}\\n\" http://10.0.2.80/ auf PC1. Ausgefallen ist nichts, und eine einzelne Anfrage kommt oft flott.",
+        "A measurement runs on PC1, constantly fetching the web page of WEB1 at 10.0.2.80. It complains of long waits, visible in the Metrics panel or with curl -s -o /dev/null -w \"%{time_total}\\n\" http://10.0.2.80/ on PC1. Nothing has failed, and a single request often comes quickly."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie, nennen Sie unter Diagnose das Kabel und geben Sie ab. Ein schlechtes Kabel ersetzen Sie, indem Sie es löschen und neu verbinden.",
+        "Find the cause, repair it, name the cable under Diagnosis and hand in. To replace a bad cable, delete it and connect the ends again."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Ein Ping sagt wenig. Viele sagen mehr: ping -c 30 10.0.2.80 auf PC1, und achten Sie auf die Zeile mit packet loss.",
+        "One ping says little. Many say more: ping -c 30 10.0.2.80 on PC1, and watch the line with packet loss."
+      ],
+      [
+        "Teilen Sie den Weg: Geht es bis R1 ohne Verlust? Bis R2? Prüfen Sie jedes Teilstück einzeln, zum Beispiel auf R1 mit ping 10.0.12.2 repeat 30.",
+        "Divide the way: does it get to R1 without loss? To R2? Check each leg on its own, for example on R1 with ping 10.0.12.2 repeat 30."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 svc load metric p99_us < 50000 over 5s"
+          ],
+          "points": 5,
+          "text": [
+            "Die Anfragen von PC1 sind wieder schnell (99 % unter 50 ms)",
+            "The requests from PC1 are fast again (99 % below 50 ms)"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.2.80"
+          ],
+          "points": 2,
+          "text": [
+            "PC1 erreicht den Webserver",
+            "PC1 reaches the web server"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R1",
+          "id": 2,
+          "port": "GigabitEthernet0/0/1",
+          "peer": "R2",
+          "peer_id": 3,
+          "peer_port": "GigabitEthernet0/0/0",
+          "points": 3,
+          "text": [
+            "Welches Kabel war schuld?",
+            "Which cable was to blame?"
+          ],
+          "explain": [
+            "Das Kabel zwischen R1 und R2 verlor etwa jedes fünfte Paket. TCP schickt Verlorenes nach, darum geht alles, nur langsam: Eine Anfrage wartet dann einige hundert Millisekunden. Ein einzelner Ping kann Glück haben; erst viele zeigen den Verlust. Pings je Teilstück grenzen ihn ein: bis R1 ohne Verlust, von R1 zu R2 mit. Ein defektes Kabel oder ein Wackelkontakt sieht in echten Netzen genauso aus.",
+            "The cable between R1 and R2 lost about every fifth packet. TCP sends lost data again, so everything works, only slowly: a request then waits a few hundred milliseconds. A single ping can be lucky; only many show the loss. Pings per leg narrow it down: to R1 without loss, from R1 to R2 with. A faulty cable or a loose contact looks just the same in real networks."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [
+              {
+                "kind": "http-load",
+                "name": "load",
+                "disabled": false,
+                "config": {
+                  "targets": [
+                    "http://10.0.2.80/"
+                  ],
+                  "mode": "closed",
+                  "users": 2,
+                  "think_ms": 100,
+                  "timeout_ms": 3000
+                }
+              }
+            ],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "R1",
+            "model": "jf-r2",
+            "x": 170,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "R2",
+            "model": "jf-r2",
+            "x": 340,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nip route 10.0.1.0 255.255.255.0 10.0.12.1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "WEB1",
+            "model": "server-1u",
+            "x": 510,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname WEB1\nip addr add 10.0.2.80/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [
+              {
+                "kind": "http-server",
+                "name": "web",
+                "disabled": false,
+                "config": {
+                  "workers": 4,
+                  "time_ms": 2,
+                  "routes": [
+                    {
+                      "path": "/",
+                      "body": "Intranet der Firma\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 4,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [
+      "impair R1 GigabitEthernet0/0/1 loss 20%"
+    ],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

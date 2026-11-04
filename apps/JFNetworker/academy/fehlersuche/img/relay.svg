@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="210" viewBox="0 0 620 210">
+  <title>A DHCP relay</title>
+  <rect x="1" y="1" width="618" height="208" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="30" y="58" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="36" y="64" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="48" y="94" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="60" y="120" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC1</text>
+  <circle cx="290" cy="80" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M294 80 L297 80" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M308.0 80.0 L297.0 74.0 L297.0 86.0 Z" fill="#44515E"/>
+  <path d="M286 80 L283 80" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M272.0 80.0 L283.0 86.0 L283.0 74.0 Z" fill="#44515E"/>
+  <path d="M290 84 L290 87" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M290.0 98.0 L296.0 87.0 L284.0 87.0 Z" fill="#44515E"/>
+  <path d="M290 76 L290 73" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M290.0 62.0 L284.0 73.0 L296.0 73.0 Z" fill="#44515E"/>
+  <text x="290" y="124" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">R1</text>
+  <rect x="514" y="52" width="52" height="56" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M522 66 L558 66" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M522 80 L558 80" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M522 94 L558 94" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <text x="540" y="126" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">DHCP</text>
+  <path d="M92 80 L264 80" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M316 80 L510 80" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M96 56 L245 56" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M256.0 56.0 L245.0 50.0 L245.0 62.0 Z" fill="#A9702A"/>
+  <text x="176" y="46" font-family="monospace" font-size="13" text-anchor="middle" fill="#A9702A" font-weight="bold">broadcast</text>
+  <path d="M322 56 L495 56" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M506.0 56.0 L495.0 50.0 L495.0 62.0 Z" fill="#2F7D4F"/>
+  <text x="414" y="46" font-family="monospace" font-size="13" text-anchor="middle" fill="#2F7D4F" font-weight="bold">unicast</text>
+  <text x="290" y="164" font-family="monospace" font-size="13" text-anchor="middle" fill="#2B3640" font-weight="bold">ip helper-address</text>
+  <text x="290" y="186" font-family="monospace" font-size="13" text-anchor="middle" fill="#2B3640">10.0.3.10</text>
+</svg>

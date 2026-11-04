@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="220" viewBox="0 0 620 220">
+  <title>TTL 1, 2 and 3</title>
+  <rect x="1" y="1" width="618" height="218" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <rect x="40" y="148" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="46" y="154" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="58" y="184" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <circle cx="240" cy="170" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M244 170 L247 170" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M258.0 170.0 L247.0 164.0 L247.0 176.0 Z" fill="#44515E"/>
+  <path d="M236 170 L233 170" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M222.0 170.0 L233.0 176.0 L233.0 164.0 Z" fill="#44515E"/>
+  <path d="M240 174 L240 177" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M240.0 188.0 L246.0 177.0 L234.0 177.0 Z" fill="#44515E"/>
+  <path d="M240 166 L240 163" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M240.0 152.0 L234.0 163.0 L246.0 163.0 Z" fill="#44515E"/>
+  <circle cx="410" cy="170" r="26" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M414 170 L417 170" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M428.0 170.0 L417.0 164.0 L417.0 176.0 Z" fill="#44515E"/>
+  <path d="M406 170 L403 170" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M392.0 170.0 L403.0 176.0 L403.0 164.0 Z" fill="#44515E"/>
+  <path d="M410 174 L410 177" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M410.0 188.0 L416.0 177.0 L404.0 177.0 Z" fill="#44515E"/>
+  <path d="M410 166 L410 163" fill="none" stroke="#44515E" stroke-width="2.5"/>
+  <path d="M410.0 152.0 L404.0 163.0 L416.0 163.0 Z" fill="#44515E"/>
+  <rect x="530" y="148" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="536" y="154" width="48" height="24" rx="1" fill="#DDF0E4" stroke="#DDF0E4" stroke-width="0"/>
+  <rect x="548" y="184" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <path d="M102 170 L214 170" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M266 170 L384 170" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M436 170 L528 170" fill="none" stroke="#C4CBD3" stroke-width="3"/>
+  <path d="M70 34 L223 34" fill="none" stroke="#3A6EA5" stroke-width="3"/>
+  <path d="M234.0 34.0 L223.0 28.0 L223.0 40.0 Z" fill="#3A6EA5"/>
+  <text x="72" y="27" font-family="monospace" font-size="12" text-anchor="start" fill="#3A6EA5" font-weight="bold">TTL 1</text>
+  <path d="M238 26 L254 42 M238 42 L254 26" stroke="#B23A3A" stroke-width="3" fill="none"/>
+  <path d="M70 68 L393 68" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M404.0 68.0 L393.0 62.0 L393.0 74.0 Z" fill="#A9702A"/>
+  <text x="72" y="61" font-family="monospace" font-size="12" text-anchor="start" fill="#A9702A" font-weight="bold">TTL 2</text>
+  <path d="M408 60 L424 76 M408 76 L424 60" stroke="#B23A3A" stroke-width="3" fill="none"/>
+  <path d="M70 102 L543 102" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M554.0 102.0 L543.0 96.0 L543.0 108.0 Z" fill="#2F7D4F"/>
+  <text x="72" y="95" font-family="monospace" font-size="12" text-anchor="start" fill="#2F7D4F" font-weight="bold">TTL 3</text>
+</svg>

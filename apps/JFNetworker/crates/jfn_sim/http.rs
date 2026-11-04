@@ -494,6 +494,10 @@ impl Serve {
     pub fn conns(&self) -> usize {
         self.conns.len()
     }
+    /// how many of its connections are older than this one (socket numbers only grow)
+    pub fn rank(&self, sock: u32) -> usize {
+        self.conns.range(..sock).count()
+    }
     /// requests read and not answered yet
     pub fn pending(&self) -> usize {
         self.reqs.len()

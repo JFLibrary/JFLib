@@ -1,0 +1,25 @@
+# JFNetworker-Experiment db_scale_small.jfnex: „Der kurze Lauf der Testsuite“
+# Konfigurationen: 3, Laststufen: 2, Seeds: 1; 2 s Warmlauf, je Stufe 1 s Übergang und 2 s Messung (virtuelle Zeit)
+# SLO: p99 bis 100 ms, Fehler bis 1 %
+# Ergebnis des Modells mit seinen Annahmen; die Kosten sind angenommene Preise (catalog::Prices), keine Angebote
+
+Puffer MiB 16 (0.470 €/h)
+Last   erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s     104.000     1.4     2.1     2.1       2.4      0.00    0.1  0.001255    ok  -
+400/s     410.000     1.4     1.7     2.1       2.7      0.00    0.4  0.000318  Knie  -
+
+Puffer MiB 256 (0.470 €/h)
+Last   erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s     104.000     1.4     2.1     2.1       2.4      0.00    0.1  0.001255    ok  -
+400/s     410.500     1.4     1.7     2.1       2.5      0.00    0.4  0.000318  Knie  -
+
+Lesen (0.470 €/h)
+Last   erreicht/s  p50 ms  p95 ms  p99 ms  p99.9 ms  Fehler %  CPU %    €/1000   SLO  Engpass
+100/s     104.500     1.8     2.1     2.4       2.7      0.00    0.1  0.001249    ok  -
+400/s     410.000     1.4     2.5     2.9       3.2      0.00    0.4  0.000318  Knie  -
+
+Zusammenfassung
+Konfiguration     €/h   Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+Puffer MiB 16   0.470  400/s    410.000        0.000318  -
+Puffer MiB 256  0.470  400/s    410.500        0.000318  -
+Lesen           0.470  400/s    410.000        0.000318  -

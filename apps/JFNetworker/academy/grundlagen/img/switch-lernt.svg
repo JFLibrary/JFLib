@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280">
+  <title>A switch floods to an unknown address and then knows the port</title>
+  <rect x="1" y="1" width="618" height="278" rx="8" fill="#F4F6F8" stroke="#C4CBD3" stroke-width="2"/>
+  <text x="150" y="26" font-family="sans-serif" font-size="18" text-anchor="middle" fill="#A9702A" font-weight="bold">1</text>
+  <rect x="104" y="104" width="92" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="114" y="114" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="134" y="114" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="154" y="114" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="174" y="114" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <text x="150" y="92" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SW1</text>
+  <rect x="30" y="22" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="36" y="28" width="48" height="24" rx="1" fill="#F6ECDD" stroke="#F6ECDD" stroke-width="0"/>
+  <rect x="48" y="58" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="60" y="90" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC1</text>
+  <rect x="120" y="190" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="126" y="196" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="138" y="226" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="150" y="258" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC2</text>
+  <rect x="220" y="190" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="226" y="196" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="238" y="226" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="250" y="258" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC3</text>
+  <path d="M96 56 L121.53 91.1039" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M128.0 100.0 L126.4 87.6 L116.7 94.6 Z" fill="#A9702A"/>
+  <path d="M150 138 L150 173" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M150.0 184.0 L156.0 173.0 L144.0 173.0 Z" fill="#A9702A"/>
+  <path d="M180 138 L226.562 176.943" fill="none" stroke="#A9702A" stroke-width="3"/>
+  <path d="M235.0 184.0 L230.4 172.3 L222.7 181.5 Z" fill="#A9702A"/>
+  <path d="M310 20 L310 260" fill="none" stroke="#C4CBD3" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="470" y="26" font-family="sans-serif" font-size="18" text-anchor="middle" fill="#2F7D4F" font-weight="bold">2</text>
+  <rect x="424" y="104" width="92" height="32" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="434" y="114" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="454" y="114" width="12" height="12" rx="1" fill="#3A6EA5" stroke="#3A6EA5" stroke-width="0"/>
+  <rect x="474" y="114" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <rect x="494" y="114" width="12" height="12" rx="1" fill="#C4CBD3" stroke="#C4CBD3" stroke-width="0"/>
+  <text x="470" y="92" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">SW1</text>
+  <rect x="350" y="22" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="356" y="28" width="48" height="24" rx="1" fill="#DDF0E4" stroke="#DDF0E4" stroke-width="0"/>
+  <rect x="368" y="58" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="380" y="90" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC1</text>
+  <rect x="440" y="190" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="446" y="196" width="48" height="24" rx="1" fill="#DDF0E4" stroke="#DDF0E4" stroke-width="0"/>
+  <rect x="458" y="226" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="470" y="258" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC2</text>
+  <rect x="540" y="190" width="60" height="36" rx="4" fill="#FFFFFF" stroke="#44515E" stroke-width="2.5"/>
+  <rect x="546" y="196" width="48" height="24" rx="1" fill="#CFE0F1" stroke="#CFE0F1" stroke-width="0"/>
+  <rect x="558" y="226" width="24" height="6" rx="0" fill="#44515E" stroke="#44515E" stroke-width="0"/>
+  <text x="570" y="258" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#2B3640" font-weight="bold">PC3</text>
+  <path d="M460 184 L460 149" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M460.0 138.0 L454.0 149.0 L466.0 149.0 Z" fill="#2F7D4F"/>
+  <path d="M435 104 L404.012 82.3081" fill="none" stroke="#2F7D4F" stroke-width="3"/>
+  <path d="M395.0 76.0 L400.6 87.2 L407.5 77.4 Z" fill="#2F7D4F"/>
+  <rect x="510" y="30" width="96" height="56" rx="2" fill="#FFFFFF" stroke="#44515E" stroke-width="2"/>
+  <text x="558" y="52" font-family="monospace" font-size="13" text-anchor="middle" fill="#2B3640">PC1  1</text>
+  <text x="558" y="74" font-family="monospace" font-size="13" text-anchor="middle" fill="#2B3640">PC2  2</text>
+</svg>
