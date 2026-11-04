@@ -115,7 +115,7 @@ static TC_TAB: [(&str, i32, i32); 12] = [
     ("selection_mode", 0, crate::app::constants::SM_COUNT - 1),
     ("selection_quality", 0, SQ_ALIASED),
     ("pressure", 0, 1),
-    ("smoothing", 0, 1),
+    ("path_smoothing", 0, 1), // (not "smoothing": a saved 0 there was the old default, not a choice)
 ];
 
 // the TOOLCFG field of tc_tab row k

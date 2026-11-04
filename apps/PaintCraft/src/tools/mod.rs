@@ -184,7 +184,7 @@ impl ToolCfg {
         selqual: SQ_AA as u32,
         pressure: 1,
         ver: 0,
-        smooth: 0, // Ungeglätteter Weg
+        smooth: 1, // Geglätteter Weg
     };
 
     // the TOOLCFG fields of the hooks / records by asm offset (t1_fields, t1_cfgf)
@@ -314,6 +314,8 @@ pub(crate) struct Tool {
     pen_tool: i32,
     /// (PN1) a pen is known (Druckempfindlichkeit shown) / plat::pen_devices was asked
     pen_seen: bool,
+    /// the size button held down, when its next step is due (ms)
+    width_hold: (u32, u32),
     pen_probed: bool,
     /// inside TD_COMMIT / TD_CANCEL
     in_live: bool,
@@ -346,6 +348,7 @@ impl Default for Tool {
             prev: 0,
             pen_tool: 0,
             pen_seen: false,
+            width_hold: (0, 0),
             pen_probed: false,
             in_live: false,
             ptr_fx: 0,
@@ -929,24 +932,61 @@ pub(crate) fn opt_sep(ui: &mut Ui) {
     ui.spacer(4);
 }
 
+const WIDTH_HOLD_MS: u32 = 350;
+const WIDTH_EVERY_MS: u32 = 40;
+
 /// opt_width() -> 1 changed -- "Pinselgröße:" [-] [number] [+]
 pub(crate) fn opt_width(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut ch = false;
     opt_label(ui, "Pinselgröße:");
-    if ui.icon_button(ID_OPT_WDEC, IC_REMOVE, "Pinsel verkleinern") & EV_ACT != 0 {
-        width_step(p, ui, -1);
-        ch = true;
-    }
+    let ev = ui.icon_button(ID_OPT_WDEC, IC_REMOVE, "Pinsel verkleinern");
+    ch |= width_button(p, ui, ID_OPT_WDEC, ev, -1);
     ui.next_size(64, 0);
     if ui.number_box_f(ID_OPT_WIDTH, &mut p.tool.cfg.width, &RF_WIDTH) & EV_ACT != 0 {
         tool_cfg_changed(p);
         outline_update(p, ui);
         ch = true;
     }
-    if ui.icon_button(ID_OPT_WINC, IC_ADD, "Pinsel vergrößern") & EV_ACT != 0 {
-        width_step(p, ui, 1);
-        ch = true;
+    let ev = ui.icon_button(ID_OPT_WINC, IC_ADD, "Pinsel vergrößern");
+    ch |= width_button(p, ui, ID_OPT_WINC, ev, 1);
+    ch
+}
+
+// a size button (the widget just before, its events ev) -> changed: a step at the press, after
+// WIDTH_HOLD_MS one every WIDTH_EVERY_MS while it stays down on the button, always at this speed.  The
+// click of a press that stepped adds nothing; a click without one (the keyboard) makes the step
+fn width_button(p: &mut Pn, ui: &mut Ui, id: u32, ev: u32, d: i32) -> bool {
+    ui.touch_take(TF_REST); // (a finger that rests holds it too)
+    let (held, next) = p.tool.width_hold;
+    if ev & EV_HELD == 0 {
+        if held == id {
+            p.tool.width_hold = (0, 0);
+            return false;
+        }
+        if ev & EV_ACT == 0 {
+            return false;
+        }
+        width_step(p, ui, d);
+        return true;
     }
+    let now = ui.now();
+    let mut ch = false;
+    let mut next = next;
+    if held != id {
+        next = now.wrapping_add(WIDTH_HOLD_MS);
+        width_step(p, ui, d);
+        ch = true;
+    } else if ev & EV_HOVER == 0 {
+        next = now.wrapping_add(WIDTH_EVERY_MS);
+    } else {
+        while now.wrapping_sub(next) as i32 >= 0 {
+            next = next.wrapping_add(WIDTH_EVERY_MS);
+            width_step(p, ui, d);
+            ch = true;
+        }
+    }
+    p.tool.width_hold = (id, next);
+    ui.timer(TMR_WIDTH_HOLD, next.wrapping_sub(now).max(1)); // (a pass then, nothing else moves)
     ch
 }
 

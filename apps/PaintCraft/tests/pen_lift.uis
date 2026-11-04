@@ -1,0 +1,59 @@
+# pen_lift.uis -- a stroke with pressure keeps it at a point without any: what a system sends as the pen
+# lifts must not end the stroke in a dot of the full width (what a Surface showed), with and without path
+# smoothing.  Aliased dabs (cmd 932 0), width 40: 20 % is 8 px wide, the full width 40 px.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) is at the point (240 + x, 148 + y); cmd 901
+# (y << 16) + x reads it into #9900.
+size 1280 800
+theme light
+cmd 932 0
+cmd 930 4000
+
+# ------------------------------------------------------------ without smoothing
+cmd 948 0
+pointer pen 20
+move 340,248
+down 340,248
+move 440,248
+move 540,248
+pointer pen
+move 560,248
+up 560,248
+wait 50
+# (the stroke reached the last point: on the line at x = 310)
+cmd 901 6553910
+expect #9900 text "FF000000"
+# 10 px above the line: inside the full width, outside 20 %
+cmd 901 5898550
+expect #9900 text "FFFFFFFF"
+cmd 901 5898560
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ with smoothing: the last piece too
+cmd 948 1
+pointer pen 20
+move 340,448
+down 340,448
+move 440,448
+move 540,448
+pointer pen
+move 560,448
+up 560,448
+wait 50
+cmd 901 19661110
+expect #9900 text "FF000000"
+cmd 901 19005750
+expect #9900 text "FFFFFFFF"
+cmd 901 19005760
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ a pen without a pressure axis: the full width
+pointer pen
+move 340,648
+down 340,648
+move 540,648
+up 540,648
+wait 50
+# (y = 490: 10 px above the line at y = 500)
+cmd 901 32112840
+expect #9900 text "FF000000"
+pointer mouse

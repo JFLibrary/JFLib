@@ -64,6 +64,7 @@ mod win {
     static REPORT: AtomicU32 = AtomicU32::new(0);
     static TIME: AtomicU32 = AtomicU32::new(0);
     static ORG: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
+    static MIDDLE: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2]; // the contact's middle (screen; 0: none)
 
     fn is_finger(id: u32) -> bool {
         (20..36).contains(&id)
@@ -84,6 +85,7 @@ mod win {
             x: X[k].load(SeqCst) + ORG[0].load(SeqCst) - back,
             y: Y[k].load(SeqCst) + ORG[1].load(SeqCst),
             time: TIME.load(SeqCst),
+            middle: Some([MIDDLE[0].load(SeqCst), MIDDLE[1].load(SeqCst)]).filter(|m| m[0] != 0),
         }
     }
 
@@ -253,6 +255,34 @@ mod win {
         // the mouse's way again without a finger: nothing to follow
         nc(k, WM_NCPOINTERUPDATE, 20, HTCAPTION);
         no_events(t, "touch: updates of a finger that lifted: nothing");
+
+        // ---- a contact given to a frame: the system moves its position there and keeps it off by that,
+        // the contact's middle says where the finger is
+        evq_clear();
+        at(20, r[0] - o[0] + 12, r[1] - o[1] + 90);
+        MIDDLE[0].store(r[0] + 12, SeqCst);
+        MIDDLE[1].store(r[1] + 110, SeqCst);
+        nc(k, WM_NCPOINTERDOWN, 20, 15);
+        let e = evq_pop().unwrap_or_default();
+        t.check(e.typ == E_DOWN && e.win == k as u8 && e.x == 12 && e.y == 110, "touch: a contact on a frame: the finger is at the contact's middle");
+        HIST.store(0, SeqCst);
+        at(20, r[0] - o[0] + 12, r[1] - o[1] + 80);
+        send(k, WM_POINTERUPDATE, 20);
+        let e = evq_pop().unwrap_or_default();
+        t.check(e.typ == E_MOVE && e.y == 100, "touch: ... and stays there while it moves");
+        send(k, WM_POINTERUP, 20);
+        let e = evq_pop().unwrap_or_default();
+        t.check(e.typ == E_UP && e.y == 100, "touch: ... and when it lifts");
+        evq_clear();
+        MIDDLE[0].store(0, SeqCst);
+        MIDDLE[1].store(0, SeqCst);
+        // a contact on a tool window's frame without a contact area: it is never the system's
+        at(20, r[0] - o[0] + 12, r[1] - o[1] + 90);
+        nc(k, WM_NCPOINTERDOWN, 20, 15);
+        let e = evq_pop().unwrap_or_default();
+        t.check(e.typ == E_DOWN && e.win == k as u8, "touch: a tool window's frame stays with the finger, with nothing under it too");
+        send(k, WM_POINTERUP, 20);
+        evq_clear();
 
         // ---- the system's mouse move while a finger is the pointer: the cursor did not move
         at(23, 8, 8);

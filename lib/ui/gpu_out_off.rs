@@ -43,6 +43,7 @@ impl Ui {
         None
     }
     pub(crate) fn gp_window_gone(&mut self, _i: u32) {}
+    pub(crate) fn gp_window_show(&mut self, _i: u32, _show: bool) {}
     pub(crate) fn gp_shutdown(&mut self) {}
     pub(crate) fn gp_scripted(&self) -> bool {
         false

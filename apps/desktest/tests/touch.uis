@@ -50,7 +50,7 @@ window any
 expect window 601 rect 24 48 260 120
 window 601
 finger down 100,20
-wait 1100
+wait 700
 finger move 130,50
 finger up
 window any

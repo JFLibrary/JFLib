@@ -48,7 +48,7 @@ pub const HB_GRAB_V: u32 = 0x80000;
 // finger moving along this axis is the widget's (not the scroll view's around it); with both the
 // press comes with the touch, unless TF_SLOP (only once the finger moved) or TF_HOLD (only after
 // resting for the long-press time: a panel that starts to move then, until then the finger goes
-// to what is around it); TF_HOLD_LONG the same after a second (a panel's title bar; ui.touch_hold_part
+// to what is around it); TF_HOLD_LONG the same after 600 ms (a panel's title bar; ui.touch_hold_part
 // shows it); TF_REST a finger that rests presses like one that moved, no context menu (a canvas); TF_TWO
 // a second finger is the widget's: no press, no click, it reads ui.touch_two or ui.touch_fingers (pan and
 // zoom); TF_DECLINE no drag at all, a tap still clicks.  0: nothing special (the finger rolls what is

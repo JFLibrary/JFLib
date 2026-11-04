@@ -17,7 +17,7 @@
 //     minimize  minimised: nothing uploaded or presented; restored: what changed meanwhile shows
 //     dpi       a DPI change: the bigger frame, the swapchain again
 //     windows   a second window on the same device; a popup outside the window stays on the CPU
-//               path; the second window closes and comes back
+//               path; the second window closes and comes back with its picture
 //     off       jfgui_GPU=0: the CPU path, the window's DC shows the frame
 //     noloader  jfgui_GPU_DLL names a missing file: the CPU path, no retry, no message
 //     lose      Device::test_lose: the frame back through the CPU path and on the screen (GDI
@@ -447,6 +447,28 @@ impl Test {
         self.ok(got == want, &format!("{what}: the screen shows {got:06x}, expected {want:06x}"));
     }
 
+    // the middle of the second window (plat window 1, filled in the frame) as the screen shows it
+    fn second_on_screen(&mut self, what: &str) {
+        let Some(r) = plat::win_get_rect(1).filter(|_| cfg!(windows)) else {
+            out(&format!("note: {what}: no way to read the window back here (no result)"));
+            return;
+        };
+        let (x, y) = (r[2] / 2, r[3] / 2);
+        let want = 0x60_4080;
+        let mut got = screen_px(r[0] + x, r[1] + y);
+        let t0 = plat::time_us();
+        while got != want && plat::time_us() < t0 + 1_500_000 {
+            plat::sleep_ms(4);
+            plat::gpu_wait(plat::time_us());
+            got = screen_px(r[0] + x, r[1] + y);
+        }
+        if got != want && plat::win_test(plat::WT_FROM_POINT, 1, [x, y, 0, 0]) != 1 {
+            out(&format!("note: {what}: another window lies on top of ours (no result)"));
+            return;
+        }
+        self.ok(got == want, &format!("{what}: the screen shows {got:06x}, expected {want:06x}"));
+    }
+
     // ---------------------------------------------------------------- the tests
 
     fn t_switch(&mut self, ui: &mut Ui) {
@@ -756,8 +778,18 @@ impl Test {
                 }
             }
             6 => {
+                // (hidden, its swapchain's image did not come back with it: what the CPU path holds does)
+                if self.after(300) {
+                    self.second_on_screen("the second window is back");
+                    self.next();
+                }
+            }
+            7 => {
                 if self.after(600) {
-                    self.ok(ui.gpu_output(1).on, "the second window shows again, on its swapchain");
+                    let o = ui.gpu_output(1);
+                    self.ok(o.on, "the second window shows again, on its swapchain");
+                    self.ok(o.switches == 2, &format!("hidden, it went back to the CPU path and came back ({} switches)", o.switches));
+                    self.second_on_screen("the second window on its swapchain again");
                     self.finish(ui);
                 }
             }

@@ -1969,7 +1969,7 @@ Fensterrand hinaus.
     unsichtbaren Rahmen eines Werkzeugfensters); ein Fenster folgt dem Finger selbst (`begin_move`). Bildschirmtastatur über
     `InputPane`.
   - Linux: `wl_touch` (Hauptfenster, Kindfenster, Popups) und XInput-2.2-Touch auf X11.
-  - Bibliothek: Zwei-Finger-Geste (`ui.touch_two`), Halten vor dem Ziehen eines Panels (`WF_TOUCH_HOLD`, 1 s, mit
+  - Bibliothek: Zwei-Finger-Geste (`ui.touch_two`), Halten vor dem Ziehen eines Panels (`WF_TOUCH_HOLD`, 600 ms, mit
     Anzeige), größere Trefferflächen vom Hintergrund aus (44 DIP), der Stift geht vor (Handballen), `TF_REST`, ein Tippen
     bleibt ein Klick, wenn der Finger etwas rollt.
   - PaintCraft: Pinch und Verschieben in jede Richtung, ein Finger malt oder verschiebt (Einstellung).

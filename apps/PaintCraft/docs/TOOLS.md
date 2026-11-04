@@ -104,7 +104,7 @@ The commit is one `hist_px_begin/touch/end` (one entry, HIST-020).
 | TC_SELMODE | u32 SM_* | Ersetzen | `opt_selmode` #2130 | Auswahlmodus: Ersetzen, Vereinigen, Subtrahieren, Schneiden, Exklusiv (XOR) |
 | TC_SELQUAL | u32 SQ_* | geglättet | `opt_selqual` #2140 (icon) | Auswahl mit Kantenglättung / nicht glätten |
 | TC_PRESSURE | u32 | 1 | – | pen pressure scales the width (tool row "Druckempfindlichkeit", PN1 §10) |
-| TC_SMOOTH | u32 | 0 | `opt_smooth` #2150 (icon, tooltip Pfadglättung) | Geglätteter Weg / Ungeglätteter Weg |
+| TC_SMOOTH | u32 | 1 | `opt_smooth` #2150 (icon, tooltip Pfadglättung) | Geglätteter Weg / Ungeglätteter Weg |
 | TC_VER | u32 | | – | bumped by every change (live tools compare it) |
 
 `[` / `]` (CMD_BRUSH_DEC / INC) change the width by 1, Strg+`[` / `]` by 5 (1..2000).  The
@@ -204,8 +204,7 @@ worker pool + `sync`, X / Standardfarben), `tools_picker.uis`, `tools_view.uis`,
 ## 9. Open points
 
 * paint.net draws the brush outline inverted (XOR-like); here a dark + a light ring.
-* The brush type (circle / square) is not implemented; the default of Pfadglättung is
-  "Ungeglätteter Weg" (paint.net's default unverified).  Pen pressure: §10.
+* The brush type (circle / square) is not implemented.  Pen pressure: §10.
 * The fill's antialiasing is a 3 × 3 tent filter (a 1 px soft edge), not paint.net's
   polygon-based AA; flood tolerance scaling is flood.s's (to be calibrated).
 * Own cursors (cursors.s, like paint.net's tool cursors): a black crosshair with a white rim
@@ -223,7 +222,9 @@ worker pool + `sync`, X / Standardfarben), `tools_picker.uis`, `tools_view.uis`,
 * **Width**: Farbpinsel, Radierer, Klonen (Stempel) and Neu färben pass the pressure of every
   move point (`UI_PPRESS`) and of the pointer (`UI_PRESSURE`) to the brush engine through
   `be_ui_pressure(ui, i)` (65535 → `BE_PRESSURE_ONE` 1024, rounded, at least 1 while there is
-  pressure); 0 = mouse = full width.  Without smoothing the dab radius is interpolated along a
+  pressure); 0 = mouse = full width, but a stroke that has pressure keeps its last one at a
+  point without any (what a system sends as the pen lifts, else a dot of the full width ends the
+  stroke).  Without smoothing the dab radius is interpolated along a
   segment from the last point's pressure to the new one and the dab step follows the smaller of
   the two radii (no gaps when the pressure rises).  Opacity does not follow the pressure
   (DRAW-020 asks for the size).  The Zeichenstift ignores pressure.

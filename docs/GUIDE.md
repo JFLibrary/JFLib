@@ -5147,7 +5147,7 @@ boxes say (the page "Container" of `apps/androidGallery` shows it):
 | `TF_H`, `TF_V`, `TF_BOTH` | a finger moving along this axis (both: the press comes with the touch) |
 | `TF_SLOP` | with `TF_BOTH`: the press only once the finger moved (a canvas waits for a second finger) |
 | `TF_HOLD` | only after resting for the long-press time, then the press comes and the drag starts (no right button); until then the finger rolls what is around it; a tap still clicks |
-| `TF_HOLD_LONG` | with `TF_HOLD`: a second instead of the long-press time (a panel's title bar) |
+| `TF_HOLD_LONG` | with `TF_HOLD`: 600 ms instead of the long-press time (a panel's title bar) |
 | `TF_REST` | a finger that rests presses like one that moved, no right button (a canvas: a dab; there is no context menu to reach) |
 | `TF_TWO` | two fingers are its own: no press, no click (a press younger than 200 ms is taken back), a pass whenever a finger moves; `ui.touch_two()` below, or `ui.touch_fingers()` (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for anything else |
 | `TF_DECLINE` | no drag at all, a tap still clicks: the finger rolls what is around it or does nothing |
