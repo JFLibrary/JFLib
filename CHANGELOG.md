@@ -139,6 +139,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** `ui.window_title_height(flags)`: a window's title bar, higher with a finger, for what is laid out below it
 - **PaintCraft:** The menus Ansicht, Bild, Ebenen and Korrekturen show a colourful icon for every command, Originalgröße a 1:1 (own artwork in tools/gen_pn_icons.py, which now writes generated.rs itself); code points of its own (PN_*) are drawn in greys on disabled rows, the bar of the Ebenen window uses the same icons
 - **ui:** `ui::main!` and `rt::main!` also take the manifest and PACKAGE from a file named by a build script (`JFGUI_PERMISSIONS_FILE`, `JFGUI_PACKAGE_FILE`), and a build without `panic = "abort"` ends with a message that names the missing setting (docs/CRATES.md, CR0)
+- **build:** jflib-build, the build script of a Cargo project: PERMISSIONS and PACKAGE checked with the line, assets/ as JFA1 with LZ4, res/app.ico without a resource compiler, the linker arguments for Windows, Linux (static or against glibc) and the browser; the crate jflib carries a template project, docs/GUIDE.md and docs/API.md; tools/crates_accept.py builds that template from the packed crates in the full suite (docs/CRATES.md)
 
 ### Changed
 
@@ -230,6 +231,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **base:** `f64_format` and `f64_parse` are bit-exact again for x64 programs under the emulation of Windows on ARM, whose x87 registers hold only doubles: the portable code then does the same steps
 - **ui:** A window that was hidden came back white on the GPU output until its next frame (a swapchain's image does not return with its window): it goes back to the CPU path while nobody sees it, also when the system hides a tool window with its minimised owner (`WST_HIDDEN`), and every window appears with its picture
 - **plat:** A finger on a tool window's frame stays with the window under the finger: Windows moves such a contact's position onto the frame and keeps it off by that, so its contact rectangle counts, and the frame is never the system's; `jfgui_TOUCH_LOG=1` says where a finger went
+- **plat:** plat links kernel32 through raw-dylib everywhere: a Windows program needs no import library, so no Visual Studio and no Windows SDK
 
 ### Security
 

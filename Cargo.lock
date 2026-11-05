@@ -153,6 +153,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-build"
+version = "0.1.0"
+dependencies = [
+ "jflib-compress",
+]
+
+[[package]]
 name = "jflib-cas"
 version = "0.1.0"
 dependencies = [

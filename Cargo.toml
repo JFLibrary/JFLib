@@ -3,8 +3,9 @@
 # docs/CRATES.md is the plan, the apps get manifests in its stage CR3.
 [workspace]
 resolver = "3"
-# worktrees below this folder may be older than this file: their Cargo.toml are not members of it
-exclude = [".claude"]
+# worktrees below this folder may be older than this file, build/ holds test projects: their
+# Cargo.toml are not members of it
+exclude = [".claude", "build"]
 default-members = ["lib/jflib"]
 # lib/ in this order is build_rs.py's LIBS: a program's crates link in it
 members = [
@@ -58,6 +59,7 @@ members = [
     "lib/eapm",
     "lib/style_assets",
     "lib/jflib",
+    "lib/jflib_build",
     "styles/winui",
     "styles/classic",
     "styles/kde",

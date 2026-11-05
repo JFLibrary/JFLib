@@ -18,7 +18,8 @@ let projects outside this repository build it with Cargo alone (docs/CRATES.md).
                                                                 app again in its session (input replayed, window,
                                                                 style, inspector kept); development builds only
   python build_rs.py test [--quick]                          lint, build, every apps/*/tests/*.uis (+ apps/*/tests),
-                                                                then parity with asm (not with --quick)
+                                                                then the crates' acceptance test (tools/crates_accept.py)
+                                                                and parity with asm (both not with --quick)
   python build_rs.py test NAME                               build one app and run its tests/*.uis
   python build_rs.py check                                   lint only
   python build_rs.py new NAME [--kind window|console|tool|service] [--style S] [--title T]
@@ -816,7 +817,8 @@ def same_text(a, b):
 def manifest_lint():
     """what rustc does not see, Cargo would only find in a build of its own (docs/CRATES.md) ->
     problems: every crate is in the facade, a style's manifest has the crates its sources name
-    (build_rs.py finds them by name), every package holds the licences it needs"""
+    (build_rs.py finds them by name), every package holds the licences it needs, the template
+    of lib/jflib is current"""
     bad = []
     members = manifests.workspace()["members"]
     styles = {f"style_{Path(m).name}": m for m in members if m.startswith("styles/")}
@@ -842,7 +844,8 @@ def manifest_lint():
             source = ROOT / "licenses" / copy.name
             if not source.is_file() or not same_text(copy, source):
                 bad.append(f"{copy.relative_to(ROOT).as_posix()}: differs from licenses/{copy.name}: copy that file over it")
-    return bad
+    from tools import crates_accept                 # the template of lib/jflib comes from apps/template
+    return bad + crates_accept.template_problems()
 
 
 def lint():
@@ -1667,6 +1670,14 @@ def run_tests(builders, out, quick):
     if r.returncode:
         fails.append("tools/site.py --check")
     if not quick:
+        # docs/CRATES.md: a project outside the repository builds from the packed crates alone (Windows,
+        # Linux, the browser), its smoke test passes; about 15 minutes from nothing
+        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web"})
+        r = subprocess.run([sys.executable, str(RS / "tools" / "crates_accept.py"), "--targets", ",".join(targets)], cwd=ROOT,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+        print("".join(ln for ln in r.stdout.splitlines(True) if ln.startswith(("FAIL", "    ", "note", "crates"))).strip())
+        if r.returncode:
+            fails.append("tools/crates_accept.py")
         # parity with the assembly reference (apps that exist in both)
         tgt = "both" if len(builders) == 2 else builders[0].target
         for name in apps():

@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FACADE = "lib/jflib"            # names every crate, no crate of its own for an app to name
+NOT_LIBS = (FACADE, "lib/jflib_build")   # the build helper: std, a build-dependency
 # the cfg of a [target] table -> the build it belongs to: None for every build of build_rs.py,
 # which never compiles inside a module with these names (ModuleBuilder passes modrt as rt itself)
 TARGET_CFG = {
@@ -43,7 +44,7 @@ def version(root=ROOT):
 
 def lib_members(root=ROOT):
     """the folders of lib/ that are library crates, in the order of the root manifest"""
-    return [m for m in workspace(root)["members"] if m.startswith("lib/") and m != FACADE]
+    return [m for m in workspace(root)["members"] if m.startswith("lib/") and m not in NOT_LIBS]
 
 
 def library_crates(root=ROOT):

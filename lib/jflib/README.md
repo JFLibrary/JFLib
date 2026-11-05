@@ -1,0 +1,91 @@
+# jflib
+
+A GUI library and everything it stands on, without the standard library: windows and controls,
+text, images in many formats, the GPU, files, the network, documents, and a runtime of its own.
+This one dependency brings all of it; a program links only what it uses.
+
+`docs/GUIDE.md` in this package explains how an app is written, `docs/API.md` lists every public
+item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crate.
+
+## Quick start
+
+`template/` in this package is a complete app with a window. Copy it and build it:
+
+```sh
+cp -r ~/.cargo/registry/src/*/jflib-0.1.*/template hallo
+cd hallo
+mv Cargo.toml.in Cargo.toml
+cargo run
+target/debug/hallo --script tests/smoke.uis
+```
+
+| File | What it is for |
+| --- | --- |
+| `Cargo.toml` | `jflib`, and `jflib-build` for the build script; the profiles below |
+| `build.rs` | `jflib_build::app()`, or `jflib_build::console()` for a command-line program |
+| `.cargo/config.toml` | the linker (rust-lld, it comes with rustup) and what Linux needs |
+| `src/lib.rs` | the app: a `ui::App` and `ui::main!` |
+| `src/main.rs` | the program, it only links the app, so the same code builds for the browser |
+| `PERMISSIONS` | what the app may do; without the file everything |
+| `PACKAGE` | its name, id and file types for `--register` |
+| `assets/` (optional) | files the app reads as `app://NAME` |
+| `res/app.ico` (optional) | its icon on Windows |
+| `tests/smoke.uis` | a test script, run with `--script` |
+
+Names come from the crate in code: `use jflib::{style, ui};`, then `ui::Ui`, `plat::read_file`.
+
+## The profiles
+
+Cargo takes no profile from a dependency, so every project needs these in its `Cargo.toml`.
+Without `panic = "abort"` the build stops at `ui::main!` with a message that says so.
+
+```toml
+[profile.dev]
+panic = "abort"
+opt-level = 1
+debug = 0
+debug-assertions = false
+overflow-checks = false
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+codegen-units = 1
+lto = "fat"
+debug = 0
+strip = "symbols"
+```
+
+## Targets
+
+| Target | Build | Notes |
+| --- | --- | --- |
+| Windows | `cargo build` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
+| Linux | `cargo build --target x86_64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
+| Browser | `cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown` | the module; the page around it (`index.html`, `loader.js`, ...) is `web/` of the JFLib repository for now |
+| Android | not through Cargo alone yet | |
+
+The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another
+(`classic`, `kde`, `macos`). All four are always there under their own names for the switch at
+run time (`style_kde::STYLE`).
+
+## Good to know
+
+- **A file added later:** after adding `PERMISSIONS`, `PACKAGE`, `assets/` or `res/app.ico` to
+  a project that had none, run `cargo clean -p NAME` once. The build script watches only what
+  exists; watching a missing file would compile the program again on every build.
+- **Always `--target` for Linux, on Linux too:** without it Cargo hands the target's flags to
+  the build scripts and proc macros as well, and the static relocation model breaks them. With it
+  they are linked by cc as usual and only the program by rust-lld. Without the two linker flags
+  cc links the program too.
+- **Paths in a release program:** panic messages name the source files with the build
+  machine's paths. `RUSTFLAGS="--remap-path-prefix=$HOME=~"` removes them.
+- **Versions:** the crates below `jflib` (`jflib-ui`, `jflib-plat`, ...) always come in the
+  same version and change together. Only the way through `jflib` is promised.
+- **Your own system calls:** JFLib checks a program's file, network and process access against
+  its `PERMISSIONS` in its platform layer. A crate that calls the system itself goes around it.
+
+## License
+
+MIT or Apache-2.0, at your choice. Parts carry third-party licenses in addition, named in each
+crate's manifest and its `licenses/` folder.

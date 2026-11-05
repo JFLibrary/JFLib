@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 build = "build.rs"
+readme = "README.md"
+# docs/ is copied in from the repository's docs/ before packing (tools/crates_accept.py), not kept in git
+include = ["src/**", "build.rs", "README.md", "LICENSE-*", "docs/*.md", "template/**"]
 
 [lib]
 test = false

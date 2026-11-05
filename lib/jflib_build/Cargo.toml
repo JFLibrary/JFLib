@@ -1,0 +1,20 @@
+[package]
+name = "jflib-build"
+description = "What a JFLib app's build.rs hands to ui::main! and rt::main!: permissions, package data, assets, link arguments"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "jflib_build"
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# the LZ4 of the app:// bundles, the same as tools/assetpack.py's
+compress.workspace = true

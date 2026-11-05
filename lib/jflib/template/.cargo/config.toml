@@ -1,0 +1,18 @@
+# What a build script cannot set (README.md of the crate jflib).  rust-lld comes with rustup.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
+
+[target.aarch64-pc-windows-msvc]
+linker = "rust-lld"
+
+# Linux: a program with a window links against glibc (the GPU drivers are glibc libraries).  A
+# command-line program can be one static file instead: "-C", "target-feature=+crt-static" in place
+# of "--cfg", "jfgui_glibc".  Always build with --target x86_64-unknown-linux-gnu, also on Linux:
+# these flags then reach only the program, not the build scripts and proc macros (linked by cc,
+# compiled for a shared library).  The linker is set here and not as `linker`, which would reach
+# them too.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
