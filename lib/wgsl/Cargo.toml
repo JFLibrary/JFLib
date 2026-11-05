@@ -1,0 +1,20 @@
+[package]
+name = "jflib-wgsl"
+description = "JFLib's WGSL compiler: source text to a checked, typed module to SPIR-V"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "wgsl"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+shader.workspace = true

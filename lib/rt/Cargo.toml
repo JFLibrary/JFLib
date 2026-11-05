@@ -1,0 +1,21 @@
+[package]
+name = "jflib-rt"
+description = "JFLib's runtime without std: allocator, memory intrinsics, program entry, panic handling"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+links = "jflib_rt"
+build = "build.rs"
+
+[lib]
+name = "rt"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]

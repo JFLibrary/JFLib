@@ -1,0 +1,27 @@
+[package]
+name = "jflib-text"
+description = "JFLib's text: fonts, synthetic styles, colour glyphs, the glyph cache, text runs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND FTL AND Unicode-3.0"
+repository.workspace = true
+
+[lib]
+name = "text"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+text_shape.workspace = true

@@ -1,0 +1,21 @@
+[package]
+name = "jflib-base"
+description = "Portable basics above JFLib's runtime and platform layer: strings, arguments, INI files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "base"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true

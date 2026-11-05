@@ -1,0 +1,26 @@
+[package]
+name = "jflib-img-bmp"
+description = "BMP decoder and encoder for JFLib"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "img_bmp"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# img_png, img_jpeg: BI_PNG and BI_JPEG
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+img_jpeg.workspace = true

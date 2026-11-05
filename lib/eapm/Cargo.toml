@@ -1,0 +1,21 @@
+[package]
+name = "jflib-eapm"
+description = "EAP-MD5 and EAP-PWD as state machines without I/O"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "eapm"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+netpkt.workspace = true
+crypto.workspace = true

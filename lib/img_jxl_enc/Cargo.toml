@@ -1,0 +1,33 @@
+[package]
+name = "jflib-img-jxl-enc"
+description = "JFLib's JPEG XL writer with the full encoder: a port of libjxl's"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+repository.workspace = true
+
+[lib]
+name = "img_jxl_enc"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
+img_jxl.workspace = true
+
+# inside a loadable module (--cfg jflib_module) the same names are modrt and modplat
+[target.'cfg(not(jflib_module))'.dependencies]
+rt.workspace = true
+plat.workspace = true
+
+[target.'cfg(jflib_module)'.dependencies]
+modrt.workspace = true
+modplat.workspace = true

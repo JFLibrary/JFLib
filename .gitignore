@@ -1,6 +1,7 @@
 rust-project.json
 /__pycache__
 /build
+/target
 /buildManager.exe
 /apps/jfWord/context
 /apps/jfWord/books

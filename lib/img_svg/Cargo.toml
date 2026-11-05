@@ -1,0 +1,22 @@
+[package]
+name = "jflib-img-svg"
+description = "SVG images and icons drawn through JFLib's path rasterizer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "img_svg"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+gfx.workspace = true
+img_core.workspace = true

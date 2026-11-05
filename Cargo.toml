@@ -1,0 +1,162 @@
+# The library's crates.  Cargo builds them for projects outside this repository; build_rs.py still
+# compiles them with rustc itself and reads what it needs from here (tools/manifests.py).
+# docs/CRATES.md is the plan, the apps get manifests in its stage CR3.
+[workspace]
+resolver = "3"
+# worktrees below this folder may be older than this file: their Cargo.toml are not members of it
+exclude = [".claude"]
+default-members = ["lib/jflib"]
+# lib/ in this order is build_rs.py's LIBS: a program's crates link in it
+members = [
+    "lib/rt",
+    "lib/agent_core",
+    "lib/plat",
+    "lib/base",
+    "lib/agent_io",
+    "lib/simd",
+    "lib/gfx",
+    "lib/img_core",
+    "lib/archive",
+    "lib/doc_core",
+    "lib/doc_layout",
+    "lib/doc_io",
+    "lib/img_png",
+    "lib/text_shape",
+    "lib/text",
+    "lib/img_jpeg",
+    "lib/img_bmp",
+    "lib/img_gif",
+    "lib/img_tga",
+    "lib/img_tiff",
+    "lib/img_webp",
+    "lib/img_hevc",
+    "lib/img_av1",
+    "lib/img_heif",
+    "lib/img_avif",
+    "lib/img_jxl",
+    "lib/img_jxl_enc",
+    "lib/img_jxr",
+    "lib/img_dds",
+    "lib/img_pdn",
+    "lib/fx",
+    "lib/img_svg",
+    "lib/img_all",
+    "lib/spell",
+    "lib/ui",
+    "lib/doc_view",
+    "lib/datetime",
+    "lib/crypto",
+    "lib/compress",
+    "lib/shader",
+    "lib/wgsl",
+    "lib/netpkt",
+    "lib/datastore",
+    "lib/netio",
+    "lib/cas",
+    "lib/update",
+    "lib/gpu",
+    "lib/eapm",
+    "lib/style_assets",
+    "lib/jflib",
+    "styles/winui",
+    "styles/classic",
+    "styles/kde",
+    "styles/macos",
+    "modules/modrt",
+    "modules/modplat",
+    "modules/jxlenc",
+]
+
+# The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JFLibrary/JFLib"
+
+# Exact versions: only the way through the crate jflib is promised, the crates below it change together.
+[workspace.dependencies]
+rt = { package = "jflib-rt", path = "lib/rt", version = "=0.1.0" }
+agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.1.0" }
+plat = { package = "jflib-plat", path = "lib/plat", version = "=0.1.0" }
+base = { package = "jflib-base", path = "lib/base", version = "=0.1.0" }
+agent_io = { package = "jflib-agent-io", path = "lib/agent_io", version = "=0.1.0" }
+simd = { package = "jflib-simd", path = "lib/simd", version = "=0.1.0" }
+gfx = { package = "jflib-gfx", path = "lib/gfx", version = "=0.1.0" }
+img_core = { package = "jflib-img-core", path = "lib/img_core", version = "=0.1.0" }
+archive = { package = "jflib-archive", path = "lib/archive", version = "=0.1.0" }
+doc_core = { package = "jflib-doc-core", path = "lib/doc_core", version = "=0.1.0" }
+doc_layout = { package = "jflib-doc-layout", path = "lib/doc_layout", version = "=0.1.0" }
+doc_io = { package = "jflib-doc-io", path = "lib/doc_io", version = "=0.1.0" }
+img_png = { package = "jflib-img-png", path = "lib/img_png", version = "=0.1.0" }
+text_shape = { package = "jflib-text-shape", path = "lib/text_shape", version = "=0.1.0" }
+text = { package = "jflib-text", path = "lib/text", version = "=0.1.0" }
+img_jpeg = { package = "jflib-img-jpeg", path = "lib/img_jpeg", version = "=0.1.0" }
+img_bmp = { package = "jflib-img-bmp", path = "lib/img_bmp", version = "=0.1.0" }
+img_gif = { package = "jflib-img-gif", path = "lib/img_gif", version = "=0.1.0" }
+img_tga = { package = "jflib-img-tga", path = "lib/img_tga", version = "=0.1.0" }
+img_tiff = { package = "jflib-img-tiff", path = "lib/img_tiff", version = "=0.1.0" }
+img_webp = { package = "jflib-img-webp", path = "lib/img_webp", version = "=0.1.0" }
+img_hevc = { package = "jflib-img-hevc", path = "lib/img_hevc", version = "=0.1.0" }
+img_av1 = { package = "jflib-img-av1", path = "lib/img_av1", version = "=0.1.0" }
+img_heif = { package = "jflib-img-heif", path = "lib/img_heif", version = "=0.1.0" }
+img_avif = { package = "jflib-img-avif", path = "lib/img_avif", version = "=0.1.0" }
+img_jxl = { package = "jflib-img-jxl", path = "lib/img_jxl", version = "=0.1.0" }
+img_jxl_enc = { package = "jflib-img-jxl-enc", path = "lib/img_jxl_enc", version = "=0.1.0" }
+img_jxr = { package = "jflib-img-jxr", path = "lib/img_jxr", version = "=0.1.0" }
+img_dds = { package = "jflib-img-dds", path = "lib/img_dds", version = "=0.1.0" }
+img_pdn = { package = "jflib-img-pdn", path = "lib/img_pdn", version = "=0.1.0" }
+fx = { package = "jflib-fx", path = "lib/fx", version = "=0.1.0" }
+img_svg = { package = "jflib-img-svg", path = "lib/img_svg", version = "=0.1.0" }
+img_all = { package = "jflib-img-all", path = "lib/img_all", version = "=0.1.0" }
+spell = { package = "jflib-spell", path = "lib/spell", version = "=0.1.0" }
+ui = { package = "jflib-ui", path = "lib/ui", version = "=0.1.0" }
+doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.1.0" }
+datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.1.0" }
+crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.1.0" }
+compress = { package = "jflib-compress", path = "lib/compress", version = "=0.1.0" }
+shader = { package = "jflib-shader", path = "lib/shader", version = "=0.1.0" }
+wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.1.0" }
+netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.1.0" }
+datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.1.0" }
+netio = { package = "jflib-netio", path = "lib/netio", version = "=0.1.0" }
+cas = { package = "jflib-cas", path = "lib/cas", version = "=0.1.0" }
+update = { package = "jflib-update", path = "lib/update", version = "=0.1.0" }
+gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.1.0" }
+eapm = { package = "jflib-eapm", path = "lib/eapm", version = "=0.1.0" }
+style_assets = { package = "jflib-style-assets", path = "lib/style_assets", version = "=0.1.0" }
+style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.1.0" }
+style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.1.0" }
+style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.1.0" }
+style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.1.0" }
+modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
+modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(jfgui_assets)',    # ui::main!: the app has assets/
+    'cfg(jfgui_dev)',       # lib/ui/build.rs: a development build
+    'cfg(jfgui_glibc)',     # Linux against glibc, not static
+    'cfg(jfgui_manifest)',  # ui::main!, rt::main!: PERMISSIONS as a file
+    'cfg(jfgui_package)',   # ui::main!: PACKAGE as a file
+    'cfg(jflib_module)',    # inside a loadable module
+    'cfg(web_threads)',     # the browser with threads
+    'cfg(jflib_style, values("winui", "classic", "kde", "macos"))',
+] }
+
+# What a project needs as well, Cargo does not take profiles from a dependency (docs/CRATES.md).
+[profile.dev]
+panic = "abort"
+opt-level = 1
+debug = 0
+debug-assertions = false
+overflow-checks = false
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+codegen-units = 1
+lto = "fat"
+debug = 0
+strip = "symbols"

@@ -1,0 +1,23 @@
+[package]
+name = "jflib-gpu"
+description = "GPU access for JFLib: an explicit API over Vulkan and WebGPU"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "gpu"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# shader: shader::reflect (pipeline constants)
+rt.workspace = true
+plat.workspace = true
+shader.workspace = true

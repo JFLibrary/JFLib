@@ -1,0 +1,24 @@
+[package]
+name = "jflib-img-dds"
+description = "DDS reader and writer for JFLib, with the BC1 to BC7 block codecs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND MIT"
+repository.workspace = true
+
+[lib]
+name = "img_dds"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+plat.workspace = true

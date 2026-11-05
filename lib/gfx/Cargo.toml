@@ -1,0 +1,27 @@
+[package]
+name = "jflib-gfx"
+description = "JFLib's 2D graphics: surfaces, the draw context, fills, blits, paths"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND MIT"
+repository.workspace = true
+
+[lib]
+name = "gfx"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+simd.workspace = true
+
+# inside a loadable module (--cfg jflib_module) the same names are modrt and modplat
+[target.'cfg(not(jflib_module))'.dependencies]
+rt.workspace = true
+
+[target.'cfg(jflib_module)'.dependencies]
+modrt.workspace = true

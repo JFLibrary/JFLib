@@ -1,0 +1,21 @@
+[package]
+name = "jflib-modplat"
+description = "The platform layer of a loadable JFLib module, through its host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "modplat"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# the name its sources use; a module gets modrt as rt
+rt = { package = "jflib-modrt", path = "../modrt", version = "=0.1.0" }

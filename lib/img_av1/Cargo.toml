@@ -1,0 +1,24 @@
+[package]
+name = "jflib-img-av1"
+description = "AV1 intra decoder and encoder for AVIF still images"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-2-Clause"
+repository.workspace = true
+
+[lib]
+name = "img_av1"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+plat.workspace = true

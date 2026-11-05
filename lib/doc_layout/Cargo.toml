@@ -1,0 +1,21 @@
+[package]
+name = "jflib-doc-layout"
+description = "Paragraph flow and pagination for JFLib documents, independent of fonts and UI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "doc_layout"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+doc_core.workspace = true

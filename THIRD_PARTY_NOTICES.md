@@ -10,6 +10,8 @@ Every build ships this file and `licenses/`. `build_rs.py` copies both next to e
 (the style notices go to `licenses/<app>/<style>/`), `tools/package.py` puts them into the
 Windows setup, the MSIX, `.deb`, `.rpm`, AppImage and Flatpak packages (on Linux in
 `/usr/share/doc/<package>/`), and the Android build packs them below `assets/` in the APK.
+A library crate published on its own holds its part of `licenses/` as a copy in its folder and
+names these licenses in its manifest; `build_rs.py check` keeps the copies equal.
 
 Many Rust modules are ports of JFLib's earlier x86 assembly, named in their file headers
 (for example `[src/img/webp_vp8.s]`). That assembly was itself written from the upstream

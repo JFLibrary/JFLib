@@ -1,0 +1,19 @@
+[package]
+name = "jflib-style-assets"
+description = "The fonts and the icon set JFLib's styles share"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND OFL-1.1 AND MIT"
+repository.workspace = true
+
+[lib]
+name = "style_assets"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]

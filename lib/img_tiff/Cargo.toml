@@ -1,0 +1,26 @@
+[package]
+name = "jflib-img-tiff"
+description = "TIFF decoder and encoder for JFLib, with CCITT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND libtiff"
+repository.workspace = true
+
+[lib]
+name = "img_tiff"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# plat: the parallel decoder
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
+plat.workspace = true

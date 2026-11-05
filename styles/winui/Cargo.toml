@@ -1,0 +1,22 @@
+[package]
+name = "jflib-style-winui"
+description = "JFLib's WinUI 3 (Fluent) style"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = ["assets/*.ttf"]
+
+[lib]
+name = "style_winui"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+ui.workspace = true
+style_assets.workspace = true

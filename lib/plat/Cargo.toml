@@ -1,0 +1,23 @@
+[package]
+name = "jflib-plat"
+description = "JFLib's platform layer: one module per operating system with the same functions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "plat"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# compress: LZ4 of the app:// bundles (vfs); crypto: DH, AES, SHA-256 (secret)
+rt.workspace = true
+compress.workspace = true
+crypto.workspace = true

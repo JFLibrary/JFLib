@@ -1,0 +1,22 @@
+[package]
+name = "jflib-agent-io"
+description = "Explicitly activated transports for JFLib's agent interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "agent_io"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+agent_core.workspace = true

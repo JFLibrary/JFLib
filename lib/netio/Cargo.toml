@@ -1,0 +1,23 @@
+[package]
+name = "jflib-netio"
+description = "Network protocols on top of JFLib's platform layer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "netio"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+crypto.workspace = true
+agent_core.workspace = true

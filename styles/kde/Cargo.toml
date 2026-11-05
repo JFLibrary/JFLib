@@ -1,0 +1,22 @@
+[package]
+name = "jflib-style-kde"
+description = "JFLib's KDE Plasma (Breeze) style"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND Bitstream-Vera"
+repository.workspace = true
+exclude = ["states"]     # the state scripts of docs/STYLES.md, in no program
+
+[lib]
+name = "style_kde"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+ui.workspace = true
+style_assets.workspace = true

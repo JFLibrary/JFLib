@@ -1,0 +1,23 @@
+[package]
+name = "jflib-archive"
+description = "In-memory ZIP32 reading and writing for JFLib"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "archive"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# plat: ZipFs (vfs)
+rt.workspace = true
+img_core.workspace = true
+plat.workspace = true

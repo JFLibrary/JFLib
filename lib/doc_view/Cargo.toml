@@ -1,0 +1,25 @@
+[package]
+name = "jflib-doc-view"
+description = "Document presentation for JFLib: stable fonts, pagination measurement, page drawing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND Bitstream-Vera"
+repository.workspace = true
+
+[lib]
+name = "doc_view"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+doc_core.workspace = true
+doc_layout.workspace = true
+gfx.workspace = true
+text.workspace = true
+ui.workspace = true

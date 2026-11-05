@@ -1,0 +1,19 @@
+[package]
+name = "jflib-datetime"
+description = "Calendar time without std: timestamps, civil dates, RFC 3339, time zones, cron schedules"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND Unicode-3.0"
+repository.workspace = true
+
+[lib]
+name = "datetime"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]

@@ -1,0 +1,20 @@
+[package]
+name = "jflib-agent-core"
+description = "Transport-independent action contracts and bounded JSON for JFLib's agent interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "agent_core"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true

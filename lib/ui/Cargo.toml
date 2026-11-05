@@ -1,0 +1,53 @@
+[package]
+name = "jflib-ui"
+description = "JFLib's immediate-mode GUI runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND Unicode-3.0"
+repository.workspace = true
+build = "build.rs"
+exclude = ["tests"]
+
+[lib]
+name = "ui"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# datetime: dates in the locale's format; spell: TB_SPELL; img_svg: ui.svg, image_view
+rt.workspace = true
+base.workspace = true
+gfx.workspace = true
+text.workspace = true
+plat.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+img_all.workspace = true
+agent_core.workspace = true
+agent_io.workspace = true
+datetime.workspace = true
+spell.workspace = true
+img_svg.workspace = true
+
+# The UI's output through the GPU: Windows, Linux in the build against glibc, Android and the browser
+# (WebGPU, no Vulkan code in its bundles).  The static Linux build links nothing of it: gpu_out_off.rs
+[target.'cfg(windows)'.dependencies]
+shader.workspace = true
+gpu.workspace = true
+
+[target.'cfg(all(target_os = "linux", jfgui_glibc))'.dependencies]
+shader.workspace = true
+gpu.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+shader.workspace = true
+gpu.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+shader.workspace = true
+gpu.workspace = true

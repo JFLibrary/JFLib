@@ -1,0 +1,26 @@
+[package]
+name = "jflib-img-avif"
+description = "AVIF reader and writer for JFLib"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "img_avif"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+plat.workspace = true
+img_heif.workspace = true
+img_av1.workspace = true

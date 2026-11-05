@@ -1,0 +1,24 @@
+[package]
+name = "jflib-doc-io"
+description = "Conservative DOCX reading and writing for JFLib documents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "doc_io"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+base.workspace = true
+plat.workspace = true
+archive.workspace = true
+doc_core.workspace = true

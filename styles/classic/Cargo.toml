@@ -1,0 +1,21 @@
+[package]
+name = "jflib-style-classic"
+description = "JFLib's classic style: the look of Windows 2000 and Office 97"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND Bitstream-Vera"
+repository.workspace = true
+
+[lib]
+name = "style_classic"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+ui.workspace = true
+style_assets.workspace = true

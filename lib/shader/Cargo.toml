@@ -1,0 +1,19 @@
+[package]
+name = "jflib-shader"
+description = "SPIR-V for JFLib's GPU code: module builder, disassembler, validator, std140 and std430 layouts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "shader"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]

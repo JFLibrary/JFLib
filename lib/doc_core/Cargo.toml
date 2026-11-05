@@ -1,0 +1,21 @@
+[package]
+name = "jflib-doc-core"
+description = "JFLib's structured document model with atomic edits and bounded undo and redo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "doc_core"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+base.workspace = true

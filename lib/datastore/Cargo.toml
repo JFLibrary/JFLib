@@ -1,0 +1,23 @@
+[package]
+name = "jflib-datastore"
+description = "An embedded, crash-safe store of JSON records with a write-ahead log and snapshots"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "datastore"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+crypto.workspace = true
+agent_core.workspace = true

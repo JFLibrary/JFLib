@@ -1,0 +1,24 @@
+[package]
+name = "jflib-fx"
+description = "Image effects and adjustments for JFLib, deterministic per pixel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND MIT AND SunPro"
+repository.workspace = true
+
+[lib]
+name = "fx"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+plat.workspace = true
