@@ -1,6 +1,6 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-05. CR0 und CR1 sind umgesetzt, CR2 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
+Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht; CR3 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -55,12 +55,14 @@ apps/jfs/crates/script/Cargo.toml   publish = false
 Das ergibt 57 veröffentlichte Crates. Ein fremdes Projekt sieht davon nur diese Struktur:
 
 ```text
-hallo/
+hallo/                       die Vorlage lib/jflib/template, im Paket von jflib
   Cargo.toml                 jflib, jflib-build, die Profile unten
+  .cargo/config.toml         rust-lld; für Linux das Relocation-Modell und glibc
   build.rs                   jflib_build::app();
   PERMISSIONS, PACKAGE       optional
-  assets/                    optional
-  src/main.rs                use jflib::{style, ui};  ...  ui::main!(...)
+  assets/, res/app.ico       optional
+  src/lib.rs                 die App: use jflib::{style, ui};  ...  ui::main!(...)
+  src/main.rs                bindet die App nur ein, so baut derselbe Code auch für den Browser
 ```
 
 Diese Profile braucht jedes Projekt, denn Cargo übernimmt sie nicht von einer Abhängigkeit:
@@ -178,7 +180,23 @@ Windows byte-gleich groß wie vor CR1, unter Linux ist `jfs` 16 und `template` 1
 
 ### CR2: Fremde Projekte
 
-Mittel. **Damit ist das Ziel „lokal kompatibel“ erreicht.**
+**Erledigt am 2026-11-05. Damit ist das Ziel „lokal kompatibel“ erreicht.** Ein Projekt außerhalb des Repos baut aus
+den gepackten Crates allein, offline, für Windows, Linux und den Browser, und sein Smoke-Test läuft.
+
+- **`jflib-build`** (`lib/jflib_build`, kein Teil von `LIBS`, mit `std`): `app()` und `console()`. `PERMISSIONS` und
+  `PACKAGE` prüft es mit denselben Meldungen wie `build_rs.py`, die Fälle von `PERM_CASES` sind seine Tests. Das
+  Asset-Bundle ist byte-gleich mit dem von `tools/assetpack.py`, das Icon (`res/app.ico`) byte-gleich mit dem, was
+  `llvm-rc` daraus macht, ohne Ressourcen-Compiler. Die Version ist die aus Cargo, ein `version=` in `PACKAGE` muss
+  ihr gleichen. Für Linux mit `jfgui_glibc` baut es die Stub-Bibliotheken selbst, mit `rustc` und dem `rust-lld` aus
+  rustup. Es beobachtet nur Dateien, die es gibt: Eine fehlende Datei würde Cargo das Programm bei jedem Build neu
+  übersetzen lassen. Nach dem ersten Anlegen von `PERMISSIONS` & Co. braucht es deshalb `cargo clean -p NAME`.
+- **Vorlage** `lib/jflib/template` im Paket von `jflib`. Die App liegt in `src/lib.rs`, `src/main.rs` bindet sie nur
+  ein. So baut `cargo rustc --lib --crate-type cdylib` dieselbe App für den Browser, ohne Cargos Warnung wegen
+  derselben Datei in zwei Zielen. `src/lib.rs`, die Übersetzungen und `tests/smoke.uis` kommen aus `apps/template`,
+  `build_rs.py check` hält sie gleich (`python tools/crates_accept.py --template`).
+- **Doku:** `lib/jflib/README.md` mit Schnellstart, Profilen, Zielen und den Fallstricken unten. `docs/GUIDE.md` und
+  `docs/API.md` kopiert `crates_accept.py` vor dem Packen nach `lib/jflib/docs` (nicht in Git), `include` der
+  Fassade nimmt sie mit.
 
 1. **`jflib-build`.** Liefert Name und Version aus Cargo, `PERMISSIONS` und `PACKAGE` mit Syntaxprüfung samt
    Zeilenangabe (heute `app_permissions` und `perm_split`), `assets/` als JFA1 mit LZ4 über `compress`, die
@@ -192,7 +210,28 @@ Mittel. **Damit ist das Ziel „lokal kompatibel“ erreicht.**
 5. **Offene Fälle klären.** Build auf einem echten Linux-Rechner (`cc`, `_start`, `jfgui_glibc` ohne Konfiguration)
    und auf einem Rechner ohne Visual Studio (`rustc` übergibt `kernel32.lib`).
 
-**Fertig, wenn:** `crates_accept.py` grün ist und beide offenen Fälle gelöst oder dokumentiert sind.
+**Geprüft:** `tools/crates_accept.py` läuft in der vollen Suite und ist grün: 57 Pakete mit 7,4 MB; Windows Dev
+(wie ohne Windows SDK) und Release mit Smoke-Test; Linux gegen glibc mit Smoke-Test in WSL; ein Konsolenprogramm
+mit `PERMISSIONS`, `PACKAGE` und `assets/` unter Windows und als statische Linux-Datei; im Browser zählt ein Klick
+(Chromium, Playwright). Von null an etwa 14 Minuten. `build_rs.py test --quick` lief mit 1329 von 1331 Skripten durch (nur `fonttest/selftest`, CRLF), die Release-Programme unter Windows sind trotz `raw-dylib` byte-gleich groß.
+
+Die beiden offenen Fälle:
+
+- **Ein echter Linux-Rechner** (Fedora 44, gcc 16): Die Vorlage baut mit `rust-lld` und mit `cc`, das Programm mit
+  Fenster braucht nur `GLIBC_2.2.5`, der Smoke-Test läuft. Zwei Dinge hat erst dieser Rechner gezeigt. Erstens gilt
+  `linker` aus `.cargo/config.toml` auch für die Build-Skripte, wenn Ziel und Host gleich sind, auch mit
+  `--target`, und `rust-lld` findet die C-Bibliotheken nicht. Deshalb steht der Linker in den `rustflags`, die mit
+  `--target` nur das Programm erreichen. Zweitens scheitern ohne `--target` die Proc-Macros am Relocation-Modell.
+  Unter Linux heißt es also immer `--target x86_64-unknown-linux-gnu`, das README sagt es.
+- **Ohne Visual Studio:** Drei Stellen in `plat` linkten `kernel32` noch über eine Importbibliothek, sie nutzen jetzt
+  `raw-dylib`. Damit braucht das Programm selbst keine Importbibliothek mehr. Nachgestellt mit
+  `/lldignoreenv /winsysroot:<leerer Ordner>`, denn `/lldignoreenv` allein hält `rust-lld` nicht davon ab, Visual
+  Studio selbst zu finden. Mit einem gewöhnlichen `#[link]` scheitert derselbe Build an `kernel32.lib`. Die
+  Build-Skripte und Proc-Macros brauchen mit Rusts msvc-Toolchain aber weiter die Visual Studio Build Tools, wie
+  jedes Rust-Projekt mit Build-Skripten. Eine GNU-Toolchain als Host ist nicht getestet.
+
+Nicht in CR2: Android über Cargo, die Seite um das Wasm-Modul (`web/` des Repos), Web mit Threads (braucht das
+eigene Sysroot) und je Programm eine eigene `PERMISSIONS.<bin>`. Das sind Aufgaben für `cargo jflib` in CR4.
 
 ### CR3: `build_rs.py` kompiliert über Cargo
 
@@ -205,8 +244,8 @@ Groß. Erst danach gibt es nur noch ein Bausystem.
 3. **Prüfungen behalten.** `lint()`, `check_intrinsics`, `plugin_verify`, `perm_lint`. `-D warnings` wird zu
    `[workspace.lints]`, der Toolchain-Test zu `rust-version`.
 4. **Varianten.** `--style` über `JFLIB_STYLE` mit eigenem Zielordner, `--profile` über `[profile.size]`, Web und
-   Android über `cargo rustc --lib --crate-type cdylib|staticlib`. Das braucht ein `[lib]` neben `[[bin]]` und gibt
-   eine Warnung wegen derselben Datei. Die Alternative ist ein vom Werkzeug erzeugtes zweites Paket.
+   Android über `cargo rustc --lib --crate-type cdylib|staticlib`. Das braucht die App als `src/lib.rs` und ein
+   `src/main.rs`, das sie nur einbindet, wie die Vorlage aus CR2.
 5. **Aufräumen.** Der direkte `rustc`-Pfad und `ide` entfallen, rust-analyzer liest Cargo selbst.
 
 **Fertig, wenn:** die volle Testsuite grün ist, die Programmgrößen höchstens 1 % abweichen und die echten
@@ -261,7 +300,7 @@ nicht neben anderer Arbeit an dieser Datei laufen.
 | --- | --- | --- |
 | Laufzeitprüfungen ändern das Verhalten | Cargos Dev-Profil schaltet `overflow-checks` und `debug-assertions` ein, `build_rs.py` nicht. Mit ihnen bleibt `template` in Web mit Threads leer, die Android-`.so` wird 23 % größer | beide in den Profilen abschalten; **zusätzlich klären, welche Prüfung auslöst, das kann ein echter Fehler in der Bibliothek sein** |
 | Zwei Bausysteme von CR1 bis CR3 | Tests laufen über `rustc`, Nutzer bauen über Cargo | `crates_accept.py`, CR3 nicht lange aufschieben |
-| Pfade im Programm | Ein Cargo-Release enthält `C:\Users\…` aus den Panic-Orten. `--remap-path-prefix` entfernt sie im Test vollständig, `trim-paths` ist nicht stabil | `cargo jflib` setzt den Schalter, in der Doku nennen |
+| Pfade im Programm | Ein Cargo-Release enthält `C:\Users\…` aus den Panic-Orten, die Vorlage 238-mal. `--remap-path-prefix` entfernt sie im Test vollständig, `trim-paths` ist nicht stabil | `cargo jflib` setzt den Schalter; das README der Fassade nennt ihn |
 | Module | gebaut und mit denselben Exporten, aber nicht geladen; die Kopien in `modules/modrt/shared` können auseinanderlaufen | in CR3 mit PaintCraft testen, Prüfung aus CR0 |
 | `img_jxl_enc` für Wasm | braucht allein 1468 s bei `opt-level` 1, bei 2 und im Release über 900 s (dort abgebrochen), bei 0 samt Abhängigkeiten 397 s. Ohne ihn dauert der erste Web-Build 88 s | auf Web aus der Fassade nehmen; die Ursache ist nicht geklärt |
 | `panic = "abort"` fehlt | ein nacktes `cargo new` baut nicht, nur mit eigener Meldung gelöst | `cargo jflib new` schreibt es, `README.md` nennt es zuerst |
