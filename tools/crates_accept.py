@@ -129,7 +129,10 @@ def pack(run):
     """the packages and the crates from outside as one local source -> its folder"""
     facade_docs()
     target = run.out / "target-package"
-    if not run.cmd("package", ["cargo", "package", "--workspace", "--exclude", "jflib-module-jxlenc", "--no-verify",
+    from tools import manifests
+    published = [m["package"]["name"] for m in (manifests.read(ROOT / p / "Cargo.toml") for p in manifests.workspace()["members"])
+                 if m["package"].get("publish", True)]
+    if not run.cmd("package", ["cargo", "package", *(x for p in published for x in ("-p", p)), "--no-verify",
                                "--allow-dirty", "--offline", "--target-dir", target], ROOT):
         return None
     vendor = run.out / "vendor"

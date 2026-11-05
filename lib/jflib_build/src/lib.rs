@@ -49,12 +49,50 @@ pub(crate) enum Kind {
 
 /// The build script of a program with a window.
 pub fn app() {
-    run(Kind::Gui)
+    Build::app().run()
 }
 
 /// The build script of a command-line program (Windows: console subsystem).
 pub fn console() {
-    run(Kind::Console)
+    Build::console().run()
+}
+
+/// A build script with more to say than [`app`] and [`console`]:
+///
+/// ```text
+/// // build.rs of the command-line program bc-server of the app BackupCraft, in apps/BackupCraft/server
+/// fn main() {
+///     jflib_build::Build::console().part_of("BackupCraft", "..").run();
+/// }
+/// ```
+pub struct Build {
+    kind: Kind,
+    app: Option<(String, PathBuf)>,
+}
+
+impl Build {
+    /// a program with a window
+    pub fn app() -> Build {
+        Build { kind: Kind::Gui, app: None }
+    }
+
+    /// a command-line program (Windows: console subsystem)
+    pub fn console() -> Build {
+        Build { kind: Kind::Console, app: None }
+    }
+
+    /// One of several programs of the app `name`, whose `PERMISSIONS`, `PACKAGE`, `assets/` and
+    /// `res/` lie in `dir` (relative to this package): the program gets the app's name and files.
+    /// A `PERMISSIONS.<this package's name>` there wins over the app's `PERMISSIONS`.
+    pub fn part_of(mut self, name: &str, dir: &str) -> Build {
+        self.app = Some((name.to_string(), PathBuf::from(dir)));
+        self
+    }
+
+    /// print what Cargo hands to the compiler and the linker
+    pub fn run(self) {
+        run(self.kind, self.app)
+    }
 }
 
 fn var(name: &str) -> String {
@@ -77,11 +115,17 @@ impl Out {
     }
 }
 
-fn run(kind: Kind) {
-    let dir = PathBuf::from(var("CARGO_MANIFEST_DIR"));
+fn run(kind: Kind, app: Option<(String, PathBuf)>) {
+    let package = PathBuf::from(var("CARGO_MANIFEST_DIR"));
     let out_dir = PathBuf::from(var("OUT_DIR"));
-    let name = var("CARGO_PKG_NAME");
+    let package_name = var("CARGO_PKG_NAME");
     let version = var("CARGO_PKG_VERSION");
+    let (name, dir) = match app {
+        Some((name, dir)) => (name, package.join(dir)),
+        None => (package_name.clone(), package.clone()),
+    };
+    let own = dir.join(format!("PERMISSIONS.{package_name}"));
+    let manifest = if own.is_file() { own } else { dir.join("PERMISSIONS") };
     let mut out = Out { lines: Vec::new(), errors: Vec::new() };
     for c in ["jfgui_manifest", "jfgui_package", "jfgui_assets", "jfgui_glibc", "jfgui_dev", "web_threads"] {
         out.lines.push(format!("cargo::rustc-check-cfg=cfg({c})"));
@@ -89,10 +133,11 @@ fn run(kind: Kind) {
     // A path that does not exist makes Cargo run this script and compile the program again on
     // every build: only what is there is watched.  A file added later counts after
     // `cargo clean -p NAME` (README.md of the crate jflib).
-    let mut watched: Vec<PathBuf> = ["PERMISSIONS", "PACKAGE", "assets", "res/app.ico"].iter().map(|f| dir.join(f)).filter(|p| p.exists()).collect();
+    let mut watched: Vec<PathBuf> =
+        [manifest.clone(), dir.join("PACKAGE"), dir.join("assets"), dir.join("res/app.ico")].into_iter().filter(|p| p.exists()).collect();
     if watched.is_empty() {
         // without a single rerun-if-changed Cargo would watch the whole package, target/ too
-        watched.push(dir.join("Cargo.toml"));
+        watched.push(package.join("Cargo.toml"));
     }
     for p in watched {
         out.lines.push(format!("cargo::rerun-if-changed={}", p.display()));
@@ -100,14 +145,16 @@ fn run(kind: Kind) {
     out.lines.push(format!("cargo::rustc-env=JFGUI_APP={name}"));
     out.lines.push(format!("cargo::rustc-env=JFGUI_VERSION={version}"));
 
-    let manifest = dir.join("PERMISSIONS");
     if let Some(text) = read(&manifest, &mut out) {
         match permissions::check(&text) {
             Ok(()) => {
                 out.env("JFGUI_PERMISSIONS_FILE", &manifest);
                 out.cfg("jfgui_manifest");
             }
-            Err((line, msg)) => out.errors.push(format!("PERMISSIONS:{line}: {msg}")),
+            Err((line, msg)) => {
+                let file = manifest.file_name().map_or("PERMISSIONS".into(), |f| f.to_string_lossy());
+                out.errors.push(format!("{file}:{line}: {msg}"))
+            }
         }
     }
     if let Some(text) = read(&dir.join("PACKAGE"), &mut out) {

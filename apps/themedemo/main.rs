@@ -404,4 +404,4 @@ impl App for Demo {
     }
 }
 
-ui::main!(ui::run(&DESC, &mut Demo::default(), &style::STYLE));
+ui::main!(ui::run(&DESC, &mut Demo::default(), &style_winui::STYLE));

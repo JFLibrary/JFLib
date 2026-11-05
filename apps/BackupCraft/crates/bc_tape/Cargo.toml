@@ -1,0 +1,20 @@
+[package]
+name = "bc_tape"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bc_tape"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+plat.workspace = true
+crypto.workspace = true
+bc_proto = { path = "../bc_proto" }

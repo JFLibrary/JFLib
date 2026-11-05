@@ -1,6 +1,6 @@
-# The library's crates.  Cargo builds them for projects outside this repository; build_rs.py still
-# compiles them with rustc itself and reads what it needs from here (tools/manifests.py).
-# docs/CRATES.md is the plan, the apps get manifests in its stage CR3.
+# The library's crates, the apps of this repository and their own crates.  Cargo builds them for
+# projects outside this repository; build_rs.py still compiles with rustc itself and reads what it
+# needs from here (tools/manifests.py).  docs/CRATES.md is the plan.
 [workspace]
 resolver = "3"
 # worktrees below this folder may be older than this file, build/ holds test projects: their
@@ -64,9 +64,88 @@ members = [
     "styles/classic",
     "styles/kde",
     "styles/macos",
+    "styles/jfoffice",
+    "styles/backupcraft",
+    "styles/netlab",
     "modules/modrt",
     "modules/modplat",
     "modules/jxlenc",
+    "apps/BackupCraft",
+    "apps/BackupCraft/server",
+    "apps/BackupCraft/agent",
+    "apps/BackupCraft/ctl",
+    "apps/BackupCraft/crates/bc_fs",
+    "apps/BackupCraft/crates/bc_proto",
+    "apps/BackupCraft/crates/bc_tape",
+    "apps/BackupCraft/crates/bc_vm",
+    "apps/BackupCraft/crates/bc_volume",
+    "apps/JFNetworker",
+    "apps/JFNetworker/sim",
+    "apps/JFNetworker/crates/jfn_model",
+    "apps/JFNetworker/crates/jfn_run",
+    "apps/JFNetworker/crates/jfn_sim",
+    "apps/Kritzel",
+    "apps/PaintCraft",
+    "apps/agenttest",
+    "apps/androidGallery",
+    "apps/appimagert",
+    "apps/asynctest",
+    "apps/audiotest",
+    "apps/buildManager",
+    "apps/cardtest",
+    "apps/codectest",
+    "apps/coretest",
+    "apps/datagallery",
+    "apps/desktest",
+    "apps/diagramtest",
+    "apps/dndtest",
+    "apps/docktest",
+    "apps/editortest",
+    "apps/efftest",
+    "apps/fontpicktest",
+    "apps/fonttest",
+    "apps/fxtest",
+    "apps/gallery",
+    "apps/gfxtest",
+    "apps/gputest",
+    "apps/i18ntest",
+    "apps/installer",
+    "apps/jfWord",
+    "apps/jfs",
+    "apps/jfs/crates/script",
+    "apps/lifetest",
+    "apps/linuxtest",
+    "apps/mdviewtest",
+    "apps/officeicontest",
+    "apps/permcli",
+    "apps/permcli/own",
+    "apps/permcli/shared",
+    "apps/permcli/gui",
+    "apps/permcli/crates/permcheck",
+    "apps/permprompt",
+    "apps/permtest",
+    "apps/plattest",
+    "apps/portabletest",
+    "apps/prefstest",
+    "apps/rstest",
+    "apps/sandboxtest",
+    "apps/scaffoldtest",
+    "apps/scaffoldtest/cli",
+    "apps/scaffoldtest/crates/scaffoldtest_core",
+    "apps/screentest",
+    "apps/shadertest",
+    "apps/spelltest",
+    "apps/svgtest",
+    "apps/symboltest",
+    "apps/template",
+    "apps/termtest",
+    "apps/themedemo",
+    "apps/traydemo",
+    "apps/uigputest",
+    "apps/uitest",
+    "apps/updatetest",
+    "apps/webgputest",
+    "apps/wgsltest",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
@@ -134,6 +213,11 @@ style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.1.
 style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.1.0" }
 modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
 modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
+jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
+# the styles of the apps that are not published
+style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
+style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
+style_netlab = { package = "jflib-style-netlab", path = "styles/netlab" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

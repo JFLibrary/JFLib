@@ -1,0 +1,33 @@
+[package]
+name = "bcctl"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "bcctl"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+datetime.workspace = true
+crypto.workspace = true
+netio.workspace = true
+bc_proto = { path = "../crates/bc_proto" }
+bc_fs = { path = "../crates/bc_fs" }
+bc_tape = { path = "../crates/bc_tape" }
+
+[build-dependencies]
+jflib-build.workspace = true

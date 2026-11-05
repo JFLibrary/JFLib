@@ -1,6 +1,7 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht; CR3 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
+Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. Von CR3 ist der erste
+Teilschritt umgesetzt, CR4 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -235,18 +236,32 @@ eigene Sysroot) und je Programm eine eigene `PERMISSIONS.<bin>`. Das sind Aufgab
 
 ### CR3: `build_rs.py` kompiliert über Cargo
 
-Groß. Erst danach gibt es nur noch ein Bausystem.
+Groß. Erst danach gibt es nur noch ein Bausystem. In Teilschritten, nach jedem bleibt die Suite grün.
 
-1. **App-Manifeste.** Für die 58 Apps einmal erzeugen, aus `STYLE`, `TARGETS`, `BINS` und `source_crates`. Neue Apps
-   bekommen ihres von `build_rs.py new`. Eine einzige Datei pro App, die Agenten sofort verstehen.
-2. **Umstellen in dieser Reihenfolge.** Windows, Linux statisch, Linux mit glibc, Web scalar und SIMD, Web mit
-   Threads, Android, Module. Die Artefakte kommen aus `--message-format=json`.
-3. **Prüfungen behalten.** `lint()`, `check_intrinsics`, `plugin_verify`, `perm_lint`. `-D warnings` wird zu
-   `[workspace.lints]`, der Toolchain-Test zu `rust-version`.
-4. **Varianten.** `--style` über `JFLIB_STYLE` mit eigenem Zielordner, `--profile` über `[profile.size]`, Web und
-   Android über `cargo rustc --lib --crate-type cdylib|staticlib`. Das braucht die App als `src/lib.rs` und ein
-   `src/main.rs`, das sie nur einbindet, wie die Vorlage aus CR2.
-5. **Aufräumen.** Der direkte `rustc`-Pfad und `ide` entfallen, rust-analyzer liest Cargo selbst.
+- **CR3a: App-Manifeste. Erledigt am 2026-11-05.** Die 57 Apps, ihre 8 weiteren Programme (`BINS`), die 11
+  App-eigenen Crates und die Stile `jfoffice`, `backupcraft` und `netlab` sind Pakete des Workspace mit
+  `publish = false`, 79 neue Manifeste. Ein Programm aus `BINS` ist ein Paket in seinem Ordner, so hat es sein eigenes
+  Subsystem und, wo es eine gibt, seine eigene `PERMISSIONS.<name>`. Jedes Programm hat ein `build.rs` mit
+  `jflib-build`: die App `jflib_build::app()`, ein Programm aus `BINS` zum Beispiel
+  `Build::console().part_of("BackupCraft", "..")`. Die Version kommt aus `PACKAGE` (ohne sie `0.0.0`), `style` aus
+  `STYLE`. `cargo check` aller Apps läuft für Windows, Linux statisch, Linux mit glibc, Web und Android ohne Warnung.
+  `build_rs.py` baut weiter mit `rustc`; `check` vergleicht die Manifeste mit den Quellen, `new` schreibt sie
+  (`tools/app_manifests.py`). `themedemo` startet jetzt mit `style_winui::STYLE`: Cargo erlaubt kein Paket unter zwei
+  Namen in einer Crate, dort wären es `style` und `style_winui` gewesen.
+- **CR3b: Windows über Cargo.** `build_rs.py` ruft `cargo build --target x86_64-pc-windows-msvc` für die Apps und
+  ihre Programme auf und kopiert die Artefakte aus `--message-format=json` nach `build/win`. Die Rechen-Crates
+  bekommen `opt-level = 2` über `[profile.dev.package]`. `check_intrinsics` prüft die rlibs aus den Artefakten,
+  `-D warnings` kommt über die `rustflags` des Werkzeugs, der Toolchain-Test aus `rust-version`.
+- **CR3c: Linux.** Statisch und gegen glibc in zwei Zielordnern, weil die Flags sich unterscheiden.
+- **CR3d: Web, Android, Module.** Web scalar und SIMD, mit Threads über das eigene Sysroot. Web und Android brauchen
+  die App als Bibliothek: ein vom Werkzeug erzeugtes zweites Paket mit `[lib]` auf ihrer `main.rs`, damit die Apps
+  selbst nicht umziehen müssen. `jxlenc` mit `--cfg jflib_module`, dann in PaintCraft geladen.
+- **CR3e: Varianten und Aufräumen.** `--style` über ein vom Werkzeug erzeugtes Paket je Variante, denn Cargo kann eine
+  Abhängigkeit nicht tauschen. `--profile` über `[profile.size]`. `tools/measure.py`, `memory_safety_check.py`,
+  `android.py` und `hotreload.py` auf Cargo umstellen. Der direkte `rustc`-Pfad und `ide` entfallen, rust-analyzer
+  liest Cargo selbst. `STYLE`, `TARGETS` und `BINS` können dann ins Manifest (`[package.metadata.jflib]`).
+
+Bleiben müssen `lint()`, `check_intrinsics`, `plugin_verify` und `perm_lint`.
 
 **Fertig, wenn:** die volle Testsuite grün ist, die Programmgrößen höchstens 1 % abweichen und die echten
 Testgeräte (Android, Linux, Web) durchgelaufen sind.

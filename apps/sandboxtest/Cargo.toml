@@ -1,0 +1,28 @@
+[package]
+name = "sandboxtest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "sandboxtest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+ui.workspace = true
+gpu.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

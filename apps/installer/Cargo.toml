@@ -1,0 +1,30 @@
+[package]
+name = "installer"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "installer"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+plat.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
+[build-dependencies]
+jflib-build.workspace = true

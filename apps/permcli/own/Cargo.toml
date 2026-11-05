@@ -1,0 +1,27 @@
+[package]
+name = "permcli-own"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "permcli-own"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+permcheck = { path = "../crates/permcheck" }
+
+[build-dependencies]
+jflib-build.workspace = true

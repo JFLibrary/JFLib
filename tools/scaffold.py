@@ -963,7 +963,39 @@ def app_files(name, kind="window", style="winui", title=None, info=None, date=No
     else:
         files.update({"src/main.rs": SERVICE_MAIN, "tests/smoke.uis": SERVICE_SMOKE, "PERMISSIONS": PERMS_SERVICE,
                       "TARGETS": "win linux\n"})
-    return {p: fill(t, v) for p, t in files.items()}
+    out = {p: fill(t, v) for p, t in files.items()}
+    out.update(cargo_files(name, kind, style, out, v["CORE"] if kind == "tool" else None))
+    return out
+
+
+def cargo_files(name, kind, style, files, core=None):
+    """the Cargo manifests and build scripts of a new app (tools/app_manifests.py): the app's, for
+    a tool its command-line program's and its crate's"""
+    import app_manifests as am
+    import manifests
+    version = re.search(r"^version=(\S+)", files["PACKAGE"], re.M).group(1)
+    app = f"apps/{name}"
+    local = {core: f"{app}/crates/{core}"} if core else {}
+    names = list(manifests.library_crates()[0]) + list(local)
+
+    def program(pkg, entry, bin_name, gui):
+        text = files[f"{pkg}/{entry}".removeprefix("./")]
+        style_ = style if gui and am.named(text, ["style"]) else None
+        return am.program(f"{app}/{pkg}", bin_name, version, bin_name, entry, am.named(text, names), local, style_, root="")
+    out = {"Cargo.toml": program(".", "src/main.rs", name, kind in ("window", "tool")), "build.rs": am.build_script()}
+    if kind == "tool":
+        cli = f"{name}-cli"
+        out.update({"cli/Cargo.toml": program("cli", "main.rs", cli, False), "cli/build.rs": am.build_script("cli", name, "..")})
+        out[f"crates/{core}/Cargo.toml"] = am.local_crate(local[core], core, version, "lib.rs",
+                                                          am.named(files[f"crates/{core}/lib.rs"], names[:-1]), local)
+    return out
+
+
+def register_app(text, members):
+    """the root Cargo.toml's text with the app's packages as members (after the last one)"""
+    at = text.index("members = [\n")
+    end = text.index("\n]\n", at)
+    return text[:end] + "".join(f'\n    "{m}",' for m in members) + text[end:]
 
 
 def write_files(base, files):
@@ -983,7 +1015,14 @@ def create_app(root, name, kind="window", style="winui", title=None, crates=(), 
     if style not in styles:
         raise ScaffoldError(f"unknown style {style} (styles: {', '.join(styles)})")
     files = app_files(name, kind, style, title, git_info(root), date)
-    return write_files(root / "apps" / name, files)
+    workspace = root / "Cargo.toml"
+    members = [f"apps/{name}/{p.removesuffix('/Cargo.toml')}".removesuffix("/Cargo.toml") for p in files if p.endswith("Cargo.toml")]
+    raw = workspace.read_bytes().decode("utf-8")
+    crlf = "\r\n" in raw
+    text = register_app(raw.replace("\r\n", "\n"), [m.removesuffix("/") for m in members])
+    paths = write_files(root / "apps" / name, files)
+    workspace.write_bytes((text.replace("\n", "\r\n") if crlf else text).encode("utf-8"))
+    return paths + [workspace]
 
 
 # ---------------------------------------------------------------- library crates

@@ -169,6 +169,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **styles:** The fonts and the icon set the styles share moved from `styles/winui/assets` into the new crate `lib/style_assets` (`style_assets::ICONS` and `FONT_*`); winui, macos, classic and kde use its statics, so every style crate can be packed on its own (docs/CRATES.md, CR0)
 - **build:** Every library crate, style and module has a Cargo manifest, the root Cargo.toml is their workspace and the new crate jflib brings all of them; build_rs.py reads its crate table from the manifests and still compiles with rustc itself (docs/CRATES.md)
 - **rt:** The library's version moved from lib/VERSION to the root Cargo.toml; rt::VERSION reads CARGO_PKG_VERSION, build_rs.py sets it for rustc
+- **build:** Every app, its further programs (BINS), its own crates and the styles jfoffice, backupcraft and netlab are Cargo packages of the workspace with a build.rs through jflib-build; build_rs.py new writes them, check compares them with the sources; themedemo starts with style_winui::STYLE
 
 ### Removed
 

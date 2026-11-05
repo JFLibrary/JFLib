@@ -1,0 +1,15 @@
+[package]
+name = "scaffoldtest_core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "scaffoldtest_core"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true

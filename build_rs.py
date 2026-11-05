@@ -814,6 +814,40 @@ def same_text(a, b):
     return a.read_bytes().replace(b"\r\n", b"\n") == b.read_bytes().replace(b"\r\n", b"\n")
 
 
+def program_manifest_lint(members):
+    """the manifests outside lib/ against what build_rs.py builds: every style, app, further program
+    (BINS) and app-local crate is a member whose manifest names the crates its sources use; an app's
+    and its programs' version is PACKAGE's, their `style` the app's STYLE -> problems"""
+    bad = []
+    names = list(crate_table()) + [f"style_{s}" for s in STYLES]
+    mset = set(members)
+
+    def check(member, root, version=None, style=None):
+        if member not in mset:
+            return bad.append(f"{member}: no member of the workspace (the root Cargo.toml; python build_rs.py new writes both)")
+        m = manifests.read(ROOT / member / "Cargo.toml")
+        deps = m.get("dependencies", {})
+        own = m.get("lib", {}).get("name")
+        for d in sorted(named_crates(root, names) - set(deps) - {own}):
+            bad.append(f"{member}/Cargo.toml: {d} is missing, its sources name it")
+        if version is not None and m["package"]["version"] != version:
+            bad.append(f"{member}/Cargo.toml: version {m['package']['version']}, PACKAGE says {version}")
+        if style is not None and "style" in deps and deps["style"].get("package") != f"jflib-style-{style}":
+            bad.append(f"{member}/Cargo.toml: style is {deps['style'].get('package')}, STYLE says jflib-style-{style}")
+        if style is not None and "style" not in deps and named_crates(root, ["style"]):
+            bad.append(f"{member}/Cargo.toml: style is missing, its sources name it")
+    for s in STYLES:
+        check(f"styles/{s}", entrypoint(ROOT / "styles" / s, "lib"))
+    for a in apps():
+        version = app_version(a) or "0.0.0"
+        check(f"apps/{a}", entrypoint(ROOT / "apps" / a, "app"), version, app_style(a))
+        for _, root, kind in app_bins(a):
+            check(root.parent.relative_to(ROOT).as_posix(), root, version, app_style(a) if kind == "gui" else None)
+    for n, (r, _) in local_crates().items():
+        check(resolve_root(ROOT / r).parent.relative_to(ROOT).as_posix().removesuffix("/src"), ROOT / r)
+    return bad
+
+
 def manifest_lint():
     """what rustc does not see, Cargo would only find in a build of its own (docs/CRATES.md) ->
     problems: every crate is in the facade, a style's manifest has the crates its sources name
@@ -821,7 +855,8 @@ def manifest_lint():
     of lib/jflib is current"""
     bad = []
     members = manifests.workspace()["members"]
-    styles = {f"style_{Path(m).name}": m for m in members if m.startswith("styles/")}
+    published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
+    styles = {f"style_{Path(m).name}": m for m in published if m.startswith("styles/")}
     facade = manifests.read(ROOT / manifests.FACADE / "Cargo.toml")
     named = set(facade["dependencies"]) | {d for t in facade["target"].values() for d in t["dependencies"]}
     uses = set(re.findall(r"^pub use (\w+);", (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8"), re.M))
@@ -830,11 +865,7 @@ def manifest_lint():
             bad.append(f"{manifests.FACADE}/Cargo.toml: {c} is missing, the facade brings every crate")
         if c not in uses:
             bad.append(f"{manifests.FACADE}/src/lib.rs: pub use {c}; is missing")
-    for c, member in styles.items():
-        have = set(manifests.read(ROOT / member / "Cargo.toml").get("dependencies", {}))
-        for d in sorted(named_crates(entrypoint(ROOT / member, "lib"), LIBS) - have):
-            bad.append(f"{member}/Cargo.toml: {d} is missing, its sources name it")
-    published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
+    bad += program_manifest_lint(members)
     for m in published:
         for name in ("LICENSE-MIT", "LICENSE-APACHE"):
             copy = ROOT / m / name
@@ -1738,12 +1769,12 @@ def dev_command(a):
             return 1
         for p in paths:
             print(f"wrote {p.relative_to(ROOT).as_posix()}")
+        r = subprocess.run(["cargo", "metadata", "--offline", "--format-version", "1"], cwd=ROOT, capture_output=True,   # Cargo.lock
+                           text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            print(f"new: Cargo.lock was not updated:\n{r.stderr.strip()}")
+            return 1
         if a.lib:
-            r = subprocess.run(["cargo", "metadata", "--offline", "--format-version", "1"], cwd=ROOT, capture_output=True,   # Cargo.lock
-                               text=True, encoding="utf-8", errors="replace")
-            if r.returncode:
-                print(f"new: Cargo.lock was not updated:\n{r.stderr.strip()}")
-                return 1
             r = subprocess.run([sys.executable, str(ROOT / "tools" / "gendoc.py")], cwd=ROOT, capture_output=True,
                                text=True, encoding="utf-8", errors="replace")
             print(r.stdout.strip())

@@ -1,0 +1,28 @@
+[package]
+name = "diagramtest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "diagramtest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+plat.workspace = true
+gfx.workspace = true
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
+[build-dependencies]
+jflib-build.workspace = true

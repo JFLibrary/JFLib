@@ -62,7 +62,7 @@ class ScaffoldTest(Temp):
                                  set(files), kind)
             for rel, text in files.items():
                 self.assertNotRegex(text, r"@[A-Z_]+@", f"{kind} {rel}: a template key is left")
-            for rel in [r for r in files if r.endswith(".rs")]:
+            for rel in [r for r in files if r.endswith(".rs") and not r.endswith("build.rs")]:     # build.rs: a Cargo build script
                 head = files[rel]
                 self.assertIn("#![no_std]", head, rel)
                 self.assertTrue("#![deny(unsafe_code)]" in head or "#![forbid(unsafe_code)]" in head, rel)
@@ -106,9 +106,16 @@ class ScaffoldTest(Temp):
                 scaffold.check_title(bad)
 
     def test_create_app(self):
+        self.write("Cargo.toml", (ROOT / "Cargo.toml").read_text(encoding="utf-8"))
         paths = scaffold.create_app(self.dir, "hello", "tool", "winui", "Hallo", ["ui"], ["winui"], "2026-10-20")
         self.assertIn(self.dir / "apps" / "hello" / "crates" / "hello_core" / "lib.rs", paths)
-        self.assertTrue(all(p.exists() and b"\r\n" not in p.read_bytes() for p in paths))
+        self.assertTrue(all(p.exists() and b"\r\n" not in p.read_bytes() for p in paths if p.name != "Cargo.toml" or p.parent != self.dir))
+        members = manifests.read(self.dir / "Cargo.toml")["workspace"]["members"]
+        self.assertEqual(members[-3:], ["apps/hello", "apps/hello/cli", "apps/hello/crates/hello_core"])
+        cli = manifests.read(self.dir / "apps" / "hello" / "cli" / "Cargo.toml")
+        self.assertEqual(cli["bin"][0]["name"], "hello-cli")
+        self.assertIn("hello_core", cli["dependencies"])
+        self.assertIn('part_of("hello", "..")', (self.dir / "apps" / "hello" / "cli" / "build.rs").read_text(encoding="utf-8"))
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_app(self.dir, "Hello", "window", "winui", None, ["ui"], ["winui"])
         with self.assertRaisesRegex(scaffold.ScaffoldError, "unknown style"):
@@ -167,7 +174,7 @@ class ScaffoldTest(Temp):
         manifests.set_version("7.8.9", self.dir)
         root = manifests.read(self.dir / "Cargo.toml")["workspace"]
         self.assertEqual(root["package"]["version"], "7.8.9")
-        self.assertEqual({d["version"] for d in root["dependencies"].values()}, {"=7.8.9"})
+        self.assertEqual({d["version"] for d in root["dependencies"].values() if "version" in d}, {"=7.8.9"})  # the unpublished: none
         self.assertEqual(manifests.read(self.dir / "modules/modplat/Cargo.toml")["dependencies"]["rt"]["version"], "=7.8.9")
         lock = manifests.read(self.dir / "Cargo.lock")["package"]
         self.assertEqual({p["version"] for p in lock if p["name"].startswith("jflib")}, {"7.8.9"})
