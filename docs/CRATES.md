@@ -1,7 +1,7 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-05. CR0 ist umgesetzt, CR1 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“ stammen
-aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
+Stand 2026-11-05. CR0 und CR1 sind umgesetzt, CR2 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
+stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
 
@@ -33,7 +33,7 @@ Nicht Teil dieses Plans: ein Umbau der eigenen Runtime, ein Betrieb mit `std`, d
 | Stile | `winui`, `classic`, `kde`, `macos`; `jfoffice`, `backupcraft` und `netlab` bleiben draußen |
 | JFScript | `apps/jfs/crates/script` mit `publish = false`, eigenes Repo erst zum Crate-Release |
 | Apps | bleiben bis zum Crate-Release im Repo, immer mit `publish = false` |
-| Version | eine für alle Crates, sie steht in der `Cargo.toml` im Wurzelordner |
+| Version | eine für alle Crates, sie steht in der `Cargo.toml` im Wurzelordner; untereinander exakt (`=0.1.0`), weil nur der Weg über `jflib` versprochen ist |
 | Offene Worktrees | bleiben lokal und passen sich später an |
 
 ## Zielbild
@@ -41,7 +41,7 @@ Nicht Teil dieses Plans: ein Umbau der eigenen Runtime, ein Betrieb mit `std`, d
 ```text
 Cargo.toml                          Workspace: Version, Profile, Lints
 Cargo.lock
-lib/<crate>/Cargo.toml              48 Crates wie heute
+lib/<crate>/Cargo.toml              49 Crates wie heute
 lib/style_assets/                   neu: Fonts und Icons der Stile
 lib/jflib/                          neu: die Fassade, die einzige Abhängigkeit eines Nutzers
 lib/jflib_build/                    neu: Helfer für die build.rs einer App
@@ -69,6 +69,7 @@ Diese Profile braucht jedes Projekt, denn Cargo übernimmt sie nicht von einer A
 [profile.dev]
 panic = "abort"
 opt-level = 1
+debug = 0
 debug-assertions = false
 overflow-checks = false
 
@@ -77,6 +78,7 @@ panic = "abort"
 opt-level = 2
 codegen-units = 1
 lto = "fat"
+debug = 0
 strip = "symbols"
 ```
 
@@ -142,7 +144,10 @@ grün). Web und Android bauen.
 
 ### CR1: Manifeste
 
-Mittel. `build_rs.py` kompiliert weiter selbst, liest aber nur noch die Manifeste.
+**Erledigt am 2026-11-05.** `build_rs.py` kompiliert weiter selbst, liest aber nur noch die Manifeste
+(`tools/manifests.py`). `lib/plugin` hat kein Manifest, es gehört nicht in die Crates. Das Manifest von JFScript kommt
+mit denen der Apps in CR3. `build_rs.py check` prüft zusätzlich, dass die Fassade jede Crate nennt, das Manifest eines
+Stils alle Crates seiner Quellen und die Lizenzkopien gleich sind. Die Werkzeuge brauchen dafür Python 3.11 (`tomllib`).
 
 1. **Wurzel und Crates.** `Cargo.toml` und `Cargo.lock` im Wurzelordner, `/target` in `.gitignore`, ein Manifest pro
    Crate. Einmal per Skript erzeugen, danach von Hand pflegen.
@@ -157,13 +162,19 @@ Mittel. `build_rs.py` kompiliert weiter selbst, liest aber nur noch die Manifest
    braucht, trägt ihn direkt ein. Der Stil kommt aus `JFLIB_STYLE`, ohne Angabe `winui`.
 6. **Pflichtangaben.** `description`, `license`, `repository`. Lizenzen pro Crate aus `THIRD_PARTY_NOTICES.md`
    zuordnen, zum Beispiel libaom zu `img_av1`, jxrlib zu `img_jxr`, DirectXTex zu `img_dds`, DejaVu zu `doc_view`,
-   fdlibm zu `rt`, OFL und Fluent-Lizenz zu `style_assets`. Die Dateien müssen im jeweiligen Paket liegen.
+   fdlibm zu `fx`, OFL und Fluent-Lizenz zu `style_assets`. Die Dateien liegen im jeweiligen Paket: `LICENSE-MIT` und
+   `LICENSE-APACHE` in jeder Crate, dazu ihr Teil von `licenses/`, jeweils als Kopie.
 7. **Eine Version im Build.** `links = "jflib_rt"` an `rt` (braucht eine leere `build.rs`), damit zwei Versionen
-   im selben Programm als klare Meldung enden und nicht als E0152. Noch nicht getestet.
+   im selben Programm als klare Meldung enden und nicht als E0152. Mit zwei kleinen Paketen geprüft.
+8. **Ältere Worktrees.** `exclude = [".claude"]` in der Wurzel: Ohne die Zeile halten Worktrees unter `.claude`, die
+   noch keine eigene Wurzel-`Cargo.toml` haben, ihre `text_shape` für ein Mitglied dieses Workspace, und ihr Build
+   bricht ab.
 
-**Fertig, wenn:** `cargo check -p jflib` für Windows, Linux, Linux mit `jfgui_glibc`, Web und Android durchläuft,
-`jxlenc` mit `--cfg jflib_module` baut, `cargo package --workspace` mit Verifikation durchläuft und
-`build_rs.py test --quick` grün bleibt.
+**Geprüft:** `cargo check -p jflib` läuft für Windows, Linux, Linux mit `jfgui_glibc`, Web und Android ohne Warnung
+durch. `jxlenc` baut mit `--cfg jflib_module` (Export `jxlenc_module`, keine Importe, 512 Byte größer als aus
+`build_rs.py`, nicht in PaintCraft geladen). `cargo package --workspace --exclude jflib-module-jxlenc` verifiziert
+alle 56 Crates in 347 s, zusammen 6,3 MB. Die Release-Programme `template`, `jfs`, `PaintCraft` und `jxlenc` sind unter
+Windows byte-gleich groß wie vor CR1, unter Linux ist `jfs` 16 und `template` 160 Byte kleiner. `build_rs.py test --quick` lief mit 1329 von 1331 Skripten durch, es fehlt nur `fonttest/selftest` auf beiden Zielen (CRLF, wie in CR0).
 
 ### CR2: Fremde Projekte
 

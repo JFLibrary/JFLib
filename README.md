@@ -226,7 +226,7 @@ The screenshots currently show German UI text; the code examples below use Engli
 
 ### Prerequisites
 
-- **Python 3**; the build tools use the standard library.
+- **Python 3.11 or newer**; the build tools use the standard library.
 - **Rust installed through rustup**, with `rustc` and `cargo` on your `PATH`. The code targets Rust **1.98.x**.
 - **LLVM / LLD**: `lld-link` for Windows, `ld.lld` for Linux, and `llvm-rc` for Windows
   app icons. `llvm-nm` is used for additional compiler checks. On Windows, the build
