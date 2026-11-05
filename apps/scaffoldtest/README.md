@@ -32,7 +32,7 @@ docs/GUIDE.md describes the app model, layout, widgets, files and the test scrip
 
 `version=` in `PACKAGE` is this app's own version (MAJOR.MINOR.PATCH). The program reads it as
 `rt::app_version!()`; the packages and `lib/update` use it. The library has a version of its own
-(`lib/VERSION`, `ui::VERSION`); [VERSIONING.md](../../docs/VERSIONING.md) explains both and
+(the root `Cargo.toml`, `ui::VERSION`); [VERSIONING.md](../../docs/VERSIONING.md) explains both and
 [CHANGELOG.md](../../CHANGELOG.md) lists the library's changes.
 
 ## A fixture

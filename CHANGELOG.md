@@ -166,6 +166,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux: the system calls ARM64 does not have are gone on x86-64 too (open, poll, fork, mkdir, unlink, rename, readlink, access, dup2, chmod): `openat`, `ppoll`, `clone`, `mkdirat`, `unlinkat`, `renameat2`, `readlinkat`, `faccessat`, `dup3`, `fchmodat`, helpers `rt::os::{poll, fork, clone, dup2, rename}`
 - **script:** The name `db` among the predeclared names of the host API (`script::GLOBALS`), for hosts that offer a database
 - **styles:** The fonts and the icon set the styles share moved from `styles/winui/assets` into the new crate `lib/style_assets` (`style_assets::ICONS` and `FONT_*`); winui, macos, classic and kde use its statics, so every style crate can be packed on its own (docs/CRATES.md, CR0)
+- **build:** Every library crate, style and module has a Cargo manifest, the root Cargo.toml is their workspace and the new crate jflib brings all of them; build_rs.py reads its crate table from the manifests and still compiles with rustc itself (docs/CRATES.md)
+- **rt:** The library's version moved from lib/VERSION to the root Cargo.toml; rt::VERSION reads CARGO_PKG_VERSION, build_rs.py sets it for rustc
 
 ### Removed
 

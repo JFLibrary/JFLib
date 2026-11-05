@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """build_rs.py -- build and test JFLib.
 rustc builds the library and app crates directly; the locked no_std text_shape
-dependencies are built through Cargo and linked as static .rlib files.
+dependencies are built through Cargo and linked as static .rlib files.  The library's crates,
+their dependencies and its version come from the Cargo manifests (tools/manifests.py), which also
+let projects outside this repository build it with Cargo alone (docs/CRATES.md).
 
   python build_rs.py lib    [--target win|linux|both]        every library crate
   python build_rs.py app NAME [--style S]                    apps/NAME -> build/<t>/NAME[.exe]
@@ -22,12 +24,12 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py new NAME [--kind window|console|tool|service] [--style S] [--title T]
                                                              a new app apps/NAME that builds and passes its
                                                                 test as it is (tools/scaffold.py)
-  python build_rs.py new --lib NAME [--deps rt,plat]         a new library crate lib/NAME, entered in LIBS
+  python build_rs.py new --lib NAME [--deps rt,plat]         a new library crate lib/NAME, entered in the manifests
   python build_rs.py api-diff [--against X.Y.Z] [--snapshot] the public API since a release (tools/apidiff.py,
                                                                 docs/VERSIONING.md): exit 1 for breaking changes
-                                                                lib/VERSION does not allow
+                                                                the library's version does not allow
   python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
-  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, lib/VERSION, docs/api/X.Y.Z.txt
+  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, the version in Cargo.toml, docs/api/X.Y.Z.txt
                                                                 (tools/changelog.py)
   python build_rs.py site [--out DIR] [--check]              the docs of the website: guides, API reference, changelog
                                                                 and roadmap from the Markdown -> build/site/
@@ -81,6 +83,8 @@ Rules checked before every build (`check`):
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
   * own crates use --extern; text_shape's pinned Cargo dependencies are the exception
+  * the facade lib/jflib names every library crate and style, a style's manifest every crate its
+    sources name, and the licence files inside a crate equal the ones they copy (manifest_lint)
   * system call numbers only in lib/rt/kernel.rs, the same names for every architecture: no const
     SYS_* elsewhere, no number as the first argument of syscall* (a wrong number compiles and
     calls something else on another architecture, docs/ARM64.md)
@@ -112,7 +116,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tools.project_sources import SourceError, entrypoint, project_sources, resolve_root
 from tools.host_exec import run_native
-from tools import assetpack
+from tools import assetpack, manifests
 
 ROOT = Path(__file__).resolve().parent              # RustLib/
 RS = ROOT
@@ -122,82 +126,15 @@ TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", 
 ARCHS = ("x86_64", "aarch64")
 ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
 ARM64_FOLDER = {"win": "win-arm64", "linux": "linux-arm64"}
-RUSTC_VERSION = "1.98"          # the toolchain this code is written for (checked, minor ignored)
+RUSTC_VERSION = manifests.workspace()["package"]["rust-version"]  # the toolchain this code is written for (checked, minor ignored)
 UNSAFE_OK = {"rt", "simd", "plat", "plugin", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
-# library crates: name -> (root file, dependencies); order = a valid build order
-LIBS = {
-    "rt": ("lib/rt/lib.rs", []),
-    "agent_core": ("lib/agent_core/src/lib.rs", ["rt"]),
-    "plat": ("lib/plat/lib.rs", ["rt", "compress", "crypto"]),  # vfs: LZ4 of the app:// bundles; secret: DH, AES, SHA-256
-    "base": ("lib/base/lib.rs", ["rt", "plat"]),
-    "agent_io": ("lib/agent_io/src/lib.rs", ["rt", "plat", "agent_core"]),
-    "simd": ("lib/simd/lib.rs", ["rt"]),
-    "gfx": ("lib/gfx/lib.rs", ["rt", "simd"]),
-    "img_core": ("lib/img_core/lib.rs", ["rt", "simd", "gfx"]),
-    "archive": ("lib/archive/lib.rs", ["rt", "img_core", "plat"]),  # vfs: ZipFs
-    "doc_core": ("lib/doc_core/lib.rs", ["rt", "base"]),
-    "doc_layout": ("lib/doc_layout/lib.rs", ["rt", "doc_core"]),
-    "doc_io": ("lib/doc_io/lib.rs", ["rt", "base", "plat", "archive", "doc_core"]),
-    "img_png": ("lib/img_png/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "text_shape": ("lib/text_shape/src/lib.rs", []),
-    "text": ("lib/text/lib.rs", ["rt", "plat", "base", "simd", "gfx", "img_core", "img_png", "text_shape"]),
-    "img_jpeg": ("lib/img_jpeg/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_bmp": ("lib/img_bmp/lib.rs", ["rt", "simd", "gfx", "img_core", "img_png", "img_jpeg"]),  # R6-bgt: BI_PNG / BI_JPEG
-    "img_gif": ("lib/img_gif/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_tga": ("lib/img_tga/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_tiff": ("lib/img_tiff/lib.rs", ["rt", "simd", "gfx", "img_core", "img_jpeg",
-                                          "plat"]),  # R6-tiff: plat for the parallel decoder
-    # R9 codec crates (main agent's skeleton; the R9 agents may add dependencies)
-    "img_webp": ("lib/img_webp/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_hevc": ("lib/img_hevc/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_av1": ("lib/img_av1/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_heif": ("lib/img_heif/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_hevc", "img_av1"]),
-    "img_avif": ("lib/img_avif/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_heif", "img_av1"]),
-    "img_jxl": ("lib/img_jxl/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_jpeg"]),
-    # jxl-module: the new JPEG XL writer (linked into codectest; PaintCraft loads it as modules/jxlenc)
-    "img_jxl_enc": ("lib/img_jxl_enc/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_jpeg", "img_jxl"]),
-    "img_jxr": ("lib/img_jxr/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_dds": ("lib/img_dds/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_pdn": ("lib/img_pdn/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_png"]),
-    "fx": ("lib/fx/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),  # R10 (main agent's skeleton)
-    # svg: SVG images and icons drawn through gfx's paths (the codec IMGF_SVG; ui.svg, ui.image_view)
-    "img_svg": ("lib/img_svg/lib.rs", ["rt", "gfx", "img_core"]),
-    "img_all": ("lib/img_all/lib.rs", ["rt", "gfx", "img_core", "img_png", "img_jpeg", "img_bmp", "img_gif", "img_tga",
-                                        "img_tiff", "img_webp", "img_heif", "img_avif", "img_jxl", "img_jxr",
-                                        "img_dds", "img_pdn"]),
-    # spell checking: Hunspell dictionaries, the system's checker (plat::spell), the personal word list
-    "spell": ("lib/spell/lib.rs", ["rt", "plat"]),
-    "ui": ("lib/ui/lib.rs", ["rt", "base", "gfx", "text", "plat", "img_core", "img_png", "img_all", "agent_core", "agent_io",
-           "datetime", "spell", "img_svg"]),  # i18n: dates in the locale's format; spell: TB_SPELL; svg: ui.svg / image_view
-    "doc_view": ("lib/doc_view/src/lib.rs", ["rt", "doc_core", "doc_layout", "gfx", "text", "ui"]),
-    # BackupCraft's foundations (usable by every app): calendar time and cron schedules
-    "datetime": ("lib/datetime/lib.rs", []),
-    "crypto": ("lib/crypto/lib.rs", []),
-    "compress": ("lib/compress/lib.rs", []),
-    # G1b: SPIR-V module builder, disassembler, validator, std140 / std430 layouts, the GPU
-    # benchmark shaders (docs/SHADER.md)
-    "shader": ("lib/shader/lib.rs", []),
-    # G2a: the WGSL front end -- lexer, parser, semantic checker, the typed IR (docs/WGSL.md);
-    # G2c: its back end lowers the IR to SPIR-V with shader
-    "wgsl": ("lib/wgsl/lib.rs", ["shader"]),
-    "netpkt": ("lib/netpkt/lib.rs", ["crypto"]),  # JFNetworker: addresses, checksums, header codecs, pcapng; ssh needs crypto
-    "datastore": ("lib/datastore/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
-    "netio": ("lib/netio/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
-    "cas": ("lib/cas/lib.rs", ["rt", "plat", "crypto", "compress", "agent_core"]),
-    # signed app updates with rollback (docs/UPDATES.md)
-    "update": ("lib/update/lib.rs", ["rt", "plat", "crypto", "agent_core", "netio"]),
-    # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
-    "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
-    # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
-    "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
-    # the fonts and icons the library's styles share (docs/STYLES.md)
-    "style_assets": ("lib/style_assets/lib.rs", []),
-}
-# what a library crate needs on one target only: G3a, G4b, G4c, G4d, the UI's output through the GPU
-# (Windows; Linux in the build against glibc, section "glibc"; Android; the browser: WebGPU, no Vulkan code
-# in its bundles; the static Linux build links nothing of it: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"], ("ui", "android"): ["shader", "gpu"], ("ui", "web"): ["shader", "gpu"]}
+# library crates: name -> (root file, dependencies), and what a crate needs on one target only:
+# lib/*/Cargo.toml, in the order of the root Cargo.toml
+LIBS, TARGET_DEPS = manifests.library_crates()
+LIB_VERSION = manifests.version()
+# rt::VERSION reads what Cargo sets for a crate's rustc; every rustc started from here gets it
+os.environ["CARGO_PKG_VERSION"] = LIB_VERSION
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -871,6 +808,43 @@ def kernel_table_lint():
            [f"lib/rt/kernel.rs: {n} only in the aarch64 table" for n in sorted(arm - x86)]
 
 
+def same_text(a, b):
+    """the same bytes but for line ends (one checkout may hold both forms)"""
+    return a.read_bytes().replace(b"\r\n", b"\n") == b.read_bytes().replace(b"\r\n", b"\n")
+
+
+def manifest_lint():
+    """what rustc does not see, Cargo would only find in a build of its own (docs/CRATES.md) ->
+    problems: every crate is in the facade, a style's manifest has the crates its sources name
+    (build_rs.py finds them by name), every package holds the licences it needs"""
+    bad = []
+    members = manifests.workspace()["members"]
+    styles = {f"style_{Path(m).name}": m for m in members if m.startswith("styles/")}
+    facade = manifests.read(ROOT / manifests.FACADE / "Cargo.toml")
+    named = set(facade["dependencies"]) | {d for t in facade["target"].values() for d in t["dependencies"]}
+    uses = set(re.findall(r"^pub use (\w+);", (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8"), re.M))
+    for c in [*LIBS, *styles]:
+        if c not in named:
+            bad.append(f"{manifests.FACADE}/Cargo.toml: {c} is missing, the facade brings every crate")
+        if c not in uses:
+            bad.append(f"{manifests.FACADE}/src/lib.rs: pub use {c}; is missing")
+    for c, member in styles.items():
+        have = set(manifests.read(ROOT / member / "Cargo.toml").get("dependencies", {}))
+        for d in sorted(named_crates(entrypoint(ROOT / member, "lib"), LIBS) - have):
+            bad.append(f"{member}/Cargo.toml: {d} is missing, its sources name it")
+    published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
+    for m in published:
+        for name in ("LICENSE-MIT", "LICENSE-APACHE"):
+            copy = ROOT / m / name
+            if not copy.is_file() or not same_text(copy, ROOT / name):
+                bad.append(f"{m}/{name}: differs from {name}: copy that file over it")
+        for copy in sorted(p for p in (ROOT / m / "licenses").glob("*") if p.is_file()):
+            source = ROOT / "licenses" / copy.name
+            if not source.is_file() or not same_text(copy, source):
+                bad.append(f"{copy.relative_to(ROOT).as_posix()}: differs from licenses/{copy.name}: copy that file over it")
+    return bad
+
+
 def lint():
     """the rules of the module docstring -> list of problems"""
     bad = kernel_table_lint()
@@ -899,7 +873,7 @@ def lint():
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
                 if ln[:2] in ('")', '",', '";'):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
-    return bad + plugin_lint() + module_lint() + perm_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests
+    return bad + plugin_lint() + module_lint() + perm_lint() + manifest_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests
 
 
 # ---------------------------------------------------------------- r13-measure: build profiles
@@ -1066,6 +1040,8 @@ class Builder:
             h.update(self.hashes[d].encode())
         h.update(" ".join(self.flags(name)).encode())
         h.update(extra.encode())
+        if name == "rt":                            # rt::VERSION; the crates above it have rt's digest
+            h.update(LIB_VERSION.encode())
         # include_bytes! assets of styles
         if "styles" in root.parts:
             for f in sorted((RS / "styles" / root.parent.name / "assets").glob("*")):
@@ -1099,8 +1075,8 @@ class Builder:
     def build_text_shape(self, root, ready):
         """Pinned no_std OpenType/Unicode dependencies, linked into our static binary."""
         manifest = RS / "lib/text_shape/Cargo.toml"
-        lock = manifest.with_name("Cargo.lock")
-        digest = self.src_hash(RS / root, [], extra=manifest.read_text()+lock.read_text()+"cargo-shaping-v2", name="text_shape")
+        digest = self.src_hash(RS / root, [], extra=manifest.read_text(encoding="utf-8") + manifests.external_lock() + "cargo-shaping-v3",
+                               name="text_shape")
         self.hashes["text_shape"] = digest
         if self.up_to_date("text_shape", digest, self.rlib("text_shape")):
             return False
@@ -1109,6 +1085,9 @@ class Builder:
         env = os.environ.copy()
         # Embedded LLVM bitcode is required by JFLib's release LTO link.
         env["RUSTFLAGS"] = "-C panic=abort -C embed-bitcode=yes"
+        # not the workspace's release profile: fat LTO and strip belong to a program's link step
+        env.update({f"CARGO_PROFILE_RELEASE_{k}": v for k, v in {"PANIC": "abort", "OPT_LEVEL": "2", "CODEGEN_UNITS": "1", "DEBUG": "false",
+                                                                 "LTO": "false", "STRIP": "none"}.items()})
         if self.target == "web" and self.web_mode == "threads":
             env["RUSTFLAGS"] += f" --sysroot {self.web_sysroot} -C target-feature=+atomics,+bulk-memory,+simd128 -A unstable-features"
         command = ["cargo", "build", "--locked", "--release", "--manifest-path", str(manifest),
@@ -1446,6 +1425,8 @@ def own_style_notices(style):
     notices = {}
     for folder in (root, root / "assets"):
         for source in sorted(folder.glob("*")):
+            if source.name in ("LICENSE-MIT", "LICENSE-APACHE"):     # the library's own, for the crate's package
+                continue
             if source.is_file() and ("license" in source.name.lower()
                                      or source.name.upper().startswith(("OFL", "NOTICE", "COPYING"))):
                 relative = Path("licenses") / style / source.name
@@ -1747,6 +1728,11 @@ def dev_command(a):
         for p in paths:
             print(f"wrote {p.relative_to(ROOT).as_posix()}")
         if a.lib:
+            r = subprocess.run(["cargo", "metadata", "--offline", "--format-version", "1"], cwd=ROOT, capture_output=True,   # Cargo.lock
+                               text=True, encoding="utf-8", errors="replace")
+            if r.returncode:
+                print(f"new: Cargo.lock was not updated:\n{r.stderr.strip()}")
+                return 1
             r = subprocess.run([sys.executable, str(ROOT / "tools" / "gendoc.py")], cwd=ROOT, capture_output=True,
                                text=True, encoding="utf-8", errors="replace")
             print(r.stdout.strip())
@@ -1793,6 +1779,7 @@ def write_ide():
             root = RS / libs[n][0]
             deps = [{"crate": idx[d], "name": d} for d in libs[n][1]]
         crates.append({"root_module": str(root), "edition": "2024", "deps": deps, "is_workspace_member": True,
+                       "env": {"CARGO_PKG_VERSION": LIB_VERSION},
                        "cfg": ["target_os=\"windows\"", "windows"], "target": TRIPLE["win"]})
     (RS / "rust-project.json").write_text(json.dumps({"sysroot": sysroot, "crates": crates}, indent=1))
     print(f"wrote rust-project.json ({len(crates)} crates)")
@@ -2426,7 +2413,7 @@ def main():
     ap.add_argument("--lib", action="store_true", help="new: a library crate under lib/ instead of an app")
     ap.add_argument("--deps", help="new --lib: the crates of LIBS it uses (rt,plat)")
     ap.add_argument("--against", help="api-diff: the release to compare with (default: the newest)")
-    ap.add_argument("--snapshot", action="store_true", help="api-diff: write docs/api/<lib/VERSION>.txt")
+    ap.add_argument("--snapshot", action="store_true", help="api-diff: write docs/api/<the library's version>.txt")
     ap.add_argument("--all", action="store_true", help="api-diff: list every change")
     ap.add_argument("--type", default="added", help="changelog: added|changed|deprecated|removed|fixed|security")
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")

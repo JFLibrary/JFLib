@@ -56,7 +56,7 @@ others), `PACKAGE` (`version=0.1.0`, an `app_id` and the `homepage` from the git
 a letter followed by letters, digits, `_` or `-`; existing apps (in any case), library crates and
 Rust keywords are refused. `--title` sets the window title and the package's display name.
 `python build_rs.py new --lib NAME --deps rt,plat` creates a library crate `lib/NAME/src/lib.rs`
-instead, enters it in `LIBS` of `build_rs.py` and in `tools/gendoc.py` and regenerates
+instead, enters it in the root `Cargo.toml`, the facade `lib/jflib` and `tools/gendoc.py` and regenerates
 [API.md](API.md). `apps/scaffoldtest` is the generator's `tool` output; the suite builds and
 tests it, so the skeletons keep building.
 

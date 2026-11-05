@@ -45456,7 +45456,7 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::crash the crash hook, CrashInfo, report (exit 3) -- also for panics
   rt::boot  what build_rs.py builds into a program (name, manifest, assets) for plat's start
   rt::main!(body)  the entry symbol of console programs (boot first, then body)
-  rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (lib/VERSION, SemVer;
+  rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
 
@@ -45466,9 +45466,9 @@ One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).
 ### `rt` crate root
 
 ```rust
-/// the library's version, "MAJOR.MINOR.PATCH" (lib/VERSION; docs/VERSIONING.md says what a
+/// the library's version, "MAJOR.MINOR.PATCH" (the root Cargo.toml; docs/VERSIONING.md says what a
 /// change of each part promises).  Not the app's version: that is `rt::app_version!()`.
-VERSION: &str = include_str!("../VERSION").trim_ascii()
+VERSION: &str = env!("CARGO_PKG_VERSION")
 /// the first number of VERSION (incompatible API changes; while 0, the MINOR number counts them)
 VERSION_MAJOR: u32 = version_part(VERSION, 0)
 /// the second number of VERSION

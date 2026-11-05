@@ -235,7 +235,7 @@ pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
 pub use recent::{RECENT_KEEP, RecentOpen};
-// the library's version (lib/VERSION, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
+// the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 // drag and drop (dnd.rs): what a drag carries, its kinds and effects
 pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData};

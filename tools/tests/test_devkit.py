@@ -26,6 +26,7 @@ import apidiff  # noqa: E402
 import changelog  # noqa: E402
 import gendoc  # noqa: E402
 import i18n_check  # noqa: E402
+import manifests  # noqa: E402
 import pkgmeta  # noqa: E402
 import scaffold  # noqa: E402
 import build_rs  # noqa: E402
@@ -132,27 +133,61 @@ class ScaffoldTest(Temp):
         self.assertEqual(scaffold.app_id_for("My-App", {"owner": ("gitlab.com", "9grp")}), "io.gitlab._9grp.My_App")
 
     def test_lib(self):
-        build = (ROOT / "build_rs.py").read_text(encoding="utf-8")
-        gd = (ROOT / "tools" / "gendoc.py").read_text(encoding="utf-8")
-        self.write("build_rs.py", build.replace("\n", "\r\n"))
-        self.write("tools/gendoc.py", gd)
+        for rel in ("Cargo.toml", "lib/jflib/Cargo.toml", "lib/jflib/src/lib.rs", "LICENSE-MIT", "LICENSE-APACHE"):
+            self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        self.write("Cargo.toml", (ROOT / "Cargo.toml").read_text(encoding="utf-8").replace("\n", "\r\n"))
+        self.write("tools/gendoc.py", (ROOT / "tools" / "gendoc.py").read_text(encoding="utf-8"))
         libs = list(build_rs.LIBS)
         with self.assertRaisesRegex(scaffold.ScaffoldError, "unknown dependencies"):
             scaffold.create_lib(self.dir, "mylib", ["nope"], None, libs, libs)
         paths = scaffold.create_lib(self.dir, "mylib", ["plat", "rt"], "my things", libs, libs)
-        nb = (self.dir / "build_rs.py").read_bytes()
+        nb = (self.dir / "Cargo.toml").read_bytes()
         self.assertEqual(nb.count(b"\n"), nb.count(b"\r\n"), "the file keeps its CRLF line ends")
-        text = nb.decode("utf-8")
-        line = re.search(r'^    "mylib": \("lib/mylib/src/lib\.rs", \["rt", "plat"\]\),  # my things\r$', text, re.M)
-        self.assertTrue(line, "LIBS entry in build order")
-        libs_block = re.search(r"^LIBS = \{\r\n.*?^\}\r\n", text, re.M | re.S).group(0)
-        self.assertTrue(libs_block.endswith("# my things\r\n}\r\n"), "the last entry of LIBS")
+        root = manifests.read(self.dir / "Cargo.toml")["workspace"]
+        self.assertEqual(root["members"][root["members"].index("lib/jflib") - 1], "lib/mylib", "the last crate of lib/")
+        self.assertEqual(root["dependencies"]["mylib"], {"package": "jflib-mylib", "path": "lib/mylib", "version": "=" + root["package"]["version"]})
+        made = manifests.read(self.dir / "lib" / "mylib" / "Cargo.toml")
+        self.assertEqual(made["package"]["description"], "my things")
+        self.assertEqual(list(made["dependencies"]), ["rt", "plat"], "in the order of the root manifest")
+        self.assertIn("mylib", manifests.read(self.dir / "lib" / "jflib" / "Cargo.toml")["dependencies"])
+        self.assertIn("pub use mylib;\n", (self.dir / "lib" / "jflib" / "src" / "lib.rs").read_text(encoding="utf-8"))
         self.assertIn('    ("mylib", "my things", "full"),\n]', (self.dir / "tools" / "gendoc.py").read_text(encoding="utf-8"))
         lib = (self.dir / "lib" / "mylib" / "src" / "lib.rs").read_text(encoding="utf-8")
         self.assertIn("#![forbid(unsafe_code)]", lib)
         self.assertIn(self.dir / "lib" / "mylib" / "src" / "lib.rs", paths)
+        self.assertTrue((self.dir / "lib" / "mylib" / "LICENSE-MIT").is_file())
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_lib(self.dir, "mylib", [], None, libs, libs)
+
+    def test_manifests_set_version(self):
+        """a release changes the version everywhere it stands, and nothing of the crates from outside"""
+        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml"):
+            self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        before = manifests.external_lock(self.dir)
+        manifests.set_version("7.8.9", self.dir)
+        root = manifests.read(self.dir / "Cargo.toml")["workspace"]
+        self.assertEqual(root["package"]["version"], "7.8.9")
+        self.assertEqual({d["version"] for d in root["dependencies"].values()}, {"=7.8.9"})
+        self.assertEqual(manifests.read(self.dir / "modules/modplat/Cargo.toml")["dependencies"]["rt"]["version"], "=7.8.9")
+        lock = manifests.read(self.dir / "Cargo.lock")["package"]
+        self.assertEqual({p["version"] for p in lock if p["name"].startswith("jflib")}, {"7.8.9"})
+        self.assertEqual(manifests.external_lock(self.dir), before)
+
+    def test_manifests_library_crates(self):
+        """the facade is no library crate, a module's names and one-target crates come out right, an
+        unknown [target] table is an error, not a dependency that build_rs.py silently misses"""
+        libs, target = manifests.library_crates()
+        self.assertNotIn("jflib", libs)
+        self.assertEqual(libs["rt"], ("lib/rt/lib.rs", []))
+        self.assertEqual(libs["text_shape"], ("lib/text_shape/src/lib.rs", []), "its crates from outside are Cargo's")
+        self.assertIn("rt", libs["img_jpeg"][1])
+        self.assertNotIn("modrt", libs["img_jpeg"][1])
+        self.assertEqual(target[("ui", "win")], ["shader", "gpu"])
+        self.assertNotIn("gpu", libs["ui"][1])
+        self.write("Cargo.toml", '[workspace]\nmembers = ["lib/a"]\n')
+        self.write("lib/a/Cargo.toml", '[lib]\nname = "a"\npath = "lib.rs"\n\n[target.\'cfg(unix)\'.dependencies]\nrt = "1"\n')
+        with self.assertRaisesRegex(manifests.ManifestError, "cfg.unix"):
+            manifests.library_crates(self.dir)
 
     def test_fixture_is_generator_output(self):
         """apps/scaffoldtest is `new scaffoldtest --kind tool --title Scaffold-Test`: a change of the
@@ -297,7 +332,7 @@ class ApiDiffTest(Temp):
         self.assertEqual(apidiff.param_types("fn h(&mut self, (x, y): (i32, i32))"), "fn h(&mut self, (i32, i32))")
 
     def test_library_snapshot(self):
-        """the release snapshots in docs/api read back, and lib/VERSION is a version"""
+        """the release snapshots in docs/api read back, and the library's version is a version"""
         apidiff.parse_version(apidiff.lib_version())
         for v, p in apidiff.snapshots():
             lines = apidiff.read_snapshot(p)
@@ -338,7 +373,7 @@ class ChangelogTest(unittest.TestCase):
                 bad()
 
     def test_repository_changelog(self):
-        """CHANGELOG.md has [Unreleased] and a section of the version in lib/VERSION"""
+        """CHANGELOG.md has [Unreleased] and a section of the library's version"""
         text, _ = changelog.read()
         self.assertIn(apidiff.lib_version(), changelog.releases(text))
         self.assertTrue(changelog.UNRELEASED.search(text))

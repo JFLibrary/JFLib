@@ -263,7 +263,7 @@ Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle 
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
 Skript verlangt mit `gpu on` anderes. Statische Linux-Programme linken nichts davon
-(`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
+(`lib/ui/gpu_out_off.rs`, the `[target]` tables in `lib/ui/Cargo.toml`).
 
 **Der Weg eines Fensters.**
 

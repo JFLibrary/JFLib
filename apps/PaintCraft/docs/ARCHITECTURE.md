@@ -73,7 +73,7 @@ algorithms should take the narrow state they need instead of `&mut Pn`.
 in the shared `plat` crate. Shared text rendering and codecs stay in their
 existing library crates:
 
-- `lib/text_shape/Cargo.toml` is the standalone Cargo crate for pinned OpenType
+- `lib/text_shape/Cargo.toml` is the Cargo crate for pinned OpenType
   and Unicode dependencies, with its implementation in `src/lib.rs`, integration
   tests in `tests/`, and dependency notices in `NOTICE.md` and `licenses/`.
 - `lib/text/shaping.rs` adapts shaping to JFLib text rendering.

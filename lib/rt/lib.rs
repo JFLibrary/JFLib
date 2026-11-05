@@ -11,7 +11,7 @@
 //   rt::crash the crash hook, CrashInfo, report (exit 3) -- also for panics
 //   rt::boot  what build_rs.py builds into a program (name, manifest, assets) for plat's start
 //   rt::main!(body)  the entry symbol of console programs (boot first, then body)
-//   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (lib/VERSION, SemVer;
+//   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
 //            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
 //   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
 //
@@ -20,16 +20,16 @@
 
 extern crate alloc;
 
-/// the library's version, "MAJOR.MINOR.PATCH" (lib/VERSION; docs/VERSIONING.md says what a
+/// the library's version, "MAJOR.MINOR.PATCH" (the root Cargo.toml; docs/VERSIONING.md says what a
 /// change of each part promises).  Not the app's version: that is `rt::app_version!()`.
-pub const VERSION: &str = include_str!("../VERSION").trim_ascii();
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// the first number of VERSION (incompatible API changes; while 0, the MINOR number counts them)
 pub const VERSION_MAJOR: u32 = version_part(VERSION, 0);
 /// the second number of VERSION
 pub const VERSION_MINOR: u32 = version_part(VERSION, 1);
 /// the third number of VERSION
 pub const VERSION_PATCH: u32 = version_part(VERSION, 2);
-const _: () = assert!(version_part(VERSION, 3) == u32::MAX, "lib/VERSION must be MAJOR.MINOR.PATCH");
+const _: () = assert!(version_part(VERSION, 3) == u32::MAX, "the version in Cargo.toml must be MAJOR.MINOR.PATCH");
 
 /// the n-th number of "1.2.3" (or "1.2.3-pre+build"); u32::MAX when it has no n-th number
 const fn version_part(v: &str, n: usize) -> u32 {

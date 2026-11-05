@@ -120,7 +120,7 @@ pub use rand::*;
 use alloc::string::String;
 
 #[cfg(not(jfgui_glibc))] pub use rt::os::exit; pub use rt::os::{write_stderr, write_stdout};
-// the library's version (lib/VERSION, docs/VERSIONING.md); the app's own: rt::app_version!()
+// the library's version (the root Cargo.toml, docs/VERSIONING.md); the app's own: rt::app_version!()
 pub use rt::{VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 
 mod cpu;

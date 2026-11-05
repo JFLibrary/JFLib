@@ -236,7 +236,7 @@ The screenshots currently show German UI text; the code examples below use Engli
 
 On systems where Python is named `python3`, replace `python` with `python3`.
 Web and Android builds need the additional tools listed below.
-The first build downloads the versions pinned in `lib/text_shape/Cargo.lock` from
+The first build downloads the versions pinned in `Cargo.lock` from
 crates.io. Later builds use Cargo's cache; `CARGO_NET_OFFLINE=true` enforces offline
 use after that cache has been populated. No system HarfBuzz installation is needed.
 Keep the generated `THIRD_PARTY_NOTICES.md` and `licenses/` folder with distributed
