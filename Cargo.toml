@@ -238,6 +238,97 @@ opt-level = 1
 debug = 0
 debug-assertions = false
 overflow-checks = false
+codegen-units = 16
+
+# the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
+# codecs stay fast in the tests, Kritzel and PaintCraft draw with their own pixel loops
+[profile.dev.package.jflib-gfx]
+opt-level = 2
+
+[profile.dev.package.jflib-text]
+opt-level = 2
+
+[profile.dev.package.jflib-simd]
+opt-level = 2
+
+[profile.dev.package.jflib-fx]
+opt-level = 2
+
+[profile.dev.package.jflib-crypto]
+opt-level = 2
+
+[profile.dev.package.jflib-compress]
+opt-level = 2
+
+[profile.dev.package.jflib-cas]
+opt-level = 2
+
+[profile.dev.package.jflib-spell]
+opt-level = 2
+
+[profile.dev.package.jflib-img-core]
+opt-level = 2
+
+[profile.dev.package.jflib-img-png]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jpeg]
+opt-level = 2
+
+[profile.dev.package.jflib-img-bmp]
+opt-level = 2
+
+[profile.dev.package.jflib-img-gif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-tga]
+opt-level = 2
+
+[profile.dev.package.jflib-img-tiff]
+opt-level = 2
+
+[profile.dev.package.jflib-img-webp]
+opt-level = 2
+
+[profile.dev.package.jflib-img-hevc]
+opt-level = 2
+
+[profile.dev.package.jflib-img-av1]
+opt-level = 2
+
+[profile.dev.package.jflib-img-heif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-avif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxl]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxl-enc]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxr]
+opt-level = 2
+
+[profile.dev.package.jflib-img-dds]
+opt-level = 2
+
+[profile.dev.package.jflib-img-pdn]
+opt-level = 2
+
+[profile.dev.package.jflib-img-svg]
+opt-level = 2
+
+[profile.dev.package.jflib-img-all]
+opt-level = 2
+
+[profile.dev.package.Kritzel]
+opt-level = 2
+
+[profile.dev.package.PaintCraft]
+opt-level = 2
+
 
 [profile.release]
 panic = "abort"

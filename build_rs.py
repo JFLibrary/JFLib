@@ -68,6 +68,11 @@ also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  A
 apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
 systems without glibc, such as Alpine).
 
+Cargo (docs/CRATES.md, CR3): the Windows programs of an app's own style are built by one
+`cargo build` per run into <out>/cargo (Builder.cargo_build); the other targets, style variants and
+--profile still compile with rustc here, as does --rustc for everything (to compare).  The profiles
+below are the root Cargo.toml's as well.
+
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
 crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
 (what only a development build has: the live inspector's editing, ui/inspect_edit.rs; hot
@@ -957,6 +962,7 @@ GLIBC_STUBS = {                                     # in the order a C program n
 
 
 STATIC_UI = False          # --static
+FORCE_RUSTC = False        # --rustc: no Cargo (to compare its programs with rustc's)
 
 
 def set_static_ui(on):
@@ -1028,6 +1034,7 @@ class Builder:
         self.asset_lock = threading.Lock()    # vfs: apps/NAME/assets packed once per run (app, bins, variants)
         self.asset_out = {}
         self.piped = set()                    # rlibs compiled in this run (their .rmeta is current)
+        self.cargo_out = {}                   # Cargo: package -> its program in Cargo's target folder
 
     def triple(self):
         return "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else arch_triple(self.target, self.arch)
@@ -1195,11 +1202,71 @@ class Builder:
         env["JFGUI_ASSETS"] = str(jfa.resolve())
         return ["--cfg", "jfgui_assets"], env
 
+    def cargo_ok(self, name, style, variant):
+        """is this program built by Cargo (docs/CRATES.md, CR3)?  Windows, the app's own style"""
+        return (not FORCE_RUSTC and self.target == "win" and self.profile is None and not variant
+                and style == app_style(name))
+
+    def cargo_build(self, names):
+        """the programs of these apps and of their BINS in one `cargo build` -> self.cargo_out
+        {package: its program}.  The compute crates' rlibs that were compiled again go through
+        check_intrinsics, as with rustc."""
+        pkgs = [p for n in names for p in [n] + [b for b, _, _ in app_bins(n)]]
+        if not pkgs:
+            return
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "-C", f"linker={tool('lld-link')}", "-C", "link-arg=/MAP"]
+        env = {"CARGO_TARGET_DIR": str(self.out / "cargo"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags), "RUSTFLAGS": None}
+        cmd = ["cargo", "build", "--locked", "--target", self.triple(), "--message-format=json-render-diagnostics"]
+        cmd += (["--release"] if self.release else []) + [x for p in pkgs for x in ("-p", p)]
+        full = {k: v for k, v in os.environ.items() if k not in env}
+        full.update({k: v for k, v in env.items() if v is not None})
+        r = subprocess.run(cmd, cwd=ROOT, env=full, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            raise BuildError("\n".join(ln for ln in r.stderr.splitlines() if not ln.lstrip().startswith(("Compiling", "Checking", "Fresh")))
+                             or "cargo build failed")
+        for ln in r.stdout.splitlines():
+            if not ln.startswith("{"):
+                continue
+            m = json.loads(ln)
+            if m.get("reason") != "compiler-artifact":
+                continue
+            kinds, crate = m["target"]["kind"], m["target"]["name"]
+            if "bin" in kinds and m.get("executable"):
+                self.cargo_out[crate] = Path(m["executable"])
+            elif "lib" in kinds and not m.get("fresh") and compute_crate(crate) and crate != "simd":
+                for f in m["filenames"]:
+                    if f.endswith(".rlib"):
+                        check_intrinsics(crate, Path(f))
+
+    def cargo_copy(self, package, dest):
+        """a program Cargo built (and its .map) -> dest"""
+        src = self.cargo_out.get(package)
+        if src is None:
+            raise BuildError(f"cargo built no program {package}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        maps = sorted((src.parent / "deps").glob(f"{src.stem}-*.map"), key=lambda p: p.stat().st_mtime)
+        if maps:
+            shutil.copyfile(maps[-1], dest.with_suffix(".map"))
+        return dest
+
     def build_app(self, name, style, variant=False):
         """apps/NAME with STYLE -> <dir>/NAME[.exe]; variant (several styles in one run):
         <dir>/<style>/NAME[.exe], with a copy of the app's modules next to it"""
         if self.target not in app_targets(name):
             return None
+        if self.cargo_ok(name, style, variant):          # CR3: built by cargo_build, here only put in place
+            if name not in self.cargo_out:
+                self.cargo_build([name])
+            vdir = self.public
+            for s in sorted({style, *(c[len("style_"):] for c in app_styles(name))}):
+                copy_style_notices(name, s, vdir)
+            copy_library_notices(vdir)
+            exe = self.cargo_copy(name, vdir / bin_file(name, self.target))
+            for b, _, _ in app_bins(name):
+                self.cargo_copy(b, vdir / bin_file(b, self.target))
+            build_app_modules(self.base, name, vdir)      # jxl-module: still rustc's (CR3d)
+            return exe
         if self.target == "linux" and not self.glibc and app_glibc(name):
             return self.glibc_twin().build_app(name, style, variant)
         scrate = f"style_{style}"
@@ -1525,15 +1592,18 @@ def build_apps(builders, names, styles=None):
 
     def libs(b):
         mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)
-                and not (b.target == "linux" and app_glibc(n))]       # section "glibc": their own crates
+                and not (b.target == "linux" and app_glibc(n)) and not b.cargo_ok(n, s, variant)]   # glibc: their own crates; Cargo's
         crates = {c for n, _ in mine for c in app_crates(n) + app_styles(n)} | {f"style_{s}" for _, s in mine}
         return b.build_libs(sorted(crates)) if mine else []
     with ThreadPoolExecutor(max(1, 2 * len(builders) * len(names))) as ex:
+        cargo = [ex.submit(b.cargo_build, sorted({n for bb, n, s in jobs if bb is b and b.target in app_targets(n)
+                                                  and b.cargo_ok(n, s, variant)})) for b in builders]
         mods = [ex.submit(build_app_modules, b, n) for b in builders for n in names
                 if b.target != "web" and b.target in app_targets(n) and APP_MODULES.get(n)]
         mods += [ex.submit(build_app_bins, b, n) for b in builders for n in names       # app-bins
-                 if b.target in ("win", "linux") and b.target in app_targets(n) and app_bins(n)]
-        for f in [ex.submit(libs, b) for b in builders]:
+                 if b.target in ("win", "linux") and b.target in app_targets(n) and app_bins(n)
+                 and not b.cargo_ok(n, app_style(n), False)]
+        for f in [ex.submit(libs, b) for b in builders] + cargo:
             f.result()
         with ThreadPoolExecutor(max(1, len(jobs))) as ex2:
             futs = [(b, n, ex2.submit(b.build_app, n, s, variant)) for b, n, s in jobs]
@@ -2448,6 +2518,7 @@ def main():
     ap.add_argument("-j", type=int, default=os.cpu_count() or 8,
                     help="rustc processes at once (libraries and app links; default: the logical CPUs)")
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--rustc", action="store_true", help="compile with rustc only, no Cargo (to compare: docs/CRATES.md, CR3)")
     ap.add_argument("--bin", help="run: one of the app's further executables (apps/NAME/BINS)")
     # new, api-diff, changelog, release (dev_command)
     ap.add_argument("--kind", choices=["window", "console", "tool", "service"], help="new: the kind of app")
@@ -2466,6 +2537,8 @@ def main():
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     set_static_ui(a.static)                         # section "glibc"
+    global FORCE_RUSTC
+    FORCE_RUSTC = a.rustc                           # CR3: compare with rustc's programs
     if a.arch != "x86_64" and a.cmd in ("run", "test", "watch"):
         print(f"{a.cmd}: nothing starts programs of --arch {a.arch} yet (docs/ARM64.md, ARM2)")
         return 1
