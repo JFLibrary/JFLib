@@ -23,7 +23,8 @@
 //! It also gives the linker what JFLib's own runtime needs: its entry point and no C runtime, on
 //! Windows the subsystem; on Linux one static file or, with `--cfg jfgui_glibc`, a program
 //! against glibc (the libraries to link against are made here, the build machine needs no glibc);
-//! for the browser the exports of the wasm module.  What a build script cannot set, the linker
+//! for the browser the exports of the wasm module.  The linker's map of a Windows or Linux program
+//! is `program.map` in the build script's `OUT_DIR` (crash reports name offsets into it).  What a build script cannot set, the linker
 //! and the relocation model, comes from the project's `.cargo/config.toml`: the template in the
 //! crate `jflib` has it, an error here names the line that is missing.
 #![forbid(unsafe_code)]

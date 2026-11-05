@@ -170,6 +170,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** Every library crate, style and module has a Cargo manifest, the root Cargo.toml is their workspace and the new crate jflib brings all of them; build_rs.py reads its crate table from the manifests and still compiles with rustc itself (docs/CRATES.md)
 - **rt:** The library's version moved from lib/VERSION to the root Cargo.toml; rt::VERSION reads CARGO_PKG_VERSION, build_rs.py sets it for rustc
 - **build:** Every app, its further programs (BINS), its own crates and the styles jfoffice, backupcraft and netlab are Cargo packages of the workspace with a build.rs through jflib-build; build_rs.py new writes them, check compares them with the sources; themedemo starts with style_winui::STYLE
+- **build:** build_rs.py builds the Windows and Linux programs (static and against glibc) through Cargo, one cargo build per target and run; jflib-build writes the linker map; --rustc compiles with rustc as before
 
 ### Removed
 

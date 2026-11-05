@@ -79,8 +79,9 @@ impl Target {
             return Err(format!("{}: JFLib builds Windows programs for the msvc targets (x86_64-pc-windows-msvc)", self.triple));
         }
         let subsystem = if kind == Kind::Gui { "WINDOWS" } else { "CONSOLE" };
+        let map = format!("/MAP:{}", out_dir.join("program.map").display());
         let mut args: Vec<String> =
-            ["/ENTRY:mainCRTStartup", &format!("/SUBSYSTEM:{subsystem}"), "/NODEFAULTLIB", "/DEBUG:NONE"].map(String::from).to_vec();
+            ["/ENTRY:mainCRTStartup", &format!("/SUBSYSTEM:{subsystem}"), "/NODEFAULTLIB", "/DEBUG:NONE", &map].map(String::from).to_vec();
         let ico = dir.join("res").join("app.ico");
         if ico.is_file() {
             let data = fs::read(&ico).map_err(|e| format!("{}: {e}", ico.display()))?;
@@ -122,7 +123,8 @@ impl Target {
         } else {
             args.push("-static".to_string());
         }
-        for a in ["-e _start", "--gc-sections", "-z noexecstack"] {
+        let map = format!("-Map={}", out_dir.join("program.map").display());
+        for a in ["-e _start", "--gc-sections", "-z noexecstack", &map] {
             if ld {
                 args.extend(a.split(' ').map(String::from));
             } else {

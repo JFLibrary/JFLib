@@ -68,9 +68,10 @@ also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  A
 apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
 systems without glibc, such as Alpine).
 
-Cargo (docs/CRATES.md, CR3): the Windows programs of an app's own style are built by one
-`cargo build` per run into <out>/cargo (Builder.cargo_build); the other targets, style variants and
---profile still compile with rustc here, as does --rustc for everything (to compare).  The profiles
+Cargo (docs/CRATES.md, CR3): the Windows and Linux programs of an app's own style are built by one
+`cargo build` per target and run into <out>/cargo (Linux against glibc: <out>/cargo-glibc;
+Builder.cargo_build); the browser, Android, the modules, style variants and --profile still compile
+with rustc here, as does --rustc for everything (to compare).  The profiles
 below are the root Cargo.toml's as well.
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
@@ -1204,18 +1205,50 @@ class Builder:
 
     def cargo_ok(self, name, style, variant):
         """is this program built by Cargo (docs/CRATES.md, CR3)?  Windows, the app's own style"""
-        return (not FORCE_RUSTC and self.target == "win" and self.profile is None and not variant
+        return (not FORCE_RUSTC and self.target in ("win", "linux") and self.profile is None and not variant
                 and style == app_style(name))
+
+    def cargo_packages(self, names):
+        """the packages this Builder's cargo_build builds for these apps: on Linux the static one the
+        apps without a UI and every cli program, its glibc twin the others"""
+        if self.target != "linux":
+            return [p for n in names for p in [n] + [b for b, _, _ in app_bins(n)]]
+        out = []
+        for n in names:
+            glibc = app_glibc(n)
+            if glibc == self.glibc:
+                out.append(n)
+            out += [b for b, _, k in app_bins(n) if (k == "gui" and glibc) == self.glibc]
+        return out
+
+    def cargo_builder(self, app, kind=None):
+        """the Builder whose Cargo run builds the app (kind None) or one of its BINS"""
+        if self.target != "linux":
+            return self
+        base = self.base
+        return base.glibc_twin() if app_glibc(app) and kind in (None, "gui") else base
+
+    def cargo_flags(self):
+        """build_rs.py's rustc flags as Cargo's rustflags (the profile is Cargo's)"""
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="]
+        if self.target == "win":
+            return flags + ["-C", f"linker={tool('lld-link')}"]
+        flags += ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"]
+        return flags + (["--cfg", "jfgui_glibc"] if self.glibc else ["-C", "target-feature=+crt-static"])
 
     def cargo_build(self, names):
         """the programs of these apps and of their BINS in one `cargo build` -> self.cargo_out
         {package: its program}.  The compute crates' rlibs that were compiled again go through
         check_intrinsics, as with rustc."""
-        pkgs = [p for n in names for p in [n] + [b for b, _, _ in app_bins(n)]]
+        pkgs = self.cargo_packages(names)
+        if self.target == "linux" and not self.glibc:              # section "glibc": the twin's share
+            twin = [n for n in names if self.glibc_twin().cargo_packages([n])]
+            if twin:
+                self.glibc_twin().cargo_build(twin)
         if not pkgs:
             return
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "-C", f"linker={tool('lld-link')}", "-C", "link-arg=/MAP"]
-        env = {"CARGO_TARGET_DIR": str(self.out / "cargo"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags), "RUSTFLAGS": None}
+        env = {"CARGO_TARGET_DIR": str(self.out / ("cargo-glibc" if self.glibc else "cargo")),
+               "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(self.cargo_flags()), "RUSTFLAGS": None}
         cmd = ["cargo", "build", "--locked", "--target", self.triple(), "--message-format=json-render-diagnostics"]
         cmd += (["--release"] if self.release else []) + [x for p in pkgs for x in ("-p", p)]
         full = {k: v for k, v in os.environ.items() if k not in env}
@@ -1224,30 +1257,34 @@ class Builder:
         if r.returncode:
             raise BuildError("\n".join(ln for ln in r.stderr.splitlines() if not ln.lstrip().startswith(("Compiling", "Checking", "Fresh")))
                              or "cargo build failed")
+        out_dirs, programs = {}, {}
         for ln in r.stdout.splitlines():
             if not ln.startswith("{"):
                 continue
             m = json.loads(ln)
+            if m.get("reason") == "build-script-executed":
+                out_dirs[m["package_id"]] = Path(m["out_dir"])
             if m.get("reason") != "compiler-artifact":
                 continue
             kinds, crate = m["target"]["kind"], m["target"]["name"]
             if "bin" in kinds and m.get("executable"):
-                self.cargo_out[crate] = Path(m["executable"])
+                programs[crate] = (Path(m["executable"]), m["package_id"])
             elif "lib" in kinds and not m.get("fresh") and compute_crate(crate) and crate != "simd":
                 for f in m["filenames"]:
                     if f.endswith(".rlib"):
                         check_intrinsics(crate, Path(f))
+        for crate, (exe, pid) in programs.items():           # jflib-build writes the map to OUT_DIR
+            self.cargo_out[crate] = (exe, out_dirs.get(pid, exe.parent) / "program.map")
 
     def cargo_copy(self, package, dest):
         """a program Cargo built (and its .map) -> dest"""
-        src = self.cargo_out.get(package)
-        if src is None:
+        if package not in self.cargo_out:
             raise BuildError(f"cargo built no program {package}")
+        src, mapf = self.cargo_out[package]
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
-        maps = sorted((src.parent / "deps").glob(f"{src.stem}-*.map"), key=lambda p: p.stat().st_mtime)
-        if maps:
-            shutil.copyfile(maps[-1], dest.with_suffix(".map"))
+        if mapf.is_file():                         # Windows NAME.map, Linux NAME.map (as rustc's builds name them)
+            shutil.copyfile(mapf, dest.with_suffix(".map") if self.target == "win" else dest.with_name(dest.name + ".map"))
         return dest
 
     def build_app(self, name, style, variant=False):
@@ -1256,15 +1293,19 @@ class Builder:
         if self.target not in app_targets(name):
             return None
         if self.cargo_ok(name, style, variant):          # CR3: built by cargo_build, here only put in place
-            if name not in self.cargo_out:
-                self.cargo_build([name])
+            own = self.cargo_builder(name)
+            if name not in own.cargo_out:
+                self.base.cargo_build([name])
             vdir = self.public
             for s in sorted({style, *(c[len("style_"):] for c in app_styles(name))}):
                 copy_style_notices(name, s, vdir)
             copy_library_notices(vdir)
-            exe = self.cargo_copy(name, vdir / bin_file(name, self.target))
-            for b, _, _ in app_bins(name):
-                self.cargo_copy(b, vdir / bin_file(b, self.target))
+            exe = own.cargo_copy(name, vdir / bin_file(name, self.target))
+            for b, _, kind in app_bins(name):
+                self.cargo_builder(name, kind).cargo_copy(b, vdir / bin_file(b, self.target))
+            if self.target == "linux":                    # section "glibc": the other build's file is gone
+                key = "app_" + name
+                ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
             build_app_modules(self.base, name, vdir)      # jxl-module: still rustc's (CR3d)
             return exe
         if self.target == "linux" and not self.glibc and app_glibc(name):
