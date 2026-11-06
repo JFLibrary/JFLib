@@ -10,6 +10,7 @@ cargo install cargo-jflib
 | --- | --- |
 | `cargo jflib new NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux |
 | `cargo jflib test` | builds the app, then runs every `tests/*.uis` with `--script` |
+| `cargo jflib watch [-- ARGS]` | hot reload: each save of the project's files builds the app again and restarts it in its session, the input replayed so it comes back where it was; a failed build keeps the running version and shows the error in its inspector |
 | `cargo jflib web [--serve]` | the app for the browser in `target/jflib-web/NAME/`: scalar, SIMD and threads, the host page, the licences; `--serve` serves it with the headers threads need |
 | `cargo jflib package [--styles winui,kde] [--formats setup,deb,..\|all] [--sign] [--repo DIR] [--update DIR]` | the app with every style built in, in `target/jflib-package/`: by default `NAME_Setup.exe` for Windows (a preview of each style to pick from, folder, shortcuts, file types, an uninstaller) and `DEB_VERSION_amd64.deb` for Linux (debconf asks for the look); with `--formats` also `msix`, `appimage` (one per style), `rpm` and `flatpak`; the licences of every crate inside |
 | `cargo jflib keygen FILE` | a key for the signed update channel (`package --update`) and its public key for the app |

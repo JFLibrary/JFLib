@@ -15,6 +15,7 @@ cargo jflib new hallo
 cd hallo
 cargo run
 cargo jflib test              # runs tests/*.uis
+cargo jflib watch             # hot reload while you edit
 cargo jflib web --serve       # the app in the browser
 cargo jflib android --install # the app on a phone (Android SDK and NDK)
 cargo jflib package           # a setup for Windows and a .deb, every style inside

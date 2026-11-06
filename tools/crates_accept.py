@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """crates_accept.py -- does a project outside this repository build with the crates alone?
 
-    python tools/crates_accept.py [--targets win,linux,web,android,package] [--out DIR]
+    python tools/crates_accept.py [--targets win,linux,web,android,package,watch] [--out DIR]
     python tools/crates_accept.py --template     write the files of lib/jflib/template that
                                                  come from apps/template (build_rs.py check
                                                  compares them)
@@ -34,6 +34,9 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           and the MSIX carry Authenticode signatures, gpgv accepts the AppImage's embedded
           signature and the apt repository (apt-get reads it in a folder of its own), the Flatpak
           repository is signed, tools/update_manifest.py verifies every style's channel.
+          `cargo jflib watch -- --script tests/watch.uis` (headless, no window): the app runs in
+          its session, a saved change builds and starts it again, a broken source keeps the
+          old build and fills build.txt, Ctrl+Break ends watch.
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -468,6 +471,63 @@ rm -rf "$T"
                   + "".join("\n    " + x for x in problems))
 
 
+def check_watch(run, app, jenv, target_dir):
+    """cargo jflib watch with the app headless under a script (no window): built and started in
+    its session, a saved change built and started again, a broken source keeps the old build and
+    fills build.txt, the fixed one builds again, Ctrl+Break (Ctrl+C) ends watch"""
+    import signal
+    (app / "tests" / "watch.uis").write_text('click "Klick mich"\nexpect text:"Klicks: 1" exists\nshot target/watch.png\n', encoding="utf-8")
+    (app / "target").mkdir(exist_ok=True)
+    shot, session = app / "target" / "watch.png", target_dir / "jflib-watch" / "hallo2"
+    shot.unlink(missing_ok=True)
+    src = app / "src" / "lib.rs"
+    original = src.read_bytes()
+    log = run.log / "cargo-jflib-watch.log"
+    text = lambda: log.read_text(encoding="utf-8", errors="replace")  # noqa: E731
+    out = open(log, "w", encoding="utf-8")
+    proc = subprocess.Popen(["cargo", "jflib", "watch", "--", "--script", "tests/watch.uis"], cwd=app, env=dict(os.environ, **jenv),
+                            stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0, start_new_session=os.name != "nt")
+
+    def until(what, cond, secs=600):
+        end = time.monotonic() + secs
+        while time.monotonic() < end and proc.poll() is None:
+            try:
+                if cond():
+                    run.check(True, what)
+                    return True
+            except OSError:
+                pass
+            time.sleep(0.5)
+        run.fail(f"{what} (log/cargo-jflib-watch.log)\n    " + text().strip()[-600:].replace("\n", "\n    "))
+        return False
+
+    code = None
+    try:
+        if until("cargo jflib watch: built, the app ran in its session (replay.txt, its script's shot)",
+                 lambda: shot.is_file() and (session / "replay.txt").is_file()):
+            shot.unlink()
+            src.write_bytes(original + b"\n// changed by crates_accept.py\n")
+            if until("watch: a saved change is built and started again", lambda: shot.is_file() and text().count("watch: build done") >= 2):
+                src.write_bytes(original + b"\nfn broken(\n")
+                if until("watch: a broken source fails, build.txt holds the error",
+                         lambda: "watch: build FAILED" in text() and "error" in (session / "build.txt").read_text(encoding="utf-8")):
+                    shot.unlink(missing_ok=True)
+                    src.write_bytes(original)
+                    until("watch: the fixed source is built and started again, build.txt empty",
+                          lambda: shot.is_file() and text().count("watch: build done") >= 3 and not (session / "build.txt").read_text(encoding="utf-8").strip())
+    finally:
+        src.write_bytes(original)
+        if proc.poll() is None:
+            proc.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
+            try:
+                code = proc.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        out.close()
+    run.check(code == 0 and "watch: ending" in text(), f"Ctrl+Break ends watch (exit {code})")
+
+
 def check_appimage(run, image, program, app):
     """the AppImage of the kde style: unsquashfs reads its image (the program is the one built),
     the .desktop and metainfo pass desktop-file-validate and appstreamcli, tests/smoke.uis runs
@@ -632,6 +692,8 @@ def accept(targets, out):
                     apk = target_dir / "jflib-android" / "hallo2-x86_64-debug.apk"
                     bad = apk_problems(apk) if apk.is_file() else [f"{apk} missing"]
                     run.check(not bad, "cargo jflib android: code, library (16 KiB), licences" + "".join("\n    " + b for b in bad))
+            if "watch" in targets:
+                check_watch(run, app, jenv, target_dir)
             dist = target_dir / "jflib-package"
             if "package" in targets and dist.is_dir():
                 # what this run makes, nothing older (the stubs and their builds stay)
@@ -672,7 +734,7 @@ def accept(targets, out):
 def main(argv=None):
     sys.stdout.reconfigure(errors="replace")             # the validators' output may hold characters cp1252 lacks
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--targets", default="win,linux,web,android,package")
+    ap.add_argument("--targets", default="win,linux,web,android,package,watch")
     ap.add_argument("--out", default=str(ROOT / "build" / "crates_accept"))
     ap.add_argument("--template", action="store_true")
     a = ap.parse_args(argv)

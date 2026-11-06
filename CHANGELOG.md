@@ -145,6 +145,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib package: an app outside this repository as a setup for Windows and a .deb for Linux with every style built in (JFLIB_STYLE), previews by --shot, the licences of every crate, PACKAGE's keys of tools/package.py; the .deb written without dpkg-deb; crates_accept.py installs the setup by script and checks the .deb with dpkg-deb
 - **build:** cargo jflib package --formats msix,appimage,rpm,flatpak (or all): an AppImage per style written without Linux tools (SquashFS with LZ4 behind the runtime jflib-appimagert), the rpm's .spec and tarball and the Flatpak manifest (rpmbuild and flatpak-builder on Linux or in WSL), the MSIX by MakeAppx; finish-args and capabilities from PERMISSIONS, AppStream metainfo
 - **build:** cargo jflib package --sign, --repo DIR, --update DIR and cargo jflib keygen FILE: Authenticode for the programs, the setup and the MSIX, GPG for the AppImages, a flat apt repository and the Flatpak repository, a signed update channel per style (Ed25519 by a small program built from jflib-crypto); crates_accept.py checks every signature with signtool's table, gpgv, apt-get and update_manifest.py
+- **build:** cargo jflib watch [-p PKG] [-- ARGS]: hot reload for an app outside this repository (tools/hotreload.py's session, built like cargo run, a failed build kept out with build.txt, Ctrl+C asks the app to end); crates_accept.py runs it headless under a script
 
 ### Changed
 

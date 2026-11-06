@@ -2,8 +2,8 @@
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
 `build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web`, `android` und `package` mit allen
-sechs Formaten, dem Signieren, apt-Repository und Update-Kanal umgesetzt, offen sind `watch`, `plugin` und CR5,
-CR6. Die Ergebnisse unter „Was schon geprüft ist“
+sechs Formaten, dem Signieren, apt-Repository und Update-Kanal sowie `watch` umgesetzt; offen sind die Frage, ob
+`plugin` bleibt, und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -373,7 +373,21 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
     `summary.sig`, `update_manifest.py` (eigenes Ed25519 in Python) prüft beide Kanäle. **Nicht geprüft:** ein
     echtes Zertifikat einer CA, `rpm --addsign` (gibt es auch in `package.py` nicht).
 - **CR4d: `watch`, `plugin`.**
-- **Reihenfolge danach:** `watch`, `plugin`.
+  - **`watch`: erledigt am 2026-11-06.** `cargo jflib watch [-p PKG] [-- ARGS]` macht, was `tools/hotreload.py`
+    für die Apps des Repos macht: eine Entwicklungs-Build, gestartet in ihrer Sitzung `target/jflib-watch/NAME`
+    (`jfgui_HOTRELOAD`, `jfgui_STATE`), nach jedem Speichern neu gebaut und neu gestartet, die Eingaben wieder
+    eingespielt; ein misslungener Build lässt die laufende Version stehen und schreibt `build.txt`, die der Inspektor
+    zeigt. Beobachtet werden alle Dateien der eigenen Pakete (Workspace und Pfad-Abhängigkeiten, ohne `target/` und
+    versteckte Ordner außer `.cargo`). Gebaut wird wie `cargo run`, damit dessen Build wieder genommen wird (unter
+    Windows ohne `--target`, unter Linux mit). Strg+C fängt ein kleiner FFI-Teil ab (`SetConsoleCtrlHandler`,
+    `signal`), damit die App gebeten wird zu enden, statt verwaist weiterzulaufen. **Geprüft** in `crates_accept.py`
+    mit der App kopflos unter `--script` (kein Fenster): Start in der Sitzung, eine gespeicherte Änderung baut und
+    startet neu, eine kaputte Quelle schlägt fehl und füllt `build.txt`, die reparierte baut wieder, Strg+Pause
+    beendet `watch` mit 0. Das Wiedereinspielen selbst prüft `tools/tests/test_hotreload.py`.
+  - **`plugin`: offen.** Das Plugin-ABI (`lib/plugin`, `plugins/*`) gehört zu PaintCraft und wird bewusst nicht
+    veröffentlicht; ein Crate-Nutzer könnte kein Plugin bauen, das irgendwo geladen wird. Vorschlag: aus CR4
+    streichen; ladbare Module eigener Apps (`modrt`, `modplat`) wären ein eigenes Thema.
+- **Reihenfolge danach:** die Entscheidung zu `plugin`, dann CR5.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
 - **Mitzuliefern:** `web/*`, `android/*` und die Starter `apps/installer` (`jflib-installer`) und `apps/appimagert`

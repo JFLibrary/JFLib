@@ -5,6 +5,7 @@
 //! cargo jflib new NAME                 a new app NAME from the template (a window)
 //! cargo jflib test [-p PKG] [--release] [--target TRIPLE]
 //!                                      build, then run every tests/*.uis with --script
+//! cargo jflib watch [-p PKG] [-- ARGS]  hot reload: built again and restarted in its session on a save
 //! cargo jflib web [-p PKG] [--release] [--modes scalar,simd,threads] [--serve [PORT]]
 //!                                      the app for the browser in target/jflib-web/NAME/
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
@@ -36,6 +37,7 @@ mod png;
 mod sha256;
 mod sign;
 mod update;
+mod watch;
 mod squashfs;
 mod test;
 mod web;
@@ -50,6 +52,11 @@ USAGE:
         a new app NAME from the template: a window, its tests, Linux and Windows settings
     cargo jflib test [-p PKG] [--release] [--target TRIPLE]
         build, then run every tests/*.uis of the package with --script
+    cargo jflib watch [-p PKG] [-- ARGS]
+        hot reload: a development build, started in its session (target/jflib-watch/NAME); each
+        save of the project's files builds again and restarts it, the input replayed so the app
+        comes back where it was; a failed build keeps the running version (the error in its
+        inspector); ARGS go to every start; Ctrl+C ends watch and the app
     cargo jflib web [-p PKG] [--release] [--modes scalar,simd,threads] [--serve [PORT]]
         the app for the browser: target/jflib-web/NAME/ (index.html, the modules, the host);
         --serve then serves it on 127.0.0.1 (default port 8766) with the headers threads need
@@ -118,6 +125,7 @@ fn main() -> ExitCode {
         Some("new") => new::run(&args[1..]),
         Some("test") => test::run(&args[1..]),
         Some("web") => web::run(&args[1..]),
+        Some("watch") => watch::run(&args[1..]),
         Some("android") => android::run_cmd(&args[1..]),
         Some("package") => package::run(&args[1..]),
         Some("keygen") => update::keygen(&args[1..]),
