@@ -239,6 +239,8 @@ debug = 0
 debug-assertions = false
 overflow-checks = false
 codegen-units = 16
+# as build_rs.py links every program; no effect on the crates of a project outside (its own profile counts)
+strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
 # codecs stay fast in the tests, Kritzel and PaintCraft draw with their own pixel loops
@@ -327,6 +329,19 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.PaintCraft]
+opt-level = 2
+
+# text_shape and the crates it pins from crates.io: optimised as build_rs.py's earlier Cargo build of them did
+[profile.dev.package."*"]
+opt-level = 2
+codegen-units = 1
+
+[profile.dev.package.jflib-text-shape]
+opt-level = 2
+codegen-units = 1
+
+# a module links with fat LTO in development builds too (build_rs.py, jxl-module): at a compute crate's level
+[profile.dev.package.jflib-module-jxlenc]
 opt-level = 2
 
 

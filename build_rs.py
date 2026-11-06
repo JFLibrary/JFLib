@@ -68,10 +68,11 @@ also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  A
 apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
 systems without glibc, such as Alpine).
 
-Cargo (docs/CRATES.md, CR3): the Windows and Linux programs of an app's own style are built by one
-`cargo build` per target and run into <out>/cargo (Linux against glibc: <out>/cargo-glibc;
-Builder.cargo_build); the browser, Android, the modules, style variants and --profile still compile
-with rustc here, as does --rustc for everything (to compare).  The profiles
+Cargo (docs/CRATES.md, CR3): the programs of an app's own style are built by one `cargo build` per
+target and run into <out>/cargo-<target> (Builder.cargo_build); for the browser and Android the tool
+makes each app a library of its own (derived_workspace), the modules link over modrt / modplat
+(Builder.cargo_module).  Style variants and --profile still compile with rustc here, as does --rustc
+for everything (to compare).  The profiles
 below are the root Cargo.toml's as well.
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
@@ -1205,12 +1206,13 @@ class Builder:
 
     def cargo_ok(self, name, style, variant):
         """is this program built by Cargo (docs/CRATES.md, CR3)?  Windows, the app's own style"""
-        return (not FORCE_RUSTC and self.target in ("win", "linux") and self.profile is None and not variant
-                and style == app_style(name))
+        return not FORCE_RUSTC and self.profile is None and not variant and style == app_style(name)
 
     def cargo_packages(self, names):
         """the packages this Builder's cargo_build builds for these apps: on Linux the static one the
         apps without a UI and every cli program, its glibc twin the others"""
+        if self.target in ("web", "android"):
+            return [derived_name(n, self.target) for n in names]
         if self.target != "linux":
             return [p for n in names for p in [n] + [b for b, _, _ in app_bins(n)]]
         out = []
@@ -1233,6 +1235,15 @@ class Builder:
         flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="]
         if self.target == "win":
             return flags + ["-C", f"linker={tool('lld-link')}"]
+        if self.target == "android":
+            return flags                                   # a static library: tools/android.py links it
+        if self.target == "web":
+            flags += ["-C", f"linker={tool('wasm-ld')}"]
+            if self.web_mode != "scalar":
+                flags += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
+            if self.web_mode == "threads":                 # LLVM supports wasm atomics on stable; Rust labels them unstable
+                flags += ["--cfg", "web_threads", "-A", "unstable-features", "--sysroot", str(self.web_sysroot)]
+            return flags
         flags += ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"]
         return flags + (["--cfg", "jfgui_glibc"] if self.glibc else ["-C", "target-feature=+crt-static"])
 
@@ -1247,9 +1258,12 @@ class Builder:
                 self.glibc_twin().cargo_build(twin)
         if not pkgs:
             return
-        env = {"CARGO_TARGET_DIR": str(self.out / ("cargo-glibc" if self.glibc else "cargo")),
-               "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(self.cargo_flags()), "RUSTFLAGS": None}
+        folder = {"win": "cargo", "linux": "cargo-glibc" if self.glibc else "cargo", "web": f"cargo-web-{self.web_mode}",
+                  "android": f"cargo-android-{self.android_abi}"}[self.target]
+        env = {"CARGO_TARGET_DIR": str(self.out / folder), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(self.cargo_flags()), "RUSTFLAGS": None}
         cmd = ["cargo", "build", "--locked", "--target", self.triple(), "--message-format=json-render-diagnostics"]
+        if self.target in ("web", "android"):              # the apps as libraries: a workspace of the tool's own
+            cmd = cmd[:2] + ["--offline", "--manifest-path", str(derived_workspace(self.out, self.target, names))] + cmd[3:]
         cmd += (["--release"] if self.release else []) + [x for p in pkgs for x in ("-p", p)]
         full = {k: v for k, v in os.environ.items() if k not in env}
         full.update({k: v for k, v in env.items() if v is not None})
@@ -1269,6 +1283,10 @@ class Builder:
             kinds, crate = m["target"]["kind"], m["target"]["name"]
             if "bin" in kinds and m.get("executable"):
                 programs[crate] = (Path(m["executable"]), m["package_id"])
+            elif ("cdylib" in kinds or "staticlib" in kinds) and m["package_id"].split("#")[0].split("/")[-1] in pkgs:
+                lib = next((Path(f) for f in m["filenames"] if f.endswith((".wasm", ".a"))), None)
+                if lib is not None:                         # derived_workspace: by its package's name
+                    self.cargo_out[m["package_id"].split("#")[0].split("/")[-1]] = (lib, None)
             elif "lib" in kinds and not m.get("fresh") and compute_crate(crate) and crate != "simd":
                 for f in m["filenames"]:
                     if f.endswith(".rlib"):
@@ -1283,9 +1301,43 @@ class Builder:
         src, mapf = self.cargo_out[package]
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
-        if mapf.is_file():                         # Windows NAME.map, Linux NAME.map (as rustc's builds name them)
+        if mapf is not None and mapf.is_file():    # Windows NAME.map, Linux NAME.map (as rustc's builds name them)
             shutil.copyfile(mapf, dest.with_suffix(".map") if self.target == "win" else dest.with_name(dest.name + ".map"))
         return dest
+
+    def cargo_module(self, name):
+        """jxl-module through Cargo: modules/NAME over modrt / modplat (--cfg jflib_module), linked as
+        ModuleBuilder links it (fat LTO, no imports, no entry) into the Builder's folder, checked
+        the way PaintCraft's loader checks a library -> its path"""
+        t = self.target
+        out = self.dir / module_file(name, t)
+        mapf = out.parent / (out.stem + ".map" if t == "win" else out.name + ".map")
+        pb = PluginBuilder.__new__(PluginBuilder)       # its link flags (no imports, no entry)
+        pb.target = t
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + pb.link_flags()
+        flags += ["-C", f"link-arg={'/MAP:' if t == 'win' else '-Map='}{mapf}"] + (["-C", "relocation-model=pic"] if t == "linux" else [])
+        profile = "RELEASE" if self.release else "DEV"
+        env = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
+        env.update({"CARGO_TARGET_DIR": str(self.out / "cargo-modules"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags),
+                    f"CARGO_PROFILE_{profile}_LTO": "fat", f"CARGO_PROFILE_{profile}_STRIP": "symbols"})
+        cmd = ["cargo", "build", "--locked", "--target", self.triple(), "--message-format=json-render-diagnostics",
+               "-p", f"jflib-module-{name}"] + (["--release"] if self.release else [])
+        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            raise BuildError(r.stderr.strip() or f"cargo build of module {name} failed")
+        lib = None
+        for ln in r.stdout.splitlines():
+            m = json.loads(ln) if ln.startswith("{") else {}
+            if m.get("reason") == "compiler-artifact" and "cdylib" in m["target"]["kind"]:
+                lib = next(Path(f) for f in m["filenames"] if f.endswith((".dll", ".so")))
+        if lib is None:
+            raise BuildError(f"cargo built no module {name}")
+        shutil.copyfile(lib, out)
+        bad = plugin_verify(out, t, export=f"{name}_module")
+        if bad:
+            out.unlink()
+            raise BuildError(f"module {name} ({t}) would be rejected by the loader:\n  " + "\n  ".join(bad))
+        return out
 
     def build_app(self, name, style, variant=False):
         """apps/NAME with STYLE -> <dir>/NAME[.exe]; variant (several styles in one run):
@@ -1294,12 +1346,26 @@ class Builder:
             return None
         if self.cargo_ok(name, style, variant):          # CR3: built by cargo_build, here only put in place
             own = self.cargo_builder(name)
-            if name not in own.cargo_out:
+            if derived_name(name, self.target) not in own.cargo_out if self.target in ("web", "android") else name not in own.cargo_out:
                 self.base.cargo_build([name])
-            vdir = self.public
-            for s in sorted({style, *(c[len("style_"):] for c in app_styles(name))}):
+            extra = app_styles(name)
+            if self.target == "android":
+                from tools.android import build_apk, build_exe
+                archive = own.cargo_out[derived_name(name, self.target)][0]
+                if "ui" not in app_crates(name):
+                    return build_exe(self, name, None, [], run_cmd, archive=archive)
+                return build_apk(self, name, style, variant, None, [], run_cmd,
+                                 app_notices([style] + [c[len("style_"):] for c in extra]), archive=archive)
+            vdir = self.web_public / name if self.target == "web" else self.public
+            vdir.mkdir(parents=True, exist_ok=True)
+            for s in sorted({style, *(c[len("style_"):] for c in extra)}):
                 copy_style_notices(name, s, vdir)
             copy_library_notices(vdir)
+            if self.target == "web":
+                suffix = ("." + self.web_mode if self.web_mode != "scalar" else "") + ".wasm"
+                exe = own.cargo_copy(derived_name(name, "web"), vdir / (name + suffix))
+                web_assets(name, vdir)
+                return exe
             exe = own.cargo_copy(name, vdir / bin_file(name, self.target))
             for b, _, kind in app_bins(name):
                 self.cargo_builder(name, kind).cargo_copy(b, vdir / bin_file(b, self.target))
@@ -1620,6 +1686,89 @@ def _web_assets(name, directory):
     variants = {mode: name + suffix for mode, suffix in (("scalar", ".wasm"), ("simd", ".simd.wasm"), ("threads", ".threads.wasm"))
                 if (directory / (name + suffix)).exists()}
     (directory / "variants.json").write_text(json.dumps(variants), encoding="utf-8")
+
+
+# ---------------------------------------------------------------- CR3: the apps as libraries
+DERIVED_LOCK = threading.Lock()
+
+
+def derived_name(app, target):
+    """the package of an app as a library (derived_workspace)"""
+    return f"{app}-{target}"
+
+
+def toml_value(v):
+    """a value as TOML (strings with a double quote as literal strings)"""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, str):
+        return f"'{v}'" if '"' in v or "\\" in v else f'"{v}"'
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    return "{ " + ", ".join(f"{k} = {toml_value(x)}" for k, x in v.items()) + " }"
+
+
+def write_changed(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def derived_profiles(target):
+    """the root manifest's profiles for derived_workspace, where the library's crates are no members:
+    its "*" (the crates from crates.io) named one by one, an app by its derived package's name"""
+    registry = sorted({p["name"] for p in manifests.read(ROOT / "Cargo.lock")["package"] if "source" in p})
+    apps_ = set(apps())
+    out = []
+    for name, prof in manifests.read(ROOT / "Cargo.toml")["profile"].items():
+        out.append(f"[profile.{name}]\n" + "".join(f"{k} = {toml_value(v)}\n" for k, v in prof.items() if k != "package"))
+        for pkg, over in prof.get("package", {}).items():
+            for p in (registry if pkg == "*" else [derived_name(pkg, target) if pkg in apps_ else pkg]):
+                out.append(f'[profile.{name}.package."{p}"]\n' + "".join(f"{k} = {toml_value(v)}\n" for k, v in over.items()))
+    return "\n".join(out)
+
+
+def derived_workspace(out, target, names):
+    """the browser and Android load an app as a library, Cargo builds a library only from a [lib]:
+    a workspace of the tool's own in <out>/cargo-<target>-ws with a package per app, its main.rs as
+    [lib] (web: cdylib, android: staticlib), the dependencies of its manifest and a build.rs that
+    reads the app's files (jflib-build's part_of); the root manifest's profiles and lints, Cargo.lock's
+    versions -> its Cargo.toml.  The apps themselves stay programs."""
+    ws = out / f"cargo-{target}-ws"
+    root = manifests.workspace()
+    kind = "cdylib" if target == "web" else "staticlib"
+    lints = "".join(f"[lints.{tool_}]\n" + "".join(f"{k} = {toml_value(v)}\n" for k, v in table.items())
+                    for tool_, table in root.get("lints", {}).items())
+    with DERIVED_LOCK:
+        members = sorted(set(re.findall(r'^    "([^"]+)",$', (ws / "Cargo.toml").read_text(encoding="utf-8"), re.M))) \
+            if (ws / "Cargo.toml").exists() else []
+        for n in names:
+            man = manifests.read(ROOT / "apps" / n / "Cargo.toml")
+            pkg = derived_name(n, target)
+            deps = []
+            for key, spec in man.get("dependencies", {}).items():
+                s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
+                if "path" in s:
+                    s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
+                s.pop("version", None)
+                deps.append(f"{key} = {toml_value(s)}\n")
+            entry = (ROOT / "apps" / n / man["bin"][0]["path"]).resolve().as_posix()
+            write_changed(ws / pkg / "Cargo.toml",
+                          f'[package]\nname = "{pkg}"\nversion = "{man["package"]["version"]}"\nedition = "2024"\npublish = false\n'
+                          "autobins = false\nautoexamples = false\nautotests = false\nautobenches = false\n\n"
+                          f'[lib]\nname = "{n.replace("-", "_").lower()}"\npath = "{entry}"\ncrate-type = ["{kind}"]\ntest = false\ndoctest = false\n\n'
+                          + lints + "\n[dependencies]\n" + "".join(deps)
+                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n')
+            write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
+                          f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{(ROOT / "apps" / n).as_posix()}").run();\n}}\n')
+            members = sorted(set(members) | {pkg})
+        write_changed(ws / "Cargo.toml", "# made by build_rs.py (derived_workspace): the apps as libraries\n[workspace]\nresolver = \"3\"\n"
+                      "members = [\n" + "".join(f'    "{m}",\n' for m in members) + "]\n\n" + derived_profiles(target))
+        if not (ws / "Cargo.lock").exists():
+            shutil.copyfile(ROOT / "Cargo.lock", ws / "Cargo.lock")
+    return ws / "Cargo.toml"
 
 
 def build_apps(builders, names, styles=None):
@@ -2468,7 +2617,10 @@ def build_app_modules(b, app, vdir=None):
     with b.mod_lock:
         if app not in b.mod_ready:
             for m in APP_MODULES.get(app, []):
-                ModuleBuilder(b, m).build()
+                if FORCE_RUSTC or b.profile is not None:
+                    ModuleBuilder(b, m).build()
+                else:
+                    b.cargo_module(m)                  # CR3
             build_pdn_host(b, app)
             b.mod_ready.add(app)
     if vdir is not None and vdir != b.dir:

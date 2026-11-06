@@ -1,7 +1,7 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. Von CR3 ist der erste
-Teilschritt umgesetzt, CR4 bis CR6 noch nicht. Die Ergebnisse unter „Was schon geprüft ist“
+Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. Von CR3 sind die
+Teilschritte a bis d umgesetzt, `build_rs.py` baut über Cargo; offen sind CR3e und CR4 bis CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -248,16 +248,27 @@ Groß. Erst danach gibt es nur noch ein Bausystem. In Teilschritten, nach jedem 
   `build_rs.py` baut weiter mit `rustc`; `check` vergleicht die Manifeste mit den Quellen, `new` schreibt sie
   (`tools/app_manifests.py`). `themedemo` startet jetzt mit `style_winui::STYLE`: Cargo erlaubt kein Paket unter zwei
   Namen in einer Crate, dort wären es `style` und `style_winui` gewesen.
-- **CR3b: Windows über Cargo.** `build_rs.py` ruft `cargo build --target x86_64-pc-windows-msvc` für die Apps und
-  ihre Programme auf und kopiert die Artefakte aus `--message-format=json` nach `build/win`. Die Rechen-Crates
-  bekommen `opt-level = 2` über `[profile.dev.package]`. `check_intrinsics` prüft die rlibs aus den Artefakten,
-  `-D warnings` kommt über die `rustflags` des Werkzeugs, der Toolchain-Test aus `rust-version`.
-- **CR3c: Linux.** Statisch und gegen glibc in zwei Zielordnern, weil die Flags sich unterscheiden.
-- **CR3d: Web, Android, Module.** Web scalar und SIMD, mit Threads über das eigene Sysroot. Web und Android brauchen
-  die App als Bibliothek: ein vom Werkzeug erzeugtes zweites Paket mit `[lib]` auf ihrer `main.rs`, damit die Apps
-  selbst nicht umziehen müssen. `jxlenc` mit `--cfg jflib_module`, dann in PaintCraft geladen.
-- **CR3e: Varianten und Aufräumen.** `--style` über ein vom Werkzeug erzeugtes Paket je Variante, denn Cargo kann eine
-  Abhängigkeit nicht tauschen. `--profile` über `[profile.size]`. `tools/measure.py`, `memory_safety_check.py`,
+- **CR3b: Windows über Cargo. Erledigt am 2026-11-06.** Ein `cargo build` pro Ziel und Lauf für alle Apps samt
+  `BINS` nach `<out>/cargo`; `build_rs.py` kopiert die Programme aus den JSON-Meldungen an ihre gewohnten Stellen,
+  `check_intrinsics` prüft die neu übersetzten rlibs. Das Dev-Profil der Wurzel ist das von `build_rs.py`
+  (16 Codegen-Units, `opt-level = 2` für die Rechen-Crates und die von crates.io, `strip`). `-D warnings` und
+  `--remap-path-prefix` kommen über die `rustflags` des Werkzeugs. `--rustc` baut wie vorher, zum Vergleichen.
+- **CR3c: Linux über Cargo. Erledigt am 2026-11-06.** Statisch nach `<out>/cargo`, gegen glibc nach
+  `<out>/cargo-glibc` (die Flags unterscheiden sich); ein `cli`-Programm aus `BINS` bleibt statisch. Die
+  Linker-Map schreibt jetzt `jflib-build` als `program.map` in sein `OUT_DIR`.
+- **CR3d: Web, Android, Module über Cargo. Erledigt am 2026-11-06.** Web und Android laden eine App als Bibliothek:
+  `build_rs.py` erzeugt dafür einen eigenen Workspace `<out>/cargo-<ziel>-ws` mit einem Paket pro App (`[lib]` auf
+  ihrer `main.rs`, ihre Abhängigkeiten, ein `build.rs` mit `part_of`), die Apps bleiben Programme. Dort sind die
+  Crates der Bibliothek keine Mitglieder, deshalb nennt er die Profile der Wurzel einzeln. Web baut scalar, SIMD und
+  mit Threads (eigenes Sysroot), Android ein `staticlib`, das `tools/android.py` wie bisher mit der C-Brücke linkt.
+  `jxlenc` baut mit `--cfg jflib_module` und Fat-LTO wie bisher und lädt in PaintCraft.
+
+  Größen gegen `rustc`: Release unter Windows `template` +0,03 %, `jfs` +0,06 %, `PaintCraft` +0,01 %, `jxlenc`
+  gleich; unter Linux `template` +0,01 %, `jfs` +0,11 %. Dev: Web +0,16 %, Windows +0,21 %, Linux −1,06 %, die
+  Android-Bibliothek +0,28 %. `test --quick` lief nach jedem Schritt durch bis auf `fonttest/selftest` (CRLF) und
+  einzelne Bildschirmproben von `uigputest` unter Windows, deren Farben knapp danebenliegen (allein grün).
+- **CR3e: Varianten und Aufräumen.** `--style` über ein vom Werkzeug erzeugtes Paket je Variante wie in CR3d, denn
+  Cargo kann eine Abhängigkeit nicht tauschen. `--profile` über `[profile.size]`. `tools/measure.py`, `memory_safety_check.py`,
   `android.py` und `hotreload.py` auf Cargo umstellen. Der direkte `rustc`-Pfad und `ide` entfallen, rust-analyzer
   liest Cargo selbst. `STYLE`, `TARGETS` und `BINS` können dann ins Manifest (`[package.metadata.jflib]`).
 
