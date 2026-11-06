@@ -1,8 +1,8 @@
 # Crates-Plan: JFLib für crates.io
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
-`build_rs.py` baut nur noch über Cargo. Von CR4 ist der erste Teilschritt umgesetzt, offen sind der Rest und CR5,
-CR6. Die Ergebnisse unter „Was schon geprüft ist“
+`build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web` und `android` umgesetzt, offen sind
+`package`, `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -307,12 +307,23 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
   SIMD und mit Threads (das Sysroot mit Atomics baut es selbst aus `rust-src`, ohne fällt der Modus mit Hinweis weg),
   legt den Host aus `web/` und die Lizenzen aller Pakete daneben; `--serve` liefert das mit den Headern aus, die
   Threads brauchen. **Geprüft** in `crates_accept.py`: aus dem gepackten Paket installiert (`cargo install --path`, denn `cargo install` aus einer Verzeichnisquelle findet das Paket und holt es dann nicht), `new`, `test` grün, `web` mit allen drei Modulen und einem Klick im Browser.
-- **CR4b: `android`.** `tools/android.py` portieren: die C-Brücke mit dem NDK, Java mit `javac` und `d8`, `aapt2`,
-  `zipalign`, `apksigner`; `android/*` mitliefern.
+- **CR4b: `android`. Erledigt am 2026-11-06.** Die Bibliothek der App als `staticlib` über `cargo rustc`, die
+  C-Brücke aus `android/` mit dem `clang` des NDK dazu gelinkt (16-KiB-Seiten, RELRO, geprüft wie in
+  `tools/android.py`), Java mit `javac --release 8` und `d8`, `aapt2`, die Dateien ohne Zip-Bibliothek an die APK
+  gehängt, `zipalign -P 16`, `apksigner` mit einem Debug-Schlüssel, den es selbst anlegt, oder dem aus
+  `jfgui_ANDROID_KEYSTORE`; `--install` über `adb`. Das Manifest kommt aus `PACKAGE` und `PERMISSIONS`, wenn die
+  App kein eigenes `android/AndroidManifest.xml` hat. `android/*` liegt als Kopie im Paket, `build_rs.py check`
+  hält sie gleich. **Geprüft:** `hallo2` aus `cargo jflib new` auf dem Emulator (API 35, x86_64) installiert,
+  gestartet, ein Klick zählt; `crates_accept.py` baut die APK aus den gepackten Crates und prüft Code, Bibliothek
+  (unkomprimiert an einer 16-KiB-Grenze) und Lizenzen, ohne SDK mit Hinweis übersprungen. Nicht geprüft:
+  `arm64-v8a` auf dem Telefon und `--release`. Dabei aufgefallen: `cargo package` setzt die Zeit jeder Datei auf
+  2006, und Cargo erkennt ein Crate aus einer Verzeichnisquelle nur an der Version. Ein zweiter Lauf von
+  `crates_accept.py` behielt deshalb, was der erste gebaut hatte (hier ein `cargo-jflib` ohne `android`); jetzt
+  löscht er die Fingerprints der Pakete, die sich seit dem letzten Lauf geändert haben.
 - **CR4c: `package`.** `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`, `codesign.py`. Die Starter
   `apps/installer` und `apps/appimagert` sind Apps: Sie müssen als Crates mitkommen, damit das Werkzeug sie bauen kann.
 - **CR4d: `watch`, `plugin`.**
-- **Reihenfolge danach:** `android`, `package`, `watch`, `plugin`.
+- **Reihenfolge danach:** `package`, `watch`, `plugin`.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
 - **Mitzuliefern:** `web/*`, `android/*` sowie die Starter `apps/installer` und `apps/appimagert`.

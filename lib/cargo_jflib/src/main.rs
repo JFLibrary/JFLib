@@ -7,17 +7,22 @@
 //!                                      build, then run every tests/*.uis with --script
 //! cargo jflib web [-p PKG] [--release] [--modes scalar,simd,threads] [--serve [PORT]]
 //!                                      the app for the browser in target/jflib-web/NAME/
+//! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
+//!                                      the app as an APK in target/jflib-android/
 //! ```
 //!
 //! It calls Cargo for the builds and needs nothing else; the browser with threads needs the
-//! Rust sources (`rustup component add rust-src`) for a core library with atomics.
+//! Rust sources (`rustup component add rust-src`) for a core library with atomics, Android the
+//! SDK (build-tools, platform 36), the NDK and a JDK.
 
+mod android;
 mod cargo;
 mod json;
 mod new;
 mod notices;
 mod test;
 mod web;
+mod zip;
 
 use std::process::ExitCode;
 
@@ -31,6 +36,9 @@ USAGE:
     cargo jflib web [-p PKG] [--release] [--modes scalar,simd,threads] [--serve [PORT]]
         the app for the browser: target/jflib-web/NAME/ (index.html, the modules, the host);
         --serve then serves it on 127.0.0.1 (default port 8766) with the headers threads need
+    cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
+        the app as an APK: target/jflib-android/NAME-ABI-debug.apk (--release: signed with the key
+        of jfgui_ANDROID_KEYSTORE); needs the Android SDK and NDK and a JDK; --install: adb install
     cargo jflib --version";
 
 /// the options every command shares
@@ -81,6 +89,7 @@ fn main() -> ExitCode {
         Some("new") => new::run(&args[1..]),
         Some("test") => test::run(&args[1..]),
         Some("web") => web::run(&args[1..]),
+        Some("android") => android::run_cmd(&args[1..]),
         Some("--version" | "-V") => {
             println!("cargo-jflib {}", env!("CARGO_PKG_VERSION"));
             Ok(())

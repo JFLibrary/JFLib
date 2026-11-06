@@ -732,7 +732,7 @@ def manifest_lint():
             if not source.is_file() or not same_text(copy, source):
                 bad.append(f"{copy.relative_to(ROOT).as_posix()}: differs from licenses/{copy.name}: copy that file over it")
     # cargo-jflib carries the template and the browser host in its package: copies of these folders
-    for copy_dir, source_dir in (("lib/cargo_jflib/template", "lib/jflib/template"), ("lib/cargo_jflib/web", "web")):
+    for copy_dir, source_dir in (("lib/cargo_jflib/template", "lib/jflib/template"), ("lib/cargo_jflib/web", "web"), ("lib/cargo_jflib/android", "android")):
         files = {p.relative_to(ROOT / d).as_posix() for d in (copy_dir, source_dir) for p in (ROOT / d).rglob("*")
                  if p.is_file() and "target" not in p.relative_to(ROOT / d).parts}
         for rel in sorted(files):
@@ -1521,8 +1521,9 @@ def run_tests(builders, out, quick):
         fails.append("tools/site.py --check")
     if not quick:
         # docs/CRATES.md: a project outside the repository builds from the packed crates alone (Windows,
-        # Linux, the browser), its smoke test passes; about 15 minutes from nothing
-        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web"})
+        # Linux, the browser, an APK when the Android SDK is there), its smoke test passes; about 15
+        # minutes from nothing
+        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web", "android"})
         r = subprocess.run([sys.executable, str(RS / "tools" / "crates_accept.py"), "--targets", ",".join(targets)], cwd=ROOT,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
         print("".join(ln for ln in r.stdout.splitlines(True) if ln.startswith(("FAIL", "    ", "note", "crates"))).strip())

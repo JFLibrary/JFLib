@@ -16,6 +16,7 @@ cd hallo
 cargo run
 cargo jflib test              # runs tests/*.uis
 cargo jflib web --serve       # the app in the browser
+cargo jflib android --install # the app on a phone (Android SDK and NDK)
 ```
 
 `cargo jflib new` writes the template that lies in this package as `template/`. Without the tool,
@@ -66,7 +67,7 @@ strip = "symbols"
 | Windows | `cargo build` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
 | Linux | `cargo build --target x86_64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
 | Browser | `cargo jflib web` | scalar, SIMD and with threads, the page around them and the licences in `target/jflib-web/NAME/`; threads need `rustup component add rust-src` |
-| Android | not through Cargo alone yet | |
+| Android | `cargo jflib android` | an APK for `arm64-v8a` (or `--abi x86_64` for the emulator) in `target/jflib-android/`; needs the Android SDK, the NDK, a JDK and `rustup target add aarch64-linux-android`; the app's code in `src/lib.rs` as the template has it |
 
 The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another
 (`classic`, `kde`, `macos`). All four are always there under their own names for the switch at

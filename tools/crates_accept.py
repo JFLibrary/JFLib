@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """crates_accept.py -- does a project outside this repository build with the crates alone?
 
-    python tools/crates_accept.py [--targets win,linux,web] [--out DIR]
+    python tools/crates_accept.py [--targets win,linux,web,android] [--out DIR]
     python tools/crates_accept.py --template     write the files of lib/jflib/template that
                                                  come from apps/template (build_rs.py check
                                                  compares them)
@@ -20,7 +20,9 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
 
   hallo2  made by `cargo jflib new` with cargo-jflib installed from the packages: `cargo jflib
           test` on Windows, `cargo jflib web` (scalar, SIMD, threads) and a click in the browser
-          (Playwright, tools/tests/crates_web.mjs; skipped without it).
+          (Playwright, tools/tests/crates_web.mjs; skipped without it), `cargo jflib android --abi
+          x86_64`: an APK with the code, the library 16 KiB aligned and the licences (skipped
+          without the Android SDK, NDK, JDK or the Rust target x86_64-linux-android).
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -127,6 +129,29 @@ class Run:
             self.fail(what)
 
 
+def forget_changed(out, crates, target_dirs):
+    """the packages that differ from the last run -> their names; their Cargo fingerprints are deleted.
+    Cargo knows a crate of a directory source by its version alone and a path source (cargo install
+    --path) by the times of its files, which `cargo package` sets to 2006 for every file: without this
+    a second run would keep what the first one built of a package that has changed since"""
+    stamp = out / "packages.json"
+    try:
+        old = json.loads(stamp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        old = {}
+    new = {c.stem: hashlib.sha256(c.read_bytes()).hexdigest() for c in crates}
+    changed = sorted(stem.rsplit("-", 1)[0] for stem, h in new.items() if old.get(stem) != h)
+    for d in target_dirs:
+        # <profile>/.fingerprint, <triple>/<profile>/.fingerprint and one level more for derived sysroots;
+        # a fingerprint is PACKAGE-HASH
+        for fp in (f for pat in ("*/.fingerprint", "*/*/.fingerprint", "*/*/*/.fingerprint") for f in d.glob(pat)):
+            for f in fp.iterdir():
+                if f.name.rsplit("-", 1)[0] in changed:
+                    shutil.rmtree(f, ignore_errors=True)
+    stamp.write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
+    return changed
+
+
 def pack(run):
     """the packages and the crates from outside as one local source -> its folder"""
     facade_docs()
@@ -148,6 +173,8 @@ def pack(run):
         (vendor / crate.stem / ".cargo-checksum.json").write_text(
             json.dumps({"files": {}, "package": hashlib.sha256(crate.read_bytes()).hexdigest()}), encoding="utf-8")
     run.check(len(crates) >= 57, f"{len(crates)} packages, {sum(c.stat().st_size for c in crates) / 1e6:.1f} MB")
+    changed = forget_changed(run.out, crates, [run.out / "target", run.out / "target-tool"])
+    print(f"ok   {len(changed)} packages changed since the last run" + (" (built again)" if changed else ""), flush=True)
     facade = vendor / f"jflib-{crates[0].stem.rsplit('-', 1)[1]}"
     run.check((facade / "docs" / "API.md").is_file() and (facade / "template" / "Cargo.toml.in").is_file(),
               "the facade's package holds docs/ and template/")
@@ -222,6 +249,48 @@ def make_probe(run, vendor):
         'rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "-C", "target-feature=+crt-static"]\n'
         + source_config(vendor), encoding="utf-8")
     return d
+
+
+def android_missing():
+    """what `cargo jflib android --abi x86_64` would miss here, roughly as it looks -> a note or None"""
+    home = Path.home()
+    sdks = [os.environ.get("ANDROID_SDK_ROOT"), os.environ.get("ANDROID_HOME"),
+            os.environ.get("LOCALAPPDATA") and str(Path(os.environ["LOCALAPPDATA"]) / "Android" / "Sdk"),
+            str(home / "Android" / "Sdk"), str(home / "Library" / "Android" / "sdk")]
+    sdk = next((Path(s) for s in sdks if s and (Path(s) / "build-tools").is_dir()), None)
+    if sdk is None:
+        return "no Android SDK"
+    if not os.environ.get("ANDROID_NDK_HOME") and not any((sdk / "ndk").glob("*/toolchains")):
+        return "no Android NDK"
+    if not (sdk / "platforms" / "android-36" / "android.jar").is_file():
+        return "no Android platform 36"
+    if not shutil.which("javac") and not (os.environ.get("JAVA_HOME") and any((Path(os.environ["JAVA_HOME"]) / "bin").glob("javac*"))):
+        return "no JDK"
+    sysroot = subprocess.run(["rustc", "--print", "sysroot"], capture_output=True, text=True).stdout.strip()
+    if not (Path(sysroot) / "lib" / "rustlib" / "x86_64-linux-android").is_dir():
+        return "no Rust target x86_64-linux-android (rustup target add x86_64-linux-android)"
+    return None
+
+
+def apk_problems(apk):
+    """the APK of cargo jflib android: its code, the library stored and 16 KiB aligned, the licences -> problems"""
+    import struct
+    import zipfile
+    raw = apk.read_bytes()
+    z = zipfile.ZipFile(apk)
+    names = set(z.namelist())
+    bad = [f"{n} missing" for n in ("AndroidManifest.xml", "classes.dex", "lib/x86_64/libjfgui_android.so") if n not in names]
+    if not any(n.startswith("assets/licenses/jflib-rt-") for n in names):
+        bad.append("assets/licenses/jflib-rt-* missing")
+    if "lib/x86_64/libjfgui_android.so" in names:
+        i = z.getinfo("lib/x86_64/libjfgui_android.so")
+        n, e = struct.unpack("<HH", raw[i.header_offset + 26:i.header_offset + 30])
+        if i.compress_type != zipfile.ZIP_STORED or (i.header_offset + 30 + n + e) % 16384:
+            bad.append("the library is not stored at a 16 KiB boundary")
+        elf = z.read(i)
+        if elf[:4] != b"\x7fELF" or struct.unpack("<H", elf[18:20])[0] != 62:
+            bad.append("the library is no x86-64 ELF")
+    return bad
 
 
 def out_file(project, target_dir, triple, profile, name):
@@ -309,6 +378,14 @@ def accept(targets, out):
                     run.notes.append("the browser run needs Playwright (PLAYWRIGHT_MODULE, tools/tests/playwright.mjs): only built")
                 else:
                     run.cmd("hallo2-web-click", ["node", ROOT / "tools" / "tests" / "crates_web.mjs", site], ROOT, timeout=300)
+            if "android" in targets:
+                missing = android_missing()
+                if missing:
+                    run.notes.append(f"cargo jflib android not run: {missing}")
+                elif run.cmd("cargo-jflib-android", ["cargo", "jflib", "android", "--abi", "x86_64"], app, jenv):
+                    apk = target_dir / "jflib-android" / "hallo2-x86_64-debug.apk"
+                    bad = apk_problems(apk) if apk.is_file() else [f"{apk} missing"]
+                    run.check(not bad, "cargo jflib android: code, library (16 KiB), licences" + "".join("\n    " + b for b in bad))
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
     run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run
@@ -316,7 +393,7 @@ def accept(targets, out):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--targets", default="win,linux,web")
+    ap.add_argument("--targets", default="win,linux,web,android")
     ap.add_argument("--out", default=str(ROOT / "build" / "crates_accept"))
     ap.add_argument("--template", action="store_true")
     a = ap.parse_args(argv)

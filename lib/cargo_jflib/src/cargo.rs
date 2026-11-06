@@ -14,6 +14,7 @@ pub(crate) fn command() -> Command {
 
 pub(crate) struct Package {
     pub name: String,
+    pub version: String,
     pub id: String,
     pub dir: PathBuf,
     /// the name of its library target, when it has one (an app's code for the browser)
@@ -60,6 +61,7 @@ pub(crate) fn project(package: Option<&str>) -> Result<Project, String> {
         target_dir: PathBuf::from(meta.s("target_directory")),
         package: Package {
             name: pick.s("name").to_string(),
+            version: pick.s("version").to_string(),
             id: pick.s("id").to_string(),
             dir: Path::new(pick.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
             lib,
