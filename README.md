@@ -7,15 +7,15 @@ The library is designed to be used by AI Agents, not by Humans – Thus the enti
 JFLIB brings widgets, layout, text, 2D graphics, image formats, and platform integration
 together in one library. This repository contains both the library and its applications:
 from small GUI examples to Kritzel, PaintCraft, jfWord, and the Build Manager.
-The Rust code uses `#![no_std]`, `core`, and `alloc`. A Python build script invokes
-`rustc` directly for the library and apps. Complex text shaping uses a small Cargo
-subproject with pinned HarfRust and Unicode dependencies; these are statically
+The Rust code uses `#![no_std]`, `core`, and `alloc`. Cargo builds the library and the apps;
+a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
+its packages. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
 linked. See the [dependency notices](lib/text_shape/NOTICE.md).
 
 ![Kritzel displaying a JFLIB sample drawing created in the app](docs/images/readme/kritzel-winui.png)
 
 [Library](#the-library) · [Feature tour](#feature-tour) · [Platforms](#platforms) · [Apps](#apps) ·
-[Build with Python](#building-apps-with-python) · [Build Manager](#build-manager) ·
+[Your own app with Cargo](#your-own-app-with-cargo) · [Build with Python](#building-apps-with-python) · [Build Manager](#build-manager) ·
 [Rust examples](#small-gui-examples) · [Styles](#styles) · [Documentation](#documentation)
 
 ## The library
@@ -219,6 +219,26 @@ using the built-in screenshot renderer on Windows. The Pocket Gallery image is a
 preview of the shared Android UI code; the Build Manager displays its bundled sample catalog.
 The screenshots currently show German UI text; the code examples below use English labels.
 
+## Your own app with Cargo
+
+An app outside this repository needs one dependency, the crate `jflib`, and the tool
+`cargo jflib` for what Cargo does not do itself:
+
+```sh
+cargo install cargo-jflib
+cargo jflib new hello        # a window app with its test and the settings for Windows and Linux
+cd hello
+cargo run
+cargo jflib test             # run tests/*.uis
+cargo jflib watch            # hot reload while you edit
+cargo jflib package          # a setup for Windows and a .deb (--formats all: also MSIX, AppImage, RPM, Flatpak)
+```
+
+The crates are not on crates.io yet ([docs/CRATES.md](docs/CRATES.md), stage CR6); until then
+`cargo install --path lib/cargo_jflib` installs the tool from this repository. The README of the
+crate [`jflib`](lib/jflib/README.md) and of [`cargo-jflib`](lib/cargo_jflib/README.md) describe both;
+[docs/VERSIONING.md](docs/VERSIONING.md) says what the crates promise.
+
 ## Building apps with Python
 
 **Run all commands below from the root of this repository**, the directory containing
@@ -357,7 +377,7 @@ rustup target add x86_64-linux-android
 python build_rs.py app androidGallery --target android --android-abi x86_64
 ```
 
-Android builds use `rustc`, the SDK, and the NDK directly, without Gradle. Debug builds are
+Android builds use Cargo, the SDK, and the NDK, without Gradle. Debug builds are
 signed with a local debug key. `--release` signs with the release key named by
 `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, and `jfgui_ANDROID_KEY_ALIAS`
 (`jfgui_ANDROID_KEY_PASS` if the key has its own password) and writes

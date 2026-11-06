@@ -9,6 +9,7 @@ release, and [CHANGELOG.md](../CHANGELOG.md) lists what changed.
 | What | Where |
 | --- | --- |
 | The library's version | `version` in [`Cargo.toml`](../Cargo.toml) in the root folder, one for all crates; in code `rt::VERSION` (also `plat::VERSION`, `ui::VERSION`) and `VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_PATCH` |
+| What the crates on crates.io promise | [The crates on crates.io](#the-crates-on-cratesio) below: the facade `jflib`, `jflib-build`, `cargo-jflib` |
 | An app's version | `version=` in `apps/NAME/PACKAGE`; in code `rt::app_version!()` (also `ui::app_version!()`) |
 | API snapshots of the releases | `docs/api/X.Y.Z.txt`, written by `build_rs.py release` / `api-diff --snapshot` ([`tools/apidiff.py`](../tools/apidiff.py)) |
 | The changelog | [`CHANGELOG.md`](../CHANGELOG.md) ([Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)), [`tools/changelog.py`](../tools/changelog.py) |
@@ -35,12 +36,36 @@ const APP_VERSION: &str = rt::app_version!();
 ui.text(TS_CAPTION, &format!("Version {} · JFLib {}", APP_VERSION, ui::VERSION));
 ```
 
+## The crates on crates.io
+
+JFLib is published as about sixty crates that share one version ([CRATES.md](CRATES.md)). A
+program depends on one of them, `jflib`, and the promise of this page is made for what it reaches
+through it and for the two tools around it:
+
+| Crate | What is promised |
+| --- | --- |
+| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE` |
+| `jflib-build` | `app()`, `console()`, `Build::app()`, `Build::console()`, `.part_of()`, `.run()` and the files it reads next to `Cargo.toml`: `PERMISSIONS`, `PACKAGE`, `assets/`, `res/app.ico` |
+| `cargo-jflib` | its commands and their options, the `PACKAGE` keys and environment variables its README names, where it writes (`target/jflib-*`) |
+| the other `jflib-*` crates | nothing of their own: they are published because `jflib` needs them. A program may name one directly, but `jflib` pins every one to its own version (`=X.Y.Z`), so they move together. `simd`, `text_shape` and `style_assets` are building blocks, hidden in `jflib` (`#[doc(hidden)]`) |
+| `jflib-installer`, `jflib-appimagert` | nothing: the setup stub and the AppImage runtime that `cargo jflib package` of the same version builds |
+| `jflib-modrt`, `jflib-modplat` | not yet: loadable modules are built, but not tested for programs outside this repository |
+
+Not published and no part of it: PaintCraft's plugin ABI (`lib/plugin`, `REPO_ONLY` in
+`tools/gendoc.py`), the apps, `build_rs.py` and `tools/`. `build_rs.py check` keeps what `jflib`
+shows equal to what API.md documents (a crate that is neither documented nor hidden fails), and
+`api-diff` compares exactly that.
+
+A crate of another author that a program adds itself is outside all of this, and outside
+`PERMISSIONS` too: its own system calls do not pass `plat`, which enforces the manifest. Only the
+`sandbox` line confines it, by the operating system's sandbox ([PERMISSIONS.md](PERMISSIONS.md)).
+
 ## What is public
 
 The public API is what [API.md](API.md) documents:
 
-- every item of the crates in the `CRATES` table of [`tools/gendoc.py`](../tools/gendoc.py) that
-  another crate can name: `pub` items of the crate root and of `pub mod` modules, items
+- every item of the crates in the `CRATES` table of [`tools/gendoc.py`](../tools/gendoc.py) (but
+  `REPO_ONLY`) that another crate can name: `pub` items of the crate root and of `pub mod` modules, items
   re-exported with `pub use` (also through private modules and globs), the `pub` methods and
   fields of public types, every member of a public trait, `#[macro_export]` macros, the derives
   and `impl Trait for Type` of public types;

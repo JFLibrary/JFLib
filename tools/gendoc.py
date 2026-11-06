@@ -78,6 +78,10 @@ UI_AREAS = [
 ]
 
 # (crate, title, kind): "full" = every public item, "codec" = see the docstring
+# documented for this repository's own code only, not published (PaintCraft's plugin ABI): no
+# part of what the crates promise (docs/VERSIONING.md), left out of api-diff
+REPO_ONLY = {"plugin"}
+
 CRATES = [
     ("ui", "the immediate-mode UI: runtime, layout, widgets, windows, style contract", "full"),
     ("agent_core", "transport-independent actions, schema validation, JSON-RPC, MCP and tasks", "full"),

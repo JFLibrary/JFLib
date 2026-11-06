@@ -385,7 +385,12 @@ ui.type ui.key`). `actions/describe` and `actions/list` report each action's `ac
 The checks above run inside the process, so a bug in the library or native code that calls the
 operating system directly can bypass them ([Limits](#limits), [Plugins](#plugins)). An app can
 ask the operating system to enforce the same manifest as well, as defence in depth. It is
-opt-in, one line in the manifest, and apps without it are unchanged:
+opt-in, one line in the manifest, and apps without it are unchanged.
+
+**Crates of other authors.** An app of its own (the crate `jflib`, built with Cargo) may add
+`no_std` crates of other authors. Their own system calls (through `windows-sys`, `rustix` and the
+like) do not pass `plat`, so neither the manifest nor an `ask` line sees them: only this line
+confines them, as far as the operating system enforces the manifest.
 
 ```text
 sandbox          # best effort: enforce what this OS and kernel support, carry on otherwise

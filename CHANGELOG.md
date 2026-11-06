@@ -146,6 +146,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib package --formats msix,appimage,rpm,flatpak (or all): an AppImage per style written without Linux tools (SquashFS with LZ4 behind the runtime jflib-appimagert), the rpm's .spec and tarball and the Flatpak manifest (rpmbuild and flatpak-builder on Linux or in WSL), the MSIX by MakeAppx; finish-args and capabilities from PERMISSIONS, AppStream metainfo
 - **build:** cargo jflib package --sign, --repo DIR, --update DIR and cargo jflib keygen FILE: Authenticode for the programs, the setup and the MSIX, GPG for the AppImages, a flat apt repository and the Flatpak repository, a signed update channel per style (Ed25519 by a small program built from jflib-crypto); crates_accept.py checks every signature with signtool's table, gpgv, apt-get and update_manifest.py
 - **build:** cargo jflib watch [-p PKG] [-- ARGS]: hot reload for an app outside this repository (tools/hotreload.py's session, built like cargo run, a failed build kept out with build.txt, Ctrl+C asks the app to end); crates_accept.py runs it headless under a script
+- **docs:** What the crates on crates.io promise (docs/VERSIONING.md): the facade jflib as API.md documents it, jflib-build and cargo jflib; the guide shows the crate way first, a foreign crate's own system calls pass by plat (only the sandbox line confines them)
 
 ### Changed
 
@@ -181,6 +182,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py builds only through Cargo: style variants and --profile too, PaintCraft's Rust plugins as packages (jflib-plugin, jflib-plugin-NAME); the direct rustc path and `build_rs.py ide` are gone, rust-analyzer reads the workspace
 - **build:** The setup stub's code is the crate jflib-installer (lib/installer, installer::main!); apps/installer only links it, cargo jflib package builds the same stub
 - **build:** The AppImage runtime's code is the crate jflib-appimagert (lib/appimagert, appimagert::main!()); apps/appimagert only links it
+- **build:** jflib shows simd, text_shape and style_assets no more (#[doc(hidden)]) and of each style only STYLE; build_rs.py check keeps what it shows equal to API.md, api-diff leaves out the repository's plugin ABI
 
 ### Removed
 

@@ -715,12 +715,27 @@ def manifest_lint():
     styles = {f"style_{Path(m).name}": m for m in published if m.startswith("styles/")}
     facade = manifests.read(ROOT / manifests.FACADE / "Cargo.toml")
     named = set(facade["dependencies"]) | {d for t in facade["target"].values() for d in t["dependencies"]}
-    uses = set(re.findall(r"^pub use (\w+);", (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8"), re.M))
+    # a crate is named by `pub use NAME;` or, a style, by `pub mod NAME { pub use ::NAME::STYLE; }`
+    uses = set(re.findall(r"^pub (?:use|mod) (\w+)(?:;| \{)", (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8"), re.M))
     for c in [*LIBS, *styles]:
         if c not in named:
             bad.append(f"{manifests.FACADE}/Cargo.toml: {c} is missing, the facade brings every crate")
         if c not in uses:
             bad.append(f"{manifests.FACADE}/src/lib.rs: pub use {c}; is missing")
+    # what the facade shows is what docs/API.md documents: that is what jflib promises
+    # (docs/VERSIONING.md, "The crates on crates.io"); a building block is #[doc(hidden)] there
+    if str(RS / "tools") not in sys.path:
+        sys.path.insert(0, str(RS / "tools"))  # gendoc imports its neighbours by name
+    import gendoc
+    text = (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8")
+    hidden = set(re.findall(r"^#\[doc\(hidden\)\]\s*\npub use (\w+);", text, re.M))
+    visible = set(re.findall(r"^pub use (\w+);", text, re.M)) - hidden
+    documented = {c[0] for c in gendoc.CRATES} - gendoc.REPO_ONLY
+    for c in sorted(visible - documented):
+        bad.append(f"{manifests.FACADE}/src/lib.rs: {c} is shown but tools/gendoc.py does not document it: "
+                   "add it to CRATES or mark the pub use #[doc(hidden)]")
+    for c in sorted(documented - visible):
+        bad.append(f"tools/gendoc.py: {c} is documented, but the facade does not show it (pub use {c};)")
     bad += program_manifest_lint(members)
     for m in published:
         for name in ("LICENSE-MIT", "LICENSE-APACHE"):

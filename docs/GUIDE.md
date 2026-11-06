@@ -1,10 +1,19 @@
 # Writing an app with jfguiLib (Rust)
 
 This guide is for developers and AI models writing desktop apps on the Rust version of
-jfguiLib. Start from `apps/template`, look up functions in [API.md](API.md) (generated from
-the sources), and look at `apps/gallery` for every control in use. How widgets look is the
-business of the linked style ([STYLES.md](STYLES.md)); packaging is in
-[PACKAGING.md](PACKAGING.md). The library itself is described in `README.md`.
+jfguiLib. There are two ways to write one, and the code is the same in both:
+
+* **An app of your own**, with the crate `jflib`: one dependency, Cargo builds it, and
+  `cargo jflib` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)) makes the project, runs its tests, reloads it while you edit, builds
+  it for the browser and Android and packages it. Start with `cargo jflib new NAME`.
+* **An app inside this repository** (`apps/NAME`), built by `build_rs.py`, which builds the
+  library and every app of the repository through Cargo.
+
+Where the two differ, this guide shows the crate way first. Look up functions in
+[API.md](API.md) (generated from the sources), and look at `apps/gallery` for every control in
+use. How widgets look is the business of the linked style ([STYLES.md](STYLES.md)); packaging is in
+[PACKAGING.md](PACKAGING.md), what the crates promise in [VERSIONING.md](VERSIONING.md). The
+library itself is described in `README.md`.
 
 The examples below were compiled and run against the library (R13); identifiers such as
 `ID_*`, `CMD_*` and the fields of `self` are the example app's own.
@@ -15,6 +24,13 @@ The examples below were compiled and run against the library (R13); identifiers 
   crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
   checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
   foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
+* **An app of your own** is `#![no_std]` too, and so is every crate it adds: JFLib's runtime
+  brings the panic handler and the allocator, a crate that needs `std` does not link. Other
+  `no_std` crates are allowed there. But a crate that makes system calls of its own (through
+  `windows-sys`, `rustix` and the like) passes by `plat`, so `PERMISSIONS` does not see them:
+  only the `sandbox` line confines it, as far as the operating system enforces the manifest
+  ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this repository's; an
+  app of your own may follow them as it likes.
 * **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
@@ -32,7 +48,22 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 ## 2. Skeleton
 
-**Start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
+**An app of your own** starts with `cargo jflib new` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)):
+
+```
+cargo jflib new notes        # notes/: Cargo.toml, build.rs, src/, tests/smoke.uis, .cargo/config.toml
+cd notes
+cargo run                    # the window
+cargo jflib test             # build it, run tests/*.uis
+cargo jflib watch            # hot reload while you edit (section 30)
+```
+
+It is the template below as a project of its own: the one dependency `jflib` (`use jflib::{style, ui};`),
+`build.rs` with `jflib_build::app()`, the profiles JFLib needs (`panic = "abort"`) and the
+settings for Windows and Linux in `.cargo/config.toml`. The README of the crate `jflib` names
+every file.
+
+**In this repository, start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
 passes its test as it is:
 
 ```
@@ -148,6 +179,12 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
 | `apps/NAME/PERMISSIONS`, `BINS`, `assets/` | what it may do (PERMISSIONS.md), further programs (section 16), files built in as `app://` (VFS.md) |
 | `apps/NAME/parity.txt` | parity settings, only for apps that also exist in `legacy/` |
 
+In an app of your own, `PERMISSIONS`, `PACKAGE`, `assets/`, `res/` and `tests/` lie next to
+`Cargo.toml`. The style comes from the environment variable `JFLIB_STYLE` (`winui` without it) instead of
+`STYLE`; `TARGETS`, `GLIBC`, `STATIC`, `BINS` and `parity.txt` are this repository's (Cargo has
+`[[bin]]` for further programs, and `.cargo/config.toml` says whether a Linux program links
+against glibc or is one static file).
+
 The same source entrypoint is used by build/dependency discovery, hashes, lint and IDE/API
 tools. Two competing roots (`main.rs` plus `src/main.rs`, or their library equivalents) are
 an error. Reference material under `context` or `books` is never discovered as app source.
@@ -158,7 +195,20 @@ JSON/MCP, `App::actions` and capability checks. `--target web` builds the same G
 `build/web/NAME/`. Use `plat::capabilities()` and asynchronous web requests for services that
 depend on the host; never report a VFS write as durable before its completion arrives.
 
-**Build and run:**
+**Build and run**, an app of your own:
+
+```
+cargo run                                        # build and start (Windows)
+cargo run --target x86_64-unknown-linux-gnu      # Linux: always with --target (.cargo/config.toml says why)
+cargo build --release                            # opt-level 2 + LTO, the profile of Cargo.toml
+JFLIB_STYLE=kde cargo run                        # another style built in
+cargo jflib watch                                # hot reload (section 30)
+cargo jflib web --serve                          # the browser: scalar, SIMD, threads
+cargo jflib android --install                    # an APK on a phone or the emulator
+cargo jflib package --formats all                # setup, MSIX, .deb, AppImage, RPM, Flatpak (PACKAGING.md)
+```
+
+In this repository:
 
 ```
 python build_rs.py app NAME                    # build/win/NAME.exe and build/linux/NAME
@@ -1658,7 +1708,14 @@ shot build/template.png
   in one go (while the backend waits for a reply, and while it waits for events); every key
   must arrive, in order.
 
-**Test commands**
+**Test commands**, an app of your own:
+
+```
+cargo jflib test                    # build it, run every tests/*.uis with --script
+cargo jflib test --release          # ... the release build
+```
+
+In this repository:
 
 ```
 python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
@@ -1752,7 +1809,8 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 PaintCraft loads effects, file types and shapes from plugins (DLL / .so). Plugins written in Rust
 use the crate `lib/plugin` (safe `Effect` / `FileType` traits over the PNAPI ABI) and are
 built with `python build_rs.py plugin NAME`; see `plugins/README.md` and
-`apps/PaintCraft/docs/PLUGINS.md`.
+`apps/PaintCraft/docs/PLUGINS.md`. The plugin ABI belongs to this repository: it is not published
+as a crate.
 
 ## 15. Data views and app shells
 
@@ -4183,7 +4241,11 @@ excluded|selected S|none|hover S|none|selector "s"|copied "s"` (`excluded`: no r
 inspector's window in the tree). The inspector's window has the id 2147422208 (`expect window
 2147422208 open`, `shot F window 2147422208`).
 
-### Hot reload: `build_rs.py watch`
+### Hot reload: `cargo jflib watch`, `build_rs.py watch`
+
+An app of your own: `cargo jflib watch [-p PKG] [-- ARGS]` in its folder does what this section
+describes for the machine's own target, with its session in `target/jflib-watch/NAME`; it watches
+every file of the project's own packages and builds as `cargo run` does. In this repository:
 
 `python build_rs.py watch NAME [--target win|linux] [-- ARGS]` builds the app, starts it and
 watches its sources, its assets and build files and the sources of every library and style

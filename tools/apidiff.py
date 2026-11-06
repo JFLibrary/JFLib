@@ -6,9 +6,10 @@
     python build_rs.py api-diff --snapshot       write docs/api/<the library's version>.txt (a release)
     python tools/gendoc.py --check --api         the suite's one-line summary (one parse)
 
-The public API (docs/VERSIONING.md) is what docs/API.md documents: the crates of gendoc's
-CRATES table (codec crates: their root, their re-exports and CODEC_EXTRA), every item another
-crate can name, minus #[doc(hidden)] and #[cfg(test)].  gendoc's parser reads the sources; this
+The public API (docs/VERSIONING.md) is what docs/API.md documents and the facade jflib shows: the
+crates of gendoc's CRATES table but REPO_ONLY (codec crates: their root, their re-exports and
+CODEC_EXTRA), every item another crate can name, minus #[doc(hidden)] and #[cfg(test)].  A
+snapshot's lines of a REPO_ONLY crate (0.1.0 still has plugin's) are left out of the comparison.  gendoc's parser reads the sources; this
 file walks the modules again to find each item's public paths and keeps the shortest one, so
 moving an item between modules that are glob re-exported (ui's files) changes nothing.
 
@@ -381,6 +382,8 @@ def current_lines():
     """the snapshot lines of the library as it is now"""
     out = set()
     for name, _title, kind in gendoc.CRATES:
+        if name in gendoc.REPO_ONLY:
+            continue
         for path, k, sig, flags in crate_lines(gendoc.load_crate(name), kind):
             out.add((path, k, sig, ",".join(sorted(set(flags)))))
     return sorted(out)
@@ -402,6 +405,8 @@ def read_snapshot(path):
         if not ln or ln.startswith("#"):
             continue
         p = ln.split("\t")
+        if p[0].split("::")[0] in gendoc.REPO_ONLY:
+            continue
         out.append(tuple((p + ["", "", "", ""])[:4]))
     return out
 

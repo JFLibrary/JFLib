@@ -2,6 +2,11 @@
 //! One dependency brings all of it; a program links only what it uses.
 //!
 //! `jflib::style` is the style of the environment variable `JFLIB_STYLE`, without it `winui`.
+//!
+//! What this crate promises (docs/VERSIONING.md, "The crates on crates.io") is every crate below
+//! by its path here, `jflib::ui::...`, as docs/API.md documents it; of the styles their `STYLE`.
+//! `simd`, `text_shape` and `style_assets` are building blocks the others stand on: reachable,
+//! hidden, no part of that promise.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -10,6 +15,7 @@ pub use agent_core;
 pub use plat;
 pub use base;
 pub use agent_io;
+#[doc(hidden)]
 pub use simd;
 pub use gfx;
 pub use img_core;
@@ -18,6 +24,7 @@ pub use doc_core;
 pub use doc_layout;
 pub use doc_io;
 pub use img_png;
+#[doc(hidden)]
 pub use text_shape;
 pub use text;
 pub use img_jpeg;
@@ -48,11 +55,28 @@ pub use wgsl;
 pub use netpkt;
 pub use gpu;
 pub use eapm;
+#[doc(hidden)]
 pub use style_assets;
-pub use style_winui;
-pub use style_classic;
-pub use style_kde;
-pub use style_macos;
+
+/// WinUI 3 (Fluent): `STYLE` for `ui::launch` and the style switch at run time
+pub mod style_winui {
+    pub use ::style_winui::STYLE;
+}
+
+/// the classic look: grey 3D edges, dark blue title bars
+pub mod style_classic {
+    pub use ::style_classic::STYLE;
+}
+
+/// KDE Plasma (Breeze)
+pub mod style_kde {
+    pub use ::style_kde::STYLE;
+}
+
+/// macOS: white buttons, blue selection, the traffic lights on the left
+pub mod style_macos {
+    pub use ::style_macos::STYLE;
+}
 
 // plat has no fs and net on these two targets
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
@@ -69,10 +93,10 @@ pub use update;
 pub use img_jxl_enc;
 
 #[cfg(jflib_style = "winui")]
-pub use style_winui as style;
+pub use self::style_winui as style;
 #[cfg(jflib_style = "classic")]
-pub use style_classic as style;
+pub use self::style_classic as style;
 #[cfg(jflib_style = "kde")]
-pub use style_kde as style;
+pub use self::style_kde as style;
 #[cfg(jflib_style = "macos")]
-pub use style_macos as style;
+pub use self::style_macos as style;

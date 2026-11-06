@@ -3,7 +3,8 @@
 Stand 2026-11-06. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
 `build_rs.py` baut nur noch über Cargo. CR4 ist umgesetzt: `cargo jflib` kann `new`, `test`, `watch`, `web`,
 `android` und `package` mit allen sechs Formaten, dem Signieren, apt-Repository und Update-Kanal; `plugin` ist
-gestrichen. Offen sind CR5 und CR6. Die Ergebnisse unter „Was schon geprüft ist“
+gestrichen. CR5 ist umgesetzt: was die Crates versprechen, steht in `docs/VERSIONING.md`, die Anleitung zeigt
+den Crate-Weg zuerst. Offen ist CR6, die Veröffentlichung. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -398,7 +399,24 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
 
 ### CR5: API-Vertrag und Doku
 
-Klein bis mittel, vor dem Crate-Release.
+Klein bis mittel, vor dem Crate-Release. **Erledigt am 2026-11-06**, beide Entscheidungen des Nutzers nach dem
+Vorschlag:
+
+- **Versprochen** ist die Fassade `jflib` mit jeder Crate, die sie zeigt (`jflib::CRATE::...`, so wie `API.md` sie
+  dokumentiert), dazu `jflib-build` und die Befehle, Optionen, `PACKAGE`-Schlüssel und Variablen von
+  `cargo-jflib`. `simd`, `text_shape` und `style_assets` stehen in der Fassade jetzt hinter `#[doc(hidden)]`, die
+  Stil-Crates nur noch mit ihrem `STYLE` (`jflib::style_kde::STYLE`, `jflib::style::STYLE`). Nicht versprochen:
+  die anderen `jflib-*` direkt, `jflib-installer` und `jflib-appimagert`, `modrt` und `modplat`, `plugin`
+  (`REPO_ONLY` in `tools/gendoc.py`). `build_rs.py check` hält gezeigte und dokumentierte Crates gleich,
+  `api-diff` lässt die `plugin`-Zeilen auch im alten Snapshot 0.1.0 weg.
+- **Die Anleitung** (`docs/GUIDE.md`) nennt beide Wege, der Crate-Weg kommt zuerst: Skelett mit `cargo jflib
+  new`, Bauen und Starten mit `cargo`, Testen mit `cargo jflib test`, Hot Reload mit `cargo jflib watch`, welche
+  Dateien neben `Cargo.toml` gelten, die Regeln für eine eigene App. Fremde `no_std`-Crates sind dort erlaubt;
+  eine mit eigenen Systemaufrufen umgeht `plat`, nur die `sandbox`-Zeile hilft (auch in `PERMISSIONS.md` und der
+  README der Fassade). `README.md` hat einen Abschnitt „Your own app with Cargo“ und sagt nicht mehr, dass ein
+  Python-Skript `rustc` direkt aufruft. Bis CR6 nennen die Texte `cargo install --path lib/cargo_jflib`.
+
+Der ursprüngliche Plan:
 
 - `docs/VERSIONING.md`: Was gilt als öffentliche API, wenn 57 Crates sichtbar sind? Vorschlag: nur der Weg über
   `jflib` ist versprochen.
@@ -414,6 +432,8 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
 2. `cargo publish --workspace --dry-run`, dann in Abhängigkeitsreihenfolge hochladen. Vorher die aktuellen Limits von
    crates.io für neue Crates prüfen, bei 57 Stück kann das dauern.
 3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt.
+4. Die Hinweise „bis die Crates auf crates.io sind: `cargo install --path lib/cargo_jflib`“ aus `README.md` und
+   `docs/GUIDE.md` nehmen.
 
 Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Reserviert ist damit nichts.
 

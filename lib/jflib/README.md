@@ -74,7 +74,7 @@ strip = "symbols"
 
 The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another
 (`classic`, `kde`, `macos`). All four are always there under their own names for the switch at
-run time (`style_kde::STYLE`).
+run time (`jflib::style_kde::STYLE`).
 
 ## Good to know
 
@@ -88,9 +88,12 @@ run time (`style_kde::STYLE`).
 - **Paths in a release program:** panic messages name the source files with the build
   machine's paths. `RUSTFLAGS="--remap-path-prefix=$HOME=~"` removes them.
 - **Versions:** the crates below `jflib` (`jflib-ui`, `jflib-plat`, ...) always come in the
-  same version and change together. Only the way through `jflib` is promised.
+  same version and change together. Only the way through `jflib` is promised, together with
+  `jflib-build` and `cargo jflib` (docs/VERSIONING.md, "The crates on crates.io").
 - **Your own system calls:** JFLib checks a program's file, network and process access against
-  its `PERMISSIONS` in its platform layer. A crate that calls the system itself goes around it.
+  its `PERMISSIONS` in its platform layer. A crate that calls the system itself goes around it;
+  only the `sandbox` line confines it, as far as the operating system enforces the manifest
+  (docs/PERMISSIONS.md, "OS sandbox").
 
 ## License
 
