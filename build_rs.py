@@ -999,6 +999,7 @@ class Builder:
         src, mapf = self.cargo_out[package]
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
+        shutil.copymode(src, dest)             # Linux: the program stays executable
         if mapf is not None and mapf.is_file():    # Windows NAME.map, Linux NAME.map (as they were named before)
             shutil.copyfile(mapf, dest.with_suffix(".map") if self.target == "win" else dest.with_name(dest.name + ".map"))
         return dest
@@ -1054,6 +1055,7 @@ class Builder:
         if lib is None:
             raise BuildError(f"cargo built no module {name}")
         shutil.copyfile(lib, out)
+        shutil.copymode(lib, out)
         bad = plugin_verify(out, t, export=f"{name}_module")
         if bad:
             out.unlink()
@@ -1700,6 +1702,7 @@ class PluginBuilder:
             raise BuildError(f"cargo built no plugin {name}")
         out = self.path(name)
         shutil.copyfile(lib, out)
+        shutil.copymode(lib, out)
         bad = plugin_verify(out, self.target)
         if bad:
             out.unlink()
