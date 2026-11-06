@@ -283,12 +283,17 @@ Groß. Erst danach gibt es nur noch ein Bausystem. In Teilschritten, nach jedem 
 
   **Geprüft:** die volle Suite mit 1329 von 1331 Skripten (nur `fonttest/selftest`, CRLF) samt den Rust-Plugins und
   `crates_accept.py`; die Proben von `memory_safety_check.py`; ein Variantenprofil wie aus `measure.py` (dieses
-  selbst braucht `legacy/` neben dem Repo und lief nicht).
+  selbst braucht `legacy/` neben dem Repo und lief nicht). Auf den Zielen selbst: alle sieben Web-Tests von `androidGallery` in
+  Chromium (`system_web` auch mit Threads), `text_web` auch in Firefox; drei Android-Tests auf dem Emulator (API 35,
+  x86_64; kein Telefon angeschlossen); `build_rs.py` selbst auf dem Fedora-Rechner: `check`, `template` und `jfs`
+  grün, `gallery` 39 von 42 (die drei anderen brauchen ein Display, es war niemand angemeldet). Erst dort fiel auf,
+  dass die Kopie aus Cargos Ordner das Ausführungsrecht verlor.
 
 Bleiben müssen `lint()`, `check_intrinsics`, `plugin_verify` und `perm_lint`.
 
-**Fertig, wenn:** die volle Testsuite grün ist, die Programmgrößen höchstens 1 % abweichen und die echten
-Testgeräte (Android, Linux, Web) durchgelaufen sind.
+**Erledigt am 2026-11-06.** Die volle Suite ist grün bis auf `fonttest/selftest` (CRLF), die Release-Größen weichen
+höchstens 0,11 % ab, Web, Android (Emulator) und ein echter Linux-Rechner sind durchgelaufen. Offen: das Telefon,
+und die GPU-Skripte von `gallery` auf Fedora mit angemeldetem Nutzer.
 
 ### CR4: `cargo jflib`
 
