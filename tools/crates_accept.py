@@ -28,7 +28,12 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           tests/smoke.uis (Linux, WSL on Windows); the AppImage: unsquashfs reads its image, the
           .desktop and metainfo pass their validators, tests/smoke.uis runs through it; the rpm's
           .spec names its tarball's files (the .rpm when rpmbuild is there); the Flatpak manifest
-          and, with flatpak-builder, the bundle; the MSIX's files (with MakeAppx).
+          and, with flatpak-builder, the bundle; the MSIX's files (with MakeAppx).  Signed with
+          --sign, --repo and --update by a test certificate (openssl, never installed), a
+          throwaway GPG key in Linux and a key from `cargo jflib keygen`: the programs, the setup
+          and the MSIX carry Authenticode signatures, gpgv accepts the AppImage's embedded
+          signature and the apt repository (apt-get reads it in a folder of its own), the Flatpak
+          repository is signed, tools/update_manifest.py verifies every style's channel.
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -302,6 +307,14 @@ def apk_problems(apk):
 def setup_entries(setup):
     """the payload of a setup: [(kind, name)] (docs/PACKAGING.md, "Payload layout")"""
     import struct
+    from tools import codesign
+    sig = codesign.pe_signature_bytes(setup)            # a signed setup: the trailer ends before the signature
+    if sig:                                             # and up to 7 bytes of padding (lib/installer/payload.rs)
+        setup = setup[:sig[0]]
+        for _ in range(7):
+            if setup[-24:-16] == b"ASMINST1":
+                break
+            setup = setup[:-1]
     stub, pay = struct.unpack("<QQ", setup[-16:])
     assert setup[-24:-16] == b"ASMINST1"
     p = setup[stub:stub + pay]
@@ -368,6 +381,91 @@ publisher=JFLib Test
 filetypes=hal2|application/x-hallo2|Hallo-Datei|own
 schemes=hallo2
 """
+
+
+class Keys:
+    """what signs in the acceptance test: env (the variables for cargo jflib package), the GPG
+    home in Linux, the update key's public half"""
+
+    def __init__(self, env, home, public):
+        self.env, self.home, self.public = env, home, public
+
+
+def signing_keys(run, out, app, jenv):
+    """a test certificate (openssl, never installed; its subject is the MSIX publisher of
+    HALLO2_PACKAGE), a throwaway GPG key in Linux (WSL), an update key from cargo jflib keygen
+    -> Keys, or None when one cannot be made here (said in a note)"""
+    from tools import pkg_check
+    from tools.host_exec import run_linux
+    d = out / "keys"
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir(parents=True)
+    pfx = pkg_check.test_cert(d, "codesign", "/CN=JFLib Test", "crates") if os.name == "nt" else None
+    if os.name == "nt" and pfx is None:
+        run.notes.append("not signed: no openssl for the test certificate")
+        return None
+    home = f"/tmp/jflib-crates-gpg-{os.getpid()}"
+    r = run_linux(["python3", pkg_check.lp(ROOT / "tools" / "pkg_check.py"), "--inside-linux", "gpgkey", home], cwd=app, timeout=300)
+    fpr = next((ln[9:] for ln in r.stdout.splitlines() if ln.startswith("INFO fpr=")), "")
+    if not fpr:
+        run.notes.append("not signed: no throwaway GPG key in Linux")
+        return None
+    r = run.cmd("cargo-jflib-keygen", ["cargo", "jflib", "keygen", d / "update.updkey"], app, jenv)
+    public = r.stdout.strip().splitlines()[-1] if r else ""
+    run.check(len(public) == 64, f"cargo jflib keygen: the public key {public[:16]}...")
+    env = {"jfgui_GPG_KEY": fpr, "jfgui_GPG_HOME": home, "jfgui_UPDATE_KEY_FILE": str(d / "update.updkey")}
+    if pfx:
+        env.update({"jfgui_SIGN_PFX": str(pfx), "jfgui_SIGN_PFX_PASS": "crates"})
+    return Keys(env, home, public)
+
+
+def check_signed(run, dist, out, app, keys):
+    """what --sign, --repo and --update made"""
+    import zipfile
+    from tools import codesign, pkg_check, update_manifest
+    from tools.host_exec import linux_path, run_linux
+    if os.name == "nt":
+        unsigned = [f.name for f in [dist / "hallo2_Setup.exe", *dist.glob("work/hallo2/*/win/hallo2.exe")]
+                    if codesign.pe_signature(f) is None]
+        run.check(not unsigned, "Authenticode: the setup and every style's program" + (f": unsigned {unsigned}" if unsigned else ""))
+        msix = dist / "hallo2-0.1.0-x64.msix"
+        if msix.is_file():
+            run.check("AppxSignature.p7x" in zipfile.ZipFile(msix).namelist(), "the MSIX is signed (AppxSignature.p7x)")
+    for style in ("winui", "kde"):
+        img = dist / f"hallo2-0.1.0-{style}-x86_64.AppImage"
+        r = run_linux(["python3", pkg_check.lp(ROOT / "tools" / "pkg_check.py"), "--inside-linux", "appimagesig", linux_path(img), keys.home],
+                      cwd=app, timeout=300)
+        bad = [ln for ln in r.stdout.splitlines() if ln.startswith("FAIL")]
+        run.check(r.returncode == 0 and not bad and "PASS" in r.stdout, f"gpgv accepts the {style} AppImage's embedded signature"
+                  + "".join("\n    " + b for b in bad))
+    apt = out / "apt"
+    script = out / "keys" / "apt.sh"
+    script.write_text(f"""set -e
+R={linux_path(apt)}
+gpgv --keyring "$R/repo.gpg" "$R/InRelease" 2>&1
+gpgv --keyring "$R/repo.gpg" "$R/Release.gpg" "$R/Release" 2>&1
+T=/tmp/jflib-crates-apt
+rm -rf "$T"; mkdir -p "$T/lists/partial" "$T/cache/archives/partial"
+echo "deb [signed-by=$R/repo.gpg] file:$R ./" > "$T/sources.list"
+O="-o Dir::Etc::SourceList=$T/sources.list -o Dir::Etc::SourceParts=/nonexistent -o Dir::State::Lists=$T/lists -o Dir::Cache=$T/cache -o Debug::NoLocking=1"
+apt-get $O update 2>&1
+apt-cache $O policy hallo2
+rm -rf "$T"
+""", encoding="utf-8", newline="\n")
+    r = run_linux(["sh", linux_path(script)], cwd=app, timeout=300)
+    run.check(r.returncode == 0 and "Good signature" in r.stdout and "Candidate: 0.1.0" in r.stdout,
+              "the apt repository: gpgv accepts InRelease and Release.gpg, apt-get reads it (candidate 0.1.0)"
+              + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-800:]))
+    repo = dist / "flatpak" / "repo"
+    run.check((repo / "summary.sig").is_file() and (dist / "flatpak" / "org.example.hallo2.gpg").is_file(),
+              "the Flatpak repository is signed (summary.sig) and its key lies next to it")
+    for style in ("winui", "kde"):
+        problems = update_manifest.check_channel(out / "channel" / style, bytes.fromhex(keys.public))
+        m = json.loads((out / "channel" / style / "update.json").read_text(encoding="utf-8"))
+        kinds = sorted(f["kind"] for f in m["files"])
+        want = ["appimage", "exe", "package"] if os.name == "nt" else ["appimage", "package"]
+        run.check(not problems and kinds == want, f"the {style} update channel verifies under the keygen key: {', '.join(kinds)}"
+                  + "".join("\n    " + x for x in problems))
 
 
 def check_appimage(run, image, program, app):
@@ -542,11 +640,16 @@ def accept(targets, out):
                         f.unlink()
                     elif f.name in ("rpm", "flatpak"):
                         shutil.rmtree(f, ignore_errors=True)
+            keys = None
             if "package" in targets:
                 # what a published app says of itself: AppStream wants a homepage and a real description
                 (app / "PACKAGE").write_text(HALLO2_PACKAGE, encoding="utf-8")
-            if "package" in targets and run.cmd("cargo-jflib-package", ["cargo", "jflib", "package", "--styles", "winui,kde", "--formats", "all"],
-                                                app, jenv):
+                keys = signing_keys(run, out, app, jenv)
+                for d in ("apt", "channel"):
+                    shutil.rmtree(out / d, ignore_errors=True)
+            signed = ["--sign", "--repo", out / "apt", "--update", out / "channel"] if keys else []
+            if "package" in targets and run.cmd("cargo-jflib-package", ["cargo", "jflib", "package", "--styles", "winui,kde", "--formats", "all", *signed],
+                                                app, dict(jenv, **(keys.env if keys else {}))):
                 work = dist / "work" / "hallo2" / "kde"
                 if os.name == "nt":
                     check_setup(run, dist / "hallo2_Setup.exe", work / "win" / "hallo2.exe")
@@ -555,6 +658,12 @@ def accept(targets, out):
                 check_appimage(run, dist / "hallo2-0.1.0-kde-x86_64.AppImage", work / "linux" / "hallo2", app)
                 check_rpm(run, dist)
                 check_flatpak(run, dist)
+                if keys:
+                    check_signed(run, dist, out, app, keys)
+            if keys:
+                from tools import pkg_check
+                from tools.host_exec import run_linux
+                run_linux(["python3", pkg_check.lp(ROOT / "tools" / "pkg_check.py"), "--inside-linux", "gpgdrop", keys.home], cwd=app, timeout=120)
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
     run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run

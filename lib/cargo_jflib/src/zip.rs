@@ -82,6 +82,39 @@ pub(crate) fn append(path: &Path, files: &[(String, Vec<u8>)]) -> Result<(), Str
     fs::write(path, out).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+fn u64_at(b: &[u8], at: usize) -> Option<u64> {
+    Some(u64::from_le_bytes(b.get(at..at + 8)?.try_into().ok()?))
+}
+
+/// the names in the zip at `path` (its central directory; ZIP64 too, as MakeAppx writes)
+pub(crate) fn names(path: &Path) -> Result<Vec<String>, String> {
+    let bad = || format!("{}: not a zip", path.display());
+    let zip = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let eocd = (0..=zip.len().saturating_sub(22)).rev().find(|&i| zip[i..].starts_with(b"PK\x05\x06")).ok_or_else(bad)?;
+    let mut count = u16_at(&zip, eocd + 10).ok_or_else(bad)? as usize;
+    let mut at = u32_at(&zip, eocd + 16).ok_or_else(bad)? as usize;
+    // ZIP64: a locator just before the record points at the ZIP64 end record with the real values
+    if (count == 0xFFFF || at == 0xFFFF_FFFF) && eocd >= 20 && zip[eocd - 20..].starts_with(b"PK\x06\x07") {
+        let rec = u64_at(&zip, eocd - 20 + 8).ok_or_else(bad)? as usize;
+        if !zip.get(rec..).is_some_and(|z| z.starts_with(b"PK\x06\x06")) {
+            return Err(bad());
+        }
+        count = u64_at(&zip, rec + 32).ok_or_else(bad)? as usize;
+        at = u64_at(&zip, rec + 48).ok_or_else(bad)? as usize;
+    }
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        if !zip.get(at..).is_some_and(|z| z.starts_with(b"PK\x01\x02")) {
+            return Err(bad());
+        }
+        let (n, x, c) = (u16_at(&zip, at + 28).ok_or_else(bad)? as usize, u16_at(&zip, at + 30).ok_or_else(bad)? as usize,
+                         u16_at(&zip, at + 32).ok_or_else(bad)? as usize);
+        out.push(String::from_utf8_lossy(zip.get(at + 46..at + 46 + n).ok_or_else(bad)?).to_string());
+        at += 46 + n + x + c;
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,6 +135,7 @@ mod tests {
         assert!(z.starts_with(b"PK\x03\x04"));
         assert_eq!(u16_at(&z, z.len() - 12), Some(1)); // one entry
         assert!(z.windows(5).any(|w| w == b"hallo"));
+        assert_eq!(names(&p).unwrap(), ["x/y.txt"]);
         fs::remove_dir_all(&dir).ok();
     }
 }

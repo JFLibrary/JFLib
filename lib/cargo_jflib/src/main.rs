@@ -10,7 +10,9 @@
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
 //!                                      the app as an APK in target/jflib-android/
 //! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
+//!                     [--sign] [--repo DIR] [--update DIR [--update-url URL] [--update-key FILE]]
 //!                                      setup, MSIX, .deb, AppImage, RPM, Flatpak in target/jflib-package/
+//! cargo jflib keygen FILE              a key for the update channel and its public key
 //! ```
 //!
 //! It calls Cargo for the builds and needs nothing else; the browser with threads needs the
@@ -31,6 +33,9 @@ mod notices;
 mod package;
 mod pkgmeta;
 mod png;
+mod sha256;
+mod sign;
+mod update;
 mod squashfs;
 mod test;
 mod web;
@@ -56,7 +61,13 @@ USAGE:
         setup (NAME_Setup.exe) and deb by default, also msix (MakeAppx), appimage (one per style),
         rpm (the .spec; the .rpm with rpmbuild) and flatpak (the manifest; the bundle with
         flatpak-builder; on Windows through WSL); the styles from --styles or PACKAGE styles=,
-        default winui; the rest of PACKAGE as in README.md of cargo-jflib
+        default winui; the rest of PACKAGE as in README.md of cargo-jflib.  Signed with what the
+        environment names (jfgui_SIGN_PFX / jfgui_SIGN_THUMBPRINT: Authenticode, jfgui_GPG_KEY:
+        AppImages, apt repository, Flatpak); --sign: every signature required
+        --repo DIR: a flat apt repository with the .deb; --update DIR: a signed update channel
+        per style (the key from --update-key, jfgui_UPDATE_KEY_FILE or jfgui_UPDATE_KEY)
+    cargo jflib keygen FILE [-p PKG]
+        a new update key in FILE (never overwritten) and its public key for update::Config
     cargo jflib --version";
 
 /// the options every command shares
@@ -109,6 +120,7 @@ fn main() -> ExitCode {
         Some("web") => web::run(&args[1..]),
         Some("android") => android::run_cmd(&args[1..]),
         Some("package") => package::run(&args[1..]),
+        Some("keygen") => update::keygen(&args[1..]),
         Some("--version" | "-V") => {
             println!("cargo-jflib {}", env!("CARGO_PKG_VERSION"));
             Ok(())

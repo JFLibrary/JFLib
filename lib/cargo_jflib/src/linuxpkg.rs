@@ -3,11 +3,14 @@
 //
 //   appimages()   one NAME-VERSION-STYLE-x86_64.AppImage per style: the AppDir (AppRun, .desktop,
 //                 icon, metainfo, the program, the licences) as SquashFS behind the runtime
-//                 jflib-appimagert (built here, static); no Linux tool needed
+//                 jflib-appimagert (built here, static); no Linux tool needed; with jfgui_GPG_KEY
+//                 signed as appimagetool --sign does (.sha256_sig, .sig_key)
 //   rpm()         rpm/SPECS/PKG.spec + rpm/SOURCES/PKG-VERSION-root.tar.gz, and the .rpm when
 //                 rpmbuild is there (Linux, or WSL on Windows)
 //   flatpak()     flatpak/ID.json + flatpak/files/: the manifest, finish-args from PERMISSIONS;
-//                 ID.flatpak when flatpak-builder and the runtime are there
+//                 ID.flatpak when flatpak-builder and the runtime are there, exported into the
+//                 repository flatpak/repo (each run adds a commit); with jfgui_GPG_KEY repository
+//                 and bundle signed, the bundle carries the key and PACKAGE flatpak_repo_url=
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -17,6 +20,7 @@ use crate::deflate;
 use crate::linux::Linux;
 use crate::package::{self, App, APPIMAGERT};
 use crate::pkgmeta::{self, About};
+use crate::sha256::{hex, sha256};
 use crate::squashfs::{self, Item};
 
 const UPD_INFO_SIZE: usize = 1024;
@@ -148,6 +152,34 @@ pub(crate) fn runtime_image(elf: &[u8], info: &str) -> Result<Vec<u8>, String> {
     Ok(b)
 }
 
+const SIGNATURE_SECTIONS: [&str; 2] = [".sha256_sig", ".sig_key"];
+
+/// appimagetool's digest of an AppImage: SHA-256 with .sha256_sig and .sig_key read as zeros, as
+/// 64 lower-case hex digits (what --sign signs and AppImageUpdate checks)
+pub(crate) fn appimage_digest(data: &[u8]) -> Result<String, String> {
+    let sec = elf_sections(data);
+    let mut b = data.to_vec();
+    for n in SIGNATURE_SECTIONS {
+        let (off, size) = *sec.get(n).ok_or_else(|| format!("AppImage: no section {n} (a runtime without room for a signature)"))?;
+        b[off..off + size].fill(0);
+    }
+    Ok(hex(&sha256(&b)))
+}
+
+/// the armored signature and public key into .sha256_sig and .sig_key (NUL-padded)
+fn appimage_embed(data: &mut [u8], sig: &str, key: &str) -> Result<(), String> {
+    let sec = elf_sections(data);
+    for (n, text) in SIGNATURE_SECTIONS.into_iter().zip([sig, key]) {
+        let (off, size) = sec[n];
+        if text.len() >= size {
+            return Err(format!("AppImage: {n} holds {} bytes, the signature or key has {}", size - 1, text.len()));
+        }
+        data[off..off + size].fill(0);
+        data[off..off + text.len()].copy_from_slice(text.as_bytes());
+    }
+    Ok(())
+}
+
 fn mode(data: &[u8]) -> u16 {
     if data.starts_with(b"\x7fELF") || data.starts_with(b"#!") { 0o755 } else { 0o644 }
 }
@@ -187,7 +219,7 @@ impl App<'_> {
             self.note("no homepage (PACKAGE homepage= or Cargo.toml): appstreamcli validate warns, Flathub wants one");
         }
         println!("[linux] AppImage runtime");
-        let runtime = runtime_image(&package::stub(self.p, &self.jflib, &APPIMAGERT)?, self.meta.or("appimage_update", ""))?;
+        let runtime = runtime_image(&package::read(&package::stub(self.p, &self.jflib, &APPIMAGERT)?)?, self.meta.or("appimage_update", ""))?;
         for style in &self.styles {
             println!("[linux] AppImage {style}");
             let mut files = self.program_files(style, "usr/", &pkg)?;
@@ -202,12 +234,21 @@ impl App<'_> {
             let mut out = runtime.clone();
             out.extend(squashfs::image(&items, pkgmeta::now() as u32)?);
             let path = self.dist.join(format!("{}-{}-{style}-x86_64.AppImage", self.name, self.version));
+            let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            if self.sign().has_gpg() {
+                let (sig, key) = self.sign().gpg_detach(appimage_digest(&out)?.as_bytes())?;
+                appimage_embed(&mut out, &sig, &key)?;
+                self.sign().done.borrow_mut().push(format!("AppImage (GPG): {name}"));
+            } else {
+                self.sign().skip(&format!("AppImage {name}: unsigned (jfgui_GPG_KEY: a GPG signature in .sha256_sig / .sig_key)"))?;
+            }
             package::write(&path, &out)?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o755));
             }
+            self.appimages.borrow_mut().insert(style.clone(), path.clone());
             self.made(path)?;
         }
         Ok(())
@@ -313,6 +354,7 @@ impl App<'_> {
         files.insert(format!("share/metainfo/{aid}.metainfo.xml"), pkgmeta::metainfo(&self.meta, &self.about(), &aid, &pkg)?.into_bytes());
         let d = self.dist.join("flatpak");
         let _ = fs::remove_dir_all(d.join("files"));
+        let url = self.meta.or("flatpak_repo_url", "").to_string();
         for (path, data) in &files {
             package::write(&d.join("files").join(path), data)?;
         }
@@ -351,15 +393,24 @@ impl App<'_> {
             }
         };
         let script = self.work.join("flatpak.sh");
-        package::write(&script, b"set -e\nid=\"$2\"\n\
-            for r in \"$4//$5\" \"$6//$5\"; do\n  flatpak info \"$r\" >/dev/null 2>&1 || { echo \"the runtime $r is not installed (flatpak install --user flathub $r)\"; exit 3; }\ndone\n\
-            t=$(mktemp -d /tmp/jflib-flatpak-XXXXXX)\ntrap 'rm -rf \"$t\"' EXIT\ncp -r \"$1\" \"$t/src\"\n\
-            flatpak-builder --disable-rofiles-fuse --force-clean --disable-updates --state-dir=\"$t/state\" --repo=\"$t/repo\" \"$t/build\" \"$t/src/$id.json\" >&2\n\
-            flatpak build-bundle \"$t/repo\" \"$t/out.flatpak\" \"$id\" >&2\ncp \"$t/out.flatpak\" \"$3\"\n")?;
+        package::write(&script, FLATPAK_SH.as_bytes())?;
         let bundle = self.dist.join(format!("{aid}.flatpak"));
-        let out = linux.run(&script, &[linux.path(&d), aid.clone(), linux.path(&bundle), name.to_string(), branch.to_string(), sdk.clone()])?;
+        let (key, env) = self.sign().gpg_for_script().unwrap_or_default();
+        let dash = |s: &str| if s.is_empty() { "-".to_string() } else { s.to_string() }; // wsl.exe drops empty arguments
+        let out = linux.run_env(&script, &[linux.path(&d), aid.clone(), linux.path(&bundle), name.to_string(), branch.to_string(), sdk.clone(),
+                                           linux.path(&d.join("repo")), dash(&key), dash(&url)], &env)?;
         match out.status.code() {
-            Some(0) => self.made(bundle),
+            Some(0) => {
+                if key.is_empty() {
+                    self.sign().skip(&format!("Flatpak {aid}.flatpak: unsigned (jfgui_GPG_KEY: a signed repository and bundle)"))?;
+                } else {
+                    self.sign().done.borrow_mut().push(format!("Flatpak (GPG): the repository {} and {aid}.flatpak", d.join("repo").display()));
+                }
+                if url.is_empty() {
+                    self.note("flatpak: no PACKAGE flatpak_repo_url=: the bundle names no repository, an installation from it gets no updates");
+                }
+                self.made(bundle)
+            }
             Some(3) => {
                 self.skip("flatpak", &format!("{} ({}); only the manifest", String::from_utf8_lossy(&out.stdout).trim(), linux.name()));
                 Ok(())
@@ -368,6 +419,49 @@ impl App<'_> {
         }
     }
 }
+
+/// flatpak-builder on the manifest (copied into Linux), exported into the repository REPO (copied in
+/// and back: each build adds a commit), then a bundle; with KEY repository and bundle signed, the
+/// bundle carries the key and URL, and ID.gpg (and with URL ID.flatpakrepo) lie next to REPO.
+/// Arguments: SRC ID BUNDLE RUNTIME BRANCH SDK REPO KEY URL ("-": none); exit 3: a runtime is missing
+const FLATPAK_SH: &str = r#"set -e
+src="$1"; id="$2"; out="$3"; repo="$7"; key="$8"; url="$9"
+[ "$key" = "-" ] && key=""; [ "$url" = "-" ] && url=""
+for r in "$4//$5" "$6//$5"; do
+  flatpak info "$r" >/dev/null 2>&1 || { echo "the runtime $r is not installed (flatpak install --user flathub $r)"; exit 3; }
+done
+sign=""
+if [ -n "$key" ]; then sign="--gpg-sign=$key"; [ -n "$jfgui_GPG_HOME" ] && sign="$sign --gpg-homedir=$jfgui_GPG_HOME"; fi
+t=$(mktemp -d /tmp/jflib-flatpak-XXXXXX)
+trap 'rm -rf "$t"' EXIT
+mkdir "$t/src"
+cp -r "$src/files" "$src/$id.json" "$t/src/"
+[ -d "$repo" ] && cp -r "$repo" "$t/repo"
+flatpak-builder --disable-rofiles-fuse --force-clean --disable-updates --state-dir="$t/state" --repo="$t/repo" $sign "$t/build" "$t/src/$id.json" >&2
+flatpak build-update-repo $sign "$t/repo" >&2
+extra=""
+if [ -n "$key" ]; then
+  G="gpg --batch"; [ -n "$jfgui_GPG_HOME" ] && G="$G --homedir $jfgui_GPG_HOME"
+  $G --export "$key" > "$t/key.gpg"
+  [ -s "$t/key.gpg" ] || { echo "gpg has no public key $key" >&2; exit 1; }
+  extra="--gpg-keys=$t/key.gpg"
+fi
+[ -n "$url" ] && extra="$extra --repo-url=$url"
+flatpak build-bundle $sign $extra "$t/repo" "$t/out.flatpak" "$id" >&2
+cp "$t/out.flatpak" "$out"
+chmod -R u+w "$t/repo"
+if [ -d "$repo" ]; then chmod -R u+w "$repo"; rm -rf "$repo"; fi
+cp -r "$t/repo" "$repo"
+if [ -n "$key" ]; then
+  cp "$t/key.gpg" "$(dirname "$repo")/$id.gpg"
+  [ -n "$url" ] && printf '[Flatpak Repo]
+Title=%s
+Url=%s
+GPGKey=%s
+' "$id" "$url" "$(base64 -w0 "$t/key.gpg")" > "$(dirname "$repo")/$id.flatpakrepo"
+fi
+exit 0
+"#;
 
 /// a PERMISSIONS path pattern -> (Flatpak filesystem location, note)
 fn fs_location(pattern: &str) -> (Option<String>, Option<String>) {

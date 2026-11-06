@@ -60,14 +60,27 @@ impl Linux {
 
     /// `sh script args..` -> its output (Err: it did not start)
     pub(crate) fn run(&self, script: &Path, args: &[String]) -> Result<Output, String> {
+        self.run_env(script, args, &[])
+    }
+
+    /// `sh script args..` with these variables (WSL hands them over by their names in WSLENV)
+    pub(crate) fn run_env(&self, script: &Path, args: &[String], env: &[(&str, String)]) -> Result<Output, String> {
         let mut cmd = match &self.wsl {
             Some(d) => {
                 let mut c = Command::new("wsl.exe");
                 c.args(["-d", d, "-e", "sh"]);
+                let names: Vec<&str> = env.iter().map(|(n, _)| *n).collect();
+                if !names.is_empty() {
+                    let old = std::env::var("WSLENV").unwrap_or_default();
+                    c.env("WSLENV", names.join(":") + if old.is_empty() { "" } else { ":" } + &old);
+                }
                 c
             }
             None => Command::new("sh"),
         };
+        for (n, v) in env {
+            cmd.env(n, v);
+        }
         cmd.arg(self.path(script)).args(args).stdin(Stdio::null()).output().map_err(|e| format!("sh: {e}"))
     }
 

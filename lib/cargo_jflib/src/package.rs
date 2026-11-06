@@ -25,6 +25,7 @@ use crate::deflate;
 use crate::notices;
 use crate::pkgmeta::{self, Meta};
 use crate::png;
+use crate::sign::Signing;
 
 pub(crate) const WIN: &str = "x86_64-pc-windows-msvc";
 pub(crate) const LINUX: &str = "x86_64-unknown-linux-gnu";
@@ -69,27 +70,45 @@ struct Opts {
     package: Option<String>,
     styles: Option<String>,
     formats: Vec<&'static str>,
+    /// every signature required (--sign)
+    sign: bool,
+    /// --repo DIR: a flat apt repository with the .deb
+    repo: Option<PathBuf>,
+    /// --update DIR [--update-url URL] [--update-key FILE]: a signed update channel per style
+    update: Option<PathBuf>,
+    update_url: String,
+    update_key: Option<String>,
 }
 
 fn options(args: &[String]) -> Result<Opts, String> {
     let (mut styles, mut formats, mut no_win, mut no_deb, mut rest) = (None, "setup,deb".to_string(), false, false, Vec::new());
+    let (mut sign, mut repo, mut update, mut update_url, mut update_key) = (false, None, None, String::new(), None);
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--styles" | "--formats" => {
-                let v = args.get(i + 1).cloned().ok_or_else(|| format!("{} needs a value", args[i]))?;
-                if args[i] == "--styles" { styles = Some(v) } else { formats = v }
+            flag @ ("--styles" | "--formats" | "--repo" | "--update" | "--update-url" | "--update-key") => {
+                let v = args.get(i + 1).cloned().ok_or_else(|| format!("{flag} needs a value"))?;
+                match flag {
+                    "--styles" => styles = Some(v),
+                    "--formats" => formats = v,
+                    "--repo" => repo = Some(PathBuf::from(v)),
+                    "--update" => update = Some(PathBuf::from(v)),
+                    "--update-url" => update_url = v,
+                    _ => update_key = Some(v),
+                }
                 i += 1;
             }
             "--no-win" => no_win = true,
             "--no-deb" => no_deb = true,
+            "--sign" => sign = true,
             a => rest.push(a.to_string()),
         }
         i += 1;
     }
     let o = crate::opts(&rest)?;
     if o.target.is_some() || o.release || o.modes.is_some() || o.serve.is_some() || !o.free.is_empty() {
-        return Err("package takes -p, --styles, --formats, --no-win and --no-deb (it always builds --release)".to_string());
+        return Err("package takes -p, --styles, --formats, --no-win, --no-deb, --sign, --repo, --update, --update-url and --update-key \
+                    (it always builds --release)".to_string());
     }
     let known: Vec<&str> = FORMATS.iter().map(|f| f.0).collect();
     let wanted: Vec<String> = if formats.trim() == "all" { known.iter().map(|f| f.to_string()).collect() }
@@ -100,7 +119,7 @@ fn options(args: &[String]) -> Result<Opts, String> {
     // in the order they are made; --no-win / --no-deb drop every Windows / Linux format
     let formats = FORMATS.iter().filter(|(f, sys)| wanted.iter().any(|w| w == f) && !(no_win && *sys == "win" || no_deb && *sys == "linux"))
         .map(|f| f.0).collect();
-    Ok(Opts { package: o.package, styles, formats })
+    Ok(Opts { package: o.package, styles, formats, sign, repo, update, update_url, update_key })
 }
 
 /// a style's shown name and description (INFO of its crate)
@@ -154,32 +173,44 @@ fn profiles(root: &Path) -> String {
     out
 }
 
-/// a program of JFLib's that a package carries, made from its crate
+/// a program of JFLib's that a package carries or packaging needs, made from its crates
 pub(crate) struct Stub {
-    /// the program's name (package and bin) and the macro's crate (the library's name)
-    name: &'static str,
-    krate: &'static str,
-    triple: &'static str,
+    /// the program's name (package and bin)
+    pub name: &'static str,
+    /// its crates (the first one's res/app.ico is its icon)
+    pub deps: &'static [&'static str],
+    /// src/main.rs
+    pub source: &'static str,
+    /// a command-line program (Windows: the console subsystem)
+    pub console: bool,
+    pub triple: &'static str,
     /// one static Linux file, whatever the app's .cargo/config.toml says (built in a target
     /// folder of its own: other rustflags would rebuild the app's crates)
-    linux_static: bool,
+    pub linux_static: bool,
 }
 
-pub(crate) const INSTALLER: Stub = Stub { name: "installer", krate: "jflib-installer", triple: WIN, linux_static: false };
-pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", krate: "jflib-appimagert", triple: LINUX, linux_static: true };
+pub(crate) const INSTALLER: Stub = Stub { name: "installer", deps: &["jflib-installer"], source: "#![no_std]\n#![no_main]\n\ninstaller::main!();\n",
+                                          console: false, triple: WIN, linux_static: false };
+pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", deps: &["jflib-appimagert"], source: "#![no_std]\n#![no_main]\n\nappimagert::main!();\n",
+                                           console: false, triple: LINUX, linux_static: true };
+/// Ed25519 keys and signatures of an update channel with lib/crypto (cargo-jflib has no curve
+/// arithmetic of its own), for the machine it runs on
+pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "jflib-plat", "jflib-crypto"], source: include_str!("signer.rs.in"),
+                                       console: true, triple: if cfg!(windows) { WIN } else { LINUX }, linux_static: false };
 
-/// a stub: its crate in a project of its own below the target folder, built like the app (its
+/// a stub: its crates in a project of its own below the target folder, built like the app (its
 /// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
-pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<Vec<u8>, String> {
+pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, String> {
     let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
+    let deps: String = s.deps.iter().map(|d| format!("{d} = \"={version}\"\n")).collect();
     write_changed(&manifest, format!(
-        "# made by cargo jflib package: {} of the app's packages ({})\n\
+        "# made by cargo jflib: {} ({})\n\
          [package]\nname = \"{}\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
-         [dependencies]\n{} = \"={version}\"\n\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
-         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.krate, s.name, s.krate, profiles(&p.workspace_root)).as_bytes())?;
-    write_changed(&dir.join("build.rs"), b"fn main() {\n    jflib_build::app();\n}\n")?;
-    write_changed(&dir.join("src/main.rs"), format!("#![no_std]\n#![no_main]\n\n{}::main!();\n", s.name).as_bytes())?;
+         [dependencies]\n{deps}\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
+         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name, profiles(&p.workspace_root)).as_bytes())?;
+    write_changed(&dir.join("build.rs"), format!("fn main() {{\n    jflib_build::{}();\n}}\n", if s.console { "console" } else { "app" }).as_bytes())?;
+    write_changed(&dir.join("src/main.rs"), s.source.as_bytes())?;
     // the versions the app was built with, on every run: the crates compiled for it are taken
     // again, and a stub's old lock cannot hold a crate the app's sources have replaced since
     let lock = dir.join("Cargo.lock");
@@ -188,8 +219,8 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<Vec<u8>, Stri
     } else {
         let _ = fs::remove_file(&lock);
     }
-    let krate = cargo::packages(&p.package.dir, &manifest)?.into_iter().find(|r| r.name == s.krate)
-        .ok_or_else(|| format!("{}: resolves no {}", manifest.display(), s.krate))?;
+    let krate = cargo::packages(&p.package.dir, &manifest)?.into_iter().find(|r| r.name == s.deps[0])
+        .ok_or_else(|| format!("{}: resolves no {}", manifest.display(), s.deps[0]))?;
     let icon = krate.dir.join("res/app.ico");
     if icon.is_file() {
         write_changed(&dir.join("res/app.ico"), &read(&icon)?)?;
@@ -204,8 +235,7 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<Vec<u8>, Stri
     } else {
         cmd.arg("--target-dir").arg(&p.target_dir);
     }
-    let exe = cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or_else(|| format!("cargo built no {}", s.name))?;
-    read(&exe)
+    cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or_else(|| format!("cargo built no {}", s.name))
 }
 
 /// files by their path: the licences of the crates
@@ -256,6 +286,13 @@ pub(crate) struct App<'a> {
     pub made: RefCell<Vec<PathBuf>>,
     pub skipped: RefCell<Vec<String>>,
     pub notes: RefCell<Vec<String>>,
+    /// the systems built for ("win", "linux")
+    pub built: Vec<&'static str>,
+    pub signing: OnceCell<Signing>,
+    /// the .deb and its control file (the apt repository, the update channel)
+    pub deb_made: RefCell<Option<(PathBuf, String)>>,
+    /// the AppImage of each style (the update channel)
+    pub appimages: RefCell<BTreeMap<String, PathBuf>>,
 }
 
 impl App<'_> {
@@ -314,6 +351,10 @@ impl App<'_> {
         Ok(png)
     }
 
+    pub(crate) fn sign(&self) -> &Signing {
+        self.signing.get().expect("signing is set up before the formats")
+    }
+
     pub(crate) fn note(&self, text: &str) {
         if !self.notes.borrow().iter().any(|n| n == text) {
             println!("  ({text})");
@@ -335,7 +376,7 @@ impl App<'_> {
 
     fn setup(&self, previews: &BTreeMap<String, Vec<u8>>) -> Result<(), String> {
         println!("[win] setup");
-        let stub = stub(self.p, &self.jflib, &INSTALLER)?;
+        let stub = read(&stub(self.p, &self.jflib, &INSTALLER)?)?;
         let mut man = vec![format!("app={}", self.name), format!("display={}", self.display), format!("version={}", self.version),
                            format!("publisher={}", self.meta.or("publisher", "")), format!("default={}", self.default_style("win"))];
         for s in &self.styles {
@@ -388,6 +429,8 @@ impl App<'_> {
         let path = self.dist.join(format!("{}_Setup.exe", self.name));
         write(&path, &out)?;
         println!("  {} styles, stub {} bytes, payload {}", self.styles.len(), stub.len(), pay.len());
+        // the setup finds its payload before the signature (lib/installer/payload.rs)
+        self.sign().windows(std::slice::from_ref(&path), Some(&format!("{} Setup", self.display)))?;
         self.made(path)
     }
 
@@ -452,6 +495,7 @@ impl App<'_> {
         let out = debfile::deb(&control, &data, pkgmeta::now());
         let path = self.dist.join(format!("{pkg}_{ver}_amd64.deb"));
         write(&path, &out)?;
+        *self.deb_made.borrow_mut() = Some((path.clone(), String::from_utf8_lossy(&control["control"]).to_string()));
         self.made(path)
     }
 }
@@ -511,13 +555,27 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         made: RefCell::new(Vec::new()),
         skipped: RefCell::new(Vec::new()),
         notes: RefCell::new(Vec::new()),
+        built: targets.clone(),
+        signing: OnceCell::new(),
+        deb_made: RefCell::new(None),
+        appimages: RefCell::new(BTreeMap::new()),
     };
+    if o.repo.is_some() && !wants("deb") {
+        return Err("--repo is an apt repository of the .deb: it needs the format deb".to_string());
+    }
     for s in &app.styles {
         for &t in &targets {
             println!("[{s}] build {t}");
             let exe = build(&p, if t == "win" { WIN } else { LINUX }, s)?;
             write(&app.exe(s, t), &read(&exe)?)?;
         }
+    }
+    let linux_signed = ["appimage", "flatpak"].iter().any(|f| wants(f)) || o.repo.is_some();
+    let _ = app.signing.set(Signing::new(o.sign, targets.contains(&"win"), linux_signed, &app.work)?);
+    if targets.contains(&"win") {
+        // every style's program, before the setup and the MSIX carry it
+        let exes: Vec<PathBuf> = app.styles.iter().map(|s| app.exe(s, "win")).collect();
+        app.sign().windows(&exes, Some(&app.display))?;
     }
     for f in &o.formats {
         match *f {
@@ -544,6 +602,12 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             _ => {}
         }
     }
+    if let Some(repo) = &o.repo {
+        app.apt_repo(repo)?;
+    }
+    if let Some(update) = &o.update {
+        app.update_channel(update, &o.update_url, o.update_key.as_deref())?;
+    }
     println!("made: {}", app.made.borrow().iter().map(|m| m.display().to_string()).collect::<Vec<_>>().join(", "));
     for s in app.skipped.borrow().iter() {
         println!("not made: {s}");
@@ -551,6 +615,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     for n in app.notes.borrow().iter() {
         println!("note: {n}");
     }
+    app.sign().report();
     Ok(())
 }
 

@@ -2,7 +2,8 @@
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
 `build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web`, `android` und `package` mit allen
-sechs Formaten umgesetzt, offen sind das Signieren (CR4c3), `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
+sechs Formaten, dem Signieren, apt-Repository und Update-Kanal umgesetzt, offen sind `watch`, `plugin` und CR5,
+CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -355,9 +356,24 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
     `rpmbuild` baut aus der `.spec` das `.rpm` (358 Dateien, die Alternativen-Skripte, `Requires: glibc`).
     **Nicht geprüft:** `rpm -i`, `flatpak install` und `Add-AppxPackage` (root, eine Installation beim Nutzer, eine
     Signatur).
-  - **CR4c3: Signieren, apt-Repository, Update-Kanal** (`codesign.py`, `update_manifest.py`).
+  - **CR4c3: Signieren, apt-Repository, Update-Kanal. Erledigt am 2026-11-06.** `--sign`, `--repo DIR`,
+    `--update DIR [--update-url URL] [--update-key FILE]` und `cargo jflib keygen FILE`, mit denselben Variablen
+    wie `codesign.py` und `update_manifest.py`. Authenticode über signtool für jedes Stil-Programm (vor dem Setup,
+    das sie trägt), das Setup und das MSIX; GPG in Linux bzw. WSL für die AppImages (Digest wie `appimagetool
+    --sign`, SHA-256 hat das Werkzeug selbst), das apt-Repository (`Packages` und `Release` schreibt es selbst,
+    ohne `apt-ftparchive`) und das Flatpak-Repository samt Bundle. Ed25519 für den Update-Kanal rechnet nicht
+    `cargo-jflib`, sondern ein kleines Programm aus `jflib-rt`, `jflib-plat` und `jflib-crypto`, das es wie die
+    Stubs baut (`cargo-jflib` kann die Crates nicht selbst nutzen: `rt` bringt Panic-Handler und Allokator mit).
+    Dabei aufgefallen: MakeAppx schreibt ZIP64 (der ZIP-Leser kann es jetzt), und signtool setzt bis zu 7
+    Füllbytes vor die Signatur (der Installer sucht seinen Trailer schon so). **Geprüft** in `crates_accept.py`
+    mit einem Testzertifikat (openssl, nirgends installiert), einem Wegwerf-GPG-Schlüssel in WSL und einem
+    Schlüssel aus `keygen`: Setup und Programme tragen Authenticode und das Setup installiert weiter, das MSIX hat
+    `AppxSignature.p7x`, `gpgv` nimmt die AppImage-Signaturen (Digest unabhängig berechnet), `InRelease` und
+    `Release.gpg`, `apt-get` liest das Repository in einem eigenen Ordner, das Flatpak-Repository hat
+    `summary.sig`, `update_manifest.py` (eigenes Ed25519 in Python) prüft beide Kanäle. **Nicht geprüft:** ein
+    echtes Zertifikat einer CA, `rpm --addsign` (gibt es auch in `package.py` nicht).
 - **CR4d: `watch`, `plugin`.**
-- **Reihenfolge danach:** CR4c3, `watch`, `plugin`.
+- **Reihenfolge danach:** `watch`, `plugin`.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
 - **Mitzuliefern:** `web/*`, `android/*` und die Starter `apps/installer` (`jflib-installer`) und `apps/appimagert`

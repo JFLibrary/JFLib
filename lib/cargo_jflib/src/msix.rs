@@ -1,8 +1,8 @@
 // The MSIX package of an app (tools/pkg_msix.py of the JFLib repository, docs/PACKAGING.md
 // "MSIX"): the default Windows style's program, the licences, the logos and AppxManifest.xml,
-// packed by MakeAppx.exe of the Windows SDK into NAME-VERSION-x64.msix; NAME.appinstaller when
-// PACKAGE appinstaller_url= says where both are published.  Unsigned: Add-AppxPackage needs a
-// trusted signature (signing comes with the next stage of cargo jflib).
+// packed by MakeAppx.exe of the Windows SDK into NAME-VERSION-x64.msix and signed like the setup
+// (the certificate's subject must be the Publisher); NAME.appinstaller when PACKAGE
+// appinstaller_url= says where both are published.
 
 use std::env;
 use std::fs;
@@ -184,7 +184,7 @@ impl App<'_> {
         if !r.status.success() {
             return Err(format!("MakeAppx pack:\n{}{}", String::from_utf8_lossy(&r.stdout), String::from_utf8_lossy(&r.stderr)));
         }
-        self.note("msix: unsigned; Add-AppxPackage needs a trusted signature (the Store takes it unsigned and signs it itself)");
+        self.sign().msix(&out, &self.publisher()?)?;
         self.made(out.clone())?;
         let base = self.meta.or("appinstaller_url", "").trim_end_matches('/');
         if base.is_empty() {
