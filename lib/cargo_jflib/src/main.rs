@@ -9,8 +9,8 @@
 //!                                      the app for the browser in target/jflib-web/NAME/
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
 //!                                      the app as an APK in target/jflib-android/
-//! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb] [--no-win] [--no-deb]
-//!                                      a setup for Windows and a .deb in target/jflib-package/
+//! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
+//!                                      setup, MSIX, .deb, AppImage, RPM, Flatpak in target/jflib-package/
 //! ```
 //!
 //! It calls Cargo for the builds and needs nothing else; the browser with threads needs the
@@ -22,11 +22,16 @@ mod cargo;
 mod debfile;
 mod deflate;
 mod json;
+mod linux;
+mod linuxpkg;
+mod lz4;
+mod msix;
 mod new;
 mod notices;
 mod package;
 mod pkgmeta;
 mod png;
+mod squashfs;
 mod test;
 mod web;
 mod zip;
@@ -46,10 +51,12 @@ USAGE:
     cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
         the app as an APK: target/jflib-android/NAME-ABI-debug.apk (--release: signed with the key
         of jfgui_ANDROID_KEYSTORE); needs the Android SDK and NDK and a JDK; --install: adb install
-    cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb] [--no-win] [--no-deb]
-        the app with every style built in, the look picked at installation: target/jflib-package/
-        NAME_Setup.exe (Windows) and DEB_VERSION_amd64.deb (Linux); the styles from --styles or
-        PACKAGE styles=, default winui; the rest of PACKAGE as in README.md of cargo-jflib
+    cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
+        the app with every style built in, the look picked at installation, in target/jflib-package/:
+        setup (NAME_Setup.exe) and deb by default, also msix (MakeAppx), appimage (one per style),
+        rpm (the .spec; the .rpm with rpmbuild) and flatpak (the manifest; the bundle with
+        flatpak-builder; on Windows through WSL); the styles from --styles or PACKAGE styles=,
+        default winui; the rest of PACKAGE as in README.md of cargo-jflib
     cargo jflib --version";
 
 /// the options every command shares

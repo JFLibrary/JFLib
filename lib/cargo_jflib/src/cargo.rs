@@ -21,6 +21,10 @@ pub(crate) struct Package {
     pub lib: Option<String>,
     /// Cargo.toml's authors
     pub authors: Vec<String>,
+    /// Cargo.toml's description, license and homepage (empty: none)
+    pub description: String,
+    pub license: String,
+    pub homepage: String,
 }
 
 pub(crate) struct Project {
@@ -71,6 +75,9 @@ pub(crate) fn project(package: Option<&str>) -> Result<Project, String> {
             dir: Path::new(pick.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
             lib,
             authors: pick.get("authors").map(Value::arr).unwrap_or_default().iter().filter_map(Value::str).map(String::from).collect(),
+            description: pick.get("description").and_then(Value::str).unwrap_or("").to_string(),
+            license: pick.get("license").and_then(Value::str).unwrap_or("").to_string(),
+            homepage: pick.get("homepage").and_then(Value::str).unwrap_or("").to_string(),
         },
     })
 }

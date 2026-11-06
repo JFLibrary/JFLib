@@ -305,13 +305,15 @@ runtime.  With `appimagetool` in PATH that tool makes the image instead, with th
 system it runs on (an AppImage brings neither, a driver has to match the system's kernel anyway);
 `tools/package.py APP --static` makes one for systems without glibc, without the GPU.
 
-**The runtime** is [`apps/appimagert`](../apps/appimagert/src/main.rs), a static Linux program
+**The runtime** is [`apps/appimagert`](../apps/appimagert/src/main.rs) (its code the crate `jflib-appimagert`,
+[`lib/appimagert`](../lib/appimagert/lib.rs), which `cargo jflib package` builds for an app outside
+this repository), a static Linux program
 of JFLib without libc (about 200 KB, built with `--profile size`); `package.py` makes it an
 AppImage type 2 runtime: the magic `AI\x02` at byte 8 of the ELF header and a section
 `.upd_info` of 1024 bytes (PACKAGE `appimage_update=`, e.g. `zsync|https://example.org/App-latest-x86_64.AppImage.zsync`),
 added to the file by `pkg_linux.runtime_image`.  The SquashFS image starts where the ELF data ends.
 The upstream runtime would mount the image with FUSE, and is downloaded by appimagetool; this one
-reads the image itself ([`sqfs.rs`](../apps/appimagert/src/sqfs.rs): SquashFS 4.0, zstd or lz4,
+reads the image itself ([`sqfs.rs`](../lib/appimagert/sqfs.rs): SquashFS 4.0, zstd or lz4,
 fragments, sparse blocks, extended inodes) and needs no FUSE:
 
 * The first start extracts the image into `$XDG_CACHE_HOME/appimage-run/<name>-<xxh64 of the

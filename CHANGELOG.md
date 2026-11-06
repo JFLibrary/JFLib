@@ -143,6 +143,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo-jflib, the tool for a JFLib app outside this repository: cargo jflib new (the template with the app's name), test (tests/*.uis) and web (scalar, SIMD and threads with its own core library, the host, the licences; --serve); crates_accept.py installs it from the packages
 - **build:** cargo jflib android: an app made with cargo jflib new as an APK (its library through cargo rustc, the C bridge with the NDK, javac, d8, aapt2, zipalign -P 16, apksigner with a debug key or jfgui_ANDROID_KEYSTORE, --install through adb; the manifest from PACKAGE and PERMISSIONS); crates_accept.py builds it from the packages and checks the APK
 - **build:** cargo jflib package: an app outside this repository as a setup for Windows and a .deb for Linux with every style built in (JFLIB_STYLE), previews by --shot, the licences of every crate, PACKAGE's keys of tools/package.py; the .deb written without dpkg-deb; crates_accept.py installs the setup by script and checks the .deb with dpkg-deb
+- **build:** cargo jflib package --formats msix,appimage,rpm,flatpak (or all): an AppImage per style written without Linux tools (SquashFS with LZ4 behind the runtime jflib-appimagert), the rpm's .spec and tarball and the Flatpak manifest (rpmbuild and flatpak-builder on Linux or in WSL), the MSIX by MakeAppx; finish-args and capabilities from PERMISSIONS, AppStream metainfo
 
 ### Changed
 
@@ -177,6 +178,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py builds for the browser, Android and the jxlenc module through Cargo too; for the browser and Android it makes each app a library package of its own in a workspace below build/
 - **build:** build_rs.py builds only through Cargo: style variants and --profile too, PaintCraft's Rust plugins as packages (jflib-plugin, jflib-plugin-NAME); the direct rustc path and `build_rs.py ide` are gone, rust-analyzer reads the workspace
 - **build:** The setup stub's code is the crate jflib-installer (lib/installer, installer::main!); apps/installer only links it, cargo jflib package builds the same stub
+- **build:** The AppImage runtime's code is the crate jflib-appimagert (lib/appimagert, appimagert::main!()); apps/appimagert only links it
 
 ### Removed
 

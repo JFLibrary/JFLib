@@ -1,22 +1,23 @@
-// cargo jflib package: the app as a setup for Windows and a .deb for Linux, every style built in
-// (JFLIB_STYLE), the look picked at installation -- tools/package.py of the JFLib repository
-// (docs/PACKAGING.md) for an app outside it.
+// cargo jflib package: the app's installable packages, every style built in (JFLIB_STYLE) --
+// tools/package.py of the JFLib repository (docs/PACKAGING.md) for an app outside it.
 //
-//   target/jflib-package/NAME_Setup.exe            the setup stub (jflib-installer, built here like
-//                                                  the app) + the payload: every style's program,
-//                                                  a preview of each, the licences
-//   target/jflib-package/DEB_VERSION_amd64.deb     every style in /usr/lib/DEB/, debconf asks for
-//                                                  the look, update-alternatives links /usr/bin/DEB
+//   target/jflib-package/NAME_Setup.exe            setup: the stub (jflib-installer, built here like
+//                                                  the app) + every style's program, a preview of
+//                                                  each, the licences; the look picked at installation
+//   target/jflib-package/DEB_VERSION_amd64.deb     deb: every style in /usr/lib/DEB/, debconf asks
+//   target/jflib-package/NAME-VERSION-STYLE-x86_64.AppImage   appimage: one per style (linuxpkg.rs)
+//   target/jflib-package/rpm/                      rpm: the .spec and its tarball, the .rpm by rpmbuild
+//   target/jflib-package/flatpak/, ID.flatpak      flatpak: the manifest, the bundle by flatpak-builder
+//   target/jflib-package/NAME-VERSION-x64.msix     msix: by MakeAppx (msix.rs)
 //
-// Inputs: PACKAGE next to Cargo.toml (display, version, publisher, summary, description, generic,
-// categories, section, deb_name, maintainer, default_win, default_linux, styles, filetypes,
-// schemes, app_id), res/app.ico and res/app_{48,128,256}.png.
+// Inputs: PACKAGE next to Cargo.toml (README.md of cargo-jflib), PERMISSIONS (Flatpak's
+// finish-args, MSIX's capabilities), res/app.ico and res/app_{48,128,256}.png.
 
+use std::cell::{OnceCell, RefCell};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cargo::{self, Project};
 use crate::debfile::{self, Tree};
@@ -25,24 +26,26 @@ use crate::notices;
 use crate::pkgmeta::{self, Meta};
 use crate::png;
 
-const WIN: &str = "x86_64-pc-windows-msvc";
-const LINUX: &str = "x86_64-unknown-linux-gnu";
+pub(crate) const WIN: &str = "x86_64-pc-windows-msvc";
+pub(crate) const LINUX: &str = "x86_64-unknown-linux-gnu";
 const STYLES: [&str; 4] = ["winui", "classic", "kde", "macos"];
 const PREVIEW: &str = "1100x700";
 const THUMB: (usize, usize) = (480, 305);
+/// the formats and the system each one packages
+const FORMATS: [(&str, &str); 6] = [("setup", "win"), ("msix", "win"), ("deb", "linux"), ("appimage", "linux"), ("rpm", "linux"), ("flatpak", "linux")];
 
 const PK_MANIFEST: u32 = 1;
 const PK_STYLE: u32 = 2;
 const PK_PREVIEW: u32 = 3;
 const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
-const NAME_MAX: usize = 47; // the payload's names and labels (apps/installer/payload.rs)
+const NAME_MAX: usize = 47; // the payload's names and labels (lib/installer/payload.rs)
 
-fn read(p: &Path) -> Result<Vec<u8>, String> {
+pub(crate) fn read(p: &Path) -> Result<Vec<u8>, String> {
     fs::read(p).map_err(|e| format!("{}: {e}", p.display()))
 }
 
-fn write(p: &Path, data: &[u8]) -> Result<(), String> {
+pub(crate) fn write(p: &Path, data: &[u8]) -> Result<(), String> {
     if let Some(d) = p.parent() {
         fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
@@ -65,7 +68,7 @@ fn cut(s: &str, max: usize) -> &str {
 struct Opts {
     package: Option<String>,
     styles: Option<String>,
-    formats: String,
+    formats: Vec<&'static str>,
 }
 
 fn options(args: &[String]) -> Result<Opts, String> {
@@ -88,12 +91,16 @@ fn options(args: &[String]) -> Result<Opts, String> {
     if o.target.is_some() || o.release || o.modes.is_some() || o.serve.is_some() || !o.free.is_empty() {
         return Err("package takes -p, --styles, --formats, --no-win and --no-deb (it always builds --release)".to_string());
     }
-    let mut list: Vec<&str> = formats.split(',').map(str::trim).filter(|f| !f.is_empty()).collect();
-    if let Some(bad) = list.iter().find(|f| !["setup", "deb"].contains(f)) {
-        return Err(format!("--formats: unknown {bad} (known: setup, deb)"));
+    let known: Vec<&str> = FORMATS.iter().map(|f| f.0).collect();
+    let wanted: Vec<String> = if formats.trim() == "all" { known.iter().map(|f| f.to_string()).collect() }
+                              else { formats.split(',').map(|f| f.trim().to_string()).filter(|f| !f.is_empty()).collect() };
+    if let Some(bad) = wanted.iter().find(|f| !known.contains(&f.as_str())) {
+        return Err(format!("--formats: unknown {bad} (known: {}, all)", known.join(", ")));
     }
-    list.retain(|f| !(no_win && *f == "setup" || no_deb && *f == "deb"));
-    Ok(Opts { package: o.package, styles, formats: list.join(",") })
+    // in the order they are made; --no-win / --no-deb drop every Windows / Linux format
+    let formats = FORMATS.iter().filter(|(f, sys)| wanted.iter().any(|w| w == f) && !(no_win && *sys == "win" || no_deb && *sys == "linux"))
+        .map(|f| f.0).collect();
+    Ok(Opts { package: o.package, styles, formats })
 }
 
 /// a style's shown name and description (INFO of its crate)
@@ -126,7 +133,7 @@ fn preview(exe: &Path, work: &Path, style: &str) -> Result<Vec<u8>, String> {
     Ok(png::encode(&png::downscale(&img, THUMB.0, THUMB.1)))
 }
 
-/// the [profile.*] sections of the workspace's Cargo.toml (the stub is built like the app)
+/// the [profile.*] sections of the workspace's Cargo.toml (a stub is built like the app)
 fn profiles(root: &Path) -> String {
     let text = fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
     let mut out = String::new();
@@ -147,18 +154,32 @@ fn profiles(root: &Path) -> String {
     out
 }
 
-/// the setup stub: jflib-installer in a project of its own below the target folder, built for
-/// Windows like the app (its profiles, its Cargo.lock, its .cargo/config.toml) -> the program
-fn stub(p: &Project, version: &str) -> Result<Vec<u8>, String> {
-    let dir = p.target_dir.join("jflib-package").join("setup-stub");
+/// a program of JFLib's that a package carries, made from its crate
+pub(crate) struct Stub {
+    /// the program's name (package and bin) and the macro's crate (the library's name)
+    name: &'static str,
+    krate: &'static str,
+    triple: &'static str,
+    /// one static Linux file, whatever the app's .cargo/config.toml says (built in a target
+    /// folder of its own: other rustflags would rebuild the app's crates)
+    linux_static: bool,
+}
+
+pub(crate) const INSTALLER: Stub = Stub { name: "installer", krate: "jflib-installer", triple: WIN, linux_static: false };
+pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", krate: "jflib-appimagert", triple: LINUX, linux_static: true };
+
+/// a stub: its crate in a project of its own below the target folder, built like the app (its
+/// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
+pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<Vec<u8>, String> {
+    let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
     write_changed(&manifest, format!(
-        "# made by cargo jflib package: the setup stub of the app's Windows package (jflib-installer)\n\
-         [package]\nname = \"installer\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
-         [dependencies]\njflib-installer = \"={version}\"\n\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
-         # its own workspace, inside the app's folder or not\n[workspace]\n", profiles(&p.workspace_root)).as_bytes())?;
+        "# made by cargo jflib package: {} of the app's packages ({})\n\
+         [package]\nname = \"{}\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
+         [dependencies]\n{} = \"={version}\"\n\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
+         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.krate, s.name, s.krate, profiles(&p.workspace_root)).as_bytes())?;
     write_changed(&dir.join("build.rs"), b"fn main() {\n    jflib_build::app();\n}\n")?;
-    write_changed(&dir.join("src/main.rs"), b"#![no_std]\n#![no_main]\n\ninstaller::main!();\n")?;
+    write_changed(&dir.join("src/main.rs"), format!("#![no_std]\n#![no_main]\n\n{}::main!();\n", s.name).as_bytes())?;
     // the versions the app was built with, on every run: the crates compiled for it are taken
     // again, and a stub's old lock cannot hold a crate the app's sources have replaced since
     let lock = dir.join("Cargo.lock");
@@ -167,15 +188,28 @@ fn stub(p: &Project, version: &str) -> Result<Vec<u8>, String> {
     } else {
         let _ = fs::remove_file(&lock);
     }
-    let inst = cargo::packages(&p.package.dir, &manifest)?.into_iter().find(|r| r.name == "jflib-installer")
-        .ok_or("the setup stub resolves no jflib-installer")?;
-    write_changed(&dir.join("res/app.ico"), &read(&inst.dir.join("res/app.ico"))?)?;
+    let krate = cargo::packages(&p.package.dir, &manifest)?.into_iter().find(|r| r.name == s.krate)
+        .ok_or_else(|| format!("{}: resolves no {}", manifest.display(), s.krate))?;
+    let icon = krate.dir.join("res/app.ico");
+    if icon.is_file() {
+        write_changed(&dir.join("res/app.ico"), &read(&icon)?)?;
+    }
     let mut cmd = cargo::command();
-    cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", WIN]).arg("--manifest-path").arg(&manifest)
-        .arg("--target-dir").arg(&p.target_dir);
-    let exe = cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or("cargo built no setup stub")?;
+    cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    if s.linux_static {
+        cmd.arg("--target-dir").arg(p.target_dir.join("jflib-package").join("static-target"));
+        // these flags instead of every target.*.rustflags of the configuration
+        cmd.env("CARGO_ENCODED_RUSTFLAGS", ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static",
+                                            "-C", "target-feature=+crt-static"].join("\u{1f}"));
+    } else {
+        cmd.arg("--target-dir").arg(&p.target_dir);
+    }
+    let exe = cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or_else(|| format!("cargo built no {}", s.name))?;
     read(&exe)
 }
+
+/// files by their path: the licences of the crates
+pub(crate) type Files = Vec<(String, Vec<u8>)>;
 
 /// one entry of the payload: kind, flags, name, label, data, its size unpacked
 type Entry = (u32, u32, String, String, Vec<u8>, usize);
@@ -204,35 +238,106 @@ fn payload(entries: &[Entry]) -> Vec<u8> {
     out
 }
 
-struct App<'a> {
-    p: &'a Project,
-    meta: Meta,
-    name: String,
-    display: String,
-    version: String,
-    styles: Vec<String>,
+pub(crate) struct App<'a> {
+    pub p: &'a Project,
+    pub meta: Meta,
+    pub name: String,
+    pub display: String,
+    pub version: String,
+    pub styles: Vec<String>,
     /// the style crates' folders (their INFO)
     infos: BTreeMap<String, PathBuf>,
-    /// the version of jflib the app resolves to: the stub's crates must have it
-    jflib: String,
-    work: PathBuf,
-    dist: PathBuf,
+    /// the version of jflib the app resolves to: a stub's crates must have it
+    pub jflib: String,
+    pub work: PathBuf,
+    pub dist: PathBuf,
+    notices: [OnceCell<Files>; 2],
+    /// what was made, what was left out and why, what to know
+    pub made: RefCell<Vec<PathBuf>>,
+    pub skipped: RefCell<Vec<String>>,
+    pub notes: RefCell<Vec<String>>,
 }
 
 impl App<'_> {
-    fn exe(&self, style: &str, target: &str) -> PathBuf {
+    pub(crate) fn exe(&self, style: &str, target: &str) -> PathBuf {
         self.work.join(style).join(target).join(if target == "win" { format!("{}.exe", self.name) } else { self.name.clone() })
     }
 
-    fn default_style(&self, key: &str) -> &str {
+    pub(crate) fn default_style(&self, target: &str) -> &str {
+        let key = if target == "win" { "default_win" } else { "default_linux" };
         self.meta.get(key).filter(|d| self.styles.iter().any(|s| s == d)).unwrap_or(&self.styles[0])
     }
 
-    fn setup(&self, previews: &BTreeMap<String, Vec<u8>>) -> Result<PathBuf, String> {
+    /// the licences of every crate the app is built from for `target` (<package>-<version>/<file>)
+    pub(crate) fn notices(&self, target: &str) -> Result<&[(String, Vec<u8>)], String> {
+        let cell = &self.notices[(target == "linux") as usize];
+        if cell.get().is_none() {
+            let _ = cell.set(notices::files(self.p, if target == "win" { WIN } else { LINUX })?);
+        }
+        Ok(cell.get().map(Vec::as_slice).unwrap_or_default())
+    }
+
+    /// the package name of the Linux formats: PACKAGE deb_name=, else the program's in lower case
+    pub(crate) fn pkg(&self) -> Result<String, String> {
+        let pkg = self.meta.get("deb_name").map(String::from).unwrap_or_else(|| self.name.to_lowercase().replace('_', "-"));
+        if pkg.len() < 2 || !pkg.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+            || !pkg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "+.-".contains(c)) {
+            return Err(format!("{pkg:?} is no Linux package name: set deb_name= in PACKAGE (a-z, 0-9, + . -)"));
+        }
+        Ok(pkg)
+    }
+
+    /// PACKAGE summary=, else Cargo.toml's description, else the shown name
+    pub(crate) fn summary(&self) -> &str {
+        self.meta.get("summary").or(Some(self.p.package.description.as_str()).filter(|d| !d.is_empty())).unwrap_or(&self.display)
+    }
+
+    pub(crate) fn license(&self) -> &str {
+        self.meta.get("license").or(Some(self.p.package.license.as_str()).filter(|l| !l.is_empty())).unwrap_or("LicenseRef-proprietary")
+    }
+
+    pub(crate) fn homepage(&self) -> &str {
+        self.meta.get("homepage").unwrap_or(&self.p.package.homepage)
+    }
+
+    /// the Linux program needs the system's glibc (a program with a window: the GPU drivers)
+    pub(crate) fn glibc(&self) -> Result<bool, String> {
+        Ok(has_interpreter(&read(&self.exe(&self.styles[0], "linux"))?))
+    }
+
+    pub(crate) fn icon(&self, size: usize) -> Result<Vec<u8>, String> {
+        let mut placeholder = false;
+        let png = pkgmeta::icon(&self.p.package.dir, size, &mut placeholder)?;
+        if placeholder {
+            self.note("res/app_256.png is missing: a placeholder icon");
+        }
+        Ok(png)
+    }
+
+    pub(crate) fn note(&self, text: &str) {
+        if !self.notes.borrow().iter().any(|n| n == text) {
+            println!("  ({text})");
+            self.notes.borrow_mut().push(text.to_string());
+        }
+    }
+
+    pub(crate) fn skip(&self, format: &str, why: &str) {
+        println!("  [{format}] not made: {why}");
+        self.skipped.borrow_mut().push(format!("{format}: {why}"));
+    }
+
+    pub(crate) fn made(&self, path: PathBuf) -> Result<(), String> {
+        let size = fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?.len();
+        println!("  {}: {size} bytes", path.display());
+        self.made.borrow_mut().push(path);
+        Ok(())
+    }
+
+    fn setup(&self, previews: &BTreeMap<String, Vec<u8>>) -> Result<(), String> {
         println!("[win] setup");
-        let stub = stub(self.p, &self.jflib)?;
+        let stub = stub(self.p, &self.jflib, &INSTALLER)?;
         let mut man = vec![format!("app={}", self.name), format!("display={}", self.display), format!("version={}", self.version),
-                           format!("publisher={}", self.meta.or("publisher", "")), format!("default={}", self.default_style("default_win"))];
+                           format!("publisher={}", self.meta.or("publisher", "")), format!("default={}", self.default_style("win"))];
         for s in &self.styles {
             man.push(format!("desc_{s}={}", style_info(&self.infos, s).1));
         }
@@ -258,17 +363,17 @@ impl App<'_> {
         // the licences in licenses/; one whose path is longer than a payload name goes, with its
         // path as a heading, into licenses/<package>.txt (or licenses/MORE-LICENSES.txt)
         let mut combined: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-        for (rel, data) in notices::files(self.p, WIN)? {
+        for (rel, data) in self.notices("win")? {
             let name = format!("licenses/{rel}");
             if name.len() <= NAME_MAX {
-                entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(&data), data.len()));
+                entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(data), data.len()));
                 continue;
             }
             let folder = format!("licenses/{}.txt", rel.split('/').next().unwrap_or_default());
             let into = if folder.len() <= NAME_MAX { folder } else { "licenses/MORE-LICENSES.txt".to_string() };
             let text = combined.entry(into).or_default();
             text.extend(format!("==== {rel} ====\n\n").into_bytes());
-            text.extend_from_slice(&data);
+            text.extend_from_slice(data);
             text.extend_from_slice(b"\n\n");
         }
         for (name, data) in combined {
@@ -282,44 +387,34 @@ impl App<'_> {
         out.extend_from_slice(&(pay.len() as u64).to_le_bytes());
         let path = self.dist.join(format!("{}_Setup.exe", self.name));
         write(&path, &out)?;
-        println!("[win] {}: {} bytes ({} styles, stub {}, payload {})", path.display(), out.len(), self.styles.len(), stub.len(), pay.len());
-        Ok(path)
+        println!("  {} styles, stub {} bytes, payload {}", self.styles.len(), stub.len(), pay.len());
+        self.made(path)
     }
 
-    fn deb(&self) -> Result<PathBuf, String> {
+    fn deb(&self) -> Result<(), String> {
         println!("[linux] deb");
-        let pkg = self.meta.get("deb_name").map(String::from).unwrap_or_else(|| self.name.to_lowercase().replace('_', "-"));
-        if pkg.len() < 2 || !pkg.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
-            || !pkg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "+.-".contains(c)) {
-            return Err(format!("{pkg:?} is no Debian package name: set deb_name= in PACKAGE (a-z, 0-9, + . -)"));
-        }
+        let pkg = self.pkg()?;
         let (ver, display) = (&self.version, &self.display);
-        let default = self.default_style("default_linux");
+        let default = self.default_style("linux");
         let (mut data, mut control) = (Tree::new(), Tree::new());
         let mut size = 0;
-        let mut glibc = false;
         for s in &self.styles {
             let exe = read(&self.exe(s, "linux"))?;
-            glibc |= has_interpreter(&exe);
             size += exe.len();
             data.insert(format!("usr/lib/{pkg}/{}-{s}", self.name), exe);
         }
-        for (rel, d) in notices::files(self.p, LINUX)? {
+        for (rel, d) in self.notices("linux")? {
             size += d.len();
-            data.insert(format!("usr/share/doc/{pkg}/licenses/{rel}"), d);
+            data.insert(format!("usr/share/doc/{pkg}/licenses/{rel}"), d.clone());
         }
-        data.insert(format!("usr/share/applications/{pkg}.desktop"), pkgmeta::desktop_entry(&self.meta, display, &pkg, &pkg)?.into_bytes());
+        data.insert(format!("usr/share/applications/{pkg}.desktop"), pkgmeta::desktop_entry(&self.meta, display, &pkg, &pkg, None)?.into_bytes());
         let types = pkgmeta::filetypes(&self.meta)?;
         let own: Vec<_> = types.iter().filter(|t| t.own).collect();
         if !own.is_empty() {
             data.insert(format!("usr/share/mime/packages/{pkg}.xml"), pkgmeta::mime_package(&own).into_bytes());
         }
-        let mut placeholder = false;
         for sz in [48, 128, 256] {
-            data.insert(format!("usr/share/icons/hicolor/{sz}x{sz}/apps/{pkg}.png"), pkgmeta::icon(&self.p.package.dir, sz, &mut placeholder)?);
-        }
-        if placeholder {
-            println!("  (res/app_256.png is missing: a placeholder icon)");
+            data.insert(format!("usr/share/icons/hicolor/{sz}x{sz}/apps/{pkg}.png"), self.icon(sz)?);
         }
         let maintainer = self.meta.get("maintainer").map(String::from).or_else(|| self.p.package.authors.first().cloned())
             .unwrap_or_else(|| format!("{} <nobody@localhost>", self.meta.or("publisher", display)));
@@ -329,8 +424,8 @@ impl App<'_> {
              Installed-Size: {}\nDepends: debconf (>= 0.5) | debconf-2.0{}Description: {}\n{} \
              Enthaelt das Programm in {} Stilen; die Auswahl erfolgt bei der Installation.\n",
             self.meta.or("section", "utils"), size / 1024 + 64,
-            if glibc { ", libc6\nRecommends: libvulkan1, mesa-vulkan-drivers\n" } else { "\n" },
-            self.meta.or("summary", display), if desc.is_empty() { String::new() } else { format!(" {desc}\n .\n") }, self.styles.len()).into_bytes());
+            if self.glibc()? { ", libc6\nRecommends: libvulkan1, mesa-vulkan-drivers\n" } else { "\n" },
+            self.summary(), if desc.is_empty() { String::new() } else { format!(" {desc}\n .\n") }, self.styles.len()).into_bytes());
         let labels: Vec<String> = self.styles.iter().map(|s| style_info(&self.infos, s).0).collect();
         control.insert("templates".into(), format!(
             "Template: {pkg}/style\nType: select\nChoices-C: {}\nChoices: {}\nDefault: {default}\nDescription: Aussehen von {display}:\n \
@@ -354,13 +449,10 @@ impl App<'_> {
             "#!/bin/sh\nset -e\nif [ \"$1\" = \"remove\" ] || [ \"$1\" = \"deconfigure\" ]; then\n{}\nfi\nexit 0\n", rm.join("\n")).into_bytes());
         control.insert("postrm".into(), b"#!/bin/sh\nset -e\nif [ \"$1\" = \"purge\" ] && [ -e /usr/share/debconf/confmodule ]; then\n  \
             . /usr/share/debconf/confmodule\n  db_purge\nfi\nexit 0\n".to_vec());
-        let mtime = std::env::var("SOURCE_DATE_EPOCH").ok().and_then(|v| v.parse().ok())
-            .unwrap_or_else(|| SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
-        let out = debfile::deb(&control, &data, mtime);
+        let out = debfile::deb(&control, &data, pkgmeta::now());
         let path = self.dist.join(format!("{pkg}_{ver}_amd64.deb"));
         write(&path, &out)?;
-        println!("[linux] {}: {} bytes ({} styles)", path.display(), out.len(), self.styles.len());
-        Ok(path)
+        self.made(path)
     }
 }
 
@@ -385,16 +477,16 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     if let Some(bad) = styles.iter().find(|s| !STYLES.contains(&s.as_str())) {
         return Err(format!("style {bad}: the styles are {}", STYLES.join(", ")));
     }
-    let (want_setup, want_deb) = (o.formats.contains("setup"), o.formats.contains("deb"));
+    let wants = |f: &str| o.formats.contains(&f);
     let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
     let mut targets: Vec<&str> = Vec::new();
-    if want_setup {
+    if wants("setup") || wants("msix") {
         targets.push("win");
     }
-    if want_deb || (want_setup && host == Some("linux")) {
+    if ["deb", "appimage", "rpm", "flatpak"].iter().any(|f| wants(f)) || (wants("setup") && host == Some("linux")) {
         targets.push("linux"); // on Linux the previews come from the Linux build
     }
-    // the style crates (their INFO) and the version of jflib, which the stub's crates must have
+    // the style crates (their INFO) and the version of jflib, which the stubs' crates must have
     let (mut infos, mut jflib) = (BTreeMap::new(), None);
     for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
         if let Some(s) = r.name.strip_prefix("jflib-style-") {
@@ -415,6 +507,10 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         jflib,
         work: p.target_dir.join("jflib-package").join("work").join(&p.package.name),
         dist: p.target_dir.join("jflib-package"),
+        notices: [OnceCell::new(), OnceCell::new()],
+        made: RefCell::new(Vec::new()),
+        skipped: RefCell::new(Vec::new()),
+        notes: RefCell::new(Vec::new()),
     };
     for s in &app.styles {
         for &t in &targets {
@@ -423,26 +519,38 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             write(&app.exe(s, t), &read(&exe)?)?;
         }
     }
-    let mut made = Vec::new();
-    if want_setup {
-        let mut previews = BTreeMap::new();
-        for s in &app.styles {
-            match host.filter(|h| targets.contains(h)) {
-                Some(h) => match preview(&app.exe(s, h), &app.work, s) {
-                    Ok(png) => {
-                        previews.insert(s.clone(), png);
+    for f in &o.formats {
+        match *f {
+            "setup" => {
+                let mut previews = BTreeMap::new();
+                for s in &app.styles {
+                    match host.filter(|h| targets.contains(h)) {
+                        Some(h) => match preview(&app.exe(s, h), &app.work, s) {
+                            Ok(png) => {
+                                previews.insert(s.clone(), png);
+                            }
+                            Err(e) => app.note(&format!("no preview of {s}: {e}")),
+                        },
+                        None => app.note(&format!("no preview of {s}: this machine runs neither build")),
                     }
-                    Err(e) => println!("  (no preview of {s}: {e})"),
-                },
-                None => println!("  (no preview of {s}: this machine runs neither build)"),
+                }
+                app.setup(&previews)?;
             }
+            "msix" => app.msix()?,
+            "deb" => app.deb()?,
+            "appimage" => app.appimages()?,
+            "rpm" => app.rpm()?,
+            "flatpak" => app.flatpak()?,
+            _ => {}
         }
-        made.push(app.setup(&previews)?);
     }
-    if want_deb {
-        made.push(app.deb()?);
+    println!("made: {}", app.made.borrow().iter().map(|m| m.display().to_string()).collect::<Vec<_>>().join(", "));
+    for s in app.skipped.borrow().iter() {
+        println!("not made: {s}");
     }
-    println!("packaged: {}", made.iter().map(|m| m.display().to_string()).collect::<Vec<_>>().join(", "));
+    for n in app.notes.borrow().iter() {
+        println!("note: {n}");
+    }
     Ok(())
 }
 
@@ -458,6 +566,15 @@ mod tests {
         assert_eq!(pay.len(), 8 + 2 * 128 + 4);
         assert_eq!(u64::from_le_bytes(pay[24..32].try_into().unwrap()), 8 + 256);
         assert_eq!(pay[8 + 128 + 32 + 47], 0); // the name cut to 47 bytes
-        assert!(has_interpreter(&[]).eq(&false));
+        assert!(!has_interpreter(&[]));
+    }
+
+    #[test]
+    fn formats() {
+        let o = options(&["--formats".into(), "all".into(), "--no-deb".into()]).unwrap();
+        assert_eq!(o.formats, ["setup", "msix"]);
+        let o = options(&["--formats".into(), "flatpak,setup".into()]).unwrap();
+        assert_eq!(o.formats, ["setup", "flatpak"]);
+        assert!(options(&["--formats".into(), "snap".into()]).is_err());
     }
 }

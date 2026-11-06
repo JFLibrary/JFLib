@@ -23,9 +23,12 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           (Playwright, tools/tests/crates_web.mjs; skipped without it), `cargo jflib android --abi
           x86_64`: an APK with the code, the library 16 KiB aligned and the licences (skipped
           without the Android SDK, NDK, JDK or the Rust target x86_64-linux-android), `cargo jflib
-          package --styles winui,kde`: the setup installs the chosen style with a script and removes
-          it again (Windows), the .deb passes dpkg-deb and its program runs tests/smoke.uis (Linux,
-          WSL on Windows).
+          package --styles winui,kde --formats all`: the setup installs the chosen style with a
+          script and removes it again (Windows), the .deb passes dpkg-deb and its program runs
+          tests/smoke.uis (Linux, WSL on Windows); the AppImage: unsquashfs reads its image, the
+          .desktop and metainfo pass their validators, tests/smoke.uis runs through it; the rpm's
+          .spec names its tarball's files (the .rpm when rpmbuild is there); the Flatpak manifest
+          and, with flatpak-builder, the bundle; the MSIX's files (with MakeAppx).
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -326,6 +329,8 @@ def check_setup(run, setup, want):
     r = run.cmd("setup-install", [setup, "--script", d / "inst.uis", "--dir", d / "inst", "--style", "kde"], d, env, timeout=300)
     if r:
         run.check((d / "inst" / "hallo2.exe").read_bytes() == want.read_bytes(), "the setup installs the kde program")
+        assoc = (d / "shell" / "assoc.txt").read_text(encoding="utf-8", errors="replace") if (d / "shell" / "assoc.txt").is_file() else ""
+        run.check(".hal2" in assoc and "hallo2" in assoc, "the setup registers the file type and the URL scheme of PACKAGE (test mode: assoc.txt)")
         run.cmd("setup-uninstall", [d / "inst" / "uninstall.exe", "--uninstall", "--script", d / "un.uis"], d, env, timeout=300)
         run.check(not (d / "inst" / "hallo2.exe").exists(), "uninstall.exe removes it again")
 
@@ -352,6 +357,88 @@ def check_deb(run, deb, app):
     r = run_linux(["sh", "-c", f"rm -rf {x} && mkdir -p {x} && dpkg-deb -x {linux_path(deb)} {x} && mkdir -p target && {x}/usr/lib/hallo2/hallo2-kde --script tests/smoke.uis"],
                   cwd=app, timeout=600)
     run.check(r.returncode == 0, "the .deb's kde program runs tests/smoke.uis" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
+
+
+HALLO2_PACKAGE = """# PACKAGE of hallo2 (crates_accept.py): the keys cargo jflib package reads
+display=Hallo Zwei
+summary=A window made by cargo jflib new
+description=The template of cargo jflib new, packaged in every format by the acceptance test of the JFLib crates.
+homepage=https://example.org/hallo2
+publisher=JFLib Test
+filetypes=hal2|application/x-hallo2|Hallo-Datei|own
+schemes=hallo2
+"""
+
+
+def check_appimage(run, image, program, app):
+    """the AppImage of the kde style: unsquashfs reads its image (the program is the one built),
+    the .desktop and metainfo pass desktop-file-validate and appstreamcli, tests/smoke.uis runs
+    through it (Linux, WSL on Windows)"""
+    from tools.host_exec import linux_path, run_linux
+    if not image.is_file():
+        return run.fail(f"{image.name} missing")
+    have = run_linux(["sh", "-c", "command -v unsquashfs"], cwd=app, timeout=60)
+    if have.returncode:
+        run.notes.append("the AppImage is not checked: no unsquashfs here")
+        return
+    x = "/tmp/jflib-crates-appimage"
+    img = linux_path(image)
+    r = run_linux(["sh", "-c", f"set -e; chmod +x {img}; off=$({img} --appimage-offset); rm -rf {x}; "
+                   f"unsquashfs -q -n -o $off -d {x} {img} >/dev/null; ls -la {x} {x}/usr/lib/hallo2; "
+                   f"cmp {x}/usr/lib/hallo2/hallo2 {linux_path(program)} && echo SAME"], cwd=app, timeout=300)
+    run.check(r.returncode == 0 and "AppRun -> usr/lib/hallo2/hallo2" in r.stdout and "SAME" in r.stdout,
+              "unsquashfs reads the AppImage: AppRun, the kde program" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
+    v = run_linux(["sh", "-c", f"desktop-file-validate {x}/org.example.hallo2.desktop && appstreamcli validate --no-net "
+                   f"{x}/usr/share/metainfo/org.example.hallo2.appdata.xml"], cwd=app, timeout=300)
+    run.check(v.returncode == 0, "the AppImage's .desktop and metainfo pass desktop-file-validate and appstreamcli"
+              + ("" if v.returncode == 0 else "\n    " + (v.stdout + v.stderr).strip()[-600:]))
+    r = run_linux(["sh", "-c", f"mkdir -p target && {img} --script tests/smoke.uis"], cwd=app, timeout=600)
+    run.check(r.returncode == 0, "tests/smoke.uis runs through the kde AppImage" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
+
+
+def check_rpm(run, dist):
+    """the .spec names exactly the files of its tarball"""
+    import re
+    specs = list((dist / "rpm" / "SPECS").glob("*.spec"))
+    tars = list((dist / "rpm" / "SOURCES").glob("*-root.tar.gz"))
+    if len(specs) != 1 or len(tars) != 1:
+        return run.fail(f"rpm: one .spec and one tarball expected: {specs} {tars}")
+    with tarfile.open(tars[0]) as t:
+        files = sorted("/" + m.name[2:] for m in t.getmembers() if m.isfile())
+    spec = specs[0].read_text(encoding="utf-8")
+    listed = sorted(m.replace("%%", "%") for m in re.findall(r'^"(/[^"]+)"$', spec.split("%files", 1)[1], re.M))
+    run.check(files == listed and f"Source0:        {tars[0].name}" in spec and "/usr/lib/hallo2/hallo2-kde" in files,
+              f"the .spec names the {len(files)} files of its tarball")
+    if any(dist.glob("*.rpm")):
+        run.check(True, "rpmbuild made the .rpm")
+    else:
+        run.notes.append("no .rpm: rpmbuild is not there (only the .spec and its tarball)")
+
+
+def check_flatpak(run, dist):
+    man = dist / "flatpak" / "org.example.hallo2.json"
+    try:
+        m = json.loads(man.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return run.fail(f"the Flatpak manifest: {e}")
+    run.check(m["id"] == "org.example.hallo2" and m["command"] == "hallo2" and "--device=dri" in m["finish-args"]
+              and (dist / "flatpak" / "files" / "lib" / "hallo2" / "hallo2").is_file(), "the Flatpak manifest and its files")
+    bundle = dist / "org.example.hallo2.flatpak"
+    if bundle.is_file():
+        run.check(bundle.read_bytes()[:8] == b"OSTREE\0\0" or bundle.stat().st_size > 100_000, f"flatpak-builder made the bundle ({bundle.stat().st_size} bytes)")
+    else:
+        run.notes.append("no .flatpak: flatpak-builder or its runtime is not there (only the manifest)")
+
+
+def check_msix(run, dist):
+    import zipfile
+    msix = dist / "hallo2-0.1.0-x64.msix"
+    if not msix.is_file():
+        run.notes.append("no .msix: MakeAppx is not there (only the folder)")
+        return
+    names = set(zipfile.ZipFile(msix).namelist())
+    want = {"AppxManifest.xml", "AppxBlockMap.xml", "hallo2.exe", "Assets/StoreLogo.png", "Assets/Wide310x150Logo.png"}
+    run.check(want <= names and any(n.startswith("licenses/jflib-style-") for n in names), f"the MSIX holds the program, the logos, the licences ({len(names)} files)")
 
 
 def out_file(project, target_dir, triple, profile, name):
@@ -447,17 +534,34 @@ def accept(targets, out):
                     apk = target_dir / "jflib-android" / "hallo2-x86_64-debug.apk"
                     bad = apk_problems(apk) if apk.is_file() else [f"{apk} missing"]
                     run.check(not bad, "cargo jflib android: code, library (16 KiB), licences" + "".join("\n    " + b for b in bad))
-            if "package" in targets and run.cmd("cargo-jflib-package", ["cargo", "jflib", "package", "--styles", "winui,kde"], app, jenv):
-                dist = target_dir / "jflib-package"
+            dist = target_dir / "jflib-package"
+            if "package" in targets and dist.is_dir():
+                # what this run makes, nothing older (the stubs and their builds stay)
+                for f in dist.iterdir():
+                    if f.is_file():
+                        f.unlink()
+                    elif f.name in ("rpm", "flatpak"):
+                        shutil.rmtree(f, ignore_errors=True)
+            if "package" in targets:
+                # what a published app says of itself: AppStream wants a homepage and a real description
+                (app / "PACKAGE").write_text(HALLO2_PACKAGE, encoding="utf-8")
+            if "package" in targets and run.cmd("cargo-jflib-package", ["cargo", "jflib", "package", "--styles", "winui,kde", "--formats", "all"],
+                                                app, jenv):
+                work = dist / "work" / "hallo2" / "kde"
                 if os.name == "nt":
-                    check_setup(run, dist / "hallo2_Setup.exe", dist / "work" / "hallo2" / "kde" / "win" / "hallo2.exe")
+                    check_setup(run, dist / "hallo2_Setup.exe", work / "win" / "hallo2.exe")
+                    check_msix(run, dist)
                 check_deb(run, dist / "hallo2_0.1.0_amd64.deb", app)
+                check_appimage(run, dist / "hallo2-0.1.0-kde-x86_64.AppImage", work / "linux" / "hallo2", app)
+                check_rpm(run, dist)
+                check_flatpak(run, dist)
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
     run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run
 
 
 def main(argv=None):
+    sys.stdout.reconfigure(errors="replace")             # the validators' output may hold characters cp1252 lacks
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--targets", default="win,linux,web,android,package")
     ap.add_argument("--out", default=str(ROOT / "build" / "crates_accept"))

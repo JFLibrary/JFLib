@@ -19,9 +19,7 @@ bench = false
 workspace = true
 
 [dependencies]
-rt.workspace = true
-plat.workspace = true
-compress.workspace = true
+appimagert.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

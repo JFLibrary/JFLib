@@ -1,8 +1,8 @@
 # Crates-Plan: JFLib für crates.io
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
-`build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web`, `android` und `package` mit Setup
-und `.deb` umgesetzt, offen sind die übrigen Paketformate, das Signieren, `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
+`build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web`, `android` und `package` mit allen
+sechs Formaten umgesetzt, offen sind das Signieren (CR4c3), `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -339,16 +339,31 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
     geprüft:** ein echtes `dpkg -i` (braucht root; WSL hat keins) und die debconf-Frage. Im zweiten Lauf
     aufgefallen: Das Stub-Projekt behielt seine `Cargo.lock`, und als sich `jflib-installer` bei gleicher Version
     änderte, brach Cargo mit einer anderen Prüfsumme ab; jetzt übernimmt der Stub bei jedem Lauf die der App.
-  - **CR4c2: AppImage, rpm, Flatpak, MSIX** (`pkg_linux.py`, `pkg_msix.py`); `apps/appimagert` muss dafür wie der
-    Setup-Stub als Crate mitkommen.
+  - **CR4c2: AppImage, rpm, Flatpak, MSIX. Erledigt am 2026-11-06.** `--formats msix,appimage,rpm,flatpak` oder
+    `all`. Die AppImage-Runtime ist jetzt die Crate `jflib-appimagert` (`lib/appimagert`), gebaut wie der
+    Setup-Stub, aber als eine statische Datei in einem eigenen Zielordner (`CARGO_ENCODED_RUSTFLAGS` statt der
+    rustflags der App, sonst baute Cargo die Crates der App neu). Das SquashFS schreibt das Werkzeug selbst (LZ4,
+    keine Fragmente, die Metadaten unkomprimiert, weil sie aufeinander zeigen); damit braucht ein AppImage weder
+    `mksquashfs` noch WSL. rpm und Flatpak schreiben `.spec` mit Tarball bzw. Manifest mit Dateien; `rpmbuild` und
+    `flatpak-builder` laufen unter Linux direkt und unter Windows in einer WSL-Distribution, die das Werkzeug hat
+    (`JFLIB_WSL_DISTRO`, sonst die erste passende: hier ist `docker-desktop` die Vorgabe). MSIX packt MakeAppx des
+    Windows SDK, unsigniert. **Geprüft** in `crates_accept.py` mit einem `PACKAGE` (Homepage, Dateityp, URL-Schema):
+    `unsquashfs` liest das AppImage und das Programm darin ist das gebaute, `.desktop` und Metainfo bestehen
+    `desktop-file-validate` und `appstreamcli validate`, `tests/smoke.uis` läuft durch das AppImage; die `.spec`
+    nennt genau die Dateien ihres Tarballs; `flatpak-builder` in WSL baut das Bundle; das MSIX enthält Programm,
+    Logos und Lizenzen; das Setup trägt Dateityp und Schema ein (Testmodus). Einmal auf dem Fedora-Rechner:
+    `rpmbuild` baut aus der `.spec` das `.rpm` (358 Dateien, die Alternativen-Skripte, `Requires: glibc`).
+    **Nicht geprüft:** `rpm -i`, `flatpak install` und `Add-AppxPackage` (root, eine Installation beim Nutzer, eine
+    Signatur).
   - **CR4c3: Signieren, apt-Repository, Update-Kanal** (`codesign.py`, `update_manifest.py`).
 - **CR4d: `watch`, `plugin`.**
-- **Reihenfolge danach:** CR4c2, CR4c3, `watch`, `plugin`.
+- **Reihenfolge danach:** CR4c3, `watch`, `plugin`.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
-- **Mitzuliefern:** `web/*`, `android/*` (erledigt) sowie die Starter `apps/installer` (erledigt: `jflib-installer`)
-  und `apps/appimagert`.
-- **Bleibt nötig wie heute:** MakeAppx, signtool, `flatpak-builder` und das Android SDK; `dpkg-deb` nicht mehr.
+- **Mitzuliefern:** `web/*`, `android/*` und die Starter `apps/installer` (`jflib-installer`) und `apps/appimagert`
+  (`jflib-appimagert`): erledigt.
+- **Bleibt nötig wie heute:** MakeAppx, signtool, `rpmbuild`, `flatpak-builder` und das Android SDK; `dpkg-deb` und
+  `mksquashfs` nicht mehr.
 
 ### CR5: API-Vertrag und Doku
 

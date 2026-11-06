@@ -109,10 +109,8 @@ dependencies = [
 name = "appimagert"
 version = "0.0.0"
 dependencies = [
+ "jflib-appimagert",
  "jflib-build",
- "jflib-compress",
- "jflib-plat",
- "jflib-rt",
 ]
 
 [[package]]
@@ -618,6 +616,15 @@ name = "jflib-agent-io"
 version = "0.1.0"
 dependencies = [
  "jflib-agent-core",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
+name = "jflib-appimagert"
+version = "0.1.0"
+dependencies = [
+ "jflib-compress",
  "jflib-plat",
  "jflib-rt",
 ]
