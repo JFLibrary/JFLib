@@ -19,10 +19,14 @@ pub(crate) struct Package {
     pub dir: PathBuf,
     /// the name of its library target, when it has one (an app's code for the browser)
     pub lib: Option<String>,
+    /// Cargo.toml's authors
+    pub authors: Vec<String>,
 }
 
 pub(crate) struct Project {
     pub target_dir: PathBuf,
+    /// where Cargo.lock lies
+    pub workspace_root: PathBuf,
     pub package: Package,
 }
 
@@ -59,14 +63,34 @@ pub(crate) fn project(package: Option<&str>) -> Result<Project, String> {
         .map(|t| t.s("name").to_string());
     Ok(Project {
         target_dir: PathBuf::from(meta.s("target_directory")),
+        workspace_root: PathBuf::from(meta.s("workspace_root")),
         package: Package {
             name: pick.s("name").to_string(),
             version: pick.s("version").to_string(),
             id: pick.s("id").to_string(),
             dir: Path::new(pick.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
             lib,
+            authors: pick.get("authors").map(Value::arr).unwrap_or_default().iter().filter_map(Value::str).map(String::from).collect(),
         },
     })
+}
+
+/// a package among those a project resolves to
+pub(crate) struct Resolved {
+    pub name: String,
+    pub version: String,
+    pub dir: PathBuf,
+}
+
+/// every package `manifest` resolves to (cargo metadata with the dependencies, run in `cwd` for
+/// its .cargo/config.toml)
+pub(crate) fn packages(cwd: &Path, manifest: &Path) -> Result<Vec<Resolved>, String> {
+    let meta = run_json(command().current_dir(cwd).arg("metadata").arg("--format-version").arg("1").arg("--manifest-path").arg(manifest))?;
+    Ok(meta.get("packages").map(Value::arr).unwrap_or_default().iter().map(|p| Resolved {
+        name: p.s("name").to_string(),
+        version: p.s("version").to_string(),
+        dir: Path::new(p.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
+    }).collect())
 }
 
 /// what one build produced

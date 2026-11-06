@@ -142,6 +142,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** jflib-build, the build script of a Cargo project: PERMISSIONS and PACKAGE checked with the line, assets/ as JFA1 with LZ4, res/app.ico without a resource compiler, the linker arguments for Windows, Linux (static or against glibc) and the browser; the crate jflib carries a template project, docs/GUIDE.md and docs/API.md; tools/crates_accept.py builds that template from the packed crates in the full suite (docs/CRATES.md)
 - **build:** cargo-jflib, the tool for a JFLib app outside this repository: cargo jflib new (the template with the app's name), test (tests/*.uis) and web (scalar, SIMD and threads with its own core library, the host, the licences; --serve); crates_accept.py installs it from the packages
 - **build:** cargo jflib android: an app made with cargo jflib new as an APK (its library through cargo rustc, the C bridge with the NDK, javac, d8, aapt2, zipalign -P 16, apksigner with a debug key or jfgui_ANDROID_KEYSTORE, --install through adb; the manifest from PACKAGE and PERMISSIONS); crates_accept.py builds it from the packages and checks the APK
+- **build:** cargo jflib package: an app outside this repository as a setup for Windows and a .deb for Linux with every style built in (JFLIB_STYLE), previews by --shot, the licences of every crate, PACKAGE's keys of tools/package.py; the .deb written without dpkg-deb; crates_accept.py installs the setup by script and checks the .deb with dpkg-deb
 
 ### Changed
 
@@ -175,6 +176,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py builds the Windows and Linux programs (static and against glibc) through Cargo, one cargo build per target and run; jflib-build writes the linker map; --rustc compiles with rustc as before
 - **build:** build_rs.py builds for the browser, Android and the jxlenc module through Cargo too; for the browser and Android it makes each app a library package of its own in a workspace below build/
 - **build:** build_rs.py builds only through Cargo: style variants and --profile too, PaintCraft's Rust plugins as packages (jflib-plugin, jflib-plugin-NAME); the direct rustc path and `build_rs.py ide` are gone, rust-analyzer reads the workspace
+- **build:** The setup stub's code is the crate jflib-installer (lib/installer, installer::main!); apps/installer only links it, cargo jflib package builds the same stub
 
 ### Removed
 
@@ -238,6 +240,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A window that was hidden came back white on the GPU output until its next frame (a swapchain's image does not return with its window): it goes back to the CPU path while nobody sees it, also when the system hides a tool window with its minimised owner (`WST_HIDDEN`), and every window appears with its picture
 - **plat:** A finger on a tool window's frame stays with the window under the finger: Windows moves such a contact's position onto the frame and keeps it off by that, so its contact rectangle counts, and the frame is never the system's; `jfgui_TOUCH_LOG=1` says where a finger went
 - **plat:** plat links kernel32 through raw-dylib everywhere: a Windows program needs no import library, so no Visual Studio and no Windows SDK
+- **build:** cargo jflib web and android ship the font and icon licences of the styles (OFL-*.txt, DejaVu-LICENSE.txt, LICENSE-FluentSystemIcons.txt in the style crates' assets/)
 
 ### Security
 

@@ -1,6 +1,6 @@
 // payload -- the setup's payload: reads its own exe, finds the trailer, validates the entry
-// table and loads manifest, styles and previews (layout: apps/installer/inc/inst.inc, writer:
-// tools/package.py)                                            [apps/installer/src/payload.s]
+// table and loads manifest, styles and previews (layout: apps/installer/inc/inst.inc, writers:
+// tools/package.py, cargo jflib package)                       [apps/installer/src/payload.s]
 //
 //   pl_load(st) -> Ok / Err (st.err holds the reason)
 //   pl_inflate(st, entry) -> Some(PE_USIZE bytes) or None

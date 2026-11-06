@@ -1523,7 +1523,7 @@ def run_tests(builders, out, quick):
         # docs/CRATES.md: a project outside the repository builds from the packed crates alone (Windows,
         # Linux, the browser, an APK when the Android SDK is there), its smoke test passes; about 15
         # minutes from nothing
-        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web", "android"})
+        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web", "android", "package"})
         r = subprocess.run([sys.executable, str(RS / "tools" / "crates_accept.py"), "--targets", ",".join(targets)], cwd=ROOT,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
         print("".join(ln for ln in r.stdout.splitlines(True) if ln.startswith(("FAIL", "    ", "note", "crates"))).strip())

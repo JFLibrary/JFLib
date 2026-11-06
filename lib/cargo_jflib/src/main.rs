@@ -9,6 +9,8 @@
 //!                                      the app for the browser in target/jflib-web/NAME/
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
 //!                                      the app as an APK in target/jflib-android/
+//! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb] [--no-win] [--no-deb]
+//!                                      a setup for Windows and a .deb in target/jflib-package/
 //! ```
 //!
 //! It calls Cargo for the builds and needs nothing else; the browser with threads needs the
@@ -17,16 +19,21 @@
 
 mod android;
 mod cargo;
+mod debfile;
+mod deflate;
 mod json;
 mod new;
 mod notices;
+mod package;
+mod pkgmeta;
+mod png;
 mod test;
 mod web;
 mod zip;
 
 use std::process::ExitCode;
 
-const HELP: &str = "cargo jflib -- a JFLib app's new project, tests and browser bundle
+const HELP: &str = "cargo jflib -- a JFLib app's new project, tests, browser bundle, APK and packages
 
 USAGE:
     cargo jflib new NAME
@@ -39,6 +46,10 @@ USAGE:
     cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
         the app as an APK: target/jflib-android/NAME-ABI-debug.apk (--release: signed with the key
         of jfgui_ANDROID_KEYSTORE); needs the Android SDK and NDK and a JDK; --install: adb install
+    cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb] [--no-win] [--no-deb]
+        the app with every style built in, the look picked at installation: target/jflib-package/
+        NAME_Setup.exe (Windows) and DEB_VERSION_amd64.deb (Linux); the styles from --styles or
+        PACKAGE styles=, default winui; the rest of PACKAGE as in README.md of cargo-jflib
     cargo jflib --version";
 
 /// the options every command shares
@@ -90,6 +101,7 @@ fn main() -> ExitCode {
         Some("test") => test::run(&args[1..]),
         Some("web") => web::run(&args[1..]),
         Some("android") => android::run_cmd(&args[1..]),
+        Some("package") => package::run(&args[1..]),
         Some("--version" | "-V") => {
             println!("cargo-jflib {}", env!("CARGO_PKG_VERSION"));
             Ok(())

@@ -34,7 +34,7 @@ What it does:
    and rendering as fast,
    UI scripts about 4 % slower ([rewrite/REPORT.md](../../rewrite/REPORT.md) section 2).
    `package.py --profile o2|release` picks another variant.
-2. **Windows**: builds the setup stub `apps/installer` (same profile), renders a preview of every
+2. **Windows**: builds the setup stub `apps/installer` (`lib/installer`, same profile), renders a preview of every
    variant (`--shot` at 1100 x 700 DIP, light theme, scaled to 480 x 305) and writes
    `<out>/<App>_Setup.exe` = stub + payload + trailer.
 3. **Linux**: assembles the package tree and runs `dpkg-deb` in WSL (Ubuntu-24.04).
@@ -90,7 +90,9 @@ committed icons are installer `--glyph E896 --color 2E9E5B`, PaintCraft `E771 1E
 ## Windows: setup.exe
 
 `apps/installer` (Windows only: `apps/installer/TARGETS` = `win`) is a normal library app
-in the winui style. The packaged setup is that exe with a payload and a trailer appended.
+in the winui style; its code is the crate `jflib-installer` (`lib/installer`), which `cargo jflib
+package` builds the same way for an app outside this repository (README.md of cargo-jflib). The
+packaged setup is that exe with a payload and a trailer appended.
 
 * **Pages**: style (list with the INFO names and descriptions, preview of the selection) ->
   options (folder, default `%LOCALAPPDATA%\Programs\<display>` -- per user, no administrator
@@ -112,7 +114,7 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
 * Running the setup again installs another style over the old one (the app's settings stay).
 * Options: `--dir PATH`, `--style ID`.
 * **File types and URL schemes** (`PACKAGE` `filetypes=` / `schemes=`, carried in the
-  manifest; `apps/installer/assoc.rs`): for each type a ProgID `<app>.<ext>` under
+  manifest; `lib/installer/assoc.rs`): for each type a ProgID `<app>.<ext>` under
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
   the app in `.<ext>\OpenWithProgids` ("Open with"). An `own` type also becomes the default of its
   extensions (`.<ext>` default value and `Content Type`). A scheme gets `HKCU\Software\Classes\<scheme>`
@@ -152,7 +154,7 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
   `apps/installer/tests/nopayload.uis` checks the bare stub (no payload: the error page); it
   runs in `build_rs.py test` and in parity.
 
-**Payload layout** (written by `tools/package.py`, read by `apps/installer/payload.rs`;
+**Payload layout** (written by `tools/package.py` and `cargo jflib package`, read by `lib/installer/payload.rs`;
 little endian, offsets relative to the payload start):
 
 | Part | Layout |

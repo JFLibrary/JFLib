@@ -1,0 +1,28 @@
+[package]
+name = "jflib-installer"
+description = "The setup stub of JFLib's Windows packages (cargo jflib package)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "installer"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+plat.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+ui.workspace = true
+style_winui.workspace = true
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc"]

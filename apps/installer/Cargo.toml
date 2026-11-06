@@ -19,12 +19,7 @@ bench = false
 workspace = true
 
 [dependencies]
-plat.workspace = true
-gfx.workspace = true
-img_core.workspace = true
-img_png.workspace = true
-ui.workspace = true
-style = { package = "jflib-style-winui", path = "../../styles/winui" }
+installer.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

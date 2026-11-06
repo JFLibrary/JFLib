@@ -1,4 +1,4 @@
-// PERMISSIONS, PACKAGE, assets/ and res/app.ico of the app, and the linker arguments (lib/jflib_build)
+// the setup's icon (lib/installer/res/app.ico) and the linker arguments (lib/jflib_build)
 fn main() {
-    jflib_build::app();
+    jflib_build::Build::app().part_of("installer", "../../lib/installer").run();
 }

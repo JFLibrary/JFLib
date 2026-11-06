@@ -109,18 +109,12 @@ fn verify_elf(data: &[u8], abi: &str) -> Result<(), String> {
     if loads == 0 { Err("the Android library has no loadable segment".to_string()) } else { Ok(()) }
 }
 
-/// a key=value file next to Cargo.toml (PACKAGE), '#' comments
-fn kv(path: &Path) -> Vec<(String, String)> {
-    fs::read_to_string(path).unwrap_or_default().lines().map(str::trim).filter(|l| !l.starts_with('#'))
-        .filter_map(|l| l.split_once('=')).map(|(k, v)| (k.trim().to_string(), v.trim().to_string())).collect()
-}
-
 /// the manifest of an app without android/AndroidManifest.xml: the shared host under the app's id
 /// (PACKAGE app_id=, else org.example.NAME), its display name, the location permission when
 /// PERMISSIONS names `location`
 fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> String {
-    let meta = kv(&dir.join("PACKAGE"));
-    let get = |k: &str| meta.iter().rev().find(|(kk, _)| kk == k).map(|(_, v)| v.clone());
+    let meta = crate::pkgmeta::Meta::read(dir);
+    let get = |k: &str| meta.get(k).map(String::from);
     let id = get("app_id").unwrap_or_else(|| format!("org.example.{}", name.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()));
     let label = get("display").unwrap_or_else(|| name.to_string()).replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;");
     let nums: Vec<u32> = version.split(['.', '-', '+']).take(3).map(|v| v.parse().unwrap_or(0)).collect();

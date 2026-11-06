@@ -58,6 +58,7 @@ members = [
     "lib/gpu",
     "lib/eapm",
     "lib/style_assets",
+    "lib/installer",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -227,6 +228,7 @@ style_macos = { package = "jflib-style-macos", path = "styles/macos", version = 
 modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
 modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
 jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
+installer = { package = "jflib-installer", path = "lib/installer", version = "=0.1.0" }
 # PaintCraft's plugins written in Rust (plugins/*) and the styles of the apps: not published
 plugin = { package = "jflib-plugin", path = "lib/plugin" }
 style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }

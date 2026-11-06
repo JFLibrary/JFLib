@@ -17,6 +17,7 @@ cargo run
 cargo jflib test              # runs tests/*.uis
 cargo jflib web --serve       # the app in the browser
 cargo jflib android --install # the app on a phone (Android SDK and NDK)
+cargo jflib package           # a setup for Windows and a .deb, every style inside
 ```
 
 `cargo jflib new` writes the template that lies in this package as `template/`. Without the tool,

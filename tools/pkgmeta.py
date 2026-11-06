@@ -44,7 +44,7 @@ def kv_file(path):
 
 def filetypes(meta):
     """PACKAGE filetypes= -> [(exts, mime, description, own)]: "ext[,ext..]|mime|description[|own]"
-    entries separated by ';' (apps/installer/assoc.rs reads the same text from the manifest)"""
+    entries separated by ';' (lib/installer/assoc.rs reads the same text from the manifest)"""
     out = []
     for entry in (e.strip() for e in meta.get("filetypes", "").split(";")):
         if not entry:

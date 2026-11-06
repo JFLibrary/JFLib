@@ -1,8 +1,8 @@
 # Crates-Plan: JFLib für crates.io
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
-`build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web` und `android` umgesetzt, offen sind
-`package`, `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
+`build_rs.py` baut nur noch über Cargo. Von CR4 sind `new`, `test`, `web`, `android` und `package` mit Setup
+und `.deb` umgesetzt, offen sind die übrigen Paketformate, das Signieren, `watch`, `plugin` und CR5, CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -320,14 +320,35 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
   2006, und Cargo erkennt ein Crate aus einer Verzeichnisquelle nur an der Version. Ein zweiter Lauf von
   `crates_accept.py` behielt deshalb, was der erste gebaut hatte (hier ein `cargo-jflib` ohne `android`); jetzt
   löscht er die Fingerprints der Pakete, die sich seit dem letzten Lauf geändert haben.
-- **CR4c: `package`.** `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`, `codesign.py`. Die Starter
-  `apps/installer` und `apps/appimagert` sind Apps: Sie müssen als Crates mitkommen, damit das Werkzeug sie bauen kann.
+- **CR4c: `package`**, in drei Teilen, weil `tools/package.py` mit seinen Helfern rund 2.000 Zeilen hat:
+  - **CR4c1: Setup und `.deb`, die Standardformate von `package.py`. Erledigt am 2026-11-06.** `cargo jflib
+    package [--styles winui,kde] [--formats setup,deb]` baut die App je Stil mit `--release` und `JFLIB_STYLE` für
+    Windows und Linux, macht Vorschaubilder mit `--shot` (Windows-Programm unter Windows, Linux-Programm unter
+    Linux) und schreibt `target/jflib-package/NAME_Setup.exe` und `DEB_VERSION_amd64.deb`. Der Setup-Stub ist jetzt
+    die Crate `jflib-installer` (`lib/installer`); `apps/installer` bindet sie nur noch ein. Das Werkzeug baut ihn in
+    einem eigenen kleinen Projekt unter `target/` mit den Profilen und der `Cargo.lock` der App, sodass die schon
+    gebauten Crates wieder genommen werden. Das `.deb` schreibt es selbst (ar, ustar, gzip), ohne `dpkg-deb` und
+    ohne WSL; dafür hat `cargo-jflib` ein eigenes Deflate (0,16 % größer als zlib -9 an einem echten Programm), PNG
+    lesen und schreiben und das Verkleinern von `pngutil.py`. Aus `PACKAGE` liest es die Schlüssel von
+    `package.py` (ohne `cross_bins`, `unit_*` und Module). Dabei aufgefallen und behoben: `web` und `android`
+    lieferten die Schrift- und Symbol-Lizenzen der Stile (`assets/OFL-*.txt`, `DejaVu-LICENSE.txt`,
+    `LICENSE-FluentSystemIcons.txt`) nicht mit. **Geprüft** in `crates_accept.py`: `hallo2` mit `--styles
+    winui,kde`; das Setup hat beide Vorschauen und die Schriftlizenz, installiert per Skript den kde-Stil (genau
+    dessen Programm) und `uninstall.exe` entfernt ihn; `dpkg-deb` liest das `.deb` (Steuerdateien, Skripte
+    ausführbar, `root/root`, Programme 0755), das ausgepackte kde-Programm besteht `tests/smoke.uis`. **Nicht
+    geprüft:** ein echtes `dpkg -i` (braucht root; WSL hat keins) und die debconf-Frage. Im zweiten Lauf
+    aufgefallen: Das Stub-Projekt behielt seine `Cargo.lock`, und als sich `jflib-installer` bei gleicher Version
+    änderte, brach Cargo mit einer anderen Prüfsumme ab; jetzt übernimmt der Stub bei jedem Lauf die der App.
+  - **CR4c2: AppImage, rpm, Flatpak, MSIX** (`pkg_linux.py`, `pkg_msix.py`); `apps/appimagert` muss dafür wie der
+    Setup-Stub als Crate mitkommen.
+  - **CR4c3: Signieren, apt-Repository, Update-Kanal** (`codesign.py`, `update_manifest.py`).
 - **CR4d: `watch`, `plugin`.**
-- **Reihenfolge danach:** `package`, `watch`, `plugin`.
+- **Reihenfolge danach:** CR4c2, CR4c3, `watch`, `plugin`.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
-- **Mitzuliefern:** `web/*`, `android/*` sowie die Starter `apps/installer` und `apps/appimagert`.
-- **Bleibt nötig wie heute:** MakeAppx, signtool, `dpkg-deb`, `flatpak-builder` und das Android SDK.
+- **Mitzuliefern:** `web/*`, `android/*` (erledigt) sowie die Starter `apps/installer` (erledigt: `jflib-installer`)
+  und `apps/appimagert`.
+- **Bleibt nötig wie heute:** MakeAppx, signtool, `flatpak-builder` und das Android SDK; `dpkg-deb` nicht mehr.
 
 ### CR5: API-Vertrag und Doku
 

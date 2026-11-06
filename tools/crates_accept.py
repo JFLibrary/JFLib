@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """crates_accept.py -- does a project outside this repository build with the crates alone?
 
-    python tools/crates_accept.py [--targets win,linux,web,android] [--out DIR]
+    python tools/crates_accept.py [--targets win,linux,web,android,package] [--out DIR]
     python tools/crates_accept.py --template     write the files of lib/jflib/template that
                                                  come from apps/template (build_rs.py check
                                                  compares them)
@@ -22,7 +22,10 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           test` on Windows, `cargo jflib web` (scalar, SIMD, threads) and a click in the browser
           (Playwright, tools/tests/crates_web.mjs; skipped without it), `cargo jflib android --abi
           x86_64`: an APK with the code, the library 16 KiB aligned and the licences (skipped
-          without the Android SDK, NDK, JDK or the Rust target x86_64-linux-android).
+          without the Android SDK, NDK, JDK or the Rust target x86_64-linux-android), `cargo jflib
+          package --styles winui,kde`: the setup installs the chosen style with a script and removes
+          it again (Windows), the .deb passes dpkg-deb and its program runs tests/smoke.uis (Linux,
+          WSL on Windows).
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -293,6 +296,64 @@ def apk_problems(apk):
     return bad
 
 
+def setup_entries(setup):
+    """the payload of a setup: [(kind, name)] (docs/PACKAGING.md, "Payload layout")"""
+    import struct
+    stub, pay = struct.unpack("<QQ", setup[-16:])
+    assert setup[-24:-16] == b"ASMINST1"
+    p = setup[stub:stub + pay]
+    out = []
+    for k in range(struct.unpack("<I", p[4:8])[0]):
+        rec = p[8 + 128 * k:8 + 128 * (k + 1)]
+        out.append((struct.unpack("<I", rec[:4])[0], rec[32:80].rstrip(b"\0").decode("utf-8")))
+    return out
+
+
+def check_setup(run, setup, want):
+    """install the kde variant with a script (ASMINST_SHELL_DIR: no shortcuts, no registry), compare
+    the program, remove it again"""
+    entries = setup_entries(setup.read_bytes())
+    run.check(sorted(n for k, n in entries if k == 3) == ["kde", "winui"], f"the setup has previews of both styles: {entries[:6]}")
+    run.check(any(k == 5 and "jflib-style-kde-" in n and "DejaVu" in n for k, n in entries)
+              or any(k == 5 and n.startswith("licenses/jflib-style-kde-") for k, n in entries),
+              "the setup carries the style's font licence")
+    d = run.out / "setup-test"
+    shutil.rmtree(d, ignore_errors=True)
+    (d / "shell").mkdir(parents=True)
+    (d / "inst.uis").write_text('click "Weiter"\nclick "Installieren"\nwait 500\nexpect "Fertigstellen" exists\n', encoding="utf-8")
+    (d / "un.uis").write_text('click "Deinstallieren"\nwait 500\nexpect "Schließen" exists\n', encoding="utf-8")
+    env = dict(os.environ, ASMINST_SHELL_DIR=str(d / "shell"))
+    r = run.cmd("setup-install", [setup, "--script", d / "inst.uis", "--dir", d / "inst", "--style", "kde"], d, env, timeout=300)
+    if r:
+        run.check((d / "inst" / "hallo2.exe").read_bytes() == want.read_bytes(), "the setup installs the kde program")
+        run.cmd("setup-uninstall", [d / "inst" / "uninstall.exe", "--uninstall", "--script", d / "un.uis"], d, env, timeout=300)
+        run.check(not (d / "inst" / "hallo2.exe").exists(), "uninstall.exe removes it again")
+
+
+def check_deb(run, deb, app):
+    """dpkg-deb reads the .deb (Linux, WSL on Windows); its kde program runs tests/smoke.uis"""
+    from tools.host_exec import linux_path, run_linux
+    have = run_linux(["sh", "-c", "command -v dpkg-deb"], cwd=app, timeout=60)
+    if have.returncode:
+        run.notes.append("the .deb is not checked: no dpkg-deb here")
+        return
+    info = run_linux(["dpkg-deb", "--info", linux_path(deb)], cwd=app, timeout=120)
+    run.check(info.returncode == 0 and "Package: hallo2" in info.stdout and "Depends: debconf" in info.stdout
+              and all(f"*  {s}" in info.stdout for s in ("config", "postinst", "prerm", "postrm")),
+              "dpkg-deb --info: the control file, the maintainer scripts executable" + ("" if info.returncode == 0 else "\n    " + info.stderr.strip()[-400:]))
+    files = run_linux(["dpkg-deb", "--contents", linux_path(deb)], cwd=app, timeout=120)
+    lines = files.stdout.splitlines()
+    want = ["rwxr-xr-x root/root .* ./usr/lib/hallo2/hallo2-kde$", "rw-r--r-- root/root .* ./usr/share/applications/hallo2.desktop$",
+            "./usr/share/icons/hicolor/256x256/apps/hallo2.png$", "./usr/share/doc/hallo2/licenses/jflib-style-kde-[0-9.]+/DejaVu-LICENSE.txt$"]
+    import re
+    missing = [w for w in want if not any(re.search(w, ln) for ln in lines)]
+    run.check(files.returncode == 0 and not missing, f"dpkg-deb --contents: {len(lines)} entries" + "".join("\n    missing " + m for m in missing))
+    x = "/tmp/jflib-crates-deb"
+    r = run_linux(["sh", "-c", f"rm -rf {x} && mkdir -p {x} && dpkg-deb -x {linux_path(deb)} {x} && mkdir -p target && {x}/usr/lib/hallo2/hallo2-kde --script tests/smoke.uis"],
+                  cwd=app, timeout=600)
+    run.check(r.returncode == 0, "the .deb's kde program runs tests/smoke.uis" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
+
+
 def out_file(project, target_dir, triple, profile, name):
     """a file the build script of the project wrote to its OUT_DIR"""
     found = sorted((target_dir / triple / profile / "build").glob(f"{project}-*/out/{name}"), key=lambda p: p.stat().st_mtime)
@@ -386,6 +447,11 @@ def accept(targets, out):
                     apk = target_dir / "jflib-android" / "hallo2-x86_64-debug.apk"
                     bad = apk_problems(apk) if apk.is_file() else [f"{apk} missing"]
                     run.check(not bad, "cargo jflib android: code, library (16 KiB), licences" + "".join("\n    " + b for b in bad))
+            if "package" in targets and run.cmd("cargo-jflib-package", ["cargo", "jflib", "package", "--styles", "winui,kde"], app, jenv):
+                dist = target_dir / "jflib-package"
+                if os.name == "nt":
+                    check_setup(run, dist / "hallo2_Setup.exe", dist / "work" / "hallo2" / "kde" / "win" / "hallo2.exe")
+                check_deb(run, dist / "hallo2_0.1.0_amd64.deb", app)
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
     run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run
@@ -393,7 +459,7 @@ def accept(targets, out):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--targets", default="win,linux,web,android")
+    ap.add_argument("--targets", default="win,linux,web,android,package")
     ap.add_argument("--out", default=str(ROOT / "build" / "crates_accept"))
     ap.add_argument("--template", action="store_true")
     a = ap.parse_args(argv)
