@@ -12,15 +12,17 @@ local source next to the crates from outside (`cargo vendor`), and builds two pr
 only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
 
   hallo   the template lib/jflib/template: Windows (development and release, through rust-lld,
-          also as on a machine without Visual Studio), Linux against glibc, the browser; on
-          Windows and Linux tests/smoke.uis runs, in the browser a click counts (Playwright,
-          tools/tests/crates_web.mjs; skipped without it).  Its icon must be the .res llvm-rc
-          makes of it.
+          also as on a machine without Visual Studio's SDK), Linux against glibc; tests/smoke.uis
+          runs on both.  Its icon must be the .res llvm-rc makes of it.
   probe   a command-line program with PERMISSIONS, PACKAGE and assets/: Windows and one static
           Linux file; it prints what reached it (app://, a refused write, its version and name).
           Its bundle must be tools/assetpack.py's byte for byte.
 
-Then `cargo test -p jflib-build`.  Output below build/crates_accept; exit 1 when something failed.
+  hallo2  made by `cargo jflib new` with cargo-jflib installed from the packages: `cargo jflib
+          test` on Windows, `cargo jflib web` (scalar, SIMD, threads) and a click in the browser
+          (Playwright, tools/tests/crates_web.mjs; skipped without it).
+
+Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
 import argparse
 import hashlib
@@ -279,20 +281,36 @@ def accept(targets, out):
             r = run_linux([linux_path(target_dir / LINUX / "debug" / "probe")], cwd=probe, timeout=120)
             want = "assets=true big=9900 denied=true version=2.5.0 app=probe"
             run.check(r.stdout.strip() == want, f"probe on Linux, one static file: {r.stdout.strip() or r.stderr.strip()[-300:]}")
-    if "web" in targets:
-        if run.cmd("hallo-web", ["cargo", "rustc", "--lib", "--crate-type", "cdylib", "--target", WEB], hallo, env):
-            site = out / "web" / "hallo"
-            shutil.rmtree(site, ignore_errors=True)
-            site.mkdir(parents=True)
-            shutil.copyfile(target_dir / WEB / "debug" / "hallo.wasm", site / "hallo.wasm")
-            build_rs.web_assets("hallo", site)
-            r = subprocess.run(["node", "-e", "import('./tools/tests/playwright.mjs').then(m=>m.loadPlaywright())"], cwd=ROOT,
-                               capture_output=True, text=True)
-            if r.returncode:
-                run.notes.append("the browser run needs Playwright (PLAYWRIGHT_MODULE, tools/tests/playwright.mjs): only built")
-            else:
-                run.cmd("hallo-web-click", ["node", ROOT / "tools" / "tests" / "crates_web.mjs", site], ROOT, timeout=300)
+    # cargo jflib, installed from the packages as a user would: a project of its own (new), its tests, the browser
+    tool = out / "tool"
+    # from the unpacked package, what crates.io would hand out (it has no dependencies): cargo install finds a
+    # package in a directory source but then fails to fetch it ("failed to find package with id")
+    package = next(vendor.glob("cargo-jflib-*"))
+    if run.cmd("cargo-jflib-install", ["cargo", "install", "--path", package, "--offline", "--force", "--root", tool], out,
+               {"CARGO_TARGET_DIR": str(out / "target-tool")}):
+        jenv = dict(env, PATH=str(tool / "bin") + os.pathsep + os.environ.get("PATH", ""))
+        made = out / "made"
+        shutil.rmtree(made, ignore_errors=True)
+        made.mkdir()
+        if run.cmd("cargo-jflib-new", ["cargo", "jflib", "new", "hallo2"], made, jenv):
+            app = made / "hallo2"
+            cfg = app / ".cargo" / "config.toml"
+            cfg.write_text(cfg.read_text(encoding="utf-8") + source_config(vendor), encoding="utf-8")
+            if "win" in targets:
+                run.cmd("cargo-jflib-test", ["cargo", "jflib", "test"], app, jenv)
+            if "web" in targets and run.cmd("cargo-jflib-web", ["cargo", "jflib", "web"], app, jenv):
+                site = target_dir / "jflib-web" / "hallo2"
+                run.check(all((site / f).is_file() for f in ("hallo2.wasm", "hallo2.simd.wasm", "hallo2.threads.wasm", "index.html",
+                                                             "loader.js", "variants.json")) and any((site / "licenses").glob("jflib-rt-*")),
+                          "cargo jflib web: three modules, the host, the licences")
+                r = subprocess.run(["node", "-e", "import('./tools/tests/playwright.mjs').then(m=>m.loadPlaywright())"], cwd=ROOT,
+                                   capture_output=True, text=True)
+                if r.returncode:
+                    run.notes.append("the browser run needs Playwright (PLAYWRIGHT_MODULE, tools/tests/playwright.mjs): only built")
+                else:
+                    run.cmd("hallo2-web-click", ["node", ROOT / "tools" / "tests" / "crates_web.mjs", site], ROOT, timeout=300)
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
+    run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FACADE = "lib/jflib"            # names every crate, no crate of its own for an app to name
-NOT_LIBS = (FACADE, "lib/jflib_build", "lib/plugin")   # the build helper (std); the plugins' ABI
+NOT_LIBS = (FACADE, "lib/jflib_build", "lib/cargo_jflib", "lib/plugin")   # the build helper (std); the plugins' ABI
 # the cfg of a [target] table -> the build it belongs to: None for every build of build_rs.py,
 # which never compiles inside a module with these names (ModuleBuilder passes modrt as rt itself)
 TARGET_CFG = {

@@ -1,7 +1,8 @@
 # Crates-Plan: JFLib für crates.io
 
 Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
-`build_rs.py` baut nur noch über Cargo. Offen sind CR4 bis CR6. Die Ergebnisse unter „Was schon geprüft ist“
+`build_rs.py` baut nur noch über Cargo. Von CR4 ist der erste Teilschritt umgesetzt, offen sind der Rest und CR5,
+CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -297,9 +298,21 @@ und die GPU-Skripte von `gallery` auf Fedora mit angemeldetem Nutzer.
 
 ### CR4: `cargo jflib`
 
-Groß, erst kurz vor dem Crate-Release sinnvoll. Eine Binary `cargo-jflib` in Rust wird automatisch zu `cargo jflib`.
+Groß. Eine Binary `cargo-jflib` in Rust wird automatisch zu `cargo jflib`. Sie braucht nur `std` und Cargo; den
+kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host trägt sie als Kopien in ihrem Paket,
+`build_rs.py check` hält sie gleich.
 
-- **Reihenfolge:** `new`, `web`, `android`, `test`, `package`, `watch`, `plugin`.
+- **CR4a: `new`, `test`, `web`. Erledigt am 2026-11-06.** `new NAME` schreibt die Vorlage mit dem Namen der App.
+  `test` baut und lässt jedes `tests/*.uis` mit `--script` laufen. `web` baut die Bibliothek der App für scalar,
+  SIMD und mit Threads (das Sysroot mit Atomics baut es selbst aus `rust-src`, ohne fällt der Modus mit Hinweis weg),
+  legt den Host aus `web/` und die Lizenzen aller Pakete daneben; `--serve` liefert das mit den Headern aus, die
+  Threads brauchen. **Geprüft** in `crates_accept.py`: aus dem gepackten Paket installiert (`cargo install --path`, denn `cargo install` aus einer Verzeichnisquelle findet das Paket und holt es dann nicht), `new`, `test` grün, `web` mit allen drei Modulen und einem Klick im Browser.
+- **CR4b: `android`.** `tools/android.py` portieren: die C-Brücke mit dem NDK, Java mit `javac` und `d8`, `aapt2`,
+  `zipalign`, `apksigner`; `android/*` mitliefern.
+- **CR4c: `package`.** `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`, `codesign.py`. Die Starter
+  `apps/installer` und `apps/appimagert` sind Apps: Sie müssen als Crates mitkommen, damit das Werkzeug sie bauen kann.
+- **CR4d: `watch`, `plugin`.**
+- **Reihenfolge danach:** `android`, `package`, `watch`, `plugin`.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
   `codesign.py` und `android.py`, dazu der Testlauf aus `build_rs.py`.
 - **Mitzuliefern:** `web/*`, `android/*` sowie die Starter `apps/installer` und `apps/appimagert`.

@@ -60,6 +60,7 @@ members = [
     "lib/style_assets",
     "lib/jflib",
     "lib/jflib_build",
+    "lib/cargo_jflib",
     "lib/plugin",
     "styles/winui",
     "styles/classic",

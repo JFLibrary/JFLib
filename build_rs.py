@@ -731,6 +731,14 @@ def manifest_lint():
             source = ROOT / "licenses" / copy.name
             if not source.is_file() or not same_text(copy, source):
                 bad.append(f"{copy.relative_to(ROOT).as_posix()}: differs from licenses/{copy.name}: copy that file over it")
+    # cargo-jflib carries the template and the browser host in its package: copies of these folders
+    for copy_dir, source_dir in (("lib/cargo_jflib/template", "lib/jflib/template"), ("lib/cargo_jflib/web", "web")):
+        files = {p.relative_to(ROOT / d).as_posix() for d in (copy_dir, source_dir) for p in (ROOT / d).rglob("*")
+                 if p.is_file() and "target" not in p.relative_to(ROOT / d).parts}
+        for rel in sorted(files):
+            a, b = ROOT / source_dir / rel, ROOT / copy_dir / rel
+            if not a.is_file() or not b.is_file() or not same_text(a, b):
+                bad.append(f"{copy_dir}/{rel}: differs from {source_dir}/{rel}: copy that folder over it")
     from tools import crates_accept                 # the template of lib/jflib comes from apps/template
     return bad + crates_accept.template_problems()
 

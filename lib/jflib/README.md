@@ -9,15 +9,18 @@ item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crat
 
 ## Quick start
 
-`template/` in this package is a complete app with a window. Copy it and build it:
-
 ```sh
-cp -r ~/.cargo/registry/src/*/jflib-0.1.*/template hallo
+cargo install cargo-jflib
+cargo jflib new hallo
 cd hallo
-mv Cargo.toml.in Cargo.toml
 cargo run
-target/debug/hallo --script tests/smoke.uis
+cargo jflib test              # runs tests/*.uis
+cargo jflib web --serve       # the app in the browser
 ```
+
+`cargo jflib new` writes the template that lies in this package as `template/`. Without the tool,
+copy it (`cp -r ~/.cargo/registry/src/*/jflib-0.1.*/template hallo`, then rename `Cargo.toml.in`
+to `Cargo.toml`).
 
 | File | What it is for |
 | --- | --- |
@@ -62,7 +65,7 @@ strip = "symbols"
 | --- | --- | --- |
 | Windows | `cargo build` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
 | Linux | `cargo build --target x86_64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
-| Browser | `cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown` | the module; the page around it (`index.html`, `loader.js`, ...) is `web/` of the JFLib repository for now |
+| Browser | `cargo jflib web` | scalar, SIMD and with threads, the page around them and the licences in `target/jflib-web/NAME/`; threads need `rustup component add rust-src` |
 | Android | not through Cargo alone yet | |
 
 The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another

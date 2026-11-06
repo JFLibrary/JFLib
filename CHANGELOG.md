@@ -140,6 +140,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **PaintCraft:** The menus Ansicht, Bild, Ebenen and Korrekturen show a colourful icon for every command, Originalgröße a 1:1 (own artwork in tools/gen_pn_icons.py, which now writes generated.rs itself); code points of its own (PN_*) are drawn in greys on disabled rows, the bar of the Ebenen window uses the same icons
 - **ui:** `ui::main!` and `rt::main!` also take the manifest and PACKAGE from a file named by a build script (`JFGUI_PERMISSIONS_FILE`, `JFGUI_PACKAGE_FILE`), and a build without `panic = "abort"` ends with a message that names the missing setting (docs/CRATES.md, CR0)
 - **build:** jflib-build, the build script of a Cargo project: PERMISSIONS and PACKAGE checked with the line, assets/ as JFA1 with LZ4, res/app.ico without a resource compiler, the linker arguments for Windows, Linux (static or against glibc) and the browser; the crate jflib carries a template project, docs/GUIDE.md and docs/API.md; tools/crates_accept.py builds that template from the packed crates in the full suite (docs/CRATES.md)
+- **build:** cargo-jflib, the tool for a JFLib app outside this repository: cargo jflib new (the template with the app's name), test (tests/*.uis) and web (scalar, SIMD and threads with its own core library, the host, the licences; --serve); crates_accept.py installs it from the packages
 
 ### Changed
 

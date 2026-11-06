@@ -1,0 +1,18 @@
+[package]
+name = "cargo-jflib"
+description = "cargo jflib: a JFLib app's new project, its test scripts and its bundle for the browser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+# template/ and web/ are copies (lib/jflib/template, web/ of the repository; build_rs.py check keeps them equal)
+include = ["src/**", "template/**", "web/**", "README.md", "LICENSE-*"]
+
+[[bin]]
+name = "cargo-jflib"
+path = "src/main.rs"
+
+[lints]
+workspace = true
