@@ -29,11 +29,12 @@ assembly counterpart either; its fonts (Inter, OFL) and icons (own artwork) may 
   file (or an unknown name) = `winui`.
 * `python build_rs.py app NAME --style classic --out build/classic` builds one app with
   another style (use a separate `--out`: the executable name stays the same).
-* `build_rs.py` finds every `styles/NAME/lib.rs` and builds it as the crate `style_NAME`
-  (it depends on `ui` only). An app is compiled with `--extern style=<out>/<t>/libstyle_NAME.rlib`
-  and passes `&style::STYLE` to `ui::run`; the core reaches the style only through that
+* Every `styles/NAME` is the crate `style_NAME` (package `jflib-style-NAME`). An app names its
+  style in its `Cargo.toml` as `style = { package = "jflib-style-NAME", ... }` and passes
+  `&style::STYLE` to `ui::run`; the core reaches the style only through that
   `&'static dyn ui::Style` (one indirect call per widget). The core is not recompiled per
-  style, so switching styles only relinks the app.
+  style: `--style` builds a package of the tool's own with the other style, which only links
+  the app again.
 * Every further style crate the app's sources name (`style_kde::STYLE`) is linked as well, under
   its own name: the app can switch to it at run time (below).
 

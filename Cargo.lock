@@ -1032,6 +1032,87 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-plugin"
+version = "0.1.0"
+
+[[package]]
+name = "jflib-plugin-badinfo"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-crash"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-crashpf"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-crashq"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-prepcheck"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-pshapes"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-qoi"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-rsdemo"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-sepiastr"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-swapchan"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
+name = "jflib-plugin-toonew"
+version = "0.1.0"
+dependencies = [
+ "jflib-plugin",
+]
+
+[[package]]
 name = "jflib-rt"
 version = "0.1.0"
 

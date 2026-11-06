@@ -1,7 +1,7 @@
 # Crates-Plan: JFLib für crates.io
 
-Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. Von CR3 sind die
-Teilschritte a bis d umgesetzt, `build_rs.py` baut über Cargo; offen sind CR3e und CR4 bis CR6. Die Ergebnisse unter „Was schon geprüft ist“
+Stand 2026-11-05. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ ist erreicht. CR3 ist umgesetzt:
+`build_rs.py` baut nur noch über Cargo. Offen sind CR4 bis CR6. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -267,10 +267,23 @@ Groß. Erst danach gibt es nur noch ein Bausystem. In Teilschritten, nach jedem 
   gleich; unter Linux `template` +0,01 %, `jfs` +0,11 %. Dev: Web +0,16 %, Windows +0,21 %, Linux −1,06 %, die
   Android-Bibliothek +0,28 %. `test --quick` lief nach jedem Schritt durch bis auf `fonttest/selftest` (CRLF) und
   einzelne Bildschirmproben von `uigputest` unter Windows, deren Farben knapp danebenliegen (allein grün).
-- **CR3e: Varianten und Aufräumen.** `--style` über ein vom Werkzeug erzeugtes Paket je Variante wie in CR3d, denn
-  Cargo kann eine Abhängigkeit nicht tauschen. `--profile` über `[profile.size]`. `tools/measure.py`, `memory_safety_check.py`,
-  `android.py` und `hotreload.py` auf Cargo umstellen. Der direkte `rustc`-Pfad und `ide` entfallen, rust-analyzer
-  liest Cargo selbst. `STYLE`, `TARGETS` und `BINS` können dann ins Manifest (`[package.metadata.jflib]`).
+- **CR3e: Varianten und Aufräumen. Erledigt am 2026-11-06.** Der direkte `rustc`-Weg ist weg (`build_rs.py` von etwa
+  2700 auf 2200 Zeilen), `ide` auch, rust-analyzer liest den Workspace selbst.
+  - `--style` baut ein Paket je Variante im Workspace des Werkzeugs, wie Web und Android. Das Programm darin heißt nach
+    dem Paket, denn Cargo legt alle Programme eines Laufs in einen Ordner, zwei gleichnamige überschreiben sich dort.
+  - `--profile` und die Varianten von `tools/measure.py` sind dasselbe Profil-Format (opt-level für Bibliothek,
+    Rechen-Crates und Apps, LTO, Codegen-Units, weitere `rustflags`), das als `--config` auf das Release-Profil geht.
+  - Die Rust-Plugins von PaintCraft sind Pakete (`lib/plugin` als `jflib-plugin`, `plugins/NAME` als
+    `jflib-plugin-NAME`), `PluginBuilder` baut sie über Cargo mit ihren eigenen Einstellungen.
+  - `tools/memory_safety_check.py` holt seine rlibs aus Cargo (`Builder.cargo_rlibs`), die Proben selbst bleiben
+    `rustc`-Aufrufe; `tools/android.py` linkt nur noch das Archiv aus Cargo.
+  - Die Prüfung auf einen Inkrementell-Cache, den ein beim ThinLTO abgebrochener `rustc` vergiftet hat, gilt jetzt
+    Cargos Ordner: Cargo hat dasselbe Problem und prüft es nicht.
+  - `STYLE`, `TARGETS` und `BINS` bleiben vorerst eigene Dateien.
+
+  **Geprüft:** die volle Suite mit 1329 von 1331 Skripten (nur `fonttest/selftest`, CRLF) samt den Rust-Plugins und
+  `crates_accept.py`; die Proben von `memory_safety_check.py`; ein Variantenprofil wie aus `measure.py` (dieses
+  selbst braucht `legacy/` neben dem Repo und lief nicht).
 
 Bleiben müssen `lint()`, `check_intrinsics`, `plugin_verify` und `perm_lint`.
 

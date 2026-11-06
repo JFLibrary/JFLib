@@ -607,7 +607,7 @@ scripts. `python build_rs.py api-diff` lists the changes of the public API since
 release ([versions](docs/VERSIONING.md)). Some existing PaintCraft tests still
 expect reference plugins under `build/rwref`, which are not included in a fresh checkout.
 The full parity run also requires the separate assembly reference.
-For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
+rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 
 ## Documentation
 

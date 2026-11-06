@@ -11,9 +11,10 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 ## 1. Rules of the code base
 
-* **`#![no_std]`, no crates, no Cargo.** Only `core` and `alloc` may be `extern crate`d;
-  `build_rs.py` calls `rustc` per crate and refuses `std` or a foreign dependency
-  (`python build_rs.py check` runs the lint alone). Edition 2024, so `gen` is a keyword.
+* **`#![no_std]`, no foreign crates.** Only `core` and `alloc` may be `extern crate`d. Every
+  crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
+  checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
+  foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
 * **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
@@ -169,10 +170,11 @@ python build_rs.py app NAME --release          # opt-level 2 + LTO
 python build_rs.py app NAME --profile size     # smaller release variant (packages)
 ```
 
-Every app crate gets every library crate (`ui`, `gfx`, `text`, `plat`, `base`, `rt`, `img_core`,
-`img_*`, `img_all`, `fx`, ...) as an `--extern`, plus its style as `style`. Development builds
-are incremental (about 1.5 s after an edit in `ui`). Use `--out build/<name>` when several
-agents build at the same time.
+An app's `Cargo.toml` names the library crates its sources use (`ui`, `gfx`, `text`, `plat`, ...)
+and its style as `style`; `build_rs.py new` writes it, `build_rs.py check` says when a crate is
+missing. Its `build.rs` (`jflib_build::app()`) hands `PERMISSIONS`, `PACKAGE`, `assets/` and
+`res/app.ico` to the program. Development builds are incremental. Use `--out build/<name>` when
+several agents build at the same time.
 
 **Platforms need no app code.** The same source builds a Windows exe and a Linux ELF: static for
 command-line programs, linked against glibc and nothing else for programs with a UI (the GPU drivers

@@ -29,7 +29,8 @@ Copy the file into `<PaintCraft folder>/Effects`, `FileTypes` or `Shapes`. Any p
 any kind of descriptor; the folders only sort them. For tests, use `PaintCraft --plugins=DIR`.
 
 What the build does (`build_rs.py`, section `rust-plugin`):
-- **The crate `plugin`:** built once per target as an rlib (`<out>/<t>/plugin_lib`).
+- **Cargo:** `lib/plugin` is the package `jflib-plugin`, every `plugins/NAME` the package
+  `jflib-plugin-NAME`; they build into `<out>/<t>/cargo-plugins`.
 - **The plugin:** a `cdylib` with:
   - `-C panic=abort`, and its own `#[panic_handler]`;
   - `opt-level=3`, one codegen unit;

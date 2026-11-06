@@ -1,4 +1,4 @@
-"""Android native APK packaging for build_rs.py: rustc + NDK + SDK, no Cargo/Gradle.
+"""Android native APK packaging for build_rs.py: the static library Cargo built + NDK + SDK, no Gradle.
 
 The shared Java/JNI host presents the library's pixels and forwards input. Apps opt in
 with `android` in TARGETS and supply android/AndroidManifest.xml and android/res/.
@@ -165,19 +165,12 @@ def native_link_flags():
             '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now']
 
 
-def rust_digest(builder, root, deps, extra, archive):
-    """what the Rust part contributes to an output's digest: rustc's sources and crates, or the
-    static library Cargo built (build_rs.py's derived_workspace)"""
-    if archive is not None:
-        return hashlib.sha256(Path(archive).read_bytes() + extra.encode())
-    return hashlib.sha256(builder.src_hash(root, deps, extra=extra).encode())
-
-
-def build_exe(builder, name, root, crates, run, archive=None):
+def build_exe(builder, name, archive):
     """a program without a UI -> <out>/android/NAME-<abi>: `adb push` it to /data/local/tmp and run it
     from `adb shell` (the driver of a GPU needs no app for that); no APK, no Java.  archive: the
-    static library Cargo built (otherwise rustc compiles root with crates here)"""
-    error = sys.modules[builder.__class__.__module__].BuildError
+    static library Cargo built (build_rs.py's derived_workspace)"""
+    build = sys.modules[builder.__class__.__module__]
+    error, run = build.BuildError, build.run_cmd
     try:
         sdk, ndk, llvm, sdkbuild, platform, java, suffix = sdk_tools()
     except RuntimeError as exc:
@@ -185,8 +178,7 @@ def build_exe(builder, name, root, crates, run, archive=None):
     work = builder.dir / 'apps' / name
     work.mkdir(parents=True, exist_ok=True)
     output = builder.android_output / f'{name}-{builder.android_abi}'
-    perms, assets, boot = builder.boot_inputs(name)
-    digest = rust_digest(builder, root, crates, boot, archive)
+    digest = hashlib.sha256(Path(archive).read_bytes())
     for path in (Path(__file__), ROOT / 'build_rs.py', ROOT / 'android' / 'exe_main.c'):
         digest.update(path.read_bytes())
     digest.update(f'{ndk}'.encode())
@@ -194,16 +186,6 @@ def build_exe(builder, name, root, crates, run, archive=None):
     fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
         return output
-    if archive is None:
-        archive = work / f'lib{name}.a'
-        cmd = ['rustc'] + builder.flags() + ['--crate-type', 'staticlib', '--crate-name', name.lower()]
-        if builder.release:
-            cmd += ['-C', 'lto=fat']
-        for crate in crates:
-            cmd += ['--extern', f'{crate}={builder.rlib(crate)}']
-        boot_args, env = builder.boot_args(name, perms, assets)
-        cmd += boot_args + ['-o', archive, root]
-        run(cmd, env=env)
     triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
     run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}', f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2',
          '-fPIE', '-pie', '-Wall', '-Wextra', '-Werror', ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(),
@@ -213,11 +195,12 @@ def build_exe(builder, name, root, crates, run, archive=None):
     return output
 
 
-def build_apk(builder, name, style, variant, root, crates, run, notices, archive=None):
-    """notices: {relative Path: source} (build_rs.app_notices), packed below assets/; archive: the
-    static library Cargo built (otherwise rustc compiles root with crates here)"""
-    # Import the same error type as the active build entry point, including __main__.
-    error = sys.modules[builder.__class__.__module__].BuildError
+def build_apk(builder, name, style, variant, archive, notices):
+    """archive: the static library Cargo built (build_rs.py's derived_workspace); notices: {relative
+    Path: source} (build_rs.app_notices), packed below assets/"""
+    # the error type and helpers of the active build entry point, including __main__
+    build = sys.modules[builder.__class__.__module__]
+    error, run = build.BuildError, build.run_cmd
     app = ROOT / 'apps' / name
     manifest = app / 'android' / 'AndroidManifest.xml'
     if not manifest.is_file():
@@ -237,13 +220,11 @@ def build_apk(builder, name, style, variant, root, crates, run, notices, archive
         except RuntimeError as exc:
             raise error(f'{name}: {exc}') from exc
     output = builder.android_output / f'{key}-{builder.android_abi}-{"release" if release else "debug"}.apk'
-    deps = crates + [f'style_{style}']
     # Packaging and tool versions participate in freshness, including the host sources.
-    perms, assets, boot = builder.boot_inputs(name)   # the manifest and app:// as on the desktop
-    missing = manifest_gaps(perms, manifest.read_text(encoding='utf-8'))
+    missing = manifest_gaps(build.app_permissions(name), manifest.read_text(encoding='utf-8'))
     if missing:
         raise error(f'{name}: {missing}')
-    digest = rust_digest(builder, root, deps, style + boot, archive)
+    digest = hashlib.sha256(Path(archive).read_bytes() + style.encode())
     sources = [Path(__file__), ROOT / 'build_rs.py']
     sources += sorted(p for p in (ROOT / 'android').rglob('*') if p.is_file())
     sources += sorted(p for p in (app / 'android').rglob('*') if p.is_file())
@@ -258,17 +239,6 @@ def build_apk(builder, name, style, variant, root, crates, run, notices, archive
     fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
         return output
-
-    if archive is None:
-        archive = work / f'lib{name}.a'
-        cmd = ['rustc'] + builder.flags() + ['--crate-type', 'staticlib', '--crate-name', name.lower()]
-        if builder.release:
-            cmd += ['-C', 'lto=fat']
-        for crate in crates:
-            cmd += ['--extern', f'{crate}={builder.rlib(crate)}']
-        boot_args, env = builder.boot_args(name, perms, assets)
-        cmd += boot_args + ['--extern', f'style={builder.rlib(f"style_{style}")}', '-o', archive, root]
-        run(cmd, env=env)
 
     triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
     native = work / 'libjfgui_android.so'

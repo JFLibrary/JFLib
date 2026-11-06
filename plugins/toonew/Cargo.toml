@@ -1,0 +1,19 @@
+[package]
+name = "jflib-plugin-toonew"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "toonew"
+path = "lib.rs"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+plugin.workspace = true

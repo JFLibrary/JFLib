@@ -81,10 +81,9 @@ existing library crates:
   `lib/img_all/psd/document.rs` handles raster-layer PSD/PSB documents. The public
   `img_all::psd::document` API is unchanged.
 
-The application keeps the repository's direct-rustc build. A Cargo workspace
-containing artificial manifests for every shared JFLib library is not needed
-for this source layout. Run `python build_rs.py ide` from the repository root to
-regenerate local rust-analyzer paths after moving sources.
+The application is a package of the repository's Cargo workspace
+(`apps/PaintCraft/Cargo.toml`); `build_rs.py` builds it through Cargo, and
+rust-analyzer reads the workspace directly.
 
 ## Build and validation
 

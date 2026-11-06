@@ -172,6 +172,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** Every app, its further programs (BINS), its own crates and the styles jfoffice, backupcraft and netlab are Cargo packages of the workspace with a build.rs through jflib-build; build_rs.py new writes them, check compares them with the sources; themedemo starts with style_winui::STYLE
 - **build:** build_rs.py builds the Windows and Linux programs (static and against glibc) through Cargo, one cargo build per target and run; jflib-build writes the linker map; --rustc compiles with rustc as before
 - **build:** build_rs.py builds for the browser, Android and the jxlenc module through Cargo too; for the browser and Android it makes each app a library package of its own in a workspace below build/
+- **build:** build_rs.py builds only through Cargo: style variants and --profile too, PaintCraft's Rust plugins as packages (jflib-plugin, jflib-plugin-NAME); the direct rustc path and `build_rs.py ide` are gone, rust-analyzer reads the workspace
 
 ### Removed
 

@@ -1,6 +1,6 @@
-# The library's crates, the apps of this repository and their own crates.  Cargo builds them for
-# projects outside this repository; build_rs.py still compiles with rustc itself and reads what it
-# needs from here (tools/manifests.py).  docs/CRATES.md is the plan.
+# The library's crates, the apps of this repository, their programs and crates, PaintCraft's Rust
+# plugins.  Cargo builds them; build_rs.py is the tool on top that reads what it needs from here
+# (tools/manifests.py).  docs/CRATES.md is the plan.
 [workspace]
 resolver = "3"
 # worktrees below this folder may be older than this file, build/ holds test projects: their
@@ -60,6 +60,7 @@ members = [
     "lib/style_assets",
     "lib/jflib",
     "lib/jflib_build",
+    "lib/plugin",
     "styles/winui",
     "styles/classic",
     "styles/kde",
@@ -70,6 +71,17 @@ members = [
     "modules/modrt",
     "modules/modplat",
     "modules/jxlenc",
+    "plugins/badinfo",
+    "plugins/crash",
+    "plugins/crashpf",
+    "plugins/crashq",
+    "plugins/prepcheck",
+    "plugins/pshapes",
+    "plugins/qoi",
+    "plugins/rsdemo",
+    "plugins/sepiastr",
+    "plugins/swapchan",
+    "plugins/toonew",
     "apps/BackupCraft",
     "apps/BackupCraft/server",
     "apps/BackupCraft/agent",
@@ -214,7 +226,8 @@ style_macos = { package = "jflib-style-macos", path = "styles/macos", version = 
 modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
 modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
 jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
-# the styles of the apps that are not published
+# PaintCraft's plugins written in Rust (plugins/*) and the styles of the apps: not published
+plugin = { package = "jflib-plugin", path = "lib/plugin" }
 style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
 style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
 style_netlab = { package = "jflib-style-netlab", path = "styles/netlab" }
