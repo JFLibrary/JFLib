@@ -63,6 +63,7 @@ fn lasting(path: &str) -> String {
 
 /// what recent_open found for a file of the list
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RecentOpen {
     /// the file can be read now
     Ready,

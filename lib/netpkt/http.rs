@@ -127,6 +127,7 @@ impl Version {
 
 /// why a message could not be read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HttpErr {
     /// malformed (400), with what was wrong
     Bad(&'static str),

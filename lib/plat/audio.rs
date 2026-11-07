@@ -87,6 +87,7 @@ pub const SOUND_NOTIFY: u32 = 5;
 
 /// why audio is not possible
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AudioError {
     /// no output device or sound service here
     Unavailable,
@@ -117,6 +118,7 @@ impl core::fmt::Display for AudioError {
 
 /// what a stream does
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum State {
     /// the device is being opened (browser: until its host answers)
     Starting,

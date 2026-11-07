@@ -5,6 +5,7 @@ use archive::Entry;
 
 /// The Word story containing an individually editable preserved text leaf.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DocxStory {
     /// Main document, including eligible table-cell paragraphs.
     Main,

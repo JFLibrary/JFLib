@@ -431,6 +431,7 @@ pub fn cull_ref(objs: &[Object], cam: &Camera) -> Vec<u32> {
 
 /// the six benchmark shaders
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Shader {
     Move,
     Cull,

@@ -11,6 +11,7 @@ const BOLD: &[u8] = include_bytes!("../assets/font_bold.bin");
 
 /// The text registry could not register the fixed document faces or their italic forms.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FontError {
     /// The registry is full, or a bundled face is invalid.
     Registration,

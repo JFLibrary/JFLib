@@ -378,6 +378,7 @@ Lang, LANGS {
 /// image dimensionality (OpTypeImage)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
+#[non_exhaustive]
 pub enum Dim {
     D1 = 0,
     D2 = 1,

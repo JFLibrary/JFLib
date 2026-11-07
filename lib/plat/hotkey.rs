@@ -47,6 +47,7 @@ pub struct Chord {
 
 /// why a shortcut was not registered
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HotkeyError {
     /// no global shortcuts here (browser, Android, no X server / portal)
     Unavailable,

@@ -68,6 +68,7 @@ pub type IconHook = Rc<dyn Fn(&mut Gfx, u32, i32, i32, i32, u32) -> bool>;
 
 /// one recorded draw command  [C_*]
 #[derive(Clone)]
+#[non_exhaustive]
 pub enum Cmd {
     Rect { x: i32, y: i32, w: i32, h: i32, c: u32 },
     /// fill (alpha 0 = none), border t px in `stroke`, its bottom band in `stroke2`; r and t

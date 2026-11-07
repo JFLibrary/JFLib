@@ -106,6 +106,7 @@ pub fn rcode_name(r: u8) -> &'static str {
 
 /// why a message could not be read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DnsErr {
     /// it ends inside a header, a name or a record
     Short,

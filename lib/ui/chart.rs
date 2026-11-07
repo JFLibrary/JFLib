@@ -540,6 +540,7 @@ impl SeriesBuf {
 
 /// how a line chart labels values (axis ticks, the hover card, the summary)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum LcUnit<'a> {
     /// numbers, large ones with k / M / G / T (1,5k), then the suffix after a space
     /// ("req/s", "%"; "" none)

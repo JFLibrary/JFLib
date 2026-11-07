@@ -129,6 +129,7 @@ pub fn nd_why(e: NdErr) -> &'static str {
         NdErr::DadDest => "eine Adressprüfung muss an eine Solicited-Node-Gruppe gehen",
         NdErr::SourceLla => "ein unspezifizierter Absender mit Link-Layer-Adresse",
         NdErr::SolicitedToGroup => "eine Antwort an eine Multicast-Gruppe",
+        _ => "keine gültige Neighbor-Discovery-Nachricht",
     }
 }
 

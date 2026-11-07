@@ -63,6 +63,7 @@ pub struct Monitor {
 
 /// why a pick or a capture did not happen
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ScreenError {
     /// not possible here (browser without EyeDropper, Android, no X server / portal)
     Unavailable,

@@ -149,6 +149,7 @@ pub fn set_unsaved(on: bool) {
 
 /// Completion state of one browser operation; durable and exported are distinct outcomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RequestStatus {
     /// The host has not completed the operation.
     Pending,

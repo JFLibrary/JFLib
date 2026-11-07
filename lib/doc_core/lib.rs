@@ -137,6 +137,7 @@ pub struct Document {
 }
 /// Invalid structure, dangling citation, source in use, or a resource budget exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Invalid,
     Missing,

@@ -39,6 +39,7 @@ pub struct Identity {
 }
 
 #[derive(Clone)]
+#[non_exhaustive]
 pub enum Trust {
     /// certificates issued by one of these CAs
     Anchors(Vec<Cert>),
@@ -71,6 +72,7 @@ pub struct ServerConfig {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TlsError {
     /// we ended the connection with this alert
     Alert(u8, &'static str),

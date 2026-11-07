@@ -38,6 +38,7 @@ fn story_label(story: DocxStory) -> &'static str {
         DocxStory::Footer => "Fußzeile",
         DocxStory::Footnote => "Fußnote",
         DocxStory::Endnote => "Endnote",
+        _ => "Text",
     }
 }
 impl FileUi {

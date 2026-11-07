@@ -50,6 +50,7 @@ pub struct GcEntry {
     pub px: Vec<u8>,
 }
 
+#[non_exhaustive]
 pub enum GcRef<'a> {
     None,
     Direct,

@@ -3,6 +3,7 @@ use alloc::{string::String, vec::Vec};
 
 /// Explicit text encodings; unmarked input is interpreted as UTF-8.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Encoding {
     Utf8,
     Utf8Bom,
@@ -12,6 +13,7 @@ pub enum Encoding {
 
 /// Invalid Unicode, unsupported UTF-32, or a caller-specified byte limit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Invalid,
     Unsupported,

@@ -615,6 +615,7 @@ impl EdTest {
                     self.code.set_breakpoints(&self.bps);
                     self.last_ev = format!("bp {}", l + 1);
                 }
+                _ => {}
             }
             ui.repass();
         }

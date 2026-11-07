@@ -796,6 +796,7 @@ impl<'a> Disc<'a> {
 }
 
 /// the summed row of a disc run: i32 x 4 per pixel, or f32 x 4 with DSF_F32
+#[non_exhaustive]
 pub enum DiscRow<'r> {
     I(&'r mut [i32]),
     F(&'r mut [f32]),

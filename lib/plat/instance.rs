@@ -30,6 +30,7 @@ use rt::sync::SpinLock;
 
 /// what claim found
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Claim {
     /// this process is the app's instance
     Primary,

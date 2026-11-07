@@ -203,6 +203,7 @@ pub struct Bpdu {
 
 /// why bytes are no BPDU
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum BpduErr {
     /// shorter than its type needs
     Short,

@@ -177,6 +177,7 @@ pub fn spec_fill(minor: u32) -> Vec<u32> {
 
 /// the component type of a texture's texels in a shader
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Texel {
     Float,
     Uint,
@@ -185,6 +186,7 @@ pub enum Texel {
 
 /// the dimension of cs_sample's texture
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SampleDim {
     D2,
     D2Array,

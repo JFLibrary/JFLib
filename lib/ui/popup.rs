@@ -115,6 +115,7 @@ impl Command {
 
 /// menu record (MENUBAR / MENU / MI_* of ui.inc); menus are `static` slices of them
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum Mi {
     /// MI_CMD cmd: a row from the command table
     Cmd(u32),

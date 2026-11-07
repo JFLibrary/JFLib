@@ -47,6 +47,7 @@ pub const PROMPT_SECONDS: u32 = 300;
 
 /// why a secret call failed
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SecretError {
     /// no secret store here (Linux: no Secret Service on the session bus; browser: no
     /// IndexedDB or WebCrypto, e.g. a page served over plain http)

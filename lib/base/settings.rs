@@ -52,6 +52,7 @@ pub const KF_RESTART: u32 = 2;
 
 /// what a key holds, with its default and limits
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum Kind {
     Bool(bool),
     Int { def: i64, min: i64, max: i64, step: i64 },
@@ -149,6 +150,7 @@ impl Desc {
 
 /// a value of a key
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Val {
     Bool(bool),
     Int(i64),

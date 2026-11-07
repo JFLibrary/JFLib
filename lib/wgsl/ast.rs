@@ -54,6 +54,7 @@ pub struct Ast {
 
 /// enable / requires / diagnostic
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum DirectiveKind {
     Enable(Vec<Ident>),
     Requires(Vec<Ident>),
@@ -87,6 +88,7 @@ impl DiagnosticControl {
 
 /// the arguments of an attribute
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum AttrKind {
     /// @name or @name(args)
     Plain { args: Vec<Expr>, parens: bool },
@@ -142,6 +144,7 @@ pub struct Member {
 
 /// var, let, const and override declarations
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum VarKind {
     Var,
     Let,
@@ -164,6 +167,7 @@ pub struct VarDecl {
 
 /// the module-scope declarations
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum DeclKind {
     Fn(FnDecl),
     Var(VarDecl),
@@ -201,6 +205,7 @@ pub struct Block {
 
 /// a case selector
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum CaseSel {
     Default(Span),
     Expr(Expr),
@@ -234,6 +239,7 @@ pub struct Continuing {
 
 /// = and the compound assignment operators
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum AssignOp {
     Assign,
     Add,
@@ -285,6 +291,7 @@ impl AssignOp {
 
 /// the statements
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum StmtKind {
     /// `;`
     Empty,
@@ -319,6 +326,7 @@ pub struct Stmt {
 
 /// unary operators
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum UnOp {
     Neg,
     Not,
@@ -342,6 +350,7 @@ impl UnOp {
 
 /// binary operators
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum BinOp {
     Add,
     Sub,
@@ -395,6 +404,7 @@ impl BinOp {
 
 /// the expressions
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum ExprKind {
     Bool(bool),
     /// text, value, suffix

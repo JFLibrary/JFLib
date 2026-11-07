@@ -1180,6 +1180,7 @@ pub struct UiaTestElem {
 
 /// (tests) what uia_test_act does to an element
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum UiaTestAct {
     Invoke,
     Toggle,

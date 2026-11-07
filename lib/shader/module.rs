@@ -41,6 +41,7 @@ pub struct Id(pub u32);
 
 /// a SPIR-V type
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Ty {
     Void,
     Bool,

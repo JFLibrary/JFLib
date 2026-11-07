@@ -96,6 +96,7 @@ fn why_hotkey(e: &HotkeyError) -> &'static str {
         HotkeyError::Conflict => "schon vergeben",
         HotkeyError::Dismissed => "vom Desktop nicht vergeben",
         HotkeyError::Failed(_) => "fehlgeschlagen",
+        _ => "fehlgeschlagen",
     }
 }
 
@@ -106,6 +107,7 @@ fn why_screen(e: Option<ScreenError>) -> String {
         Some(ScreenError::Cancelled) => String::from("abgebrochen"),
         Some(ScreenError::Busy) => String::from("läuft schon"),
         Some(ScreenError::Failed(s)) => format!("fehlgeschlagen: {s}"),
+        Some(_) => String::from("fehlgeschlagen"),
         None => String::from("abgebrochen"),
     }
 }

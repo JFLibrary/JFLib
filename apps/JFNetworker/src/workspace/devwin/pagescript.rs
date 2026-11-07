@@ -380,6 +380,7 @@ pub(crate) fn refused_text(e: Refused) -> &'static str {
         Refused::HttpOnly => t("HttpOnly dürfen Skripte nicht setzen oder überschreiben"),
         Refused::Secure => t("Secure geht nur über https"),
         Refused::SameSiteNone => t("SameSite=None braucht Secure"),
+        _ => t("abgelehnt"),
     }
 }
 

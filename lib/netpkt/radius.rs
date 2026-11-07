@@ -391,6 +391,7 @@ pub fn value_name(t: u8, v: u32) -> Option<&'static str> {
 
 /// why bytes are no RADIUS packet (a receiver discards them silently)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Bad {
     /// shorter than the header, or than the Length field says
     Short,

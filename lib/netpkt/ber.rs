@@ -60,6 +60,7 @@ pub const OID_MAX: usize = 128;
 
 /// why bytes are no BER element as SNMP wants it
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Bad {
     /// the buffer ends inside a header or before the contents it announces
     Truncated,

@@ -105,6 +105,16 @@ struct as a literal. The library's descriptor structs come with an empty value
 so a new field is a compatible addition here; `api-diff` lists it under "Notes". Code that lists
 every field without `..X::NONE` may have to be extended.
 
+**Enums that grow** are `#[non_exhaustive]`, so a new variant is no break: every error enum,
+the GPU stack (`gpu`, `wgsl`, `shader`), and the open lists such as widget events, roles, states,
+formats and `netpkt::decode::Proto` (172 of 284 public enums). A program that matches one needs a
+`_` arm. Exhaustive stay the enums a consumer must handle completely, where the compiler's demand
+for a new arm is the point: the document model (`doc_core`, its errors excepted; `doc_io` and
+`doc_layout` write every variant), the protocol messages of `netpkt` and `eapm` (a program that
+speaks a protocol handles each message), what `ui` handles completely (`plat`'s events, states and
+answers, `gpu::TryAcquire`, `gpu::PresentMode`) and closed alternatives (`Either`, `IpAddr`,
+`FingerPhase`, a kind with an `Other` variant). A new variant there is breaking.
+
 **Parameter names** are no part of a signature: renaming `_id` to `id` changes nothing for a
 caller, and `api-diff` ignores it, as it ignores line breaks and trailing commas.
 

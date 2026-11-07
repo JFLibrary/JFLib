@@ -118,6 +118,7 @@ pub struct Registered {
 
 /// why a registration failed
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AssocError {
     /// not here: web, Android, an MSIX package or a Flatpak (the package declares the types)
     Unavailable,

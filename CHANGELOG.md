@@ -183,6 +183,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** The setup stub's code is the crate jflib-installer (lib/installer, installer::main!); apps/installer only links it, cargo jflib package builds the same stub
 - **build:** The AppImage runtime's code is the crate jflib-appimagert (lib/appimagert, appimagert::main!()); apps/appimagert only links it
 - **build:** jflib shows simd, text_shape and style_assets no more (#[doc(hidden)]) and of each style only STYLE; build_rs.py check keeps what it shows equal to API.md, api-diff leaves out the repository's plugin ABI
+- **api:** #[non_exhaustive] on the enums that grow (172 of 284: every error enum, gpu, wgsl, shader, the open lists such as widget events, roles, states, formats); a match on one needs a _ arm. The document model, protocol messages and closed alternatives stay exhaustive (docs/VERSIONING.md)
 
 ### Removed
 

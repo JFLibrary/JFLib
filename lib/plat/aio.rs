@@ -34,6 +34,7 @@ pub const CHUNK: usize = 256 * 1024;
 
 /// why a file operation failed
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum IoError {
     /// the source is missing, refused (permissions) or no file
     Open,

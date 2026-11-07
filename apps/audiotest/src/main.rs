@@ -143,6 +143,7 @@ impl Audiotest {
                     audio::State::Ended => t("Zu Ende"),
                     audio::State::Blocked => t("Wartet auf einen Klick (Browser)"),
                     audio::State::Lost => t("Kein Gerät"),
+                    _ => "?",
                 };
                 let dev = s.device();
                 tf(

@@ -66,6 +66,7 @@ const WINDOW: u32 = 2 << 20;
 const CHUNK: u32 = 32 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SshError {
     Net(NetError),
     /// the peer broke the protocol or offers nothing we speak
@@ -256,6 +257,7 @@ pub struct HostKey {
 }
 
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum HostKeyCheck {
     /// exactly this key ("SHA256:...")
     Pinned(String),

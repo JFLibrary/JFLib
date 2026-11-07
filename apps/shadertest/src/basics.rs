@@ -326,6 +326,7 @@ pub fn golden_text(sh: Shader, minor: u32) -> &'static str {
         (Shader::VsInstanced, _) => include_str!("../golden/vs_instanced_16.spvasm"),
         (Shader::VsSingle, _) => include_str!("../golden/vs_single_16.spvasm"),
         (Shader::FsLambert, _) => include_str!("../golden/fs_lambert_16.spvasm"),
+        _ => "",
     }
 }
 

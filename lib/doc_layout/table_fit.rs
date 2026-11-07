@@ -1,6 +1,7 @@
 //! Explicit, undoable column sizing with the same font metrics as pagination.
 use super::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TableFit {
     Contents,
     Page,

@@ -56,6 +56,7 @@ pub use ris::{decode_ris, encode_ris};
 
 /// Failure with the unsupported part/element included for a useful UI explanation.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Io,
     Limit,

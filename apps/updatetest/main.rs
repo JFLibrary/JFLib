@@ -876,6 +876,7 @@ fn startup_text(s: &Startup) -> String {
         Startup::RollingBack(v) => format!("rollingback {}", v),
         Startup::RolledBack(v) => format!("rolledback {}", v),
         Startup::Failed(e) => format!("failed {}", e),
+        _ => String::from("other"),
     }
 }
 

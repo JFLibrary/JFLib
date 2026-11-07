@@ -333,6 +333,7 @@ pub struct Asks<'a> {
 
 /// why a jar does not take a cookie
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Refused {
     /// no "name=value" with a name
     Syntax,

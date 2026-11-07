@@ -26,6 +26,7 @@ use crate::{xid, Diagnostic, LineMap};
 
 /// token kinds: identifiers, literals, keywords, syntactic tokens, template delimiters
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Tok {
     Ident,
     Int,
@@ -513,6 +514,7 @@ pub fn tokens(src: &str) -> (Vec<Token>, Vec<Diagnostic>) {
 
 /// the suffix of a numeric literal
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Suffix {
     None,
     I,
@@ -547,6 +549,7 @@ pub fn int_value(text: &str) -> Result<(i64, Suffix), String> {
 
 /// the format a float literal is rounded to
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Fmt {
     F16,
     F32,

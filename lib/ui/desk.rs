@@ -195,6 +195,7 @@ impl<'a> DeskWin<'a> {
 
 /// what desk_end reports
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeskEv {
     /// the user wants to close the window (close button, menu, taskbar): take it out of the
     /// list of windows (DeskState keeps its place until forget), or ask first

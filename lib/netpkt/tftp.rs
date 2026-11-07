@@ -118,6 +118,7 @@ pub fn from_netascii(data: &[u8]) -> Vec<u8> {
 
 /// why bytes are no TFTP packet
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Bad {
     /// shorter than its opcode and fixed fields
     Short,

@@ -17,6 +17,7 @@ use alloc::vec::Vec;
 use crate::module::{Ty, Types};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Rule {
     Std140,
     Std430,

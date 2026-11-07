@@ -86,6 +86,7 @@ impl Default for CompileOptions<'_> {
 
 /// what a binding holds
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ResourceKind {
     UniformBuffer,
     StorageBuffer { read_only: bool },
@@ -150,6 +151,7 @@ pub struct Needs {
 
 /// where a specialization constant's value comes from
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SpecSource {
     /// an override (Module::overrides index)
     Override(u32),

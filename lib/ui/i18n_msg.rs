@@ -27,6 +27,7 @@ use super::{DATE_LONG, DATE_SHORT, Locale, language_code, locale, plural};
 
 /// one argument of msg()
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum Arg<'a> {
     Str(&'a str),
     Int(i64),

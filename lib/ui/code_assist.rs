@@ -125,6 +125,7 @@ pub trait CodeAssist {
 
 /// what the user asked of a code editor in its last pass (ui.code_events)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CodeEv {
     /// go to the definition of the word at the position (Ctrl+click, F12)
     Definition(TextPos),

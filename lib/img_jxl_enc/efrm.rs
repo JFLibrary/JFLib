@@ -27,6 +27,7 @@ static D_ORIGIN: [u32; 8] = [0, 8, 256, 11, 2304, 14, 18688, 30];
 
 /// colour encoding of the image header
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Colour {
     Srgb,
     Gray,

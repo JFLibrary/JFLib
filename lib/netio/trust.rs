@@ -30,6 +30,7 @@ use crate::Stream;
 pub const UNTRUSTED: &str = "untrusted-ca";
 
 #[derive(Clone)]
+#[non_exhaustive]
 pub enum ServerTrust {
     /// certificates of this CA only
     Ca(Cert),

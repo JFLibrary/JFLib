@@ -51,6 +51,7 @@ pub const KIND_DATA: u8 = 0;
 pub const KIND_TREE: u8 = 1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CasError {
     Io(String),
     /// damaged or forged data
@@ -146,6 +147,7 @@ impl Keys {
 }
 
 /// how to open a repository
+#[non_exhaustive]
 pub enum Unlock<'a> {
     /// the server's repository wrap key
     Master(&'a [u8; 32]),

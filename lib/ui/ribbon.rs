@@ -74,6 +74,7 @@ impl<'a> RibbonGroup<'a> {
 
 /// Presentation of an open ribbon group; pass it to `ribbon_group_end`.
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RibbonGroupMode {
     /// Preferred or compact inline width in DIP.
     Inline(i32),

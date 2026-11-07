@@ -74,6 +74,7 @@ pub fn decode_source_library(bytes: &[u8]) -> Result<SourceLibrary, Error> {
 
 /// Persistent-library failures distinguish stale content, a held lock and codec rejection.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LibraryStoreError {
     /// A path could not be inspected, read, backed up or atomically replaced.
     Io,

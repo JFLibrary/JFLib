@@ -49,6 +49,7 @@ pub fn record_limits() -> Limits {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StoreError {
     /// another process holds the store
     Locked,

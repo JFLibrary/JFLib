@@ -489,6 +489,7 @@ fn histo_cost(hist: &[i32], method: u32) -> f32 {
 
 /// ANS histogram strategy
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Strat {
     Fast,
     Approx,
@@ -959,6 +960,7 @@ fn build_prefix<S: Sink>(hist: &[i32], w: &mut S) -> SymInfo {
 // ------------------------------------------------------------------------- clustering
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Clu {
     Fastest,
     Fast,
@@ -966,6 +968,7 @@ pub enum Clu {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UintM {
     None,
     K000,
@@ -975,6 +978,7 @@ pub enum UintM {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Lz {
     None,
     Rle,

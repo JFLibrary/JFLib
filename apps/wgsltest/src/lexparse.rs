@@ -139,6 +139,7 @@ fn shape(e: &wgsl::ast::Expr) -> String {
         ExprKind::Member(a, m) => format!("{}.{}", shape(a), m.name),
         ExprKind::Call(id, _, args) => format!("{}({})", id.name, args.iter().map(shape).collect::<Vec<_>>().join(",")),
         ExprKind::Error => String::from("?"),
+        _ => String::from("?"),
     }
 }
 

@@ -4,6 +4,7 @@ use crate::Text;
 
 /// Glyph rasterization independent of font metrics and text editing coordinates.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FontRaster {
     /// Original x-height fitting and downward quarter-pixel positioning.
     #[default]

@@ -36,6 +36,7 @@ impl Default for Limits {
 }
 /// Structural, integrity, feature or resource-limit failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Invalid,
     Unsupported,

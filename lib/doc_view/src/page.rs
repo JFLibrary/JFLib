@@ -18,6 +18,7 @@ pub fn page_backdrop(ui: &mut ui::Ui, rect: [i32; 4]) {
 
 /// A page index, geometry or thumbnail size cannot be rendered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PageError {
     /// The requested page is not in the layout.
     Page,

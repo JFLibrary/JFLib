@@ -28,6 +28,7 @@ use crate::Ui;
 
 /// how a canvas may use the GPU while its view moves
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum CanvasGpu {
     /// the CPU path in every frame, as without a GPU
     Cpu,

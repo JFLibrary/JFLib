@@ -74,6 +74,7 @@ pub struct Token {
 }
 
 /// a rule of a grammar (see the module header)
+#[non_exhaustive]
 pub enum Rule {
     /// from the text to the end of the line: a comment
     LineComment(&'static str),

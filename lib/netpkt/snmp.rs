@@ -217,6 +217,7 @@ pub struct Message {
 
 /// why bytes are no SNMP message of version 1 or 2c
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Bad {
     /// not well-formed BER, or an element missing or out of place
     Ber(ber::Bad),

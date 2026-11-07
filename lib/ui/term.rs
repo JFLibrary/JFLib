@@ -98,6 +98,7 @@ const BELL_MS: u32 = 150;
 
 /// what ui.terminal reports
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum TermEv {
     /// Enter: the line (already echoed after the prompt and kept in the history)
     Submit(String),

@@ -224,6 +224,7 @@ pub struct Decision {
 
 /// what the manifest says about an agent action ([`agent_rule`])
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AgentRule {
     /// no rule: the agent may run it
     Free,
