@@ -4,7 +4,8 @@ Stand 2026-11-06. CR0 bis CR2 sind umgesetzt, das Ziel „lokal kompatibel“ is
 `build_rs.py` baut nur noch über Cargo. CR4 ist umgesetzt: `cargo jflib` kann `new`, `test`, `watch`, `web`,
 `android` und `package` mit allen sechs Formaten, dem Signieren, apt-Repository und Update-Kanal; `plugin` ist
 gestrichen. CR5 ist umgesetzt: was die Crates versprechen, steht in `docs/VERSIONING.md`, die Anleitung zeigt
-den Crate-Weg zuerst. Offen ist CR6, die Veröffentlichung. Die Ergebnisse unter „Was schon geprüft ist“
+den Crate-Weg zuerst. Neu eingeschoben ist CR6, Apps mit `std` (geplant am 2026-11-07); danach CR7, die
+Veröffentlichung. Die Ergebnisse unter „Was schon geprüft ist“
 stammen aus einer Kopie der Quellen außerhalb des Repos, die Größen der Stufen sind geschätzt.
 
 ## Ziel
@@ -18,10 +19,11 @@ jflib = "0.1"
 ```
 
 Der erste Schritt ist **lokal kompatibel**, noch ohne Upload. Dieser Schritt ist mit [CR2](#cr2-fremde-projekte)
-erreicht. Das Hochladen ist eine eigene Stufe ([CR6](#cr6-auszug-und-veröffentlichung)) und braucht eine eigene
+erreicht. Das Hochladen ist eine eigene Stufe ([CR7](#cr7-auszug-und-veröffentlichung)) und braucht eine eigene
 Zusage, weil es sich nicht zurücknehmen lässt.
 
-Nicht Teil dieses Plans: ein Umbau der eigenen Runtime, ein Betrieb mit `std`, der Stil `jfoffice`, macOS und iOS.
+Nicht Teil dieses Plans: der Stil `jfoffice`, macOS und iOS. (Bis 2026-11-07 stand hier auch „ein Umbau der eigenen
+Runtime, ein Betrieb mit `std`“; das war nie die Entscheidung des Nutzers, siehe [CR6](#cr6-apps-mit-std).)
 
 ## Entscheidungen
 
@@ -29,7 +31,7 @@ Nicht Teil dieses Plans: ein Umbau der eigenen Runtime, ein Betrieb mit `std`, d
 | --- | --- |
 | Kompilieren | Cargo |
 | Alles andere | ein Werkzeug über Cargo: zuerst `build_rs.py`, für Crate-Nutzer später `cargo jflib` in Rust |
-| Runtime | bleibt die eigene (`rt`, `plat`), Cargo ändert daran nichts |
+| Runtime | die Bibliothek bleibt `no_std`; eine App darf `std` nutzen und `std`-Crates einbinden ([CR6](#cr6-apps-mit-std)), empfohlen bleibt `no_std` |
 | Einstieg | nur `jflib`, keine Features; alles wird immer mitgeladen, soweit es auf dem Ziel kompiliert |
 | Namen | Präfix `jflib-`, im Code weiter `rt::`, `ui::` über `[lib] name` |
 | Ordner | kein `crates/`, `lib/` und `styles/` bleiben |
@@ -414,7 +416,7 @@ Vorschlag:
   Dateien neben `Cargo.toml` gelten, die Regeln für eine eigene App. Fremde `no_std`-Crates sind dort erlaubt;
   eine mit eigenen Systemaufrufen umgeht `plat`, nur die `sandbox`-Zeile hilft (auch in `PERMISSIONS.md` und der
   README der Fassade). `README.md` hat einen Abschnitt „Your own app with Cargo“ und sagt nicht mehr, dass ein
-  Python-Skript `rustc` direkt aufruft. Bis CR6 nennen die Texte `cargo install --path lib/cargo_jflib`.
+  Python-Skript `rustc` direkt aufruft. Bis zur Veröffentlichung (CR7) nennen die Texte `cargo install --path lib/cargo_jflib`.
 
 Der ursprüngliche Plan:
 
@@ -424,7 +426,87 @@ Der ursprüngliche Plan:
 - `docs/GUIDE.md` und `README.md` auf Cargo umstellen. Darin auch festhalten, dass eine fremde Crate mit eigenen
   Systemaufrufen `plat` umgeht und nur die `sandbox`-Zeile dagegen hilft.
 
-### CR6: Auszug und Veröffentlichung
+### CR6: Apps mit `std`
+
+Mittel bis groß, vor der Veröffentlichung. Geplant am 2026-11-07, noch nicht umgesetzt.
+
+**Warum diese Stufe:** Bis CR5 stand hier „kein Betrieb mit `std`“. Das war meine Empfehlung, nicht die Entscheidung
+des Nutzers: Am 2026-11-04 hatte er festgelegt, Panic-Handler, Allocator und Einstieg „muss dann wohl umgebaut
+werden“, damit Apps `std`-Crates nutzen können. Ich habe empfohlen, die Runtime zu behalten, nicht zurückgefragt und
+seine Zustimmung zum Werkzeug als Zustimmung zu allem gelesen. Bemerkt am 2026-11-07, einen Tag vor der geplanten
+Veröffentlichung. Heute bricht jede App mit einer `std`-Crate mit E0152 ab (doppelter Panic-Handler).
+
+**Ziel:** Die Bibliothek bleibt `no_std`. Eine App darf ein gewöhnliches `std`-Programm sein und jede `std`-Crate
+einbinden. Empfohlen bleibt eine App in `no_std`.
+
+**Entscheidungen des Nutzers** (2026-11-07, im Wortlaut):
+
+- „Wenn Linux Fenster Apps nur unter Linux gebaut werden können dann ist das so. Hauptsache es funktioniert.“
+- „Permissions bleibt bei raus.“ Geklärt in CR6d: `PERMISSIONS` bleibt freiwillig wie heute („Ja, behalten“); eine
+  `std`-App braucht die Datei nicht, und für sie wird nichts erzwungen.
+- In die Doku und auf die Website: Apps ebenfalls in `no_std` entwickeln; eigene Fensterschleifen und
+  Async-Laufzeiten können Probleme machen; mit JFLib steckt man nicht wie bei egui eframe und andere UI-Crates
+  zusammen, alles kommt aus einer Hand und liegt schon vor. „Ich denke mal, dass einige aus Gewohnheit so etwas
+  einbauen würden.“
+
+**Teilschritte:**
+
+- **CR6a: Runtime aufteilen.** Panic-Handler, Allocator und Einstieg stecken nicht mehr fest in `rt`. Eine
+  `no_std`-App bekommt sie wie heute über `ui::main!` und `rt::main!`, ihr Code ändert sich nicht. Eine `std`-App hat
+  ein gewöhnliches `fn main()` und ruft darin die Oberfläche auf (`ui::launch`); JFLibs Absturzbericht hängt sich als
+  Panic-Hook von `std` ein. Der Allocator aus `rt` läuft auch unter `std` (am 2026-11-04 gemessen); eine `std`-App
+  nimmt den des Systems oder mit einer Zeile den von `rt`, und eine App mit eigenem (etwa mimalloc) kollidiert nicht
+  mehr. Nebenbei kann `modrt` dann neben `rt` liegen (heute zwei Panic-Handler).
+- **CR6b: Start, Ende und Threads unter `std`.** `plat` bekommt Argumente und Umgebung auch ohne eigenen Einstieg.
+  Das Ende geht über `std`, damit gepufferte Ausgaben (`println!`) nicht verloren gehen. Threads entstehen über
+  pthreads, sobald glibc gelinkt ist (die Programme mit Fenster tun das seit dem GPU-Umbau); der rohe `clone` ohne
+  Thread-lokalen Speicher bleibt den statischen `no_std`-Programmen, denn auf ihm stürzt `thread_local!` einer
+  `std`-Crate ab.
+- **CR6c: Bauen und Linken je Ziel.** `jflib-build` gibt einer `std`-App keine eigenen Einstiegs- und Link-Argumente
+  (`/ENTRY`, `/NODEFAULTLIB`, die glibc-Stubs).
+
+  | Ziel | Eine `std`-App braucht | Gebaut auf |
+  | --- | --- | --- |
+  | Windows | die C-Runtime von Microsoft (Visual Studio Build Tools, die Rust ohnehin braucht) | Windows |
+  | Linux mit Fenster | glibc mit Startdateien und `libgcc_s` | Linux (Entscheidung oben); `cargo zigbuild` unter Windows nur prüfen, nicht versprechen |
+  | Linux ohne Fenster | musl, statisch | Windows und Linux, zu prüfen |
+  | Android | das NDK wie heute | wie heute |
+  | Browser | `std` für `wasm32` (Dateien, Netz, Threads melden „nicht unterstützt“) | wie heute |
+
+- **CR6d: `PERMISSIONS`.** Entschieden am 2026-11-07: behalten, freiwillig wie heute („Ja, behalten“). Die
+  Bedingung des Nutzers dafür: drin lassen nur, „wenn es keine Nachteile hat, und einfach nur drinne liegt für die
+  Leute, die das wirklich komplett no_std machen wollen. Wenn es heißt, man muss groß etwas anpassen, sobald man mit
+  std anfängt, dann nein.“ Die Fakten dazu: `PERMISSIONS` ist schon heute
+  freiwillig, ohne die Datei darf eine App alles (`docs/PERMISSIONS.md`); dann gibt es keine Rückfragen und die
+  Pakete bekommen weite Rechte. Wechselt eine App zu `std`, muss sie nichts anpassen; mit der Datei prüft `plat`
+  weiter seine eigenen Aufrufe (Dateidialog, Bibliothek, Skripte), `std::fs` und `std::net` laufen daran vorbei. Der
+  einzige Nachteil ist eine falsche Sicherheit in einer `std`-App mit der Datei. Umsetzung: die Vorlage von
+  `cargo jflib new --std` ohne `PERMISSIONS` (die `no_std`-Vorlage hat heute `fs.user`); `jflib-build` warnt bei
+  einer `std`-App mit der Datei, dass sie nur JFLibs eigene Aufrufe abdeckt. Auf `std`-Code wirken nur die
+  Rechte von Flatpak und die `sandbox`-Zeile, weil das Betriebssystem sie durchsetzt; die `sandbox`-Zeile nur, wenn
+  sie vor dem ersten Thread greift (Landlock gilt für den aufrufenden Thread und die danach gestarteten), in einer
+  `std`-App also als Erstes in `main`. Ob die seccomp-Sperrliste glibc und `std` etwas verbietet, was sie brauchen,
+  prüft CR6g. Ganz entfernen hieße, die Prüfungen in `plat`, den Rückfrage-Dialog, die `sandbox`-Zeile und die Rechte
+  der Pakete auszubauen; Flatpak-Pakete bekämen dann immer die weiten Rechte.
+- **CR6e: Vorlage und `cargo jflib`.** `cargo jflib new NAME` bleibt `no_std` (die Empfehlung), `cargo jflib new
+  --std NAME` legt eine `std`-App an. `test`, `watch`, `web`, `android` und `package` arbeiten mit beiden.
+- **CR6f: Doku und Website.** Die Texte aus CR5, die das Verbot als Regel beschreiben, werden berichtigt
+  (`docs/GUIDE.md` §1 und §2, `docs/VERSIONING.md`, `docs/PERMISSIONS.md`, die README der Fassade). Dazu die
+  Punkte des Nutzers oben, in der Anleitung und in der README der Fassade, die Agenten lesen. Auf der Website
+  (Repo `jflibWebsite`, englisch) gehört dieselbe Botschaft auf die Start- und die Features-Seite; den Text dort
+  zuerst mit dem Nutzer abstimmen.
+- **CR6g: Abnahme.** `crates_accept.py` baut eine `std`-App mit `std::thread`, `std::fs`, `println!` und einer
+  `std`-Crate (aus einem Pfad, damit es offline bleibt): unter Windows; für Linux mit Fenster auf dem
+  Fedora-Rechner oder nativ in WSL; Linux ohne Fenster mit musl; Android im Emulator; im Browser. Unter Linux und
+  Windows einmal mit einer `PERMISSIONS`-Datei samt `sandbox`-Zeile: die App startet und `std` läuft; unter Linux
+  scheitert ein verbotener Pfad auch über `std::fs` (Landlock; die Mitigation Policies von Windows sperren keine
+  Pfade). Die bisherigen `no_std`-Prüfungen bleiben.
+
+**Risiken:** Code einer `std`-Crate auf einem Thread von `plat` (CR6b); zwei Fensterschleifen oder eine
+Async-Laufzeit auf dem Hauptthread; unter Windows die COM-Initialisierung, wenn eine andere Crate sie anders
+wünscht. Die Doku nennt das (CR6f), technisch verhindern lässt es sich nicht.
+
+### CR7: Auszug und Veröffentlichung
 
 Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zurückziehen (yank), nicht löschen.
 
@@ -435,6 +517,10 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
 4. Die Hinweise „bis die Crates auf crates.io sind: `cargo install --path lib/cargo_jflib`“ aus `README.md` und
    `docs/GUIDE.md` nehmen.
 
+Vorher zu entscheiden: die Version. `CHANGELOG.md` hat schon `[0.1.0] - 2026-10-20` (ohne Git-Tag), und
+`api-diff` verlangt seitdem 0.2.0 (27 Brüche bis CR5, dazu `#[non_exhaustive]` an 172 Enums vom 2026-11-07).
+Entweder `python build_rs.py release 0.2.0` und 0.2.0 hochladen, oder das interne 0.1.0 im Changelog umbenennen.
+
 Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Reserviert ist damit nichts.
 
 ## Reihenfolge
@@ -443,7 +529,8 @@ Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Rese
 CR0 -> CR1 -> CR2   lokal kompatibel, das Ziel für jetzt
               CR3   nur noch ein Bausystem
               CR4, CR5   vor dem Crate-Release, unabhängig voneinander
-              CR6   mit eigener Zusage
+              CR6   Apps mit std, vor dem Crate-Release
+              CR7   mit eigener Zusage
 ```
 
 Die Punkte von CR0 lassen sich parallel bearbeiten. CR1 und CR3 berühren `build_rs.py` an vielen Stellen und sollten
