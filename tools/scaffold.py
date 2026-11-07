@@ -1027,6 +1027,9 @@ def create_app(root, name, kind="window", style="winui", title=None, crates=(), 
 
 # ---------------------------------------------------------------- library crates
 FACADE_ANCHOR = "style_winui"       # the first style: the facade and the root manifest list the library crates before it
+# lib/jflib/src/lib.rs: the styles are modules with their STYLE only, a new crate's `pub use` goes before the
+# hidden building block that comes last among the crates
+FACADE_USE_ANCHOR = "#[doc(hidden)]\npub use style_assets;"
 LIB_MAIN = """\
 // @NAME@ -- @TITLE@
 //
@@ -1126,7 +1129,7 @@ def create_lib(root, name, deps=(), title=None, libs=(), crates=()):
     gendoc = root / "tools" / "gendoc.py"
     writes = [edit(workspace, lambda t: register_workspace(t, name)),
               edit(facade, lambda t: before(t, f"{FACADE_ANCHOR}.workspace = true", f"{name}.workspace = true\n", "lib/jflib/Cargo.toml")),
-              edit(facade_uses, lambda t: before(t, f"pub use {FACADE_ANCHOR};", f"pub use {name};\n", "lib/jflib/src/lib.rs")),
+              edit(facade_uses, lambda t: before(t, FACADE_USE_ANCHOR, f"pub use {name};\n", "lib/jflib/src/lib.rs")),
               edit(gendoc, lambda t: register_gendoc(t, name, title))]
     v = {"NAME": name, "TITLE": title, "DEPS_TEXT": ", ".join(order) or "none", "PACKAGE": "jflib-" + name.replace("_", "-"),
          "DEPS": "".join(f"{d}.workspace = true\n" for d in order)}
