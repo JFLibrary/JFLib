@@ -248,6 +248,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** A finger on a tool window's frame stays with the window under the finger: Windows moves such a contact's position onto the frame and keeps it off by that, so its contact rectangle counts, and the frame is never the system's; `jfgui_TOUCH_LOG=1` says where a finger went
 - **plat:** plat links kernel32 through raw-dylib everywhere: a Windows program needs no import library, so no Visual Studio and no Windows SDK
 - **build:** cargo jflib web and android ship the font and icon licences of the styles (OFL-*.txt, DejaVu-LICENSE.txt, LICENSE-FluentSystemIcons.txt in the style crates' assets/)
+- **plat:** plat::web::RequestStatus is exhaustive again: jflib-ui did not compile for the browser and Android since the enums became #[non_exhaustive]
 
 ### Security
 
