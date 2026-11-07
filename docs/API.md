@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -99,7 +99,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
-  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs)
+  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [plugin](#plugin) -- the PaintCraft plugin ABI for plugins written in Rust
   <br>[lib.rs](#plugin-crate-root) · [abi.rs](#pluginabirs) · [api.rs](#pluginapirs) · [ft.rs](#pluginftrs) · [fx.rs](#pluginfxrs)
 
@@ -208,6 +208,18 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   --unregister, assoc.rs).  A Cargo build hands both over as files (JFGUI_PERMISSIONS_FILE with
   --cfg jfgui_manifest, JFGUI_PACKAGE_FILE with --cfg jfgui_package), because an environment
   variable of a build script holds one line only.
+
+  In a program with std (feature `std` of jflib) it also defines `fn main`, which hands over to
+  plat's start of a std program (`plat::std_start`: crash handlers, the panic hook, then
+  `jfgui_main`, the end through `std::process::exit`); the crate then has neither `#![no_std]`
+  nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
+  the program's own calls `jflib::plat::std_start()`.
+
+- **`main!(...)`**
+  (see above)
+
+- **`__jfgui_main!(...)`**
+  ui::main!'s `jfgui_main`, without and with std
 
 - **`struct AppDesc`**
   the app descriptor (APP_DESC): title, AF_\* flags, sizes in DIP, accent 0xRRGGBB.  Write
@@ -22791,6 +22803,7 @@ UNICODE_VERSION: &str = "15.1.0"
 plat -- the platform layer: one module per OS with the same functions  [src/plat]
 
   process: entry point (calls the app's jfgui_main), args(), arg_value(name), exit(code),
+           std_start() (feature std: the start of a program with std, from its fn main),
            write_stdout / write_stderr, time_us(), sleep_ms(ms), date()
   environment: env(name) (= getenv), setenv(name, Some / None), config_dir(), temp_dir(), cwd()
   folders: user_dir(DIR_DOCUMENTS ..) (desktop, documents, downloads, pictures, music,
@@ -23641,6 +23654,33 @@ randomness is worse than no key).
 
 - **`fn random_u64() -> u64`**
   a random 64-bit number
+
+### `plat/hosted.rs`
+
+Source: [`lib/plat/hosted.rs`](../lib/plat/hosted.rs)
+
+```text
+hosted -- a program with the standard library (feature std, docs/CRATES.md CR6); the only file
+of plat that names std, compiled only with that feature.  Its start is std's (the C runtime's
+entry, std's main), so plat has no entry point of its own: the program's fn main calls
+std_start (win.rs, linux_glibc.rs), which sets up what plat's entry sets up without std.
+rt::main! and ui::main! write that fn main.
+
+  exit(code)          plat::exit: std::process::exit, which writes out what std's stdout holds
+  jfgui_std_start()   the symbol the fn main of rt::main! and ui::main! calls: std_start()
+  std_start()         (browser, Android) the host starts the app there (web.rs), never a fn main
+  initial_block()     (Linux) argc, argv[], 0, envp[], 0 from std, as the kernel lays them out
+```
+
+- **`fn exit(code: i32) -> !`**
+  end the process: std::process::exit, which writes out what std's stdout still holds; from any
+  thread, not from a crash handler
+
+- **`fn jfgui_std_start() -> !`**
+  what rt::main!'s and ui::main!'s `fn main` calls: [`std_start`](crate::std_start)
+
+- **`fn std_start() -> !`**
+  In the browser and on Android the host starts the app (web.rs), never a `fn main`.
 
 ### `plat/cpu.rs`
 
@@ -27337,6 +27377,11 @@ threads, wake-up: win_thread.rs; the user32/gdi32 windows: win_api.rs)
 
 - **`extern "system" fn mainCRTStartup() -> !`**
 
+- **`fn std_start() -> !`**
+  (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+  program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
+  through std::process::exit
+
 - **`fn time_us() -> u64`**
 
 - **`fn sleep_ms(ms: u32)`**
@@ -29329,6 +29374,9 @@ docs/GPU.md "Linux"): every Linux GPU driver is a glibc library
   _start, glibc_main          the process start through __libc_start_main (ld.so has set up the
                               main thread's TLS and run libc's initialisers by then), then what
                               linux_entry does in a static program
+  std_start()                 (feature std: every program with std on Linux is this build) the
+                              start from the program's fn main, std's arguments and environment
+                              as plat reads them from the initial stack, the end through std
   exit(code)                  plat::exit: glibc's exit (atexit handlers, the destructors of the
                               loaded libraries, stdio); so does returning from the program's main.
                               Crash reports end in rt::os::exit as everywhere: exit_group, no
@@ -29350,6 +29398,11 @@ driver's thread may call back into it (debug messages); a child after a raw fork
 calls until its exec.  plat::setenv changes JFLib's list, which plat::env and child processes see;
 a driver's getenv reads the start environment.
 ```
+
+- **`fn std_start() -> !`**
+  (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+  program's own): std's arguments and environment as a block like the initial stack, then what
+  glibc_main does, with rt's panic hook first; the end through std::process::exit
 
 - **`fn exit(code: i32) -> !`**
   end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
@@ -45455,7 +45508,10 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::cpu  CPU feature bits (CPUID, cached; force_baseline for --simd sse2)
   rt::crash the crash hook, CrashInfo, report (exit 3) -- also for panics
   rt::boot  what build_rs.py builds into a program (name, manifest, assets) for plat's start
-  rt::main!(body)  the entry symbol of console programs (boot first, then body)
+  rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
+           feature std also their fn main
+  rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+  rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
@@ -45490,6 +45546,21 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   program with exit code 2.  A Cargo build hands the manifest over as a file
   (JFGUI_PERMISSIONS_FILE with --cfg jfgui_manifest), because an environment variable of a build
   script holds one line only.
+
+  In a program with std (feature `std`) it also defines `fn main`, which hands over to plat's
+  start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
+  the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
+
+- **`main!(...)`**
+  (see above)
+
+- **`__jfgui_main!(...)`**
+  rt::main!'s `jfgui_main`, without and with std
+
+- **`__std_main!(...)`**
+  the `fn main` of a program with std: plat's start (jfgui_std_start), which calls jfgui_main.  In
+  a library crate (an app whose program only links it, like the template) it is not the entry
+  point and stays unused: the program's own main calls `plat::std_start()`.
 
 **`mod portable`**
 
@@ -45903,6 +45974,23 @@ binary64 series; native x87 remains unchanged and is the comparison reference.
 
 - **`fn sin(x: f64) -> f64`**
   Scalar sine using the common angle reduction.
+
+### `rt/hosted.rs`
+
+Source: [`lib/rt/hosted.rs`](../lib/rt/hosted.rs)
+
+```text
+hosted -- what rt has for a program with the standard library (feature std, docs/CRATES.md
+CR6); the only file of rt that names std, compiled only with that feature.  std brings the panic
+handler, the allocator and the memory functions then (lib.rs, mem.rs and os.rs leave theirs out).
+
+  panic_hook()   std's panics end as rt's panic handler ends them without std
+```
+
+- **`fn panic_hook()`**
+  (feature std) std's panics end as rt's panic handler ends them without std: one line on stderr,
+  the crash hook, exit code 3.  plat's start of a std program installs it; replacing it with
+  `std::panic::set_hook` gives up JFLib's crash report for panics.
 
 ## plugin
 

@@ -428,8 +428,9 @@ Der ursprüngliche Plan:
 
 ### CR6: Apps mit `std`
 
-Mittel bis groß, vor der Veröffentlichung. Geplant am 2026-11-07, umgesetzt am selben Tag bis auf die Website
-(CR6f) und die Abnahme (CR6g); der Stand steht bei jedem Teilschritt.
+Mittel bis groß, vor der Veröffentlichung. Geplant, umgesetzt und abgenommen am 2026-11-07; der Stand steht bei
+jedem Teilschritt. Die Website-Texte liegen auf dem Branch `std-apps` im Repo `jflibWebsite`, noch nicht
+veröffentlicht.
 
 **Warum diese Stufe:** Bis CR5 stand hier „kein Betrieb mit `std`“. Das war meine Empfehlung, nicht die Entscheidung
 des Nutzers: Am 2026-11-04 hatte er festgelegt, Panic-Handler, Allocator und Einstieg „muss dann wohl umgebaut
@@ -508,14 +509,28 @@ einbinden. Empfohlen bleibt eine App in `no_std`.
   der Pakete auszubauen; Flatpak-Pakete bekämen dann immer die weiten Rechte.
 - **CR6e: Vorlage und `cargo jflib`.** Umgesetzt: `cargo jflib new NAME` bleibt `no_std` (die Empfehlung),
   `cargo jflib new --std NAME` legt dieselbe App mit `std` an (ohne `#![no_std]`, eigenes `main`, `.cargo/config.toml`
-  nur mit `+crt-static`, ohne `PERMISSIONS`). `test`, `web`, `android` und `package` geprüft; `watch` steht in CR6g.
+  nur mit `+crt-static`, ohne `PERMISSIONS`). `test`, `watch`, `web`, `android` und `package` in CR6g geprüft.
 - **CR6f: Doku und Website.** Im Repo umgesetzt (`docs/GUIDE.md` §1 und „An app with std“, die READMEs von `jflib`
-  und `cargo-jflib`, `docs/PERMISSIONS.md`, `docs/VERSIONING.md`, `README.md`); die Website ist offen. Die Texte aus CR5, die das Verbot als Regel beschreiben, werden berichtigt
+  und `cargo-jflib`, `docs/PERMISSIONS.md`, `docs/VERSIONING.md`, `README.md`). Die Website-Texte (Start- und
+  Features-Seite) hat der Nutzer am 2026-11-07 freigegeben („Ja, so übernehmen“); sie liegen auf dem Branch
+  `std-apps` im Repo `jflibWebsite`. Die Texte aus CR5, die das Verbot als Regel beschreiben, werden berichtigt
   (`docs/GUIDE.md` §1 und §2, `docs/VERSIONING.md`, `docs/PERMISSIONS.md`, die README der Fassade). Dazu die
   Punkte des Nutzers oben, in der Anleitung und in der README der Fassade, die Agenten lesen. Auf der Website
   (Repo `jflibWebsite`, englisch) gehört dieselbe Botschaft auf die Start- und die Features-Seite; den Text dort
   zuerst mit dem Nutzer abstimmen.
-- **CR6g: Abnahme.** `crates_accept.py` baut eine `std`-App mit `std::thread`, `std::fs`, `println!` und einer
+- **CR6g: Abnahme.** Umgesetzt am 2026-11-07. `crates_accept.py` legt `hallo3` mit `cargo jflib new --std` an,
+  mit einer `std`-Crate aus einem Pfad (`HashMap`, `thread_local!`), und prüft unter Windows: `cargo jflib test`;
+  ein Release-Programm, in dem `std::thread`, `std::fs` und `print!` neben JFLib laufen, `thread_local!` der Crate
+  auf einem Thread von `plat` zählt, eine Panic als JFLibs Absturzbericht endet (Exit 3) und keine DLL der C-Runtime
+  importiert wird; `cargo jflib watch` wie bei `hallo2`; den Browser (scalar und SIMD, kein Threads-Modus); die APK;
+  `package` lehnt die Formate des anderen Systems ab. Linux baut das Skript nur auf einem Linux-Rechner. Von Hand:
+  Fedora (KDE Wayland, `smoke.uis` mit Fenster), Android im Emulator, der Browser (Klicks zählen). Mit
+  `PERMISSIONS` samt `sandbox`-Zeile: unter Linux greifen Landlock und seccomp, ein erlaubter Pfad lässt sich über
+  `std::fs` schreiben, ein verbotener nicht, auch nicht von einem `std::thread` aus; die Sperrliste von seccomp
+  verbietet dort nichts, was glibc und `std` für Threads, Dateien und Ausgaben brauchen (geprüft ohne Fenster).
+  Unter Windows startet die App, `std` läuft, die Mitigation Policies sind an, Pfade sperren sie wie erwartet nicht.
+  Linux ohne Fenster mit musl entfällt (siehe CR6b). Der Plan dazu lautete:
+  `crates_accept.py` baut eine `std`-App mit `std::thread`, `std::fs`, `println!` und einer
   `std`-Crate (aus einem Pfad, damit es offline bleibt): unter Windows; für Linux mit Fenster auf dem
   Fedora-Rechner oder nativ in WSL; Linux ohne Fenster mit musl; Android im Emulator; im Browser. Unter Linux und
   Windows einmal mit einer `PERMISSIONS`-Datei samt `sandbox`-Zeile: die App startet und `std` läuft; unter Linux

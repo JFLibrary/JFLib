@@ -37,6 +37,13 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           `cargo jflib watch -- --script tests/watch.uis` (headless, no window): the app runs in
           its session, a saved change builds and starts it again, a broken source keeps the
           old build and fills build.txt, Ctrl+Break ends watch.
+  hallo3  made by `cargo jflib new --std` (docs/CRATES.md, CR6) with a std crate from a path:
+          `cargo jflib test`; a release program whose std::thread, std::fs and print! work next to
+          JFLib, whose std crate's thread_local! counts on a thread of plat, whose panic ends as
+          JFLib's crash report (exit 3), and which imports no C runtime DLL (+crt-static); the
+          browser (scalar and SIMD), the APK; watch as for hallo2; package refuses the other
+          system's formats.  Linux
+          only on a Linux machine (a program with std is built there).
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 """
@@ -476,13 +483,16 @@ def check_watch(run, app, jenv, target_dir):
     its session, a saved change built and started again, a broken source keeps the old build and
     fills build.txt, the fixed one builds again, Ctrl+Break (Ctrl+C) ends watch"""
     import signal
+    name = app.name
+    tag = "" if name == "hallo2" else f"{name}: "
+    (app / "tests").mkdir(exist_ok=True)
     (app / "tests" / "watch.uis").write_text('click "Klick mich"\nexpect text:"Klicks: 1" exists\nshot target/watch.png\n', encoding="utf-8")
     (app / "target").mkdir(exist_ok=True)
-    shot, session = app / "target" / "watch.png", target_dir / "jflib-watch" / "hallo2"
+    shot, session = app / "target" / "watch.png", target_dir / "jflib-watch" / name
     shot.unlink(missing_ok=True)
     src = app / "src" / "lib.rs"
     original = src.read_bytes()
-    log = run.log / "cargo-jflib-watch.log"
+    log = run.log / f"cargo-jflib-watch-{name}.log"
     text = lambda: log.read_text(encoding="utf-8", errors="replace")  # noqa: E731
     out = open(log, "w", encoding="utf-8")
     proc = subprocess.Popen(["cargo", "jflib", "watch", "--", "--script", "tests/watch.uis"], cwd=app, env=dict(os.environ, **jenv),
@@ -494,12 +504,12 @@ def check_watch(run, app, jenv, target_dir):
         while time.monotonic() < end and proc.poll() is None:
             try:
                 if cond():
-                    run.check(True, what)
+                    run.check(True, tag + what)
                     return True
             except OSError:
                 pass
             time.sleep(0.5)
-        run.fail(f"{what} (log/cargo-jflib-watch.log)\n    " + text().strip()[-600:].replace("\n", "\n    "))
+        run.fail(f"{tag}{what} (log/{log.name})\n    " + text().strip()[-600:].replace("\n", "\n    "))
         return False
 
     code = None
@@ -525,7 +535,7 @@ def check_watch(run, app, jenv, target_dir):
             except subprocess.TimeoutExpired:
                 proc.kill()
         out.close()
-    run.check(code == 0 and "watch: ending" in text(), f"Ctrl+Break ends watch (exit {code})")
+    run.check(code == 0 and "watch: ending" in text(), f"{tag}Ctrl+Break ends watch (exit {code})")
 
 
 def check_appimage(run, image, program, app):
@@ -598,6 +608,130 @@ def check_msix(run, dist):
     want = {"AppxManifest.xml", "AppxBlockMap.xml", "hallo2.exe", "Assets/StoreLogo.png", "Assets/Wide310x150Logo.png"}
     run.check(want <= names and any(n.startswith("licenses/jflib-style-") for n in names), f"the MSIX holds the program, the logos, the licences ({len(names)} files)")
 
+
+# ---------------------------------------------------------------- an app with std (CR6)
+STD_CRATE = """//! stdcrate -- an ordinary std crate: a HashMap and thread_local!
+use std::cell::Cell;
+use std::collections::HashMap;
+
+thread_local! {
+    static CALLS: Cell<u32> = const { Cell::new(0) };
+}
+
+/// the number of different words, and how often this thread called it so far
+pub fn count_words(text: &str) -> (usize, u32) {
+    let mut m: HashMap<&str, usize> = HashMap::new();
+    for w in text.split_whitespace() {
+        *m.entry(w).or_default() += 1;
+    }
+    let calls = CALLS.with(|c| {
+        c.set(c.get() + 1);
+        c.get()
+    });
+    (m.len(), calls)
+}
+"""
+
+# at the start of ui::main!'s body in hallo3's src/lib.rs: std next to JFLib, without a window
+STD_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--std-panic") {
+        panic!("std panic check");
+    }
+    if jflib::plat::args().iter().any(|a| a == "--std-check") {
+        let (words, calls) = std::thread::spawn(|| stdcrate::count_words("a b a")).join().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let th = jflib::plat::thread_spawn(0, Box::new(move || {
+            let _ = tx.send((stdcrate::count_words("x").1, stdcrate::count_words("y").1));
+        }));
+        let tls = match th {
+            Some(t) => {
+                t.join();
+                rx.recv().unwrap_or((0, 0))
+            }
+            None => (0, 0),
+        };
+        let file = std::env::temp_dir().join("hallo3-std-check.txt");
+        let fs = std::fs::write(&file, "std").is_ok() && std::fs::read_to_string(&file).is_ok_and(|s| s == "std");
+        print!("std words={words} calls={calls} tls={},{} fs={fs}", tls.0, tls.1);
+        return 0;
+    }
+"""
+STD_WANT = "std words=2 calls=1 tls=1,2 fs=true"
+
+
+def pe_imports(exe):
+    """the DLLs a PE program imports"""
+    import struct
+    d = Path(exe).read_bytes()
+    pe = struct.unpack_from("<I", d, 0x3C)[0]
+    n, opt = struct.unpack_from("<H", d, pe + 6)[0], struct.unpack_from("<H", d, pe + 20)[0]
+    secs = [struct.unpack_from("<8sIIII", d, pe + 24 + opt + 40 * i) for i in range(n)]
+
+    def off(rva):
+        return next(rva - va + ro for _, vs, va, rs, ro in secs if va <= rva < va + max(vs, rs))
+    o, names = off(struct.unpack_from("<I", d, pe + 24 + 120)[0]), []
+    while True:
+        entry = struct.unpack_from("<IIIII", d, o)
+        if entry[3] == 0:
+            return names
+        s = off(entry[3])
+        names.append(d[s:d.index(b"\0", s)].decode())
+        o += 20
+
+
+def check_std(run, made, vendor, targets, jenv, target_dir):
+    """hallo3: `cargo jflib new --std` and a std crate from a path; std's threads, files and output,
+    thread_local! on a thread of plat, a panic as JFLib's crash report; the browser and Android"""
+    if not run.cmd("cargo-jflib-new-std", ["cargo", "jflib", "new", "--std", "hallo3"], made, jenv):
+        return
+    app = made / "hallo3"
+    run.check(not (app / "PERMISSIONS").exists() and "+crt-static" in (app / ".cargo" / "config.toml").read_text(encoding="utf-8"),
+              "cargo jflib new --std: no PERMISSIONS, the C runtime linked in on Windows")
+    cfg = app / ".cargo" / "config.toml"
+    cfg.write_text(cfg.read_text(encoding="utf-8") + source_config(vendor), encoding="utf-8")
+    (app / "stdcrate" / "src").mkdir(parents=True)
+    (app / "stdcrate" / "Cargo.toml").write_text('[package]\nname = "stdcrate"\nversion = "0.1.0"\nedition = "2024"\n', encoding="utf-8")
+    (app / "stdcrate" / "src" / "lib.rs").write_text(STD_CRATE, encoding="utf-8")
+    toml = app / "Cargo.toml"
+    toml.write_text(toml.read_text(encoding="utf-8").replace("[dependencies]\n", '[dependencies]\nstdcrate = { path = "stdcrate" }\n', 1),
+                    encoding="utf-8")
+    lib = app / "src" / "lib.rs"
+    text = lib.read_text(encoding="utf-8")
+    run.check("ui::main!({\n" in text, "hallo3's src/lib.rs has ui::main!")
+    lib.write_text(text.replace("ui::main!({\n", "ui::main!({\n" + STD_CHECK, 1), encoding="utf-8")
+    (app / "target").mkdir(exist_ok=True)
+    if "win" in targets:
+        run.cmd("hallo3-test", ["cargo", "jflib", "test"], app, jenv)
+        if run.cmd("hallo3-win-release", ["cargo", "build", "--release", "--target", WIN], app, jenv):
+            exe = target_dir / WIN / "release" / "hallo3.exe"
+            r = subprocess.run([exe, "--std-check"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+            run.check(r.returncode == 0 and r.stdout == STD_WANT, f"hallo3 --std-check: {r.stdout!r} (exit {r.returncode})")
+            r = subprocess.run([exe, "--std-panic"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+            run.check(r.returncode == 3 and "panic: panicked at" in r.stderr and "std panic check" in r.stderr,
+                      f"hallo3 --std-panic: JFLib's crash report, exit 3 (exit {r.returncode}: {r.stderr.strip()[-200:]})")
+            crt = [n for n in pe_imports(exe) if n.lower().startswith(("vcruntime", "api-ms-win-crt", "ucrtbase", "msvcp"))]
+            run.check(not crt, f"hallo3.exe imports no C runtime DLL (+crt-static): {crt}")
+    if "linux" in targets:
+        if sys.platform.startswith("linux"):
+            if run.cmd("hallo3-linux", ["cargo", "build", "--target", LINUX], app, jenv):
+                r = subprocess.run([target_dir / LINUX / "debug" / "hallo3", "--std-check"], cwd=app, capture_output=True, text=True, timeout=120)
+                run.check(r.returncode == 0 and r.stdout == STD_WANT, f"hallo3 --std-check on Linux: {r.stdout!r}")
+        else:
+            run.notes.append("hallo3 for Linux: a program with std is built on Linux itself (run this there; Fedora by hand on 2026-11-07)")
+    if "web" in targets and run.cmd("hallo3-web", ["cargo", "jflib", "web"], app, jenv):
+        site = target_dir / "jflib-web" / "hallo3"
+        run.check((site / "hallo3.wasm").is_file() and (site / "hallo3.simd.wasm").is_file() and not (site / "hallo3.threads.wasm").exists(),
+                  "cargo jflib web with std: scalar and SIMD, no threads mode")
+    if "android" in targets and not android_missing():
+        if run.cmd("hallo3-android", ["cargo", "jflib", "android", "--abi", "x86_64"], app, jenv):
+            apk = target_dir / "jflib-android" / "hallo3-x86_64-debug.apk"
+            bad = apk_problems(apk) if apk.is_file() else [f"{apk} missing"]
+            run.check(not bad, "cargo jflib android with std" + "".join("\n    " + b for b in bad))
+    if "watch" in targets:
+        check_watch(run, app, jenv, target_dir)
+    if "package" in targets:
+        r = subprocess.run(["cargo", "jflib", "package", "--formats", "deb" if os.name == "nt" else "setup"], cwd=app,
+                           env=dict(os.environ, **jenv), capture_output=True, text=True, timeout=600)
+        run.check(r.returncode != 0 and "made on" in r.stderr, "cargo jflib package refuses the other system's formats for an app with std")
 
 def out_file(project, target_dir, triple, profile, name):
     """a file the build script of the project wrote to its OUT_DIR"""
@@ -726,6 +860,7 @@ def accept(targets, out):
                 from tools import pkg_check
                 from tools.host_exec import run_linux
                 run_linux(["python3", pkg_check.lp(ROOT / "tools" / "pkg_check.py"), "--inside-linux", "gpgdrop", keys.home], cwd=app, timeout=120)
+        check_std(run, made, vendor, targets, jenv, target_dir)
     run.cmd("jflib-build-tests", ["cargo", "test", "-p", "jflib-build", "--offline"], ROOT)
     run.cmd("cargo-jflib-tests", ["cargo", "test", "-p", "cargo-jflib", "--offline"], ROOT)
     return run
