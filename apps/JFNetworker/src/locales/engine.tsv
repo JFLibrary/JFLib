@@ -739,6 +739,7 @@ der Absender ist keine Link-Local-Adresse	the sender is not a link-local address
 eine Adressprüfung muss an eine Solicited-Node-Gruppe gehen	an address check must go to a solicited-node group
 ein unspezifizierter Absender mit Link-Layer-Adresse	an unspecified sender with a link-layer address
 eine Antwort an eine Multicast-Gruppe	an answer to a multicast group
+keine gültige Neighbor-Discovery-Nachricht	not a valid Neighbor Discovery message
 Router Solicitation über {}: gibt es hier einen Router?	Router solicitation via {}: is there a router here?
 Router Solicitation von {} an {}: ein Router Advertisement folgt.	Router solicitation from {} on {}: a router advertisement follows.
 Router Advertisement über {} an {} (auf Anfrage): Lebensdauer {} s, Präfixe: {}.	Router advertisement via {} to {} (on request): lifetime {} s, prefixes: {}.
