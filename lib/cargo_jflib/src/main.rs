@@ -2,7 +2,7 @@
 //! bundle for the browser.  `cargo install cargo-jflib`, then:
 //!
 //! ```text
-//! cargo jflib new NAME                 a new app NAME from the template (a window)
+//! cargo jflib new [--std] NAME         a new app NAME from the template (a window); --std: with std
 //! cargo jflib test [-p PKG] [--release] [--target TRIPLE]
 //!                                      build, then run every tests/*.uis with --script
 //! cargo jflib watch [-p PKG] [-- ARGS]  hot reload: built again and restarted in its session on a save
@@ -48,8 +48,9 @@ use std::process::ExitCode;
 const HELP: &str = "cargo jflib -- a JFLib app's new project, tests, browser bundle, APK and packages
 
 USAGE:
-    cargo jflib new NAME
-        a new app NAME from the template: a window, its tests, Linux and Windows settings
+    cargo jflib new [--std] NAME
+        a new app NAME from the template: a window, its tests, Linux and Windows settings;
+        --std: an app with the standard library (jflib's feature std), so it may use std crates
     cargo jflib test [-p PKG] [--release] [--target TRIPLE]
         build, then run every tests/*.uis of the package with --script
     cargo jflib watch [-p PKG] [-- ARGS]
@@ -85,6 +86,8 @@ pub(crate) struct Opts {
     pub target: Option<String>,
     pub modes: Option<String>,
     pub serve: Option<u16>,
+    /// (new) an app with std: jflib's feature std
+    pub std: bool,
     pub free: Vec<String>,
 }
 
@@ -99,6 +102,7 @@ pub(crate) fn opts(args: &[String]) -> Result<Opts, String> {
         match args[i].as_str() {
             "-p" | "--package" => o.package = Some(value(&mut i, "-p")?),
             "--release" => o.release = true,
+            "--std" => o.std = true,
             "--target" => o.target = Some(value(&mut i, "--target")?),
             "--modes" => o.modes = Some(value(&mut i, "--modes")?),
             "--serve" => {

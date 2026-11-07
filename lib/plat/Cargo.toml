@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+build = "build.rs"
 
 [lib]
 name = "plat"
@@ -15,6 +16,11 @@ doctest = false
 
 [lints]
 workspace = true
+
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): no entry point of its own, std_start
+# instead; on Linux plat's glibc build (pthreads, the dynamic linker), as for the GPU drivers
+std = ["rt/std"]
 
 [dependencies]
 # compress: LZ4 of the app:// bundles (vfs); crypto: DH, AES, SHA-256 (secret)

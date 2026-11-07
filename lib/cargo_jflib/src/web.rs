@@ -101,7 +101,13 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
                             (the template of cargo jflib new)", p.package.name));
     };
     let explicit = o.modes.is_some();
-    let mut modes: Vec<String> = o.modes.as_deref().unwrap_or("scalar,simd,threads").split(',').map(String::from).collect();
+    // a program with std: std for wasm32 comes prebuilt without atomics, so no threads mode
+    let all = if p.package.std { "scalar,simd" } else { "scalar,simd,threads" };
+    let mut modes: Vec<String> = o.modes.as_deref().unwrap_or(all).split(',').map(String::from).collect();
+    if p.package.std && modes.iter().any(|m| m == "threads") {
+        return Err("the browser's threads mode needs a standard library built with atomics, which rustup does not ship: \
+                    a program with std (jflib's feature std) runs in the modes scalar and simd".to_string());
+    }
     let work = p.target_dir.join("jflib-web");
     let mut sys = None;
     if modes.iter().any(|m| m == "threads") {

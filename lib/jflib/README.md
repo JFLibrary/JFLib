@@ -11,7 +11,7 @@ item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crat
 
 ```sh
 cargo install cargo-jflib
-cargo jflib new hallo
+cargo jflib new hallo         # or new --std hallo: an app with std (below)
 cd hallo
 cargo run
 cargo jflib test              # runs tests/*.uis
@@ -30,7 +30,7 @@ to `Cargo.toml`).
 | --- | --- |
 | `Cargo.toml` | `jflib`, and `jflib-build` for the build script; the profiles below |
 | `build.rs` | `jflib_build::app()`, or `jflib_build::console()` for a command-line program |
-| `.cargo/config.toml` | the linker (rust-lld, it comes with rustup) and what Linux needs |
+| `.cargo/config.toml` | the linker (rust-lld, it comes with rustup) and what Linux needs (with std only `+crt-static` for Windows) |
 | `src/lib.rs` | the app: a `ui::App` and `ui::main!` |
 | `src/main.rs` | the program, it only links the app, so the same code builds for the browser |
 | `PERMISSIONS` | what the app may do; without the file everything |
@@ -40,6 +40,27 @@ to `Cargo.toml`).
 | `tests/smoke.uis` | a test script, run with `--script` |
 
 Names come from the crate in code: `use jflib::{style, ui};`, then `ui::Ui`, `plat::read_file`.
+
+## Apps with std
+
+JFLib is `no_std` and brings everything an app needs from one hand. Write apps `no_std` as well
+where you can, and look in `docs/API.md` before adding a crate. An app that needs a crate with
+`std` turns on the feature `std` (`cargo jflib new --std` writes such an app):
+
+```toml
+jflib = { features = ["std"], version = "0.1" }
+```
+
+Then `src/lib.rs` has no `#![no_std]`, `src/main.rs` is `extern crate hallo; fn main() {
+jflib::plat::std_start() }`, `.cargo/config.toml` only links the C runtime in on Windows
+(`+crt-static`) and `PERMISSIONS` covers JFLib's own calls only. Linux programs with std are built
+on Linux (cc, glibc); in the browser std has no clock, files or threads and there is no threads
+mode; on Android `std::fs` needs the app's real folder (`docs/GUIDE.md`, "An app with std").
+
+Don't add a second window loop or UI crate (winit, eframe, egui, SDL): `ui::launch` is the whole
+stack, not one crate of several as with egui and eframe. Don't run an async runtime (tokio) on the
+UI thread: JFLib runs `async` blocks itself (`ui.spawn`); a crate that needs tokio gets it on a
+thread of its own, with results back through `plat::wake()`.
 
 ## The profiles
 

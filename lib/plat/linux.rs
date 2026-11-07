@@ -77,7 +77,7 @@ unsafe extern "Rust" {
     fn jfgui_main() -> i32;
 }
 
-#[cfg(not(jfgui_glibc))] core::arch::global_asm!(
+#[cfg(not(any(jfgui_glibc, feature = "std")))] core::arch::global_asm!(
     ".globl _start",
     "_start:",
     "    xor ebp, ebp",
@@ -88,7 +88,7 @@ unsafe extern "Rust" {
     entry = sym linux_entry,
 );
 
-#[cfg(not(jfgui_glibc))] extern "C" fn linux_entry(sp: *const usize) -> ! {
+#[cfg(not(any(jfgui_glibc, feature = "std")))] extern "C" fn linux_entry(sp: *const usize) -> ! {
     // SAFETY: written once before anything reads it, on the only thread.
     unsafe { START_SP = sp };
     crash::crash_init();
@@ -211,4 +211,8 @@ pub fn sleep_ms(ms: u32) {
 #[path = "linux_glibc.rs"]
 mod glibc;
 #[cfg(jfgui_glibc)]
-pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, exit, glibc_thread_ids, glibc_version}; #[cfg(jfgui_glibc)] #[path = "linux_gpuout.rs"] pub(crate) mod gpuout; #[cfg(jfgui_glibc)] pub use gpuout::*;
+pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, glibc_thread_ids, glibc_version};
+#[cfg(all(jfgui_glibc, not(feature = "std")))]
+pub use glibc::exit;
+#[cfg(feature = "std")]
+pub use glibc::std_start; #[cfg(jfgui_glibc)] #[path = "linux_gpuout.rs"] pub(crate) mod gpuout; #[cfg(jfgui_glibc)] pub use gpuout::*;

@@ -8,7 +8,7 @@ cargo install cargo-jflib
 
 | Command | What it does |
 | --- | --- |
-| `cargo jflib new NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux |
+| `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates |
 | `cargo jflib test` | builds the app, then runs every `tests/*.uis` with `--script` |
 | `cargo jflib watch [-- ARGS]` | hot reload: each save of the project's files builds the app again and restarts it in its session, the input replayed so it comes back where it was; a failed build keeps the running version and shows the error in its inspector |
 | `cargo jflib web [--serve]` | the app for the browser in `target/jflib-web/NAME/`: scalar, SIMD and threads, the host page, the licences; `--serve` serves it with the headers threads need |
@@ -17,7 +17,9 @@ cargo install cargo-jflib
 | `cargo jflib android [--abi arm64-v8a\|x86_64] [--release] [--install]` | the app as an APK in `target/jflib-android/NAME-ABI-debug.apk`: the code for one ABI, its Java and C bridge, the licences; signed with a debug key it makes itself, `--release` with yours; `--install` hands it to `adb` |
 
 The browser with threads needs the Rust sources once: `rustup component add rust-src`. Without
-them `web` builds the other two modes.
+them `web` builds the other two modes. An app with std has no threads mode (rustup ships no std
+with atomics), and `package` makes its packages on their own system: `setup` and `msix` on
+Windows, the Linux formats on Linux.
 
 Android needs the Android SDK (build-tools, `platforms;android-36`), the NDK, a JDK 17 or newer and
 the Rust target (`rustup target add aarch64-linux-android x86_64-linux-android`). The SDK is found

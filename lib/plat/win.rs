@@ -36,7 +36,9 @@ unsafe extern "Rust" {
     fn jfgui_main() -> i32;
 }
 
-// PE entry point (lld-link /entry:mainCRTStartup): the app's jfgui_main, then exit
+// PE entry point (lld-link /entry:mainCRTStartup): the app's jfgui_main, then exit; a program
+// with std has the C runtime's
+#[cfg(not(feature = "std"))]
 #[unsafe(no_mangle)]
 pub extern "system" fn mainCRTStartup() -> ! {
     crash::crash_init();
@@ -46,6 +48,21 @@ pub extern "system" fn mainCRTStartup() -> ! {
     // SAFETY: the app defines jfgui_main (ui::main! macro).
     let code = unsafe { jfgui_main() };
     rt::os::exit(code)
+}
+
+/// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+/// program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
+/// through std::process::exit
+#[cfg(feature = "std")]
+pub fn std_start() -> ! {
+    rt::panic_hook();
+    crash::crash_init();
+    thread::wake_init();
+    crate::cpu::simd_override();
+    rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
+    // SAFETY: the app defines jfgui_main (ui::main!, rt::main!).
+    let code = unsafe { jfgui_main() };
+    crate::exit(code) // hosted.rs: std::process::exit
 }
 
 pub fn time_us() -> u64 {

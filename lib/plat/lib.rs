@@ -1,6 +1,7 @@
 // plat -- the platform layer: one module per OS with the same functions  [src/plat]
 //
 //   process: entry point (calls the app's jfgui_main), args(), arg_value(name), exit(code),
+//            std_start() (feature std: the start of a program with std, from its fn main),
 //            write_stdout / write_stderr, time_us(), sleep_ms(ms), date()
 //   environment: env(name) (= getenv), setenv(name, Some / None), config_dir(), temp_dir(), cwd()
 //   folders: user_dir(DIR_DOCUMENTS ..) (desktop, documents, downloads, pictures, music,
@@ -88,6 +89,8 @@
 // The layer knows events, pixel rows, files and threads only -- no UI, no gfx.  One of the
 // four crates that may contain `unsafe` (rt, simd, plat, plugin); nothing unsafe leaves it.
 #![no_std]
+#[cfg(feature = "std")]
+extern crate std;
 
 extern crate alloc;
 
@@ -119,7 +122,14 @@ pub use rand::*;
 
 use alloc::string::String;
 
-#[cfg(not(jfgui_glibc))] pub use rt::os::exit; pub use rt::os::{write_stderr, write_stdout};
+#[cfg(not(any(jfgui_glibc, feature = "std")))] pub use rt::os::exit; pub use rt::os::{write_stderr, write_stdout};
+// a program with std (feature std): its exit and the symbol its fn main calls
+#[cfg(feature = "std")]
+mod hosted;
+#[cfg(feature = "std")]
+pub use hosted::{exit, jfgui_std_start};
+#[cfg(all(feature = "std", any(target_arch = "wasm32", target_os = "android")))]
+pub use hosted::std_start;
 // the library's version (the root Cargo.toml, docs/VERSIONING.md); the app's own: rt::app_version!()
 pub use rt::{VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 

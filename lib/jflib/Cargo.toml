@@ -7,6 +7,8 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 build = "build.rs"
+# DEP_JFLIB_STD for the app's build script (jflib-build): a program with std links differently
+links = "jflib"
 readme = "README.md"
 # docs/ is copied in from the repository's docs/ before packing (tools/crates_accept.py), not kept in git
 include = ["src/**", "build.rs", "README.md", "LICENSE-*", "docs/*.md", "template/**"]
@@ -17,6 +19,12 @@ doctest = false
 
 [lints]
 workspace = true
+
+[features]
+# A program with the standard library (docs/CRATES.md, CR6; docs/GUIDE.md): std's panic handler,
+# allocator and entry instead of JFLib's own, so the app may use any std crate.  Its main.rs has
+# neither #![no_std] nor #![no_main]; ui::main! and rt::main! stay.
+std = ["rt/std", "plat/std", "ui/std", "gpu/std"]
 
 [dependencies]
 rt.workspace = true

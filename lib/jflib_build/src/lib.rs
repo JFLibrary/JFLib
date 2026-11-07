@@ -20,6 +20,9 @@
 //!
 //! The version of the program (`rt::app_version!()`) is the package's version in Cargo.toml.
 //!
+//! A program with std (the feature `std` of jflib) gets the C runtime's entry point and libraries
+//! instead; on Linux it is built on Linux, through the system's cc.
+//!
 //! It also gives the linker what JFLib's own runtime needs: its entry point and no C runtime, on
 //! Windows the subsystem; on Linux one static file or, with `--cfg jfgui_glibc`, a program
 //! against glibc (the libraries to link against are made here, the build machine needs no glibc);
@@ -96,6 +99,11 @@ impl Build {
     }
 }
 
+/// a program with std: jflib's feature std, which jflib's build script hands on as DEP_JFLIB_STD
+pub(crate) fn std_program() -> bool {
+    env::var_os("DEP_JFLIB_STD").is_some()
+}
+
 fn var(name: &str) -> String {
     env::var(name).unwrap_or_else(|_| panic!("{name} is not set: jflib_build runs in a build script"))
 }
@@ -151,6 +159,14 @@ fn run(kind: Kind, app: Option<(String, PathBuf)>) {
             Ok(()) => {
                 out.env("JFGUI_PERMISSIONS_FILE", &manifest);
                 out.cfg("jfgui_manifest");
+                if std_program() {
+                    out.lines.push(
+                        "cargo::warning=PERMISSIONS in a program with std: it covers JFLib's own calls only, std::fs, std::net and \
+                         std crates pass it by; a `sandbox` line has the operating system enforce it for all code (JFLib's \
+                         docs/PERMISSIONS.md)"
+                            .to_string(),
+                    );
+                }
             }
             Err((line, msg)) => {
                 let file = manifest.file_name().map_or("PERMISSIONS".into(), |f| f.to_string_lossy());

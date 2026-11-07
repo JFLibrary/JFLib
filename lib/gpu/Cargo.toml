@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+build = "build.rs"
 
 [lib]
 name = "gpu"
@@ -15,6 +16,10 @@ doctest = false
 
 [lints]
 workspace = true
+
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): on Linux the glibc build, as plat's
+std = ["plat/std"]
 
 [dependencies]
 # shader: shader::reflect (pipeline constants)

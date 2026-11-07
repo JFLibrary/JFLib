@@ -777,13 +777,19 @@ def lint():
         for f in files:
             text = f.read_text(encoding="utf-8")
             bad += kernel_lint(f, text)
+            # a program with std (feature std, docs/CRATES.md CR6): rt and plat keep what names std in
+            # hosted.rs, compiled only with that feature; std is an extern crate only behind it
+            hosted = kind == "lib" and f.name == "hosted.rs" and name in ("rt", "plat")
+            prev = ""
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate modrt as rt;",
-                                                      "extern crate modplat as plat;"):
+                std_crate = s == "extern crate std;" and prev == '#[cfg(feature = "std")]' and name in ("rt", "plat")
+                if s.startswith("extern crate") and not std_crate and s not in (
+                        "extern crate alloc;", "extern crate core;", "extern crate modrt as rt;", "extern crate modplat as plat;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
-                if s.startswith("use std") or " std::" in s.split("//")[0]:
+                if not hosted and (s.startswith("use std") or " std::" in s.split("//")[0]):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
+                prev = s
                 if ln[:2] in ('")', '",', '";'):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
     return bad + plugin_lint() + module_lint() + perm_lint() + manifest_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests

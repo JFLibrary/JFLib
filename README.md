@@ -7,7 +7,8 @@ The library is designed to be used by AI Agents, not by Humans – Thus the enti
 JFLIB brings widgets, layout, text, 2D graphics, image formats, and platform integration
 together in one library. This repository contains both the library and its applications:
 from small GUI examples to Kritzel, PaintCraft, jfWord, and the Build Manager.
-The Rust code uses `#![no_std]`, `core`, and `alloc`. Cargo builds the library and the apps;
+The Rust code uses `#![no_std]`, `core`, and `alloc`; an app of its own may use `std` and `std`
+crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps;
 a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
 its packages. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
 linked. See the [dependency notices](lib/text_shape/NOTICE.md).

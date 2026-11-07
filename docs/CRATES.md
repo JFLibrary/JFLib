@@ -428,7 +428,8 @@ Der ursprüngliche Plan:
 
 ### CR6: Apps mit `std`
 
-Mittel bis groß, vor der Veröffentlichung. Geplant am 2026-11-07, noch nicht umgesetzt.
+Mittel bis groß, vor der Veröffentlichung. Geplant am 2026-11-07, umgesetzt am selben Tag bis auf die Website
+(CR6f) und die Abnahme (CR6g); der Stand steht bei jedem Teilschritt.
 
 **Warum diese Stufe:** Bis CR5 stand hier „kein Betrieb mit `std`“. Das war meine Empfehlung, nicht die Entscheidung
 des Nutzers: Am 2026-11-04 hatte er festgelegt, Panic-Handler, Allocator und Einstieg „muss dann wohl umgebaut
@@ -448,32 +449,49 @@ einbinden. Empfohlen bleibt eine App in `no_std`.
   Async-Laufzeiten können Probleme machen; mit JFLib steckt man nicht wie bei egui eframe und andere UI-Crates
   zusammen, alles kommt aus einer Hand und liegt schon vor. „Ich denke mal, dass einige aus Gewohnheit so etwas
   einbauen würden.“
+- Der Schalter (2026-11-07, Antwort „Feature std (Empfohlen)“): ein Feature `std` an `jflib`,
+  `jflib = { features = ["std"], version = "0.1" }`. Das weicht von „Features fallen weg“ (2026-11-04) ab und wurde
+  deshalb eigens gefragt; eine `no_std`-App wählt weiterhin nichts. `ui::main!` und `rt::main!` bleiben, in `main.rs`
+  fallen `#![no_std]` und `#![no_main]` weg.
 
 **Teilschritte:**
 
-- **CR6a: Runtime aufteilen.** Panic-Handler, Allocator und Einstieg stecken nicht mehr fest in `rt`. Eine
-  `no_std`-App bekommt sie wie heute über `ui::main!` und `rt::main!`, ihr Code ändert sich nicht. Eine `std`-App hat
-  ein gewöhnliches `fn main()` und ruft darin die Oberfläche auf (`ui::launch`); JFLibs Absturzbericht hängt sich als
-  Panic-Hook von `std` ein. Der Allocator aus `rt` läuft auch unter `std` (am 2026-11-04 gemessen); eine `std`-App
-  nimmt den des Systems oder mit einer Zeile den von `rt`, und eine App mit eigenem (etwa mimalloc) kollidiert nicht
-  mehr. Nebenbei kann `modrt` dann neben `rt` liegen (heute zwei Panic-Handler).
-- **CR6b: Start, Ende und Threads unter `std`.** `plat` bekommt Argumente und Umgebung auch ohne eigenen Einstieg.
-  Das Ende geht über `std`, damit gepufferte Ausgaben (`println!`) nicht verloren gehen. Threads entstehen über
-  pthreads, sobald glibc gelinkt ist (die Programme mit Fenster tun das seit dem GPU-Umbau); der rohe `clone` ohne
-  Thread-lokalen Speicher bleibt den statischen `no_std`-Programmen, denn auf ihm stürzt `thread_local!` einer
-  `std`-Crate ab.
-- **CR6c: Bauen und Linken je Ziel.** `jflib-build` gibt einer `std`-App keine eigenen Einstiegs- und Link-Argumente
-  (`/ENTRY`, `/NODEFAULTLIB`, die glibc-Stubs).
+- **CR6a: Runtime aufteilen.** Umgesetzt: Das Feature `std` (an `jflib`, weitergereicht an `rt`, `plat`, `ui`,
+  `gpu`) nimmt aus `rt` den Panic-Handler, den Allocator, die eigenen `memcpy`/`memset`/... und die Symbole, die sonst
+  die C-Runtime bringt (`_fltused`, `__chkstk`, `rust_eh_personality`, `_Unwind_Resume`); aus `plat` den Einstieg
+  (`mainCRTStartup`, `_start`). Was `std` nennt, liegt allein in `rt/hosted.rs` und `plat/hosted.rs` (die Prüfung von
+  `build_rs.py` nimmt nur diese beiden aus). `ui::main!` und `rt::main!` schreiben mit `std` zusätzlich `fn main`, das
+  `plat::std_start` aufruft: Absturz-Handler, Panic-Hook (`rt::panic_hook`: JFLibs Absturzbericht, Exit 3), dann
+  `jfgui_main`, das Ende über `std::process::exit`. Eine App, deren Code in `src/lib.rs` liegt (die Vorlage), ruft
+  `jflib::plat::std_start()` in ihrem eigenen `main`. Eine `std`-App nimmt den Allocator des Systems oder mit einer
+  Zeile den von `rt` (`rt::Alloc`). `modrt` bleibt getrennt: ohne `std` hat `rt` seinen Panic-Handler weiter.
+- **CR6b: Start, Ende und Threads unter `std`.** Umgesetzt: Unter Linux legt `std_start` Argumente und Umgebung
+  aus `std` wie den Anfangs-Stack ab, `plat` liest sie wie bisher. `plat::exit` ist mit `std` `std::process::exit`
+  (ein `print!` ohne Zeilenende kommt an). Eine `std`-App unter Linux ist immer `plat`s glibc-Build (die Build-Skripte
+  von `plat` und `gpu` setzen `jfgui_glibc`): Threads über pthreads, `thread_local!` einer `std`-Crate läuft auch auf
+  Threads von `plat`. musl lehnt `plat` mit `std` ab: seine eigenen Threads haben dort keinen Thread-lokalen
+  Speicher.
+- **CR6c: Bauen und Linken je Ziel.** Umgesetzt: `jflib-build` erfährt das Feature über `DEP_JFLIB_STD` (die
+  Fassade hat dafür `links = "jflib"`) und gibt einer `std`-App keine eigenen Link-Argumente (`/NODEFAULTLIB`, die
+  glibc-Stubs); unter Windows `/ENTRY:mainCRTStartup` der C-Runtime für das Windows-Subsystem. Es warnt ohne
+  `+crt-static` (sonst braucht das Programm `VCRUNTIME140.dll`, die nicht jedes Windows hat) und lehnt unter Linux die
+  Flags der `no_std`-Vorlage ab. `cargo jflib web` baut für `std`-Apps nur scalar und SIMD (rustup liefert kein `std`
+  mit Atomics), `cargo jflib package` baut sie nur für das eigene System. Geprüft am 2026-11-07 mit einer Test-App
+  (Fenster, `std::thread`, `std::fs`, `println!`, eine `std`-Crate mit `thread_local!`, Panics): Windows Debug und
+  Release mit `link.exe` und `rust-lld`, mit `+crt-static` nur noch System-DLLs (4,0 MB statt 3,9); Linux auf dem
+  Fedora-Rechner (glibc, KDE Wayland, `smoke.uis` grün); Android im Emulator; Browser (Klicks zählen). Im Browser hat
+  `std` keine Uhr (`SystemTime::now` panikt), keine Dateien und keine Threads; unter Android braucht `std::fs` echte
+  Pfade, `plat`s Pfade (`/tmp`) sind virtuell.
 
   | Ziel | Eine `std`-App braucht | Gebaut auf |
   | --- | --- | --- |
-  | Windows | die C-Runtime von Microsoft (Visual Studio Build Tools, die Rust ohnehin braucht) | Windows |
-  | Linux mit Fenster | glibc mit Startdateien und `libgcc_s` | Linux (Entscheidung oben); `cargo zigbuild` unter Windows nur prüfen, nicht versprechen |
-  | Linux ohne Fenster | musl, statisch | Windows und Linux, zu prüfen |
+  | Windows | die C-Runtime von Microsoft, mit `+crt-static` eingebunden (Visual Studio Build Tools, die Rust ohnehin braucht) | Windows |
+  | Linux mit Fenster | glibc mit Startdateien und `libgcc_s` | Linux (Entscheidung oben) |
+  | Linux ohne Fenster | glibc wie mit Fenster; musl nicht mit `std` (siehe CR6b) | Linux |
   | Android | das NDK wie heute | wie heute |
-  | Browser | `std` für `wasm32` (Dateien, Netz, Threads melden „nicht unterstützt“) | wie heute |
+  | Browser | `std` für `wasm32` (Uhr, Dateien, Netz, Threads fehlen); kein Threads-Modus | wie heute |
 
-- **CR6d: `PERMISSIONS`.** Entschieden am 2026-11-07: behalten, freiwillig wie heute („Ja, behalten“). Die
+- **CR6d: `PERMISSIONS`.** Umgesetzt wie unten (Vorlage ohne Datei, Warnung von `jflib-build`). Entschieden am 2026-11-07: behalten, freiwillig wie heute („Ja, behalten“). Die
   Bedingung des Nutzers dafür: drin lassen nur, „wenn es keine Nachteile hat, und einfach nur drinne liegt für die
   Leute, die das wirklich komplett no_std machen wollen. Wenn es heißt, man muss groß etwas anpassen, sobald man mit
   std anfängt, dann nein.“ Die Fakten dazu: `PERMISSIONS` ist schon heute
@@ -488,9 +506,11 @@ einbinden. Empfohlen bleibt eine App in `no_std`.
   `std`-App also als Erstes in `main`. Ob die seccomp-Sperrliste glibc und `std` etwas verbietet, was sie brauchen,
   prüft CR6g. Ganz entfernen hieße, die Prüfungen in `plat`, den Rückfrage-Dialog, die `sandbox`-Zeile und die Rechte
   der Pakete auszubauen; Flatpak-Pakete bekämen dann immer die weiten Rechte.
-- **CR6e: Vorlage und `cargo jflib`.** `cargo jflib new NAME` bleibt `no_std` (die Empfehlung), `cargo jflib new
-  --std NAME` legt eine `std`-App an. `test`, `watch`, `web`, `android` und `package` arbeiten mit beiden.
-- **CR6f: Doku und Website.** Die Texte aus CR5, die das Verbot als Regel beschreiben, werden berichtigt
+- **CR6e: Vorlage und `cargo jflib`.** Umgesetzt: `cargo jflib new NAME` bleibt `no_std` (die Empfehlung),
+  `cargo jflib new --std NAME` legt dieselbe App mit `std` an (ohne `#![no_std]`, eigenes `main`, `.cargo/config.toml`
+  nur mit `+crt-static`, ohne `PERMISSIONS`). `test`, `web`, `android` und `package` geprüft; `watch` steht in CR6g.
+- **CR6f: Doku und Website.** Im Repo umgesetzt (`docs/GUIDE.md` §1 und „An app with std“, die READMEs von `jflib`
+  und `cargo-jflib`, `docs/PERMISSIONS.md`, `docs/VERSIONING.md`, `README.md`); die Website ist offen. Die Texte aus CR5, die das Verbot als Regel beschreiben, werden berichtigt
   (`docs/GUIDE.md` §1 und §2, `docs/VERSIONING.md`, `docs/PERMISSIONS.md`, die README der Fassade). Dazu die
   Punkte des Nutzers oben, in der Anleitung und in der README der Fassade, die Agenten lesen. Auf der Website
   (Repo `jflibWebsite`, englisch) gehört dieselbe Botschaft auf die Start- und die Features-Seite; den Text dort

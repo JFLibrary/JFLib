@@ -19,7 +19,8 @@ unsafe extern "C" {
 }
 
 struct AndroidAllocator;
-#[global_allocator]
+#[cfg_attr(not(feature = "std"), global_allocator)]
+#[cfg_attr(feature = "std", allow(dead_code))] // std's allocator: the same malloc
 static ALLOC: AndroidAllocator = AndroidAllocator;
 
 // SAFETY: Bionic supplies distinct, aligned allocations and accepts its own pointers on free.
@@ -88,6 +89,7 @@ pub fn write_stdout(bytes: &[u8]) { log(bytes, 4); }
 /// Write errors to Android logcat.
 pub fn write_stderr(bytes: &[u8]) { log(bytes, 6); }
 
-/// Unwinding is disabled; satisfy precompiled core's unused personality reference.
+/// Unwinding is disabled; satisfy precompiled core's unused personality reference (std has its own).
+#[cfg(not(feature = "std"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_eh_personality() -> ! { exit(4) }

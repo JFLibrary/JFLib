@@ -65,15 +65,19 @@ mod imp {
         unsafe { VirtualFree(p, 0, 0x8000) };
     }
 
+    // what the C runtime defines, for a program without it (with std the C runtime is there)
+    #[cfg(not(feature = "std"))]
     #[unsafe(no_mangle)]
     pub static _fltused: i32 = 0;
 
+    #[cfg(not(feature = "std"))]
     #[unsafe(no_mangle)]
     pub extern "C" fn __CxxFrameHandler3() -> ! {
         exit(4)
     }
 
     // stack probe: frames over 4 KB touch every page from the top down
+    #[cfg(not(feature = "std"))]
     core::arch::global_asm!(
         ".globl __chkstk",
         "__chkstk:",
@@ -251,9 +255,12 @@ mod imp {
         unsafe { syscall3(SYS_MUNMAP, p as usize, n, 0) };
     }
 
+    // std defines these (and links libgcc_s)
+    #[cfg(not(feature = "std"))]
     #[unsafe(no_mangle)]
     pub extern "C" fn rust_eh_personality() {}
 
+    #[cfg(not(feature = "std"))]
     #[unsafe(no_mangle)]
     pub extern "C" fn _Unwind_Resume() -> ! {
         exit(4)

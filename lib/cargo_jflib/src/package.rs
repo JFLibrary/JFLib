@@ -530,6 +530,18 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     if ["deb", "appimage", "rpm", "flatpak"].iter().any(|f| wants(f)) || (wants("setup") && host == Some("linux")) {
         targets.push("linux"); // on Linux the previews come from the Linux build
     }
+    // a program with std links against the C runtime of the system it is built for, so it is built
+    // on that system (JFLib's own runtime builds Linux programs on Windows and back)
+    if p.package.std {
+        for (system, formats, shown) in [("win", "setup, msix", "Windows"), ("linux", "deb, appimage, rpm, flatpak", "Linux")] {
+            if targets.contains(&system) && host != Some(system) {
+                return Err(format!(
+                    "{name} has std (jflib's feature std): its {formats} are made on {shown} itself; here --formats \
+                     with the formats of this system"
+                ));
+            }
+        }
+    }
     // the style crates (their INFO) and the version of jflib, which the stubs' crates must have
     let (mut infos, mut jflib) = (BTreeMap::new(), None);
     for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {

@@ -18,4 +18,10 @@ doctest = false
 [lints]
 workspace = true
 
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): std's panic handler, allocator, memory
+# functions and entry; rt::panic_hook gives std's panics JFLib's crash report, rt::Alloc is rt's
+# allocator on request.  Cargo turns it on for the whole program (jflib's feature std).
+std = []
+
 [dependencies]

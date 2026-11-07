@@ -24,13 +24,14 @@ The examples below were compiled and run against the library (R13); identifiers 
   crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
   checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
   foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
-* **An app of your own** is `#![no_std]` too, and so is every crate it adds: JFLib's runtime
-  brings the panic handler and the allocator, a crate that needs `std` does not link. Other
-  `no_std` crates are allowed there. But a crate that makes system calls of its own (through
-  `windows-sys`, `rustix` and the like) passes by `plat`, so `PERMISSIONS` does not see them:
-  only the `sandbox` line confines it, as far as the operating system enforces the manifest
-  ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this repository's; an
-  app of your own may follow them as it likes.
+* **An app of your own** is best `#![no_std]` too: JFLib's runtime brings the entry point, the
+  panic handler and the allocator, and other `no_std` crates are allowed there. An app that needs
+  a crate with `std` turns on the feature `std` of `jflib` ([An app with std](#an-app-with-std)):
+  std brings those three then, and every `std` crate links. Code that makes system calls of its
+  own (`std::fs`, `windows-sys`, `rustix` and the like) passes by `plat`, so `PERMISSIONS` does not
+  see it: only the `sandbox` line confines it, as far as the operating system enforces the
+  manifest ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this
+  repository's; an app of your own may follow them as it likes.
 * **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
@@ -62,6 +63,56 @@ It is the template below as a project of its own: the one dependency `jflib` (`u
 `build.rs` with `jflib_build::app()`, the profiles JFLib needs (`panic = "abort"`) and the
 settings for Windows and Linux in `.cargo/config.toml`. The README of the crate `jflib` names
 every file.
+
+### An app with std
+
+JFLib itself is `no_std` and brings what an app needs from one hand: windows and controls, files,
+the network, threads and async tasks, images, documents, sound. **Write an app `no_std` as well**
+where you can, and look in [API.md](API.md) before adding a crate. When an app needs a crate that
+uses `std`, it turns on the feature `std` of `jflib`, and every `std` crate links:
+
+```
+cargo jflib new --std notes  # the same template with std
+```
+
+```toml
+[dependencies]
+jflib = { features = ["std"], version = "0.1" }
+```
+
+The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
+panic still ends with JFLib's crash report (`rt::panic_hook`). What changes against the template:
+
+| File | With std |
+| --- | --- |
+| `src/lib.rs` | no `#![no_std]` and no `extern crate alloc`; `ui::main!` stays |
+| `src/main.rs` | `extern crate notes; fn main() { jflib::plat::std_start() }` (an app in one file: `ui::main!` writes `fn main` itself, without `#![no_main]`) |
+| `.cargo/config.toml` | only `+crt-static` for Windows, so the program needs no `VCRUNTIME140.dll`; std links with the system's linker |
+| `PERMISSIONS` | none: in a program with std it covers JFLib's own calls only (the build warns) |
+
+| Target | With std |
+| --- | --- |
+| Windows | `cargo build`; the Visual Studio Build Tools, which Rust's msvc toolchain needs anyway |
+| Linux | `cargo build` on Linux, through cc against glibc; not from Windows, and not with musl |
+| Browser | `cargo jflib web`, the modes scalar and SIMD (no threads mode: rustup ships no std with atomics). std has no clock, files, threads or network there: they panic or fail. JFLib's own (`plat::time_us`, `ui.spawn`, `plat::read_file`) work |
+| Android | `cargo jflib android`; `std::fs` needs real paths (the app's folder). JFLib's paths (`/tmp`, `/documents`) are names that only `plat` resolves |
+
+`cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
+Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux.
+
+**One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
+and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is
+the whole stack and owns the main thread and its event loop. Out of habit it is easy to add
+another one; don't:
+
+* **Window and UI crates** (winit, tao, SDL, eframe, egui, iced): a second event loop on the main
+  thread competes with JFLib's, its windows do not get JFLib's input, styles or tests.
+* **Async runtimes** (tokio, async-std, smol): `block_on` on the UI thread freezes the window. JFLib
+  runs `async` blocks itself (`ui.spawn`, [Async tasks](#async-tasks-uispawn-plattask-plataio)).
+  A crate that needs tokio gets a runtime on a thread of its own; results go back through a
+  channel and `plat::wake()` ([Threads](#9-threads)).
+* **Crates that start their own threads** call back on them: hand the result to the UI thread
+  the same way, never touch `Ui` there.
 
 **In this repository, start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
 passes its test as it is:

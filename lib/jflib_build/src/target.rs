@@ -17,6 +17,8 @@ pub(crate) struct Target {
     features: Vec<String>,
     glibc: bool,
     rustflags: String,
+    /// a program with std (jflib's feature std, DEP_JFLIB_STD): the C runtime's entry and libraries
+    std: bool,
 }
 
 // section "glibc" of build_rs.py: the libraries to link against, one "ret" per name, every symbol
@@ -55,6 +57,7 @@ impl Target {
             features: get("CARGO_CFG_TARGET_FEATURE").split(',').map(str::to_string).collect(),
             glibc: env::var_os("CARGO_CFG_JFGUI_GLIBC").is_some(),
             rustflags: get("CARGO_ENCODED_RUSTFLAGS").replace('\x1f', " "),
+            std: crate::std_program(),
         })
     }
 
@@ -64,6 +67,14 @@ impl Target {
 
     /// the cargo:: lines of the linker arguments
     pub(crate) fn link(&self, kind: Kind, dir: &Path, out_dir: &Path) -> Result<Vec<String>, String> {
+        let mut lines = Vec::new();
+        if self.std && self.os == "windows" && !self.features.iter().any(|f| f == "crt-static") {
+            lines.push(format!(
+                "cargo::warning=a program with std imports VCRUNTIME140.dll, which not every Windows has: -C target-feature=+crt-static \
+                 in [target.{}] rustflags of .cargo/config.toml links the C runtime in (cargo jflib new --std writes it)",
+                self.triple
+            ));
+        }
         let args = match self.os.as_str() {
             "windows" => self.windows(kind, dir, out_dir)?,
             "linux" if self.env == "gnu" => self.linux(out_dir)?,
@@ -71,7 +82,8 @@ impl Target {
             _ if self.arch == "wasm32" => return Ok(self.wasm()),
             _ => return Err(format!("{}: JFLib builds for Windows, Linux, Android and the browser", self.triple)),
         };
-        Ok(args.into_iter().map(|a| format!("cargo::rustc-link-arg-bins={a}")).collect())
+        lines.extend(args.into_iter().map(|a| format!("cargo::rustc-link-arg-bins={a}")));
+        Ok(lines)
     }
 
     fn windows(&self, kind: Kind, dir: &Path, out_dir: &Path) -> Result<Vec<String>, String> {
@@ -80,8 +92,13 @@ impl Target {
         }
         let subsystem = if kind == Kind::Gui { "WINDOWS" } else { "CONSOLE" };
         let map = format!("/MAP:{}", out_dir.join("program.map").display());
-        let mut args: Vec<String> =
-            ["/ENTRY:mainCRTStartup", &format!("/SUBSYSTEM:{subsystem}"), "/NODEFAULTLIB", "/DEBUG:NONE", &map].map(String::from).to_vec();
+        // with std the C runtime's mainCRTStartup, which calls main (also in the Windows subsystem,
+        // as #![windows_subsystem] does it), and its libraries
+        let mut args: Vec<String> = if self.std {
+            ["/ENTRY:mainCRTStartup", &format!("/SUBSYSTEM:{subsystem}"), &map].map(String::from).to_vec()
+        } else {
+            ["/ENTRY:mainCRTStartup", &format!("/SUBSYSTEM:{subsystem}"), "/NODEFAULTLIB", "/DEBUG:NONE", &map].map(String::from).to_vec()
+        };
         let ico = dir.join("res").join("app.ico");
         if ico.is_file() {
             let data = fs::read(&ico).map_err(|e| format!("{}: {e}", ico.display()))?;
@@ -96,6 +113,9 @@ impl Target {
     /// default) or lld (`-C linker-flavor=ld.lld`, the template's .cargo/config.toml)
     fn linux(&self, out_dir: &Path) -> Result<Vec<String>, String> {
         let triple = &self.triple;
+        if self.std {
+            return self.linux_std(out_dir);
+        }
         if !self.flag("relocation-model=static") {
             return Err(format!(
                 "{triple}: JFLib's programs start without a C runtime and need -C relocation-model=static: \
@@ -136,6 +156,19 @@ impl Target {
             args.extend(self.glibc_stubs(&out_dir.join("glibc"))?.iter().map(|p| p.display().to_string()));
         }
         Ok(args)
+    }
+
+    /// a program with std: glibc's start files and libraries, through the system's cc as for every
+    /// Rust program (built on Linux); the template's flags for JFLib's own runtime do not fit
+    fn linux_std(&self, out_dir: &Path) -> Result<Vec<String>, String> {
+        let triple = &self.triple;
+        if self.flag("linker-flavor=ld") || self.features.iter().any(|f| f == "crt-static") {
+            return Err(format!(
+                "{triple}: a program with std (jflib's feature std) links against glibc through cc: remove the rustflags of \
+                 [target.{triple}] from .cargo/config.toml (rust-lld, crt-static and jfgui_glibc are for JFLib's own runtime)"
+            ));
+        }
+        Ok(vec![format!("-Wl,-Map={}", out_dir.join("program.map").display())])
     }
 
     /// the three libraries a program against glibc links with: rustc assembles the stubs, the lld

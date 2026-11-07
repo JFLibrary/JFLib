@@ -18,6 +18,10 @@ doctest = false
 [lints]
 workspace = true
 
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): ui::main! also defines fn main
+std = ["rt/std", "plat/std"]
+
 [dependencies]
 # datetime: dates in the locale's format; spell: TB_SPELL; img_svg: ui.svg, image_view
 rt.workspace = true

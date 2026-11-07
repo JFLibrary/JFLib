@@ -282,8 +282,41 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 /// --unregister, assoc.rs).  A Cargo build hands both over as files (JFGUI_PERMISSIONS_FILE with
 /// --cfg jfgui_manifest, JFGUI_PACKAGE_FILE with --cfg jfgui_package), because an environment
 /// variable of a build script holds one line only.
+///
+/// In a program with std (feature `std` of jflib) it also defines `fn main`, which hands over to
+/// plat's start of a std program (`plat::std_start`: crash handlers, the panic hook, then
+/// `jfgui_main`, the end through `std::process::exit`); the crate then has neither `#![no_std]`
+/// nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
+/// the program's own calls `jflib::plat::std_start()`.
+#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! main {
+    ($body:expr) => {
+        $crate::__jfgui_main!($body);
+    };
+}
+
+/// (see above)
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! main {
+    ($body:expr) => {
+        $crate::__jfgui_main!($body);
+        #[allow(unsafe_code, dead_code)]
+        fn main() {
+            unsafe extern "Rust" {
+                fn jfgui_std_start() -> !;
+            }
+            // SAFETY: plat defines it in a program with std; it takes no arguments.
+            unsafe { jfgui_std_start() }
+        }
+    };
+}
+
+/// ui::main!'s `jfgui_main`, without and with std
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __jfgui_main {
     ($body:expr) => {
         #[cfg(panic = "unwind")]
         compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");

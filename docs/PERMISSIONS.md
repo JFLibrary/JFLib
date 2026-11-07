@@ -388,9 +388,12 @@ ask the operating system to enforce the same manifest as well, as defence in dep
 opt-in, one line in the manifest, and apps without it are unchanged.
 
 **Crates of other authors.** An app of its own (the crate `jflib`, built with Cargo) may add
-`no_std` crates of other authors. Their own system calls (through `windows-sys`, `rustix` and the
-like) do not pass `plat`, so neither the manifest nor an `ask` line sees them: only this line
-confines them, as far as the operating system enforces the manifest.
+`no_std` crates of other authors, and with the feature `std` of `jflib` any crate. Their own
+system calls (through `std::fs`, `std::net`, `windows-sys`, `rustix` and the like) do not pass
+`plat`, so neither the manifest nor an `ask` line sees them: only this line confines them, as far
+as the operating system enforces the manifest. A program with std that has a manifest gets a
+warning from the build saying so; `cargo jflib new --std` writes none. The line acts when the
+program starts (`plat::std_start`): threads a crate started before do not have it.
 
 ```text
 sandbox          # best effort: enforce what this OS and kernel support, carry on otherwise

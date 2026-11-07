@@ -25,6 +25,8 @@ pub(crate) struct Package {
     pub description: String,
     pub license: String,
     pub homepage: String,
+    /// a program with std: its dependency jflib has the feature std
+    pub std: bool,
 }
 
 pub(crate) struct Project {
@@ -78,6 +80,9 @@ pub(crate) fn project(package: Option<&str>) -> Result<Project, String> {
             description: pick.get("description").and_then(Value::str).unwrap_or("").to_string(),
             license: pick.get("license").and_then(Value::str).unwrap_or("").to_string(),
             homepage: pick.get("homepage").and_then(Value::str).unwrap_or("").to_string(),
+            std: pick.get("dependencies").map(Value::arr).unwrap_or_default().iter().any(|d| {
+                d.s("name") == "jflib" && d.get("features").map(Value::arr).unwrap_or_default().iter().any(|f| f.str() == Some("std"))
+            }),
         },
     })
 }

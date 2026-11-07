@@ -10,4 +10,8 @@ fn main() {
         println!("cargo::error=JFLIB_STYLE={style}: the styles are {}", STYLES.join(", "));
     }
     println!("cargo::rustc-cfg=jflib_style=\"{style}\"");
+    // the app's build script (jflib-build) reads it as DEP_JFLIB_STD
+    if std::env::var_os("CARGO_FEATURE_STD").is_some() {
+        println!("cargo::metadata=std=1");
+    }
 }

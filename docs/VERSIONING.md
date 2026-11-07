@@ -44,7 +44,7 @@ through it and for the two tools around it:
 
 | Crate | What is promised |
 | --- | --- |
-| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE` |
+| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE`; its feature `std` (an app with std: `plat::std_start`, `rt::panic_hook`, `rt::Alloc`) |
 | `jflib-build` | `app()`, `console()`, `Build::app()`, `Build::console()`, `.part_of()`, `.run()` and the files it reads next to `Cargo.toml`: `PERMISSIONS`, `PACKAGE`, `assets/`, `res/app.ico` |
 | `cargo-jflib` | its commands and their options, the `PACKAGE` keys and environment variables its README names, where it writes (`target/jflib-*`) |
 | the other `jflib-*` crates | nothing of their own: they are published because `jflib` needs them. A program may name one directly, but `jflib` pins every one to its own version (`=X.Y.Z`), so they move together. `simd`, `text_shape` and `style_assets` are building blocks, hidden in `jflib` (`#[doc(hidden)]`) |

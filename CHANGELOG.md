@@ -147,6 +147,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib package --sign, --repo DIR, --update DIR and cargo jflib keygen FILE: Authenticode for the programs, the setup and the MSIX, GPG for the AppImages, a flat apt repository and the Flatpak repository, a signed update channel per style (Ed25519 by a small program built from jflib-crypto); crates_accept.py checks every signature with signtool's table, gpgv, apt-get and update_manifest.py
 - **build:** cargo jflib watch [-p PKG] [-- ARGS]: hot reload for an app outside this repository (tools/hotreload.py's session, built like cargo run, a failed build kept out with build.txt, Ctrl+C asks the app to end); crates_accept.py runs it headless under a script
 - **docs:** What the crates on crates.io promise (docs/VERSIONING.md): the facade jflib as API.md documents it, jflib-build and cargo jflib; the guide shows the crate way first, a foreign crate's own system calls pass by plat (only the sandbox line confines them)
+- **crates:** apps of your own may use std and any std crate: the feature std of jflib (std's entry, panic handler and allocator; ui::main! and rt::main! stay, plat::std_start, rt::panic_hook, rt::Alloc), cargo jflib new --std; the library stays no_std (docs/GUIDE.md, An app with std)
 
 ### Changed
 
