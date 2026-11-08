@@ -555,9 +555,15 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem
    einzelnen Ordner scheitert dagegen, weil es die übrigen auf crates.io sucht. Das Limit für neue Crates ist 5 auf
    einmal, dann eine je 10 Minuten (`rate_limiter.rs` von crates.io; Ausnahmen je Nutzer möglich), für 60 also rund
-   9 Stunden: `cargo publish --workspace` allein bricht nach der fünften ab. Nötig ist ein Skript, das Crate für
-   Crate hochlädt, am Limit wartet und nach einem Abbruch bei der nächsten weitermacht. Die Doku der Fassade liegt
-   seit 2026-11-08 in Git (`lib/jflib/docs/`, siehe unten), ein Kopierschritt entfällt.
+   9 Stunden: `cargo publish --workspace` allein bricht nach der fünften ab, und ein zweiter Lauf beginnt gar nicht
+   erst, solange eine seiner Crates schon oben ist (Cargos `verify_unpublished`). Dafür gibt es seit 2026-11-08
+   `tools/publish.py` (auf Wunsch des Nutzers): ohne Schalter der Plan (Reihenfolge aus `cargo metadata`, was
+   crates.io schon hat, die Dauer), mit `--publish` `cargo publish -p NAME` Crate für Crate, danach wartet es, bis der
+   Index sie zeigt; bei 429 bis zu der Zeit, die crates.io nennt, danach eine neue Crate je 10 Minuten. Abgebrochen
+   macht es beim nächsten Start weiter. Vor dem Upload prüft es `template/` und `docs/` der Fassade und den
+   Abschnitt im Changelog; solange `jflib` nicht oben ist, stoppt ein vergebener Name alles, bevor etwas hochgeht.
+   Das Token bleibt bei `cargo login`. Planlauf am 2026-11-08: alle 60 Namen frei, rund 9,5 Stunden. Die Doku der
+   Fassade liegt seit 2026-11-08 in Git (`lib/jflib/docs/`, siehe unten), ein Kopierschritt entfällt.
 3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt. Vorbereitet am 2026-11-08 (Antwort
    „Ja, vorbereiten“): Jedes veröffentlichte Manifest nennt in `[package.metadata.docs.rs]` seine Ziele, sonst baute
    docs.rs seine fünf Standardziele, darunter macOS und 32-Bit-Windows. Die vier von JFLib für die Bibliothek; nur

@@ -181,6 +181,45 @@ class ScaffoldTest(Temp):
         self.assertEqual([p["version"] for p in lock if p["name"] == "cargo-jflib"], ["7.8.9"], "cargo-jflib is published too")
         self.assertEqual(manifests.external_lock(self.dir), before)
 
+    def test_publish_plan(self):
+        """tools/publish.py: the sparse index's paths, an order where each crate follows what it needs,
+        crates.io's retry time out of its 429 text, which crates are there, new or a new version"""
+        from tools import publish
+        self.assertEqual([publish.index_path(n) for n in ("a", "ab", "abc", "jflib", "Cargo-JFLib")],
+                         ["1/a", "2/ab", "3/a/abc", "jf/li/jflib", "ca/rg/cargo-jflib"])
+        pkgs = {"jflib": {"version": "0.1.0", "deps": ["ui", "rt"]}, "ui": {"version": "0.1.0", "deps": ["rt"]},
+                "rt": {"version": "0.1.0", "deps": []}, "cargo-jflib": {"version": "0.1.0", "deps": []}}
+        self.assertEqual(publish.order(pkgs), ["cargo-jflib", "rt", "ui", "jflib"])
+        with self.assertRaisesRegex(publish.PublishError, "cycle"):
+            publish.order({"a": {"version": "1", "deps": ["b"]}, "b": {"version": "1", "deps": ["a"]}})
+        when = publish.retry_after("error: ... (status 429 Too Many Requests): You have published too many new crates in a "
+                                   "short period of time. Please try again after Mon, 09 Nov 2026 12:34:56 GMT and see "
+                                   "https://crates.io/docs/rate-limits for more details.")
+        self.assertEqual((when.year, when.month, when.day, when.hour, when.minute, when.utcoffset().total_seconds()), (2026, 11, 9, 12, 34, 0))
+        self.assertIsNone(publish.retry_after("error: something else"))
+        have = {"rt": {"0.1.0"}, "ui": {"0.0.9"}}
+        self.assertEqual(publish.plan(pkgs, ["rt", "ui", "jflib"], have.get),
+                         [("rt", "0.1.0", "there"), ("ui", "0.1.0", "update"), ("jflib", "0.1.0", "new")])
+
+    def test_publish_waits_out_the_limit(self):
+        """tools/publish.py --publish: a 429 waits until crates.io's time and tries the same crate
+        again, a crate that is there is skipped, another failure stops (start again goes on)"""
+        from unittest import mock
+        from tools import publish
+        answers = iter([(0, "Uploaded"), (101, "error: (status 429 Too Many Requests): ... Please try again after "
+                                               "Mon, 09 Nov 2026 12:34:56 GMT and see ..."), (0, "Uploaded"),
+                        (101, "error: crate b@0.1.0 already exists on crates.io index"), (101, "error: network down")])
+        calls, waits = [], []
+        with mock.patch.object(publish, "cargo_publish", lambda n, nv: calls.append(n) or next(answers)), \
+             mock.patch.object(publish, "wait_in_index", lambda n, v: None), \
+             mock.patch.object(publish, "wait_until", lambda when, why: waits.append(when)), \
+             mock.patch.object(publish, "say", lambda text: None):
+            rows = [("a", "0.1.0", "new"), ("z", "0.1.0", "there"), ("c", "0.1.0", "new"), ("b", "0.1.0", "new"), ("d", "0.1.0", "new")]
+            with self.assertRaisesRegex(publish.PublishError, "cargo publish -p d failed"):
+                publish.publish({}, rows, False)
+        self.assertEqual(calls, ["a", "c", "c", "b", "d"])
+        self.assertEqual((waits[0].hour, waits[0].minute, waits[0].second), (12, 35, 11), "the retry time plus 15 s")
+
     def test_manifests_docs_rs(self):
         """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
         include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:

@@ -21,6 +21,7 @@ the Rust rewrite of jfguiLib, published as JFLib on 2026-10-14, and the roadmap 
 
 ### Added
 
+- **build:** tools/publish.py: the crates to crates.io one by one in the order of their dependencies, waiting out crates.io's rate limit (5 new crates, then one per 10 minutes) and going on where it stopped; without --publish only the plan
 - **ui:** One gesture recogniser for a finger (`lib/ui/touch.rs`, GUIDE §37): pan 1:1 with its direction locked and handed along the views around the widget, a fling on Android's curve that a touch stops, tap, long press; widgets take the finger by themselves (`HB_GRAB_H`, `HB_GRAB_V`, their cursor); no scroll bars with a finger (`ui.touch_mode`), title bars move windows by finger, not out of reach; the script commands `tap`, `longpress`, `swipe`, `flick`, `finger`, `expect ... value MIN..MAX`, `nohover`, `unpressed`
 - **ui:** What a widget wants of a finger: `ui.touch_take` with `TF_H`, `TF_V`, `TF_BOTH`, `TF_SLOP`, `TF_HOLD`, `TF_TWO`, `TF_DECLINE`, `ui.touch_fingers`, `WF_TOUCH_HOLD`
 - **plat:** One entry for a host's raw fingers with an id and the sample's age: `plat::finger`, `FingerPhase`, `plat::finger_event` (browser and Android: the export `jfgui_finger`), `plat::touch_primary`, `plat::reach_clamp`; Android draws on every vsync while a finger is down or a fling runs and logs `nativeRender` with the extra `jfgui_PERF`; in the browser `inputmode="none"` under `pointer: coarse` until a text field has the focus
