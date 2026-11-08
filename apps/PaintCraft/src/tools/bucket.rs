@@ -607,7 +607,7 @@ fn bk_commit(p: &mut Pn, ui: &mut Ui, _doc: DocId) -> bool {
         bk_request(p);
         p.tbucket.sync = false;
     }
-    let r = tl_commit(p, TL_BUCKET, "Farbeimer", IC_DROP);
+    let r = tl_commit(p, TL_BUCKET, "Farbeimer", IC_DROP); // i18n
     bk_end(p, ui);
     r
 }

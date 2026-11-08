@@ -192,7 +192,7 @@ pub(crate) fn sel_frame(p: &mut Pn, ui: &mut Ui) {
         ui.number_box(0x93000,&mut p.sel.feather_radius,&Range::new(1,128,1,0));
         if ui.button(0x93001,crate::preferences::localization::tr("Anwenden"))&EV_ACT!=0 {
             if let Some(doc)=p.sel.feather_doc.filter(|d|p.doc.get(*d).is_some()) {
-                if hist_push_sel(p,doc,"Weiche Auswahlkante",IC_SELECT_ALL) {
+                if hist_push_sel(p,doc,"Weiche Auswahlkante",IC_SELECT_ALL) { // i18n
                     sel_bake(p,doc);
                     p.doc.dm(doc).sel.ops.push(Op{poly:Arc::new(Poly::default()),mode:SM_UNION as u32,qual:Q_AA,feather:p.sel.feather_radius.clamp(1,128) as u32});
                     sel_render(p,doc);
@@ -273,7 +273,7 @@ pub(crate) fn sel_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
     }
     let Some(doc) = doc_active(&p.doc) else { return true };
     if id == CMD_SELECT_ALL {
-        if hist_push_sel(p, doc, "Alles auswählen", IC_SELECT_ALL) {
+        if hist_push_sel(p, doc, "Alles auswählen", IC_SELECT_ALL) { // i18n
             let (w, h) = (p.doc.d(doc).w, p.doc.d(doc).h);
             sel_set_rect(p, doc, 0, 0, w, h);
         }
@@ -284,12 +284,12 @@ pub(crate) fn sel_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
                 p.sel.feather_open.set(1);ui.repass();
             }
             CMD_DESELECT => {
-                if hist_push_sel(p, doc, "Auswahl aufheben", IC_CLEAR_SELECTION) {
+                if hist_push_sel(p, doc, "Auswahl aufheben", IC_CLEAR_SELECTION) { // i18n
                     sel_clear(p, doc);
                 }
             }
             CMD_INVERT_SEL => {
-                if hist_push_sel(p, doc, "Auswahl umkehren", IC_SELECT_ALL) {
+                if hist_push_sel(p, doc, "Auswahl umkehren", IC_SELECT_ALL) { // i18n
                     let (w, h) = (p.doc.d(doc).w, p.doc.d(doc).h);
                     if let Some(r) = sel_poly_rect(0, 0, w, h) {
                         sel_combine(p, doc, &r, M_XOR, Q_AA);
@@ -1012,12 +1012,12 @@ pub(crate) fn sel_hsize(b: &SelBlob) -> u64 {
 
 /// sel_erase(doc) -> step -- "Auswahlinhalt löschen": alpha *= 1 - coverage
 pub(crate) fn sel_erase(p: &mut Pn, doc: DocId) -> bool {
-    sel_px_op(p, doc, 0, 0, "Auswahlinhalt löschen", IC_DELETE)
+    sel_px_op(p, doc, 0, 0, "Auswahlinhalt löschen", IC_DELETE) // i18n
 }
 
 /// sel_fill(doc, argb) -> step -- "Auswahl füllen": argb (Normal) through the coverage
 pub(crate) fn sel_fill(p: &mut Pn, doc: DocId, argb: u32) -> bool {
-    sel_px_op(p, doc, 1, argb, "Auswahl füllen", IC_DROP)
+    sel_px_op(p, doc, 1, argb, "Auswahl füllen", IC_DROP) // i18n
 }
 
 // sel_px_op(doc, kind, argb, name, icon) -> step -- kind 0 erase, 1 fill; the tiles with
@@ -1212,7 +1212,7 @@ pub(crate) fn sel_crop(p: &mut Pn, doc: DocId) -> bool {
     }
     hist_begin_compound(p, doc);
     if !hist_push_sel(p, doc, "Auf Auswahl zuschneiden", IC_CROP) || !hist_push_doc(p, doc, "Auf Auswahl zuschneiden", IC_CROP) {
-        hist_end_compound(p, doc, "Auf Auswahl zuschneiden", IC_CROP);
+        hist_end_compound(p, doc, "Auf Auswahl zuschneiden", IC_CROP); // i18n
         return false;
     }
     // install the new surfaces (the old ones: history or freed)

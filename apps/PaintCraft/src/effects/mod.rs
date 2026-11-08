@@ -101,8 +101,8 @@ pub(crate) const FSK_CURVES: u32 = 1; // adj_curves.rs
 pub(crate) const FSK_LEVELS: u32 = 2; // adj_levels.rs
 pub(crate) const FSK_NONE: u32 = 3; // applied at once (FXF_NO_DIALOG, Strg+F)
 
-const S_NOMEM: &str = "Zu wenig Arbeitsspeicher für diesen Effekt.";
-const S_REP_DEFAULT: &str = "Letzten Effekt wiederholen";
+const S_NOMEM: &str = "Zu wenig Arbeitsspeicher für diesen Effekt."; // i18n
+const S_REP_DEFAULT: &str = "Letzten Effekt wiederholen"; // i18n
 const S_SEC_FX: &str = "Effekte";
 const S_KEY_LAST: &str = "_last";
 
@@ -111,6 +111,7 @@ const S_KEY_LAST: &str = "_last";
 pub(crate) static FX_SYNC_ASK: AtomicBool = AtomicBool::new(false);
 
 // German choice labels
+// i18n
 static CH_BLEND: [&str; 14] = [
     "Normal",
     "Multiplizieren",
@@ -127,13 +128,50 @@ static CH_BLEND: [&str; 14] = [
     "Bildschirm",
     "XOR",
 ];
-static CH_EDGE: [&str; 7] = ["Abschneiden", "Umlaufend", "Spiegeln", "Primärfarbe", "Sekundärfarbe", "Transparent", "Original"];
-static CH_SCHEME: [&str; 4] = ["Klassisch", "Graustufen", "Palette", "Regenbogen"];
-static CH_MORPH_MODE: [&str; 4] = ["Erweitern", "Erodieren", "Öffnen", "Schließen"];
-static CH_MORPH_SHAPE: [&str; 3] = ["Kreis", "Quadrat", "Raute"];
-static CH_QUANT_ALG: [&str; 2] = ["Octree", "Medianschnitt"];
-static CH_QUANT_ALPHA: [&str; 2] = ["Beibehalten", "Binär"];
-static CH_CURVES: [&str; 2] = ["Leuchtkraft", "RGB"];
+static CH_EDGE: [&str; 7] = ["Abschneiden", "Umlaufend", "Spiegeln", "Primärfarbe", "Sekundärfarbe", "Transparent", "Original"]; // i18n
+static CH_SCHEME: [&str; 4] = ["Klassisch", "Graustufen", "Palette", "Regenbogen"]; // i18n
+static CH_MORPH_MODE: [&str; 4] = ["Erweitern", "Erodieren", "Öffnen", "Schließen"]; // i18n
+static CH_MORPH_SHAPE: [&str; 3] = ["Kreis", "Quadrat", "Raute"]; // i18n
+static CH_QUANT_ALG: [&str; 2] = ["Octree", "Medianschnitt"]; // i18n
+static CH_QUANT_ALPHA: [&str; 2] = ["Beibehalten", "Binär"]; // i18n
+static CH_CURVES: [&str; 2] = ["Leuchtkraft", "RGB"]; // i18n
+// the German property labels and choices of the library's own effects (lib/fx/enhance.rs):
+// the effect dialog translates every label and choice; listed here for the catalogue's check
+// i18n
+const _: [&str; 32] = [
+    "Cyan / Rot",
+    "Magenta / Grün",
+    "Gelb / Blau",
+    "Helligkeit",
+    "Kontrast",
+    "Vorgabe",
+    "Leuchtdichte",
+    "Durchschnitt",
+    "Rotfilter",
+    "Grünfilter",
+    "Blaufilter",
+    "Infrarot",
+    "Fokus",
+    "Stärke",
+    "Pinselgröße",
+    "Grobheit",
+    "Schattenstärke",
+    "Schattendetail",
+    "Pastellgröße",
+    "Rauheit",
+    "Radius",
+    "Breite",
+    "Lichtrichtung",
+    "Abwedeln / Nachbelichten",
+    "Tonwerte",
+    "Alle",
+    "Schatten",
+    "Mitteltöne",
+    "Lichter",
+    "Suchgenauigkeit",
+    "Glättung",
+    "Kantenschutz",
+];
 
 use ::fx::{
     FX_ADD_NOISE, FX_AUTO_LEVEL, FX_BLACK_WHITE, FX_BOKEH_BLUR, FX_BRIGHT_CONTRAST, FX_BULGE, FX_CLOUDS, FX_CRYSTALIZE,
@@ -148,6 +186,7 @@ use ::fx::{
 
 /// menu rows -> effects (German names, also the history entry names);
 /// id 0: no kernel yet, the row stays disabled
+// i18n
 static FX_MAP: [(u32, u32, &str); 66] = [
     (CMD_FX_CONTENT_FILL, ::fx::enhance::CONTENT_FILL, "Inhaltsbasiert füllen"),
     (CMD_FX_PORTRAIT, ::fx::enhance::PORTRAIT, "Porträt retuschieren"),
@@ -577,10 +616,10 @@ fn prog_frame(p: &mut Pn, ui: &mut Ui) {
     let f = &p.fx;
     let open = f.progopen.clone();
     let rect = f.prog_rect.clone();
-    if ui.window_begin(WINID_FXPROG, f.name, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_FXPROG, crate::preferences::localization::tr(f.name), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         let (done, total, _) = fx_progress(f);
         let pct = if total != 0 { done.wrapping_mul(100) / total } else { 0 };
-        let t = fmt_cap(format!("Rendern... {}%", pct as i32), PROG_CAP);
+        let t = fmt_cap(crate::preferences::localization::tf("Rendern... {}%", &[&format!("{}", pct as i32)]), PROG_CAP);
         ui.next_size(-1, 0); // fixed width: the text changes between passes
         ui.text(TS_BODY, &t);
         ui.next_size(-1, 0);
@@ -747,7 +786,7 @@ fn fs_begin(p: &mut Pn, desc: &'static FxDesc, name: &'static str) -> bool {
         Err(nomem) => {
             fs_free(&mut p.fx);
             if nomem {
-                crate::integrations::file_io::fio_error(p, Some(name), S_NOMEM);
+                crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr(name)), S_NOMEM);
             }
             return false;
         }
@@ -1069,12 +1108,12 @@ fn fs_poll(p: &mut Pn, ui: &mut Ui) {
     match p.fx.phase {
         FSP_FAILED => {
             let msg = if p.fx.core.data.as_ref().is_some_and(|d| d.err.load(SeqCst) == ERR_PLUGIN_FAULT) {
-                "Das Plugin ist abgestürzt und wurde deaktiviert (siehe Einstellungen ▸ Plugin-Fehler)."
+                "Das Plugin ist abgestürzt und wurde deaktiviert (siehe Einstellungen ▸ Plugin-Fehler)." // i18n
             } else {
-                "Der Effekt ist fehlgeschlagen (zu wenig Arbeitsspeicher)."
+                "Der Effekt ist fehlgeschlagen (zu wenig Arbeitsspeicher)." // i18n
             };
             let n = p.fx.name;
-            crate::integrations::file_io::fio_error(p, Some(n), msg);
+            crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr(n)), msg);
             fs_end(p, ui);
         }
         FSP_IDLE => {
@@ -1250,7 +1289,7 @@ fn fs_commit(p: &mut Pn) -> bool {
     if fs_touch(p, doc) != 0 {
         crate::document::history::hist_px_cancel(p, doc);
         let n = p.fx.name;
-        crate::integrations::file_io::fio_error(p, Some(n), S_NOMEM);
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr(n)), S_NOMEM);
         return false;
     }
     fs_hook_off(p, false);
@@ -1330,7 +1369,7 @@ fn fs_remember(p: &mut Pn) {
 // rep_label() -- CMD_FX_REPEAT = "<Effekt> wiederholen" (paint.net Effects.RepeatMenuItem.Format)
 fn rep_label(p: &mut Pn) {
     let Some(n) = p.fx.last_name else { return };
-    p.fx.rep_label = fmt_cap(format!("{} wiederholen", n), REP_CAP);
+    p.fx.rep_label = fmt_cap(crate::preferences::localization::tf("{} wiederholen", &[crate::preferences::localization::tr(n)]), REP_CAP);
     let l = p.fx.rep_label.clone();
     pn_cmd_label(p, CMD_FX_REPEAT, &l);
 }
@@ -1586,7 +1625,7 @@ pub(crate) fn fx_diag_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
             f.memok = [false; MEM_MAX];
             f.last_desc = None;
             f.last_name = None;
-            pn_cmd_label(p, CMD_FX_REPEAT, S_REP_DEFAULT);
+            pn_cmd_label(p, CMD_FX_REPEAT, crate::preferences::localization::tr(S_REP_DEFAULT));
             fx_settings_load(&mut p.fx, &ini);
             if p.fx.rep_pending {
                 p.fx.rep_pending = false;

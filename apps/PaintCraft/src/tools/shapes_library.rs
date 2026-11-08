@@ -127,7 +127,9 @@ pub(crate) fn shl_name(s: &Shl, i: i32) -> &str {
     if s.shapes.is_empty() {
         return "";
     }
-    &shl_rec(s, i).name
+    // the built-in shapes in the UI language, the own ones as their files name them
+    let r = shl_rec(s, i);
+    if r.cat == SHC_CUSTOM { &r.name } else { crate::preferences::localization::tr(&r.name) }
 }
 
 /// shl_radius(i) -> 1 for the rounded rectangle
@@ -647,9 +649,9 @@ fn shl_parse_xaml(s: &mut Shl, buf: &[u8], fname: &str) -> i32 {
 
 // shl_status text: "%d eigene Formen" (+ "; nicht geladen: " + the files)
 fn shl_stat_update(s: &mut Shl) {
-    let mut t = alloc::format!("{} eigene Formen", s.ncust);
+    let mut t = crate::preferences::localization::tf("{} eigene Formen", &[&alloc::format!("{}", s.ncust)]);
     if s.nfail != 0 {
-        cat(&mut t, "; nicht geladen: ", ERR_CAP + 64);
+        cat(&mut t, crate::preferences::localization::tr("; nicht geladen: "), ERR_CAP + 64);
         cat(&mut t, &s.err, ERR_CAP + 64);
     }
     s.stat = t;
@@ -759,7 +761,7 @@ fn shl_btn_icon(p: &mut Pn, ui: &mut Ui) {
     ui.cmd_custom(r[0] + inset, r[1], r[3], r[3], Some(f), user, version);
 }
 
-static CATNAMES: [&str; 6] = ["Grundlegende Formen", "Polygone und Sterne", "Pfeile", "Sprechblasen", "Symbole", "Eigene Formen"];
+static CATNAMES: [&str; 6] = ["Grundlegende Formen", "Polygone und Sterne", "Pfeile", "Sprechblasen", "Symbole", "Eigene Formen"]; // i18n
 
 /// shl_gallery(cur) -> chosen shape or -1
 pub(crate) fn shl_gallery(p: &mut Pn, ui: &mut Ui, cur: i32) -> i32 {
@@ -777,7 +779,7 @@ pub(crate) fn shl_gallery(p: &mut Pn, ui: &mut Ui, cur: i32) -> i32 {
             if !p.shl.shapes.iter().any(|r| r.cat == c) {
                 continue;
             }
-            ui.text(TS_BODY_STRONG, CATNAMES[c as usize]);
+            ui.text(TS_BODY_STRONG, crate::preferences::localization::tr(CATNAMES[c as usize]));
             ui.box_begin(0, BOX_H, 2);
             let mut col = 0;
             for i in 0..p.shl.shapes.len() {

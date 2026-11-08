@@ -17,13 +17,19 @@ fn wanted() -> Option<u32> {
     Some(ui::i18n::negotiate(&CODES, &list).map_or(1, |k| k as u32))
 }
 pub(crate) fn tr(s: &str) -> &str { translate(s, LANGUAGE.load(Ordering::Relaxed)) }
+/// the text in the UI language with its "{}" placeholders filled in order
+pub(crate) fn tf(s: &str, args: &[&str]) -> alloc::string::String { ui::i18n::fill(tr(s), args) }
+/// the decimal separator of the UI language: "." in English, "," in German and French
+pub(crate) fn dec() -> &'static str { if LANGUAGE.load(Ordering::Relaxed) == 1 { "." } else { "," } }
 fn translate(s: &str, language: u32) -> &str {
     if language == 0 || s.is_empty() { return s; }
     for line in CATALOG.lines() {
         let mut fields = line.split('\t');
         if fields.next() == Some(s) { return fields.nth(language as usize-1).filter(|v| !v.is_empty()).unwrap_or(s); }
     }
-    s
+    // then the library's own texts in the same language (apply sets it), as ui::i18n::t does;
+    // tools/i18n_check.py counts them as translated
+    match ui::i18n::library_keys().find(|k| *k == s) { Some(k) => ui::i18n::tr(k), None => s }
 }
 pub(crate) fn list<'a>(items: &[&'a str]) -> Vec<&'a str> { items.iter().map(|s| tr(s)).collect() }
 fn menu(items: &'static [Mi], language: u32) -> &'static [Mi] {

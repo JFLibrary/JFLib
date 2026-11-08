@@ -105,16 +105,17 @@ const RANGE_SIZE: RangeF = RangeF::new(SIZE_MIN as f64, SIZE_MAX as f64, 0.0, 2,
 
 static DEF_FAMILIES: [&str; 7] = ["Segoe UI", "DejaVu Sans", "Noto Sans", "Liberation Sans", "Ubuntu", "Cantarell", "Arial"];
 // labels and tooltips of the text tool row
-static RENDER_LABELS: [&str; 3] = ["Glatt", "Scharf (Modern)", "Scharf (Klassisch)"];
-static ALIGN_LABELS: [&str; 3] = ["Linksbündig", "Zentrieren", "Rechtsbündig"];
-static METRIC_LABELS: [&str; 2] = ["Punkte (Bild DPI)", "Fest (96 DPI)"];
-static STYLE_TIPS: [&str; 4] = ["Fett", "Kursiv", "Unterstrichen", "Durchgestrichen"];
+static RENDER_LABELS: [&str; 3] = ["Glatt", "Scharf (Modern)", "Scharf (Klassisch)"]; // i18n
+static ALIGN_LABELS: [&str; 3] = ["Linksbündig", "Zentrieren", "Rechtsbündig"]; // i18n
+static METRIC_LABELS: [&str; 2] = ["Punkte (Bild DPI)", "Fest (96 DPI)"]; // i18n
+static STYLE_TIPS: [&str; 4] = ["Fett", "Kursiv", "Unterstrichen", "Durchgestrichen"]; // i18n
 static ALIGN_ICONS: [u32; 3] = [IC_ALIGN_LEFT, IC_ALIGN_CENTER, IC_ALIGN_RIGHT];
 static STYLE_ICONS: [u32; 4] = [IC_BOLD, IC_ITALIC, IC_UNDERLINE, IC_STRIKETHROUGH];
 /// paint.net's size list (points)
 static SIZE_TAB: [u16; NSIZES] = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72, 84, 96, 108, 144, 192, 216, 288];
-const S_SZDEC_TIP: &str = "Kleinere Schrift\nMit Strg in Fünferschritten";
-const S_SZINC_TIP: &str = "Größere Schrift\nMit Strg in Fünferschritten";
+// the tooltips of the size buttons: a line each (a catalogue row has no line break)
+const S_SZDEC_TIP: [&str; 2] = ["Kleinere Schrift", "Mit Strg in Fünferschritten"]; // i18n
+const S_SZINC_TIP: [&str; 2] = ["Größere Schrift", "Mit Strg in Fünferschritten"]; // i18n
 const S_HINT_LIVE: &str = "Am Anfasser lässt sich der Text verschieben. Mit gedrückter Strg-Taste verschwinden Anfasser und Schreibmarke."; // i18n
 
 /// a layout line (LN_*)
@@ -413,7 +414,7 @@ fn tx_options(p: &mut Pn, ui: &mut Ui) {
     ch |= tx_style_buttons(p, ui);
     ui.spacer(4);
     let mut v = p.ttext.render;
-    ch |= opt_menu(p, ui, ID_TX_RENDER, &mut v, &RENDER_LABELS, &[], Some("Textdarstellung"), OMF_NOICON as u32);
+    ch |= opt_menu(p, ui, ID_TX_RENDER, &mut v, &RENDER_LABELS, &[], Some("Textdarstellung"), OMF_NOICON as u32); // i18n
     p.ttext.render = v;
     let mut v = p.ttext.align;
     ch |= opt_menu(p, ui, ID_TX_ALIGN, &mut v, &ALIGN_LABELS, &ALIGN_ICONS, None, OMF_ICONONLY as u32);
@@ -436,7 +437,7 @@ fn tx_font_widget(p: &mut Pn, ui: &mut Ui) -> bool {
     ui.next_size(130, 0);
     let fam = p.ttext.family.clone();
     let ev = ui.dropdown_button(ID_FONT_LIST, &fam);
-    ui.tooltip("Schriftart");
+    ui.tooltip(crate::preferences::localization::tr("Schriftart"));
     // opened just now: focus in the search box, the current family scrolled into view
     let open = ev & EV_OPEN != 0;
     if open != p.ttext.fopen {
@@ -452,7 +453,7 @@ fn tx_font_widget(p: &mut Pn, ui: &mut Ui) -> bool {
     if ui.flyout_begin(ID_FONT_LIST, FL_BELOW | FL_MINW) {
         ui.next_size(260, 0);
         let mut s = core::mem::take(&mut p.ttext.search);
-        let ev = ui.textbox(ID_FONT_SEARCH, Some("Suchen"), &mut s, SRCH_CAP);
+        let ev = ui.textbox(ID_FONT_SEARCH, Some(crate::preferences::localization::tr("Suchen")), &mut s, SRCH_CAP);
         p.ttext.search = s;
         if ev & EV_ACT != 0 {
             tx_filter(&mut p.ttext);
@@ -540,11 +541,11 @@ fn tx_size_widgets(p: &mut Pn, ui: &mut Ui) -> bool {
     if ui.flyout_begin(ID_TX_SZLIST, FL_BELOW) {
         // [A-] [A+]
         ui.box_begin(0, BOX_H, 4);
-        if ui.icon_button(ID_TX_SZDEC, IC_FONT_DECREASE, S_SZDEC_TIP) & EV_ACT != 0 {
+        if ui.icon_button(ID_TX_SZDEC, IC_FONT_DECREASE, &alloc::format!("{}\n{}", crate::preferences::localization::tr(S_SZDEC_TIP[0]), crate::preferences::localization::tr(S_SZDEC_TIP[1]))) & EV_ACT != 0 {
             tx_size_step(p, ui, -1);
             changed = true;
         }
-        if ui.icon_button(ID_TX_SZINC, IC_FONT_INCREASE, S_SZINC_TIP) & EV_ACT != 0 {
+        if ui.icon_button(ID_TX_SZINC, IC_FONT_INCREASE, &alloc::format!("{}\n{}", crate::preferences::localization::tr(S_SZINC_TIP[0]), crate::preferences::localization::tr(S_SZINC_TIP[1]))) & EV_ACT != 0 {
             tx_size_step(p, ui, 1);
             changed = true;
         }
@@ -567,7 +568,7 @@ fn tx_size_widgets(p: &mut Pn, ui: &mut Ui) -> bool {
             if b == p.ttext.metric {
                 ui.next_flags(ST_CHECKED);
             }
-            if ui.menu_item(ID_TX_METRIC + 1 + b, METRIC_LABELS[b as usize]) & EV_ACT != 0 && b != p.ttext.metric {
+            if ui.menu_item(ID_TX_METRIC + 1 + b, crate::preferences::localization::tr(METRIC_LABELS[b as usize])) & EV_ACT != 0 && b != p.ttext.metric {
                 p.ttext.metric = b;
                 changed = true;
             }
@@ -590,7 +591,7 @@ fn tx_style_buttons(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut changed = false;
     for b in 0..4u32 {
         let mut checked = ((p.ttext.style >> b) & 1) as i32;
-        if ui.tool_button(ID_TX_BOLD + b, STYLE_ICONS[b as usize], STYLE_TIPS[b as usize], &mut checked, 1) & EV_ACT != 0 {
+        if ui.tool_button(ID_TX_BOLD + b, STYLE_ICONS[b as usize], crate::preferences::localization::tr(STYLE_TIPS[b as usize]), &mut checked, 1) & EV_ACT != 0 {
             p.ttext.style ^= 1 << b;
             changed = true;
         }
@@ -1679,7 +1680,7 @@ fn tx_commit(p: &mut Pn, ui: &mut Ui, _doc: DocId) -> bool {
         if let Some(m) = tx_mask(p) {
             m.optimize();
         }
-        tl_commit(p, TL_TEXT, "Text", IC_FONT)
+        tl_commit(p, TL_TEXT, "Text", IC_FONT) // i18n
     };
     tx_end(p, ui);
     r

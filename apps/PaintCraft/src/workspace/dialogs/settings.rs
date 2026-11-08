@@ -71,9 +71,9 @@ const RANGE_BUDGET: Range = Range::new(0, BUDGET_MB_MAX, 256, 0);
 const RANGE_THREADS: Range = Range::new(0, THREADS_MAX, 1, 0);
 const S_OS: &str = if cfg!(windows) { "Windows (x64)" } else { "Linux (x86-64)" };
 const S_MODULES: &str = if cfg!(windows) {
-    "kernel32.dll, user32.dll, gdi32.dll (keine weiteren Bibliotheken)"
+    "kernel32.dll, user32.dll, gdi32.dll (keine weiteren Bibliotheken)" // i18n
 } else {
-    "keine (statisches ELF, nur Systemaufrufe)"
+    "keine (statisches ELF, nur Systemaufrufe)" // i18n
 };
 // colour schemes (Standard = follow the system)
 static THEME_LIST: [&str; 3] = ["Standard", "Hell", "Dunkel"];
@@ -358,7 +358,7 @@ fn sd_page_ui(p: &mut Pn, ui: &mut Ui) {
     sd_note(ui, crate::preferences::localization::tr("Standard folgt der Einstellung des Betriebssystems (heller oder dunkler App-Modus)."));
     sd_row(ui, crate::preferences::localization::tr("Akzentfarbe:"));
     ui.next_size(CTL_W, 0);
-    let ev = ui.textbox(ID_SET_ACCENT, Some("Standard"), &mut p.dset.acc, ACC_CAP);
+    let ev = ui.textbox(ID_SET_ACCENT, Some(crate::preferences::localization::tr("Standard")), &mut p.dset.acc, ACC_CAP);
     if ev & (EV_ACT | EV_COMMIT) != 0 {
         sd_accent_commit(p, ui, ev & EV_COMMIT != 0);
     }
@@ -377,8 +377,8 @@ fn sd_page_ui(p: &mut Pn, ui: &mut Ui) {
         ui.set_anim_off(p.st.st.anim == 0);
     }
     ui.text(TS_BODY_STRONG,crate::preferences::localization::tr("Arbeitsfläche"));
-    for (id,label,color) in [(0x90500,"Hintergrundfarbe",&mut p.st.st.workspace),(0x90501,"Schachbrett hell",&mut p.st.st.checker0),(0x90502,"Schachbrett dunkel",&mut p.st.st.checker1)] {
-        ui.dropdown_button(id,label);
+    for (id,label,color) in [(0x90500,"Hintergrundfarbe",&mut p.st.st.workspace),(0x90501,"Schachbrett hell",&mut p.st.st.checker0),(0x90502,"Schachbrett dunkel",&mut p.st.st.checker1)] { // i18n
+        ui.dropdown_button(id,crate::preferences::localization::tr(label));
         if ui.flyout_begin(id,FL_BELOW) {
             if ui.color_picker(id+10,color) & EV_ACT != 0 {*color |= 0xFF000000;ui.invalidate();}
         }
@@ -440,29 +440,27 @@ fn sd_page_tools(p: &mut Pn, ui: &mut Ui) {
 // sd_tool_summary() -- sum rows from the stored defaults (ST_TOOLDEF)
 fn sd_tool_summary(p: &mut Pn) {
     let tc = p.st.st.tooldef;
-    // German decimal comma
-    let w = fmt_cap(base::num::f64_format(tc.width), 32).replace('.', ",");
-    let fill = if tc.fill == 0 { String::from("Volltonfarbe") } else { format!("Muster {}", tc.fill as i32) };
+    // the decimal separator of the UI language
+    let w = fmt_cap(base::num::f64_format(tc.width), 32).replace('.', crate::preferences::localization::dec());
+    let fill = if tc.fill == 0 { String::from(crate::preferences::localization::tr("Volltonfarbe")) } else { crate::preferences::localization::tf("Muster {}", &[&format!("{}", tc.fill as i32)]) };
     let s = &mut p.dset.sum;
     s[0] = fmt_cap(
-        format!("Pinseln und füllen: Pinselgröße {}, Härte {} %, Abstand {} %, {}", w, tc.hard as i32, tc.spacing as i32, fill),
+        crate::preferences::localization::tf("Pinseln und füllen: Pinselgröße {}, Härte {} %, Abstand {} %, {}", &[&w, &format!("{}", tc.hard as i32), &format!("{}", tc.spacing as i32), &fill]),
         LINE_CAP,
     );
     s[1] = fmt_cap(
-        format!(
+        crate::preferences::localization::tf(
             "Optionen: {}, Mischmodus {}, {}",
-            sd_nth(&AA_LIST, tc.aa),
-            sd_nth(&BLEND_LIST, tc.blend),
-            sd_nth(&SMOOTH_LIST, tc.smooth)
+            &[crate::preferences::localization::tr(sd_nth(&AA_LIST, tc.aa)), crate::preferences::localization::tr(sd_nth(&BLEND_LIST, tc.blend)), crate::preferences::localization::tr(sd_nth(&SMOOTH_LIST, tc.smooth))],
         ),
         LINE_CAP,
     );
     s[2] = fmt_cap(
-        format!("Farbeimer, Zauberstab und Neu färben: Toleranz {} %, Füllmodus {}", tc.tol as i32, sd_nth(&FLOOD_LIST, tc.flood)),
+        crate::preferences::localization::tf("Farbeimer, Zauberstab und Neu färben: Toleranz {} %, Füllmodus {}", &[&format!("{}", tc.tol as i32), crate::preferences::localization::tr(sd_nth(&FLOOD_LIST, tc.flood))]),
         LINE_CAP,
     );
-    s[3] = fmt_cap(format!("Probennahme: {}", sd_nth(&SMP_LIST, tc.sample)), LINE_CAP);
-    s[4] = fmt_cap(format!("Auswahl: {}, {}", sd_nth(&SELMODE_LIST, tc.selmode), sd_nth(&SELQ_LIST, tc.selqual)), LINE_CAP);
+    s[3] = fmt_cap(crate::preferences::localization::tf("Probennahme: {}", &[crate::preferences::localization::tr(sd_nth(&SMP_LIST, tc.sample))]), LINE_CAP);
+    s[4] = fmt_cap(crate::preferences::localization::tf("Auswahl: {}, {}", &[crate::preferences::localization::tr(sd_nth(&SELMODE_LIST, tc.selmode)), crate::preferences::localization::tr(sd_nth(&SELQ_LIST, tc.selqual))]), LINE_CAP);
 }
 
 // Verlauf: memory budget, memory in use, spill folder (HIST-012..014)
@@ -478,13 +476,13 @@ fn sd_page_hist(p: &mut Pn, ui: &mut Ui) {
     }
     ui.box_end();
     let l = fmt_cap(
-        format!("0 = automatisch ({} MB: 40 % des Arbeitsspeichers, höchstens 4 GB).", p.st.bauto >> 20),
+        crate::preferences::localization::tf("0 = automatisch ({} MB: 40 % des Arbeitsspeichers, höchstens 4 GB).", &[&format!("{}", p.st.bauto >> 20)]),
         LINE_CAP,
     );
     sd_note(ui, &l);
     let ram = crate::document::history::memory::hist_mem_ram(&p.hm) >> 20;
     let disk = crate::document::history::memory::hist_mem_disk(&p.hm) >> 20;
-    let l = fmt_cap(format!("Belegt: {} MB im Arbeitsspeicher, {} MB in der Auslagerungsdatei.", ram, disk), LINE_CAP);
+    let l = fmt_cap(crate::preferences::localization::tf("Belegt: {} MB im Arbeitsspeicher, {} MB in der Auslagerungsdatei.", &[&format!("{}", ram), &format!("{}", disk)]), LINE_CAP);
     sd_note(ui, &l);
     sd_row(ui, crate::preferences::localization::tr("Ordner der Auslagerungsdatei:"));
     ui.next_size(-1, 0);
@@ -515,10 +513,9 @@ fn sd_page_gfx(p: &mut Pn, ui: &mut Ui) {
     p.st.st.threads = t as u32;
     ui.box_end();
     let l = fmt_cap(
-        format!(
+        crate::preferences::localization::tf(
             "0 = automatisch ({} logische Prozessoren). Aktuell {} Threads; Änderungen werden nach einem Neustart wirksam.",
-            plat::cpu_count() as i32,
-            plat::thr_count() as i32
+            &[&format!("{}", plat::cpu_count() as i32), &format!("{}", plat::thr_count() as i32)],
         ),
         LINE_CAP,
     );
@@ -559,9 +556,9 @@ fn sd_page_pen(p: &mut Pn, ui: &mut Ui) {
     sd_note(ui, crate::preferences::localization::tr("Damit werten Stifte und Grafiktabletts den Andruck aus und werden mit hoher Rate abgetastet. Macht ein Gerät Probleme, hilft es oft, die Option auszuschalten."));
     let n = plat::pen_devices();
     let t = if n > 0 {
-        fmt_cap(format!("Gefundene Stifte und Grafiktabletts: {}", n), LINE_CAP)
+        fmt_cap(crate::preferences::localization::tf("Gefundene Stifte und Grafiktabletts: {}", &[&format!("{}", n)]), LINE_CAP)
     } else {
-        String::from("Kein Stift und kein Grafiktablett gefunden.")
+        String::from(crate::preferences::localization::tr("Kein Stift und kein Grafiktablett gefunden."))
     };
     ui.next_size(-1, 0);
     ui.text(TS_BODY | TX_WRAP, &t);
@@ -653,9 +650,9 @@ fn sd_statics(p: &mut Pn) {
     }
     p.dset.stat = true;
     let b = plat::cpu_brand();
-    p.dset.cpu = if b.is_empty() { String::from("unbekannt") } else { fmt_cap(b, CPU_CAP) };
+    p.dset.cpu = if b.is_empty() { String::from(crate::preferences::localization::tr("unbekannt")) } else { fmt_cap(b, CPU_CAP) };
     let f = plat::cpu_features();
-    let mut s = String::from(if cfg!(target_arch = "wasm32") { "Skalar (WebAssembly)" } else { "SSE2" });
+    let mut s = String::from(if cfg!(target_arch = "wasm32") { crate::preferences::localization::tr("Skalar (WebAssembly)") } else { "SSE2" });
     for &(bit, name) in FEAT_NAMES.iter() {
         if f & bit != 0 {
             s.push_str(name);
@@ -674,38 +671,38 @@ fn sd_diag_build(p: &mut Pn) {
     sd_statics(p);
     let d = &p.dset;
     let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("PaintCraft {} (JFLib, Rust)\n", PN_VERSION));
-    lines.push(format!("Betriebssystem: {}\n", S_OS));
-    lines.push(format!("Prozessor: {}\n", d.cpu));
-    lines.push(format!("Befehlssätze: {}\n", d.feat));
-    lines.push(format!("Logische Prozessoren: {}, Worker-Threads: {}\n", plat::cpu_count() as i32, plat::thr_count() as i32));
-    lines.push(format!("Arbeitsspeicher: {} MB\n", plat::mem_total() >> 20));
-    lines.push(format!(
-        "Verlauf: Budget {} MB, im Arbeitsspeicher {} MB, ausgelagert {} MB\n",
-        crate::document::history::memory::hist_budget(&p.hm) >> 20,
-        crate::document::history::memory::hist_mem_ram(&p.hm) >> 20,
-        crate::document::history::memory::hist_mem_disk(&p.hm) >> 20
+    lines.push(format!("PaintCraft {} (JFLib, Rust)", PN_VERSION));
+    lines.push(crate::preferences::localization::tf("Betriebssystem: {}", &[S_OS]));
+    lines.push(crate::preferences::localization::tf("Prozessor: {}", &[&d.cpu]));
+    lines.push(crate::preferences::localization::tf("Befehlssätze: {}", &[&d.feat]));
+    lines.push(crate::preferences::localization::tf("Logische Prozessoren: {}, Worker-Threads: {}", &[&format!("{}", plat::cpu_count() as i32), &format!("{}", plat::thr_count() as i32)]));
+    lines.push(crate::preferences::localization::tf("Arbeitsspeicher: {} MB", &[&format!("{}", plat::mem_total() >> 20)]));
+    lines.push(crate::preferences::localization::tf(
+        "Verlauf: Budget {} MB, im Arbeitsspeicher {} MB, ausgelagert {} MB",
+        &[
+            &format!("{}", crate::document::history::memory::hist_budget(&p.hm) >> 20),
+            &format!("{}", crate::document::history::memory::hist_mem_ram(&p.hm) >> 20),
+            &format!("{}", crate::document::history::memory::hist_mem_disk(&p.hm) >> 20),
+        ],
     ));
     let dpi = d.dpi;
-    lines.push(format!(
-        "Anzeige: {} dpi ({} %), Farbschema {}\n",
-        dpi,
-        ((dpi as u32).wrapping_mul(100) / 96) as i32,
-        if d.dark { "Dunkel" } else { "Hell" }
+    lines.push(crate::preferences::localization::tf(
+        "Anzeige: {} dpi ({} %), Farbschema {}",
+        &[&format!("{}", dpi), &format!("{}", ((dpi as u32).wrapping_mul(100) / 96) as i32), if d.dark { crate::preferences::localization::tr("Dunkel") } else { crate::preferences::localization::tr("Hell") }],
     ));
-    lines.push(format!("Geöffnete Bilder: {}\n", crate::document::model::doc_count(&p.doc)));
+    lines.push(crate::preferences::localization::tf("Geöffnete Bilder: {}", &[&format!("{}", crate::document::model::doc_count(&p.doc))]));
     let file = if p.st.on && p.st.unreadable {
-        format!("{} (nicht lesbar, wird nicht \u{fc}berschrieben)", p.st.file)
+        crate::preferences::localization::tf("{} (nicht lesbar, wird nicht überschrieben)", &[&p.st.file])
     } else if p.st.on {
         p.st.file.clone()
-    } else { String::from("(keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)") };
-    lines.push(format!("Einstellungsdatei: {}\n", file));
+    } else { String::from(crate::preferences::localization::tr("(keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)")) };
+    lines.push(crate::preferences::localization::tf("Einstellungsdatei: {}", &[&file]));
     let tmp = if p.st.st.tempdir.is_empty() { d.tmpdef.clone() } else { p.st.st.tempdir.clone() };
-    lines.push(format!("Temp-Ordner: {}\n", tmp));
-    lines.push(format!("Palettenordner: {}\n", d.paldir));
-    lines.push(format!("Geladene Module: {}\n", S_MODULES));
-    lines.push(format!("Effekte und Anpassungen: {}\n", fx_count()));
-    lines.push(format!("Plugins: {} geladen\n", crate::integrations::plugins::plug_loaded(&p.plug))); // P1
+    lines.push(crate::preferences::localization::tf("Temp-Ordner: {}", &[&tmp]));
+    lines.push(crate::preferences::localization::tf("Palettenordner: {}", &[&d.paldir]));
+    lines.push(crate::preferences::localization::tf("Geladene Module: {}", &[crate::preferences::localization::tr(S_MODULES)]));
+    lines.push(crate::preferences::localization::tf("Effekte und Anpassungen: {}", &[&format!("{}", fx_count())]));
+    lines.push(crate::preferences::localization::tf("Plugins: {} geladen", &[&format!("{}", crate::integrations::plugins::plug_loaded(&p.plug))])); // P1
     // sd_dcat: append while there is room (each piece cut to the room left)
     let mut out = String::new();
     for l in lines {
@@ -713,7 +710,7 @@ fn sd_diag_build(p: &mut Pn) {
             break;
         }
         let room = DIAG_CAP - out.len();
-        out.push_str(&fmt_cap(l, room));
+        out.push_str(&fmt_cap(l + "\n", room)); // a line each (catalogue texts have no line break)
     }
     p.dset.diag = out;
 }

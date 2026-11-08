@@ -218,7 +218,7 @@ pub(crate) fn levels_frame(p: &mut Pn, ui: &mut Ui) {
     let open = p.fx.open.clone();
     let rect = p.levels.rect.clone();
     let mut prev: Option<Params> = None;
-    if ui.window_begin(WINID_LEVELS, p.fx.name, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_LEVELS, crate::preferences::localization::tr(p.fx.name), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         prev = Some(p.fx.param);
         lv_body(p, ui);
         fxui_status(p, ui);
@@ -251,34 +251,34 @@ fn lv_body(p: &mut Pn, ui: &mut Ui) {
     // four columns
     ui.box_begin(0, BOX_H, 16);
     // -- Eingabehistogramm
-    lv_col_begin(ui, HIST_W, "Eingabehistogramm");
+    lv_col_begin(ui, HIST_W, "Eingabehistogramm"); // i18n
     ui.spacer(NB_H);
     ui.next_size(HIST_W, BAR_H);
     lv_image(ui, ID_LV_HIN, l.sfin.as_ref(), l.ver_in);
-    ui.tooltip("Farbverteilung des Bildes vor der Korrektur.");
+    ui.tooltip(crate::preferences::localization::tr("Farbverteilung des Bildes vor der Korrektur."));
     ui.box_end();
     // -- Eingabe
-    lv_col_begin(ui, COL_W, "Eingabe");
+    lv_col_begin(ui, COL_W, "Eingabe"); // i18n
     lv_numbox(ui, ID_LV_INHI, &mut l.v[0]);
-    ui.tooltip("Eingangsweißwert");
+    ui.tooltip(crate::preferences::localization::tr("Eingangsweißwert"));
     lv_slider(l, prm, ui, ID_LV_INSL, false);
     lv_numbox(ui, ID_LV_INLO, &mut l.v[1]);
-    ui.tooltip("Eingangsschwarzwert");
+    ui.tooltip(crate::preferences::localization::tr("Eingangsschwarzwert"));
     ui.box_end();
     // -- Ausgabe
-    lv_col_begin(ui, COL_W, "Ausgabe");
+    lv_col_begin(ui, COL_W, "Ausgabe"); // i18n
     lv_numbox(ui, ID_LV_OUTHI, &mut l.v[2]);
-    ui.tooltip("Ausgangsweißwert");
+    ui.tooltip(crate::preferences::localization::tr("Ausgangsweißwert"));
     lv_slider(l, prm, ui, ID_LV_OUTSL, true);
     lv_numbox(ui, ID_LV_OUTLO, &mut l.v[3]);
-    ui.tooltip("Ausgangsschwarzwert");
+    ui.tooltip(crate::preferences::localization::tr("Ausgangsschwarzwert"));
     ui.box_end();
     // -- Ausgabehistogramm
-    lv_col_begin(ui, HIST_W, "Ausgabehistogramm");
+    lv_col_begin(ui, HIST_W, "Ausgabehistogramm"); // i18n
     ui.spacer(NB_H);
     ui.next_size(HIST_W, BAR_H);
     lv_image(ui, ID_LV_HOUT, l.sfout.as_ref(), l.ver_out);
-    ui.tooltip("Farbverteilung, wie sie nach der Korrektur aussehen wird.");
+    ui.tooltip(crate::preferences::localization::tr("Farbverteilung, wie sie nach der Korrektur aussehen wird."));
     ui.box_end();
     ui.box_end();
     // Ausgangsgamma
@@ -294,7 +294,7 @@ fn lv_body(p: &mut Pn, ui: &mut Ui) {
     if ui.button(ID_LV_AUTO, crate::preferences::localization::tr("Automatisch")) & EV_ACT != 0 {
         lv_auto(l, prm);
     }
-    ui.tooltip("Schwarz- und Weißpunkt der Eingabe sowie das Gamma selbst bestimmen lassen");
+    ui.tooltip(crate::preferences::localization::tr("Schwarz- und Weißpunkt der Eingabe sowie das Gamma selbst bestimmen lassen"));
     if ui.button(ID_LV_RESET, crate::preferences::localization::tr("Zurücksetzen")) & EV_ACT != 0 {
         if let Some(d) = desc {
             ::fx::defaults(d, prm);
@@ -303,11 +303,11 @@ fn lv_body(p: &mut Pn, ui: &mut Ui) {
     }
     ui.spacer(-1);
     ui.checkbox(ID_LV_RED, crate::preferences::localization::tr("R"), &mut l.mask[0]);
-    ui.tooltip("Rotkanal bearbeiten (ein/aus)");
+    ui.tooltip(crate::preferences::localization::tr("Rotkanal bearbeiten (ein/aus)"));
     ui.checkbox(ID_LV_GREEN, crate::preferences::localization::tr("G"), &mut l.mask[1]);
-    ui.tooltip("Grünkanal bearbeiten (ein/aus)");
+    ui.tooltip(crate::preferences::localization::tr("Grünkanal bearbeiten (ein/aus)"));
     ui.checkbox(ID_LV_BLUE, crate::preferences::localization::tr("B"), &mut l.mask[2]);
-    ui.tooltip("Blaukanal bearbeiten (ein/aus)");
+    ui.tooltip(crate::preferences::localization::tr("Blaukanal bearbeiten (ein/aus)"));
     ui.box_end();
 }
 
@@ -325,7 +325,7 @@ fn lv_image(ui: &mut Ui, id: u32, sf: Option<&Rc<Surface>>, ver: u32) {
 fn lv_col_begin(ui: &mut Ui, w: i32, caption: &str) {
     ui.next_size(w, 0);
     ui.box_begin(0, BOX_V, 8);
-    ui.text(TS_CAPTION | TX_ELLIPSIS, caption);
+    ui.text(TS_CAPTION | TX_ELLIPSIS, crate::preferences::localization::tr(caption));
 }
 
 // lv_numbox(id, &i32) -- a 0..255 number box over the column's width

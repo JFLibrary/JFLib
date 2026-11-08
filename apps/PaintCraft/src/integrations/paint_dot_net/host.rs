@@ -91,7 +91,7 @@ pub(crate) fn command(p: &mut Pn, ui: &mut Ui, id: u32, _arg: u32) -> bool {
     if let Some(problem) = unavailable() {
         crate::integrations::file_io::fio_error(
             p,
-            Some("Paint.NET-Plugins"),
+            Some(crate::preferences::localization::tr("Paint.NET-Plugins")),
             crate::preferences::localization::tr(problem),
         );
     } else if plat::arg_value("--pdn-plugin").is_some() {
@@ -142,7 +142,7 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
     open.set(p.pdn.job.is_some() as i32);
     if ui.window_begin(
         WINDOW,
-        "Paint.NET-Plugin",
+        crate::preferences::localization::tr("Paint.NET-Plugin"),
         Some(&open),
         WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT | WF_NOCLOSE,
         None,
@@ -172,7 +172,7 @@ fn start(p: &mut Pn, ui: &mut Ui) {
         crate::integrations::file_io::fio_error(
             p,
             Some("Paint.NET-Plugin"),
-            "Das Bild überschreitet die Host-Grenze von 100 Millionen Pixeln.",
+            "Das Bild überschreitet die Host-Grenze von 100 Millionen Pixeln.", // i18n
         );
         return;
     }
@@ -232,7 +232,7 @@ fn start(p: &mut Pn, ui: &mut Ui) {
         crate::integrations::file_io::fio_error(
             p,
             Some("Paint.NET-Plugin"),
-            "Der Plugin-Thread konnte nicht gestartet werden.",
+            "Der Plugin-Thread konnte nicht gestartet werden.", // i18n
         );
         return;
     }
@@ -295,7 +295,7 @@ fn commit(p: &mut Pn, data: &[u8]) {
         crate::integrations::file_io::fio_error(
             p,
             Some("Paint.NET-Plugin"),
-            "Ungültiges Ergebnis: Bildgröße oder Protokoll stimmt nicht.",
+            "Ungültiges Ergebnis: Bildgröße oder Protokoll stimmt nicht.", // i18n
         );
         return;
     }
@@ -311,7 +311,7 @@ fn commit(p: &mut Pn, data: &[u8]) {
         crate::integrations::file_io::fio_error(
             p,
             Some("Paint.NET-Plugin"),
-            "Das Bild wurde während der Plugin-Ausführung geändert. Das Ergebnis wurde verworfen.",
+            "Das Bild wurde während der Plugin-Ausführung geändert. Das Ergebnis wurde verworfen.", // i18n
         );
         return;
     }

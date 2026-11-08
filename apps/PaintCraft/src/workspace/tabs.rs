@@ -251,7 +251,7 @@ pub(crate) fn tabs_frame(p: &mut Pn, ui: &mut Ui) {
     if p.tabs.overflow {
         ui.spacer(-1);
         ui.next_flags(ST_SUBTLE | ST_ICON_ONLY);
-        if ui.icon_button(ID_TAB_LISTBTN, IC_CHEV_DOWN, "Bilderliste") & EV_ACT != 0 {
+        if ui.icon_button(ID_TAB_LISTBTN, IC_CHEV_DOWN, crate::preferences::localization::tr("Bilderliste")) & EV_ACT != 0 {
             ui.popup_open(ID_TAB_LISTPOP);
         }
     }
@@ -432,7 +432,7 @@ fn tab_item(p: &mut Pn, ui: &mut Ui, i: i32) {
         ui.draw_icon(IC_CANCEL, x + o, y + o, s);
         // semantics of the close button
         ui.last_set([x, y, cs, cs], ui.last_state());
-        ui.sem(K_BUTTON, ID_TAB_CLOSE0 + i as u32, Some("Schließen"), 0);
+        ui.sem(K_BUTTON, ID_TAB_CLOSE0 + i as u32, Some(crate::preferences::localization::tr("Schließen")), 0);
         if cev & EV_ACT != 0 {
             ui.cmd_run(CMD_TAB_CLOSE, i as u32);
         }

@@ -81,8 +81,9 @@ const PM_LAYER: u32 = 0; // paste modes
 const PM_NEWLAYER: u32 = 1;
 const PM_NEWIMAGE: u32 = 2;
 
-const S_CUT: &str = "Ausschneiden";
+const S_CUT: &str = "Ausschneiden"; // i18n
 /// history names of Auswahl einfügen per SM_*
+// i18n
 static PS_NAMES: [&str; 5] = [
     "Auswahl einfügen",
     "Auswahl einfügen (vereinigen)",
@@ -93,6 +94,7 @@ static PS_NAMES: [&str; 5] = [
 /// commands of the k1_state bits
 static KS_CMDS: [u32; 6] = [CMD_PASTE, CMD_PASTE_LAYER, CMD_PASTE_IMAGE, CMD_COPY_SEL, CMD_PASTE_SEL, CMD_COPY];
 /// Drag & Drop texts: singular / plural (question, Öffnen, Ebene(n) hinzufügen)
+// i18n
 static DW_TEXTS: [[&str; 2]; 4] = [
     ["Wie soll die Datei geöffnet werden?", "Wie sollen die Dateien geöffnet werden?"],
     ["Öffnet das Bild.", "Öffnet alle Bilder."],
@@ -238,7 +240,7 @@ fn clip_copy(p: &mut Pn, ui: &mut Ui, merged: bool, cut: bool) {
             return;
         }
         let Some(mut sf) = surf_try(w, h) else {
-            fio_error(p, Some("Kopieren"), "Die Zwischenablage hat die Daten nicht angenommen.");
+            fio_error(p, Some(crate::preferences::localization::tr("Kopieren")), "Die Zwischenablage hat die Daten nicht angenommen."); // i18n
             return;
         };
         let (ds, ss) = (sf.stride as usize, src.stride as usize);
@@ -277,7 +279,7 @@ fn clip_copy(p: &mut Pn, ui: &mut Ui, merged: bool, cut: bool) {
         }
     }
     if ui.clip_set_image(&sf) != 0 {
-        fio_error(p, Some("Kopieren"), "Die Zwischenablage hat die Daten nicht angenommen.");
+        fio_error(p, Some(crate::preferences::localization::tr("Kopieren")), "Die Zwischenablage hat die Daten nicht angenommen."); // i18n
         return;
     }
     if cut {
@@ -342,7 +344,7 @@ fn clip_paste_sel(p: &mut Pn, ui: &mut Ui, mode: u32) {
                 }
             }
             Err(_) => {
-                fio_error(p, Some("Auswahl einfügen"), "Nichts zum Einfügen: Die Zwischenablage hat weder Auswahl noch Bild.");
+                fio_error(p, Some(crate::preferences::localization::tr("Auswahl einfügen")), "Nichts zum Einfügen: Die Zwischenablage hat weder Auswahl noch Bild."); // i18n
                 return;
             }
         }
@@ -387,14 +389,14 @@ fn clip_paste(p: &mut Pn, ui: &mut Ui, mode: u32) {
     let sf = match ui.clip_get_image() {
         Ok(sf) => sf,
         Err(_) => {
-            let m = if mode == PM_NEWIMAGE { "In der Zwischenablage liegt kein Bild, aus dem ein neues entstehen kann." } else { "In der Zwischenablage liegt kein Bild." };
-            fio_error(p, Some("Einfügen"), m);
+            let m = if mode == PM_NEWIMAGE { "In der Zwischenablage liegt kein Bild, aus dem ein neues entstehen kann." } else { "In der Zwischenablage liegt kein Bild." }; // i18n
+            fio_error(p, Some(crate::preferences::localization::tr("Einfügen")), m);
             return;
         }
     };
     if mode == PM_NEWIMAGE {
         let Some(nd) = doc_new(p, sf.w, sf.h, 0xFFFF_FFFF, 0) else { return }; // white background (paint.net)
-        hist_init(p, nd, "Neues Bild", IC_PAGE);
+        hist_init(p, nd, "Neues Bild", IC_PAGE); // i18n
         tmove_paste(p, ui, nd, sf, 0, 0);
         return;
     }
@@ -423,7 +425,7 @@ fn paste_go(p: &mut Pn, ui: &mut Ui, doc: DocId, sf: Surface, mode: u32, enlarge
         iop_canvas(p, doc, &par);
     }
     if mode == PM_NEWLAYER {
-        if !hist_push_layers(p, doc, "Neue Ebene", IC_ADD) {
+        if !hist_push_layers(p, doc, "Neue Ebene", IC_ADD) { // i18n
             return;
         }
         let cur = p.doc.d(doc).cur + 1;
@@ -516,20 +518,25 @@ fn ask_window(p: &mut Pn, ui: &mut Ui) {
     let (open, rect) = (p.clip.ask_open.clone(), p.clip.ask_rect.clone());
     if ui.window_begin(WINID_K1_PASTE, crate::preferences::localization::tr("Einfügen"), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         let mut answer = 0;
-        lay_lines(ui, TS_BODY, "Das Bild ragt über die Leinwand hinaus.\nWie soll es weitergehen?");
+        lay_lines(ui, TS_BODY, &["Das Bild ragt über die Leinwand hinaus.", "Wie soll es weitergehen?"]); // i18n
         ui.box_begin(0, BOX_V, 4);
-        if ui.accent_button(ID_K1_ENLARGE, "Leinwand vergrößern") & EV_ACT != 0 {
+        if ui.accent_button(ID_K1_ENLARGE, crate::preferences::localization::tr("Leinwand vergrößern")) & EV_ACT != 0 {
             answer = 1;
         }
-        lay_lines(ui, TS_CAPTION | TX_SECONDARY, "Die Leinwand wächst mit, bis das neue Bild\nvollständig darauf passt.");
+        lay_lines(ui, TS_CAPTION | TX_SECONDARY, &["Die Leinwand wächst mit, bis das neue Bild", "vollständig darauf passt."]); // i18n
         ui.box_end();
         ui.box_begin(0, BOX_V, 4);
         if ui.button(ID_K1_KEEP, crate::preferences::localization::tr("Leinwand nicht ändern")) & EV_ACT != 0 {
             answer = 2;
         }
-        lay_lines(ui, TS_CAPTION | TX_SECONDARY, "Die Leinwand bleibt, wie sie ist. Was über den Rand ragt,\nwird abgeschnitten; schieben Sie das Bild so, dass der\ngewünschte Teil auf der Leinwand liegt.");
+        // i18n
+        lay_lines(ui, TS_CAPTION | TX_SECONDARY, &[
+            "Die Leinwand bleibt, wie sie ist. Was über den Rand ragt,",
+            "wird abgeschnitten; schieben Sie das Bild so, dass der",
+            "gewünschte Teil auf der Leinwand liegt.",
+        ]);
         ui.box_end();
-        if ui.dialog_buttons(None, None, Some("Abbrechen")) != DLG_NONE {
+        if ui.dialog_buttons(None, None, Some(crate::preferences::localization::tr("Abbrechen"))) != DLG_NONE {
             answer = 3; // Abbrechen
         }
         if answer != 0 {
@@ -551,20 +558,20 @@ fn drop_window(p: &mut Pn, ui: &mut Ui) {
     if ui.window_begin(WINID_K1_DROP, crate::preferences::localization::tr("Drag & Drop"), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         let mut answer = 0;
         let k = if p.clip.drop_n > 1 { 1 } else { 0 }; // plural
-        lay_lines(ui, TS_BODY, DW_TEXTS[0][k]);
+        lay_lines(ui, TS_BODY, &[DW_TEXTS[0][k]]);
         ui.box_begin(0, BOX_V, 4);
-        if ui.accent_button(ID_K1_OPEN, "Öffnen") & EV_ACT != 0 {
+        if ui.accent_button(ID_K1_OPEN, crate::preferences::localization::tr("Öffnen")) & EV_ACT != 0 {
             answer = 1;
         }
-        lay_lines(ui, TS_CAPTION | TX_SECONDARY, DW_TEXTS[1][k]);
+        lay_lines(ui, TS_CAPTION | TX_SECONDARY, &[DW_TEXTS[1][k]]);
         ui.box_end();
         ui.box_begin(0, BOX_V, 4);
-        if ui.button(ID_K1_IMPORT, DW_TEXTS[2][k]) & EV_ACT != 0 {
+        if ui.button(ID_K1_IMPORT, crate::preferences::localization::tr(DW_TEXTS[2][k])) & EV_ACT != 0 {
             answer = 2;
         }
-        lay_lines(ui, TS_CAPTION | TX_SECONDARY, DW_TEXTS[3][k]);
+        lay_lines(ui, TS_CAPTION | TX_SECONDARY, &[DW_TEXTS[3][k]]);
         ui.box_end();
-        if ui.dialog_buttons(None, None, Some("Abbrechen")) != DLG_NONE {
+        if ui.dialog_buttons(None, None, Some(crate::preferences::localization::tr("Abbrechen"))) != DLG_NONE {
             answer = 3;
         }
         if answer != 0 {

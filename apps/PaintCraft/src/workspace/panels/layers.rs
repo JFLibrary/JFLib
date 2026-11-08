@@ -67,6 +67,7 @@ static WL_BTN_TAB: [(u32, u32, u32); NBTN] = [
 ];
 
 // tooltips of the bottom bar (command labels)
+// i18n
 static WL_TIP_TEXT: [&str; NBTN] = [
     "Neue Ebene",
     "Ebene löschen",
@@ -179,9 +180,9 @@ fn wl_tips(w: &mut WLay, ui: &Ui) {
     for (k, b) in WL_BTN_TAB.iter().enumerate() {
         let acc = ui.accel_text(b.2);
         let t = if acc.is_empty() {
-            String::from(WL_TIP_TEXT[k])
+            String::from(crate::preferences::localization::tr(WL_TIP_TEXT[k]))
         } else {
-            format!("{} ({})", WL_TIP_TEXT[k], acc)
+            format!("{} ({})", crate::preferences::localization::tr(WL_TIP_TEXT[k]), acc)
         };
         w.tips.push(crate::app::formatting::fmt_cap(t, TIP_CAP));
     }

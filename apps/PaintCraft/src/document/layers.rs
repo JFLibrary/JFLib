@@ -14,7 +14,7 @@
 //   lay_flatten(doc) -> 0 / -1               every visible layer into one (history step)
 //   lay_flatten_cmd()  lay_flat_states()     CMD_FLATTEN for imgops.rs (iop_cmd / iop_states)
 //   lay_import_paths(doc, paths) -> n        import files as layers above the current one
-//   lay_lines(style, str)                    ui.text per '\n'-separated line (dialogs)
+//   lay_lines(style, lines)                  ui.text per line, translated (dialogs)
 // Model (every change calls doc_mark_layers; history is recorded by lay_cmd, not here):
 //   lay_new(doc, index, name) -> index       transparent layer at index (name None = "Ebene n");
 //                                            layers at >= index move up, DOC_CUR follows its
@@ -185,7 +185,7 @@ pub(crate) fn lay_free_rec(rec: Layer) {
 fn default_name(d: &Doc, name: Option<&str>) -> String {
     match name {
         Some(s) => String::from(s),
-        None => fmt_cap(alloc::format!("Ebene {}", d.layers.len() as i32), LNAME_CAP as usize),
+        None => fmt_cap(crate::preferences::localization::tf("Ebene {}", &[&alloc::format!("{}", d.layers.len() as i32)]), LNAME_CAP as usize),
     }
 }
 
@@ -343,7 +343,7 @@ pub(crate) fn lay_set_visible(p: &mut Pn, doc: DocId, i: i32, on: bool) {
 pub(crate) fn lay_dup(p: &mut Pn, doc: DocId, i: i32) -> Option<i32> {
     let d = p.doc.get_mut(doc)?;
     let src = lay_rec(d, i)?;
-    let name = fmt_cap(alloc::format!("{} Kopie", src.name), LNAME_CAP as usize);
+    let name = fmt_cap(crate::preferences::localization::tf("{} Kopie", &[&src.name]), LNAME_CAP as usize);
     let j = lay_new_d(d, i + 1, Some(&name))? as usize;
     let i = i as usize; // the source stays below the copy
     let (lo, hi) = d.layers.split_at_mut(j);
@@ -549,22 +549,22 @@ pub(crate) fn lay_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_LAYER_ROTZOOM => crate::workspace::dialogs::rotate_zoom::rz_open(p, ui, doc),
         CMD_LAYER_PROPS => crate::workspace::dialogs::layer_properties::lprops_open(p, ui, doc, cur),
         CMD_LAYER_ADD => {
-            if hist_push_layers(p, doc, "Neue Ebene", IC_ADD) && lay_new(p, doc, cur + 1, None).is_some() {
+            if hist_push_layers(p, doc, "Neue Ebene", IC_ADD) && lay_new(p, doc, cur + 1, None).is_some() { // i18n
                 p.doc.dm(doc).cur = cur + 1;
             }
         }
         CMD_LAYER_DEL => {
-            if top > 0 && hist_push_layers(p, doc, "Ebene löschen", IC_DELETE) {
+            if top > 0 && hist_push_layers(p, doc, "Ebene löschen", IC_DELETE) { // i18n
                 lay_delete(p, doc, cur);
             }
         }
         CMD_LAYER_DUP => {
-            if hist_push_layers(p, doc, "Ebene verdoppeln", IC_COPY) && lay_dup(p, doc, cur).is_some() {
+            if hist_push_layers(p, doc, "Ebene verdoppeln", IC_COPY) && lay_dup(p, doc, cur).is_some() { // i18n
                 p.doc.dm(doc).cur = cur + 1;
             }
         }
         CMD_LAYER_MERGE => {
-            if cur > 0 && hist_push_layers(p, doc, "Nach unten vereinen", IC_DOWNLOAD) {
+            if cur > 0 && hist_push_layers(p, doc, "Nach unten vereinen", IC_DOWNLOAD) { // i18n
                 lay_merge_down(p, doc, cur);
             }
         }
@@ -573,14 +573,14 @@ pub(crate) fn lay_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_LAYER_GO_DOWN => set_cur(p, cur - 1),
         CMD_LAYER_GO_BOTTOM => set_cur(p, 0),
         CMD_LAYER_SELECT => set_cur(p, arg as i32),
-        CMD_LAYER_TO_TOP => mv(p, "Ebene ganz nach oben", top),
-        CMD_LAYER_UP => mv(p, "Ebene eine Stufe höher", cur + 1),
-        CMD_LAYER_DOWN => mv(p, "Ebene eine Stufe tiefer", cur - 1),
-        CMD_LAYER_TO_BOTTOM => mv(p, "Ebene ganz nach unten", 0),
+        CMD_LAYER_TO_TOP => mv(p, "Ebene ganz nach oben", top), // i18n
+        CMD_LAYER_UP => mv(p, "Ebene eine Stufe höher", cur + 1), // i18n
+        CMD_LAYER_DOWN => mv(p, "Ebene eine Stufe tiefer", cur - 1), // i18n
+        CMD_LAYER_TO_BOTTOM => mv(p, "Ebene ganz nach unten", 0), // i18n
         CMD_LAYER_REORDER => {
             let from = (arg & 0xFFFF) as i32;
             let to = (arg >> 16) as i32;
-            if from <= top && to <= top && to != from && hist_push_layers(p, doc, "Ebene verschieben", IC_UP) {
+            if from <= top && to <= top && to != from && hist_push_layers(p, doc, "Ebene verschieben", IC_UP) { // i18n
                 lay_move(p, doc, from, to);
             }
         }
@@ -589,7 +589,7 @@ pub(crate) fn lay_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
             if id == CMD_LAYER_SET_VIS && arg > top as u32 {
                 return true;
             }
-            if hist_push_layer_props(p, doc, idx, "Ebene Sichtbarkeit", IC_VIEW) {
+            if hist_push_layer_props(p, doc, idx, "Ebene Sichtbarkeit", IC_VIEW) { // i18n
                 if let Some(l) = lay_rec(p.doc.d(doc), idx) {
                     let on = !l.flags & LYF_VISIBLE as u32 != 0;
                     lay_set_visible(p, doc, idx, on);
@@ -642,9 +642,10 @@ pub(crate) fn lay_find_uid(d: &Doc, uid: u64) -> Option<i32> {
     d.layers.iter().position(|l| l.uid == uid).map(|i| i as i32)
 }
 
-/// lay_lines(style, str) -- one ui.text(style) per '\n'-separated line (ui.text does not wrap)
-pub(crate) fn lay_lines(ui: &mut Ui, style: u32, s: &str) {
-    for line in s.split('\n') {
+/// lay_lines(style, lines) -- one ui.text(style) per line (ui.text does not wrap), each in the UI
+/// language
+pub(crate) fn lay_lines(ui: &mut Ui, style: u32, lines: &[&str]) {
+    for line in lines.iter().map(|s| crate::preferences::localization::tr(s)) {
         let mut n = line.len().min(LINE_CAP - 1);
         while !line.is_char_boundary(n) {
             n -= 1;
@@ -704,15 +705,15 @@ pub(crate) fn lay_flip(p: &mut Pn, doc: DocId, i: i32, kind: i32) -> bool {
     let name = match kind as u32 {
         0 => {
             img_core::ops::flip_h(&mut l.sf);
-            "Horizontal kippen"
+            "Horizontal kippen" // i18n
         }
         1 => {
             img_core::ops::flip_v(&mut l.sf);
-            "Vertikal kippen"
+            "Vertikal kippen" // i18n
         }
         _ => {
             img_core::ops::rotate180(&mut l.sf);
-            "Um 180° rotieren"
+            "Um 180° rotieren" // i18n
         }
     };
     doc_mark_px(p, doc, i, 0, 0, w, h);
@@ -779,7 +780,7 @@ pub(crate) fn lay_flatten(p: &mut Pn, doc: DocId) -> i32 {
         sf_copy_tl(&mut s, c);
         s
     };
-    if !hist_push_layers(p, doc, "Zusammenfassen", IC_LAYERS) {
+    if !hist_push_layers(p, doc, "Zusammenfassen", IC_LAYERS) { // i18n
         return -1;
     }
     // every layer above the bottom one goes (lay_delete: record out, hist_release)
@@ -852,9 +853,9 @@ fn imp_build_exts(l: &mut Lay) {
     // ibe_put(str): append str with its NUL at g_ibe_pos (skipped when full); the first one
     // ("=Alle Bildtypen") continues the extensions written so far
     let mut pos = all.len();
-    let tail = "=Alle Bildtypen";
+    let tail = alloc::format!("={}", crate::preferences::localization::tr("Alle Bildtypen"));
     if pos + tail.len() + 2 < IMPX_CAP {
-        all.push_str(tail);
+        all.push_str(&tail);
         pos += tail.len() + 1;
     }
     let mut list = alloc::vec![all];
@@ -941,15 +942,15 @@ fn imp_error(p: &mut Pn, err: i32, path: &str) {
     let msg = match err {
         ERR_IO => {
             if plat::file_exists(path) != 0 {
-                "Die Datei ließ sich nicht vom Datenträger lesen."
+                "Die Datei ließ sich nicht vom Datenträger lesen." // i18n
             } else {
-                "Datei nicht gefunden."
+                "Datei nicht gefunden." // i18n
             }
         }
-        ERR_UNSUPPORTED => "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen.",
-        ERR_NOMEM | ERR_LIMIT => "Zu wenig Arbeitsspeicher, um das Bild zu laden.",
-        ERR_DIMS => "Das Bild ist zu groß.",
-        _ => "Die Datei ist defekt oder passt nicht zu ihrem Format.",
+        ERR_UNSUPPORTED => "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen.", // i18n
+        ERR_NOMEM | ERR_LIMIT => "Zu wenig Arbeitsspeicher, um das Bild zu laden.", // i18n
+        ERR_DIMS => "Das Bild ist zu groß.", // i18n
+        _ => "Die Datei ist defekt oder passt nicht zu ihrem Format.", // i18n
     };
     crate::integrations::file_io::fio_error(p, Some(lay_file_part(path)), msg);
 }
@@ -1121,26 +1122,26 @@ fn imp_commit(p: &mut Pn, mode: u32) {
     if w != d.w || h != d.h {
         grown = grow_prepare(p, d, w, h);
         if grown.is_none() {
-            err = Some("Zu wenig Arbeitsspeicher für die neue Bildgröße.");
+            err = Some("Zu wenig Arbeitsspeicher für die neue Bildgröße."); // i18n
         }
     }
     if err.is_none() {
         for r in p.lay.imp_list.iter_mut() {
             if imp_fit(r, w, h) != 0 {
-                err = Some("Zu wenig Arbeitsspeicher für die neue Ebenengröße.");
+                err = Some("Zu wenig Arbeitsspeicher für die neue Ebenengröße."); // i18n
                 break;
             }
         }
     }
     if let Some(msg) = err {
-        crate::integrations::file_io::fio_error(p, Some("Als Ebene importieren"), msg);
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Als Ebene importieren")), msg);
         imp_clear(&mut p.lay);
         return;
     }
     let ok = if grown.is_some() {
-        hist_push_doc(p, doc, "Als Ebene importieren", IC_OPEN_FILE)
+        hist_push_doc(p, doc, "Als Ebene importieren", IC_OPEN_FILE) // i18n
     } else {
-        hist_push_layers(p, doc, "Als Ebene importieren", IC_OPEN_FILE)
+        hist_push_layers(p, doc, "Als Ebene importieren", IC_OPEN_FILE) // i18n
     };
     if !ok {
         imp_clear(&mut p.lay); // 0 = out of memory: no change
@@ -1187,16 +1188,16 @@ fn imp_ask_window(p: &mut Pn, ui: &mut Ui) {
     let rect = l.imp_ask_rect.clone();
     if ui.window_begin(WINID_IMPASK, crate::preferences::localization::tr("Als Ebene importieren"), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         let mut answer = 0;
-        lay_lines(ui, TS_BODY, "Das Bild ragt über die Leinwand hinaus.\nWie soll es weitergehen?");
+        lay_lines(ui, TS_BODY, &["Das Bild ragt über die Leinwand hinaus.", "Wie soll es weitergehen?"]); // i18n
         // Leinwand vergrößern
         ui.box_begin(0, BOX_V, 4);
-        if ui.accent_button(ID_IMP_ENLARGE, "Leinwand vergrößern") & EV_ACT != 0 {
+        if ui.accent_button(ID_IMP_ENLARGE, crate::preferences::localization::tr("Leinwand vergrößern")) & EV_ACT != 0 {
             answer = 1;
         }
         lay_lines(
             ui,
             TS_CAPTION | TX_SECONDARY,
-            "Die Leinwand wächst mit, bis das neue Bild\nvollständig darauf passt.",
+            &["Die Leinwand wächst mit, bis das neue Bild", "vollständig darauf passt."], // i18n
         );
         ui.box_end();
         // Leinwand nicht ändern
@@ -1207,10 +1208,15 @@ fn imp_ask_window(p: &mut Pn, ui: &mut Ui) {
         lay_lines(
             ui,
             TS_CAPTION | TX_SECONDARY,
-            "Die Leinwand bleibt, wie sie ist. Was über den Rand ragt,\nwird abgeschnitten; schieben Sie das Bild so, dass der\ngewünschte Teil auf der Leinwand liegt.",
+            // i18n
+            &[
+                "Die Leinwand bleibt, wie sie ist. Was über den Rand ragt,",
+                "wird abgeschnitten; schieben Sie das Bild so, dass der",
+                "gewünschte Teil auf der Leinwand liegt.",
+            ],
         );
         ui.box_end();
-        if ui.dialog_buttons(None, None, Some("Abbrechen")) != DLG_NONE {
+        if ui.dialog_buttons(None, None, Some(crate::preferences::localization::tr("Abbrechen"))) != DLG_NONE {
             answer = 3; // Abbrechen
         }
         if answer != 0 {

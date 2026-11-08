@@ -172,9 +172,9 @@ fn br_commit(p: &mut Pn, _ui: &mut Ui, _doc: DocId) -> bool {
     be_finish(&mut p.be); // the last piece of a smoothed path
     br_mark(p);
     let (name, icon) = match p.tbrush.tool {
-        TOOL_ERASER => ("Radierer", IC_ERASER),
-        TOOL_PENCIL => ("Zeichenstift", IC_PENCIL),
-        _ => ("Farbpinsel", IC_BRUSH),
+        TOOL_ERASER => ("Radierer", IC_ERASER), // i18n
+        TOOL_PENCIL => ("Zeichenstift", IC_PENCIL), // i18n
+        _ => ("Farbpinsel", IC_BRUSH), // i18n
     };
     let r = tl_commit(p, TL_BRUSH, name, icon);
     be_end(&mut p.be);

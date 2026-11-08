@@ -27,6 +27,7 @@ const WT_X: i32 = 8; // default place (DIP from the main client origin):
 const WT_Y: i32 = 140; // left edge, below the tool bars
 
 // tooltips (tool name + key), TOOL_* order
+// i18n
 static WT_TIPS: [&str; 19] = [
     "Rechteckige Auswahl (S)",
     "Pixel verschieben (M)",
@@ -93,7 +94,7 @@ pub(crate) fn wtools_frame(p: &mut Pn, ui: &mut Ui) {
     p.wtools.cur = crate::tools::tool_cur(&p.tool);
     let open = crate::workspace::chrome::chrome_wnd_open(&p.chrome, WND_TOOLS);
     // (two columns: too narrow for the title)
-    let title = if cols == 2 { "" } else { "Werkzeuge" };
+    let title = if cols == 2 { "" } else { crate::preferences::localization::tr("Werkzeuge") };
     let rect = p.wtools.rect.clone();
     if ui.window_begin(WINID_TOOLS, title, Some(&open), WF_TOOL | WF_AUTOHEIGHT | WF_TOUCH_HOLD, Some(&rect)) {
         ui.box_begin(0, BOX_V | BOX_XSTART | (WT_PAD << PAD_SHIFT), WT_GAP);
@@ -120,7 +121,7 @@ fn wt_button(p: &mut Pn, ui: &mut Ui, i: i32) {
     }
     ui.next_size(WT_BW, WT_BH);
     let icon = p.cmds.iter().find(|c| c.id == CMD_TOOL0 + i as u32).map_or(0, |c| c.icon);
-    let ev = ui.tool_button(ID_WTOOLS_FIRST + i as u32, icon, WT_TIPS[i as usize], &mut p.wtools.cur, i);
+    let ev = ui.tool_button(ID_WTOOLS_FIRST + i as u32, icon, crate::preferences::localization::tr(WT_TIPS[i as usize]), &mut p.wtools.cur, i);
     if ev & EV_ACT != 0 {
         ui.cmd_run(CMD_TOOL0 + i as u32, 0);
         // chosen with the pointer: the keys go to the tool again (the arrows would only walk

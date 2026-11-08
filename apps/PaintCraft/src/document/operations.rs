@@ -57,10 +57,10 @@ const CHUNK: i32 = 64; // map: columns per block (cache friendly rotations)
 const MIN_BAND: i32 = 16;
 const IIF_SWAPDPU: u32 = 1; // iop_install: exchange DOC_DPU_X / DOC_DPU_Y
 
-const S_RESIZE: &str = "Größe ändern";
-const S_CANVAS: &str = "Leinwandgröße";
-const S_OOM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus.";
-const S_OOM_RESIZE: &str = "Zu wenig Arbeitsspeicher, um die Bildgröße zu ändern.";
+const S_RESIZE: &str = "Größe ändern"; // i18n
+const S_CANVAS: &str = "Leinwandgröße"; // i18n
+const S_OOM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus."; // i18n
+const S_OOM_RESIZE: &str = "Zu wenig Arbeitsspeicher, um die Bildgröße zu ändern."; // i18n
 
 /// the commands enabled while an image is open
 static IOP_CMD_IDS: [u32; 7] = [CMD_RESIZE, CMD_CANVAS_SIZE, CMD_FLIP_H, CMD_FLIP_V, CMD_ROT_CW, CMD_ROT_CCW, CMD_ROT_180];
@@ -86,6 +86,7 @@ struct Xt {
     name: &'static str,
 }
 
+// i18n: name
 static XK_TAB: [Xt; XK_COUNT as usize] = [
     Xt { swap: false, ax: -1, bx: 0, cxs: 1, ay: 0, by: 1, cys: 0, ma: -1, mb: 0, mcs: 1, md: 0, me: 1, mfs: 0, icon: 0, name: "Bild horizontal spiegeln" },
     Xt { swap: false, ax: 1, bx: 0, cxs: 0, ay: 0, by: -1, cys: 2, ma: 1, mb: 0, mcs: 0, md: 0, me: -1, mfs: 2, icon: 0, name: "Bild vertikal spiegeln" },
@@ -184,7 +185,7 @@ pub(crate) fn iop_xform(p: &mut Pn, doc: DocId, kind: i32) -> bool {
     let (w, h) = (p.doc.d(doc).w, p.doc.d(doc).h);
     let (nw, nh, flags) = if t.swap { (h, w, IIF_SWAPDPU) } else { (w, h, 0) };
     let Some(mut nsf) = iop_alloc(p.doc.d(doc), nw, nh) else {
-        fio_error(p, Some(t.name), S_OOM);
+        fio_error(p, Some(crate::preferences::localization::tr(t.name)), S_OOM);
         return false;
     };
     // pixel map dst -> src: c* selects 0, W - 1 or H - 1 of the old image
@@ -242,7 +243,7 @@ pub(crate) fn iop_resize(p: &mut Pn, doc: DocId, par: &IopPar) -> bool {
         Some(nsf)
     };
     let Some(nsf) = ok else {
-        fio_error(p, Some(S_RESIZE), S_OOM_RESIZE);
+        fio_error(p, Some(crate::preferences::localization::tr(S_RESIZE)), S_OOM_RESIZE);
         return false;
     };
     // the selection scales with the image
@@ -281,7 +282,7 @@ pub(crate) fn iop_canvas(p: &mut Pn, doc: DocId, par: &IopPar) -> bool {
     let oy = anchor_off(a / 3, h - oh);
     let d = p.doc.d(doc);
     let Some(mut nsf) = iop_alloc(d, w, h) else {
-        fio_error(p, Some(S_CANVAS), S_OOM_RESIZE);
+        fio_error(p, Some(crate::preferences::localization::tr(S_CANVAS)), S_OOM_RESIZE);
         return false;
     };
     // fill colour per layer

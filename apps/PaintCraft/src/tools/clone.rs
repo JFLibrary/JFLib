@@ -68,9 +68,9 @@ const ID_TC_RCOPT: u32 = ID_TCLONE_FIRST + 3;
 const ID_TC_RCCOL: u32 = ID_TCLONE_FIRST + 4;
 const ID_RC_SAMP: u32 = (TOOLOPT_BASE + TOOL_RECOLOR * TOOLOPT_STRIDE) as u32; // Probennahme (rows +1..+2)
 const ID_RC_ALPHA: u32 = ID_RC_SAMP + 5; // Alpha-Modus (rows +1..+2)
-const S_NOANCHOR: &str = "Zum Klonen fehlt noch die Quelle. Legen Sie sie zuerst mit Strg+Klick fest.";
-static SAMP_LABELS: [&str; 2] = ["Quelle: erster Klick", "Quelle: Sekundärfarbe"];
-static ALPHA_LABELS: [&str; 2] = ["Vormultipliziert", "Gerade"];
+const S_NOANCHOR: &str = "Zum Klonen fehlt noch die Quelle. Legen Sie sie zuerst mit Strg+Klick fest."; // i18n
+static SAMP_LABELS: [&str; 2] = ["Quelle: erster Klick", "Quelle: Sekundärfarbe"]; // i18n
+static ALPHA_LABELS: [&str; 2] = ["Vormultipliziert", "Gerade"]; // i18n
 static SAMP_ICONS: [u32; 2] = [IC_EYEDROPPER, IC_COLOR];
 static ALPHA_ICONS: [u32; 2] = [IC_CONTRAST, IC_DROP];
 
@@ -677,7 +677,7 @@ fn recolor_options(p: &mut Pn, ui: &mut Ui) {
     opt_sep(ui);
     opt_tolerance(p, ui);
     let mut v = p.tclone.rc_alpha;
-    opt_menu(p, ui, ID_RC_ALPHA, &mut v, &ALPHA_LABELS, &ALPHA_ICONS, Some("Alpha-Modus der Toleranz"), OMF_ICONONLY as u32);
+    opt_menu(p, ui, ID_RC_ALPHA, &mut v, &ALPHA_LABELS, &ALPHA_ICONS, Some("Alpha-Modus der Toleranz"), OMF_ICONONLY as u32); // i18n
     p.tclone.rc_alpha = v;
     let mut v = p.tclone.rc_samp;
     opt_menu(p, ui, ID_RC_SAMP, &mut v, &SAMP_LABELS, &SAMP_ICONS, None, OMF_ICONONLY as u32);

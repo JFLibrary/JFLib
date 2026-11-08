@@ -94,7 +94,7 @@ const SETTINGS_W: i32 = 290; // DIP
 /// jxl-module: the note under the JPEG XL options when the writer module (jxlenc.dll / .so
 /// next to the exe) is missing
 pub(crate) const JXL_COMPAT_NOTE: &str =
-    "Hinweis: Das JPEG-XL-Modul (jxlenc) fehlt. Gespeichert wird mit dem einfachen Schreiber: nur Qualität und Verlustfrei wirken.";
+    "Hinweis: Das JPEG-XL-Modul (jxlenc) fehlt. Gespeichert wird mit dem einfachen Schreiber: nur Qualität und Verlustfrei wirken."; // i18n
 const HDR_CAP: usize = 96;
 const CHECK_DIP: i32 = 8; // checkerboard cell
 const DRAG_DIP: i32 = 4; // a press that moves less is a click
@@ -142,7 +142,7 @@ static FLAG_MAP: [(u32, u32, usize); 6] = [
     (IOF_DDS_UNIFORM, IOM_DDSFMT, V_METRIC),
 ];
 // bit depth lists: values, labels (TGA and JPEG XR: no 8-bit)
-static BD_FULL: ([u32; 4], [&str; 4]) = ([0, 32, 24, 8], ["Automatisch", "32-Bit", "24-Bit", "8-Bit"]);
+static BD_FULL: ([u32; 4], [&str; 4]) = ([0, 32, 24, 8], ["Automatisch", "32-Bit", "24-Bit", "8-Bit"]); // i18n
 static BD_TGA: ([u32; 3], [&str; 3]) = ([0, 32, 24], ["Automatisch", "32-Bit", "24-Bit"]);
 static CHROMA_NAMES: [&str; 3] = ["4:2:0 (kleinste Datei)", "4:2:2", "4:4:4 (höchste Qualität)"];
 static PRESET_NAMES: [&str; 6] = ["Standard", "Bild", "Foto", "Zeichnen", "Icon", "Text"];
@@ -391,7 +391,7 @@ pub(crate) fn saveopt_open(p: &mut Pn, ui: &mut Ui, doc: DocId, fmt: u32) -> boo
     }
     let src = Surface { px, w: c.w, h: c.h, stride: c.stride, fmt: c.fmt, flags: c.flags, opac: c.opac, blend: c.blend };
     if !copied {
-        crate::integrations::file_io::fio_error(p, Some("Speicheroptionen"), "Zu wenig Arbeitsspeicher f\u{fc}r die Vorschau.");
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Speicheroptionen")), "Zu wenig Arbeitsspeicher für die Vorschau."); // i18n
         return false;
     }
     let s = &mut p.saveopt;
@@ -805,10 +805,10 @@ pub(crate) fn saveopt_frame(p: &mut Pn, ui: &mut Ui) {
         so_canvas(p, ui);
         ui.box_begin(0, BOX_H, 16);
         let s = &mut p.saveopt;
-        if ui.radio(ID_SO_FIT, "Ganzes Bild", &mut s.zoom, 0) & EV_ACT != 0 {
+        if ui.radio(ID_SO_FIT, crate::preferences::localization::tr("Ganzes Bild"), &mut s.zoom, 0) & EV_ACT != 0 {
             s.cver = s.cver.wrapping_add(1);
         }
-        if ui.radio(ID_SO_ACTUAL, "Originalgröße", &mut s.zoom, 1) & EV_ACT != 0 {
+        if ui.radio(ID_SO_ACTUAL, crate::preferences::localization::tr("Originalgröße"), &mut s.zoom, 1) & EV_ACT != 0 {
             s.cver = s.cver.wrapping_add(1);
         }
         ui.box_end();
@@ -847,14 +847,14 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
     if iom & IOM_BITDEPTH != 0 {
         ui.text(TS_BODY, crate::preferences::localization::tr("Bit-Tiefe"));
         for (k, l) in bdl.iter().enumerate() {
-            ui.radio(ID_SO_BD + k as u32, l, &mut v[V_BD], k as i32);
+            ui.radio(ID_SO_BD + k as u32, crate::preferences::localization::tr(l), &mut v[V_BD], k as i32);
         }
     }
     if iom & IOM_DITHER != 0 {
         if dis {
             ui.disabled_push();
         }
-        ui.prop_slider(ID_SO_DITHER, "Dithering-Level", &mut v[V_DITHER], &RANGE_DITHER, 7);
+        ui.prop_slider(ID_SO_DITHER, crate::preferences::localization::tr("Dithering-Level"), &mut v[V_DITHER], &RANGE_DITHER, 7);
         if dis {
             ui.disabled_pop();
         }
@@ -863,7 +863,7 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
         if dis {
             ui.disabled_push();
         }
-        ui.prop_slider(ID_SO_THR, "Schwelle für Transparenz", &mut v[V_THR], &RANGE_THR, 128);
+        ui.prop_slider(ID_SO_THR, crate::preferences::localization::tr("Schwelle für Transparenz"), &mut v[V_THR], &RANGE_THR, 128);
         if dis {
             ui.disabled_pop();
         }
@@ -875,7 +875,7 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
             ui.disabled_push();
         }
         let def = so_qdef(s.fmt);
-        ui.prop_slider(ID_SO_Q, "Qualität", &mut v[V_Q], &RANGE_Q, def);
+        ui.prop_slider(ID_SO_Q, crate::preferences::localization::tr("Qualität"), &mut v[V_Q], &RANGE_Q, def);
         if off {
             ui.disabled_pop();
         }
@@ -891,7 +891,7 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
         }
         ui.text(TS_BODY, crate::preferences::localization::tr("Chroma-Subsampling"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_SO_CHROMA, &mut v[V_CHROMA], &CHROMA_NAMES);
+        ui.combobox(ID_SO_CHROMA, &mut v[V_CHROMA], &crate::preferences::localization::list(&CHROMA_NAMES));
         if off {
             ui.disabled_pop();
         }
@@ -899,7 +899,7 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
     if iom & IOM_PRESET != 0 {
         ui.text(TS_BODY, crate::preferences::localization::tr("Preset"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_SO_PRESET, &mut v[V_PRESET], &PRESET_NAMES);
+        ui.combobox(ID_SO_PRESET, &mut v[V_PRESET], &crate::preferences::localization::list(&PRESET_NAMES));
     }
     // jxl-module: without the writer module the compatible writer ignores Bemühung and
     // Filmkörnung
@@ -908,10 +908,10 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
         if s.fmt == IMGF_DDS {
             ui.text(TS_BODY, crate::preferences::localization::tr("Tempo der BC6H/BC7-Kompression"));
             ui.next_size(-1, 0);
-            ui.combobox(ID_SO_SPEED, &mut v[V_SPEED], &SPEED_NAMES);
+            ui.combobox(ID_SO_SPEED, &mut v[V_SPEED], &crate::preferences::localization::list(&SPEED_NAMES));
         } else {
             let def = so_edef(s.fmt);
-            let l = if s.fmt == IMGF_PNG { "Komprimierungsstufe" } else { "Bemühung" };
+            let l = if s.fmt == IMGF_PNG { crate::preferences::localization::tr("Komprimierungsstufe") } else { crate::preferences::localization::tr("Bemühung") };
             if jxc {
                 ui.disabled_push();
             }
@@ -927,14 +927,14 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
         if off {
             ui.disabled_push();
         }
-        ui.prop_slider(ID_SO_NOISE, "Filmkörnung (ISO)", &mut v[V_NOISE], &RANGE_NOISE, 0);
+        ui.prop_slider(ID_SO_NOISE, crate::preferences::localization::tr("Filmkörnung (ISO)"), &mut v[V_NOISE], &RANGE_NOISE, 0);
         if off {
             ui.disabled_pop();
         }
     }
     // ---- jxl-module: the note when the writer module is missing
     if jxc {
-        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, JXL_COMPAT_NOTE);
+        ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, crate::preferences::localization::tr(JXL_COMPAT_NOTE));
     }
     if iom & IOM_RLE != 0 {
         ui.checkbox(ID_SO_RLE, crate::preferences::localization::tr("Komprimieren (RLE)"), &mut v[V_RLE]);
@@ -942,15 +942,15 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
     if iom & IOM_TIFFCOMP != 0 {
         ui.text(TS_BODY, crate::preferences::localization::tr("Komprimierung"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_SO_TIFFC, &mut v[V_TIFFC], &TIFFC_NAMES);
+        ui.combobox(ID_SO_TIFFC, &mut v[V_TIFFC], &crate::preferences::localization::list(&TIFFC_NAMES));
     }
     if iom & IOM_DDSFMT != 0 {
         ui.text(TS_BODY, crate::preferences::localization::tr("Format"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_SO_DDSFMT, &mut v[V_DDSFMT], &DDS_NAMES);
+        ui.combobox(ID_SO_DDSFMT, &mut v[V_DDSFMT], &crate::preferences::localization::list(&DDS_NAMES));
         ui.text(TS_BODY, crate::preferences::localization::tr("Fehlermetrik"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_SO_METRIC, &mut v[V_METRIC], &METRIC_NAMES);
+        ui.combobox(ID_SO_METRIC, &mut v[V_METRIC], &crate::preferences::localization::list(&METRIC_NAMES));
     }
     if iom & IOM_CUBE != 0 {
         ui.checkbox(ID_SO_CUBE, crate::preferences::localization::tr("Cubemap aus Kreuz-Layout"), &mut v[V_CUBE]);
@@ -964,7 +964,7 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
             }
             ui.text(TS_BODY, crate::preferences::localization::tr("Resampling"));
             ui.next_size(-1, 0);
-            ui.combobox(ID_SO_MIPF, &mut v[V_MIPF], &MIPF_NAMES);
+            ui.combobox(ID_SO_MIPF, &mut v[V_MIPF], &crate::preferences::localization::list(&MIPF_NAMES));
             if off {
                 ui.disabled_pop();
             }
@@ -978,26 +978,26 @@ fn so_rows(s: &mut SaveOpt, ui: &mut Ui) {
 // so_header() -- hdr = "Vorschau – Dateigröße 1,23 MB" / "(wird berechnet)" / "(Fehler)"
 fn so_header(s: &mut SaveOpt) {
     let t = if s.ver != s.rver {
-        String::from("(wird berechnet)")
+        String::from(crate::preferences::localization::tr("(wird berechnet)"))
     } else if s.err != 0 {
-        String::from("(Fehler)")
+        String::from(crate::preferences::localization::tr("(Fehler)"))
     } else {
         so_size_text(s.len)
     };
-    s.hdr = crate::app::formatting::fmt_cap(format!("Vorschau – Dateigröße {}", t), HDR_CAP);
+    s.hdr = crate::app::formatting::fmt_cap(crate::preferences::localization::tf("Vorschau – Dateigröße {}", &[&t]), HDR_CAP);
 }
 
 // so_size_text(bytes) -- "123 Bytes", "45,6 KB", "1,23 MB"
 fn so_size_text(n: u64) -> String {
     if n < 1024 {
-        return format!("{} Bytes", n as i32);
+        return crate::preferences::localization::tf("{} Bytes", &[&format!("{}", n as i32)]);
     }
     if n < 1_048_576 {
         let t = (n * 10 + 512) >> 10; // tenths of a KB, rounded
-        return format!("{},{} KB", (t / 10) as i32, (t % 10) as i32);
+        return format!("{}{}{} KB", (t / 10) as i32, crate::preferences::localization::dec(), (t % 10) as i32);
     }
     let h = (n * 100 + 524_288) >> 20; // hundredths of a MB, rounded
-    format!("{},{:02} MB", (h / 100) as i32, (h % 100) as i32)
+    format!("{}{}{:02} MB", (h / 100) as i32, crate::preferences::localization::dec(), (h % 100) as i32)
 }
 
 // so_canvas() -- the preview canvas: a click toggles Ganzes Bild / Originalgröße, a drag pans

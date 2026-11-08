@@ -304,11 +304,11 @@ fn di_size_str(b: u64) -> String {
     } else if b > 1 << 10 {
         (10, "KB")
     } else {
-        return format!("{} Bytes", b as u32);
+        return crate::preferences::localization::tf("{} Bytes", &[&format!("{}", b as u32)]);
     };
     // tenths = round(bytes * 10 / unit)
     let t = (b.wrapping_mul(20).wrapping_add(1 << sh)) >> (sh + 1);
-    fmt_cap(format!("{},{} {}", (t / 10) as u32, (t % 10) as u32, unit), 32)
+    fmt_cap(format!("{}{}{} {}", (t / 10) as u32, crate::preferences::localization::dec(), (t % 10) as u32, unit), 32)
 }
 
 // di_row(label) -- open a row: label (LABEL_W), then the next widget gets FIELD_W; the caller
@@ -331,13 +331,13 @@ fn di_size_block(g: &mut DImg, ui: &mut Ui, base: u32) {
     let id = |k: i32| base + k as u32;
     // memory of the current and of the new image (all layers, 4 bytes per pixel)
     let cur = (g.w0 as u32 as u64 * g.h0 as u32 as u64).wrapping_mul(g.nlay as u32 as u64) << 2;
-    ui.text(TS_BODY, &fmt_cap(format!("Aktuelle Bildgröße: {}", di_size_str(cur)), TXT_CAP));
+    ui.text(TS_BODY, &fmt_cap(crate::preferences::localization::tf("Aktuelle Bildgröße: {}", &[&di_size_str(cur)]), TXT_CAP));
     let new = (g.w as u32 as u64 * g.h as u32 as u64).wrapping_mul(g.nlay as u32 as u64) << 2;
-    ui.text(TS_BODY_STRONG, &fmt_cap(format!("Neue Größe: {}", di_size_str(new)), TXT_CAP));
+    ui.text(TS_BODY_STRONG, &fmt_cap(crate::preferences::localization::tf("Neue Größe: {}", &[&di_size_str(new)]), TXT_CAP));
     // Prozentual: [n] %
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(LABEL_W, 0);
-    if ui.radio(id(DI_PCT_RB), "Prozentual:", &mut g.bypct, 0) & EV_ACT != 0 {
+    if ui.radio(id(DI_PCT_RB), crate::preferences::localization::tr("Prozentual:"), &mut g.bypct, 0) & EV_ACT != 0 {
         di_from_pct(g);
         di_print(g, ui);
     }
@@ -358,7 +358,7 @@ fn di_size_block(g: &mut DImg, ui: &mut Ui, base: u32) {
     }
     ui.box_end();
     // Absolut:
-    ui.radio(id(DI_ABS_RB), "Absolut:", &mut g.bypct, 1);
+    ui.radio(id(DI_ABS_RB), crate::preferences::localization::tr("Absolut:"), &mut g.bypct, 1);
     // the absolute part (disabled while Prozentual is chosen)
     let mut f = BOX_V;
     if g.bypct == 0 {
@@ -371,27 +371,27 @@ fn di_size_block(g: &mut DImg, ui: &mut Ui, base: u32) {
     }
     ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Pixelgröße"));
     // Breite
-    di_row(ui, "Breite:");
+    di_row(ui, crate::preferences::localization::tr("Breite:"));
     let ev = ui.number_box(id(DI_W), &mut g.w, &RANGE_DIM);
     di_nb_enter(g, ui, ev, id(DI_W));
     if ev & EV_ACT != 0 {
         di_keep(g, true);
         di_print(g, ui);
     }
-    di_unit(ui, "Pixel");
+    di_unit(ui, crate::preferences::localization::tr("Pixel"));
     ui.box_end();
     // Höhe
-    di_row(ui, "Höhe:");
+    di_row(ui, crate::preferences::localization::tr("Höhe:"));
     let ev = ui.number_box(id(DI_H), &mut g.h, &RANGE_DIM);
     di_nb_enter(g, ui, ev, id(DI_H));
     if ev & EV_ACT != 0 {
         di_keep(g, false);
         di_print(g, ui);
     }
-    di_unit(ui, "Pixel");
+    di_unit(ui, crate::preferences::localization::tr("Pixel"));
     ui.box_end();
     // Pixeldichte
-    di_row(ui, "Pixeldichte:");
+    di_row(ui, crate::preferences::localization::tr("Pixeldichte:"));
     let ev = ui.number_box_f(id(DI_RES), &mut g.res, &RANGEF_RES);
     di_nb_enter(g, ui, ev, id(DI_RES));
     if ev & EV_ACT != 0 {
@@ -404,24 +404,24 @@ fn di_size_block(g: &mut DImg, ui: &mut Ui, base: u32) {
     ui.box_end();
     // Druckgröße
     ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Druckgröße"));
-    di_row(ui, "Breite:");
+    di_row(ui, crate::preferences::localization::tr("Breite:"));
     let ev = ui.number_box_f(id(DI_PW), &mut g.pw, &RANGEF_PRINT);
     di_nb_enter(g, ui, ev, id(DI_PW));
     if ev & EV_ACT != 0 {
         di_px_from_print(g, ui, true);
     }
     ui.next_size(UNIT_W, 0);
-    if ui.combobox(id(DI_PUNIT), &mut g.unit, &PUNIT_LIST) & EV_ACT != 0 {
+    if ui.combobox(id(DI_PUNIT), &mut g.unit, &crate::preferences::localization::list(&PUNIT_LIST)) & EV_ACT != 0 {
         di_unit_changed(g, ui);
     }
     ui.box_end();
-    di_row(ui, "Höhe:");
+    di_row(ui, crate::preferences::localization::tr("Höhe:"));
     let ev = ui.number_box_f(id(DI_PH), &mut g.ph, &RANGEF_PRINT);
     di_nb_enter(g, ui, ev, id(DI_PH));
     if ev & EV_ACT != 0 {
         di_px_from_print(g, ui, false);
     }
-    di_unit(ui, if g.unit == 0 { "Zoll" } else { "Zentimeter" });
+    di_unit(ui, if g.unit == 0 { crate::preferences::localization::tr("Zoll") } else { crate::preferences::localization::tr("Zentimeter") });
     ui.box_end();
     ui.box_end(); // the absolute part
 }
@@ -479,9 +479,9 @@ fn di_resize_frame(p: &mut Pn, ui: &mut Ui) {
         ui.box_begin(0, BOX_V, GAP);
         di_size_block(g, ui, ID_DLG_RESIZE);
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Optionen"));
-        di_row(ui, "Interpolation:");
+        di_row(ui, crate::preferences::localization::tr("Interpolation:"));
         ui.next_size(WIDE_W, 0);
-        ui.combobox(ID_RS_FILTER, &mut g.filter, &FILTER_LIST);
+        ui.combobox(ID_RS_FILTER, &mut g.filter, &crate::preferences::localization::list(&FILTER_LIST));
         ui.box_end();
         ui.checkbox(ID_RS_GAMMA, crate::preferences::localization::tr("Gammakorrektur anwenden"), &mut g.gamma);
         ui.box_end();
@@ -512,13 +512,13 @@ fn di_canvas_frame(p: &mut Pn, ui: &mut Ui) {
         // Anker / Fülleffekt on the left, the 3 x 3 grid on the right
         ui.box_begin(0, BOX_H, 16);
         ui.box_begin(0, BOX_V, GAP);
-        di_row(ui, "Anker:");
+        di_row(ui, crate::preferences::localization::tr("Anker:"));
         ui.next_size(ANCH_W, 0);
-        ui.combobox(ID_CS_ANCHOR, &mut g.anchor, &ANCHOR_NAMES);
+        ui.combobox(ID_CS_ANCHOR, &mut g.anchor, &crate::preferences::localization::list(&ANCHOR_NAMES));
         ui.box_end();
-        di_row(ui, "Fülleffekt:");
+        di_row(ui, crate::preferences::localization::tr("Fülleffekt:"));
         ui.next_size(ANCH_W, 0);
-        ui.combobox(ID_CS_FILL, &mut g.fillc, &FILL_LIST);
+        ui.combobox(ID_CS_FILL, &mut g.fillc, &crate::preferences::localization::list(&FILL_LIST));
         ui.box_end();
         ui.box_end();
         di_anchor_grid(g, ui);
@@ -549,7 +549,7 @@ fn di_anchor_grid(g: &mut DImg, ui: &mut Ui) {
             let cell = row * 3 + col; // AN_*
             ui.next_size(CELL, CELL);
             let icon = if cell == g.anchor { IC_IMAGE } else { 0 };
-            ui.tool_button(ID_CS_CELL0 + cell as u32, icon, ANCHOR_NAMES[cell as usize], &mut g.anchor, cell);
+            ui.tool_button(ID_CS_CELL0 + cell as u32, icon, crate::preferences::localization::tr(ANCHOR_NAMES[cell as usize]), &mut g.anchor, cell);
             if cell != g.anchor {
                 di_cell_frame(ui); // the checked cell has its own border
             }

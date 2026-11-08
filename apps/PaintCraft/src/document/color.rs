@@ -75,19 +75,19 @@ const ID_CM_IMPORT: u32 = ID_DLG_PROFILE + 3;
 const ID_CM_EXPORT: u32 = ID_DLG_PROFILE + 4;
 const ID_CM_PROBE: u32 = ID_ICC_FIRST;
 
-const S_TITLE: &str = "Farbprofil";
-const S_CUR_NONE: &str = "sRGB (kein Profil eingebettet)";
-const S_CUR_NONAME: &str = "Unbenanntes Profil";
-const S_IMP_NONAME: &str = "Importiertes Profil";
-const S_H_ASSIGN: &str = "Farbprofil zuweisen";
-const S_H_CONVERT: &str = "In Farbprofil umrechnen";
-const S_ERR_CONV: &str = "In dieses Farbprofil lässt sich nicht umrechnen.";
-const S_ERR_FILE: &str = "Die Datei enthält kein brauchbares Farbprofil.";
-const S_ERR_WRITE: &str = "Das Farbprofil ließ sich nicht speichern.";
+const S_TITLE: &str = "Farbprofil"; // i18n
+const S_CUR_NONE: &str = "sRGB (kein Profil eingebettet)"; // i18n
+const S_CUR_NONAME: &str = "Unbenanntes Profil"; // i18n
+const S_IMP_NONAME: &str = "Importiertes Profil"; // i18n
+const S_H_ASSIGN: &str = "Farbprofil zuweisen"; // i18n
+const S_H_CONVERT: &str = "In Farbprofil umrechnen"; // i18n
+const S_ERR_CONV: &str = "In dieses Farbprofil lässt sich nicht umrechnen."; // i18n
+const S_ERR_FILE: &str = "Die Datei enthält kein brauchbares Farbprofil."; // i18n
+const S_ERR_WRITE: &str = "Das Farbprofil ließ sich nicht speichern."; // i18n
 const S_EXP_NAME: &str = "Farbprofil.icc";
 static S_EXTS: [&str; 1] = ["icc;icm=Farbprofil"];
-static BI_NAMES: [&str; 5] = ["sRGB", "A98 RGB", "Display P3", "ROMM RGB", "Graustufen (Gamma 2,2)"];
-static INTENT_LIST: [&str; 4] = ["Perzeptiv", "Relativ farbmetrisch", "Sättigung", "Absolut farbmetrisch"];
+static BI_NAMES: [&str; 5] = ["sRGB", "A98 RGB", "Display P3", "ROMM RGB", "Graustufen (Gamma 2,2)"]; // i18n
+static INTENT_LIST: [&str; 4] = ["Perzeptiv", "Relativ farbmetrisch", "Sättigung", "Absolut farbmetrisch"]; // i18n
 
 /// a profile history record (CR_*)
 struct CrRec {
@@ -265,15 +265,15 @@ fn cm_rows(cm: &mut Cm) {
     cm.list.clear();
     for i in 0..ICC_BI_COUNT {
         cm.rows.push(i);
-        cm.list.push(String::from(BI_NAMES[i as usize]));
+        cm.list.push(String::from(crate::preferences::localization::tr(BI_NAMES[i as usize])));
     }
     if !cm.mon.is_empty() {
         cm.rows.push(ROW_MON);
-        cm.list.push(fmt_cap(format!("Monitor: {}", cm.mon_desc), DESC_CAP + 16));
+        cm.list.push(fmt_cap(crate::preferences::localization::tf("Monitor: {}", &[&cm.mon_desc]), DESC_CAP + 16));
     }
     if !cm.imp.is_empty() {
         cm.rows.push(ROW_IMP);
-        cm.list.push(fmt_cap(format!("Importiert: {}", cm.imp_desc), DESC_CAP + 16));
+        cm.list.push(fmt_cap(crate::preferences::localization::tf("Importiert: {}", &[&cm.imp_desc]), DESC_CAP + 16));
     }
 }
 
@@ -613,15 +613,15 @@ fn cm_dlg_frame(p: &mut Pn, ui: &mut Ui) {
     }
     let open = p.cmdlg.open.clone();
     let rect = p.cmdlg.rect.clone();
-    if ui.window_begin(WINID_DLG_PROFILE, S_TITLE, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_DLG_PROFILE, crate::preferences::localization::tr(S_TITLE), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         // Aktuell:
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Aktuell:"));
         let icc = &p.doc.d(doc).icc;
         let cur = if icc.is_empty() {
-            String::from(S_CUR_NONE)
+            String::from(crate::preferences::localization::tr(S_CUR_NONE))
         } else {
             let s = describe(icc);
-            if s.is_empty() { String::from(S_CUR_NONAME) } else { s }
+            if s.is_empty() { String::from(crate::preferences::localization::tr(S_CUR_NONAME)) } else { s }
         };
         ui.text(TS_BODY, &cur);
         ui.spacer(8);
@@ -644,7 +644,7 @@ fn cm_dlg_frame(p: &mut Pn, ui: &mut Ui) {
         // intent + black point compensation
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Priorität:"));
         ui.next_size(-1, 0);
-        ui.combobox(ID_CM_INTENT, &mut cm.intent, &INTENT_LIST);
+        ui.combobox(ID_CM_INTENT, &mut cm.intent, &crate::preferences::localization::list(&INTENT_LIST));
         ui.checkbox(ID_CM_BPC, crate::preferences::localization::tr("Tiefenkompensierung verwenden"), &mut cm.bpc);
         if let Some(e) = cm.err {
             ui.spacer(8);
@@ -698,7 +698,7 @@ fn cm_import(cm: &mut Cm, icc: Vec<u8>) -> bool {
     }
     let d = describe(&icc);
     cm.imp = icc;
-    cm.imp_desc = if d.is_empty() { String::from(S_IMP_NONAME) } else { d };
+    cm.imp_desc = if d.is_empty() { String::from(crate::preferences::localization::tr(S_IMP_NONAME)) } else { d };
     cm_rows(cm);
     cm.sel = cm.rows.len() as i32 - 1;
     true

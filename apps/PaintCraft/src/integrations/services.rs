@@ -73,8 +73,8 @@ fn start(p: &mut Pn, ui: &mut Ui, scan: bool) {
     if worker.is_none() {
         crate::integrations::file_io::fio_error(
             p,
-            Some("Systemdienst"),
-            "Der Hintergrund-Thread konnte nicht gestartet werden.",
+            Some(crate::preferences::localization::tr("Systemdienst")),
+            "Der Hintergrund-Thread konnte nicht gestartet werden.", // i18n
         );
         return;
     }
@@ -83,7 +83,7 @@ fn start(p: &mut Pn, ui: &mut Ui, scan: bool) {
     p.services.worker = worker;
     BUSY.store(true, Ordering::Release);
     if !scan {
-        p.services.update_status = String::from("Veröffentlichungen werden geprüft …");
+        p.services.update_status = String::from(crate::preferences::localization::tr("Veröffentlichungen werden geprüft …"));
     }
     ui.repass();
 }
@@ -106,14 +106,14 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
                 if error != 0 {
                     crate::integrations::file_io::fio_error(
                         p,
-                        Some("Bilderfassung"),
-                        &format!("Das erfasste Bild ließ sich nicht öffnen ({error})."),
+                        Some(crate::preferences::localization::tr("Bilderfassung")),
+                        &crate::preferences::localization::tf("Das erfasste Bild ließ sich nicht öffnen ({}).", &[&format!("{error}")]),
                     );
                 }
             }
             Ok(bytes) if !p.services.scan => p.services.update_status = String::from_utf8_lossy(&bytes).into_owned(),
             Ok(_) => {}
-            Err(e) if p.services.scan => crate::integrations::file_io::fio_error(p, Some("Bilderfassung"), &e),
+            Err(e) if p.services.scan => crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Bilderfassung")), &e),
             Err(e) => p.services.update_status = e,
         }
         ui.repass();
@@ -125,7 +125,7 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
     open.set((p.services.scan && p.services.job.is_some()) as i32);
     if ui.window_begin(
         0x60E4,
-        "Scanner oder Kamera",
+        crate::preferences::localization::tr("Scanner oder Kamera"),
         Some(&open),
         WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT | WF_NOCLOSE,
         None,
@@ -141,13 +141,13 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
 }
 #[cfg(not(any(windows, target_os = "linux")))]
 fn run(_scan: bool, _beta: bool, _fixture: Option<&str>, _job: &Job) -> Result<Vec<u8>, String> {
-    Err(String::from("Systemdienste sind in der Desktop-Version verfügbar."))
+    Err(String::from("Systemdienste sind in der Desktop-Version verfügbar.")) // i18n
 }
 #[cfg(any(windows, target_os = "linux"))]
 fn run(scan: bool, beta: bool, fixture: Option<&str>, job: &Job) -> Result<Vec<u8>, String> {
     if scan {
         if let Some(path) = fixture {
-            return plat::read_file(path).ok_or_else(|| String::from("Testaufnahme nicht lesbar."));
+            return plat::read_file(path).ok_or_else(|| String::from("Testaufnahme nicht lesbar.")); // i18n
         }
     }
     let mut args: Vec<&str> = Vec::new();
@@ -216,7 +216,7 @@ fn run(scan: bool, beta: bool, fixture: Option<&str>, job: &Job) -> Result<Vec<u
                             if error {
                                 continue;
                             }
-                            return Err(String::from("Die Antwort überschreitet die zulässige Größe."));
+                            return Err(String::from("Die Antwort überschreitet die zulässige Größe.")); // i18n
                         }
                         dst.extend_from_slice(&buf[..n]);
                     }
@@ -230,7 +230,7 @@ fn run(scan: bool, beta: bool, fixture: Option<&str>, job: &Job) -> Result<Vec<u
                     break;
                 }
                 if out.len() + n > 512 * 1024 * 1024 {
-                    return Err(String::from("Antwort zu groß."));
+                    return Err(String::from("Antwort zu groß.")); // i18n
                 }
                 out.extend_from_slice(&buf[..n]);
             }

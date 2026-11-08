@@ -208,14 +208,14 @@ pub(crate) fn curves_frame(p: &mut Pn, ui: &mut Ui) {
     let open = p.fx.open.clone();
     let rect = p.curves.rect.clone();
     let mut prev: Option<Params> = None;
-    if ui.window_begin(WINID_CURVES, p.fx.name, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_CURVES, crate::preferences::localization::tr(p.fx.name), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         prev = Some(p.fx.param);
         // Transferzuordnung
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
         ui.text(TS_BODY, crate::preferences::localization::tr("Transferzuordnung:"));
         ui.next_size(140, 0);
         let mut m = p.fx.param.0[0] as u32 as i32;
-        if ui.combobox(ID_CV_MODE, &mut m, &CV_MODES) & EV_ACT != 0 {
+        if ui.combobox(ID_CV_MODE, &mut m, &crate::preferences::localization::list(&CV_MODES)) & EV_ACT != 0 {
             p.curves.drag = -1;
         }
         p.fx.param.0[0] = (p.fx.param.0[0] & !0xFFFF_FFFF) | m as u32 as u64;

@@ -51,7 +51,7 @@ pub(super) fn builtin(path: &str) -> Option<&'static [u8]> {
 }
 fn import(p: &mut Pn, path: String) -> Result<(), String> {
     let data = plat::read_file(&path)
-        .ok_or_else(|| String::from("Die Preset-Datei ließ sich nicht lesen."))?;
+        .ok_or_else(|| String::from("Die Preset-Datei ließ sich nicht lesen."))?; // i18n
     let items = presets::parse(&data)?;
     let library = &mut p.custom_brush.presets;
     library.path = path;
@@ -64,7 +64,7 @@ fn apply(p: &mut Pn, ui: &mut Ui) -> Result<(), String> {
     let preset = library
         .items
         .get(library.selected as usize)
-        .ok_or_else(|| String::from("Kein Preset ausgewählt."))?;
+        .ok_or_else(|| String::from("Kein Preset ausgewählt."))?; // i18n
     if !preset.unsupported.is_empty() {
         return Err(format!(
             "{}: Diese aktiven Einstellungen werden noch nicht unterstützt: {}",
@@ -123,7 +123,7 @@ fn apply(p: &mut Pn, ui: &mut Ui) -> Result<(), String> {
 }
 fn report(p: &mut Pn, result: Result<(), String>) {
     if let Err(e) = result {
-        crate::integrations::file_io::fio_error(p, Some("Pinsel-Presets"), &e);
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Pinsel-Presets")), &e);
     }
 }
 pub(super) fn initialize(p: &mut Pn, ui: &mut Ui) {
@@ -197,9 +197,9 @@ pub(super) fn controls(p: &mut Pn, ui: &mut Ui) {
         ui.combobox(0x90211, &mut library.selected, &names);
         if let Some(preset) = library.items.get(library.selected as usize) {
             let text = if preset.unsupported.is_empty() {
-                format!("{} px · Bild: {}", preset.size, preset.image)
+                crate::preferences::localization::tf("{} px · Bild: {}", &[&format!("{}", preset.size), &preset.image])
             } else {
-                format!("Noch nicht anwendbar: {}", preset.unsupported.join(", "))
+                crate::preferences::localization::tf("Noch nicht anwendbar: {}", &[&preset.unsupported.join(", ")])
             };
             ui.text(TS_BODY | TX_WRAP, &text);
         }

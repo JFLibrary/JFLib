@@ -163,24 +163,24 @@ pub(crate) fn crash_frame(p: &mut Pn, ui: &mut Ui) {
     if !c.placed {
         c.placed = true;
         ui.timer(TMR_CRASH, 1); // placed once the window runs (like settings.s)
-        ui.set_title("PaintCraft Absturz");
+        ui.set_title(crate::preferences::localization::tr("PaintCraft Absturz"));
     }
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | BOX_BG, 0);
-    ui.titlebar_begin("PaintCraft Absturz", 0);
+    ui.titlebar_begin(crate::preferences::localization::tr("PaintCraft Absturz"), 0);
     ui.titlebar_end();
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | PAD_24, 12);
     ui.text(TS_SUBTITLE, crate::preferences::localization::tr("PaintCraft wurde unerwartet beendet"));
     ui.text(
         TS_BODY | TX_WRAP,
-        "PaintCraft musste wegen eines unerwarteten Fehlers beendet werden. Was seit dem letzten Speichern geändert wurde, ist leider verloren.",
+        crate::preferences::localization::tr("PaintCraft musste wegen eines unerwarteten Fehlers beendet werden. Was seit dem letzten Speichern geändert wurde, ist leider verloren."),
     );
-    let line = fmt_cap(format!("Ein Absturzprotokoll wurde gespeichert: {}", c.path), PATH_CAP + 64);
+    let line = fmt_cap(crate::preferences::localization::tf("Ein Absturzprotokoll wurde gespeichert: {}", &[&c.path]), PATH_CAP + 64);
     ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, &line);
     // Details anzeigen / ausblenden, In die Zwischenablage kopieren, Ordner öffnen
     ui.box_begin(0, BOX_H, 8);
-    let lbl = if c.details { "Details ausblenden" } else { "Details anzeigen" };
+    let lbl = if c.details { crate::preferences::localization::tr("Details ausblenden") } else { crate::preferences::localization::tr("Details anzeigen") };
     if ui.button(ID_CR_DETAILS, lbl) & EV_ACT != 0 {
         c.details = !c.details;
         ui.repass();

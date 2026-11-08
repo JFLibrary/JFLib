@@ -210,7 +210,7 @@ fn tw_input(p: &mut Pn, ui: &mut Ui, doc: DocId, inp: &UiInput, x_fx: i32, y_fx:
     t.shift = (inp.mods & MOD_SHIFT != 0) as u32; // Umschalt: global (FF_GLOBAL = 1)
     let mode = tsel_mode(p, inp, btn);
     let Some(poly) = tw_run(p, doc) else { return true };
-    if hist_push_sel(p, doc, "Zauberstab", IC_MAGIC_SELECT) {
+    if hist_push_sel(p, doc, "Zauberstab", IC_MAGIC_SELECT) { // i18n
         sel_combine(p, doc, &poly, mode, SQ_AA as u32);
         if p.doc.d(doc).sel.nops != 0 {
             tw_remember(p, doc);

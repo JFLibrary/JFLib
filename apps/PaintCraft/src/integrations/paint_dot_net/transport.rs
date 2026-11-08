@@ -33,14 +33,14 @@ fn install_dir() -> String {
 /// why original plugins cannot run here, in the words of the menu (None: nothing known against it)
 pub(crate) fn problem() -> Option<&'static str> {
     if !configured() {
-        return Some("Unter Linux nur über die Wine-Brücke");
+        return Some("Unter Linux nur über die Wine-Brücke"); // i18n
     }
     #[cfg(windows)]
     if plat::file_exists(&format!("{}\\PaintDotNet.Effects.Core.dll", install_dir())) == 0 {
-        return Some("paint.net 5.1 ist nicht installiert");
+        return Some("paint.net 5.1 ist nicht installiert"); // i18n
     }
     if plat::file_exists(&helper_path()) == 0 {
-        return Some("Der Plugin-Host fehlt in dieser Installation");
+        return Some("Der Plugin-Host fehlt in dieser Installation"); // i18n
     }
     None
 }
@@ -97,7 +97,7 @@ impl Invocation {
             let (program, mut full) = if apphost {
                 (String::from(helper), Vec::new())
             } else if own_runtime {
-                let exe = plat::current_exe().ok_or_else(|| String::from("Der Programmpfad ist unbekannt."))?;
+                let exe = plat::current_exe().ok_or_else(|| String::from("Der Programmpfad ist unbekannt."))?; // i18n
                 (exe, alloc::vec![String::from("--pdn-clr"), install, String::from(helper)])
             } else {
                 env.push((String::from("DOTNET_ReadyToRun"), String::from("0")));
@@ -115,7 +115,7 @@ impl Invocation {
         {
             let mut env = alloc::vec![(String::from("DOTNET_ReadyToRun"), String::from("0"))];
             let program = option("--pdn-wine", "PAINTCRAFT_PDN_WINE")
-                .ok_or_else(|| String::from("Linux-DLL-Brücke: --pdn-wine und eine Windows-.NET-/Paint.NET-Installation konfigurieren."))?;
+                .ok_or_else(|| String::from("Linux-DLL-Brücke: --pdn-wine und eine Windows-.NET-/Paint.NET-Installation konfigurieren."))?; // i18n
             let cwd = plat::cwd();
             let map = |s: &str| super::paths::to_windows(s, &cwd).map_err(String::from);
             let dotnet = option("--pdn-dotnet", "PAINTCRAFT_PDN_DOTNET")
@@ -138,7 +138,7 @@ impl Invocation {
             let prefix = prefix();
             if !prefix.starts_with('/') {
                 return Err(String::from(
-                    "Das Wine-Präfix muss ein absoluter Linux-Pfad sein.",
+                    "Das Wine-Präfix muss ein absoluter Linux-Pfad sein.", // i18n
                 ));
             }
             env.push((String::from("WINEPREFIX"), prefix));
@@ -189,7 +189,7 @@ impl Heartbeat {
             }
         }
         Err(String::from(
-            "Plugin-Überwachung konnte nicht angelegt werden.",
+            "Plugin-Überwachung konnte nicht angelegt werden.", // i18n
         ))
     }
     fn tick(&mut self, force: bool) -> Result<(), String> {
@@ -198,7 +198,7 @@ impl Heartbeat {
             let data = now.to_le_bytes();
             if self.file.as_ref().and_then(|f| f.write_at(0, &data)) != Some(data.len()) {
                 return Err(String::from(
-                    "Plugin-Überwachung konnte nicht aktualisiert werden.",
+                    "Plugin-Überwachung konnte nicht aktualisiert werden.", // i18n
                 ));
             }
             self.last = now;
@@ -248,13 +248,13 @@ pub(crate) fn exchange(
         if cancel() || timeout_ms != 0 && plat::time_us().saturating_sub(start) / 1000 > timeout_ms
         {
             return Err(String::from(
-                "Plugin abgebrochen oder Zeitlimit überschritten.",
+                "Plugin abgebrochen oder Zeitlimit überschritten.", // i18n
             ));
         }
         heartbeat.tick(false)?;
         let exit = child
             .try_wait()
-            .map_err(|_| String::from("Plugin-Prozess nicht erreichbar."))?;
+            .map_err(|_| String::from("Plugin-Prozess nicht erreichbar."))?; // i18n
         let mut pending_output = false;
         // Drain both streams while sending, so Wine diagnostics cannot fill a pipe
         // and deadlock a large image upload before the helper starts reading it.
@@ -277,7 +277,7 @@ pub(crate) fn exchange(
                     }
                     Ok(Some(n)) => {
                         if n > limit.saturating_sub(output.len()) {
-                            return Err(String::from("Ungültige Größe der Plugin-Antwort."));
+                            return Err(String::from("Ungültige Größe der Plugin-Antwort.")); // i18n
                         }
                         output.extend_from_slice(&buffer[..n]);
                     }
@@ -302,14 +302,14 @@ pub(crate) fn exchange(
                 ));
             }
             if sent < input.len() {
-                return Err(String::from("Plugin-Host hat die Eingabe abgebrochen."));
+                return Err(String::from("Plugin-Host hat die Eingabe abgebrochen.")); // i18n
             }
             return Ok(output);
         }
         if sent < input.len() {
             match child.write_stdin(&input[sent..]) {
                 Ok(Some(0)) => {
-                    return Err(String::from("Plugin-Host hat die Eingabe abgebrochen."));
+                    return Err(String::from("Plugin-Host hat die Eingabe abgebrochen.")); // i18n
                 }
                 // no pause while data flows: a pause per 4 KiB write capped the upload at
                 // about 260 KB/s, so images of 30 MB and more ran into the timeout
