@@ -1886,9 +1886,10 @@ Fensterrand hinaus.
 
 ## 9. Plattformen
 
-- **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend` ohne libc ist eigener
-  Aufwand); heute macOS nur über das Web.
-- **P2** · *fehlt* · Native iOS-Version.
+- **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend`, gegen libSystem gelinkt, weil
+  macOS keine stabilen Syscalls hat); heute macOS nur über das Web. Plan mit den Meilensteinen AP0 bis
+  AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
+- **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
   den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
