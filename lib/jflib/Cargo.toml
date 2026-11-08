@@ -13,7 +13,9 @@ build = "build.rs"
 # DEP_JFLIB_STD for the app's build script (jflib-build): a program with std links differently
 links = "jflib"
 readme = "README.md"
-# docs/ is copied in from the repository's docs/ before packing (tools/crates_accept.py), not kept in git
+# docs/GUIDE.md and docs/API.md are copies of the repository's (in git, so `cargo publish` takes them from any
+# checkout): tools/gendoc.py writes both API.md, `python tools/crates_accept.py --template` the guide, build_rs.py
+# check compares them
 include = ["src/**", "build.rs", "README.md", "LICENSE-*", "docs/*.md", "template/**"]
 
 [lib]

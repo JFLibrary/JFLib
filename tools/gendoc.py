@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gendoc.py -- docs/API.md from the doc comments of the Rust library (lib).
 
-    python tools/gendoc.py             # writes docs/API.md
+    python tools/gendoc.py             # writes docs/API.md and its copy lib/jflib/docs/API.md
     python tools/gendoc.py --check     # writes nothing; exit 1 when docs/API.md is stale
     python tools/gendoc.py --missing   # also list the public items without a comment
     python tools/gendoc.py --check --api   # ... and sum up the API changes since the last
@@ -41,6 +41,8 @@ from project_sources import entrypoint, project_sources
 ROOT = Path(__file__).resolve().parents[1]
 LIB = ROOT / "lib"
 OUT = ROOT / "docs" / "API.md"
+# the copy in the facade's package (lib/jflib/Cargo.toml: `cargo publish` takes it from git)
+FACADE_COPY = ROOT / "lib" / "jflib" / "docs" / "API.md"
 
 # ---------------------------------------------------------------- configuration
 # ui: areas (files of lib/ui); a file not named here lands in "Other modules"
@@ -1085,8 +1087,9 @@ def main():
               f"({w.count} items, {len(w.missing)} without a comment)")
         rc = 1 if stale else 0
     else:
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        OUT.write_bytes(data)
+        for out in (OUT, FACADE_COPY):
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(data)
         print(f"wrote {rel(OUT)}: {len(data)} bytes, {w.count} items, {len(w.missing)} without a comment")
         rc = 0
     if "--missing" in args:

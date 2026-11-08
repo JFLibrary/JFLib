@@ -97,4 +97,5 @@ def set_version(new, root=ROOT):
         return re.sub(r'version = "=[^"]*"', f'version = "={new}"', text)
     edit("Cargo.toml", lambda t: pins(re.sub(r'^version = "[^"]*"', f'version = "{new}"', t, count=1, flags=re.M)))
     edit("modules/modplat/Cargo.toml", pins)
-    edit("Cargo.lock", lambda t: re.sub(r'(name = "jflib(?:-[a-z0-9-]+)?"\r?\nversion = )"[^"]*"', rf'\g<1>"{new}"', t))
+    # every published package: jflib, jflib-*, and cargo-jflib (forgotten before 1.0.0: `--locked` then fails)
+    edit("Cargo.lock", lambda t: re.sub(r'(name = "(?:cargo-)?jflib(?:-[a-z0-9-]+)?"\r?\nversion = )"[^"]*"', rf'\g<1>"{new}"', t))

@@ -5,8 +5,9 @@
     python tools/crates_accept.py --targets docs [--docs-toolchain nightly]
                                                  only the docs as docs.rs builds them (below)
     python tools/crates_accept.py --template     write the files of lib/jflib/template that
-                                                 come from apps/template (build_rs.py check
-                                                 compares them)
+                                                 come from apps/template and the copies of
+                                                 docs/GUIDE.md and docs/API.md in lib/jflib/docs
+                                                 (build_rs.py check compares them)
 
 The acceptance test of docs/CRATES.md (CR2), run by the full suite (`build_rs.py test` without
 --quick).  It packs every crate as `cargo package` would publish it, unpacks the packages into a
@@ -69,6 +70,7 @@ TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 TEMPLATE = ROOT / "lib" / "jflib" / "template"
 FACADE_DOCS = ROOT / "lib" / "jflib" / "docs"
+FACADE_DOC_NAMES = ("GUIDE.md", "API.md")
 WIN, LINUX, WEB = "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"
 
 
@@ -103,6 +105,10 @@ def template_problems():
         p = TEMPLATE / rel
         if not p.is_file() or p.read_bytes().decode("utf-8").replace("\r\n", "\n") != text:
             bad.append(f"lib/jflib/template/{rel}: differs from apps/template: python tools/crates_accept.py --template")
+    for name in FACADE_DOC_NAMES:
+        copy, source = FACADE_DOCS / name, ROOT / "docs" / name
+        if not copy.is_file() or copy.read_bytes().replace(b"\r\n", b"\n") != source.read_bytes().replace(b"\r\n", b"\n"):
+            bad.append(f"lib/jflib/docs/{name}: differs from docs/{name}: python tools/crates_accept.py --template")
     return bad
 
 
@@ -112,14 +118,16 @@ def write_template():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(text.encode("utf-8"))
         print(f"wrote lib/jflib/template/{rel}")
+    facade_docs()
+    print(f"wrote lib/jflib/docs/{', '.join(FACADE_DOC_NAMES)}")
 
 
 # ---------------------------------------------------------------- packing
 def facade_docs():
-    """docs/GUIDE.md and docs/API.md into the facade's package (lib/jflib/docs, not in git: the
-    facade's include names it), where an agent finds them below ~/.cargo/registry/src"""
+    """docs/GUIDE.md and docs/API.md into the facade's package (lib/jflib/docs, in git, the facade's
+    include names it), where an agent finds them below ~/.cargo/registry/src"""
     FACADE_DOCS.mkdir(exist_ok=True)
-    for name in ("GUIDE.md", "API.md"):
+    for name in FACADE_DOC_NAMES:
         shutil.copyfile(ROOT / "docs" / name, FACADE_DOCS / name)
 
 

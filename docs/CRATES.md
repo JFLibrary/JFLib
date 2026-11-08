@@ -555,9 +555,9 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem
    einzelnen Ordner scheitert dagegen, weil es die übrigen auf crates.io sucht. Das Limit für neue Crates ist 5 auf
    einmal, dann eine je 10 Minuten (`rate_limiter.rs` von crates.io; Ausnahmen je Nutzer möglich), für 60 also rund
-   9 Stunden: `cargo publish --workspace` allein bricht nach der fünften ab. Nötig ist ein Skript, das vorher
-   `docs/GUIDE.md` und `docs/API.md` nach `lib/jflib/docs/` kopiert (nicht in Git, sonst fehlen sie im Paket der
-   Fassade), dann Crate für Crate hochlädt, am Limit wartet und nach einem Abbruch bei der nächsten weitermacht.
+   9 Stunden: `cargo publish --workspace` allein bricht nach der fünften ab. Nötig ist ein Skript, das Crate für
+   Crate hochlädt, am Limit wartet und nach einem Abbruch bei der nächsten weitermacht. Die Doku der Fassade liegt
+   seit 2026-11-08 in Git (`lib/jflib/docs/`, siehe unten), ein Kopierschritt entfällt.
 3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt. Vorbereitet am 2026-11-08 (Antwort
    „Ja, vorbereiten“): Jedes veröffentlichte Manifest nennt in `[package.metadata.docs.rs]` seine Ziele, sonst baute
    docs.rs seine fünf Standardziele, darunter macOS und 32-Bit-Windows. Die vier von JFLib für die Bibliothek; nur
@@ -575,9 +575,19 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
 4. Die Hinweise „bis die Crates auf crates.io sind: `cargo install --path lib/cargo_jflib`“ aus `README.md` und
    `docs/GUIDE.md` nehmen.
 
-Vorher zu entscheiden: die Version. `CHANGELOG.md` hat schon `[0.1.0] - 2026-10-20` (ohne Git-Tag), und
-`api-diff` verlangt seitdem 0.2.0 (27 Brüche bis CR5, dazu `#[non_exhaustive]` an 172 Enums vom 2026-11-07).
-Entweder `python build_rs.py release 0.2.0` und 0.2.0 hochladen, oder das interne 0.1.0 im Changelog umbenennen.
+Die Version: 0.1.0, entschieden vom Nutzer am 2026-11-08 („für cargo natürlich 0.1.0“; ein „Version 1.0“
+davor hatte ich wörtlich genommen und zurückgenommen). Das interne `[0.1.0] - 2026-10-20` war nie veröffentlicht und
+ohne Git-Tag: Der Changelog führt es mit allem seither zu `[0.1.0] - 2026-11-08` zusammen, die API-Basis
+`docs/api/0.1.0.txt` ist der heutige Stand (`api-diff` zählt ab da). Es gilt die rechte Spalte von
+`docs/VERSIONING.md`: solange 0.x, zählt MINOR die inkompatiblen Änderungen (0.2.0), PATCH alles andere. Der Git-Tag
+`v0.1.0` kommt auf den Commit, der hochgeladen wird; liegt der Upload nicht am 2026-11-08, das Datum im Changelog
+nachziehen.
+
+Die Doku im Paket der Fassade: `lib/jflib/docs/GUIDE.md` und `API.md` liegen seit 2026-11-08 als Kopien in Git
+(gleicher Inhalt, Git speichert sie nur einmal), damit `cargo publish --workspace` sie aus jeder Kopie mitnimmt.
+`tools/gendoc.py` schreibt beide API.md, `python tools/crates_accept.py --template` die Anleitung, `build_rs.py check`
+vergleicht. Die Zeile `/lib/jflib/docs` in `.gitignore` ist damit überholt, sie stört aber nicht (die beiden
+Dateien sind mit `git add -f` aufgenommen); sie fällt weg, sobald `.gitignore` ohnehin geändert wird.
 
 Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Reserviert ist damit nichts.
 

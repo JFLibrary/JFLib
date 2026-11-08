@@ -94,7 +94,7 @@ to the original assembly version.
 Newer parts of the library, captured from the demo and test apps named above each picture
 (`python build_rs.py run NAME --target win` starts them). The [roadmap](docs/ROADMAP.md)
 shows what is done and what is still missing; the [changelog](CHANGELOG.md) lists the
-changes since version 0.1.0.
+changes of each version (0.1.0 is the first on crates.io).
 
 | Charts and data views (`datagallery`) | Diagram canvas (`diagramtest`) |
 | --- | --- |

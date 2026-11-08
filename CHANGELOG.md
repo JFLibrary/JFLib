@@ -13,6 +13,12 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-08
+
+The first version on crates.io. It takes in the internal 0.1.0 of 2026-10-20, never published:
+the Rust rewrite of jfguiLib, published as JFLib on 2026-10-14, and the roadmap work since then
+([docs/ROADMAP.md](docs/ROADMAP.md)). Its public API is recorded in `docs/api/0.1.0.txt`.
+
 ### Added
 
 - **ui:** One gesture recogniser for a finger (`lib/ui/touch.rs`, GUIDE §37): pan 1:1 with its direction locked and handed along the views around the widget, a fling on Android's curve that a touch stops, tap, long press; widgets take the finger by themselves (`HB_GRAB_H`, `HB_GRAB_V`, their cursor); no scroll bars with a finger (`ui.touch_mode`), title bars move windows by finger, not out of reach; the script commands `tap`, `longpress`, `swipe`, `flick`, `finger`, `expect ... value MIN..MAX`, `nohover`, `unpressed`
@@ -149,9 +155,57 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **docs:** What the crates on crates.io promise (docs/VERSIONING.md): the facade jflib as API.md documents it, jflib-build and cargo jflib; the guide shows the crate way first, a foreign crate's own system calls pass by plat (only the sandbox line confines them)
 - **crates:** apps of your own may use std and any std crate: the feature std of jflib (std's entry, panic handler and allocator; ui::main! and rt::main! stay, plat::std_start, rt::panic_hook, rt::Alloc), cargo jflib new --std; the library stays no_std (docs/GUIDE.md, An app with std)
 - **build:** docs.rs: every published crate names JFLib's four targets in [package.metadata.docs.rs] (jflib, rt, plat, ui and gpu with std, so plat::std_start shows and Linux shows the glibc build), jflib's page is its README, jflib::guide is docs/GUIDE.md with its links into the repository; python tools/crates_accept.py --targets docs documents every package as docs.rs does (offline, nightly, DOCS_RS=1); keywords and categories for jflib, cargo-jflib and jflib-build; every crate's homepage is https://jflib.org (from the root's [workspace.package])
+- **Foundation:** `#![no_std]` crates without libc for Windows, Linux (X11 and Wayland), the
+  browser (WebAssembly) and Android: the immediate-mode UI with interchangeable styles, a software
+  renderer, text shaping, image codecs from PNG to JPEG XL, effects, documents and DOCX,
+  networking (HTTP/1.1, TLS 1.3, SSH-2, DNS), cryptography, compression, an embedded database and
+  backup repositories; screenshots, widget dumps and `.uis` scripts for tests, and opt-in agent
+  control (JSON, MCP).
+- **Permissions and security (roadmap 1):** the app manifest `apps/NAME/PERMISSIONS`, enforced by
+  `plat` in every program of an app (files, programs, URL schemes, plugins, printing, secrets,
+  autostart, `net.connect` / `net.listen`); questions at run time with remembered answers; rights
+  for plugins and agent actions; passwords and tokens in the system's secret store
+  (`plat::secret`).
+- **Files and resources (roadmap 2):** one file namespace (`app://`, `config://`, `data://`,
+  `cache://`, `logs://`, `mem://`, the user's folders, mounts, overlays, ZIP archives), app assets
+  built into the program, the user's standard folders, the recycle bin (`plat::trash`), streamed
+  file I/O with progress and cancellation (`plat::aio`).
+- **Desktop integration (roadmap 3):** one instance per app, file types and URL schemes (also
+  registered without a setup), the system's recent files, a notification-area symbol and
+  notifications, drag and drop between widgets and programs, keeping the system awake, starting
+  at login, taskbar progress, badges and jump lists.
+- **Text and fonts (roadmap 4):** glyph fallback, input methods on X11, font aliases and
+  languages, the system's font rendering settings, a font picker and font dialog, Unicode text
+  segmentation in text boxes and wrapped text, spell checking (Hunspell dictionaries, the Windows
+  spell checker, `TB_SPELL`); JFLib Sans (Selawik with the missing code points built in) as the
+  text font of the winui and macos styles.
+- **Internationalisation (roadmap 5):** system languages, regional formats, plural rules and
+  message catalogues, mirrored windows for right-to-left languages, sorting by language, Unicode
+  case mapping, the library's own texts in nine languages.
+- **Widgets and layout (roadmap 6):** a grid box, an undo history, easing curves, docking panels
+  in tab groups and floating tool windows, popups that leave the main window, a diagram canvas
+  (nodes, ports, edges, selection, minimap), a terminal widget, multi-colour vector symbols and
+  the netlab style.
+- **App framework (roadmap 7):** a log framework and lifecycle hooks, typed settings, saved window
+  state, widget ids from names, async tasks in the event loop (`ui.spawn`, `plat::task`).
+- **Delivery and updates (roadmap 10):** signed app updates with rollback (`lib/update`), code
+  signing (Authenticode, a signed apt repository, the Android release key), packages as AppImage,
+  Flatpak, MSIX and RPM `.spec` next to the Windows setup and the `.deb`.
+- **Accessibility (roadmap 11):** the UI for screen readers through AT-SPI2, UI Automation, an
+  ARIA shadow tree in the browser and Android's accessibility nodes; the system's contrast,
+  accent, motion and text size settings; the caret for screen magnifiers.
+- **Network tools:** packet codecs from Ethernet to TCP with a dissector and pcapng files
+  (`netpkt`), deterministic random numbers, typed JSON.
+- **Developer experience (roadmap 12):** `python build_rs.py new NAME --kind window|console|tool|service`
+  and `new --lib NAME` create apps and library crates that build and pass their test right away;
+  `build_rs.py test NAME` tests one app; the library's version (`lib/VERSION`, `ui::VERSION`,
+  `plat::VERSION`) and `rt::app_version!()` for an app's own `version=`; the SemVer policy
+  ([docs/VERSIONING.md](docs/VERSIONING.md)), API snapshots and `build_rs.py api-diff`; this
+  changelog with `build_rs.py changelog` and `build_rs.py release`.
 
 ### Changed
 
+- **build:** The facade's `docs/GUIDE.md` and `docs/API.md` lie in git as copies (`lib/jflib/docs`), so `cargo publish --workspace` takes them from any checkout; `tools/gendoc.py` writes both API.md, `python tools/crates_accept.py --template` the guide, `build_rs.py check` compares them
 - **spell:** Spell checking agrees with Hunspell 1.7 on real dictionaries (COMPOUNDRULE, compound flags, forbidden words, CHECKCOMPOUNDPATTERN ...) and checks and suggests faster; suggestions come from a worker, so the menu opens at once
 - **img_core:** img_core::icc_xform: ICC_BI_ADOBE is now ICC_BI_A98 and ICC_BI_PROPHOTO is ICC_BI_ROMM (the same values; names of the standards instead of trademarks)
 - **ui:** ui::KIND_NAMES has 23 entries: the new record kind K_HEADING (level as the value, dump name heading) of the Markdown / HTML viewer; K_KIND_COUNT is 23
@@ -193,6 +247,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Fixed
 
+- **build:** `build_rs.py release` writes cargo-jflib's version into Cargo.lock as well (before, `cargo --locked` failed after a release)
 - **JFNetworker:** A device with many TCP connections, TIME-WAIT among them, spent its time looking for the next deadline on every segment; a load generator with thousands of requests in flight looked through its connections for each one. Both find them at once now: such runs take a seventieth to a five-hundredth of the time, with the same reports.
 - **rt:** Small blocks of the allocator live in 64 heaps with a lock each, chosen by the stack's address, instead of one lock for all: threads that allocate all the time no longer wait for each other (a simulation's sweep took as long on 4 threads as on 1, and now under half).
 - **JFNetworker:** A closed-loop load generator no longer stops for good when its target goes away and requests fail as they are made (no route, ARP gave up): it tries again every 100 ms
@@ -252,69 +307,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib web and android ship the font and icon licences of the styles (OFL-*.txt, DejaVu-LICENSE.txt, LICENSE-FluentSystemIcons.txt in the style crates' assets/)
 - **plat:** plat::web::RequestStatus is exhaustive again: jflib-ui did not compile for the browser and Android since the enums became #[non_exhaustive]
 - **ui:** An app with std on Linux shows its UI through the GPU as well: ui's build script turns on the glibc build there (jfgui_glibc, as plat's and gpu's do), and ui's gpu and shader dependencies are there on every Linux build, since Cargo's [target] tables cannot see a build script's cfg
+- HTTP servers linger after an error answer, so the client can read it.
+- App assets stay byte for byte the same in every checkout (no line-end conversion).
 
 ### Security
 
 - **plat:** Wayland: the sizes of the shared-memory buffers of windows and popups are computed without 32-bit wrap-around; a frame whose buffers would pass the protocol's 2 GiB pool limit stays unshown instead of being copied past the mapping
 - **plat:** Windows: the single-instance pipe is used only when the SIDs of both processes were read and are equal (two failed lookups counted as the same user); device names and spell-checker strings are scanned with the length limit checked before each read
-
-## [0.1.0] - 2026-10-20
-
-The first versioned state: the Rust rewrite of jfguiLib, published as JFLib on 2026-10-14, and
-the roadmap work since then ([docs/ROADMAP.md](docs/ROADMAP.md)). Its public API is recorded in
-`docs/api/0.1.0.txt`.
-
-### Added
-
-- **Foundation:** `#![no_std]` crates without libc for Windows, Linux (X11 and Wayland), the
-  browser (WebAssembly) and Android: the immediate-mode UI with interchangeable styles, a software
-  renderer, text shaping, image codecs from PNG to JPEG XL, effects, documents and DOCX,
-  networking (HTTP/1.1, TLS 1.3, SSH-2, DNS), cryptography, compression, an embedded database and
-  backup repositories; screenshots, widget dumps and `.uis` scripts for tests, and opt-in agent
-  control (JSON, MCP).
-- **Permissions and security (roadmap 1):** the app manifest `apps/NAME/PERMISSIONS`, enforced by
-  `plat` in every program of an app (files, programs, URL schemes, plugins, printing, secrets,
-  autostart, `net.connect` / `net.listen`); questions at run time with remembered answers; rights
-  for plugins and agent actions; passwords and tokens in the system's secret store
-  (`plat::secret`).
-- **Files and resources (roadmap 2):** one file namespace (`app://`, `config://`, `data://`,
-  `cache://`, `logs://`, `mem://`, the user's folders, mounts, overlays, ZIP archives), app assets
-  built into the program, the user's standard folders, the recycle bin (`plat::trash`), streamed
-  file I/O with progress and cancellation (`plat::aio`).
-- **Desktop integration (roadmap 3):** one instance per app, file types and URL schemes (also
-  registered without a setup), the system's recent files, a notification-area symbol and
-  notifications, drag and drop between widgets and programs, keeping the system awake, starting
-  at login, taskbar progress, badges and jump lists.
-- **Text and fonts (roadmap 4):** glyph fallback, input methods on X11, font aliases and
-  languages, the system's font rendering settings, a font picker and font dialog, Unicode text
-  segmentation in text boxes and wrapped text, spell checking (Hunspell dictionaries, the Windows
-  spell checker, `TB_SPELL`); JFLib Sans (Selawik with the missing code points built in) as the
-  text font of the winui and macos styles.
-- **Internationalisation (roadmap 5):** system languages, regional formats, plural rules and
-  message catalogues, mirrored windows for right-to-left languages, sorting by language, Unicode
-  case mapping, the library's own texts in nine languages.
-- **Widgets and layout (roadmap 6):** a grid box, an undo history, easing curves, docking panels
-  in tab groups and floating tool windows, popups that leave the main window, a diagram canvas
-  (nodes, ports, edges, selection, minimap), a terminal widget, multi-colour vector symbols and
-  the netlab style.
-- **App framework (roadmap 7):** a log framework and lifecycle hooks, typed settings, saved window
-  state, widget ids from names, async tasks in the event loop (`ui.spawn`, `plat::task`).
-- **Delivery and updates (roadmap 10):** signed app updates with rollback (`lib/update`), code
-  signing (Authenticode, a signed apt repository, the Android release key), packages as AppImage,
-  Flatpak, MSIX and RPM `.spec` next to the Windows setup and the `.deb`.
-- **Accessibility (roadmap 11):** the UI for screen readers through AT-SPI2, UI Automation, an
-  ARIA shadow tree in the browser and Android's accessibility nodes; the system's contrast,
-  accent, motion and text size settings; the caret for screen magnifiers.
-- **Network tools:** packet codecs from Ethernet to TCP with a dissector and pcapng files
-  (`netpkt`), deterministic random numbers, typed JSON.
-- **Developer experience (roadmap 12):** `python build_rs.py new NAME --kind window|console|tool|service`
-  and `new --lib NAME` create apps and library crates that build and pass their test right away;
-  `build_rs.py test NAME` tests one app; the library's version (`lib/VERSION`, `ui::VERSION`,
-  `plat::VERSION`) and `rt::app_version!()` for an app's own `version=`; the SemVer policy
-  ([docs/VERSIONING.md](docs/VERSIONING.md)), API snapshots and `build_rs.py api-diff`; this
-  changelog with `build_rs.py changelog` and `build_rs.py release`.
-
-### Fixed
-
-- HTTP servers linger after an error answer, so the client can read it.
-- App assets stay byte for byte the same in every checkout (no line-end conversion).

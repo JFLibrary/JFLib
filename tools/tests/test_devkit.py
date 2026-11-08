@@ -178,6 +178,7 @@ class ScaffoldTest(Temp):
         self.assertEqual(manifests.read(self.dir / "modules/modplat/Cargo.toml")["dependencies"]["rt"]["version"], "=7.8.9")
         lock = manifests.read(self.dir / "Cargo.lock")["package"]
         self.assertEqual({p["version"] for p in lock if p["name"].startswith("jflib")}, {"7.8.9"})
+        self.assertEqual([p["version"] for p in lock if p["name"] == "cargo-jflib"], ["7.8.9"], "cargo-jflib is published too")
         self.assertEqual(manifests.external_lock(self.dir), before)
 
     def test_manifests_docs_rs(self):
