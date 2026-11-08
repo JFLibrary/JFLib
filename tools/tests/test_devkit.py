@@ -220,6 +220,30 @@ class ScaffoldTest(Temp):
         self.assertEqual(calls, ["a", "c", "c", "b", "d"])
         self.assertEqual((waits[0].hour, waits[0].minute, waits[0].second), (12, 35, 11), "the retry time plus 15 s")
 
+    def test_publish_logs_cargo(self):
+        """tools/publish.py: Cargo's output goes to build/publish.log too (a failed upload of the
+        first run of 2026-11-08 left only "exit 101" there)"""
+        import io
+        import tempfile
+        from unittest import mock
+        from tools import publish
+
+        class Proc:
+            stdout = io.StringIO("    Updating crates.io index\nerror: no token found\n")
+
+            def wait(self):
+                return 101
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "publish.log"
+            with mock.patch.object(publish, "LOG", log), mock.patch.object(publish.subprocess, "Popen", lambda *a, **k: Proc()), \
+                 mock.patch("builtins.print"):
+                code, out = publish.cargo_publish("cargo-jflib", False)
+            self.assertEqual(code, 101)
+            self.assertIn("error: no token found", out)
+            text = log.read_text(encoding="utf-8")
+            self.assertIn("$ cargo publish -p cargo-jflib --locked", text)
+            self.assertIn("    error: no token found\n", text)
+
     def test_manifests_docs_rs(self):
         """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
         include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:

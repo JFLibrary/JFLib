@@ -4,7 +4,7 @@ This guide is for developers and AI models writing desktop apps with JFLib. Ther
 ways to write one, and the code is the same in both:
 
 * **An app of your own**, with the crate `jflib`: one dependency, Cargo builds it, and
-  `cargo jflib` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)) makes the project, runs its tests, reloads it while you edit, builds
+  `cargo jflib` (`cargo install cargo-jflib`) makes the project, runs its tests, reloads it while you edit, builds
   it for the browser and Android and packages it. Start with `cargo jflib new NAME`.
 * **An app inside this repository** (`apps/NAME`), built by `build_rs.py`, which builds the
   library and every app of the repository through Cargo.
@@ -49,7 +49,7 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 ## 2. Skeleton
 
-**An app of your own** starts with `cargo jflib new` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)):
+**An app of your own** starts with `cargo jflib new` (`cargo install cargo-jflib`):
 
 ```sh
 cargo jflib new notes        # notes/: Cargo.toml, build.rs, src/, tests/smoke.uis, .cargo/config.toml

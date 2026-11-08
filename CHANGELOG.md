@@ -13,6 +13,11 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+### Changed
+
+- The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
+  is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
+
 ## [0.1.0] - 2026-11-08
 
 The first version on crates.io. It takes in the internal 0.1.0 of 2026-10-20, never published:

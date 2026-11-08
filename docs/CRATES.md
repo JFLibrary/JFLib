@@ -416,7 +416,8 @@ Vorschlag:
   Dateien neben `Cargo.toml` gelten, die Regeln für eine eigene App. Fremde `no_std`-Crates sind dort erlaubt;
   eine mit eigenen Systemaufrufen umgeht `plat`, nur die `sandbox`-Zeile hilft (auch in `PERMISSIONS.md` und der
   README der Fassade). `README.md` hat einen Abschnitt „Your own app with Cargo“ und sagt nicht mehr, dass ein
-  Python-Skript `rustc` direkt aufruft. Bis zur Veröffentlichung (CR7) nennen die Texte `cargo install --path lib/cargo_jflib`.
+  Python-Skript `rustc` direkt aufruft. Bis zur Veröffentlichung (CR7) nannten die Texte `cargo install --path
+  lib/cargo_jflib`; seit dem Upload am 2026-11-08 nur noch `cargo install cargo-jflib`.
 
 Der ursprüngliche Plan:
 
@@ -564,6 +565,10 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    Abschnitt im Changelog; solange `jflib` nicht oben ist, stoppt ein vergebener Name alles, bevor etwas hochgeht.
    Das Token bleibt bei `cargo login`. Planlauf am 2026-11-08: alle 60 Namen frei, rund 9,5 Stunden. Die Doku der
    Fassade liegt seit 2026-11-08 in Git (`lib/jflib/docs/`, siehe unten), ein Kopierschritt entfällt.
+   **Hochgeladen am 2026-11-08** vom Nutzer mit `python tools/publish.py --publish`, von Commit 8356c7db: alle 60
+   Crates in 0.1.0, von 12:18 bis 21:56 Uhr. Die ersten zwei Starts brachen bei der ersten Crate nach wenigen
+   Sekunden ab (Exit 101; Cargos Ausgabe stand damals nicht im Log, `publish.py` schreibt sie seitdem mit), der
+   dritte lief durch.
 3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt. Vorbereitet am 2026-11-08 (Antwort
    „Ja, vorbereiten“): Jedes veröffentlichte Manifest nennt in `[package.metadata.docs.rs]` seine Ziele, sonst baute
    docs.rs seine fünf Standardziele, darunter macOS und 32-Bit-Windows. Die vier von JFLib für die Bibliothek; nur
@@ -578,8 +583,10 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    unter den 15 Minuten von docs.rs, höchstens 25 kB Log je Crate (docs.rs behält 102,4 kB). Offen: rund 560
    Warnungen von rustdoc (meist `a[i]` als kaputter Link gelesen, `Vec<u8>` als HTML), sie stören den Bau nicht.
    Gefunden dabei: `ui` hatte in Linux-Programmen mit `std` keine GPU-Ausgabe (CR6b, behoben am 2026-11-08).
+   Nach dem Upload (2026-11-08, `https://docs.rs/crate/NAME/0.1.0/status.json`): docs.rs hat die Doku aller 59
+   Bibliotheken gebaut; `cargo-jflib` ist ein reines Programm, docs.rs zeigt dort „not a library“ und die README.
 4. Die Hinweise „bis die Crates auf crates.io sind: `cargo install --path lib/cargo_jflib`“ aus `README.md` und
-   `docs/GUIDE.md` nehmen.
+   `docs/GUIDE.md` nehmen. Erledigt am 2026-11-08; der Git-Tag `v0.1.0` steht auf 8356c7db.
 
 Die Version: 0.1.0, entschieden vom Nutzer am 2026-11-08 („für cargo natürlich 0.1.0“; ein „Version 1.0“
 davor hatte ich wörtlich genommen und zurückgenommen). Das interne `[0.1.0] - 2026-10-20` war nie veröffentlicht und

@@ -170,14 +170,16 @@ def wait_in_index(name, version, limit=15 * 60):
 
 
 def cargo_publish(name, no_verify):
-    """`cargo publish -p NAME`, its output shown and kept -> (exit code, output)"""
+    """`cargo publish -p NAME`, its output shown and kept, in the log too -> (exit code, output)"""
     args = ["cargo", "publish", "-p", name, "--locked"] + (["--no-verify"] if no_verify else [])
     say("$ " + " ".join(args))
     p = subprocess.Popen(args, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     lines = []
-    for line in p.stdout:
-        print("    " + line.rstrip(), flush=True)
-        lines.append(line)
+    with open(LOG, "a", encoding="utf-8") as log:
+        for line in p.stdout:
+            print("    " + line.rstrip(), flush=True)
+            log.write("    " + line.rstrip() + "\n")
+            lines.append(line)
     return p.wait(), "".join(lines)
 
 

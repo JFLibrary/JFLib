@@ -235,8 +235,8 @@ cargo jflib watch            # hot reload while you edit
 cargo jflib package          # a setup for Windows and a .deb (--formats all: also MSIX, AppImage, RPM, Flatpak)
 ```
 
-The crates are not on crates.io yet ([docs/CRATES.md](docs/CRATES.md), stage CR7); until then
-`cargo install --path lib/cargo_jflib` installs the tool from this repository. The README of the
+Both are on crates.io ([`jflib`](https://crates.io/crates/jflib), [`cargo-jflib`](https://crates.io/crates/cargo-jflib)),
+the documentation of the library on docs.rs ([docs.rs/jflib](https://docs.rs/jflib)). The README of the
 crate [`jflib`](lib/jflib/README.md) and of [`cargo-jflib`](lib/cargo_jflib/README.md) describe both;
 [docs/VERSIONING.md](docs/VERSIONING.md) says what the crates promise.
 
