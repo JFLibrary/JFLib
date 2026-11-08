@@ -399,13 +399,13 @@ impl Console {
         if label == "fleet.check" {
             if let Some(s) = FleetServer::from_json(&body) {
                 let sev = if matches!(s.status.as_str(), "ok" | "warning") { IB_SUCCESS } else { IB_WARNING };
-                ui.toast(sev, &s.name, &alloc::format!("{} – {}", views::fleet::status(&s.status).0, s.message), 5000);
+                ui.toast(sev, &s.name, &alloc::format!("{} – {}", views::fleet::status(&s.status).0, tr::srv(&s.message)), 5000);
             }
             return;
         }
         if label == "settings.test" || label == "notify.summary" {
-            let m = j::str_of(&body, "message");
-            ui.toast(IB_SUCCESS, t("Gesendet"), m, 5000);
+            let m = tr::srv(j::str_of(&body, "message"));
+            ui.toast(IB_SUCCESS, t("Gesendet"), &m, 5000);
             return;
         }
         let msg = match label {

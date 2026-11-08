@@ -1039,3 +1039,191 @@ Andere Daten	Other data
 frei von {} · Platte {} belegt	free of {} · disk {} used
 freier Platz unbekannt	free space unknown
 Im Repository	In the repository
+Weniger als 10 % frei	Less than 10% free
+Der Ordner ist nicht erreichbar	The folder is not reachable
+Keine Antwort seit 2 Tagen	No answer for 2 days
+Keine Verbindung zum Agenten	No connection to the agent
+Restore-Point erstellt	Restore point created
+Dateien wiederhergestellt	Files restored
+Alle Daten lesbar und unverändert	All data readable and unchanged
+{} ist fehlgeschlagen	{} failed
+{} fehlgeschlagene Sicherungen in 24 h	{} failed backups in 24 h
+{} Sicherungen mit Warnungen in 24 h	{} backups with warnings in 24 h
+Repository „{}“ fast voll	Repository “{}” almost full
+Repository „{}“ nicht erreichbar	Repository “{}” not reachable
+{} % belegt, noch {} frei	{}% used, {} free
+{} ist offline	{} is offline
+Letzter Kontakt vor 2 Tagen	Last contact 2 days ago
+Agent nicht erreichbar	Agent not reachable
+{} Dateien waren gesperrt und wurden übersprungen	{} files were locked and skipped
+{} Dateien waren gesperrt	{} files were locked
+Agent {} nicht erreichbar (Zeitüberschreitung)	Agent {} not reachable (timed out)
+Server {} nicht erreichbar	Server {} not reachable
+Server {} lehnt die Überwachung ab	Server {} refuses monitoring
+Server {}: andere Zertifizierungsstelle	Server {}: different certificate authority
+{} Jobs, {} Restore-Points	{} jobs, {} restore points
+Verbindung abgelehnt ({})	Connection refused ({})
+BackupCraft {} ist verfügbar	BackupCraft {} is available
+Einstellungen › Über BackupCraft	Settings › About BackupCraft
+Heruntergeladen: {}	Downloaded: {}
+Für eine spätere Version geplant	Planned for a later version
+E-Mail an {} gesendet	Email sent to {}
+Sitzung	Session
+Nicht in der Bibliothek (ausgelagert?)	Not in the library (stored offsite?)
+Der Ordner {} fehlt	The folder {} is missing
+läuft (KVM)	running (KVM)
+läuft (ohne Hardware-Virtualisierung)	running (without hardware virtualization)
+Beendet; die Änderungen wurden verworfen	Stopped; the changes were discarded
+Beendet; die zusammengeführten Platten bleiben	Stopped; the merged disks are kept
+Läuft von {}	Running from {}
+Die VM wurde im Gast heruntergefahren	The VM was shut down from the guest
+Der Server wurde neu gestartet	The server was restarted
+läuft seit {} s	running for {} s
+„{}“ erschienen	“{}” appeared
+„{}“ nicht innerhalb von {} s	“{}” not within {} s
+keine Antwort innerhalb von {} s	no answer within {} s
+antwortet	responds
+{} von {} Prüfungen bestanden	{} of {} checks passed
+{}: Zugriff verweigert auf {}	{}: access denied to {}
+Failover seit {}: {} auf {} ist in Gebrauch	Failover since {}: {} on {} is in use
+gestern {}	yesterday {}
+Failover durch Plan „{}“	Failover by plan “{}”
+Failback fehlgeschlagen: {}	Failback failed: {}
+{} Replikate umgeschaltet	{} replicas switched over
+{} umgeschaltet, nicht bereit: {}	{} switched over, not ready: {}
+{} umgeschaltet, {} nicht: {}	{} switched over, {} not: {}
+Zusammenführen fehlgeschlagen: {}	Merge failed: {}
+{}: Sicherung	{}: Backup
+{}: Aktive Vollsicherung	{}: Active full backup
+{}: Wiederherstellung	{}: Restore
+{}: Prüfung	{}: Verification
+{}: Startprüfung {}	{}: Boot check {}
+{}: {} aus dem Restore-Point starten	{}: Start {} from the restore point
+{}: zusammenführen	{}: Merge
+{}: vom Band wiederherstellen	{}: Restore from tape
+{}: Bandsatz prüfen	{}: Verify tape set
+{}: auf Band ({})	{}: Write to tape ({})
+{}: auf Band	{}: Write to tape
+Repository „{}“ prüfen	Check repository “{}”
+Repository „{}“ aufräumen	Clean up repository “{}”
+Verbindung zu {} prüfen	Check connection to {}
+Keine Antwort innerhalb von 10 s	No answer within 10 s
+Erreichbar, Zertifikat gültig	Reachable, certificate valid
+Agent auf {} installieren	Install agent on {}
+Agent installiert und gekoppelt	Agent installed and paired
+Agent wird installiert …	Installing agent …
+{} freigegeben ({} Pakete gelöscht, {} neu geschrieben)	{} freed ({} packs deleted, {} rewritten)
+{} freigegeben	{} freed
+Keine Fehler gefunden	No errors found
+Gesichert und verschlüsselt	Backed up and encrypted
+Replikat {}: Abgleich	Replica {}: Sync
+Abgeglichen: {} geändert, {} unverändert	Synced: {} changed, {} unchanged
+Replikat {}: Failover verwerfen	Replica {}: Discard failover
+Zurück auf den Restore-Point	Back to the restore point
+Replikat {}: Failback	Replica {}: Failback
+Zurückgeschrieben: {} Dateien	Written back: {} files
+Failover-Plan {}	Failover plan {}
+Band {} löschen	Erase tape {}
+Das Band ist leer	The tape is blank
+{} Bänder gelesen ({} neu), {} Sätze katalogisiert	{} tapes read ({} new), {} sets cataloged
+Bandbibliothek einlesen	Scan tape library
+{} Dateien vom Band wiederhergestellt	{} files restored from tape
+{} Dateien von {} gelesen und geprüft	{} files read and verified from {}
+{} Dateien auf {} geschrieben	{} files written to {}
+Die Platten wurden übertragen	The disks were transferred
+Die VM läuft	The VM is running
+Anmeldung von {}	Sign-in from {}
+Manuell gestartet	Started manually
+Aufbewahrung: {} Punkte, {} Tage	Retention: {} points, {} days
+{} Dateien nach {}	{} files to {}
+Agent gekoppelt	Agent paired
+Falsches Passwort ({})	Wrong password ({})
+Gesperrt: zu viele Fehlversuche	Locked: too many failed attempts
+Falscher Benutzername oder falsches Passwort	Wrong user name or password
+Rolle: Betrachter	Role: Viewer
+Automatisch, verschlüsselt	Automatic, encrypted
+Restore-Points bleiben erhalten	Restore points are kept
+Freigegebene Ordner geändert	Shared folders changed
+Zertifikat gesperrt	Certificate revoked
+Pairing-Code erzeugt (15 min gültig)	Pairing code created (valid for 15 min)
+Neues Recovery-Kit erzeugt	New recovery kit created
+Die Dateien im Zielordner bleiben	The files in the target folder are kept
+Demo-Server: nichts versendet	Demo server: nothing sent
+Wird beim nächsten Start angewendet	Applied at the next start
+Sitzung gestartet: {}	Session started: {}
+Vor-Skript ausgeführt: {} (Exitcode {})	Pre-script run: {} (exit code {})
+Quelle wird gelesen: {}	Reading source: {}
+Änderungen ermittelt (Größe, Änderungszeit, Datei-ID)	Changes found (size, modification time, file ID)
+Datei gesperrt, übersprungen: {}	File locked, skipped: {}
+Sitzung abgebrochen, kein Restore-Point erstellt	Session aborted, no restore point created
+{} Dateien gelesen, {} neue Daten nach Dedupe und Kompression	{} files read, {} of new data after dedupe and compression
+Keine Änderungen seit dem letzten Restore-Point: kein neuer Punkt	No changes since the last restore point: no new point
+Restore-Point signiert und veröffentlicht	Restore point signed and published
+Signatur des Restore-Points geprüft	Restore point signature verified
+Passphrase des Jobs im Repository hinterlegt	Job passphrase stored in the repository
+Aufbewahrung angewendet: {} alter Punkt entfernt	Retention applied: {} old point removed
+Aufbewahrung angewendet: {} alte Restore-Points entfernt	Retention applied: {} old restore points removed
+Aufbewahrung: {}	Retention: {}
+Sitzung beendet	Session finished
+Unbekannter Pfad	Unknown path
+Bitte erneut anmelden	Please sign in again
+Dafür fehlt die Berechtigung	You do not have permission for this
+Diese Funktion ist in dieser Version noch nicht verfügbar	This feature is not available in this version yet
+Benutzername oder Passwort falsch	Wrong user name or password
+Job nicht gefunden	Job not found
+Ungültige Anfrage	Invalid request
+Der Name fehlt	The name is missing
+Ungültiger Zeitplan	Invalid schedule
+Der Job läuft bereits	The job is already running
+Restore-Point nicht gefunden	Restore point not found
+Der Restore-Point ist noch unveränderlich	The restore point is still immutable
+Sitzung nicht gefunden	Session not found
+Vorgang nicht gefunden	Operation not found
+Der Vorgang ist bereits beendet	The operation has already finished
+Host nicht gefunden	Host not found
+Der Backup-Server selbst kann nicht entfernt werden	The backup server itself cannot be removed
+Der Agent ist nicht erreichbar	The agent is not reachable
+Die Adresse fehlt	The address is missing
+Bitte den Host-Schlüssel bestätigen	Please confirm the host key
+Repository nicht gefunden	Repository not found
+Name und Pfad sind nötig	Name and path are required
+Die Unveränderlichkeit kann nur verlängert werden	Immutability can only be extended
+Jobs verwenden dieses Repository noch	Jobs still use this repository
+Der Benutzername fehlt	The user name is missing
+Das Passwort braucht mindestens 12 Zeichen	The password needs at least 12 characters
+Den Benutzer gibt es schon	This user already exists
+Benutzer nicht gefunden	User not found
+Der letzte Administrator kann nicht gelöscht werden	The last administrator cannot be deleted
+Bitte einen Namen angeben	Please enter a name
+Bitte einen Job wählen	Please choose a job
+Bitte einen Zielhost wählen	Please choose a target host
+„{}“ liegt nicht in einem Wiederherstellungsordner von {}	“{}” is not in a restore folder of {}
+Replikat nicht gefunden	Replica not found
+Ein Failover-Plan verwendet dieses Replikat	A failover plan uses this replica
+Das Replikat ist im Failover	The replica is in failover
+Nur aus dem Failover	Only from failover
+Das Replikat ist nicht bereit	The replica is not ready
+Bitte einen Namen und mindestens ein Replikat angeben	Please enter a name and at least one replica
+Failover-Plan nicht gefunden	Failover plan not found
+Das Barcode-Präfix hat 2 bis 4 Buchstaben	The barcode prefix has 2 to 4 letters
+Band nicht gefunden	Tape not found
+Nur leere Bänder wechseln den Pool	Only blank tapes can change pools
+Das Band ist noch schreibgeschützt	The tape is still write-protected
+Medienpool nicht gefunden	Media pool not found
+Der Pool hat beschriebene Bänder	The pool has written tapes
+Bandsatz nicht gefunden	Tape set not found
+Bitte einen Medienpool wählen	Please choose a media pool
+Kein Band mit Platz im Pool	No tape with room in the pool
+Volumes von Agenten: in Vorbereitung (bisher nur die des Backup-Servers)	Volumes of agents: in preparation (so far only the backup server's)
+Die VM läuft nicht aus einem Restore-Point	The VM is not running from a restore point
+Bitte eine VM wählen	Please choose a VM
+Bitte eine gültige Adresse angeben	Please enter a valid address
+Überwachter Server nicht gefunden	Monitored server not found
+Bitte das Überwachungs-Token des Servers angeben	Please enter the server's monitoring token
+Bitte zuerst die Zertifizierungsstelle des Servers bestätigen	Please confirm the server's certificate authority first
+Bitte eine Bezeichnung angeben	Please enter a label
+Überwachungs-Token nicht gefunden	Monitoring token not found
+Im Demo-Server nicht vorhanden	Not available in the demo server
+Ungültige Serveradresse	Invalid server address
+Speicherort	Location
+Sicherungsziel	Backup target
