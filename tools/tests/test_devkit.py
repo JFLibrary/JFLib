@@ -180,6 +180,26 @@ class ScaffoldTest(Temp):
         self.assertEqual({p["version"] for p in lock if p["name"].startswith("jflib")}, {"7.8.9"})
         self.assertEqual(manifests.external_lock(self.dir), before)
 
+    def test_manifests_docs_rs(self):
+        """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
+        include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:
+        description, license, repository, homepage (docs/CRATES.md, CR7)"""
+        import subprocess
+        import tomllib
+        files = subprocess.run(["git", "ls-files", "*Cargo.toml"], cwd=manifests.ROOT, capture_output=True, text=True, check=True).stdout.split()
+        published = 0
+        for rel in files:
+            m = tomllib.loads((manifests.ROOT / rel).read_text(encoding="utf-8"))
+            if "package" not in m or m["package"].get("publish", True) is False:
+                continue
+            published += 1
+            targets = m["package"].get("metadata", {}).get("docs", {}).get("rs", {}).get("targets")
+            self.assertTrue(targets, f"{rel}: no [package.metadata.docs.rs] targets")
+            self.assertFalse({"aarch64-apple-darwin", "i686-pc-windows-msvc"} & set(targets), rel)
+            for field in ("description", "license", "repository", "homepage"):
+                self.assertIn(field, m["package"], f"{rel}: no {field} (crates.io shows it; the root's through {field}.workspace)")
+        self.assertGreater(published, 50)
+
     def test_manifests_library_crates(self):
         """the facade is no library crate, a module's names and one-target crates come out right, an
         unknown [target] table is an error, not a dependency that build_rs.py silently misses"""

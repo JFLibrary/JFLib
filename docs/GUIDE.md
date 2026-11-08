@@ -1,7 +1,7 @@
-# Writing an app with jfguiLib (Rust)
+# Writing an app with JFLib (Rust)
 
-This guide is for developers and AI models writing desktop apps on the Rust version of
-jfguiLib. There are two ways to write one, and the code is the same in both:
+This guide is for developers and AI models writing desktop apps with JFLib. There are two
+ways to write one, and the code is the same in both:
 
 * **An app of your own**, with the crate `jflib`: one dependency, Cargo builds it, and
   `cargo jflib` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)) makes the project, runs its tests, reloads it while you edit, builds
@@ -51,7 +51,7 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 **An app of your own** starts with `cargo jflib new` (`cargo install cargo-jflib` (until the crates are on crates.io: `cargo install --path lib/cargo_jflib` in a checkout of this repository)):
 
-```
+```sh
 cargo jflib new notes        # notes/: Cargo.toml, build.rs, src/, tests/smoke.uis, .cargo/config.toml
 cd notes
 cargo run                    # the window
@@ -117,7 +117,7 @@ another one; don't:
 **In this repository, start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
 passes its test as it is:
 
-```
+```sh
 python build_rs.py new notes --title "Notizen"           # a window app (the default kind)
 python build_rs.py new mytool --kind tool --style kde    # window + command line program + shared crate
 python build_rs.py new report --kind console             # a console program (rt::main!)
@@ -1761,14 +1761,14 @@ shot build/template.png
 
 **Test commands**, an app of your own:
 
-```
+```sh
 cargo jflib test                    # build it, run every tests/*.uis with --script
 cargo jflib test --release          # ... the release build
 ```
 
 In this repository:
 
-```
+```sh
 python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
@@ -4266,7 +4266,7 @@ the file and line where the app called each widget, with "Im Editor öffnen" ("S
   value)` after their `behave` -- the dump, scripts, screen readers and the inspector see the
   same records.
 
-```
+```text
 # apps/gallery/tests/inspect.uis (excerpt)
 inspect snap                         # the main window's frame
 inspect arm
@@ -4381,7 +4381,7 @@ check box's, a text box's) are never written; the inspector gives input instead.
 * The tool window itself is built in the style's own look: the app theme and an edited text
   scale do not reach it, so it stays usable whatever is edited (style, mode and language do).
 
-```
+```text
 # apps/gallery/tests/inspect_edit.uis (excerpt)
 inspect on
 inspect set token bg #E0F0E0           # the colours in use (light)
@@ -4454,7 +4454,7 @@ of the app's call that built the selected widget (or layout box), e.g.
 * **Scripts never start the user's editor**: a headless run takes only an editor the script
   set with `inspect editor "COMMAND"`.
 
-```
+```text
 # apps/gallery/tests/inspect_source.uis (excerpt)
 inspect on
 inspect select #702                           # a number box: the app's number_box call

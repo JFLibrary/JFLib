@@ -148,6 +148,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib watch [-p PKG] [-- ARGS]: hot reload for an app outside this repository (tools/hotreload.py's session, built like cargo run, a failed build kept out with build.txt, Ctrl+C asks the app to end); crates_accept.py runs it headless under a script
 - **docs:** What the crates on crates.io promise (docs/VERSIONING.md): the facade jflib as API.md documents it, jflib-build and cargo jflib; the guide shows the crate way first, a foreign crate's own system calls pass by plat (only the sandbox line confines them)
 - **crates:** apps of your own may use std and any std crate: the feature std of jflib (std's entry, panic handler and allocator; ui::main! and rt::main! stay, plat::std_start, rt::panic_hook, rt::Alloc), cargo jflib new --std; the library stays no_std (docs/GUIDE.md, An app with std)
+- **build:** docs.rs: every published crate names JFLib's four targets in [package.metadata.docs.rs] (jflib, rt, plat, ui and gpu with std, so plat::std_start shows and Linux shows the glibc build), jflib's page is its README, jflib::guide is docs/GUIDE.md with its links into the repository; python tools/crates_accept.py --targets docs documents every package as docs.rs does (offline, nightly, DOCS_RS=1); keywords and categories for jflib, cargo-jflib and jflib-build; every crate's homepage is https://jflib.org (from the root's [workspace.package])
 
 ### Changed
 
@@ -250,6 +251,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat links kernel32 through raw-dylib everywhere: a Windows program needs no import library, so no Visual Studio and no Windows SDK
 - **build:** cargo jflib web and android ship the font and icon licences of the styles (OFL-*.txt, DejaVu-LICENSE.txt, LICENSE-FluentSystemIcons.txt in the style crates' assets/)
 - **plat:** plat::web::RequestStatus is exhaustive again: jflib-ui did not compile for the browser and Android since the enums became #[non_exhaustive]
+- **ui:** An app with std on Linux shows its UI through the GPU as well: ui's build script turns on the glibc build there (jfgui_glibc, as plat's and gpu's do), and ui's gpu and shader dependencies are there on every Linux build, since Cargo's [target] tables cannot see a build script's cfg
 
 ### Security
 

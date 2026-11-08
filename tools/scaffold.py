@@ -1064,6 +1064,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 
 [lib]
 name = "@NAME@"
@@ -1075,7 +1076,11 @@ doctest = false
 workspace = true
 
 [dependencies]
-@DEPS@"""
+@DEPS@
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
+"""
 
 
 def before(text, line, new, what):

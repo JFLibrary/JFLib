@@ -2,6 +2,8 @@
 """crates_accept.py -- does a project outside this repository build with the crates alone?
 
     python tools/crates_accept.py [--targets win,linux,web,android,package,watch] [--out DIR]
+    python tools/crates_accept.py --targets docs [--docs-toolchain nightly]
+                                                 only the docs as docs.rs builds them (below)
     python tools/crates_accept.py --template     write the files of lib/jflib/template that
                                                  come from apps/template (build_rs.py check
                                                  compares them)
@@ -46,6 +48,11 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           only on a Linux machine (a program with std is built there).
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
+
+`--targets docs` (not part of the default, docs/CRATES.md, CR7) documents every package's library
+as docs.rs would after the upload: from the unpacked package, offline, with DOCS_RS=1 and --cfg
+docsrs, for the targets and features its [package.metadata.docs.rs] names, with nightly as docs.rs
+(--docs-toolchain "" takes the default toolchain).  It never installs a toolchain or a target.
 """
 import argparse
 import hashlib
@@ -733,13 +740,95 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
                            env=dict(os.environ, **jenv), capture_output=True, text=True, timeout=600)
         run.check(r.returncode != 0 and "made on" in r.stderr, "cargo jflib package refuses the other system's formats for an app with std")
 
+# ---------------------------------------------------------------- the docs as docs.rs builds them (CR7)
+# what docs.rs builds without [package.metadata.docs.rs] targets (docs.rs/about/metadata)
+DOCS_RS_DEFAULT = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc", "aarch64-unknown-linux-gnu",
+                   "i686-pc-windows-msvc"]
+
+
+def docs_toolchain_missing(toolchain, targets):
+    """what the toolchain lacks for these targets -> a message, or None.  Never through `cargo +X` or
+    `rustup +X ...` before the toolchain is known to be there: rustup would download it unasked."""
+    if not toolchain:
+        return None
+    r = subprocess.run(["rustup", "toolchain", "list"], capture_output=True, text=True)
+    if not any(line.split()[0].startswith(toolchain + "-") or line.split()[0] == toolchain for line in r.stdout.splitlines() if line.strip()):
+        return f"rustup has no toolchain {toolchain} (rustup toolchain install {toolchain} --profile minimal)"
+    r = subprocess.run(["rustup", "+" + toolchain, "target", "list", "--installed"], capture_output=True, text=True)
+    missing = sorted(set(targets) - set(r.stdout.split()))
+    return f"the toolchain {toolchain} lacks {', '.join(missing)} (rustup +{toolchain} target add {' '.join(missing)})" if missing else None
+
+
+def check_docs(run, vendor, toolchain):
+    """every package's library documented as docs.rs does it: rustdoc from the unpacked package (its
+    own workspace), offline (docs.rs has no network), DOCS_RS=1, --cfg docsrs, the targets and
+    features of its [package.metadata.docs.rs]; docs.rs uses nightly, stops rustdoc after 15 minutes
+    and keeps 102.4 kB of log.  The facade first into an empty target folder: its time is the one of
+    a build from nothing; the others then find their dependencies compiled."""
+    import tomllib
+    work, target_dir = run.out / "docsrs", run.out / "target-docsrs"
+    shutil.rmtree(work, ignore_errors=True)
+    shutil.rmtree(target_dir, ignore_errors=True)
+    packages = sorted((d for d in vendor.iterdir() if d.name.startswith(("jflib-", "cargo-jflib-"))), key=lambda d: (not d.name.startswith("jflib-0"), d.name))
+    plans = []
+    for pkg in packages:
+        m = tomllib.loads((pkg / "Cargo.toml").read_text(encoding="utf-8"))
+        meta = m["package"].get("metadata", {}).get("docs", {}).get("rs", {})
+        plans.append((pkg, m, meta, meta.get("targets") or DOCS_RS_DEFAULT))
+    missing = docs_toolchain_missing(toolchain, {t for _, m, _, ts in plans if "lib" in m for t in ts})
+    if missing:
+        run.fail(f"docs: {missing}")
+        return
+    tc = [f"+{toolchain}"] if toolchain else []
+    env = {"CARGO_TARGET_DIR": str(target_dir), "DOCS_RS": "1", "RUSTDOCFLAGS": "--cfg docsrs"}
+    slow, chatty, built = [], [], 0
+    for pkg, m, meta, targets in plans:
+        name = m["package"]["name"]
+        if "lib" not in m:
+            run.check(True, f"docs: {name} is a program, docs.rs documents no library")
+            continue
+        run.check(not ({"aarch64-apple-darwin", "i686-pc-windows-msvc"} & set(targets)), f"docs: {name} names its targets ({len(targets)})")
+        d = work / name
+        shutil.copytree(pkg, d)
+        toml = d / "Cargo.toml"
+        toml.write_text(toml.read_text(encoding="utf-8") + "\n[workspace]\n", encoding="utf-8")
+        (d / ".cargo").mkdir(exist_ok=True)
+        (d / ".cargo" / "config.toml").write_text(source_config(vendor), encoding="utf-8")
+        args = ["cargo", *tc, "rustdoc", "--lib", "--offline"]
+        if meta.get("features"):
+            args += ["--features", ",".join(meta["features"])]
+        if meta.get("all-features"):
+            args.append("--all-features")
+        if meta.get("no-default-features"):
+            args.append("--no-default-features")
+        for t in targets:
+            start = time.monotonic()
+            r = run.cmd(f"docs-{name}-{t}", args + ["--target", t], d, env)
+            took = time.monotonic() - start
+            if not r:
+                continue
+            built += 1
+            if not (target_dir / t / "doc" / m["lib"]["name"] / "index.html").is_file():
+                run.fail(f"docs: {name} for {t}: no {m['lib']['name']}/index.html")
+            log = r.stdout + r.stderr
+            if took > 300:
+                slow.append(f"{name} {t} {took:.0f} s")
+            warnings = sum(1 for line in log.splitlines() if line.startswith("warning:"))
+            if len(log.encode()) > 100_000 or warnings > 50:
+                chatty.append(f"{name} {t}: {warnings} warnings, {len(log.encode()) // 1000} kB of log")
+    run.check(built > 0, f"docs: {built} builds as docs.rs makes them ({toolchain or 'default toolchain'})")
+    if slow:
+        run.notes.append("docs: slow (docs.rs stops rustdoc after 15 minutes, on slower machines): " + "; ".join(slow))
+    if chatty:
+        run.notes.append("docs: much output (docs.rs keeps 102.4 kB of log): " + "; ".join(chatty))
+
 def out_file(project, target_dir, triple, profile, name):
     """a file the build script of the project wrote to its OUT_DIR"""
     found = sorted((target_dir / triple / profile / "build").glob(f"{project}-*/out/{name}"), key=lambda p: p.stat().st_mtime)
     return found[-1] if found else None
 
 
-def accept(targets, out):
+def accept(targets, out, docs_toolchain="nightly"):
     sys.path.insert(0, str(ROOT))
     sys.dont_write_bytecode = True
     import build_rs
@@ -749,6 +838,10 @@ def accept(targets, out):
     vendor = pack(run)
     if vendor is None:
         return run
+    if "docs" in targets:
+        check_docs(run, vendor, docs_toolchain)
+        if targets <= {"docs"}:
+            return run
     hallo, probe = make_hallo(run, vendor), make_probe(run, vendor)
     target_dir = out / "target"                  # shared: the probe finds the crates compiled for hallo
     env = {"CARGO_TARGET_DIR": str(target_dir)}
@@ -872,12 +965,13 @@ def main(argv=None):
     ap.add_argument("--targets", default="win,linux,web,android,package,watch")
     ap.add_argument("--out", default=str(ROOT / "build" / "crates_accept"))
     ap.add_argument("--template", action="store_true")
+    ap.add_argument("--docs-toolchain", default="nightly", help='--targets docs: the toolchain ("" the default one)')
     a = ap.parse_args(argv)
     if a.template:
         write_template()
         return 0
     start = time.monotonic()
-    run = accept(set(a.targets.split(",")), Path(a.out).resolve())
+    run = accept(set(a.targets.split(",")), Path(a.out).resolve(), a.docs_toolchain)
     for n in run.notes:
         print(f"note: {n}")
     print(f"crates: {'ok' if not run.fails else 'FAILED'} ({len(run.fails)} failed, {time.monotonic() - start:.0f} s)")

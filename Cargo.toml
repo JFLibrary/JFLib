@@ -170,6 +170,7 @@ edition = "2024"
 rust-version = "1.98"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/JFLibrary/JFLib"
+homepage = "https://jflib.org"
 
 # Exact versions: only the way through the crate jflib is promised, the crates below it change together.
 [workspace.dependencies]

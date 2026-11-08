@@ -1,14 +1,20 @@
-//! JFLib: a GUI library and everything it stands on, without the standard library.
-//! One dependency brings all of it; a program links only what it uses.
-//!
-//! `jflib::style` is the style of the environment variable `JFLIB_STYLE`, without it `winui`.
-//!
-//! What this crate promises (docs/VERSIONING.md, "The crates on crates.io") is every crate below
-//! by its path here, `jflib::ui::...`, as docs/API.md documents it; of the styles their `STYLE`.
-//! `simd`, `text_shape` and `style_assets` are building blocks the others stand on: reachable,
-//! hidden, no part of that promise.
+// The crate's page (docs.rs) is its README, the same text crates.io shows.  `jflib::style` is the
+// style of the environment variable `JFLIB_STYLE`, without it `winui`.
+//
+// What this crate promises (docs/VERSIONING.md, "The crates on crates.io") is every crate below
+// by its path here, `jflib::ui::...`, as docs/API.md documents it; of the styles their `STYLE`.
+// `simd`, `text_shape` and `style_assets` are building blocks the others stand on: reachable,
+// hidden, no part of that promise.
+#![doc = include_str!("../README.md")]
 #![no_std]
 #![forbid(unsafe_code)]
+
+/// How an app is written with JFLib: the guide of the repository (`docs/GUIDE.md`), which also
+/// lies in this crate's package as `docs/GUIDE.md`.  Only documentation, no code: it exists when
+/// rustdoc builds the docs (docs.rs), its links lead to the repository on GitHub (build.rs).
+#[cfg(doc)]
+#[doc = include_str!(concat!(env!("OUT_DIR"), "/GUIDE.md"))]
+pub mod guide {}
 
 pub use rt;
 pub use agent_core;

@@ -17,6 +17,7 @@ NOT_LIBS = (FACADE, "lib/jflib_build", "lib/cargo_jflib", "lib/installer", "lib/
 TARGET_CFG = {
     "cfg(windows)": "win",
     'cfg(all(target_os = "linux", jfgui_glibc))': "linux-glibc",
+    'cfg(target_os = "linux")': "linux",
     'cfg(target_os = "android")': "android",
     'cfg(target_arch = "wasm32")': "web",
     "cfg(not(jflib_module))": None,

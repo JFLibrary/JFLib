@@ -5,7 +5,8 @@ text, images in many formats, the GPU, files, the network, documents, and a runt
 This one dependency brings all of it; a program links only what it uses.
 
 `docs/GUIDE.md` in this package explains how an app is written, `docs/API.md` lists every public
-item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crate.
+item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crate; the guide is
+also on docs.rs as [`jflib::guide`](https://docs.rs/jflib/latest/jflib/guide/index.html).
 
 ## Quick start
 

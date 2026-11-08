@@ -1,11 +1,14 @@
 [package]
 name = "jflib"
 description = "A GUI library and everything it stands on, without the standard library"
+keywords = ["gui", "ui", "widgets", "no-std", "immediate-mode"]
+categories = ["gui", "no-std", "graphics"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 build = "build.rs"
 # DEP_JFLIB_STD for the app's build script (jflib-build): a program with std links differently
 links = "jflib"
@@ -86,3 +89,9 @@ update.workspace = true
 # takes about 25 minutes for wasm32 (docs/CRATES.md, "Risiken"); who needs it there names it directly
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 img_jxl_enc.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's);
+# with std, so plat::std_start and rt::panic_hook show and Linux shows the glibc build that windows use
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
+features = ["std"]

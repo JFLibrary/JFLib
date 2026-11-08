@@ -114,7 +114,7 @@ Rust 1.98.1 unter Windows, Vergleiche jeweils aus einem einzigen Lauf.
 | Android | `.so` mit denselben JNI-Exporten und Importen wie `build_rs.py`, 2,5 % größer; nicht auf einem Gerät gestartet |
 | `jxlenc` über `modrt` und `modplat` | Export `jxlenc_module`, keine Importe; nicht in PaintCraft geladen |
 | Inspector | Dev-Build kann bearbeiten, Release-Build verweigert es |
-| `cargo doc` für Linux | läuft, 561 Warnungen; docs.rs selbst nicht getestet |
+| `cargo doc` für Linux | läuft, 561 Warnungen; docs.rs nachgestellt in CR7 (`crates_accept.py --targets docs`) |
 
 Zwei Dinge haben diese Versuche ausgeschlossen:
 
@@ -471,7 +471,11 @@ einbinden. Empfohlen bleibt eine App in `no_std`.
   (ein `print!` ohne Zeilenende kommt an). Eine `std`-App unter Linux ist immer `plat`s glibc-Build (die Build-Skripte
   von `plat` und `gpu` setzen `jfgui_glibc`): Threads über pthreads, `thread_local!` einer `std`-Crate läuft auch auf
   Threads von `plat`. musl lehnt `plat` mit `std` ab: seine eigenen Threads haben dort keinen Thread-lokalen
-  Speicher.
+  Speicher. Nachtrag 2026-11-08: Auch `ui` setzt dann `jfgui_glibc` (sein Build-Skript), und seine
+  Abhängigkeiten `gpu` und `shader` stehen unter Linux immer da, weil Cargos `[target]`-Tabellen die cfg eines
+  Build-Skripts nicht sehen. Vorher zeigte eine Linux-App mit `std` ihre Oberfläche ohne GPU (auf Fedora unbemerkt,
+  der Weg über die CPU funktionierte). Auf Fedora im Fenster geprüft: die alte Fassung meldet bei `gpu expect gpu`
+  „no GPU output on this target“, die neue zeigt über die Intel HD Graphics 610 (`on: true`, mailbox).
 - **CR6c: Bauen und Linken je Ziel.** Umgesetzt: `jflib-build` erfährt das Feature über `DEP_JFLIB_STD` (die
   Fassade hat dafür `links = "jflib"`) und gibt einer `std`-App keine eigenen Link-Argumente (`/NODEFAULTLIB`, die
   glibc-Stubs); unter Windows `/ENTRY:mainCRTStartup` der C-Runtime für das Windows-Subsystem. Es warnt ohne
@@ -547,8 +551,27 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
 
 1. Die echten Apps und JFScript in eigene Repos, die Test-Apps bleiben hier.
 2. `cargo publish --workspace --dry-run`, dann in Abhängigkeitsreihenfolge hochladen. Vorher die aktuellen Limits von
-   crates.io für neue Crates prüfen, bei 57 Stück kann das dauern.
-3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt.
+   crates.io für neue Crates prüfen, bei 57 Stück kann das dauern. Stand 2026-11-08: `cargo publish --workspace
+   --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem
+   einzelnen Ordner scheitert dagegen, weil es die übrigen auf crates.io sucht. Das Limit für neue Crates ist 5 auf
+   einmal, dann eine je 10 Minuten (`rate_limiter.rs` von crates.io; Ausnahmen je Nutzer möglich), für 60 also rund
+   9 Stunden: `cargo publish --workspace` allein bricht nach der fünften ab. Nötig ist ein Skript, das vorher
+   `docs/GUIDE.md` und `docs/API.md` nach `lib/jflib/docs/` kopiert (nicht in Git, sonst fehlen sie im Paket der
+   Fassade), dann Crate für Crate hochlädt, am Limit wartet und nach einem Abbruch bei der nächsten weitermacht.
+3. Prüfen, ob die Dokumentation auf docs.rs baut und eine Einstiegsseite zeigt. Vorbereitet am 2026-11-08 (Antwort
+   „Ja, vorbereiten“): Jedes veröffentlichte Manifest nennt in `[package.metadata.docs.rs]` seine Ziele, sonst baute
+   docs.rs seine fünf Standardziele, darunter macOS und 32-Bit-Windows. Die vier von JFLib für die Bibliothek; nur
+   Windows und Linux für `cas`, `datastore`, `netio`, `update` (dort hat `plat` keine Dateien und kein Netz) und die
+   Module; `jflib`, `rt`, `plat`, `ui` und `gpu` mit `features = ["std"]`, damit `plat::std_start` erscheint und
+   Linux den glibc-Build zeigt, den Programme mit Fenster haben (ohne ihn fehlten dort `plat`s GPU-Ausgabe).
+   `test_devkit` prüft die Tabelle, `scaffold.py` schreibt sie in neue Crates. Die Seite von `jflib` ist seine
+   README, `jflib::guide` die Anleitung (`docs/GUIDE.md`, nur in der Doku, ihre Links führen auf GitHub `main`).
+   `python tools/crates_accept.py --targets docs` baut die Doku jeder Crate aus ihrem Paket, wie docs.rs es tut:
+   offline, Nightly, `DOCS_RS=1`, `--cfg docsrs`, Ziele und Features aus dem Manifest; es installiert nie selbst
+   eine Toolchain. Ergebnis mit Rust 1.98: alles baut, der längste Build (die Fassade aus dem Leeren) bleibt weit
+   unter den 15 Minuten von docs.rs, höchstens 25 kB Log je Crate (docs.rs behält 102,4 kB). Offen: rund 560
+   Warnungen von rustdoc (meist `a[i]` als kaputter Link gelesen, `Vec<u8>` als HTML), sie stören den Bau nicht.
+   Gefunden dabei: `ui` hatte in Linux-Programmen mit `std` keine GPU-Ausgabe (CR6b, behoben am 2026-11-08).
 4. Die Hinweise „bis die Crates auf crates.io sind: `cargo install --path lib/cargo_jflib`“ aus `README.md` und
    `docs/GUIDE.md` nehmen.
 
@@ -557,6 +580,13 @@ Vorher zu entscheiden: die Version. `CHANGELOG.md` hat schon `[0.1.0] - 2026-10-
 Entweder `python build_rs.py release 0.2.0` und 0.2.0 hochladen, oder das interne 0.1.0 im Changelog umbenennen.
 
 Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Reserviert ist damit nichts.
+
+**CI (2026-11-08, auf Wunsch des Nutzers):** `.github/workflows/crates.yml` läuft bei jedem Push auf `main`, bei
+Pull Requests, montags und von Hand. `check`: `cargo check` der Fassade für die vier Ziele mit und ohne `std`, mit der
+versprochenen `rust-version` (1.98) und mit dem neuesten stable, dazu die Crates außerhalb der Fassade (`modrt`,
+`modplat`, `installer`, `appimagert`). `tools`: die Tests von `jflib-build` und `cargo-jflib` unter Linux und Windows.
+`docs`: `crates_accept.py --targets docs` mit Nightly wie docs.rs. Kein Job für die neuesten Versionen der Crates von
+außen, sie sind genau festgelegt. Die Apps baut CI nicht (`build_rs.py test` auf den Entwicklerrechnern).
 
 ## Reihenfolge
 

@@ -1,11 +1,14 @@
 [package]
 name = "jflib-build"
 description = "What a JFLib app's build.rs hands to ui::main! and rt::main!: permissions, package data, assets, link arguments"
+keywords = ["jflib", "build-script"]
+categories = ["development-tools::build-utils"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 
 [lib]
 name = "jflib_build"
@@ -18,3 +21,7 @@ workspace = true
 [dependencies]
 # the LZ4 of the app:// bundles, the same as tools/assetpack.py's
 compress.workspace = true
+
+# docs.rs: it runs in a build script, on the machines that build JFLib apps
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
