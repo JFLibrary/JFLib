@@ -16,6 +16,7 @@ const PREVIEW_PARAGRAPHS: usize = 4096;
 
 /// Whether the entire document is represented by the editable model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DocxMode {
     /// Every supported package component has passed the strict editable codec.
     Editable,

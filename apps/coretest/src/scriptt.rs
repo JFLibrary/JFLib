@@ -1,4 +1,4 @@
-// scriptt -- checks of lib/script: the JFNetworker example, operator precedence, strings and
+// scriptt -- checks of apps/jfs/crates/script: the JFNetworker example, operator precedence, strings and
 // interpolation, line-break rules, error recovery, check(), tokens(), outline(), robustness
 
 use alloc::boxed::Box;

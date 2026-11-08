@@ -1,4 +1,4 @@
-// jfs -- the standalone runner of the script language (lib/script, .jfs): runs a script on the
+// jfs -- the standalone runner of the script language (apps/jfs/crates/script, .jfs): runs a script on the
 // console, like `python file.py`
 //
 //   jfs [OPTIONS] FILE.jfs [ARGS ...]   compile and run a script; ARGS are config.args

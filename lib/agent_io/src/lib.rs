@@ -13,6 +13,7 @@ use alloc::string::String;
 pub const LINE_LIMIT: usize = 1_048_576;
 
 /// One bounded line or a rejected oversized record.
+#[non_exhaustive]
 pub enum Record {
     /// Complete UTF-8 candidate, validated by agent_core's JSON decoder.
     Line(Vec<u8>),

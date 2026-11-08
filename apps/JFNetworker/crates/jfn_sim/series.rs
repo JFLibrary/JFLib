@@ -531,6 +531,7 @@ fn roles(kind: &str) -> Roles {
         "http-client" => r(&["responses"], &["errors"], None, None),
         "lb" => r(&["requests", "connections"], &["errors"], None, Some("active")),
         "kv" => r(&["requests"], &["unavailable", "full"], None, None),
+        "db" => r(&["statements"], &["errors"], None, Some("inflight")),
         "cache" => r(&["requests"], &["backend_errors"], None, None),
         "mq" => r(&["published"], &["rejected", "dead"], Some("depth"), Some("inflight")),
         "worker" => r(&["done", "failed"], &["failed"], None, Some("busy")),
@@ -880,7 +881,13 @@ impl Engine {
             err_pm: per_mille(s.change(rec, r.err, from, to), s.change(rec, r.req, from, to)),
             queue: gauge(r.queue),
             inflight: gauge(r.inflight),
-            hit_pm: if rec.kind == "cache" { per_mille(s.change(rec, &["hits"], from, to), s.change(rec, &["hits", "misses"], from, to)) } else { None },
+            hit_pm: if rec.kind == "cache" {
+                per_mille(s.change(rec, &["hits"], from, to), s.change(rec, &["hits", "misses"], from, to))
+            } else if rec.kind == "db" {
+                per_mille(s.change(rec, &["pool_hits"], from, to), s.change(rec, &["pool_hits", "pool_misses"], from, to))
+            } else {
+                None
+            },
             load_milli: if kv { rates(&["requests", "replica_reads", "replica_writes"]) } else { None },
             keys: gauge(Some("keys")),
             bytes: if rec.find("bytes").is_some_and(|x| x.kind == SeriesKind::Gauge) { gauge(Some("bytes")) } else { None },

@@ -118,10 +118,10 @@ static CORNER_X: [usize; 4] = [0, 2, 2, 0];
 static CORNER_Y: [usize; 4] = [1, 1, 3, 3];
 /// Linienanfang / Linienende menu -> LCAP_*: Flach, Pfeil, Ausgefüllter Pfeil, Abgerundet
 static CAP_MAP: [u32; 4] = [LCAP_FLAT, LCAP_ARROW, LCAP_ARROW_FILLED, LCAP_ROUND];
-static CTYPE_LABELS: [&str; 2] = ["Kurvenzug (Spline)", "Bézierpfad"];
-static CAP_LABELS: [&str; 4] = ["Flach", "Pfeil", "Ausgefüllter Pfeil", "Abgerundet"];
-static DASH_LABELS: [&str; 5] = ["Durchgezogen", "Striche", "Punktiert", "Strich-Punkt", "Strich-Punkt-Punkt"];
-static MODE_LABELS: [&str; 3] = ["Umriss zeichnen", "Nur Füllung", "Füllung und Umriss"];
+static CTYPE_LABELS: [&str; 2] = ["Kurvenzug (Spline)", "Bézierpfad"]; // i18n
+static CAP_LABELS: [&str; 4] = ["Flach", "Pfeil", "Ausgefüllter Pfeil", "Abgerundet"]; // i18n
+static DASH_LABELS: [&str; 5] = ["Durchgezogen", "Striche", "Punktiert", "Strich-Punkt", "Strich-Punkt-Punkt"]; // i18n
+static MODE_LABELS: [&str; 3] = ["Umriss zeichnen", "Nur Füllung", "Füllung und Umriss"]; // i18n
 static CTYPE_ICONS: [u32; 2] = [IC_CURVE, IC_INKING_TOOL];
 static CAP0_ICONS: [u32; 4] = [IC_REMOVE, IC_BACK, IC_CARET_LEFT, IC_CIRCLE_RING];
 static CAP1_ICONS: [u32; 4] = [IC_REMOVE, IC_FORWARD, IC_CARET_RIGHT, IC_CIRCLE_RING];
@@ -932,9 +932,9 @@ fn ts_commit(p: &mut Pn, ui: &mut Ui, _doc: DocId) -> bool {
         tl_hide(p, TL_SHAPES);
         false
     } else if p.tshp.tool == TOOL_LINE {
-        tl_commit(p, TL_SHAPES, "Linie / Kurve", IC_CURVE)
+        tl_commit(p, TL_SHAPES, "Linie / Kurve", IC_CURVE) // i18n
     } else {
-        tl_commit(p, TL_SHAPES, "Formen", IC_SHAPES)
+        tl_commit(p, TL_SHAPES, "Formen", IC_SHAPES) // i18n
     };
     ts_end(p, ui);
     r
@@ -1420,10 +1420,10 @@ fn ts_is_line_cur(p: &Pn) -> bool {
 
 // ts_opt_style() -- "Stil:" (line: Linienanfang, Linienart, Linienende; shape: Linienart)
 fn ts_opt_style(p: &mut Pn, ui: &mut Ui) {
-    opt_label(ui, "Stil:");
+    opt_label(ui, "Stil:"); // i18n
     if ts_is_line_cur(p) {
         let mut v = p.tshp.cap0;
-        let r = opt_menu(p, ui, OPT_CAP0, &mut v, &CAP_LABELS, &CAP0_ICONS, Some("Form des Linienanfangs"), OMF_ICONONLY as u32);
+        let r = opt_menu(p, ui, OPT_CAP0, &mut v, &CAP_LABELS, &CAP0_ICONS, Some("Form des Linienanfangs"), OMF_ICONONLY as u32); // i18n
         p.tshp.cap0 = v;
         p.tshp.ochg |= r;
     }
@@ -1431,7 +1431,7 @@ fn ts_opt_style(p: &mut Pn, ui: &mut Ui) {
     p.tshp.ochg |= r;
     if ts_is_line_cur(p) {
         let mut v = p.tshp.cap1;
-        let r = opt_menu(p, ui, OPT_CAP1, &mut v, &CAP_LABELS, &CAP1_ICONS, Some("Form des Linienendes"), OMF_ICONONLY as u32);
+        let r = opt_menu(p, ui, OPT_CAP1, &mut v, &CAP_LABELS, &CAP1_ICONS, Some("Form des Linienendes"), OMF_ICONONLY as u32); // i18n
         p.tshp.cap1 = v;
         p.tshp.ochg |= r;
     }
@@ -1459,13 +1459,13 @@ fn ts_dash_menu(p: &mut Pn, ui: &mut Ui) -> bool {
     #[cfg(target_pointer_width = "32")]
     let (user, version) = (cur as usize, tc);
     ui.cmd_custom(r[0] + inset, r[1], (r[2] - inset - chev).max(4), r[3], Some(f), user, version);
-    ui.tooltip("Linienart ändern");
+    ui.tooltip(crate::preferences::localization::tr("Linienart ändern"));
     if ui.flyout_begin(OPT_DASH, FL_BELOW) {
         for i in 0..DASH_COUNT {
             if i == p.tshp.dash {
                 ui.next_flags(ST_CHECKED);
             }
-            if ui.menu_item(OPT_DASH + 1 + i, DASH_LABELS[i as usize]) & EV_ACT != 0 {
+            if ui.menu_item(OPT_DASH + 1 + i, crate::preferences::localization::tr(DASH_LABELS[i as usize])) & EV_ACT != 0 {
                 chosen = i;
                 ui.popup_close();
             }
@@ -1522,7 +1522,7 @@ fn ts_options(p: &mut Pn, ui: &mut Ui) {
         opt_width(p, ui);
         opt_sep(ui);
         let mut v = p.tshp.mode;
-        let r = opt_menu(p, ui, OPT_MODE, &mut v, &MODE_LABELS, &MODE_ICONS, Some("Formfüllmodus"), OMF_ICONONLY as u32);
+        let r = opt_menu(p, ui, OPT_MODE, &mut v, &MODE_LABELS, &MODE_ICONS, Some("Formfüllmodus"), OMF_ICONONLY as u32); // i18n
         p.tshp.mode = v;
         p.tshp.ochg |= r;
         opt_sep(ui);
@@ -1539,10 +1539,10 @@ fn ts_options(p: &mut Pn, ui: &mut Ui) {
     opt_aa(p, ui);
     if !ts_is_line_cur(p) {
         opt_sep(ui);
-        if ui.icon_button(OPT_FLIPH, IC_SWITCH, "Horizontal spiegeln") & EV_ACT != 0 {
+        if ui.icon_button(OPT_FLIPH, IC_SWITCH, crate::preferences::localization::tr("Horizontal spiegeln")) & EV_ACT != 0 {
             ts_flip(p, ui, false);
         }
-        if ui.icon_button(OPT_FLIPV, IC_CHEV_UP_DOWN, "Vertikal spiegeln") & EV_ACT != 0 {
+        if ui.icon_button(OPT_FLIPV, IC_CHEV_UP_DOWN, crate::preferences::localization::tr("Vertikal spiegeln")) & EV_ACT != 0 {
             ts_flip(p, ui, true);
         }
     }
@@ -1554,9 +1554,9 @@ fn ts_options(p: &mut Pn, ui: &mut Ui) {
 
 // ts_opt_radius() -- "Ecke Größe:" [-] number [+]
 fn ts_opt_radius(p: &mut Pn, ui: &mut Ui) {
-    opt_label(ui, "Ecke Größe:");
+    opt_label(ui, "Ecke Größe:"); // i18n
     let t = &mut p.tshp;
-    if ui.icon_button(OPT_RDEC, IC_REMOVE, "Ecke verkleinern") & EV_ACT != 0 && t.radius - 1 >= 0 {
+    if ui.icon_button(OPT_RDEC, IC_REMOVE, crate::preferences::localization::tr("Ecke verkleinern")) & EV_ACT != 0 && t.radius - 1 >= 0 {
         t.radius -= 1;
         t.ochg = true;
     }
@@ -1564,7 +1564,7 @@ fn ts_opt_radius(p: &mut Pn, ui: &mut Ui) {
     if ui.number_box(OPT_RADIUS, &mut t.radius, &RANGE_RADIUS) & EV_ACT != 0 {
         t.ochg = true;
     }
-    if ui.icon_button(OPT_RINC, IC_ADD, "Ecke vergrößern") & EV_ACT != 0 && (t.radius as u32) < RADIUS_MAX as u32 {
+    if ui.icon_button(OPT_RINC, IC_ADD, crate::preferences::localization::tr("Ecke vergrößern")) & EV_ACT != 0 && (t.radius as u32) < RADIUS_MAX as u32 {
         t.radius += 1;
         t.ochg = true;
     }

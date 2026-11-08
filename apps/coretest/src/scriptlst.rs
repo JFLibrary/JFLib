@@ -1,4 +1,4 @@
-// scriptlst -- checks of lib/script's language services (SK6, script::ls) and formatter
+// scriptlst -- checks of apps/jfs/crates/script's language services (SK6, script::ls) and formatter
 // (script::fmt): definitions and references with shadowing, closures, loops and catch, rename
 // edits and refusals, completion in scope, after a dot, of a module and on broken code, hover
 // texts, signature help, folding ranges, the outline, the formatter on every syntax form,

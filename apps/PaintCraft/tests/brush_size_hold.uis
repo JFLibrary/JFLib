@@ -1,0 +1,60 @@
+# brush_size_hold.uis -- the size buttons of the tool row: a click is one step; held down, a step at the
+# press, then after 350 ms one every 40 ms, always at this speed (no acceleration); off the button it
+# waits.  #9932 = width x 100.
+size 1280 800
+theme light
+cmd 930 2000
+expect #9932 value 2000
+
+# ------------------------------------------------------------ a click: one step
+click #2002
+expect #9932 value 2100
+click #2001
+expect #9932 value 2000
+
+# ------------------------------------------------------------ held down
+move #2002
+down #2002
+wait 16
+expect #9932 value 2100
+wait 300
+expect #9932 value 2100
+# (350 ms after the press, then every 40 ms)
+wait 40
+expect #9932 value 2200
+wait 400
+expect #9932 value 3200
+# the same speed later on
+wait 400
+expect #9932 value 4200
+up #2002
+wait 16
+expect #9932 value 4200
+wait 200
+expect #9932 value 4200
+
+# ------------------------------------------------------------ and down again
+move #2001
+down #2001
+wait 16
+expect #9932 value 4100
+wait 340
+wait 400
+expect #9932 value 3000..3200
+up #2001
+wait 16
+
+# ------------------------------------------------------------ a finger that taps is one step, one that rests holds
+cmd 930 2000
+pointer touch
+wait 16
+tap #2002
+expect #9932 value 2100
+finger down #2002
+wait 500
+expect #9932 value 2200
+wait 700
+expect #9932 value 2600..4000
+finger up
+wait 200
+pointer mouse

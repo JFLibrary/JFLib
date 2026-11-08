@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{APP}}</title>
+<link rel="stylesheet" href="host.css">
+<body data-app="{{APP}}">
+<div id="hostbar" role="toolbar" aria-label="Browserdienste">
+  <strong>{{APP}}</strong>
+  <button id="open">Datei öffnen</button>
+  <button id="control" aria-pressed="false">Agentensteuerung aktivieren</button>
+  <output id="status" role="status">Wird geladen …</output>
+</div>
+<main id="viewport">
+  <canvas id="screen" tabindex="0" aria-label="Anwendungsfläche"></canvas>
+  <textarea id="input" aria-label="Texteingabe" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+  <div id="a11y"></div>
+</main>
+<input id="files" type="file" multiple hidden>
+<script type="module" src="loader.js"></script>
+</body>
+</html>

@@ -4,6 +4,9 @@
 //   _start, glibc_main          the process start through __libc_start_main (ld.so has set up the
 //                               main thread's TLS and run libc's initialisers by then), then what
 //                               linux_entry does in a static program
+//   std_start()                 (feature std: every program with std on Linux is this build) the
+//                               start from the program's fn main, std's arguments and environment
+//                               as plat reads them from the initial stack, the end through std
 //   exit(code)                  plat::exit: glibc's exit (atexit handlers, the destructors of the
 //                               loaded libraries, stdio); so does returning from the program's main.
 //                               Crash reports end in rt::os::exit as everywhere: exit_group, no
@@ -33,6 +36,7 @@ unsafe extern "C" {
                          init: usize, fini: usize, rtld_fini: usize, stack_end: *const u8) -> i32;
     fn __cxa_atexit(f: extern "C" fn(*mut c_void), arg: *mut c_void, dso: *mut c_void) -> i32;
     fn __errno_location() -> *mut i32;
+    #[cfg(not(feature = "std"))] // with std: std::process::exit (hosted.rs)
     #[link_name = "exit"]
     fn c_exit(code: i32) -> !;
     fn gnu_get_libc_version() -> *const u8;
@@ -58,6 +62,8 @@ const RTLD_NOW: i32 = 2;
 
 // the ABI's entry: rsp -> argc, argv[], 0, envp[], 0; rdx = ld.so's finaliser (registered by
 // __libc_start_main).  init and fini 0: this program has neither (glibc takes both as optional).
+// A program with std has the C runtime's _start and std_start.
+#[cfg(not(feature = "std"))]
 core::arch::global_asm!(
     ".globl _start",
     "_start:",
@@ -77,6 +83,7 @@ core::arch::global_asm!(
     start = sym __libc_start_main,
 );
 
+#[cfg(not(feature = "std"))]
 extern "C" fn glibc_main(_argc: i32, argv: *const usize, _envp: *const usize) -> i32 {
     // SAFETY: argv lies on the initial stack right after argc, as linux.rs reads it; written once
     // before anything reads it, on the only thread of this program.
@@ -89,8 +96,26 @@ extern "C" fn glibc_main(_argc: i32, argv: *const usize, _envp: *const usize) ->
     unsafe { super::jfgui_main() }
 }
 
+/// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+/// program's own): std's arguments and environment as a block like the initial stack, then what
+/// glibc_main does, with rt's panic hook first; the end through std::process::exit
+#[cfg(feature = "std")]
+pub fn std_start() -> ! {
+    // SAFETY: written once, first thing in the program's main, before anything reads it.
+    unsafe { super::START_SP = crate::hosted::initial_block() };
+    rt::panic_hook();
+    super::crash::crash_init();
+    super::thread::wake_init();
+    crate::cpu::simd_override();
+    rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
+    // SAFETY: the program's entry symbol (ui::main!, rt::main!).
+    let code = unsafe { super::jfgui_main() };
+    crate::exit(code) // hosted.rs: std::process::exit
+}
+
 /// end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
 /// from any thread, not from a signal handler
+#[cfg(not(feature = "std"))]
 pub fn exit(code: i32) -> ! {
     // SAFETY: ends the process.
     unsafe { c_exit(code) }

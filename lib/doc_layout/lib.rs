@@ -97,6 +97,7 @@ pub struct Layout {
 }
 /// Invalid model/measurements or exceeded expansion, fragment or page budget.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Model(doc_core::Error),
     Metrics,

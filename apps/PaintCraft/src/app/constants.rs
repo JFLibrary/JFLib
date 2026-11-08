@@ -369,6 +369,7 @@ pub(crate) const TMR_CHROME: u32 = 0x5000; // chrome.s      0x5000-0x500F
 pub(crate) const TMR_VIEW: u32 = 0x5010; // view.s        0x5010-0x501F
 pub(crate) const TMR_SEL: u32 = 0x5020; // sel.s         0x5020-0x502F (marching ants)
 pub(crate) const TMR_TOOL: u32 = 0x5030; // tool.s, t_*.s 0x5030-0x506F
+pub(crate) const TMR_WIDTH_HOLD: u32 = 0x5048; // the size buttons of the tool row
 pub(crate) const TMR_TGRAD: u32 = 0x5050; // t_gradient.s  0x5050-0x5057
 pub(crate) const TMR_TSHP: u32 = 0x5058; // t_shapes.s    0x5058-0x505F
 pub(crate) const TMR_TTEXT: u32 = 0x5060; // t_text.s      0x5060-0x5067 (caret blink)

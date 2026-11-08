@@ -372,6 +372,7 @@ impl<'a> Je<'a> {
 }
 
 /// where the residuals go: counting (pass 1) or the token stream
+#[non_exhaustive]
 pub enum Sink<'s, 'e> {
     Count(&'s mut Eh),
     Put(&'e Eh, &'s mut Jw, &'s mut Es),

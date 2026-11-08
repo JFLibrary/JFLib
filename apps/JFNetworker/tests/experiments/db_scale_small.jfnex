@@ -1,0 +1,58 @@
+{
+  "format": "jfnex",
+  "version": 1,
+  "name": "db_scale_small",
+  "title": "Der kurze Lauf der Testsuite",
+  "project": "db_scale.jfnet",
+  "load": {
+    "dev": "GEN",
+    "svc": "load",
+    "rps": [
+      100,
+      400
+    ]
+  },
+  "timing": {
+    "warmup_s": 2,
+    "settle_s": 1,
+    "measure_s": 2,
+    "seeds": [
+      31
+    ]
+  },
+  "slo": {
+    "p99_ms": 100,
+    "errors_pct": 1
+  },
+  "series": [
+    {
+      "name": "Puffer",
+      "axes": [
+        {
+          "kind": "config",
+          "name": "MiB",
+          "dev": "DB",
+          "path": "db.pool_mb",
+          "values": [
+            16,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lesen",
+      "axes": [
+        {
+          "kind": "config",
+          "name": "Gewicht",
+          "dev": "GEN",
+          "path": "http-load.mix.0.weight",
+          "values": [
+            5
+          ]
+        }
+      ]
+    }
+  ]
+}

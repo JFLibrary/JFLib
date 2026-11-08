@@ -7,10 +7,10 @@
 # their values.  Size: the 16 px design where Fluent has one (1 px strokes at 16 px, the size the
 # styles draw most icons at), else the 20 px design; regular unless the icon is a filled shape.
 # Comments note where the Fluent shape differs from the former Segoe glyph.
-# Regenerate styles/winui/assets/icons.bin (FLUENT = fonts/ directory of the repository above):
+# Regenerate lib/style_assets/assets/icons.bin (FLUENT = fonts/ directory of the repository above):
 #   python tools/ttf2bin.py --font FLUENT/FluentSystemIcons-Regular.ttf
 #       --font FLUENT/FluentSystemIcons-Filled.ttf --icons tools/icons.txt
-#       --remap tools/icons_fluent.txt --out styles/winui/assets/icons.bin
+#       --remap tools/icons_fluent.txt --out lib/style_assets/assets/icons.bin
 
 # --- DESIGN.md §3.3 base set ----------------------------------------------------------------------
 Menu                ic_fluent_navigation_16_regular

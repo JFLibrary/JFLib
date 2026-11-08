@@ -1,0 +1,71 @@
+#!args --fixture --lang en
+# the demo server in English: its demo data (jobs, repositories, replicas, pools, files) is
+# English, and what the server writes in German (alerts, statuses, operations, session logs,
+# boot checks, audit details, error answers) is shown in English (tr::srv); no German name
+size 1440 900
+wait 50
+expect "Overview" selected
+expect "Domain controller failed" exists
+expect "Repository “Archive” almost full" exists
+expect "Munich: File server MUC with warnings" exists
+expect "Server Berlin (branch office) not reachable" exists
+expect "Connection refused (10.8.0.12:7642) · Today 21:57" exists
+expect "Oct 1" exists
+expect link:"File server – daily" exists
+expect "Dateiserver – täglich" missing
+click "Backup jobs"
+wait 20
+expect "Development VM images" exists
+expect "Month-end close (copy)" exists
+expect "Entwicklung VM-Images" missing
+click "Repositories"
+wait 20
+expect "Primary (NAS)" exists
+expect "Less than 10% free" exists
+click "Replication"
+wait 20
+expect "File server – standby" exists
+expect "Failover active: Web server – standby" exists
+click "Tape"
+wait 20
+click "Media pools"
+wait 20
+expect "Saturdays, protected for four weeks" exists
+click "Instant start"
+wait 20
+click "Started from backups"
+wait 20
+expect "running (KVM)" exists
+expect "Stopped; the changes were discarded" exists
+click "Boot checks"
+wait 20
+expect "dc02: 2 of 2 checks passed" exists
+expect "running for 30 s" exists
+expect "“login:” appeared" exists
+click "Monitoring"
+wait 20
+expect "Session started: Web server configuration" exists
+expect "Restore point signed and published" exists
+click "Operations"
+wait 20
+expect "File server – daily: Backup" exists
+expect "Check repository “Primary (NAS)”" exists
+click "Audit log"
+wait 20
+expect "Started manually" exists
+expect "Retention: 14 points, 30 days" exists
+expect "Role: Viewer" exists
+click "Settings"
+wait 20
+click "About BackupCraft"
+wait 20
+expect "Copy jobs, tape library and zstd compression." exists
+# a job started: the activity bar shows the operation's title in English
+click "Backup jobs"
+wait 20
+click "Web server configuration"
+wait 20
+click #3145738
+wait 300
+expect "Web server configuration: Backup" exists
+expect_nowarn

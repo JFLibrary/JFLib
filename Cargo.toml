@@ -1,0 +1,376 @@
+# The library's crates, the apps of this repository, their programs and crates, PaintCraft's Rust
+# plugins.  Cargo builds them; build_rs.py is the tool on top that reads what it needs from here
+# (tools/manifests.py).  docs/CRATES.md is the plan.
+[workspace]
+resolver = "3"
+# worktrees below this folder may be older than this file, build/ holds test projects: their
+# Cargo.toml are not members of it
+exclude = [".claude", "build"]
+default-members = ["lib/jflib"]
+# lib/ in this order is build_rs.py's LIBS: a program's crates link in it
+members = [
+    "lib/rt",
+    "lib/agent_core",
+    "lib/plat",
+    "lib/base",
+    "lib/agent_io",
+    "lib/simd",
+    "lib/gfx",
+    "lib/img_core",
+    "lib/archive",
+    "lib/doc_core",
+    "lib/doc_layout",
+    "lib/doc_io",
+    "lib/img_png",
+    "lib/text_shape",
+    "lib/text",
+    "lib/img_jpeg",
+    "lib/img_bmp",
+    "lib/img_gif",
+    "lib/img_tga",
+    "lib/img_tiff",
+    "lib/img_webp",
+    "lib/img_hevc",
+    "lib/img_av1",
+    "lib/img_heif",
+    "lib/img_avif",
+    "lib/img_jxl",
+    "lib/img_jxl_enc",
+    "lib/img_jxr",
+    "lib/img_dds",
+    "lib/img_pdn",
+    "lib/fx",
+    "lib/img_svg",
+    "lib/img_all",
+    "lib/spell",
+    "lib/ui",
+    "lib/doc_view",
+    "lib/datetime",
+    "lib/crypto",
+    "lib/compress",
+    "lib/shader",
+    "lib/wgsl",
+    "lib/netpkt",
+    "lib/datastore",
+    "lib/netio",
+    "lib/cas",
+    "lib/update",
+    "lib/gpu",
+    "lib/eapm",
+    "lib/style_assets",
+    "lib/installer",
+    "lib/appimagert",
+    "lib/render3d",
+    "lib/jflib",
+    "lib/jflib_build",
+    "lib/cargo_jflib",
+    "lib/plugin",
+    "styles/winui",
+    "styles/classic",
+    "styles/kde",
+    "styles/macos",
+    "styles/jfoffice",
+    "styles/backupcraft",
+    "styles/netlab",
+    "modules/modrt",
+    "modules/modplat",
+    "modules/jxlenc",
+    "plugins/badinfo",
+    "plugins/crash",
+    "plugins/crashpf",
+    "plugins/crashq",
+    "plugins/prepcheck",
+    "plugins/pshapes",
+    "plugins/qoi",
+    "plugins/rsdemo",
+    "plugins/sepiastr",
+    "plugins/swapchan",
+    "plugins/toonew",
+    "apps/BackupCraft",
+    "apps/BackupCraft/server",
+    "apps/BackupCraft/agent",
+    "apps/BackupCraft/ctl",
+    "apps/BackupCraft/crates/bc_fs",
+    "apps/BackupCraft/crates/bc_proto",
+    "apps/BackupCraft/crates/bc_tape",
+    "apps/BackupCraft/crates/bc_vm",
+    "apps/BackupCraft/crates/bc_volume",
+    "apps/JFNetworker",
+    "apps/JFNetworker/sim",
+    "apps/JFNetworker/crates/jfn_model",
+    "apps/JFNetworker/crates/jfn_run",
+    "apps/JFNetworker/crates/jfn_sim",
+    "apps/Kritzel",
+    "apps/PaintCraft",
+    "apps/agenttest",
+    "apps/androidGallery",
+    "apps/appimagert",
+    "apps/asynctest",
+    "apps/audiotest",
+    "apps/buildManager",
+    "apps/cardtest",
+    "apps/codectest",
+    "apps/coretest",
+    "apps/datagallery",
+    "apps/desktest",
+    "apps/diagramtest",
+    "apps/dndtest",
+    "apps/docktest",
+    "apps/editortest",
+    "apps/efftest",
+    "apps/fontpicktest",
+    "apps/fonttest",
+    "apps/fxtest",
+    "apps/gallery",
+    "apps/gfxtest",
+    "apps/gputest",
+    "apps/i18ntest",
+    "apps/installer",
+    "apps/jfWord",
+    "apps/jfs",
+    "apps/jfs/crates/script",
+    "apps/lifetest",
+    "apps/linuxtest",
+    "apps/mdviewtest",
+    "apps/officeicontest",
+    "apps/permcli",
+    "apps/permcli/own",
+    "apps/permcli/shared",
+    "apps/permcli/gui",
+    "apps/permcli/crates/permcheck",
+    "apps/permprompt",
+    "apps/permtest",
+    "apps/plattest",
+    "apps/portabletest",
+    "apps/prefstest",
+    "apps/render3dtest",
+    "apps/rstest",
+    "apps/sandboxtest",
+    "apps/scaffoldtest",
+    "apps/scaffoldtest/cli",
+    "apps/scaffoldtest/crates/scaffoldtest_core",
+    "apps/screentest",
+    "apps/shadertest",
+    "apps/spelltest",
+    "apps/svgtest",
+    "apps/symboltest",
+    "apps/template",
+    "apps/termtest",
+    "apps/themedemo",
+    "apps/traydemo",
+    "apps/uigputest",
+    "apps/uitest",
+    "apps/updatetest",
+    "apps/webgputest",
+    "apps/wgsltest",
+]
+
+# The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JFLibrary/JFLib"
+homepage = "https://jflib.org"
+
+# Exact versions: only the way through the crate jflib is promised, the crates below it change together.
+[workspace.dependencies]
+rt = { package = "jflib-rt", path = "lib/rt", version = "=0.1.0" }
+agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.1.0" }
+plat = { package = "jflib-plat", path = "lib/plat", version = "=0.1.0" }
+base = { package = "jflib-base", path = "lib/base", version = "=0.1.0" }
+agent_io = { package = "jflib-agent-io", path = "lib/agent_io", version = "=0.1.0" }
+simd = { package = "jflib-simd", path = "lib/simd", version = "=0.1.0" }
+gfx = { package = "jflib-gfx", path = "lib/gfx", version = "=0.1.0" }
+img_core = { package = "jflib-img-core", path = "lib/img_core", version = "=0.1.0" }
+archive = { package = "jflib-archive", path = "lib/archive", version = "=0.1.0" }
+doc_core = { package = "jflib-doc-core", path = "lib/doc_core", version = "=0.1.0" }
+doc_layout = { package = "jflib-doc-layout", path = "lib/doc_layout", version = "=0.1.0" }
+doc_io = { package = "jflib-doc-io", path = "lib/doc_io", version = "=0.1.0" }
+img_png = { package = "jflib-img-png", path = "lib/img_png", version = "=0.1.0" }
+text_shape = { package = "jflib-text-shape", path = "lib/text_shape", version = "=0.1.0" }
+text = { package = "jflib-text", path = "lib/text", version = "=0.1.0" }
+img_jpeg = { package = "jflib-img-jpeg", path = "lib/img_jpeg", version = "=0.1.0" }
+img_bmp = { package = "jflib-img-bmp", path = "lib/img_bmp", version = "=0.1.0" }
+img_gif = { package = "jflib-img-gif", path = "lib/img_gif", version = "=0.1.0" }
+img_tga = { package = "jflib-img-tga", path = "lib/img_tga", version = "=0.1.0" }
+img_tiff = { package = "jflib-img-tiff", path = "lib/img_tiff", version = "=0.1.0" }
+img_webp = { package = "jflib-img-webp", path = "lib/img_webp", version = "=0.1.0" }
+img_hevc = { package = "jflib-img-hevc", path = "lib/img_hevc", version = "=0.1.0" }
+img_av1 = { package = "jflib-img-av1", path = "lib/img_av1", version = "=0.1.0" }
+img_heif = { package = "jflib-img-heif", path = "lib/img_heif", version = "=0.1.0" }
+img_avif = { package = "jflib-img-avif", path = "lib/img_avif", version = "=0.1.0" }
+img_jxl = { package = "jflib-img-jxl", path = "lib/img_jxl", version = "=0.1.0" }
+img_jxl_enc = { package = "jflib-img-jxl-enc", path = "lib/img_jxl_enc", version = "=0.1.0" }
+img_jxr = { package = "jflib-img-jxr", path = "lib/img_jxr", version = "=0.1.0" }
+img_dds = { package = "jflib-img-dds", path = "lib/img_dds", version = "=0.1.0" }
+img_pdn = { package = "jflib-img-pdn", path = "lib/img_pdn", version = "=0.1.0" }
+fx = { package = "jflib-fx", path = "lib/fx", version = "=0.1.0" }
+img_svg = { package = "jflib-img-svg", path = "lib/img_svg", version = "=0.1.0" }
+img_all = { package = "jflib-img-all", path = "lib/img_all", version = "=0.1.0" }
+spell = { package = "jflib-spell", path = "lib/spell", version = "=0.1.0" }
+ui = { package = "jflib-ui", path = "lib/ui", version = "=0.1.0" }
+doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.1.0" }
+datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.1.0" }
+crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.1.0" }
+compress = { package = "jflib-compress", path = "lib/compress", version = "=0.1.0" }
+shader = { package = "jflib-shader", path = "lib/shader", version = "=0.1.0" }
+wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.1.0" }
+netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.1.0" }
+datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.1.0" }
+netio = { package = "jflib-netio", path = "lib/netio", version = "=0.1.0" }
+cas = { package = "jflib-cas", path = "lib/cas", version = "=0.1.0" }
+update = { package = "jflib-update", path = "lib/update", version = "=0.1.0" }
+gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.1.0" }
+eapm = { package = "jflib-eapm", path = "lib/eapm", version = "=0.1.0" }
+style_assets = { package = "jflib-style-assets", path = "lib/style_assets", version = "=0.1.0" }
+render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.1.0" }
+style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.1.0" }
+style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.1.0" }
+style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.1.0" }
+style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.1.0" }
+modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
+modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
+jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
+installer = { package = "jflib-installer", path = "lib/installer", version = "=0.1.0" }
+appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = "=0.1.0" }
+# PaintCraft's plugins written in Rust (plugins/*) and the styles of the apps: not published
+plugin = { package = "jflib-plugin", path = "lib/plugin" }
+style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
+style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
+style_netlab = { package = "jflib-style-netlab", path = "styles/netlab" }
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(jfgui_assets)',    # ui::main!: the app has assets/
+    'cfg(jfgui_dev)',       # lib/ui/build.rs: a development build
+    'cfg(jfgui_glibc)',     # Linux against glibc, not static
+    'cfg(jfgui_manifest)',  # ui::main!, rt::main!: PERMISSIONS as a file
+    'cfg(jfgui_package)',   # ui::main!: PACKAGE as a file
+    'cfg(jflib_module)',    # inside a loadable module
+    'cfg(web_threads)',     # the browser with threads
+    'cfg(jflib_style, values("winui", "classic", "kde", "macos"))',
+] }
+
+# What a project needs as well, Cargo does not take profiles from a dependency (docs/CRATES.md).
+[profile.dev]
+panic = "abort"
+opt-level = 1
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+# as build_rs.py links every program; no effect on the crates of a project outside (its own profile counts)
+strip = "symbols"
+
+# the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
+# codecs stay fast in the tests, Kritzel and PaintCraft draw with their own pixel loops
+[profile.dev.package.jflib-gfx]
+opt-level = 2
+
+[profile.dev.package.jflib-text]
+opt-level = 2
+
+[profile.dev.package.jflib-simd]
+opt-level = 2
+
+[profile.dev.package.jflib-fx]
+opt-level = 2
+
+[profile.dev.package.jflib-crypto]
+opt-level = 2
+
+[profile.dev.package.jflib-compress]
+opt-level = 2
+
+[profile.dev.package.jflib-cas]
+opt-level = 2
+
+[profile.dev.package.jflib-spell]
+opt-level = 2
+
+[profile.dev.package.jflib-img-core]
+opt-level = 2
+
+[profile.dev.package.jflib-img-png]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jpeg]
+opt-level = 2
+
+[profile.dev.package.jflib-img-bmp]
+opt-level = 2
+
+[profile.dev.package.jflib-img-gif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-tga]
+opt-level = 2
+
+[profile.dev.package.jflib-img-tiff]
+opt-level = 2
+
+[profile.dev.package.jflib-img-webp]
+opt-level = 2
+
+[profile.dev.package.jflib-img-hevc]
+opt-level = 2
+
+[profile.dev.package.jflib-img-av1]
+opt-level = 2
+
+[profile.dev.package.jflib-img-heif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-avif]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxl]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxl-enc]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jxr]
+opt-level = 2
+
+[profile.dev.package.jflib-img-dds]
+opt-level = 2
+
+[profile.dev.package.jflib-img-pdn]
+opt-level = 2
+
+[profile.dev.package.jflib-img-svg]
+opt-level = 2
+
+[profile.dev.package.jflib-img-all]
+opt-level = 2
+
+[profile.dev.package.Kritzel]
+opt-level = 2
+
+[profile.dev.package.PaintCraft]
+opt-level = 2
+
+# text_shape and the crates it pins from crates.io: optimised as build_rs.py's earlier Cargo build of them did
+[profile.dev.package."*"]
+opt-level = 2
+codegen-units = 1
+
+[profile.dev.package.jflib-text-shape]
+opt-level = 2
+codegen-units = 1
+
+# a module links with fat LTO in development builds too (build_rs.py, jxl-module): at a compute crate's level
+[profile.dev.package.jflib-module-jxlenc]
+opt-level = 2
+
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+codegen-units = 1
+lto = "fat"
+debug = 0
+strip = "symbols"

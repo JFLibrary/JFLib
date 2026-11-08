@@ -46,15 +46,15 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
     if !p.custom_brush.initialized {
         p.custom_brush.initialized = true;
         if let Some(path) = plat::arg_value("--brush-tip") {
-            if !set_path(&mut p.custom_brush,path) { crate::integrations::file_io::fio_error(p, Some("Pinselspitze"), "Die Pinselspitze ließ sich nicht laden (höchstens 4.194.304 Pixel)."); }
+            if !set_path(&mut p.custom_brush,path) { crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Pinselspitze")), "Die Pinselspitze ließ sich nicht laden (höchstens 4.194.304 Pixel)."); } // i18n
         }
         super::preset_ui::initialize(p, ui);
     }
     super::preset_ui::file_dialog(p, ui);
     let pick = p.custom_brush.pick.clone();
-    if ui.filedlg(0x92000, FD_OPEN, &pick, &mut p.custom_brush.candidate, 4096, &["png,bmp,tif,tiff=Bild-Pinselspitzen"]) & EV_ACT != 0 {
+    if ui.filedlg(0x92000, FD_OPEN, &pick, &mut p.custom_brush.candidate, 4096, &[crate::preferences::localization::tr("png,bmp,tif,tiff=Bild-Pinselspitzen")]) & EV_ACT != 0 {
         let candidate=p.custom_brush.candidate.clone();
-        if !set_path(&mut p.custom_brush,candidate) { crate::integrations::file_io::fio_error(p, Some("Pinselspitze"), "Die Pinselspitze ließ sich nicht laden."); }
+        if !set_path(&mut p.custom_brush,candidate) { crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Pinselspitze")), "Die Pinselspitze ließ sich nicht laden."); } // i18n
     }
     let open = p.custom_brush.open.clone();
     let rect=p.custom_brush.rect.clone();

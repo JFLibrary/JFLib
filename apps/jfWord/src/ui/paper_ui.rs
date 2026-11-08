@@ -85,6 +85,7 @@ pub(crate) fn paper_viewport_end(
         match edit {
             doc_view::RulerEdit::Paragraph(p) => { self.paragraph_change(ui, doc_core::ParagraphChange::Properties(p)); },
             doc_view::RulerEdit::Page(p) => { self.apply(Edit::SetPage(p)); },
+            _ => {}
         }
         ui.repass();
     }

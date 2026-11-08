@@ -1,5 +1,5 @@
 // modabi -- the ABI of loadable modules (jxl-module): the records the host (modhost.rs) and a
-// module (the module runtime modules/modrt, which includes this file) exchange
+// module (the module runtime modules/modrt, which has a copy of this file) exchange
 //                                                                       [jxl-module: no asm]
 //
 // A module is a no_std cdylib linked against nothing (no imports; built and checked like a

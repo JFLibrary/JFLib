@@ -19,7 +19,7 @@ static HEAP: SpinLock<Heap> = SpinLock::new(Heap {
     end: 0,
 });
 struct Alloc;
-#[global_allocator]
+#[cfg_attr(not(feature = "std"), global_allocator)]
 static ALLOC: Alloc = Alloc;
 
 fn class(layout: Layout) -> Option<usize> {
@@ -120,7 +120,7 @@ pub(crate) unsafe fn clear(p: *mut u8, n: usize) {
 /// C ABI nonoverlapping byte copy required by compiler-generated code.
 /// # Safety
 /// Both ranges must be valid for n bytes and must not overlap.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     for i in 0..n {
         // SAFETY: guaranteed by the caller; volatile accesses prevent self-recursion.
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) 
 /// C ABI overlapping byte copy.
 /// # Safety
 /// Both ranges must be valid for n bytes.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     if (dst as usize) <= src as usize {
         // SAFETY: forward order is safe for this overlap direction.
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize)
 /// C ABI byte fill.
 /// # Safety
 /// The destination must be writable for n bytes.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_void {
     for i in 0..n {
         // SAFETY: guaranteed by the caller.
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_vo
 /// C ABI lexicographic unsigned-byte comparison.
 /// # Safety
 /// Both ranges must be readable for n bytes.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, n: usize) -> i32 {
     for i in 0..n {
         // SAFETY: guaranteed by the caller.
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, n: usize) ->
 /// C ABI byte equality comparison.
 /// # Safety
 /// Both ranges must be readable for n bytes.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn bcmp(a: *const c_void, b: *const c_void, n: usize) -> i32 {
     // SAFETY: same valid ranges as memcmp.
     unsafe { memcmp(a, b, n) }
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn bcmp(a: *const c_void, b: *const c_void, n: usize) -> i
 /// C ABI NUL-terminated string length.
 /// # Safety
 /// The pointer must reference a readable NUL-terminated string.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn strlen(s: *const core::ffi::c_char) -> usize {
     let mut n = 0;
     // SAFETY: the caller guarantees a terminating NUL byte.

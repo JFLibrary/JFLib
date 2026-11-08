@@ -1,0 +1,27 @@
+# Built with --cfg jflib_module: the crates below then use modrt and modplat, what a module has of
+# rt and plat.  Without that cfg it does not build, so this is no default member and never published.
+[package]
+name = "jflib-module-jxlenc"
+description = "The JPEG XL writer as a loadable module"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "jxlenc"
+path = "lib.rs"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+img_jxl.workspace = true
+img_jxl_enc.workspace = true
+rt = { package = "jflib-modrt", path = "../modrt" }
+plat = { package = "jflib-modplat", path = "../modplat" }

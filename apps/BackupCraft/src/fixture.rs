@@ -3,6 +3,11 @@
 // users, audit), deterministic for screenshots and scripts (--fixture).  Running jobs,
 // restores and checks advance with the clock and finish with a session, a restore point and
 // an audit entry, like the real server.
+//
+// The demo data (names of jobs, hosts' folders, repositories, pools, replicas, plans, watched
+// servers, labels, file names) is German or English, as the console runs (Fixture::new(now,
+// en)).  What the server itself writes (statuses, messages, titles, details, logs, errors)
+// stays German as the real server writes it; the console translates it (tr::srv).
 
 use alloc::format;
 use alloc::string::String;
@@ -66,6 +71,8 @@ pub struct Fixture {
     instant: Vec<InstantSession>,
     boot_checks: Vec<BootCheckResult>,
     zone: Zone,
+    /// the demo data in English (the console runs in English)
+    en: bool,
 }
 
 fn s(x: &str) -> String {
@@ -77,7 +84,8 @@ fn err(status: u16, c: &str, m: &str) -> (u16, Value) {
 }
 
 impl Fixture {
-    pub fn new(now: i64) -> Fixture {
+    /// the demo server at `now`; `en`: its demo data in English
+    pub fn new(now: i64, en: bool) -> Fixture {
         let mut f = Fixture {
             now,
             rng: 0x9E37_79B9_7F4A_7C15,
@@ -108,9 +116,15 @@ impl Fixture {
             instant: Vec::new(),
             boot_checks: Vec::new(),
             zone: Zone::by_name("Europe/Berlin").unwrap_or_else(Zone::utc),
+            en,
         };
         f.populate();
         f
+    }
+
+    /// the German or the English of a piece of demo data
+    fn l(&self, de: &'static str, en: &'static str) -> &'static str {
+        if self.en { en } else { de }
     }
 
     fn rand(&mut self) -> u64 {
@@ -142,15 +156,18 @@ impl Fixture {
 
     fn populate(&mut self) {
         let now = self.now;
+        let en = self.en;
+        let l = move |de: &'static str, e: &'static str| -> &'static str { if en { e } else { de } };
         // users
-        for (name, role) in [("admin", Role::Admin), ("j.mueller", Role::Operator), ("helpdesk", Role::Restore), ("revision", Role::Viewer)] {
+        let (operator, viewer) = (l("j.mueller", "j.miller"), l("revision", "auditor"));
+        for (name, role) in [("admin", Role::Admin), (operator, Role::Operator), ("helpdesk", Role::Restore), (viewer, Role::Viewer)] {
             let id = self.id();
             self.users.push((User { id, username: s(name), role, created: now - 180 * DAY, last_login: now - 3600, disabled: false }, s("demo")));
         }
         // hosts
         let hosts: [(&str, &str, Os, &str, HostKind, HostStatus, &[&str]); 7] = [
             ("backup-srv01", "10.0.10.5", Os::Linux, "Ubuntu 24.04 LTS", HostKind::Server, HostStatus::Online, &["/srv", "/etc", "/home"]),
-            ("fs01.corp.local", "10.0.20.11", Os::Windows, "Windows Server 2022", HostKind::Agent, HostStatus::Online, &["D:\\Daten", "E:\\Medien"]),
+            ("fs01.corp.local", "10.0.20.11", Os::Windows, "Windows Server 2022", HostKind::Agent, HostStatus::Online, &[l("D:\\Daten", "D:\\Data"), l("E:\\Medien", "E:\\Media")]),
             ("sql01.corp.local", "10.0.20.15", Os::Windows, "Windows Server 2022", HostKind::Agent, HostStatus::Online, &["C:\\SQLBackup"]),
             ("mail01.corp.local", "10.0.20.21", Os::Linux, "Debian 12", HostKind::Agent, HostStatus::Online, &["/var/mail", "/etc"]),
             ("web01.corp.local", "10.0.30.8", Os::Linux, "Ubuntu 22.04 LTS", HostKind::Agent, HostStatus::Online, &["/var/www", "/etc/nginx"]),
@@ -183,9 +200,9 @@ impl Fixture {
         // repositories: name, path, disk size, used, logical, dedupe, immutable days, encrypted,
         // other data on the disk
         let repos: [(&str, &str, u64, u64, u64, u32, u32, bool, u64); 3] = [
-            ("Primär (NAS)", "/mnt/nas/backupcraft", 20 * TB, 14_200 * GB, 41_000 * GB, 289, 0, true, 1_100 * GB),
-            ("Offsite (S3-Gateway)", "/mnt/offsite/backupcraft", 30 * TB, 11_400 * GB, 29_600 * GB, 260, 30, true, 0),
-            ("Archiv", "/srv/archive", 8 * TB, 7_440 * GB, 15_800 * GB, 212, 365, false, 160 * GB),
+            (l("Primär (NAS)", "Primary (NAS)"), "/mnt/nas/backupcraft", 20 * TB, 14_200 * GB, 41_000 * GB, 289, 0, true, 1_100 * GB),
+            (l("Offsite (S3-Gateway)", "Offsite (S3 gateway)"), "/mnt/offsite/backupcraft", 30 * TB, 11_400 * GB, 29_600 * GB, 260, 30, true, 0),
+            (l("Archiv", "Archive"), "/srv/archive", 8 * TB, 7_440 * GB, 15_800 * GB, 212, 365, false, 160 * GB),
         ];
         for (name, path, cap, used, logical, dedup, imm, enc, other) in repos {
             let free = cap - used - other;
@@ -209,15 +226,15 @@ impl Fixture {
         }
         // jobs: name, host index, sources, repo index, cron, kind, base size, last status
         let jobs: [(&str, usize, &[&str], usize, &str, JobKind, u64, SessionStatus, bool); 9] = [
-            ("Dateiserver – täglich", 1, &["D:\\Daten"], 0, "0 2 * * *", JobKind::File, 182 * GB, SessionStatus::Success, true),
-            ("SQL-Cluster Logs", 2, &["C:\\SQLBackup"], 0, "30 1 * * *", JobKind::File, 21 * GB, SessionStatus::Warning, true),
-            ("Mailserver", 3, &["/var/mail", "/etc"], 0, "0 23 * * *", JobKind::File, 96 * GB, SessionStatus::Success, true),
-            ("Entwicklung VM-Images", 6, &["/opt/builds"], 2, "15 22 * * 1-5", JobKind::File, 512 * GB, SessionStatus::Failed, true),
-            ("Webserver Konfiguration", 4, &["/var/www", "/etc/nginx"], 0, "10 3 * * *", JobKind::File, 1_200_000_000, SessionStatus::Success, true),
-            ("Buchhaltung Archiv", 1, &["D:\\Daten\\Buchhaltung"], 2, "0 4 1 * *", JobKind::File, 84 * GB, SessionStatus::Never, false),
-            ("Medien – wöchentlich", 1, &["E:\\Medien"], 1, "0 1 * * 6", JobKind::File, 340 * GB, SessionStatus::Success, true),
-            ("Monatsabschluss (Kopie)", 0, &[], 1, "0 4 1 * *", JobKind::Copy, 340 * GB, SessionStatus::Success, true),
-            ("Domänencontroller", 5, &["C:\\Windows\\NTDS", "C:\\Windows\\SYSVOL"], 0, "30 2 * * *", JobKind::File, 14 * GB, SessionStatus::Success, true),
+            (l("Dateiserver – täglich", "File server – daily"), 1, &[l("D:\\Daten", "D:\\Data")], 0, "0 2 * * *", JobKind::File, 182 * GB, SessionStatus::Success, true),
+            (l("SQL-Cluster Logs", "SQL cluster logs"), 2, &["C:\\SQLBackup"], 0, "30 1 * * *", JobKind::File, 21 * GB, SessionStatus::Warning, true),
+            (l("Mailserver", "Mail server"), 3, &["/var/mail", "/etc"], 0, "0 23 * * *", JobKind::File, 96 * GB, SessionStatus::Success, true),
+            (l("Entwicklung VM-Images", "Development VM images"), 6, &["/opt/builds"], 2, "15 22 * * 1-5", JobKind::File, 512 * GB, SessionStatus::Failed, true),
+            (l("Webserver Konfiguration", "Web server configuration"), 4, &["/var/www", "/etc/nginx"], 0, "10 3 * * *", JobKind::File, 1_200_000_000, SessionStatus::Success, true),
+            (l("Buchhaltung Archiv", "Accounting archive"), 1, &[l("D:\\Daten\\Buchhaltung", "D:\\Data\\Accounting")], 2, "0 4 1 * *", JobKind::File, 84 * GB, SessionStatus::Never, false),
+            (l("Medien – wöchentlich", "Media – weekly"), 1, &[l("E:\\Medien", "E:\\Media")], 1, "0 1 * * 6", JobKind::File, 340 * GB, SessionStatus::Success, true),
+            (l("Monatsabschluss (Kopie)", "Month-end close (copy)"), 0, &[], 1, "0 4 1 * *", JobKind::Copy, 340 * GB, SessionStatus::Success, true),
+            (l("Domänencontroller", "Domain controller"), 5, &["C:\\Windows\\NTDS", "C:\\Windows\\SYSVOL"], 0, "30 2 * * *", JobKind::File, 14 * GB, SessionStatus::Success, true),
         ];
         for (i, (name, hi, src, ri, cron, kind, size, last, enabled)) in jobs.iter().enumerate() {
             let id = self.id();
@@ -237,11 +254,11 @@ impl Fixture {
                 schedule: Schedule { cron: s(cron), tz: s("Europe/Berlin"), enabled: *enabled },
                 retention: Retention { points: 14, days: 30, weekly: 8, monthly: if i % 2 == 0 { 12 } else { 6 }, yearly: if i == 7 { 7 } else { 0 } },
                 encrypted: *ri != 2,
-                key_hint: if *ri != 2 { s("Tresor › BackupCraft › Jobschlüssel") } else { String::new() },
+                key_hint: if *ri != 2 { s(l("Tresor › BackupCraft › Jobschlüssel", "Vault › BackupCraft › Job key")) } else { String::new() },
                 compression: Compression::Lz4,
                 active_full_days: if i % 3 == 0 { 30 } else { 0 },
-                pre_script: if *hi == 2 { s("C:\\Skripte\\sql-freeze.ps1") } else { String::new() },
-                post_script: if *hi == 2 { s("C:\\Skripte\\sql-thaw.ps1") } else { String::new() },
+                pre_script: if *hi == 2 { s(l("C:\\Skripte\\sql-freeze.ps1", "C:\\Scripts\\sql-freeze.ps1")) } else { String::new() },
+                post_script: if *hi == 2 { s(l("C:\\Skripte\\sql-thaw.ps1", "C:\\Scripts\\sql-thaw.ps1")) } else { String::new() },
                 source_job: String::new(),
                 pool_id: String::new(),
                 cdp: i == 1,
@@ -293,13 +310,13 @@ impl Fixture {
             self.repos[r].points = n as u32;
         }
         // operations of the last hours
-        let titles = ["Dateiserver – täglich: Sicherung", "Repository „Primär (NAS)“ prüfen", "Konfiguration sichern"];
+        let titles = [format!("{}: Sicherung", self.jobs[0].name), format!("Repository „{}“ prüfen", self.repos[0].name), s("Konfiguration sichern")];
         for (i, t) in titles.iter().enumerate() {
             let id = self.id();
             self.ops.push(Operation {
                 id,
                 kind: s(["job.run", "repository.check", "config.backup"][i]),
-                title: s(t),
+                title: t.clone(),
                 owner: s("admin"),
                 status: OpStatus::Succeeded,
                 done: 100,
@@ -314,21 +331,23 @@ impl Fixture {
             });
         }
         // credentials
-        for (label, user, kind) in [("Linux-Server (SSH-Schlüssel)", "backupcraft", CredKind::SshKey), ("Domänen-Dienstkonto", "CORP\\svc-backup", CredKind::Password)] {
+        for (label, user, kind) in [(l("Linux-Server (SSH-Schlüssel)", "Linux servers (SSH key)"), "backupcraft", CredKind::SshKey),
+                                    (l("Domänen-Dienstkonto", "Domain service account"), "CORP\\svc-backup", CredKind::Password)] {
             let id = self.id();
             self.creds.push(Credential { id, label: s(label), username: s(user), kind, created: now - 60 * DAY });
         }
-        // audit
+        // audit (the details as the server writes them)
+        let (file_job, sql_job, archive) = (self.jobs[0].name.clone(), self.jobs[1].name.clone(), self.repos[2].name.clone());
         let entries = [
             ("admin", "login", "", "Anmeldung von 10.0.10.44", true),
-            ("j.mueller", "job.run", "Dateiserver – täglich", "Manuell gestartet", true),
-            ("admin", "job.update", "SQL-Cluster Logs", "Aufbewahrung: 14 Punkte, 30 Tage", true),
-            ("helpdesk", "restore", "Dateiserver – täglich", "3 Dateien nach D:\\Restore", true),
+            (operator, "job.run", file_job.as_str(), "Manuell gestartet", true),
+            ("admin", "job.update", sql_job.as_str(), "Aufbewahrung: 14 Punkte, 30 Tage", true),
+            ("helpdesk", "restore", file_job.as_str(), "3 Dateien nach D:\\Restore", true),
             ("admin", "host.pair", "web01.corp.local", "Agent gekoppelt", true),
-            ("unbekannt", "login", "", "Falsches Passwort (10.0.99.3)", false),
+            (l("unbekannt", "unknown"), "login", "", "Falsches Passwort (10.0.99.3)", false),
             ("admin", "settings.update", "restore.allowed_roots", "D:\\Restore, /srv/restore", true),
-            ("admin", "repository.create", "Archiv", "/srv/archive", true),
-            ("admin", "user.create", "revision", "Rolle: Betrachter", true),
+            ("admin", "repository.create", archive.as_str(), "/srv/archive", true),
+            ("admin", "user.create", viewer, "Rolle: Betrachter", true),
             ("admin", "config.backup", "", "Automatisch, verschlüsselt", true),
         ];
         for (i, (actor, action, target, detail, ok)) in entries.iter().enumerate() {
@@ -366,10 +385,10 @@ impl Fixture {
         self.recovery = RecoveryStatus { created: now - 150 * DAY, fingerprint: s("4f2a 91c0 7be3 1d55") };
         // replicas: name, job, target host, folder, state, auto, message
         let reps: [(&str, usize, usize, &str, ReplicaState, bool, &str); 4] = [
-            ("Dateiserver – Standby", 0, 0, "/srv/restore/fs01", ReplicaState::Ready, true, ""),
-            ("SQL-Logs – Standby", 1, 1, "D:\\Restore\\sql01", ReplicaState::Failed, true, "fs01.corp.local: Zugriff verweigert auf D:\\Restore\\sql01\\C\\SQLBackup"),
-            ("Webserver – Standby", 4, 0, "/srv/restore/web01", ReplicaState::Failover, false, "Failover seit gestern 14:12: /srv/restore/web01 auf backup-srv01 ist in Gebrauch"),
-            ("Mailserver – Standby", 2, 0, "/srv/restore/mail01", ReplicaState::New, false, ""),
+            (l("Dateiserver – Standby", "File server – standby"), 0, 0, "/srv/restore/fs01", ReplicaState::Ready, true, ""),
+            (l("SQL-Logs – Standby", "SQL logs – standby"), 1, 1, "D:\\Restore\\sql01", ReplicaState::Failed, true, "fs01.corp.local: Zugriff verweigert auf D:\\Restore\\sql01\\C\\SQLBackup"),
+            (l("Webserver – Standby", "Web server – standby"), 4, 0, "/srv/restore/web01", ReplicaState::Failover, false, "Failover seit gestern 14:12: /srv/restore/web01 auf backup-srv01 ist in Gebrauch"),
+            (l("Mailserver – Standby", "Mail server – standby"), 2, 0, "/srv/restore/mail01", ReplicaState::New, false, ""),
         ];
         for (i, (name, ji, hi, target, state, auto, msg)) in reps.iter().enumerate() {
             let id = self.id();
@@ -399,22 +418,24 @@ impl Fixture {
         }
         let order = [1usize, 0, 2].iter().map(|i| self.replicas[*i].id.clone()).collect();
         let id = self.id();
-        self.plans.push(FailoverPlan { id, name: s("Standort Frankfurt ausgefallen"), replicas: order, delay_s: 120, last_run: now - 20 * DAY, last_status: s("success"),
-                                       message: s("3 Replikate umgeschaltet"), created: now - 30 * DAY });
+        self.plans.push(FailoverPlan { id, name: s(l("Standort Frankfurt ausgefallen", "Frankfurt site down")), replicas: order, delay_s: 120, last_run: now - 20 * DAY,
+                                       last_status: s("success"), message: s("3 Replikate umgeschaltet"), created: now - 30 * DAY });
         let order = alloc::vec![self.replicas[2].id.clone()];
         let id = self.id();
-        self.plans.push(FailoverPlan { id, name: s("Nur Webserver"), replicas: order, delay_s: 0, created: now - 12 * DAY, ..FailoverPlan::default() });
-        // other sites this server watches: name, address, state, message, jobs, ok, warn, fail, used, capacity, seen
+        self.plans.push(FailoverPlan { id, name: s(l("Nur Webserver", "Web server only")), replicas: order, delay_s: 0, created: now - 12 * DAY, ..FailoverPlan::default() });
+        // other sites this server watches: name, address, state, message, jobs, ok, warn, fail, used, capacity, seen;
+        // Munich's message is the title of its alert about a job there
+        let muc = format!("{} mit Warnungen", l("Fileserver MUC", "File server MUC"));
         let sites: [(&str, &str, &str, &str, u32, u32, u32, u32, u64, u64, i64); 3] = [
             ("Hamburg", "https://backup-hh01.corp.local:7642", "ok", "14 Jobs, 412 Restore-Points", 14, 14, 0, 0, 9_800 * GB, 24 * TB, 40),
-            ("München", "https://backup-muc02.corp.local:7642", "warning", "Fileserver MUC mit Warnungen", 9, 8, 1, 0, 6_100 * GB, 8 * TB, 35),
-            ("Berlin (Außenstelle)", "https://10.8.0.12:7642", "unreachable", "Verbindung abgelehnt (10.8.0.12:7642)", 4, 4, 0, 0, 1_900 * GB, 4 * TB, 3 * 3600 + 120),
+            (l("München", "Munich"), "https://backup-muc02.corp.local:7642", "warning", muc.as_str(), 9, 8, 1, 0, 6_100 * GB, 8 * TB, 35),
+            (l("Berlin (Außenstelle)", "Berlin (branch office)"), "https://10.8.0.12:7642", "unreachable", "Verbindung abgelehnt (10.8.0.12:7642)", 4, 4, 0, 0, 1_900 * GB, 4 * TB, 3 * 3600 + 120),
         ];
         for (i, (name, url, status, msg, jobs, okc, warn, fail, used, cap, ago)) in sites.iter().enumerate() {
             let id = self.id();
             let mut alerts = Vec::new();
             if *warn > 0 {
-                alerts.push(Alert { severity: Severity::Warning, title: s("Fileserver MUC mit Warnungen"), detail: s("3 Dateien waren gesperrt"), target_kind: s("job"), target_id: String::new(), at: now - 5 * 3600 });
+                alerts.push(Alert { severity: Severity::Warning, title: muc.clone(), detail: s("3 Dateien waren gesperrt"), target_kind: s("job"), target_id: String::new(), at: now - 5 * 3600 });
             }
             let report = Summary {
                 server_name: format!("backup-{}", ["hh01", "muc02", "ber03"][i]),
@@ -452,7 +473,7 @@ impl Fixture {
             });
         }
         let id = self.id();
-        self.fleet_tokens.push(FleetToken { id, label: s("Zentrale Frankfurt"), created: now - 60 * DAY, created_by: s("admin"), last_used: now - 40 });
+        self.fleet_tokens.push(FleetToken { id, label: s(l("Zentrale Frankfurt", "Frankfurt HQ")), created: now - 60 * DAY, created_by: s("admin"), last_used: now - 40 });
         self.populate_tape();
         self.populate_vm();
     }
@@ -485,9 +506,11 @@ impl Fixture {
         }
         let id = self.id();
         let next = self.next_run("0 1 * * *", true);
+        let job_name = s(self.l("VMs – nachts", "VMs – nightly"));
+        let operator = self.users[1].0.username.clone();
         self.jobs.push(Job {
             id,
-            name: s("VMs – nachts"),
+            name: job_name.clone(),
             kind: JobKind::Qemu,
             enabled: true,
             host_id: server.id.clone(),
@@ -496,7 +519,7 @@ impl Fixture {
             schedule: Schedule { cron: s("0 1 * * *"), tz: s("Europe/Berlin"), enabled: true },
             retention: Retention { points: 14, days: 30, weekly: 8, monthly: 6, yearly: 0 },
             encrypted: true,
-            key_hint: s("Tresor › BackupCraft › VMs"),
+            key_hint: s(self.l("Tresor › BackupCraft › VMs", "Vault › BackupCraft › VMs")),
             compression: Compression::Zstd,
             last_size: 340 * GB,
             next_run: next,
@@ -522,7 +545,7 @@ impl Fixture {
             point_id: newest.id.clone(),
             point_time: newest.created,
             job_id: jid.clone(),
-            job_name: s("VMs – nachts"),
+            job_name: job_name.clone(),
             vm: s("erp-app"),
             purpose: s("instant"),
             state: s("running"),
@@ -530,7 +553,7 @@ impl Fixture {
             cpus: 4,
             network: s("isolated"),
             started: now - 2400,
-            owner: s("j.mueller"),
+            owner: operator.clone(),
             message: s("läuft (KVM)"),
             ..InstantSession::default()
         });
@@ -540,7 +563,7 @@ impl Fixture {
             point_id: older.id.clone(),
             point_time: older.created,
             job_id: jid.clone(),
-            job_name: s("VMs – nachts"),
+            job_name: job_name.clone(),
             vm: s("dc02"),
             purpose: s("instant"),
             state: s("stopped"),
@@ -566,7 +589,7 @@ impl Fixture {
                     point_id: p.id.clone(),
                     point_time: p.created,
                     job_id: jid.clone(),
-                    job_name: s("VMs – nachts"),
+                    job_name: job_name.clone(),
                     vm: s(vm),
                     started: p.created + 1800,
                     finished: p.created + 1800 + if failed { 214 } else { 46 },
@@ -584,7 +607,9 @@ impl Fixture {
     /// the month-end copies, a tape job
     fn populate_tape(&mut self) {
         let now = self.now;
-        for (name, desc, days, enc, append) in [("Wöchentlich", "Samstags, vier Wochen geschützt", 28u32, false, true), ("Tresor", "Monatsende, ausgelagert", 365, true, false)] {
+        let pools = [(self.l("Wöchentlich", "Weekly"), self.l("Samstags, vier Wochen geschützt", "Saturdays, protected for four weeks"), 28u32, false, true),
+                     (self.l("Tresor", "Vault"), self.l("Monatsende, ausgelagert", "Month end, stored offsite"), 365, true, false)];
+        for (name, desc, days, enc, append) in pools {
             let id = self.id();
             self.pools.push(MediaPool { id, name: s(name), description: s(desc), protect_days: days, encrypted: enc, append, created: now - 90 * DAY, ..MediaPool::default() });
         }
@@ -654,7 +679,7 @@ impl Fixture {
         let pool = self.pools[0].id.clone();
         self.jobs.push(Job {
             id,
-            name: s("Dateiserver – auf Band"),
+            name: s(self.l("Dateiserver – auf Band", "File server – to tape")),
             kind: JobKind::Tape,
             enabled: true,
             source_job: file_job.id.clone(),
@@ -978,7 +1003,7 @@ impl Fixture {
                     return (200, Listing { path: path_q, entries, more: false, offset: 0 }.to_json());
                 }
                 let roots = job.sources.clone();
-                (200, browse(&roots, &path_q, pt.created).to_json())
+                (200, browse(&roots, &path_q, pt.created, self.en).to_json())
             }
             (Method::Post, "/api/points/{id}/restore") | (Method::Post, "/api/points/{id}/verify") => {
                 let Some(pt) = self.points.iter().find(|p| p.id == id).cloned() else { return err(404, code::NOT_FOUND, "Restore-Point nicht gefunden") };
@@ -1013,7 +1038,7 @@ impl Fixture {
                 None => err(404, code::NOT_FOUND, "Sitzung nicht gefunden"),
             },
             (Method::Get, "/api/sessions/{id}/log") => match self.sessions.iter().find(|x| x.id == id) {
-                Some(x) => (200, list(&session_log(x, &self.jobs))),
+                Some(x) => (200, list(&session_log(x, &self.jobs, self.en))),
                 None => err(404, code::NOT_FOUND, "Sitzung nicht gefunden"),
             },
             (Method::Get, "/api/operations") => {
@@ -1065,7 +1090,7 @@ impl Fixture {
                     return err(503, code::BUSY, "Der Agent ist nicht erreichbar");
                 }
                 let path_q = api::query(path, "path").unwrap_or_default();
-                (200, browse(&h.roots, &path_q, now).to_json())
+                (200, browse(&h.roots, &path_q, now, self.en).to_json())
             }
             (Method::Post, "/api/hosts/{id}/check") => {
                 let Some(h) = self.hosts.iter().find(|h| h.id == id).cloned() else { return err(404, code::NOT_FOUND, "Host nicht gefunden") };
@@ -1260,7 +1285,7 @@ impl Fixture {
                 platform: s("windows-x86_64"),
                 latest: s("0.2.0"),
                 available: true,
-                notes: s("Kopierjobs, Bandbibliothek und zstd-Kompression."),
+                notes: s(self.l("Kopierjobs, Bandbibliothek und zstd-Kompression.", "Copy jobs, tape library and zstd compression.")),
                 date: now - 2 * DAY,
                 checked: now - 3600,
                 file: s("BackupCraft_Setup.exe"),
@@ -1541,7 +1566,7 @@ impl Fixture {
             (Method::Get, "/api/tape/sets/{id}/browse") => {
                 let Some(x) = self.tape_sets.iter().find(|x| x.id == id) else { return err(404, code::NOT_FOUND, "Bandsatz nicht gefunden") };
                 let path_q = api::query(path, "path").unwrap_or_default();
-                (200, browse(&x.roots, &path_q, x.point_time).to_json())
+                (200, browse(&x.roots, &path_q, x.point_time, self.en).to_json())
             }
             (Method::Post, "/api/tape/sets/{id}/restore") | (Method::Post, "/api/tape/sets/{id}/verify") => {
                 let Some(x) = self.tape_sets.iter().find(|x| x.id == id).cloned() else { return err(404, code::NOT_FOUND, "Bandsatz nicht gefunden") };
@@ -1605,7 +1630,7 @@ impl Fixture {
                 if self.hosts.first().is_none_or(|h| h.id != id) {
                     return err(501, code::CAPABILITY, "Volumes von Agenten: in Vorbereitung (bisher nur die des Backup-Servers)");
                 }
-                let v = [("/dev/sda2", "", "ext4", 256u64, 61u64, "part", "/"), ("/dev/vg0/srv", "daten", "xfs", 2000, 820, "lvm", "/srv"), ("/dev/vg0/home", "", "ext4", 500, 310, "lvm", "/home")];
+                let v = [("/dev/sda2", "", "ext4", 256u64, 61u64, "part", "/"), ("/dev/vg0/srv", self.l("daten", "data"), "xfs", 2000, 820, "lvm", "/srv"), ("/dev/vg0/home", "", "ext4", 500, 310, "lvm", "/home")];
                 (200, list(&v.iter().map(|(id, label, fs, size, free, kind, mount)| Volume { id: s(id), label: s(label), fs: s(fs), size: size * GB, free: free * GB, kind: s(kind), mount: s(mount) }).collect::<Vec<_>>()))
             }
             (Method::Get, "/api/instant-start") => (200, list(&self.instant)),
@@ -2030,7 +2055,7 @@ fn fmt_hm(secs: i64, zone: &Zone) -> String {
     format!("{:02}.{:02}. {:02}:{:02}", l.day, l.month, l.hour, l.minute)
 }
 
-fn session_log(x: &Session, jobs: &[Job]) -> Vec<LogLine> {
+fn session_log(x: &Session, jobs: &[Job], en: bool) -> Vec<LogLine> {
     let job = jobs.iter().find(|j| j.id == x.job_id);
     let mut v = Vec::new();
     let mut at = x.started;
@@ -2049,8 +2074,9 @@ fn session_log(x: &Session, jobs: &[Job]) -> Vec<LogLine> {
     }
     push(3, LogLevel::Info, String::from("Änderungen ermittelt (Größe, Änderungszeit, Datei-ID)"));
     if x.warnings > 0 {
-        push(40, LogLevel::Warning, String::from("Datei gesperrt, übersprungen: D:\\Daten\\Projekte\\~$Planung.xlsx"));
-        push(2, LogLevel::Warning, String::from("Datei gesperrt, übersprungen: D:\\Daten\\Buchhaltung\\~$Abschluss.docx"));
+        let (a, b) = if en { ("D:\\Data\\Projects\\~$Planning.xlsx", "D:\\Data\\Accounting\\~$Closing.docx") } else { ("D:\\Daten\\Projekte\\~$Planung.xlsx", "D:\\Daten\\Buchhaltung\\~$Abschluss.docx") };
+        push(40, LogLevel::Warning, format!("Datei gesperrt, übersprungen: {}", a));
+        push(2, LogLevel::Warning, format!("Datei gesperrt, übersprungen: {}", b));
     }
     if x.status == SessionStatus::Failed {
         push(60, LogLevel::Error, x.message.clone());
@@ -2066,8 +2092,47 @@ fn session_log(x: &Session, jobs: &[Job]) -> Vec<LogLine> {
     v
 }
 
+// the folder and file names of the demo trees, German and English (the same place in both)
+const DIRS: [[&str; 8]; 2] = [
+    ["Projekte", "Buchhaltung", "Archiv", "Personal", "Vorlagen", "Temp", "Marketing", "Verträge"],
+    ["Projects", "Accounting", "Archive", "HR", "Templates", "Temp", "Marketing", "Contracts"],
+];
+const FILES: [[(&str, u64); 8]; 2] = [
+    [("Angebot_2026.docx", 48_200), ("Planung.xlsx", 612_000), ("Protokoll.pdf", 1_240_000), ("Logo.png", 88_400),
+     ("Bericht_Q3.pdf", 2_310_000), ("notes.txt", 4_100), ("Export.csv", 940_000), ("Präsentation.pptx", 6_800_000)],
+    [("Quote_2026.docx", 48_200), ("Planning.xlsx", 612_000), ("Minutes.pdf", 1_240_000), ("Logo.png", 88_400),
+     ("Report_Q3.pdf", 2_310_000), ("notes.txt", 4_100), ("Export.csv", 940_000), ("Presentation.pptx", 6_800_000)],
+];
+
+// an English path with its folders' German names (the roots D:\Data and E:\Media too): the
+// English tree is the German one with translated names
+fn german_path(path: &str) -> String {
+    let mut out = String::new();
+    let mut word = String::new();
+    let flush = |w: &mut String, out: &mut String| {
+        let de = match w.as_str() {
+            "Data" => "Daten",
+            "Media" => "Medien",
+            x => DIRS[1].iter().position(|d| *d == x).map_or(x, |k| DIRS[0][k]),
+        };
+        out.push_str(de);
+        w.clear();
+    };
+    for c in path.chars() {
+        if c == '/' || c == '\\' {
+            flush(&mut word, &mut out);
+            out.push(c);
+        } else {
+            word.push(c);
+        }
+    }
+    flush(&mut word, &mut out);
+    out
+}
+
 /// a deterministic file tree under the roots: "" lists the roots, below names from a hash
-fn browse(roots: &[String], path: &str, mtime: i64) -> Listing {
+/// (of the German path: the English tree has the same shape)
+fn browse(roots: &[String], path: &str, mtime: i64, en: bool) -> Listing {
     let mut entries = Vec::new();
     if path.is_empty() || path == "/" {
         for r in roots {
@@ -2075,11 +2140,10 @@ fn browse(roots: &[String], path: &str, mtime: i64) -> Listing {
         }
         return Listing { path: String::new(), entries, more: false, offset: 0 };
     }
-    let h = ids::key(path);
+    let h = if en { ids::key(&german_path(path)) } else { ids::key(path) };
     let depth = path.matches(['/', '\\']).count();
-    let dirs = ["Projekte", "Buchhaltung", "Archiv", "Personal", "Vorlagen", "Temp", "Marketing", "Verträge"];
-    let files = [("Angebot_2026.docx", 48_200u64), ("Planung.xlsx", 612_000), ("Protokoll.pdf", 1_240_000), ("Logo.png", 88_400),
-                 ("Bericht_Q3.pdf", 2_310_000), ("notes.txt", 4_100), ("Export.csv", 940_000), ("Präsentation.pptx", 6_800_000)];
+    let dirs = DIRS[en as usize];
+    let files = FILES[en as usize];
     if depth < 4 {
         for k in 0..(3 + (h % 4) as usize) {
             entries.push(Entry { name: String::from(dirs[(h as usize + k * 3) % dirs.len()]), kind: EntryKind::Dir, size: 0, mtime: mtime - (k as i64) * 7200 });

@@ -140,6 +140,7 @@ impl Config {
 
 /// why a step failed
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// no channel, no valid key or an invalid address
     Config(String),
@@ -225,6 +226,7 @@ pub struct Offer {
 
 /// the answer of a check
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Check {
     /// no newer version (or only one that was rolled back)
     UpToDate,
@@ -240,6 +242,7 @@ pub enum Check {
 
 /// who updates an installation that lib/update does not update itself (Check::Managed)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Manager {
     /// App Installer: the MSIX package came from an .appinstaller file and is updated as that
     /// file says (tools/pkg_msix.py: at the next start)
@@ -255,6 +258,7 @@ pub enum Manager {
 
 /// what startup() did
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Startup {
     /// nothing to do
     Normal,
@@ -274,6 +278,7 @@ pub enum Startup {
 
 /// what an Updater is doing
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Phase {
     #[default]
     Idle,

@@ -1,0 +1,58 @@
+// jflib-sign -- made by cargo jflib: the Ed25519 keys and signatures of an update channel
+// (lib/update, docs/UPDATES.md) with lib/crypto; cargo-jflib has no curve arithmetic of its own.
+//
+//   jflib-sign keygen        a new key: "<seed> <public key>" in hex (the seed from the OS CSPRNG)
+//   jflib-sign public        the public key of the seed in JFLIB_SIGN_SEED
+//   jflib-sign sign FILE     the signature of FILE by that seed, in hex
+#![no_std]
+#![no_main]
+
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::String;
+
+use crypto::ed25519::Keypair;
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+fn seed() -> Option<[u8; 32]> {
+    let text = plat::env("JFLIB_SIGN_SEED")?;
+    let t = text.trim();
+    let mut s = [0u8; 32];
+    if t.len() != 64 {
+        return None;
+    }
+    for (i, b) in s.iter_mut().enumerate() {
+        *b = u8::from_str_radix(t.get(2 * i..2 * i + 2)?, 16).ok()?;
+    }
+    Some(s)
+}
+
+rt::main!({
+    let args = plat::args();
+    let out = match args.get(1).map(String::as_str) {
+        Some("keygen") => {
+            let s: [u8; 32] = plat::random_bytes();
+            Some(format!("{} {}\n", hex(&s), hex(&Keypair::from_seed(&s).public)))
+        }
+        Some("public") => seed().map(|s| format!("{}\n", hex(&Keypair::from_seed(&s).public))),
+        Some("sign") => match (seed(), args.get(2).and_then(|p| plat::read_file(p))) {
+            (Some(s), Some(data)) => Some(format!("{}\n", hex(&Keypair::from_seed(&s).sign(&data)))),
+            _ => None,
+        },
+        _ => None,
+    };
+    match out {
+        Some(text) => {
+            plat::write_stdout(text.as_bytes());
+            0
+        }
+        None => {
+            plat::write_stderr(b"jflib-sign: keygen | public | sign FILE (the seed in JFLIB_SIGN_SEED)\n");
+            1
+        }
+    }
+});

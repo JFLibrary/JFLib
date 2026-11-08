@@ -1,0 +1,28 @@
+[package]
+name = "jfn-sim"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "jfn-sim"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+jfn_model = { path = "../crates/jfn_model" }
+jfn_run = { path = "../crates/jfn_run" }
+
+[build-dependencies]
+jflib-build.workspace = true

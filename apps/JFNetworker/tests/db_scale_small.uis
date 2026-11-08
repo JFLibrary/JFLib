@@ -1,0 +1,5 @@
+#!args apps/JFNetworker/tests/experiments/db_scale.jfnet --sweep apps/JFNetworker/tests/experiments/db_scale_small.jfnex --threads 2 --golden apps/JFNetworker/tests/experiments/db_scale_small.report
+# a short sweep of a study with a real database through the GUI program, without a window: the size of the buffer
+# pool and the share of reads at two loads, on two threads.  The table must equal
+# tests/experiments/db_scale_small.report byte for byte on every target and for any number of threads (the script
+# itself is not run)

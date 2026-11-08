@@ -70,12 +70,12 @@ pub(crate) const HK_LAYERS: u8 = 3; // LAYER array + document size / resolution
 pub(crate) const HK_SEL: u8 = 4; // selection blob
 pub(crate) const HK_COMP: u8 = 5; // compound: child entries
 
-const S_NEW_IMAGE: &str = "Neues Bild";
-pub(crate) const S_EDIT: &str = "Bearbeiten";
-const S_OOM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus.";
-const S_OOM_CLEAR: &str = "Arbeitsspeicher knapp: Der Verlauf wurde geleert.";
-const S_DROPPED: &str = "Ältere Verlaufsschritte wurden verworfen, um Arbeitsspeicher freizugeben.";
-const S_APPLY_FAIL: &str = "Der Verlaufsschritt konnte nicht wiederhergestellt werden.";
+const S_NEW_IMAGE: &str = "Neues Bild"; // i18n
+pub(crate) const S_EDIT: &str = "Bearbeiten"; // i18n
+const S_OOM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus."; // i18n
+const S_OOM_CLEAR: &str = "Arbeitsspeicher knapp: Der Verlauf wurde geleert."; // i18n
+const S_DROPPED: &str = "Ältere Verlaufsschritte wurden verworfen, um Arbeitsspeicher freizugeben."; // i18n
+const S_APPLY_FAIL: &str = "Der Verlaufsschritt konnte nicht wiederhergestellt werden."; // i18n
 
 /// a LAYER record kept by a structure entry: the record's fields and the identity of its pixel
 /// buffer (the buffer itself is in a document layer or in DocHist::pool)

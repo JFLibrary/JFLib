@@ -4,8 +4,10 @@ use doc_core::{PageSettings, ParagraphFormat, TabAlignment, TabLeader, TabStop};
 use ui::{UiInput, BTN_LEFT, MOD_ALT, VK_DELETE, VK_ESCAPE};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RulerHandle { FirstLine, Hanging, LeftIndent, RightIndent, MarginStart, MarginEnd, Tab(i32), NewTab }
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum RulerEdit { Paragraph(ParagraphFormat), Page(PageSettings) }
 #[derive(Clone, Copy)]
 struct Drag { handle: RulerHandle, page: PageSettings, paragraph: ParagraphFormat, context: u64, grab: i32, start: i32, value: i32, removed: bool }

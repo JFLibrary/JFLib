@@ -31,6 +31,7 @@ impl Node {
 }
 /// Syntax error, resource limit, or an intentionally unsupported XML construct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Syntax,
     Limit,

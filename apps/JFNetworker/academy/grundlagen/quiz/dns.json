@@ -1,0 +1,173 @@
+{
+  "format": "jfn-quiz",
+  "version": 1,
+  "title": [
+    "Quiz: DNS",
+    "Quiz: DNS"
+  ],
+  "pass": 70,
+  "questions": [
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Ein Ping an `10.30.0.80` geht, ein Ping an `www.schule.lab` nicht. Wo liegt der Fehler?",
+        "A ping to `10.30.0.80` works, a ping to `www.schule.lab` does not. Where is the fault?"
+      ],
+      "explain": [
+        "Die Leitung trägt ja. Es fehlt die Übersetzung des Namens: falscher oder fehlender Namensserver, oder der Eintrag gibt es nicht.",
+        "The wire carries fine. What is missing is the name's translation: a wrong or missing name server, or no such record."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Bei der Namensauflösung",
+            "With the name lookup"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Am Kabel",
+            "At the cable"
+          ]
+        },
+        {
+          "text": [
+            "Am Gateway des Hosts",
+            "At the host's gateway"
+          ],
+          "explain": [
+            "Dann ginge auch der Ping an die Adresse nicht, sofern sie in einem anderen Netz liegt.",
+            "Then the ping to the address would fail as well, if it lies in another network."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "Welcher Record-Typ ordnet einem Namen eine IPv4-Adresse zu?",
+        "Which record type maps a name to an IPv4 address?"
+      ],
+      "explain": [
+        "A für IPv4, AAAA für IPv6.",
+        "A for IPv4, AAAA for IPv6."
+      ],
+      "answers": [
+        {
+          "text": [
+            "A",
+            "A"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "CNAME",
+            "CNAME"
+          ]
+        },
+        {
+          "text": [
+            "MX",
+            "MX"
+          ]
+        },
+        {
+          "text": [
+            "PTR",
+            "PTR"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "points": 1,
+      "stem": [
+        "In welcher Datei steht auf einem Linux-artigen Host der Namensserver?",
+        "In which file does a Linux-like host keep its name server?"
+      ],
+      "explain": [
+        "`/etc/resolv.conf`, mit einer Zeile `nameserver ADRESSE`.",
+        "`/etc/resolv.conf`, with a line `nameserver ADDRESS`."
+      ],
+      "accept": [
+        "/etc/resolv\\.conf"
+      ]
+    },
+    {
+      "kind": "single",
+      "points": 1,
+      "stem": [
+        "`dig` meldet `status: NXDOMAIN`. Was heißt das?",
+        "`dig` reports `status: NXDOMAIN`. What does that mean?"
+      ],
+      "explain": [
+        "Der Server hat geantwortet, und seine Antwort lautet: Diesen Namen gibt es nicht.",
+        "The server has answered, and its answer is that this name does not exist."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Der Server antwortet: Diesen Namen gibt es nicht",
+            "The server answers that this name does not exist"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Kein Server ist erreichbar",
+            "No server can be reached"
+          ],
+          "explain": [
+            "Dann käme gar keine Antwort, und `dig` meldete eine Zeitüberschreitung.",
+            "Then no answer would come at all, and `dig` would report a timeout."
+          ]
+        },
+        {
+          "text": [
+            "Das Ziel antwortet nicht auf Ping",
+            "The destination does not answer a ping"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "multi",
+      "points": 1,
+      "stem": [
+        "Was stimmt über einen CNAME?",
+        "What is true about a CNAME?"
+      ],
+      "explain": [
+        "Er ist ein zweiter Name für einen anderen Namen. Die Adresse steht beim Ziel des Alias, und die Antwort nennt beides.",
+        "It is a second name for another name. The address stands at the alias's target, and the answer gives both."
+      ],
+      "answers": [
+        {
+          "text": [
+            "Er verweist auf einen anderen Namen",
+            "It points to another name"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Die Antwort kann gleich die Adresse des Ziels mitliefern",
+            "The answer can bring along the target's address right away"
+          ],
+          "right": true
+        },
+        {
+          "text": [
+            "Er nennt selbst eine IPv4-Adresse",
+            "It names an IPv4 address itself"
+          ]
+        }
+      ]
+    }
+  ]
+}

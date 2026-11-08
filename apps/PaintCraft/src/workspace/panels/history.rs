@@ -136,7 +136,7 @@ fn wh_row(p: &Pn, ui: &mut Ui, doc: Option<DocId>, i: i32, pos: i32) {
         None => (0, ""),
     };
     ui.icon(icon, WH_ICON);
-    ui.text(TS_BODY, name);
+    ui.text(TS_BODY, crate::preferences::localization::tr(name));
     ui.box_end();
     ui.list_item_end();
 }
@@ -179,10 +179,10 @@ fn wh_bar(p: &Pn, ui: &mut Ui, doc: Option<DocId>) {
     };
     ui.box_begin(0, BOX_H | BOX_XCENTER | PAD_4, 4);
     ui.focus_group_begin(0); // one Tab stop, the arrows move inside
-    wh_btn(ui, ID_WH_REWIND, IC_PREVIOUS, "Zurück zum Anfang", un, CMD_HIST_REWIND);
-    wh_btn(ui, ID_WH_UNDO, IC_UNDO, "Einen Schritt zurück", un, CMD_UNDO);
-    wh_btn(ui, ID_WH_REDO, IC_REDO, "Einen Schritt vor", re, CMD_REDO);
-    wh_btn(ui, ID_WH_FFWD, IC_NEXT, "Vor bis zum Ende", re, CMD_HIST_FFWD);
+    wh_btn(ui, ID_WH_REWIND, IC_PREVIOUS, crate::preferences::localization::tr("Zurück zum Anfang"), un, CMD_HIST_REWIND);
+    wh_btn(ui, ID_WH_UNDO, IC_UNDO, crate::preferences::localization::tr("Einen Schritt zurück"), un, CMD_UNDO);
+    wh_btn(ui, ID_WH_REDO, IC_REDO, crate::preferences::localization::tr("Einen Schritt vor"), re, CMD_REDO);
+    wh_btn(ui, ID_WH_FFWD, IC_NEXT, crate::preferences::localization::tr("Vor bis zum Ende"), re, CMD_HIST_FFWD);
     ui.focus_group_end();
     ui.box_end();
 }
@@ -200,7 +200,7 @@ fn wh_btn(ui: &mut Ui, id: u32, icon: u32, tip: &str, on: bool, cmd: u32) {
 // wh_message() -- the last history message (icon, wrapped text, close button)
 fn wh_message(p: &mut Pn, ui: &mut Ui) {
     let Some((msg, kind)) = crate::document::history::hist_message(&p.hist) else { return };
-    let msg = alloc::string::String::from(msg);
+    let msg = alloc::string::String::from(crate::preferences::localization::tr(msg));
     let icon = if kind == IB_ERROR { IC_ERROR } else { IC_WARNING };
     ui.box_begin(0, BOX_H | BOX_XSTART | BOX_LAYER | PAD_8, 8);
     ui.icon(icon, WH_ICON);
@@ -211,7 +211,7 @@ fn wh_message(p: &mut Pn, ui: &mut Ui) {
     let maxw = ui.dp(w);
     wh_wrap(ui, &msg, maxw);
     ui.box_end();
-    if ui.icon_button(ID_WH_MSGX, IC_CANCEL, "Schließen") & EV_ACT != 0 {
+    if ui.icon_button(ID_WH_MSGX, IC_CANCEL, crate::preferences::localization::tr("Schließen")) & EV_ACT != 0 {
         crate::document::history::hist_message_clear(&mut p.hist);
         ui.repass();
     }

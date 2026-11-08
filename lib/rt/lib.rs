@@ -10,8 +10,11 @@
 //   rt::cpu  CPU feature bits (CPUID, cached; force_baseline for --simd sse2)
 //   rt::crash the crash hook, CrashInfo, report (exit 3) -- also for panics
 //   rt::boot  what build_rs.py builds into a program (name, manifest, assets) for plat's start
-//   rt::main!(body)  the entry symbol of console programs (boot first, then body)
-//   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (lib/VERSION, SemVer;
+//   rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
+//            feature std also their fn main
+//   rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+//   rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
+//   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
 //            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
 //   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
 //
@@ -19,17 +22,19 @@
 #![no_std]
 
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
-/// the library's version, "MAJOR.MINOR.PATCH" (lib/VERSION; docs/VERSIONING.md says what a
+/// the library's version, "MAJOR.MINOR.PATCH" (the root Cargo.toml; docs/VERSIONING.md says what a
 /// change of each part promises).  Not the app's version: that is `rt::app_version!()`.
-pub const VERSION: &str = include_str!("../VERSION").trim_ascii();
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// the first number of VERSION (incompatible API changes; while 0, the MINOR number counts them)
 pub const VERSION_MAJOR: u32 = version_part(VERSION, 0);
 /// the second number of VERSION
 pub const VERSION_MINOR: u32 = version_part(VERSION, 1);
 /// the third number of VERSION
 pub const VERSION_PATCH: u32 = version_part(VERSION, 2);
-const _: () = assert!(version_part(VERSION, 3) == u32::MAX, "lib/VERSION must be MAJOR.MINOR.PATCH");
+const _: () = assert!(version_part(VERSION, 3) == u32::MAX, "the version in Cargo.toml must be MAJOR.MINOR.PATCH");
 
 /// the n-th number of "1.2.3" (or "1.2.3-pre+build"); u32::MAX when it has no n-th number
 const fn version_part(v: &str, n: usize) -> u32 {
@@ -76,22 +81,72 @@ macro_rules! app_version {
 /// Define the common app entry symbol without requiring the GUI crate in headless tools.  It
 /// first hands what build_rs.py built in (boot.rs: the app's name, its manifest, its assets)
 /// to the platform layer, which installs them as ui::main! does; a refused manifest ends the
-/// program with exit code 2.
+/// program with exit code 2.  A Cargo build hands the manifest over as a file
+/// (JFGUI_PERMISSIONS_FILE with --cfg jfgui_manifest), because an environment variable of a build
+/// script holds one line only.
+///
+/// In a program with std (feature `std`) it also defines `fn main`, which hands over to plat's
+/// start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
+/// the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
+#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! main {
     ($body:expr) => {
-        #[allow(unsafe_code)]
+        $crate::__jfgui_main!($body);
+    };
+}
+
+/// (see above)
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! main {
+    ($body:expr) => {
+        $crate::__jfgui_main!($body);
+        $crate::__std_main!();
+    };
+}
+
+/// rt::main!'s `jfgui_main`, without and with std
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __jfgui_main {
+    ($body:expr) => {
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
+            #[cfg(jfgui_manifest)]
+            const JF_MANIFEST: Option<&str> = Some(include_str!(env!("JFGUI_PERMISSIONS_FILE")));
+            #[cfg(not(jfgui_manifest))]
+            const JF_MANIFEST: Option<&str> = option_env!("JFGUI_PERMISSIONS");
             #[cfg(jfgui_assets)]
             static ASSETS: &[u8] = include_bytes!(env!("JFGUI_ASSETS"));
             #[cfg(not(jfgui_assets))]
             static ASSETS: &[u8] = &[];
-            let boot = $crate::boot::Boot { app: option_env!("JFGUI_APP"), manifest: option_env!("JFGUI_PERMISSIONS"), assets: ASSETS };
+            let boot = $crate::boot::Boot { app: option_env!("JFGUI_APP"), manifest: JF_MANIFEST, assets: ASSETS };
             if let Err(code) = $crate::boot::start(&boot) {
                 return code;
             }
             $body
+        }
+    };
+}
+
+/// the `fn main` of a program with std: plat's start (jfgui_std_start), which calls jfgui_main.  In
+/// a library crate (an app whose program only links it, like the template) it is not the entry
+/// point and stays unused: the program's own main calls `plat::std_start()`.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __std_main {
+    () => {
+        #[allow(unsafe_code, dead_code)]
+        fn main() {
+            unsafe extern "Rust" {
+                fn jfgui_std_start() -> !;
+            }
+            // SAFETY: plat defines it in a program with std; it takes no arguments.
+            unsafe { jfgui_std_start() }
         }
     };
 }
@@ -106,7 +161,12 @@ pub mod fx;
 pub mod kernel;
 #[cfg(not(target_os = "android"))]
 #[cfg_attr(target_arch = "wasm32", path = "portable/mem.rs")]
+#[cfg_attr(feature = "std", allow(dead_code))] // std brings the allocator and the memory functions
 mod mem;
+/// rt's allocator, for a program with std that wants it instead of the system's:
+/// `#[global_allocator] static ALLOC: jflib::rt::Alloc = jflib::rt::Alloc::new();`
+#[cfg(all(feature = "std", not(any(target_os = "android", target_arch = "wasm32"))))]
+pub use mem::Alloc;
 #[cfg_attr(target_arch = "wasm32", path = "portable/os.rs")]
 #[cfg_attr(target_os = "android", path = "android.rs")]
 pub mod os;
@@ -122,8 +182,18 @@ pub mod portable {
 }
 
 /// panic: one line on stderr, the crash hook (CK_PANIC), exit code 3
+#[cfg(not(feature = "std"))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
+    panic_report(info)
+}
+
+#[cfg(feature = "std")]
+mod hosted;
+#[cfg(feature = "std")]
+pub use hosted::panic_hook;
+
+pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {
     use core::fmt::Write;
     if crash::busy() {
         os::exit(3); // a panic inside the crash hook

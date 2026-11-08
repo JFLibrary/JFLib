@@ -1,0 +1,34 @@
+[package]
+name = "plattest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "plattest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+img_core.workspace = true
+archive.workspace = true
+img_png.workspace = true
+fx.workspace = true
+spell.workspace = true
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
+[build-dependencies]
+jflib-build.workspace = true

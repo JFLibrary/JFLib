@@ -23,6 +23,7 @@ use crate::x509::Cert;
 use crate::Stream;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Security {
     StartTls,
     Tls,

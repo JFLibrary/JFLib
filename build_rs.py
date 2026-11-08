@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""build_rs.py -- build and test JFLib.
-rustc builds the library and app crates directly; the locked no_std text_shape
-dependencies are built through Cargo and linked as static .rlib files.
+"""build_rs.py -- build and test JFLib: the tool on top of Cargo (docs/CRATES.md).
+Cargo compiles; this tool checks the sources first, runs one `cargo build` per target and run, puts
+the programs into build/<target> with their notices, modules and the browser's host files, makes the
+APKs, runs the tests and keeps the rest of the repository's work (packages, site, i18n, releases).
+The crates, their dependencies and the library's version come from the Cargo manifests
+(tools/manifests.py): one Cargo.toml per crate, app and further program, the workspace in the root.
 
   python build_rs.py lib    [--target win|linux|both]        every library crate
   python build_rs.py app NAME [--style S]                    apps/NAME -> build/<t>/NAME[.exe]
                                                                 (+ its loadable modules, e.g. PaintCraft's jxlenc: section "jxl-module")
   python build_rs.py app NAME --style S1,S2,..               one variant per style: build/<t>/<style>/NAME[.exe]
-                                                                (libraries once, the variants linked in parallel)
+                                                                (each variant a package of the tool's own)
   python build_rs.py all                                     libraries + every app
   python build_rs.py run NAME [--target win|linux] [-- ARGS] build and start (Linux: WSL)
   python build_rs.py run NAME --bin BIN [-- ARGS]            start one of the app's further executables (BINS)
@@ -16,18 +19,19 @@ dependencies are built through Cargo and linked as static .rlib files.
                                                                 app again in its session (input replayed, window,
                                                                 style, inspector kept); development builds only
   python build_rs.py test [--quick]                          lint, build, every apps/*/tests/*.uis (+ apps/*/tests),
-                                                                then parity with asm (not with --quick)
+                                                                then the crates' acceptance test (tools/crates_accept.py)
+                                                                and parity with asm (both not with --quick)
   python build_rs.py test NAME                               build one app and run its tests/*.uis
   python build_rs.py check                                   lint only
   python build_rs.py new NAME [--kind window|console|tool|service] [--style S] [--title T]
                                                              a new app apps/NAME that builds and passes its
                                                                 test as it is (tools/scaffold.py)
-  python build_rs.py new --lib NAME [--deps rt,plat]         a new library crate lib/NAME, entered in LIBS
+  python build_rs.py new --lib NAME [--deps rt,plat]         a new library crate lib/NAME, entered in the manifests
   python build_rs.py api-diff [--against X.Y.Z] [--snapshot] the public API since a release (tools/apidiff.py,
                                                                 docs/VERSIONING.md): exit 1 for breaking changes
-                                                                lib/VERSION does not allow
+                                                                the library's version does not allow
   python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
-  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, lib/VERSION, docs/api/X.Y.Z.txt
+  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, the version in Cargo.toml, docs/api/X.Y.Z.txt
                                                                 (tools/changelog.py)
   python build_rs.py site [--out DIR] [--check]              the docs of the website: guides, API reference, changelog
                                                                 and roadmap from the Markdown -> build/site/
@@ -39,19 +43,20 @@ dependencies are built through Cargo and linked as static .rlib files.
                                                                 placeholders and plural forms; --update adds the
                                                                 missing rows (untranslated); --check: the suite's
                                                                 check (errors only, the gaps are reported)
-  python build_rs.py ide                                    write rust-project.json
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
-  options: --target win|linux|both (default both; run: win), --release, --out DIR, -j N,
+  options: --target win|linux|both|web|all|android (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
            --profile size|o2 (release variants, section "r13-measure"),
            --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
 
-Both targets build side by side.  Every crate starts as soon as its own dependencies are done
-(no waves), an app waits only for the crates its sources name (app_crates: PaintCraft does not
-wait for img_jxl_enc), the apps' modules build alongside the libraries, and the apps link in
-parallel once their libraries exist (a release link is one single-threaded LTO step: PaintCraft
-about 80 s).  -j N (default: the logical CPUs) bounds the rustc processes running at once over
-everything.
+Cargo: every target builds in a Cargo folder of its own below <out> (cargo, cargo-glibc,
+cargo-web-<mode>, cargo-android-<abi>, cargo-modules, cargo-plugins), side by side.  One `cargo
+build` per target and run builds the apps in their own style and their BINS (Builder.cargo_build),
+another one each further style; the programs come from Cargo's JSON messages.  The browser and
+Android load an app as a library, Cargo cannot swap a dependency for a style variant: for both the
+tool makes a package of each app in a workspace of its own (derived_workspace, <out>/cargo-<t>-ws);
+the apps themselves stay programs.  The modules link over modrt / modplat (cargo_module), the Rust
+plugins with their own settings (PluginBuilder).
 
 Output folders (--out overrides): build/<target> for development builds, build/release/<target>
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
@@ -65,22 +70,25 @@ also `gui` programs of apps/NAME/BINS and an app with a file apps/NAME/GLIBC.  A
 apps/NAME/STATIC stays static, and --static builds the program of this run static (no GPU; for
 systems without glibc, such as Alpine).
 
-Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
-crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
-(what only a development build has: the live inspector's editing, ui/inspect_edit.rs; hot
-reload, ui/hotreload.rs).  --release:
-opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and 6-10 % smaller,
-rewrite/REPORT.md section 2; R13 measured with 3).  A crate is rebuilt only when
-its sources, its dependencies or the flags changed (hash stamps in <out>/<target>/.stamp).
-An incremental cache left by a rustc killed during ThinLTO is discarded before the crate's next
-build (incremental_flags).
+The profiles are the root Cargo.toml's.  Development builds (default): incremental, 16 codegen
+units, opt-level 2 for the compute crates (gfx, text, simd, fx, img_*) and the crates from
+crates.io, 1 for the rest (quick rebuilds), stripped; lib/ui/build.rs gives ui --cfg jfgui_dev
+(what only a development build has: the live inspector's editing, ui/inspect_edit.rs; hot reload,
+ui/hotreload.rs).  --release: opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and
+6-10 % smaller, rewrite/REPORT.md section 2; R13 measured with 3).  --profile adds --config to
+it.  The rustflags are the tool's: -D warnings, no build paths in the panic locations, LLVM's
+linkers.  An incremental cache left by a rustc killed during ThinLTO is discarded before the next
+development build (incremental_flags).
 
 Rules checked before every build (`check`):
   * every crate root starts with #![no_std]; only alloc / core are `extern crate`d
   * `unsafe` is allowed only in rt, simd, plat, plugin, gpu: every other library and style
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
-  * own crates use --extern; text_shape's pinned Cargo dependencies are the exception
+  * every app, further program, app-local crate and style is a package whose manifest names the
+    crates its sources use, the app's style and version (program_manifest_lint)
+  * the facade lib/jflib names every library crate and style, a style's manifest every crate its
+    sources name, and the licence files inside a crate equal the ones they copy (manifest_lint)
   * system call numbers only in lib/rt/kernel.rs, the same names for every architecture: no const
     SYS_* elsewhere, no number as the first argument of syscall* (a wrong number compiles and
     calls something else on another architecture, docs/ARM64.md)
@@ -112,7 +120,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tools.project_sources import SourceError, entrypoint, project_sources, resolve_root
 from tools.host_exec import run_native
-from tools import assetpack
+from tools import manifests
 
 ROOT = Path(__file__).resolve().parent              # RustLib/
 RS = ROOT
@@ -122,83 +130,15 @@ TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", 
 ARCHS = ("x86_64", "aarch64")
 ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
 ARM64_FOLDER = {"win": "win-arm64", "linux": "linux-arm64"}
-RUSTC_VERSION = "1.98"          # the toolchain this code is written for (checked, minor ignored)
+RUSTC_VERSION = manifests.workspace()["package"]["rust-version"]  # the toolchain this code is written for (checked, minor ignored)
 UNSAFE_OK = {"rt", "simd", "plat", "plugin", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
-# library crates: name -> (root file, dependencies); order = a valid build order
-LIBS = {
-    "rt": ("lib/rt/lib.rs", []),
-    "agent_core": ("lib/agent_core/src/lib.rs", ["rt"]),
-    "plat": ("lib/plat/lib.rs", ["rt", "compress", "crypto"]),  # vfs: LZ4 of the app:// bundles; secret: DH, AES, SHA-256
-    "base": ("lib/base/lib.rs", ["rt", "plat"]),
-    "agent_io": ("lib/agent_io/src/lib.rs", ["rt", "plat", "agent_core"]),
-    "simd": ("lib/simd/lib.rs", ["rt"]),
-    "gfx": ("lib/gfx/lib.rs", ["rt", "simd"]),
-    "img_core": ("lib/img_core/lib.rs", ["rt", "simd", "gfx"]),
-    "archive": ("lib/archive/lib.rs", ["rt", "img_core", "plat"]),  # vfs: ZipFs
-    "doc_core": ("lib/doc_core/lib.rs", ["rt", "base"]),
-    "doc_layout": ("lib/doc_layout/lib.rs", ["rt", "doc_core"]),
-    "doc_io": ("lib/doc_io/lib.rs", ["rt", "base", "plat", "archive", "doc_core"]),
-    "img_png": ("lib/img_png/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "text_shape": ("lib/text_shape/src/lib.rs", []),
-    "text": ("lib/text/lib.rs", ["rt", "plat", "base", "simd", "gfx", "img_core", "img_png", "text_shape"]),
-    "img_jpeg": ("lib/img_jpeg/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_bmp": ("lib/img_bmp/lib.rs", ["rt", "simd", "gfx", "img_core", "img_png", "img_jpeg"]),  # R6-bgt: BI_PNG / BI_JPEG
-    "img_gif": ("lib/img_gif/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_tga": ("lib/img_tga/lib.rs", ["rt", "simd", "gfx", "img_core"]),
-    "img_tiff": ("lib/img_tiff/lib.rs", ["rt", "simd", "gfx", "img_core", "img_jpeg",
-                                          "plat"]),  # R6-tiff: plat for the parallel decoder
-    # R9 codec crates (main agent's skeleton; the R9 agents may add dependencies)
-    "img_webp": ("lib/img_webp/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_hevc": ("lib/img_hevc/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_av1": ("lib/img_av1/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_heif": ("lib/img_heif/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_hevc", "img_av1"]),
-    "img_avif": ("lib/img_avif/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_heif", "img_av1"]),
-    "img_jxl": ("lib/img_jxl/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_jpeg"]),
-    # jxl-module: the new JPEG XL writer (linked into codectest; PaintCraft loads it as modules/jxlenc)
-    "img_jxl_enc": ("lib/img_jxl_enc/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_jpeg", "img_jxl"]),
-    "img_jxr": ("lib/img_jxr/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_dds": ("lib/img_dds/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),
-    "img_pdn": ("lib/img_pdn/lib.rs", ["rt", "simd", "gfx", "img_core", "plat", "img_png"]),
-    "fx": ("lib/fx/lib.rs", ["rt", "simd", "gfx", "img_core", "plat"]),  # R10 (main agent's skeleton)
-    # svg: SVG images and icons drawn through gfx's paths (the codec IMGF_SVG; ui.svg, ui.image_view)
-    "img_svg": ("lib/img_svg/lib.rs", ["rt", "gfx", "img_core"]),
-    "img_all": ("lib/img_all/lib.rs", ["rt", "gfx", "img_core", "img_png", "img_jpeg", "img_bmp", "img_gif", "img_tga",
-                                        "img_tiff", "img_webp", "img_heif", "img_avif", "img_jxl", "img_jxr",
-                                        "img_dds", "img_pdn"]),
-    # spell checking: Hunspell dictionaries, the system's checker (plat::spell), the personal word list
-    "spell": ("lib/spell/lib.rs", ["rt", "plat"]),
-    "ui": ("lib/ui/lib.rs", ["rt", "base", "gfx", "text", "plat", "img_core", "img_png", "img_all", "agent_core", "agent_io",
-           "datetime", "spell", "img_svg"]),  # i18n: dates in the locale's format; spell: TB_SPELL; svg: ui.svg / image_view
-    "doc_view": ("lib/doc_view/src/lib.rs", ["rt", "doc_core", "doc_layout", "gfx", "text", "ui"]),
-    # BackupCraft's foundations (usable by every app): calendar time and cron schedules
-    "datetime": ("lib/datetime/lib.rs", []),
-    "crypto": ("lib/crypto/lib.rs", []),
-    "compress": ("lib/compress/lib.rs", []),
-    # G1b: SPIR-V module builder, disassembler, validator, std140 / std430 layouts, the GPU
-    # benchmark shaders (docs/SHADER.md)
-    "shader": ("lib/shader/lib.rs", []),
-    # G2a: the WGSL front end -- lexer, parser, semantic checker, the typed IR (docs/WGSL.md);
-    # G2c: its back end lowers the IR to SPIR-V with shader
-    "wgsl": ("lib/wgsl/lib.rs", ["shader"]),
-    "netpkt": ("lib/netpkt/lib.rs", ["crypto"]),  # JFNetworker: addresses, checksums, header codecs, pcapng; ssh needs crypto
-    "datastore": ("lib/datastore/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
-    "netio": ("lib/netio/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
-    "cas": ("lib/cas/lib.rs", ["rt", "plat", "crypto", "compress", "agent_core"]),
-    # signed app updates with rollback (docs/UPDATES.md)
-    "update": ("lib/update/lib.rs", ["rt", "plat", "crypto", "agent_core", "netio"]),
-    "script": ("lib/script/lib.rs", ["rt", "agent_core"]),  # JFNetworker's .jfs scripts (SK3: json via agent_core)
-    # G1a: GPU access (Vulkan on Windows, vulkan-1.dll loaded at run time; docs/GPU.md)
-    "gpu": ("lib/gpu/lib.rs", ["rt", "plat", "shader"]),  # G2b: shader::reflect (pipeline constants)
-    # G5a: the core of the 3D engine on gpu (docs/RENDER3D.md)
-    "render3d": ("lib/render3d/lib.rs", ["gpu"]),
-    # X1g: EAP-MD5 and EAP-PWD as state machines without I/O (peer and server)
-    "eapm": ("lib/eapm/lib.rs", ["netpkt", "crypto"]),
-}
-# what a library crate needs on one target only: G3a, G4b, G4c, G4d, the UI's output through the GPU
-# (Windows; Linux in the build against glibc, section "glibc"; Android; the browser: WebGPU, no Vulkan code
-# in its bundles; the static Linux build links nothing of it: lib/ui/gpu_out_off.rs)
-TARGET_DEPS = {("ui", "win"): ["shader", "gpu"], ("ui", "linux-glibc"): ["shader", "gpu"], ("ui", "android"): ["shader", "gpu"], ("ui", "web"): ["shader", "gpu"]}
+# library crates: name -> (root file, dependencies), and what a crate needs on one target only:
+# lib/*/Cargo.toml, in the order of the root Cargo.toml
+LIBS, TARGET_DEPS = manifests.library_crates()
+LIB_VERSION = manifests.version()
+# rt::VERSION reads what Cargo sets for a crate's rustc; every rustc started from here gets it
+os.environ["CARGO_PKG_VERSION"] = LIB_VERSION
 STYLES = sorted(d.name for d in (ROOT / "styles").iterdir() if d.is_dir() and entrypoint(d, "lib", False))
 
 
@@ -220,49 +160,14 @@ def tool(name):
     return str(p) if os.name == "nt" and p.exists() else name
 
 
-RUSTC_SLOTS = threading.BoundedSemaphore(os.cpu_count() or 8)     # rustc processes at once (main(): -j)
-
-
-def run_rustc_pipelined(cmd, on_meta):
-    """rustc with JSON messages: on_meta() as soon as the crate's metadata file is written (its
-    dependents may start), the diagnostics as rustc renders them -> (exit code, output)"""
-    p = subprocess.Popen([str(c) for c in cmd] + ["--error-format=json", "--json=artifacts"],
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                         errors="replace")
-    lines = []
-    for ln in p.stdout:
-        try:
-            msg = json.loads(ln) if ln.startswith("{") else None
-        except ValueError:
-            msg = None
-        if not isinstance(msg, dict):
-            lines.append(ln)
-        elif "artifact" in msg:
-            if msg.get("emit") == "metadata":
-                on_meta()
-        elif msg.get("rendered"):
-            lines.append(msg["rendered"])
-    return p.wait(), "".join(lines)
-
-
-def run_cmd(cmd, quiet=False, on_meta=None, env=None):
-    """run a command (rustc: within RUSTC_SLOTS; on_meta: pipelined, run_rustc_pipelined) ->
-    its output, BuildError on failure.  env: variables to set (None as a value: removed)"""
+def run_cmd(cmd, quiet=False, env=None):
+    """run a command (the NDK, llvm-rc, a probe's rustc) -> its output, BuildError on failure.  env:
+    variables to set (None as a value: removed)"""
     full_env = None
     if env:
         full_env = {k: v for k, v in os.environ.items() if k not in env}
         full_env.update({k: v for k, v in env.items() if v is not None})
-    if cmd[0] == "rustc" and on_meta:
-        with RUSTC_SLOTS:
-            code, out = run_rustc_pipelined(cmd, on_meta)
-            r = subprocess.CompletedProcess(cmd, code, out, "")
-    elif cmd[0] == "rustc":
-        with RUSTC_SLOTS:
-            r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, encoding="utf-8",
-                               errors="replace", env=full_env)
-    else:
-        r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           env=full_env)
+    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, encoding="utf-8", errors="replace", env=full_env)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         raise BuildError(out or f"{cmd[0]} failed")
@@ -295,58 +200,6 @@ def check_intrinsics(name, rlib):
                          f"inside a simd::Kernel?):{sep}" + sep.join(bad[:10]))
 
 
-def run_dag(nodes):
-    """nodes: {name: (deps, fn)} -> fn(name, ready) for every node, each as soon as its
-    dependencies inside nodes are ready (not in waves: a long crate holds up only what depends
-    on it), independent ones at once (RUSTC_SLOTS bounds the rustc processes).  fn may call
-    ready() before it returns: a crate's metadata is written, its dependents compile against
-    it while its code is still generated (pipelining, as Cargo does).  After a failure no
-    further node starts; the first failure is raised once every node finished.  Returns the
-    names whose fn returned True (rebuilt)."""
-    done = {n: threading.Event() for n in nodes}
-    errors, built = [], []
-
-    def work(n):
-        deps, fn = nodes[n]
-        try:
-            for d in deps:
-                if d in done:
-                    done[d].wait()
-            if not errors and fn(n, done[n].set):
-                built.append(n)
-        except BaseException as e:      # noqa: BLE001 -- raised by the caller's thread below
-            errors.append(e)
-        finally:
-            done[n].set()
-    threads = [threading.Thread(target=work, args=(n,), daemon=True) for n in nodes]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    if errors:
-        raise errors[0]
-    return [n for n in nodes if n in built]
-
-
-def compile_rlib(cmd, root, out, deps, piped, ready):
-    """compile a library crate (cmd: rustc, flags, crate type and name) to out =
-    <dir>/lib<name>.rlib; deps: [(extern name, its rlib)].  Pipelined: rustc writes the crate's
-    .rmeta first and ready() lets its dependents start; they compile against the .rmeta of the
-    crates compiled in this run (piped), as Cargo does.  The old .rlib / .rmeta are removed
-    first: no stale file lies next to the new metadata.  The apps and modules linked from these
-    rlibs are byte for byte the ones of a build without pipelining (checked on PaintCraft and
-    jxlenc, both targets)."""
-    rmeta = out.with_suffix(".rmeta")
-    for f in (out, rmeta):
-        f.unlink(missing_ok=True)
-    ext = [x for nm, rl in deps for x in ("--extern", f"{nm}={rl.with_suffix('.rmeta') if rl in piped else rl}")]
-    piped.add(out)                  # before ready(): the dependents look it up when they start
-    # -o, not --out-dir: it keeps the object names inside the rlib (lib<name>.<name>.<hash>-
-    # cgu.0.rcgu.o); with --out-dir they lose the "lib" and the LTO step lays out the exe
-    # differently
-    run_cmd(cmd + ext + [f"--emit=metadata={rmeta},link", "-o", out, root], on_meta=ready)
-
-
 def session_lock_held(lock):
     """is a rustc still working in this incremental session?  It holds the session's lock file
     while it runs: LockFileEx on the first byte on Windows, flock on Linux."""
@@ -377,8 +230,9 @@ def incremental_flags(inc):
     A compile error leaves a -working folder too, but its keys are older than its lock file: the
     cache stays.  Only the newest session counts: an older -working folder shares its keys with
     the sessions after it, and this check has already run before each of them.
-    A cache that broke without this check (its rustc exited 0, nothing shows it here): delete
-    <out>/<target>/inc/CRATE and .stamp/CRATE."""
+    Builder.cargo runs it on Cargo's incremental folder before every development build.  A cache
+    that broke without this check (its rustc exited 0, nothing shows it here): delete
+    <out>/<cargo folder>/<triple>/debug/incremental."""
     for crate in inc.glob("*"):
         newest = max((d for d in crate.glob("s-*") if d.is_dir()), key=lambda d: d.name, default=None)
         if newest is None or not newest.name.endswith("-working"):
@@ -393,10 +247,6 @@ def incremental_flags(inc):
             shutil.rmtree(inc, ignore_errors=True)
             break
     return ["-C", f"incremental={inc}"]
-
-
-def crate_dir(root_file):
-    return resolve_root(RS / root_file).parent
 
 
 # a path's first segment (NAME::) and extern crate NAME: whole identifiers, like \bNAME:: and
@@ -716,31 +566,6 @@ def perm_lint():
     return bad
 
 
-# apps/NAME/PACKAGE: what ui::main! registers on --register (lib/plat/assoc.rs, docs/GUIDE.md
-# "Desktop integration"): display, app_id, categories, filetypes and schemes, checked as
-# tools/pkgmeta.py checks them for the packages and handed to rustc as JFGUI_PACKAGE.
-def app_package(name):
-    """the JFGUI_PACKAGE text of apps/NAME/PACKAGE ("key=value" lines), None without the file"""
-    f = ROOT / "apps" / name / "PACKAGE"
-    if not f.exists():
-        return None
-    tools = str(ROOT / "tools")
-    if tools not in sys.path:
-        sys.path.append(tools)
-    import pkgmeta
-    meta = pkgmeta.kv_file(f)
-    try:
-        types = pkgmeta.filetypes(meta)
-        schemes = pkgmeta.schemes(meta)
-        aid = pkgmeta.app_id(meta, name)
-    except SystemExit as e:
-        raise BuildError(f"apps/{name}/PACKAGE: {e}")
-    ft = "; ".join(f"{','.join(exts)}|{mime}|{desc}" + ("|own" if own else "") for exts, mime, desc, own in types)
-    lines = [f"display={meta.get('display', name)}", f"app_id={aid}", f"categories={meta.get('categories', 'Utility;')}",
-             f"filetypes={ft}", f"schemes={' '.join(schemes)}"]
-    return "\n".join(lines) + "\n"
-
-
 SEMVER = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?")
 
 
@@ -755,23 +580,6 @@ def app_version(name):
     if v is not None and not SEMVER.fullmatch(v):
         raise BuildError(f"apps/{name}/PACKAGE: version={v} is no MAJOR.MINOR.PATCH version (docs/VERSIONING.md)")
     return v
-
-
-# ---------------------------------------------------------------- assets
-# apps/NAME/assets: the app's files, packed by tools/assetpack.py (JFA1, LZ4) and built into
-# the program; ui::main! mounts them as app:// (lib/plat/vfs.rs, docs/VFS.md).
-
-
-def app_assets_hash(name):
-    """a digest of apps/NAME/assets (names and contents), or None without the folder"""
-    d = ROOT / "apps" / name / "assets"
-    if not d.is_dir():
-        return None
-    h = hashlib.sha1()
-    for rel, path in sorted(assetpack.collect(d).items()):
-        h.update(rel.encode("utf-8") + b"\0")
-        h.update(path.read_bytes())
-    return h.hexdigest()
 
 
 def app_style(name):
@@ -827,21 +635,6 @@ def bin_file(name, target):
 def app_bin_files(app, target):
     """the file names of an app's further executables (tools/package.py)"""
     return [bin_file(b, target) for b, _, _ in app_bins(app)] if target in ("win", "linux") else []
-def build_app_bins(b, app, vdir=None):
-    """app-bins: the BINS of an app into the Builder's folder (once per run, independent ones in
-    parallel), copied next to a style variant's exe (vdir) -> their paths"""
-    if b.target not in ("win", "linux") or b.target not in app_targets(app):
-        return []
-    with b.bin_lock:
-        if app not in b.bin_out:
-            bins = app_bins(app)
-            with ThreadPoolExecutor(max(1, len(bins))) as ex:
-                futs = [ex.submit(b.build_bin, app, n, r, k) for n, r, k in bins]
-                b.bin_out[app] = [f.result() for f in futs]
-    if vdir is not None and vdir != b.dir:
-        for exe in b.bin_out[app]:
-            shutil.copyfile(exe, vdir / exe.name)
-    return b.bin_out[app]
 # ---------------------------------------------------------------- end app-bins
 
 
@@ -872,6 +665,99 @@ def kernel_table_lint():
            [f"lib/rt/kernel.rs: {n} only in the aarch64 table" for n in sorted(arm - x86)]
 
 
+def same_text(a, b):
+    """the same bytes but for line ends (one checkout may hold both forms)"""
+    return a.read_bytes().replace(b"\r\n", b"\n") == b.read_bytes().replace(b"\r\n", b"\n")
+
+
+def program_manifest_lint(members):
+    """the manifests outside lib/ against what build_rs.py builds: every style, app, further program
+    (BINS) and app-local crate is a member whose manifest names the crates its sources use; an app's
+    and its programs' version is PACKAGE's, their `style` the app's STYLE -> problems"""
+    bad = []
+    names = list(crate_table()) + [f"style_{s}" for s in STYLES]
+    mset = set(members)
+
+    def check(member, root, version=None, style=None):
+        if member not in mset:
+            return bad.append(f"{member}: no member of the workspace (the root Cargo.toml; python build_rs.py new writes both)")
+        m = manifests.read(ROOT / member / "Cargo.toml")
+        deps = m.get("dependencies", {})
+        own = m.get("lib", {}).get("name")
+        for d in sorted(named_crates(root, names) - set(deps) - {own}):
+            bad.append(f"{member}/Cargo.toml: {d} is missing, its sources name it")
+        if version is not None and m["package"]["version"] != version:
+            bad.append(f"{member}/Cargo.toml: version {m['package']['version']}, PACKAGE says {version}")
+        if style is not None and "style" in deps and deps["style"].get("package") != f"jflib-style-{style}":
+            bad.append(f"{member}/Cargo.toml: style is {deps['style'].get('package')}, STYLE says jflib-style-{style}")
+        if style is not None and "style" not in deps and named_crates(root, ["style"]):
+            bad.append(f"{member}/Cargo.toml: style is missing, its sources name it")
+    for s in STYLES:
+        check(f"styles/{s}", entrypoint(ROOT / "styles" / s, "lib"))
+    for a in apps():
+        version = app_version(a) or "0.0.0"
+        check(f"apps/{a}", entrypoint(ROOT / "apps" / a, "app"), version, app_style(a))
+        for _, root, kind in app_bins(a):
+            check(root.parent.relative_to(ROOT).as_posix(), root, version, app_style(a) if kind == "gui" else None)
+    for n, (r, _) in local_crates().items():
+        check(resolve_root(ROOT / r).parent.relative_to(ROOT).as_posix().removesuffix("/src"), ROOT / r)
+    return bad
+
+
+def manifest_lint():
+    """what rustc does not see, Cargo would only find in a build of its own (docs/CRATES.md) ->
+    problems: every crate is in the facade, a style's manifest has the crates its sources name
+    (build_rs.py finds them by name), every package holds the licences it needs, the template
+    of lib/jflib is current"""
+    bad = []
+    members = manifests.workspace()["members"]
+    published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
+    styles = {f"style_{Path(m).name}": m for m in published if m.startswith("styles/")}
+    facade = manifests.read(ROOT / manifests.FACADE / "Cargo.toml")
+    named = set(facade["dependencies"]) | {d for t in facade["target"].values() for d in t["dependencies"]}
+    # a crate is named by `pub use NAME;` or, a style, by `pub mod NAME { pub use ::NAME::STYLE; }`
+    uses = set(re.findall(r"^pub (?:use|mod) (\w+)(?:;| \{)", (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8"), re.M))
+    for c in [*LIBS, *styles]:
+        if c not in named:
+            bad.append(f"{manifests.FACADE}/Cargo.toml: {c} is missing, the facade brings every crate")
+        if c not in uses:
+            bad.append(f"{manifests.FACADE}/src/lib.rs: pub use {c}; is missing")
+    # what the facade shows is what docs/API.md documents: that is what jflib promises
+    # (docs/VERSIONING.md, "The crates on crates.io"); a building block is #[doc(hidden)] there
+    if str(RS / "tools") not in sys.path:
+        sys.path.insert(0, str(RS / "tools"))  # gendoc imports its neighbours by name
+    import gendoc
+    text = (ROOT / manifests.FACADE / "src/lib.rs").read_text(encoding="utf-8")
+    hidden = set(re.findall(r"^#\[doc\(hidden\)\]\s*\npub use (\w+);", text, re.M))
+    visible = set(re.findall(r"^pub use (\w+);", text, re.M)) - hidden
+    documented = {c[0] for c in gendoc.CRATES} - gendoc.REPO_ONLY
+    for c in sorted(visible - documented):
+        bad.append(f"{manifests.FACADE}/src/lib.rs: {c} is shown but tools/gendoc.py does not document it: "
+                   "add it to CRATES or mark the pub use #[doc(hidden)]")
+    for c in sorted(documented - visible):
+        bad.append(f"tools/gendoc.py: {c} is documented, but the facade does not show it (pub use {c};)")
+    bad += program_manifest_lint(members)
+    for m in published:
+        for name in ("LICENSE-MIT", "LICENSE-APACHE"):
+            copy = ROOT / m / name
+            if not copy.is_file() or not same_text(copy, ROOT / name):
+                bad.append(f"{m}/{name}: differs from {name}: copy that file over it")
+        for copy in sorted(p for p in (ROOT / m / "licenses").glob("*") if p.is_file()):
+            source = ROOT / "licenses" / copy.name
+            if not source.is_file() or not same_text(copy, source):
+                bad.append(f"{copy.relative_to(ROOT).as_posix()}: differs from licenses/{copy.name}: copy that file over it")
+    # cargo-jflib carries the template and the browser host in its package: copies of these folders
+    for copy_dir, source_dir in (("lib/cargo_jflib/template", "lib/jflib/template"), ("lib/cargo_jflib/web", "web"), ("lib/cargo_jflib/android", "android")):
+        files = {p.relative_to(ROOT / d).as_posix() for d in (copy_dir, source_dir) for p in (ROOT / d).rglob("*")
+                 if p.is_file() and "target" not in p.relative_to(ROOT / d).parts}
+        for rel in sorted(files):
+            a, b = ROOT / source_dir / rel, ROOT / copy_dir / rel
+            if not a.is_file() or not b.is_file() or not same_text(a, b):
+                bad.append(f"{copy_dir}/{rel}: differs from {source_dir}/{rel}: copy that folder over it")
+    from tools import crates_accept                 # the template of lib/jflib comes from apps/template
+    return bad + crates_accept.template_problems()
+
+
 def lint():
     """the rules of the module docstring -> list of problems"""
     bad = kernel_table_lint()
@@ -891,15 +777,22 @@ def lint():
         for f in files:
             text = f.read_text(encoding="utf-8")
             bad += kernel_lint(f, text)
+            # a program with std (feature std, docs/CRATES.md CR6): rt and plat keep what names std in
+            # hosted.rs, compiled only with that feature; std is an extern crate only behind it
+            hosted = kind == "lib" and f.name == "hosted.rs" and name in ("rt", "plat")
+            prev = ""
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
+                std_crate = s == "extern crate std;" and prev == '#[cfg(feature = "std")]' and name in ("rt", "plat")
+                if s.startswith("extern crate") and not std_crate and s not in (
+                        "extern crate alloc;", "extern crate core;", "extern crate modrt as rt;", "extern crate modplat as plat;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
-                if s.startswith("use std") or " std::" in s.split("//")[0]:
+                if not hosted and (s.startswith("use std") or " std::" in s.split("//")[0]):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
+                prev = s
                 if ln[:2] in ('")', '",', '";'):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
-    return bad + plugin_lint() + module_lint() + perm_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests
+    return bad + plugin_lint() + module_lint() + perm_lint() + manifest_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests
 
 
 # ---------------------------------------------------------------- r13-measure: build profiles
@@ -930,24 +823,14 @@ PROFILES = {
 # an app with a file apps/NAME/STATIC or any UI program under --static (gpu_out_off.rs: no Vulkan
 # code; its windows through shared memory only; for systems without glibc).
 #
-# Nothing has to be installed for it: Builder.glibc_stubs writes the three libraries to link against
-# from GLIBC_STUBS (one function "ret" per name, rustc --emit=obj, then ld.lld -shared with a version
-# script).  They only name what the program imports and at which version; at run time the system's
-# libraries are used.  Every symbol is asked for at the oldest version the architecture has (x86-64
-# GLIBC_2.2.5, ARM64 GLIBC_2.17):
-# glibc up to 2.33 has these functions in libdl and libpthread under that version; 2.34 moved them
-# into libc, keeps that version as a compatibility symbol there and libdl / libpthread as empty files,
-# so the same binary starts on both.  The program imports no data, only functions (no copy
-# relocations), and exports nothing: rt's memcpy never replaces the drivers'.
-GLIBC_INTERP = {"x86_64": "/lib64/ld-linux-x86-64.so.2", "aarch64": "/lib/ld-linux-aarch64.so.1"}
-GLIBC_VERSION = {"x86_64": "GLIBC_2.2.5", "aarch64": "GLIBC_2.17"}
-GLIBC_STUBS = {                                     # in the order a C program names them: libc last
-    "libpthread.so.0": ["pthread_attr_destroy", "pthread_attr_init", "pthread_attr_setstack", "pthread_create", "pthread_join"],
-    "libdl.so.2": ["dlopen", "dlsym", "dlclose", "dlerror"],
-    "libc.so.6": ["__libc_start_main", "__cxa_atexit", "__errno_location", "exit", "gnu_get_libc_version", "pthread_self"],
-}
-
-
+# Nothing has to be installed for it: jflib-build writes the three libraries to link against
+# (lib/jflib_build/src/target.rs, GLIBC_STUBS).  They only name what the program imports and at which
+# version; at run time the system's libraries are used.  Every symbol is asked for at the oldest
+# version the architecture has (x86-64 GLIBC_2.2.5, ARM64 GLIBC_2.17): glibc up to 2.33 has these
+# functions in libdl and libpthread under that version; 2.34 moved them into libc, keeps that
+# version as a compatibility symbol there and libdl / libpthread as empty files, so the same binary
+# starts on both.  The program imports no data, only functions (no copy relocations), and exports
+# nothing: rt's memcpy never replaces the drivers'.
 STATIC_UI = False          # --static
 
 
@@ -968,28 +851,27 @@ def app_glibc(name):
     return entrypoint(d, "app", False) is not None and "ui" in app_crates(name)
 
 
-def glibc_stub_text(arch):
-    """what the stubs and the link depend on (part of a program's digest)"""
-    return f"glibc {GLIBC_INTERP[arch]} {GLIBC_VERSION[arch]} {sorted(GLIBC_STUBS.items())}"
 # ---------------------------------------------------------------- end glibc
 
 
 # ---------------------------------------------------------------- build
 class Builder:
+    """the programs of one target (and Linux: its glibc twin) through Cargo: one `cargo build` per run
+    into <out>/<target dir> (cargo_build), the programs copied to <out>/<folder> as before"""
+
     def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None,
                  arch="x86_64"):
         self.target = target
         self.arch = arch
         self.folder = arch_folder(target, arch)
         self.out = out
-        self.profile_name = profile
+        self.profile_name = profile if isinstance(profile, str) else None
         self.dir = out / self.folder
         self.public = self.dir                # where the programs go
         self.glibc = glibc_base is not None   # section "glibc": this Builder makes its programs
         self.base = glibc_base or self        # the static Builder (the modules, BINS)
         self.twin = None
         self.twin_lock = threading.Lock()
-        self.stub_lock = threading.Lock()
         if self.glibc:
             self.dir = self.dir / ".glibc"
         self.android_abi = android_abi
@@ -1005,380 +887,245 @@ class Builder:
             from tools.web_sysroot import ensure
             self.web_sysroot = ensure(self.dir / "sysroot")
         self.release = release or profile is not None
-        self.profile = PROFILES[profile] if profile else None     # r13-measure
+        # r13-measure: a name of PROFILES or a dict of the same keys (tools/measure.py's variants)
+        self.profile = PROFILES[profile] if isinstance(profile, str) else profile
         self.jobs = jobs
         self.dir.mkdir(parents=True, exist_ok=True)
-        (self.dir / ".stamp").mkdir(exist_ok=True)
-        self.hashes = {}
-        self.lib_lock = threading.Lock()      # build_libs from parallel app builds
-        self.ready = set()                    # crates checked / built in this run
-        self.res_lock = threading.Lock()      # an app's icon resource (style variants link at once)
         self.mod_lock = threading.Lock()      # jxl-module: an app's modules, once per run
         self.mod_ready = set()
-        self.bin_lock = threading.Lock()      # app-bins: an app's further executables, once per run
-        self.bin_out = {}
-        self.asset_lock = threading.Lock()    # vfs: apps/NAME/assets packed once per run (app, bins, variants)
-        self.asset_out = {}
-        self.piped = set()                    # rlibs compiled in this run (their .rmeta is current)
+        self.cargo_out = {}                   # package -> (its program or library, its map) in Cargo's folder
+        self.deps_dir = None                  # cargo_rlibs: the folder of the rlibs (probe_flags)
 
     def triple(self):
         return "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else arch_triple(self.target, self.arch)
 
-    def flags(self, name=""):
-        f = ["--edition", "2024", "--target", self.triple(), "-C", "panic=abort", "-C", "debuginfo=0",
-             "-D", "warnings", "-L", f"dependency={self.dir}",
-             f"--remap-path-prefix={ROOT}{os.sep}="]       # panic locations: rs/..., no build paths
-        if self.release and self.profile:                 # r13-measure: --profile
-            p = self.profile
-            opt = p["app"] if name == "" else p["compute"] if compute_crate(name) else p["lib"]
-            f += ["-C", f"opt-level={opt}", "-C", "codegen-units=1"]
-        elif self.release:
-            # opt-level 2: no slower than 3 in any measurement, 6-10 % smaller (REPORT.md, variant "2")
-            f += ["-C", "opt-level=2", "-C", "codegen-units=1"]
-        else:
-            # development: compute crates optimised (pixels, codecs stay fast in tests), the
-            # rest quick to compile
-            f += ["-C", f"opt-level={2 if compute_crate(name) else 1}", "-C", "codegen-units=16"]
-            # what only a development build has (never --release): the inspector's editing
-            # (ui/inspect_edit.rs), hot reload (ui/hotreload.rs, `watch`; desktop targets only)
-            if name == "ui":
-                f += ["--cfg", "jfgui_dev"]
-        if self.glibc:
-            f += ["--cfg", "jfgui_glibc"]
-        if self.target == "web" and self.web_mode != "scalar":
-            f += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
-        if self.target == "web" and self.web_mode == "threads":
-            # LLVM supports wasm atomics on stable; Rust still labels the feature unstable.
-            f += ["--cfg", "web_threads", "-A", "unstable-features"]
-            f += ["--sysroot", str(self.web_sysroot)]
-        return f
-
-    def rlib(self, name):
-        return self.dir / f"lib{name}.rlib"
-
-    def src_hash(self, root, deps, extra="", name=""):
-        h = hashlib.sha1()
-        files = project_sources(root, assets=True)
-        for f in files:
-            h.update(f.relative_to(RS).as_posix().encode())
-            h.update(f.read_bytes())
-        for d in deps:
-            h.update(self.hashes[d].encode())
-        h.update(" ".join(self.flags(name)).encode())
-        h.update(extra.encode())
-        # include_bytes! assets of styles
-        if "styles" in root.parts:
-            for f in sorted((RS / "styles" / root.parent.name / "assets").glob("*")) + sorted((RS / "styles" / "winui" / "assets").glob("*")):
-                h.update(f.read_bytes())
-        return h.hexdigest()
-
-    def up_to_date(self, name, digest, out):
-        st = self.dir / ".stamp" / name
-        return out.exists() and st.exists() and st.read_text() == digest
-
-    def stamp(self, name, digest):
-        (self.dir / ".stamp" / name).write_text(digest)
-
-    def build_lib(self, name, root, deps, ready=None):
-        if name == "text_shape":
-            return self.build_text_shape(root, ready)
-        digest = self.src_hash(RS / root, deps, name=name)
-        self.hashes[name] = digest
-        out = self.rlib(name)
-        if self.up_to_date(name, digest, out):
-            return False
-        cmd = ["rustc"] + self.flags(name) + ["--crate-type", "rlib", "--crate-name", name]
-        if not self.release:
-            cmd += incremental_flags(self.dir / "inc" / name)
-        compile_rlib(cmd, RS / root, out, [(d, self.rlib(d)) for d in deps], self.piped, ready)
-        if self.target in ("win", "linux", "android") and compute_crate(name) and name != "simd":
-            check_intrinsics(name, out)
-        self.stamp(name, digest)
-        return True
-
-    def build_text_shape(self, root, ready):
-        """Pinned no_std OpenType/Unicode dependencies, linked into our static binary."""
-        manifest = RS / "lib/text_shape/Cargo.toml"
-        lock = manifest.with_name("Cargo.lock")
-        digest = self.src_hash(RS / root, [], extra=manifest.read_text()+lock.read_text()+"cargo-shaping-v2", name="text_shape")
-        self.hashes["text_shape"] = digest
-        if self.up_to_date("text_shape", digest, self.rlib("text_shape")):
-            return False
-        triple = self.triple()
-        cargo_dir = self.dir / "cargo-shaping"
-        env = os.environ.copy()
-        # Embedded LLVM bitcode is required by JFLib's release LTO link.
-        env["RUSTFLAGS"] = "-C panic=abort -C embed-bitcode=yes"
-        if self.target == "web" and self.web_mode == "threads":
-            env["RUSTFLAGS"] += f" --sysroot {self.web_sysroot} -C target-feature=+atomics,+bulk-memory,+simd128 -A unstable-features"
-        command = ["cargo", "build", "--locked", "--release", "--manifest-path", str(manifest),
-                   "--target", triple, "--target-dir", str(cargo_dir)]
-        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if result.returncode:
-            raise RuntimeError(result.stdout + result.stderr)
-        artifacts = cargo_dir / triple / "release"
-        for artifact in (artifacts / "deps").glob("*.rlib"):
-            if not artifact.name.startswith("libtext_shape-"):
-                shutil.copy2(artifact, self.dir / artifact.name)
-        # Proc-macro metadata is a host DLL/so even when the output targets Linux/Web.
-        for suffix in ("*.dll", "*.so", "*.dylib"):
-            for artifact in (cargo_dir / "release/deps").glob(suffix):
-                shutil.copy2(artifact, self.dir / artifact.name)
-        shutil.copy2(artifacts / "libtext_shape.rlib", self.rlib("text_shape"))
-        self.stamp("text_shape", digest)
-        if ready is not None:
-            ready()
-        return True
-
-    def build_libs(self, names):
-        """build the crates and their dependencies, each as soon as its dependencies are done,
-        independent ones in parallel (once per run: the app builds that run in parallel find
-        them ready)"""
-        with self.lib_lock:
-            libs = all_libs("linux-glibc" if self.glibc else self.target)
-            need = set()
-
-            def add(n):
-                if n not in need:
-                    need.add(n)
-                    for d in libs[n][1]:
-                        add(d)
-            for n in names:
-                add(n)
-            todo = [n for n in libs if n in need and n not in self.ready]
-
-            def one(n, ready):
-                r = self.build_lib(n, libs[n][0], libs[n][1], ready)
-                self.ready.add(n)
-                return r
-            return run_dag({n: (libs[n][1], one) for n in todo})
-
-    def boot_inputs(self, app, bin=None):
-        """permissions / vfs: what a program of the app gets built in -> (manifest text or None,
-        assets digest or None, digest text)"""
-        perms = app_permissions(app, bin)                 # permissions: the app's (or bin's) manifest
-        assets = app_assets_hash(app)                     # vfs: apps/NAME/assets -> app://
-        package = app_package(app)                        # assoc: PACKAGE's file types and schemes
-        version = app_version(app)                        # PACKAGE version=: rt::app_version!()
-        return perms, assets, (("" if perms is None else " permissions=" + perms) + ("" if assets is None else " assets=" + assets)
-                               + ("" if package is None else " package=" + package)
-                               + ("" if version is None else " version=" + version))
-
-    def boot_args(self, app, perms, assets):
-        """the rustc arguments and environment of boot_inputs: JFGUI_APP, JFGUI_PERMISSIONS,
-        JFGUI_PACKAGE (ui::main! only), JFGUI_VERSION (rt::app_version!()) and JFGUI_ASSETS
-        (apps/APP/assets packed into <dir>/assets/APP.jfa, --cfg jfgui_assets), read by ui::main!
-        and rt::main! -> (args, env)"""
-        env = {"JFGUI_PERMISSIONS": perms, "JFGUI_APP": app, "JFGUI_ASSETS": None, "JFGUI_PACKAGE": app_package(app),
-               "JFGUI_VERSION": app_version(app)}
-        if assets is None:
-            return [], env
-        jfa = self.dir / "assets" / f"{app}.jfa"
-        with self.asset_lock:
-            if self.asset_out.get(app) != assets or not jfa.exists():
-                jfa.parent.mkdir(parents=True, exist_ok=True)
-                jfa.write_bytes(assetpack.pack(ROOT / "apps" / app / "assets"))
-                self.asset_out[app] = assets
-        env["JFGUI_ASSETS"] = str(jfa.resolve())
-        return ["--cfg", "jfgui_assets"], env
-
-    def build_app(self, name, style, variant=False):
-        """apps/NAME with STYLE -> <dir>/NAME[.exe]; variant (several styles in one run):
-        <dir>/<style>/NAME[.exe], with a copy of the app's modules next to it"""
-        if self.target not in app_targets(name):
-            return None
-        if self.target == "linux" and not self.glibc and app_glibc(name):
-            return self.glibc_twin().build_app(name, style, variant)
-        scrate = f"style_{style}"
-        crates = app_crates(name)
-        extra = app_styles(name)                       # further styles to switch to at run time
-        # a program of the glibc build without a UI does not build the UI for a style it never names
-        styled = (not self.glibc and self.target != "android") or "ui" in crates
-        deps = crates + (sorted({scrate, *extra}) if styled else [])
-        self.build_libs(deps)
-        root = entrypoint(RS / "apps" / name, "app")
-        if self.target == "android":
-            from tools.android import build_apk, build_exe
-            if "ui" not in crates:                     # a plain executable for `adb shell` (apps/gputest)
-                return build_exe(self, name, root, crates + extra, run_cmd)
-            return build_apk(self, name, style, variant, root, crates + extra, run_cmd,
-                             app_notices([style] + [c[len("style_"):] for c in extra]))
-        lto = self.profile["lto"] if self.release and self.profile else "fat"      # r13-measure
-        perms, assets, boot = self.boot_inputs(name)     # permissions, vfs: manifest and assets
-        digest = self.src_hash(root, deps, extra=style + ("" if lto == "fat" else f" lto={lto}")
-                               + (" wasm-variant-link-v1" if self.target == "web" else "") + boot
-                               + (" " + glibc_stub_text(self.arch) if self.glibc else ""))
-        key = "app_" + name + (f"@{style}" if variant else "")
-        vdir = self.public / style if variant else self.public
-        if self.target == "web":
-            vdir = (self.web_public / style if variant else self.web_public) / name
-        vdir.mkdir(parents=True, exist_ok=True)
-        for s in sorted({style, *(c[len("style_"):] for c in extra)}) if styled else []:
-            copy_style_notices(name, s, vdir)
-        copy_library_notices(vdir)
-        web_suffix = ("." + self.web_mode if self.web_mode != "scalar" else "") + ".wasm"
-        exe = vdir / (name + (".exe" if self.target == "win" else web_suffix if self.target == "web" else ""))
-        if self.up_to_date(key, digest, exe):
-            build_app_modules(self.base, name, vdir)      # jxl-module: its modules next to it
-            if self.target == "web":
-                web_assets(name, vdir)
-            return exe
-        cmd = ["rustc"] + self.flags() + ["--crate-type", "cdylib" if self.target == "web" else "bin", "--crate-name", name.replace("-", "_").lower(), "-C", "strip=symbols"]
-        if self.release:
-            cmd += ["-C", "lto" if lto == "fat" else f"lto={lto}"]
-        if self.target == "web":
-            # All browser variants share the public bundle directory. Give their
-            # intermediate codegen objects distinct names during parallel linking.
-            cmd += ["-C", f"metadata=jfgui_{self.web_mode}",
-                    "-C", f"linker={tool('wasm-ld')}", "-C", "link-arg=--no-entry",
-                    "-C", "link-arg=--export-memory", "-C", "link-arg=-zstack-size=8388608"]
-            if self.web_mode == "threads":
-                cmd += [x for arg in ("--import-memory", "--shared-memory", "--max-memory=2147483648",
-                                      "--initial-memory=33554432", "--export=__stack_pointer")
-                        for x in ("-C", "link-arg=" + arg)]
-        elif not self.release:
-            cmd += incremental_flags(self.dir / "inc" / key)
-        for d in crates:
-            cmd += ["--extern", f"{d}={self.rlib(d)}"]
-        if styled:
-            cmd += ["--extern", f"style={self.rlib(scrate)}"]
-            for c in extra:
-                cmd += ["--extern", f"{c}={self.rlib(c)}"]
-        cmd += self.native_link_args(name, exe, "WINDOWS")
-        boot_args, env = self.boot_args(name, perms, assets)
-        cmd += boot_args
-        # rustc's temporary object filenames use the crate name, not all output
-        # suffixes. Separate link directories prevent simultaneous variants from
-        # overwriting each other's objects before publishing the final WASM.
-        link_root = self.dir / "link" / style if variant else self.dir / "link"
-        linked = link_root / name / exe.name if self.target == "web" else exe
-        linked.parent.mkdir(parents=True, exist_ok=True)
-        cmd += ["-o", linked, root]
-        run_cmd(cmd, env=env)
-        if linked != exe:
-            shutil.copyfile(linked, exe)
-        pdb = vdir / f"{name}.pdb"                # only this app's (a glob NAME* would match longer app names too)
-        if pdb.exists():
-            pdb.unlink()
-        self.stamp(key, digest)
-        if self.target == "linux":                        # section "glibc": the other build's file is gone
-            ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
-        build_app_modules(self.base, name, vdir)          # jxl-module: its modules next to it
-        build_app_bins(self.base, name, vdir)             # app-bins: its further executables next to it
-        if self.target == "web":
-            web_assets(name, vdir)
-        return exe
-
-    def native_link_args(self, app, exe, subsystem):
-        """the linker arguments of a native executable (Windows: /SUBSYSTEM:WINDOWS or CONSOLE and
-        the app's icon resource)"""
-        if self.target == "win":
-            args = ["-C", f"linker={tool('lld-link')}", "-C", "link-arg=/ENTRY:mainCRTStartup",
-                    "-C", f"link-arg=/SUBSYSTEM:{subsystem}", "-C", "link-arg=/NODEFAULTLIB", "-C", "link-arg=/DEBUG:NONE",
-                    "-C", f"link-arg=/MAP:{exe.with_suffix('.map')}"]
-            res = self.app_res(app)
-            if res:
-                args += ["-C", f"link-arg={res}"]
-            return args
-        if self.target == "linux" and self.glibc:
-            # no -static and no crt-static: a dynamic executable at a fixed address, like the static
-            # ones (the .map lists its addresses); --no-as-needed: all three libraries stay named
-            args = ["-nostdlib", f"--dynamic-linker={GLIBC_INTERP[self.arch]}", "-e", "_start", "--gc-sections", "-z", "noexecstack",
-                    f"-Map={exe}.map", "--no-as-needed"] + [str(s) for s in self.glibc_stubs()]
-            return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"] + \
-                   [x for a in args for x in ("-C", "link-arg=" + a)]
-        if self.target == "linux":
-            return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static",
-                    "-C", "target-feature=+crt-static", "-C", "link-arg=-static", "-C", "link-arg=-nostdlib",
-                    "-C", "link-arg=-e", "-C", "link-arg=_start", "-C", "link-arg=--gc-sections",
-                    "-C", "link-arg=-z", "-C", "link-arg=noexecstack", "-C", f"link-arg=-Map={exe}.map"]
-        return []
+    def target_dir(self):
+        folder = {"win": "cargo", "linux": "cargo-glibc" if self.glibc else "cargo", "web": f"cargo-web-{self.web_mode}",
+                  "android": f"cargo-android-{self.android_abi}"}[self.target]
+        return self.out / (folder if self.arch == "x86_64" else f"{folder}-{self.arch}")
 
     def glibc_twin(self):
-        """section "glibc": the Builder of the programs linked against glibc (once per Builder):
-        its crates in <dir>/.glibc, its programs next to the static ones"""
+        """section "glibc": the Builder of the programs linked against glibc (once per Builder): its
+        own Cargo folder, its programs next to the static ones"""
         with self.twin_lock:
             if self.twin is None:
-                self.twin = Builder(self.target, self.out, self.release, self.jobs, self.profile_name, glibc_base=self, arch=self.arch)
+                self.twin = Builder(self.target, self.out, self.release, self.jobs, self.profile, glibc_base=self, arch=self.arch)
             return self.twin
 
-    def glibc_stubs(self):
-        """section "glibc": the libraries to link against -> their paths, in the order of GLIBC_STUBS"""
-        stub = self.dir / "glibc-stubs"
-        paths = [stub / lib for lib in GLIBC_STUBS]
-        text = glibc_stub_text(self.arch)
-        with self.stub_lock:
-            if self.up_to_date("glibc_stubs", text, paths[0]) and all(p.exists() for p in paths):
-                return paths
-            stub.mkdir(parents=True, exist_ok=True)
-            names = sorted(n for symbols in GLIBC_STUBS.values() for n in symbols)
-            lines = [x for n in names for x in (f".globl {n}", f".type {n},@function", f"{n}:")] + ["ret"]
-            src = stub / "stub.rs"
-            src.write_text("#![no_std]\ncore::arch::global_asm!(\n" + "".join(f'    "{ln}",\n' for ln in lines) + ");\n",
-                           encoding="utf-8")
-            obj = stub / "stub.o"
-            run_cmd(["rustc", "--edition", "2024", "--target", self.triple(), "--crate-type", "lib", "--crate-name", "glibc_stub",
-                     "-C", "panic=abort", "-C", "codegen-units=1", "--emit=obj", "-o", obj, src])
-            for lib, symbols in GLIBC_STUBS.items():
-                script = stub / (lib + ".map")
-                script.write_text(GLIBC_VERSION[self.arch] + " {\n  global:\n" + "".join(f"    {n};\n" for n in symbols) + "  local: *;\n};\n",
-                                  encoding="utf-8")
-                run_cmd([tool("ld.lld"), "-shared", f"--soname={lib}", f"--version-script={script}", "-o", stub / lib, obj])
-            self.stamp("glibc_stubs", text)
-        return paths
+    def cargo_flags(self):
+        """the rustflags of this target (the profile is Cargo's): warnings are errors, no build paths in
+        the panic locations, the linker of LLVM, what the Linux and browser builds need"""
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + list((self.profile or {}).get("rustflags", []))
+        if self.target == "win":
+            return flags + ["-C", f"linker={tool('lld-link')}"]
+        if self.target == "android":
+            return flags                                   # a static library: tools/android.py links it
+        if self.target == "web":
+            flags += ["-C", f"linker={tool('wasm-ld')}"]
+            if self.web_mode != "scalar":
+                flags += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
+            if self.web_mode == "threads":                 # LLVM supports wasm atomics on stable; Rust labels them unstable
+                flags += ["--cfg", "web_threads", "-A", "unstable-features", "--sysroot", str(self.web_sysroot)]
+            return flags
+        flags += ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static"]
+        return flags + (["--cfg", "jfgui_glibc"] if self.glibc else ["-C", "target-feature=+crt-static"])
 
-    def build_bin(self, app, name, root, kind):
-        """app-bins: one executable of apps/APP/BINS -> <dir>/NAME[.exe] (cli: no style, console
-        subsystem; gui: the app's style; on Linux against glibc like the app's GUI, section "glibc")"""
-        if self.target == "linux" and not self.glibc and kind == "gui" and app_glibc(app):
-            return self.glibc_twin().build_bin(app, name, root, kind)
-        crates = source_crates(root)
-        style = app_style(app) if kind == "gui" else None
-        deps = crates + ([f"style_{style}"] if style else [])
-        self.build_libs(deps)
-        exe = self.public / bin_file(name, self.target)
-        key = f"bin_{app}_{name}"
-        perms, assets, boot = self.boot_inputs(app, name)   # permissions, vfs: as the app's exe
-        digest = self.src_hash(root, deps, extra=f"bin {kind} {style or ''} {'lto' if self.release else ''}" + boot
-                               + (" " + glibc_stub_text(self.arch) if self.glibc else ""))
-        if self.up_to_date(key, digest, exe):
-            return exe
-        cmd = ["rustc"] + self.flags() + ["--crate-type", "bin", "--crate-name", name.replace("-", "_").lower(),
-                                          "-C", "strip=symbols"]
-        if self.release:
-            cmd += ["-C", "lto"]
-        else:
-            cmd += incremental_flags(self.dir / "inc" / key)
-        for d in crates:
-            cmd += ["--extern", f"{d}={self.rlib(d)}"]
-        if style:
-            cmd += ["--extern", f"style={self.rlib(f'style_{style}')}"]
-        cmd += self.native_link_args(app, exe, "WINDOWS" if kind == "gui" else "CONSOLE")
-        boot_args, env = self.boot_args(app, perms, assets)
-        cmd += boot_args + ["-o", exe, root]
-        run_cmd(cmd, env=env)
-        pdb = self.dir / f"{name}.pdb"
-        if pdb.exists():
-            pdb.unlink()
-        self.stamp(key, digest)
-        if self.target == "linux":                        # section "glibc": the other build's file is gone
-            ((self.base.dir if self.glibc else self.dir / ".glibc") / ".stamp" / key).unlink(missing_ok=True)
-        return exe
+    def cargo_profile(self, apps_):
+        """--profile (r13-measure): the release profile with other levels, as --config arguments: lib
+        for every crate, compute for the compute crates, app for the programs of apps_"""
+        p = self.profile
+        if not p:
+            return []
 
-    def app_res(self, name):
-        """apps/NAME/res/app.ico -> the icon resource of the exe (as build.py does it)"""
-        ico = ROOT / "apps" / name / "res" / "app.ico"
-        if not ico.exists():
+        def level(v):
+            return toml_value(int(v) if str(v).isdigit() else str(v))
+        lto = {"fat": '"fat"', "thin": '"thin"', "off": "false"}[p["lto"]]
+        args = [f"profile.release.opt-level={level(p['lib'])}", f"profile.release.lto={lto}",
+                f"profile.release.codegen-units={int(p.get('cgu', 1))}"]
+        args += [f'profile.release.package."jflib-{c.replace("_", "-")}".opt-level={level(p["compute"])}' for c in LIBS if compute_crate(c)]
+        args += [f'profile.release.package."{a}".opt-level={level(p["app"])}' for a in apps_]
+        return [x for a in args for x in ("--config", a)]
+
+    def cargo(self, cmd, env=None):
+        """run cargo with this target's rustflags into its folder -> (stdout, stderr); BuildError on failure"""
+        full = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
+        full.update({"CARGO_TARGET_DIR": str(self.target_dir()), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(self.cargo_flags())})
+        full.update(env or {})
+        if not self.release:             # a rustc killed during ThinLTO poisons Cargo's cache as it did rustc's
+            incremental_flags(Path(full["CARGO_TARGET_DIR"]) / self.triple() / "debug" / "incremental")
+        cmd = cmd[:2] + ["--target", self.triple(), "--message-format=json-render-diagnostics"] + (["--release"] if self.release else []) + \
+            (["-j", str(self.jobs)] if self.jobs else []) + cmd[2:]
+        r = subprocess.run(cmd, cwd=ROOT, env=full, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            raise BuildError("\n".join(ln for ln in r.stderr.splitlines()
+                                       if not ln.lstrip().startswith(("Compiling", "Checking", "Fresh", "Blocking", "warning: profile package spec")))
+                             or f"{' '.join(cmd[:4])} failed")
+        return r.stdout, r.stderr
+
+    def cargo_packages(self, names, style=None):
+        """the packages this Builder's cargo_build builds for these apps: the apps (on Linux the static
+        Builder the apps without a UI and every cli program, its glibc twin the others) and their BINS,
+        a library or a style variant the package derived_workspace makes"""
+        if style is not None or self.target in ("web", "android"):
+            return [derived_name(n, self.target, style) for n in names if self.target != "linux" or app_glibc(n) == self.glibc]
+        if self.target != "linux":
+            return [p for n in names for p in [n] + [b for b, _, _ in app_bins(n)]]
+        out = []
+        for n in names:
+            glibc = app_glibc(n)
+            if glibc == self.glibc:
+                out.append(n)
+            out += [b for b, _, k in app_bins(n) if (k == "gui" and glibc) == self.glibc]
+        return out
+
+    def cargo_builder(self, app, kind=None):
+        """the Builder whose Cargo run builds the app (kind None) or one of its BINS"""
+        if self.target != "linux":
+            return self
+        base = self.base
+        return base.glibc_twin() if app_glibc(app) and kind in (None, "gui") else base
+
+    def cargo_build(self, names, style=None):
+        """the programs of these apps and of their BINS in one `cargo build` (style: a variant in that
+        style, derived_workspace) -> self.cargo_out {package: (its program or library, its map)}.  The
+        compute crates' rlibs that were compiled again go through check_intrinsics."""
+        if self.target == "linux" and not self.glibc:      # section "glibc": the twin's share
+            twin = [n for n in names if self.glibc_twin().cargo_packages([n], style)]
+            if twin:
+                self.glibc_twin().cargo_build(twin, style)
+        pkgs = self.cargo_packages(names, style)
+        if not pkgs:
+            return
+        cmd = ["cargo", "build", "--locked"]
+        if style is not None or self.target in ("web", "android"):     # a workspace of the tool's own
+            cmd = ["cargo", "build", "--offline", "--manifest-path", str(derived_workspace(self.out, self.target, names, style))]
+        out, _ = self.cargo(cmd + self.cargo_profile(pkgs) + [x for p in pkgs for x in ("-p", p)])
+        out_dirs, programs = {}, {}
+        for ln in out.splitlines():
+            m = json.loads(ln) if ln.startswith("{") else {}
+            if m.get("reason") == "build-script-executed":
+                out_dirs[m["package_id"]] = Path(m["out_dir"])
+            if m.get("reason") != "compiler-artifact":
+                continue
+            kinds, crate, pkg = m["target"]["kind"], m["target"]["name"], package_of(m["package_id"])
+            if "bin" in kinds and m.get("executable"):
+                programs[pkg] = (Path(m["executable"]), m["package_id"])
+            elif ("cdylib" in kinds or "staticlib" in kinds) and pkg in pkgs:
+                lib = next((Path(f) for f in m["filenames"] if f.endswith((".wasm", ".a"))), None)
+                if lib is not None:
+                    self.cargo_out[pkg] = (lib, None)
+            elif "lib" in kinds and not m.get("fresh") and compute_crate(crate) and crate != "simd" and self.target != "web":
+                for f in m["filenames"]:
+                    if f.endswith(".rlib"):
+                        check_intrinsics(crate, Path(f))
+        for pkg, (exe, pid) in programs.items():             # jflib-build writes the map to OUT_DIR
+            self.cargo_out[pkg] = (exe, out_dirs.get(pid, exe.parent) / "program.map")
+
+    def cargo_copy(self, package, dest):
+        """a program Cargo built (and its .map) -> dest"""
+        if package not in self.cargo_out:
+            raise BuildError(f"cargo built no program {package}")
+        src, mapf = self.cargo_out[package]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        shutil.copymode(src, dest)             # Linux: the program stays executable
+        if mapf is not None and mapf.is_file():    # Windows NAME.map, Linux NAME.map (as they were named before)
+            shutil.copyfile(mapf, dest.with_suffix(".map") if self.target == "win" else dest.with_name(dest.name + ".map"))
+        return dest
+
+    def cargo_libs(self):
+        """`build_rs.py lib`: every library crate of the target (the crate jflib names them all) and the
+        styles the apps use -> the packages"""
+        pkgs = ["jflib"] + ([f"jflib-style-{s}" for s in ("jfoffice", "backupcraft", "netlab")] if self.target != "web" else [])
+        self.cargo(["cargo", "build", "--locked"] + [x for p in pkgs for x in ("-p", p)])
+        return pkgs
+
+    def cargo_rlibs(self, crates):
+        """the rlibs of these library crates (and what they need) for a probe that rustc builds against
+        them (tools/memory_safety_check.py) -> {crate: rlib}; probe_flags() then names their folder"""
+        out, _ = self.cargo(["cargo", "build", "--locked"] + [x for c in crates for x in ("-p", f"jflib-{c.replace('_', '-')}")])
+        rlibs = {}
+        for ln in out.splitlines():
+            m = json.loads(ln) if ln.startswith("{") else {}
+            if m.get("reason") == "compiler-artifact" and "lib" in m["target"]["kind"]:
+                rlib = next((Path(f) for f in m["filenames"] if f.endswith(".rlib")), None)
+                if rlib is not None:                     # the packages asked for: copies in debug/, the rest in deps/
+                    rlibs[m["target"]["name"]] = rlib
+                    self.deps_dir = rlib.parent if rlib.parent.name == "deps" else rlib.parent / "deps"
+        return {c: rlibs[c] for c in crates}
+
+    def probe_flags(self):
+        """rustc's flags for a probe against cargo_rlibs (tools/memory_safety_check.py)"""
+        f = ["--edition", "2024", "--target", self.triple(), "-C", "panic=abort", "-C", "debuginfo=0", "-C", "opt-level=1",
+             "-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="]
+        return f + (["-L", f"dependency={self.deps_dir}"] if self.deps_dir else [])
+
+    def cargo_module(self, name):
+        """jxl-module through Cargo: modules/NAME over modrt / modplat (--cfg jflib_module), fat LTO, no
+        imports, no entry, into the Builder's folder, checked the way PaintCraft's loader checks a
+        library -> its path"""
+        t = self.target
+        out = self.dir / module_file(name, t)
+        mapf = out.parent / (out.stem + ".map" if t == "win" else out.name + ".map")
+        pb = PluginBuilder.__new__(PluginBuilder)       # its link flags (no imports, no entry)
+        pb.target = t
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + pb.link_flags()
+        flags += ["-C", f"link-arg={'/MAP:' if t == 'win' else '-Map='}{mapf}"] + (["-C", "relocation-model=pic"] if t == "linux" else [])
+        profile = "RELEASE" if self.release else "DEV"
+        env = {"CARGO_TARGET_DIR": str(self.out / "cargo-modules"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags),
+               f"CARGO_PROFILE_{profile}_LTO": "fat", f"CARGO_PROFILE_{profile}_STRIP": "symbols"}
+        stdout, _ = self.cargo(["cargo", "build", "--locked"] + self.cargo_profile([f"jflib-module-{name}"]) + ["-p", f"jflib-module-{name}"],
+                               env)
+        lib = None
+        for ln in stdout.splitlines():
+            m = json.loads(ln) if ln.startswith("{") else {}
+            if m.get("reason") == "compiler-artifact" and "cdylib" in m["target"]["kind"]:
+                lib = next(Path(f) for f in m["filenames"] if f.endswith((".dll", ".so")))
+        if lib is None:
+            raise BuildError(f"cargo built no module {name}")
+        shutil.copyfile(lib, out)
+        shutil.copymode(lib, out)
+        bad = plugin_verify(out, t, export=f"{name}_module")
+        if bad:
+            out.unlink()
+            raise BuildError(f"module {name} ({t}) would be rejected by the loader:\n  " + "\n  ".join(bad))
+        return out
+
+    def build_app(self, name, style, variant=False):
+        """apps/NAME with STYLE -> <dir>/NAME[.exe] (the browser: <dir>/NAME/NAME.wasm, Android: the
+        APK); variant (several styles in one run): <dir>/<style>/NAME[.exe], with a copy of the app's
+        modules next to it.  build_apps has Cargo build them first, otherwise it happens here."""
+        if self.target not in app_targets(name):
             return None
-        objdir = self.dir / "res" / name
-        objdir.mkdir(parents=True, exist_ok=True)
-        res = objdir / "app.res"
-        with self.res_lock:
-            if not res.exists() or res.stat().st_mtime < ico.stat().st_mtime:
-                rc = objdir / "app.rc"
-                rc.write_text(f'1 ICON "{ico.as_posix()}"\n', encoding="utf-8")
-                run_cmd([tool("llvm-rc"), "/nologo", "/fo", res, rc], quiet=True)
-        return res
+        own = self.cargo_builder(name)
+        derived = variant or style != app_style(name)
+        pkg = derived_name(name, self.target, style if derived else None) if derived or self.target in ("web", "android") else name
+        if pkg not in own.cargo_out:
+            self.base.cargo_build([name], style if derived else None)
+        extra = app_styles(name)
+        if self.target == "android":
+            from tools.android import build_apk, build_exe
+            archive = own.cargo_out[pkg][0]
+            if "ui" not in app_crates(name):
+                return build_exe(self, name, archive)
+            return build_apk(self, name, style, variant, archive, app_notices([style] + [c[len("style_"):] for c in extra]))
+        vdir = (self.web_public / style if variant else self.web_public) / name if self.target == "web" else \
+            self.public / style if variant else self.public
+        vdir.mkdir(parents=True, exist_ok=True)
+        for s in sorted({style, *(c[len("style_"):] for c in extra)}):
+            copy_style_notices(name, s, vdir)
+        copy_library_notices(vdir)
+        if self.target == "web":
+            exe = own.cargo_copy(pkg, vdir / (name + ("." + self.web_mode if self.web_mode != "scalar" else "") + ".wasm"))
+            web_assets(name, vdir)
+            return exe
+        exe = own.cargo_copy(pkg, vdir / bin_file(name, self.target))
+        if app_bins(name) and any(b not in self.cargo_builder(name, k).cargo_out for b, _, k in app_bins(name)):
+            self.base.cargo_build([name])                 # a variant: the BINS stay in the app's own style
+        for b, _, kind in app_bins(name):
+            self.cargo_builder(name, kind).cargo_copy(b, vdir / bin_file(b, self.target))
+        build_app_modules(self.base, name, vdir)          # jxl-module: its modules next to it
+        return exe
 
 
 def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch="x86_64"):
@@ -1446,6 +1193,8 @@ def own_style_notices(style):
     notices = {}
     for folder in (root, root / "assets"):
         for source in sorted(folder.glob("*")):
+            if source.name in ("LICENSE-MIT", "LICENSE-APACHE"):     # the library's own, for the crate's package
+                continue
             if source.is_file() and ("license" in source.name.lower()
                                      or source.name.upper().startswith(("OFL", "NOTICE", "COPYING"))):
                 relative = Path("licenses") / style / source.name
@@ -1499,33 +1248,139 @@ def _web_assets(name, directory):
     (directory / "variants.json").write_text(json.dumps(variants), encoding="utf-8")
 
 
+# ---------------------------------------------------------------- the apps as libraries, other styles
+# The browser and Android load an app as a library, Cargo builds a library only from a [lib]; Cargo
+# cannot swap a dependency either, which a style variant needs.  derived_workspace makes such packages
+# in a workspace of the tool's own below <out>; the apps themselves stay programs in their own style.
+DERIVED_LOCK = threading.Lock()
+
+
+def package_of(package_id):
+    """the package's name in Cargo's id: path+file:///.../DIR#NAME@VERSION, or #VERSION alone when the
+    folder has the package's name"""
+    path, _, fragment = package_id.partition("#")
+    return fragment.split("@")[0] if "@" in fragment else path.rstrip("/").split("/")[-1]
+
+
+def derived_name(app, target, style=None):
+    """the package derived_workspace makes of an app: a library for the browser and Android, a
+    program or library in another style"""
+    return f"{app}-{target}" + (f"-{style}" if style else "")
+
+
+def toml_value(v):
+    """a value as TOML (strings with a double quote or a backslash as literal strings)"""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, str):
+        return f"'{v}'" if '"' in v or "\\" in v else f'"{v}"'
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    return "{ " + ", ".join(f"{k} = {toml_value(x)}" for k, x in v.items()) + " }"
+
+
+def write_changed(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def derived_profiles(members):
+    """the root manifest's profiles for derived_workspace, where the library's crates are no members:
+    its "*" (the crates from crates.io) named one by one, an app by the packages made of it
+    (members: {package: app})"""
+    registry = sorted({p["name"] for p in manifests.read(ROOT / "Cargo.lock")["package"] if "source" in p})
+    apps_ = set(members.values())
+    out = []
+    for name, prof in manifests.read(ROOT / "Cargo.toml")["profile"].items():
+        out.append(f"[profile.{name}]\n" + "".join(f"{k} = {toml_value(v)}\n" for k, v in prof.items() if k != "package"))
+        for pkg, over in prof.get("package", {}).items():
+            names = registry if pkg == "*" else sorted(m for m, a in members.items() if a == pkg) if pkg in apps_ else [pkg]
+            for p in names:
+                out.append(f'[profile.{name}.package."{p}"]\n' + "".join(f"{k} = {toml_value(v)}\n" for k, v in over.items()))
+    return "\n".join(out)
+
+
+def derived_workspace(out, target, names, style=None):
+    """a workspace of the tool's own in <out>/cargo-<target>-ws with a package per app: for the browser
+    and Android its main.rs as [lib] (cdylib, staticlib), else as a program; its manifest's
+    dependencies, `style` the one given; a build.rs that reads the app's files (jflib-build's
+    part_of); the root manifest's profiles and lints, Cargo.lock's versions -> its Cargo.toml"""
+    ws = out / f"cargo-{target}-ws"
+    root = manifests.workspace()
+    lib = target in ("web", "android")
+    lints = "".join(f"[lints.{tool_}]\n" + "".join(f"{k} = {toml_value(v)}\n" for k, v in table.items())
+                    for tool_, table in root.get("lints", {}).items())
+    with DERIVED_LOCK:
+        index = ws / "members.json"
+        members = json.loads(index.read_text(encoding="utf-8")) if index.exists() else {}
+        for n in names:
+            man = manifests.read(ROOT / "apps" / n / "Cargo.toml")
+            deps = man.get("dependencies", {})
+            if style is not None and "style" in deps and f"style_{style}" in deps:
+                raise BuildError(f"apps/{n} names style_{style} itself: a variant in {style} would name it twice (Cargo refuses that)")
+            lines = []
+            for key, spec in deps.items():
+                s = dict(root["dependencies"][key]) if spec.get("workspace") else dict(spec)
+                if "path" in s:
+                    s["path"] = ((ROOT if spec.get("workspace") else ROOT / "apps" / n) / s["path"]).resolve().as_posix()
+                s.pop("version", None)
+                if key == "style" and style is not None:
+                    s = {"package": f"jflib-style-{style}", "path": (ROOT / "styles" / style).as_posix()}
+                lines.append(f"{key} = {toml_value(s)}\n")
+            pkg = derived_name(n, target, style)
+            entry = (ROOT / "apps" / n / man["bin"][0]["path"]).resolve().as_posix()
+            # named after the package: Cargo puts the programs of all packages into one folder, two of
+            # the same name (an app in two styles) would overwrite each other there
+            unit = (f'[lib]\nname = "{pkg.replace("-", "_").lower()}"\npath = "{entry}"\ncrate-type = ["{"cdylib" if target == "web" else "staticlib"}"]\n'
+                    "test = false\ndoctest = false\n" if lib else f'[[bin]]\nname = "{pkg}"\npath = "{entry}"\ntest = false\nbench = false\n')
+            write_changed(ws / pkg / "Cargo.toml",
+                          f'[package]\nname = "{pkg}"\nversion = "{man["package"]["version"]}"\nedition = "2024"\npublish = false\n'
+                          "autobins = false\nautoexamples = false\nautotests = false\nautobenches = false\n\n" + unit + "\n"
+                          + lints + "\n[dependencies]\n" + "".join(lines)
+                          + f'\n[build-dependencies]\njflib-build = {{ path = "{(ROOT / "lib" / "jflib_build").as_posix()}" }}\n')
+            write_changed(ws / pkg / "build.rs", "// made by build_rs.py (derived_workspace): the app's files and link arguments\n"
+                          f'fn main() {{\n    jflib_build::Build::app().part_of("{n}", "{(ROOT / "apps" / n).as_posix()}").run();\n}}\n')
+            members[pkg] = n
+        write_changed(index, json.dumps(members, indent=1, sort_keys=True) + "\n")
+        write_changed(ws / "Cargo.toml", "# made by build_rs.py (derived_workspace): the apps as libraries, other styles\n[workspace]\n"
+                      'resolver = "3"\nmembers = [\n' + "".join(f'    "{m}",\n' for m in sorted(members)) + "]\n\n" + derived_profiles(members))
+        if not (ws / "Cargo.lock").exists():
+            shutil.copyfile(ROOT / "Cargo.lock", ws / "Cargo.lock")
+    return ws / "Cargo.toml"
+
+
 def build_apps(builders, names, styles=None):
-    """build apps for every target: the libraries of all targets side by side, and with them the
-    apps' modules (which need none of them), then every app link in parallel (RUSTC_SLOTS bounds
-    the processes) -> [(builder, name, exe or None)] in the order builders x names x styles.
-    styles: None = each app's STYLE; several = one variant per style (Builder.build_app).  The
-    first failure is raised after the running builds finished."""
+    """build apps for every target: one Cargo run per target for the apps in their own style, one per
+    further style (derived_workspace), the modules alongside; then every program in its place ->
+    [(builder, name, exe or None)] in the order builders x names x styles.  styles: None = each app's
+    STYLE; several = one variant per style (Builder.build_app).  The first failure is raised after
+    the running builds finished."""
     jobs = [(b, n, s) for b in builders for n in names for s in (styles or [app_style(n)])]
     variant = len(styles or []) > 1
-
-    def libs(b):
-        mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)
-                and not (b.target == "linux" and app_glibc(n))]       # section "glibc": their own crates
-        crates = {c for n, _ in mine for c in app_crates(n) + app_styles(n)} | {f"style_{s}" for _, s in mine}
-        return b.build_libs(sorted(crates)) if mine else []
-    with ThreadPoolExecutor(max(1, 2 * len(builders) * len(names))) as ex:
-        mods = [ex.submit(build_app_modules, b, n) for b in builders for n in names
-                if b.target != "web" and b.target in app_targets(n) and APP_MODULES.get(n)]
-        mods += [ex.submit(build_app_bins, b, n) for b in builders for n in names       # app-bins
-                 if b.target in ("win", "linux") and b.target in app_targets(n) and app_bins(n)]
-        for f in [ex.submit(libs, b) for b in builders]:
-            f.result()
-        with ThreadPoolExecutor(max(1, len(jobs))) as ex2:
-            futs = [(b, n, ex2.submit(b.build_app, n, s, variant)) for b, n, s in jobs]
-            res = [(b, n, f.result()) for b, n, f in futs]
-        for f in mods:
-            f.result()
-    return res
+    runs = []
+    for b in builders:
+        mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)]
+        runs.append((b, sorted({n for n, s in mine if not variant and s == app_style(n)}), None))
+        for s in sorted({s for n, s in mine if variant or s != app_style(n)}):
+            runs.append((b, sorted({n for n, ss in mine if ss == s and (variant or ss != app_style(n))}), s))
+    errors = []
+    with ThreadPoolExecutor(max(1, len(runs) + len(builders) * len(names))) as ex:
+        futs = [ex.submit(b.cargo_build, ns, s) for b, ns, s in runs if ns]
+        futs += [ex.submit(build_app_modules, b, n) for b in builders for n in names
+                 if b.target not in ("web", "android") and b.target in app_targets(n) and APP_MODULES.get(n)]
+        for f in futs:
+            try:
+                f.result()
+            except BaseException as e:      # noqa: BLE001 -- raised once every build finished
+                errors.append(e)
+    if errors:
+        raise errors[0]
+    with ThreadPoolExecutor(max(1, len(jobs))) as ex:
+        futs = [(b, n, ex.submit(b.build_app, n, s, variant)) for b, n, s in jobs]
+        return [(b, n, f.result()) for b, n, f in futs]
 
 
 # ---------------------------------------------------------------- run / test
@@ -1686,6 +1541,15 @@ def run_tests(builders, out, quick):
     if r.returncode:
         fails.append("tools/site.py --check")
     if not quick:
+        # docs/CRATES.md: a project outside the repository builds from the packed crates alone (Windows,
+        # Linux, the browser, an APK when the Android SDK is there), its smoke test passes; about 15
+        # minutes from nothing
+        targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web", "android", "package", "watch"})
+        r = subprocess.run([sys.executable, str(RS / "tools" / "crates_accept.py"), "--targets", ",".join(targets)], cwd=ROOT,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+        print("".join(ln for ln in r.stdout.splitlines(True) if ln.startswith(("FAIL", "    ", "note", "crates"))).strip())
+        if r.returncode:
+            fails.append("tools/crates_accept.py")
         # parity with the assembly reference (apps that exist in both)
         tgt = "both" if len(builders) == 2 else builders[0].target
         for name in apps():
@@ -1746,6 +1610,11 @@ def dev_command(a):
             return 1
         for p in paths:
             print(f"wrote {p.relative_to(ROOT).as_posix()}")
+        r = subprocess.run(["cargo", "metadata", "--offline", "--format-version", "1"], cwd=ROOT, capture_output=True,   # Cargo.lock
+                           text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            print(f"new: Cargo.lock was not updated:\n{r.stderr.strip()}")
+            return 1
         if a.lib:
             r = subprocess.run([sys.executable, str(ROOT / "tools" / "gendoc.py")], cwd=ROOT, capture_output=True,
                                text=True, encoding="utf-8", errors="replace")
@@ -1772,32 +1641,6 @@ def dev_command(a):
         return 1
 
 
-def write_ide():
-    """rust-project.json: rust-analyzer without Cargo (Windows target)"""
-    sysroot = subprocess.run(["rustc", "--print", "sysroot"], capture_output=True, text=True).stdout.strip()
-    libs = all_libs("win")
-    bins = {f"bin:{a}/{b}": (a, root, kind) for a in apps() for b, root, kind in app_bins(a)}     # app-bins
-    names = list(libs) + [f"app:{a}" for a in apps()] + list(bins)
-    idx = {n: i for i, n in enumerate(names)}
-    crates = []
-    for n in names:
-        if n.startswith("bin:"):
-            a, root, kind = bins[n]
-            deps = [{"crate": idx[d], "name": d} for d in source_crates(root)]
-            if kind == "gui":
-                deps.append({"crate": idx[f"style_{app_style(a)}"], "name": "style"})
-        elif n.startswith("app:"):
-            root = entrypoint(RS / "apps" / n[4:], "app")
-            deps = [{"crate": idx[d], "name": d} for d in app_crates(n[4:]) + app_styles(n[4:])] + [{"crate": idx[f"style_{app_style(n[4:])}"], "name": "style"}]
-        else:
-            root = RS / libs[n][0]
-            deps = [{"crate": idx[d], "name": d} for d in libs[n][1]]
-        crates.append({"root_module": str(root), "edition": "2024", "deps": deps, "is_workspace_member": True,
-                       "cfg": ["target_os=\"windows\"", "windows"], "target": TRIPLE["win"]})
-    (RS / "rust-project.json").write_text(json.dumps({"sysroot": sysroot, "crates": crates}, indent=1))
-    print(f"wrote rust-project.json ({len(crates)} crates)")
-
-
 # ---------------------------------------------------------------- rust-plugin
 # PaintCraft plugins written in Rust (plugins/README.md; ABI crate lib/plugin):
 #   python build_rs.py plugin [NAME] [--target win|linux|both] [--out DIR]
@@ -1807,8 +1650,8 @@ def write_ide():
 # /NOENTRY /NODEFAULTLIB (no imports, export pn_plugin_query only); Linux: ld.lld -shared
 # -Bsymbolic --no-undefined (no DT_NEEDED, only RELATIVE relocations).  Each binary is then
 # checked the way PaintCraft's loader checks it (plugin_verify: lib/plat/win_lib.rs,
-# linux_elfload.rs) -- a plugin the loader would reject fails the build.  The plugin crate's
-# rlib lives in <out>/<t>/plugin_lib.  `test` also runs apps/PaintCraft/tests/plugins*.uis on the
+# linux_elfload.rs) -- a plugin the loader would reject fails the build.  Cargo builds a plugin as
+# the package jflib-plugin-NAME into <out>/<t>/cargo-plugins.  `test` also runs apps/PaintCraft/tests/plugins*.uis on the
 # Rust PaintCraft with the Rust plugins (<out>/<t>/rsptest, the layout of PLUGIN_TEST_SET).
 PLUGIN_LIB_ROOT = RS / "lib" / "plugin" / "lib.rs"
 PLUGINS_RS = RS / "plugins"
@@ -1836,7 +1679,8 @@ def plugin_lint():
             bad += kernel_lint(f, text)
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
+                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate modrt as rt;",
+                                                      "extern crate modplat as plat;"):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
                 if s.startswith("use std") or " std::" in s.split("//")[0]:
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
@@ -1846,23 +1690,16 @@ def plugin_lint():
 
 
 class PluginBuilder:
-    """the plugin crate (rlib) and the plugins of one target"""
+    """the plugins of one target: plugins/NAME (package jflib-plugin-NAME) through Cargo into
+    <out>/<t>/cargo-plugins, always optimised (opt-level 3, one codegen unit, fat LTO, stripped),
+    copied to <out>/<t>/plugins and checked the way PaintCraft's loader checks them"""
 
     def __init__(self, target, out, arch="x86_64"):
         self.target = target
         self.arch = arch
         self.dir = out / arch_folder(target, arch) / "plugins"
-        self.lib_dir = out / arch_folder(target, arch) / "plugin_lib"
+        self.cargo_dir = out / arch_folder(target, arch) / "cargo-plugins"
         self.dir.mkdir(parents=True, exist_ok=True)
-        self.lib_dir.mkdir(parents=True, exist_ok=True)
-        self.lib_digest = None
-
-    def flags(self):
-        f = ["--edition", "2024", "--target", arch_triple(self.target, self.arch), "-C", "panic=abort", "-C", "debuginfo=0",
-             "-D", "warnings", "-C", "opt-level=3", "-C", "codegen-units=1", f"--remap-path-prefix={ROOT}{os.sep}="]
-        if self.target == "linux":
-            f += ["-C", "relocation-model=pic"]
-        return f
 
     def link_flags(self):
         if self.target == "win":
@@ -1871,57 +1708,35 @@ class PluginBuilder:
         args = ["-Bsymbolic", "--no-undefined", "--hash-style=both", "-z", "noexecstack", "-z", "now", "--build-id=none"]
         return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld"] + [x for a in args for x in ("-C", "link-arg=" + a)]
 
-    @staticmethod
-    def digest(files, extra):
-        h = hashlib.sha1()
-        for f in files:
-            h.update(Path(os.path.relpath(f, ROOT)).as_posix().encode())
-            h.update(f.read_bytes())
-        h.update(extra.encode())
-        return h.hexdigest()
-
-    def rlib(self):
-        return self.lib_dir / "libplugin.rlib"
-
-    def build_lib(self):
-        if self.lib_digest:
-            return self.lib_digest
-        root = resolve_root(PLUGIN_LIB_ROOT)
-        d = self.digest(project_sources(root, assets=True), " ".join(self.flags()))
-        st = self.lib_dir / "plugin.stamp"
-        if not (self.rlib().exists() and st.exists() and st.read_text() == d):
-            run_cmd(["rustc"] + self.flags() + ["--crate-type", "rlib", "--crate-name", "plugin",
-                                                "-o", self.rlib(), root])
-            st.write_text(d)
-        self.lib_digest = d
-        return d
-
     def path(self, name):
         return self.dir / (name + (".dll" if self.target == "win" else ".so"))
 
     def build(self, name):
-        """plugins/NAME -> the checked plugin library (rebuilt when its sources, the plugin
-        crate or the flags changed)"""
-        root = entrypoint(PLUGINS_RS / name, "lib")
-        lib = self.build_lib()
-        d = self.digest(project_sources(root, assets=True), lib + " ".join(self.flags() + self.link_flags()))
+        """plugins/NAME -> the checked plugin library (Cargo builds it again when something changed)"""
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + (["-C", "relocation-model=pic"] if self.target == "linux" else [])
+        env = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
+        env.update({"CARGO_TARGET_DIR": str(self.cargo_dir), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags + self.link_flags()),
+                    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+                    "CARGO_PROFILE_RELEASE_LTO": "fat", "CARGO_PROFILE_RELEASE_STRIP": "symbols"})
+        cmd = ["cargo", "build", "--locked", "--release", "--target", arch_triple(self.target, self.arch),
+               "--message-format=json-render-diagnostics", "-p", f"jflib-plugin-{name}"]
+        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            raise BuildError(r.stderr.strip() or f"cargo build of plugin {name} failed")
+        lib = None
+        for ln in r.stdout.splitlines():
+            m = json.loads(ln) if ln.startswith("{") else {}
+            if m.get("reason") == "compiler-artifact" and "cdylib" in m["target"]["kind"]:
+                lib = next(Path(f) for f in m["filenames"] if f.endswith((".dll", ".so")))
+        if lib is None:
+            raise BuildError(f"cargo built no plugin {name}")
         out = self.path(name)
-        st = self.lib_dir / f"{name}.stamp"
-        if out.exists() and st.exists() and st.read_text() == d:
-            return out
-        cmd = ["rustc"] + self.flags() + ["--crate-type", "cdylib", "--crate-name", name, "-C", "lto=fat",
-                                          "-C", "strip=symbols", "--extern", f"plugin={self.rlib()}",
-                                          "-L", f"dependency={self.lib_dir}"] + self.link_flags() + ["-o", out, root]
-        run_cmd(cmd)
-        for extra in (out.parent / (out.name + ".lib"), out.parent / (out.name + ".exp"), out.with_suffix(".pdb"),
-                      out.with_suffix(".lib"), out.with_suffix(".exp")):
-            if extra.exists():                      # import library / PDB: not needed
-                extra.unlink()
+        shutil.copyfile(lib, out)
+        shutil.copymode(lib, out)
         bad = plugin_verify(out, self.target)
         if bad:
             out.unlink()
             raise BuildError(f"plugin {name} ({self.target}) would be rejected by PaintCraft's loader:\n  " + "\n  ".join(bad))
-        st.write_text(d)
         return out
 
 
@@ -2158,18 +1973,16 @@ def rust_plugin_scripts(b):
 # Loadable modules (rewrite/AGENTS.md "JPEG XL encoder as a loadable module"; the ABI in
 # lib/plat/modabi.rs): modules/NAME -> <app folder>/NAME.dll | NAME.so, built with every
 # app that loads it (APP_MODULES: PaintCraft loads jxlenc, the JPEG XL writer), in the Builder's
-# folder with its flags (dev, --release, --profile).  The library crates a module contains
-# (MODULE_LIBS[NAME] and its dependencies from LIBS) are compiled once more into
-# <out>/<t>/mod_NAME with modules/modrt passed as `rt` and modules/modplat as `plat` (the
-# module runtime: the host's allocator, worker pool and crash report through a function table),
-# then the cdylib like a Rust plugin: panic=abort, fat LTO, linked against nothing (lld-link
+# folder with its flags (dev, --release, --profile).  Cargo builds the package jflib-module-NAME
+# with --cfg jflib_module into <out>/cargo-modules: the library crates it contains then name
+# modules/modrt as `rt` and modules/modplat as `plat` (the module runtime: the host's allocator,
+# worker pool and crash report through a function table); the cdylib links like a Rust plugin: panic=abort, fat LTO, linked against nothing (lld-link
 # /NOENTRY /NODEFAULTLIB; ld.lld -shared -Bsymbolic --no-undefined), a .map next to it, and
 # checked the way PaintCraft's loader checks a library (plugin_verify with the export
 # NAME_module).  Lint: #![no_std]; modrt / modplat may contain unsafe (the module's rt / plat),
 # a module crate #![deny(unsafe_code)] with module_entry!() as its one exception.
 MODULES_RS = RS / "modules"
 MOD_RT = {"rt": "modrt", "plat": "modplat"}         # the crates a module gets as rt / plat
-MODULE_LIBS = {"jxlenc": "img_jxl_enc"}             # module -> the library crate it wraps
 APP_MODULES = {"PaintCraft": ["jxlenc"]}              # the modules an app's folder gets
 
 
@@ -2182,6 +1995,11 @@ def module_lint():
     bad = []
     if not MODULES_RS.is_dir():
         return bad
+    shared = MODULES_RS / "modrt" / "shared"             # copies of files of lib/ (docs/CRATES.md)
+    for copy in sorted(p for p in shared.rglob("*") if p.is_file()):
+        source = ROOT / "lib" / copy.relative_to(shared)
+        if not source.is_file() or source.read_bytes() != copy.read_bytes():
+            bad.append(f"{copy.relative_to(ROOT)}: differs from {source.relative_to(ROOT)}: copy that file over it")
     for d in sorted(p for p in MODULES_RS.iterdir() if p.is_dir() and entrypoint(p, "lib", False)):
         root = entrypoint(d, "lib")
         head = root.read_text(encoding="utf-8")
@@ -2201,128 +2019,16 @@ def module_lint():
     return bad
 
 
-class ModuleBuilder:
-    """the library crates of one module (over modrt / modplat) and the module of one Builder"""
-
-    def __init__(self, b, name):
-        self.b = b
-        self.name = name
-        self.dir = b.dir / f"mod_{name}"
-        (self.dir / ".stamp").mkdir(parents=True, exist_ok=True)
-        self.digests = {}
-
-    def crates(self):
-        """[(crate, root, deps as crate names, deps as extern names)] in build order"""
-        libs = all_libs()
-        order = []
-
-        def add(n):
-            if n not in order:
-                for d in libs[n][1]:
-                    add(d)
-                order.append(n)
-        add(MODULE_LIBS[self.name])
-        out = []
-        for n in order:
-            if n in MOD_RT:
-                m = MOD_RT[n]
-                deps = ["rt"] if m == "modplat" else []
-                root = entrypoint(MODULES_RS / m, "lib").relative_to(RS).as_posix()
-                out.append((m, root, [MOD_RT[d] for d in deps], deps))
-            else:
-                out.append((n, libs[n][0], [MOD_RT.get(d, d) for d in libs[n][1]], libs[n][1]))
-        return out
-
-    def flags(self, name):
-        return [f"dependency={self.dir}" if x == f"dependency={self.b.dir}" else x for x in self.b.flags(name)]
-
-    def rlib(self, crate):
-        return self.dir / f"lib{crate}.rlib"
-
-    def digest(self, crate, root, deps, extra=""):
-        h = hashlib.sha1()
-        files = project_sources(RS / root, assets=True)
-        for f in files:
-            h.update(f.relative_to(RS).as_posix().encode())
-            h.update(f.read_bytes())
-        for d in deps:
-            h.update(self.digests[d].encode())
-        h.update(" ".join(self.flags(crate)).encode())
-        h.update(extra.encode())
-        return h.hexdigest()
-
-    def fresh(self, key, digest, out):
-        st = self.dir / ".stamp" / key
-        return out.exists() and st.exists() and st.read_text() == digest
-
-    def build(self):
-        """the module file in the app's folder (rebuilt when a source, a flag or a crate changed)"""
-        info = {c[0]: c for c in self.crates()}
-
-        def one(crate, ready):
-            _, root, deps, names = info[crate]
-            d = self.digest(crate, root, deps)
-            self.digests[crate] = d
-            out = self.rlib(crate)
-            if self.fresh(crate, d, out):
-                return False
-            cmd = ["rustc"] + self.flags(crate) + ["--crate-type", "rlib", "--crate-name", crate]
-            if not self.b.release:
-                cmd += incremental_flags(self.dir / "inc" / crate)
-            compile_rlib(cmd, RS / root, out, [(nm, self.rlib(dep)) for dep, nm in zip(deps, names)],
-                         self.b.piped, ready)
-            if compute_crate(crate) and crate != "simd":
-                check_intrinsics(crate, out)
-            (self.dir / ".stamp" / crate).write_text(d)
-            return True
-        run_dag({c: (info[c][2], one) for c in info})     # each crate once its dependencies are done
-        t = self.b.target
-        out = self.b.dir / module_file(self.name, t)
-        root = entrypoint(MODULES_RS / self.name, "lib")
-        top = [c for c, _, _, _ in self.crates()]
-        names = [{v: k for k, v in MOD_RT.items()}.get(c, c) for c in top]
-        pb = PluginBuilder.__new__(PluginBuilder)   # its link flags (no imports, no entry)
-        pb.target = t
-        flags = self.flags(MODULE_LIBS[self.name])  # a compute crate's opt-level for the LTO step
-        if t == "linux":
-            flags += ["-C", "relocation-model=pic"]
-        mapf = out.parent / (out.stem + ".map" if t == "win" else out.name + ".map")
-        link = pb.link_flags() + ["-C", f"link-arg={'/MAP:' if t == 'win' else '-Map='}{mapf}"]
-        h = hashlib.sha1(("".join(self.digests[c] for c in top) + " ".join(flags + link)).encode())
-        for source in project_sources(root, assets=True):
-            h.update(source.relative_to(RS).as_posix().encode())
-            h.update(source.read_bytes())
-        d = h.hexdigest()
-        if self.fresh("module", d, out):
-            return out
-        cmd = ["rustc"] + flags + ["--crate-type", "cdylib", "--crate-name", self.name, "-C", "lto=fat",
-                                   "-C", "strip=symbols"]
-        for c, nm in zip(top, names):
-            cmd += ["--extern", f"{nm}={self.rlib(c)}"]
-        cmd += link + ["-o", out, root]
-        run_cmd(cmd)
-        for extra in (out.parent / (out.name + ".lib"), out.parent / (out.name + ".exp"), out.with_suffix(".pdb"),
-                      out.with_suffix(".lib"), out.with_suffix(".exp")):
-            if extra.exists():                      # import library / PDB: not needed
-                extra.unlink()
-        bad = plugin_verify(out, t, export=f"{self.name}_module")
-        if bad:
-            out.unlink()
-            raise BuildError(f"module {self.name} ({t}) would be rejected by the loader:\n  " + "\n  ".join(bad))
-        (self.dir / ".stamp" / "module").write_text(d)
-        return out
-
-
 def build_app_modules(b, app, vdir=None):
-    """the modules of APP_MODULES[app] into the app's folder (Builder b; once per run, also
-    when several style variants link at once), copied next to a variant's exe (vdir); the browser
-    and Android load none (lib/plat/web_lib.rs)"""
+    """the modules of APP_MODULES[app] into the app's folder (Builder b; once per run, also when several
+    style variants link at once), copied next to a variant's exe (vdir); the browser and Android load
+    none (lib/plat/web_lib.rs)"""
     if b.target in ("web", "android"):
         return
     with b.mod_lock:
         if app not in b.mod_ready:
             for m in APP_MODULES.get(app, []):
-                ModuleBuilder(b, m).build()
+                b.cargo_module(m)
             build_pdn_host(b, app)
             b.mod_ready.add(app)
     if vdir is not None and vdir != b.dir:
@@ -2393,7 +2099,7 @@ def main():
         i = argv.index("--")
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "ide", "plugin",
+    ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "plugin",
                                     "new", "api-diff", "changelog", "release", "site", "i18n", "watch"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
@@ -2411,7 +2117,7 @@ def main():
                     help="release variant: size (z for UI crates, 2 for compute + app, LTO) or o2 (2, no LTO)")
     ap.add_argument("--out", help="output folder (default build; --release: build/release; --profile P: build/P)")
     ap.add_argument("-j", type=int, default=os.cpu_count() or 8,
-                    help="rustc processes at once (libraries and app links; default: the logical CPUs)")
+                    help="Cargo's jobs (default: the logical CPUs)")
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--bin", help="run: one of the app's further executables (apps/NAME/BINS)")
     # new, api-diff, changelog, release (dev_command)
@@ -2420,7 +2126,7 @@ def main():
     ap.add_argument("--lib", action="store_true", help="new: a library crate under lib/ instead of an app")
     ap.add_argument("--deps", help="new --lib: the crates of LIBS it uses (rt,plat)")
     ap.add_argument("--against", help="api-diff: the release to compare with (default: the newest)")
-    ap.add_argument("--snapshot", action="store_true", help="api-diff: write docs/api/<lib/VERSION>.txt")
+    ap.add_argument("--snapshot", action="store_true", help="api-diff: write docs/api/<the library's version>.txt")
     ap.add_argument("--all", action="store_true", help="api-diff: list every change")
     ap.add_argument("--type", default="added", help="changelog: added|changed|deprecated|removed|fixed|security")
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")
@@ -2434,9 +2140,6 @@ def main():
     if a.arch != "x86_64" and a.cmd in ("run", "test", "watch"):
         print(f"{a.cmd}: nothing starts programs of --arch {a.arch} yet (docs/ARM64.md, ARM2)")
         return 1
-    if a.cmd == "ide":
-        write_ide()
-        return 0
     if a.cmd == "site":                             # tools/site.py (its own process: `site` is a stdlib name)
         return subprocess.run([sys.executable, str(ROOT / "tools" / "site.py")]
                               + (["--out", str((ROOT / a.out).resolve())] if a.out else [])
@@ -2481,16 +2184,13 @@ def main():
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
     builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch)
-    global RUSTC_SLOTS
-    RUSTC_SLOTS = threading.BoundedSemaphore(max(1, a.j))
     t0 = time.perf_counter()
     try:
         if a.cmd == "lib":
             with ThreadPoolExecutor(len(builders)) as ex:
-                res = [(b, ex.submit(b.build_libs, list(all_libs()))) for b in builders]
+                res = [(b, ex.submit(b.cargo_libs)) for b in builders]
                 for b, f in res:
-                    built = f.result()
-                    print(f"[{b.folder}] libraries: {len(built)} rebuilt ({', '.join(built) or 'none'})")
+                    print(f"[{b.folder}] libraries: {', '.join(f.result())} and what they need")
         elif a.cmd in ("app", "run"):
             if not a.name:
                 raise BuildError("app name missing")

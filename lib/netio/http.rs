@@ -122,6 +122,7 @@ impl Request {
 }
 
 /// a response body
+#[non_exhaustive]
 pub enum Body {
     Empty,
     Bytes(Vec<u8>),
@@ -230,6 +231,7 @@ pub fn reason(status: u16) -> &'static str {
 
 /// why reading a message failed
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ReadError {
     /// the connection ended before a message started (normal end of keep-alive)
     Closed,

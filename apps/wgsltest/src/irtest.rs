@@ -50,6 +50,7 @@ fn kind_name(k: &ExprKind) -> &'static str {
         ExprKind::Bitcast(_) => "Bitcast",
         ExprKind::Call(..) => "Call",
         ExprKind::Builtin(..) => "Builtin",
+        _ => "?",
     }
 }
 

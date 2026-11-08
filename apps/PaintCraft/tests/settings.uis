@@ -15,7 +15,7 @@ expect #9918 text ""
 expect #710 enabled
 expect #5906 text "Paintbrush"
 expect #5907 value 10
-expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
 expect #5910 text "FF000000 FFFFFFFF"
 expect #5910 value 64
 expect #5912 value 0
@@ -132,7 +132,7 @@ expect window 24624 open
 expect #5917 value 6
 click #5502
 click #5541
-expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
 click #5540
 click listitem:"Zoomen"
 key esc
@@ -161,8 +161,8 @@ expect #5901 value 3
 # ------------------------------------------------------------ factory state
 cmd 852
 expect #5906 text "Paintbrush"
-expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
-expect #5909 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
+expect #5909 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
 expect #5910 text "FF000000 FFFFFFFF"
 expect #5910 value 64
 expect #5912 value 0
@@ -184,8 +184,8 @@ expect #5904 text "C42B1C"
 expect #5905 value 1
 expect #5906 text "Zoom"
 expect #5907 value 5
-expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
-expect #5909 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
+expect #5909 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=1"
 expect #5910 text "FFFFFFFF FF000000"
 expect #5910 value 65
 expect #5911 text "FF000000 FFFFFFFF"

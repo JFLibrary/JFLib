@@ -10,7 +10,7 @@ use ui::*;
 
 use crate::app::{Console, Page, ID_DASH};
 use crate::icons::*;
-use crate::tr::{t, tf};
+use crate::tr::{self, t, tf};
 use crate::{fmt, views, widgets, wizards};
 
 const ID_BARS: u32 = ID_DASH + 100;
@@ -87,7 +87,7 @@ pub fn frame(app: &mut Console, ui: &mut Ui) {
     widgets::card_begin(ui, t("Sitzungen der letzten 14 Tage"), t("Sicherungen, Kopien und Prüfungen pro Tag"));
     let labels: Vec<String> = s.history.iter().map(|d| {
         let c = app.zone.to_local(datetime::Timestamp::from_secs(d.day - 1));
-        format!("{}.{}", c.day, c.month)
+        if tr::en() { format!("{} {}", ::ui::i18n::month_short(c.month as u32), c.day) } else { format!("{}.{}", c.day, c.month) }
     }).collect();
     let lref: Vec<&str> = labels.iter().map(|x| x.as_str()).collect();
     let warn: Vec<f32> = s.history.iter().map(|d| d.warn as f32).collect();

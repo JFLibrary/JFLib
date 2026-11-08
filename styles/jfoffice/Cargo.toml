@@ -1,0 +1,22 @@
+[package]
+name = "jflib-style-jfoffice"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "style_jfoffice"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+gfx.workspace = true
+text.workspace = true
+fx.workspace = true
+ui.workspace = true

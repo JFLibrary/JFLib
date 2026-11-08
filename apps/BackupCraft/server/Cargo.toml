@@ -1,0 +1,39 @@
+[package]
+name = "bc-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "bc-server"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+agent_core.workspace = true
+plat.workspace = true
+datetime.workspace = true
+crypto.workspace = true
+compress.workspace = true
+datastore.workspace = true
+netio.workspace = true
+cas.workspace = true
+update.workspace = true
+bc_proto = { path = "../crates/bc_proto" }
+bc_fs = { path = "../crates/bc_fs" }
+bc_tape = { path = "../crates/bc_tape" }
+bc_vm = { path = "../crates/bc_vm" }
+bc_volume = { path = "../crates/bc_volume" }
+
+[build-dependencies]
+jflib-build.workspace = true

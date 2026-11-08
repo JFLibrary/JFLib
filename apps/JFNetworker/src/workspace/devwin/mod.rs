@@ -42,7 +42,7 @@
 //                fetch (ids ID_MAIL0 + 0x400 k ..)
 //   mib.rs       the MIB-Browser of the Desktop: the MIB's objects, Get, GetNext, Walk and Set
 //                as commands on the console (ids ID_MIB0 + 0x400 k ..)
-//   scriptls.rs  the language services of the IDE's editor (lib/script's script::ls with the
+//   scriptls.rs  the language services of the IDE's editor (apps/jfs/crates/script's script::ls with the
 //                simulator's host names and the device's files for imports): completion,
 //                hover, signature help, folding, the outline, go to definition, rename, format
 //

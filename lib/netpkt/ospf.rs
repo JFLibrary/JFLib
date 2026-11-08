@@ -386,6 +386,7 @@ pub enum LsaBody {
 
 /// why an LSA cannot be read
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum LsaErr {
     /// fewer bytes than its header or its length field
     Short,
@@ -606,6 +607,7 @@ pub enum Body {
 
 /// why a packet cannot be read
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum OspfErr {
     /// not version 2
     Version(u8),

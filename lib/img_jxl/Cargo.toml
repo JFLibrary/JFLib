@@ -1,0 +1,37 @@
+[package]
+name = "jflib-img-jxl"
+description = "JPEG XL reader and writer for JFLib: lossless modular, lossy VarDCT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause AND MIT"
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "img_jxl"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
+
+# inside a loadable module (--cfg jflib_module) the same names are modrt and modplat
+[target.'cfg(not(jflib_module))'.dependencies]
+rt.workspace = true
+plat.workspace = true
+
+[target.'cfg(jflib_module)'.dependencies]
+modrt.workspace = true
+modplat.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

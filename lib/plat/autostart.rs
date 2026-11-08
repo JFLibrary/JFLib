@@ -34,6 +34,7 @@ pub const AUTOSTART_WAIT_MS: i32 = 120_000;
 
 /// why autostart_set failed
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AutostartError {
     /// not possible here (web, Android, no session bus for the portal, an MSIX package without
     /// a StartupTask)

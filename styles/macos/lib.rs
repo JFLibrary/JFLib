@@ -57,11 +57,11 @@ impl Style for MacOs {
 // SF Pro is not freely available: winui's embedded faces, JFLib Sans regular / semibold / bold
 // (Selawik subsets with ∞ ● № from Inter; the licences are copied to assets/OFL-Selawik.txt and
 // assets/OFL-Inter.txt because build_rs.py ships only a style's own licence files), and the
-// WinUI icon set (styles/winui/assets, shared)
-static FONT_REG_BIN: &[u8] = include_bytes!("../winui/assets/font_reg.bin");
-static FONT_SEMI_BIN: &[u8] = include_bytes!("../winui/assets/font_semi.bin");
-static FONT_BOLD_BIN: &[u8] = include_bytes!("../winui/assets/font_bold.bin");
-static FONT_ICON_BIN: &[u8] = include_bytes!("../winui/assets/icons.bin");
+// WinUI icon set (lib/style_assets, shared)
+static FONT_REG_BIN: &[u8] = style_assets::FONT_REG;
+static FONT_SEMI_BIN: &[u8] = style_assets::FONT_SEMI;
+static FONT_BOLD_BIN: &[u8] = style_assets::FONT_BOLD;
+static FONT_ICON_BIN: &[u8] = style_assets::ICONS;
 // family, style, full, typographic family, typographic style  [fonts.s sty_font_names]
 static FONT_NAMES: [[&str; 5]; 4] = [
     ["JFLib Sans", "Regular", "JFLib Sans", "JFLib Sans", "Regular"],

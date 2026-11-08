@@ -54,7 +54,7 @@ pub(crate) fn frame(p: &mut Pn, ui: &mut Ui) {
 }
 #[cfg(not(any(windows, target_os = "linux")))]
 fn start(p: &mut Pn, _: &mut Ui) {
-    crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Die externe G’MIC-Anbindung benötigt die Desktop-Version.");
+    crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Die externe G’MIC-Anbindung benötigt die Desktop-Version."); // i18n
 }
 #[cfg(any(windows, target_os = "linux"))]
 fn start(p: &mut Pn, ui: &mut Ui) {
@@ -75,7 +75,7 @@ fn start(p: &mut Pn, ui: &mut Ui) {
         let result = run(&program, filter.as_deref(), pixels, &j);
         *j.result.lock() = Some(result); plat::wake();
     }));
-    if worker.is_none() { crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Der G’MIC-Thread konnte nicht gestartet werden."); return; }
+    if worker.is_none() { crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Der G’MIC-Thread konnte nicht gestartet werden."); return; } // i18n
     p.gmic.worker = worker; p.gmic.job = Some(job); BUSY.store(true, Ordering::Release); ui.repass();
 }
 #[cfg(any(windows, target_os = "linux"))]
@@ -100,17 +100,17 @@ fn output_number(name: &str) -> Option<u32> {
 #[cfg(any(windows, target_os = "linux"))]
 fn run(program: &str, filter: Option<&str>, pixels: gfx::Surface, job: &Job) -> Result<Vec<gfx::Surface>, String> {
     let fail = |s: &str| String::from(s);
-    let root = plat::temp_dir().ok_or_else(|| fail("Kein temporärer Ordner verfügbar."))?;
+    let root = plat::temp_dir().ok_or_else(|| fail("Kein temporärer Ordner verfügbar."))?; // i18n
     // unpredictable name, owner-only directory: other users cannot pre-create or read it
     let folder = format!("{root}/paintcraft-gmic-{:016x}", plat::random_u64());
-    if plat::file_exists(&folder) != 0 || !plat::fs::mkdir_private(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); }
+    if plat::file_exists(&folder) != 0 || !plat::fs::mkdir_private(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); } // i18n
     let temp = Temp(folder);
     let input = format!("{}/input.png", temp.0);
     let output = format!("{}/output-%l.png", temp.0);
     let png = img_core::io::encode(&pixels, Some(&img_core::ImgOpt { fmt: img_core::IMGF_PNG, ..Default::default() }))
-        .map_err(|_| fail("G’MIC-Eingabe konnte nicht kodiert werden."))?;
+        .map_err(|_| fail("G’MIC-Eingabe konnte nicht kodiert werden."))?; // i18n
     drop(pixels);
-    if !plat::write_file(&input, &png) { return Err(fail("G’MIC-Eingabe konnte nicht geschrieben werden.")); }
+    if !plat::write_file(&input, &png) { return Err(fail("G’MIC-Eingabe konnte nicht geschrieben werden.")); } // i18n
     drop(png);
     let mut args = alloc::vec!["--output", output.as_str()];
     if let Some(filter) = filter { args.extend_from_slice(&["--command", filter, "--apply"]); }
@@ -121,7 +121,7 @@ fn run(program: &str, filter: Option<&str>, pixels: gfx::Surface, job: &Job) -> 
     let mut errors = Vec::new(); let mut buf = [0u8; 16384];
     loop {
         if job.stop.load(Ordering::Acquire) { return Ok(Vec::new()); }
-        let exit = child.try_wait().map_err(|_| fail("G’MIC-Prozess nicht erreichbar."))?;
+        let exit = child.try_wait().map_err(|_| fail("G’MIC-Prozess nicht erreichbar."))?; // i18n
         // Bound each draining pass so a verbose child cannot starve cancellation.
         for _ in 0..16 { if !matches!(child.read_stdout(&mut buf), Ok(Some(n)) if n > 0) { break; } }
         for _ in 0..16 {
@@ -143,13 +143,13 @@ fn run(program: &str, filter: Option<&str>, pixels: gfx::Surface, job: &Job) -> 
     let mut images = Vec::new(); let mut budget = 100_000_000u64;
     for (_, name, size) in files {
         if job.stop.load(Ordering::Acquire) { return Ok(Vec::new()); }
-        if budget==0 { return Err(fail("G’MIC-Ergebnis zu groß.")); }
-        if size > 512_000_000 { return Err(fail("G’MIC-Ergebnis überschreitet die Dateigrößengrenze.")); }
+        if budget==0 { return Err(fail("G’MIC-Ergebnis zu groß.")); } // i18n
+        if size > 512_000_000 { return Err(fail("G’MIC-Ergebnis überschreitet die Dateigrößengrenze.")); } // i18n
         let bytes = plat::read_file(&format!("{}/{name}", temp.0)).ok_or_else(|| fail("G’MIC-Ergebnis nicht lesbar."))?;
         let image = img_core::io::decode_ex(&bytes, Some(&img_core::ImgDec { flags: img_core::IMGD_STRAIGHT, maxpx: budget, maxmem: 512_000_000, ..Default::default() }), None)
-            .map_err(|_| fail("Ungültiges oder zu großes G’MIC-Ergebnis."))?;
+            .map_err(|_| fail("Ungültiges oder zu großes G’MIC-Ergebnis."))?; // i18n
         let n = image.w as u64 * image.h as u64;
-        budget = budget.checked_sub(n).ok_or_else(|| fail("G’MIC-Ergebnis zu groß."))?;
+        budget = budget.checked_sub(n).ok_or_else(|| fail("G’MIC-Ergebnis zu groß."))?; // i18n
         images.push(image);
     }
     Ok(images)
@@ -160,7 +160,7 @@ fn commit(p: &mut Pn, mut images: Vec<gfx::Surface>) {
     if images.len() != 1 || images[0].w != w || images[0].h != h {
         let w = images.iter().map(|s| s.w).max().unwrap_or(1);
         let h = images.iter().map(|s| s.h).max().unwrap_or(1);
-        if w as u64 * h as u64 * images.len() as u64 > 100_000_000 { crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Die Ergebnis-Leinwände überschreiten die Speichergrenze."); return; }
+        if w as u64 * h as u64 * images.len() as u64 > 100_000_000 { crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Die Ergebnis-Leinwände überschreiten die Speichergrenze."); return; } // i18n
         let Some(id) = crate::document::model::doc_new(p, w, h, 0, crate::app::constants::DNF_EMPTY as u32) else { return; };
         // %l is top-first; PaintCraft stores bottom-first. Pad smaller images with alpha.
         for (i, image) in images.into_iter().rev().enumerate() {
@@ -176,7 +176,7 @@ fn commit(p: &mut Pn, mut images: Vec<gfx::Surface>) {
     let Some(id) = p.gmic.doc else { return; }; let Some(d) = p.doc.get(id) else { return; };
     let Some(li) = crate::document::layers::lay_find_uid(d, p.gmic.uid) else { return; };
     if d.ver_px != p.gmic.version || d.layers[li as usize].sf.w != w || d.layers[li as usize].sf.h != h {
-        crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Das Bild wurde während der Filterausführung geändert. Das Ergebnis wurde verworfen."); return;
+        crate::integrations::file_io::fio_error(p, Some("G’MIC-Qt"), "Das Bild wurde während der Filterausführung geändert. Das Ergebnis wurde verworfen."); return; // i18n
     }
     if crate::document::history::hist_px_begin(p, id, li) != 0 { return; }
     if crate::document::history::hist_px_touch(p, id, 0, 0, w, h) != 0 { crate::document::history::hist_px_cancel(p, id); return; }

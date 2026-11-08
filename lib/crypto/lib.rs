@@ -91,6 +91,7 @@ pub trait Hash: Clone {
 
 /// the hash functions of signatures
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HashAlg {
     Sha256,
     Sha384,

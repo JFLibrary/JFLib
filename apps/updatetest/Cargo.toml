@@ -1,0 +1,30 @@
+[package]
+name = "updatetest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "updatetest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+agent_core.workspace = true
+plat.workspace = true
+ui.workspace = true
+crypto.workspace = true
+netio.workspace = true
+update.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

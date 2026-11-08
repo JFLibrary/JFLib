@@ -290,6 +290,7 @@ pub struct DModel<'a> {
 
 /// what a point of the canvas shows
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub enum DHit {
     #[default]
     None,
@@ -326,6 +327,7 @@ fn same(a: DHit, b: DHit) -> bool {
 
 /// what the user did (ui.diagram's result, in order)
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum DEv {
     /// st.sel changed
     Select,

@@ -1,0 +1,30 @@
+#!args --config build/tests/pn_menu_icons --open apps/PaintCraft/tests/fixtures/p1_plugin.png
+# menu_icons.uis -- the colourful icons of the menus (tools/gen_pn_icons.py, workspace/icons/mod.rs):
+# PaintCraft's own code points have no glyph in the icon font, so the hook has to draw them on
+# enabled rows in colour and on disabled rows in greys; the last icon of the table is complete.
+size 1100 820
+theme light
+wait 16
+click menu:"Ansicht"
+wait 16
+# Originalgröße: the badge, a digit of the "1:1"
+expect pixel 219 187 #DBEAFE
+expect pixel 221 192 #1E3A8A
+# Auf Auswahl zoomen (no command enables it yet): a disabled row, the icon in greys
+expect menuitem:"Auf Auswahl zoomen" disabled
+expect pixel 218 158 #B3B3B3
+key esc
+wait 16
+click menu:"Korrekturen"
+wait 16
+# Tontrennung: the top step of the stairs
+expect pixel 429 513 #FED7AA
+key esc
+wait 16
+theme dark
+wait 16
+click menu:"Ansicht"
+wait 16
+expect pixel 221 192 #1E3A8A
+expect pixel 218 158 #686868
+key esc

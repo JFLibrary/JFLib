@@ -1,0 +1,28 @@
+# The template of a JFLib app (README.md of the crate jflib): rename this file to Cargo.toml.
+[package]
+name = "hallo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+jflib = "0.1"
+
+[build-dependencies]
+jflib-build = "0.1"
+
+# Cargo takes no profile from a dependency.  JFLib's runtime needs panic = "abort"; a development
+# build without overflow checks and debug assertions is the build JFLib is tested with.
+[profile.dev]
+panic = "abort"
+opt-level = 1
+debug = 0
+debug-assertions = false
+overflow-checks = false
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+codegen-units = 1
+lto = "fat"
+debug = 0
+strip = "symbols"

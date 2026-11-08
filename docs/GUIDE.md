@@ -1,19 +1,37 @@
-# Writing an app with jfguiLib (Rust)
+# Writing an app with JFLib (Rust)
 
-This guide is for developers and AI models writing desktop apps on the Rust version of
-jfguiLib. Start from `apps/template`, look up functions in [API.md](API.md) (generated from
-the sources), and look at `apps/gallery` for every control in use. How widgets look is the
-business of the linked style ([STYLES.md](STYLES.md)); packaging is in
-[PACKAGING.md](PACKAGING.md). The library itself is described in `README.md`.
+This guide is for developers and AI models writing desktop apps with JFLib. There are two
+ways to write one, and the code is the same in both:
+
+* **An app of your own**, with the crate `jflib`: one dependency, Cargo builds it, and
+  `cargo jflib` (`cargo install cargo-jflib`) makes the project, runs its tests, reloads it while you edit, builds
+  it for the browser and Android and packages it. Start with `cargo jflib new NAME`.
+* **An app inside this repository** (`apps/NAME`), built by `build_rs.py`, which builds the
+  library and every app of the repository through Cargo.
+
+Where the two differ, this guide shows the crate way first. Look up functions in
+[API.md](API.md) (generated from the sources), and look at `apps/gallery` for every control in
+use. How widgets look is the business of the linked style ([STYLES.md](STYLES.md)); packaging is in
+[PACKAGING.md](PACKAGING.md), what the crates promise in [VERSIONING.md](VERSIONING.md). The
+library itself is described in `README.md`.
 
 The examples below were compiled and run against the library (R13); identifiers such as
 `ID_*`, `CMD_*` and the fields of `self` are the example app's own.
 
 ## 1. Rules of the code base
 
-* **`#![no_std]`, no crates, no Cargo.** Only `core` and `alloc` may be `extern crate`d;
-  `build_rs.py` calls `rustc` per crate and refuses `std` or a foreign dependency
-  (`python build_rs.py check` runs the lint alone). Edition 2024, so `gen` is a keyword.
+* **`#![no_std]`, no foreign crates.** Only `core` and `alloc` may be `extern crate`d. Every
+  crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
+  checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
+  foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
+* **An app of your own** is best `#![no_std]` too: JFLib's runtime brings the entry point, the
+  panic handler and the allocator, and other `no_std` crates are allowed there. An app that needs
+  a crate with `std` turns on the feature `std` of `jflib` ([An app with std](#an-app-with-std)):
+  std brings those three then, and every `std` crate links. Code that makes system calls of its
+  own (`std::fs`, `windows-sys`, `rustix` and the like) passes by `plat`, so `PERMISSIONS` does not
+  see it: only the `sandbox` line confines it, as far as the operating system enforces the
+  manifest ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this
+  repository's; an app of your own may follow them as it likes.
 * **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
@@ -31,10 +49,75 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 ## 2. Skeleton
 
-**Start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
-passes its test as it is:
+**An app of your own** starts with `cargo jflib new` (`cargo install cargo-jflib`):
+
+```sh
+cargo jflib new notes        # notes/: Cargo.toml, build.rs, src/, tests/smoke.uis, .cargo/config.toml
+cd notes
+cargo run                    # the window
+cargo jflib test             # build it, run tests/*.uis
+cargo jflib watch            # hot reload while you edit (section 30)
+```
+
+It is the template below as a project of its own: the one dependency `jflib` (`use jflib::{style, ui};`),
+`build.rs` with `jflib_build::app()`, the profiles JFLib needs (`panic = "abort"`) and the
+settings for Windows and Linux in `.cargo/config.toml`. The README of the crate `jflib` names
+every file.
+
+### An app with std
+
+JFLib itself is `no_std` and brings what an app needs from one hand: windows and controls, files,
+the network, threads and async tasks, images, documents, sound. **Write an app `no_std` as well**
+where you can, and look in [API.md](API.md) before adding a crate. When an app needs a crate that
+uses `std`, it turns on the feature `std` of `jflib`, and every `std` crate links:
 
 ```
+cargo jflib new --std notes  # the same template with std
+```
+
+```toml
+[dependencies]
+jflib = { features = ["std"], version = "0.1" }
+```
+
+The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
+panic still ends with JFLib's crash report (`rt::panic_hook`). What changes against the template:
+
+| File | With std |
+| --- | --- |
+| `src/lib.rs` | no `#![no_std]` and no `extern crate alloc`; `ui::main!` stays |
+| `src/main.rs` | `extern crate notes; fn main() { jflib::plat::std_start() }` (an app in one file: `ui::main!` writes `fn main` itself, without `#![no_main]`) |
+| `.cargo/config.toml` | only `+crt-static` for Windows, so the program needs no `VCRUNTIME140.dll`; std links with the system's linker |
+| `PERMISSIONS` | none: in a program with std it covers JFLib's own calls only (the build warns) |
+
+| Target | With std |
+| --- | --- |
+| Windows | `cargo build`; the Visual Studio Build Tools, which Rust's msvc toolchain needs anyway |
+| Linux | `cargo build` on Linux, through cc against glibc; not from Windows, and not with musl |
+| Browser | `cargo jflib web`, the modes scalar and SIMD (no threads mode: rustup ships no std with atomics). std has no clock, files, threads or network there: they panic or fail. JFLib's own (`plat::time_us`, `ui.spawn`, `plat::read_file`) work |
+| Android | `cargo jflib android`; `std::fs` needs real paths (the app's folder). JFLib's paths (`/tmp`, `/documents`) are names that only `plat` resolves |
+
+`cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
+Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux.
+
+**One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
+and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is
+the whole stack and owns the main thread and its event loop. Out of habit it is easy to add
+another one; don't:
+
+* **Window and UI crates** (winit, tao, SDL, eframe, egui, iced): a second event loop on the main
+  thread competes with JFLib's, its windows do not get JFLib's input, styles or tests.
+* **Async runtimes** (tokio, async-std, smol): `block_on` on the UI thread freezes the window. JFLib
+  runs `async` blocks itself (`ui.spawn`, [Async tasks](#async-tasks-uispawn-plattask-plataio)).
+  A crate that needs tokio gets a runtime on a thread of its own; results go back through a
+  channel and `plat::wake()` ([Threads](#9-threads)).
+* **Crates that start their own threads** call back on them: hand the result to the UI thread
+  the same way, never touch `Ui` there.
+
+**In this repository, start a new app with `build_rs.py new`.** It writes a complete app folder that builds and
+passes its test as it is:
+
+```sh
 python build_rs.py new notes --title "Notizen"           # a window app (the default kind)
 python build_rs.py new mytool --kind tool --style kde    # window + command line program + shared crate
 python build_rs.py new report --kind console             # a console program (rt::main!)
@@ -56,7 +139,7 @@ others), `PACKAGE` (`version=0.1.0`, an `app_id` and the `homepage` from the git
 a letter followed by letters, digits, `_` or `-`; existing apps (in any case), library crates and
 Rust keywords are refused. `--title` sets the window title and the package's display name.
 `python build_rs.py new --lib NAME --deps rt,plat` creates a library crate `lib/NAME/src/lib.rs`
-instead, enters it in `LIBS` of `build_rs.py` and in `tools/gendoc.py` and regenerates
+instead, enters it in the root `Cargo.toml`, the facade `lib/jflib` and `tools/gendoc.py` and regenerates
 [API.md](API.md). `apps/scaffoldtest` is the generator's `tool` output; the suite builds and
 tests it, so the skeletons keep building.
 
@@ -147,6 +230,12 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
 | `apps/NAME/PERMISSIONS`, `BINS`, `assets/` | what it may do (PERMISSIONS.md), further programs (section 16), files built in as `app://` (VFS.md) |
 | `apps/NAME/parity.txt` | parity settings, only for apps that also exist in `legacy/` |
 
+In an app of your own, `PERMISSIONS`, `PACKAGE`, `assets/`, `res/` and `tests/` lie next to
+`Cargo.toml`. The style comes from the environment variable `JFLIB_STYLE` (`winui` without it) instead of
+`STYLE`; `TARGETS`, `GLIBC`, `STATIC`, `BINS` and `parity.txt` are this repository's (Cargo has
+`[[bin]]` for further programs, and `.cargo/config.toml` says whether a Linux program links
+against glibc or is one static file).
+
 The same source entrypoint is used by build/dependency discovery, hashes, lint and IDE/API
 tools. Two competing roots (`main.rs` plus `src/main.rs`, or their library equivalents) are
 an error. Reference material under `context` or `books` is never discovered as app source.
@@ -157,7 +246,20 @@ JSON/MCP, `App::actions` and capability checks. `--target web` builds the same G
 `build/web/NAME/`. Use `plat::capabilities()` and asynchronous web requests for services that
 depend on the host; never report a VFS write as durable before its completion arrives.
 
-**Build and run:**
+**Build and run**, an app of your own:
+
+```
+cargo run                                        # build and start (Windows)
+cargo run --target x86_64-unknown-linux-gnu      # Linux: always with --target (.cargo/config.toml says why)
+cargo build --release                            # opt-level 2 + LTO, the profile of Cargo.toml
+JFLIB_STYLE=kde cargo run                        # another style built in
+cargo jflib watch                                # hot reload (section 30)
+cargo jflib web --serve                          # the browser: scalar, SIMD, threads
+cargo jflib android --install                    # an APK on a phone or the emulator
+cargo jflib package --formats all                # setup, MSIX, .deb, AppImage, RPM, Flatpak (PACKAGING.md)
+```
+
+In this repository:
 
 ```
 python build_rs.py app NAME                    # build/win/NAME.exe and build/linux/NAME
@@ -169,10 +271,11 @@ python build_rs.py app NAME --release          # opt-level 2 + LTO
 python build_rs.py app NAME --profile size     # smaller release variant (packages)
 ```
 
-Every app crate gets every library crate (`ui`, `gfx`, `text`, `plat`, `base`, `rt`, `img_core`,
-`img_*`, `img_all`, `fx`, ...) as an `--extern`, plus its style as `style`. Development builds
-are incremental (about 1.5 s after an edit in `ui`). Use `--out build/<name>` when several
-agents build at the same time.
+An app's `Cargo.toml` names the library crates its sources use (`ui`, `gfx`, `text`, `plat`, ...)
+and its style as `style`; `build_rs.py new` writes it, `build_rs.py check` says when a crate is
+missing. Its `build.rs` (`jflib_build::app()`) hands `PERMISSIONS`, `PACKAGE`, `assets/` and
+`res/app.ico` to the program. Development builds are incremental. Use `--out build/<name>` when
+several agents build at the same time.
 
 **Platforms need no app code.** The same source builds a Windows exe and a Linux ELF: static for
 command-line programs, linked against glibc and nothing else for programs with a UI (the GPU drivers
@@ -1656,9 +1759,16 @@ shot build/template.png
   in one go (while the backend waits for a reply, and while it waits for events); every key
   must arrive, in order.
 
-**Test commands**
+**Test commands**, an app of your own:
 
+```sh
+cargo jflib test                    # build it, run every tests/*.uis with --script
+cargo jflib test --release          # ... the release build
 ```
+
+In this repository:
+
+```sh
 python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
@@ -1750,7 +1860,8 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 PaintCraft loads effects, file types and shapes from plugins (DLL / .so). Plugins written in Rust
 use the crate `lib/plugin` (safe `Effect` / `FileType` traits over the PNAPI ABI) and are
 built with `python build_rs.py plugin NAME`; see `plugins/README.md` and
-`apps/PaintCraft/docs/PLUGINS.md`.
+`apps/PaintCraft/docs/PLUGINS.md`. The plugin ABI belongs to this repository: it is not published
+as a crate.
 
 ## 15. Data views and app shells
 
@@ -3618,7 +3729,7 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
 * Only the visible lines' diagnostics are drawn, an underline is one command however long it
   is: 100 000 lines with 13 000 diagnostics scroll and edit at the speed of a short file
   (`apps/editortest/tests/code_diag.uis`: hover, F8, edits, checking while typing, shots).
-* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights lib/script's language: keywords,
+* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights apps/jfs/crates/script's language: keywords,
   `true` / `false` / `nil`, numbers (`1_000`, `0xFF`, `0b101`, `1.5e-3`), `//` and `/* */`,
   strings with escapes and `${…}` whose code is highlighted too (the delimiters are `SY_META`,
   so their braces match as a bracket pair). A grammar of one's own gets such strings with
@@ -3631,7 +3742,7 @@ hover texts and signature help; every method has a default that offers nothing. 
 app -- go to a definition, rename, format, toggle a breakpoint -- comes back as events.
 
 ```rust
-struct Jfs;                                   // lib/script's services for .jfs
+struct Jfs;                                   // apps/jfs/crates/script's services for .jfs
 impl CodeAssist for Jfs {
     fn complete(&mut self, doc: &CodeDoc, at: TextPos, _explicit: bool) -> Option<CompList> {
         let c = script::ls::complete(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default());
@@ -3700,12 +3811,12 @@ doc.apply_edits(&edits, "Umbenennen");
   the caret put there by the app (`set_selection`, undo) unfolds, folding around the caret
   moves it to the range's first line. Without ranges a row is a line: 100 000 lines stay as
   fast as before (`tests/code_ide.uis` benches 80 000 lines with 10 000 folded functions).
-* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches lib/script's
+* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches apps/jfs/crates/script's
   services on for JFS), `--test model` group `ide`.
 
 ## 29. Scripts: `script` (compiler and VM)
 
-[`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
+[`apps/jfs/crates/script`](../apps/jfs/crates/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
 source into bytecode, a `Vm` runs it with fuel (virtual CPU time), a heap of its own with a
 mark-and-sweep collector and hard limits. Everything is deterministic: no clock, no randomness,
 float arithmetic in software (`script::num`), so a script gives the same bits on every target,
@@ -3819,7 +3930,7 @@ impl Host for MyHost {
   the hardware) and `coretest --only scriptlib` (the standard library); `program.disasm()`
   prints the bytecode.
 
-**The standard library** ([`stdlib.rs`](../lib/script/stdlib.rs) and its neighbours) is part of
+**The standard library** ([`stdlib.rs`](../apps/jfs/crates/script/stdlib.rs) and its neighbours) is part of
 every VM, whatever the host. Methods take the value first, so `s.split(",")` and
 `str.split(s, ",")` are the same call; a map's own field of the same name wins over a map
 method (`map.keys(m)` always reaches the library), and a script may shadow a module with a
@@ -3884,7 +3995,7 @@ let shard = "user:42".hash() % 8                     // FNV-1a, stable everywher
 * math: `abs`, `min`, `max`, `clamp`, `floor`, `ceil`, `round` and `trunc` keep ints as ints
   (`math.floor(7)` is `7`, `math.floor(2.5)` is `2.0`); `round` rounds halves away from zero;
   `min` / `max` take arguments or one list and answer `nan` when one is `nan`. The float
-  functions ([`math.rs`](../lib/script/math.rs)) are fdlibm in its FreeBSD / musl form on
+  functions ([`math.rs`](../apps/jfs/crates/script/math.rs)) are fdlibm in its FreeBSD / musl form on
   `script::num`: errors below 1 ulp, exact where the result is (`math.log2(8)` is `3.0`,
   `math.pow(2, 10)` is `1024.0`), `exp` and `pow` bit for bit like Java's `StrictMath`
   except that `pow` follows C99 where Java answers NaN (`pow(1, nan)`, `pow(-1, inf)` and
@@ -3941,8 +4052,8 @@ column, the source line and the calls; exit code 1 (2 for a wrong command line).
 are example scripts with their expected stdout, stderr, exit code and files
 (`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
 
-**Language services and the formatter** ([`script::ls`](../lib/script/ls.rs),
-[`script::fmt`](../lib/script/fmt.rs)) are what an editor or IDE needs, without editor types:
+**Language services and the formatter** ([`script::ls`](../apps/jfs/crates/script/ls.rs),
+[`script::fmt`](../apps/jfs/crates/script/fmt.rs)) are what an editor or IDE needs, without editor types:
 positions are bytes into the source, results carry `Span`s (lines and columns from 1). They
 work on code that does not parse (what `parse_partial` made of it), so completion and hover
 keep working while a line is half typed.
@@ -4001,7 +4112,7 @@ let tidy = script::fmt::format(src)?;                    // or the syntax errors
   rename and its refusals; completion in scope, after a dot, of an import and on broken code;
   hover; signature help; folding; the outline; the formatter on every syntax form, idempotent,
   the same code).
-**Scripts of one VM** ([`module.rs`](../lib/script/module.rs)), as a page has several `<script>`
+**Scripts of one VM** ([`module.rs`](../apps/jfs/crates/script/module.rs)), as a page has several `<script>`
 elements: `vm.add_script(name, src)` links a further script while the VM is idle, then `run()` runs
 its top-level code with fresh fuel. Their top-level names are one scope: a script sees the `fn`s and
 `let`s of the program and of the scripts before it, the same variables, and a name it declares again
@@ -4021,7 +4132,7 @@ for (name, src) in scripts {
 }
 ```
 
-**Modules** ([`module.rs`](../lib/script/module.rs)): `import(path)` is a function, not
+**Modules** ([`module.rs`](../apps/jfs/crates/script/module.rs)): `import(path)` is a function, not
 syntax. It gives the top-level names of another file as a map -- its `fn`s and `let`s, without
 the names that start with `_` -- with the values they have when the module's code has run:
 
@@ -4052,7 +4163,7 @@ carry a `file`; `Error`'s text names it only where a call is in another file tha
 so messages of single files stay as they were. The program's own host values (`config`) hold
 for its modules too. `script::check` stays per file: a module's members are dynamic.
 
-**The debug interface** ([`debug.rs`](../lib/script/debug.rs)) has no UI; the runner's
+**The debug interface** ([`debug.rs`](../apps/jfs/crates/script/debug.rs)) has no UI; the runner's
 `--debug` and JFNetworker's script services build on it. The compiler keeps a line table
 (`Program::line_table()`: every instruction's function, line, column and whether a statement
 starts there; `break_lines()` lists the lines a breakpoint can stop at), the locals of every
@@ -4155,7 +4266,7 @@ the file and line where the app called each widget, with "Im Editor öffnen" ("S
   value)` after their `behave` -- the dump, scripts, screen readers and the inspector see the
   same records.
 
-```
+```text
 # apps/gallery/tests/inspect.uis (excerpt)
 inspect snap                         # the main window's frame
 inspect arm
@@ -4181,7 +4292,11 @@ excluded|selected S|none|hover S|none|selector "s"|copied "s"` (`excluded`: no r
 inspector's window in the tree). The inspector's window has the id 2147422208 (`expect window
 2147422208 open`, `shot F window 2147422208`).
 
-### Hot reload: `build_rs.py watch`
+### Hot reload: `cargo jflib watch`, `build_rs.py watch`
+
+An app of your own: `cargo jflib watch [-p PKG] [-- ARGS]` in its folder does what this section
+describes for the machine's own target, with its session in `target/jflib-watch/NAME`; it watches
+every file of the project's own packages and builds as `cargo run` does. In this repository:
 
 `python build_rs.py watch NAME [--target win|linux] [-- ARGS]` builds the app, starts it and
 watches its sources, its assets and build files and the sources of every library and style
@@ -4266,7 +4381,7 @@ check box's, a text box's) are never written; the inspector gives input instead.
 * The tool window itself is built in the style's own look: the app theme and an edited text
   scale do not reach it, so it stays usable whatever is edited (style, mode and language do).
 
-```
+```text
 # apps/gallery/tests/inspect_edit.uis (excerpt)
 inspect on
 inspect set token bg #E0F0E0           # the colours in use (light)
@@ -4339,7 +4454,7 @@ of the app's call that built the selected widget (or layout box), e.g.
 * **Scripts never start the user's editor**: a headless run takes only an editor the script
   set with `inspect editor "COMMAND"`.
 
-```
+```text
 # apps/gallery/tests/inspect_source.uis (excerpt)
 inspect on
 inspect select #702                           # a number box: the app's number_box call
@@ -5147,7 +5262,7 @@ boxes say (the page "Container" of `apps/androidGallery` shows it):
 | `TF_H`, `TF_V`, `TF_BOTH` | a finger moving along this axis (both: the press comes with the touch) |
 | `TF_SLOP` | with `TF_BOTH`: the press only once the finger moved (a canvas waits for a second finger) |
 | `TF_HOLD` | only after resting for the long-press time, then the press comes and the drag starts (no right button); until then the finger rolls what is around it; a tap still clicks |
-| `TF_HOLD_LONG` | with `TF_HOLD`: a second instead of the long-press time (a panel's title bar) |
+| `TF_HOLD_LONG` | with `TF_HOLD`: 600 ms instead of the long-press time (a panel's title bar) |
 | `TF_REST` | a finger that rests presses like one that moved, no right button (a canvas: a dab; there is no context menu to reach) |
 | `TF_TWO` | two fingers are its own: no press, no click (a press younger than 200 ms is taken back), a pass whenever a finger moves; `ui.touch_two()` below, or `ui.touch_fingers()` (`Finger`: `id`, `x`, `y`, `down_x`, `down_y`, `time_ms`) for anything else |
 | `TF_DECLINE` | no drag at all, a tap still clicks: the finger rolls what is around it or does nothing |

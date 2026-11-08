@@ -110,7 +110,7 @@ pub(crate) const CAPTION_MIN_W: i32 = 120;
 const OUTSIDE: i32 = -10000;
 /// TF_HOLD_LONG: a panel's title bar moves after resting this long; nothing shows before HOLD_SHOW_MS
 /// (a tap shows nothing)
-const HOLD_LONG_MS: u32 = 1000;
+const HOLD_LONG_MS: u32 = 600;
 const HOLD_SHOW_MS: u32 = 120;
 /// a finger within this time after the pen's last sign of life is a palm
 const PALM_MS: u32 = 500;
@@ -458,8 +458,8 @@ impl Ui {
     }
 
     /// ui_touch_hold_part(id) -> how far a finger's press and hold on widget id of this window is, in
-    /// 1/1000 (TF_HOLD_LONG): None without one, 1000 once the drag runs.  Show it: a second is long
-    /// without a sign
+    /// 1/1000 (TF_HOLD_LONG): None without one, 1000 once the drag runs.  Show it: it is long without
+    /// a sign
     pub fn touch_hold_part(&self, id: u32) -> Option<u32> {
         let s = &self.m.touch;
         if s.grab & G_HOLD_LONG == 0 || s.win != self.uiw_cur || s.down_id != id || id == 0 {
@@ -791,7 +791,8 @@ impl Ui {
 
     // what the finger means, in the live window: on the background the nearest small widget whose
     // rectangle, grown to the target size around its middle, holds the point.  Only one that is on top
-    // where the finger would touch it, and an exact hit is left alone
+    // where the finger would touch it, and an exact hit is left alone; a surface with gestures of its own
+    // (TF_TWO) counts as background: a finger just above the status bar means the slider in it
     fn touch_aim(&mut self) {
         if self.uiw_inert_now() {
             return;
@@ -806,7 +807,7 @@ impl Ui {
         let grip = |h: &Hit| matches!((h.flags as u32 >> HB_CURSOR_SHIFT) & 15, CUR_SIZE_WE | CUR_SIZE_NS | CUR_SIZE_NWSE | CUR_SIZE_NESW);
         let usable = |h: &Hit| real(h) && h.flags as u32 & HB_DISABLED == 0 && !grip(h);
         let exact = hit_index(list, c.modal_prev, p[0], p[1]);
-        if exact.is_some_and(|i| real(&list[i])) {
+        if exact.is_some_and(|i| real(&list[i]) && list[i].grab & G_TWO == 0) {
             return;
         }
         let floor = exact.map_or(c.modal_prev as i32, |i| list[i].layer as i32).max(c.modal_prev as i32);

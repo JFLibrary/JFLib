@@ -229,7 +229,8 @@ impl Be {
 
     /// be_to(x_fx, y_fx, pressure) -> true when the mask changed
     fn to(&mut self, x: i32, y: i32, p: u32) -> bool {
-        let p = p as i32;
+        // (a stroke with pressure: a point without any, a system's sign as the pen lifts, is no full width)
+        let p = if p == 0 && self.flags & BEF_PRESSURE != 0 { self.lp } else { p as i32 };
         if self.flags & BEF_PENCIL != 0 {
             let (x, y) = (x >> 8, y >> 8);
             if x == self.px && y == self.py {
@@ -282,10 +283,11 @@ impl Be {
         let n = self.sn;
         self.sn = 0;
         let sp = self.sp;
+        let p = self.lp; // (0 would be the full width)
         match n {
-            2 => self.spline_seg(sp[0], sp[0], sp[1], sp[1], 0), // p0 p0 p1 p1
-            3 => self.spline_seg(sp[0], sp[1], sp[2], sp[2], 0), // p0 p1 p2 p2
-            4 => self.spline_seg(sp[1], sp[2], sp[3], sp[3], 0), // p1 p2 p3 p3
+            2 => self.spline_seg(sp[0], sp[0], sp[1], sp[1], p), // p0 p0 p1 p1
+            3 => self.spline_seg(sp[0], sp[1], sp[2], sp[2], p), // p0 p1 p2 p2
+            4 => self.spline_seg(sp[1], sp[2], sp[3], sp[3], p), // p1 p2 p3 p3
             _ => false,
         }
     }

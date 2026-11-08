@@ -86,7 +86,7 @@ pub(crate) fn find(d: &Device, name: &str) -> Option<usize> {
 }
 
 /// the first error that keeps `text` from compiling: line, column, message (German, as
-/// lib/script words it)
+/// apps/jfs/crates/script words it)
 pub(crate) fn first_error(text: &str) -> Option<(u32, u32, String)> {
     script::check(text).into_iter().find(|d| d.error).map(|d| (d.line, d.col, d.msg))
 }

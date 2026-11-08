@@ -1,0 +1,5 @@
+# What the program registers with --register (docs/GUIDE.md of JFLib, "Desktop integration"):
+# display, app_id, categories, filetypes, schemes.  The version is Cargo.toml's.
+display=Hallo
+app_id=org.example.Hallo
+categories=Utility;

@@ -103,10 +103,9 @@ pub(crate) fn command(p: &mut Pn, ui: &mut Ui, id: u32, _: u32) -> bool {
     true
 }
 pub(crate) fn summary() -> String {
-    format!(
+    crate::preferences::localization::tf(
         "Originale Paint.NET-Plugins: {} Effekte, {} Dateiformate",
-        EFFECTS.lock().len(),
-        FILES.lock().len()
+        &[&format!("{}", EFFECTS.lock().len()), &format!("{}", FILES.lock().len())],
     )
 }
 
@@ -211,11 +210,11 @@ fn search_in_background(p: &mut Pn, helper: String, args: Vec<String>) {
         }),
     );
     if worker.is_none() {
-        error(String::from("Der Thread der Plugin-Suche konnte nicht gestartet werden."));
-        *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen";
+        error(String::from("Der Thread der Plugin-Suche konnte nicht gestartet werden.")); // i18n
+        *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen"; // i18n
         return;
     }
-    *STATUS.lock() = "Plugins werden gesucht …";
+    *STATUS.lock() = "Plugins werden gesucht …"; // i18n
     SEARCHING.store(true, Ordering::Release);
     p.pdn.scan = Some(job);
     p.pdn.scan_worker = worker;
@@ -227,7 +226,7 @@ fn apply(p: &mut Pn, ui: &mut Ui, result: Result<Vec<u8>, String>, late: bool) {
         Ok(data) => data,
         Err(e) => {
             error(e);
-            *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen";
+            *STATUS.lock() = "Die Plugin-Suche ist fehlgeschlagen"; // i18n
             ui.repass();
             return;
         }
@@ -237,7 +236,7 @@ fn apply(p: &mut Pn, ui: &mut Ui, result: Result<Vec<u8>, String>, late: bool) {
     for row in text.lines() {
         let fields: Vec<_> = row.split('\t').collect();
         if fields.len() != 6 {
-            error(String::from("Ungültiger Katalogeintrag vom .NET-Host"));
+            error(String::from("Ungültiger Katalogeintrag vom .NET-Host")); // i18n
             continue;
         }
         let (Some(path), Some(kind), Some(name), Some(exts)) = (
@@ -271,7 +270,7 @@ fn apply(p: &mut Pn, ui: &mut Ui, result: Result<Vec<u8>, String>, late: bool) {
                 }
             }
             "U" | "X" => error(format!("{}: {}", entry.path, entry.name)),
-            _ => error(String::from("Unbekannte Plugin-Kategorie")),
+            _ => error(String::from("Unbekannte Plugin-Kategorie")), // i18n
         }
     }
     // Alphabetical: the search order follows folders, and packs bring dozens of effects.
@@ -296,7 +295,7 @@ fn apply(p: &mut Pn, ui: &mut Ui, result: Result<Vec<u8>, String>, late: bool) {
     *STATUS.lock() = if !names.is_empty() || MESSAGES.lock().is_empty() {
         ""
     } else {
-        "Keine Effekte geladen, siehe Einstellungen > Plugin-Fehler"
+        "Keine Effekte geladen, siehe Einstellungen > Plugin-Fehler" // i18n
     };
     if late {
         crate::integrations::file_io::build_filters(&mut p.fio);

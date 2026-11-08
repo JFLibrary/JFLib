@@ -1,0 +1,3 @@
+# hallo: what the app may do (docs/PERMISSIONS.md of JFLib); without this file an app may do
+# everything.  After adding it to a project that had none: cargo clean -p hallo.
+fs.user                      # the files the user opens (file dialog, drops, "Open with")

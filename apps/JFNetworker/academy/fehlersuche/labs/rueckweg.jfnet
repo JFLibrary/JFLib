@@ -1,0 +1,322 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Hin geht es, zurück nicht",
+  "description": "Kurs Fehlersuche: eine fehlende Route, die nur den Rückweg bricht.",
+  "seed": 1,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 170,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 340,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 510,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 255,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Hin geht es, zurück nicht",
+      "The way there works, the way back does not"
+    ],
+    "summary": [
+      "PC1 erreicht den Server nicht. Dabei kennen alle Geräte auf dem Weg dorthin ihr nächstes Ziel.",
+      "PC1 does not reach the server. Yet all the devices on the way there know their next step."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 soll den Server SRV1 unter 10.0.2.10 erreichen, zwischen ihnen stehen die Router R1 und R2. Ein Kollege hat die Routen auf dem Weg dorthin geprüft und nichts gefunden: PC1 hat sein Gateway, und R1 kennt den Weg ins Netz des Servers. Trotzdem kommt keine Antwort.",
+        "PC1 is to reach the server SRV1 at 10.0.2.10, with the routers R1 and R2 between them. A colleague has checked the routes on the way there and found nothing: PC1 has its gateway, and R1 knows the way to the server's network. Still no answer comes."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie auf dem betroffenen Router, nennen Sie ihn und geben Sie ab.",
+        "Find the cause, repair it on the router concerned, name it and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "traceroute -n 10.0.2.10 auf PC1 zeigt, wie weit Antworten zurückfinden.",
+        "traceroute -n 10.0.2.10 on PC1 shows how far answers find their way back."
+      ],
+      [
+        "Ein Paket braucht zwei Wege. Ist der Ping vom Router R1 zum Server erfolgreich, der von PC1 aber nicht, liegt das am Absender: R1 fragt aus dem Netz 10.0.12.0/30, PC1 aus 10.0.1.0/24.",
+        "A packet needs two ways. If the ping from router R1 to the server succeeds and the one from PC1 does not, that is down to the sender: R1 asks from the network 10.0.12.0/30, PC1 from 10.0.1.0/24."
+      ],
+      [
+        "Lesen Sie show ip route auf jedem Router und fragen Sie: Weiß er, wo die Absender wohnen?",
+        "Read show ip route on each router and ask: does it know where the senders live?"
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.2.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC1 erreicht den Server",
+            "PC1 reaches the server"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "R2 route 10.0.1.0/24"
+          ],
+          "points": 3,
+          "text": [
+            "R2 kennt den Weg zum Netz von PC1",
+            "R2 knows the way to the network of PC1"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "R2",
+          "id": 3,
+          "points": 3,
+          "text": [
+            "Welchem Router fehlte etwas?",
+            "Which router was missing something?"
+          ],
+          "explain": [
+            "R2 kannte den Weg zurück ins Netz 10.0.1.0/24 nicht. Das Echo kam beim Server an, die Antwort blieb an R2 hängen. traceroute zeigt das: R1 antwortet, danach nur noch Sterne, denn auch die Meldungen von R2 finden nicht zurück. Der Hinweg war in Ordnung; darum findet nichts, wer nur ihn prüft. Die Route auf R2: ip route 10.0.1.0 255.255.255.0 10.0.12.1",
+            "R2 did not know the way back to the network 10.0.1.0/24. The echo reached the server, and the reply got stuck at R2. traceroute shows this: R1 answers, after that only stars, because the messages from R2 do not find their way back either. The way there was fine, so whoever checks only that finds nothing. The route on R2: ip route 10.0.1.0 255.255.255.0 10.0.12.1"
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 170,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 10.0.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "R2",
+            "model": "jf-r4",
+            "x": 340,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nip route 10.0.1.0 255.255.255.0 10.0.12.1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 510,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 4,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

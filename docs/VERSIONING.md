@@ -8,7 +8,8 @@ release, and [CHANGELOG.md](../CHANGELOG.md) lists what changed.
 
 | What | Where |
 | --- | --- |
-| The library's version | [`lib/VERSION`](../lib/VERSION); in code `rt::VERSION` (also `plat::VERSION`, `ui::VERSION`) and `VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_PATCH` |
+| The library's version | `version` in [`Cargo.toml`](../Cargo.toml) in the root folder, one for all crates; in code `rt::VERSION` (also `plat::VERSION`, `ui::VERSION`) and `VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_PATCH` |
+| What the crates on crates.io promise | [The crates on crates.io](#the-crates-on-cratesio) below: the facade `jflib`, `jflib-build`, `cargo-jflib` |
 | An app's version | `version=` in `apps/NAME/PACKAGE`; in code `rt::app_version!()` (also `ui::app_version!()`) |
 | API snapshots of the releases | `docs/api/X.Y.Z.txt`, written by `build_rs.py release` / `api-diff --snapshot` ([`tools/apidiff.py`](../tools/apidiff.py)) |
 | The changelog | [`CHANGELOG.md`](../CHANGELOG.md) ([Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)), [`tools/changelog.py`](../tools/changelog.py) |
@@ -35,12 +36,36 @@ const APP_VERSION: &str = rt::app_version!();
 ui.text(TS_CAPTION, &format!("Version {} · JFLib {}", APP_VERSION, ui::VERSION));
 ```
 
+## The crates on crates.io
+
+JFLib is published as about sixty crates that share one version ([CRATES.md](CRATES.md)). A
+program depends on one of them, `jflib`, and the promise of this page is made for what it reaches
+through it and for the two tools around it:
+
+| Crate | What is promised |
+| --- | --- |
+| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE`; its feature `std` (an app with std: `plat::std_start`, `rt::panic_hook`, `rt::Alloc`) |
+| `jflib-build` | `app()`, `console()`, `Build::app()`, `Build::console()`, `.part_of()`, `.run()` and the files it reads next to `Cargo.toml`: `PERMISSIONS`, `PACKAGE`, `assets/`, `res/app.ico` |
+| `cargo-jflib` | its commands and their options, the `PACKAGE` keys and environment variables its README names, where it writes (`target/jflib-*`) |
+| the other `jflib-*` crates | nothing of their own: they are published because `jflib` needs them. A program may name one directly, but `jflib` pins every one to its own version (`=X.Y.Z`), so they move together. `simd`, `text_shape` and `style_assets` are building blocks, hidden in `jflib` (`#[doc(hidden)]`) |
+| `jflib-installer`, `jflib-appimagert` | nothing: the setup stub and the AppImage runtime that `cargo jflib package` of the same version builds |
+| `jflib-modrt`, `jflib-modplat` | not yet: loadable modules are built, but not tested for programs outside this repository |
+
+Not published and no part of it: PaintCraft's plugin ABI (`lib/plugin`, `REPO_ONLY` in
+`tools/gendoc.py`), the apps, `build_rs.py` and `tools/`. `build_rs.py check` keeps what `jflib`
+shows equal to what API.md documents (a crate that is neither documented nor hidden fails), and
+`api-diff` compares exactly that.
+
+A crate of another author that a program adds itself is outside all of this, and outside
+`PERMISSIONS` too: its own system calls do not pass `plat`, which enforces the manifest. Only the
+`sandbox` line confines it, by the operating system's sandbox ([PERMISSIONS.md](PERMISSIONS.md)).
+
 ## What is public
 
 The public API is what [API.md](API.md) documents:
 
-- every item of the crates in the `CRATES` table of [`tools/gendoc.py`](../tools/gendoc.py) that
-  another crate can name: `pub` items of the crate root and of `pub mod` modules, items
+- every item of the crates in the `CRATES` table of [`tools/gendoc.py`](../tools/gendoc.py) (but
+  `REPO_ONLY`) that another crate can name: `pub` items of the crate root and of `pub mod` modules, items
   re-exported with `pub use` (also through private modules and globs), the `pub` methods and
   fields of public types, every member of a public trait, `#[macro_export]` macros, the derives
   and `impl Trait for Type` of public types;
@@ -80,6 +105,16 @@ struct as a literal. The library's descriptor structs come with an empty value
 so a new field is a compatible addition here; `api-diff` lists it under "Notes". Code that lists
 every field without `..X::NONE` may have to be extended.
 
+**Enums that grow** are `#[non_exhaustive]`, so a new variant is no break: every error enum,
+the GPU stack (`gpu`, `wgsl`, `shader`), and the open lists such as widget events, roles, states,
+formats and `netpkt::decode::Proto` (172 of 284 public enums). A program that matches one needs a
+`_` arm. Exhaustive stay the enums a consumer must handle completely, where the compiler's demand
+for a new arm is the point: the document model (`doc_core`, its errors excepted; `doc_io` and
+`doc_layout` write every variant), the protocol messages of `netpkt` and `eapm` (a program that
+speaks a protocol handles each message), what `ui` handles completely (`plat`'s events, states and
+answers, `gpu::TryAcquire`, `gpu::PresentMode`) and closed alternatives (`Either`, `IpAddr`,
+`FingerPhase`, a kind with an `Other` variant). A new variant there is breaking.
+
 **Parameter names** are no part of a signature: renaming `_id` to `id` changes nothing for a
 caller, and `api-diff` ignores it, as it ignores line breaks and trailing commas.
 
@@ -102,7 +137,7 @@ caller, and `api-diff` ignores it, as it ignores line breaks and trailing commas
 python build_rs.py api-diff                    # the sources against the newest docs/api snapshot
 python build_rs.py api-diff --against 0.1.0    # ... against that release
 python build_rs.py api-diff --all              # every line (default: 200 per group)
-python build_rs.py api-diff --snapshot         # write docs/api/<lib/VERSION>.txt
+python build_rs.py api-diff --snapshot         # write docs/api/<the library's version>.txt
 ```
 
 It reads the sources with gendoc's parser (no compiler), walks every crate's modules to find
@@ -110,8 +145,8 @@ each item's public paths and keeps the shortest, so moving an item between modul
 re-exported changes nothing. It prints four groups: **Breaking** (removed, changed, a new variant
 of an exhaustive enum, a new required trait member, ...), **Deprecated**, **Added** and
 **Notes**, then the version the next release needs. The exit code is 1 when there are breaking
-changes and `lib/VERSION` is lower than that version, so it can guard a release or a CI job;
-between releases (`lib/VERSION` still the last release) it flags every breaking change.
+changes and the library's version is lower than that version, so it can guard a release or a CI job;
+between releases (the version still the last release) it flags every breaking change.
 
 `build_rs.py test` prints a one-line summary (`API since 0.1.0: 2 breaking, 0 deprecated, 14 added`)
 and does not fail on it: breaking changes between releases are allowed, the release decides the
@@ -128,7 +163,7 @@ describes the format and the rules in detail.
 1. `python build_rs.py api-diff`: read the breaking changes and decide the version.
 2. `python build_rs.py changelog` shows `[Unreleased]`; add what is missing.
 3. `python build_rs.py release X.Y.Z` renames `[Unreleased]` to `[X.Y.Z] - DATE` (a new empty
-   `[Unreleased]` above it), writes `lib/VERSION` and the snapshot `docs/api/X.Y.Z.txt`. It
+   `[Unreleased]` above it), writes the version to `Cargo.toml` and `Cargo.lock` and the snapshot `docs/api/X.Y.Z.txt`. It
    refuses a version that is not newer than the last release or too small for the API changes
    (`--force` cuts it anyway, with a warning; `--date` sets the date).
 4. `python build_rs.py test --quick` (both targets) and `python tools/gendoc.py --check`, then

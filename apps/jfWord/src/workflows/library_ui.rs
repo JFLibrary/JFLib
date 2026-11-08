@@ -99,6 +99,7 @@ fn storage_message(error: &LibraryStoreError) -> String {
         LibraryStoreError::Codec(_) => {
             "Die Bibliothek oder die Änderung enthält ungültige oder nicht unterstützte Daten. Bitte eine geprüfte Sicherung verwenden."
         }
+        _ => "Die Bibliothek konnte nicht verwendet werden. Es wurde nichts übernommen.",
     })
 }
 fn source_label(source: &Source) -> String {

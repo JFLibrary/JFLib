@@ -9,6 +9,7 @@
 use crate::bn::{self, Limbs, Mont};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Curve {
     P256,
     P384,

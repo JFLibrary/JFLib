@@ -5,6 +5,7 @@ use alloc::{string::String, vec::Vec};
 
 /// State of a cooperative host operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Status {
     /// Queued but not started.
     Pending,

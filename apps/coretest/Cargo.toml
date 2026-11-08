@@ -1,0 +1,37 @@
+[package]
+name = "coretest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "coretest"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+agent_core.workspace = true
+plat.workspace = true
+base.workspace = true
+datetime.workspace = true
+crypto.workspace = true
+compress.workspace = true
+netpkt.workspace = true
+datastore.workspace = true
+netio.workspace = true
+cas.workspace = true
+eapm.workspace = true
+script = { path = "../jfs/crates/script" }
+
+[build-dependencies]
+jflib-build.workspace = true

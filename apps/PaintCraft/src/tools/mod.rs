@@ -184,7 +184,7 @@ impl ToolCfg {
         selqual: SQ_AA as u32,
         pressure: 1,
         ver: 0,
-        smooth: 0, // Ungeglätteter Weg
+        smooth: 1, // Geglätteter Weg
     };
 
     // the TOOLCFG fields of the hooks / records by asm offset (t1_fields, t1_cfgf)
@@ -314,6 +314,8 @@ pub(crate) struct Tool {
     pen_tool: i32,
     /// (PN1) a pen is known (Druckempfindlichkeit shown) / plat::pen_devices was asked
     pen_seen: bool,
+    /// the size button held down, when its next step is due (ms)
+    width_hold: (u32, u32),
     pen_probed: bool,
     /// inside TD_COMMIT / TD_CANCEL
     in_live: bool,
@@ -346,6 +348,7 @@ impl Default for Tool {
             prev: 0,
             pen_tool: 0,
             pen_seen: false,
+            width_hold: (0, 0),
             pen_probed: false,
             in_live: false,
             ptr_fx: 0,
@@ -929,24 +932,61 @@ pub(crate) fn opt_sep(ui: &mut Ui) {
     ui.spacer(4);
 }
 
+const WIDTH_HOLD_MS: u32 = 350;
+const WIDTH_EVERY_MS: u32 = 40;
+
 /// opt_width() -> 1 changed -- "Pinselgröße:" [-] [number] [+]
 pub(crate) fn opt_width(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut ch = false;
     opt_label(ui, "Pinselgröße:");
-    if ui.icon_button(ID_OPT_WDEC, IC_REMOVE, "Pinsel verkleinern") & EV_ACT != 0 {
-        width_step(p, ui, -1);
-        ch = true;
-    }
+    let ev = ui.icon_button(ID_OPT_WDEC, IC_REMOVE, crate::preferences::localization::tr("Pinsel verkleinern"));
+    ch |= width_button(p, ui, ID_OPT_WDEC, ev, -1);
     ui.next_size(64, 0);
     if ui.number_box_f(ID_OPT_WIDTH, &mut p.tool.cfg.width, &RF_WIDTH) & EV_ACT != 0 {
         tool_cfg_changed(p);
         outline_update(p, ui);
         ch = true;
     }
-    if ui.icon_button(ID_OPT_WINC, IC_ADD, "Pinsel vergrößern") & EV_ACT != 0 {
-        width_step(p, ui, 1);
-        ch = true;
+    let ev = ui.icon_button(ID_OPT_WINC, IC_ADD, crate::preferences::localization::tr("Pinsel vergrößern"));
+    ch |= width_button(p, ui, ID_OPT_WINC, ev, 1);
+    ch
+}
+
+// a size button (the widget just before, its events ev) -> changed: a step at the press, after
+// WIDTH_HOLD_MS one every WIDTH_EVERY_MS while it stays down on the button, always at this speed.  The
+// click of a press that stepped adds nothing; a click without one (the keyboard) makes the step
+fn width_button(p: &mut Pn, ui: &mut Ui, id: u32, ev: u32, d: i32) -> bool {
+    ui.touch_take(TF_REST); // (a finger that rests holds it too)
+    let (held, next) = p.tool.width_hold;
+    if ev & EV_HELD == 0 {
+        if held == id {
+            p.tool.width_hold = (0, 0);
+            return false;
+        }
+        if ev & EV_ACT == 0 {
+            return false;
+        }
+        width_step(p, ui, d);
+        return true;
     }
+    let now = ui.now();
+    let mut ch = false;
+    let mut next = next;
+    if held != id {
+        next = now.wrapping_add(WIDTH_HOLD_MS);
+        width_step(p, ui, d);
+        ch = true;
+    } else if ev & EV_HOVER == 0 {
+        next = now.wrapping_add(WIDTH_EVERY_MS);
+    } else {
+        while now.wrapping_sub(next) as i32 >= 0 {
+            next = next.wrapping_add(WIDTH_EVERY_MS);
+            width_step(p, ui, d);
+            ch = true;
+        }
+    }
+    p.tool.width_hold = (id, next);
+    ui.timer(TMR_WIDTH_HOLD, next.wrapping_sub(now).max(1)); // (a pass then, nothing else moves)
     ch
 }
 
@@ -1045,18 +1085,18 @@ pub(crate) fn opt_menu(p: &mut Pn, ui: &mut Ui, id: u32, cur: &mut u32, labels: 
     true
 }
 
-static AA_LABELS: [&str; 2] = ["Kantenglättung an", "Kantenglättung aus"];
+static AA_LABELS: [&str; 2] = ["Kantenglättung an", "Kantenglättung aus"]; // i18n
 static AA_ICONS: [u32; 2] = [IC_CIRCLE_FILL, IC_GRID];
-static SMOOTH_LABELS: [&str; 2] = ["Geglätteter Weg", "Ungeglätteter Weg"];
+static SMOOTH_LABELS: [&str; 2] = ["Geglätteter Weg", "Ungeglätteter Weg"]; // i18n
 static SMOOTH_ICONS: [u32; 2] = [IC_CURVE, IC_LINE];
-static PRESSURE_LABELS: [&str; 2] = ["Stiftdruck auswerten", "Stiftdruck ignorieren"]; // (PN1)
+static PRESSURE_LABELS: [&str; 2] = ["Stiftdruck auswerten", "Stiftdruck ignorieren"]; // (PN1) // i18n
 static PRESSURE_ICONS: [u32; 2] = [IC_INKING_TOOL, IC_EDIT];
-static SELQUAL_LABELS: [&str; 2] = ["Auswahl mit Kantenglättung", "Auswahl ohne Kantenglättung"];
-static FLOOD_LABELS: [&str; 2] = ["Zusammenhängend", "Global"];
+static SELQUAL_LABELS: [&str; 2] = ["Auswahl mit Kantenglättung", "Auswahl ohne Kantenglättung"]; // i18n
+static FLOOD_LABELS: [&str; 2] = ["Zusammenhängend", "Global"]; // i18n
 static FLOOD_ICONS: [u32; 2] = [IC_DROP, IC_GLOBE];
-static SAMPLE_LABELS: [&str; 2] = ["Ebene", "Bild"];
+static SAMPLE_LABELS: [&str; 2] = ["Ebene", "Bild"]; // i18n
 static SAMPLE_ICONS: [u32; 2] = [IC_LAYERS, IC_IMAGE];
-static SELMODE_LABELS: [&str; 5] = ["Ersetzen", "Vereinigen", "Subtrahieren", "Schneiden", "Exklusiv (XOR)"];
+static SELMODE_LABELS: [&str; 5] = ["Ersetzen", "Vereinigen", "Subtrahieren", "Schneiden", "Exklusiv (XOR)"]; // i18n
 static SELMODE_ICONS: [u32; 5] = [IC_SELECT_RECT, IC_ADD, IC_REMOVE, IC_CROP, IC_SWITCH];
 static BLEND_ICON: [u32; 1] = [IC_LAYERS];
 /// blend mode menu: row -> BM_* and BM_* -> row (Normal, Überschreiben, then the others)
@@ -1066,7 +1106,7 @@ static BLEND_ROW: [u8; 15] = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 1];
 /// opt_aa() -> 1 changed -- antialiasing on / off (icon drop-down)
 pub(crate) fn opt_aa(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut v = (p.tool.cfg.aa == 0) as u32; // 0 = aktiviert, 1 = deaktiviert
-    if !opt_menu(p, ui, ID_OPT_AA, &mut v, &AA_LABELS, &AA_ICONS, Some("Antialiasing"), OMF_ICONONLY as u32) {
+    if !opt_menu(p, ui, ID_OPT_AA, &mut v, &AA_LABELS, &AA_ICONS, Some("Antialiasing"), OMF_ICONONLY as u32) { // i18n
         return false;
     }
     p.tool.cfg.aa = (v == 0) as u32;
@@ -1077,7 +1117,7 @@ pub(crate) fn opt_aa(p: &mut Pn, ui: &mut Ui) -> bool {
 pub(crate) fn opt_blend(p: &mut Pn, ui: &mut Ui) -> bool {
     let b = if p.tool.cfg.blend < BM_COUNT { p.tool.cfg.blend } else { 0 };
     let mut v = BLEND_ROW[b as usize] as u32;
-    if !opt_menu(p, ui, ID_OPT_BLEND, &mut v, &BLEND_LABELS, &BLEND_ICON, Some("Füllmethode"), (OMF_ICONONLY | OMF_ICON1) as u32) {
+    if !opt_menu(p, ui, ID_OPT_BLEND, &mut v, &BLEND_LABELS, &BLEND_ICON, Some("Füllmethode"), (OMF_ICONONLY | OMF_ICON1) as u32) { // i18n
         return false;
     }
     if v <= BLEND_N - 1 {
@@ -1088,7 +1128,7 @@ pub(crate) fn opt_blend(p: &mut Pn, ui: &mut Ui) -> bool {
 
 /// opt_flood() -> 1 changed -- "Füllungsmodus:" Zusammenhängend / Global
 pub(crate) fn opt_flood(p: &mut Pn, ui: &mut Ui) -> bool {
-    opt_label(ui, "Füllungsmodus:");
+    opt_label(ui, "Füllungsmodus:"); // i18n
     let mut v = p.tool.cfg.flood;
     let r = opt_menu(p, ui, ID_OPT_FLOOD, &mut v, &FLOOD_LABELS, &FLOOD_ICONS, None, OMF_ICONONLY as u32);
     p.tool.cfg.flood = v;
@@ -1105,7 +1145,7 @@ pub(crate) fn opt_sampling(p: &mut Pn, ui: &mut Ui) -> bool {
 
 /// opt_selmode() -> 1 changed -- "Auswahlmodus:" (selection tools)
 pub(crate) fn opt_selmode(p: &mut Pn, ui: &mut Ui) -> bool {
-    opt_label(ui, "Auswahlmodus:");
+    opt_label(ui, "Auswahlmodus:"); // i18n
     let mut v = p.tool.cfg.selmode;
     let r = opt_menu(p, ui, ID_OPT_SELMODE, &mut v, &SELMODE_LABELS, &SELMODE_ICONS, None, 0);
     p.tool.cfg.selmode = v;
@@ -1115,7 +1155,7 @@ pub(crate) fn opt_selmode(p: &mut Pn, ui: &mut Ui) -> bool {
 /// opt_smooth() -> 1 changed -- Pfadglättung: Geglätteter / Ungeglätteter Weg (icon)
 pub(crate) fn opt_smooth(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut v = (p.tool.cfg.smooth == 0) as u32; // 0 = geglättet
-    if !opt_menu(p, ui, ID_OPT_SMOOTH, &mut v, &SMOOTH_LABELS, &SMOOTH_ICONS, Some("Pfadglättung"), OMF_ICONONLY as u32) {
+    if !opt_menu(p, ui, ID_OPT_SMOOTH, &mut v, &SMOOTH_LABELS, &SMOOTH_ICONS, Some("Pfadglättung"), OMF_ICONONLY as u32) { // i18n
         return false;
     }
     p.tool.cfg.smooth = (v == 0) as u32;
@@ -1131,7 +1171,7 @@ pub(crate) fn opt_pressure(p: &mut Pn, ui: &mut Ui) -> bool {
         return false;
     }
     let mut v = (p.tool.cfg.pressure == 0) as u32; // 0 = aktiviert
-    if !opt_menu(p, ui, ID_OPT_PRESSURE, &mut v, &PRESSURE_LABELS, &PRESSURE_ICONS, Some("Druckempfindlichkeit"), OMF_ICONONLY as u32) {
+    if !opt_menu(p, ui, ID_OPT_PRESSURE, &mut v, &PRESSURE_LABELS, &PRESSURE_ICONS, Some("Druckempfindlichkeit"), OMF_ICONONLY as u32) { // i18n
         return false;
     }
     p.tool.cfg.pressure = (v == 0) as u32;
@@ -1159,7 +1199,7 @@ fn pen_known(p: &mut Pn, ui: &mut Ui) -> bool {
 /// opt_selqual() -> 1 changed -- Auswahl mit Kantenglättung / nicht glätten (icon drop-down)
 pub(crate) fn opt_selqual(p: &mut Pn, ui: &mut Ui) -> bool {
     let mut v = p.tool.cfg.selqual;
-    let r = opt_menu(p, ui, ID_OPT_SELQUAL, &mut v, &SELQUAL_LABELS, &AA_ICONS, Some("Auswahl-Qualität"), OMF_ICONONLY as u32);
+    let r = opt_menu(p, ui, ID_OPT_SELQUAL, &mut v, &SELQUAL_LABELS, &AA_ICONS, Some("Auswahl-Qualität"), OMF_ICONONLY as u32); // i18n
     p.tool.cfg.selqual = v;
     r
 }
@@ -1845,6 +1885,7 @@ static HELP_TAB: [&str; 19] = [
 ];
 
 /// tool blend modes (paint.net ContentBlendMode names), in menu order
+// i18n
 static BLEND_LABELS: [&str; 15] = [
     "Normal",
     "Überschreiben",

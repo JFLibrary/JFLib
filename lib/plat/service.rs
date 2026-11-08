@@ -37,6 +37,7 @@ pub struct ServiceSpec<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ServiceState {
     NotInstalled,
     Stopped,

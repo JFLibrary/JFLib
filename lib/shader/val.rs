@@ -69,6 +69,7 @@ use crate::parse::{self, Inst};
 use crate::spv::{self, op, Bi, Cap, Dec, Model, Mode, Sc};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Rule {
     Header,
     Grammar,

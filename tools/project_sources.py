@@ -44,7 +44,9 @@ def project_sources(root, assets=False):
     for directory, children, names in os.walk(root.parent, followlinks=False):
         children[:] = sorted(c for c in children if c not in EXCLUDED
                              and not (Path(directory) / c).is_symlink())
-        files.update((Path(directory) / n).resolve() for n in names if n.endswith(".rs"))
+        # a Cargo build script next to the crate root is a program of its own, with std
+        files.update((Path(directory) / n).resolve() for n in names if n.endswith(".rs")
+                     and not (n == "build.rs" and Path(directory) == root.parent))
     pending = list(files)
     seen = set(files)
     while pending:

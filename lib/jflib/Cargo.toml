@@ -1,0 +1,100 @@
+[package]
+name = "jflib"
+description = "A GUI library and everything it stands on, without the standard library"
+keywords = ["gui", "ui", "widgets", "no-std", "immediate-mode"]
+categories = ["gui", "no-std", "graphics"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+build = "build.rs"
+# DEP_JFLIB_STD for the app's build script (jflib-build): a program with std links differently
+links = "jflib"
+readme = "README.md"
+# docs/GUIDE.md and docs/API.md are copies of the repository's (in git, so `cargo publish` takes them from any
+# checkout): tools/gendoc.py writes both API.md, `python tools/crates_accept.py --template` the guide, build_rs.py
+# check compares them
+include = ["src/**", "build.rs", "README.md", "LICENSE-*", "docs/*.md", "template/**"]
+
+[lib]
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[features]
+# A program with the standard library (docs/CRATES.md, CR6; docs/GUIDE.md): std's panic handler,
+# allocator and entry instead of JFLib's own, so the app may use any std crate.  Its main.rs has
+# neither #![no_std] nor #![no_main]; ui::main! and rt::main! stay.
+std = ["rt/std", "plat/std", "ui/std", "gpu/std"]
+
+[dependencies]
+rt.workspace = true
+agent_core.workspace = true
+plat.workspace = true
+base.workspace = true
+agent_io.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+archive.workspace = true
+doc_core.workspace = true
+doc_layout.workspace = true
+doc_io.workspace = true
+img_png.workspace = true
+text_shape.workspace = true
+text.workspace = true
+img_jpeg.workspace = true
+img_bmp.workspace = true
+img_gif.workspace = true
+img_tga.workspace = true
+img_tiff.workspace = true
+img_webp.workspace = true
+img_hevc.workspace = true
+img_av1.workspace = true
+img_heif.workspace = true
+img_avif.workspace = true
+img_jxl.workspace = true
+img_jxr.workspace = true
+img_dds.workspace = true
+img_pdn.workspace = true
+fx.workspace = true
+img_svg.workspace = true
+img_all.workspace = true
+spell.workspace = true
+ui.workspace = true
+doc_view.workspace = true
+datetime.workspace = true
+crypto.workspace = true
+compress.workspace = true
+shader.workspace = true
+wgsl.workspace = true
+netpkt.workspace = true
+gpu.workspace = true
+eapm.workspace = true
+style_assets.workspace = true
+render3d.workspace = true
+style_winui.workspace = true
+style_classic.workspace = true
+style_kde.workspace = true
+style_macos.workspace = true
+
+# plat has no fs and net there
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
+cas.workspace = true
+datastore.workspace = true
+netio.workspace = true
+update.workspace = true
+
+# takes about 25 minutes for wasm32 (docs/CRATES.md, "Risiken"); who needs it there names it directly
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+img_jxl_enc.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's);
+# with std, so plat::std_start and rt::panic_hook show and Linux shows the glibc build that windows use
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
+features = ["std"]

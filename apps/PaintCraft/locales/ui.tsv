@@ -484,3 +484,729 @@ Ein Klick setzt die Schreibmarke, danach einfach lostippen. Der Text erscheint i
 Linke Maustaste zeichnet in der Primärfarbe, rechte in der Sekundärfarbe. Umschalt rastet die Richtung ein, Alt zeichnet von der Mitte aus.	The left mouse button draws in the primary color, the right one in the secondary color. Shift snaps the direction, Alt draws from the center.	Le bouton gauche dessine avec la couleur primaire, le bouton droit avec la couleur secondaire. Maj aimante la direction, Alt dessine depuis le centre.
 Mit gedrückter Maustaste eine Form aufziehen. Umschalt hält die Proportionen fest, Alt zeichnet von der Mitte aus.	Drag to draw a shape. Shift keeps the proportions, Alt draws from the center.	Faites glisser pour tracer une forme. Maj conserve les proportions, Alt dessine depuis le centre.
 Am Anfasser lässt sich der Text verschieben. Mit gedrückter Strg-Taste verschwinden Anfasser und Schreibmarke.	Drag the handle to move the text. Hold Ctrl to hide the handle and the cursor.	La poignée déplace le texte. En maintenant Ctrl, la poignée et le curseur disparaissent.
+# the English UI pass (2026-11-08): texts the code shows through tr / tf / list
+(Fehler)	(error)	(erreur)
+(keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)	(none: test run without --config / PaintCraft_CONFIG_DIR)	(aucun : exécution de test sans --config / PaintCraft_CONFIG_DIR)
+(wird berechnet)	(calculating)	(calcul en cours)
+0 = automatisch ({} MB: 40 % des Arbeitsspeichers, höchstens 4 GB).	0 = automatic ({} MB: 40 % of the memory, at most 4 GB).	0 = automatique ({} Mo : 40 % de la mémoire, 4 Go au plus).
+0 = automatisch ({} logische Prozessoren). Aktuell {} Threads; Änderungen werden nach einem Neustart wirksam.	0 = automatic ({} logical processors). Currently {} threads; changes take effect after a restart.	0 = automatique ({} processeurs logiques). Actuellement {} threads ; les modifications prennent effet après un redémarrage.
+11 × 11 Pixel	11 × 11 pixels	11 × 11 pixels
+180° (alle) Drehen	Rotate 180°	Faire pivoter de 180°
+24-Bit	24-bit	24 bits
+3 × 3 Pixel	3 × 3 pixels	3 × 3 pixels
+31 × 31 Pixel	31 × 31 pixels	31 × 31 pixels
+32-Bit	32-bit	32 bits
+4:2:0 (kleinste Datei)	4:2:0 (smallest file)	4:2:0 (fichier le plus petit)
+4:4:4 (höchste Qualität)	4:4:4 (best quality)	4:4:4 (meilleure qualité)
+5 × 5 Pixel	5 × 5 pixels	5 × 5 pixels
+51 × 51 Pixel	51 × 51 pixels	51 × 51 pixels
+8-Bit	8-bit	8 bits
+90° nach links drehen	Rotate 90° counterclockwise	Faire pivoter de 90° vers la gauche
+90° nach rechts drehen	Rotate 90° clockwise	Faire pivoter de 90° vers la droite
+; nicht geladen: 	; not loaded: 	 ; non chargées :
+<< Weniger	<< Less	<< Moins
+A3 (297 × 420 mm)	A3 (297 × 420 mm)	A3 (297 × 420 mm)
+A4 (210 × 297 mm)	A4 (210 × 297 mm)	A4 (210 × 297 mm)
+A5 (148 × 210 mm)	A5 (148 × 210 mm)	A5 (148 × 210 mm)
+A8 (Linear, Alpha)	A8 (linear, alpha)	A8 (linéaire, alpha)
+A98 RGB	A98 RGB	A98 RGB
+Abdunkeln	Darken	Assombrir
+Abgeflachte Kante	Bevel	Biseau
+Abgerundet	Round	Arrondi
+Abschneiden	Clamp	Bloquer
+Absolut farbmetrisch	Absolute colorimetric	Colorimétrie absolue
+Absolut:	Absolute:	Absolu :
+Absturz in {} ({} bei {}, Adresse {}). Das Plugin wurde deaktiviert.	Crash in {} ({} at {}, address {}). The plugin was disabled.	Plantage dans {} ({} à {}, adresse {}). Le plugin a été désactivé.
+Abwedeln / Nachbelichten	Dodge / burn	Densité − / +
+Adaptiv (scharf)	Adaptive (sharp)	Adaptatif (net)
+Additiv	Additive	Addition
+Aktuelle Bildgröße: {}	Current image size: {}	Taille actuelle de l’image : {}
+Alle Bildtypen	All image types	Tous les types d’image
+Alle Größen	Any size	Toutes les tailles
+Alles auswählen	Select all	Tout sélectionner
+Alpha-Modus der Toleranz	Tolerance alpha mode	Mode alpha de la tolérance
+An Seite anpassen	Fit to page	Ajuster à la page
+Anker:	Anchor:	Ancre :
+Ansicht verschieben (H)	Pan (H)	Déplacer la vue (H)
+Antialiasing	Antialiasing	Lissage
+Antwort zu groß.	Response too large.	Réponse trop volumineuse.
+Anzeige: {} dpi ({} %), Farbschema {}	Display: {} dpi ({} %), color scheme {}	Affichage : {} ppp ({} %), thème {}
+Arbeitsspeicher knapp: Der Verlauf wurde geleert.	Low memory: the history was cleared.	Mémoire insuffisante : l’historique a été vidé.
+Arbeitsspeicher: {} MB	Memory: {} MB	Mémoire : {} Mo
+Auf Auswahl zuschneiden	Crop to selection	Rogner selon la sélection
+Aufhellen	Lighten	Éclaircir
+Ausgabe	Output	Sortie
+Ausgabehistogramm	Output histogram	Histogramme de sortie
+Ausgangsschwarzwert	Output black point	Point noir de sortie
+Ausgangsweißwert	Output white point	Point blanc de sortie
+Ausgefüllter Pfeil	Filled arrow	Flèche pleine
+Ausrichtungsfehler	alignment fault	erreur d’alignement
+Ausschneiden	Cut	Couper
+Auswahl aufheben	Deselect	Désélectionner
+Auswahl drehen	Rotate selection	Faire pivoter la sélection
+Auswahl einfügen (Schnittmenge)	Paste selection (intersect)	Coller la sélection (intersection)
+Auswahl einfügen (XOR)	Paste selection (XOR)	Coller la sélection (XOR)
+Auswahl einfügen (abziehen)	Paste selection (subtract)	Coller la sélection (soustraire)
+Auswahl einfügen (vereinigen)	Paste selection (union)	Coller la sélection (union)
+Auswahl füllen	Fill selection	Remplir la sélection
+Auswahl umkehren	Invert selection	Inverser la sélection
+Auswahl verschieben (M)	Move selection (M)	Déplacer la sélection (M)
+Auswahl-Qualität	Selection quality	Qualité de la sélection
+Auswahl: {}, {}	Selection: {}, {}	Sélection : {}, {}
+Auswahlgröße ändern	Resize selection	Redimensionner la sélection
+Auswahlinhalt löschen	Erase selection	Effacer la sélection
+Auswahlmodus:	Selection mode:	Mode de sélection :
+B4G4R4A4 (Linear, A4R4G4B4)	B4G4R4A4 (linear, A4R4G4B4)	B4G4R4A4 (linéaire, A4R4G4B4)
+B5G5R5A1 (Linear, A1R5G5B5)	B5G5R5A1 (linear, A1R5G5B5)	B5G5R5A1 (linéaire, A1R5G5B5)
+B5G6R5 (Linear, R5G6B5)	B5G6R5 (linear, R5G6B5)	B5G6R5 (linéaire, R5G6B5)
+B8G8R8 (Linear, R8G8B8)	B8G8R8 (linear, R8G8B8)	B8G8R8 (linéaire, R8G8B8)
+B8G8R8A8 (Linear, A8R8G8B8)	B8G8R8A8 (linear, A8R8G8B8)	B8G8R8A8 (linéaire, A8R8G8B8)
+B8G8R8A8 (sRGB, DX 10+)	B8G8R8A8 (sRGB, DX 10+)	B8G8R8A8 (sRGB, DX 10+)
+B8G8R8X8 (Linear, X8R8G8B8)	B8G8R8X8 (linear, X8R8G8B8)	B8G8R8X8 (linéaire, X8R8G8B8)
+B8G8R8X8 (sRGB, DX 10+)	B8G8R8X8 (sRGB, DX 10+)	B8G8R8X8 (sRGB, DX 10+)
+BC1 (Linear, DXT1)	BC1 (linear, DXT1)	BC1 (linéaire, DXT1)
+BC1 (sRGB, DX 10+)	BC1 (sRGB, DX 10+)	BC1 (sRGB, DX 10+)
+BC2 (Linear, DXT3)	BC2 (linear, DXT3)	BC2 (linéaire, DXT3)
+BC2 (sRGB, DX 10+)	BC2 (sRGB, DX 10+)	BC2 (sRGB, DX 10+)
+BC3 (Linear, DXT5)	BC3 (linear, DXT5)	BC3 (linéaire, DXT5)
+BC3 (sRGB, DX 10+)	BC3 (sRGB, DX 10+)	BC3 (sRGB, DX 10+)
+BC4 (Linear, mit Vorzeichen)	BC4 (linear, signed)	BC4 (linéaire, signé)
+BC4 (Linear, vorzeichenlos)	BC4 (linear, unsigned)	BC4 (linéaire, non signé)
+BC5 (Linear, mit Vorzeichen)	BC5 (linear, signed)	BC5 (linéaire, signé)
+BC5 (Linear, vorzeichenlos)	BC5 (linear, unsigned)	BC5 (linéaire, non signé)
+BC6H (Linear, mit Vorzeichen, DX 11+)	BC6H (linear, signed, DX 11+)	BC6H (linéaire, signé, DX 11+)
+BC6H (Linear, vorzeichenlos, DX 11+)	BC6H (linear, unsigned, DX 11+)	BC6H (linéaire, non signé, DX 11+)
+BC7 (Linear, DX 11+)	BC7 (linear, DX 11+)	BC7 (linéaire, DX 11+)
+BC7 (sRGB, DX 11+)	BC7 (sRGB, DX 11+)	BC7 (sRGB, DX 11+)
+Bearbeiten	Edit	Modifier
+Befehlssätze: {}	Instruction sets: {}	Jeux d’instructions : {}
+Begradigen	Straighten	Redresser
+Beibehalten	Keep	Conserver
+Belegt: {} MB im Arbeitsspeicher, {} MB in der Auslagerungsdatei.	In use: {} MB in memory, {} MB in the swap file.	Utilisé : {} Mo en mémoire, {} Mo dans le fichier d’échange.
+Belichtung	Exposure	Exposition
+Bemühung	Effort	Effort
+Betriebssystem: {}	Operating system: {}	Système d’exploitation : {}
+Bewegungsunschärfe	Motion blur	Flou de mouvement
+Bikubisch	Bicubic	Bicubique
+Bikubisch (glatt)	Bicubic (smooth)	Bicubique (lisse)
+Bild horizontal spiegeln	Flip image horizontally	Retourner l’image horizontalement
+Bild vertikal spiegeln	Flip image vertically	Retourner l’image verticalement
+Bild wird dekodiert …	Decoding image …	Décodage de l’image …
+Bild: {} × {} Pixel, {} dpi	Image: {} × {} pixels, {} dpi	Image : {} × {} pixels, {} ppp
+Bilderfassung	Image capture	Acquisition d’image
+Bilderliste	Image list	Liste des images
+Bildschirm	Screen	Superposition
+Bilinear	Bilinear	Bilinéaire
+Bilinear (schnell)	Bilinear (fast)	Bilinéaire (rapide)
+Bilinear mit Multisampling	Bilinear with multisampling	Bilinéaire avec multiéchantillonnage
+Bilineare	Bilinear	Bilinéaire
+Binär	Binary	Binaire
+Blaukanal bearbeiten (ein/aus)	Edit blue channel (on/off)	Modifier le canal bleu (oui/non)
+Bleistiftskizze	Pencil sketch	Dessin au crayon
+Bokeh	Bokeh	Bokeh
+Box-Weichzeichner	Square blur	Flou carré
+Bézierpfad	Bézier path	Tracé de Bézier
+CustomBrushes fehlt in der Preset-Datei.	CustomBrushes is missing from the preset file.	CustomBrushes est absent du fichier de préréglages.
+CustomBrushes fehlt oder ist mehrfach vorhanden.	CustomBrushes is missing or appears more than once.	CustomBrushes est absent ou présent plusieurs fois.
+Das Bild ist zu groß.	The image is too large.	L’image est trop grande.
+Das Bild ragt über die Leinwand hinaus.	The image is larger than the canvas.	L’image dépasse du canevas.
+Das Bild wurde während der Filterausführung geändert. Das Ergebnis wurde verworfen.	The image changed while the filter ran. The result was discarded.	L’image a été modifiée pendant l’exécution du filtre. Le résultat a été abandonné.
+Das Bild wurde während der Plugin-Ausführung geändert. Das Ergebnis wurde verworfen.	The image changed while the plugin ran. The result was discarded.	L’image a été modifiée pendant l’exécution du plugin. Le résultat a été abandonné.
+Das Bild überschreitet die Host-Grenze von 100 Millionen Pixeln.	The image exceeds the host’s limit of 100 million pixels.	L’image dépasse la limite de l’hôte de 100 millions de pixels.
+Das Drucken ist fehlgeschlagen.	Printing failed.	L’impression a échoué.
+Das Farbprofil ließ sich nicht speichern.	The color profile could not be saved.	Impossible d’enregistrer le profil de couleur.
+Das Pinsel-Preset ist kein Objekt.	The brush preset is not an object.	Le préréglage de pinceau n’est pas un objet.
+Das Plugin benötigt andere Bibliotheken (nicht erlaubt: nur die Plugin-API).	The plugin needs other libraries (not allowed: only the plugin API).	Le plugin a besoin d’autres bibliothèques (non autorisé : seulement l’API des plugins).
+Das Plugin benötigt die Plugin-API-Version {}, vorhanden ist {}.	The plugin needs plugin API version {}, available is {}.	Le plugin nécessite la version {} de l’API des plugins, la version disponible est {}.
+Das Plugin enthält eine nicht unterstützte Relokation.	The plugin contains an unsupported relocation.	Le plugin contient une relocalisation non prise en charge.
+Das Plugin enthält weder Effekte noch Dateitypen noch Formen.	The plugin contains no effects, file types or shapes.	Le plugin ne contient ni effets, ni types de fichier, ni formes.
+Das Plugin hat das Laden abgelehnt (pn_plugin_query lieferte 0).	The plugin refused to load (pn_plugin_query returned 0).	Le plugin a refusé le chargement (pn_plugin_query a renvoyé 0).
+Das Plugin ist abgestürzt und wurde deaktiviert (siehe Einstellungen ▸ Plugin-Fehler).	The plugin crashed and was disabled (see Settings ▸ Plugin errors).	Le plugin a planté et a été désactivé (voir Paramètres ▸ Erreurs des plugins).
+Das Plugin wurde nach einem Fehler deaktiviert (siehe Einstellungen ▸ Plugin-Fehler).	The plugin was disabled after an error (see Settings ▸ Plugin errors).	Le plugin a été désactivé après une erreur (voir Paramètres ▸ Erreurs des plugins).
+Das Speichern ist aus unbekanntem Grund fehlgeschlagen.	Saving failed for an unknown reason.	L’enregistrement a échoué pour une raison inconnue.
+Das Wine-Präfix muss ein absoluter Linux-Pfad sein.	The Wine prefix must be an absolute Linux path.	Le préfixe Wine doit être un chemin Linux absolu.
+Das betrifft nur die gespeicherte Datei; im geöffneten Dokument bleiben alle Ebenen erhalten.	This affects only the saved file; the open document keeps all its layers.	Cela ne concerne que le fichier enregistré ; le document ouvert conserve tous ses calques.
+Das erfasste Bild ließ sich nicht öffnen ({}).	The captured image could not be opened ({}).	Impossible d’ouvrir l’image acquise ({}).
+Datei nicht gefunden.	File not found.	Fichier introuvable.
+Datei wird gelesen: {} %	Reading file: {} %	Lecture du fichier : {} %
+Datei öffnen	Open file	Ouvrir le fichier
+Dateiendung bereits belegt: {}	File extension already taken: {}	Extension de fichier déjà utilisée : {}
+Dateityp: Funktion liegt außerhalb des Codes.	File type: function lies outside the code.	Type de fichier : fonction en dehors du code.
+Dateityp: ungültige Dateiendungen.	File type: invalid file extensions.	Type de fichier : extensions non valides.
+Dateityp: ungültiger MIME-Typ.	File type: invalid MIME type.	Type de fichier : type MIME non valide.
+Dateityp: ungültiger Name.	File type: invalid name.	Type de fichier : nom non valide.
+Deckfähigkeit	Opacity	Opacité
+Deflate (ZIP)	Deflate (ZIP)	Deflate (ZIP)
+Dellen	Dents	Bosselages
+Der Arbeitsspeicher reicht für diesen Schritt nicht aus.	There is not enough memory for this step.	La mémoire est insuffisante pour cette étape.
+Der Effekt ist fehlgeschlagen (zu wenig Arbeitsspeicher).	The effect failed (not enough memory).	L’effet a échoué (mémoire insuffisante).
+Der G’MIC-Thread konnte nicht gestartet werden.	The G’MIC thread could not be started.	Impossible de démarrer le thread G’MIC.
+Der Hintergrund-Thread konnte nicht gestartet werden.	The background thread could not be started.	Impossible de démarrer le thread d’arrière-plan.
+Der Ordner ist nicht beschreibbar.	The folder is not writable.	Le dossier n’est pas accessible en écriture.
+Der Plugin-Host lieferte keinen absoluten Dateipfad.	The plugin host did not return an absolute file path.	L’hôte de plugins n’a pas renvoyé de chemin de fichier absolu.
+Der Plugin-Thread konnte nicht gestartet werden.	The plugin thread could not be started.	Impossible de démarrer le thread du plugin.
+Der Programmpfad ist unbekannt.	The program path is unknown.	Le chemin du programme est inconnu.
+Der Speicher für das Plugin konnte nicht eingerichtet werden.	The memory for the plugin could not be set up.	Impossible de préparer la mémoire du plugin.
+Der Thread der Plugin-Suche konnte nicht gestartet werden.	The plugin search thread could not be started.	Impossible de démarrer le thread de recherche des plugins.
+Der Verlaufsschritt konnte nicht wiederhergestellt werden.	The history step could not be restored.	Impossible de restaurer l’étape de l’historique.
+Der temporäre G’MIC-Ordner ließ sich nicht anlegen.	The temporary G’MIC folder could not be created.	Impossible de créer le dossier temporaire de G’MIC.
+Details anzeigen	Show details	Afficher les détails
+Details ausblenden	Hide details	Masquer les détails
+Die Antwort überschreitet die zulässige Größe.	The response exceeds the allowed size.	La réponse dépasse la taille autorisée.
+Die Datei enthält kein brauchbares Farbprofil.	The file contains no usable color profile.	Le fichier ne contient aucun profil de couleur utilisable.
+Die Datei ist defekt oder passt nicht zu ihrem Format.	The file is damaged or does not match its format.	Le fichier est endommagé ou ne correspond pas à son format.
+Die Datei ist nicht lesbar oder enthält keine Farbe.	The file cannot be read or contains no color.	Le fichier est illisible ou ne contient aucune couleur.
+Die Datei ließ sich nicht auf den Datenträger schreiben.	The file could not be written to the disk.	Impossible d’écrire le fichier sur le disque.
+Die Datei ließ sich nicht vom Datenträger lesen.	The file could not be read from the disk.	Impossible de lire le fichier sur le disque.
+Die Datei muss 1 bis 1024 Pinsel-Presets enthalten.	The file must contain 1 to 1024 brush presets.	Le fichier doit contenir de 1 à 1024 préréglages de pinceau.
+Die Ergebnis-Leinwände überschreiten die Speichergrenze.	The resulting canvases exceed the memory limit.	Les canevas obtenus dépassent la limite de mémoire.
+Die Funktion pn_plugin_query fehlt (keine Plugin-Bibliothek).	The function pn_plugin_query is missing (not a plugin library).	La fonction pn_plugin_query est absente (pas une bibliothèque de plugin).
+Die Leinwand bleibt, wie sie ist. Was über den Rand ragt,	The canvas stays as it is. Whatever extends past the edge	Le canevas reste tel quel. Ce qui dépasse du bord
+Die Leinwand wächst mit, bis das neue Bild	The canvas grows until the new image	Le canevas s’agrandit jusqu’à ce que la nouvelle image
+Die Palette ließ sich nicht laden.	The palette could not be loaded.	Impossible de charger la palette.
+Die Palette ließ sich nicht speichern.	The palette could not be saved.	Impossible d’enregistrer la palette.
+Die Pinselspitze ließ sich nicht laden (höchstens 4.194.304 Pixel).	The brush tip could not be loaded (at most 4,194,304 pixels).	Impossible de charger la pointe de pinceau (4 194 304 pixels au plus).
+Die Pinselspitze ließ sich nicht laden.	The brush tip could not be loaded.	Impossible de charger la pointe de pinceau.
+Die Plugin-Datei ließ sich nicht laden.	The plugin file could not be loaded.	Impossible de charger le fichier du plugin.
+Die Plugin-Datei ließ sich nicht lesen.	The plugin file could not be read.	Impossible de lire le fichier du plugin.
+Die Preset-Datei ließ sich nicht lesen.	The preset file could not be read.	Impossible de lire le fichier de préréglages.
+Die Rechte des Plugins sind fehlerhaft: {}	The plugin’s permissions are invalid: {}	Les autorisations du plugin sont incorrectes : {}
+Die Wine-Brücke unterstützt Katalogpfade auf C: und Z:.	The Wine bridge supports catalog paths on C: and Z:.	Le pont Wine prend en charge les chemins de catalogue sur C: et Z:.
+Die Zwischenablage hat die Daten nicht angenommen.	The clipboard did not accept the data.	Le presse-papiers n’a pas accepté les données.
+Die externe G’MIC-Anbindung benötigt die Desktop-Version.	The external G’MIC connection needs the desktop version.	La connexion externe à G’MIC nécessite la version de bureau.
+Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen.	This image format is not recognized; the file cannot be opened.	Ce format d’image n’est pas reconnu ; impossible d’ouvrir le fichier.
+Dieses Dateiformat kennt keine Ebenen. Für die Datei werden deshalb alle Ebenen zu einer einzigen vereint.	This file format has no layers. All layers are therefore merged into one for the file.	Ce format de fichier ne connaît pas les calques. Tous les calques sont donc fusionnés en un seul pour le fichier.
+Differenz	Difference	Différence
+Display P3	Display P3	Display P3
+Dithering-Level	Dithering level	Niveau de tramage
+Druckempfindlichkeit	Pressure sensitivity	Sensibilité à la pression
+Druckgröße: {} × {} cm	Print size: {} × {} cm	Taille d’impression : {} × {} cm
+Durchgezogen	Solid	Continu
+Ebene Sichtbarkeit	Layer visibility	Visibilité du calque
+Ebene duplizieren	Duplicate layer	Dupliquer le calque
+Ebene hinzufügen	Add layer	Ajouter un calque
+Ebene löschen	Delete layer	Supprimer le calque
+Ebene verdoppeln	Duplicate layer	Dupliquer le calque
+Ebene verschieben	Move layer	Déplacer le calque
+Ebene {}	Layer {}	Calque {}
+Ebenen hinzufügen	Add layers	Ajouter des calques
+Ecke Größe:	Corner size:	Taille des coins :
+Ecke vergrößern	Larger corner	Coin plus grand
+Ecke verkleinern	Smaller corner	Coin plus petit
+Effekt-Name bereits vergeben: {}	Effect name already taken: {}	Nom d’effet déjà utilisé : {}
+Effekt: free liegt außerhalb des Codes.	Effect: free lies outside the code.	Effet : free est en dehors du code.
+Effekt: prepare liegt außerhalb des Codes.	Effect: prepare lies outside the code.	Effet : prepare est en dehors du code.
+Effekt: render fehlt oder liegt außerhalb des Codes.	Effect: render is missing or lies outside the code.	Effet : render est absent ou en dehors du code.
+Effekt: ungültige Eigenschaft.	Effect: invalid property.	Effet : propriété non valide.
+Effekt: ungültiger Name.	Effect: invalid name.	Effet : nom non valide.
+Effekte und Anpassungen: {}	Effects and adjustments: {}	Effets et réglages : {}
+Eigene Formen	Custom shapes	Formes personnalisées
+Eigenschaften	Properties	Propriétés
+Ein Absturzprotokoll wurde gespeichert: {}	A crash report was saved: {}	Un rapport de plantage a été enregistré : {}
+Ein Linux-Pfad darf für Wine keinen Rückstrich enthalten.	A Linux path for Wine must not contain a backslash.	Un chemin Linux pour Wine ne doit pas contenir de barre oblique inverse.
+Einen Schritt vor	Redo	Rétablir
+Einen Schritt zurück	Undo	Annuler
+Eingabehistogramm	Input histogram	Histogramme d’entrée
+Eingangsschwarzwert	Input black point	Point noir d’entrée
+Eingangsweißwert	Input white point	Point blanc d’entrée
+Einheitlich	Uniform	Uniforme
+Einprägen	Emboss	Embossage
+Einstellungsdatei: {}	Settings file: {}	Fichier de paramètres : {}
+Einzelne Pixel	Single pixel	Pixel unique
+Elliptische Auswahl (S)	Ellipse select (S)	Sélection elliptique (S)
+Erodieren	Erode	Éroder
+Erweitern	Dilate	Dilater
+Es ist kein Drucker bzw. Druckdienst verfügbar.	No printer or print service is available.	Aucune imprimante ni aucun service d’impression n’est disponible.
+Es sind zu viele Bilder geöffnet.	Too many images are open.	Trop d’images sont ouvertes.
+Exklusiv (XOR)	Exclusive (XOR)	Exclusif (XOR)
+Fant	Fant	Fant
+Farbauswahl (K)	Color picker (K)	Pipette (K)
+Farbbalance	Color balance	Balance des couleurs
+Farbe hinzufügen	Add color	Ajouter une couleur
+Farbeimer (F)	Paint bucket (F)	Pot de peinture (F)
+Farbeimer, Zauberstab und Neu färben: Toleranz {} %, Füllmodus {}	Paint bucket, magic wand and recolor: tolerance {} %, flood mode {}	Pot de peinture, baguette magique et recolorier : tolérance {} %, mode de remplissage {}
+Farben vertauschen (X)	Swap colors (X)	Intervertir les couleurs (X)
+Farbig abwedeln	Color dodge	Densité couleur −
+Farbig nachbelichten	Color burn	Densité couleur +
+Farbpinsel (B)	Paintbrush (B)	Pinceau (B)
+Farbprofil	Color profile	Profil de couleur
+Farbprofil zuweisen	Assign color profile	Attribuer un profil de couleur
+Farbtemperatur / Tönung	Color temperature / tint	Température et teinte
+Farbtiefe / HDR	Color depth / HDR	Profondeur de couleur / HDR
+Farbton / Sättigung	Hue / saturation	Teinte / saturation
+Farbverlauf (G)	Gradient (G)	Dégradé (G)
+Farbverteilung des Bildes vor der Korrektur.	Color distribution of the image before the adjustment.	Répartition des couleurs de l’image avant la correction.
+Farbverteilung, wie sie nach der Korrektur aussehen wird.	Color distribution as it will look after the adjustment.	Répartition des couleurs telle qu’elle sera après la correction.
+Fest (96 DPI)	Fixed (96 DPI)	Fixe (96 PPP)
+Feste Größe	Fixed size	Taille fixe
+Festes Seitenverhältnis	Fixed ratio	Proportions fixes
+Filmkörnung (ISO)	Film grain (ISO)	Grain de film (ISO)
+Flach	Flat	Plat
+Form des Linienanfangs	Line start shape	Forme du début de ligne
+Form des Linienendes	Line end shape	Forme de la fin de ligne
+Form: ungültige Pfaddaten.	Shape: invalid path data.	Forme : données de tracé non valides.
+Form: ungültiger Name.	Shape: invalid name.	Forme : nom non valide.
+Formen (O)	Shapes (O)	Formes (O)
+Formfüllmodus	Shape fill mode	Mode de remplissage de la forme
+Fügt das Bild dem geöffneten Bild als zusätzliche Ebene hinzu.	Adds the image to the open image as an extra layer.	Ajoute l’image à l’image ouverte comme calque supplémentaire.
+Fügt die Bilder dem geöffneten Bild als zusätzliche Ebenen hinzu.	Adds the images to the open image as extra layers.	Ajoute les images à l’image ouverte comme calques supplémentaires.
+Füllmethode	Blend mode	Mode de fusion
+Füllung und Umriss	Fill and outline	Remplissage et contour
+Füllungsmodus:	Flood mode:	Mode de remplissage :
+Ganzes Bild	Whole image	Image entière
+Gaußscher Weichzeichner	Gaussian blur	Flou gaussien
+Gefundene Stifte und Grafiktabletts: {}	Pens and graphics tablets found: {}	Stylets et tablettes graphiques trouvés : {}
+Geladene Module: {}	Loaded modules: {}	Modules chargés : {}
+Gerade	Straight	Direct
+Gespiegelt wiederholen	Reflected	Répétition en miroir
+Geöffnete Bilder: {}	Open images: {}	Images ouvertes : {}
+Glatt	Smooth	Lisse
+Graustufen	Grayscale	Niveaux de gris
+Graustufen (Gamma 2,2)	Grayscale (gamma 2.2)	Niveaux de gris (gamma 2,2)
+Gravur	Relief	Relief
+Grundfarbe	Primary color	Couleur primaire
+Grundlegende Formen	Basic shapes	Formes de base
+Größere Schrift	Larger font	Police plus grande
+Grünkanal bearbeiten (ein/aus)	Edit green channel (on/off)	Modifier le canal vert (oui/non)
+G’MIC-Eingabe konnte nicht geschrieben werden.	The G’MIC input could not be written.	Impossible d’écrire l’entrée de G’MIC.
+G’MIC-Eingabe konnte nicht kodiert werden.	The G’MIC input could not be encoded.	Impossible d’encoder l’entrée de G’MIC.
+G’MIC-Ergebnis zu groß.	G’MIC result too large.	Résultat de G’MIC trop volumineux.
+G’MIC-Ergebnis überschreitet die Dateigrößengrenze.	The G’MIC result exceeds the file size limit.	Le résultat de G’MIC dépasse la taille de fichier maximale.
+G’MIC-Prozess nicht erreichbar.	G’MIC process not reachable.	Processus G’MIC injoignable.
+Haltepunkt	breakpoint	point d’arrêt
+Helligkeit / Kontrast	Brightness / contrast	Luminosité / contraste
+Hintergrund	Background	Arrière-plan
+Hintergrund:	Background:	Arrière-plan :
+Hinweis: Das JPEG-XL-Modul (jxlenc) fehlt. Gespeichert wird mit dem einfachen Schreiber: nur Qualität und Verlustfrei wirken.	Note: the JPEG XL module (jxlenc) is missing. Saving uses the simple writer: only Quality and Lossless take effect.	Remarque : le module JPEG XL (jxlenc) est absent. L’enregistrement utilise l’encodeur simple : seuls Qualité et Sans perte ont un effet.
+Hochformat	Portrait	Portrait
+Horizontal kippen	Flip horizontal	Retourner horizontalement
+Horizontal spiegeln	Flip horizontal	Retourner horizontalement
+Icon	Icon	Icône
+Importiert: {}	Imported: {}	Importé : {}
+Importiertes Profil	Imported profile	Profil importé
+In Farbprofil umrechnen	Convert to color profile	Convertir vers un profil de couleur
+In Pixel auflösen	Pixelate	Pixelliser
+In der Zwischenablage liegt kein Bild, aus dem ein neues entstehen kann.	The clipboard holds no image to create a new one from.	Le presse-papiers ne contient aucune image à partir de laquelle en créer une nouvelle.
+In der Zwischenablage liegt kein Bild.	The clipboard holds no image.	Le presse-papiers ne contient aucune image.
+In diesem Format kann PaintCraft nicht speichern.	PaintCraft cannot save in this format.	PaintCraft ne peut pas enregistrer dans ce format.
+In dieses Farbprofil lässt sich nicht umrechnen.	The image cannot be converted to this color profile.	Impossible de convertir l’image vers ce profil de couleur.
+Info	About	À propos
+Inhaltsbasiert füllen	Content-aware fill	Remplissage d’après le contenu
+Innerer Schatten	Inner shadow	Ombre intérieure
+Interpolation:	Resampling:	Rééchantillonnage :
+Julia-Fraktal	Julia fractal	Fractale de Julia
+Kachelmodus:	Tiling:	Mosaïque :
+Kachelspiegelung	Tile reflection	Réflexion en mosaïque
+Kantenerhaltende Unschärfe	Surface blur	Flou de surface
+Kantenerkennung	Edge detection	Détection des contours
+Kein Platz mehr für weitere Plugin-Dateitypen.	No room for more plugin file types.	Plus de place pour d’autres types de fichier de plugin.
+Kein Platz mehr für weitere Plugin-Effekte, -Dateitypen oder -Formen.	No room for more plugin effects, file types or shapes.	Plus de place pour d’autres effets, types de fichier ou formes de plugin.
+Kein Platz mehr für weitere Plugin-Effekte.	No room for more plugin effects.	Plus de place pour d’autres effets de plugin.
+Kein Platz mehr für weitere Plugin-Formen.	No room for more plugin shapes.	Plus de place pour d’autres formes de plugin.
+Kein Preset ausgewählt.	No preset selected.	Aucun préréglage sélectionné.
+Kein Stift und kein Grafiktablett gefunden.	No pen or graphics tablet found.	Aucun stylet ni aucune tablette graphique trouvé.
+Kein temporärer Ordner verfügbar.	No temporary folder available.	Aucun dossier temporaire disponible.
+Keine Wiederholung	No repetition	Sans répétition
+Keine gültige Plugin-Bibliothek (x86-64-DLL / ELF-Shared-Object erwartet) oder die Datei ist defekt.	Not a valid plugin library (x86-64 DLL / ELF shared object expected) or the file is damaged.	Pas une bibliothèque de plugin valide (DLL x86-64 / objet partagé ELF attendu) ou le fichier est endommagé.
+Kippen X:	Tilt X:	Inclinaison X :
+Kippen Y:	Tilt Y:	Inclinaison Y :
+Klassisch	Classic	Classique
+Kleinere Schrift	Smaller font	Police plus petite
+Klonen (Stempel) (L)	Clone stamp (L)	Tampon de duplication (L)
+Komprimierungsstufe	Compression level	Niveau de compression
+Konisch	Conical	Conique
+Kreis	Circle	Cercle
+Kristallisieren	Crystallize	Cristalliser
+Kurven	Curves	Courbes
+Kurvenzug (Spline)	Spline	Spline
+L8 (Linear, Helligkeit)	L8 (linear, luminance)	L8 (linéaire, luminance)
+LZW	LZW	LZW
+Lanczos	Lanczos	Lanczos
+Langsam	Slow	Lent
+Lasso-Auswahl (S)	Lasso select (S)	Sélection au lasso (S)
+Leerer oder ungültiger Plugin-Pfad.	Empty or invalid plugin path.	Chemin de plugin vide ou non valide.
+Legal (8,5 × 14 in)	Legal (8.5 × 14 in)	Legal (8,5 × 14 po)
+Leinwand vergrößern	Enlarge the canvas	Agrandir le canevas
+Letter (8,5 × 11 in)	Letter (8.5 × 11 in)	Letter (8,5 × 11 po)
+Leuchten	Glow	Lueur
+Leuchtkraft	Luminosity	Luminosité
+Linear	Linear	Linéaire
+Linear (gespiegelt)	Linear (reflected)	Linéaire (miroir)
+Linie / Kurve (O)	Line / curve (O)	Ligne / courbe (O)
+Linienart ändern	Change dash style	Changer le style de trait
+Links	Left	Gauche
+Links oben	Top left	En haut à gauche
+Links unten	Bottom left	En bas à gauche
+Linux-DLL-Brücke: --pdn-wine und eine Windows-.NET-/Paint.NET-Installation konfigurieren.	Linux DLL bridge: configure --pdn-wine and a Windows .NET / Paint.NET installation.	Pont DLL Linux : configurez --pdn-wine et une installation Windows de .NET / Paint.NET.
+Logische Prozessoren: {}, Worker-Threads: {}	Logical processors: {}, worker threads: {}	Processeurs logiques : {}, threads de travail : {}
+Mandelbrot-Fraktal	Mandelbrot fractal	Fractale de Mandelbrot
+Manuelle Anpassung	Levels	Niveaux
+Median	Median	Médiane
+Medianschnitt	Median cut	Coupe médiane
+Medianunschärfe	Median blur	Flou médian
+Mehr >>	More >>	Plus >>
+Milchglas	Frosted glass	Verre dépoli
+Mitte	Center	Centre
+Mittel	Medium	Moyen
+Monitor: {}	Monitor: {}	Écran : {}
+Morphologie	Morphology	Morphologie
+Multiplizieren	Multiply	Produit
+Muster {}	Pattern {}	Motif {}
+Nach dem Klick:	After clicking:	Après le clic :
+Nach unten vereinen	Merge layer down	Fusionner avec le calque inférieur
+Negierung	Negation	Négation
+Neu färben (R)	Recolor (R)	Recolorier (R)
+Neue Ebene	New layer	Nouveau calque
+Neue Größe: {}	New size: {}	Nouvelle taille : {}
+Neue Größe: {} MB	New size: {} MB	Nouvelle taille : {} Mo
+Nichts zum Einfügen: Die Zwischenablage hat weder Auswahl noch Bild.	Nothing to paste: the clipboard holds neither a selection nor an image.	Rien à coller : le presse-papiers ne contient ni sélection ni image.
+Noch nicht anwendbar: {}	Not applicable yet: {}	Pas encore applicable : {}
+Normal	Normal	Normal
+Nur Füllung	Fill only	Remplissage seul
+Nächster Nachbar	Nearest neighbor	Plus proche voisin
+Oben	Top	Haut
+Octree	Octree	Octree
+Optionen: {}, Mischmodus {}, {}	Options: {}, blend mode {}, {}	Options : {}, mode de fusion {}, {}
+Original	Original	Original
+Originale Paint.NET-Plugins: {} Effekte, {} Dateiformate	Original Paint.NET plugins: {} effects, {} file formats	Plugins Paint.NET d’origine : {} effets, {} formats de fichier
+Originalgröße	Actual size	Taille réelle
+Originalgröße (Pixeldichte)	Actual size (resolution)	Taille réelle (résolution)
+PSD-Ebenen importieren	Import PSD layers	Importer les calques PSD
+PSD-Import	PSD import	Importation PSD
+PackBits	PackBits	PackBits
+Paint.NET-Dateiformat	Paint.NET file format	Format de fichier Paint.NET
+Paint.NET-Plugin	Paint.NET plugin	Plugin Paint.NET
+PaintCraft Absturz	PaintCraft crash	Plantage de PaintCraft
+PaintCraft ist eine Bildbearbeitung in Rust auf Basis von JFLib. Ebenen, Auswahlwerkzeuge, Bildformate, Schriften, Effekte und Oberfläche werden von JFLib bereitgestellt. Die Anwendung unterstützt Windows, Linux und WebAssembly.	PaintCraft is an image editor in Rust built on JFLib. Layers, selection tools, image formats, fonts, effects and the user interface are provided by JFLib. The application supports Windows, Linux and WebAssembly.	PaintCraft est un éditeur d’images en Rust basé sur JFLib. Les calques, les outils de sélection, les formats d’image, les polices, les effets et l’interface sont fournis par JFLib. L’application prend en charge Windows, Linux et WebAssembly.
+PaintCraft musste wegen eines unerwarteten Fehlers beendet werden. Was seit dem letzten Speichern geändert wurde, ist leider verloren.	PaintCraft had to close because of an unexpected error. Unfortunately, changes made since the last save are lost.	PaintCraft a dû se fermer à cause d’une erreur inattendue. Les modifications apportées depuis le dernier enregistrement sont malheureusement perdues.
+PaintCraft-Hilfe	PaintCraft help	Aide de PaintCraft
+Palette	Palette	Palette
+Palettenordner: {}	Palette folder: {}	Dossier des palettes : {}
+Pastell	Pastel	Pastel
+Periodisch wiederholen	Repeat	Répéter
+Perzeptiv	Perceptual	Perceptuel
+Pfadglättung	Path smoothing	Lissage du tracé
+Pfeil	Arrow	Flèche
+Pfeile	Arrows	Flèches
+Pinsel-Presets	Brush presets	Préréglages de pinceau
+Pinseln und füllen: Pinselgröße {}, Härte {} %, Abstand {} %, {}	Painting and filling: brush width {}, hardness {} %, spacing {} %, {}	Peinture et remplissage : taille du pinceau {}, dureté {} %, espacement {} %, {}
+Pinselspitze	Brush tip	Pointe de pinceau
+Pixel	Pixels	Pixels
+Pixel verschieben (M)	Move pixels (M)	Déplacer les pixels (M)
+Pixeldichte:	Resolution:	Résolution :
+Plugin abgebrochen oder Zeitlimit überschritten.	Plugin canceled or time limit exceeded.	Plugin annulé ou délai dépassé.
+Plugin-Host hat die Eingabe abgebrochen.	The plugin host aborted the input.	L’hôte de plugins a interrompu l’entrée.
+Plugin-Prozess nicht erreichbar.	Plugin process not reachable.	Processus du plugin injoignable.
+Plugin-Überwachung konnte nicht aktualisiert werden.	The plugin watchdog could not be updated.	Impossible de mettre à jour la surveillance du plugin.
+Plugin-Überwachung konnte nicht angelegt werden.	The plugin watchdog could not be created.	Impossible de créer la surveillance du plugin.
+Plugins: {} geladen	Plugins: {} loaded	Plugins : {} chargés
+Polarinvertierung	Polar inversion	Inversion polaire
+Polygone und Sterne	Polygons and stars	Polygones et étoiles
+Porträt retuschieren	Retouch portrait	Retoucher le portrait
+Porträt weichzeichnen	Soften portrait	Adoucir le portrait
+Preset-Datei ist größer als 4 MiB.	The preset file is larger than 4 MiB.	Le fichier de préréglages dépasse 4 Mio.
+Presets müssen UTF-8 sein.	Presets must be UTF-8.	Les préréglages doivent être en UTF-8.
+Primärfarbe	Primary color	Couleur primaire
+Probenahme:	Sampling:	Échantillonnage :
+Probennahme:	Sampling:	Échantillonnage :
+Probennahme: {}	Sampling: {}	Échantillonnage : {}
+Prozentual:	By percentage:	En pourcentage :
+Prozessor: {}	Processor: {}	Processeur : {}
+Punkte (Bild DPI)	Points (image DPI)	Points (PPP de l’image)
+Punktiert	Dotted	Pointillé
+Quadrat	Square	Carré
+Quantize	Quantize	Quantifier
+Quelle: Sekundärfarbe	Source: secondary color	Source : couleur secondaire
+Quelle: erster Klick	Source: first click	Source : premier clic
+Querformat	Landscape	Paysage
+R8G8 (Linear, vorzeichenlos, A8L8)	R8G8 (linear, unsigned, A8L8)	R8G8 (linéaire, non signé, A8L8)
+R8G8B8A8 (Linear, A8B8G8R8)	R8G8B8A8 (linear, A8B8G8R8)	R8G8B8A8 (linéaire, A8B8G8R8)
+R8G8B8A8 (sRGB, DX 10+)	R8G8B8A8 (sRGB, DX 10+)	R8G8B8A8 (sRGB, DX 10+)
+RGB	RGB	RVB
+ROMM RGB	ROMM RGB	ROMM RGB
+Radial	Radial	Radial
+Radialer Weichzeichner	Radial blur	Flou radial
+Radierer (E)	Eraser (E)	Gomme (E)
+Raster	Screen	Superposition
+Rauschen hinzufügen	Add noise	Ajouter du bruit
+Rauschen reduzieren	Reduce noise	Réduire le bruit
+Raute	Diamond	Losange
+Rechenfehler	arithmetic error	erreur arithmétique
+Rechteck (Box)	Box	Boîte
+Rechteckige Auswahl (S)	Rectangle select (S)	Sélection rectangulaire (S)
+Rechts	Right	Droite
+Rechts oben	Top right	En haut à droite
+Rechts unten	Bottom right	En bas à droite
+Reflektieren	Reflect	Réflexion
+Regenbogen	Rainbow	Arc-en-ciel
+Relativ farbmetrisch	Relative colorimetric	Colorimétrie relative
+Rendern... {}%	Rendering... {}%	Rendu… {} %
+Rote Augen entfernen	Red eye removal	Correction des yeux rouges
+Rotkanal bearbeiten (ein/aus)	Edit red channel (on/off)	Modifier le canal rouge (oui/non)
+Scanner oder Kamera	Scanner or camera	Scanner ou appareil photo
+Scharf (Klassisch)	Sharp (classic)	Net (classique)
+Scharf (Modern)	Sharp (modern)	Net (moderne)
+Schlagschatten	Drop shadow	Ombre portée
+Schneiden	Intersect	Intersection
+Schnell	Fast	Rapide
+Schwarz	Black	Noir
+Schwarz- und Weißpunkt der Eingabe sowie das Gamma selbst bestimmen lassen	Set the input black and white points and the gamma automatically	Déterminer automatiquement les points noir et blanc d’entrée ainsi que le gamma
+Schwarzweiß erweitert	Advanced black and white	Noir et blanc avancé
+Schwelle für Transparenz	Transparency threshold	Seuil de transparence
+Sekundärfarbe	Secondary color	Couleur secondaire
+Sepia	Sepia	Sépia
+Skalar (WebAssembly)	Scalar (WebAssembly)	Scalaire (WebAssembly)
+Skizze nachzeichnen	Ink sketch	Dessin à l’encre
+Skizzenunschärfe	Sketch blur	Flou esquisse
+Spiegeln	Reflect	Réfléchir
+Spirale	Twist	Tourbillon
+Spirale linksdrehend	Spiral counterclockwise	Spirale antihoraire
+Spirale rechtsdrehend	Spiral clockwise	Spirale horaire
+Sprechblasen	Callouts	Bulles
+Stapelüberlauf	stack overflow	débordement de pile
+Stil:	Style:	Style :
+Strich-Punkt	Dash dot	Tiret-point
+Strich-Punkt-Punkt	Dash dot dot	Tiret-point-point
+Striche	Dashed	Tirets
+Subtrahieren	Subtract	Soustraire
+Symbole	Symbols	Symboles
+Systemdienst	System service	Service système
+Systemdienste sind in der Desktop-Version verfügbar.	System services are available in the desktop version.	Les services système sont disponibles dans la version de bureau.
+Sättigung	Saturation	Saturation
+Temp-Ordner: {}	Temp folder: {}	Dossier temporaire : {}
+Testaufnahme nicht lesbar.	Test capture not readable.	Capture de test illisible.
+Text (T)	Text (T)	Texte (T)
+Textdarstellung	Text rendering	Rendu du texte
+Thread-lokale Daten, Initialisierer oder ein Interpreter werden nicht unterstützt.	Thread-local data, initializers or an interpreter are not supported.	Les données locales de thread, les initialiseurs ou un interpréteur ne sont pas pris en charge.
+Tiefen / Lichter	Shadows / highlights	Ombres / hautes lumières
+Tontrennung	Posterize	Postériser
+Transparent	Transparent	Transparent
+Transparenz - Alpha	Transparency - alpha	Transparence - alpha
+Transparenzverlauf	Transparency mode	Dégradé de transparence
+Traum	Dream	Rêve
+Turbulenz	Turbulence	Turbulence
+Um 180° rotieren	Rotate 180°	Faire pivoter de 180°
+Umlaufend	Wrap	Envelopper
+Umriss	Outline	Contour
+Umriss zeichnen	Draw outline	Dessiner le contour
+Unbekannte Plugin-Kategorie	Unknown plugin category	Catégorie de plugin inconnue
+Unbenannt	Untitled	Sans titre
+Unbenannt {}	Untitled {}	Sans titre {}
+Unbenanntes Profil	Unnamed profile	Profil sans nom
+Ungültige Größe der Plugin-Antwort.	Invalid size of the plugin response.	Taille de la réponse du plugin non valide.
+Ungültige Plugin-Info (API-Version 0).	Invalid plugin info (API version 0).	Informations de plugin non valides (version d’API 0).
+Ungültige Plugin-Info (Autor).	Invalid plugin info (author).	Informations de plugin non valides (auteur).
+Ungültige Plugin-Info (Größe {}).	Invalid plugin info (size {}).	Informations de plugin non valides (taille {}).
+Ungültige Plugin-Info (Herkunft).	Invalid plugin info (origin).	Informations de plugin non valides (origine).
+Ungültige Plugin-Info (Kennung).	Invalid plugin info (signature).	Informations de plugin non valides (signature).
+Ungültige Plugin-Info (Name).	Invalid plugin info (name).	Informations de plugin non valides (nom).
+Ungültige Plugin-Info (Version).	Invalid plugin info (version).	Informations de plugin non valides (version).
+Ungültige Plugin-Info (Zeiger außerhalb des Plugins).	Invalid plugin info (pointer outside the plugin).	Informations de plugin non valides (pointeur en dehors du plugin).
+Ungültige Plugin-Info (zu viele Einträge).	Invalid plugin info (too many entries).	Informations de plugin non valides (trop d’entrées).
+Ungültige Preset-JSON-Datei.	Invalid preset JSON file.	Fichier JSON de préréglages non valide.
+Ungültige oder nicht unterstützte Preset-XML-Datei.	Invalid or unsupported preset XML file.	Fichier XML de préréglages non valide ou non pris en charge.
+Ungültiger Bildpfad.	Invalid image path.	Chemin d’image non valide.
+Ungültiger Katalogeintrag vom .NET-Host	Invalid catalog entry from the .NET host	Entrée de catalogue non valide de l’hôte .NET
+Ungültiger Preset-Name.	Invalid preset name.	Nom de préréglage non valide.
+Ungültiger Wine-Katalogpfad.	Invalid Wine catalog path.	Chemin de catalogue Wine non valide.
+Ungültiger XML-Preset-Eintrag.	Invalid XML preset entry.	Entrée de préréglage XML non valide.
+Ungültiges Ergebnis: Bildgröße oder Protokoll stimmt nicht.	Invalid result: wrong image size or protocol.	Résultat non valide : taille d’image ou protocole incorrect.
+Ungültiges oder zu großes G’MIC-Ergebnis.	Invalid or too large G’MIC result.	Résultat de G’MIC non valide ou trop volumineux.
+Unschärfe	Unfocus	Défocaliser
+Unten	Bottom	Bas
+Unterschied	Difference	Différence
+Verdunkeln	Darken	Assombrir
+Vereinigen	Union	Union
+Verlauf: Budget {} MB, im Arbeitsspeicher {} MB, ausgelagert {} MB	History: budget {} MB, in memory {} MB, swapped out {} MB	Historique : budget {} Mo, en mémoire {} Mo, sur disque {} Mo
+Verschärfen	Sharpen	Renforcer la netteté
+Vertikal kippen	Flip vertical	Retourner verticalement
+Vertikal spiegeln	Flip vertical	Retourner verticalement
+Verwackelung	Fragment	Fragmenter
+Veröffentlichungen werden geprüft …	Checking for releases …	Recherche de versions …
+Vignette	Vignette	Vignette
+Vormultipliziert	Premultiplied	Prémultiplié
+Vorschau – Dateigröße {}	Preview – file size {}	Aperçu – taille du fichier {}
+Weiche Objektkante	Feather object	Adoucir les bords de l’objet
+Weitere Optionen links	More options to the left	Plus d’options à gauche
+Weitere Optionen rechts	More options to the right	Plus d’options à droite
+Weitere Paletten…	More palettes…	Plus de palettes…
+Weiß	White	Blanc
+Werkzeug beibehalten	Keep the tool	Garder l’outil
+Wie soll die Datei geöffnet werden?	How should the file be opened?	Comment ouvrir le fichier ?
+Wie soll es weitergehen?	How do you want to continue?	Comment voulez-vous continuer ?
+Wie sollen die Dateien geöffnet werden?	How should the files be opened?	Comment ouvrir les fichiers ?
+Wiederhergestellt	Recovered	Récupéré
+Wine benötigt ein absolutes Arbeitsverzeichnis.	Wine needs an absolute working directory.	Wine nécessite un répertoire de travail absolu.
+Wine benötigt einen absoluten Windows-Pfad.	Wine needs an absolute Windows path.	Wine nécessite un chemin Windows absolu.
+Wolken	Clouds	Nuages
+Wölbung	Bulge	Bombement
+XOR	Xor	Xor
+Xor	Xor	Xor
+Zauberstab (S)	Magic wand (S)	Baguette magique (S)
+Zeichenmodus:	Drawing mode:	Mode de dessin :
+Zeichenstift (P)	Pencil (P)	Crayon (P)
+Zentimeter	Centimeters	Centimètres
+Zoom-Weichzeichner	Zoom blur	Flou de zoom
+Zoomen (Z)	Zoom (Z)	Zoom (Z)
+Zu wenig Arbeitsspeicher für die Vorschau.	Not enough memory for the preview.	Mémoire insuffisante pour l’aperçu.
+Zu wenig Arbeitsspeicher für die neue Bildgröße.	Not enough memory for the new image size.	Mémoire insuffisante pour la nouvelle taille d’image.
+Zu wenig Arbeitsspeicher für die neue Ebenengröße.	Not enough memory for the new layer size.	Mémoire insuffisante pour la nouvelle taille de calque.
+Zu wenig Arbeitsspeicher für diesen Effekt.	Not enough memory for this effect.	Mémoire insuffisante pour cet effet.
+Zu wenig Arbeitsspeicher für ein Bild dieser Größe.	Not enough memory for an image of this size.	Mémoire insuffisante pour une image de cette taille.
+Zu wenig Arbeitsspeicher, um das Bild zu laden.	Not enough memory to load the image.	Mémoire insuffisante pour charger l’image.
+Zu wenig Arbeitsspeicher, um das Bild zu speichern.	Not enough memory to save the image.	Mémoire insuffisante pour enregistrer l’image.
+Zu wenig Arbeitsspeicher, um das Plugin zu laden.	Not enough memory to load the plugin.	Mémoire insuffisante pour charger le plugin.
+Zu wenig Arbeitsspeicher, um die Bildgröße zu ändern.	Not enough memory to resize the image.	Mémoire insuffisante pour redimensionner l’image.
+Zugriffsverletzung	access violation	violation d’accès
+Zum Klonen fehlt noch die Quelle. Legen Sie sie zuerst mit Strg+Klick fest.	Cloning needs a source first. Set it with Ctrl+click.	Le clonage nécessite d’abord une source. Définissez-la avec Ctrl+clic.
+Zum Zeichenstift wechseln	Switch to the pencil	Passer au crayon
+Zurück zum vorigen Werkzeug	Back to the previous tool	Revenir à l’outil précédent
+decode	decode	decode
+dem Lader	the loader	le chargeur
+den Plugin-Daten	the plugin data	les données du plugin
+encode	encode	encode
+free	free	free
+gewünschte Teil auf der Leinwand liegt.	the part you want lies on the canvas.	se trouve sur le canevas.
+keine (statisches ELF, nur Systemaufrufe)	none (static ELF, system calls only)	aucun (ELF statique, appels système uniquement)
+kernel32.dll, user32.dll, gdi32.dll (keine weiteren Bibliotheken)	kernel32.dll, user32.dll, gdi32.dll (no other libraries)	kernel32.dll, user32.dll, gdi32.dll (aucune autre bibliothèque)
+paint.net ist eine Marke von dotPDN LLC. PaintCraft ist ein unabhängiges Projekt und steht in keiner Verbindung zu dotPDN LLC.	paint.net is a trademark of dotPDN LLC. PaintCraft is an independent project and is not affiliated with dotPDN LLC.	paint.net est une marque de dotPDN LLC. PaintCraft est un projet indépendant sans lien avec dotPDN LLC.
+parallel_for	parallel_for	parallel_for
+pn_plugin_query	pn_plugin_query	pn_plugin_query
+png,bmp,tif,tiff=Bild-Pinselspitzen	png,bmp,tif,tiff=Image brush tips	png,bmp,tif,tiff=Pointes de pinceau en image
+prepare	prepare	prepare
+probe	probe	probe
+render	render	render
+sRGB	sRGB	sRGB
+sRGB (kein Profil eingebettet)	sRGB (no embedded profile)	sRGB (aucun profil incorporé)
+unbekannter Autor	unknown author	auteur inconnu
+ungültiger Befehl	illegal instruction	instruction illégale
+vollständig darauf passt.	fits on it completely.	y tienne entièrement.
+wird abgeschnitten; schieben Sie das Bild so, dass der	is cut off; move the image so that	est coupé ; déplacez l’image pour que la partie voulue
+{} (nicht lesbar, wird nicht überschrieben)	{} (not readable, will not be overwritten)	{} (illisible, ne sera pas écrasé)
+{} Bytes	{} bytes	{} octets
+{} Kopie	{} copy	{} copie
+{} eigene Formen	{} custom shapes	{} formes personnalisées
+{} px · Bild: {}	{} px · image: {}	{} px · image : {}
+{} wiederholen	Repeat {}	Répéter {}
+{} {} – {} · {}: {} Effekte/Korrekturen, {} Dateitypen, {} Formen	{} {} – {} · {}: {} effects/adjustments, {} file types, {} shapes	{} {} – {} · {} : {} effets/réglages, {} types de fichier, {} formes
+Ältere Verlaufsschritte wurden verworfen, um Arbeitsspeicher freizugeben.	Older history steps were discarded to free memory.	Des étapes plus anciennes de l’historique ont été abandonnées pour libérer de la mémoire.
+Öffnet alle Bilder.	Opens all images.	Ouvre toutes les images.
+Öffnet das Bild.	Opens the image.	Ouvre l’image.
+Ölgemälde	Oil painting	Peinture à l’huile
+Ölgemälde erweitert	Advanced oil painting	Peinture à l’huile avancée
+Überlagern	Overlay	Incrustation
+Überlagerung	Overlay	Incrustation
+„{}“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?	“{}” has been changed and not saved yet. How do you want to continue?	« {} » a été modifié et n’est pas encore enregistré. Comment voulez-vous continuer ?
+Helligkeit	Brightness	Luminosité
+Kontrast	Contrast	Contraste
+Transferzuordnung	Transfer map	Correspondance de transfert
+Tiefen	Shadows	Ombres
+Lichter	Highlights	Hautes lumières
+Farbton	Hue	Teinte
+Verbunden	Linked	Liées
+Temperatur	Temperature	Température
+Tönung	Tint	Teinte
+Kontur nachzeichnen	Ink outline	Contour à l’encre
+Färbung	Coloring	Coloration
+Pinselgröße	Brush size	Taille du pinceau
+Farbvarianz	Coarseness	Grossièreté
+Bleistiftdicke	Pencil tip size	Taille de la mine
+Bereich	Range	Plage
+Granularität	Granularity	Granularité
+Verwackelungseffekt	Fragments	Fragments
+Entfernung	Distance	Distance
+Drehung	Rotation	Rotation
+Zentriert	Centered	Centré
+Streuung	Spread	Dispersion
+Distanz	Distance	Distance
+Algorithmus:	Algorithm:	Algorithme :
+Transparenz:	Transparency:	Transparence :
+Mittig	Center offset	Décalage du centre
+Zellgröße	Cell size	Taille des cellules
+Skalierung	Scale	Échelle
+Brechung	Refraction	Réfraction
+Detail	Detail	Détail
+Größter Streuradius	Maximum scatter radius	Rayon de dispersion maximal
+Glättung	Smoothness	Lissage
+Modus:	Mode:	Mode :
+Form:	Shape:	Forme :
+Kantenlänge	Cell size	Taille des cellules
+Versatz	Offset	Décalage
+Kachelgröße	Tile size	Taille des carreaux
+Biegung	Curvature	Courbure
+Stärke / Richtung	Amount / direction	Intensité / sens
+Größe	Size	Taille
+Farbsättigung	Color saturation	Saturation des couleurs
+Abdeckung	Coverage	Couverture
+Perzentil	Percentile	Centile
+Schattenradius	Shadow radius	Rayon de l’ombre
+Nur Schatten	Shadow only	Ombre seule
+Toleranz	Tolerance	Tolérance
+Betrag	Amount	Quantité
+Weichheit	Softness	Douceur
+Beleuchtung	Lighting	Éclairage
+Wärme	Warmth	Chaleur
+Automatisch zoomen	Auto zoom	Zoom automatique
+Stärke	Strength	Intensité
+Grobheit	Roughness	Rugosité
+Vergrößern	Zoom	Zoom
+Oktaven	Octaves	Octaves
+Linienstärke	Line width	Épaisseur du trait
+Radius	Radius	Rayon
+Winkel	Angle	Angle
+Zufällig anordnen	Reseed	Nouvelle graine
+Intensität	Intensity	Intensité
+Schwellenwert	Threshold	Seuil
+Faktor	Factor	Facteur
+Kantenverhalten:	Edge behavior:	Comportement des bords :
+Cyan / Rot	Cyan / red	Cyan / rouge
+Magenta / Grün	Magenta / green	Magenta / vert
+Gelb / Blau	Yellow / blue	Jaune / bleu
+Vorgabe	Preset	Préréglage
+Fokus	Focus	Mise au point
+Schattenstärke	Shadow strength	Intensité des ombres
+Schattendetail	Shadow detail	Détail des ombres
+Pastellgröße	Pastel size	Taille du pastel
+Rauheit	Roughness	Rugosité
+Breite	Width	Largeur
+Lichtrichtung	Light direction	Direction de la lumière
+Tonwerte	Tones	Tons
+Suchgenauigkeit	Search precision	Précision de recherche
+Kantenschutz	Edge protection	Protection des bords
+Leuchtdichte	Luminance	Luminance
+Durchschnitt	Average	Moyenne
+Rotfilter	Red filter	Filtre rouge
+Grünfilter	Green filter	Filtre vert
+Blaufilter	Blue filter	Filtre bleu
+Infrarot	Infrared	Infrarouge
+Alle	All	Tous
+Schatten	Shadows	Ombres
+Mitteltöne	Midtones	Tons moyens
+Rechteck	Rectangle	Rectangle
+Abgerundetes Rechteck	Rounded rectangle	Rectangle arrondi
+Ellipse	Ellipse	Ellipse
+Parallelogramm	Parallelogram	Parallélogramme
+Trapez	Trapezoid	Trapèze
+Dreieck	Triangle	Triangle
+Rechtwinkliges Dreieck	Right triangle	Triangle rectangle
+Fünfeck	Pentagon	Pentagone
+Sechseck	Hexagon	Hexagone
+Heptagon	Heptagon	Heptagone
+Achteck	Octagon	Octogone
+Stern (3 Zacken)	3-point star	Étoile à 3 branches
+Stern (4 Zacken)	4-point star	Étoile à 4 branches
+Stern (5 Zacken)	5-point star	Étoile à 5 branches
+Stern (6 Zacken)	6-point star	Étoile à 6 branches
+Gekerbter Pfeil	Notched arrow	Flèche à encoche
+Richtungspfeil	Pentagon arrow	Flèche pentagonale
+Chevron Pfeil	Chevron arrow	Flèche en chevron
+Sprechblase (eckig)	Rectangular callout	Bulle rectangulaire
+Sprechblase (abgerundet)	Rounded callout	Bulle arrondie
+Sprechblase (oval)	Oval callout	Bulle ovale
+Sprechblase (Wolke)	Cloud callout	Bulle nuage
+Häkchen	Check mark	Coche
+Zahnrad	Gear	Engrenage
+Herz	Heart	Cœur
+Blitz	Lightning bolt	Éclair
+Smartphone	Smartphone	Smartphone
+Mit Strg in Fünferschritten	With Ctrl in steps of five	Avec Ctrl par pas de cinq

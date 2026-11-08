@@ -568,6 +568,7 @@ impl DiagramTest {
                 self.last = tf("Kontext: {}", &[&what]);
             }
             DEv::Select | DEv::ViewChanged => {}
+            _ => {}
         }
     }
 

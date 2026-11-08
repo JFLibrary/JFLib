@@ -1,4 +1,4 @@
-# icons.txt -- icon set of styles/winui/assets/icons.bin.  Format: "Name codepoint(hex)" per line,
+# icons.txt -- icon set of lib/style_assets/assets/icons.bin.  Format: "Name codepoint(hex)" per line,
 # '#' starts a comment.  Names become IC_NAME constants (lib/ui/keys.rs, CamelCase -> UPPER_SNAKE:
 # ChevDown -> IC_CHEV_DOWN).  The codepoints are those of Segoe Fluent Icons, where the set came
 # from, and stay fixed; the comments below describe those former Segoe glyphs.  The glyphs now come

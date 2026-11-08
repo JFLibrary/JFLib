@@ -75,7 +75,6 @@ def execute(spec, emit):
     emit('phase', phase='Varianten bauen')
     for args in build_arguments(spec, cache):
         print('$ ' + json.dumps(args, ensure_ascii=False), flush=True)
-    build.RUSTC_SLOTS = threading.BoundedSemaphore(spec['jobs'])
     optimization = spec['optimization'] if release and spec['optimization'] != 'release' else None
     builders = build.make_builders(spec['targets'], cache, release, spec['jobs'], optimization)
     built = build.build_apps(builders, [app], spec['styles'])

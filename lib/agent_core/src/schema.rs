@@ -5,6 +5,7 @@ use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 /// Supported JSON Schema subset, represented without parsing schema text at runtime.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum Schema {
     /// Any bounded JSON value.
     Any,

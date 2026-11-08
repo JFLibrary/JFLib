@@ -263,7 +263,7 @@ Dreieck zeichnet die Textur ins Swapchain-Bild, das Bild wird dargestellt. Alle 
 Gerät. **Das ist der Standard** (unten: was es kostet). `jfgui_GPU=0`
 schaltet die GPU überall ab. Skripte und Läufe ohne Fenster bleiben auf dem CPU-Pfad, außer ein
 Skript verlangt mit `gpu on` anderes. Statische Linux-Programme linken nichts davon
-(`lib/ui/gpu_out_off.rs`, `TARGET_DEPS` in `build_rs.py`).
+(`lib/ui/gpu_out_off.rs`, the `[target]` tables in `lib/ui/Cargo.toml`).
 
 **Der Weg eines Fensters.**
 
@@ -273,7 +273,7 @@ Skript verlangt mit `gpu on` anderes. Statische Linux-Programme linken nichts da
 | Job | Instanz, Gerät, Pipeline und Swapchain entstehen auf einem Hilfsthread, der erst nach dem ersten Bild startet und danach endet. Die CPU zeichnet weiter |
 | Wechsel | der ganze Framebuffer in die Textur, ein `present` auf dem verborgenen Kindfenster, dann das Kindfenster zeigen und die Kopie für `WM_PAINT` freigeben |
 | GPU | je Bild: Rechtecke hochladen, `try_acquire`, zeichnen, `present` |
-| zurück | bei neuer Größe oder einem Fehler erst das Bild über den CPU-Pfad zeigen, dann das Kindfenster verbergen; keine Lücke, kein falsches Bild |
+| zurück | bei neuer Größe, einem Fehler oder vor dem Verbergen erst das Bild über den CPU-Pfad zeigen, dann das Kindfenster verbergen; keine Lücke, kein falsches Bild |
 
 **Das Kindfenster.** Hat eine Swapchain auf einem Fenster dargestellt, bleibt GDI dort unsichtbar,
 auch nachdem Swapchain und Fläche zerstört sind, nach `WM_PAINT`, neuer Größe und Aus- und
@@ -293,6 +293,16 @@ Swapchain käme ein bis zwei Bilder später: gestreckte Bilder oder Lücken). So
 steht und die modale Schleife zu Ende ist, baut der Hilfsthread die Swapchain neu (etwa 10 ms, das Fenster bleibt so lange auf dem CPU-Pfad) und
 das Fenster wechselt zurück. Dasselbe bei Maximieren, Einrasten, Vollbild und DPI-Wechsel. Beim
 Verschieben, auch auf einen anderen Monitor, geschieht nichts: das Kindfenster fährt mit.
+
+**Aus- und Einblenden.** Das Bild einer Swapchain kommt mit ihrem Fenster nicht zurück: Ein verborgenes
+und wieder gezeigtes Fenster blieb weiß, bis ein neues Bild kam, und ein unverändertes Fenster stellt keines
+dar (gemessen auf einer RTX 2070 und auf einem Surface; ein Fokuswechsel half, weil er neu zeichnet). Deshalb
+geht ein Fenster vor dem Verbergen auf den CPU-Pfad zurück (`gp_window_show`), für ein verborgenes Fenster
+wird nichts gebaut oder gewechselt, und beim Zeigen steht das Bild aus der Kopie sofort da (`UpdateWindow`
+nach `ShowWindow`: `WM_PAINT` käme sonst erst, wenn die Nachrichtenschlange leer ist, und ein schwebender
+Stift hält sie voll; bis dahin verdeckt, `DWMWA_CLOAK`, sonst wären die ersten Zusammensetzungen weiß). Die Swapchain folgt wie nach einer Größenänderung. Dasselbe gilt, wenn das System ein
+Werkzeugfenster mit seinem minimierten Besitzer verbirgt (`WST_HIDDEN`). `uigputest --test windows` liest das
+wiedergekommene Fenster vom Bildschirm.
 
 **Warten.** Ein `present` wartet nie: `Swapchain::try_acquire` gibt `NotReady`, wenn kein Bild frei
 ist; das Bild bleibt in der Textur und kommt mit `gp_tick` (die Fensterschleife schaut nach 2 ms)

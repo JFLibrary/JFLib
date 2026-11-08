@@ -297,6 +297,7 @@ impl Ui {
 
 /// what ui.image_view shows
 #[derive(Clone, Copy)]
+#[non_exhaustive]
 pub enum ViewImage<'a> {
     /// a bitmap (FMT_PARGB, FMT_ARGB or FMT_XRGB) and its version (bump it when the
     /// pixels change)

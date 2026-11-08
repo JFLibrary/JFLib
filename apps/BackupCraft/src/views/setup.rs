@@ -218,6 +218,7 @@ fn start_worker(program: String, args: Vec<String>, report: String, wait_port: O
 
 /// the questions of each role: (step titles)
 fn steps(role: i32) -> &'static [&'static str] {
+    // i18n
     match role {
         0 => &["Rolle", "Speicherort", "Administrator", "Sicherungsziel", "Einrichten"],
         2 => &["Rolle", "Server", "Ordner", "Koppeln"],

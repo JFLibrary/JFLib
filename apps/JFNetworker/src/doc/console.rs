@@ -663,6 +663,8 @@ fn submit(n: &mut Net, dev: u32, line: &str) {
     }
     let page = n.cons.by_dev.get(&dev).is_some_and(|c| c.ios && !c.nopage) || n.doc.sim.engine().cli_pager(dev);
     let out = pump_paged(n, if page { Some((dev, 0)) } else { None });
+    // a line that needs no time sends no CliState, and a quiet network wakes nothing: the goals look now
+    n.task.console |= !n.doc.sim.engine().cli_busy(dev);
     // "terminal length N" (the device took it): N lines a page (the last one --More--), 0 none
     if let Some(len) = term_length(line)
         && out.is_empty()

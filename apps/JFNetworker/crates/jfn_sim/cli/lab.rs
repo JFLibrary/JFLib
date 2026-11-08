@@ -5,6 +5,9 @@
 //                                            a KV node: members as it sees them, the ring, the
 //                                            replicas of a key and what each one holds, its
 //                                            own entries
+//   dbctl [status|tables|locks|explain SQL] [-s NAME]
+//                                            a database: state and figures, its tables, the row locks
+//                                            held and waited for, how a statement would go
 //   cachectl [status|keys] [-s NAME]         a cache: hits, misses, its entries
 //   mqctl [status] [-s NAME]                 a queue: its topics
 //   workerctl [status] [-s NAME]             a worker: its slots
@@ -19,6 +22,7 @@ use alloc::vec::Vec;
 use base::hashring::hash64;
 
 use crate::cache::Cache;
+use crate::db::Db;
 use crate::disk::size_text;
 use crate::kernel::{Engine, Ns};
 use crate::kv::KvNode;
@@ -76,6 +80,7 @@ fn ppm(v: u32) -> String {
 
 const LB_HELP: &str = "lbctl [status] [-s DIENST]   zeigt den Loadbalancer: Einstellungen, Zahlen und jedes Backend\n";
 const KV_HELP: &str = "kvctl [status] [-s DIENST]   zeigt den KV-Knoten: Mitglieder, wie er sie sieht, und seine Zahlen\nkvctl ring                   die Tokens des Rings und ihre Knoten\nkvctl where SCHLÜSSEL        die Replikate eines Schlüssels und was jedes davon hält\nkvctl get SCHLÜSSEL          der Eintrag dieses Knotens\nkvctl keys                   die Schlüssel dieses Knotens\n";
+const DB_HELP: &str = "dbctl [status] [-s DIENST]   zeigt die Datenbank: Zustand, Puffer, Log und Zahlen\ndbctl tables                 ihre Tabellen: Zeilen, geänderte Zeilen, Seiten, Indizes\ndbctl locks                  die Zeilensperren, wer sie hält und wie viele warten\ndbctl explain ANWEISUNG      wie eine Anweisung liefe: Index oder alle Seiten, Zeilen, Seiten, warum\n";
 const CACHE_HELP: &str = "cachectl [status|keys] [-s DIENST]   zeigt den Cache: Treffer, Fehlschläge, Einträge\n";
 const MQ_HELP: &str = "mqctl [status] [-s DIENST]   zeigt die Queue mit ihren Topics\n";
 const WORKER_HELP: &str = "workerctl [status] [-s DIENST]   zeigt den Worker und seine Plätze\n";
@@ -257,6 +262,77 @@ impl Engine {
             rows.push(alloc::vec![format!("  {}", r.addr), String::from(if r.leader { "Leader" } else { "Follower" }), String::from(if r.up { "erreichbar" } else { "ausgefallen" }), held]);
         }
         s.push_str(&table(&rows));
+        s
+    }
+
+    // ---------------------------------------------------------------- dbctl
+
+    pub(crate) fn sh_dbctl(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
+        let Ok((svc, rest)) = Engine::lab_args(args) else {
+            self.out(ni, DB_HELP);
+            return Ok(());
+        };
+        let Some(name) = self.lab_pick::<Db>(ni, svc.as_deref()) else {
+            return self.lab_err(ni, "dbctl: auf diesem Gerät läuft keine Datenbank\n");
+        };
+        let dev = self.dev_of(ni);
+        let words: Vec<&str> = rest.iter().map(String::as_str).collect();
+        let text = match words.as_slice() {
+            [] | ["status"] => self.db_status(dev, &name),
+            ["tables"] => {
+                let mut rows = alloc::vec![row(&["Tabelle", "Schlüssel", "Zeilen", "geändert", "Seiten", "im Puffer", "Baumtiefe", "Indizes", "Spalten"])];
+                if let Some(d) = self.service::<Db>(dev, &name) {
+                    for t in d.tables() {
+                        rows.push(alloc::vec![t.name.clone(), t.key.clone(), format!("{}", t.rows), format!("{}", t.touched), format!("{}", t.heap_pages), format!("{}", t.held_pages), format!("{}", t.depth), if t.indexes.is_empty() { String::from("-") } else { t.indexes.join(", ") }, t.columns.join(", ")]);
+                    }
+                }
+                table(&rows)
+            }
+            ["locks"] => {
+                let list = self.service::<Db>(dev, &name).map_or(Vec::new(), |d| d.lock_list());
+                if list.is_empty() {
+                    String::from("keine Zeilensperren\n")
+                } else {
+                    let mut rows = alloc::vec![row(&["Tabelle", "Zeile", "Transaktion", "wartend"])];
+                    for l in list {
+                        rows.push(alloc::vec![l.table.clone(), format!("{}", l.key), format!("{}", l.holder), format!("{}", l.waiting)]);
+                    }
+                    table(&rows)
+                }
+            }
+            ["explain", sql @ ..] if !sql.is_empty() => match self.service::<Db>(dev, &name).map(|d| d.explain(&sql.join(" "))) {
+                Some(Ok(t)) => format!("{}\n", t),
+                Some(Err(e)) => return self.lab_err(ni, &format!("dbctl: {}\n", e.line())),
+                None => String::new(),
+            },
+            _ => return self.lab_err(ni, &format!("dbctl: {} kenne ich nicht\n{}", rest.join(" "), DB_HELP)),
+        };
+        self.out(ni, &text);
+        Ok(())
+    }
+
+    fn db_status(&self, dev: u32, name: &str) -> String {
+        let Some(v) = self.db_view(dev, name) else {
+            return String::new();
+        };
+        let st = v.stats;
+        let mut s = format!("Datenbank {}: Port {}{}, {} von höchstens {} Verbindungen, {} Transaktionen offen, {} Anweisungen in Arbeit\n", name, v.port, if v.listening { "" } else { " (nicht offen)" }, v.conns, v.max_conns, v.txns, v.running);
+        if !v.metered {
+            s.push_str("Dieses Gerät simuliert keine Hardware: die CPU kostet nichts, Platte und Sperren kosten weiter Zeit.\n");
+        }
+        if v.recovering {
+            s.push_str("Liest das Log seit dem letzten Prüfpunkt: nimmt noch keine Anweisungen an.\n");
+        }
+        if let Some((need, cap)) = v.no_disk {
+            s.push_str(&format!("Die Tabellen brauchen {}, die Platte hat {}.\n", size_text(need), size_text(cap)));
+        }
+        s.push_str(&format!("Puffer: {} von {}, Treffer {}{}\n", size_text(v.pool_used), size_text(v.pool_bytes), pm(v.hit_pm), if v.pool_rate > 1 { format!(", zählt jede {}. Seite", v.pool_rate) } else { String::new() }));
+        s.push_str(&format!("Log: Stand {}, auf der Platte {}, Prüfpunkt {}; Schreiben {}, Durability {}, Isolation {}\n", v.lsn, v.flushed, v.ckpt, st.wal_flushes, if v.durable { "full" } else { "relaxed" }, v.iso.name()));
+        s.push_str(&format!("Anweisungen {}: gelesen {}, eingefügt {}, geändert {}, gelöscht {}; Commits {}, Rollbacks {}\n", st.statements, st.selects, st.inserts, st.updates, st.deletes, st.commits, st.rollbacks));
+        s.push_str(&format!("Fehler {}: Syntax {}, Konflikte {}, Verklemmungen {}, Sperren zu spät {}, still abgebrochen {}, abgewiesen {}\n", st.errors, st.syntax_errors, st.conflicts, st.deadlocks, st.lock_timeouts, st.idle_aborts, st.refused));
+        s.push_str(&format!("Sperren gewartet {}; Zeilen angesehen {}, Seiten gelesen {}; geänderte Zeilen {}, vergessen {}\n", st.lock_waits, st.rows_examined, st.pages_read, v.touched, st.forgotten));
+        s.push_str(&format!("Nach Abstürzen: {} Mal, zuletzt {} ms, verlorene Commits {}\n", st.recoveries, st.recovery_ms, st.lost_commits));
+        s.push_str(&format!("Antwortzeit p50 {}, p95 {}, p99 {}\n", opt_ns(v.p50), opt_ns(v.p95), opt_ns(v.p99)));
         s
     }
 

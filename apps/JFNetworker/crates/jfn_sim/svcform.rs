@@ -28,7 +28,7 @@ use crate::kernel::{Ns, MS, US};
 use crate::os::Service;
 
 /// the kinds with a form
-pub const KINDS: [&str; 7] = ["http-server", "http-load", "lb", "kv", "cache", "mq", "worker"];
+pub const KINDS: [&str; 8] = ["http-server", "http-load", "lb", "kv", "cache", "mq", "worker", "db"];
 
 /// a number with the fraction it has
 fn dec(v: u64, unit: u64) -> Value {
@@ -70,6 +70,7 @@ fn built(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
         "kv" => crate::kv::from_def_msg(c),
         "cache" => crate::cache::from_def_msg(c),
         "mq" | "worker" => crate::mq::from_def_msg(kind, c),
+        "db" => crate::db::from_def_msg(c),
         k => Err(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
     }
 }
@@ -86,6 +87,7 @@ pub fn effective(kind: &str, c: &Value) -> Result<Value, Msg> {
         "cache" => a.downcast_ref::<crate::cache::Cache>().map(|x| x.settings()),
         "mq" => a.downcast_ref::<crate::mq::Queue>().map(|x| x.settings()),
         "worker" => a.downcast_ref::<crate::mq::Worker>().map(|x| x.settings()),
+        "db" => a.downcast_ref::<crate::db::Db>().map(|x| x.settings()),
         _ => None,
     };
     Ok(v.unwrap_or_else(empty_object))
@@ -101,6 +103,7 @@ fn least(kind: &str) -> Value {
         "kv" => Value::object([("nodes", Value::Array(alloc::vec![ip]))]),
         "cache" => Value::object([("backend", local)]),
         "worker" => Value::object([("queue", local)]),
+        "db" => Value::object([("tables", Value::Array(alloc::vec![Value::object([("name", Value::string("t")), ("rows", Value::u64(1))])]))]),
         _ => empty_object(),
     }
 }
@@ -127,6 +130,7 @@ pub fn missing(kind: &str, c: &Value) -> Option<Msg> {
         "kv" if !has(c, "nodes") => Some(msg!("Noch keine Knoten: der KV-Speicher weiß nicht, wer dazugehört.")),
         "cache" if !has(c, "backend") => Some(msg!("Noch kein Backend: der Cache kann nichts nachladen.")),
         "worker" if !has(c, "queue") => Some(msg!("Noch keine Queue: der Worker holt nichts ab.")),
+        "db" if !has(c, "tables") => Some(msg!("Noch keine Tabellen: die Datenbank hat nichts, worauf sich eine Anweisung beziehen könnte.")),
         _ => None,
     }
 }

@@ -94,8 +94,8 @@ static PAL_DEFAULT_TAB: [u32; PAL_DEF_N] = [
 static PAL_CMD_IDS: [u32; 4] = [CMD_PAL_FOLDER, CMD_PAL_OPEN, CMD_PAL_SAVE, CMD_PAL_RESET];
 static PAL_TDIRS: [&str; 3] = ["", "build", "apps/PaintCraft/tests/fixtures/palettes"];
 
-const S_ERR_LOAD: &str = "Die Palette ließ sich nicht laden.";
-const S_ERR_SAVE: &str = "Die Palette ließ sich nicht speichern.";
+const S_ERR_LOAD: &str = "Die Palette ließ sich nicht laden."; // i18n
+const S_ERR_SAVE: &str = "Die Palette ließ sich nicht speichern."; // i18n
 
 /// the state of palette.s (its g_* globals)
 pub(crate) struct Pal {
@@ -583,13 +583,13 @@ pub(crate) fn pal_frame(p: &mut Pn, ui: &mut Ui) {
         }
     }
     let eo = pal.err_open.clone();
-    if ui.dialog_begin(ID_PAL_ERR, "Palette", &eo) {
+    if ui.dialog_begin(ID_PAL_ERR, crate::preferences::localization::tr("Palette"), &eo) {
         // the message and the hint below it (two lines: TX_WRAP is not implemented)
-        ui.text(TS_BODY, pal.err_msg.unwrap_or(""));
+        ui.text(TS_BODY, crate::preferences::localization::tr(pal.err_msg.unwrap_or("")));
         let hint = if pal.err_msg == Some(S_ERR_SAVE) {
-            "Der Ordner ist nicht beschreibbar."
+            crate::preferences::localization::tr("Der Ordner ist nicht beschreibbar.")
         } else {
-            "Die Datei ist nicht lesbar oder enthält keine Farbe."
+            crate::preferences::localization::tr("Die Datei ist nicht lesbar oder enthält keine Farbe.")
         };
         ui.text(TS_BODY | TX_SECONDARY, hint);
         ui.dialog_buttons(Some(crate::preferences::localization::tr("OK")), None, None);
@@ -704,7 +704,7 @@ pub(crate) fn pal_grid(p: &mut Pn, ui: &mut Ui) {
 pub(crate) fn pal_buttons(p: &mut Pn, ui: &mut Ui) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 0);
     ui.next_size(28, 28);
-    if ui.icon_button(ID_PAL_ADD, IC_ADD, "Farbe hinzufügen") & EV_ACT != 0 {
+    if ui.icon_button(ID_PAL_ADD, IC_ADD, crate::preferences::localization::tr("Farbe hinzufügen")) & EV_ACT != 0 {
         pal_add_primary(&mut p.pal);
     }
     ui.next_flags(ST_SUBTLE | ST_ICON_ONLY);
@@ -731,7 +731,7 @@ pub(crate) fn pal_buttons(p: &mut Pn, ui: &mut Ui) {
             ui.menu_sep();
             for k in 0..pal.list.len() {
                 if k >= LIST_SHOW {
-                    if ui.menu_item(ID_PAL_MORE, "Weitere Paletten…") & EV_ACT != 0 {
+                    if ui.menu_item(ID_PAL_MORE, crate::preferences::localization::tr("Weitere Paletten…")) & EV_ACT != 0 {
                         ui.cmd_run(CMD_PAL_FOLDER, 0);
                     }
                     break;

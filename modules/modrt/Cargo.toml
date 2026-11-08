@@ -1,0 +1,24 @@
+[package]
+name = "jflib-modrt"
+description = "The runtime of a loadable JFLib module: no_std, no imports, served by its host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "modrt"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+
+# docs.rs: Windows and Linux only (loadable modules exist on x86-64 Windows and Linux only), not docs.rs's five defaults
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]

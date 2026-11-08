@@ -59,6 +59,7 @@ pub const F_HIDDEN: u8 = 2;
 
 /// a typed parameter
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Param {
     Num(i64, i64),
     Ipv4,
@@ -116,6 +117,7 @@ impl Param {
 
 /// a value of a parsed command
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Val {
     /// a keyword, written out in full
     Key(String),
@@ -256,6 +258,7 @@ impl<C> Parsed<C> {
 
 /// why a line does not parse
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// nothing was typed
     Empty,
@@ -287,6 +290,7 @@ impl Error {
 
 /// the answer to "?"
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Help {
     /// what may follow: (label, description) in display order; `cr` when the command may end
     /// here; the mode's title for an empty line

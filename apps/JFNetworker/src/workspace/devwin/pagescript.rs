@@ -1,5 +1,5 @@
 // pagescript -- the page scripts of the Webbrowser (B3): <script type="text/jfs"> in a page from
-// the simulated network runs in lib/script's VM with a host of its own, on the document the view
+// the simulated network runs in apps/jfs/crates/script's VM with a host of its own, on the document the view
 // shows (md_dom.rs through MdViewState::doc_mut); the Console a tab of the developer view shows
 // (devtools.rs, B4)
 //
@@ -380,6 +380,7 @@ pub(crate) fn refused_text(e: Refused) -> &'static str {
         Refused::HttpOnly => t("HttpOnly dürfen Skripte nicht setzen oder überschreiben"),
         Refused::Secure => t("Secure geht nur über https"),
         Refused::SameSiteNone => t("SameSite=None braucht Secure"),
+        _ => t("abgelehnt"),
     }
 }
 

@@ -207,7 +207,7 @@ class WatchTest(unittest.TestCase):
     def test_watch_files(self):
         rel = {p.relative_to(ROOT).as_posix() for p in hotreload.watch_files("gallery")}
         for f in ("apps/gallery/main.rs", "apps/gallery/sec_win.rs", "lib/ui/inspect.rs", "lib/ui/hotreload.rs",
-                  "lib/plat/lib.rs", "lib/gfx/lib.rs", "styles/winui/lib.rs", "lib/text_shape/Cargo.lock"):
+                  "lib/plat/lib.rs", "lib/gfx/lib.rs", "styles/winui/lib.rs", "Cargo.lock"):
             self.assertIn(f, rel)
         self.assertFalse(any(r.startswith(("lib/img_jxl_enc/", "apps/PaintCraft/", "lib/netio/")) for r in rel))
         self.assertFalse(any("/tests/" in r for r in rel))

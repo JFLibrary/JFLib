@@ -33,6 +33,13 @@ class ProjectSourcesTest(unittest.TestCase):
         legacy.unlink()
         self.assertEqual(entrypoint(legacy.parent, "app"), modular)
 
+    def test_build_script_is_no_source(self):
+        """a Cargo build script next to the crate root is a program of its own, deeper down it is a module"""
+        root = self.write("lib/a/lib.rs", "mod deep;")
+        self.write("lib/a/build.rs", "fn main() { std::env::var(\"X\"); }")
+        deep = self.write("lib/a/deep/build.rs")
+        self.assertEqual(project_sources(root), [deep.resolve(), root.resolve()])
+
     def test_references_are_not_sources(self):
         root = self.write("app/main.rs", 'mod editor;')
         editor = self.write("app/editor.rs")

@@ -9,7 +9,7 @@
 //   traceroute [-n] [-m MAX] [-q N] [-w S] DEST       (DEST: an address or a name)
 //   hostname [NAME], sysctl [-w] net.ipv4.ip_forward[=0|1], echo, clear, true, false
 //   curl, nc, ss, top, printf and "echo|printf ... | nc|cat ..." (tools.rs)
-//   lbctl, kvctl, cachectl, mqctl, workerctl (lab.rs: the services of the lab)
+//   lbctl, kvctl, dbctl, cachectl, mqctl, workerctl (lab.rs: the services of the lab)
 //   script [list|status|start|stop|restart|errors|output] [NAME] (scripts.rs: the scripts)
 //   dhclient [-v] [-r] [IF], cat /etc/resolv.conf|/etc/hosts|/etc/hostname (netsvc.rs)
 //   ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 / traceroute -6, sysctl net.ipv6.*
@@ -161,6 +161,7 @@ impl Engine {
             "printf" => self.sh_printf(ni, &args),
             "lbctl" => self.sh_lbctl(ni, &args),
             "kvctl" => self.sh_kvctl(ni, &args),
+            "dbctl" => self.sh_dbctl(ni, &args),
             "cachectl" => self.sh_cachectl(ni, &args),
             "mqctl" => self.sh_mqctl(ni, &args),
             "workerctl" => self.sh_workerctl(ni, &args),
@@ -265,7 +266,7 @@ impl Engine {
     /// Tab: command names, the objects of ip, paths (sh.rs)
     pub(crate) fn linux_complete(&self, ni: usize, line: &str) -> (Option<String>, Vec<String>) {
         const CMDS: &[&str] = &[
-            "cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
+            "cachectl", "cat", "clear", "curl", "dbctl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
             "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
             "systemctl", "journalctl",
             "who", "w", "tty", "ssh", "scp", "ssh-keygen",

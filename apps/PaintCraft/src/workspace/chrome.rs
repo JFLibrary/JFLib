@@ -335,13 +335,13 @@ fn toolrow_pager(p: &mut Pn, ui: &mut Ui) {
     // back
     ui.next_flags(if pos > 0 { 0 } else { ST_DISABLED });
     ui.next_size(TRP_BTN, TRP_BTN);
-    if ui.icon_button(ID_TOOLROW_BACK, IC_CHEV_LEFT, "Weitere Optionen links") & EV_ACT != 0 {
+    if ui.icon_button(ID_TOOLROW_BACK, IC_CHEV_LEFT, crate::preferences::localization::tr("Weitere Optionen links")) & EV_ACT != 0 {
         ui.scroll_to(ID_TOOLROW_SCROLL, (pos - page).max(0), -1);
     }
     // forward (+ 1: DIP rounding of the px position)
     ui.next_flags(if pos + 1 < maxp { 0 } else { ST_DISABLED });
     ui.next_size(TRP_BTN, TRP_BTN);
-    if ui.icon_button(ID_TOOLROW_FWD, IC_CHEV_RIGHT, "Weitere Optionen rechts") & EV_ACT != 0 {
+    if ui.icon_button(ID_TOOLROW_FWD, IC_CHEV_RIGHT, crate::preferences::localization::tr("Weitere Optionen rechts")) & EV_ACT != 0 {
         ui.scroll_to(ID_TOOLROW_SCROLL, (pos + page).min(maxp), -1);
     }
 }
@@ -414,7 +414,7 @@ pub(crate) fn chrome_statusbar(p: &mut Pn, ui: &mut Ui) {
         c.sb_units = u;
     }
     ui.next_size(0, 26);
-    if ui.combobox(ID_SB_UNITS, &mut c.sb_units, &UNITS_LIST) & EV_ACT != 0 {
+    if ui.combobox(ID_SB_UNITS, &mut c.sb_units, &crate::preferences::localization::list(&UNITS_LIST)) & EV_ACT != 0 {
         ui.cmd_run(CMD_UNIT_SET, c.sb_units as u32);
     }
     // zoom: preset combo box (current value first when it is no preset), Ganzes Bild, slider

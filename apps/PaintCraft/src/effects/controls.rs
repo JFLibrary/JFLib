@@ -139,7 +139,7 @@ pub(crate) fn fxui_frame(p: &mut Pn, ui: &mut Ui) {
     let open = p.fx.open.clone();
     let rect = p.fxui.rect.clone();
     let mut prev: Option<Params> = None; // FS_PARAM before the widgets (the rows were built)
-    if ui.window_begin(WINID_FX, p.fx.name, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_FX, crate::preferences::localization::tr(p.fx.name), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         prev = Some(p.fx.param);
         for i in 0..desc.props.len().min(FX_NSLOTS) {
             fxui_prop_row(p, ui, i);
@@ -171,7 +171,7 @@ fn fxui_prop_row(p: &mut Pn, ui: &mut Ui, i: usize) {
     let pr = &desc.props[i];
     let s = pr.slot as usize & (FX_NSLOTS - 1);
     let id = ID_FX_PROP0 + (i as u32) * 16; // widget id
-    let label = fx_label(desc, i);
+    let label = crate::preferences::localization::tr(fx_label(desc, i));
     let u = &mut p.fxui;
     let slot = &mut p.fx.param.0;
     match pr.typ {
@@ -194,7 +194,7 @@ fn fxui_prop_row(p: &mut Pn, ui: &mut Ui, i: usize) {
         FP_CHOICE => {
             // radio buttons (<= 3) or a combo box
             ui.text(TS_BODY, label);
-            let ch = fx_choices(desc, i);
+            let ch = crate::preferences::localization::list(fx_choices(desc, i));
             if ch.is_empty() {
                 return;
             }
@@ -205,7 +205,7 @@ fn fxui_prop_row(p: &mut Pn, ui: &mut Ui, i: usize) {
                 }
             } else {
                 ui.next_size(-1, 0);
-                ui.combobox(id, &mut v, ch);
+                ui.combobox(id, &mut v, &ch);
             }
             set_lo32(&mut slot[s], v as u32);
         }
@@ -288,7 +288,7 @@ fn fxui_reset(ui: &mut Ui, id: u32, is_default: bool) -> bool {
     if is_default {
         ui.next_flags(ST_DISABLED);
     }
-    ui.icon_button(id, IC_UNDO, "Zurücksetzen") & EV_ACT != 0
+    ui.icon_button(id, IC_UNDO, crate::preferences::localization::tr("Zurücksetzen")) & EV_ACT != 0
 }
 
 /// fxui_status() -- a row of STATUS_H DIP: "Rendern... n%" and a progress bar while the
@@ -302,7 +302,7 @@ pub(crate) fn fxui_status(p: &mut Pn, ui: &mut Ui) {
     let mut status = String::new();
     if busy {
         let pct = if total != 0 { done.wrapping_mul(100) / total } else { 0 };
-        status = fmt_cap(format!("Rendern... {}%", pct as i32), STATUS_CAP);
+        status = fmt_cap(crate::preferences::localization::tf("Rendern... {}%", &[&format!("{}", pct as i32)]), STATUS_CAP);
     }
     ui.next_size(STATUS_TXT_W, STATUS_H);
     ui.text(TS_CAPTION | TX_SECONDARY, &status);

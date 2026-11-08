@@ -11,7 +11,7 @@ struct SecurityAttributes {
     inherit: i32,
 }
 
-#[link(name = "kernel32")]
+#[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn CreateNamedPipeW(
         name: *const u16,
@@ -362,7 +362,7 @@ fn process_sid(process: isize) -> Result<String, i32> {
 // app's running instance.  A starting process checks that the pipe's server runs as the same
 // user and allows it to take the foreground.
 
-#[link(name = "kernel32")]
+#[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn CreateFileW(name: *const u16, access: u32, share: u32, sa: usize, disp: u32, flags: u32, tmpl: isize) -> isize;
     fn WaitNamedPipeW(name: *const u16, timeout: u32) -> i32;

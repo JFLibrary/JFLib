@@ -852,6 +852,8 @@ pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) 
     );
     AGENT.store(args.iter().any(|a| a == "--agent"), Ordering::Relaxed);
     *ARGS.lock() = args;
+    #[cfg(feature = "std")]
+    rt::panic_hook();
     crate::cpu::simd_override();
     windows::viewport(width, height, dpi);
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest

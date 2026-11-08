@@ -1,0 +1,29 @@
+[package]
+name = "jflib-img-webp"
+description = "WebP decoder and encoders for JFLib: VP8 and VP8L"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "img_webp"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+simd.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+plat.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

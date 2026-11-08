@@ -7,15 +7,26 @@ The library is designed to be used by AI Agents, not by Humans – Thus the enti
 JFLIB brings widgets, layout, text, 2D graphics, image formats, and platform integration
 together in one library. This repository contains both the library and its applications:
 from small GUI examples to Kritzel, PaintCraft, jfWord, and the Build Manager.
-The Rust code uses `#![no_std]`, `core`, and `alloc`. A Python build script invokes
-`rustc` directly for the library and apps. Complex text shaping uses a small Cargo
-subproject with pinned HarfRust and Unicode dependencies; these are statically
+The Rust code uses `#![no_std]`, `core`, and `alloc`; an app of its own may use `std` and `std`
+crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps;
+a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
+its packages. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
 linked. See the [dependency notices](lib/text_shape/NOTICE.md).
+
+```sh
+cargo install cargo-jflib     # once
+cargo jflib new hello         # a window app with its test
+cd hello
+cargo run
+```
+
+The app's one dependency is the crate [`jflib`](https://crates.io/crates/jflib), its documentation
+is on [docs.rs](https://docs.rs/jflib). More under [Your own app with Cargo](#your-own-app-with-cargo).
 
 ![Kritzel displaying a JFLIB sample drawing created in the app](docs/images/readme/kritzel-winui.png)
 
 [Library](#the-library) · [Feature tour](#feature-tour) · [Platforms](#platforms) · [Apps](#apps) ·
-[Build with Python](#building-apps-with-python) · [Build Manager](#build-manager) ·
+[Your own app with Cargo](#your-own-app-with-cargo) · [Build with Python](#building-apps-with-python) · [Build Manager](#build-manager) ·
 [Rust examples](#small-gui-examples) · [Styles](#styles) · [Documentation](#documentation)
 
 ## The library
@@ -93,7 +104,7 @@ to the original assembly version.
 Newer parts of the library, captured from the demo and test apps named above each picture
 (`python build_rs.py run NAME --target win` starts them). The [roadmap](docs/ROADMAP.md)
 shows what is done and what is still missing; the [changelog](CHANGELOG.md) lists the
-changes since version 0.1.0.
+changes of each version (0.1.0 is the first on crates.io).
 
 | Charts and data views (`datagallery`) | Diagram canvas (`diagramtest`) |
 | --- | --- |
@@ -219,6 +230,26 @@ using the built-in screenshot renderer on Windows. The Pocket Gallery image is a
 preview of the shared Android UI code; the Build Manager displays its bundled sample catalog.
 The screenshots currently show German UI text; the code examples below use English labels.
 
+## Your own app with Cargo
+
+An app outside this repository needs one dependency, the crate `jflib`, and the tool
+`cargo jflib` for what Cargo does not do itself:
+
+```sh
+cargo install cargo-jflib
+cargo jflib new hello        # a window app with its test and the settings for Windows and Linux
+cd hello
+cargo run
+cargo jflib test             # run tests/*.uis
+cargo jflib watch            # hot reload while you edit
+cargo jflib package          # a setup for Windows and a .deb (--formats all: also MSIX, AppImage, RPM, Flatpak)
+```
+
+Both are on crates.io ([`jflib`](https://crates.io/crates/jflib), [`cargo-jflib`](https://crates.io/crates/cargo-jflib)),
+the documentation of the library on docs.rs ([docs.rs/jflib](https://docs.rs/jflib)). The README of the
+crate [`jflib`](lib/jflib/README.md) and of [`cargo-jflib`](lib/cargo_jflib/README.md) describe both;
+[docs/VERSIONING.md](docs/VERSIONING.md) says what the crates promise.
+
 ## Building apps with Python
 
 **Run all commands below from the root of this repository**, the directory containing
@@ -226,7 +257,7 @@ The screenshots currently show German UI text; the code examples below use Engli
 
 ### Prerequisites
 
-- **Python 3**; the build tools use the standard library.
+- **Python 3.11 or newer**; the build tools use the standard library.
 - **Rust installed through rustup**, with `rustc` and `cargo` on your `PATH`. The code targets Rust **1.98.x**.
 - **LLVM / LLD**: `lld-link` for Windows, `ld.lld` for Linux, and `llvm-rc` for Windows
   app icons. `llvm-nm` is used for additional compiler checks. On Windows, the build
@@ -236,7 +267,7 @@ The screenshots currently show German UI text; the code examples below use Engli
 
 On systems where Python is named `python3`, replace `python` with `python3`.
 Web and Android builds need the additional tools listed below.
-The first build downloads the versions pinned in `lib/text_shape/Cargo.lock` from
+The first build downloads the versions pinned in `Cargo.lock` from
 crates.io. Later builds use Cargo's cache; `CARGO_NET_OFFLINE=true` enforces offline
 use after that cache has been populated. No system HarfBuzz installation is needed.
 Keep the generated `THIRD_PARTY_NOTICES.md` and `licenses/` folder with distributed
@@ -357,7 +388,7 @@ rustup target add x86_64-linux-android
 python build_rs.py app androidGallery --target android --android-abi x86_64
 ```
 
-Android builds use `rustc`, the SDK, and the NDK directly, without Gradle. Debug builds are
+Android builds use Cargo, the SDK, and the NDK, without Gradle. Debug builds are
 signed with a local debug key. `--release` signs with the release key named by
 `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, and `jfgui_ANDROID_KEY_ALIAS`
 (`jfgui_ANDROID_KEY_PASS` if the key has its own password) and writes
@@ -607,7 +638,7 @@ scripts. `python build_rs.py api-diff` lists the changes of the public API since
 release ([versions](docs/VERSIONING.md)). Some existing PaintCraft tests still
 expect reference plugins under `build/rwref`, which are not included in a fresh checkout.
 The full parity run also requires the separate assembly reference.
-For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
+rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 
 ## Documentation
 

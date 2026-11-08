@@ -1,0 +1,32 @@
+[package]
+name = "efftest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "efftest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+fx.workspace = true
+img_all.workspace = true
+ui.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

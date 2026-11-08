@@ -1482,6 +1482,7 @@ pub fn tokenize(tree: &Tree) -> (Vec<Token>, Tree) {
 
 /// tree kinds of PredefinedTree
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Kind {
     Trivial,
     Learn,

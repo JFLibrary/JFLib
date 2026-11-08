@@ -1,0 +1,380 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Nur nach draußen geht nichts",
+  "description": "Kurs Fehlersuche: ein falsches Gateway.",
+  "seed": 1,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.254\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24",
+      "x": 170,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 340,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 510,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 255,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Nur nach draußen geht nichts",
+      "Only the outside does not work"
+    ],
+    "summary": [
+      "PC1 erreicht alle in seinem Netz, aber den Server im anderen Netz nicht. PC2 hat das Problem nicht.",
+      "PC1 reaches everyone in its network, but not the server in the other network. PC2 does not have the problem."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 erreicht PC2 und den Router, aber nicht den Server SRV1 unter 10.0.2.10. PC2 am selben Switch erreicht den Server ohne Weiteres.",
+        "PC1 reaches PC2 and the router, but not the server SRV1 at 10.0.2.10. PC2 on the same switch reaches the server without trouble."
+      ],
+      [
+        "Finden Sie die Ursache, reparieren Sie sie, nennen Sie das Gerät und geben Sie ab.",
+        "Find the cause, repair it, name the device and hand in."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Zwei Hosts, ein Unterschied im Verhalten: Vergleichen Sie, was sie über sich sagen. ip route auf PC1 und PC2.",
+        "Two hosts, one difference in behaviour: compare what they say about themselves. ip route on PC1 and PC2."
+      ],
+      [
+        "Liegt am Ziel des Eintrags default überhaupt jemand? Ein Ping an diese Adresse sagt es.",
+        "Is there anyone at the target of the default entry? A ping to that address tells."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "check",
+          "checks": [
+            "PC1 route 0.0.0.0/0 via 10.0.1.1"
+          ],
+          "points": 3,
+          "text": [
+            "PC1 hat das richtige Gateway",
+            "PC1 has the right gateway"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.2.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC1 erreicht den Server",
+            "PC1 reaches the server"
+          ]
+        },
+        {
+          "what": "diagnosis",
+          "dev": "PC1",
+          "id": 1,
+          "points": 3,
+          "text": [
+            "Welches Gerät war falsch eingerichtet?",
+            "Which device was set up wrongly?"
+          ],
+          "explain": [
+            "PC1 hatte das Gateway 10.0.1.254, und unter dieser Adresse gibt es niemanden: Pakete nach draußen blieben an der ARP-Frage hängen. Der Vergleich mit PC2 führt direkt hin. Am Router lag es nicht, denn PC2 kam ja durch.",
+            "PC1 had the gateway 10.0.1.254, and nobody exists at that address: packets to the outside got stuck at the ARP question. The comparison with PC2 leads straight there. The router was not to blame, because PC2 got through."
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 0,
+            "y": 160,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.1.11/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SW1",
+            "model": "jf-s24",
+            "x": 170,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 340,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "SRV1",
+            "model": "server-1u",
+            "x": 510,
+            "y": 80,
+            "off": false,
+            "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 6,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 8,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/3"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 9,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 5,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    },
+    "start_faults": [],
+    "lock": {
+      "problems": true,
+      "faults": true,
+      "answer": true
+    },
+    "pass": 80
+  }
+}

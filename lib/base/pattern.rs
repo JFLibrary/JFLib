@@ -185,6 +185,7 @@ pub fn has_glob(s: &str) -> bool {
 
 /// which syntax an expression is written in
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Syntax {
     /// POSIX basic (grep): \( \) \{ \} \| \+ \? are the operators
     Basic,
@@ -194,6 +195,7 @@ pub enum Syntax {
 
 /// why an expression does not compile
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ReErr {
     /// an open group without its end
     Paren,

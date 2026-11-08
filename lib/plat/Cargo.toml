@@ -1,0 +1,36 @@
+[package]
+name = "jflib-plat"
+description = "JFLib's platform layer: one module per operating system with the same functions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+build = "build.rs"
+
+[lib]
+name = "plat"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): no entry point of its own, std_start
+# instead; on Linux plat's glibc build (pthreads, the dynamic linker), as for the GPU drivers
+std = ["rt/std"]
+
+[dependencies]
+# compress: LZ4 of the app:// bundles (vfs); crypto: DH, AES, SHA-256 (secret)
+rt.workspace = true
+compress.workspace = true
+crypto.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's);
+# with std, so plat::std_start and rt::panic_hook show and Linux shows the glibc build that windows use
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
+features = ["std"]

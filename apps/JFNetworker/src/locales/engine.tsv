@@ -739,6 +739,7 @@ der Absender ist keine Link-Local-Adresse	the sender is not a link-local address
 eine Adressprüfung muss an eine Solicited-Node-Gruppe gehen	an address check must go to a solicited-node group
 ein unspezifizierter Absender mit Link-Layer-Adresse	an unspecified sender with a link-layer address
 eine Antwort an eine Multicast-Gruppe	an answer to a multicast group
+keine gültige Neighbor-Discovery-Nachricht	not a valid Neighbor Discovery message
 Router Solicitation über {}: gibt es hier einen Router?	Router solicitation via {}: is there a router here?
 Router Solicitation von {} an {}: ein Router Advertisement folgt.	Router solicitation from {} on {}: a router advertisement follows.
 Router Advertisement über {} an {} (auf Anfrage): Lebensdauer {} s, Präfixe: {}.	Router advertisement via {} to {} (on request): lifetime {} s, prefixes: {}.
@@ -1830,3 +1831,29 @@ Noch kein Ziel: der Lastgenerator sendet nichts.	No target yet: the load generat
 Noch keine Knoten: der KV-Speicher weiß nicht, wer dazugehört.	No nodes yet: the KV store does not know who belongs to it.
 Noch kein Backend: der Cache kann nichts nachladen.	No backend yet: the cache cannot fetch anything.
 Noch keine Queue: der Worker holt nichts ab.	No queue yet: the worker fetches nothing.
+Die Tabellen brauchen {}, die Platte hat {}	The tables need {}, the disk has {}
+Port {}: liest das Log seit dem letzten Prüfpunkt	Port {}: reading the log since the last checkpoint
+Port {}: {} Anweisungen, Treffer im Puffer {} ‰, {} Transaktionen offen. Ohne Hardware kostet die CPU nichts: diese Zahlen sagen wenig.	Port {}: {} statements, pool hits {} ‰, {} transactions open. Without hardware the CPU costs nothing: these figures mean little.
+Port {}: {} Anweisungen, Treffer im Puffer {} ‰, {} Transaktionen offen, {} geänderte Zeilen vergessen	Port {}: {} statements, pool hits {} ‰, {} transactions open, {} changed rows forgotten
+Port {}: {} Anweisungen, Treffer im Puffer {} ‰, {} Transaktionen offen	Port {}: {} statements, pool hits {} ‰, {} transactions open
+Port, Seitengröße und Tabellen ändern sich nur mit einem Neustart.	Port, page size and tables change only with a restart.
+Tabelle {}: „{}“ ist keine Spalte (name, name:text, name:int:1000).	Table {}: "{}" is no column (name, name:text, name:int:1000).
+Tabelle {}: eine Spalte braucht einen Namen und den Typ int oder text.	Table {}: a column needs a name and the type int or text.
+Tabelle {}: eine Spalte ist ein Text oder ein Objekt.	Table {}: a column is a text or an object.
+„{}“ geht nicht als Name einer Tabelle: Buchstaben, Ziffern und _.	"{}" does not work as a table's name: letters, digits and _.
+Tabelle {}: „rows“ nimmt 1 bis 2^40 Zeilen.	Table {}: "rows" takes 1 to 2^40 rows.
+Tabelle {}: „row_bytes“ nimmt 1 Byte bis 1 MiB.	Table {}: "row_bytes" takes 1 byte to 1 MiB.
+Tabelle {}: „dist“ kennt {} nicht (uniform, zipf).	Table {}: "dist" does not know {} (uniform, zipf).
+Tabelle {}: „zipf_s“ nimmt 0 bis 5.	Table {}: "zipf_s" takes 0 to 5.
+Tabelle {}: den Index {} gibt es nicht als Spalte.	Table {}: the index {} is no column.
+„tables“ fehlt: eine Datenbank braucht mindestens eine Tabelle.	"tables" is missing: a database needs at least one table.
+Die Tabelle {} steht zweimal da.	The table {} is there twice.
+„page_kb“ nimmt 1, 2, 4, 8, 16, 32 oder 64.	"page_kb" takes 1, 2, 4, 8, 16, 32 or 64.
+„durability“ kennt {} nicht (full, relaxed).	"durability" does not know {} (full, relaxed).
+„isolation“ kennt {} nicht (read committed, repeatable read).	"isolation" does not know {} (read committed, repeatable read).
+Eine Route mit „backend“ db braucht „sql“.	A route with "backend" db needs "sql".
+Die Anweisung „{}“: {}	The statement "{}": {}
+„param“ kennt {} nicht (rest, draw, query:NAME, none).	"param" does not know {} (rest, draw, query:NAME, none).
+„db.addr“: „{}“ ist keine IPv4-Adresse.	"db.addr": "{}" is no IPv4 address.
+Eine Route fragt die Datenbank, aber „db“ fehlt.	A route asks the database, but "db" is missing.
+Noch keine Tabellen: die Datenbank hat nichts, worauf sich eine Anweisung beziehen könnte.	No tables yet: the database has nothing a statement could refer to.

@@ -78,7 +78,7 @@ use crate::{
     PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WST_ACTIVE, WST_MAXIMIZED, WST_MINIMIZED, evq_count,
     evq_push,
 };
-use crate::{WCMD_FULLSCREEN, WCMD_LOWER, WCMD_WINDOWED, WST_FULLSCREEN};
+use crate::{WCMD_FULLSCREEN, WCMD_LOWER, WCMD_WINDOWED, WST_FULLSCREEN, WST_HIDDEN};
 
 #[path = "win_clip.rs"]
 mod clip;
@@ -251,6 +251,7 @@ unsafe extern "system" {
     fn DefWindowProcW(h: isize, m: u32, wp: usize, lp: isize) -> isize;
     fn DestroyWindow(h: isize) -> i32;
     fn ShowWindow(h: isize, cmd: i32) -> i32;
+    fn UpdateWindow(h: isize) -> i32;
     fn SetWindowPos(h: isize, after: isize, x: i32, y: i32, w: i32, cy: i32, flags: u32) -> i32;
     fn GetWindowRect(h: isize, r: *mut Rect) -> i32;
     fn GetClientRect(h: isize, r: *mut Rect) -> i32;
@@ -335,6 +336,8 @@ const SRCCOPY: u32 = 0x00CC_0020;
 const WM_CLOSE: u32 = 0x0010;
 const WM_QUIT: u32 = 0x0012;
 const WM_ERASEBKGND: u32 = 0x0014;
+const WM_SHOWWINDOW: u32 = 0x0018;
+const DWMWA_CLOAK: u32 = 13;
 const WM_GETOBJECT: u32 = 0x003D;
 const WM_ACTIVATEAPP: u32 = 0x001C;
 const WM_SETCURSOR: u32 = 0x0020;
@@ -1404,6 +1407,13 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             0
         }
         WM_ERASEBKGND => 1,
+        WM_SHOWWINDOW => {
+            // (the system may hide it with its owner: the loop has a look, ui gpu_out)
+            if wp == 0 {
+                win_push(E_PAINT, 0, 0, 0, 0);
+            }
+            def()
+        }
         // UI Automation asks for the window's accessibility tree (win_uia.rs)
         WM_GETOBJECT => win_uia::get_object(hwnd, w, wp, lp).unwrap_or_else(def),
         WM_CLOSE => {
@@ -1996,6 +2006,11 @@ pub fn win_destroy(w: i32) {
     }
 }
 
+#[link(name = "dwmapi", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32;
+}
+
 /// PWS_HIDE / PWS_SHOW (activates) / PWS_SHOWNA
 pub fn win_show(w: i32, mode: u32) {
     let Some(r) = rec(w) else { return };
@@ -2004,8 +2019,23 @@ pub fn win_show(w: i32, mode: u32) {
         PWS_SHOWNA => SW_SHOWNA,
         _ => SW_SHOW,
     };
-    // SAFETY: our window.
-    unsafe { ShowWindow(r.hwnd.get(), cmd) };
+    // the frame is in the copy already: on the screen with the window, not when the message queue has
+    // run empty (a pen that hovers keeps it busy), and the first compositions not white (cloaked until
+    // it is painted)
+    let paint = mode != 0 && r.psf.get();
+    let h = r.hwnd.get();
+    // SAFETY: our window; WM_PAINT copies pixels and queues an event, the values live through the calls.
+    unsafe {
+        if paint {
+            DwmSetWindowAttribute(h, DWMWA_CLOAK, &1, 4);
+        }
+        ShowWindow(h, cmd);
+        if paint {
+            UpdateWindow(h);
+            GdiFlush();
+            DwmSetWindowAttribute(h, DWMWA_CLOAK, &0, 4);
+        }
+    }
 }
 
 /// make the window the active one (keyboard focus)
@@ -2086,6 +2116,9 @@ pub fn win_state(w: i32) -> u32 {
         }
         if IsIconic(r.hwnd.get()) != 0 {
             v |= WST_MINIMIZED;
+        }
+        if IsWindowVisible(r.hwnd.get()) == 0 {
+            v |= WST_HIDDEN;
         }
     }
     if st().app_active.get() {

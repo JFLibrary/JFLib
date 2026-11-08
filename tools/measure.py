@@ -1202,21 +1202,9 @@ VARIANTS = {
 
 
 def seed_variant(name, seed, targets):
-    """copy the rlibs and library stamps of the seed variant (same library flags) -> only the
-    apps are built again (their stamps are not copied)"""
-    for t in targets:
-        src, dst = variant_dir(seed) / t, variant_dir(name) / t
-        if not src.exists():
-            continue
-        (dst / ".stamp").mkdir(parents=True, exist_ok=True)
-        for f in src.glob("*.rlib"):
-            if not (dst / f.name).exists():
-                shutil.copy2(f, dst / f.name)
-        for f in (src / ".stamp").iterdir():
-            if not f.name.startswith("app_"):
-                shutil.copy2(f, dst / ".stamp" / f.name)
-        for f in (dst / ".stamp").glob("app_*"):
-            f.unlink()
+    """nothing to seed any more: every variant builds in a Cargo folder of its own (build_rs.py)"""
+
+
 XP_APPS = ["gallery", "Kritzel", "PaintCraft", "codectest", "efftest"]
 
 
@@ -1225,42 +1213,20 @@ def variant_dir(name):
 
 
 def build_variant(name, v, targets, apps):
-    """build the apps with the settings of variant v (build_rs.Builder with other flags) -> seconds"""
+    """build the apps with the settings of variant v (build_rs.py's profile: the opt-levels of the
+    library, the compute crates and the apps, LTO, codegen units, more rustflags) -> seconds"""
     import build_rs as br
-
-    class VB(br.Builder):
-        def flags(self, crate=""):
-            f = ["--edition", "2024", "--target", br.TRIPLE[self.target], "-C", "panic=abort", "-C", "debuginfo=0",
-                 "-D", "warnings", "-L", f"dependency={self.dir}", f"--remap-path-prefix={br.ROOT}{os.sep}="]
-            opt = v["aopt"] if crate == "" else v["copt"] if br.compute_crate(crate) else v["opt"]
-            return f + ["-C", f"opt-level={opt}", "-C", f"codegen-units={v.get('cgu', 1)}"] + v.get("rustc", []) + \
-                v.get("rustc_" + self.target, [])
-
-    orig = br.run_cmd
-
-    def run_cmd(cmd, quiet=False):
-        cmd = [str(c) for c in cmd]
-        if "bin" in cmd and "--crate-type" in cmd:
-            k = cmd.index("lto") if "lto" in cmd else -1
-            if k > 0 and cmd[k - 1] == "-C":
-                cmd[k] = {"fat": "lto=fat", "thin": "lto=thin", "off": "lto=off"}[v["lto"]]
-            tgt = "win" if "x86_64-pc-windows-msvc" in cmd else "linux"
-            for la in v.get("link_" + tgt, []):
-                cmd[-3:-3] = ["-C", f"link-arg={la}"]
-        return orig(cmd, quiet)
-
-    br.run_cmd = run_cmd
     orig_check = br.check_intrinsics
     if v.get("nocheck"):
         br.check_intrinsics = lambda *x: None
     t0 = time.perf_counter()
     try:
         for t in targets:
-            b = VB(t, variant_dir(name), True, 8)
-            for app in (apps[t] if isinstance(apps, dict) else apps):
-                b.build_app(app, br.app_style(app))
+            link = [x for la in v.get("link_" + t, []) for x in ("-C", f"link-arg={la}")]
+            profile = {"lib": v["opt"], "compute": v["copt"], "app": v["aopt"], "lto": v["lto"], "cgu": v.get("cgu", 1),
+                       "rustflags": v.get("rustc", []) + v.get("rustc_" + t, []) + link}
+            br.build_apps([br.Builder(t, variant_dir(name), True, 8, profile)], apps[t] if isinstance(apps, dict) else apps)
     finally:
-        br.run_cmd = orig
         br.check_intrinsics = orig_check
     return time.perf_counter() - t0
 

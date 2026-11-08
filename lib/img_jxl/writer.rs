@@ -156,6 +156,7 @@ pub type WriterFn = fn(&Px, &Opts) -> Result<Vec<u8>, i32>;
 
 /// which writer saves JPEG XL files without IOF_JXL_COMPAT
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Kind {
     /// the writer linked into the app (img_jxl_enc)
     Static,

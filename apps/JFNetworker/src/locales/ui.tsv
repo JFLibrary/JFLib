@@ -1748,6 +1748,7 @@ die Domain passt nicht zur Adresse	the domain does not fit the address
 HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or overwrite HttpOnly
 Secure geht nur über https	Secure works only over https
 SameSite=None braucht Secure	SameSite=None needs Secure
+abgelehnt	refused
 Zertifikat abgelehnt	Certificate refused
 Seriell, erstes Ende D&CE	Serial, first end D&CE
 Seriell, erstes Ende D&TE	Serial, first end D&TE
@@ -2657,3 +2658,72 @@ Was jedes Kabel in den letzten {} s von seiner Bitrate trug, je Richtung; die Ra
 Größer oder mehr?	Bigger or more?
 Ein Webdienst mit Datenbank: ein immer größerer Server gegen immer mehr kleine, als Experiment im Bereich Experimente.	A web service with a database: an ever bigger server against ever more small ones, as an experiment in the area Experiments.
 Die Einstellungen von {} als JSON. Übernehmen prüft sie und startet {} mit ihnen neu.	The settings of {} as JSON. Apply checks them and restarts {} with them.
+DB	DB
+Eine Datenbank des Labors: connect.	A database of the lab: connect.
+Verbindet mit einer Datenbank (Port 7100, wenn keiner dasteht); die Verbindung kennt query, begin, commit, rollback und close.	Connects to a database (port 7100 unless given); the connection has query, begin, commit, rollback and close.
+Zipf: wenige Zeilen oft	Zipf: few rows often
+locker: Antwort sofort, Verlust möglich	relaxed: answer at once, losses possible
+voll: Antwort erst nach dem Schreiben	full: answer only after the write
+read committed: je Anweisung neu	read committed: anew per statement
+repeatable read: ein Stand je Transaktion	repeatable read: one state per transaction
+Datenbank	Database
+Name, Zeilen, Bytes je Zeile, Schlüssel, Verteilung und Indizes. Spalten stehen im JSON. Nur geänderte Zeilen sind wirklich da, alle anderen folgen aus ihrem Schlüssel.	Name, rows, bytes per row, key, distribution and indexes. Columns are in the JSON. Only changed rows really exist, all others follow from their key.
+Tabellen	Tables
+Puffer im RAM	Buffer pool in RAM
+So viel hält die Datenbank von ihren Seiten im RAM. Zu groß für das Gerät: erst Swap, dann beendet sie der Speichermangel.	This much of its pages the database holds in RAM. Too large for the device: first swap, then running out of memory ends it.
+Darüber bekommt eine Verbindung 503 und wird geschlossen.	Beyond this a connection gets 503 and is closed.
+Beim Commit	On commit
+Voll wartet auf die Platte. Locker antwortet sofort und ist schneller, ein Absturz verliert dann die letzten Commits und zählt sie.	Full waits for the disk. Relaxed answers at once and is faster; a crash then loses the last commits and counts them.
+Isolation	Isolation
+Was eine Transaktion sieht, wenn andere gleichzeitig ändern.	What a transaction sees when others change things at the same time.
+Hier nimmt sie Anweisungen an: POST /query.	It takes statements here: POST /query.
+Kosten (Annahmen dieses Labors)	Costs (assumptions of this lab)
+Annahme: Lesen und Planen einer Anweisung auf einem Referenzkern. Zählt nur mit simulierter Hardware.	Assumption: reading and planning a statement on a reference core. Counts only with simulated hardware.
+CPU je Anweisung	CPU per statement
+Annahme: jede Seite, die eine Anweisung anfasst, ob im Puffer oder nicht.	Assumption: every page a statement touches, in the pool or not.
+CPU je Seite	CPU per page
+Annahme: jede Zeile, die eine Anweisung ansieht.	Assumption: every row a statement looks at.
+CPU je Zeile	CPU per row
+Annahme: jede Zeile, die eine Anweisung schreibt.	Assumption: every row a statement writes.
+CPU je Änderung	CPU per change
+Annahme: 1, 2, 4, 8, 16, 32 oder 64. Daraus folgen die Zeilen je Seite und die Tiefe der Bäume.	Assumption: 1, 2, 4, 8, 16, 32 or 64. Rows per page and the depth of the trees follow from it.
+Seitengröße	Page size
+Annahme: 0 rechnet aus der Seitengröße mit 16 Bytes je Eintrag.	Assumption: 0 works it out from the page size at 16 bytes per entry.
+Äste je Baumseite	Branches per tree page
+Annahme: So schnell läuft die Wiederherstellung nach einem Absturz.	Assumption: this fast recovery runs after a crash.
+Log wieder anwenden	Replaying the log
+MB/s	MB/s
+Danach bricht die Transaktion ab und darf es noch einmal versuchen.	After this the transaction is aborted and may try again.
+Warten auf eine Sperre	Waiting for a lock
+So lange darf eine Transaktion ohne Anweisung offen bleiben, dann gehen ihre Sperren.	This long a transaction may stay open without a statement, then its locks go.
+Stille Transaktion	Silent transaction
+Log schreiben alle	Write the log every
+Nur bei lockerem Commit: das ist die Zeit, die ein Absturz höchstens verliert.	Only with a relaxed commit: this is the time a crash loses at most.
+Ein Prüfpunkt schreibt geänderte Seiten; das Log davor braucht die Wiederherstellung nicht mehr.	A checkpoint writes changed pages; recovery no longer needs the log before it.
+Prüfpunkt alle	Checkpoint every
+s	s
+Mehr schickt sie nicht; die Antwort sagt dann truncated.	It sends no more; the answer then says truncated.
+Zeilen je Antwort	Rows per answer
+Eine Anweisung, die mehr ändern würde, wird abgewiesen.	A statement that would change more is refused.
+Zeilen je Änderung	Rows per change
+Geänderte Zeilen	Changed rows
+Grenze des Simulators: darüber vergisst er die ältesten Werte und zählt das. Die Zeiten stimmen weiter, diese Werte nicht.	A limit of the simulator: beyond it, it forgets the oldest values and counts that. The times stay right, these values do not.
+Name der Tabelle	Name of the table
+Zeilen	Rows
+Bytes je Zeile	Bytes per row
+Verteilung: gleichmäßig	Distribution: uniform
+Indizes, durch Kommas getrennt	Indexes, separated by commas
+Tabelle hinzufügen	Add table
+Eine Datenbank mit Tabellen, Puffer, Sperren, Versionen und Log; sie nimmt SQL-artige Anweisungen über HTTP an.	A database with tables, buffer pool, locks, versions and a log; it takes SQL-shaped statements over HTTP.
+Puffer	Buffer pool
+Verlorene Commits/s	Lost commits/s
+Anweisungen/s	Statements/s
+Commits/s	Commits/s
+Rollbacks/s	Rollbacks/s
+Treffer im Puffer	Pool hits
+Puffer belegt	Pool in use
+Warten auf Sperren/s	Waits for locks/s
+Verklemmungen/s	Deadlocks/s
+Sperren zu spät/s	Lock timeouts/s
+Log geschrieben/s	Log writes/s
+Commits je Schreiben (Tausendstel)	Commits per write (thousandths)

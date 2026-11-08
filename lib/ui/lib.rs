@@ -111,7 +111,7 @@ pub use highlight::{
     CodeTheme, Grammar, Highlighter, Rule, Token, INI, JSON, MARKDOWN, PLAIN, RUST, SY_CODE, SY_COMMENT, SY_CONST, SY_COUNT, SY_EMPH, SY_ESCAPE,
     SY_FUNC, SY_HEADING, SY_KEY, SY_KEYWORD, SY_LINK, SY_META, SY_NUMBER, SY_PUNCT, SY_STRING, SY_STRONG, SY_TEXT, SY_TYPE, TOML,
 };
-pub use highlight::JFS; // (L6) the grammar of lib/script's .jfs
+pub use highlight::JFS; // (L6) the grammar of apps/jfs/crates/script's .jfs
 mod code_edit;
 mod code_long;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};
@@ -235,7 +235,7 @@ pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
 pub use recent::{RECENT_KEEP, RecentOpen};
-// the library's version (lib/VERSION, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
+// the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 // drag and drop (dnd.rs): what a drag carries, its kinds and effects
 pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData};
@@ -279,21 +279,66 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 /// (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
 /// (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
 /// (apps/NAME/PACKAGE as JFGUI_PACKAGE: the switches --register / --register-replace /
-/// --unregister, assoc.rs).
+/// --unregister, assoc.rs).  A Cargo build hands both over as files (JFGUI_PERMISSIONS_FILE with
+/// --cfg jfgui_manifest, JFGUI_PACKAGE_FILE with --cfg jfgui_package), because an environment
+/// variable of a build script holds one line only.
+///
+/// In a program with std (feature `std` of jflib) it also defines `fn main`, which hands over to
+/// plat's start of a std program (`plat::std_start`: crash handlers, the panic hook, then
+/// `jfgui_main`, the end through `std::process::exit`); the crate then has neither `#![no_std]`
+/// nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
+/// the program's own calls `jflib::plat::std_start()`.
+#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! main {
     ($body:expr) => {
-        #[allow(unsafe_code)]
+        $crate::__jfgui_main!($body);
+    };
+}
+
+/// (see above)
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! main {
+    ($body:expr) => {
+        $crate::__jfgui_main!($body);
+        #[allow(unsafe_code, dead_code)]
+        fn main() {
+            unsafe extern "Rust" {
+                fn jfgui_std_start() -> !;
+            }
+            // SAFETY: plat defines it in a program with std; it takes no arguments.
+            unsafe { jfgui_std_start() }
+        }
+    };
+}
+
+/// ui::main!'s `jfgui_main`, without and with std
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __jfgui_main {
+    ($body:expr) => {
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
+            #[cfg(jfgui_manifest)]
+            const JF_MANIFEST: Option<&str> = Some(include_str!(env!("JFGUI_PERMISSIONS_FILE")));
+            #[cfg(not(jfgui_manifest))]
+            const JF_MANIFEST: Option<&str> = option_env!("JFGUI_PERMISSIONS");
+            #[cfg(jfgui_package)]
+            const JF_PACKAGE: Option<&str> = Some(include_str!(env!("JFGUI_PACKAGE_FILE")));
+            #[cfg(not(jfgui_package))]
+            const JF_PACKAGE: Option<&str> = option_env!("JFGUI_PACKAGE");
             #[cfg(jfgui_assets)]
             static ASSETS: &[u8] = include_bytes!(env!("JFGUI_ASSETS"));
             #[cfg(not(jfgui_assets))]
             static ASSETS: &[u8] = &[];
-            if let Err(code) = $crate::boot(option_env!("JFGUI_APP"), option_env!("JFGUI_PERMISSIONS"), ASSETS) {
+            if let Err(code) = $crate::boot(option_env!("JFGUI_APP"), JF_MANIFEST, ASSETS) {
                 return code;
             }
-            if let Some(code) = $crate::desk_boot(option_env!("JFGUI_PACKAGE")) {
+            if let Some(code) = $crate::desk_boot(JF_PACKAGE) {
                 return code;
             }
             $body

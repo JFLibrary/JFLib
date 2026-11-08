@@ -62,6 +62,7 @@ pub const KU_KEY_CERT_SIGN: u8 = 0x04;
 pub const KU_CRL_SIGN: u8 = 0x02;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Usage {
     Server,
     Client,
@@ -69,6 +70,7 @@ pub enum Usage {
 
 /// a public key
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PubKey {
     /// a key type this code does not use
     #[default]
@@ -82,6 +84,7 @@ pub enum PubKey {
 
 /// a signature algorithm (of certificates and of TLS handshakes)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SigAlg {
     #[default]
     Unknown,

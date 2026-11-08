@@ -171,6 +171,7 @@ pub trait Provider: Send + Sync {
 }
 
 /// what [`Provider::open`] answers
+#[non_exhaustive]
 pub enum Opened {
     /// the provider's own stream
     File(Box<dyn Stream>),
@@ -191,6 +192,7 @@ impl Opened {
 }
 
 /// where a name leads
+#[non_exhaustive]
 pub enum Route {
     /// no scheme: a path of the OS
     Os,

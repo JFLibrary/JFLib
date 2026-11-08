@@ -235,7 +235,7 @@ fn free_serial(d: &Docs) -> u32 {
 
 // untitled_name(serial) -> "Unbenannt" / "Unbenannt n"
 fn untitled_name(serial: u32) -> String {
-    if serial <= 1 { String::from("Unbenannt") } else { alloc::format!("Unbenannt {}", serial as i32) }
+    if serial <= 1 { String::from(crate::preferences::localization::tr("Unbenannt")) } else { crate::preferences::localization::tf("Unbenannt {}", &[&alloc::format!("{}", serial as i32)]) }
 }
 
 /// a new document record (doc_new without the list): no layers
@@ -288,7 +288,7 @@ pub(crate) fn doc_new(p: &mut Pn, w: i32, h: i32, bg_argb: u32, flags: u32) -> O
         return None;
     }
     if flags & DNF_EMPTY as u32 == 0 {
-        let i = crate::document::layers::lay_new_d(&mut d, 0, Some("Hintergrund"))?;
+        let i = crate::document::layers::lay_new_d(&mut d, 0, Some(crate::preferences::localization::tr("Hintergrund")))?;
         let l = &mut d.layers[i as usize];
         l.flags |= LYF_BG as u32;
         if bg_argb != 0 {

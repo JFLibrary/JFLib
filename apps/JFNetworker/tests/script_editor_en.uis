@@ -2,7 +2,7 @@
 # the IDE in English (U7, IDE1): the context menu, the desktop's IDE window, the Explorer's inline scripts, the
 # status line, the messages of a run in Problems, Output, the tool bar's names, a template (its
 # comments and texts in English) as a new file on PC1, which has no script yet, and the keys in
-# the overview of the shortcuts.  The messages of lib/script and of the running program stay
+# the overview of the shortcuts.  The messages of apps/jfs/crates/script and of the running program stay
 # German.  Ids as in script_editor.uis: 26624 the device window, 98305 File, 98816 the editor,
 # 98569 Output, 98571 Problems (rows 99073 + i).
 size 1280 900

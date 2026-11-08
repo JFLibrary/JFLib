@@ -8,7 +8,7 @@
 // follow edits, rows and lines, edits inside unfold), several edits and a whole new text as
 // one undo step (group ide), what the code editor keeps of long lines through edits
 // (ui::code_long_check) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
-// and the states across lines; JFS also token by token against lib/script's tokens() on two
+// and the states across lines; JFS also token by token against apps/jfs/crates/script's tokens() on two
 // samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
 // the number of failures.
 
@@ -568,10 +568,10 @@ fn diags(t: &mut T) {
     out(&format!("model: 101 edits with {} diagnostics over 100 000 lines in {} ms\n", v.len(), us / 1000));
 }
 
-// ------------------------------------------------------------------ JFS against lib/script
+// ------------------------------------------------------------------ JFS against apps/jfs/crates/script
 
 // the tokens of each line as (start, end, class) with neighbours of a class merged: what the
-// grammar and lib/script's lexer have to agree on
+// grammar and apps/jfs/crates/script's lexer have to agree on
 type Classes = Vec<Vec<(usize, usize, &'static str)>>;
 
 fn merged(v: &mut Vec<(usize, usize, &'static str)>, s: usize, e: usize, class: &'static str) {
@@ -676,13 +676,13 @@ for i in 0 .. 10 { m.list.push(i) }
 
 fn jfs(t: &mut T) {
     t.group = "jfs";
-    // token by token against lib/script's lexer
+    // token by token against apps/jfs/crates/script's lexer
     for (name, src) in [("editor sample", crate::JFS_SAMPLE), ("more", JFS_MORE)] {
         let (g, s) = (jfs_by_grammar(src), jfs_by_script(src));
         t.eq(g.len(), s.len(), &format!("{}: lines", name));
         for (l, (a, b)) in g.iter().zip(&s).enumerate() {
             let text = src.split('\n').nth(l).unwrap_or("");
-            t.check(a == b, &format!("{} line {} {:?}: grammar {:?}, lib/script {:?}", name, l + 1, text, a, b));
+            t.check(a == b, &format!("{} line {} {:?}: grammar {:?}, apps/jfs/crates/script {:?}", name, l + 1, text, a, b));
         }
     }
     let h = Highlighter::jfs();

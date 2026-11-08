@@ -6,6 +6,7 @@ use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 /// Stable structured failure categories.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorCode {
     /// External control has not been explicitly activated.
     Disabled,

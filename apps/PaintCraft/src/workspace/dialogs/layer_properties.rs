@@ -211,11 +211,11 @@ pub(crate) fn lprops_frame(p: &mut Pn, ui: &mut Ui) {
         ui.spacer(8);
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Mischmodus:"));
         ui.next_size(-1, 0);
-        if ui.combobox(ID_LP_BLEND, &mut g.blend, &BLEND_LIST) & EV_ACT != 0 {
+        if ui.combobox(ID_LP_BLEND, &mut g.blend, &crate::preferences::localization::list(&BLEND_LIST)) & EV_ACT != 0 {
             changed = true;
         }
         ui.spacer(8);
-        if ui.prop_slider(ID_LP_OPAC, "Deckfähigkeit", &mut g.opac, &RANGE_OPAC, i32::MIN) & (EV_ACT | EV_COMMIT) != 0 {
+        if ui.prop_slider(ID_LP_OPAC, crate::preferences::localization::tr("Deckfähigkeit"), &mut g.opac, &RANGE_OPAC, i32::MIN) & (EV_ACT | EV_COMMIT) != 0 {
             changed = true;
         }
         if changed {

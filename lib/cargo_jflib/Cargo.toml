@@ -1,0 +1,25 @@
+[package]
+name = "cargo-jflib"
+description = "cargo jflib: a JFLib app's new project, its test scripts, hot reload, its builds for the browser and Android, its packages"
+keywords = ["jflib", "gui", "packaging", "hot-reload", "wasm"]
+categories = ["development-tools::cargo-plugins"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+# template/, web/ and android/ are copies (lib/jflib/template, web/, android/ of the repository; build_rs.py check keeps them equal)
+include = ["src/**", "template/**", "web/**", "android/**", "README.md", "LICENSE-*"]
+
+[[bin]]
+name = "cargo-jflib"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+# docs.rs: a program, nothing to document but its page; one target instead of five
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]

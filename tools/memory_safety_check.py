@@ -1,4 +1,4 @@
-"""Bounded, isolated unsafe/allocator review probes. Uses build_rs.py's compiler driver.
+"""Bounded, isolated unsafe/allocator review probes. The library's rlibs come from Cargo (build_rs.py).
 
 Native probes link the actual rt/simd crates. The ASan plugin probe changes only the
 snapshot's `mod mem;` declaration: libc/ASan provide compiler memory entry points.
@@ -88,11 +88,11 @@ def main():
     if args.mode == "native":
         for target in ["win", "linux"]:
             builder = build.Builder(target, out / "native", False, 2)
-            builder.build_libs(["rt", "simd"])
+            rlibs = builder.cargo_rlibs(["rt", "simd"])
             exe = builder.dir / ("memory_probe.exe" if target == "win" else "memory_probe")
-            cmd = ["rustc"] + builder.flags() + ["--crate-name", "memory_probe", "--crate-type", "bin",
-                "-C", "debuginfo=2", "--extern", f"rt={builder.rlib('rt')}",
-                "--extern", f"simd={builder.rlib('simd')}"]
+            cmd = ["rustc"] + builder.probe_flags() + ["--crate-name", "memory_probe", "--crate-type", "bin",
+                "-C", "debuginfo=2", "--extern", f"rt={rlibs['rt']}",
+                "--extern", f"simd={rlibs['simd']}"]
             if target == "win":
                 cmd += ["-C", f"linker={build.tool('lld-link')}", "-C", "link-arg=/ENTRY:mainCRTStartup",
                         "-C", "link-arg=/SUBSYSTEM:CONSOLE", "-C", "link-arg=/NODEFAULTLIB"]
@@ -103,8 +103,8 @@ def main():
             compile_log(out, target + "-build", cmd + [support / "native_probe.rs", "-o", exe])
             launch = [exe] if target == "win" else ["wsl.exe", "-d", "Ubuntu-24.04", "--", "timeout", "30s", linux_path(exe)]
             results.append(run_log(out, target + "-native", launch))
-            trait_cmd = ["rustc"] + builder.flags() + ["--crate-name", "guard_traits", "--crate-type", "rlib",
-                "--emit=metadata", "--extern", f"rt={builder.rlib('rt')}", support / "guard_traits.rs",
+            trait_cmd = ["rustc"] + builder.probe_flags() + ["--crate-name", "guard_traits", "--crate-type", "rlib",
+                "--emit=metadata", "--extern", f"rt={rlibs['rt']}", support / "guard_traits.rs",
                 "-o", builder.dir / "guard_traits.rmeta"]
             results.append(run_log(out, target + "-guard-sync-witness", trait_cmd))
     elif args.mode == "asan":
@@ -152,10 +152,10 @@ def main():
         directory = out / "loader"
         directory.mkdir(exist_ok=True)
         builder = build.Builder("linux", out / "native", False, 2)
-        builder.build_libs(["plat"])
+        rlibs = builder.cargo_rlibs(["rt", "plat"])
         exe = directory / "loader_probe"
-        cmd = ["rustc"] + builder.flags() + ["--crate-name", "loader_probe", "--crate-type", "bin", "-Cdebuginfo=2",
-                "--extern", f"rt={builder.rlib('rt')}", "--extern", f"plat={builder.rlib('plat')}",
+        cmd = ["rustc"] + builder.probe_flags() + ["--crate-name", "loader_probe", "--crate-type", "bin", "-Cdebuginfo=2",
+                "--extern", f"rt={rlibs['rt']}", "--extern", f"plat={rlibs['plat']}",
                 "-C", f"linker={build.tool('ld.lld')}", "-C", "linker-flavor=ld", "-C", "relocation-model=static",
                 "-C", "target-feature=+crt-static", "-C", "link-arg=-static", "-C", "link-arg=-nostdlib", "-C", "link-arg=-e_start",
                 support / "loader_probe.rs", "-o", exe]

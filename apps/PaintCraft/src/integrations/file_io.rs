@@ -311,7 +311,7 @@ fn fio_open_args(p: &mut Pn, ui: &mut Ui, cwd: &str, a: &[String]) {
 // new_default() -- "Unbenannt": 800 x 600, white, 96 dpi
 fn new_default(p: &mut Pn) {
     if let Some(d) = crate::document::model::doc_new(p, DEF_W, DEF_H, 0xFFFF_FFFF, 0) {
-        crate::document::history::hist_init(p, d, "Neues Bild", IC_PAGE);
+        crate::document::history::hist_init(p, d, "Neues Bild", IC_PAGE); // i18n
     }
 }
 
@@ -359,9 +359,10 @@ pub(crate) fn build_filters(f: &mut Fio) {
         }
     }
     // open_exts = the all types entry + body
-    if fits(alen, 16, EXTS_CAP - 32) {
-        all.push_str("=Alle Bildtypen");
-        alen += 16;
+    let every = alloc::format!("={}", crate::preferences::localization::tr("Alle Bildtypen"));
+    if fits(alen, every.len(), EXTS_CAP - 32) {
+        all.push_str(&every);
+        alen += every.len();
     }
     let mut list = alloc::vec![all];
     if alen + olen < EXTS_CAP * 2 - 2 {
@@ -372,10 +373,11 @@ pub(crate) fn build_filters(f: &mut Fio) {
 
 // ------------------------------------------------------------------ helpers
 
-/// fio_error(title, msg) -- the error bar shows `msg` (title None = "Fehler")
+/// fio_error(title, msg) -- the error bar shows `msg` in the UI language (a German text of the
+/// catalogue is translated; the caller translates the title, None = "Fehler")
 pub(crate) fn fio_error(p: &mut Pn, title: Option<&str>, msg: &str) {
-    p.fio.err_title = cap(String::from(title.unwrap_or("Fehler")), ERR_CAP);
-    p.fio.err_msg = cap(String::from(msg), ERR_CAP);
+    p.fio.err_title = cap(String::from(title.unwrap_or_else(|| crate::preferences::localization::tr("Fehler"))), ERR_CAP);
+    p.fio.err_msg = cap(String::from(crate::preferences::localization::tr(msg)), ERR_CAP);
     p.repass();
 }
 
@@ -411,16 +413,16 @@ fn load_error_msg(p: &mut Pn, err: i32, path: &str) {
     let msg = match err {
         ERR_IO => {
             if plat::file_exists(path) != 0 {
-                "Die Datei ließ sich nicht vom Datenträger lesen."
+                "Die Datei ließ sich nicht vom Datenträger lesen." // i18n
             } else {
-                "Datei nicht gefunden."
+                "Datei nicht gefunden." // i18n
             }
         }
-        ERR_UNSUPPORTED => "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen.",
-        ERR_NOMEM | ERR_LIMIT => "Zu wenig Arbeitsspeicher, um das Bild zu laden.",
-        ERR_DIMS => "Das Bild ist zu groß.",
-        ERR_FAIL => "Es sind zu viele Bilder geöffnet.",
-        _ => "Die Datei ist defekt oder passt nicht zu ihrem Format.",
+        ERR_UNSUPPORTED => "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen.", // i18n
+        ERR_NOMEM | ERR_LIMIT => "Zu wenig Arbeitsspeicher, um das Bild zu laden.", // i18n
+        ERR_DIMS => "Das Bild ist zu groß.", // i18n
+        ERR_FAIL => "Es sind zu viele Bilder geöffnet.", // i18n
+        _ => "Die Datei ist defekt oder passt nicht zu ihrem Format.", // i18n
     };
     let t = String::from(file_part(path));
     fio_error(p, Some(&t), msg);
@@ -557,12 +559,12 @@ fn install_open(p: &mut Pn, ui: &mut Ui, image: LoadedImage, path: &str) -> i32 
             let high_depth = meta.bits > 8 || meta.flags & (img_core::IMF_HDR | img_core::IMF_FLOAT) != 0;
             let result = install_flat(p, ui, sf, meta, if layered || external || high_depth { "" } else { path }, hint);
             if result == 0 && layered {
-                fio_error(p,Some("PSD-Import"),"Das gespeicherte PSD-Gesamtbild wurde als neues 8-Bit-Bild importiert. Nicht unterstützte Photoshop-Strukturen und höhere Farbtiefen bleiben in der Originaldatei erhalten. Bitte unter einem neuen Namen speichern.");
+                fio_error(p,Some(crate::preferences::localization::tr("PSD-Import")),"Das gespeicherte PSD-Gesamtbild wurde als neues 8-Bit-Bild importiert. Nicht unterstützte Photoshop-Strukturen und höhere Farbtiefen bleiben in der Originaldatei erhalten. Bitte unter einem neuen Namen speichern.");
             } else if result == 0 && high_depth {
-                fio_error(p,Some("Farbtiefe / HDR"),"Die Quelldatei wurde in ein neues 8-Bit-Dokument umgewandelt. PaintCraft bearbeitet und zeigt derzeit SDR; höhere Präzision und HDR-Werte bleiben nur in der Originaldatei erhalten. Bitte unter einem neuen Namen speichern.");
+                fio_error(p,Some(crate::preferences::localization::tr("Farbtiefe / HDR")),"Die Quelldatei wurde in ein neues 8-Bit-Dokument umgewandelt. PaintCraft bearbeitet und zeigt derzeit SDR; höhere Präzision und HDR-Werte bleiben nur in der Originaldatei erhalten. Bitte unter einem neuen Namen speichern.");
             }
             if result == 0 && external {
-                fio_error(p,Some("Paint.NET-Dateiformat"),"Als neues Bild geöffnet: nur die vereinten Pixel und die Auflösung. Ebenen und übrige Metadaten stehen weiter nur in der Originaldatei; beim Export nutzt das Plugin seine Vorgaben.");
+                fio_error(p,Some(crate::preferences::localization::tr("Paint.NET-Dateiformat")),"Als neues Bild geöffnet: nur die vereinten Pixel und die Auflösung. Ebenen und übrige Metadaten stehen weiter nur in der Originaldatei; beim Export nutzt das Plugin seine Vorgaben.");
             }
             result
         }
@@ -644,7 +646,7 @@ fn poll_open(p: &mut Pn, ui: &mut Ui) {
         if worker.is_some() { p.fio.opening.job = Some(job); p.fio.opening.worker = worker; }
         else {
             p.fio.opening.paths.clear();
-            fio_error(p, Some("Öffnen"), "Der Hintergrund-Thread konnte nicht gestartet werden.");
+            fio_error(p, Some(crate::preferences::localization::tr("Öffnen")), "Der Hintergrund-Thread konnte nicht gestartet werden."); // i18n
         }
     }
     OPEN_BUSY.store(p.fio.opening.job.is_some() || !p.fio.opening.paths.is_empty(), Ordering::Release);
@@ -657,7 +659,7 @@ fn open_window(p: &mut Pn, ui: &mut Ui) {
     if ui.window_begin(0x60EA, crate::preferences::localization::tr("Bild öffnen"), None, WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT | WF_NOCLOSE, None) {
         ui.text(TS_BODY | TX_WRAP, file_part(&job.path));
         let progress = job.progress.load(Ordering::Acquire);
-        ui.text(TS_BODY, &if progress == 100 { String::from("Bild wird dekodiert …") } else { format!("Datei wird gelesen: {progress} %") });
+        ui.text(TS_BODY, &if progress == 100 { String::from(crate::preferences::localization::tr("Bild wird dekodiert …")) } else { crate::preferences::localization::tf("Datei wird gelesen: {} %", &[&alloc::format!("{progress}")]) });
         if ui.button(0x94000, crate::preferences::localization::tr("Abbrechen")) & EV_ACT != 0 {
             job.cancel.store(1, Ordering::Release);
             p.fio.opening.paths.clear();
@@ -677,7 +679,7 @@ fn opened(p: &mut Pn, ui: &mut Ui, doc: DocId, path: &str, fmt: u32) {
     crate::document::model::doc_set_path(p, doc, path);
     recent_add(p, ui, path);
     set_last_dir(&mut p.fio, path);
-    crate::document::history::hist_init(p, doc, "Datei öffnen", IC_FOLDER_OPEN);
+    crate::document::history::hist_init(p, doc, "Datei öffnen", IC_FOLDER_OPEN); // i18n
     doc_set_modified(p, doc, false);
     doc_set_active(p, doc);
 }
@@ -716,7 +718,7 @@ fn open_flat(p: &mut Pn, ui: &mut Ui, data: &[u8], path: &str, hint: u32) -> i32
 
 fn install_flat(p: &mut Pn, ui: &mut Ui, sf: Surface, mut meta: ImgMeta, path: &str, hint: u32) -> i32 {
     let Some(doc) = crate::document::model::doc_new(p, sf.w, sf.h, 0, DNF_EMPTY as u32) else { return ERR_NOMEM };
-    let li = match crate::document::layers::lay_add_sf(p, doc, 0, sf, Some("Hintergrund")) {
+    let li = match crate::document::layers::lay_add_sf(p, doc, 0, sf, Some(crate::preferences::localization::tr("Hintergrund"))) {
         Ok(i) => i,
         Err(_) => {
             crate::document::model::doc_close(p, doc);
@@ -733,7 +735,7 @@ fn install_flat(p: &mut Pn, ui: &mut Ui, sf: Surface, mut meta: ImgMeta, path: &
     }
     let fmt = if meta.fmt != 0 { meta.fmt } else { hint };
     if path.is_empty() {
-        crate::document::history::hist_init_unsaved(p, doc, "Bilderfassung", IC_SCAN);
+        crate::document::history::hist_init_unsaved(p, doc, "Bilderfassung", IC_SCAN); // i18n
         doc_set_active(p,doc);
     } else {opened(p, ui, doc, path, fmt);}
     0
@@ -783,7 +785,7 @@ fn install_pdn(p: &mut Pn, ui: &mut Ui, pd: img_pdn::PdnDoc, path: &str) -> i32 
     crate::document::model::doc_mark_layers(p, doc);
     if path.is_empty() {
         // recovered after a session end: unsaved, no file yet (fio_recover gives it one)
-        crate::document::history::hist_init_unsaved(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN);
+        crate::document::history::hist_init_unsaved(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN); // i18n
         doc_set_active(p, doc);
     } else {
         opened(p, ui, doc, path, IMGF_PDN);
@@ -810,8 +812,8 @@ fn install_psd(p: &mut Pn, ui: &mut Ui, psd: img_all::psd::document::Document, p
     d.cur = d.layers.len() as i32 - 1;
     crate::document::model::doc_mark_layers(p, doc);
     if psd.converted {
-        crate::document::history::hist_init_unsaved(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN);
-        fio_error(p, Some("PSD-Import"), "Die Rasterebenen wurden als neues 8-Bit-Dokument importiert. Masken wurden angewendet; höhere Farbtiefen, Bereiche außerhalb der Leinwand oder zusätzliche Photoshop-Daten bleiben in der Originaldatei. Bitte unter einem neuen Namen speichern.");
+        crate::document::history::hist_init_unsaved(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN); // i18n
+        fio_error(p, Some(crate::preferences::localization::tr("PSD-Import")), "Die Rasterebenen wurden als neues 8-Bit-Dokument importiert. Masken wurden angewendet; höhere Farbtiefen, Bereiche außerhalb der Leinwand oder zusätzliche Photoshop-Daten bleiben in der Originaldatei. Bitte unter einem neuen Namen speichern.");
     } else {
         opened(p, ui, doc, path, img_core::IMGF_PSD);
     }
@@ -1119,10 +1121,10 @@ fn finish_save(p: &mut Pn, ui: &mut Ui, doc: DocId, path: &str, fmt: u32, err: i
         return 0;
     }
     let msg = match err {
-        ERR_IO => "Die Datei ließ sich nicht auf den Datenträger schreiben.",
-        ERR_NOMEM => "Zu wenig Arbeitsspeicher, um das Bild zu speichern.",
-        ERR_UNSUPPORTED => "In diesem Format kann PaintCraft nicht speichern.",
-        _ => "Das Speichern ist aus unbekanntem Grund fehlgeschlagen.",
+        ERR_IO => "Die Datei ließ sich nicht auf den Datenträger schreiben.", // i18n
+        ERR_NOMEM => "Zu wenig Arbeitsspeicher, um das Bild zu speichern.", // i18n
+        ERR_UNSUPPORTED => "In diesem Format kann PaintCraft nicht speichern.", // i18n
+        _ => "Das Speichern ist aus unbekanntem Grund fehlgeschlagen.", // i18n
     };
     let t = String::from(file_part(path));
     fio_error(p, Some(&t), msg);
@@ -1186,7 +1188,7 @@ fn request_save(p: &mut Pn, ui: &mut Ui, doc: DocId, path: Option<&str>, fmt: u3
     if let Some(path) = path {
         p.fio.sv_path = canon_path(path);
         if p.fio.sv_path.is_empty() {
-            fio_error(p, None, "Der Pfad ist zu lang.");
+            fio_error(p, None, "Der Pfad ist zu lang."); // i18n
             p.fio.sv_saveas = false;
             return -1;
         }
@@ -1498,7 +1500,7 @@ fn ask_window(p: &mut Pn, ui: &mut Ui) {
                 }
             }
             let name = d.map_or(String::new(), |d| d.name.clone());
-            let t = cap(format!("„{}“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?", name), ERR_CAP);
+            let t = cap(crate::preferences::localization::tf("„{}“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?", &[&name]), ERR_CAP);
             ui.next_size(300, 0);
             ui.text(TS_BODY | TX_WRAP, &t);
             ui.box_end();
@@ -1537,11 +1539,11 @@ fn flat_window(p: &mut Pn, ui: &mut Ui) {
     if ui.window_begin(WINID_FLAT, crate::preferences::localization::tr("Speichern"), Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         ui.text(
             TS_BODY | TX_WRAP,
-            "Dieses Dateiformat kennt keine Ebenen. Für die Datei werden deshalb alle Ebenen zu einer einzigen vereint.",
+            crate::preferences::localization::tr("Dieses Dateiformat kennt keine Ebenen. Für die Datei werden deshalb alle Ebenen zu einer einzigen vereint."),
         );
         ui.text(
             TS_CAPTION | TX_WRAP | TX_SECONDARY,
-            "Das betrifft nur die gespeicherte Datei; im geöffneten Dokument bleiben alle Ebenen erhalten.",
+            crate::preferences::localization::tr("Das betrifft nur die gespeicherte Datei; im geöffneten Dokument bleiben alle Ebenen erhalten."),
         );
         let r = ui.dialog_buttons(Some(crate::preferences::localization::tr("Zusammenfassen")), None, Some(crate::preferences::localization::tr("Abbrechen")));
         if r != 0 {

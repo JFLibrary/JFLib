@@ -28,6 +28,7 @@ const CHUNK: usize = 1 << 16;
 
 /// where an update stands
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Stage {
     /// nothing pending
     #[default]

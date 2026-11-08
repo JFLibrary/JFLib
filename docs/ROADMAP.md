@@ -1318,7 +1318,7 @@ Fensterrand hinaus.
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
   Vektor-Icons ([STYLES.md](STYLES.md)).
-- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](../lib/script/lib.rs), seit
+- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](../apps/jfs/crates/script/lib.rs), seit
   2026-10-19, Meilenstein SK1): `.jfs`-Dateien, klein und dynamisch typisiert (JS/Lua-artig,
   Closures, `try`/`catch`, `??`, Interpolation `"${x}"`). Lexer mit `tokens()` für die
   Syntaxhervorhebung (deckt jedes Byte ab, scheitert nie), Pratt-Parser mit Fehlerkorrektur
@@ -1366,7 +1366,7 @@ Fensterrand hinaus.
   (`Action::ScriptSource`; App-README „Skript-Editor“).
 - **P3** · *erledigt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25,
   seit 2026-10-26): [`apps/jfs`](../apps/jfs/README.md) führt Skripte der Sprache aus
-  `lib/script` außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
+  `apps/jfs/crates/script` außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
   Linux). `jfs DATEI.jfs [ARGS…]` übersetzt und startet ein Skript (die Argumente in
   `config.args`), `jfs -e "CODE"` und `jfs -` (stdin) für Einzeiler, `jfs --check` gibt nur die
   Diagnosen als `DATEI:ZEILE:SPALTE: Fehler: …` und Warnungen auf stdout aus (Exit-Code 1 bei
@@ -1382,7 +1382,7 @@ Fensterrand hinaus.
   `--heap` (auch `64k`, `16M`), `--depth`, `--stack`, sonst `Limits::default()`. Fehler beim
   Übersetzen oder Laufen erscheinen auf stderr mit Datei, Zeile:Spalte, der Quellzeile mit
   Marke und der Aufrufkette (Rekursionen zusammengefasst), Exit-Code 1; ein falscher Aufruf
-  ergibt 2. Sprache und VM sind unverändert; neu in `lib/script` ist nur
+  ergibt 2. Sprache und VM sind unverändert; neu in `apps/jfs/crates/script` ist nur
   `compile_with(name, src, globals)`: Namen gegen die des Hosts (dazu Built-ins und
   Standardbibliothek), ein unbekannter Name ist dort ein Fehler statt einer Warnung (getestet
   in `coretest --only scriptvm`). Eine REPL gibt es nicht. Tests: `python build_rs.py test jfs`
@@ -1463,7 +1463,7 @@ Fensterrand hinaus.
   zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
   Linux). Seit B3 (2026-11-01) nennt `MdEv::click` das Element unter einem Klick, auch inline
   (`MdDoc::element_at`, `mdviewtest --test unit`, `doc_clicks.uis`), `MdDoc::dom_size` die Größe des
-  Baums, und `Vm::add_script` in `lib/script` gibt die Skripte einer Seite in eine VM mit gemeinsamen
+  Baums, und `Vm::add_script` in `apps/jfs/crates/script` gibt die Skripte einer Seite in eine VM mit gemeinsamen
   obersten Namen (coretest `scriptmod`). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten
   das ganze Dokument neu ab statt nur den betroffenen Container.
   (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
@@ -1487,7 +1487,7 @@ Fensterrand hinaus.
   Getestet mit `mdviewtest --test unit` (Gruppe `css`: Spezifität, Reihenfolge, `!important`,
   Vererbung, Kästen, Ignoriertes, physische Seiten in rechts-nach-links, Kosten; die 300
   zufälligen Änderungen von (3) mit Stylesheet) und `--page css` (`css_shots.uis` hell, dunkel,
-  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In `lib/script` nur
+  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In `apps/jfs/crates/script` nur
   `compile_with` (siehe den Runner), damit der Browser-Host seine eigenen Globals (`document`,
   `fetch` …) prüfen lässt. Bewusst nicht: eine vollständige HTML/CSS-Engine (Box-Modell mit
   Breiten und Höhen, Floats, Flexbox, Grid, Positionierung) und JavaScript. Offen: Schriftgrößen
@@ -1506,7 +1506,7 @@ Fensterrand hinaus.
   coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker. Seit R1 findet
   `find_mode` einen Modus über seinen Prompt (die Modi der Zugriffslisten von JFNetworker).
 - **P3** · *erledigt* · Sprachdienste für jfs (SK6, 2026-10-30, für die IDE von JFNetworker):
-  [`script::ls`](../lib/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
+  [`script::ls`](../apps/jfs/crates/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
   lokale `let`, `fn` samt Parametern, Closures, Schleifen- und catch-Variablen) und jede
   Verwendung nach den Gültigkeitsregeln von `ast.rs`, auch auf Code, der nicht parst
   (`parse_partial`); darauf `definition` (in importierte Module über einen Lade-Callback des
@@ -1516,8 +1516,8 @@ Fensterrand hinaus.
   Kurzbeschreibung, Built-ins und Module der Standardbibliothek, Methoden von str / list / map /
   bytes nach dem Typ eines Literals, Schlüsselwörter am Anweisungsanfang; nach Art und Präfix
   sortiert), `hover` (Art, Signatur, `///`-Doku-Kommentar; deutsche Beschreibungen jeder
-  Funktion der Standardbibliothek in [`lsdoc.rs`](../lib/script/lsdoc.rs)), `signature`,
-  `folding`, `symbols` (Gliederung). [`script::fmt`](../lib/script/fmt.rs) formatiert
+  Funktion der Standardbibliothek in [`lsdoc.rs`](../apps/jfs/crates/script/lsdoc.rs)), `signature`,
+  `folding`, `symbols` (Gliederung). [`script::fmt`](../apps/jfs/crates/script/fmt.rs) formatiert
   (Einrückung nach Klammern, Leerzeichen um Operatoren, eine Anweisung je Zeile, Kommentare und
   höchstens eine Leerzeile bleiben, idempotent), verweigert Code mit Syntaxfehlern und prüft,
   dass der Baum des Ergebnisses dem des Originals gleicht – der übersetzte Code bleibt gleich.
@@ -1982,7 +1982,7 @@ Fensterrand hinaus.
     unsichtbaren Rahmen eines Werkzeugfensters); ein Fenster folgt dem Finger selbst (`begin_move`). Bildschirmtastatur über
     `InputPane`.
   - Linux: `wl_touch` (Hauptfenster, Kindfenster, Popups) und XInput-2.2-Touch auf X11.
-  - Bibliothek: Zwei-Finger-Geste (`ui.touch_two`), Halten vor dem Ziehen eines Panels (`WF_TOUCH_HOLD`, 1 s, mit
+  - Bibliothek: Zwei-Finger-Geste (`ui.touch_two`), Halten vor dem Ziehen eines Panels (`WF_TOUCH_HOLD`, 600 ms, mit
     Anzeige), größere Trefferflächen vom Hintergrund aus (44 DIP), der Stift geht vor (Handballen), `TF_REST`, ein Tippen
     bleibt ein Klick, wenn der Finger etwas rollt.
   - PaintCraft: Pinch und Verschieben in jede Richtung, ein Finger malt oder verschiebt (Einstellung).

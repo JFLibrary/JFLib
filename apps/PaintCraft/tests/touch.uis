@@ -43,12 +43,23 @@ wait 200
 
 # ------------------------------------------------------------ the zoom slider
 expect #1026 value 11
+# a finger's higher title bar does not push the Layers window onto the status bar: it ends where it does
+# with a mouse, at 760 (478 + 40 + 2 + 240; #1400 ends at 768)
+expect window 24579 rect 1062 478 208 240
 swipe 1208,784 1160,784 200 hold
 expect #1026 value 0..10
 expect #9909 value 100..9999
 # with the finger a little above the slider's middle, on the slider's upper edge
 swipe 1160,770 1260,772 200 hold
 expect #1026 value 20..27
+key ctrl+0
+expect #9909 value 10000
+wait 200
+# with its middle just above the status bar, over the canvas: the slider is meant, no stroke
+expect #9905 value 0
+swipe 1208,766 1160,766 200 hold
+expect #1026 value 0..10
+expect #9905 value 0
 key ctrl+0
 expect #9909 value 10000
 wait 200
@@ -64,7 +75,7 @@ expect #9909 value 10000
 # rests on the title bar, then goes down only
 window 24577
 finger down 20,10
-wait 1100
+wait 700
 finger move 20,130
 finger up
 window any
@@ -73,7 +84,7 @@ wait 200
 # up and to the right
 window 24577
 finger down 20,10
-wait 1100
+wait 700
 finger move 320,-40
 finger up
 window any

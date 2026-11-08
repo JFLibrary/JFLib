@@ -155,6 +155,7 @@ pub struct Capture {
 
 /// why a capture could not be read
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ReadErr {
     NotPcapng,
     Truncated,

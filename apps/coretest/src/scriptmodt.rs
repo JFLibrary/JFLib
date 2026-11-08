@@ -1,4 +1,4 @@
-// scriptmodt -- checks of lib/script's modules, debug interface and test functions (SK7), and
+// scriptmodt -- checks of apps/jfs/crates/script's modules, debug interface and test functions (SK7), and
 // the VM benchmark
 //
 //   run(t)    group "scriptmod": import (maps, privacy, caching, relative and absolute paths,

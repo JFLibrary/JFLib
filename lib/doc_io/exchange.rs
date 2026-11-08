@@ -5,6 +5,7 @@ use doc_core::Source;
 
 /// Supported standalone source-list formats. Each codec has an explicit editable subset.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BibliographyFormat {
     #[default]
     WordXml,

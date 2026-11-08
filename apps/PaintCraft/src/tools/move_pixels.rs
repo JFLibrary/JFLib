@@ -114,8 +114,8 @@ static CORNER_X: [usize; 4] = [0, 2, 2, 0];
 static CORNER_Y: [usize; 4] = [1, 1, 3, 3];
 /// Probenahme rows -> RS_*
 static FILTER_RS: [u32; 4] = [RS_NEAREST, RS_BILINEAR, RS_BICUBIC, RS_MULTISAMPLE];
-static FILTER_LABELS: [&str; 4] = ["Nächster Nachbar", "Bilineare", "Bikubisch", "Bilinear mit Multisampling"];
-const S_MOVEPX: &str = "Pixel verschieben";
+static FILTER_LABELS: [&str; 4] = ["Nächster Nachbar", "Bilineare", "Bikubisch", "Bilinear mit Multisampling"]; // i18n
+const S_MOVEPX: &str = "Pixel verschieben"; // i18n
 
 /// the row context of mv_row (MC_*, g_mv_ctx): what the compose hook and the commit read
 #[derive(Default)]
@@ -811,15 +811,15 @@ fn mv_commit(p: &mut Pn, ui: &mut Ui, doc: DocId) -> bool {
     }
     let t = &p.tmove;
     let (name, icon) = if t.paste {
-        ("Einfügen", IC_PASTE) // K1
+        ("Einfügen", IC_PASTE) // K1 // i18n
     } else if mv_is_px(t) {
         (S_MOVEPX, IC_MOVE)
     } else if t.did & DID_ROTATE != 0 {
-        ("Auswahl drehen", IC_ROTATE)
+        ("Auswahl drehen", IC_ROTATE) // i18n
     } else if t.did & DID_SCALE != 0 {
-        ("Auswahlgröße ändern", IC_RESIZE)
+        ("Auswahlgröße ändern", IC_RESIZE) // i18n
     } else {
-        ("Auswahl verschieben", IC_POINTER)
+        ("Auswahl verschieben", IC_POINTER) // i18n
     };
     hist_begin_compound(p, doc);
     // the selection: the state before (pending transform off), then the moved one
@@ -1260,16 +1260,16 @@ fn mv_options(p: &mut Pn, ui: &mut Ui) {
     let mut id = ID_MV_SEL;
     if tool_cur(&p.tool) == TOOL_MOVE_PIXELS {
         id = ID_MV_PX;
-        opt_label(ui, "Probenahme:");
+        opt_label(ui, "Probenahme:"); // i18n
         let mut v = p.tmove.filter;
         opt_menu(p, ui, id + MVO_FILTER, &mut v, &FILTER_LABELS, &[], None, OMF_NOICON as u32);
         p.tmove.filter = v;
         opt_sep(ui);
     }
-    if ui.icon_button(id + MVO_FLIPH, IC_SWITCH, "Horizontal spiegeln") & EV_ACT != 0 {
+    if ui.icon_button(id + MVO_FLIPH, IC_SWITCH, crate::preferences::localization::tr("Horizontal spiegeln")) & EV_ACT != 0 {
         mv_flip(p, ui, false);
     }
-    if ui.icon_button(id + MVO_FLIPV, IC_CHEV_UP_DOWN, "Vertikal spiegeln") & EV_ACT != 0 {
+    if ui.icon_button(id + MVO_FLIPV, IC_CHEV_UP_DOWN, crate::preferences::localization::tr("Vertikal spiegeln")) & EV_ACT != 0 {
         mv_flip(p, ui, true);
     }
 }

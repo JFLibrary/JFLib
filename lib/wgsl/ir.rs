@@ -70,6 +70,7 @@ pub const VOID: TypeId = 7;
 
 /// the scalar types (AbstractInt / AbstractFloat only for analysis)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum Scalar {
     Bool,
     AbstractInt,
@@ -127,6 +128,7 @@ impl Scalar {
 
 /// the address spaces (Handle: textures and samplers)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum AddressSpace {
     Function,
     Private,
@@ -154,6 +156,7 @@ impl AddressSpace {
 
 /// access modes of memory views
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum Access {
     Read,
     Write,
@@ -181,6 +184,7 @@ impl Access {
 
 /// the element count of an array type
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum ArrayCount {
     Fixed(u32),
     /// an identifier naming an override (Module::overrides index)
@@ -192,6 +196,7 @@ pub enum ArrayCount {
 
 /// texture dimensionalities
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum TexDim {
     D1,
     D2,
@@ -229,6 +234,7 @@ impl TexDim {
 
 /// the texel formats of storage textures (spec 6.6.1)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum TexelFormat {
     Rgba8unorm, Rgba8snorm, Rgba8uint, Rgba8sint, Rgba16unorm, Rgba16snorm, Rgba16uint, Rgba16sint,
     Rgba16float, Rg8unorm, Rg8snorm, Rg8uint, Rg8sint, Rg16unorm, Rg16snorm, Rg16uint, Rg16sint,
@@ -281,6 +287,7 @@ impl TexelFormat {
 
 /// texture kinds (with the sampled type, format and access where they have one)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum TexKind {
     /// texture_1d<T> ... texture_cube_array<T>; T is f32, i32 or u32
     Sampled(Scalar),
@@ -293,6 +300,7 @@ pub enum TexKind {
 
 /// a type (see the module comment)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum Type {
     Scalar(Scalar),
     Vector(u8, Scalar),
@@ -316,6 +324,7 @@ pub enum Type {
 
 /// the predeclared structures of built-in results
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum BuiltinStruct {
     /// frexp: (vector width or 1, fract scalar type)
     Frexp(u8, Scalar),
@@ -327,6 +336,7 @@ pub enum BuiltinStruct {
 
 /// the built-in values of @builtin(...)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum BuiltinValue {
     VertexIndex,
     InstanceIndex,
@@ -374,6 +384,7 @@ impl BuiltinValue {
 
 /// @interpolate types
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum InterpType {
     Perspective,
     Linear,
@@ -382,6 +393,7 @@ pub enum InterpType {
 
 /// @interpolate samplings
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum InterpSampling {
     Center,
     Centroid,
@@ -392,6 +404,7 @@ pub enum InterpSampling {
 
 /// the depth mode of @builtin(frag_depth, less | greater) (fragment_depth)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum DepthMode {
     Less,
     Greater,
@@ -438,6 +451,7 @@ pub struct Struct {
 
 /// a folded constant; Zero is the zero value of whatever type the node has
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum Value {
     Bool(bool),
     AInt(i64),
@@ -473,6 +487,7 @@ pub fn f16_bits(x: f32) -> u16 {
 
 /// unary operators (&, * are AddrOf / Deref)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum UnaryOp {
     Neg,
     /// logical not (bool, vecN<bool>)
@@ -482,6 +497,7 @@ pub enum UnaryOp {
 
 /// the built-in functions (spec section 17; no buffer views)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[non_exhaustive]
 pub enum Builtin {
     // logical, array
     All, Any, Select, ArrayLength,
@@ -519,6 +535,7 @@ pub enum Builtin {
 
 /// expression nodes (see the module comment for the conventions)
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum ExprKind {
     Const(Value),
     Override(u32),
@@ -563,6 +580,7 @@ pub struct Case {
 
 /// statements (for and while are desugared to Loop)
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum Stmt {
     Block(Vec<Stmt>),
     Var { local: u32, init: Option<ExprId> },
@@ -584,6 +602,7 @@ pub enum Stmt {
 
 /// what a local is
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum LocalKind {
     /// a function-scope variable: Local(i) is a reference to ty
     Var,
@@ -611,6 +630,7 @@ pub struct Param {
 
 /// shader stages
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Stage {
     Vertex,
     Fragment,
@@ -698,6 +718,7 @@ pub struct Const {
 
 /// one workgroup_size dimension
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum WgSize {
     Const(u32),
     /// an override-expression in Module::exprs
@@ -706,6 +727,7 @@ pub enum WgSize {
 
 /// how a stage input / output is bound
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum IoKind {
     Builtin(BuiltinValue),
     /// location, blend_src, interpolation with the defaults applied (None for integer
@@ -754,6 +776,7 @@ pub struct EntryPoint {
 
 /// diagnostic filter severities
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Severity {
     Error,
     Warning,

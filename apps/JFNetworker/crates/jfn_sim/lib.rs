@@ -62,6 +62,8 @@
 //   experiment  a parameter sweep (SA2): configurations and load levels from one warm state, on
 //            clones of the engine at full speed; results, knee, cost, CSV
 //   svcform  what the window's forms ask of the lab's services: their settings, what they lack (SA3)
+//   db       the database service: SQL-shaped statements over modelled tables, buffer pool, row locks,
+//            versions, a log with group commit and recovery (SA4); dbsql its statements, dbstore its tables
 //   units    services as units on Linux hosts: unit files, enable, restart policies
 //   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
@@ -71,7 +73,7 @@
 //   cache    HTTP cache in front of a backend: LRU with a time to live, hits and misses
 //   mq       message queue (topics, at-least-once, acknowledgements, redelivery, dead
 //            letters) and the workers that take from it
-//   scriptsvc scripts as services: a .jfs program (lib/script) driven by events, its fuel the
+//   scriptsvc scripts as services: a .jfs program (apps/jfs/crates/script) driven by events, its fuel the
 //            CPU time of a single-threaded program; the host API (log, timers, net, dns, http,
 //            disk, metrics); a new source that keeps the disk and numbers (ScriptSource)
 //   series   time series on virtual time: every service's metrics (rates of counters, gauges,
@@ -312,6 +314,9 @@ pub mod imapd;
 pub mod res;
 pub mod experiment;
 pub mod svcform;
+pub mod db;
+pub mod dbsql;
+pub mod dbstore;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -348,6 +353,7 @@ pub use experiment::{ConfigOut, DevFig, Fig, LinkFig, Plan, Point, Status, SvcFi
 pub use disk::Disk;
 pub use fault::{Fault, FaultMark, LinkOver};
 pub use lb::{Algo, BackendView, Lb, LbMode, LbOp, LbView};
+pub use db::{Db, DbCfg, DbStats, DbView, LockView, TableView, WalKind, WalRec};
 pub use kv::{Consistency, Entry, KvClient, KvDone, KvNode, KvView, ReplicaView, Ver};
 pub use cache::{Cache, CacheView};
 pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};

@@ -1,0 +1,44 @@
+[package]
+name = "codectest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "codectest"
+path = "main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_png.workspace = true
+img_jpeg.workspace = true
+img_bmp.workspace = true
+img_gif.workspace = true
+img_webp.workspace = true
+img_hevc.workspace = true
+img_av1.workspace = true
+img_heif.workspace = true
+img_jxl.workspace = true
+img_jxl_enc.workspace = true
+img_jxr.workspace = true
+img_dds.workspace = true
+img_pdn.workspace = true
+img_all.workspace = true
+ui.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

@@ -86,7 +86,8 @@ impl Files {
         match ui.recent_open(path) {
             RecentOpen::Ready => self.open_path(ui, path, t("Wieder geöffnet")),
             RecentOpen::Asking => self.info = String::from(t("Wird wieder geöffnet …")),
-            RecentOpen::Missing => {
+            // Missing, and what a later version adds: gone or out of reach
+            _ => {
                 self.info = tf("Nicht mehr da: {}", &[&plat::display_name(path)]);
                 ui.recent_remove(path);
             }

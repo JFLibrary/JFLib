@@ -46,7 +46,7 @@ ignoriert); Aufzählungen nur über bekannte Namen. `version` > 1 wird gelesen w
 | ToolsWindow, HistoryWindow, LayersWindow, ColorsWindow | visible, x, y (+ width, height bei Verlauf/Ebenen; expanded bei Farben) | WINRECT der wnd_*.s-Module: DIP relativ zum Client-Ursprung des Hauptfensters, ±20000 (sonst Standardplatz); Größe 120..4000 × 80..4000 |
 | Colors | primary, secondary, palette | `AARRGGBB`; Palette = bis 96 Farben, kommagetrennt (ungültige Einträge übersprungen) |
 | View | units, grid, rulers | `pixel`/`inch`/`cm`; 0/1; 0/1 |
-| Tools | default, width, hardness, spacing, antialias, blend, fill, tolerance, flood, sampling, selection_mode, selection_quality, pressure, smoothing | Standardwerkzeug (englischer Name, z. B. `Paintbrush`, `Zoom`) + TOOLCFG-Standards (width f64 1..2000, sonst TC_*-Bereiche aus pn_tooli.inc) |
+| Tools | default, width, hardness, spacing, antialias, blend, fill, tolerance, flood, sampling, selection_mode, selection_quality, pressure, path_smoothing | Standardwerkzeug (englischer Name, z. B. `Paintbrush`, `Zoom`) + TOOLCFG-Standards (width f64 1..2000, sonst TC_*-Bereiche aus pn_tooli.inc) |
 | RecentFiles | file1..file10 | neueste zuerst; < 1040 Byte |
 | History | budget_mb, temp_dir | 0 = automatisch (min(40 % RAM, 4 GB)), bis 262144; Ordner der Auslagerungsdatei, leer = System-Temp |
 | Performance | threads | 0 = automatisch, 1..64 (wirkt nur, wenn der Pool noch nicht lief → praktisch nach Neustart) |

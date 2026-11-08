@@ -350,6 +350,7 @@ pub enum NdMsg {
 
 /// why a receiver drops an ND message (RFC 4861 6.1, 7.1, 8.1)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NdErr {
     /// the ICMP code is not 0
     Code(u8),

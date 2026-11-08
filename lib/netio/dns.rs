@@ -149,6 +149,7 @@ fn skip_name(m: &[u8], mut p: usize) -> Option<usize> {
 
 /// what an answer says
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Answer {
     /// the addresses of the asked type (maybe none: the name exists without them)
     Found(Vec<IpAddr>),

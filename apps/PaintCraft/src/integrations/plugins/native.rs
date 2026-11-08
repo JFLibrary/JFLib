@@ -141,21 +141,24 @@ const FW_PARFOR: u32 = 9;
 
 static S_FOLDERS: [&str; 3] = ["Effects", "FileTypes", "Shapes"];
 const S_LIBEXT: &str = if cfg!(windows) { ".dll" } else { ".so" };
+// i18n
 static S_WHERE: [&str; 10] =
     ["dem Lader", "pn_plugin_query", "den Plugin-Daten", "prepare", "render", "free", "probe", "decode", "encode", "parallel_for"];
+// i18n
 static S_KINDS: [&str; 7] =
     ["Fehler", "Zugriffsverletzung", "ungültiger Befehl", "Rechenfehler", "Ausrichtungsfehler", "Haltepunkt", "Stapelüberlauf"];
+// i18n
 static S_LIBE: [&str; 8] = [
-    "Die Plugin-Datei ließ sich nicht laden.",
-    "Die Plugin-Datei ließ sich nicht lesen.",
-    "Keine gültige Plugin-Bibliothek (x86-64-DLL / ELF-Shared-Object erwartet) oder die Datei ist defekt.",
-    "Das Plugin benötigt andere Bibliotheken (nicht erlaubt: nur die Plugin-API).",
-    "Das Plugin enthält eine nicht unterstützte Relokation.",
-    "Zu wenig Arbeitsspeicher, um das Plugin zu laden.",
-    "Thread-lokale Daten, Initialisierer oder ein Interpreter werden nicht unterstützt.",
-    "Der Speicher für das Plugin konnte nicht eingerichtet werden.",
+    "Die Plugin-Datei ließ sich nicht laden.", // i18n
+    "Die Plugin-Datei ließ sich nicht lesen.", // i18n
+    "Keine gültige Plugin-Bibliothek (x86-64-DLL / ELF-Shared-Object erwartet) oder die Datei ist defekt.", // i18n
+    "Das Plugin benötigt andere Bibliotheken (nicht erlaubt: nur die Plugin-API).", // i18n
+    "Das Plugin enthält eine nicht unterstützte Relokation.", // i18n
+    "Zu wenig Arbeitsspeicher, um das Plugin zu laden.", // i18n
+    "Thread-lokale Daten, Initialisierer oder ein Interpreter werden nicht unterstützt.", // i18n
+    "Der Speicher für das Plugin konnte nicht eingerichtet werden.", // i18n
 ];
-const S_BADPTR: &str = "Ungültige Plugin-Info (Zeiger außerhalb des Plugins).";
+const S_BADPTR: &str = "Ungültige Plugin-Info (Zeiger außerhalb des Plugins)."; // i18n
 const S_X_OPEN: &str =
     "<ps:SimpleGeometryShape xmlns:ps=\"clr-namespace:PaintDotNet.Shapes;assembly=PaintDotNet.Framework\" DisplayName=\"";
 const S_X_GEO: &str = "\" Geometry=\"";
@@ -755,7 +758,7 @@ fn plug_fault_msg(r: &mut PlugRec, whr: u32, info: &GuardInfo, base: u64, span: 
     let pcs = fmt_cap(pcs, 32);
     let w = S_WHERE[if whr as usize <= FW_PARFOR as usize { whr as usize } else { 0 }];
     let k = S_KINDS[if info.kind as usize <= 6 { info.kind as usize } else { 0 }];
-    r.msg = fmt_cap(format!("Absturz in {} ({} bei {}, Adresse 0x{:x}). Das Plugin wurde deaktiviert.", w, k, pcs, info.addr), PL_MSG_CAP);
+    r.msg = fmt_cap(crate::preferences::localization::tf("Absturz in {} ({} bei {}, Adresse {}). Das Plugin wurde deaktiviert.", &[crate::preferences::localization::tr(w), crate::preferences::localization::tr(k), &pcs, &format!("0x{:x}", info.addr)]), PL_MSG_CAP);
 }
 
 // plug_reject(i, msg) -- PS_REJECTED with a message (UI thread, loading)
@@ -1233,7 +1236,7 @@ fn plug_load(p: &mut Pn, folder: usize, name: &str) {
         r[i] = rights.as_ref().ok().cloned();
     }
     if let Err(e) = rights {
-        plug_reject(i, format!("Die Rechte des Plugins sind fehlerhaft: {}", e));
+        plug_reject(i, crate::preferences::localization::tf("Die Rechte des Plugins sind fehlerhaft: {}", &[&format!("{}", e)]));
         return;
     }
     // ---- the loader (guarded as well: it reads an untrusted file)
@@ -1260,7 +1263,7 @@ fn plug_load(p: &mut Pn, folder: usize, name: &str) {
     let mut info = GuardInfo { tag, ..GuardInfo::default() };
     let q = plat::guard_run(|| plat::lib_sym(&lib, "pn_plugin_query"), Some(&mut info)).unwrap_or(0);
     if info.kind != 0 || q == 0 || plat::lib_seg(&lib, q).1 & plat::LIBA_X == 0 {
-        plug_reject(i, String::from("Die Funktion pn_plugin_query fehlt (keine Plugin-Bibliothek)."));
+        plug_reject(i, String::from("Die Funktion pn_plugin_query fehlt (keine Plugin-Bibliothek).")); // i18n
         return;
     }
     let (inf, _, info) = gcall(q as u64, [addr(&PNAPI), 0, 0, 0], tag);
@@ -1271,7 +1274,7 @@ fn plug_load(p: &mut Pn, folder: usize, name: &str) {
         return;
     }
     if inf == 0 {
-        plug_reject(i, String::from("Das Plugin hat das Laden abgelehnt (pn_plugin_query lieferte 0)."));
+        plug_reject(i, String::from("Das Plugin hat das Laden abgelehnt (pn_plugin_query lieferte 0).")); // i18n
         return;
     }
     // ---- validation and registration
@@ -1382,42 +1385,42 @@ fn plug_import(p: &mut Pn, i: usize, h: &plat::Lib, inf: u64) -> Result<(), Stri
     // ---- the record itself
     let b = rd(h, inf, PI_SIZE_V1).ok_or(String::from(S_BADPTR))?;
     if le32(&b, 0) != PLUGIN_MAGIC {
-        return Err(String::from("Ungültige Plugin-Info (Kennung)."));
+        return Err(String::from("Ungültige Plugin-Info (Kennung).")); // i18n
     }
     let size = le32(&b, 4);
     if (size as usize) < PI_SIZE_V1 || size > 4096 {
-        return Err(format!("Ungültige Plugin-Info (Größe {}).", size));
+        return Err(crate::preferences::localization::tf("Ungültige Plugin-Info (Größe {}).", &[&format!("{}", size)]));
     }
     // ---- texts
-    let name = chk_str(h, le64(&b, 16), NAME_MAX).ok_or(String::from("Ungültige Plugin-Info (Name)."))?;
+    let name = chk_str(h, le64(&b, 16), NAME_MAX).ok_or(String::from("Ungültige Plugin-Info (Name)."))?; // i18n
     PLUGS.lock()[i].name = fmt_cap(name, 64);
-    let ver = chk_str(h, le64(&b, 24), 31).ok_or(String::from("Ungültige Plugin-Info (Version)."))?;
+    let ver = chk_str(h, le64(&b, 24), 31).ok_or(String::from("Ungültige Plugin-Info (Version)."))?; // i18n
     PLUGS.lock()[i].ver = fmt_cap(ver, 32);
     let apimin = le32(&b, 8);
     if apimin > PNAPI_VERSION {
-        return Err(format!("Das Plugin benötigt die Plugin-API-Version {}, vorhanden ist {}.", apimin, PNAPI_VERSION));
+        return Err(crate::preferences::localization::tf("Das Plugin benötigt die Plugin-API-Version {}, vorhanden ist {}.", &[&format!("{}", apimin), &format!("{}", PNAPI_VERSION)]));
     }
     if apimin == 0 {
-        return Err(String::from("Ungültige Plugin-Info (API-Version 0)."));
+        return Err(String::from("Ungültige Plugin-Info (API-Version 0).")); // i18n
     }
     if le64(&b, 32) != 0 {
-        let a = chk_str(h, le64(&b, 32), NAME_MAX).ok_or(String::from("Ungültige Plugin-Info (Autor)."))?;
+        let a = chk_str(h, le64(&b, 32), NAME_MAX).ok_or(String::from("Ungültige Plugin-Info (Autor)."))?; // i18n
         PLUGS.lock()[i].author = fmt_cap(a, 64);
     }
     if le64(&b, 40) != 0 {
-        let u = chk_str(h, le64(&b, 40), 127).ok_or(String::from("Ungültige Plugin-Info (Herkunft)."))?;
+        let u = chk_str(h, le64(&b, 40), 127).ok_or(String::from("Ungültige Plugin-Info (Herkunft)."))?; // i18n
         PLUGS.lock()[i].url = fmt_cap(u, 128);
     }
     // ---- counts and capacity
     let (nfx, nft, nsh) = (le32(&b, 48), le32(&b, 52), le32(&b, 72));
     if nfx > PER_PLUG_FX || nft > PER_PLUG_FT || nsh > PER_PLUG_SH {
-        return Err(String::from("Ungültige Plugin-Info (zu viele Einträge)."));
+        return Err(String::from("Ungültige Plugin-Info (zu viele Einträge).")); // i18n
     }
     if p.plug.npfx + nfx as usize > PFX_MAX || p.plug.npft + nft as usize > PFT_MAX || p.plug.shapes.len() + nsh as usize > PSH_MAX {
-        return Err(String::from("Kein Platz mehr für weitere Plugin-Effekte, -Dateitypen oder -Formen."));
+        return Err(String::from("Kein Platz mehr für weitere Plugin-Effekte, -Dateitypen oder -Formen.")); // i18n
     }
     if nfx | nft | nsh == 0 {
-        return Err(String::from("Das Plugin enthält weder Effekte noch Dateitypen noch Formen."));
+        return Err(String::from("Das Plugin enthält weder Effekte noch Dateitypen noch Formen.")); // i18n
     }
     // ---- effects
     let mut sfx: Vec<StagedFx> = Vec::new();
@@ -1531,7 +1534,7 @@ fn prop_static(s: StagedProp) -> FxProp {
 // import_fx(desc, staged) -> staged effect / message
 fn import_fx(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFx]) -> Result<StagedFx, String> {
     if p.plug.npfx + staged.len() >= PFX_MAX {
-        return Err(String::from("Kein Platz mehr für weitere Plugin-Effekte."));
+        return Err(String::from("Kein Platz mehr für weitere Plugin-Effekte.")); // i18n
     }
     let b = rd(h, d, FXD_SIZE).ok_or(String::from(S_BADPTR))?;
     let flags = le32(&b, 4);
@@ -1543,23 +1546,23 @@ fn import_fx(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFx]) -> Result<Stage
         return Err(String::from("Effekt: unbekannte Kategorie."));
     }
     // name (menu label, settings key)
-    let name = chk_str(h, le64(&b, 8), FX_NAME_MAX).ok_or(String::from("Effekt: ungültiger Name."))?;
+    let name = chk_str(h, le64(&b, 8), FX_NAME_MAX).ok_or(String::from("Effekt: ungültiger Name."))?; // i18n
     if !key_ok(&name) {
-        return Err(String::from("Effekt: ungültiger Name."));
+        return Err(String::from("Effekt: ungültiger Name.")); // i18n
     }
     if ::fx::find(&name).is_some() || staged.iter().any(|s| s.name == name) {
-        return Err(format!("Effekt-Name bereits vergeben: {}", name));
+        return Err(crate::preferences::localization::tf("Effekt-Name bereits vergeben: {}", &[&name]));
     }
     // functions
     let (prep, rend, free) = (le64(&b, 16), le64(&b, 24), le64(&b, 32));
     if !chk_fn(h, rend) {
-        return Err(String::from("Effekt: render fehlt oder liegt außerhalb des Codes."));
+        return Err(String::from("Effekt: render fehlt oder liegt außerhalb des Codes.")); // i18n
     }
     if prep != 0 && !chk_fn(h, prep) {
-        return Err(String::from("Effekt: prepare liegt außerhalb des Codes."));
+        return Err(String::from("Effekt: prepare liegt außerhalb des Codes.")); // i18n
     }
     if free != 0 && !chk_fn(h, free) {
-        return Err(String::from("Effekt: free liegt außerhalb des Codes."));
+        return Err(String::from("Effekt: free liegt außerhalb des Codes.")); // i18n
     }
     // properties
     let np = le32(&b, 40) as usize;
@@ -1570,7 +1573,7 @@ fn import_fx(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFx]) -> Result<Stage
     if np != 0 {
         let pb = rd(h, le64(&b, 48), np * FXP_SIZE).ok_or(String::from(S_BADPTR))?;
         for k in 0..np {
-            props.push(import_prop(h, &pb[k * FXP_SIZE..(k + 1) * FXP_SIZE]).ok_or(String::from("Effekt: ungültige Eigenschaft."))?);
+            props.push(import_prop(h, &pb[k * FXP_SIZE..(k + 1) * FXP_SIZE]).ok_or(String::from("Effekt: ungültige Eigenschaft."))?); // i18n
         }
     }
     Ok(StagedFx { flags, cat, name, prep, rend, free, props })
@@ -1644,15 +1647,15 @@ fn import_strlist(h: &plat::Lib, mut a: u64) -> Option<Vec<String>> {
 // import_ft(ftdesc, staged) -> staged file type / message
 fn import_ft(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFt]) -> Result<StagedFt, String> {
     if p.plug.npft + staged.len() >= PFT_MAX {
-        return Err(String::from("Kein Platz mehr für weitere Plugin-Dateitypen."));
+        return Err(String::from("Kein Platz mehr für weitere Plugin-Dateitypen.")); // i18n
     }
     let b = rd(h, d, FT_SIZE).ok_or(String::from(S_BADPTR))?;
-    let name = chk_str(h, le64(&b, 0), 31).ok_or(String::from("Dateityp: ungültiger Name."))?;
+    let name = chk_str(h, le64(&b, 0), 31).ok_or(String::from("Dateityp: ungültiger Name."))?; // i18n
     let mut mime = String::new();
     if le64(&b, 16) != 0 {
-        mime = chk_str(h, le64(&b, 16), NAME_MAX).ok_or(String::from("Dateityp: ungültiger MIME-Typ."))?;
+        mime = chk_str(h, le64(&b, 16), NAME_MAX).ok_or(String::from("Dateityp: ungültiger MIME-Typ."))?; // i18n
     }
-    let exts = chk_str(h, le64(&b, 8), 127).ok_or(String::from("Dateityp: ungültige Dateiendungen."))?;
+    let exts = chk_str(h, le64(&b, 8), 127).ok_or(String::from("Dateityp: ungültige Dateiendungen."))?; // i18n
     let list = exts_check(&exts, staged)?;
     let lowered = list.join(";");
     let entry = format!("{}={}", lowered, name);
@@ -1663,7 +1666,7 @@ fn import_ft(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFt]) -> Result<Stage
     }
     for f in [probe, dec, enc] {
         if f != 0 && !chk_fn(h, f) {
-            return Err(String::from("Dateityp: Funktion liegt außerhalb des Codes."));
+            return Err(String::from("Dateityp: Funktion liegt außerhalb des Codes.")); // i18n
         }
     }
     Ok(StagedFt { name, entry, mime, probe, dec, enc, caps: le32(&b, 48) & IFC_PLUGIN_OK, exts: list })
@@ -1673,7 +1676,7 @@ fn import_ft(p: &Pn, h: &plat::Lib, d: u64, staged: &[StagedFt]) -> Result<Stage
 // extensions of 1..15 characters [a-z0-9]; none may already be known (format_from_path) or
 // staged
 fn exts_check(exts: &str, staged: &[StagedFt]) -> Result<Vec<String>, String> {
-    let bad = || String::from("Dateityp: ungültige Dateiendungen.");
+    let bad = || String::from("Dateityp: ungültige Dateiendungen."); // i18n
     let mut out: Vec<String> = Vec::new();
     for e in exts.split(';') {
         let mut s = String::new();
@@ -1693,7 +1696,7 @@ fn exts_check(exts: &str, staged: &[StagedFt]) -> Result<Vec<String>, String> {
         let taken = img_core::io::format_from_path(&format!("x.{}", s)) != 0
             || staged.iter().any(|t| t.exts.iter().any(|x| *x == s));
         if taken {
-            return Err(format!("Dateiendung bereits belegt: {}", s));
+            return Err(crate::preferences::localization::tf("Dateiendung bereits belegt: {}", &[&format!("{}", s)]));
         }
         out.push(s);
     }
@@ -1703,14 +1706,14 @@ fn exts_check(exts: &str, staged: &[StagedFt]) -> Result<Vec<String>, String> {
 // import_shape(shapedesc, staged) -> (name, path data) / message
 fn import_shape(p: &Pn, h: &plat::Lib, d: u64, staged: usize) -> Result<(String, String), String> {
     if p.plug.shapes.len() + staged >= PSH_MAX {
-        return Err(String::from("Kein Platz mehr für weitere Plugin-Formen."));
+        return Err(String::from("Kein Platz mehr für weitere Plugin-Formen.")); // i18n
     }
     let b = rd(h, d, PSD_SIZE).ok_or(String::from(S_BADPTR))?;
-    let name = chk_str(h, le64(&b, 0), NAME_MAX).ok_or(String::from("Form: ungültiger Name."))?;
-    let data = chk_str(h, le64(&b, 8), SHAPE_DATA_MAX).ok_or(String::from("Form: ungültige Pfaddaten."))?;
+    let name = chk_str(h, le64(&b, 0), NAME_MAX).ok_or(String::from("Form: ungültiger Name."))?; // i18n
+    let data = chk_str(h, le64(&b, 8), SHAPE_DATA_MAX).ok_or(String::from("Form: ungültige Pfaddaten."))?; // i18n
     // path data: letters, digits, blanks , . + -
     if !data.bytes().all(|c| matches!(c, b' ' | b',' | b'+' | b'-' | b'.') || c.is_ascii_alphanumeric()) {
-        return Err(String::from("Form: ungültige Pfaddaten."));
+        return Err(String::from("Form: ungültige Pfaddaten.")); // i18n
     }
     Ok((name, data))
 }
@@ -1887,7 +1890,7 @@ pub(crate) fn plug_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
                 crate::integrations::file_io::fio_error(
                     p,
                     Some(s.name),
-                    "Das Plugin wurde nach einem Fehler deaktiviert (siehe Einstellungen ▸ Plugin-Fehler).",
+                    "Das Plugin wurde nach einem Fehler deaktiviert (siehe Einstellungen ▸ Plugin-Fehler).", // i18n
                 );
                 return true;
             }
@@ -1923,14 +1926,14 @@ pub(crate) fn plug_text(_pl: &Plug, i: i32) -> (u32, String) {
     let Some(r) = g.get(i as u32 as usize) else { return (0, String::new()) };
     let st = pstate(i as usize);
     if st != PS_LOADED {
-        return (st, format!("{}: {}", r.file, r.msg));
+        return (st, format!("{}: {}", r.file, crate::preferences::localization::tr(&r.msg)));
     }
-    let author = if r.author.is_empty() { "unbekannter Autor" } else { r.author.as_str() };
+    let author = if r.author.is_empty() { crate::preferences::localization::tr("unbekannter Autor") } else { r.author.as_str() };
     (
         st,
-        format!(
+        crate::preferences::localization::tf(
             "{} {} – {} · {}: {} Effekte/Korrekturen, {} Dateitypen, {} Formen",
-            r.name, r.ver, author, r.file, r.nfx, r.nft, r.nsh
+            &[&r.name, &r.ver, author, &r.file, &format!("{}", r.nfx), &format!("{}", r.nft), &format!("{}", r.nsh)],
         ),
     )
 }

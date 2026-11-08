@@ -322,6 +322,10 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `academy_quit.uis` | Beenden mit einem laufenden Test fragt vorher, auch von einer anderen Seite aus |
 | `author_diagnosis.uis` | eine Diagnose in „Aufgabe erstellen“: was abgelehnt wird, ein Gerät, ein Kabel, ihre Zeile, ihre Bearbeitung, wieder entfernen |
 | `academy_shots.uis` | die Bilder der Akademie: Karte, Liste der Kurse, Gliederung, Lektion, Rückfrage, Labor mit Leiste; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/academy_*.png`) |
+| `course_grundlagen.uis` | der Kurs Grundlagen, wie ein Lernender ihn durchklickt: Karte, Gliederung, eine Lektion mit Bild, ein Link zur nächsten, ein Link zum Labor, das Labor mit neuem Kabel und an den Konsolen gelöst, Weiter im Kurs ins Quiz, das Quiz bis zum Bestehen, das nächste Labor, was worauf wartet, Englisch |
+| `course_fehlersuche.uis` | der Kurs Fehlersuche: eine Lektion mit Bild; die erste Fehlersuche unverändert mit falscher Antwort abgegeben, Neu beginnen, neues Kabel, die richtige Antwort, die Erklärung; die nächste an der Konsole des Switches gelöst, mit `--More--`; Englisch |
+| `courses_shots.uis` | die Bilder der echten Kurse: Liste, Gliederung, Lektion mit Zeichnung und mit Konsolenausgabe, Labor, Quiz, Fehlersuche; hell und dunkel, 100 und 150 %, schmal (`build/jfnetworker/courses_*.png`) |
+| `model.uis`, Gruppe `courses` | der Beweis, dass die Kurse gehen (siehe [Akademie](#akademie)): zu jedem Schritt jedes Kurses, der kein Beispiel ist, eine Zeile in `src/coursetest.rs`. Ein Labor wird an denselben Konsolen gelöst wie vom Lernenden, eine Fehlersuche repariert und benannt, ein Quiz beantwortet; was eine Lektion zeigt, wird getippt und verglichen; Namensregel und beide Sprachen in jedem Text jeder Art |
 | `model.uis`, Gruppe `install` | die Kursliste und jede Ablehnung mit ihrer genauen Meldung (`..`, absolute Pfade, zu groß, doppelt, falsches Format); eine Quelle im Speicher, die halb abbricht, abbricht und weitermacht; nicht gelistete Dateien werden nie geholt; falsche Größe und Prüfsumme; ein Update, das scheitert, lässt den alten Kurs stehen; was ein Absturz hinterlässt; Deinstallieren behält den Fortschritt; Versionen; die Einstellung; die Kursliste nach einer Änderung; mit `--academy-dir` jede Datei gegen `index.json`, jeder Kurs mit den Prüfungen von `jfn-sim course`, der Beispielkurs aus seinem Ordner von vorn bis hinten |
 | `tools/academy_e2e.py` (von Hand, kein Teil von `build_rs.py test`) | echtes HTTP mit `jfn-sim` gegen einen Server auf diesem Rechner: falsche Prüfsumme, eine Übertragung, die abbricht und mit Range weitergeht, Abbrechen, Umleitung, 404, kaputte und zu große Liste, ein Update, das scheitert. Das Fenster darf localhost nicht erreichen und keinen Server starten, darum läuft das nicht als `.uis` |
 | `model.uis`, Gruppe `quiz` | das Quizformat und jede Meldung, was es prüft (keine richtige Antwort, ein Muster, das sich nicht übersetzen lässt, eine fehlende Sprache), die Bewertung jeder Art mit Teilpunkten, Mustern und Toleranz, die Reihenfolge aus dem Seed, Versuche und Zeitgrenze, was in den Fortschritt geht, `requires`; `start_faults` und `lock` samt ihren Standardwerten (ein altes Labor bleibt, wie es war), die Diagnose, die Prüfung, dass etwas nicht gehen darf, Determinismus und Zurückspulen mit Startfehlern; die Fehlersuche des Beispielkurses mit und ohne ihre Lösung |
@@ -475,6 +479,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `lab_forms.uis`, `lab_forms_en.uis` | Dienste im Fenster auf `fixtures/lab_forms.jfnet`: jede Art hinzufügen, was fehlt, Geräte wählen, Formular und JSON, Ablehnung, im Lauf oder mit Neustart, Rückgängig, Vergangenheit nur lesen, Platzieren mit Dienst und Probleme, Tastatur, Englisch |
 | `experiments_panel.uis` | der Bereich Experimente: `sweep_small` per Klick definiert, Befunde live, Lauf gleich dem Golden-Bericht, zwei Läufe behalten und verglichen, CSV und `.jfnex` durch den Dateidialog, Abbruch, Entfernen mit Frage |
 | `experiments_shots.uis` | die Bilder dazu auf der Vorlage „Größer oder mehr?“ hell, dunkel, schmal, 100 und 150 %, mit Formular und Metriken (`build/jfnetworker/exp_*.png`) |
+| `model.uis`, Gruppe `db` | die Datenbank gegen ihre Formeln, jeder Vergleich nennt seine: CPU, IOPS, Index gegen Suche, Trefferquote mit Che, heiße Zeile, Group Commit, Wiederherstellung; Zähler und Überweisungen unter Gleichzeitigkeit, die Isolation, Verklemmung, Zeitgrenzen, alte Versionen, Absturz mit und ohne Verlust, OOM, die Grenze der geänderten Zeilen; Klon, Threads und Keyframes mit gehaltenen Sperren; jede Ablehnung wörtlich; Routen, `db.connect`, `dbctl`, `curl`; das Formular gegen sein JSON, live oder Neustart, das Preset |
+| `scen_db_basic.uis` | das Golden-Szenario Datenbank Byte für Byte (`fixtures/db_basic.jfnet`): Anweisungen mit `curl`, `dbctl` mit Tabellen, Sperren und `explain`, ein Join, Routen mit Transaktion, ein Index im Betrieb, Absturz und Wiederherstellung |
+| `db_scale_small.uis` | ein kurzer Sweep mit echter Datenbank ohne Fenster: seine Tabelle Byte für Byte (`experiments/db_scale_small.jfnex`, `db_scale_small.report`) |
+| `db_forms.uis`, `db_forms_en.uis` | die Datenbank im Fenster auf `fixtures/lab_forms.jfnet`: die Art im Dialog, was fehlt, der Tabelleneditor, Formular und JSON, Ablehnungen wörtlich, live oder Neustart, die Kosten als Annahmen, Rückgängig, die Kachel, die Tastatur |
+| `db_shots.uis` | die Bilder dazu hell, dunkel, schmal, 100 und 150 %, mit den Kosten und dem Panel Metriken |
 | `models_palette.uis` | die Palette mit den neuen Modellen: Kacheln in ihren Kategorien, JF-S8 per Ziehen platziert, Tooltips der Firewalls und von JF-AP7, die Suche nach Name, Beschreibung und Id; Bilder hell und dunkel bei 100 und 150 % (`build/jfnetworker/models_palette_*.png`) |
 | `model.uis`, Gruppe `fwgui` | der Reiter Firewall: was die Formulare für jede Art von Regel und für NAT tippen und dass die Konsole es nimmt, was sie mit welchem Grund ablehnen, Regeln zurück in Zeilen und Felder, Verschieben mit Zählern und Bemerkungen, `Acls::probe`, der Test gegen eine Tabelle von Paketen, jedes auch wirklich gesendet (eingehend, ausgehend, ausgehend nach NAT), `run_lines_running` mit getippten und ungesicherten Listen, einem Rückgängig-Schritt und einer Ablehnung, die nichts ändert |
 | `firewall_panel.uis` | der Reiter im Fenster auf `fixtures/nat_pat.jfnet`: Regel anlegen und binden, ein Ping wird abgewiesen und der Zähler steigt, Rückgängig, eine in der Konsole getippte Regel erscheint, Verschieben, Duplizieren, Bearbeiten, Löschen, Port-Weiterleitung bis zum Server, der Test, Ablehnungen mit Grund, ein Gerät ohne Routing und ohne Strom, die Ansicht in der Vergangenheit |
@@ -495,7 +504,7 @@ TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `fil
 `phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
 `phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
-und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`), `hw_basic.jfnet` (ein Lastgenerator, zwei Webserver,
+und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`), `db_basic.jfnet` (ein Lastgenerator, ein Webserver, eine Datenbank; `db_basic.scn`), `hw_basic.jfnet` (ein Lastgenerator, zwei Webserver,
 Hardware simuliert; `hw_basic.scn` und die `hardware_*.uis`), `live_changes.jfnet` (Lastgenerator, Load Balancer, Webserver, Cache, KV; `live_changes.scn`), in
 `tests/experiments` das Projekt und die Experimente der Studie (`scale_up_vs_out.jfnet`, `.jfnex`, `sweep_small.jfnex`) und die Netze
 der Golden-Szenarien. Die
@@ -593,7 +602,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
 | SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
-| Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
+| Module und Debugger | [`apps/jfs/crates/script/module.rs`](../../apps/jfs/crates/script/module.rs), [`apps/jfs/crates/script/debug.rs`](../../apps/jfs/crates/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 | Einheiten und Bereitstellen | [`crates/jfn_model/unit.rs`](crates/jfn_model/unit.rs), [`crates/jfn_sim/units.rs`](crates/jfn_sim/units.rs), [`deploy.rs`](crates/jfn_sim/deploy.rs), [`cli/units.rs`](crates/jfn_sim/cli/units.rs), [`src/workspace/ide/deploy.rs`](src/workspace/ide/deploy.rs), [`load.rs`](src/workspace/ide/load.rs), [`src/unitstest.rs`](src/unitstest.rs) | Unit-Dateien, `systemctl` und `journalctl`, Neustart-Regeln, die rollende Bereitstellung als Dienst der Engine, die Bereiche Bereitstellen und Lasttest der IDE; Selbsttest-Gruppe `units` |
 | Webbrowser | [`src/workspace/devwin/browser.rs`](src/workspace/devwin/browser.rs) (das Programm), [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs) (Seitenskripte: der Host der VM, die Konsole), [`src/workspace/devwin/devtools.rs`](src/workspace/devwin/devtools.rs) (die Entwickleransicht), [`crates/jfn_sim/webc.rs`](crates/jfn_sim/webc.rs) (Anfragen und Weiterleitungen in der Engine), [`crates/jfn_sim/tlssim.rs`](crates/jfn_sim/tlssim.rs) (Zertifikate des Labors, TLS-Notizen), [`lib/netpkt/uri.rs`](../../lib/netpkt/uri.rs) (URLs nach RFC 3986), [`lib/netpkt/cookie.rs`](../../lib/netpkt/cookie.rs) (Cookies nach RFC 6265), [`lib/netpkt/tls.rs`](../../lib/netpkt/tls.rs) und [`lib/netpkt/x509.rs`](../../lib/netpkt/x509.rs) (TLS 1.3 ohne I/O) |
@@ -607,6 +616,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Akademie | [`crates/jfn_model/academy.rs`](crates/jfn_model/academy.rs), [`crates/jfn_model/quiz.rs`](crates/jfn_model/quiz.rs), [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) (`check_course`), [`src/workspace/academy/`](src/workspace/academy/mod.rs) (`store.rs`, `pages.rs`, `quiz.rs`), [`academy/beispiel`](academy/beispiel), [`src/academytest.rs`](src/academytest.rs), [`src/quiztest.rs`](src/quiztest.rs) | Quiz und Tests als Dateien, ihre Bewertung und ihre Seite; Kurse als Dateien, was an einem Kurs nicht stimmt, der Fortschritt (ohne I/O); `jfn-sim course`; die Seiten Liste, Gliederung und Lektion, die Leiste über der Zeichenfläche, was gelesen und geschrieben wird; der Beispielkurs; ihr Selbsttest (Gruppe `academy`; siehe [Akademie](#akademie)) |
 | Startseite | [`src/workspace/startpage.rs`](src/workspace/startpage.rs), [`assets/templates`](assets/templates), [`lib/ui/action_card.rs`](../../lib/ui/action_card.rs), [`src/startpagetest.rs`](src/startpagetest.rs) | die Seite statt Werkzeugleiste, Dock und Statusleiste mit Neu, Zuletzt und Lernen, der Dialog Projektinfo, die fünf Vorlagen, die Karte aus der Bibliothek (getestet in `apps/cardtest`), ihr Selbsttest (Gruppe `startpage`) |
 | Kurse installieren | [`crates/jfn_run/install.rs`](crates/jfn_run/install.rs), [`src/workspace/academy/install.rs`](src/workspace/academy/install.rs), [`tools/academy_index.py`](../../tools/academy_index.py), [`tools/academy_e2e.py`](../../tools/academy_e2e.py), [`academy/index.json`](academy/index.json), [`PERMISSIONS`](PERMISSIONS), [`PERMISSIONS.jfn-sim`](PERMISSIONS.jfn-sim), [`src/installtest.rs`](src/installtest.rs) | der Weg eines Kurses ohne Fenster (Quelle, Prüfung, an seinen Platz), die Liste auf der Seite der Akademie, ihr Arbeits-Thread, die Rückfragen; die Kursliste erzeugen; der Selbsttest (Gruppe `install`) |
+| Datenbank | [`crates/jfn_sim/db.rs`](crates/jfn_sim/db.rs), [`dbsql.rs`](crates/jfn_sim/dbsql.rs), [`dbstore.rs`](crates/jfn_sim/dbstore.rs), `dbctl` in [`cli/lab.rs`](crates/jfn_sim/cli/lab.rs), Formular in [`src/workspace/devwin/svcform.rs`](src/workspace/devwin/svcform.rs), [`src/dbtest.rs`](src/dbtest.rs) |
 | Hardware der Geräte | [`crates/jfn_sim/res.rs`](crates/jfn_sim/res.rs), [`crates/jfn_model/catalog.rs`](crates/jfn_model/catalog.rs), [`src/workspace/inspector/hardware.rs`](src/workspace/inspector/hardware.rs), [`src/hardwaretest.rs`](src/hardwaretest.rs) |
 | Dienste im Fenster | [`src/workspace/devwin/svcform.rs`](src/workspace/devwin/svcform.rs), [`svcedit.rs`](src/workspace/devwin/svcedit.rs), [`crates/jfn_sim/svcform.rs`](crates/jfn_sim/svcform.rs), [`src/expguitest.rs`](src/expguitest.rs) |
 | Experimente im Fenster | [`src/workspace/experiments`](src/workspace/experiments/mod.rs), [`src/workspace/metrics.rs`](src/workspace/metrics.rs), `SweepJob` in [`crates/jfn_run/lib.rs`](crates/jfn_run/lib.rs) |
@@ -1426,7 +1436,7 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
   Vorgaben stehen nur in den Diensten: Das Formular fragt sie (`jfn_sim::svcform::defaults`). Vor dem Übernehmen sagt es, ob der
   Dienst die Änderung im Lauf annimmt oder das Gerät neu startet (`live_steps`, `can_reconfigure`), und tut dann genau das;
   Übernehmen ist ein Schritt der Rückgängig-Liste, in einer Ansicht der Vergangenheit lässt sich nichts ändern.
-- **Vorgaben beim Platzieren** (`catalog::preset_service`, `edits::add_placed`): Load Balancer, DB-Shard (vorerst `kv`), Cache,
+- **Vorgaben beim Platzieren** (`catalog::preset_service`, `edits::add_placed`): Load Balancer, DB-Shard (`db` mit einer kleinen Beispieltabelle, `catalog::preset_config`), Cache,
   Message Queue und Traffic-Generator aus der Palette bringen im selben Rückgängig-Schritt ihren Dienst mit. Das gilt nur beim
   Platzieren im Fenster: Eine geladene Datei bekommt nichts dazu. Fehlt noch etwas (Backends, ein Ziel, Knoten), startet der
   Dienst nicht und sendet nichts; seine Karte und der Bereich Probleme sagen, was fehlt (`svcform::missing`,
@@ -1570,7 +1580,7 @@ des Geräts mit CPU-Anteil, `-b`, `-n`, `-d`) und `printf` mit `|` in ein Progra
 `traceroute` nehmen `-4` und `-6` (siehe [IPv6](#ipv6)).
 Router und Switches zeigen `show tcp brief [all]`, `show tcp statistics` und
 `show control-plane host open-ports`. Die Dienste des Labors zeigen `lbctl` (Backends mit
-Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Replikaten und
+Zustand und Zahlen), `dbctl` (Zustand, `tables`, `locks`, `explain ANWEISUNG`: [Datenbank](#datenbank-der-dienst-db)), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Replikaten und
 ihren Versionen, `get`, `keys`), `cachectl`, `mqctl` und `workerctl`, mit `-s NAME` für einen
 bestimmten Dienst; ihre Texte sind eigene Worte. Die Skripte eines Hosts zeigt und steuert
 `script` (siehe [Skripte in Hosts](#skripte-in-hosts)).
@@ -1832,7 +1842,7 @@ ausgeschaltet ist, fällt R1 auf seinen lokalen Benutzer zurück; 7 Erwartungen.
 ### Skripte in Hosts
 
 Eigene Programme laufen als Dienste in den Hosts ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)):
-ein Skript in der Sprache von [`lib/script`](../../lib/script/lib.rs) (`.jfs`, siehe
+ein Skript in der Sprache von [`apps/jfs/crates/script`](../../apps/jfs/crates/script/lib.rs) (`.jfs`, siehe
 [GUIDE §29](../../docs/GUIDE.md)), das nur auf die Ereignisse reagiert, um die es gebeten hat –
 Datagramme, Verbindungen, Daten, HTTP-Anfragen, Antworten, Timer, Namen, Zugriffe auf die Disk.
 Es steht wie die anderen Dienste in der Projektdatei (`"kind": "script"`) oder kommt mit
@@ -1888,6 +1898,7 @@ Konfiguration sieht das Skript als `config` (`config.port`):
 | `dns.resolve(name, fn(err, adressen))` | der Resolver des Geräts (Suchdomänen, Cache) |
 | `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}` (`query`: die Felder der URL, dekodiert), bei einem Inhalt vom Typ `application/x-www-form-urlencoded` dazu `form` mit dessen Feldern (sonst fehlt es: `req.form ?? {}`), `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
 | `http.request(url, fn(err, resp))`, `http.request({url, method, headers, body, timeout_ms}, ..)` | HTTP-Client mit gehaltenen Verbindungen, Namen über den Resolver, ohne Angabe 30 s Timeout; `resp` ist `{status, headers, body}` |
+| `db.connect(addr, port)` | eine Verbindung zu einer [Datenbank](#datenbank-der-dienst-db), `addr` eine Adresse oder `"http://addr:port"`, Port 7100, wenn keiner dasteht. Sie kennt `query(sql, params, fn(err, res))` (`params` darf fehlen), `begin(fn(err, res))`, `commit(..)`, `rollback(..)`, `close()`; `res` ist die Antwort als Map (`rows`, `count`, `figures`), `err` der Text eines Fehlers, dann sagt `res` auch `code` und `retryable`. Sie merkt sich die Transaktion ihres `begin`; jeder Aufruf ist eine HTTP-Anfrage |
 | `disk.get(key, fn(err, wert))`, `disk.put(key, wert, fn(err))`, `disk.delete(key, fn(err, war_da))`, `disk.scan(präfix, fn(err, einträge))` | JSON-Werte auf der Disk des Geräts mit ihren Zugriffszeiten und ihrer Kapazität (`"disk": {...}` wie beim KV-Knoten) |
 | `metrics.inc(name, n)`, `metrics.gauge(name, wert)`, `metrics.observe(name, wert)` | Zahlen des Dienstes für `expect … svc NAME metric X`; `observe` ergibt `NAME_count`, `NAME_p50`, `NAME_p95`, `NAME_p99` und `NAME_max` über fünf Minuten |
 | `json`, `str`, `list`, `map`, `math`, `bytes` | die Standardbibliothek |
@@ -4050,7 +4061,7 @@ Rechners gelesen werden. Nicht nachgebildet: Datei-Felder und Mehrfachauswahl in
 
 **Seitenskripte (B3, [`src/workspace/devwin/pagescript.rs`](src/workspace/devwin/pagescript.rs)):**
 Eine Seite aus dem simulierten Netz führt `<script type="text/jfs">` aus, im Dokument oder mit `src`,
-in der Sprache von `lib/script`; JavaScript gibt es nicht, nur dieser `type` läuft. Die Skripte
+in der Sprache von `apps/jfs/crates/script`; JavaScript gibt es nicht, nur dieser `type` läuft. Die Skripte
 laufen in der Reihenfolge des Dokuments und teilen sich ihre obersten Namen; ein `src`-Skript wird
 zuerst geholt, die nächsten warten darauf, ein Fehler beim Holen steht in der Konsole und das
 nächste läuft.
@@ -4432,7 +4443,7 @@ Inspektor sagen das. Mehr Kerne kommen mit weniger Takt, damit „größer“ ni
   4 ms läuft eine Aufgabe durch, und ein Stück eines Skripts überholt die schon zugesagten Aufgaben ein wenig (seine Arbeit zählt voll).
 - Keine NUMA-, Cache- oder Hyper-Threading-Effekte außer dem, was `usl` ausdrückt; kein Speicher des Betriebssystems selbst; Caches werden unter Druck
   nicht freigegeben.
-- Die Queue `mq` rechnet nicht und hält nur ihre Grundmenge; ein `db`-Dienst mit Puffer und Index kommt mit SA4.
+- Die Queue `mq` rechnet nicht und hält nur ihre Grundmenge; Puffer und Indizes hat die [Datenbank `db`](#datenbank-der-dienst-db).
 
 Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::MemHog`, `Fault::Resize`, `Engine::res_view(dev)`,
 `Engine::res_of(dev)`, `Service::mem`, `OsApi::cpu`, `cpu_usl`, `cpu_or_timer`, `cpu_slice`, `cpu_slice_usl`, `metered`, `cpu_turn`, `cpu_charge`,
@@ -4451,6 +4462,143 @@ Für Programme: `Action::Resize`, `Action::Metered`, `Fault::SlowCpu`, `Fault::M
 
 Hardware selbst kostet wenig: Gegenüber demselben Lauf ohne Hardware, aber mit 1 ms Wartezeit (`time_ms`), sind es ohne neue Ereignisse rund 3 %. In `lab_shards`
 kommen rund 8 % Ereignisse dazu, weil `lb` und `kv` eine Anfrage bis zum Ende ihrer Rechenzeit halten.
+### Datenbank: der Dienst `db`
+
+Der Dienst `db` ist eine Datenbank des Labors, damit ein Versuch echte Antworten auf echte Fragen bekommt: Was begrenzt mich, die Sperre einer Zeile, die Platte oder die CPU? Hilft mehr Puffer oder ein Index? Er spricht **SQL-artige Anweisungen über HTTP**. Das ist keine SQL-Engine und nicht das Protokoll eines echten Produkts, und kein Produkt ist damit kompatibel. Aufbau: [`db.rs`](crates/jfn_sim/db.rs) (Dienst, Sperren, Log), [`dbsql.rs`](crates/jfn_sim/dbsql.rs) (Anweisungen), [`dbstore.rs`](crates/jfn_sim/dbstore.rs) (Tabellen, Plan, Puffer).
+
+Eine Tabelle sagt, wie viele Zeilen sie hat und wie sie aussieht, aber sie hält diese Zeilen nicht. **Nur Zeilen, die geschrieben wurden, sind wirklich da, mit ihren Versionen.** Alle anderen folgen aus Schlüssel und Seed: `(Schlüssel - 1 + Versatz) mod distinct`, ein Text schreibt das als `name-N`. So kostet eine Tabelle mit einer Milliarde Zeilen nichts, ein Klon der Maschine kopiert keine Gigabytes, und Sperren und Versionen sind trotzdem echt.
+
+**Einstellungen.** Alles außer `tables` darf fehlen.
+
+```json
+{"kind": "db", "name": "db", "config": {
+  "port": 7100,
+  "tables": [{"name": "users", "rows": 1000000, "row_bytes": 200, "key": "id", "dist": "uniform", "zipf_s": 1.0,
+              "columns": ["email:text", {"name": "balance", "type": "int", "distinct": 1000}], "indexes": ["email"]}],
+  "seed": 1, "pool_mb": 128, "page_kb": 8, "fanout": 0, "max_conns": 100,
+  "durability": "full", "flush_ms": 200, "isolation": "read committed",
+  "lock_timeout_ms": 5000, "txn_idle_ms": 30000, "checkpoint_s": 30, "touched_max": 100000,
+  "stmt_us": 30, "page_us": 2, "row_us": 0.5, "write_us": 10, "redo_mbps": 200,
+  "max_rows": 1000, "write_rows_max": 10000, "wal_tail": 1024, "mem_mb": 64, "conn_kb": 256, "disk": {}}}
+```
+
+Eine Spalte kurz: `"name"` (eine Zahl je Schlüssel), `"name:text"`, `"name:int:1000"` (1000 verschiedene Zahlen). `dist` ist die Verteilung der gezogenen Schlüssel, `zipf` mit dem Exponenten `zipf_s`; die Ränge sind über die Schlüssel verstreut, also teilen sich heiße Zeilen ihre Seiten nicht. Im Fenster gibt es das Formular mit einem kleinen Tabelleneditor; die Spalten stehen im JSON. Sweeps können `pool_mb`, `max_conns`, `durability` und alles andere variieren (`known_keys`). Im Betrieb ändert sich alles außer Port, Seitengröße, Seed, Tabellen und eigener Platte (`reconfigure`); das Formular sagt es vorher.
+
+**Anweisungen.**
+
+| Anweisung | Was sie kann |
+|---|---|
+| `SELECT * \| COUNT(*) \| a, b FROM t [JOIN u ON t.x = u.y] [WHERE ..] [ORDER BY c [DESC]] [LIMIT n] [FOR UPDATE]` | `WHERE`: Vergleiche mit `=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, mit `AND` verbunden; Werte sind Zahlen, `'Text'` oder `?`. `ORDER BY` über den Schlüssel oder einen Index. `JOIN` über den Schlüssel oder einen Index der zweiten Tabelle |
+| `INSERT INTO t (a, b) VALUES (1, 'x')` | eine Zeile; ohne Schlüssel den nächsten; was fehlt, folgt aus dem Schlüssel |
+| `UPDATE t SET a = 1, b = b + 1 WHERE ..`, `DELETE FROM t WHERE ..` | höchstens `write_rows_max` Zeilen |
+| `BEGIN [ISOLATION LEVEL READ COMMITTED \| REPEATABLE READ]`, `COMMIT`, `ROLLBACK` | eine Transaktion lebt auf der Nummer, die `BEGIN` gibt |
+| `CREATE INDEX ON t (c)`, `DROP INDEX ON t (c)` | im Betrieb; Bauen kostet wirklich Zeit: `Zeilen · row_us · log2(Zeilen)` CPU auf einem Kern, die Tabelle lesen, den Index schreiben |
+| `EXPLAIN ..`, `dbctl explain ..` | Index oder alle Seiten, geschätzte Zeilen, Seiten, CPU und warum |
+
+**Nicht dabei**, jedes mit seiner eigenen Ablehnung und der Stelle: `OR`, `NOT`, `LIKE`, `IN`, `NULL`, `GROUP BY`, `HAVING`, andere Aggregate, Unterabfragen, äußere Joins, mehr als ein Join, `CREATE TABLE`, `ALTER`, mehrere Zeilen je `INSERT`, Text mit `<` oder `>`.
+
+**Fragen.** `POST /query`, der Inhalt ist die Anweisung oder JSON `{"sql": "..", "params": [1, "x", {"draw": true}], "txn": 7}`. `{"draw": true}` zieht einen Schlüssel nach der Verteilung der Tabelle, die Antwort sagt welchen. Die Transaktion geht auch als `?txn=7` oder Kopfzeile `X-Txn`. So reicht ein `curl -d "SELECT * FROM users WHERE id = 5" http://10.0.0.30:7100/query`.
+
+```json
+{"ok":true,"rows":[{"id":5,"email":"email-20835","balance":969}],"count":1,
+ "figures":{"rows_examined":1,"pages_hit":0,"pages_missed":3,"lock_wait_us":0,"us":104}}
+```
+
+| Status | Wann |
+|---|---|
+| 200 | es ging |
+| 400 `syntax`, `too_many_rows` | ein Fehler in der Anweisung oder im Schema, mit `pos`, der Stelle: `Zeichen 15: Die Tabelle „nix“ gibt es nicht.` |
+| 404 `no_transaction` | diese Transaktion gibt es nicht (mehr) |
+| 409 `deadlock`, `serialization`, `lock_timeout` | Konflikt, die Transaktion ist weg, `"retryable": true`; `duplicate_key` und `txn_busy` beenden sie nicht |
+| 503 `too_many_connections`, `recovering` | Überlast oder noch in der Wiederherstellung |
+| 507 `disk_full` | die Platte ist voll |
+
+`GET /_db/health` sagt Zustand, Rolle und Log-Positionen, `GET /_db/stats` alle Zahlen und die Tabellen. Die Shell hat `dbctl [status|tables|locks|explain ANWEISUNG] [-s DIENST]`. Eine Route eines Webservers fragt mit `"backend": "db"`, dazu auf Serverebene `"db": {"addr": "10.0.0.30", "port": 7100, "timeout_ms": 5000, "conns": 32}`:
+
+```json
+{"path": "/pay", "method": "POST", "backend": "db", "param": "draw", "retries": 3,
+ "sql": ["BEGIN", "SELECT balance FROM users WHERE id = ? FOR UPDATE", "UPDATE users SET balance = balance + 1 WHERE id = ?", "COMMIT"]}
+```
+
+Jede Anweisung ist eine Runde über das Netz, und der Worker wartet. `param` sagt, was `?` ist: `rest` (der Rest des Pfads), `query:NAME`, `draw` (einmal je Anfrage gezogen, alle Anweisungen sehen denselben), `none`. `retries` wiederholt nach einer Antwort mit `retryable`. Vorsicht, wie im Leben: Halten mehr Worker eine Transaktion offen, als `conns` Verbindungen da sind, wartet die Sperre auf eine Verbindung und die Verbindung auf die Sperre, bis die Zeitgrenze kommt. Skripte nehmen `db.connect(addr, port)` mit Rückrufen `fn(err, res)`:
+
+```text
+let c = db.connect("10.0.0.30")
+c.begin(fn(err, r) {
+    c.query("UPDATE users SET balance = balance + ? WHERE id = ?", [5, 42], fn(err, r) {
+        c.commit(fn(err, r) { log("fertig", err) })
+    })
+})
+```
+
+**Was eine Anweisung kostet.** Annahmen dieses Labors, alle im Formular als Annahme markiert, keine Messung eines Produkts:
+
+| Einstellung | Vorgabe | Was es ist |
+|---|---|---|
+| `stmt_us` | 30 µs | Lesen und Planen einer Anweisung |
+| `page_us` | 2 µs | jede Seite, die sie anfasst, ob im Puffer oder nicht |
+| `row_us` | 0,5 µs | jede Zeile, die sie ansieht |
+| `write_us` | 10 µs | jede Zeile, die sie schreibt |
+| `page_kb` | 8 KiB | Seitengröße; Zeilen je Seite = Seite / `row_bytes` |
+| `fanout` | 512 | Einträge einer Baumseite (Seite / 16 Bytes); Tiefe = 1 + ⌈log_fanout(Blätter)⌉ |
+| `redo_mbps` | 200 MB/s | Tempo der Wiederherstellung |
+| Log | Zeile + 64 Bytes, Commit 64 Bytes | was auf die Platte muss |
+
+Ein Punktzugriff geht durch die oberen Ebenen des Baums, sein Blatt und eine Tabellenseite. Ein Bereich über den Schlüssel liest benachbarte Seiten, einer über einen anderen Index verstreute. Eine Suche ohne Index fasst alle Seiten an und sieht jede Zeile an. `EXPLAIN` und die Rechnung kommen aus derselben Stelle (`cost_of`). Die CPU läuft in Stücken von 4 ms auf den echten Kernen des Geräts, ein Fehlschlag im Puffer liest von der echten Platte: verstreute Seiten einzeln mit ihrer Latenz, benachbarte in Stücken von 64. Keine Ereignisse je Seite oder Zeile: Eine Suche über eine Million Seiten kostet wenige tausend Ereignisse, und die Antwort steht schon beim Start fest, denn sie liest ihren Snapshot. **Ohne Hardware auf dem Gerät kostet die CPU nichts**, Platte und Sperren kosten weiter; das steht im Status, weil die Zahlen dann wenig sagen.
+
+**Der Puffer.** `pool_mb` zählt in `Service::mem`, während er sich füllt: Zu groß für das Gerät heißt erst Swap, dann das Ende mit Status 137, wie auf einer echten Maschine. Ein Neustart oder Absturz leert ihn, ein kalter Start ist sichtbar langsamer und wärmt sich auf. Er ist ein LRU über höchstens 16 384 Seiten, und das steht hier, weil es seine Grenze ist: Bis zu 128 MiB bei 8 KiB ist er exakt. Größer führt er jede R-te Seite (nach einem Hash, R = Puffer / 16 384) in einem LRU von Puffer / R Plätzen, und ein Zugriff auf eine andere Seite ist ein Treffer mit der Quote, die die geführten ihrer Art zuletzt hatten; das entscheidet ein Akkumulator, kein Zufall. Der Füllstand steigt dann in Schritten von R Seiten. Die oberen Ebenen der Bäume bleiben, einmal gelesen, im Puffer, in einem geteilten Puffer auch die Blätter kleiner Bäume. Eine lange Suche in einer großen Tabelle (mehr Seiten als ein Viertel des Puffers) verdrängt nichts: Ihre Treffer sind der Anteil der Tabelle im Puffer in diesem Moment. Geänderte Seiten schreibt ein Prüfpunkt oder das Verdrängen im Hintergrund.
+
+**Gleichzeitigkeit.** Leser sehen einen Snapshot und warten nie. `read committed` nimmt einen je Anweisung, `repeatable read` einen je Transaktion. Schreiben nimmt eine Sperre je Zeile, auch für Zeilen, die nur abgeleitet sind, in Schlüsselreihenfolge, mit Warteschlange und `lock_timeout_ms`. Wer gewartet hat, rechnet bei `read committed` mit dem neuesten Stand weiter, also geht kein Zähler verloren; bei `repeatable read` bekommt er `serialization`, wenn die Zeile sich seit seinem Snapshot geändert hat. Wer einen Kreis im Warte-Graphen schließt, ist das Opfer (`deadlock`). Eine Transaktion, von der `txn_idle_ms` lang nichts kommt, verliert ihre Sperren. Alte Versionen gehen, sobald kein Snapshot sie braucht. `Service::lock_busy` ist die Zeit, in der eine Zeilensperre Wartende hatte; so kann eine Studie „Sperre“ sagen.
+
+**Commit und Absturz.** Das Log liegt auf der echten Platte, seine Positionen zählen Bytes. Bei `"durability": "full"` wartet die Antwort auf das Schreiben, und Commits, die während eines Schreibens kommen, teilen sich das nächste (Group Commit). Bei `"relaxed"` kommt die Antwort sofort und geschrieben wird alle `flush_ms`: Ein Absturz verliert, was seither beantwortet wurde, und zählt es (`lost_commits`). Sperren gehen, wenn der Commit endgültig ist. Jeder Stopp zählt als Absturz, einen sauberen Halt gibt es nicht: Was das Log nicht hat, ist weg, offene Transaktionen auch, der Puffer ist leer. Der nächste Start liest das Log seit dem letzten Prüfpunkt und spielt es ein, `Log / Plattenrate + Latenz + Log / redo_mbps` lang; bis dahin gibt es 503 `recovering`, die Dauer steht in `recovery_ms`. Für die spätere Replikation gibt es Positionen und einen begrenzten Rest des Logs (`Db::wal_since`, `wal_tail`); Replikation selbst gibt es hier noch nicht.
+
+**Die Grenze der geänderten Zeilen.** `touched_max` (100 000) begrenzt, was wirklich da ist. Darüber geht die älteste saubere Zeile, die keine Sperre und kein Snapshot braucht, zu ihren abgeleiteten Werten zurück, und `forgotten` zählt das, der Status sagt es auch. Das ist eine Grenze des Simulators, kein Verhalten einer Datenbank: Die Zeiten stimmen weiter, die Werte dieser Zeilen nicht. Wer Summen prüft, bleibt darunter.
+
+**Die Zahlen lesen.** `statements`, `commits`, `rollbacks`; `p50_us`, `p95_us`, `p99_us` vom Eintreffen bis zur Antwort; `pool_hit_pm` und `pool_use_pm` der letzten Sekunden; `lock_waits`, `deadlocks`, `lock_timeouts`, `conflicts`; `wal_flushes` und `group_pm` (Commits je Schreiben, in Tausendsteln); `touched_rows`, `forgotten`, `old_versions`, `dirty_pages`, `recoveries`, `recovery_ms`. Das Panel Metriken zeigt die wichtigsten, die Karte im Canvas die Anweisungen je Sekunde.
+
+**Geprüft gegen Formeln** (Selbsttest-Gruppe `db`, `--selftest --only=db --numbers`):
+
+| Vergleich | Formel | gemessen | Formel sagt | Abstand | Toleranz |
+|---|---|---|---|---|---|
+| CPU-gebunden, 1, 2 und 4 Kerne (150 %) | Kerne · Tempo / (stmt + Seiten · page + Zeilen · row) | 993,5 · 1987 · 5961 /s | 993,5 · 1987 · 5961 /s | unter 0,01 % | 1 % |
+| IO-gebunden, Puffer 100 und 400 MiB | IOPS / (1 − Treffer) | 2225 · 3354 /s | 2228 · 3387 /s | 0,16 % · 0,98 % | 4 % |
+| Index gegen Suche, warm | Zeit aus Seiten und Zeilen; `EXPLAIN` sagt dasselbe wie die Rechnung | 36 µs · 55 030 µs | 36,5 µs · 55 030 µs | 1,4 % · 0 % | 10 % · 1 % |
+| Treffer gleichverteilt, exakt und je 13. und 62. Seite | Puffer / Daten | 0,100 · 0,500 · 0,098 · 0,497 | 0,1 · 0,5 · 0,1 · 0,5 | höchstens 1,5 % | 1 %, geteilt 3 % |
+| Treffer Zipf 1,0, exakt | Che | 0,523 · 0,710 · 0,875 | 0,523 · 0,709 · 0,875 | höchstens 0,12 % | 3 % |
+| Treffer Zipf 1,0, je 2. und 4. Seite | Che | 0,733 · 0,897 | 0,735 · 0,910 | 0,29 % · 1,44 % | 5 % |
+| Treffer über den ganzen Weg, gleichverteilt und Zipf | Puffer / Daten, Che | 0,510 · 0,634 | 0,512 · 0,635 | 0,31 % · 0,20 % | 3 % · 5 % |
+| Heiße Zeile, ohne Hardware und mit `write_us` | 1 / Haltezeit | 500,0 · 400,0 /s | 499,9 · 399,9 /s | 0,02 % · 0,01 % | 1 % · 2 % |
+| Group Commit, ein Client | 1 / Schreiben | 200,0 /s | 199,99 /s | 0,01 % | 1 % |
+| Group Commit, 16 Clients | mehr als das Fünffache, mehr als 5 Commits je Schreiben | | | | |
+| Index bauen | Zeilen · row · log2(Zeilen) | 1,800 s | 1,800 s | 0 % | 10 % |
+| Wiederherstellung | Log / Platte + Latenz + Log / `redo_mbps` | 964 ms | 964,06 ms | 0,01 % | 5 % |
+
+Dazu ohne Toleranz: Kein Update eines Zählers geht verloren, Überweisungen halten die Summe, und jeder Leser sieht sie in jedem Moment; `read committed` und `repeatable read` unterscheiden sich genau, wo sie sollen; eine Verklemmung bricht eine ab, die andere committet; nach einem Absturz ist jeder beantwortete Commit da und keine offene Transaktion; bei `relaxed` passt die Zahl der verlorenen genau; zu viel Puffer endet mit 137; ein Klon einer warmen Maschine mit gehaltenen Sperren läuft gleich weiter, 1 und 3 Threads geben dieselben Bytes, ein Keyframe mit gehaltenen Sperren spielt zum selben Ergebnis.
+
+**Eine Studie.** `tests/experiments/db_scale.jfnex` auf `db_scale.jfnet`: 2 Millionen Zeilen, eine Platte mit 5000 IOPS. Sie vergleicht die Größe des Puffers, einen Index gegen keinen und den Anteil der Lesezugriffe. Das ist **die Ausgabe des Modells mit seinen Annahmen**:
+
+```text
+Zusammenfassung
+Konfiguration             €/h     Knie  Maximum/s  €/1000 am Knie  begrenzt durch
+Puffer MiB 16           0.470   2000/s   2777.250        0.000065  Platte DB
+Puffer MiB 64           0.470   4000/s   3976.750        0.000032  Platte DB
+Puffer MiB 256          0.470   4000/s   7274.625        0.000032  Platte DB
+Puffer MiB 1024         0.470  16000/s  15992.375        0.000008  Platte DB
+E-Mail Index ["email"]  0.470  16000/s  16009.875        0.000008  -
+E-Mail Index []         0.470        -    140.500               -  CPU DB
+Lesen Gewicht 95        0.470   4000/s   7274.625        0.000032  Platte DB
+Lesen Gewicht 45        0.470   4000/s   7169.125        0.000032  Platte DB
+Lesen Gewicht 5         0.470   4000/s   6529.125        0.000032  Platte DB
+```
+
+Was sie zeigt: Mehr Puffer spart Lesen von der Platte, und das wirkt erst richtig, wenn die Daten fast ganz hineinpassen: 800 MiB Daten, 256 MiB Puffer verdoppeln knapp, 1024 MiB befreien die Datenbank von ihrer Platte. Ohne Index liest jede Anfrage 50 000 Zeilen: 4 Kerne / 30 ms sind 133 Suchen je Sekunde, mit den 5 % Schreibzugriffen 140/s, statt mehr als 16 000/s mit Index. Mehr Schreibzugriffe (Gewicht 5 heißt halb Lesen, halb Schreiben) kosten hier nur 10 %, weil Group Commit das Log bündelt und die Platte vor allem das Lesen begrenzt. Die Tabelle läuft in rund 2 Minuten auf 4 Threads (54 Läufe); `scale_up_vs_out` braucht unter denselben Bedingungen 3 Minuten. Timeouts stehen hier auf 10 Minuten, damit unter Überlast nichts abläuft und `erreicht/s` die Kapazität bleibt.
+
+Die Vorlage „Größer oder mehr?“ nimmt jetzt auch die echte Datenbank: Jede Anfrage liest eine Zeile und erhöht einen Zähler, also ist die Haltezeit dieser heißen Zeile (150 µs `write_us` plus das Schreiben des Logs, rund 172 µs) die Grenze, an die die vielen kleinen Hosts stoßen: 8 Hosts schaffen 5814/s, „begrenzt durch Sperre DB db“, und die Web-Hosts sind nur zu 68 % belegt. Die Referenzstudie `scale_up_vs_out` mit Webserver und Sperre bleibt als Golden, wie sie ist.
+
+**Was es nicht modelliert:** keinen Optimierer mit Statistiken (die Wahl folgt festen Regeln über Schlüssel und Indizes), keine Spalten, die vom Schlüssel unabhängig sind, keine Bereichssperren und damit keine Phantome als Thema, keinen vollen Serialisierbarkeits-Modus. Der Speicher jenseits des Puffers ist fest (`mem_mb`, `conn_kb`). Bytes auf dem Netz sind die der JSON-Antwort, nicht `row_bytes`. Seiten teilen sich keine Schreibsperre, Indexseiten teilen sich nicht. Die Platte hat eine Warteschlange, einen Schreibcache gibt es nicht, ein Schreiben ist also immer ein `fsync`. Replikation, Proxy und Verbindungspool davor kommen mit späteren Stufen.
+
+Für Programme: `Db::{view, tables, lock_list, explain, lsn, flushed_lsn, wal_since, table, row_now, pool}`, `Engine::db_view`, `dbstore::{Table, Pool, Layout, Zipf}`, `dbsql::{parse, params_of}`, `catalog::preset_config`, `Serve::rank`, `KvClient::set_conns`. Geprüft wird in der Selbsttest-Gruppe `db` ([`src/dbtest.rs`](src/dbtest.rs)), mit `scen_db_basic.uis`, `db_scale_small.uis` und den Fensterskripten `db_forms.uis`, `db_forms_en.uis` und `db_shots.uis`.
+
 ### Experimente: Parameter-Sweeps
 
 Ein Experiment vergleicht Konfigurationen eines Projekts unter steigender Last: mehr Kerne gegen mehr Server, ein anderer
@@ -4588,7 +4736,7 @@ cache clear CACHE cache
 
 **Was es nicht modelliert:** alles aus dem Abschnitt Hardware (keine CPU je Rahmen, keine NUMA-, Cache- oder Hyper-Thread-Effekte außer `usl`). Dazu: Ein Generator verlangt offene Last, kennt aber keine
 Grenzen des Clients. Ein Server arbeitet Anfragen ab, deren Client längst aufgegeben hat, was unter Überlast die Leistung bis auf 0 drücken kann; das ist echtes Verhalten des Modells, und mit kurzen Timeouts kommt
-es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Ports wegen TIME-WAIT aus, ebenfalls wie im Leben. Die Datenbank im Beispiel ist ein Webserver mit Sperre, kein SQL (das kommt mit SA4). Ein SLO sagt
+es so auch vor. Bei vielen Verbindungsabbrüchen je Sekunde laufen die freien Ports wegen TIME-WAIT aus, ebenfalls wie im Leben. Die Datenbank im Beispiel ist ein Webserver mit Sperre; die Vorlage „Größer oder mehr?“ und die Studie `db_scale` nehmen die echte [Datenbank `db`](#datenbank-der-dienst-db). Ein SLO sagt
 etwas über die gewählten Stufen: Das Knie liegt nie zwischen zwei Stufen, und eine Messung von 20 s sieht keine seltenen Ereignisse.
 
 Für Programme: `jfn_model::experiment::{Experiment, Axis, Series, LoadAxis, Timing, Slo, Config, Level}`, `Experiment::{from_text, problems, configs, levels}`, `jfn_sim::experiment::{Plan, Sweep, Point, ConfigOut, Fig}` mit `Plan::{new, warm, measure, run_level, run_all, collect}` und `Sweep::{table, csv, detail_csv}`,
@@ -4869,7 +5017,46 @@ Für Programme: `jfn_model::academy` (`Course`, `Index`, `Progress`, `load`, `sa
 `Folder`, `read_index`, `install`, `uninstall`, `recover`, `Counters`, `Failure`, `Kind`), `update::fetch`, `workspace/academy` (`Academy`,
 `store::place`, `store::list`, `quiz.rs`, `install.rs`).
 
-Noch offen: die Kurse selbst (AK4).
+**Die Kurse.** [`academy/grundlagen`](academy/grundlagen) (Einsteiger, 24 Schritte, etwa 4 Stunden) führt vom Kabel bis zum
+Namen: Hosts, Switch, Rahmen, ARP; Adressen und Maske; Router und Gateway; DHCP; DNS; dann ein Labor über alles und
+ein Test. [`academy/fehlersuche`](academy/fehlersuche) (Fortgeschrittene, 20 Schritte, gut 3 Stunden) lehrt eine Methode und
+übt sie an elf kaputten Netzen, vom gezogenen Kabel bis zu mehreren Fehlern gegen die Uhr, mit einem Test am Ende.
+„Jetzt installieren“ nimmt beide mit; [`academy/beispiel`](academy/beispiel) zeigt nur das Format.
+
+**Der Beweis, dass ein Kurs geht.** `jfn-sim course` lässt keine Zeit laufen und bewertet nichts. Darum gehört zu jedem Schritt
+jedes Kurses, der kein Beispiel ist, eine Zeile in der Tabelle `ROWS` in [`src/coursetest.rs`](src/coursetest.rs) (Selbsttest-Gruppe
+`courses`, mit `--academy-dir`). Sie steht nicht im Kursordner, weil jede Datei dort zu den Lernenden geht. Ein Schritt ohne
+Zeile lässt den Selbsttest scheitern, eine Zeile ohne Schritt auch.
+
+| Zeile | was sie beweist |
+|---|---|
+| `Proof::Lesson` | eine Lektion ohne Konsole |
+| `Proof::Shows(netz, vorher)` | eine Lektion mit Blöcken ```` ```console ````: Das Netz (ein Pfad im Kurs) läuft, `vorher` geschieht ungesehen, dann wird jede Zeile, die mit dem Prompt eines Geräts beginnt, dort getippt, und die Zeilen danach müssen genau das sein, was die Konsole ausgibt (`…` steht für beliebig viele Zeilen) |
+| `Proof::Solve(schritte)` | ein Labor: am Anfang kein Ziel; dann die Lösung an denselben Konsolen, die auch Lernende benutzen, und mit Kabeln, wie die Zeichenfläche sie zieht; alle Ziele erreicht; die Prüfungen gelten auch später noch |
+| `Proof::Hunt { repair, test, right, wrong }` | eine Fehlersuche: unberührt unter der Grenze, auch mit der richtigen Diagnose; ein ausgeschaltetes Gerät, welches auch immer, bringt nichts; repariert ohne oder mit falscher Diagnose unter der Grenze, die falsche kostet die Punkte; repariert mit der richtigen 100 %; das Zielnetz hält alle Kriterien außer der Diagnose; alles ist gesperrt, was die Antwort zeigt. `test` ist, was Lernende nach der Reparatur ausprobieren: Geprüft wird auf einer Kopie der Engine, ein Router, der erst per ARP fragen muss, verwirft aber das erste Paket, und über zwei frische Router scheitert eine Namensauflösung beim ersten Mal |
+| `Proof::Answers(texte)` | ein Quiz oder Test: die richtigen Antworten (je Textfrage ein Text aus der Tabelle) ergeben 100, falsche unter der Grenze, jede Frage erklärt sich |
+
+Für jede Lektion gilt außerdem: Ein Code-Stück im Fließtext, das mit einem Befehlswort beginnt (`ping 10.0.0.2`, `show ip route`),
+wird auf den Geräten von `tests/fixtures/course_commands.jfnet` getippt und muss angenommen werden. Also immer ein echtes
+Beispiel, kein Platzhalter. Ein Block ist ```` ```console ```` (bewiesen) oder ```` ```text ```` (keine Befehle). Für alles gilt die
+Namensregel, beide Sprachen in jedem Text, Deutsch, das sich wie Deutsch liest, und Englisch wie Englisch; jede Datei im Kursordner
+muss von einem Schritt oder einer Lektion benutzt werden.
+
+Zitierte Ausgaben schreibt niemand von Hand: Einen Block nur mit den Befehlszeilen anlegen, dann
+
+```bash
+JFNetworker --selftest --only=courses --academy-dir apps/JFNetworker/academy --course-fill OUT
+```
+
+`OUT/<kurs>/<sprache>/<datei>` enthält jede Lektion mit dem, was die Konsolen wirklich ausgegeben haben. Lange Ausgaben kürzt man
+danach von Hand auf ihre wichtigen Zeilen und `…`. Ändert sich der Simulator so, dass eine zitierte Ausgabe nicht mehr stimmt, meldet
+der Selbsttest die Stelle mit beiden Fassungen; dann `course_version` erhöhen.
+
+**Beim Schreiben:** Ein Router verwirft das erste Paket, solange er per ARP fragt: `ping -c 1` über einen frischen Router zeigt
+Verlust, und das ist echt. Eine Konsole mit IOS-artiger Zeile hält lange Ausgaben im Fenster bei `--More--` an (im Selbsttest nicht), in
+einem Skript also `key space` tippen. Ein Dienst wie der Namensserver wird in einem Labor vorgegeben; was Lernende tippen sollen, muss
+sich tippen lassen. Eine doppelte Adresse zeigt sich erst, wenn jemand per ARP gefragt hat, also prüft die Bewertung die neue Adresse.
+Unter `lock.faults` lässt sich nur reparieren, was im Abschnitt zur Fehlersuche steht.
 
 ## Performance
 
@@ -4936,12 +5123,12 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `apps/jfs/crates/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6; X1f SSH und SNMPv3 ✓; X1g 802.1X, WPA-Enterprise und IMAP ✓) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: außerhalb ausführbar mit dem Runner `jfs` der Library, aufgegangen in IDE1 und V2 (Dateien auf dem Gerät, Import und Export im Dateimanager) ✓ · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten ✓ · B2 Formulare (GET / POST) ✓ · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) ✓ · B4 CSS-Teilmenge, Cookies, HTTPS mit echtem TLS 1.3 im Simulator, Entwickleransicht ✓ (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 | 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen ✓ · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor ✓ · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf ✓ · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor ✓ |
-| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche ✓ · F2 Zonen und Stateful ✓ · Akademie: AK1 Kursformat und Kursansicht ✓, AK2 Tests und Fehlersuche ✓, AK3 Installieren ✓, AK4 Inhalte · Architektur-Labor: SA1 CPU und RAM je Gerät ✓, SA2 Sweeps ✓, SA3 Labor im Fenster und Experimente ✓, SA4 bis SA7 (Datenbank, Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
+| 7 Breite und Tiefe | Z1 Dock-Reiter erst nach 0,3 s Halten ziehen ✓ · H1 mehr Gerätemodelle ✓ · H2 Kabelauswahl und neue Kabelarten ✓ · H3 schmale Beschriftung ✓ · ST1 Startseite mit Vorlagen ✓ · F1 Firewall-Oberfläche ✓ · F2 Zonen und Stateful ✓ · Akademie: AK1 Kursformat und Kursansicht ✓, AK2 Tests und Fehlersuche ✓, AK3 Installieren ✓, AK4 Inhalte (Grundlagen und Fehlersuche ✓, weitere Kurse folgen) · Architektur-Labor: SA1 CPU und RAM je Gerät ✓, SA2 Sweeps ✓, SA3 Labor im Fenster und Experimente ✓, SA4 Datenbank ✓, SA5 bis SA7 (Replikation, Verkehrssteuerung, Autoscaler) · H4 Steckplätze |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

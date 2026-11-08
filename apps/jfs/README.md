@@ -1,6 +1,6 @@
 # jfs
 
-`jfs` runs scripts of the language of [`lib/script`](../../lib/script/lib.rs) (`.jfs`, the
+`jfs` runs scripts of the language of [`apps/jfs/crates/script`](crates/script/lib.rs) (`.jfs`, the
 scripts of JFNetworker) on the command line, the way `python file.py` runs a Python file.
 [GUIDE.md §29](../../docs/GUIDE.md#29-scripts-script-compiler-and-vm) describes the language and
 its standard library.

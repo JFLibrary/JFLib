@@ -53,9 +53,9 @@ fn neutral(v: &Value) -> bool {
 fn preset(name: &str, value: &Value) -> Result<Preset, String> {
     let fields = value
         .as_object()
-        .ok_or_else(|| String::from("Das Pinsel-Preset ist kein Objekt."))?;
+        .ok_or_else(|| String::from("Das Pinsel-Preset ist kein Objekt."))?; // i18n
     if name.is_empty() || name.len() > 1024 {
-        return Err(String::from("Ungültiger Preset-Name."));
+        return Err(String::from("Ungültiger Preset-Name.")); // i18n
     }
     let size = number(value, "BrushSize", 2, 1, 2000)? as i32;
     let mut density = number(value, "BrushDensity", 10, 0, 100)? as i32;
@@ -76,11 +76,11 @@ fn preset(name: &str, value: &Value) -> Result<Preset, String> {
         None => String::from("Circle Light"),
         Some(v) => String::from(
             v.as_str()
-                .ok_or_else(|| String::from("Ungültiger Bildpfad."))?,
+                .ok_or_else(|| String::from("Ungültiger Bildpfad."))?, // i18n
         ),
     };
     if image.len() > 4096 || image.contains('\0') {
-        return Err(String::from("Ungültiger Bildpfad."));
+        return Err(String::from("Ungültiger Bildpfad.")); // i18n
     }
     let blend = match value.get("BlendMode").and_then(Value::as_str) {
         Some(s) if s.parse::<i64>().is_err() => [
@@ -203,15 +203,15 @@ fn xml_value(node: &base::xml::Node) -> Result<Value, String> {
 }
 pub(crate) fn parse(data: &[u8]) -> Result<Vec<Preset>, String> {
     if data.len() > 4_194_304 {
-        return Err(String::from("Preset-Datei ist größer als 4 MiB."));
+        return Err(String::from("Preset-Datei ist größer als 4 MiB.")); // i18n
     }
     let source = core::str::from_utf8(data)
-        .map_err(|_| String::from("Presets müssen UTF-8 sein."))?
+        .map_err(|_| String::from("Presets müssen UTF-8 sein."))? // i18n
         .trim_start_matches('\u{feff}')
         .trim();
     let rows = if source.starts_with('<') {
         let root = base::xml::parse(source)
-            .map_err(|_| String::from("Ungültige oder nicht unterstützte Preset-XML-Datei."))?;
+            .map_err(|_| String::from("Ungültige oder nicht unterstützte Preset-XML-Datei."))?; // i18n
         if !matches!(
             root.name.local.as_str(),
             "DynamicDrawSettings" | "BrushFactorySettings"
@@ -226,7 +226,7 @@ pub(crate) fn parse(data: &[u8]) -> Result<Vec<Preset>, String> {
             .collect();
         if containers.len() != 1 {
             return Err(String::from(
-                "CustomBrushes fehlt oder ist mehrfach vorhanden.",
+                "CustomBrushes fehlt oder ist mehrfach vorhanden.", // i18n
             ));
         }
         let mut rows = Vec::new();
@@ -242,7 +242,7 @@ pub(crate) fn parse(data: &[u8]) -> Result<Vec<Preset>, String> {
                 .filter(|n| n.name.local == "Value")
                 .collect();
             if keys.len() != 1 || values.len() != 1 {
-                return Err(String::from("Ungültiger XML-Preset-Eintrag."));
+                return Err(String::from("Ungültiger XML-Preset-Eintrag.")); // i18n
             }
             rows.push((keys[0].text.clone(), xml_value(values[0])?));
         }
@@ -255,15 +255,15 @@ pub(crate) fn parse(data: &[u8]) -> Result<Vec<Preset>, String> {
                 ..Default::default()
             },
         )
-        .map_err(|_| String::from("Ungültige Preset-JSON-Datei."))?;
+        .map_err(|_| String::from("Ungültige Preset-JSON-Datei."))?; // i18n
         root.get("CustomBrushes")
             .and_then(Value::as_object)
-            .ok_or_else(|| String::from("CustomBrushes fehlt in der Preset-Datei."))?
+            .ok_or_else(|| String::from("CustomBrushes fehlt in der Preset-Datei."))? // i18n
             .to_vec()
     };
     if rows.is_empty() || rows.len() > 1024 {
         return Err(String::from(
-            "Die Datei muss 1 bis 1024 Pinsel-Presets enthalten.",
+            "Die Datei muss 1 bis 1024 Pinsel-Presets enthalten.", // i18n
         ));
     }
     let mut presets: Vec<Preset> = Vec::new();

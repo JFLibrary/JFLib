@@ -25,6 +25,7 @@ use crate::url::Url;
 use crate::Stream;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HttpError {
     /// not an http(s) URL, or https without a connector
     Url(String),

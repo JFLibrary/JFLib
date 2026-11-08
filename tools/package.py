@@ -44,7 +44,8 @@ says so; --sign makes it an error.
 --impl rs (the default) packages the Rust build: every variant is built by one
 `build_rs.py app NAME --target both --style S1,S2,.. --profile size` (one shared output folder
 <out>/rs_<profile>: the libraries once, both targets side by side, the style variants linked in
-parallel; each exe copied to <out>/<App>/<style>/<target>), the setup stub is apps/installer.
+parallel; each exe copied to <out>/<App>/<style>/<target>), the setup stub is apps/installer
+(lib/installer, the crate jflib-installer, which `cargo jflib package` builds for apps outside).
 --profile size (default; rewrite/REPORT.md section 2: -14 to -21 % against opt-level 3, codecs / effects / rendering
 unchanged, UI scripts about +4 %), o2 (opt-level 2, no LTO) or release (build_rs's default
 release: opt-level 2, fat LTO) picks the build_rs release variant.  --impl asm packages the
@@ -59,7 +60,7 @@ file and, for "own" types, a shared-mime-info package), apps/<App>/res/app.ico a
 app_{48,128,256}.png (tools/mkicon.py), styles/<style>/INFO (shown name, description;
 --impl asm: legacy/ASMLIB/styles/<style>/INFO). The .deb uses local dpkg-deb on Linux, or
 WSL on Windows (jfgui_WSL_DISTRO, default Ubuntu-24.04). Payload layout:
-docs/PACKAGING.md (apps/installer/payload.rs reads it).
+docs/PACKAGING.md (lib/installer/payload.rs reads it).
 
 pdn-host: PaintCraft's host for original paint.net plugins (build_rs.py, section "pdn-host") is
 built where the .NET SDK and paint.net exist and installed in pdn-host/ of the program folder; only
@@ -192,7 +193,7 @@ def package_notices(styles, impl):
 
 
 def build_stub(impl, work, rsout, profile="size"):
-    """the setup stub (apps/installer or apps/installer) -> its bytes"""
+    """the setup stub (apps/installer, or legacy/apps/installer) -> its bytes"""
     if impl == "rs":
         run([sys.executable, "build_rs.py", "app", "installer", "--target", "win", *rs_mode(profile),
              "--out", rsout])

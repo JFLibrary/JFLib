@@ -146,6 +146,7 @@ pub const COLOR_TARGETS_MAX: usize = 8;
 
 /// what went wrong
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum GpuError {
     /// the GPU is switched off (jfgui_GPU=0)
     Disabled,
@@ -230,6 +231,7 @@ pub fn bytes_of<T: Pod>(s: &[T]) -> &[u8] {
 
 /// the feature level of a device (Basis < Voll)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Level {
     /// WebGPU / Vulkan 1.1: compute, storage buffers, single indirect draws, texture arrays
     Basis,
@@ -239,6 +241,7 @@ pub enum Level {
 
 /// what kind of GPU
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AdapterKind {
     Discrete,
     Integrated,
@@ -509,6 +512,7 @@ flags! {
 
 /// where a buffer's memory lives
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MemoryKind {
     /// GPU memory (fastest for the GPU; filled by copies or Queue::write_buffer)
     Device,
@@ -528,6 +532,7 @@ pub struct BufferDesc {
 
 /// texel formats
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Format {
     R8Unorm,
     Rg8Unorm,
@@ -622,6 +627,7 @@ impl TextureDesc {
 
 /// a view's dimension
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ViewDim {
     D2,
     D2Array,
@@ -642,6 +648,7 @@ pub struct ViewDesc {
 
 /// the state a texture is in (texture_barrier, render pass attachments, write_texture)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Layout {
     /// contents discarded; waits for earlier colour, copy and compute work (and for the
     /// swapchain image's acquisition)
@@ -661,12 +668,14 @@ pub enum Layout {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Filter {
     Nearest,
     Linear,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AddressMode {
     Repeat,
     MirrorRepeat,
@@ -675,6 +684,7 @@ pub enum AddressMode {
 
 /// comparison functions (depth test, comparison samplers)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Compare {
     Never,
     Less,
@@ -719,6 +729,7 @@ impl SamplerDesc {
 
 /// what a binding holds
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BindingKind {
     UniformBuffer,
     /// read and written by shaders
@@ -751,6 +762,7 @@ pub struct PipelineLayoutDesc<'a> {
 
 /// a resource bound into a BindGroup
 #[derive(Clone, Copy)]
+#[non_exhaustive]
 pub enum Resource<'a> {
     /// a buffer range (size 0: to the end); offsets aligned to Limits::min_*_offset_alignment
     Buffer { buffer: &'a Buffer, offset: u64, size: u64 },
@@ -819,6 +831,7 @@ pub struct ComputePipelineDesc<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Topology {
     Points,
     Lines,
@@ -828,6 +841,7 @@ pub enum Topology {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Cull {
     None,
     Front,
@@ -836,6 +850,7 @@ pub enum Cull {
 
 /// vertex attribute formats
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum VertexFormat {
     F32,
     F32x2,
@@ -864,6 +879,7 @@ pub struct VertexBufferLayout<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BlendFactor {
     Zero,
     One,
@@ -878,6 +894,7 @@ pub enum BlendFactor {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BlendOp {
     Add,
     Subtract,
@@ -953,6 +970,7 @@ pub struct RenderPipelineDesc<'a> {
 
 /// what a render pass does with an attachment's old contents
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Load {
     Keep,
     Clear,
@@ -991,6 +1009,7 @@ pub struct RenderPassDesc<'d, 'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum IndexFormat {
     U16,
     U32,

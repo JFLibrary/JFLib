@@ -83,7 +83,7 @@ fn dedup(v: Vec<String>) -> Vec<String> {
 }
 
 #[cfg(windows)]
-#[link(name = "kernel32")]
+#[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn GetUserPreferredUILanguages(flags: u32, num: *mut u32, buf: *mut u16, len: *mut u32) -> i32;
     fn GetUserDefaultLocaleName(buf: *mut u16, len: i32) -> i32;

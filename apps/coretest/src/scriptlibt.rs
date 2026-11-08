@@ -1,4 +1,4 @@
-// scriptlibt -- checks of lib/script's standard library (SK3): str, list, map, bytes, math,
+// scriptlibt -- checks of apps/jfs/crates/script's standard library (SK3): str, list, map, bytes, math,
 // json, int / float.parse and type() from scripts, Unicode, empty lists, nan and inf, JSON
 // round trips and errors with positions, sort stability, the fuel of library calls (fixed
 // numbers, a stop in the middle of a big sort), the heap limit for results, the collector

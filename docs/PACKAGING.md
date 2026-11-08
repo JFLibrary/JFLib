@@ -34,7 +34,7 @@ What it does:
    and rendering as fast,
    UI scripts about 4 % slower ([rewrite/REPORT.md](../../rewrite/REPORT.md) section 2).
    `package.py --profile o2|release` picks another variant.
-2. **Windows**: builds the setup stub `apps/installer` (same profile), renders a preview of every
+2. **Windows**: builds the setup stub `apps/installer` (`lib/installer`, same profile), renders a preview of every
    variant (`--shot` at 1100 x 700 DIP, light theme, scaled to 480 x 305) and writes
    `<out>/<App>_Setup.exe` = stub + payload + trailer.
 3. **Linux**: assembles the package tree and runs `dpkg-deb` in WSL (Ubuntu-24.04).
@@ -82,7 +82,7 @@ styles=winui classic macos kde
 **Icons**: `python tools/mkicon.py NAME --glyph E771 --color 1E78E6` renders a glyph of the icon
 font on a gradient square in every icon size (16..256 px), cuts anti-aliased rounded corners
 (`tools/pngutil.py`) and writes `app.ico` and the PNGs. The glyph comes from
-`styles/winui/assets/icons.bin` (Fluent UI System Icons, MIT; the styles that use it ship
+`lib/style_assets/assets/icons.bin` (Fluent UI System Icons, MIT; the styles that use it ship
 `LICENSE-FluentSystemIcons.txt`) and is drawn by `tools/refrender.py`, so no build is needed. The
 committed icons are installer `--glyph E896 --color 2E9E5B`, PaintCraft `E771 1E78E6` and paint
 `E790 D9822B`.
@@ -90,7 +90,9 @@ committed icons are installer `--glyph E896 --color 2E9E5B`, PaintCraft `E771 1E
 ## Windows: setup.exe
 
 `apps/installer` (Windows only: `apps/installer/TARGETS` = `win`) is a normal library app
-in the winui style. The packaged setup is that exe with a payload and a trailer appended.
+in the winui style; its code is the crate `jflib-installer` (`lib/installer`), which `cargo jflib
+package` builds the same way for an app outside this repository (README.md of cargo-jflib). The
+packaged setup is that exe with a payload and a trailer appended.
 
 * **Pages**: style (list with the INFO names and descriptions, preview of the selection) ->
   options (folder, default `%LOCALAPPDATA%\Programs\<display>` -- per user, no administrator
@@ -112,7 +114,7 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
 * Running the setup again installs another style over the old one (the app's settings stay).
 * Options: `--dir PATH`, `--style ID`.
 * **File types and URL schemes** (`PACKAGE` `filetypes=` / `schemes=`, carried in the
-  manifest; `apps/installer/assoc.rs`): for each type a ProgID `<app>.<ext>` under
+  manifest; `lib/installer/assoc.rs`): for each type a ProgID `<app>.<ext>` under
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
   the app in `.<ext>\OpenWithProgids` ("Open with"). An `own` type also becomes the default of its
   extensions (`.<ext>` default value and `Content Type`). A scheme gets `HKCU\Software\Classes\<scheme>`
@@ -152,7 +154,7 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
   `apps/installer/tests/nopayload.uis` checks the bare stub (no payload: the error page); it
   runs in `build_rs.py test` and in parity.
 
-**Payload layout** (written by `tools/package.py`, read by `apps/installer/payload.rs`;
+**Payload layout** (written by `tools/package.py` and `cargo jflib package`, read by `lib/installer/payload.rs`;
 little endian, offsets relative to the payload start):
 
 | Part | Layout |
@@ -303,13 +305,15 @@ runtime.  With `appimagetool` in PATH that tool makes the image instead, with th
 system it runs on (an AppImage brings neither, a driver has to match the system's kernel anyway);
 `tools/package.py APP --static` makes one for systems without glibc, without the GPU.
 
-**The runtime** is [`apps/appimagert`](../apps/appimagert/src/main.rs), a static Linux program
+**The runtime** is [`apps/appimagert`](../apps/appimagert/src/main.rs) (its code the crate `jflib-appimagert`,
+[`lib/appimagert`](../lib/appimagert/lib.rs), which `cargo jflib package` builds for an app outside
+this repository), a static Linux program
 of JFLib without libc (about 200 KB, built with `--profile size`); `package.py` makes it an
 AppImage type 2 runtime: the magic `AI\x02` at byte 8 of the ELF header and a section
 `.upd_info` of 1024 bytes (PACKAGE `appimage_update=`, e.g. `zsync|https://example.org/App-latest-x86_64.AppImage.zsync`),
 added to the file by `pkg_linux.runtime_image`.  The SquashFS image starts where the ELF data ends.
 The upstream runtime would mount the image with FUSE, and is downloaded by appimagetool; this one
-reads the image itself ([`sqfs.rs`](../apps/appimagert/src/sqfs.rs): SquashFS 4.0, zstd or lz4,
+reads the image itself ([`sqfs.rs`](../lib/appimagert/sqfs.rs): SquashFS 4.0, zstd or lz4,
 fragments, sparse blocks, extended inodes) and needs no FUSE:
 
 * The first start extracts the image into `$XDG_CACHE_HOME/appimage-run/<name>-<xxh64 of the

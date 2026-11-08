@@ -72,6 +72,7 @@ pub fn token_index(name: &str) -> Option<usize> {
 /// rounded corners of a theme: every corner radius that is not a pill becomes this many DIP,
 /// or the style's radius scaled by this percentage
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Radius {
     Dip(u16),
     Percent(u16),

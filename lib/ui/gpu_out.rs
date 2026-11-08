@@ -12,6 +12,7 @@
 //   gp_tick() / gp_deadline()    the window loop: finished jobs, frames that found no free image;
 //                                the time of the next look (None: nothing to look at, no wake-up)
 //   gp_window_gone(i)            before window i's plat window is destroyed
+//   gp_window_show(i, show)      before window i is hidden or shown again
 //   gp_shutdown()                window_main's end
 //   sc_gpu(app, args)            the script command `gpu` (below)
 //   Ui::gpu_output(win)          what a window shows through (status and counters for tests)
@@ -25,6 +26,11 @@
 // hides the child: no gap, no wrong frame.  The first frames of a program are CPU frames: the
 // instance, device and swapchain (hundreds of ms the first time) are made on a worker thread that
 // starts after the first frame, so the first frame never waits for them.
+//
+// A hidden window goes back to Cpu too: a swapchain's image does not come back with its window (white
+// until the next present, measured on Windows, and a frame that did not change presents nothing).  What
+// the CPU path holds does come back, the swapchain follows as after a resize; nothing is built or
+// switched for a window nobody sees (unseen: the UI hid it, or the system with its minimised owner).
 //
 // The swapchain lives on a child window (plat win_gpuout.rs): once a swapchain has presented on a
 // window GDI stays invisible there, also after the swapchain is gone.
@@ -533,6 +539,7 @@ struct Win {
     full: bool,    // the texture lacks pixels: the whole frame goes up next
     undef: bool,   // the texture is new (Layout::Undefined)
     pending: bool, // the texture holds pixels that were not presented
+    hidden: bool,  // the UI hid it: no swapchain is built or shown for it
     apart_before: bool, // the last frame had layers, images or canvases apart
     last_present: u64,
     job: u32,      // the job in flight
@@ -1618,6 +1625,7 @@ impl Ui {
             full: true,
             undef: true,
             pending: false,
+            hidden: false,
             apart_before: false,
             last_present: 0,
             job: 0,
@@ -1839,7 +1847,9 @@ impl Ui {
             w.rb = dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback }).ok();
         }
         w.stage = Stage::Switch;
-        self.gp_switch(i);
+        if !unseen(w) {
+            self.gp_switch(i);
+        }
     }
 
     /// the whole framebuffer on the new swapchain, then the child shown: from now on the GPU
@@ -1934,7 +1944,8 @@ impl Ui {
             }
             let Some(w) = self.m.gout.wins[i].as_ref() else { continue };
             match w.stage {
-                Stage::Switch => self.gp_switch(i),
+                Stage::Switch if !unseen(w) => self.gp_switch(i),
+                Stage::Gpu if unseen(w) => self.gp_leave(i, "hidden"),
                 // (Android: a tool window or popup is composed on the canvas, below the surface)
                 Stage::Gpu if !plat::win_gpu_child_alone(w.pw) => self.gp_leave(i, "something else shows"),
                 Stage::Gpu if w.pending && plat::time_us() >= w.last_present + MIN_PRESENT_US => self.gp_retry(i),
@@ -2030,7 +2041,7 @@ impl Ui {
         let desc = s.desc();
         for i in 0..n {
             let Some(w) = s.wins[i].as_ref() else { continue };
-            if w.stage != Stage::Cpu || now < w.fail_at || now < w.stable_at + STABLE_US {
+            if w.stage != Stage::Cpu || unseen(w) || now < w.fail_at || now < w.stable_at + STABLE_US {
                 continue;
             }
             let pw = w.pw;
@@ -2107,13 +2118,13 @@ impl Ui {
             // (Linux: a frame on its way, a display that has not answered yet)
             let on_way = w.sc.as_ref().is_some_and(|sc| sc.busy());
             match w.stage {
-                Stage::Switch if !minimised => d = d.min(now + RETRY_US),
+                Stage::Switch if !minimised && !unseen(w) => d = d.min(now + RETRY_US),
                 Stage::Gpu if on_way => d = d.min(now + RETRY_US.min(1000)),
                 Stage::Gpu if w.pending && !minimised => {
                     let retry = (w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000));
                     d = d.min(w.sc.as_ref().map_or(retry, |sc| sc.next_look(retry)));
                 }
-                Stage::Cpu if ready && !minimised && !moving && w.fail_at != u64::MAX && !plat::win_gpu_child_later(w.pw) => {
+                Stage::Cpu if ready && !minimised && !moving && !unseen(w) && w.fail_at != u64::MAX && !plat::win_gpu_child_later(w.pw) => {
                     // (a size the frame has not reached yet: its event is on the way)
                     let settle = if plat::win_size(w.pw) == w.size { 1000 } else { 16_000 };
                     d = d.min((w.stable_at + STABLE_US).max(w.fail_at).max(now + settle));
@@ -2185,6 +2196,21 @@ impl Ui {
                 let n: usize = c.levels.iter().map(|l| l.tiles.len()).sum();
                 s.tile_bytes -= n as u64 * TILE_BYTES;
             }
+        }
+    }
+
+    /// window i is about to be hidden or shown again: hidden, it goes back to the CPU path (the top of
+    /// this file), and its swapchain follows when it is back and has settled
+    pub(crate) fn gp_window_show(&mut self, i: u32, show: bool) {
+        let i = i as usize;
+        let Some(stage) = self.m.gout.wins.get(i).and_then(|w| w.as_ref()).map(|w| w.stage) else { return };
+        if !show && stage == Stage::Gpu {
+            self.gp_leave(i, "hidden");
+        }
+        let now = plat::time_us();
+        if let Some(w) = self.m.gout.win(i) {
+            w.hidden = !show;
+            w.stable_at = now;
         }
     }
 
@@ -3622,6 +3648,11 @@ impl Ui {
             }
         }
     }
+}
+
+/// nobody sees the window: the UI hid it, or the system did (a tool window with its minimised owner)
+fn unseen(w: &Win) -> bool {
+    w.hidden || plat::win_state(w.pw) & plat::WST_HIDDEN != 0
 }
 
 /// a script's real window that the system keeps at another size than its frame, for a while now

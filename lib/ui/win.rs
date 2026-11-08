@@ -743,6 +743,13 @@ impl Ui {
     }
 
     /// uiw_drawable(i): the window exists and is shown (the main window: always)
+    /// the title bar of a window with these WF_* flags that draws its own (DIP): the style's, higher
+    /// with a finger, and the window grows with it (lay out what lies below it with this height)
+    pub fn window_title_height(&self, flags: u32) -> i32 {
+        let h = self.style.metric(if flags & WF_TOOL != 0 { SM_WIN_TBH_TOOL } else { SM_WIN_TBH_DIALOG });
+        if self.m.touch.on { h.max(super::touch::TITLE_DIP) } else { h } // (a finger moves it there)
+    }
+
     pub(crate) fn uiw_drawable(&self, i: u32) -> bool {
         let s = self.m.win.recs[(i as usize) & (WIN_MAX - 1)].state;
         s & (UWI_VISIBLE | UWI_CREATED) == UWI_VISIBLE | UWI_CREATED
@@ -815,9 +822,7 @@ impl Ui {
         let tbh = if flags & WF_SYSFRAME != 0 || self.m.win.recs[iu].fs {
             0
         } else {
-            let st = self.style;
-            let h = st.metric(if flags & WF_TOOL != 0 { SM_WIN_TBH_TOOL } else { SM_WIN_TBH_DIALOG });
-            if self.m.touch.on { h.max(super::touch::TITLE_DIP) } else { h } // (a finger moves it there)
+            self.window_title_height(flags)
         };
         {
             let r = &mut self.m.win.recs[iu];
@@ -2298,6 +2303,7 @@ impl Ui {
         if pw < 0 {
             return;
         }
+        self.gp_window_show(i, show);
         let mut mode = plat::PWS_HIDE;
         if show {
             mode = plat::PWS_SHOW;

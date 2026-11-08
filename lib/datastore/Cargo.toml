@@ -1,0 +1,28 @@
+[package]
+name = "jflib-datastore"
+description = "An embedded, crash-safe store of JSON records with a write-ahead log and snapshots"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "datastore"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+crypto.workspace = true
+agent_core.workspace = true
+
+# docs.rs: Windows and Linux only (plat has no files and no network in the browser and on Android), not docs.rs's five defaults
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]

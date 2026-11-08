@@ -73,7 +73,7 @@ algorithms should take the narrow state they need instead of `&mut Pn`.
 in the shared `plat` crate. Shared text rendering and codecs stay in their
 existing library crates:
 
-- `lib/text_shape/Cargo.toml` is the standalone Cargo crate for pinned OpenType
+- `lib/text_shape/Cargo.toml` is the Cargo crate for pinned OpenType
   and Unicode dependencies, with its implementation in `src/lib.rs`, integration
   tests in `tests/`, and dependency notices in `NOTICE.md` and `licenses/`.
 - `lib/text/shaping.rs` adapts shaping to JFLib text rendering.
@@ -81,10 +81,9 @@ existing library crates:
   `lib/img_all/psd/document.rs` handles raster-layer PSD/PSB documents. The public
   `img_all::psd::document` API is unchanged.
 
-The application keeps the repository's direct-rustc build. A Cargo workspace
-containing artificial manifests for every shared JFLib library is not needed
-for this source layout. Run `python build_rs.py ide` from the repository root to
-regenerate local rust-analyzer paths after moving sources.
+The application is a package of the repository's Cargo workspace
+(`apps/PaintCraft/Cargo.toml`); `build_rs.py` builds it through Cargo, and
+rust-analyzer reads the workspace directly.
 
 ## Build and validation
 

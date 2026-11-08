@@ -59,7 +59,7 @@ pub struct TestResult {
     /// where it failed: file (a module's path when the error is in one), line, column (0: no
     /// place)
     pub at: Option<(String, u32, u32)>,
-    /// why it failed (German, as lib/script words it)
+    /// why it failed (German, as apps/jfs/crates/script words it)
     pub msg: String,
     /// what it printed (the last OUTPUT_KEEP bytes)
     pub output: String,

@@ -280,6 +280,7 @@ pub fn dns_servers() -> Vec<SocketAddr> {
 // ------------------------------------------------------------------ errors
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NetErrorKind {
     TimedOut,
     Refused,

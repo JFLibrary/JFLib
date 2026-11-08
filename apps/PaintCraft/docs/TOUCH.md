@@ -11,9 +11,10 @@ Bibliothek dazu: [`lib/ui/touch.rs`](../../../lib/ui/touch.rs), [GUIDE §37](../
 | Ein Finger | Malt mit dem aktuellen Werkzeug, oder verschiebt die Ansicht (Einstellung, unten) |
 | Tippen | Ein Klick an der Stelle, auch wenn der Finger dabei ein paar Pixel rollt |
 | Finger liegt, ohne sich zu bewegen | Der Druck kommt nach 400 ms (ein Punkt des Pinsels), kein Kontextmenü |
-| Werkzeugfenster: oben drücken und halten | In einer Sekunde läuft eine Linie unter der Titelleiste voll, dann folgt das Fenster dem Finger in jede Richtung. Ein schnelles Wischen dort tut nichts |
+| Werkzeugfenster: oben drücken und halten | In gut einer halben Sekunde läuft eine Linie unter der Titelleiste voll, dann folgt das Fenster dem Finger in jede Richtung. Ein schnelles Wischen dort tut nichts |
 | Zoomregler, Zahnrad und andere kleine Knöpfe | Auch ein Finger knapp daneben trifft: Auf dem Hintergrund gewinnt das nächste kleine Bedienelement in 44 DIP Reichweite; mit der Maus ändert sich nichts |
 | Kleine Knöpfe am Rand eines Werkzeugfensters („+“ und Stift im Ebenen-Fenster) | Sie gewinnen gegen den für Finger breiten Griff zum Größenziehen; daneben zieht der Griff wie gewohnt |
+| Pinselgröße − und + | Tippen ist ein Schritt. Bleibt der Finger liegen oder hält man Stift oder Maus gedrückt, läuft die Größe mit fester Geschwindigkeit weiter (25 Schritte in der Sekunde) |
 | Zweiter Finger kurz nach dem ersten (unter 200 ms) | Der angefangene Strich wird zurückgenommen, es zählt die Zwei-Finger-Geste. Später stört ein zweiter Finger den Strich nicht |
 
 **Ein Finger und der Stift.** Einstellungen ▸ Stift & Tablett ▸ „Ein Finger auf der Leinwand“:
@@ -47,6 +48,25 @@ Gemessen mit echten Kontakten (`InjectTouchInput`, 60 px breit wie ein Finger, o
   maximiert, 100 %), einmal unter rund 20 Versuchen kam gar kein Ereignis an. Ein Finger, der beim Abheben den Knopf
   verlässt, war vorher kein Klick; das ist jetzt behoben, aber ob das die Ursache war, zeigt nur das Gerät.
 
+## Was der zweite Surface-Test war
+
+- **Zoomregler „triggert das Fenster darüber“, und die Leinwand verschiebt sich mit:** teilweise nachgestellt. Mit dem Finger
+  wird die Titelleiste höher, und das Ebenen-Fenster wuchs in die Statusleiste: Sein unsichtbarer Rahmen lag über dem ganzen
+  Regler. Die automatische Anordnung rechnet jetzt mit dieser Höhe. Die Leinwand: Windows verschiebt die gemeldete Position
+  eines Kontakts auf den Rahmen, dem es ihn gibt, und lässt sie dabei (gemessen: 17 Pixel; `ptPixelLocationRaw` ebenso), und
+  das lag vor der neuen Anordnung über der Leinwand; nach dem ersten Stiftstrich verschiebt ein Finger dort die Ansicht. Jetzt
+  zählt für so einen Kontakt die Mitte des Kontaktrechtecks.
+  Außerdem geändert: Der Rahmen eines Werkzeugfensters gibt einen Finger nie mehr ans System
+  (dafür ist das Band im Fenster da), verborgene Fenster anderer Programme in der Z-Reihenfolge zählen nicht mehr, ein
+  Kontakt, dessen Mitte nicht im Fenster liegt, das ihn bekam, geht an das Fenster unter seiner Mitte, und knapp über der
+  Statusleiste meint ein Finger den Regler, nicht die Leinwand.
+- **Wie es weitergeht, wenn es noch hakt:** `set jfgui_TOUCH_LOG=1`, dann `build\win\PaintCraft.exe 2> finger.txt`. In der
+  Datei steht je Finger, wo er aufkam, wem er gehört (`ht` ist der Bereich des Fensterrahmens, 0 das Fensterinnere) und
+  was Windows meldete: Position, Rohposition, Kontaktrechteck, rohes Kontaktrechteck.
+- **Weiße Fenster:** nachgestellt, die GPU-Ausgabe (`docs/GPU.md`, „Aus- und Einblenden“).
+- **Dicker Punkt beim Absetzen des Stifts:** Ein Punkt ohne Druck zeichnete in voller Breite; ein Strich mit Druck behält
+  jetzt den letzten.
+
 ## Tests
 
 | Was | Wo | Was es beweist |
@@ -73,7 +93,7 @@ Mit dem Finger, ohne Stift:
 2. **Zoomregler** unten rechts: nach links und rechts ziehen. Die Zoomzahl ändert sich, das Ebenen-Fenster darüber bleibt, wie
    es ist. Auch einmal auf den Regler tippen.
 3. **Ein Werkzeugfenster verschieben:** oben auf die Titelleiste drücken und liegen lassen. Eine blaue Linie läuft in
-   knapp einer Sekunde voll, danach folgt das Fenster dem Finger, nach oben, unten, links, rechts. Ist die Zeit
+   gut einer halben Sekunde voll, danach folgt das Fenster dem Finger, nach oben, unten, links, rechts. Ist die Zeit
    angenehm, zu lang oder zu kurz (`HOLD_LONG_MS` in `lib/ui/touch.rs`)? Schnell darüberwischen darf nichts bewegen.
 4. **Knöpfe in einem Werkzeugfenster** antippen (Pinsel, Radierer): Das Werkzeug wechselt, das Fenster bleibt liegen.
    Auch „+“ und den Stift unten im Ebenen-Fenster: Sie legen eine Ebene an und öffnen die Eigenschaften, das Fenster ändert

@@ -101,7 +101,7 @@ def watch_files(name, style=None):
         if c.startswith("style_"):
             files.update(p for p in (ROOT / "styles" / c[len("style_"):] / "assets").glob("*") if p.is_file())
     if "text_shape" in need:
-        files.update(ROOT / "lib" / "text_shape" / f for f in ("Cargo.toml", "Cargo.lock"))
+        files.update((ROOT / "lib" / "text_shape" / "Cargo.toml", ROOT / "Cargo.lock"))
     return sorted(Path(f).resolve() for f in files)
 
 

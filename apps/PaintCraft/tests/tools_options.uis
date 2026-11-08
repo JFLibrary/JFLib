@@ -49,13 +49,13 @@ click menuitem:"Normal"
 expect #9937 text "75,15,1,0,0,50,0,0,0,0"
 # path smoothing (Pfadglättung)
 click #2150
-expect menuitem:"Ungeglätteter Weg" checked
-click menuitem:"Geglätteter Weg"
-click #2150
 expect menuitem:"Geglätteter Weg" checked
 click menuitem:"Ungeglätteter Weg"
 click #2150
 expect menuitem:"Ungeglätteter Weg" checked
+click menuitem:"Geglätteter Weg"
+click #2150
+expect menuitem:"Geglätteter Weg" checked
 key esc
 # antialiasing
 click #2020

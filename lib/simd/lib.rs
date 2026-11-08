@@ -27,6 +27,10 @@
 // refuses compute crates with out-of-line core_arch functions.
 #![no_std]
 
+// in a module's build (--cfg jflib_module, docs/CRATES.md) the module runtime goes by the same name
+#[cfg(jflib_module)]
+extern crate modrt as rt;
+
 #[cfg(target_arch = "x86_64")]
 mod native;
 #[cfg(target_arch = "x86_64")]

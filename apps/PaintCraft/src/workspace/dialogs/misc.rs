@@ -72,7 +72,7 @@ pub(crate) fn misc_frame(p: &mut Pn, ui: &mut Ui) {
     let m = &mut p.misc;
     let open = m.open.clone();
     let rect = m.rect.clone();
-    if ui.window_begin(WINID_INFO, if m.help {"PaintCraft-Hilfe"} else {"Info"}, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
+    if ui.window_begin(WINID_INFO, if m.help {crate::preferences::localization::tr("PaintCraft-Hilfe")} else {crate::preferences::localization::tr("Info")}, Some(&open), WF_DIALOG | WF_MODAL | WF_AUTOHEIGHT, Some(&rect)) {
         if m.help {
             ui.next_size(-1,420);
             ui.textbox(ID_INFO_DIAG,None,&mut m.diag,32768|TB_MULTI|TB_WRAP|TB_READONLY);
@@ -83,11 +83,11 @@ pub(crate) fn misc_frame(p: &mut Pn, ui: &mut Ui) {
         ui.text(TS_BODY_STRONG, &v);
         ui.text(
             TS_BODY | TX_WRAP,
-            "PaintCraft ist eine Bildbearbeitung in Rust auf Basis von JFLib. Ebenen, Auswahlwerkzeuge, Bildformate, Schriften, Effekte und Oberfläche werden von JFLib bereitgestellt. Die Anwendung unterstützt Windows, Linux und WebAssembly.",
+            crate::preferences::localization::tr("PaintCraft ist eine Bildbearbeitung in Rust auf Basis von JFLib. Ebenen, Auswahlwerkzeuge, Bildformate, Schriften, Effekte und Oberfläche werden von JFLib bereitgestellt. Die Anwendung unterstützt Windows, Linux und WebAssembly."),
         );
         ui.text(
             TS_CAPTION | TX_WRAP | TX_SECONDARY,
-            "paint.net ist eine Marke von dotPDN LLC. PaintCraft ist ein unabhängiges Projekt und steht in keiner Verbindung zu dotPDN LLC.",
+            crate::preferences::localization::tr("paint.net ist eine Marke von dotPDN LLC. PaintCraft ist ein unabhängiges Projekt und steht in keiner Verbindung zu dotPDN LLC."),
         );
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Diagnose"));
         ui.next_size(-1, 180);

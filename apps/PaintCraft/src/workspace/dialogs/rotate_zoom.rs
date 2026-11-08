@@ -182,7 +182,7 @@ pub(crate) fn rz_open(p: &mut Pn, ui: &mut Ui, doc: DocId) {
     rz_defaults(&mut p.rz);
     p.rz.prev = Surface::try_new(lw, lh, FMT_ARGB).unwrap_or_default();
     if p.rz.prev.px.is_empty() {
-        crate::integrations::file_io::fio_error(p, Some("Rotationszoom"), "Der Arbeitsspeicher reicht für diesen Schritt nicht aus.");
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Rotationszoom")), "Der Arbeitsspeicher reicht für diesen Schritt nicht aus."); // i18n
         return;
     }
     // the pan control's thumbnail: the layer fitted into THUMB_DIP
@@ -426,7 +426,7 @@ fn rz_commit(p: &mut Pn, ui: &mut Ui, ok: bool, doc: DocId, li: i32) -> Option<(
         }
     }
     crate::document::model::doc_mark_px(p, doc, li, 0, 0, lw, lh);
-    crate::document::history::hist_px_end(p, doc, "Rotationszoom", IC_ROTATE);
+    crate::document::history::hist_px_end(p, doc, "Rotationszoom", IC_ROTATE); // i18n
     Some(())
 }
 
@@ -450,10 +450,10 @@ pub(crate) fn rz_frame(p: &mut Pn, ui: &mut Ui) {
         ui.number_box_f(ID_RZ_ANGLE_NUM, &mut r.par.angle, &RF_ANGLE);
         ui.box_end();
         ui.box_end();
-        rz_row(ui, "Kippen X:");
+        rz_row(ui, crate::preferences::localization::tr("Kippen X:"));
         ui.number_box_f(ID_RZ_ZOOM_NUM + 1, &mut r.par.tilt_x, &RF_TILT);
         ui.box_end();
-        rz_row(ui, "Kippen Y:");
+        rz_row(ui, crate::preferences::localization::tr("Kippen Y:"));
         ui.number_box_f(ID_RZ_ZOOM_NUM + 2, &mut r.par.tilt_y, &RF_TILT);
         ui.box_end();
         // Verschieben
@@ -475,14 +475,14 @@ pub(crate) fn rz_frame(p: &mut Pn, ui: &mut Ui) {
         ui.number_box_f(ID_RZ_ZOOM_NUM, &mut r.par.zoom, &RF_ZOOM);
         ui.box_end();
         // Kachelmodus
-        rz_row(ui, "Kachelmodus:");
-        ui.combobox(ID_RZ_TILE, &mut r.par.tile, &TILE_LIST);
+        rz_row(ui, crate::preferences::localization::tr("Kachelmodus:"));
+        ui.combobox(ID_RZ_TILE, &mut r.par.tile, &crate::preferences::localization::list(&TILE_LIST));
         ui.box_end();
         ui.checkbox(ID_RZ_KEEP, crate::preferences::localization::tr("Original als Hintergrund"), &mut r.par.keep);
         // Qualität
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Qualität"));
-        rz_row(ui, "Probenahme:");
-        ui.combobox(ID_RZ_SAMPLE, &mut r.par.sample, &SAMPLE_LIST);
+        rz_row(ui, crate::preferences::localization::tr("Probenahme:"));
+        ui.combobox(ID_RZ_SAMPLE, &mut r.par.sample, &crate::preferences::localization::list(&SAMPLE_LIST));
         ui.box_end();
         // a changed parameter: one preview update after this frame
         if r.hdone != Some(r.par.bytes()) && !r.queued {

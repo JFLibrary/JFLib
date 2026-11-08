@@ -100,6 +100,9 @@ pub const WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT;
 pub const WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT;
 pub const WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT;
 pub const WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT;
+/// (Windows) the window is not shown, whoever hid it: the system hides a tool window while its owner
+/// is minimised
+pub const WST_HIDDEN: u32 = 1 << 11;
 
 // gpu_out_state: how the UI's output through the GPU came up
 /// nothing known, nothing to remember

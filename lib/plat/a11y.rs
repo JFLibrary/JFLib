@@ -41,6 +41,7 @@ pub const NONE: u32 = u32::MAX;
 
 /// what a node is
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Role {
     /// a container without a meaning of its own (a titled box)
     #[default]
@@ -369,6 +370,7 @@ impl Snapshot {
 
 /// what changed between two snapshots (window: the UI's window index; key 0: the window)
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Change {
     /// a window appeared (true) or went away
     Window(u8, bool),

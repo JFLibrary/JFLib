@@ -206,7 +206,7 @@ Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
   eine `repr(C)`-Struktur.
 - `lib/plugin/mem.rs`: `memcpy` und Verwandte in Assembler, je ein Block für Windows und System V. Auf ARM64
   rufen beide Systeme gleich auf, einer reicht. `plugin::trap` in `lib/plugin/lib.rs` nutzt `ud2`.
-- `modules/modrt` bindet `rt/cpu.rs`, `rt/fx.rs`, `rt/x87.rs` und `plugin/mem.rs` selbst per `#[path]` ein, die
+- `modules/modrt` hat Kopien von `rt/cpu.rs`, `rt/fx.rs`, `rt/x87.rs` und `plugin/mem.rs` (`shared/`, `lint()` hält sie gleich) und bindet sie per `#[path]` ein, die
   Auswahl in `rt/lib.rs` gilt dort nicht. Dazu kommen `ud2` und der Testfehler `JXT_FAULT` in `modrt/lib.rs`.
 - `build_rs.py plugin`, `pe_verify`, `elf_verify`, Meldung für Plugins der falschen Architektur.
 

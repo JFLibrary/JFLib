@@ -8,7 +8,8 @@
                                                          fixed, security; default added)
     python build_rs.py release X.Y.Z [--date D] [--force]
                                                          cut the release: [Unreleased] becomes
-                                                         "## [X.Y.Z] - D", lib/VERSION = X.Y.Z, the
+                                                         "## [X.Y.Z] - D", the version X.Y.Z in the
+                                                         root Cargo.toml and Cargo.lock, the
                                                          API snapshot docs/api/X.Y.Z.txt
 
 The changelog is the library's (lib/, styles/, the build and its tools, docs); apps keep their
@@ -99,6 +100,7 @@ def cut(text, version, date):
 def release(version, date=None, force=False):
     """the release steps (see the module docstring) -> the lines to print"""
     import apidiff
+    import manifests
     date = date or datetime.date.today().isoformat()
     try:
         apidiff.parse_version(version)
@@ -123,9 +125,9 @@ def release(version, date=None, force=False):
     if not unreleased(text).strip():
         out.append("note: [Unreleased] is empty")
     write(cut(text, version, date), crlf)
-    (ROOT / "lib" / "VERSION").write_bytes(f"{version}\n".encode())
+    manifests.set_version(version)
     snap = apidiff.write_snapshot(version)
-    out += [f"CHANGELOG.md: [Unreleased] -> [{version}] - {date}", f"lib/VERSION: {version}",
+    out += [f"CHANGELOG.md: [Unreleased] -> [{version}] - {date}", f"Cargo.toml, Cargo.lock: {version}",
             f"{snap.relative_to(ROOT).as_posix()}: the API of {version}",
             f"next: review, commit, then `git tag v{version}`"]
     return out

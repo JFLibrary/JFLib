@@ -30,10 +30,10 @@ const PK_ID_SMP: u32 = PK_ID + 10; // Ebene / Bild (rows + 1 .. + 2)
 const PK_ID_AFTER: u32 = PK_ID + 20; // Nach dem Klick (rows + 1 .. + 3)
 const PK_SIZES: u32 = 6;
 static PK_HALF: [u8; 6] = [0, 1, 2, 5, 15, 25];
-static SIZE_LABELS: [&str; 6] = ["Einzelne Pixel", "3 × 3 Pixel", "5 × 5 Pixel", "11 × 11 Pixel", "31 × 31 Pixel", "51 × 51 Pixel"];
-static SMP_LABELS: [&str; 2] = ["Ebene", "Bild"];
+static SIZE_LABELS: [&str; 6] = ["Einzelne Pixel", "3 × 3 Pixel", "5 × 5 Pixel", "11 × 11 Pixel", "31 × 31 Pixel", "51 × 51 Pixel"]; // i18n
+static SMP_LABELS: [&str; 2] = ["Ebene", "Bild"]; // i18n
 static SMP_ICONS: [u32; 2] = [IC_LAYERS, IC_IMAGE];
-static AFTER_LABELS: [&str; 3] = ["Werkzeug beibehalten", "Zurück zum vorigen Werkzeug", "Zum Zeichenstift wechseln"];
+static AFTER_LABELS: [&str; 3] = ["Werkzeug beibehalten", "Zurück zum vorigen Werkzeug", "Zum Zeichenstift wechseln"]; // i18n
 
 /// the state of t_picker.s (its g_* globals)
 #[derive(Default)]
@@ -185,7 +185,7 @@ fn pk_deactivate(p: &mut Pn, _ui: &mut Ui, _doc: Option<DocId>) {
 
 // pk_options(): "Probennahme:" size, Ebene / Bild | "Nach dem Klick:"
 fn pk_options(p: &mut Pn, ui: &mut Ui) {
-    opt_label(ui, "Probennahme:");
+    opt_label(ui, "Probennahme:"); // i18n
     let mut v = p.tpicker.size;
     opt_menu(p, ui, PK_ID_SIZE, &mut v, &SIZE_LABELS, &[], None, OMF_NOICON as u32);
     p.tpicker.size = v;
@@ -193,7 +193,7 @@ fn pk_options(p: &mut Pn, ui: &mut Ui) {
     opt_menu(p, ui, PK_ID_SMP, &mut v, &SMP_LABELS, &SMP_ICONS, None, 0);
     p.tpicker.smp = v;
     opt_sep(ui);
-    opt_label(ui, "Nach dem Klick:");
+    opt_label(ui, "Nach dem Klick:"); // i18n
     let mut v = p.tpicker.after;
     opt_menu(p, ui, PK_ID_AFTER, &mut v, &AFTER_LABELS, &[], None, OMF_NOICON as u32);
     p.tpicker.after = v;

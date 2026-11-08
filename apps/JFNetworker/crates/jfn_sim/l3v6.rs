@@ -208,6 +208,7 @@ impl Engine {
                     ReasmErr::BadLength => Some(4),
                     ReasmErr::TooLong => Some((IPV6_HDR + at + 2) as u32),
                     ReasmErr::Overlap => None,
+                    _ => None, // what a later netpkt adds: dropped without a Parameter Problem
                 };
                 if let Some(p) = pointer {
                     let pkt = v.packet().to_vec();

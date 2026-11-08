@@ -147,6 +147,7 @@ pub const P_TELNET: u32 = 1 << 29;
 
 /// a protocol layer
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[non_exhaustive]
 pub enum Proto {
     Eth,
     Vlan,

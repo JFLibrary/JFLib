@@ -42,7 +42,7 @@ const TSO_W: u32 = 10;
 const TSO_H: u32 = 11;
 const NFC: usize = NF_COUNT as usize;
 const C_INV256: f32 = 0.00390625;
-static DM_LABELS: [&str; 3] = ["Alle Größen", "Festes Seitenverhältnis", "Feste Größe"];
+static DM_LABELS: [&str; 3] = ["Alle Größen", "Festes Seitenverhältnis", "Feste Größe"]; // i18n
 /// edges moved by each frame handle (NF_* order): 1 left, 2 top, 4 right, 8 bottom
 static NUB_EDGES: [u8; 8] = [3, 2, 6, 4, 12, 8, 9, 1];
 static NUB_CURSORS: [u32; 8] = [CUR_SIZE_NWSE, CUR_SIZE_NS, CUR_SIZE_NESW, CUR_SIZE_WE, CUR_SIZE_NWSE, CUR_SIZE_NS, CUR_SIZE_NESW, CUR_SIZE_WE];
@@ -325,15 +325,15 @@ fn ts_finish(p: &mut Pn, ui: &mut Ui) {
     sel_set_preview(p, doc, None, 0, 0);
     let Some(poly) = poly else {
         // a click: Ersetzen deselects
-        if p.tsel.mode == SM_REPLACE as u32 && p.doc.d(doc).sel.nops != 0 && hist_push_sel(p, doc, "Auswahl aufheben", IC_CLEAR_SELECTION) {
+        if p.tsel.mode == SM_REPLACE as u32 && p.doc.d(doc).sel.nops != 0 && hist_push_sel(p, doc, "Auswahl aufheben", IC_CLEAR_SELECTION) { // i18n
             sel_clear(p, doc);
         }
         return;
     };
     let (name, icon) = match p.tsel.tool {
-        TOOL_LASSO => ("Lasso-Auswahl", IC_LASSO),
-        TOOL_ELLIPSE_SELECT => ("Elliptische Auswahl", IC_CIRCLE_RING),
-        _ => ("Rechteckige Auswahl", IC_SELECT_RECT),
+        TOOL_LASSO => ("Lasso-Auswahl", IC_LASSO), // i18n
+        TOOL_ELLIPSE_SELECT => ("Elliptische Auswahl", IC_CIRCLE_RING), // i18n
+        _ => ("Rechteckige Auswahl", IC_SELECT_RECT), // i18n
     };
     if hist_push_sel(p, doc, name, icon) {
         let (m, q) = (p.tsel.mode, p.tsel.qual);
@@ -537,7 +537,7 @@ fn ts_options(p: &mut Pn, ui: &mut Ui) {
         _ => return,
     };
     opt_sep(ui);
-    opt_label(ui, "Zeichenmodus:");
+    opt_label(ui, "Zeichenmodus:"); // i18n
     let mut v = p.tsel.dm;
     opt_menu(p, ui, id + TSO_DM, &mut v, &DM_LABELS, &[], None, OMF_NOICON as u32);
     p.tsel.dm = v;

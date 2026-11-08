@@ -675,6 +675,7 @@ pub fn fmt_date_time(c: &Civil) -> String {
 
 /// a CLDR plural category
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Plural {
     Zero,
     One,

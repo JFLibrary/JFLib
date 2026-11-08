@@ -24,6 +24,7 @@ pub use xxh::{xxh32, xxh64};
 
 /// the compression of a stored blob (the byte on disk)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Codec {
     None = 0,
     Lz4 = 1,

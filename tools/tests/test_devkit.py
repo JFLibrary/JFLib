@@ -26,6 +26,7 @@ import apidiff  # noqa: E402
 import changelog  # noqa: E402
 import gendoc  # noqa: E402
 import i18n_check  # noqa: E402
+import manifests  # noqa: E402
 import pkgmeta  # noqa: E402
 import scaffold  # noqa: E402
 import build_rs  # noqa: E402
@@ -61,7 +62,7 @@ class ScaffoldTest(Temp):
                                  set(files), kind)
             for rel, text in files.items():
                 self.assertNotRegex(text, r"@[A-Z_]+@", f"{kind} {rel}: a template key is left")
-            for rel in [r for r in files if r.endswith(".rs")]:
+            for rel in [r for r in files if r.endswith(".rs") and not r.endswith("build.rs")]:     # build.rs: a Cargo build script
                 head = files[rel]
                 self.assertIn("#![no_std]", head, rel)
                 self.assertTrue("#![deny(unsafe_code)]" in head or "#![forbid(unsafe_code)]" in head, rel)
@@ -105,9 +106,16 @@ class ScaffoldTest(Temp):
                 scaffold.check_title(bad)
 
     def test_create_app(self):
+        self.write("Cargo.toml", (ROOT / "Cargo.toml").read_text(encoding="utf-8"))
         paths = scaffold.create_app(self.dir, "hello", "tool", "winui", "Hallo", ["ui"], ["winui"], "2026-10-20")
         self.assertIn(self.dir / "apps" / "hello" / "crates" / "hello_core" / "lib.rs", paths)
-        self.assertTrue(all(p.exists() and b"\r\n" not in p.read_bytes() for p in paths))
+        self.assertTrue(all(p.exists() and b"\r\n" not in p.read_bytes() for p in paths if p.name != "Cargo.toml" or p.parent != self.dir))
+        members = manifests.read(self.dir / "Cargo.toml")["workspace"]["members"]
+        self.assertEqual(members[-3:], ["apps/hello", "apps/hello/cli", "apps/hello/crates/hello_core"])
+        cli = manifests.read(self.dir / "apps" / "hello" / "cli" / "Cargo.toml")
+        self.assertEqual(cli["bin"][0]["name"], "hello-cli")
+        self.assertIn("hello_core", cli["dependencies"])
+        self.assertIn('part_of("hello", "..")', (self.dir / "apps" / "hello" / "cli" / "build.rs").read_text(encoding="utf-8"))
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_app(self.dir, "Hello", "window", "winui", None, ["ui"], ["winui"])
         with self.assertRaisesRegex(scaffold.ScaffoldError, "unknown style"):
@@ -132,27 +140,145 @@ class ScaffoldTest(Temp):
         self.assertEqual(scaffold.app_id_for("My-App", {"owner": ("gitlab.com", "9grp")}), "io.gitlab._9grp.My_App")
 
     def test_lib(self):
-        build = (ROOT / "build_rs.py").read_text(encoding="utf-8")
-        gd = (ROOT / "tools" / "gendoc.py").read_text(encoding="utf-8")
-        self.write("build_rs.py", build.replace("\n", "\r\n"))
-        self.write("tools/gendoc.py", gd)
+        for rel in ("Cargo.toml", "lib/jflib/Cargo.toml", "lib/jflib/src/lib.rs", "LICENSE-MIT", "LICENSE-APACHE"):
+            self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        self.write("Cargo.toml", (ROOT / "Cargo.toml").read_text(encoding="utf-8").replace("\n", "\r\n"))
+        self.write("tools/gendoc.py", (ROOT / "tools" / "gendoc.py").read_text(encoding="utf-8"))
         libs = list(build_rs.LIBS)
         with self.assertRaisesRegex(scaffold.ScaffoldError, "unknown dependencies"):
             scaffold.create_lib(self.dir, "mylib", ["nope"], None, libs, libs)
         paths = scaffold.create_lib(self.dir, "mylib", ["plat", "rt"], "my things", libs, libs)
-        nb = (self.dir / "build_rs.py").read_bytes()
+        nb = (self.dir / "Cargo.toml").read_bytes()
         self.assertEqual(nb.count(b"\n"), nb.count(b"\r\n"), "the file keeps its CRLF line ends")
-        text = nb.decode("utf-8")
-        line = re.search(r'^    "mylib": \("lib/mylib/src/lib\.rs", \["rt", "plat"\]\),  # my things\r$', text, re.M)
-        self.assertTrue(line, "LIBS entry in build order")
-        libs_block = re.search(r"^LIBS = \{\r\n.*?^\}\r\n", text, re.M | re.S).group(0)
-        self.assertTrue(libs_block.endswith("# my things\r\n}\r\n"), "the last entry of LIBS")
+        root = manifests.read(self.dir / "Cargo.toml")["workspace"]
+        self.assertEqual(root["members"][root["members"].index("lib/jflib") - 1], "lib/mylib", "the last crate of lib/")
+        self.assertEqual(root["dependencies"]["mylib"], {"package": "jflib-mylib", "path": "lib/mylib", "version": "=" + root["package"]["version"]})
+        made = manifests.read(self.dir / "lib" / "mylib" / "Cargo.toml")
+        self.assertEqual(made["package"]["description"], "my things")
+        self.assertEqual(list(made["dependencies"]), ["rt", "plat"], "in the order of the root manifest")
+        self.assertIn("mylib", manifests.read(self.dir / "lib" / "jflib" / "Cargo.toml")["dependencies"])
+        self.assertIn("pub use mylib;\n", (self.dir / "lib" / "jflib" / "src" / "lib.rs").read_text(encoding="utf-8"))
         self.assertIn('    ("mylib", "my things", "full"),\n]', (self.dir / "tools" / "gendoc.py").read_text(encoding="utf-8"))
         lib = (self.dir / "lib" / "mylib" / "src" / "lib.rs").read_text(encoding="utf-8")
         self.assertIn("#![forbid(unsafe_code)]", lib)
         self.assertIn(self.dir / "lib" / "mylib" / "src" / "lib.rs", paths)
+        self.assertTrue((self.dir / "lib" / "mylib" / "LICENSE-MIT").is_file())
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_lib(self.dir, "mylib", [], None, libs, libs)
+
+    def test_manifests_set_version(self):
+        """a release changes the version everywhere it stands, and nothing of the crates from outside"""
+        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml"):
+            self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        before = manifests.external_lock(self.dir)
+        manifests.set_version("7.8.9", self.dir)
+        root = manifests.read(self.dir / "Cargo.toml")["workspace"]
+        self.assertEqual(root["package"]["version"], "7.8.9")
+        self.assertEqual({d["version"] for d in root["dependencies"].values() if "version" in d}, {"=7.8.9"})  # the unpublished: none
+        self.assertEqual(manifests.read(self.dir / "modules/modplat/Cargo.toml")["dependencies"]["rt"]["version"], "=7.8.9")
+        lock = manifests.read(self.dir / "Cargo.lock")["package"]
+        self.assertEqual({p["version"] for p in lock if p["name"].startswith("jflib")}, {"7.8.9"})
+        self.assertEqual([p["version"] for p in lock if p["name"] == "cargo-jflib"], ["7.8.9"], "cargo-jflib is published too")
+        self.assertEqual(manifests.external_lock(self.dir), before)
+
+    def test_publish_plan(self):
+        """tools/publish.py: the sparse index's paths, an order where each crate follows what it needs,
+        crates.io's retry time out of its 429 text, which crates are there, new or a new version"""
+        from tools import publish
+        self.assertEqual([publish.index_path(n) for n in ("a", "ab", "abc", "jflib", "Cargo-JFLib")],
+                         ["1/a", "2/ab", "3/a/abc", "jf/li/jflib", "ca/rg/cargo-jflib"])
+        pkgs = {"jflib": {"version": "0.1.0", "deps": ["ui", "rt"]}, "ui": {"version": "0.1.0", "deps": ["rt"]},
+                "rt": {"version": "0.1.0", "deps": []}, "cargo-jflib": {"version": "0.1.0", "deps": []}}
+        self.assertEqual(publish.order(pkgs), ["cargo-jflib", "rt", "ui", "jflib"])
+        with self.assertRaisesRegex(publish.PublishError, "cycle"):
+            publish.order({"a": {"version": "1", "deps": ["b"]}, "b": {"version": "1", "deps": ["a"]}})
+        when = publish.retry_after("error: ... (status 429 Too Many Requests): You have published too many new crates in a "
+                                   "short period of time. Please try again after Mon, 09 Nov 2026 12:34:56 GMT and see "
+                                   "https://crates.io/docs/rate-limits for more details.")
+        self.assertEqual((when.year, when.month, when.day, when.hour, when.minute, when.utcoffset().total_seconds()), (2026, 11, 9, 12, 34, 0))
+        self.assertIsNone(publish.retry_after("error: something else"))
+        have = {"rt": {"0.1.0"}, "ui": {"0.0.9"}}
+        self.assertEqual(publish.plan(pkgs, ["rt", "ui", "jflib"], have.get),
+                         [("rt", "0.1.0", "there"), ("ui", "0.1.0", "update"), ("jflib", "0.1.0", "new")])
+
+    def test_publish_waits_out_the_limit(self):
+        """tools/publish.py --publish: a 429 waits until crates.io's time and tries the same crate
+        again, a crate that is there is skipped, another failure stops (start again goes on)"""
+        from unittest import mock
+        from tools import publish
+        answers = iter([(0, "Uploaded"), (101, "error: (status 429 Too Many Requests): ... Please try again after "
+                                               "Mon, 09 Nov 2026 12:34:56 GMT and see ..."), (0, "Uploaded"),
+                        (101, "error: crate b@0.1.0 already exists on crates.io index"), (101, "error: network down")])
+        calls, waits = [], []
+        with mock.patch.object(publish, "cargo_publish", lambda n, nv: calls.append(n) or next(answers)), \
+             mock.patch.object(publish, "wait_in_index", lambda n, v: None), \
+             mock.patch.object(publish, "wait_until", lambda when, why: waits.append(when)), \
+             mock.patch.object(publish, "say", lambda text: None):
+            rows = [("a", "0.1.0", "new"), ("z", "0.1.0", "there"), ("c", "0.1.0", "new"), ("b", "0.1.0", "new"), ("d", "0.1.0", "new")]
+            with self.assertRaisesRegex(publish.PublishError, "cargo publish -p d failed"):
+                publish.publish({}, rows, False)
+        self.assertEqual(calls, ["a", "c", "c", "b", "d"])
+        self.assertEqual((waits[0].hour, waits[0].minute, waits[0].second), (12, 35, 11), "the retry time plus 15 s")
+
+    def test_publish_logs_cargo(self):
+        """tools/publish.py: Cargo's output goes to build/publish.log too (a failed upload of the
+        first run of 2026-11-08 left only "exit 101" there)"""
+        import io
+        import tempfile
+        from unittest import mock
+        from tools import publish
+
+        class Proc:
+            stdout = io.StringIO("    Updating crates.io index\nerror: no token found\n")
+
+            def wait(self):
+                return 101
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "publish.log"
+            with mock.patch.object(publish, "LOG", log), mock.patch.object(publish.subprocess, "Popen", lambda *a, **k: Proc()), \
+                 mock.patch("builtins.print"):
+                code, out = publish.cargo_publish("cargo-jflib", False)
+            self.assertEqual(code, 101)
+            self.assertIn("error: no token found", out)
+            text = log.read_text(encoding="utf-8")
+            self.assertIn("$ cargo publish -p cargo-jflib --locked", text)
+            self.assertIn("    error: no token found\n", text)
+
+    def test_manifests_docs_rs(self):
+        """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
+        include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:
+        description, license, repository, homepage (docs/CRATES.md, CR7)"""
+        import subprocess
+        import tomllib
+        files = subprocess.run(["git", "ls-files", "*Cargo.toml"], cwd=manifests.ROOT, capture_output=True, text=True, check=True).stdout.split()
+        published = 0
+        for rel in files:
+            m = tomllib.loads((manifests.ROOT / rel).read_text(encoding="utf-8"))
+            if "package" not in m or m["package"].get("publish", True) is False:
+                continue
+            published += 1
+            targets = m["package"].get("metadata", {}).get("docs", {}).get("rs", {}).get("targets")
+            self.assertTrue(targets, f"{rel}: no [package.metadata.docs.rs] targets")
+            self.assertFalse({"aarch64-apple-darwin", "i686-pc-windows-msvc"} & set(targets), rel)
+            for field in ("description", "license", "repository", "homepage"):
+                self.assertIn(field, m["package"], f"{rel}: no {field} (crates.io shows it; the root's through {field}.workspace)")
+        self.assertGreater(published, 50)
+
+    def test_manifests_library_crates(self):
+        """the facade is no library crate, a module's names and one-target crates come out right, an
+        unknown [target] table is an error, not a dependency that build_rs.py silently misses"""
+        libs, target = manifests.library_crates()
+        self.assertNotIn("jflib", libs)
+        self.assertEqual(libs["rt"], ("lib/rt/lib.rs", []))
+        self.assertEqual(libs["text_shape"], ("lib/text_shape/src/lib.rs", []), "its crates from outside are Cargo's")
+        self.assertIn("rt", libs["img_jpeg"][1])
+        self.assertNotIn("modrt", libs["img_jpeg"][1])
+        self.assertEqual(target[("ui", "win")], ["shader", "gpu"])
+        self.assertNotIn("gpu", libs["ui"][1])
+        self.write("Cargo.toml", '[workspace]\nmembers = ["lib/a"]\n')
+        self.write("lib/a/Cargo.toml", '[lib]\nname = "a"\npath = "lib.rs"\n\n[target.\'cfg(unix)\'.dependencies]\nrt = "1"\n')
+        with self.assertRaisesRegex(manifests.ManifestError, "cfg.unix"):
+            manifests.library_crates(self.dir)
 
     def test_fixture_is_generator_output(self):
         """apps/scaffoldtest is `new scaffoldtest --kind tool --title Scaffold-Test`: a change of the
@@ -297,7 +423,7 @@ class ApiDiffTest(Temp):
         self.assertEqual(apidiff.param_types("fn h(&mut self, (x, y): (i32, i32))"), "fn h(&mut self, (i32, i32))")
 
     def test_library_snapshot(self):
-        """the release snapshots in docs/api read back, and lib/VERSION is a version"""
+        """the release snapshots in docs/api read back, and the library's version is a version"""
         apidiff.parse_version(apidiff.lib_version())
         for v, p in apidiff.snapshots():
             lines = apidiff.read_snapshot(p)
@@ -338,7 +464,7 @@ class ChangelogTest(unittest.TestCase):
                 bad()
 
     def test_repository_changelog(self):
-        """CHANGELOG.md has [Unreleased] and a section of the version in lib/VERSION"""
+        """CHANGELOG.md has [Unreleased] and a section of the library's version"""
         text, _ = changelog.read()
         self.assertIn(apidiff.lib_version(), changelog.releases(text))
         self.assertTrue(changelog.UNRELEASED.search(text))

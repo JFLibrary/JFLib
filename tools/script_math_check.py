@@ -1,4 +1,4 @@
-"""script_math_check.py -- lib/script's math (script::math, num::sqrt) against correctly
+"""script_math_check.py -- apps/jfs/crates/script's math (script::math, num::sqrt) against correctly
 rounded references from Python's decimal module, with random and special inputs.
 
     python tools/script_math_check.py [--target win|linux|both] [-n CASES] [--seed S] [--out DIR]

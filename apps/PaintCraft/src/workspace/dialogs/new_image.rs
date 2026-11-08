@@ -38,6 +38,7 @@ const RES_MAX: i32 = 10_000_000;
 const RANGE_DIM: Range = Range::new(1, MAXDIM, 1, 0);
 static RESUNIT_LIST: [&str; 2] = ["Pixel/in", "Pixel/cm"];
 static PUNIT_LIST: [&str; 2] = ["Zoll", "Zentimeter"];
+static BACKGROUND_LIST: [&str; 4] = ["Weiß", "Transparent", "Primärfarbe", "Sekundärfarbe"];
 
 /// the state of dlg_new.s (its g_* globals)
 pub(crate) struct DlgNew {
@@ -254,30 +255,30 @@ pub(crate) fn dlgnew_frame(p: &mut Pn, ui: &mut Ui) {
         // "Neue Größe: 1,8 MB" (w * h * 4 bytes)
         let t = ((g.w as u32 as u64 * g.h as u32 as u64) << 2) * 10;
         let tenths = (t + 524_288) >> 20;
-        ui.text(TS_BODY_STRONG, &format!("Neue Größe: {},{} MB", tenths / 10, tenths % 10));
+        ui.text(TS_BODY_STRONG, &crate::preferences::localization::tf("Neue Größe: {} MB", &[&format!("{}{}{}", tenths / 10, crate::preferences::localization::dec(), tenths % 10)]));
         if ui.checkbox(ID_ND_KEEP, crate::preferences::localization::tr("Seitenverhältnis beibehalten"), &mut g.keep) & EV_ACT != 0 {
             g.rw = g.w;
             g.rh = g.h;
         }
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Pixelgröße"));
         // Breite
-        nd_row(ui, "Breite:");
+        nd_row(ui, crate::preferences::localization::tr("Breite:"));
         if ui.number_box(ID_ND_W, &mut g.w, &RANGE_DIM) & EV_ACT != 0 {
             keep_ratio(g, true);
             nd_print_texts(g, ui);
         }
-        unit_text(ui, "Pixel");
+        unit_text(ui, crate::preferences::localization::tr("Pixel"));
         ui.box_end();
         // Höhe
-        nd_row(ui, "Höhe:");
+        nd_row(ui, crate::preferences::localization::tr("Höhe:"));
         if ui.number_box(ID_ND_H, &mut g.h, &RANGE_DIM) & EV_ACT != 0 {
             keep_ratio(g, false);
             nd_print_texts(g, ui);
         }
-        unit_text(ui, "Pixel");
+        unit_text(ui, crate::preferences::localization::tr("Pixel"));
         ui.box_end();
         // Pixeldichte
-        nd_row(ui, "Pixeldichte:");
+        nd_row(ui, crate::preferences::localization::tr("Pixeldichte:"));
         if ui.textbox(ID_ND_RES, None, &mut g.res_txt, NUM_CAP) & EV_COMMIT != 0 {
             let v = parse_hundredths(&g.res_txt);
             if v > 0 {
@@ -296,26 +297,26 @@ pub(crate) fn dlgnew_frame(p: &mut Pn, ui: &mut Ui) {
         ui.box_end();
         // Druckgröße
         ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Druckgröße"));
-        nd_row(ui, "Breite:");
+        nd_row(ui, crate::preferences::localization::tr("Breite:"));
         if ui.textbox(ID_ND_PW, None, &mut g.pw_txt, NUM_CAP) & EV_COMMIT != 0 {
             let t = g.pw_txt.clone();
             nd_print_edit(g, ui, &t, true);
         }
         ui.next_size(UNIT_W, 0);
-        if ui.combobox(ID_ND_PUNIT, &mut g.punit, &PUNIT_LIST) & EV_ACT != 0 {
+        if ui.combobox(ID_ND_PUNIT, &mut g.punit, &crate::preferences::localization::list(&PUNIT_LIST)) & EV_ACT != 0 {
             nd_print_texts(g, ui);
         }
         ui.box_end();
-        nd_row(ui, "Höhe:");
+        nd_row(ui, crate::preferences::localization::tr("Höhe:"));
         if ui.textbox(ID_ND_PH, None, &mut g.ph_txt, NUM_CAP) & EV_COMMIT != 0 {
             let t = g.ph_txt.clone();
             nd_print_edit(g, ui, &t, false);
         }
-        unit_text(ui, if g.punit == 0 { "Zoll" } else { "Zentimeter" });
+        unit_text(ui, if g.punit == 0 { crate::preferences::localization::tr("Zoll") } else { crate::preferences::localization::tr("Zentimeter") });
         ui.box_end();
-        nd_row(ui, "Hintergrund:");
+        nd_row(ui, crate::preferences::localization::tr("Hintergrund:"));
         ui.next_size(250, 0);
-        ui.combobox(ID_DLG_NEW + 9, &mut g.background, &["Weiß", "Transparent", "Primärfarbe", "Sekundärfarbe"]);
+        ui.combobox(ID_DLG_NEW + 9, &mut g.background, &crate::preferences::localization::list(&BACKGROUND_LIST));
         ui.box_end();
         if ui.dialog_buttons(Some(crate::preferences::localization::tr("OK")), None, Some(crate::preferences::localization::tr("Abbrechen"))) == DLG_PRIMARY {
             ui.cmd_run(CMD_FIO_NEWDO, 0);
@@ -354,7 +355,7 @@ pub(crate) fn dlgnew_create(p: &mut Pn, _ui: &mut Ui) -> i32 {
     let too_big = w as u64 * h as u64 * 4 > crate::integrations::file_io::img_mem_budget();
     let doc = if too_big { None } else { crate::document::model::doc_new(p, w, h, background, 0) };
     let Some(doc) = doc else {
-        crate::integrations::file_io::fio_error(p, Some("Neues Bild"), "Zu wenig Arbeitsspeicher für ein Bild dieser Größe.");
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Neues Bild")), "Zu wenig Arbeitsspeicher für ein Bild dieser Größe."); // i18n
         return -1;
     };
     // resolution: Pixel/in -> unit inch, Pixel/cm -> unit cm
@@ -367,7 +368,7 @@ pub(crate) fn dlgnew_create(p: &mut Pn, _ui: &mut Ui) -> i32 {
         d.dpu_y = r;
         d.dpu_unit = unit;
     }
-    crate::document::history::hist_init(p, doc, "Neues Bild", IC_PAGE);
+    crate::document::history::hist_init(p, doc, "Neues Bild", IC_PAGE); // i18n
     let g = &mut p.dlgnew;
     g.last_w = w;
     g.last_h = h;

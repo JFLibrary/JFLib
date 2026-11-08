@@ -53,17 +53,30 @@ pub struct Alloc {
 
 unsafe impl Sync for Alloc {}
 
-#[global_allocator]
-static ALLOC: Alloc = Alloc {
-    shards: [const {
-        Shard {
-            lock: AtomicBool::new(false),
-            heap: core::cell::UnsafeCell::new(Heap { free: [core::ptr::null_mut(); CLASSES], chunk: core::ptr::null_mut(), chunk_left: 0 }),
+#[cfg_attr(not(feature = "std"), global_allocator)]
+static ALLOC: Alloc = Alloc::new();
+
+impl Alloc {
+    /// an empty allocator; there is one per program (the `#[global_allocator]`)
+    pub const fn new() -> Alloc {
+        Alloc {
+            shards: [const {
+                Shard {
+                    lock: AtomicBool::new(false),
+                    heap: core::cell::UnsafeCell::new(Heap { free: [core::ptr::null_mut(); CLASSES], chunk: core::ptr::null_mut(), chunk_left: 0 }),
+                }
+            }; SHARDS],
+            runs_lock: AtomicBool::new(false),
+            runs: core::cell::UnsafeCell::new(Runs { mid: [core::ptr::null_mut(); MID], mid_bytes: 0 }),
         }
-    }; SHARDS],
-    runs_lock: AtomicBool::new(false),
-    runs: core::cell::UnsafeCell::new(Runs { mid: [core::ptr::null_mut(); MID], mid_bytes: 0 }),
-};
+    }
+}
+
+impl Default for Alloc {
+    fn default() -> Alloc {
+        Alloc::new()
+    }
+}
 
 /// the cache bucket of a page run of `total` bytes (rounded up to PAGE << k), None = too large
 fn mid_of(total: usize) -> Option<usize> {
@@ -300,7 +313,7 @@ unsafe impl GlobalAlloc for Alloc {
 
 // ---- memory intrinsics (no C runtime): rep movsb / stosb, so the compiler cannot turn
 // them back into calls to themselves
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     // SAFETY: the caller guarantees valid, non-overlapping ranges.
     unsafe {
@@ -310,7 +323,7 @@ pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) 
     dst
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     let (d, s) = (dst as *mut u8, src as *const u8);
     if n == 0 || (d as usize) <= (s as usize) || (d as usize) >= (s as usize) + n {
@@ -327,7 +340,7 @@ pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize)
     dst
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_void {
     // SAFETY: the caller guarantees a valid range.
     unsafe {
@@ -350,7 +363,7 @@ unsafe fn load8(p: *const u8) -> u64 {
     v
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, n: usize) -> i32 {
     let (a, b) = (a as *const u8, b as *const u8);
     let mut i = 0;
@@ -376,13 +389,13 @@ pub unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, n: usize) ->
     0
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn bcmp(a: *const c_void, b: *const c_void, n: usize) -> i32 {
     // SAFETY: same contract as memcmp.
     unsafe { memcmp(a, b, n) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn strlen(s: *const core::ffi::c_char) -> usize {
     let s = s as *const u8;
     let mut n = 0;

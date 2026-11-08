@@ -1,0 +1,35 @@
+[package]
+name = "jflib-gpu"
+description = "GPU access for JFLib: an explicit API over Vulkan and WebGPU"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+build = "build.rs"
+
+[lib]
+name = "gpu"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[features]
+# a program with the standard library (docs/CRATES.md, CR6): on Linux the glibc build, as plat's
+std = ["plat/std"]
+
+[dependencies]
+# shader: shader::reflect (pipeline constants)
+rt.workspace = true
+plat.workspace = true
+shader.workspace = true
+
+# docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's);
+# with std, so plat::std_start and rt::panic_hook show and Linux shows the glibc build that windows use
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]
+features = ["std"]

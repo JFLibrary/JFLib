@@ -1,0 +1,115 @@
+# The crates as they go to crates.io (docs/CRATES.md): do they build on JFLib's four targets, with
+# and without std, with the rust-version they promise and with the newest stable Rust; do the
+# tests of the build tools pass; do the docs build as docs.rs builds them. Apps are not built
+# here: `python build_rs.py test` on the developer machines does that, with windows and devices.
+# The crates from outside are pinned exactly (Cargo.lock, `=x.y.z`), so no job for their newest
+# versions (doc.rust-lang.org/cargo/guide/continuous-integration.html).
+name: Crates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays: a new stable or nightly that breaks something shows before a release does
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crates-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: 1
+
+jobs:
+  check:
+    name: check ${{ matrix.target }} (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.98: the rust-version of the root Cargo.toml (keep both equal)
+        toolchain: ["1.98", stable]
+        # the library's build scripts run no programs, so one Linux runner checks all four
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, wasm32-unknown-unknown, aarch64-linux-android]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Rust
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --target ${{ matrix.target }} --no-self-update
+          rustup default ${{ matrix.toolchain }}
+          rustc --version
+      - name: jflib
+        run: cargo check --locked -p jflib --target ${{ matrix.target }}
+      - name: jflib with std
+        run: cargo check --locked -p jflib --features std --target ${{ matrix.target }}
+      - name: The crates outside the facade
+        run: |
+          t=${{ matrix.target }}
+          case "$t" in
+            x86_64-pc-windows-msvc) extra="jflib-modrt jflib-modplat jflib-installer" ;;
+            x86_64-unknown-linux-gnu) extra="jflib-modrt jflib-modplat jflib-appimagert" ;;
+            *) extra="" ;;
+          esac
+          for p in $extra; do
+            echo "::group::$p"
+            cargo check --locked -p "$p" --target "$t"
+            echo "::endgroup::"
+          done
+
+  tools:
+    name: tools (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+      - name: jflib-build and cargo-jflib
+        run: cargo test --locked -p jflib-build -p cargo-jflib
+
+  docs:
+    name: docs as docs.rs builds them (nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup toolchain install nightly --profile minimal --no-self-update --target x86_64-pc-windows-msvc,wasm32-unknown-unknown,aarch64-linux-android
+          rustc +nightly --version
+      - name: Every published crate names its docs.rs targets
+        run: python -m unittest tools.tests.test_devkit -k manifests_docs_rs
+      - name: The crates from outside
+        run: cargo fetch --locked
+      - name: Pack every crate, document it as docs.rs does
+        run: python -u tools/crates_accept.py --targets docs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: docs-logs
+          retention-days: 7
+          path: build/crates_accept/log

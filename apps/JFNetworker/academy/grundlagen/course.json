@@ -1,0 +1,288 @@
+{
+  "format": "jfn-course",
+  "version": 1,
+  "course_version": 1,
+  "title": [
+    "Grundlagen der Netze",
+    "Network basics"
+  ],
+  "summary": [
+    "Vom Kabel bis zum Namen: Hosts und Switches, MAC- und IP-Adressen, Router, DHCP und DNS. Jede Einheit mit Lektionen, einem Labor und einem Quiz, am Ende ein Labor über alles und ein Test.",
+    "From the cable to the name: hosts and switches, MAC and IP addresses, routers, DHCP and DNS. Each unit has lessons, a lab and a quiz, and the course ends with a lab on all of it and a test."
+  ],
+  "level": "beginner",
+  "minutes": 240,
+  "units": [
+    {
+      "title": [
+        "Das erste Netz",
+        "The first network"
+      ],
+      "steps": [
+        {
+          "id": "netz",
+          "kind": "lesson",
+          "title": [
+            "Was ein Netz ist",
+            "What a network is"
+          ],
+          "file": "01-netz.md"
+        },
+        {
+          "id": "rahmen",
+          "kind": "lesson",
+          "title": [
+            "Rahmen und MAC-Adressen",
+            "Frames and MAC addresses"
+          ],
+          "file": "02-rahmen.md"
+        },
+        {
+          "id": "arp",
+          "kind": "lesson",
+          "title": [
+            "ARP: von der IP- zur MAC-Adresse",
+            "ARP: from the IP to the MAC address"
+          ],
+          "file": "03-arp.md"
+        },
+        {
+          "id": "erstes-netz",
+          "kind": "lab",
+          "title": [
+            "Labor: zwei PCs und ein Switch",
+            "Lab: two PCs and a switch"
+          ],
+          "file": "labs/erstes-netz.jfnet"
+        },
+        {
+          "id": "quiz-netz",
+          "kind": "quiz",
+          "title": [
+            "Quiz: das erste Netz",
+            "Quiz: the first network"
+          ],
+          "file": "quiz/netz.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Adressen",
+        "Addresses"
+      ],
+      "steps": [
+        {
+          "id": "ipv4",
+          "kind": "lesson",
+          "title": [
+            "IPv4-Adressen",
+            "IPv4 addresses"
+          ],
+          "file": "04-ipv4.md"
+        },
+        {
+          "id": "maske",
+          "kind": "lesson",
+          "title": [
+            "Maske und Präfix",
+            "Mask and prefix"
+          ],
+          "file": "05-maske.md"
+        },
+        {
+          "id": "selbes-netz",
+          "kind": "lesson",
+          "title": [
+            "Wer ist im selben Netz?",
+            "Who is in the same network?"
+          ],
+          "file": "06-selbes-netz.md"
+        },
+        {
+          "id": "falsche-maske",
+          "kind": "lab",
+          "title": [
+            "Labor: eine Maske zu eng",
+            "Lab: a mask too narrow"
+          ],
+          "file": "labs/falsche-maske.jfnet"
+        },
+        {
+          "id": "quiz-adressen",
+          "kind": "quiz",
+          "title": [
+            "Quiz: Adressen",
+            "Quiz: addresses"
+          ],
+          "file": "quiz/adressen.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Router und Gateway",
+        "Router and gateway"
+      ],
+      "steps": [
+        {
+          "id": "router",
+          "kind": "lesson",
+          "title": [
+            "Warum zwei Netze einen Router brauchen",
+            "Why two networks need a router"
+          ],
+          "file": "07-router.md"
+        },
+        {
+          "id": "gateway",
+          "kind": "lesson",
+          "title": [
+            "Das Standard-Gateway",
+            "The default gateway"
+          ],
+          "file": "08-gateway.md"
+        },
+        {
+          "id": "routing-tabelle",
+          "kind": "lesson",
+          "title": [
+            "Die Routingtabelle und traceroute",
+            "The routing table and traceroute"
+          ],
+          "file": "09-routing-tabelle.md"
+        },
+        {
+          "id": "router-gateway",
+          "kind": "lab",
+          "title": [
+            "Labor: zwei Netze, ein Router",
+            "Lab: two networks, one router"
+          ],
+          "file": "labs/router-gateway.jfnet"
+        },
+        {
+          "id": "quiz-router",
+          "kind": "quiz",
+          "title": [
+            "Quiz: Router und Gateway",
+            "Quiz: router and gateway"
+          ],
+          "file": "quiz/router.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "DHCP",
+        "DHCP"
+      ],
+      "steps": [
+        {
+          "id": "dhcp",
+          "kind": "lesson",
+          "title": [
+            "DHCP: Adressen, die von selbst kommen",
+            "DHCP: addresses that come by themselves"
+          ],
+          "file": "10-dhcp.md"
+        },
+        {
+          "id": "dhcp-pool",
+          "kind": "lab",
+          "title": [
+            "Labor: Adressen vom Router",
+            "Lab: addresses from the router"
+          ],
+          "file": "labs/dhcp-pool.jfnet"
+        },
+        {
+          "id": "quiz-dhcp",
+          "kind": "quiz",
+          "title": [
+            "Quiz: DHCP",
+            "Quiz: DHCP"
+          ],
+          "file": "quiz/dhcp.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "DNS",
+        "DNS"
+      ],
+      "steps": [
+        {
+          "id": "dns",
+          "kind": "lesson",
+          "title": [
+            "DNS: Namen für Adressen",
+            "DNS: names for addresses"
+          ],
+          "file": "11-dns.md"
+        },
+        {
+          "id": "dig",
+          "kind": "lesson",
+          "title": [
+            "dig: den Namensserver befragen",
+            "dig: asking the name server"
+          ],
+          "file": "12-dig.md"
+        },
+        {
+          "id": "namen",
+          "kind": "lab",
+          "title": [
+            "Labor: Namen statt Nummern",
+            "Lab: names instead of numbers"
+          ],
+          "file": "labs/namen.jfnet"
+        },
+        {
+          "id": "quiz-dns",
+          "kind": "quiz",
+          "title": [
+            "Quiz: DNS",
+            "Quiz: DNS"
+          ],
+          "file": "quiz/dns.json"
+        }
+      ]
+    },
+    {
+      "title": [
+        "Alles zusammen",
+        "All of it together"
+      ],
+      "steps": [
+        {
+          "id": "alles-zusammen",
+          "kind": "lab",
+          "title": [
+            "Labor: das ganze Netz",
+            "Lab: the whole network"
+          ],
+          "file": "labs/alles-zusammen.jfnet",
+          "requires": [
+            "dhcp-pool",
+            "namen"
+          ]
+        },
+        {
+          "id": "abschluss",
+          "kind": "exam",
+          "title": [
+            "Test: Grundlagen der Netze",
+            "Test: network basics"
+          ],
+          "file": "quiz/abschluss.json",
+          "requires": [
+            "alles-zusammen"
+          ]
+        }
+      ]
+    }
+  ]
+}

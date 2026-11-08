@@ -26,6 +26,14 @@ use bc_proto::model::*;
 
 use crate::fixture::Fixture;
 use crate::live::Live;
+use crate::tr;
+
+/// an operation's title, result and error in the console's language (tr::local)
+pub fn localize_op(o: &mut Operation) {
+    tr::local(&mut o.title);
+    tr::local(&mut o.result);
+    tr::local(&mut o.error);
+}
 
 /// one answer of the backend
 pub struct Response {
@@ -223,9 +231,94 @@ impl Data {
             }
             _ => {}
         }
+        self.localize(&seg);
         self.loaded.insert(String::from(path));
         self.errors.remove(path);
         self.ver += 1;
+    }
+
+    // the texts the server wrote (statuses, messages, titles, details: German) in the
+    // console's language, once per answer (tr::local)
+    fn localize(&mut self, seg: &[&str]) {
+        if !tr::en() {
+            return;
+        }
+        let alerts = |v: &mut Vec<Alert>| {
+            for a in v {
+                tr::local(&mut a.title);
+                tr::local(&mut a.detail);
+            }
+        };
+        let fleet = |f: &mut FleetServer| {
+            tr::local(&mut f.message);
+            alerts(&mut f.report.alerts);
+        };
+        match seg {
+            ["api", "summary"] => {
+                if let Some(s) = &mut self.summary {
+                    alerts(&mut s.alerts);
+                }
+            }
+            ["api", "hosts"] => self.hosts.iter_mut().for_each(|h| tr::local(&mut h.message)),
+            ["api", "repositories"] => self.repos.iter_mut().for_each(|r| tr::local(&mut r.message)),
+            ["api", "sessions"] => self.sessions.iter_mut().for_each(|x| tr::local(&mut x.message)),
+            ["api", "sessions", id, "log"] => {
+                if let Some(v) = self.logs.get_mut(*id) {
+                    v.iter_mut().for_each(|l| tr::local(&mut l.msg));
+                }
+            }
+            ["api", "operations"] => self.ops.iter_mut().for_each(localize_op),
+            ["api", "operations", id] => {
+                if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
+                    localize_op(o);
+                }
+            }
+            ["api", "audit"] => {
+                for a in &mut self.audit {
+                    tr::local(&mut a.target);
+                    tr::local(&mut a.detail);
+                }
+            }
+            ["api", "capabilities"] => self.caps.iter_mut().for_each(|c| tr::local(&mut c.reason)),
+            ["api", "notify"] => {
+                if let Some(n) = &mut self.notify {
+                    tr::local(&mut n.last_message);
+                    tr::local(&mut n.last_what);
+                }
+            }
+            ["api", "update"] | ["api", "update", "check"] => {
+                if let Some(u) = &mut self.update {
+                    tr::local(&mut u.error);
+                }
+            }
+            ["api", "replicas"] => self.replicas.iter_mut().for_each(|r| tr::local(&mut r.message)),
+            ["api", "failover-plans"] => self.plans.iter_mut().for_each(|p| tr::local(&mut p.message)),
+            ["api", "cdp"] => self.cdp.iter_mut().for_each(|c| tr::local(&mut c.message)),
+            ["api", "fleet"] => self.fleet.iter_mut().for_each(fleet),
+            ["api", "fleet", "servers", id, "check"] => {
+                if let Some(f) = self.fleet.iter_mut().find(|x| x.id == *id) {
+                    fleet(f);
+                }
+            }
+            ["api", "tape"] => {
+                if let Some(t) = &mut self.tape {
+                    tr::local(&mut t.message);
+                }
+            }
+            ["api", "tape", "tapes"] => self.tapes.iter_mut().for_each(|c| tr::local(&mut c.message)),
+            ["api", "hypervisors"] => self.hypervisors.iter_mut().for_each(|h| tr::local(&mut h.message)),
+            ["api", "instant-start"] => self.instant.iter_mut().for_each(|x| tr::local(&mut x.message)),
+            ["api", "boot-checks"] => {
+                for b in &mut self.boot_checks {
+                    tr::local(&mut b.message);
+                    for c in &mut b.checks {
+                        tr::local(&mut c.name);
+                        tr::local(&mut c.detail);
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// a setting's value ("" when unset)
@@ -293,9 +386,9 @@ impl Net {
         }
     }
 
-    /// the demo server
+    /// the demo server (its demo data in the console's language)
     pub fn fixture(now: i64) -> Net {
-        Net::with(Backend::Fixture(Box::new(Fixture::new(now))), "demo.backupcraft.local")
+        Net::with(Backend::Fixture(Box::new(Fixture::new(now, tr::en()))), "demo.backupcraft.local")
     }
 
     /// a BackupCraft server
@@ -468,8 +561,9 @@ impl Net {
                     // a followed operation that finished
                     if let Some(id) = path.strip_prefix("/api/operations/") {
                         if self.follow.contains(id) {
-                            if let Some(op) = Operation::from_json(&r.body) {
+                            if let Some(mut op) = Operation::from_json(&r.body) {
                                 if op.status.finished() {
+                                    localize_op(&mut op);
                                     self.follow.remove(id);
                                     self.events.push(Event::OpFinished(op));
                                     // what the operation changed
@@ -481,7 +575,7 @@ impl Net {
                         }
                     }
                 } else {
-                    let msg = String::from(j::str_of(&r.body, "message"));
+                    let msg = tr::srv(j::str_of(&r.body, "message"));
                     self.data.errors.insert(path, if msg.is_empty() { alloc::format!("HTTP {}", r.status) } else { msg });
                     self.data.ver += 1;
                 }
@@ -502,10 +596,10 @@ impl Net {
                     self.events.push(Event::Done { label, body: r.body, after });
                 } else {
                     let code = String::from(j::str_of(&r.body, "code"));
-                    let mut message = String::from(j::str_of(&r.body, "message"));
+                    let mut message = tr::srv(j::str_of(&r.body, "message"));
                     if message.is_empty() {
                         message = if r.status == 0 {
-                            String::from(crate::tr::t("Keine Verbindung zum Server"))
+                            String::from(tr::t("Keine Verbindung zum Server"))
                         } else {
                             alloc::format!("HTTP {}", r.status)
                         };

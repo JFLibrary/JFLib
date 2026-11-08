@@ -1,7 +1,7 @@
 # Text shaping dependencies
 
 JFLib's optional complex text layout uses HarfRust, Unicode Bidi and Unicode
-Script, with the transitive dependencies pinned in `Cargo.lock`. These libraries
+Script, with the transitive dependencies pinned in the root `Cargo.lock`. These libraries
 are statically linked; no HarfBuzz system installation is needed. Cargo and its
 registry cache are used during the build. Preserve the license texts when
 redistributing binaries. `build_rs.py` copies this notice and `licenses/` into

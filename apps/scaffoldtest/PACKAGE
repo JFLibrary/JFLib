@@ -1,7 +1,7 @@
 # apps/scaffoldtest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
 #   python tools/package.py scaffoldtest --formats all
 # version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
-# as rt::app_version!(), the packages and lib/update use it.  The library has its own (lib/VERSION).
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
 display=Scaffold-Test
 version=0.1.0
 publisher=JFLib

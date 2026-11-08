@@ -284,6 +284,7 @@ pub fn dec_hop_limit(pkt: &mut [u8]) -> u8 {
 /// why a fragment could not be taken (the receiver answers the first two with a Parameter
 /// Problem, RFC 8200 4.5)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ReasmErr {
     /// a fragment with more to come whose data is not a multiple of 8 bytes (pointer: the
     /// Payload Length field)

@@ -134,7 +134,7 @@ pub(crate) fn dock_frame(p: &mut Pn, ui: &mut Ui) {
     for k in 0..WND_COUNT {
         ui.window_snap(k as u32 + WINID_TOOLS, [l, t, r - l, b.wrapping_sub(t)], DK_SNAP);
     }
-    let tbh = ui.style.metric(SM_WIN_TBH_TOOL) + 2; // title bar + border
+    let tbh = ui.window_title_height(WF_TOOL) + 2; // title bar + border
     // Werkzeuge in two rows when the vertical window does not fit the height
     let hgt = b.wrapping_sub(t);
     p.dock.horiz = hgt < WT_V_H + tbh;

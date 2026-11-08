@@ -400,6 +400,7 @@ impl App for Desk {
                 DeskEv::Move(k) => (2, k, "bewegt"),
                 DeskEv::Resize(k) => (3, k, "Größe"),
                 DeskEv::State(k) => (4, k, "Zustand"),
+                _ => continue,
             };
             self.evs[n] += 1;
             if let DeskEv::Close(k) = ev {

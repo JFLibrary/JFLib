@@ -9,6 +9,8 @@
 //   feedback_off(hwnd)      no system visuals for a touch of this window
 //   touch_api_set(Some(api))   (test aid) the touch calls through the given functions (plattest's
 //        fakes, like pen_api_set); None = user32's again
+//   jfgui_TOUCH_LOG=1          stderr: where each finger came down and whose it became (for a device
+//        nobody at the desk has)
 //   win_touch_primary() -> a tablet in slate posture    win_touch_keyboard(w, show) the on-screen keyboard
 //
 // Every finger goes to plat::finger: no gesture is decided here (ui/touch.rs).  A handled pointer
@@ -20,8 +22,13 @@
 // touches (measured with InjectTouchInput, a contact 60 px wide): a finger on PaintCraft's zoom slider
 // arrived as WM_NCPOINTERDOWN HTBOTTOM on the tool window above it, whose invisible resize border ends
 // at the status bar, and resized that window.  So a finger over a border belongs to the window whose
-// client area is under its centre (z-order, from the window that got it), with none the system's resize
-// goes on.  HTCAPTION: a tool window's title bar is the UI's (press and hold, then begin_drag); the main
+// client area is under its centre (z-order, from the window that got it), also a contact the system
+// gives to a client area its centre is not in.  With no window there the main window's resize is the
+// system's; a tool window's frame never is, its resize band for a finger lies inside it (ui edge_grips).
+// The position of such a contact is not where the finger is: the system moves it onto the frame (17 px off
+// on the slider above, also ptPixelLocationRaw) and it stays off by that while the contact lives; only the
+// contact rectangle tells (Slot::adj).
+// HTCAPTION: a tool window's title bar is the UI's (press and hold, then begin_drag); the main
 // window's goes to the system (moves, snaps, double tap) unless a small widget is close (a finger that
 // misses the gear by a hair).
 //
@@ -50,6 +57,11 @@ unsafe extern "system" {
     fn GetTickCount() -> u32;
 }
 
+#[link(name = "dwmapi", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn DwmGetWindowAttribute(h: isize, attr: u32, value: *mut u32, size: u32) -> i32;
+}
+
 const PTI_SIZE: usize = 144; // POINTER_TOUCH_INFO (x64)
 pub const TOUCH_HIST: usize = 16; // samples per WM_POINTERUPDATE
 const SLOTS: usize = 10; // fingers at once: the slot is the finger's id
@@ -71,6 +83,9 @@ const HTLEFT: u32 = 10;
 const HTBOTTOMRIGHT: u32 = 17;
 const HTCLOSE: u32 = 20;
 const GW_HWNDNEXT: u32 = 2;
+const GWL_EXSTYLE: i32 = -20;
+const WS_EX_TRANSPARENT: isize = 0x20;
+const DWMWA_CLOAKED: u32 = 14;
 const SWP_NOSIZE: u32 = 0x0001;
 const SWP_NOZORDER: u32 = 0x0004;
 const SWP_NOACTIVATE: u32 = 0x0010;
@@ -84,6 +99,7 @@ pub struct TouchInfo {
     pub x: i32,     // ptPixelLocation (screen px)
     pub y: i32,
     pub time: u32,  // dwTime (ms, 0: none)
+    pub middle: Option<[i32; 2]>, // the middle of rcContact, if it has one (screen px)
 }
 
 /// the touch part of the pointer API (functions that are missing are None)
@@ -106,6 +122,7 @@ struct Slot {
     ptr: u32,    // the pointer id
     win: i32,    // the window it belongs to
     screen: [i32; 2],
+    adj: [i32; 2], // what the position is off by (a contact given to a frame)
 }
 
 // a window that follows a finger
@@ -134,7 +151,7 @@ struct Touch {
 static TOUCH: UiThread<Touch> = UiThread(Touch {
     loaded: Cell::new(false),
     api: Cell::new(NO_API),
-    slots: Cell::new([Slot { used: false, ptr: 0, win: 0, screen: [0; 2] }; SLOTS]),
+    slots: Cell::new([Slot { used: false, ptr: 0, win: 0, screen: [0; 2], adj: [0; 2] }; SLOTS]),
     drag: Cell::new(Drag { on: false, slot: 0, win: 0, edges: 0, start: [0; 2], rect: [0; 4], org: [0; 2] }),
     finger_mode: Cell::new(false),
     cursor: Cell::new((0, 0)),
@@ -144,6 +161,7 @@ static TOUCH: UiThread<Touch> = UiThread(Touch {
 static P_INFO: AtomicUsize = AtomicUsize::new(0);
 static P_HIST: AtomicUsize = AtomicUsize::new(0);
 static P_FEEDBACK: AtomicUsize = AtomicUsize::new(usize::MAX);
+static LOG: AtomicUsize = AtomicUsize::new(usize::MAX);
 
 fn touch() -> &'static Touch {
     &TOUCH.0
@@ -187,7 +205,10 @@ fn u32_at(b: &[u8], o: usize) -> u32 {
 
 /// the fields of a POINTER_TOUCH_INFO record
 fn pti(b: &[u8]) -> TouchInfo {
-    TouchInfo { flags: u32_at(b, 12), x: u32_at(b, 32) as i32, y: u32_at(b, 36) as i32, time: u32_at(b, 64) }
+    let r = [u32_at(b, 104) as i32, u32_at(b, 108) as i32, u32_at(b, 112) as i32, u32_at(b, 116) as i32];
+    // (touchMask: TOUCH_MASK_CONTACTAREA)
+    let middle = (u32_at(b, 100) & 1 != 0 && r[2] > r[0] && r[3] > r[1]).then(|| [r[0] / 2 + r[2] / 2, r[1] / 2 + r[3] / 2]);
+    TouchInfo { flags: u32_at(b, 12), x: u32_at(b, 32) as i32, y: u32_at(b, 36) as i32, time: u32_at(b, 64), middle }
 }
 
 fn real_info(id: u32) -> Option<TouchInfo> {
@@ -269,8 +290,31 @@ fn client(win: i32, sx: i32, sy: i32) -> (i32, i32) {
     (p.x, p.y)
 }
 
-// a new finger for window `win`
-fn down(id: u32, win: i32, i: &TouchInfo) -> bool {
+// jfgui_TOUCH_LOG=1: a finger came down on window `from` (ht: the hit test of the non-client message, 0
+// in the client area) and goes to `to` (None: the system's)
+fn log_down(id: u32, ht: u32, from: i32, to: Option<i32>, i: &TouchInfo) {
+    let mut on = LOG.load(Ordering::Relaxed);
+    if on == usize::MAX {
+        on = crate::getenv("jfgui_TOUCH_LOG").is_some_and(|v| v.starts_with('1')) as usize;
+        LOG.store(on, Ordering::Relaxed);
+    }
+    if on != 0 {
+        let (x, y) = client(from, i.x, i.y);
+        // the record as the system gave it: the position, the raw one, the contact, the raw contact
+        let mut b = [0u8; PTI_SIZE];
+        let f = P_INFO.load(Ordering::Relaxed);
+        if f != 0 {
+            // SAFETY: GetPointerTouchInfo(UINT32, POINTER_TOUCH_INFO*) -> BOOL; b holds one record.
+            let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(f) };
+            unsafe { f(id, b.as_mut_ptr()) };
+        }
+        let v: alloc::vec::Vec<i32> = [32, 36, 48, 52, 104, 108, 112, 116, 120, 124, 128, 132].iter().map(|&o| u32_at(&b, o) as i32).collect();
+        crate::write_stderr(alloc::format!("touch: down ht={ht} screen {},{} window {from} at {x},{y} -> {to:?} record {v:?}\n", i.x, i.y).as_bytes());
+    }
+}
+
+// a new finger for window `win`; adj: what its position is off by
+fn down(id: u32, win: i32, i: &TouchInfo, adj: [i32; 2]) -> bool {
     let t = touch();
     let mut slots = t.slots.get();
     if let Some(k) = slots.iter().position(|s| s.used && s.ptr == id) {
@@ -281,7 +325,8 @@ fn down(id: u32, win: i32, i: &TouchInfo) -> bool {
         push(slots[k].win, FingerPhase::Cancel, k, x, y, 0);
     }
     let Some(k) = slots.iter().position(|s| !s.used) else { return true }; // no room: nobody's
-    slots[k] = Slot { used: true, ptr: id, win, screen: [i.x, i.y] };
+    let (sx, sy) = (i.x + adj[0], i.y + adj[1]);
+    slots[k] = Slot { used: true, ptr: id, win, screen: [sx, sy], adj };
     t.slots.set(slots);
     // the mouse cursor stays where it is: what comes from there is no mouse
     t.finger_mode.set(true);
@@ -290,7 +335,7 @@ fn down(id: u32, win: i32, i: &TouchInfo) -> bool {
     if unsafe { GetCursorPos(&mut p) } != 0 {
         t.cursor.set((p.x, p.y));
     }
-    let (x, y) = client(win, i.x, i.y);
+    let (x, y) = client(win, sx, sy);
     push(win, FingerPhase::Down, k, x, y, age_of(i));
     true
 }
@@ -307,7 +352,7 @@ fn gone(k: usize, phase: FingerPhase, sample: Option<&TouchInfo>) {
         d.on = false;
         t.drag.set(d);
     }
-    let (sx, sy) = sample.map_or((s.screen[0], s.screen[1]), |i| (i.x, i.y));
+    let (sx, sy) = sample.map_or((s.screen[0], s.screen[1]), |i| (i.x + s.adj[0], i.y + s.adj[1]));
     let (x, y) = client(s.win, sx, sy);
     push(s.win, phase, k, x, y, sample.map_or(0, age_of));
 }
@@ -316,24 +361,27 @@ fn gone(k: usize, phase: FingerPhase, sample: Option<&TouchInfo>) {
 fn moved(k: usize, i: &TouchInfo) {
     let t = touch();
     let mut slots = t.slots.get();
-    slots[k].screen = [i.x, i.y];
+    let (sx, sy) = (i.x + slots[k].adj[0], i.y + slots[k].adj[1]);
+    slots[k].screen = [sx, sy];
     t.slots.set(slots);
     let d = t.drag.get();
     if d.on && d.slot == k {
-        drag_to(&d, i.x, i.y);
+        drag_to(&d, sx, sy);
         return;
     }
-    let (x, y) = client(slots[k].win, i.x, i.y);
+    let (x, y) = client(slots[k].win, sx, sy);
     push(slots[k].win, FingerPhase::Move, k, x, y, age_of(i));
 }
 
 /// a pointer message of a finger (PT_TOUCH) of window w -> handled
-pub(super) fn pointer(_hwnd: isize, msg: u32, id: u32, w: i32) -> bool {
+pub(super) fn pointer(hwnd: isize, msg: u32, id: u32, w: i32) -> bool {
     let api = touch_api();
     match msg {
         WM_POINTERDOWN => {
             let Some(i) = api.info.and_then(|f| f(id)) else { return false };
-            down(id, w, &i)
+            let to = if client_has(hwnd, i.x, i.y) { w } else { window_under(hwnd, i.x, i.y).unwrap_or(w) };
+            log_down(id, 0, w, Some(to), &i);
+            down(id, to, &i, [0, 0])
         }
         WM_POINTERUPDATE | WM_NCPOINTERUPDATE => {
             let Some(k) = find(id) else { return false }; // (it began on the system's frame)
@@ -394,8 +442,12 @@ pub(super) fn nc_pointer(hwnd: isize, msg: u32, wp: usize, w: i32) -> bool {
     }
     let api = touch_api();
     let Some(i) = api.info.and_then(|f| f(id)) else { return false };
-    match route(hwnd, w, (wp >> 16) as u16 as u32, i.x, i.y) {
-        Some(to) => down(id, to, &i),
+    let ht = (wp >> 16) as u16 as u32;
+    let adj = i.middle.map_or([0, 0], |m| [m[0] - i.x, m[1] - i.y]);
+    let to = route(hwnd, w, ht, i.x + adj[0], i.y + adj[1]);
+    log_down(id, ht, w, to, &i);
+    match to {
+        Some(to) => down(id, to, &i, adj),
         None => false,
     }
 }
@@ -408,9 +460,13 @@ fn route(hwnd: isize, w: i32, ht: u32, sx: i32, sy: i32) -> Option<i32> {
         HTMINBUTTON | HTMAXBUTTON | HTCLOSE => Some(w),
         HTCAPTION => (!top || widget_near(w, sx, sy)).then_some(w),
         HTLEFT..=HTBOTTOMRIGHT => {
-            let to = window_under(hwnd, sx, sy)?;
+            let under = window_under(hwnd, sx, sy);
+            if !top {
+                return Some(under.unwrap_or(w));
+            }
+            let to = under?;
             // the main window's own band: what it is for, unless a small widget is close
-            (to != w || !top || widget_near(w, sx, sy)).then_some(to)
+            (to != w || widget_near(w, sx, sy)).then_some(to)
         }
         _ => None,
     }
@@ -426,6 +482,28 @@ fn widget_near(w: i32, sx: i32, sy: i32) -> bool {
     })
 }
 
+// a screen point lies in the client area of window h
+fn client_has(h: isize, sx: i32, sy: i32) -> bool {
+    let (mut o, mut c) = (Point::default(), Rect::default());
+    // SAFETY: any handle is tolerated, valid out-parameters.
+    unsafe {
+        ClientToScreen(h, &mut o);
+        GetClientRect(h, &mut c);
+    }
+    sx >= o.x && sx < o.x + c.r && sy >= o.y && sy < o.y + c.b
+}
+
+// another program's window that counts as visible and takes no touch: cloaked (a suspended store app, the
+// input host) or WS_EX_TRANSPARENT
+fn see_through(h: isize) -> bool {
+    let mut cloaked = 0u32;
+    // SAFETY: any handle is tolerated, a valid out-parameter of the size given.
+    unsafe {
+        DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut cloaked, 4) == 0 && cloaked != 0
+            || super::GetWindowLongPtrW(h, GWL_EXSTYLE) & WS_EX_TRANSPARENT != 0
+    }
+}
+
 // our window whose client area is under a screen point, from hwnd down the z-order; another program's
 // window in between or none: None
 fn window_under(hwnd: isize, sx: i32, sy: i32) -> Option<i32> {
@@ -437,22 +515,15 @@ fn window_under(hwnd: isize, sx: i32, sy: i32) -> Option<i32> {
         }
         // SAFETY: GetWindow / IsWindowVisible / GetWindowRect tolerate any handle.
         if unsafe { IsWindowVisible(h) } != 0 {
-            let inside = |l: i32, t: i32, r: i32, b: i32| sx >= l && sx < r && sy >= t && sy < b;
             if let Some(k) = (0..PW_MAX).find(|&k| s.ww[k].hwnd.get() == h) {
-                let (mut o, mut c) = (Point::default(), Rect::default());
-                // SAFETY: our window, valid out-parameters.
-                unsafe {
-                    ClientToScreen(h, &mut o);
-                    GetClientRect(h, &mut c);
-                }
-                if inside(o.x, o.y, o.x + c.r, o.y + c.b) {
+                if client_has(h, sx, sy) {
                     return Some(k as i32);
                 }
-            } else {
+            } else if !see_through(h) {
                 let mut r = Rect::default();
                 // SAFETY: a valid RECT.
                 unsafe { GetWindowRect(h, &mut r) };
-                if inside(r.l, r.t, r.r, r.b) {
+                if sx >= r.l && sx < r.r && sy >= r.t && sy < r.b {
                     return None;
                 }
             }

@@ -4,19 +4,19 @@ use alloc::{format, string::String};
 
 pub(crate) fn to_windows(path: &str, cwd: &str) -> Result<String, &'static str> {
     if path.is_empty() || path.contains('\0') {
-        return Err("Leerer oder ungültiger Plugin-Pfad.");
+        return Err("Leerer oder ungültiger Plugin-Pfad."); // i18n
     }
     if path.as_bytes().get(1) == Some(&b':') {
         if !path.as_bytes()[0].is_ascii_alphabetic()
             || !matches!(path.as_bytes().get(2), Some(b'/' | b'\\'))
         {
-            return Err("Wine benötigt einen absoluten Windows-Pfad.");
+            return Err("Wine benötigt einen absoluten Windows-Pfad."); // i18n
         }
         return Ok(path.replace('/', "\\"));
     }
     // Backslash is legal in a Unix name but cannot be represented by this mapping.
     if path.contains('\\') {
-        return Err("Ein Linux-Pfad darf für Wine keinen Rückstrich enthalten.");
+        return Err("Ein Linux-Pfad darf für Wine keinen Rückstrich enthalten."); // i18n
     }
     let absolute = if path.starts_with('/') {
         String::from(path)
@@ -24,20 +24,20 @@ pub(crate) fn to_windows(path: &str, cwd: &str) -> Result<String, &'static str> 
         format!("{cwd}/{path}")
     };
     if !absolute.starts_with('/') {
-        return Err("Wine benötigt ein absolutes Arbeitsverzeichnis.");
+        return Err("Wine benötigt ein absolutes Arbeitsverzeichnis."); // i18n
     }
     Ok(format!("Z:{}", absolute.replace('/', "\\")))
 }
 
 pub(crate) fn to_native(path: &str, prefix: &str) -> Result<String, &'static str> {
     if path.contains('\0') || path.is_empty() {
-        return Err("Ungültiger Wine-Katalogpfad.");
+        return Err("Ungültiger Wine-Katalogpfad."); // i18n
     }
     if path.starts_with('/') && !path.contains('\\') {
         return Ok(String::from(path));
     }
     if path.len() < 3 || path.as_bytes()[1] != b':' || !matches!(path.as_bytes()[2], b'\\' | b'/') {
-        return Err("Der Plugin-Host lieferte keinen absoluten Dateipfad.");
+        return Err("Der Plugin-Host lieferte keinen absoluten Dateipfad."); // i18n
     }
     let rest = path[2..].replace('\\', "/");
     match path.as_bytes()[0].to_ascii_uppercase() {
@@ -45,7 +45,7 @@ pub(crate) fn to_native(path: &str, prefix: &str) -> Result<String, &'static str
         b'C' if prefix.starts_with('/') => {
             Ok(format!("{}/drive_c{rest}", prefix.trim_end_matches('/')))
         }
-        _ => Err("Die Wine-Brücke unterstützt Katalogpfade auf C: und Z:."),
+        _ => Err("Die Wine-Brücke unterstützt Katalogpfade auf C: und Z:."), // i18n
     }
 }
 

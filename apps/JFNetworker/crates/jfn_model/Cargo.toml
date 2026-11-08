@@ -1,0 +1,22 @@
+[package]
+name = "jfn_model"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "jfn_model"
+path = "lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+agent_core.workspace = true
+base.workspace = true
+crypto.workspace = true
+netpkt.workspace = true

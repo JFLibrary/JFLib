@@ -588,6 +588,7 @@ fn code(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, key: &Key, acts: &
                 }
             }
             CodeEv::Breakpoint(line) => acts.push(Act::Bp(line + 1, None)),
+            _ => {}
         }
     }
     let changed = dr.changed();

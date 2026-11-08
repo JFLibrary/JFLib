@@ -506,12 +506,12 @@ fn wc_left(p: &mut Pn, ui: &mut Ui) {
     ui.next_size(-1, WC_ROWA_H);
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(-1, 0);
-    if ui.combobox(ID_WC_WHICH, &mut p.wcol.which, &WHICH_LIST) & EV_ACT != 0 {
+    if ui.combobox(ID_WC_WHICH, &mut p.wcol.which, &crate::preferences::localization::list(&WHICH_LIST)) & EV_ACT != 0 {
         wc_sync(p);
         ui.repass();
     }
     ui.next_size(104, 0);
-    let l = if p.wcol.more { "<< Weniger" } else { "Mehr >>" };
+    let l = if p.wcol.more { crate::preferences::localization::tr("<< Weniger") } else { crate::preferences::localization::tr("Mehr >>") };
     if ui.button(ID_WC_MORE, l) & EV_ACT != 0 {
         wc_toggle_more(&mut p.wcol, ui);
     }
@@ -566,7 +566,7 @@ fn wc_right(p: &mut Pn, ui: &mut Ui) {
     for k in ROW_H..ROW_A {
         wc_row(p, ui, k);
     }
-    wc_header(ui, "Transparenz - Alpha");
+    wc_header(ui, crate::preferences::localization::tr("Transparenz - Alpha"));
     wc_row(p, ui, ROW_A);
     ui.box_end();
 }
@@ -767,7 +767,7 @@ fn wc_swatches(p: &mut Pn, ui: &mut Ui) {
     wc_square(ui, x, y, sq, c, ed);
     ui.focus_ring_draw(ev);
     wc_sw_record(ui, ID_WC_SEC, c, ed);
-    ui.tooltip("Sekundärfarbe");
+    ui.tooltip(crate::preferences::localization::tr("Sekundärfarbe"));
     if ev & EV_ACT != 0 {
         wc_select(p, ui, 1);
     }
@@ -778,7 +778,7 @@ fn wc_swatches(p: &mut Pn, ui: &mut Ui) {
     wc_square(ui, x0, y0, sq, c, ed);
     ui.focus_ring_draw(ev);
     wc_sw_record(ui, ID_WC_PRI, c, ed);
-    ui.tooltip("Primärfarbe");
+    ui.tooltip(crate::preferences::localization::tr("Primärfarbe"));
     if ev & EV_ACT != 0 {
         wc_select(p, ui, 0);
     }
@@ -788,8 +788,8 @@ fn wc_swatches(p: &mut Pn, ui: &mut Ui) {
     wc_icon_bg(ui, ev, x, y, ic);
     wc_swap_arrow(ui, x, y);
     ui.focus_ring_draw(ev);
-    ui.sem(K_BUTTON, ID_WC_SWAP, Some("Farben vertauschen"), 0);
-    ui.tooltip("Farben vertauschen (X)");
+    ui.sem(K_BUTTON, ID_WC_SWAP, Some(crate::preferences::localization::tr("Farben vertauschen")), 0);
+    ui.tooltip(crate::preferences::localization::tr("Farben vertauschen (X)"));
     if ev & EV_ACT != 0 {
         pal_swap(&mut p.pal);
     }
@@ -809,8 +809,8 @@ fn wc_swatches(p: &mut Pn, ui: &mut Ui) {
     }
     ui.last_set([x, y, ic, ic], ui.last_state());
     ui.focus_ring_draw(ev);
-    ui.sem(K_BUTTON, ID_WC_RESET, Some("Standardfarben"), 0);
-    ui.tooltip("Standardfarben");
+    ui.sem(K_BUTTON, ID_WC_RESET, Some(crate::preferences::localization::tr("Standardfarben")), 0);
+    ui.tooltip(crate::preferences::localization::tr("Standardfarben"));
     if ev & EV_ACT != 0 {
         pal_reset(&mut p.pal);
     }

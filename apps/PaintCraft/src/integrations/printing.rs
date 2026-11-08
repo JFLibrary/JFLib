@@ -50,6 +50,7 @@ const PAPER_IMG_LINE: u32 = 0xFFA0A0A0; // preview: image outline
 const C_PR_CM100: f64 = 3.5277777777777777; // pt -> 1/100 cm (254 / 72)
 const RANGE_PCT: Range = Range::new(1, 1000, 1, 0);
 const RANGE_MARGIN: Range = Range::new(0, 50, 1, 0);
+// i18n
 static PAPER_LIST: [&str; 5] =
     ["A4 (210 × 297 mm)", "Letter (8,5 × 11 in)", "A5 (148 × 210 mm)", "Legal (8,5 × 14 in)", "A3 (297 × 420 mm)"];
 
@@ -125,7 +126,7 @@ pub(crate) fn prt_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
     true
 }
 
-const S_NOMEM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus.";
+const S_NOMEM: &str = "Der Arbeitsspeicher reicht für diesen Schritt nicht aus."; // i18n
 
 // pr_open() -- show the dialog for the active image (ignored while it is open)
 fn pr_open(p: &mut Pn, ui: &mut Ui) {
@@ -137,7 +138,7 @@ fn pr_open(p: &mut Pn, ui: &mut Ui) {
     comp_update(p, doc);
     let sf = comp_sf(p.doc.d(doc));
     if sf.px.is_empty() {
-        crate::integrations::file_io::fio_error(p, Some("Drucken"), S_NOMEM);
+        crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Drucken")), S_NOMEM);
         return;
     }
     // thumbnail over white (a checkerboard cell larger than any image), long side THUMB_DIP
@@ -192,12 +193,12 @@ fn pr_done(p: &mut Pn, ui: &mut Ui, ok: bool) {
         if r == plat::ERR_NOMEM {
             S_NOMEM
         } else if r == plat::ERR_UNSUPPORTED {
-            "Es ist kein Drucker bzw. Druckdienst verfügbar."
+            "Es ist kein Drucker bzw. Druckdienst verfügbar." // i18n
         } else {
-            "Das Drucken ist fehlgeschlagen."
+            "Das Drucken ist fehlgeschlagen." // i18n
         }
     };
-    crate::integrations::file_io::fio_error(p, Some("Drucken"), msg);
+    crate::integrations::file_io::fio_error(p, Some(crate::preferences::localization::tr("Drucken")), msg);
 }
 
 // pr_job(doc) -- g_pr_job from the dialog's options and the document (composite, name, dpi)
@@ -293,11 +294,11 @@ fn pr_cm100(pt: f64) -> u32 {
 
 // pr_info() -- the two lines under the options: image size / dpi, print size
 fn pr_info(g: &Prt, ui: &mut Ui) {
-    let s = fmt_cap(format!("Bild: {} × {} Pixel, {} dpi", g.src_w as u32, g.src_h as u32, cvtd(g.dpi_x) as u32), INFO_CAP);
+    let s = fmt_cap(crate::preferences::localization::tf("Bild: {} × {} Pixel, {} dpi", &[&format!("{}", g.src_w as u32), &format!("{}", g.src_h as u32), &format!("{}", cvtd(g.dpi_x) as u32)]), INFO_CAP);
     ui.text(TS_BODY | TX_SECONDARY, &s);
     let w = pr_cm100(g.place.w);
     let h = pr_cm100(g.place.h);
-    let s = fmt_cap(format!("Druckgröße: {},{:02} × {},{:02} cm", w / 100, w % 100, h / 100, h % 100), INFO_CAP);
+    let s = fmt_cap(crate::preferences::localization::tf("Druckgröße: {} × {} cm", &[&format!("{}{}{:02}", w / 100, crate::preferences::localization::dec(), w % 100), &format!("{}{}{:02}", h / 100, crate::preferences::localization::dec(), h % 100)]), INFO_CAP);
     ui.text(TS_BODY | TX_SECONDARY, &s);
 }
 
@@ -357,22 +358,22 @@ fn pr_body(p: &mut Pn, ui: &mut Ui) {
     ui.box_begin(0, BOX_V, 4);
     ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Papierformat"));
     ui.next_size(-1, 0);
-    let ev = ui.combobox(ID_PR_PAPER, &mut g.paper, &PAPER_LIST);
+    let ev = ui.combobox(ID_PR_PAPER, &mut g.paper, &crate::preferences::localization::list(&PAPER_LIST));
     pr_changed(g, ev);
     ui.spacer(8);
     ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Ausrichtung"));
-    let ev = ui.radio(ID_PR_PORTRAIT, "Hochformat", &mut g.orient, 0);
+    let ev = ui.radio(ID_PR_PORTRAIT, crate::preferences::localization::tr("Hochformat"), &mut g.orient, 0);
     pr_changed(g, ev);
-    let ev = ui.radio(ID_PR_LANDSCAPE, "Querformat", &mut g.orient, 1);
+    let ev = ui.radio(ID_PR_LANDSCAPE, crate::preferences::localization::tr("Querformat"), &mut g.orient, 1);
     pr_changed(g, ev);
     ui.spacer(8);
     ui.text(TS_BODY_STRONG, crate::preferences::localization::tr("Druckgröße"));
-    let ev = ui.radio(ID_PR_FIT, "An Seite anpassen", &mut g.scale, plat::PJS_FIT as i32);
+    let ev = ui.radio(ID_PR_FIT, crate::preferences::localization::tr("An Seite anpassen"), &mut g.scale, plat::PJS_FIT as i32);
     pr_changed(g, ev);
-    let ev = ui.radio(ID_PR_DPI, "Originalgröße (Pixeldichte)", &mut g.scale, plat::PJS_DPI as i32);
+    let ev = ui.radio(ID_PR_DPI, crate::preferences::localization::tr("Originalgröße (Pixeldichte)"), &mut g.scale, plat::PJS_DPI as i32);
     pr_changed(g, ev);
     pr_row_begin(ui);
-    let ev = ui.radio(ID_PR_PCT_RB, "Prozentual:", &mut g.scale, plat::PJS_PERCENT as i32);
+    let ev = ui.radio(ID_PR_PCT_RB, crate::preferences::localization::tr("Prozentual:"), &mut g.scale, plat::PJS_PERCENT as i32);
     pr_changed(g, ev);
     let pct_on = g.scale == plat::PJS_PERCENT as i32;
     if !pct_on {

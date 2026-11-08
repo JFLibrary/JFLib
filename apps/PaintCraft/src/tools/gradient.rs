@@ -144,10 +144,11 @@ static DESC_GRAD: ToolDesc = ToolDesc {
     tick: Some(tg_tick),
     ..ToolDesc::NONE
 };
+// i18n
 static TYPE_LABELS: [&str; 7] =
     ["Linear", "Linear (gespiegelt)", "Raute", "Radial", "Konisch", "Spirale rechtsdrehend", "Spirale linksdrehend"];
-static MODE_LABELS: [&str; 2] = ["Farbverlauf", "Transparenzverlauf"];
-static REP_LABELS: [&str; 3] = ["Keine Wiederholung", "Periodisch wiederholen", "Gespiegelt wiederholen"];
+static MODE_LABELS: [&str; 2] = ["Farbverlauf", "Transparenzverlauf"]; // i18n
+static REP_LABELS: [&str; 3] = ["Keine Wiederholung", "Periodisch wiederholen", "Gespiegelt wiederholen"]; // i18n
 /// rotated-grid supersample offsets (x, y)
 static SS_OFF: [[f64; 2]; 4] = [[-0.375, -0.125], [0.125, -0.375], [0.375, 0.125], [-0.125, 0.375]];
 /// (cos, sin) of k * 15 degrees, k = 0 .. 23 (the asm's table bits)
@@ -684,7 +685,7 @@ fn tg_commit(p: &mut Pn, ui: &mut Ui, _doc: DocId) -> bool {
     }
     let mut r = false;
     if p.tool.tls[TL_GRADIENT].shown {
-        r = tl_commit(p, TL_GRADIENT, "Farbverlauf", IC_CONTRAST);
+        r = tl_commit(p, TL_GRADIENT, "Farbverlauf", IC_CONTRAST); // i18n
     }
     tg_end(p, ui);
     r

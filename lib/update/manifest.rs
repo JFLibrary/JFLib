@@ -21,6 +21,7 @@ pub const MAX_SIG: usize = 4096;
 
 /// what a package of the manifest is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Kind {
     /// the program file itself
     Exe,

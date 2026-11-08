@@ -15,6 +15,7 @@ pub struct Formula {
 }
 /// Formula failures are displayable data, not failed document edits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FormulaError { Syntax, Unsupported, Reference, Value, DivisionByZero, Cycle, Number, Limit }
 impl FormulaError {
     /// Stable code for page rendering and automation; independent of UI language.

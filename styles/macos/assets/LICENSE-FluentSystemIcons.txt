@@ -1,4 +1,4 @@
-styles/winui/assets/icons.bin (used by the winui, macos, classic and kde styles) contains glyph
+lib/style_assets/assets/icons.bin (used by the winui, macos, classic and kde styles) contains glyph
 outlines from Fluent UI System Icons by Microsoft:
   https://github.com/microsoft/fluentui-system-icons
   fonts/FluentSystemIcons-Regular.ttf and fonts/FluentSystemIcons-Filled.ttf,

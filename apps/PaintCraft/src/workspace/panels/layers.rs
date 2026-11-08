@@ -34,6 +34,7 @@ use gfx::Surface;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::workspace::icons::generated::{PN_LAYER_DOWN, PN_LAYER_NEW, PN_LAYER_PROPS, PN_LAYER_UP};
 use crate::document::model::{Doc, DocId};
 use crate::document::layers::lay_rec;
 use crate::app::commands::pn_cmd_flags;
@@ -56,16 +57,17 @@ const BTN_DIP: i32 = 28; // bottom bar buttons (7 x 28 fit 208 DIP)
 
 // bottom bar: widget id, icon, command
 static WL_BTN_TAB: [(u32, u32, u32); NBTN] = [
-    (ID_WL_ADD, IC_ADD, CMD_LAYER_ADD),
+    (ID_WL_ADD, PN_LAYER_NEW, CMD_LAYER_ADD),
     (ID_WL_DEL, IC_DELETE, CMD_LAYER_DEL),
     (ID_WL_DUP, IC_COPY, CMD_LAYER_DUP),
     (ID_WL_MERGE, IC_DOWNLOAD, CMD_LAYER_MERGE),
-    (ID_WL_UP, IC_UP, CMD_LAYER_UP),
-    (ID_WL_DOWN, IC_DOWN, CMD_LAYER_DOWN),
-    (ID_WL_PROPS, IC_EDIT, CMD_LAYER_PROPS),
+    (ID_WL_UP, PN_LAYER_UP, CMD_LAYER_UP),
+    (ID_WL_DOWN, PN_LAYER_DOWN, CMD_LAYER_DOWN),
+    (ID_WL_PROPS, PN_LAYER_PROPS, CMD_LAYER_PROPS),
 ];
 
 // tooltips of the bottom bar (command labels)
+// i18n
 static WL_TIP_TEXT: [&str; NBTN] = [
     "Neue Ebene",
     "Ebene löschen",
@@ -178,9 +180,9 @@ fn wl_tips(w: &mut WLay, ui: &Ui) {
     for (k, b) in WL_BTN_TAB.iter().enumerate() {
         let acc = ui.accel_text(b.2);
         let t = if acc.is_empty() {
-            String::from(WL_TIP_TEXT[k])
+            String::from(crate::preferences::localization::tr(WL_TIP_TEXT[k]))
         } else {
-            format!("{} ({})", WL_TIP_TEXT[k], acc)
+            format!("{} ({})", crate::preferences::localization::tr(WL_TIP_TEXT[k]), acc)
         };
         w.tips.push(crate::app::formatting::fmt_cap(t, TIP_CAP));
     }
