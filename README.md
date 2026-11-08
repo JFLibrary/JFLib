@@ -13,6 +13,16 @@ a Python build script (`build_rs.py`) sits on top for this repository's own apps
 its packages. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
 linked. See the [dependency notices](lib/text_shape/NOTICE.md).
 
+```sh
+cargo install cargo-jflib     # once
+cargo jflib new hello         # a window app with its test
+cd hello
+cargo run
+```
+
+The app's one dependency is the crate [`jflib`](https://crates.io/crates/jflib), its documentation
+is on [docs.rs](https://docs.rs/jflib). More under [Your own app with Cargo](#your-own-app-with-cargo).
+
 ![Kritzel displaying a JFLIB sample drawing created in the app](docs/images/readme/kritzel-winui.png)
 
 [Library](#the-library) · [Feature tour](#feature-tour) · [Platforms](#platforms) · [Apps](#apps) ·
