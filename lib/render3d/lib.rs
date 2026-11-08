@@ -1,11 +1,13 @@
-// render3d -- the core of the 3D engine on lib/gpu (G5a; docs/RENDER3D.md): meshes in shared buffers, a
-// table of materials, scenes of instances, a camera, a sun, visibility on the GPU and one instance list
-// per mesh.  No draw per object anywhere: a frame is one compute dispatch and one indirect draw per
-// mesh (level Basis) or one multi-draw for all of them (level Voll).  The same WGSL on every path:
-// compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+// render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
+// a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+// instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
+// anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
+// per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+// Vulkan, handed to the browser as text on WebGPU.
 //
 //   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
 //   renderer.add_mesh(&MeshData) -> Result<MeshId>              positions, normals, uv, indices into the pools
+//   renderer.add_texture(&TextureData) -> Result<TextureId>     rgba into the array of its size class, mip levels
 //   renderer.add_material(&Material) -> Result<MaterialId>, set_material(id, &Material)
 //   renderer.set_size(w, h)                                     a depth buffer the renderer keeps (or bring your own)
 //   Scene::new(&renderer) -> Result<Scene>
@@ -16,6 +18,8 @@
 //        renderer.record(&mut encoder, &scene, color, depth)?;      depth None: the renderer's own
 //        let id = queue.submit([encoder.finish()?])?;   (or swapchain.present)
 //        scene.submitted(id);
+//   gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
+//        materials, and its instances for a Scene (gltf.rs)
 //
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 // of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
@@ -35,10 +39,13 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use gpu::*;
 
+pub mod gltf;
 pub mod math;
 mod scene;
+mod texture;
 
 pub use scene::{Camera, FrameStats, Instance, InstanceId, ListInfo, Scene, Sun, Transform, UploadInfo};
+pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
 pub const DEPTH_CLEAR: f32 = 0.0;
@@ -51,12 +58,11 @@ pub(crate) const LIGHTS_BYTES: u64 = 48;
 pub(crate) const LIGHTS_AT: u64 = 256;
 pub(crate) const INSTANCE_WORDS: usize = 16;
 pub(crate) const CHANGE_WORDS: usize = 24;
-const MATERIAL_WORDS: usize = 16;
+const MATERIAL_WORDS: usize = 20;
+const MATERIAL_BYTES: u64 = MATERIAL_WORDS as u64 * 4;
 pub(crate) const DRAW_BYTES: u64 = 20;
 pub(crate) const WG_CULL: u32 = 256;
 pub(crate) const WG_SCATTER: u32 = 64;
-/// what a texture slot of a material holds when it has none (G5b)
-const NO_TEXTURE: u32 = u32::MAX;
 
 /// the shaders, compiled from the *.wgsl beside this file (render3dtest --test shaders compares them with
 /// what wgsl::compile makes of them, --gen-shaders writes them again); the browser takes the WGSL itself
@@ -125,28 +131,55 @@ pub struct MeshInfo {
     pub radius: f64,
 }
 
-/// a row of the material table.  G5a shows the base colour (rgb; alpha reaches the target); the other
-/// values wait for PBR (G5c), the table has slots for textures (G5b)
+/// a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
+/// texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
+/// What reaches the target is opaque (alpha 1)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Material {
-    /// linear rgb and alpha
+    /// linear rgb and alpha (the texture's sRGB is decoded first)
     pub base_color: [f32; 4],
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
+    pub base_color_texture: Option<TextureRef>,
+    /// linear: roughness in g, metallic in b
+    pub metallic_roughness_texture: Option<TextureRef>,
+    pub normal_texture: Option<TextureRef>,
+    pub normal_scale: f32,
+    pub occlusion_texture: Option<TextureRef>,
+    pub occlusion_strength: f32,
+    pub emissive_texture: Option<TextureRef>,
+    /// glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
+    pub alpha_cutoff: Option<f32>,
 }
 
 impl Material {
     /// a dull material of one colour
     pub const fn color(r: f32, g: f32, b: f32) -> Material {
-        Material { base_color: [r, g, b, 1.0], metallic: 0.0, roughness: 1.0, emissive: [0.0; 3] }
+        Material { base_color: [r, g, b, 1.0], metallic: 0.0, roughness: 1.0, emissive: [0.0; 3], base_color_texture: None,
+                   metallic_roughness_texture: None, normal_texture: None, normal_scale: 1.0, occlusion_texture: None,
+                   occlusion_strength: 1.0, emissive_texture: None, alpha_cutoff: None }
     }
 
-    fn words(&self) -> [u32; MATERIAL_WORDS] {
+    /// a dull material of a texture (white times the texture)
+    pub const fn textured(t: TextureRef) -> Material {
+        let mut m = Material::color(1.0, 1.0, 1.0);
+        m.base_color_texture = Some(t);
+        m
+    }
+
+    /// the 80 bytes of draw.wgsl's Material
+    fn words(&self, t: &texture::Textures) -> Result<[u32; MATERIAL_WORDS]> {
         let b = |v: f32| v.to_bits();
         let (c, e) = (self.base_color, self.emissive);
-        [b(c[0]), b(c[1]), b(c[2]), b(c[3]), b(e[0]), b(e[1]), b(e[2]), b(self.metallic), b(self.roughness), 0, 0, 0,
-         NO_TEXTURE, NO_TEXTURE, NO_TEXTURE, NO_TEXTURE]
+        let cutoff = match self.alpha_cutoff {
+            Some(v) if v.is_finite() && v >= 0.0 => v,
+            Some(_) => return Err(GpuError::Invalid("Material: alpha_cutoff must be finite and not negative")),
+            None => -1.0,
+        };
+        Ok([b(c[0]), b(c[1]), b(c[2]), b(c[3]), b(e[0]), b(e[1]), b(e[2]), b(self.metallic), b(self.roughness), b(self.normal_scale),
+            b(self.occlusion_strength), b(cutoff), t.word(&self.base_color_texture)?, t.word(&self.metallic_roughness_texture)?,
+            t.word(&self.normal_texture)?, t.word(&self.occlusion_texture)?, t.word(&self.emissive_texture)?, 0, 0, 0])
     }
 }
 
@@ -204,7 +237,10 @@ pub struct Renderer {
     pub(crate) max_instances: u32,
     cull: ComputePipeline,
     scatter: ComputePipeline,
+    /// front faces counter-clockwise; clockwise for the lists of mirrored instances
     draw: RenderPipeline,
+    draw_mirrored: RenderPipeline,
+    pub(crate) textures: texture::Textures,
     pub(crate) cull_layout: BindGroupLayout,
     pub(crate) scatter_layout: BindGroupLayout,
     pub(crate) draw_layout: BindGroupLayout,
@@ -272,20 +308,22 @@ impl Renderer {
         ])?;
         let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 8 })?;
         let scatter_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&scatter_layout], push_constants: 4 })?;
-        let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout], push_constants: 4 })?;
+        let textures = texture::Textures::new(dev)?;
+        let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout], push_constants: 4 })?;
         let cull = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&cull_m, "main") })?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&scatter_m, "main") })?;
-        let draw = dev.create_render_pipeline(&RenderPipelineDesc {
+        let pipeline = |front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &draw_pl,
             vertex: ShaderStage::new(&vs, "vs"),
             fragment: Some(ShaderStage::new(&fs, "fs")),
             buffers: &[],
             topology: Topology::Triangles,
             cull: Cull::Back,
-            front_cw: false,
+            front_cw,
             targets: &[ColorTarget { format: desc.color, blend: None, write_mask: 0xF }],
             depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
-        })?;
+        });
+        let (draw, draw_mirrored) = (pipeline(false)?, pipeline(true)?);
         let (f, l) = (dev.features(), dev.limits());
         let multi = dev.level() == Level::Voll && f.multi_draw_indirect && f.draw_indirect_first_instance;
         // what the bindings and one dispatch can reach
@@ -300,7 +338,7 @@ impl Renderer {
             meshes: Vec::new(),
             materials: Vec::new(),
             counts: Arc::new(Counts { meshes: AtomicU32::new(0), materials: AtomicU32::new(0) }),
-            material_buf: dev.create_buffer(&BufferDesc { size: 64 * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
+            material_buf: dev.create_buffer(&BufferDesc { size: MATERIAL_BYTES * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
             bindings_gen: 0,
             material_cap: 64,
             material_dirty: None,
@@ -315,6 +353,8 @@ impl Renderer {
             cull,
             scatter,
             draw,
+            draw_mirrored,
+            textures,
             cull_layout,
             scatter_layout,
             draw_layout,
@@ -402,9 +442,36 @@ impl Renderer {
         self.meshes.get(id.0 as usize).copied()
     }
 
+    /// a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
+    /// not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+    pub fn add_texture(&mut self, d: &TextureData) -> Result<TextureId> {
+        let dev = self.dev.clone();
+        self.textures.add(&dev, d)
+    }
+
+    pub fn texture_info(&self, id: TextureId) -> Option<TextureInfo> {
+        self.textures.info.get(id.0 as usize).copied()
+    }
+
+    pub fn texture_count(&self) -> u32 {
+        self.textures.info.len() as u32
+    }
+
+    /// bytes of GPU memory the texture arrays take
+    pub fn texture_bytes(&self) -> u64 {
+        self.textures.bytes()
+    }
+
+    /// (tests) the array of a size class and colour space (layers: TextureInfo::layer), None without a texture
+    pub fn texture_array(&self, class: u32, srgb: bool) -> Option<&Texture> {
+        self.textures.array(class, srgb)
+    }
+
+    /// a row of the table; its textures must be this renderer's
     pub fn add_material(&mut self, m: &Material) -> Result<MaterialId> {
         let i = self.materials.len() as u32;
-        self.materials.push(m.words());
+        let words = m.words(&self.textures)?;
+        self.materials.push(words);
         self.mark_material(i);
         self.counts.materials.store(i + 1, Ordering::Relaxed);
         Ok(MaterialId(i))
@@ -412,8 +479,9 @@ impl Renderer {
 
     /// a row of the table; the next frame shows it
     pub fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()> {
+        let words = m.words(&self.textures)?;
         let Some(row) = self.materials.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("set_material: no such material")) };
-        *row = m.words();
+        *row = words;
         self.mark_material(id.0);
         Ok(())
     }
@@ -448,15 +516,15 @@ impl Renderer {
         let n = self.materials.len() as u32;
         if n > self.material_cap {
             self.material_cap = n.max(self.material_cap * 2);
-            self.material_buf = self.dev.create_buffer(&BufferDesc { size: 64 * self.material_cap as u64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?;
+            self.material_buf = self.dev.create_buffer(&BufferDesc { size: MATERIAL_BYTES * self.material_cap as u64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?;
             self.bindings_gen += 1;
             self.material_dirty = Some((0, n));
         }
         let Some((a, b)) = self.material_dirty.take() else { return Ok(0) };
-        let size = (b - a) as u64 * 64;
+        let size = (b - a) as u64 * MATERIAL_BYTES;
         let up = self.dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Upload })?;
         up.write(0, &self.materials[a as usize..b as usize])?;
-        self.material_up = Some((up, a as u64 * 64, size));
+        self.material_up = Some((up, a as u64 * MATERIAL_BYTES, size));
         self.material_up_done.set(false);
         Ok(size)
     }
@@ -580,31 +648,37 @@ impl Renderer {
         }
     }
 
-    /// one view's lists into the running pass (a depth-only pipeline can take the same lists)
+    /// one view's lists into the running pass (a depth-only pipeline can take the same lists): those of
+    /// instances as they are, then those of mirrored ones with the pipeline whose front faces are clockwise
     fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
-        if s.lists.is_empty() {
-            return;
-        }
-        e.set_render_pipeline(&self.draw);
-        e.set_bind_group(0, &s.render_group);
-        if self.multi {
-            // lists side by side with the same width of indices are one multi-draw (usually all of them)
-            e.push_constants(0, &[0u32]);
-            for &(first, count, wide) in &s.runs {
-                self.bind_indices(e, wide);
-                e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
+        for mirrored in [false, true] {
+            if !s.lists.iter().any(|l| l.mirrored == mirrored && l.count > 0) {
+                continue;
             }
-        } else {
-            // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
-            let mut bound = None;
-            for (i, l) in s.lists.iter().enumerate() {
-                if l.count > 0 {
-                    if bound != Some(l.wide) {
-                        self.bind_indices(e, l.wide);
-                        bound = Some(l.wide);
+            e.set_render_pipeline(if mirrored { &self.draw_mirrored } else { &self.draw });
+            e.set_bind_group(0, &s.render_group);
+            e.set_bind_group(1, &self.textures.group);
+            if self.multi {
+                // lists side by side with the same width of indices and side are one multi-draw (usually all)
+                e.push_constants(0, &[0u32]);
+                for &(first, count, wide, m) in &s.runs {
+                    if m == mirrored {
+                        self.bind_indices(e, wide);
+                        e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
                     }
-                    e.push_constants(0, &[l.first]);
-                    e.draw_indexed_indirect(&v.draws, i as u64 * DRAW_BYTES);
+                }
+            } else {
+                // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
+                let mut bound = None;
+                for (i, l) in s.lists.iter().enumerate() {
+                    if l.count > 0 && l.mirrored == mirrored {
+                        if bound != Some(l.wide) {
+                            self.bind_indices(e, l.wide);
+                            bound = Some(l.wide);
+                        }
+                        e.push_constants(0, &[l.first]);
+                        e.draw_indexed_indirect(&v.draws, i as u64 * DRAW_BYTES);
+                    }
                 }
             }
         }

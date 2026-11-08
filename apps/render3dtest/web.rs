@@ -1,5 +1,6 @@
 // web -- render3dtest in the browser (tests/engine_web.mjs reads the console): the engine over WebGPU, from
-// the same WGSL, on the app's worker.  The gallery's three images go out as hex lines, compared with those
+// the same WGSL, on the app's worker.  The gallery's five images (G5a's three, the textured one with
+// mirrored instances, the glTF scene read from a .glb made here) go out as hex lines, compared with those
 // of the Vulkan path on the same machine by the test; the counts of the lists against the exact test on
 // the CPU.  Nothing can wait here: every frame is submitted at once, the read-backs are looked at per tick.
 
@@ -61,6 +62,7 @@ struct Probe {
     keep: Vec<(&'static str, Off)>,
     scenes: Vec<Scene>,
     renderer: Option<Renderer>,
+    more: Vec<Renderer>,
     counts: Vec<Counted>,
     ok: u32,
     bad: u32,
@@ -119,6 +121,19 @@ impl Probe {
         self.scenes.push(s);
         self.scenes.push(f);
         self.renderer = Some(r);
+        // G5b: textures of four classes and mirrored instances; the glTF scene
+        for name in ["tex", "gltf"] {
+            let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+            let mut s = if name == "tex" { tex_gallery(&mut r)? } else { gltf_gallery(&mut r)? };
+            let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+            off.submit(&mut r, &mut s)?;
+            let mirrored = s.lists().iter().filter(|l| l.mirrored).count();
+            self.yes(mirrored > 0 && r.texture_count() > 0, &format!("{name}: {} textures ({} MiB of arrays), {} lists of which {mirrored} mirrored", r.texture_count(),
+                                                                     r.texture_bytes() >> 20, s.lists().len()));
+            self.keep.push((name, off));
+            self.scenes.push(s);
+            self.more.push(r);
+        }
         Ok(())
     }
 
@@ -220,7 +235,7 @@ impl plat::web::WebApplication for Probe {
 
 pub fn start() -> i32 {
     let t0 = plat::time_us();
-    let p = Probe { step: 0, inst: None, dev: None, keep: Vec::new(), scenes: Vec::new(), renderer: None, counts: Vec::new(), ok: 0, bad: 0, t0 };
+    let p = Probe { step: 0, inst: None, dev: None, keep: Vec::new(), scenes: Vec::new(), renderer: None, more: Vec::new(), counts: Vec::new(), ok: 0, bad: 0, t0 };
     if !plat::web::install(Box::new(p)) {
         return 2;
     }

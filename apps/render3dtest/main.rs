@@ -14,10 +14,20 @@
 //                    what the origin is for: without it the image falls apart
 //        frames      frames in flight with their own cameras and changes, against each drawn alone
 //        errors      what the API refuses
+//        textures    (G5b) nearest texels, levels and wrap modes exactly, sRGB and the levels against a box
+//                    filter of its own (read back too), trilinear within a tolerance, the five size classes,
+//                    40 textures in one list, arrays growing, resampled sizes, MASK (tex.rs)
+//        mirror      (G5b) mirrored instances against the ray caster, their lists, turned at run time, seen
+//                    from inside, their visibility (tex.rs)
+//        gltf        (G5b) lib/gltf against files of its own: three forms, contents, broken files, the scene
+//                    drawn against the ray caster (gltftest.rs, gltfgen.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
-//                [--moved K] [--meshes M] [--verify]    the scene of gputest --bench over the engine (bench.rs)
+//                [--moved K] [--meshes M] [--textures T [--tex-size S]] [--verify]    the scene of gputest
+//                --bench over the engine (bench.rs); T textures of S texels on the cubes' materials
+//   render3dtest --bench-upload              texture upload and mip levels per size class (bench.rs)
+//   render3dtest --bench-gltf [--nodes N | --vertices V]   a generated glTF: load time, memory (bench.rs)
 //   render3dtest --gen-shaders FILE          lib/render3d/shaders_spv.rs from lib/render3d/*.wgsl
 //   render3dtest --dump DIR                  the gallery's images per level, for tests/engine_web.mjs
 //   In the browser: the same gallery, step by step as the browser answers (web.rs; tests/engine_web.mjs).
@@ -34,11 +44,17 @@ extern crate alloc;
 mod common;
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 mod cpu;
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+mod gltfgen;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod bench;
 #[cfg(not(target_arch = "wasm32"))]
+mod gltftest;
+#[cfg(not(target_arch = "wasm32"))]
 mod tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod tex;
 #[cfg(target_arch = "wasm32")]
 mod web;
 

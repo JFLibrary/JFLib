@@ -1751,7 +1751,16 @@ Fensterrand hinaus.
   Firefox. Nicht gebaut: Meshes entfernen, negative Skalierung, orthografische Kamera, Durchsichtigkeit. In der Durchsicht gefunden und
   behoben: eine fehlende Barriere zwischen Sichtbarkeit und Vertex-Shader, die weder die Bilder noch die Validierung zeigten; die
   Synchronisationsprüfung sieht seitdem auch, was Shader lesen und schreiben ([GPU.md](GPU.md#validierung)).
-- **P2** · *fehlt* · G5b: Texturen und glTF-Import, dazu gespiegelte Instanzen (negative Skalierung), weil glTF-Knoten sie haben können.
+- **P2** · *erledigt* (2026-11-09) · G5b: Texturen, glTF-Import und gespiegelte Instanzen ([RENDER3D.md](RENDER3D.md#texturen),
+  [GLTF.md](GLTF.md)). Texturen in einem Array je Größenklasse (128 bis 2048) und Farbraum, im Fragment-Shader über das Material
+  gewählt, auf Voll, Basis und im Browser aus demselben WGSL (kein `binding_array` in `lib/wgsl` und WebGPU); Mip-Stufen als
+  Kastenfilter auf der CPU, sRGB in linearem Licht; Wrap- und Filtermodi von glTF genau im Shader, ein Sampler; MASK. Das Material
+  trägt die fünf Texturen von glTF für G5c. Neue Bibliothek `lib/gltf` (`jflib-gltf`): `.gltf` und `.glb`, ohne GPU, Dateien als
+  nicht vertrauenswürdig geprüft und begrenzt; `render3d::gltf::upload`. Gespiegelte Instanzen in eigenen Listen mit einer zweiten
+  Pipeline. Gemessen (1 Mio. Würfel, 1080p, RTX 2070 SUPER): Zeichnen 1,240 ms (G5a), 1,266 ms ohne und 1,339 ms mit 256 Texturen.
+  Texturen gegen einen Strahlenwerfer mit eigener Filterung (genau, trilinear auf 6), Stufen Byte für Byte gegen einen eigenen
+  Kastenfilter; Voll, Basis und Chrome 156 zeigen dieselben Bilder, 0 Pixel anders; abgeschnittene und verfälschte glTF-Dateien sind
+  Fehler, keine Panik. Nicht gebaut: Bindless auf Voll, Mip-Stufen auf der GPU, BLEND, beidseitige Materialien, Scherung.
 - **P2** · *fehlt* · G5c: PBR, Licht, Schatten.
 - **P2** · *fehlt* · G5d: Verdeckung über eine Hi-Z-Pyramide, Detailstufen, zweite Warteschlange.
 - **P2** · *fehlt* · G5e: 3D-Ansicht in der UI, Linux, Android, Browser in einem echten Fenster, Messungen auf anderen GPUs.

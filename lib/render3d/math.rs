@@ -71,3 +71,38 @@ pub fn rotation(q: [f32; 4]) -> [V3; 3] {
         [s * (x * z + w * y), s * (y * z - w * x), 1.0 - s * (x * x + y * y)],
     ]
 }
+
+/// the natural logarithm (x <= 0: -inf): x = m 2^e, ln m by the series of atanh
+pub fn ln(x: f64) -> f64 {
+    if x <= 0.0 || x.is_nan() {
+        return f64::NEG_INFINITY;
+    }
+    let bits = x.to_bits();
+    let e = ((bits >> 52) & 0x7FF) as i64 - 1023;
+    let m = f64::from_bits((bits & ((1u64 << 52) - 1)) | (1023u64 << 52));
+    let (m, e) = if m > core::f64::consts::SQRT_2 { (m * 0.5, e + 1) } else { (m, e) };
+    let z = (m - 1.0) / (m + 1.0);
+    let (z2, mut term, mut sum) = (z * z, z, 0.0);
+    for k in 0..30 {
+        sum += term / (2 * k + 1) as f64;
+        term *= z2;
+    }
+    2.0 * sum + e as f64 * core::f64::consts::LN_2
+}
+
+/// e^x for |x| below 700: x = k ln 2 + r, the series of e^r
+pub fn exp(x: f64) -> f64 {
+    let k = (x / core::f64::consts::LN_2 + if x < 0.0 { -0.5 } else { 0.5 }) as i64;
+    let r = x - k as f64 * core::f64::consts::LN_2;
+    let (mut term, mut sum) = (1.0, 1.0);
+    for n in 1..25 {
+        term *= r / n as f64;
+        sum += term;
+    }
+    sum * f64::from_bits(((k + 1023).clamp(1, 2046) as u64) << 52)
+}
+
+/// x^y for x > 0 (else 0)
+pub fn pow(x: f64, y: f64) -> f64 {
+    if x <= 0.0 { 0.0 } else { exp(y * ln(x)) }
+}

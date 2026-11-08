@@ -565,6 +565,7 @@ dependencies = [
  "jflib-eapm",
  "jflib-fx",
  "jflib-gfx",
+ "jflib-gltf",
  "jflib-gpu",
  "jflib-img-all",
  "jflib-img-av1",
@@ -752,6 +753,16 @@ dependencies = [
  "jflib-modrt",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-gltf"
+version = "0.1.0"
+dependencies = [
+ "jflib-agent-core",
+ "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-img-png",
 ]
 
 [[package]]
@@ -1135,6 +1146,7 @@ dependencies = [
 name = "jflib-render3d"
 version = "0.1.0"
 dependencies = [
+ "jflib-gltf",
  "jflib-gpu",
 ]
 
@@ -1550,7 +1562,11 @@ name = "render3dtest"
 version = "0.1.0"
 dependencies = [
  "jflib-build",
+ "jflib-gfx",
+ "jflib-gltf",
  "jflib-gpu",
+ "jflib-img-core",
+ "jflib-img-jpeg",
  "jflib-plat",
  "jflib-render3d",
  "jflib-rt",

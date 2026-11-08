@@ -1,0 +1,4 @@
+#!args --test gltf
+# (G5b) lib/gltf against files written by the test: .gltf with files, with data URIs and .glb alike, what was
+# written read back, truncated, corrupted and broken files as errors of their kind, the scene drawn against the
+# ray caster; Voll and Basis

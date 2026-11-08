@@ -81,7 +81,7 @@ pub fn setup(t: &mut T) -> Option<Gpu> {
 }
 
 /// a test on the adapter's own level and on a device limited to Basis
-fn on_levels(t: &mut T, f: &mut dyn FnMut(&mut T, &Device, &str)) {
+pub fn on_levels(t: &mut T, f: &mut dyn FnMut(&mut T, &Device, &str)) {
     let Some(g) = setup(t) else { return };
     if g.adapter.level() == Level::Voll {
         if let Some(d) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") {
@@ -94,7 +94,7 @@ fn on_levels(t: &mut T, f: &mut dyn FnMut(&mut T, &Device, &str)) {
 }
 
 /// submit, wait, read the image
-fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str) -> Option<Vec<u8>> {
+pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str) -> Option<Vec<u8>> {
     let id = t.res(off.submit(r, s), what)?;
     if !t.res(dev.wait(id, 10_000_000_000), what)? {
         t.ok(false, &format!("{what}: the GPU did not finish within 10 s"));
@@ -152,7 +152,7 @@ fn read_depth(t: &mut T, dev: &Device, off: &Off) -> Option<Vec<f32>> {
     Some(d)
 }
 
-fn sun_of() -> Sun {
+pub fn sun_of() -> Sun {
     Sun { direction: [0.3, 0.8, 0.5], color: [0.7, 0.7, 0.7], ambient: [0.3, 0.3, 0.3] }
 }
 
@@ -183,7 +183,7 @@ fn build(t: &mut T, dev: &Device, geos: &[Geo], specs: &[Spec], colors: &[[f32; 
     Some(Built { r, s, rs })
 }
 
-fn ref_camera(c: &Camera) -> RefCamera {
+pub fn ref_camera(c: &Camera) -> RefCamera {
     RefCamera::new(c.eye, c.forward, c.up, c.fov_y, c.aspect, c.near, c.far)
 }
 
@@ -283,13 +283,13 @@ fn pixels_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 // ---------------------------------------------------------------- visibility
 
 /// the lists of the last frame: which slots they hold, against what the instance's mesh is
-struct Seen {
+pub struct Seen {
     slots: Vec<u32>,
     per_list: Vec<u32>,
     wrong_list: u32,
 }
 
-fn read_lists(t: &mut T, dev: &Device, s: &mut Scene, off: &mut Off, r: &mut Renderer, specs: &[(u32, u32)]) -> Option<Seen> {
+pub fn read_lists(t: &mut T, dev: &Device, s: &mut Scene, off: &mut Off, r: &mut Renderer, specs: &[(u32, u32)]) -> Option<Seen> {
     let id = t.res(off.submit(r, s), "frame")?;
     t.res(dev.wait(id, 10_000_000_000), "wait")?;
     let lists = s.lists();
@@ -424,7 +424,7 @@ fn cpu_len(t: f64) -> f64 {
     1.0 / v[0]
 }
 
-fn judge(t: &mut T, what: &str, seen: &Seen, truth: &[(u32, cpu::Seen)]) {
+pub fn judge(t: &mut T, what: &str, seen: &Seen, truth: &[(u32, cpu::Seen)]) {
     let mut in_list = vec![false; truth.iter().map(|x| x.0).max().map_or(0, |v| v as usize + 1)];
     let mut twice = 0;
     for &slot in &seen.slots {
@@ -695,7 +695,10 @@ fn many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 
 // ---------------------------------------------------------------- levels, coordinates, frames
 
-fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 3]> {
+/// the gallery's images: mixed, changed, far away (G5a), textured with mirrored instances, the glTF scene (G5b)
+pub const GALLERY_NAMES: [&str; 5] = ["mix", "changed", "far", "tex", "gltf"];
+
+fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 5]> {
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm), "target")?;
@@ -705,7 +708,13 @@ fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 3]> {
     let b = shot(t, dev, &mut off, &mut r, &mut s, "gallery, changed")?;
     let (mut far, _) = t.res(gallery_scene(&r, meshes, materials, [1e7, -3e6, 2e7]), "gallery far")?;
     let c = shot(t, dev, &mut off, &mut r, &mut far, "gallery, far")?;
-    Some([a, b, c])
+    let mut rt = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut st = t.res(tex_gallery(&mut rt), "textured gallery")?;
+    let d = shot(t, dev, &mut off, &mut rt, &mut st, "gallery, textured")?;
+    let mut rg = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut sg = t.res(gltf_gallery(&mut rg), "glTF gallery")?;
+    let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
+    Some([a, b, c, d, e])
 }
 
 fn levels(t: &mut T) {
@@ -718,7 +727,8 @@ fn levels(t: &mut T) {
     let Some(a) = gallery_image(t, &voll) else { return };
     let Some(basis) = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device") else { return };
     let Some(b) = gallery_image(t, &basis) else { return };
-    for (i, name) in ["3000 instances, 48 meshes, 96 materials", "changed", "far away"].iter().enumerate() {
+    for (i, name) in ["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK",
+                      "the glTF scene"].iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
         t.ok(n == 0, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m})", GALLERY_W * GALLERY_H));
     }
@@ -882,7 +892,9 @@ fn errors(t: &mut T) {
     t.ok(inv(r.set_material(MaterialId(5), &Material::color(1.0, 1.0, 1.0))), "set_material of a material not there: Invalid");
     let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
     let mirrored = Transform { pos: [0.0; 3], rot: [0.0, 0.0, 0.0, 1.0], scale: [-1.0, 1.0, 1.0] };
-    t.ok(inv(s.add(render3d::Instance { mesh, material: mat, transform: mirrored }).map(|_| ())), "a negative scale: Invalid (not built)");
+    t.ok(s.add(render3d::Instance { mesh, material: mat, transform: mirrored }).is_ok() && s.lists().iter().any(|l| l.mirrored), "a negative scale: a mirrored instance in a list of its own (G5b)");
+    let infinite = Transform { scale: [f32::INFINITY, 1.0, 1.0], ..mirrored };
+    t.ok(inv(s.add(render3d::Instance { mesh, material: mat, transform: infinite }).map(|_| ())), "a scale not finite: Invalid");
     let no_rot = Transform { pos: [0.0; 3], rot: [0.0; 4], scale: [1.0; 3] };
     t.ok(inv(s.add(render3d::Instance { mesh, material: mat, transform: no_rot }).map(|_| ())), "a quaternion of length 0: Invalid");
     let nowhere = Transform::at([f64::NAN, 0.0, 0.0]);
@@ -1147,7 +1159,7 @@ fn dump(dir: &str) -> i32 {
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
         let Some(imgs) = gallery_image(&mut t, &dev) else { continue };
-        for (i, name) in ["mix", "changed", "far"].iter().enumerate() {
+        for (i, name) in GALLERY_NAMES.iter().enumerate() {
             let file = format!("{dir}/{level}_{name}.rgba");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
@@ -1169,6 +1181,12 @@ pub fn run() -> i32 {
     if let Some(d) = plat::arg_value("--dump") {
         return dump(&d);
     }
+    if args.iter().any(|a| a == "--bench-upload") {
+        return crate::bench::bench_upload();
+    }
+    if args.iter().any(|a| a == "--bench-gltf") {
+        return crate::bench::bench_gltf();
+    }
     if let Some(n) = plat::arg_value("--bench").and_then(|v| v.parse::<u32>().ok()).filter(|&n| n > 0) {
         return crate::bench::bench(n, validate);
     }
@@ -1177,8 +1195,9 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 9] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
-                                         ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors)];
+    let list: [(&str, fn(&mut T)); 12] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+                                          ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
+                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

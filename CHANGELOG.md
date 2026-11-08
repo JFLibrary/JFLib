@@ -16,12 +16,17 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Added
 
 - **render3d:** The crate jflib-render3d (lib/render3d, in the facade as jflib::render3d), the core of the 3D engine on lib/gpu: meshes in shared buffers, a table of materials, scenes of instances with f64 positions relative to an origin, a camera with reverse Z, a sun, visibility in a compute shader and one instance list per mesh (one multi-draw on Voll, one indirect draw per list on Basis and in the browser), from the same WGSL; `render3dtest`, tested against a ray caster on the CPU (docs/RENDER3D.md)
+- **gltf:** The crate jflib-gltf (lib/gltf, in the facade as jflib::gltf): glTF 2.0 import of .gltf (external files, data URIs) and .glb into a model without a GPU: triangles with positions, normals and uv (byte strides, normalized uv, sparse accessors, flat normals where the file has none), pbrMetallicRoughness materials with their five textures, PNG and JPEG images decoded by img_png and img_jpeg, samplers, nodes with f64 world matrices, the instances of a scene, decompose; files are checked as untrusted input and bounded by Limits, a required extension is Unsupported (docs/GLTF.md)
+- **render3d:** Textures: one texture array per size class (128 to 2048) and colour space, chosen per instance through its material in the fragment shader, the same WGSL on Voll, Basis and WebGPU; mip levels by a box filter on the CPU (sRGB in linear light), other sizes resampled, glTF's wrap and filter modes done exactly in the shader with one sampler, alpha mode MASK; Material carries glTF's five textures and their factors for PBR; add_texture, texture_info, mip_chain (docs/RENDER3D.md)
+- **render3d:** Mirrored instances: a transform with a negative determinant goes to its mesh's list of mirrored instances, drawn by a second pipeline with clockwise front faces and correct normals; negative scales are no longer Invalid
+- **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
 
 ### Changed
 
 - **gpu:** Validation with jfgui_GPU_VALIDATE now also checks what shaders read and write through their bindings (syncval_shader_accesses_heuristic, off in the layer by default): a missing barrier between two shaders no longer goes unreported
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
+- **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
 
 ## [0.1.0] - 2026-11-08
 

@@ -1,0 +1,4 @@
+#!args --test textures
+# (G5b) textures against the ray caster: nearest texels, levels and wrap modes exactly, sRGB and the mip
+# levels against a box filter of its own (also read back), trilinear within 6, the five size classes, 40
+# textures in one list, arrays growing, resampled sizes, MASK; Voll and Basis

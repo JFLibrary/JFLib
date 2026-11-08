@@ -62,8 +62,10 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
-- [render3d](#render3d) -- the core of the 3D engine: meshes, materials, scenes of instances, visibility on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners)
+- [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
+  <br>[lib.rs](#render3d-crate-root) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [texture.rs](#render3dtexturers)
+- [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
+  <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
@@ -19864,17 +19866,19 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 
 ## render3d
 
-*the core of the 3D engine: meshes, materials, scenes of instances, visibility on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
+*the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a; docs/RENDER3D.md): meshes in shared buffers, a
-table of materials, scenes of instances, a camera, a sun, visibility on the GPU and one instance list
-per mesh.  No draw per object anywhere: a frame is one compute dispatch and one indirect draw per
-mesh (level Basis) or one multi-draw for all of them (level Voll).  The same WGSL on every path:
-compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
+a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
+anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
+per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
   renderer.add_mesh(&MeshData) -> Result<MeshId>              positions, normals, uv, indices into the pools
+  renderer.add_texture(&TextureData) -> Result<TextureId>     rgba into the array of its size class, mip levels
   renderer.add_material(&Material) -> Result<MaterialId>, set_material(id, &Material)
   renderer.set_size(w, h)                                     a depth buffer the renderer keeps (or bring your own)
   Scene::new(&renderer) -> Result<Scene>
@@ -19885,6 +19889,8 @@ compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebG
        renderer.record(&mut encoder, &scene, color, depth)?;      depth None: the renderer's own
        let id = queue.submit([encoder.finish()?])?;   (or swapchain.present)
        scene.submitted(id);
+  gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
+       materials, and its instances for a Scene (gltf.rs)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
@@ -19946,17 +19952,28 @@ FS_SPV: &[u32] = spv::FS
   - `radius: f64`
 
 - **`struct Material`**
-  a row of the material table.  G5a shows the base colour (rgb; alpha reaches the target); the other
-  values wait for PBR (G5c), the table has slots for textures (G5b)
-  - `base_color: [f32; 4]` -- linear rgb and alpha
+  a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
+  texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
+  What reaches the target is opaque (alpha 1)
+  - `base_color: [f32; 4]` -- linear rgb and alpha (the texture's sRGB is decoded first)
   - `metallic: f32`
   - `roughness: f32`
   - `emissive: [f32; 3]`
+  - `base_color_texture: Option<TextureRef>`
+  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b
+  - `normal_texture: Option<TextureRef>`
+  - `normal_scale: f32`
+  - `occlusion_texture: Option<TextureRef>`
+  - `occlusion_strength: f32`
+  - `emissive_texture: Option<TextureRef>`
+  - `alpha_cutoff: Option<f32>` -- glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
 
 **`impl Material`**
 
 - **`const fn color(r: f32, g: f32, b: f32) -> Material`**
   a dull material of one colour
+- **`const fn textured(t: TextureRef) -> Material`**
+  a dull material of a texture (white times the texture)
 
 - **`struct Renderer`**
   the pipelines of one colour format, the mesh pools and the material table of one device
@@ -19973,7 +19990,17 @@ FS_SPV: &[u32] = spv::FS
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
+- **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
+  a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
+  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+- **`fn texture_info(&self, id: TextureId) -> Option<TextureInfo>`**
+- **`fn texture_count(&self) -> u32`**
+- **`fn texture_bytes(&self) -> u64`**
+  bytes of GPU memory the texture arrays take
+- **`fn texture_array(&self, class: u32, srgb: bool) -> Option<&Texture>`**
+  (tests) the array of a size class and colour space (layers: TextureInfo::layer), None without a texture
 - **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
+  a row of the table; its textures must be this renderer's
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
@@ -19981,6 +20008,36 @@ FS_SPV: &[u32] = spv::FS
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
   colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+
+### `render3d/gltf.rs`
+
+Source: [`lib/render3d/gltf.rs`](../lib/render3d/gltf.rs)
+
+```text
+gltf -- a jflib-gltf Document into a Renderer (G5b; docs/GLTF.md): each primitive as a mesh, each image as a
+texture (once per image, colour space and filter: base colour and emissive sRGB, the others linear), each
+material as a row, and the instances of a scene with their world matrices taken apart (gltf::decompose)
+for Scene::add.  What the engine cannot show yet is counted in notes: BLEND drawn opaque, double-sided
+materials drawn from the front, uv sets other than 0, world matrices with shear (drawn without it).
+
+  let doc = ::gltf::load(&bytes, &mut |uri| read(dir, uri), &::gltf::Limits::DEFAULT)?;
+  let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
+  for i in &imported.instances { scene.add(*i)?; }
+```
+
+- **`struct Imported`**
+  what upload made of a Document
+  - `meshes: Vec<Vec<MeshId>>` -- the renderer's mesh of each primitive: meshes[mesh][primitive]
+  - `materials: Vec<MaterialId>` -- the renderer's material of each of the document's, and glTF's default material for primitives without
+  - `default_material: Option<MaterialId>`
+  - `textures: u32` -- textures uploaded
+  - `instances: Vec<Instance>` -- the scene's instances, for Scene::add
+  - `sheared: u32` -- instances whose world matrix has shear, which a Transform cannot hold (the largest |cos| between
+    two axes above 1e-4); drawn without it
+  - `notes: Vec<String>` -- what the engine leaves out (once each)
+
+- **`fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Result<Imported>`**
+  the document's meshes, textures, materials, and the instances of `scene` (None: the document's)
 
 ### `render3d/math.rs`
 
@@ -20016,6 +20073,15 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 - **`fn rotation(q: [f32; 4]) -> [V3; 3]`**
   the rotation matrix's columns of a quaternion (x, y, z, w; any length except 0)
 
+- **`fn ln(x: f64) -> f64`**
+  the natural logarithm (x &lt;= 0: -inf): x = m 2^e, ln m by the series of atanh
+
+- **`fn exp(x: f64) -> f64`**
+  e^x for |x| below 700: x = k ln 2 + r, the series of e^r
+
+- **`fn pow(x: f64, y: f64) -> f64`**
+  x^y for x > 0 (else 0)
+
 ### `render3d/scene.rs`
 
 Source: [`lib/render3d/scene.rs`](../lib/render3d/scene.rs)
@@ -20026,8 +20092,10 @@ scene -- a scene's instances, camera and sun (lib.rs has the overview, docs/REND
 On the CPU: one Slot per instance with its f64 position; free places on a list, used again first.
 On the GPU, per slot: spheres (16 bytes, read by cull), list_of (4 bytes, read by cull only for what
 is visible), instances (64 bytes, the finished matrix, read by the vertex shader).  Per list (one per
-mesh in use): a draw record, a first place in the visible list.  Capacities double, a list keeps room
-for its instances, so frames with instances coming and going rewrite no list layout.
+mesh and side in use: a mirrored instance, its scales' product negative, turns its faces round and is
+drawn by the pipeline whose front faces are clockwise): a draw record, a first place in the visible
+list.  Capacities double, a list keeps room for its instances, so frames with instances coming and
+going rewrite no list layout.
 
 What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the
 barrier against the frame before): always the view and the lights of this frame's slot; the changed
@@ -20038,9 +20106,10 @@ commands without a barrier against the frames still on the GPU.
 ```
 
 - **`struct Transform`**
-  where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis
-  (not negative: a mirrored instance would turn its faces inside out; 0 on some of the axes leaves
-  faces without a normal, they come out black)
+  where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
+  Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
+  list of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
+  a normal, they come out black
   - `pos: [f64; 3]`
   - `rot: [f32; 4]`
   - `scale: [f32; 3]`
@@ -20048,6 +20117,8 @@ commands without a barrier against the frames still on the GPU.
 **`impl Transform`**
 
 - **`const fn at(pos: [f64; 3]) -> Transform`**
+- **`fn mirrored(&self) -> bool`**
+  the determinant is negative: the faces turn round
 
 - **`struct Instance`**
   what Scene::add takes
@@ -20094,6 +20165,7 @@ commands without a barrier against the frames still on the GPU.
 - **`struct ListInfo`**
   a list of the scene
   - `mesh: MeshId`
+  - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `count: u32` -- the instances of this mesh, and the room for them in the visible list
   - `capacity: u32`
   - `first: u32` -- its first place in the visible list
@@ -20116,6 +20188,8 @@ commands without a barrier against the frames still on the GPU.
 - **`fn remove(&mut self, id: InstanceId) -> Result<()>`**
   the instance goes; its place comes free
 - **`fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()>`**
+  a new transform; one that mirrors where the old did not (or the other way round) moves the instance
+  to its mesh's other list, as set_mesh does
 - **`fn transform(&self, id: InstanceId) -> Result<Transform>`**
 - **`fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()>`**
 - **`fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()>`**
@@ -20153,6 +20227,308 @@ commands without a barrier against the frames still on the GPU.
   the frame's data for Renderer::record: waits for this slot's last frame, sends what changed
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render3d/texture.rs`
+
+Source: [`lib/render3d/texture.rs`](../lib/render3d/texture.rs)
+
+```text
+texture -- the textures of a Renderer (G5b; docs/RENDER3D.md "Texturen"): one texture array per size class
+and colour space, chosen per instance through its material in the fragment shader (a switch over the five
+classes), one repeating trilinear sampler for everything.  The same binding model on Vulkan Voll, Basis and
+WebGPU, from the same WGSL: lib/wgsl has no binding arrays and WebGPU none in its core.
+
+Classes are squares of 128, 256, 512, 1024 and 2048 texels with every mip level.  A texture of another
+size goes into the class of its next power of two (128 at least, 2048 at most), resampled on the CPU:
+nearest for textures drawn with a nearest filter (a small one is repeated texel for texel), else
+bilinear upwards and a box downwards, in linear light for sRGB.  The mip levels are 2 x 2 box filters on
+the CPU, sRGB decoded by a table, averaged, encoded again (exactly rounded through a table of thresholds).
+Wrap modes and nearest filtering happen in the shader (draw.wgsl: wrap_coord), exactly, because the
+classes are powers of two.
+
+An array grows by doubling its layers: a new texture, the old layers copied through a buffer, the old one
+dropped once the GPU is done with it.  Uploads go through Queue::write_texture (staged before the next
+submission, after a barrier from Sampled: frames still reading the array finish first).
+```
+
+```rust
+/// the size classes: 128 << k texels square
+CLASSES: usize = 5
+CLASS_MIN: u32 = 128
+CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
+```
+
+- **`struct TextureData<'a>`**
+  what add_texture takes: rows from the top, 4 bytes per texel, r g b a with straight alpha
+  - `width: u32`
+  - `height: u32`
+  - `rgba: &'a [u8]`
+  - `srgb: bool` -- colour (base colour, emissive): sRGB; data (metallic-roughness, normals, occlusion): linear
+  - `nearest: bool` -- it is drawn with a nearest filter: a resampling to its class keeps the texels (else bilinear)
+
+- **`struct TextureId(pub u32)`**
+  a texture of a Renderer
+
+- **`struct TextureInfo`**
+  where a texture lies
+  - `class: u32` -- its class (0 ..), the class's size, its layer in the class's array
+  - `size: u32`
+  - `layer: u32`
+  - `srgb: bool`
+  - `width: u32` -- the size it was given; resampled: it was not the class's size
+  - `height: u32`
+  - `resampled: bool`
+
+- **`enum Wrap`**
+  - `Repeat`
+  - `Clamp`
+  - `Mirror`
+
+- **`enum Mip`**
+  - `None` -- level 0 only
+  - `Nearest`
+  - `Linear`
+
+- **`struct Sampling`**
+  how a material samples a texture (glTF's samplers)
+  - `mag_nearest: bool`
+  - `min_nearest: bool`
+  - `mip: Mip`
+  - `wrap_u: Wrap`
+  - `wrap_v: Wrap`
+
+**`impl Sampling`**
+
+- **`const LINEAR: Sampling = Sampling { mag_nearest: false, min_nearest: false, mip: M ...`**
+  repeating, trilinear: the sampler's own path in the shader
+- **`const NEAREST: Sampling = Sampling { mag_nearest: true, min_nearest: true, mip: Mip ...`**
+  repeating, nearest texels of the nearest level
+
+- **`struct TextureRef`**
+  a texture of a material: which, sampled how (uv set 0)
+  - `texture: TextureId`
+  - `sampling: Sampling`
+
+- **`fn class_of(w: u32, h: u32) -> u32`**
+  the class of a texture of w x h: its next power of two, 128 ..= 2048
+
+- **`fn mip_chain(d: &TextureData) -> Vec<Vec<u8>>`**
+  what add_texture uploads, without a device (tools, measurements): the texels resampled to their class's
+  size, then each mip level down to 1 x 1; rows of 4 bytes per texel.  Empty when the data is too short
+
+## gltf
+
+*glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU* -- crate root [`lib/gltf/lib.rs`](../lib/gltf/lib.rs)
+
+```text
+gltf -- glTF 2.0 import (G5b; docs/GLTF.md): .gltf (JSON with external files or data URIs) and .glb, read
+into a data model that needs no GPU: meshes of triangles with positions, normals and one uv set, materials
+with the five textures of pbrMetallicRoughness, decoded images (PNG and JPEG through img_png / img_jpeg),
+samplers, nodes with their world matrices in f64 and the instances a scene draws.  lib/render3d puts a
+Document on the GPU (render3d::gltf); a CAD or game tool can read the same without a device.
+
+  gltf::load(bytes, &mut |uri| Option<Vec<u8>>, &Limits) -> Result<Document>   .glb or .gltf by its first
+       bytes; the closure reads the files a .gltf names (relative paths, decoded; never called for data URIs)
+  doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
+  gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
+
+Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
+(Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
+anything (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is Error::Unsupported; other
+extensions and what this model has no place for (animations, skins, cameras, lights, tangents, colours,
+further uv sets) are ignored.  URIs that leave the file's folder (absolute paths, "..", a scheme) are
+refused before the closure sees them.
+```
+
+### `gltf` crate root
+
+- **`enum Error`**
+  what went wrong; the text says where
+  - `Json(String)` -- not JSON, or JSON that breaks the parser's limits (the byte offset in the text)
+  - `Invalid(String)` -- a rule of glTF or of a format inside it broken: an index or a range out of bounds, a wrong type, a cycle
+  - `Unsupported(String)` -- valid, but not supported here: a required extension, an image format, a URI scheme
+  - `Limit(String)` -- a Limits value exceeded
+  - `Missing(String)` -- the closure had no file for this URI
+
+- **`type Result<T> = core::result::Result<T, Error>`**
+
+- **`struct Limits`**
+  the bounds a file must stay in (Limits::DEFAULT; raise them for large files you trust more)
+  - `file_bytes: u64` -- bytes of the .glb / .gltf and of each file it names
+  - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
+  - `json_values: usize`
+  - `buffer_bytes: u64` -- bytes of all buffers together
+  - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
+  - `indices: u64`
+  - `nodes: usize` -- nodes, and how deep they nest
+  - `depth: usize`
+  - `instances: u64` -- instances of one scene (node x primitive)
+  - `image_pixels: u64` -- pixels of one image, bytes of all decoded images (4 per pixel)
+  - `image_bytes: u64`
+
+**`impl Limits`**
+
+- **`const DEFAULT: Limits = Limits { file_bytes: 1 << 30, json_bytes: 256 << 20, json ...`**
+
+- **`struct Document`**
+  what a file holds, in the order of its arrays (indices of the file stay valid)
+  - `version: String` -- asset.version ("2.0") and asset.generator
+  - `generator: String`
+  - `meshes: Vec<Mesh>`
+  - `materials: Vec<Material>`
+  - `textures: Vec<Texture>`
+  - `images: Vec<Image>`
+  - `nodes: Vec<Node>`
+  - `scenes: Vec<SceneDef>`
+  - `scene: Option<usize>` -- the scene to show (the file's `scene`; else the first; None: no scenes, instances() takes every root)
+  - `notes: Vec<String>` -- what was read but left out: points and lines, unused images, unknown attributes, ... (once each)
+
+- **`struct Mesh`**
+  a mesh: primitives with a material each
+  - `name: String`
+  - `primitives: Vec<Primitive>`
+
+- **`struct Primitive`**
+  triangles: one normal and one uv per position, three indices per triangle, counter-clockwise from outside.
+  Strips and fans become lists; points and lines are left out (a note)
+  - `positions: Vec<[f32; 3]>`
+  - `normals: Vec<[f32; 3]>`
+  - `uvs: Vec<[f32; 2]>`
+  - `indices: Vec<u32>`
+  - `material: Option<usize>`
+  - `flat_normals: bool` -- the file had no normals: each triangle has its own three vertices with its face's normal
+  - `has_uvs: bool` -- the file had TEXCOORD_0 (else every uv is 0)
+
+- **`enum AlphaMode`**
+  - `Opaque`
+  - `Mask` -- below alpha_cutoff: not drawn
+  - `Blend`
+
+- **`struct TextureRef`**
+  a texture of a material: which one, which uv set (render3d takes 0)
+  - `texture: usize`
+  - `tex_coord: u32`
+
+- **`struct Material`**
+  a material: pbrMetallicRoughness and the three others, with glTF's defaults for what the file leaves out
+  - `name: String`
+  - `base_color_factor: [f32; 4]` -- linear rgba; the texture is sRGB
+  - `base_color_texture: Option<TextureRef>`
+  - `metallic_factor: f32`
+  - `roughness_factor: f32`
+  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b
+  - `normal_texture: Option<TextureRef>`
+  - `normal_scale: f32`
+  - `occlusion_texture: Option<TextureRef>`
+  - `occlusion_strength: f32`
+  - `emissive_factor: [f32; 3]` -- linear rgb; the texture is sRGB
+  - `emissive_texture: Option<TextureRef>`
+  - `alpha_mode: AlphaMode`
+  - `alpha_cutoff: f32`
+  - `double_sided: bool`
+
+- **`enum Filter`**
+  - `Nearest`
+  - `Linear`
+
+- **`enum Wrap`**
+  - `Repeat`
+  - `ClampToEdge`
+  - `MirroredRepeat`
+
+- **`struct Sampler`**
+  a sampler; what the file leaves out is linear with linear mip levels, repeating
+  - `mag: Filter`
+  - `min: Filter`
+  - `mip: Option<Filter>` -- between mip levels; None: level 0 only (minFilter NEAREST or LINEAR)
+  - `wrap_s: Wrap`
+  - `wrap_t: Wrap`
+
+**`impl Sampler`**
+
+- **`const DEFAULT: Sampler = Sampler { mag: Filter::Linear, min: Filter::Linear, mip: ...`**
+
+- **`struct Texture`**
+  an image with a sampler.  image None: the file names its image only through an extension it does not
+  require (the materials' references to it are dropped, a note)
+  - `name: String`
+  - `image: Option<usize>`
+  - `sampler: Sampler`
+
+- **`struct Image`**
+  a decoded image: rows from the top, 4 bytes per pixel, r g b a with straight alpha; the file's colour
+  profile and gamma are ignored (glTF says so), a JPEG's EXIF orientation too.  Images no texture uses
+  are not decoded (width 0)
+  - `name: String`
+  - `width: u32`
+  - `height: u32`
+  - `rgba: Vec<u8>`
+
+- **`struct Node`**
+  a node: its own transform (column-major 4 x 4, f64), the product of those of its ancestors and itself
+  - `name: String`
+  - `mesh: Option<usize>`
+  - `children: Vec<usize>`
+  - `parent: Option<usize>`
+  - `local: [f64; 16]`
+  - `world: [f64; 16]`
+
+- **`struct SceneDef`**
+  - `name: String`
+  - `nodes: Vec<usize>` -- root nodes
+
+- **`struct InstanceRef`**
+  a primitive drawn by a node
+  - `node: usize`
+  - `mesh: usize`
+  - `primitive: usize`
+  - `world: [f64; 16]`
+
+```rust
+/// the identity, column-major
+IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 ...
+```
+
+**`impl Document`**
+
+- **`fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef>`**
+  the instances of a scene (None: Document::scene), depth first in the order of the file; without
+  scenes those of every node without a parent
+
+- **`fn load(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>, limits: &Limits) -> Result<Document>`**
+  read a .glb or a .gltf (by its first bytes); `files` gives the bytes of a relative URI the file names
+
+- **`fn glb_chunks(b: &[u8]) -> Result<(&[u8], Option<&[u8]>)>`**
+  the JSON and the BIN chunk of a .glb
+
+- **`fn write_glb(json: &[u8], bin: Option<&[u8]>) -> Vec<u8>`**
+  a .glb of a JSON text and a binary buffer (tools and tests): chunks padded with spaces and zeros
+
+- **`fn base64_decode(s: &[u8]) -> Option<Vec<u8>>`**
+  standard base64 (padding optional); None for anything else
+
+- **`fn base64_encode(b: &[u8]) -> String`**
+  base64 of bytes (tools and tests: data URIs)
+
+- **`fn sqrt(x: f64) -> f64`**
+  a square root in f64 (no libm in no_std)
+
+- **`fn mat_mul(a: &[f64; 16], b: &[f64; 16]) -> [f64; 16]`**
+  a \* b, column-major 4 x 4
+
+- **`fn trs_matrix(t: [f64; 3], q: [f64; 4], s: [f64; 3]) -> [f64; 16]`**
+  the matrix of translation, rotation (unit quaternion x, y, z, w) and scale: T \* R \* S
+
+- **`struct Trs`**
+  a node matrix taken apart: translation, rotation (unit quaternion x, y, z, w), scale (a mirror makes x
+  negative), and how far the columns are from right angles (|cos| of the worst pair: 0 without shear, which
+  T \* R \* S cannot hold)
+  - `translation: [f64; 3]`
+  - `rotation: [f64; 4]`
+  - `scale: [f64; 3]`
+  - `shear: f64`
+
+- **`fn decompose(m: &[f64; 16]) -> Trs`**
 
 ## shader
 

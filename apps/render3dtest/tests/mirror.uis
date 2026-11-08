@@ -1,0 +1,3 @@
+#!args --test mirror
+# (G5b) mirrored instances (negative scales) against the ray caster, their lists per mesh and side, turned at
+# run time, seen from inside, their visibility against the exact test; Voll and Basis
