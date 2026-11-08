@@ -8,6 +8,7 @@ rust-project.json
 /apps/jfWord/context
 /apps/jfWord/books
 /apps/JFNetworker/books
+/apps/JFDiagrammer/context
 /apps/BackupCraft/context
 /tools/paintcraft-pdn-host/obj
 *.pyc
