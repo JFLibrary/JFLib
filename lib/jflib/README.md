@@ -66,7 +66,11 @@ thread of its own, with results back through `plat::wake()`.
 ## The profiles
 
 Cargo takes no profile from a dependency, so every project needs these in its `Cargo.toml`.
-Without `panic = "abort"` the build stops at `ui::main!` with a message that says so.
+Without `panic = "abort"` the build stops at `ui::main!` with a message that says so. An app with
+std that must survive panics of its own code turns on the feature `unwind` instead of `std` and
+writes `panic = "unwind"` in both profiles: a panic it catches with `std::panic::catch_unwind`
+leaves it running, one nobody catches ends it with JFLib's crash report (`docs/GUIDE.md`, "An app
+with std").
 
 ```toml
 [profile.dev]
