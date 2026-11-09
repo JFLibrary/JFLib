@@ -4,7 +4,10 @@
 // schemes= as URL types), the icon as NAME.icns from res/app_*.png, signed ad hoc; with `sandbox`
 // in PERMISSIONS the App Sandbox and the entitlements its rules need.  The same bundle as the JFLib
 // repository's tools/apple.py mac_bundle.  On a Mac only (Apple's SDK, codesign).  --run starts it
-// through `open` (in the logged-in session, also from SSH) and waits for it.
+// through `open` (in the logged-in session, also from SSH) and waits for it.  jfgui_MAC_IDENTITY
+// names a certificate of the keychain ("Developer ID Application: NAME (TEAM)"): then the bundle is
+// signed with it, the hardened runtime and a secure time stamp instead of ad hoc (sign).  dmg puts a
+// bundle on a compressed disk image beside a link to /Applications (cargo jflib package --formats dmg).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,8 +16,8 @@ use std::process::Command;
 use crate::cargo;
 use crate::pkgmeta::{self, Meta, xml};
 
-const TRIPLE: &str = "aarch64-apple-darwin";
-const MAC_MIN: &str = "13.0";
+pub(crate) const TRIPLE: &str = "aarch64-apple-darwin";
+pub(crate) const MAC_MIN: &str = "13.0";
 /// (ICNS type, PNG size): up to the largest res/app_*.png (an icon is never scaled up)
 const ICNS: [(&[u8; 4], usize); 11] = [(b"icp4", 16), (b"icp5", 32), (b"ic11", 32), (b"icp6", 64), (b"ic12", 64), (b"ic07", 128),
                                        (b"ic13", 256), (b"ic08", 256), (b"ic14", 512), (b"ic09", 512), (b"ic10", 1024)];
@@ -58,7 +61,7 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
 }
 
 /// the program exe as out/NAME.app: Contents/MacOS/NAME, Info.plist, Resources/NAME.icns, signed
-fn bundle(dir: &Path, version: &str, exe: &Path, out: &Path) -> Result<PathBuf, String> {
+pub(crate) fn bundle(dir: &Path, version: &str, exe: &Path, out: &Path) -> Result<PathBuf, String> {
     let name = exe.file_name().and_then(|n| n.to_str()).ok_or("the program has no name")?.to_string();
     let app = out.join(format!("{name}.app"));
     let _ = fs::remove_dir_all(&app);
@@ -75,20 +78,79 @@ fn bundle(dir: &Path, version: &str, exe: &Path, out: &Path) -> Result<PathBuf, 
     }
     fs::write(contents.join("Info.plist"), info_plist(&meta, &name, version, icns.is_some())?).map_err(|e| e.to_string())?;
     fs::write(contents.join("PkgInfo"), "APPL????").map_err(|e| e.to_string())?;
-    let mut cmd = Command::new("codesign");
-    cmd.args(["-f", "-s", "-", "--timestamp=none"]);
     let ent = entitlements(pkgmeta::permissions(dir).as_deref());
     let ent_file = out.join(format!("{name}.entitlements"));
     if let Some(e) = &ent {
         fs::write(&ent_file, e).map_err(|e| e.to_string())?;
-        cmd.arg("--entitlements").arg(&ent_file);
     }
-    let st = cmd.arg(&app).status().map_err(|e| format!("codesign: {e}"))?;
+    let signed = sign(&app, ent.as_ref().map(|_| ent_file.as_path()));
     let _ = fs::remove_file(&ent_file);
-    if !st.success() {
-        return Err(format!("codesign {} failed", app.display()));
-    }
+    signed?;
     Ok(app)
+}
+
+/// the certificate of jfgui_MAC_IDENTITY (None: ad hoc)
+fn identity() -> Option<String> {
+    std::env::var("jfgui_MAC_IDENTITY").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+/// sign a bundle or a disk image: ad hoc, or with jfgui_MAC_IDENTITY, the hardened runtime and a time
+/// stamp (what notarization requires; a disk image gets neither runtime nor entitlements)
+pub(crate) fn sign(path: &Path, entitlements: Option<&Path>) -> Result<(), String> {
+    let ident = identity();
+    let image = path.extension().is_some_and(|e| e == "dmg");
+    let mut cmd = Command::new("codesign");
+    cmd.args(["-f", "-s", ident.as_deref().unwrap_or("-")]);
+    cmd.arg(if ident.is_some() { "--timestamp" } else { "--timestamp=none" });
+    if ident.is_some() && !image {
+        cmd.args(["--options", "runtime"]);
+    }
+    if let (Some(e), false) = (entitlements, image) {
+        cmd.arg("--entitlements").arg(e);
+    }
+    let st = cmd.arg(path).status().map_err(|e| format!("codesign: {e}"))?;
+    if !st.success() {
+        return Err(format!("codesign {} failed", path.display()));
+    }
+    Ok(())
+}
+
+/// the link to /Applications the user drags the app onto
+fn link_applications(dir: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    return std::os::unix::fs::symlink("/Applications", dir.join("Applications")).map_err(|e| format!("the link to /Applications: {e}"));
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
+        Err("a dmg is made on a Mac".to_string())
+    }
+}
+
+/// the bundle on a compressed disk image (hdiutil, UDZO) beside a link to /Applications, signed like
+/// the bundle when there is an identity
+pub(crate) fn dmg(app: &Path, out: &Path, volume: &str) -> Result<(), String> {
+    let stage = out.with_extension("dmg-stage");
+    let _ = fs::remove_dir_all(&stage);
+    let dir = stage.join(volume);
+    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let name = app.file_name().ok_or("the bundle has no name")?;
+    let run = |cmd: &mut Command, what: &str| -> Result<(), String> {
+        let st = cmd.status().map_err(|e| format!("{what}: {e}"))?;
+        if st.success() { Ok(()) } else { Err(format!("{what} failed")) }
+    };
+    let made = (|| {
+        run(Command::new("ditto").arg(app).arg(dir.join(name)), "ditto")?; // keeps the signature and the modes
+        link_applications(&dir)?;
+        let _ = fs::remove_file(out);
+        run(Command::new("hdiutil").args(["create", "-volname", volume, "-srcfolder"]).arg(&dir)
+            .args(["-fs", "HFS+", "-format", "UDZO", "-ov", "-quiet"]).arg(out), "hdiutil create")
+    })();
+    let _ = fs::remove_dir_all(&stage);
+    made?;
+    if identity().is_some() {
+        sign(out, None)?;
+    }
+    Ok(())
 }
 
 /// the icon as an ICNS file of PNG entries, None without res/app_*.png

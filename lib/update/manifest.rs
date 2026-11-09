@@ -5,7 +5,7 @@
 //                                           kind this version does not know are left out)
 //   Manifest::package_for(target, appimage) the entry for this system and installation
 //   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
-//   target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
+//   target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | "macos-aarch64" | ...
 //   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
 
 use alloc::format;
@@ -163,10 +163,14 @@ pub fn verify(bytes: &[u8], sig_text: &[u8], keys: &[[u8; 32]]) -> bool {
 }
 
 /// the system this program runs on, as the manifest names it: "windows-x86_64",
-/// "linux-x86_64", "linux-aarch64", "android-aarch64", "web-wasm32"
+/// "linux-x86_64", "linux-aarch64", "android-aarch64", "macos-aarch64", "ios-aarch64", "web-wasm32"
 pub fn target() -> &'static str {
     if cfg!(target_arch = "wasm32") {
         "web-wasm32"
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "x86_64") { "macos-x86_64" } else { "macos-aarch64" }
+    } else if cfg!(target_os = "ios") {
+        "ios-aarch64"
     } else if cfg!(target_os = "android") {
         if cfg!(target_arch = "x86_64") { "android-x86_64" } else { "android-aarch64" }
     } else if cfg!(windows) {

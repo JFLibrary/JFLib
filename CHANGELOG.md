@@ -45,6 +45,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** iOS through UIKit (docs/APPLE.md, AP5): the app's runtime takes Android's host path, a host in Rust drives it (apple_ios.rs): one scene with a view inside the safe area and above the keyboard, the frame as the layer's contents, fingers with their coalesced samples, the Apple Pencil as a pen, an iPad's pointer as a mouse, the on-screen keyboard (UIKeyInput) and a hardware keyboard, rotation, the display link resting while the app is idle, active / background / termination as E_FOCUS_*, E_POWER and E_SESSION_END, the appearance, reduced motion and darker colours as system settings; the clipboard through UIPasteboard, Open / Save as / folders through UIDocumentPickerViewController (answering later, as on Android), URLs through UIApplication, spell checking through UITextChecker
 - **build:** build_rs.py test NAME --target ios --sim runs an app's scripts in the simulator (tools/apple.py sim starts programs in the repository's folder: jfgui_CWD on iOS); the iOS bundle's Info.plist names its scene and orientations; androidGallery and plattest build for ios; plattest --test clip checks the real clipboard (not in all)
 - **plat:** iOS after the check on the iPhone: a bar with Done above the on-screen keyboard (an iPhone has no key that closes it), notifications through UNUserNotificationCenter (asked the first time; refused: NoteClosed), the motion sensors and the location through Core Motion and Core Location (web_sensors.rs's host interface, as on Android); the block helpers of macOS's notifications are shared with iOS (apple_block.rs)
+- **build:** A .dmg for macOS: tools/package.py --formats dmg and cargo jflib package --formats dmg (on a Mac; per style) put NAME.app on a compressed disk image beside a link to /Applications; tools/apple.py dmg; with jfgui_MAC_IDENTITY the bundle and the image are signed with that certificate, the hardened runtime and a time stamp instead of ad hoc (docs/APPLE.md AP8a)
 
 ### Changed
 
@@ -79,6 +80,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
+- **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
 
 ## [0.1.0] - 2026-11-08
 

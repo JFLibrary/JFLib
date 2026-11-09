@@ -15,7 +15,7 @@ path) or jfgui_UPDATE_KEY (the key text).  A key file holds one line "JFUPDKEY1 
 (the Ed25519 seed).  Keep it out of the repository (*.updkey is ignored by git) -- whoever has
 it can ship code to every installation.
 
-TARGET is "windows-x86_64", "linux-x86_64", "linux-aarch64", ... (update::target()); kind
+TARGET is "windows-x86_64", "linux-x86_64", "linux-aarch64", "macos-aarch64", ... (update::target()); kind
 "exe" (default) replaces the program file, "bundle" is a JFA1 bundle of files relative to the
 program's folder (tools/assetpack.py pack_files), "package" an installer the app hands to the
 user, "appimage" a whole AppImage that replaces the running AppImage's file (only a program

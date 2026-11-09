@@ -7,6 +7,7 @@ the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun de
                                                             sign it for the iPhone only
     python tools/apple.py gui build/mac/NAME [ARGS..]       start a program with windows from SSH
     python tools/apple.py mac build/mac/NAME [APP]           pack a macOS program as NAME.app beside it
+    python tools/apple.py dmg build/mac/NAME.app [OUT.dmg]   the bundle as a disk image (docs/APPLE.md AP8)
 
 build_rs.py packs every program it builds for ios into NAME.app next to it (bundle); the simulator's
 build is signed ad hoc there.  The iPhone needs the Apple Development certificate and a provisioning
@@ -26,7 +27,10 @@ build_rs.py packs every program it builds for mac into NAME.app too (mac_bundle,
 Info.plist from apps/APP/PACKAGE (display, version, app_id, filetypes= as document types -- "own"
 ones also exported as types of the app --, schemes= as URL types), the icon as NAME.icns from
 res/app_*.png (none without), signed ad hoc; PERMISSIONS with `sandbox` turns on the App Sandbox with
-the entitlements its rules need (mac_entitlements).
+the entitlements its rules need (mac_entitlements).  The signature is ad hoc unless jfgui_MAC_IDENTITY names a
+certificate of the keychain ("Developer ID Application: NAME (TEAM)"): then with the hardened runtime and a
+secure time stamp, as notarization wants (mac_sign).  mac_dmg puts a bundle on a compressed disk image
+(hdiutil, UDZO) beside a link to /Applications; with an identity the image is signed too.
 
     jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone)
     jfgui_SIM_KEEP=1          leave a simulator running that this tool booted
@@ -237,15 +241,53 @@ def mac_bundle(exe, app=None):
         plist["CFBundleIconFile"] = name
     (contents / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
     (contents / "PkgInfo").write_bytes(b"APPL????")
-    ent = mac_entitlements(pkgmeta.permissions(app))
-    cmd = ["codesign", "-f", "-s", "-", "--timestamp=none"]
-    with tempfile.TemporaryDirectory() as d:
-        if ent:
-            ef = Path(d) / "entitlements.plist"
-            ef.write_bytes(plistlib.dumps(ent, fmt=plistlib.FMT_XML))
-            cmd += ["--entitlements", ef]
-        run(cmd + [bundle])
+    mac_sign(bundle, mac_entitlements(pkgmeta.permissions(app)))
     return bundle
+
+
+def mac_identity():
+    """the signing certificate of jfgui_MAC_IDENTITY (None: ad hoc)"""
+    return os.environ.get("jfgui_MAC_IDENTITY", "").strip() or None
+
+
+def mac_sign(path, entitlements=None):
+    """sign a bundle or a disk image: ad hoc, or with jfgui_MAC_IDENTITY, the hardened runtime and a time
+    stamp (what notarization requires; a disk image gets neither runtime nor entitlements)"""
+    ident = mac_identity()
+    path = Path(path)
+    image = path.suffix == ".dmg"
+    cmd = ["codesign", "-f", "-s", ident or "-"]
+    cmd += ["--timestamp"] if ident else ["--timestamp=none"]
+    if ident and not image:
+        cmd += ["--options", "runtime"]
+    with tempfile.TemporaryDirectory() as d:
+        if entitlements and not image:
+            ef = Path(d) / "entitlements.plist"
+            ef.write_bytes(plistlib.dumps(entitlements, fmt=plistlib.FMT_XML))
+            cmd += ["--entitlements", ef]
+        run(cmd + [path], timeout=300)
+
+
+def mac_dmg(bundle, out=None, volume=None):
+    """the bundle on a compressed disk image beside a link to /Applications (drag it there to install)
+    -> the image's path (default: NAME.dmg beside the bundle)"""
+    bundle = Path(bundle)
+    if bundle.suffix != ".app" or not (bundle / "Contents" / "Info.plist").exists():
+        raise RuntimeError(f"{bundle} is no app bundle")
+    out = Path(out) if out else bundle.with_suffix(".dmg")
+    volume = volume or bundle.stem
+    with tempfile.TemporaryDirectory() as d:
+        stage = Path(d) / volume
+        stage.mkdir()
+        run(["ditto", bundle, stage / bundle.name])          # keeps the signature and the modes
+        (stage / "Applications").symlink_to("/Applications")
+        if out.exists():
+            out.unlink()
+        run(["hdiutil", "create", "-volname", volume, "-srcfolder", stage, "-fs", "HFS+", "-format", "UDZO", "-ov",
+             "-quiet", out], timeout=600)
+    if mac_identity():
+        mac_sign(out)
+    return out
 
 
 # ---------------------------------------------------------------- macOS: windows from SSH
@@ -457,13 +499,16 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac", "dmg"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
     try:
         if cmd == "mac":
             print(mac_bundle(path, rest[0] if rest else None))
+            return 0
+        if cmd == "dmg":
+            print(mac_dmg(path, rest[0] if rest else None))
             return 0
         if cmd in ("sim", "gui"):
             r = sim_run(path, rest) if cmd == "sim" else gui_run(path, rest)
