@@ -20,7 +20,10 @@ modules, items re-exported with `pub use` (globs too, through private modules), 
 of public types, every method of a public trait.  An item's text is its /// comment; consts,
 fields and variants also take the // comment that ends their line, consts the plain //
 lines right above them.  Files of #[cfg(windows)] / #[cfg(target_os = "linux")] /
-#[cfg(target_vendor = "apple")] modules are marked (Windows) / (Linux) / (Apple).
+#[cfg(target_vendor = "apple")] modules are marked (Windows) / (Linux) / (Apple).  A module
+declared once per platform under one name (plat/process.rs: three `mod native`, each with its
+own #[cfg] and #[path]) keeps every variant: a path through it (`pub use native::Child`) reaches
+the item in each of them, and each variant's file has its own section with its own mark.
 
 ui: the files are grouped by area (UI_AREAS), with an index of the Ui methods per area.
 Codec crates (img_png ... img_pdn): the crate root, the items re-exported there, the items
@@ -558,7 +561,7 @@ class Module:
         self.path, self.name, self.parent = path, name, parent
         self.cfg, self.vis, self.item = cfg, vis, item
         self.items = []         # every item but mod / use (source order)
-        self.children = {}      # name -> Module
+        self.children = {}      # name -> [Module]: one per cfg variant (`mod native` per platform)
         self.inline = []        # inline child modules (mod x { .. }) in source order
         self.uses = []          # (vis, [(segments, alias, glob)], text)
         self.header = []
@@ -583,7 +586,7 @@ def fill_module(mod, p, items, child_dir, file_dir, files):
         if it.kind == "mod":
             if it.body is not None:                             # mod name { .. }
                 sub = Module(mod.path, it.name, mod, it.cfg, it.vis, it)
-                mod.children[it.name] = sub
+                mod.children.setdefault(it.name, []).append(sub)
                 mod.inline.append(sub)
                 fill_module(sub, p, p.items(*it.body), child_dir / it.name, file_dir, files)
                 continue
@@ -595,7 +598,7 @@ def fill_module(mod, p, items, child_dir, file_dir, files):
                 if not f.exists():
                     f = child_dir / it.name / "mod.rs"
             if f.exists():
-                mod.children[it.name] = load_module(f, it.name, mod, it.cfg, it.vis, files, it)
+                mod.children.setdefault(it.name, []).append(load_module(f, it.name, mod, it.cfg, it.vis, files, it))
         elif it.kind == "use":
             mod.uses.append((it.vis, parse_use(it.sig), it.sig))
         elif it.kind not in ("extern_crate", "extern_block", "other"):
@@ -629,16 +632,18 @@ class Crate:
 
         def walk(m):
             out.append(m)
-            for ch in m.children.values():
-                walk(ch)
+            for variants in m.children.values():
+                for ch in variants:
+                    walk(ch)
         walk(self.root)
         return out
 
     def resolve(self, mod, segs):
-        """(module, rest of the path) for a use path; module None = another crate"""
+        """[(module, rest of the path)] for a use path, one per cfg variant of the modules on
+        the way (`native::Child` with three `mod native`: three); [(None, segs)] = another crate"""
         cur, k = mod, 0
         if not segs:
-            return mod, []
+            return [(mod, [])]
         if segs[0] == "crate":
             cur, k = self.root, 1
         elif segs[0] == "self":
@@ -648,11 +653,17 @@ class Crate:
                 cur = cur.parent or cur
                 k += 1
         elif segs[0] not in mod.children:
-            return None, segs
-        while k < len(segs) and segs[k] in cur.children:
-            cur = cur.children[segs[k]]
-            k += 1
-        return cur, segs[k:]
+            return [(None, segs)]
+        out = []
+
+        def walk(cur, k):
+            if k < len(segs) and segs[k] in cur.children:
+                for ch in cur.children[segs[k]]:
+                    walk(ch, k + 1)
+            else:
+                out.append((cur, segs[k:]))
+        walk(cur, k)
+        return out
 
     def visit_ns(self, mod):
         if id(mod) not in self.ns:
@@ -670,23 +681,24 @@ class Crate:
                 self.reach.add(id(it))
                 if via_use:
                     self.rexp.add(id(it))
-        for ch in mod.children.values():
-            if ch.vis == "pub":
-                self.visit_ns(ch)
+        for variants in mod.children.values():
+            for ch in variants:
+                if ch.vis == "pub":
+                    self.visit_ns(ch)
         for vis, trees, text in mod.uses:
             if vis != "pub":
                 continue
             ext = False
             for segs, alias, glob in trees:
-                target, rest = self.resolve(mod, segs)
-                if target is None:
-                    ext = True
-                elif glob and not rest:
-                    self.flatten(target, True)
-                elif not glob and len(rest) == 1:
-                    self.mark(target, rest[0])
-                elif not glob and not rest:
-                    self.visit_ns(target)
+                for target, rest in self.resolve(mod, segs):
+                    if target is None:
+                        ext = True
+                    elif glob and not rest:
+                        self.flatten(target, True)
+                    elif not glob and len(rest) == 1:
+                        self.mark(target, rest[0])
+                    elif not glob and not rest:
+                        self.visit_ns(target)
             if ext and not via_use and (mod, text) not in self.external:
                 self.external.append((mod, text))
 
@@ -698,20 +710,20 @@ class Crate:
                 self.reach.add(id(it))
                 self.rexp.add(id(it))
                 found = True
-        if name in mod.children:
-            self.visit_ns(mod.children[name])
+        for ch in mod.children.get(name, ()):
+            self.visit_ns(ch)
             found = True
         if found or depth > 8:
             return
         for vis, trees, text in mod.uses:
             for segs, alias, glob in trees:
-                target, rest = self.resolve(mod, segs)
-                if target is None:
-                    continue
-                if glob and not rest:
-                    self.mark(target, name, depth + 1)
-                elif not glob and len(rest) == 1 and (alias or rest[0]) == name:
-                    self.mark(target, rest[0], depth + 1)
+                for target, rest in self.resolve(mod, segs):
+                    if target is None:
+                        continue
+                    if glob and not rest:
+                        self.mark(target, name, depth + 1)
+                    elif not glob and len(rest) == 1 and (alias or rest[0]) == name:
+                        self.mark(target, rest[0], depth + 1)
 
     def file_list(self):
         skip = SKIP_FILES.get(self.name, set())
