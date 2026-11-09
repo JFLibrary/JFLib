@@ -3065,6 +3065,9 @@ impl Ui {
         if self.wp.canv.views.is_empty() {
             return;
         }
+        // (contents the app dropped: their records go, and with them what holds a device; also without an output,
+        // where gp_tick does not look)
+        self.m.gview.views.retain(|e| e.content.strong_count() > 0);
         let i = self.uiw_cur as usize;
         let now = plat::time_us();
         let dev = self.gp_view_device(now);
