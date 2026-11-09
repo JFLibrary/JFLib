@@ -1644,6 +1644,7 @@ name = "viewtest"
 version = "0.1.0"
 dependencies = [
  "jflib-build",
+ "jflib-plat",
  "jflib-rt",
  "jflib-style-winui",
  "jflib-ui",

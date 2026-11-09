@@ -8,8 +8,11 @@
 //   menus at a point     a right click on the page opens its menu one pass later, where the
 //                        click was (ui.menu_popup_at), as when an engine answers; "Menü später"
 //                        opens a flyout of the app's own at a point of the page (ui.popup_open_at)
+//   the links            drawn by the page itself, published as K_LINK records without a hit box
+//                        (ui.sem_rect): a script clicks one by its label, the page gets the click
 //
-// tests/keys.uis and tests/menus.uis drive it; the texts above the page say what it saw.
+// tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
+// it saw.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -20,6 +23,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use plat::a11y::Role;
 use ui::*;
 
 const ID_SINK: u32 = 100;
@@ -28,10 +32,12 @@ const ID_PLAIN: u32 = 102;
 const ID_LATER: u32 = 103; // "Menü später"
 const ID_FLYOUT: u32 = 104; // the flyout it opens at a point of the page
 const ID_ROW: u32 = 105; // its row
+const ID_TREE: u32 = 106; // "Baum prüfen": the links of the accessibility tree
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
 const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
+const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
@@ -45,7 +51,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 480,
+    h: 560,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -71,11 +77,15 @@ struct ViewTest {
     later: bool,
     copy: u32,
     rows: u32,
+    /// the link the page saw a click on
+    clicked: &'static str,
+    /// the names of the links in the accessibility tree ("Baum prüfen")
+    tree: String,
 }
 
 impl Default for ViewTest {
     fn default() -> Self {
-        ViewTest { sink: 1, keys: Vec::new(), new_tab: 0, reload: 0, cursor: u32::MAX, hover: 0, menu_at: None, later: false, copy: 0, rows: 0 }
+        ViewTest { sink: 1, keys: Vec::new(), new_tab: 0, reload: 0, cursor: u32::MAX, hover: 0, menu_at: None, later: false, copy: 0, rows: 0, clicked: "-", tree: String::new() }
     }
 }
 
@@ -108,9 +118,19 @@ impl ViewTest {
         let r = inp.rect;
         ui.draw_color(0xFFFF_FFFF);
         ui.draw_rect(r[0], r[1], r[2], r[3]);
-        for (i, (l, _)) in LINKS.iter().enumerate() {
+        for (i, (l, text)) in LINKS.iter().enumerate() {
+            let lr = [r[0] + ui.dp(l[0]), r[1] + ui.dp(l[1]), ui.dp(l[2]), ui.dp(l[3])];
             ui.draw_color(if hover == i as u32 + 1 { 0xFF00_40C0 } else { 0xFF20_60E0 });
-            ui.draw_rect(r[0] + ui.dp(l[0]), r[1] + ui.dp(l[1]), ui.dp(l[2]), ui.dp(l[3]));
+            ui.draw_rect(lr[0], lr[1], lr[2], lr[3]);
+            // what an engine's tree would say: a link with its text, no hit box of its own
+            ui.sem_rect(K_LINK, 0, lr, Some(text), 0);
+        }
+        // a click on the page: on a link?
+        if inp.ev & EV_ACT != 0 {
+            if let Some(i) = link_at(ui, inp.press_x, inp.press_y) {
+                self.clicked = LINKS[i].1;
+                ui.repass();
+            }
         }
         let now = if inp.ev & EV_HOVER != 0 { link_at(ui, inp.x, inp.y).map_or(0, |i| i as u32 + 1) } else { 0 };
         if now != hover {
@@ -187,6 +207,11 @@ impl App for ViewTest {
         self.page(ui);
         self.plain(ui);
         ui.text(TS_BODY, &format!("Menü: Kopieren {} Eintrag {}", self.copy, self.rows));
+        ui.text(TS_BODY, &format!("Geklickt: {}", self.clicked));
+        if ui.button(ID_TREE, "Baum prüfen") & EV_ACT != 0 {
+            ui.cmd_run(CMD_TREE, 0);
+        }
+        ui.text(TS_BODY, &format!("Baum: {}", self.tree));
         if ui.button(ID_LATER, "Menü später") & EV_ACT != 0 {
             self.later = true;
         }
@@ -197,8 +222,14 @@ impl App for ViewTest {
         ui.flyout_end();
     }
 
-    fn command(&mut self, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
         match id {
+            CMD_TREE => {
+                // what a screen reader gets: the page's links as links with their names
+                let tree = ui.a11y_tree();
+                let links = tree.wins.first().map(|w| w.nodes.iter().filter(|n| n.role == Role::Link).map(|n| n.name.as_str()).collect::<Vec<_>>());
+                self.tree = links.unwrap_or_default().join(", ");
+            }
             CMD_NEW_TAB => self.new_tab += 1,
             CMD_RELOAD => self.reload += 1,
             CMD_COPY => self.copy += 1,
