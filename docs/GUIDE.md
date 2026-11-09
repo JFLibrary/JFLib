@@ -5,7 +5,7 @@ ways to write one, and the code is the same in both:
 
 * **An app of your own**, with the crate `jflib`: one dependency, Cargo builds it, and
   `cargo jflib` (`cargo install cargo-jflib`) makes the project, runs its tests, reloads it while you edit, builds
-  it for the browser and Android and packages it. Start with `cargo jflib new NAME`.
+  it for the browser, Android and macOS and packages it. Start with `cargo jflib new NAME`.
 * **An app inside this repository** (`apps/NAME`), built by `build_rs.py`, which builds the
   library and every app of the repository through Cargo.
 
@@ -98,7 +98,8 @@ panic still ends with JFLib's crash report (`rt::panic_hook`). What changes agai
 | Android | `cargo jflib android`; `std::fs` needs real paths (the app's folder). JFLib's paths (`/tmp`, `/documents`) are names that only `plat` resolves |
 
 `cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
-Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux.
+Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux, `dmg` on a Mac (`cargo jflib mac` builds
+`NAME.app` there; [APPLE.md](APPLE.md)).
 
 **One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
 and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is
@@ -2689,7 +2690,9 @@ ui::main!({
   the same key; a folder the user cannot write is `Error::ReadOnly`; `fs.write $APPIMAGE/**`),
   a Flatpak checks and installs through the Flatpak portal (`Kind::Flatpak`; `apply()` starts
   the new version), and an MSIX package or a Snap answers `Check::Managed(..)`: App Installer,
-  the Store or snapd update it ([UPDATES.md](UPDATES.md), "Packages").
+  the Store or snapd update it ([UPDATES.md](UPDATES.md), "Packages").  On macOS a program in an
+  app bundle takes the channel's `app` entry: the whole `NAME.app` is replaced in one step after
+  its signature checked against the installed one ([UPDATES.md](UPDATES.md), "macOS app bundles").
 
 ## 19. Accessibility (screen readers)
 
