@@ -235,6 +235,43 @@ eigenen Fenster (`[NSWindow sendEvent:]` oder direkt an die View), nichts erreic
 **Fertig, wenn:** die Desktop-Apps (`jfWord`, `BackupCraft`, JFPainter) auf dem Mac ohne fehlende Grundfunktionen
 laufen.
 
+**Aufteilung (2026-11-10).** Die Bestandsaufnahme nach AP4 ergab mehr als die Liste oben: Papierkorb, zuletzt
+benutzte Dateien, Locale und Rechtschreibung des Systems (aus AP3), globale Tastenkürzel, `E_POWER` und
+`E_SESSION_END` sowie Cmd+Q fehlen ebenfalls. Eine Menüleiste aus den Menüs der App gibt es auf keiner Plattform,
+die UI zeichnet ihre Menüs selbst; oben steht deshalb zunächst nur das App-Menü des Systems. AP7 läuft in drei
+Schritten, jeder für sich prüfbar und mergebar:
+
+- **AP7a, die App im System:** App-Menü (Über, Ausblenden, Beenden mit Cmd+Q als `E_CLOSE` des Hauptfensters,
+  Fenster-Menü mit Cmd+M), App-Delegate (Beenden über Dock oder Abmelden fragt die App), `E_POWER` und
+  `E_SESSION_END` (`NSWorkspace`), Ruhezustand verhindern (`IOPMAssertion`), Papierkorb (`NSFileManager`), zuletzt
+  benutzte Dateien (`NSDocumentController`), Sprachen und Format des Systems (`CFLocale`), die Rechtschreibung des
+  Systems (`NSSpellChecker`), Drucken über den Druckdialog des Systems, Tool-Fenster, die beim Klick die Tastatur nur
+  für ein Textfeld nehmen (wie unter Windows).
+- **AP7b, Dienste:** Statusmenü (`NSStatusItem`) und Mitteilungen, Dock (Badge, Fortschritt), Autostart (Login-Item
+  über einen LaunchAgent, mit Bündel `SMAppService`), globale Tastenkürzel, Dateien und URLs, mit denen das System die
+  App öffnet (`application:openURLs:`).
+- **AP7c, Bündel und Apps:** GUI-Apps als `NAME.app` mit `Info.plist` und Symbol (`.icns`) aus `build_rs.py` und
+  `cargo-jflib`, Dateizuordnungen im `Info.plist`, App-Sandbox und die Rechte aus PERMISSIONS.md als Entitlements;
+  dann `jfWord`, `BackupCraft` und JFPainter auf dem Mac.
+
+**AP7a umgesetzt (2026-11-10):** [`apple_mac_app.rs`](../lib/plat/apple_mac_app.rs) baut beim ersten Fenster das
+App-Menü und das Fenster-Menü (Deutsch oder Englisch nach der ersten Sprache des Systems). Cmd+Q, „Beenden“ im Dock
+und das Abmelden fragen über `applicationShouldTerminate:` das Hauptfenster (`E_CLOSE`), die App entscheidet. Ein
+Klick aufs Dock-Symbol holt das Hauptfenster zurück. `NSWorkspace` meldet Ruhezustand und Aufwachen (`E_POWER`) und das
+Ausschalten (`E_SESSION_END`); SIGTERM kommt über eine Dispatch-Quelle der Hauptschlange ebenfalls als
+`E_SESSION_END`. Tool-Fenster sind Panels einer eigenen Klasse und werden nur bei einem Klick in ein Textfeld zum
+Schlüsselfenster. Dazu: Ruhezustand verhindern ([`apple_power.rs`](../lib/plat/apple_power.rs), IOKit-Assertions),
+Papierkorb (`NSFileManager`), zuletzt benutzte Dateien ([`apple_recent.rs`](../lib/plat/apple_recent.rs),
+`NSDocumentController`), Sprachen und Format des Systems (`CFLocale`, auch iOS; von Hand gesetzte `LANGUAGE`,
+`LC_*` gehen vor, `LANG` allein nicht, weil Terminal es aus der Region setzt), die Rechtschreibung des Systems
+([`apple_spell.rs`](../lib/plat/apple_spell.rs), `NSSpellChecker`, auf dem Test-Mac 44 Sprachen) und der Druckdialog
+(`NSPrintPanel`, danach das PDF des Auftrags über PDFKit auf dem gewählten Papier).
+
+Geprüft auf dem Mac: `plattest --test trash` (19), `power` (10), `spell` (57), `recent` (43), `all` (212) per SSH,
+`--test window` (57) in der angemeldeten Sitzung, mit Testhilfen für Menü, Beenden, `NSWorkspace`, SIGTERM und das
+abgebrochene Druckpanel. Noch nicht geprüft: Der Panel-Fokus braucht eine aktive App, und der Test-Mac stand beim
+Lauf auf dem Sperrbildschirm.
+
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 
 - `.app` als `.dmg`, Signatur mit Developer ID und Notarisierung, Update-Kanal `macos-aarch64`, iOS über TestFlight,

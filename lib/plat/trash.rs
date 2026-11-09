@@ -22,7 +22,11 @@
 // extension.  Nothing is copied across file systems, a mount point is not moved, and the
 // trash itself cannot be trashed.  Missing trash folders are created with mode 0700.
 //
-// Browser and Android: false (there is no trash).
+// macOS: NSFileManager's trashItemAtURL:resultingItemURL:error: (the Finder's trash of the item's
+// volume; the Finder can put it back); true only when it reports the new place and the item is
+// gone from the old one.
+//
+// Browser, Android and iOS: false (there is no trash).
 
 #[cfg(windows)]
 pub(crate) use win::trash_raw;
@@ -30,10 +34,43 @@ pub(crate) use win::trash_raw;
 #[cfg(target_os = "linux")]
 pub(crate) use lnx::trash_raw;
 
-/// the browser and Android have no trash
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+pub(crate) use mac::trash_raw;
+
+/// the browser, Android and iOS have no trash
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub(crate) fn trash_raw(_path: &str) -> bool {
     false
+}
+
+// ---------------------------------------------------------------- macOS
+
+#[cfg(target_os = "macos")]
+mod mac {
+    use crate::apple::objc::{Id, NIL, class, msg, nsstring, objc_autoreleasePoolPop, objc_autoreleasePoolPush, release};
+
+    pub(crate) fn trash_raw(path: &str) -> bool {
+        let Some(n) = crate::policy::normalize(path) else { return false };
+        if n == "/" || !n.starts_with('/') || crate::file_exists_raw(&n) == 0 {
+            return false;
+        }
+        // SAFETY: a pool of ours; NSFileManager's call with an NSURL made here; the out values are
+        // autoreleased in the pool.
+        let moved = unsafe {
+            let pool = objc_autoreleasePoolPush();
+            let s = nsstring(&n);
+            let url: Id = msg!(class(c"NSURL"), c"fileURLWithPath:", s => Id; Id);
+            release(s);
+            let fm: Id = msg!(class(c"NSFileManager"), c"defaultManager"; Id);
+            let (mut new_url, mut err): (Id, Id) = (NIL, NIL);
+            let ok = !url.is_null()
+                && !fm.is_null()
+                && msg!(fm, c"trashItemAtURL:resultingItemURL:error:", url => Id, &mut new_url as *mut Id => *mut Id, &mut err as *mut Id => *mut Id; bool);
+            objc_autoreleasePoolPop(pool);
+            ok && !new_url.is_null()
+        };
+        moved && crate::file_exists_raw(&n) == 0
+    }
 }
 
 // ---------------------------------------------------------------- Windows

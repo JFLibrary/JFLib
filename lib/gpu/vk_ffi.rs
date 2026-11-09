@@ -204,6 +204,7 @@ pub const IMAGE_VIEW_TYPE_2D_ARRAY: u32 = 5;
 pub const IMAGE_VIEW_TYPE_CUBE_ARRAY: u32 = 6;
 pub const IMAGE_TILING_OPTIMAL: u32 = 0;
 pub const SHARING_MODE_EXCLUSIVE: u32 = 0;
+pub const SHARING_MODE_CONCURRENT: u32 = 1;
 pub const SAMPLE_COUNT_1_BIT: u32 = 1;
 
 pub const IMAGE_ASPECT_COLOR_BIT: u32 = 1;

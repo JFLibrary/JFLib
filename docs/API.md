@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -8633,6 +8633,15 @@ Linux program, the browser), or without a GPU, it prints a SKIP once and does no
   gpu lose               the device behaves as lost from now on (Device::test_lose)
   gpu hold MS            real time passes, the windows stay as they are (a look from outside)
   gpu print              the counters
+```
+
+```rust
+/// the embedded shaders of the output and their source (uigputest: the embedding check)
+GPU_OUT_WGSL: &str = include_str!("gpu_out.wgsl")
+GPU_OUT_VS: &[u32] = spv::VS
+GPU_OUT_FS: &[u32] = spv::FS
+GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE
+GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
 ```
 
 **`impl Ui`**
@@ -18077,9 +18086,14 @@ Planned: Metal; it provides the same types and methods.
   instance.prepare() -> Result<bool>             adapter and device are there (false: the browser's
                    answer is on its way; never waits; true at once elsewhere)
   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
+         create_device_with(&DeviceDesc, &DeviceOptions)   (G5d) options: compute_queue (asked for, off by default)
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
          wait(id, timeout_ns), wait_idle(), memory_reserved()
+  device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies, when
+         DeviceOptions asked for it (Vulkan: a family without graphics; None in the browser, without one
+         and when not asked for): encoder(), submit, submit_after(&[id], ..); queue.submit_after(&[id], ..)
+         waits for the other
   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
                                                   read(off, &mut [T]) (Upload / Readback)
   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -18138,7 +18152,8 @@ before the drop (the device's timeline).  Nothing waits on the CPU unless asked 
 read_buffer, Timestamps::read_*).
 
 Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
-jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
+queue of its own for compute, even when DeviceOptions asks for one),
 jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 ```
@@ -18300,6 +18315,19 @@ COLOR_TARGETS_MAX: usize = 8
 **`impl DeviceDesc`**
 
 - **`const DEFAULT: DeviceDesc = DeviceDesc { max_level: Level::Voll }`**
+
+- **`struct DeviceOptions`**
+  (G5d) what Adapter::create_device_with sets up beyond DeviceDesc; DEFAULT is what create_device does.  Fields may
+  come in later versions: start from DEFAULT
+  - `compute_queue: bool` -- a queue of its own for compute and copies (Device::compute_queue): Vulkan, where the device has a family
+    without graphics.  Then every buffer and every texture that is no render target is shared by both queues'
+    families (concurrently), which some GPUs may pay for; off by default, and jfgui_GPU_COMPUTE=0 turns it off
+
+**`impl DeviceOptions`**
+
+- **`const DEFAULT: DeviceOptions = DeviceOptions { compute_queue: false }`**
+- **`const fn with_compute_queue(self) -> DeviceOptions`**
+  these options with a compute queue asked for
 
 - **`struct SubmitId(pub u64)`**
   a submission's place on the device timeline (Device::wait)
@@ -18744,6 +18772,9 @@ write), CopySrc / CopyDst (transfer), Sampled (vertex + fragment + compute shade
 (colour output), DepthTarget (early + late fragment tests), DepthRead (fragment tests and
 shaders), Present (as Undefined; bottom of pipe).
 Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
+(G5d) An encoder of the compute queue (ComputeQueue::encoder) records no render pass, and its barriers keep the
+stages and accesses a compute family has (compute, copies, indirect arguments, the host): the graphics stages of a
+layout or of Access flags fall away there.
 ```
 
 - **`struct CommandEncoder<'a>`**
@@ -18755,7 +18786,7 @@ Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
 **`impl Device`**
 
 - **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
-  a command encoder (a recording command buffer)
+  a command encoder (a recording command buffer) of the device's queue
 
 **`impl<'a> CommandEncoder<'a>`**
 
@@ -18829,7 +18860,10 @@ buffer slots, staged uploads, submission
        primitive index (geometryShader), sample-rate shading, dual-source blending in
        shaders, the extended storage image formats, storage reads without format.  Not
        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
-  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
+  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
+  device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies when
+       DeviceOptions::compute_queue asked for it (Adapter::create_device_with): a family without graphics where the
+       device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -18856,10 +18890,23 @@ by the next one that fits and released when none came for a second (Device::poll
 small rectangles costs what they hold, not a full frame or a new allocation.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
+(G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
+queue, every resource exclusive).  It has a timeline of its own (two queues signalling one timeline semaphore could reach its
+values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
+the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
+command slots come from a pool of each family.  Resources are shared between the families concurrently: every
+buffer, and every texture that is no render target (render targets stay exclusive to the device's queue: render
+passes run there only, and some GPUs compress exclusive targets) -- no ownership transfers in the caller's code.
+Pending uploads run on the device's queue: a compute submission flushes them first and waits for them.
 ```
 
 - **`struct Device`**
   a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute shaders and copies, beside the device's queue (Device::compute_queue): its
+  encoders record no render passes, its submissions run in parallel with the device queue's unless one waits for the
+  other (submit_after)
 
 - **`struct Queue`**
   the device's queue (graphics, compute, copies, presentation)
@@ -18867,11 +18914,18 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 **`impl Adapter`**
 
 - **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
-  a device of this adapter (level: the highest up to desc.max_level)
+  a device of this adapter (level: the highest up to desc.max_level), with one queue
+- **`fn create_device_with(&self, desc: &DeviceDesc, opts: &DeviceOptions) -> Result<Device>`**
+  (G5d) a device of this adapter with options: a compute queue of its own (Device::compute_queue) where the
+  adapter has a family without graphics and jfgui_GPU_COMPUTE is not 0
 
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) the queue of its own for compute and copies (a family without graphics), when DeviceOptions asked for it;
+  None where the device has none, without asking and with jfgui_GPU_COMPUTE=0 (then everything goes through
+  queue())
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
   what this device has enabled
@@ -18888,13 +18942,13 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn poll(&self) -> Result<()>`**
   free what the GPU has finished with (also done by submit and wait)
 - **`fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool>`**
-  wait for a submission -> false when timeout_ns passed first
+  wait for a submission (of either queue) -> false when timeout_ns passed first
 - **`fn wait_idle(&self) -> Result<()>`**
-  wait for every submission so far
+  wait for every submission so far (of both queues)
 - **`fn completed(&self) -> SubmitId`**
   the last submission the GPU has finished
 - **`fn is_done(&self, id: SubmitId) -> bool`**
-  the submission id is done on the GPU (asks the driver; never waits)
+  the submission id (of either queue) is done on the GPU (asks the driver; never waits)
 - **`fn memory_reserved(&self) -> u64`**
   bytes of device and host memory the device holds in blocks
 
@@ -18902,6 +18956,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order (after the pending uploads) -> their timeline value
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) run command buffers in order once the submissions `wait` (of either queue; Device::compute_queue) are
+  done: a wait through the timeline, at all commands
 - **`fn flush(&self) -> Result<SubmitId>`**
   submit the pending uploads now
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
@@ -18921,6 +18978,18 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
   read a buffer's contents at offset (copies through a readback buffer when needed,
   submits and waits for the GPU: the slow path, for tools and tests)
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+  (G5d) an encoder of this queue's family: copies, fills, barriers, compute and timestamps (where the family has
+  them); a render pass is Invalid (from finish)
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  (G5d) run this queue's command buffers in order -> their SubmitId (Device::wait takes it); the pending uploads go
+  first, on the device's queue
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) the same once the submissions `wait` (of either queue) are done: a wait through the timeline, at all
+  commands
 
 ### `gpu/vk_inst.rs`
 
@@ -19073,6 +19142,10 @@ GPU has finished the submissions made before it was dropped (vk_dev.rs).
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19243,6 +19316,9 @@ well.  The system then says SUBOPTIMAL at every present while the display is tur
 nothing here: a new size is seen in window_size (a surface there never says OUT_OF_DATE for it).
 ```
 
+- **`struct Surface(pub(crate) Arc<SurfShared>)`**
+  a window as a target for swapchains
+
 **`impl Surface`**
 
 - **`fn track_size(&self)`**
@@ -19256,11 +19332,24 @@ nothing here: a new size is seen in window_size (a surface there never says OUT_
   the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
   whose size and state are those of plat window `window`
 
+- **`struct Frame`**
+  an acquired swapchain image (present it with Swapchain::present)
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no image is free yet, or the frame slot's previous submission still runs: try again later
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window is minimised or has no area
+
 **`impl Frame`**
 
 - **`fn index(&self) -> u32`**
   the image's index in the swapchain
 - **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  the images a window shows, presented in turn
 
 **`impl Device`**
 
@@ -19569,6 +19658,8 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 - **`fn level(&self) -> Level`**
   always Basis in the browser
 - **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
+- **`fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
+  (G5d) as create_device: WebGPU has one queue, so a compute queue asked for stays None
 - **`fn create_device(&self, _desc: &DeviceDesc) -> Result<Device>`**
   the device of this adapter, which prepare got (WebGPU gives one per adapter: a second one
   takes a new Instance)
@@ -19579,9 +19670,21 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 - **`struct Queue`**
   the device's queue
 
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute: WebGPU has one queue, so Device::compute_queue is None here and there is no
+  value of this type
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _cmds: I) -> Result<SubmitId>`**
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], _cmds: I) -> Result<SubmitId>`**
+
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) WebGPU has one queue: None
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
 - **`fn limits(&self) -> &Limits`**
@@ -19606,6 +19709,8 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order -> their number
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) one queue: its submissions run in order, so this is submit
 - **`fn flush(&self) -> Result<SubmitId>`**
   nothing waits for a submission here
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
@@ -19675,6 +19780,10 @@ A browser's errors come later than the call (web_dev.rs); what can be known here
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for (a swapchain frame's: a colour target)
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19867,11 +19976,11 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
-anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
-per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
+against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
+indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
 Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
@@ -19906,11 +20015,19 @@ Errors are gpu's: Invalid for ids and values this crate can judge, the rest from
 DEPTH_CLEAR: f32 = 0.0
 /// the most frames the CPU may record ahead of the GPU
 FRAMES_MAX: usize = 3
+/// (G5d) the most detail levels of a mesh
+LODS_MAX: usize = 8
 /// the WGSL sources and their embedded words (render3dtest: the embedding check)
 CULL_WGSL: &str = include_str!("cull.wgsl")
 SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
+/// (G5d) the depth pyramid of the occlusion test
+HIZ_WGSL: &str = include_str!("hiz.wgsl")
 CULL_SPV: &[u32] = spv::CULL
+CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+CULL_LATE_SPV: &[u32] = spv::CULL_LATE
+HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
+HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 FS_SPV: &[u32] = spv::FS
@@ -19939,6 +20056,12 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 
 - **`struct MeshId(pub u32)`**
   a mesh of a Renderer
+
+- **`struct Lod`**
+  (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
+  than `below` of the view's height is drawn with `mesh` instead; None: not drawn at all (contribution culling)
+  - `mesh: Option<MeshId>`
+  - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
   a material of a Renderer
@@ -20004,6 +20127,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
+- **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
+  (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
+  falling, at most LODS_MAX; empty: none.  The visibility picks per instance from the camera's distance (the shadow
+  cascades take the camera's pick, so a shadow matches its caster); the sphere culling takes for the mesh's instances
+  grows to hold every level (cull_sphere).  Scenes send all their instances again with their next frame.  Invalid
+  for meshes the renderer does not have and thresholds not finite, not above 0 or not falling
+- **`fn lods(&self, mesh: MeshId) -> &[Lod]`**
+  (G5d) a mesh's detail levels (empty: none)
+- **`fn cull_sphere(&self, mesh: MeshId) -> Option<([f64; 3], f64)>`**
+  (G5d) the sphere (centre, radius in the mesh's coordinates) the visibility takes for a mesh's instances: its own,
+  grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
   not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
@@ -20018,10 +20152,19 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
-  a depth buffer the renderer keeps, for frames recorded with depth None
+  a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
+  its pyramid from it)
+- **`fn depth_texture(&self) -> Option<&Texture>`**
+  (G5d; tests) the renderer's own depth buffer (set_size)
+- **`fn pyramid(&self, depth: &TextureView) -> Option<&Texture>`**
+  (G5d; tests) the occlusion test's pyramid of a depth attachment as the last frame with it built it: mip k - 1
+  holds level k (the smallest depth of 2^k x 2^k pixels), in Layout::Sampled; None when no record used it lately
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
-  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared.
+  (G5d) With the occlusion test (Scene::set_occlusion, and a depth attachment with TextureUsage::SAMPLED) the
+  pass is two: phase 1 with the attachments' load and their `before`, phase 2 that keeps what phase 1 drew and
+  ends in their `store` and `after`
 
 ### `render3d/dfg.rs`
 
@@ -20304,16 +20447,19 @@ commands without a barrier against the frames still on the GPU.
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `count: u32` -- the instances of this mesh, and the room for them in the visible list
   - `capacity: u32`
+  - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
 
 - **`struct FrameStats`**
   what a finished frame measured (Scene::set_stats)
   - `frame: u64` -- counts the scene's frames from 0
-  - `visible: u64` -- instances the compute shader found visible
-  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
-    timestamps here: None)
+  - `visible: u64` -- instances the compute shader found visible (with the occlusion test: drawn in phase 1 or 2)
+  - `late: u64` -- (G5d) of them, those phase 2 of the occlusion test drew (0 without it)
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling (phase 1), after the frame
+    (no timestamps here: None)
   - `cascades: [[f64; 2]; CASCADES_MAX]` -- (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
-  - `draw: f64` -- (G5c) the main render pass, ms
+  - `draw: f64` -- (G5c) the main render pass, ms (G5d: both phases' passes)
+  - `occlusion: [f64; 3]` -- (G5d) the occlusion test, ms: building the pyramid, phase 2's culling, phase 2's pass (0 without it)
 
 - **`struct Scene`**
   instances, camera and sun of one scene of a Renderer
@@ -20362,6 +20508,13 @@ commands without a barrier against the frames still on the GPU.
 - **`fn origin(&self) -> [f64; 3]`**
 - **`fn set_culling(&mut self, on: bool)`**
   false: every live instance is drawn (a test's comparison, a debugging aid)
+- **`fn set_occlusion(&mut self, on: bool)`**
+  (G5d) the camera's occlusion test against a depth pyramid in two phases (docs/RENDER3D.md "Verdeckung"): true
+  at first.  It runs when the depth attachment can be sampled (the renderer's own can) and culling is on
+- **`fn occlusion(&self) -> bool`**
+- **`fn late_buffers(&self) -> (&Buffer, &Buffer)`**
+  (G5d; tests, tools) phase 2's draw records and visible list after a frame (laid out as draws_buffer and
+  visible_buffer, which hold phase 1's with the occlusion test)
 - **`fn set_stats(&mut self, on: bool)`**
   FrameStats of each frame: the instances found visible (a small copy per frame), the GPU's times
 - **`fn upload_info(&self) -> UploadInfo`**
@@ -24005,6 +24158,9 @@ Source: [`lib/plat/process_win.rs`](../lib/plat/process_win.rs)
 Windows child pipes and job ownership; no console window and only explicit handles inherited.
 ```
 
+- **`struct Child`**
+  Native child with captured output and a kill-on-close Windows job.
+
 **`impl Child`**
 
 - **`fn read_stdout(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
@@ -24027,6 +24183,9 @@ Source: [`lib/plat/process_linux.rs`](../lib/plat/process_linux.rs)
 ```text
 Linux child pipes, exec and owned process groups. All allocations precede fork.
 ```
+
+- **`struct Child`**
+  Native child with independent output pipes; drop terminates its process group.
 
 **`impl Child`**
 
@@ -25757,8 +25916,9 @@ Windows (win_spell.rs): ISpellCheckerFactory / ISpellChecker of the Spell Checki
 thread (an apartment of its own on the UI thread): a SysSpeller stays on the thread that
 opened it (it is not Send).  check() reports a word as misspelled when ISpellChecker::Check
 returns any error for it (also "replace" / "delete" actions); the user's Windows word list
-counts as known.  Linux, Web, Android: no system checker (None, empty) -- their Hunspell
-dictionaries are files the spell crate reads itself.
+counts as known.  macOS (apple_spell.rs): NSSpellChecker (its languages; the words the user
+taught it count as known).  Linux, Web, Android, iOS: no system checker (None, empty) -- their
+Hunspell dictionaries are files the spell crate reads itself.
 ```
 
 - **`struct SysSpeller`**
@@ -25923,7 +26083,8 @@ the last guard goes).  A backend may still drop an inhibition later; the guard d
 notice.  logind's Inhibit is not used: it answers with a file descriptor, which plat's
 D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
-partial WakeLock (INHIBIT_SUSPEND).
+partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
+(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
 ```
 
 ```rust
@@ -26594,10 +26755,12 @@ recent -- the system's list of recently used files
                                   item is given to that id: SHARD_APPIDINFO).
                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
                                   freedesktop format GTK and KDE read: href, added / modified /
-                                  visited, the MIME type, this app's entry with exec and count)
+                                  visited, the MIME type, this app's entry with exec and count).
+                                  macOS: the app's recent documents (NSDocumentController, the
+                                  Dock's menu of the app; apple_recent.rs)
   recent_list(max) -> [path]      this app's files, newest first (Windows: the jump list's
                                   recent items, IApplicationDocumentLists; Linux: the
-                                  bookmarks with an entry of this app)
+                                  bookmarks with an entry of this app; macOS: recentDocumentURLs)
   recent_remove(path) -> bool     the file out of the app's list (Windows: the jump list,
                                   IApplicationDestinations -- Explorer's recent files keep it;
                                   Linux: this app's entry, the bookmark when no other app is
@@ -26887,6 +27050,98 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
+
+### `plat/win_audio.rs` (Windows)
+
+Source: [`lib/plat/win_audio.rs`](../lib/plat/win_audio.rs)
+
+```text
+win_audio -- (audio.rs) WASAPI in shared mode: one thread per stream, event-driven
+
+  open(feed, name) -> Dev    the thread (COM multithreaded, "Audio" MMCSS class) opens the
+                             default render device (IMMDeviceEnumerator, eRender / eConsole),
+                             IAudioClient::Initialize in f32 with the stream's rate and
+                             channels (AUTOCONVERTPCM + SRC_DEFAULT_QUALITY: the engine
+                             converts to its mix format), a buffer of Core::dev_ms; open waits
+                             for that first answer (no device: Unavailable)
+  the loop                   waits for the buffer event or a kick; tops the buffer up from
+                             the Feed (GetCurrentPadding / GetBuffer / ReleaseBuffer); pause:
+                             Stop, stop(): Stop + Reset, the end: drained, then Stop
+  default device             an IMMNotificationClient of the thread: OnDefaultDeviceChanged
+                             (render, console) reopens on the new device; an invalidated
+                             device (unplugged) the same; none at all: State::Lost, retried
+                             every second and on the next change
+  system_sound(kind)         PlaySoundW(alias, SND_ALIAS | SND_ASYNC | SND_NODEFAULT |
+                             SND_SYSTEM): the sound scheme's own sound (none assigned: false)
+  Loopback                   (tests) the default render device's mix captured
+                             (AUDCLNT_STREAMFLAGS_LOOPBACK) on a thread of its own
+
+COM objects are used through their vtable slots (as win_spell.rs, win_taskbar.rs).  The
+stream's name is not shown: the volume mixer names the program.
+```
+
+- **`struct Loopback`**
+  (tests) the default render device's mix captured while it runs (WASAPI loopback)
+
+**`impl Loopback`**
+
+- **`fn start() -> Result<Loopback, AudioError>`**
+  start capturing -> Err(Unavailable): no render device
+- **`fn finish(mut self) -> (u32, u16, Vec<f32>)`**
+  stop -> (frames per second, channels, interleaved samples)
+
+### `plat/linux_audio.rs` (Linux)
+
+Source: [`lib/plat/linux_audio.rs`](../lib/plat/linux_audio.rs)
+
+```text
+linux_audio -- (audio.rs) sound through a PulseAudio server (pipewire-pulse on current
+desktops, WSLg's server), one connection and thread per stream; the freedesktop sound theme
+
+  open(feed, name) -> Dev   the thread connects (linux_pulse.rs), creates a playback stream
+                            (float32le, the stream's rate and channels, tlength =
+                            Core::dev_ms, ADJUST_LATENCY, no device named: the server's
+                            default -- the server moves the stream when the default changes)
+                            and answers the server's REQUESTs from the Feed; open waits for
+                            that first answer (no server: Unavailable)
+  the loop                  poll on the socket and an eventfd (kicks): pause = CORK, start =
+                            uncork, stop() = cork + FLUSH, the end = DRAIN (its reply: Ended,
+                            corked again); GET_PLAYBACK_LATENCY every 250 ms while playing
+                            (the sink's latency + what the server holds); PLAYBACK_STREAM_MOVED:
+                            the new device's name, device_changes(); UNDERFLOW counts; a killed
+                            stream or a lost connection: State::Lost, reconnected every second
+  system_sound(kind)        org.gnome.desktop.sound from the settings portal: event-sounds off
+                            -> nothing; theme-name (else freedesktop) with its Inherits=, the
+                            names dialog-information / -warning / -error / -question, bell,
+                            message-new-instant (and fallbacks) as .disabled / .oga / .ogg /
+                            .wav in the theme's Directories= (else stereo) below
+                            $XDG_DATA_HOME/sounds and $XDG_DATA_DIRS/sounds; decoded once,
+                            played through play(); no file: None (audio.rs plays a tone)
+                            (jfgui_SOUND_THEME, jfgui_EVENT_SOUNDS=0|1 override the portal)
+
+ALSA (/dev/snd) is not used: without a sound server there is no output (Unavailable).
+```
+
+- **`struct ServerStream`**
+  (tests) a playback stream as the PulseAudio server lists it
+  - `index: u32` -- the sink input (Stream::server_id)
+  - `name: String`
+  - `sink: u32`
+  - `rate: u32`
+  - `channels: u8`
+  - `buffer_us: u64` -- what the server holds and the sink's latency (microseconds)
+  - `sink_us: u64`
+  - `corked: bool`
+  - `props: Vec<(String, String)>`
+
+- **`fn server_streams() -> Option<Vec<ServerStream>>`**
+  (tests) the server's playback streams (GET_SINK_INPUT_INFO_LIST on a connection of its own)
+
+- **`fn server_info() -> Option<(String, String, String)>`**
+  (tests) the server: (its name, its version, the default sink)
+
+- **`fn pulse_selftest() -> Vec<(&'static str, bool)>`**
+  (tests) the wire format against hand-made bytes -> (check, passed)
 
 ### `plat/screen.rs`
 
@@ -27646,7 +27901,9 @@ locale -- the user's languages and regional format as BCP 47 tags ("de-DE", "en-
 Windows: GetUserPreferredUILanguages and GetUserDefaultLocaleName.  Linux, the browser and
 Android: the environment -- LANGUAGE (a ':' list, GNU), LC_ALL, LC_MESSAGES, LANG for the
 languages; LC_ALL, LC_TIME, LC_NUMERIC, LANG for the format.  The browser host sets LANGUAGE
-from navigator.languages, the Android host from the system's locale list.
+from navigator.languages, the Android host from the system's locale list.  macOS and iOS:
+CoreFoundation's preferred languages and current locale; LANGUAGE / LC_ALL / LC_MESSAGES and
+LC_ALL / LC_TIME / LC_NUMERIC set by hand win (LANG alone does not).
 ```
 
 - **`fn locale_tag(s: &str) -> Option<String>`**
@@ -27658,6 +27915,14 @@ from navigator.languages, the Android host from the system's locale list.
 
 - **`fn system_locale() -> Option<String>`**
   the regional format (numbers, dates, currency) of the user
+
+- **`fn system_languages() -> Vec<String>`** *(Apple)*
+  Apple: the system's preferred languages (CFLocaleCopyPreferredLanguages); LANGUAGE, LC_ALL or
+  LC_MESSAGES set by hand win (LANG alone does not: Terminal sets it from the region)
+
+- **`fn system_locale() -> Option<String>`** *(Apple)*
+  Apple: LC_ALL, LC_TIME or LC_NUMERIC set by hand, else the system's current locale
+  (CFLocaleCopyCurrent: "de_DE", "en_US@rg=dezzzz" -> "en-US"), else LANG, else the first language
 
 - **`fn system_languages() -> Vec<String>`** *(Windows)*
   the UI languages in order of preference (empty when the system names none)
@@ -27863,6 +28128,12 @@ Nonblocking byte-mode named pipes with an explicit current-user DACL and remote 
 Security APIs are loaded dynamically from advapi32; no additional static DLL dependency.
 ```
 
+- **`struct Listener`**
+  User-private listener. Dropping closes the accepting handle; peer handles are separate.
+
+- **`struct Stream`**
+  One accepted nonblocking local connection.
+
 **`impl Listener`**
 
 - **`fn bind(app: &str) -> Result<Self, i32>`**
@@ -27887,6 +28158,12 @@ Source: [`lib/plat/control_ipc_linux.rs`](../lib/plat/control_ipc_linux.rs)
 Nonblocking Unix sockets restricted to the effective user. Linux raw syscalls.
 New code; socket paths never accept external directory or filename input.
 ```
+
+- **`struct Listener`**
+  Private local listener. Dropping it closes and removes only its own socket path.
+
+- **`struct Stream`**
+  One nonblocking authenticated local connection.
 
 **`impl Listener`**
 
@@ -30759,8 +31036,8 @@ apple_mac.rs.
 
 - **`fn print(job: &mut crate::PrintJob<'_>) -> i32`**
   printing as linux_print.rs checks it: the manifest, a job without pixels (ERR_DIMS), the test
-  variant jfgui_PRINT_TO=FILE (the PDF into a file); the system's print dialog comes with AP7, until
-  then ERR_UNSUPPORTED
+  variant jfgui_PRINT_TO=FILE (the PDF into a file); macOS: the system's print dialog
+  (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 
 - **`fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32)`**
   iOS: no system file dialog before AP5 -> (-1, 0): the library's own dialog, as in a browser without
@@ -30813,6 +31090,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
   system    monitors (NSScreen), the appearance, the accent colour and the accessibility settings
             (sys_settings_os), custom cursors (NSCursor of an NSBitmapImageRep)
   dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
+  the app   apple_mac_app.rs: the main menu (Cmd+Q asks the main window), NSApp's delegate,
+            E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 
 Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -30941,6 +31220,12 @@ reaches the system's event stream.
                              TS_PINCH a magnification of a / 1000 (magnifyWithEvent:, at client px b, c)
     WT_PARENT [popup]        the index of the window w (popup = 1: popup slot w) hangs on, -1 none
     WT_MIN_SIZE              window w's minimum client size (DIP): w | h << 32
+    WT_MENU                  the main menu: its items | the app menu's items << 8 | (1 << 16 when its
+                             Quit is Cmd+Q)
+    WT_TERMINATE             [NSApp terminate:] (Cmd+Q, the Dock's Quit) -> 0 when the app goes on
+    WT_WORKSPACE [k]         NSWorkspace's notification k (0 will sleep, 1 did wake, 2 will power off)
+                             posted in this process
+    WT_SIGTERM               SIGTERM to this process (kill)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -30959,6 +31244,10 @@ WT_POPUP_SEND: u32 = 13
 WT_SEND: u32 = 32
 WT_PARENT: u32 = 33
 WT_MIN_SIZE: u32 = 34
+WT_MENU: u32 = 35
+WT_TERMINATE: u32 = 36
+WT_WORKSPACE: u32 = 37
+WT_SIGTERM: u32 = 38
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
@@ -31016,6 +31305,39 @@ is bounded by dnd.rs / clipdrop.rs (drop_add, drop_set_*).
   (plattest) a drop of data at px x, y of window w, the source offering `mask` (NSDragOperation
   bits): draggingEntered:, draggingUpdated:, then performDragOperation: (or draggingExited: when
   refused) of the view, with a stand-in NSDraggingInfo -> the effect (0 refused); None: no window
+
+### `plat/apple_mac_app.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_app.rs`](../lib/plat/apple_mac_app.rs)
+
+```text
+apple_mac_app -- the app in macOS (docs/APPLE.md AP7a): its menu, its delegate, the system's events,
+tool windows as panels, the print dialog
+
+  gui_once()                (win_create, the first window) the main menu: the app menu (About, Hide,
+                            Hide Others, Show All, Quit: Cmd+Q) and the Window menu (Minimize: Cmd+M,
+                            Zoom, Bring All to Front), in German or English after the system's first
+                            language; SIGTERM becomes E_SESSION_END (a dispatch source on the main
+                            queue: the run loop delivers it)
+  observe(obs)              (init) the observer (a delegate object of ours, index -1) is NSApp's
+                            delegate and hears NSWorkspace: will sleep / did wake -> E_POWER 1 / 0,
+                            will power off -> E_SESSION_END
+  delegate methods          applicationShouldTerminate: (Cmd+Q, the Dock's Quit, logging out): E_CLOSE
+                            of the main window, the app decides (NSTerminateCancel); without a main
+                            window the app ends.  applicationShouldHandleReopen:hasVisibleWindows:
+                            (a click on the Dock icon) brings the main window back
+  panel_class()             PWF_TOOL windows are panels of our class JFPanel: they become the key
+                            window only for a click into a text field (the hit hook's HB_TEXT), as on
+                            Windows (MA_NOACTIVATE); JFPanel's sendEvent: notes the event
+                            needsPanelToBecomeKey looks at
+  print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies;
+                            the job laid out on the chosen paper and its printable area as a one-page
+                            PDF (print.rs), printed through PDFKit without a second panel
+  print_dialog_autoclose(ms) (test aid) the next print panel is cancelled after ms (NSApp abortModal)
+```
+
+- **`fn print_dialog_autoclose(ms: u32)`**
+  (test aid) the next print panel is cancelled after ms
 
 ### `plat/web.rs`
 
@@ -31362,6 +31684,52 @@ REQUEST_UNSAVED: u32 = 22
 
 - **`extern "C" fn jfgui_complete(id: u32, status: i32) -> u32`**
   Confirm a host operation: 0 durable, 1 exported, 2 completed; negatives are explicit errors.
+
+### `plat/android_files.rs`
+
+Source: [`lib/plat/android_files.rs`](../lib/plat/android_files.rs)
+
+```text
+Android's files: the virtual names of the host adapter (/config, /data, /cache, /tmp,
+/documents, /imports -- the same as in the browser, so the permissions and the vfs see one
+layout) on real files of the app's internal storage, through Bionic.  They survive restarts.
+
+  /cache/..  -> <cacheDir>/cache/..   (the system may clear it when storage runs low)
+  /tmp/..    -> <cacheDir>/tmp/..     (emptied when the app starts)
+  /..        -> <filesDir>/fs/..      (config, data, documents, imports and anything else)
+GalleryActivity passes filesDir / cacheDir before the start (jfgui_ANDROID_FILES,
+jfgui_ANDROID_CACHE); without them every file call fails.
+
+write_file and AtomicFile write a sibling "NAME.tmp-PID-SEQ-TIME", fsync it and rename it
+over the target (readers see the old or the new file, also after a crash).  FileLock is
+flock (across processes of the app).  open_temp unlinks its file at once.  Writing needs the
+folder to exist (as on Linux; config:// etc. create theirs).  The documents of other apps
+are content:// names (content.rs, android_host.rs), not paths.
+```
+
+- **`fn cwd() -> String`**
+  Current virtual directory; it is unrelated to the process's working directory.
+
+- **`fn config_dir() -> Option<String>`**
+  The app's settings below internal storage.
+
+- **`fn data_dir() -> Option<String>`**
+  The app's data below internal storage.
+
+- **`fn cache_dir() -> Option<String>`**
+  The cache below the app's cache folder (the system may clear it).
+
+- **`fn temp_dir() -> Option<String>`**
+  Temporary files (emptied when the app starts).
+
+- **`fn home() -> Option<String>`**
+  The app's own documents (internal storage; the user's documents are content:// names).
+
+- **`fn drives() -> Vec<String>`**
+  One virtual root.
+
+- **`fn dev_ino(_path: &str) -> Option<(u64, u64)>`**
+  Device / inode identity is not exposed for the virtual names.
 
 ### `plat/web_files.rs`
 

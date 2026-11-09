@@ -14,9 +14,14 @@
 //   instance.prepare() -> Result<bool>             adapter and device are there (false: the browser's
 //                    answer is on its way; never waits; true at once elsewhere)
 //   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
+//          create_device_with(&DeviceDesc, &DeviceOptions)   (G5d) options: compute_queue (asked for, off by default)
 //   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
 //   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
 //          wait(id, timeout_ns), wait_idle(), memory_reserved()
+//   device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies, when
+//          DeviceOptions asked for it (Vulkan: a family without graphics; None in the browser, without one
+//          and when not asked for): encoder(), submit, submit_after(&[id], ..); queue.submit_after(&[id], ..)
+//          waits for the other
 //   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
 //                                                   read(off, &mut [T]) (Upload / Readback)
 //   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -75,7 +80,8 @@
 // read_buffer, Timestamps::read_*).
 //
 // Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
-// jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+// jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
+// queue of its own for compute, even when DeviceOptions asks for one),
 // jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 // installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 #![no_std]
@@ -117,7 +123,7 @@ mod web_swap;
 #[cfg(not(target_arch = "wasm32"))]
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
 #[cfg(not(target_arch = "wasm32"))]
-pub use vk_dev::{Device, Queue};
+pub use vk_dev::{ComputeQueue, Device, Queue};
 #[cfg(not(target_arch = "wasm32"))]
 pub use vk_inst::{Adapter, Instance, low_power_rank, validation_messages};
 #[cfg(not(target_arch = "wasm32"))]
@@ -128,7 +134,7 @@ pub use vk_swap::{Frame, Surface, Swapchain, TryAcquire};
 #[cfg(target_arch = "wasm32")]
 pub use web_cmd::{CommandBuffer, CommandEncoder};
 #[cfg(target_arch = "wasm32")]
-pub use web_dev::{Adapter, Device, Instance, Queue, low_power_rank, validation_messages};
+pub use web_dev::{Adapter, ComputeQueue, Device, Instance, Queue, low_power_rank, validation_messages};
 #[cfg(target_arch = "wasm32")]
 pub use web_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
                   ShaderModule, Texture, TextureView, Timestamps};
@@ -423,6 +429,32 @@ pub struct DeviceDesc {
 
 impl DeviceDesc {
     pub const DEFAULT: DeviceDesc = DeviceDesc { max_level: Level::Voll };
+}
+
+/// (G5d) what Adapter::create_device_with sets up beyond DeviceDesc; DEFAULT is what create_device does.  Fields may
+/// come in later versions: start from DEFAULT
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct DeviceOptions {
+    /// a queue of its own for compute and copies (Device::compute_queue): Vulkan, where the device has a family
+    /// without graphics.  Then every buffer and every texture that is no render target is shared by both queues'
+    /// families (concurrently), which some GPUs may pay for; off by default, and jfgui_GPU_COMPUTE=0 turns it off
+    pub compute_queue: bool,
+}
+
+impl DeviceOptions {
+    pub const DEFAULT: DeviceOptions = DeviceOptions { compute_queue: false };
+
+    /// these options with a compute queue asked for
+    pub const fn with_compute_queue(self) -> DeviceOptions {
+        DeviceOptions { compute_queue: true, ..self }
+    }
+}
+
+impl Default for DeviceOptions {
+    fn default() -> DeviceOptions {
+        DeviceOptions::DEFAULT
+    }
 }
 
 /// a submission's place on the device timeline (Device::wait)
