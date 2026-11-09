@@ -1,0 +1,3 @@
+#!args --test viewplain
+# (G5e1) a view without reading every presented image back: while it moves the framebuffer lacks it, Ui::gpu_settle
+# gives it, at rest it holds it by itself; a popup over it reads every frame back

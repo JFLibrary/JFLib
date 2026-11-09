@@ -30,6 +30,11 @@ impl Ui {
         false
     }
     pub(crate) fn gp_canvas_begin(&mut self) {}
+    // (G5e1) views paint here: no device (gpu_view.rs)
+    pub(crate) fn gp_views_begin(&mut self) {}
+    pub(crate) fn gp_plan_views(&mut self) -> bool {
+        false
+    }
     pub(crate) fn gp_canvas_damage(&mut self, _id: u32, _r: [f64; 4]) {}
     pub(crate) fn gp_split_begin(&mut self, _n: i32) -> bool {
         false

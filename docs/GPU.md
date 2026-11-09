@@ -16,7 +16,8 @@ Windows, Linux, Android und im Browser zeigt die GPU das Ergebnis
 unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android),
 im Browser auf einer eigenen Leinwand über `#screen`: G4d, [Ausgabe im Browser](#ausgabe-im-browser);
 `jfgui_GPU=0` schaltet das ab), die Ebenen über dem Grund
-und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)).
+und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bilder)); eine 3D-Szene als Teil der
+Oberfläche auf dem Gerät der UI (G5e1, [3D-Ansicht](#3d-ansicht-g5e1)).
 
 | Teil | Wo |
 | --- | --- |
@@ -33,7 +34,7 @@ und große Bilder als eigene Texturen (G3b, [Ebenen und Bilder](#ebenen-und-bild
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
 | WebGPU im Browser | [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs), [`web_res.rs`](../lib/gpu/web_res.rs), [`web_cmd.rs`](../lib/gpu/web_cmd.rs), [`web_swap.rs`](../lib/gpu/web_swap.rs), die Seite des Browsers: [`web/gpu.js`](../web/gpu.js); die Leinwand: [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs), [`web/loader.js`](../web/loader.js) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
-| Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs) |
+| Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs); 3D-Ansichten (G5e1): [`lib/ui/gpu_view.rs`](../lib/ui/gpu_view.rs), [3D-Ansicht](#3d-ansicht-g5e1) |
 | Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py); Browser: [`apps/gallery/tests/gpu_web.mjs`](../apps/gallery/tests/gpu_web.mjs), [`apps/webgputest`](../apps/webgputest/main.rs), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) |
 
 ## Ein Beispiel
@@ -437,7 +438,7 @@ lib/ui/gpu_out_spv.rs` schreibt sie neu.
 **Tests.** `apps/gallery/tests/gpu_output.uis` (das Skriptkommando `gpu`, GUIDE §12) und
 `apps/uigputest` (Windows und Linux; echtes Fenster, echte Fensterschleife, jeder Test ein Skript):
 `switch`, `resize`, `minimize`, `dpi`, `windows`, `off`, `noloader`, `lose`, `idle`, `csd`, `monitors`, `shaders`,
-`adapter`, `hwnd`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`, `nodmabuf`, `refused`; dazu `apps/gallery/tests/gpu_layers.uis` und
+`adapter`, `hwnd`, `layers`, `images`, `imgplain`, `canvas`, `canvasplain`, `canvasoff`, `nodmabuf`, `refused`, (G5e1) `view`, `views2`, `viewsize`, `viewlose`, `viewplain`, `viewcpu`, `viewoff`, `viewbasis` ([3D-Ansicht](#3d-ansicht-g5e1)); dazu `apps/gallery/tests/gpu_layers.uis` und
 `gpu_layers_rtl.uis`, und `gpu_canvas.uis` von `svgtest`, `diagramtest` (auch `gpu_canvas_rtl.uis`), Kritzel und PaintCraft. Alle unter der Validierungsschicht ohne Meldung, jedes dargestellte Bild
 zurückgelesen; ohne GPU `SKIP`; liegt ein anderes Fenster über dem Testfenster, ist die Prüfung des
 Bildschirms ein Hinweis statt eines Fehlers. Maximieren und Vollbild aktivieren das Fenster, deshalb tut das
@@ -1036,6 +1037,102 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 
 **Nicht gebaut:** Zeitstempel, `create_compute_pipeline_sized`, Bindless; das Skriptkommando `gpu`; Freigeben von `#screen` während der GPU-Zeit (dort bleiben 8 MB für den Rückweg).
 
+### 3D-Ansicht (G5e1)
+
+Eine 3D-Szene als Teil einer jfgui-Oberfläche: in einem gewöhnlichen Fenster, neben Widgets, unter Popups und Tooltips, mit neuer Größe, DPI, Minimieren und verlorenem Gerät ([`lib/ui/gpu_view.rs`](../lib/ui/gpu_view.rs), [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), G5e1). Gebaut und geprüft unter Windows (RTX 2070 SUPER, Vulkan); Linux, Android und der Browser laufen über denselben Code und werden in G5e2 geprüft. Der Grundsatz der UI bleibt: **Der Framebuffer der CPU ist die Wahrheit.** Eine Ansicht ist darin eine Leinwand wie jede andere, ihr `Draw` kopiert das letzte Bild der Ansicht hinein. Neu ist, woher das Bild kommt: Der Inhalt der App zeichnet es auf dem Gerät der UI in eine Textur von der Größe der Ansicht, und von dort wird es zurückgelesen, wenn die CPU es braucht.
+
+**Die API.** `lib/ui` kennt render3d nicht. Es gibt einen allgemeinen Haken für GPU-Inhalt auf dem Gerät der UI; die Verbindung zu render3d steht in der App ([RENDER3D.md, In der Oberfläche](RENDER3D.md#in-der-oberfläche-g5e1)).
+
+```rust
+pub trait GpuContent {
+    fn attach(&mut self, dev: &gpu::Device) -> gpu::Result<()>;   // ein Gerät: das erste, ein neues nach einem verlorenen
+    fn detach(&mut self);                                          // es geht: fallen lassen, was darauf lag
+    fn draw<'a>(&'a mut self, e: &mut gpu::CommandEncoder<'a>, target: gpu::ColorAttachment<'a>, size: (u32, u32)) -> gpu::Result<()>;
+    fn submitted(&mut self, id: gpu::SubmitId) {}                  // render3d: Scene::submitted
+    fn paint(&self, g: &mut Gfx, r: [i32; 4]) { /* dunkelgrau */ }  // ohne Gerät
+}
+
+const DESC: AppDesc = AppDesc { flags: AF_GPU_3D | AF_RESIZABLE, .. };   // der Wunsch: Stufe Voll, schneller Adapter
+let inp = ui.gpu_view(ID, &self.ansicht, self.ver).clone();             // Rc<RefCell<impl GpuContent>>; Rechteck aus dem Layout
+if inp.ev & EV_DRAG != 0 { self.ansicht.borrow_mut().kamera_drehen(inp.x, inp.y); self.ver += 1; }
+```
+
+`ui.gpu_view` nimmt das nächste Rechteck des Layouts (`next_size`, `next_rect_px`) und gibt die Eingabe wie `ui.canvas` zurück. `ver` steht für alles, was die Ansicht zeigt (Szene, Kamera, die Zeit einer Animation): Ein anderer Wert zeichnet ein Bild, derselbe keins. `GPU_VIEW_FORMAT` ist das Format des Ziels (`Bgra8Unorm`), `Ui::gpu_view_info(win, id)` sagt, was eine Ansicht gerade tut (`GpuViewInfo`: Gerät, Stufe, Generation, ob die Ausgabe sie zeichnet, Anbindungen, Bilder, Rücklesungen und ihre Zeiten), `GpuOutput::view_quads` zählt, was der Render-Durchgang eines Fensters zeichnete. Die API gibt es, wo `lib/gpu` eine Abhängigkeit von `lib/ui` ist (Windows, Linux, Android, Browser); unter macOS (noch ohne GPU-Ausgabe) nicht.
+
+**Der Weg eines Bildes.**
+
+| Wo das Fenster gerade ist | Was geschieht |
+| --- | --- |
+| auf seiner Swapchain, die Ansicht in der Grundebene | beim Rendern (`gp_views_begin`, vor dem Hashen der Zellen) zeichnet der Inhalt ein Bild, wenn `ver`, Größe oder Gerät neu sind, lib/ui übergibt es. In den Zellen, in denen die Ansicht als Letzte der Grundebene liegt, zeichnet der Render-Durchgang der Ausgabe die Textur (`QuadSrc::View`, der kopierende Shader `fs` an ihrem Ort, Scissor an ihrem Rand); dort zeichnet und lädt die CPU nichts. Der Hash ihres Befehls steht dann nur für ihren Ort, ein neues Bild zählt wie die Bewegung einer Leinwand: ihre Zellen `owed` und `stale`, die Zellen mit etwas darüber und unter einer Ebene zeichnet die CPU neu, über dem zurückgelesenen Bild |
+| auf dem CPU-Pfad (vor dem Wechsel, neue Größe, minimiert, Inspektor, rechts nach links, eine Ansicht in einer höheren Ebene, `jfgui_GPU_VIEWS=0`, `jfgui_GPU_OUTPUT=0`, ein Skript ohne `gpu on`) | der Befehl hasht die Nummer des Bildes: Jedes neue Bild zeichnet die CPU in ihren Zellen, und ihr `Draw` liest es dafür sofort zurück |
+| ohne Gerät (`jfgui_GPU=0`, kein Vulkan, kein brauchbarer Adapter, ein statisches Linux-Programm, ein verlorenes Gerät, bis das neue da ist) | das letzte zurückgelesene Bild, sonst `GpuContent::paint` |
+
+**Zurücklesen.** Nur so bekommt die CPU die Pixel: eine Kopie der Textur in einen Rücklese-Puffer, gewartet, Zeile für Zeile in die Kopie der Ansicht (`gpu_view.rs`, `read_back`). Das `Draw` der Ansicht tut es, wenn sein Bild älter ist als das der GPU, also genau dann, wenn jemand den Framebuffer liest: `gp_settle` (Rückweg zum CPU-Pfad, jede Ebene darüber, `jfgui_GPU_VERIFY`, `--verify-dirty`, `shot`, `expect pixel`, der Agent, `Ui::gpu_settle`) und die Zellen, die die CPU zeichnet. Dazu einmal in Ruhe: 180 ms nach dem letzten Bild setzt `gp_tick` das Fenster einmal fest (`VIEW_REST_US`), **in Ruhe hält der Framebuffer also das Bild, ohne dass jemand fragt**, und ein später verlorenes Gerät nimmt nichts mit. Ein Bild, das niemand liest, wird nie zurückgelesen. Verworfen: jedes Bild gleich in der Übergabe mitkopieren (eine Kopie über PCIe je Bild, bei 1200 × 700 rund 3,4 MB, auch wenn niemand liest; das Lesen spart dann nur das Übergeben, Messung unten).
+
+**Entscheidungen.**
+
+1. **Gerät: eines für alle Fenster, UI-Ausgabe und Ansichten teilen es.** So gibt es keine Kopie zwischen Geräten; die Textur der Ansicht ist eine Textur des Geräts, das das Fenster zeigt. Den Wunsch sagt die App vorher, am `AppDesc`: `AF_GPU_3D`. Dann baut der Hilfsthread das Gerät auf Stufe Voll und nimmt den schnellsten Adapter, der die Fläche zeigen kann (`fast_adapters`: diskrete vor integrierten, keine CPU oder virtuelle, `jfgui_GPU_ADAPTER` wie immer); ohne den Wunsch bleibt alles wie bisher (Basis, `adapters_low_power`). Am App-Deskriptor und nicht am Fenster, weil alle Fenster ein Gerät teilen und es mit dem ersten Fenster entsteht: Eine Option am zweiten Fenster käme zu spät. Ohne den Wunsch läuft eine Ansicht trotzdem, auf dem Basis-Gerät der UI (render3d kann Basis; Test `viewbasis`). Verworfen: den Wunsch aus der ersten Ansicht ableiten (eine Ansicht, die später kommt, hieße ein neues Gerät, alle Fenster eine halbe Sekunde auf dem CPU-Pfad), ein zweites Gerät für 3D (Kopien zwischen Geräten oder geteilter Speicher, den `lib/gpu` nicht hat). **Nicht getestet: die Wahl des Adapters.** Dieser Rechner hat eine GPU; auf einem Laptop mit zweien ist offen, ob DWM das Bild der diskreten GPU ohne Verlust auf den Monitor der integrierten bringt. Unter Linux zeigt die Ausgabe ohnehin nur auf der GPU des Compositors (`can_present`), der Wunsch ändert dort die Stufe, nicht die GPU. Im Browser bittet `gpu.js` weiter um `low-power`, die Stufe ist dort immer Basis.
+2. **Zusammensetzen in der Grundebene**, wo die Ansicht als Letzte liegt, wie Bilder und Leinwände. Ebenen darüber bleiben pixelgleich: Sie werden auf der CPU über das gelegt, was wirklich darunter liegt, und dafür liest das `Draw` das Bild zurück (Test `view`: Popup und Tooltip über einer Ansicht, die sich bewegt, jedes dargestellte Bild gleich dem Framebuffer). Kein Mischen auf der GPU, aus demselben Grund wie bei Ebenen.
+3. **Ohne GPU-Ausgabe.** Gibt es eine GPU, zeichnet die Ansicht offscreen und liest jedes Bild in den Framebuffer zurück: auf dem Gerät der Ausgabe, solange ihr Fenster vorübergehend auf dem CPU-Pfad ist, sonst auf einem eigenen, beim ersten Bedarf angelegt (Stufe Voll, `Instance::adapter`, also die schnelle GPU), wenn dieser Lauf keine Ausgabe hat (nicht gewollt, `jfgui_GPU_OUTPUT=0`, ein Skript ohne `gpu on`, eine Remote-Desktop-Sitzung, nie möglich). Gibt es keine (`jfgui_GPU=0`, kein Vulkan, ein statisches Linux-Programm), malt der Inhalt einen Ersatz (`GpuContent::paint`). Nach einem verlorenen Gerät bleibt bis zum neuen das letzte zurückgelesene Bild stehen statt des Ersatzes.
+4. **Takt.** Gezeichnet wird nur, wenn sich `ver`, die Größe oder das Gerät ändern, für ein minimiertes oder verborgenes Fenster gar nicht (das nächste Bild folgt, wenn es wieder zu sehen ist). Im Leerlauf kein Bild, keine Übergabe, kein Thread; einzig das Festsetzen in Ruhe liest einmal zurück, ohne darzustellen. Den Takt einer Animation gibt die App, mit einem Timer im Bildtakt (`ui.timer`): `ui.invalidate` aus `frame` allein weckt die Fensterschleife nicht.
+5. **Verlorenes Gerät, neue Größe, DPI, minimiert, zweites Fenster.** Jedes Gerät, auf dem Ansichten zeichnen können, bekommt eine Generation (`GpuViewInfo::generation`); eine andere als die, an die ein Inhalt gebunden ist, ruft `detach` und dann `attach`. Ein verlorenes Gerät ruft `detach` sofort (`gp_failed` → `gp_views_gone`), das nächste `attach`; die App baut Renderer und Szene neu. Das Ziel folgt der Größe des Rechtecks (eine neue Textur, `Undefined`), also auch einem DPI-Wechsel. Ein zweites Fenster teilt das Gerät. Ein verborgenes Fenster behält seine Ansicht angebunden und zeichnet nichts.
+6. **Eingabe** wie `ui.canvas`: Zeiger, Rad, Ziehen (die Ansicht fängt den Zeiger), Tasten nach einem Klick. Ein Helfer für eine Orbit-Kamera steht nicht in `lib/ui` (er bräuchte die Kamera von render3d); `apps/uigputest/view.rs` hat eine Funktion `orbit`.
+7. **Browser.** Dieselbe API auf dem WebGPU-Gerät der Seite. Warten geht dort nicht: Ein Zurücklesen kommt später, das `Draw` zeigt bis dahin das letzte Bild, das zurückkam, und das Festsetzen in Ruhe holt das neueste. Ein eigenes Gerät gibt es im Browser nicht (Adapter und Gerät antworten später); ohne Ausgabe malt der Inhalt. **Nicht geprüft**, auch nicht kopflos: uigputest hat kein Browser-Ziel, eine Seite mit Ansicht hieße ein neues Bündel mit render3d und ein neues Playwright-Skript; das gehört zu G5e2. Geprüft ist, dass `jflib` für `wasm32-unknown-unknown` übersetzt.
+8. **Abhängigkeiten.** `lib/ui` hängt nicht von `lib/render3d` ab; der Haken nennt nur Typen von `lib/gpu`, das auf den vier Zielen schon eine Abhängigkeit ist. Keine neue Abhängigkeit zwischen Bibliotheken. Die Verbindung zu render3d steht in der App (rund 40 Zeilen, [RENDER3D.md](RENDER3D.md#in-der-oberfläche-g5e1)); verworfen: ein Feature `ui` in render3d (render3d hinge dann von jflib-ui ab, und was `attach` baut, weiß ohnehin nur die App).
+
+**Barrieren.** Das Ziel ruht zwischen den Bildern in `Layout::Sampled`. Jede Barriere gegen die Zugriffe gelesen, die sie ordnet:
+
+| Übergang | Barriere | Zugriff davor → danach |
+| --- | --- | --- |
+| Bild der Ansicht → Abtasten durch die UI | Ende des Durchgangs des Inhalts, `after: Sampled` (`ColorTarget → Sampled`) | Farbausgabe, Schreiben des Anhangs → Vertex-, Fragment-, Rechen-Shader, Lesen; das Abtasten liegt im Durchgang der Ausgabe, eine spätere Übergabe derselben Warteschlange |
+| Abtasten → nächstes Bild | Anfang des Durchgangs, `before: Sampled` (`Sampled → ColorTarget`; das erste Bild einer Textur `Undefined`) | Shader (Lesen, kein Zugriff nötig: eine Ausführungsabhängigkeit gegen das Überschreiben) → Farbausgabe, Lesen und Schreiben |
+| Bild → Kopie zum Zurücklesen | `texture_barrier(Sampled → CopySrc)` am Anfang der Rücklese-Übergabe | Shader → Transfer, Lesen; eine Kette über die Barriere am Ende des Durchgangs, die die Farbausgabe schon für Shader sichtbar gemacht hat |
+| Kopie → wieder abtasten | `texture_barrier(CopySrc → Sampled)` | Transfer (Lesen) → Shader, Lesen |
+| Kopie → CPU | `barrier(COPY_WRITE → HOST_READ)`, dann `Device::wait` auf den Wert der Übergabe | Transfer, Schreiben → Host, Lesen; der Rücklese-Puffer wird erst nach dem Lesen wieder beschrieben (Programmfolge vor der nächsten Übergabe) |
+| neue Größe, neues Gerät | keine: eine neue Textur beginnt in `Undefined`, die alte, ihre Bindungsgruppe und ihr Puffer gehen über das verzögerte Freigeben von `lib/gpu`, wenn die GPU fertig ist; ein Quad des letzten Bildes hält seine Textur (`Rc<ViewTex>`), solange es gezeigt werden kann | |
+
+Innerhalb des Rücklese-Puffers prüft die Validierung mit der Heuristik für Shader-Zugriffe; zwischen den Übergaben (Bild der Ansicht, Durchgang der Ausgabe, Rücklesen) ist sie blind. Was über Übergaben geht, prüfen die Tests am Wert. **Gegenproben**, je ein Lauf von `uigputest --test view`, danach zurückgesetzt: (a) ohne `CopySrc → Sampled` nach der Kopie: 10 Validierungsfehler (der Durchgang der Ausgabe erwartet `SHADER_READ_ONLY_OPTIMAL`, die Textur ist in `TRANSFER_SRC_OPTIMAL`), alle Pixelprüfungen bestehen, die NVIDIA kümmert das Layout nicht; (b) ohne das Warten vor dem Lesen: 0 Validierungsfehler, aber 16 von 44 dargestellten Bildern weichen vom Framebuffer ab, die Ansicht im Framebuffer gegen offscreen in 6 149 Pixeln, gegen den Strahlenwerfer 1 075 falsch.
+
+**Tests** (`apps/uigputest/view.rs`, je ein `.uis`-Skript; echtes Fenster, ohne Aktivierung, unter der Validierungsschicht mit der Heuristik für Shader-Zugriffe, jedes dargestellte Bild zurückgelesen außer bei `viewplain`). Die Szene: fünf Formen über einem Boden, eine Orbit-Kamera; ihr Bild im Framebuffer gegen dasselbe Bild offscreen mit demselben Renderer auf demselben Gerät (`Off` aus render3dtest) und gegen den Strahlenwerfer von render3dtest (`cpu.rs`, `common.rs` unverändert eingebunden).
+
+| Test | Prüft | Ergebnis |
+| --- | --- | --- |
+| `view` | Gerät der Ausgabe auf Stufe Voll (`AF_GPU_3D`), vom Render-Durchgang gezeichnet; das erste Bild; Leerlauf 600 ms; 40 Durchgänge Drehung; in Ruhe ohne Zutun; etwas der Grundebene über der Ansicht, ein Popup, ein Tooltip, während sie sich dreht; der Bildschirm in ihrer Mitte | 1 Anbindung, Voll, 1 Quad; 560 × 340 gegen offscreen 0 Pixel anders (viermal, auch in Ruhe ohne Festsetzen von Hand), gegen den Strahlenwerfer 0 falsch, größte Abweichung 1; Leerlauf: 0 Bilder, 0 Bilder der Ansicht, 0 Rücklesungen, 0 ms CPU; der Bildschirm gleich dem Framebuffer; 45 dargestellte Bilder zurückgelesen, 0 anders; Validierung 0 Fehler |
+| `views2` | zwei Ansichten in einem Fenster, eine im zweiten Fenster auf demselben Gerät, alle drei drehen sich; das zweite Fenster verborgen | 2 Quads, dieselbe Generation in beiden Fenstern; beide Ansichten gegen offscreen 0 Pixel anders, in Ruhe ebenso; beide Fenster: kein dargestelltes Bild anders; verborgen: 0 Bilder der Ansicht, sie bleibt angebunden |
+| `viewsize` | neue Größe (die Ansicht auf dem CPU-Pfad mit, dann wieder von der Ausgabe gezeichnet), 150 % und zurück, minimiert | auf dem CPU-Pfad, auf der neuen Swapchain, bei 150 % und wieder 100 % gegen offscreen 0 Pixel anders; minimiert 0 Bilder der Ansicht, wiederhergestellt das versäumte; Bildschirm gleich |
+| `viewlose` | `gpu_test_lose`, während sich die Ansicht dreht: ihr eigenes Bild findet das Gerät verloren; ohne Gerät bleibt ihr letztes Bild; das neue Gerät | `detach` einmal; ohne Gerät das letzte Bild, nicht der Ersatz; neue Generation, 2 Anbindungen (Renderer neu gebaut), wieder von der Ausgabe gezeichnet, gegen offscreen 0 Pixel anders, gegen den Strahlenwerfer 0 falsch |
+| `viewplain` | ohne Zurücklesen jedes Bildes: was dem Framebuffer fehlt und wann er es bekommt | in Ruhe von selbst zurückgelesen (0 Pixel anders, ohne Festsetzen von Hand); 30 Bilder Drehung: 0 Rücklesungen, der Framebuffer hält ein älteres Bild; `Ui::gpu_settle`: 1 Rücklesung, 0 Pixel anders; wieder in Ruhe genau 1; mit Popup darüber eine Rücklesung je Bild |
+| `viewcpu` | `jfgui_GPU_OUTPUT=0`: eigenes Gerät, CPU-Pfad, das DC des Fensters | keine Ausgabe, die Ansicht auf eigenem Gerät, Voll; jedes Bild zurückgelesen; gegen offscreen 0 Pixel anders, gegen den Strahlenwerfer 0 falsch; das DC des Fensters zeigt die Ansicht |
+| `viewoff` | `jfgui_GPU=0` | kein Gerät („GPU disabled (jfgui_GPU=0)“), kein Bild, keine Anbindung; der Ersatz des Inhalts im Framebuffer und im DC |
+| `viewbasis` | ohne `AF_GPU_3D` | das Gerät der UI auf Stufe Basis, von der Ausgabe gezeichnet; gegen offscreen auf demselben Basis-Gerät 0 Pixel anders, gegen den Strahlenwerfer 0 falsch, auch nach einer Drehung |
+
+**Messungen.** GeForce RTX 2070 SUPER, Treiber 610.88, Ryzen 5 3600, Windows 11, Release-Build, `uigputest --bench view`: ein Fenster von 1280 × 800 mit einer Ansicht von 1200 × 700, darin die Galerie von render3dtest (3000 Instanzen, 48 Meshes, Sonne), die Kamera dreht sich, ein Bild je Durchgang, die Durchgänge über einen Timer von 1 ms; 300 Bilder nach dem Aufwärmen. Je Variante drei Läufe im Wechsel, gezeigt der Median der Läufe und ihre Spanne. Die GPU-Last anderer Prozesse vor jeder Runde 1–3 % (`nvidia-smi`; zwischen den Läufen 19–38 %, der Nachlauf des Laufs davor), keine `rustc` anderer Sitzungen. „Rendern“ und „Darstellen“ sind `render_us` und `present_us` der Ausgabe je Bild der Ansicht, „Bild der Ansicht“ das Aufzeichnen und Übergeben (`GpuViewInfo::draw_us`), die GPU-Zeit die Zeitstempel von render3d.
+
+| je Bild | zusammengesetzt, Voll | zusammengesetzt, Basis | jedes Bild zurückgelesen (`jfgui_GPU_VIEWS=0`) | CPU-Pfad, eigenes Gerät (`jfgui_GPU_OUTPUT=0`) | render3d offscreen | offscreen mit Rücklesen |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Bildabstand (Median) | 1,21 ms (1,12–1,34) | 1,16 ms (1,12–1,26) | 2,84 ms (2,70–3,15) | 3,56 ms (3,21–3,79) | 0,39 ms (0,37–0,40) | 1,29 ms (1,26–2,08) |
+| CPU: Rendern (mit dem Bild der Ansicht) | 172 µs (162–172) | 212 µs (188–232) | 2 191 µs (2 123–2 495) | – | – | – |
+| CPU: davon das Bild der Ansicht | 126 µs (118–126) | 160 µs (140–179) | 152 µs (139–177) | 207 µs (175–231) | 104 µs (87–106) | 108 µs (100–238) |
+| CPU: Zurücklesen (Kopie, Warten, Zeilen) | 0 | 0 | 1 256 µs (1 254–1 406) | 1 358 µs (1 215–1 534) | – | 1 167 µs (1 148–1 795) |
+| CPU: Darstellen; dargestellt von 300 | 11 µs (8–15); 73–78 | 18 µs (7–18); 70–74 | 625 µs (596–688); 150–155 | – | – | – |
+| GPU: das Bild von render3d | 0,236 ms (0,234–0,236) | 0,231 ms (0,195–0,234) | 0,173 ms (0,171–0,182) | 0,175 ms (0,163–0,182) | 0,193 ms (0,192–0,194) | 0,161 ms |
+| `memory_reserved` des Geräts | 45,6 MiB | 45,6 MiB | 49,6–53,5 MiB | (nicht erfasst) | 47,4 MiB | 47,4 MiB |
+| Working Set / privat | 92,3 / 135,9 MiB | 95,8 / 143,8 MiB | 92,2 / 136,0 MiB | 86,5 / 117,8 MiB | – | – |
+
+Leerlauf (zusammengesetzt, Voll, 5 s ohne Änderung nach dem ersten Bild): 0 weitere Bilder, 1 Rücklesung (das Festsetzen in Ruhe nach dem letzten Bild), CPU 0, 15,6 und 31,2 ms in 5 s (`GetThreadTimes` zählt in Schritten von 15,6 ms), Working Set 86–91 MiB.
+
+Was das heißt:
+
+- **Zusammensetzen kostet fast nichts.** Das Bild der Ansicht kostet im Fenster 126 µs CPU gegen 104 µs offscreen, dazu kommen Hashen und Planen der Zellen (rund 46 µs im ganzen Rendern) und je dargestelltem Bild rund 45 µs Darstellen. Die GPU-Zeit des Quads im Durchgang der Ausgabe ist nicht einzeln gemessen (die Ausgabe hat keine Zeitstempel); die Zeit von render3d liegt im Fenster bei 0,24 statt 0,19 ms, ohne dass dem nachgegangen wäre.
+- **Zurücklesen kostet 1,2–1,4 ms je Bild** bei 1200 × 700 (Kopie über PCIe, Warten, 700 Zeilen), und weil die CPU die Zellen dann zeichnet, kommt das Hochladen in die Grundtextur dazu (Darstellen 625 statt 11 µs). Wer jedes Bild zurückliest, zahlt also rund 2,6 ms CPU je Bild mehr als mit dem Zusammensetzen. Deshalb liest die Ansicht nur zurück, wenn jemand den Framebuffer liest, und einmal in Ruhe.
+- **Basis gegen Voll auf dem Gerät der UI:** auf der GPU kein Unterschied (0,231 gegen 0,236 ms; die Galerie hat rund 100 Listen), auf der CPU 34 µs mehr je Bild (ein Befehl je Liste statt eines Multi-Draws). Der Wunsch `AF_GPU_3D` zahlt sich hier also erst mit vielen Listen oder einer schnelleren zweiten GPU aus; er kostet nichts.
+- **Takt:** Die Messung zeichnet so schnell, wie der Timer es zulässt; von 300 Bildern der Ansicht wurden 73–78 dargestellt (zwei Darstellungen liegen mindestens 4 ms auseinander). Eine App gibt den Takt im Bildtakt des Monitors vor.
+- **Speicher:** 45,6 MiB reserviert für Ausgabe und Szene zusammen (die Galerie, ihr Ziel und der Rücklese-Puffer von je 3,4 MB, die Swapchain); auf dem CPU-Pfad mit eigenem Gerät 18 MiB weniger privat (keine Swapchain, keine Textur des Fensters).
+
+**Nicht getestet:** die Wahl des Adapters auf einem Rechner mit zwei GPUs; Linux, Android und der Browser (G5e2; `jflib` übersetzt für alle vier Ziele, mit und ohne `std`); ein echter Treiber-Reset (`test_lose` spielt ihn vor); andere GPUs (ob die Barrieren dort reichen, zeigt nur ein Lauf dort); ein Fenster im Dauerbetrieb; eine Ansicht in einer höheren Ebene (ein Dialog) und in einem gespiegelten Fenster (beide auf dem CPU-Pfad gebaut, nicht geprüft); `--verify-dirty`, Agent und `shot` mit einer Ansicht (sie lesen über `gp_settle`, wie bei Bildern geprüft); Skripte mit Ansicht (kein Testprogramm hat eine; der Weg ist der von `jfgui_GPU_OUTPUT=0`); der Tod eines eigenen Geräts der Ansichten.
+
+**Nicht gebaut:** sRGB-Ziele (`lib/gpu` hat keine Sicht mit anderem Format; der Inhalt schreibt, was er schreibt); eine Ansicht in einer höheren Ebene auf der GPU; Mischen mit durchscheinendem Inhalt (die Ansicht ist deckend); ein eigener Takt der Ansicht (ein Bild je Rendern, wenn `ver` sich ändert; die App gibt den Takt); ein Inhalt in zwei Ansichten; die Bitte um eine leistungsfähige GPU im Browser (`powerPreference`); Zurücklesen ohne Warten außer im Browser.
+
 ### Was fehlt
 
 - Kacheln entstehen auf dem UI-Thread, in dem Bild, das sie braucht, ohne Vorrat um die Ansicht: das erste Bild einer Geste bleibt teuer. Ein Hilfsthread ginge nur für Inhalte, deren `draw_view` keine `Rc`-Welt braucht.
@@ -1083,6 +1180,8 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 | `jfgui_GPU_CANVAS_ZOOM=a,b` | sie zoomen auch aus Kacheln, was immer das Widget gewählt hat |
 | `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128) |
 | `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
+| `jfgui_GPU_OUTPUT=0` (oder `off`) | (G5e1) die Fenster über den CPU-Pfad, die GPU bleibt für 3D-Ansichten: sie zeichnen auf einem eigenen Gerät und lesen jedes Bild zurück ([3D-Ansicht](#3d-ansicht-g5e1)) |
+| `jfgui_GPU_VIEWS=0` | (G5e1) kein Render-Durchgang der Ausgabe zeichnet eine 3D-Ansicht: jedes ihrer Bilder wird in den Framebuffer zurückgelesen |
 | `jfgui_GPU_RETRY_MS=n` | Wartezeit bis zum ersten neuen Gerät nach einem Fehler (Vorgabe 2000, dann doppelt so lang, bis 5 min) |
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |

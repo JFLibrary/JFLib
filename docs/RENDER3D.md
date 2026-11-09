@@ -2,7 +2,7 @@
 
 `lib/render3d` zeichnet Szenen aus sehr vielen Instanzen über [`lib/gpu`](GPU.md): Meshes in gemeinsamen Puffern, Materialien mit Texturen als Tabelle, Instanzen mit Position in `f64`, Sichtbarkeit im Rechen-Shader, eine Instanzliste je Mesh, Seite und Alpha-Klasse (gespiegelte Instanzen drehen ihre Flächen um, deckende Listen zeichnet eine Pipeline ohne `discard`). Kein Befehl je Objekt, nirgends: Ein Bild sind ein Dispatch und ein indirekter Zeichenbefehl je Liste (Stufe Basis) oder ein Multi-Draw je Seite und Klasse für alle (Stufe Voll). Dieselben WGSL-Quellen laufen auf Vulkan Voll, auf Vulkan Basis und im Browser über WebGPU.
 
-Stand: Listen je Alpha-Modus ([Listen je Alpha-Modus](#listen-je-alpha-modus)); G5d: Verdeckung der Kamera gegen eine Hi-Z-Pyramide in zwei Phasen ([Verdeckung](#verdeckung-g5d)), Detailstufen ([Detailstufen](#detailstufen-g5d)); G5c: Materialien nach PBR (glTF 2.0, Anhang B) mit allen fünf Texturen, Belichtung und Tonemapping im Fragment-Shader; kaskadierte Schatten der Sonne; Punkt- und Spotlichter (auch aus glTF über `KHR_lights_punctual`); Umgebungslicht aus sphärischen Harmonischen und einer vorgefilterten Würfel-Textur; auf G5b (Texturen, glTF-Import ([GLTF.md](GLTF.md)), gespiegelte Instanzen) und dem Kern aus G5a. Die 3D-Ansicht in der UI, Linux, Android, andere GPUs (G5e) kommen danach ([Roadmap](ROADMAP.md)).
+Stand: Listen je Alpha-Modus ([Listen je Alpha-Modus](#listen-je-alpha-modus)); G5d: Verdeckung der Kamera gegen eine Hi-Z-Pyramide in zwei Phasen ([Verdeckung](#verdeckung-g5d)), Detailstufen ([Detailstufen](#detailstufen-g5d)); G5c: Materialien nach PBR (glTF 2.0, Anhang B) mit allen fünf Texturen, Belichtung und Tonemapping im Fragment-Shader; kaskadierte Schatten der Sonne; Punkt- und Spotlichter (auch aus glTF über `KHR_lights_punctual`); Umgebungslicht aus sphärischen Harmonischen und einer vorgefilterten Würfel-Textur; auf G5b (Texturen, glTF-Import ([GLTF.md](GLTF.md)), gespiegelte Instanzen) und dem Kern aus G5a. G5e1: eine Szene als Teil einer jfgui-Oberfläche, unter Windows gebaut und geprüft ([In der Oberfläche](#in-der-oberfläche-g5e1)). Linux, Android, der Browser im echten Fenster und andere GPUs (G5e2) kommen danach ([Roadmap](ROADMAP.md)).
 
 | Teil | Wo |
 | --- | --- |
@@ -305,6 +305,53 @@ Es läuft dasselbe WGSL, `lib/gpu` macht `var<immediate>` zu einem Uniform-Block
 | Kopien zwischen Puffer und Textur: Zeilen in Vielfachen von 256 Byte | das Wachsen eines Arrays richtet jede Stufe so aus |
 | `rgba8unorm-srgb` ist keine Speicher-Textur | Mip-Stufen auf der CPU |
 
+## In der Oberfläche (G5e1)
+
+Eine Szene als Teil einer jfgui-Oberfläche, neben Widgets, unter Popups und Tooltips, in einem gewöhnlichen Fenster: `ui.gpu_view` ([GPU.md, 3D-Ansicht](GPU.md#3d-ansicht-g5e1); dort auch, wie die Ansicht ins Bild kommt, was sie kostet und was ohne GPU geschieht). `lib/ui` kennt render3d nicht und hängt nicht davon ab: Die Verbindung ist ein `ui::GpuContent` in der App, der `Renderer` und `Scene` hält, rund 40 Zeilen. So sieht sie aus (getestet als `View3d` in [`apps/uigputest/view.rs`](../apps/uigputest/view.rs)):
+
+```rust
+struct Ansicht { r: Option<render3d::Renderer>, s: Option<render3d::Scene>, kamera: render3d::Camera }
+
+impl ui::GpuContent for Ansicht {
+    // das erste Gerät, oder ein neues nach einem verlorenen: alles auf ihm neu bauen
+    fn attach(&mut self, dev: &gpu::Device) -> gpu::Result<()> {
+        let mut r = render3d::Renderer::new(dev, &render3d::RendererDesc::new(ui::GPU_VIEW_FORMAT))?;
+        // ... Meshes, Texturen, Materialien
+        let mut s = render3d::Scene::new(&r)?;
+        // ... Instanzen, Sonne, Lichter
+        (self.r, self.s) = (Some(r), Some(s));
+        Ok(())
+    }
+    // das Gerät geht: was darauf lag, fallen lassen
+    fn detach(&mut self) {
+        (self.s, self.r) = (None, None);
+    }
+    fn draw<'a>(&'a mut self, e: &mut gpu::CommandEncoder<'a>, target: gpu::ColorAttachment<'a>, (w, h): (u32, u32)) -> gpu::Result<()> {
+        self.kamera.aspect = w as f64 / h as f64;
+        if let (Some(r), Some(s)) = (self.r.as_mut(), self.s.as_mut()) {
+            r.set_size(w, h)?;                     // der Tiefenpuffer folgt der Ansicht
+            s.set_camera(&self.kamera);
+            s.prepare(r)?;
+        }
+        let me: &'a Self = self;
+        let (Some(r), Some(s)) = (&me.r, &me.s) else { return Err(gpu::GpuError::Invalid("nicht angebunden")) };
+        r.record(e, s, gpu::ColorAttachment { clear: [0.1, 0.1, 0.12, 1.0], ..target }, None)
+    }
+    fn submitted(&mut self, id: gpu::SubmitId) {
+        if let Some(s) = &mut self.s { s.submitted(id) }
+    }
+}
+
+// im Bild der App: ein neues `ver`, wenn Szene oder Kamera sich ändern; die Eingabe wie bei ui.canvas
+let inp = ui.gpu_view(ID, &self.ansicht, self.ver).clone();
+```
+
+- **Das Ziel** hat `ui::GPU_VIEW_FORMAT` (`Bgra8Unorm`), der Renderer entsteht mit diesem Format. Die Farben gehen ohne sRGB-Kodierung hinein, wie bisher im Fenster-Test `window`. Ein sRGB-Ziel bräuchte in `lib/ui` einen Shader, der die Texel roh liest (`lib/gpu` kennt keine Sicht mit anderem Format als die Textur), oder das Kodieren im Fragment-Shader von render3d; nicht gebaut.
+- **Der Durchgang** beginnt in `target.before` und endet in `target.after` (lib/ui setzt beide: `Sampled`, beim ersten Bild `Undefined`). Mit Verdeckung teilt `record` ihn in zwei Durchgänge, Phase 1 mit `before`, Phase 2 mit `after`; render3d muss nichts weiter wissen. Lädt der Inhalt anders (`load`, `clear`), überschreibt er nur diese Felder.
+- **Ein neues Gerät** (Treiberreset, `Ui::gpu_test_lose`, ein Wechsel vom eigenen Gerät zu dem der UI-Ausgabe): `detach`, dann `attach` auf dem neuen; der Renderer wird neu gebaut, das nächste Bild folgt von selbst. Bis dahin zeigt die Ansicht ihr letztes zurückgelesenes Bild. Geprüft im Test `viewlose`: 2 Anbindungen, dasselbe Bild auf dem neuen Gerät (0 Pixel anders als offscreen).
+- **Stufe**: Mit `AF_GPU_3D` legt die UI ihr Gerät auf Stufe Voll an (ein Multi-Draw je Seite und Klasse); ohne den Wunsch läuft dieselbe Ansicht auf dem Basis-Gerät der UI (ein indirekter Aufruf je Liste), geprüft im Test `viewbasis`.
+- **Eine Szene je Ansicht.** Zwei Ansichten mit zwei Inhalten teilen das Gerät (Test `views2`); zwei Ansichten mit *einem* Inhalt hieße `attach` zweimal auf demselben Inhalt: nicht vorgesehen.
+
 ## Tests
 
 `python -u build_rs.py test render3dtest --target win` führt `apps/render3dtest/tests/*.uis` aus, alles offscreen außer `window.uis`, die meisten auf Voll und auf einem auf Basis begrenzten Gerät. Ohne GPU `SKIP`. Die Referenz ist unabhängig von der Engine: ein Strahlenwerfer in `f64` (eigene Wurzel, eigene Drehung über Quaternionen-Produkte, die Ebenen als Abstände im Kameraraum). Seit G5c schattiert er mit derselben BRDF, aus der Spezifikation neu geschrieben (Neutral-Tonemapper, Tangentenrahmen des Dreiecks aus seinen Kanten und UV); die Tabelle der Split-Sum ist für ihn Daten wie die Texel einer Textur, ihr Inhalt wird gegen sein eigenes Integral geprüft. Alle Bilder der G5a- und G5b-Tests haben ihre neue Referenz aus ihm, keine aus der GPU. An Kanten darf ein einfarbiges Objekt jede Farbe zwischen denen zeigen, die sein Dreieck mit den Normalen seiner Ecken und am Treffer hätte (vorher: jede Helligkeit zwischen Grundlicht und voller Sonne; mit Glanz und Fresnel ist die Farbe kein Vielfaches der Grundfarbe mehr).
@@ -320,6 +367,7 @@ Es läuft dasselbe WGSL, `lib/gpu` macht `var<immediate>` zu einem Uniform-Block
 | `frames` | sieben Bilder in Flug mit eigener Kamera und eigener Änderung gegen jedes einzeln gezeichnet; der Tiefenpuffer des Renderers | 0 Pixel anders |
 | `errors`, `shaders` | was die API verweist; leere Szene, auch mit Ursprung und nach einem `prepare` ohne Bild; Instanzen nach `prepare`; ein Bild, das nie abgeschickt wurde; eine Szene mit fremdem Renderer; verlorenes Gerät; die eingebetteten Wörter | bestanden |
 | `window` | ein echtes Fenster, sechs Bilder, das dargestellte Bild gegen dasselbe Bild offscreen, mit Validierung; ein einziger, kurzer Lauf | 0 Pixel anders |
+| (G5e1) `uigputest --test view*` | eine Szene in einer jfgui-Oberfläche: das Bild im Framebuffer gegen dasselbe Bild offscreen auf demselben Gerät und gegen den Strahlenwerfer, jedes dargestellte Bild gegen den Framebuffer ([GPU.md](GPU.md#3d-ansicht-g5e1)) | 0 Pixel anders, gegen den Strahlenwerfer 0 falsch |
 | `bench_shadows` (G5c) | ein kurzer Messlauf mit vier Kaskaden unter Validierung | 0 Fehler; die Listen der Kamera wie `cull_ref` |
 | `validate`, `bench_smoke`, `bench_textures` | alles außer `window` unter der Validierungsschicht mit Synchronisationsprüfung, auch der Shader-Zugriffe; kurze Messläufe mit Änderungen und mit 16 Texturen: die Listen enthalten alles aus `cull_ref` der Messszene | 0 Fehler, 0 Warnungen; 0 fehlen |
 | `textures` (G5b) | die Wrap-Modi vergrößert, nächstgelegen und bilinear; die Stufen 1 und 2 (ρ 2,6 und 5,2) nächstgelegen und zwischen zwei Stufen gemischt; die 8 Stufen einer 128er-Textur (sRGB und linear) aus dem Array zurückgelesen gegen den eigenen Kastenfilter; ein Boden unter flachem Winkel trilinear über den Sampler und im Shader (Clamp × Repeat, Mirror mit nächster Stufe); jede Klasse vergrößert; 40 Würfel einer Liste mit 40 Texturen (sRGB und linear); 90 Texturen mehr (die Arrays wachsen von 3 auf 15 MiB); 100 × 60 bilinear und 48 × 20 nächstgelegen umgerechnet gegen eigenes Umrechnen; 4096 × 64 in Klasse 2048; MASK mit Löchern und mit einem Faktor-Alpha unter der Schwelle; was verweigert wird | 0 falsche Pixel; größte Abweichung genau gefordert ±1: gemessen 1; bilinear (±2): 1; trilinear über den Sampler (±6): 5, im Shader: 1; Stufen: 0 Byte anders |
@@ -561,6 +609,8 @@ Punktlichter (dieselbe Szene ohne Schatten, die Lichter zufällig über die Szen
 - **PBR kostet 29 % mehr Zeichenzeit** (0,37 ms). Darin: die BRDF (zwei Wurzeln, eine Normierung des Halbvektors), die vier Lesezugriffe der Tabelle, der Tonemapper, die Weltposition als Varying und ihre zwei Ableitungen, die Sicht im Fragment-Shader. Nicht weiter aufgeteilt. Die Würfel sind klein; je mehr Fläche ein Bild hat, desto mehr zählt der Fragment-Shader.
 
 ## Was nicht getestet ist
+
+Aus G5e1: eine Szene in der Oberfläche unter Linux, Android und im Browser (G5e2), auf einem Rechner mit zwei GPUs (die Wahl des Adapters mit `AF_GPU_3D`), mit Schatten, Lichtern und Umgebung in der Ansicht (die Tests nehmen fünf Formen unter der Sonne, die Messung die Galerie), ein sRGB-Ziel (nicht gebaut, [In der Oberfläche](#in-der-oberfläche-g5e1)).
 
 Aus den Listen je Alpha-Modus: andere GPUs (ob sie den frühen Tiefentest ohne `discard` wirklich ziehen, zeigt nur eine Messung dort), mehrere Szenen eines Renderers mit einem Klassenwechsel zwischen `prepare` und `record` (oben), Szenen mit sehr vielen Listen beider Klassen (Messung mit einer Liste je Klasse), der Klassenwechsel eines Materials mit 1 Mio. Instanzen (die Szene sieht dann alle Plätze an).
 

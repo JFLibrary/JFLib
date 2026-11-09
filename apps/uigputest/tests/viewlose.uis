@@ -1,0 +1,3 @@
+#!args --test viewlose
+# (G5e1) a lost device while a view moves: the CPU path with its last frame, the content detached; a new device:
+# attached again, its renderer built anew, the same picture

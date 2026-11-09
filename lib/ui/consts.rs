@@ -257,6 +257,7 @@ pub const AF_LIGHT: u32 = 8; // force light theme
 pub const AF_SINGLE_INSTANCE: u32 = 16; // one window per user: later starts hand their command line over (UIC_OPEN)
 pub const AF_LOG_FILE: u32 = 32; // window mode: the log also goes to logs://APP.log (1 MiB, 3 older files)
 pub const AF_SAVE_STATE: u32 = 64; // window mode: the main and tool windows' placement kept in config://windows.ini
+pub const AF_GPU_3D: u32 = 128; // the app shows 3D views (ui.gpu_view): the UI's GPU device at level Voll on the fastest adapter
 
 // ------------------------------------------------------------------ theme tokens (color)
 // byte offsets as in ASMLIB; index = token / 4

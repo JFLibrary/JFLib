@@ -118,6 +118,20 @@
 // drawn when a view moves over it.  Nothing of it exists before the first move, and nothing SETTLE
 // + CANVAS_UNUSED_US after the last one.  Right-to-left windows draw canvases on the CPU.
 //
+// Views (G5e1, gpu_view.rs).  A view of GPU content (ui.gpu_view: a 3D scene between widgets) draws its frames
+// on this device into a texture of its size (gp_views_begin, at render time before the cells are hashed: a new
+// ver, size or device draws one, nothing else does).  Where the window is on its swapchain and the view ends up
+// on top it is a quad like an image's (QuadSrc::View, drawn by the shader that copies: `fs` at its place), its
+// command's hash stands for where it lies as a canvas apart's (dirty.canv), and a new frame counts as a canvas's
+// move: its cells owed and stale, the cells with something over it and under a layer drawn again by the CPU,
+// whose Draw reads the frame back (the only way the CPU gets it: a copy to a read-back buffer, waited for).
+// VIEW_REST_US after the last frame gp_tick settles the window once: at rest the framebuffer holds the picture.
+// Anywhere else the view's command hashes its frame's number, so each new frame is drawn by the CPU, which reads
+// it back.  AF_GPU_3D makes the device at level Voll on the fastest adapter; without the flag views work on the
+// Basis device of the frugal adapter.  Without an output in this run (not wanted, never possible) views make a
+// device of their own (gp_view_device).  A lost device detaches every content (gp_views_gone) and attaches it to
+// the next one.
+//
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 // usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
@@ -132,7 +146,9 @@
 // canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
 // jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (they also zoom from
 // tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
-// jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
+// jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move), jfgui_GPU_OUTPUT=0 (the
+// windows through the CPU path, the GPU stays for views, which read every frame back), jfgui_GPU_VIEWS=0 (no view
+// is drawn by the output's render pass: every frame read back into the framebuffer);
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
@@ -194,7 +210,8 @@ use super::canvas::{CanvasGpu, CanvasView};
 use super::cmd::{render_layer, Cmd, DrawRef, Gfx};
 use super::consts::*;
 use super::dirty::TOP_BLOCKED;
-use super::{App, GpuOutput, Ui};
+use super::gpu_view::{Entry, GpuContent, Own, Target, ViewTex, GPU_VIEW_FORMAT};
+use super::{App, GpuOutput, Mods, Ui};
 use gfx::{Dc, Surface, FMT_A8, FMT_XRGB};
 use text::Text;
 
@@ -282,9 +299,11 @@ const PHASE_TOL: f64 = 1.0 / 64.0;
 const LEVELS_MAX: usize = 6;
 /// (scripts) a window shows once more, 4 ms between the tries: longer than a display takes to answer
 const SHOW_TRIES: u32 = 300;
+/// (views) this long after a view's last frame the window is settled: its frame read back into the framebuffer (us)
+const VIEW_REST_US: u64 = 180_000;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
-/// wgsl::compile makes of it, --gen-shaders writes them again); the browser takes the WGSL itself
+/// wgsl::compile makes of it, --devgen-shaders writes them again); the browser takes the WGSL itself
 #[cfg(not(target_arch = "wasm32"))]
 mod spv {
     include!("gpu_out_spv.rs");
@@ -473,6 +492,8 @@ struct TileDraw {
 enum QuadSrc {
     Image { tex: Rc<ImageTex>, src: Rc<Surface>, w: i32, h: i32, step: [u32; 2] },
     Canvas { f: DrawRef, w: i32, h: i32, vis: [i32; 4], tiles: Vec<TileDraw>, copy: bool, loose: bool },
+    /// (G5e1) a view's frame: its target, one to one at the quad's place; its Draw reads the frame back
+    View { tex: Rc<ViewTex>, f: DrawRef, w: i32, h: i32, vis: [i32; 4] },
 }
 
 /// an image or a canvas drawn by the GPU in a window's frame: its place, the rectangles of its cells
@@ -657,6 +678,11 @@ pub(crate) struct S {
     said_ok: bool, // plat::gpu_out_state
     tile_marked: u64, // `gpu expect fills`
     diff_marked: u64, // `gpu expect nodiff`
+    /// (views) counts the devices views can draw on (the output's, their own): a new one takes their contents along
+    dev_gen: u32,
+    /// (views) the output's render pass may draw them (jfgui_GPU_VIEWS); the app shows them (AF_GPU_3D)
+    views_on: bool,
+    want3d: bool,
     #[cfg(target_arch = "wasm32")]
     web_inst: Option<Instance>, // adapter and device asked for, on their way
     #[cfg(target_arch = "wasm32")]
@@ -711,6 +737,9 @@ impl Default for S {
             said_ok: false,
             tile_marked: 0,
             diff_marked: 0,
+            dev_gen: 0,
+            views_on: true,
+            want3d: false,
             #[cfg(target_arch = "wasm32")]
             web_inst: None,
             #[cfg(target_arch = "wasm32")]
@@ -731,7 +760,9 @@ fn wanted() -> bool {
         _ if cfg!(target_arch = "wasm32") => DEFAULT_ON_BROWSER && !plat::args().iter().any(|a| a == "--agent"),
         _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX }, // (Android: the host says)
     };
-    on && !plat::win_remote_session()
+    // (jfgui_GPU_OUTPUT=0: the windows through the CPU path, the GPU stays for views)
+    let output = !plat::env("jfgui_GPU_OUTPUT").is_some_and(|v| v == "0" || v.eq_ignore_ascii_case("off"));
+    on && output && !plat::win_remote_session()
 }
 
 fn ms(a: u64, b: u64) -> f64 {
@@ -760,6 +791,7 @@ impl S {
         if let Some(ms) = plat::env("jfgui_GPU_CANVAS_SETTLE_MS").and_then(|v| v.parse::<u64>().ok()) {
             self.canvas_settle_us = ms * 1000;
         }
+        self.views_on = self.layers_on && !off("jfgui_GPU_VIEWS");
     }
 
     /// how this canvas may use the GPU (the variables say what the widget's choice is not)
@@ -933,7 +965,7 @@ impl S {
         let desc = self.desc();
         let trace = self.trace;
         let t0 = plat::time_us();
-        let r = build_device(self.web_inst.take(), nw, pw, None, desc, trace);
+        let r = build_device(self.web_inst.take(), nw, pw, None, desc, trace, self.want3d);
         self.note(&format!("device, pipelines, swapchain: {:.2} ms on this thread", ms(t0, plat::time_us())));
         if let Some(w) = self.win(i) {
             w.stage = Stage::Job;
@@ -1077,8 +1109,21 @@ fn build_window(dev: &Device, bgl: &BindGroupLayout, surf: gpu::Surface, old: Op
     Ok(Built { surf, sc, tex, group })
 }
 
-/// instance, the adapter for this window, device, pipeline, the first swapchain
-fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, desc: SwapchainDesc, trace: bool) -> gpu::Result<(Core, Built)> {
+/// (AF_GPU_3D) the adapters for windows and 3D views together, the fastest first: discrete before integrated, none
+/// the output would not take either (a CPU or virtual one; the browser's one unless it is software).  jfgui_GPU_ADAPTER
+/// picks one as in Instance::adapter
+fn fast_adapters(inst: &Instance) -> gpu::Result<Vec<Adapter>> {
+    if plat::env("jfgui_GPU_ADAPTER").is_some_and(|s| !s.is_empty()) {
+        return inst.adapter().map(|a| vec![a]);
+    }
+    let list: Vec<Adapter> = inst.adapters()?.into_iter().filter(|a| a.info().missing.is_none() && gpu::low_power_rank(a.info().kind, false).is_some()).collect();
+    if list.is_empty() { Err(GpuError::NoAdapter) } else { Ok(list) }
+}
+
+/// instance, the adapter for this window, device, pipeline, the first swapchain.  want3d (AF_GPU_3D): the fastest
+/// adapter at level Voll (3D views share the device), else the frugal one at level Basis
+#[allow(clippy::too_many_arguments)]
+fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, display: Option<(u32, u32)>, desc: SwapchainDesc, trace: bool, want3d: bool) -> gpu::Result<(Core, Built)> {
     let t0 = plat::time_us();
     #[cfg(target_os = "android")]
     if env_on("jfgui_GPU_TEST_DIE") {
@@ -1090,10 +1135,10 @@ fn build_device(prepared: Option<Instance>, nw: plat::NativeWindow, pw: i32, dis
     };
     let t1 = plat::time_us();
     let surf = gpu::Surface::native(&inst, nw, pw)?;
-    let list: Vec<Adapter> = inst.adapters_low_power(display)?;
+    let list: Vec<Adapter> = if want3d { fast_adapters(&inst)? } else { inst.adapters_low_power(display)? };
     let adapter = list.into_iter().find(|a| a.can_present(&surf)).ok_or(GpuError::NoAdapter)?;
     let t2 = plat::time_us();
-    let dev = adapter.create_device(&DeviceDesc { max_level: Level::Basis })?;
+    let dev = adapter.create_device(&DeviceDesc { max_level: if want3d { Level::Voll } else { Level::Basis } })?;
     let t3 = plat::time_us();
     let bgl = dev.create_bind_group_layout(&[Binding { binding: 0, kind: BindingKind::Texture, stages: Stages::FRAGMENT }])?;
     let built = build_window(&dev, &bgl, surf, None, &desc)?;
@@ -1210,6 +1255,17 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
                     e.set_render_pipeline(&core.pipe_image);
                     e.set_bind_group(0, &tex.group);
                     e.push_constants(0, &[q.x, q.y, step[0] as i32, step[1] as i32]);
+                    for r in &q.rects {
+                        scissor(&mut e, r);
+                        e.draw(3, 1, 0, 0);
+                    }
+                }
+                QuadSrc::View { tex, .. } => {
+                    // (its frame ended in Layout::Sampled; the content's pass made it visible to the shaders)
+                    let Some(group) = &tex.group else { continue };
+                    e.set_render_pipeline(&core.pipe);
+                    e.set_bind_group(0, group);
+                    e.push_constants(0, &[q.x, q.y, 0, 0]);
                     for r in &q.rects {
                         scissor(&mut e, r);
                         e.draw(3, 1, 0, 0);
@@ -1483,7 +1539,8 @@ fn quad_blit(fb: &mut Surface, q: &Quad, b: [i32; 4], text: &mut Text) {
     dc.clip_push(b[0], b[1], b[2] - b[0], b[3] - b[1]);
     match &q.src {
         QuadSrc::Image { src, w, h, .. } => dc.blit_scaled(fb, src, q.x, q.y, *w, *h),
-        QuadSrc::Canvas { f, w, h, vis, .. } => {
+        // (a view's Draw reads its frame back)
+        QuadSrc::Canvas { f, w, h, vis, .. } | QuadSrc::View { f, w, h, vis, .. } => {
             dc.clip_push(vis[0], vis[1], vis[2] - vis[0], vis[3] - vis[1]);
             dc.clip_push(q.x, q.y, *w, *h);
             f.draw(&mut Gfx { dc: &mut dc, sf: fb, text }, [q.x, q.y, *w, *h]);
@@ -1526,13 +1583,81 @@ fn layer_texture(core: &Core, bb: [i32; 4], fw: i32, fh: i32) -> gpu::Result<Lay
     Ok(LayerTex { t, group, ox, oy, w, h, fresh: true })
 }
 
+// ------------------------------------------------------------------ views (G5e1)
+
+/// a view's content leaves its device: detach, the target and its read-back go (what was read back stays)
+fn view_detach(e: &mut Entry) {
+    if e.devgen == 0 {
+        return;
+    }
+    if let Some(c) = e.content.upgrade() {
+        if let Ok(mut c) = c.try_borrow_mut() {
+            c.detach();
+        }
+    }
+    e.info.detaches += 1;
+    e.devgen = 0;
+    e.output = false;
+    e.refused = 0;
+    e.tex = None;
+    e.tried = None;
+    e.apart = false;
+    e.moved = false;
+    e.rest_at = 0;
+    e.sh.c.borrow_mut().gpu = None;
+}
+
+/// one frame of view e: its target of this size (new: also the output's bind group for it and the read-back), the
+/// content's pass into it, submitted.  The target rests in Layout::Sampled between frames: the pass goes from
+/// there (Undefined the first time) to ColorTarget and back to Sampled at its end, which makes its writes
+/// visible to the shaders that sample it (the output's pass, later on the same queue) and waits for their
+/// reads before the next frame writes
+fn view_frame(e: &mut Entry, content: &Rc<core::cell::RefCell<dyn GpuContent>>, dev: &Device, bgl: Option<&BindGroupLayout>, size: (u32, u32)) -> gpu::Result<()> {
+    let (w, h) = size;
+    if e.tex.as_ref().is_none_or(|t| (t.w, t.h) != size) {
+        e.tex = None;
+        e.sh.c.borrow_mut().gpu = None;
+        let t = dev.create_texture(&TextureDesc::d2(w, h, GPU_VIEW_FORMAT, TextureUsage::COLOR_TARGET | TextureUsage::SAMPLED | TextureUsage::COPY_SRC))?;
+        let group = match bgl {
+            Some(l) => Some(dev.create_bind_group(&BindGroupDesc { layout: l, entries: &[BindEntry { binding: 0, resource: Resource::Texture(t.view()) }] })?),
+            None => None,
+        };
+        let stride = (w * 4 + 255) & !255;
+        e.sh.c.borrow_mut().gpu = Some(Target {
+            dev: dev.clone(),
+            t: t.clone(),
+            // (the browser: a buffer per read-back, gpu_view.rs)
+            #[cfg(not(target_arch = "wasm32"))]
+            rb: dev.create_buffer(&BufferDesc { size: stride as u64 * h as u64, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?,
+            stride,
+            #[cfg(target_arch = "wasm32")]
+            wait: None,
+        });
+        e.tex = Some(Rc::new(ViewTex { t, group, w, h, fresh: core::cell::Cell::new(true) }));
+    }
+    let Some(tex) = e.tex.clone() else { return Err(GpuError::Invalid("no target")) };
+    let before = if tex.fresh.get() { Layout::Undefined } else { Layout::Sampled };
+    let mut c = content.try_borrow_mut().map_err(|_| GpuError::Invalid("the view's content is borrowed"))?;
+    let mut enc = dev.encoder()?;
+    let target = ColorAttachment { view: tex.t.view(), load: Load::Clear, clear: [0.0, 0.0, 0.0, 1.0], store: true, before, after: Layout::Sampled };
+    c.draw(&mut enc, target, size)?;
+    let id = dev.queue().submit([enc.finish()?])?;
+    c.submitted(id);
+    drop(c);
+    tex.fresh.set(false);
+    e.sh.c.borrow_mut().frame += 1;
+    Ok(())
+}
+
 // ------------------------------------------------------------------ the runtime's calls
 
 impl Ui {
     /// window_main: the output's decision for this run
     pub(crate) fn gp_window_mode(&mut self) {
+        let want3d = self.desc.flags & AF_GPU_3D != 0;
         let s = &mut self.m.gout;
         s.want = wanted();
+        s.want3d = want3d;
         s.setup();
     }
 
@@ -1715,6 +1840,11 @@ impl Ui {
                 w.out.error = Some(format!("{e}"));
             }
         }
+        // (views: their frames as read back last stay in the framebuffers; the contents leave the device)
+        if matches!(self.m.gout.dev, Dev::Ready(_)) {
+            let devgen = self.m.gout.dev_gen;
+            self.gp_views_gone(Some(devgen));
+        }
         let s = &mut self.m.gout;
         s.images_gone();
         s.canvases_gone();
@@ -1753,10 +1883,14 @@ impl Ui {
                     match r {
                         Ok((core, built)) => {
                             let s = &mut self.m.gout;
-                            s.note(&format!("device ready: {}", core.name));
+                            s.note(&format!("device ready: {} ({:?})", core.name, core.dev.level()));
                             s.dev = Dev::Ready(core);
+                            s.dev_gen += 1; // (views: their contents come to it with their next frame)
                             s.ready_at = plat::time_us();
                             self.gp_built(win, built);
+                            if !self.m.gview.views.is_empty() {
+                                self.invalidate(); // (a view at rest gets its frame on the new device)
+                            }
                         }
                         Err(e) => {
                             let s = &mut self.m.gout;
@@ -1923,6 +2057,7 @@ impl Ui {
         let n = self.m.gout.wins.len();
         let now = plat::time_us();
         self.gp_canvas_tick(now);
+        self.gp_views_tick(now);
         for w in self.m.gout.wins.iter_mut().flatten() {
             if w.sp.linger_at != 0 && now >= w.sp.linger_at {
                 w.sp.linger_at = 0;
@@ -2020,10 +2155,10 @@ impl Ui {
             let desc = s.desc();
             let job = s.next_job;
             s.next_job += 1;
-            let trace = s.trace;
+            let (trace, want3d) = (s.trace, s.want3d);
             s.note("start: instance, device, swapchain on a worker");
             plat::gpu_out_state(plat::GPU_STATE_TRYING);
-            let ok = s.spawn(move || Done::Device { job, win: i, r: build_device(None, nw, pw, display, desc, trace) });
+            let ok = s.spawn(move || Done::Device { job, win: i, r: build_device(None, nw, pw, display, desc, trace, want3d) });
             if ok {
                 s.dev = Dev::Starting(job);
                 if let Some(w) = s.win(i) {
@@ -2108,6 +2243,10 @@ impl Ui {
         if s.canvas_free_at != 0 {
             d = d.min(s.canvas_free_at);
         }
+        // (views: the look at rest, once after the last frame)
+        for e in self.m.gview.views.iter().filter(|e| e.rest_at != 0) {
+            d = d.min(e.rest_at);
+        }
         let ready = matches!(s.dev, Dev::Ready(_));
         let moving = plat::win_in_sizemove();
         for w in s.wins.iter().flatten() {
@@ -2180,6 +2319,12 @@ impl Ui {
     /// window i goes away: its swapchain and surface before its plat window
     pub(crate) fn gp_window_gone(&mut self, i: u32) {
         let i = i as usize;
+        // (its views: their contents leave the device, the records go)
+        let views = &mut self.m.gview.views;
+        for e in views.iter_mut().filter(|e| e.win == i) {
+            view_detach(e);
+        }
+        views.retain(|e| e.win != i);
         if self.m.gout.wins.get(i).and_then(|w| w.as_ref()).is_none() {
             return;
         }
@@ -2217,6 +2362,9 @@ impl Ui {
     /// the window loop ended: everything of the GPU goes (a job still running after 2 s is left
     /// to the process's end)
     pub(crate) fn gp_shutdown(&mut self) {
+        // (views: their contents drop what they built before a device goes, also the views' own)
+        self.gp_views_gone(None);
+        self.m.gview.own = Own::None;
         if !self.m.gout.want {
             return;
         }
@@ -2262,7 +2410,8 @@ impl Ui {
                 o.layer_store += u.store.px.capacity() as u64;
             }
             o.image_quads = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::Image { .. })).count() as u32;
-            o.canvas_quads = w.sp.quads.len() as u32 - o.image_quads;
+            o.view_quads = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::View { .. })).count() as u32;
+            o.canvas_quads = w.sp.quads.len() as u32 - o.image_quads - o.view_quads;
             o
         });
         o.wanted = s.want;
@@ -2858,8 +3007,281 @@ impl Ui {
         }
     }
 
-    /// render_live, after dirty_compute: is this frame drawn layer by layer?  (Else it goes as
-    /// without layers: the whole base texture holds the framebuffer's cells then.)
+    // ------------------------------------------------------------------ views (G5e1, gpu_view.rs)
+
+    /// the device views draw on now: the output's (device, generation, true); else, when this run has no output
+    /// (not wanted, never possible), their own, made on first use; None while the output's device is on its way
+    /// or a new one is awaited (a view shows what it showed last)
+    fn gp_view_device(&mut self, now: u64) -> Option<(Device, u32, bool)> {
+        let Mods { gout: s, gview, .. } = &mut self.m;
+        if let (true, Dev::Ready(core)) = (s.want, &s.dev) {
+            return Some((core.dev.clone(), s.dev_gen, true));
+        }
+        if let Own::Ready { dev, devgen, .. } = &gview.own {
+            return Some((dev.clone(), *devgen, false));
+        }
+        if s.want && !matches!(s.dev, Dev::Never(_)) {
+            return None;
+        }
+        match gview.own {
+            Own::Never(_) => return None,
+            Own::Retry(at) if now < at => return None,
+            _ => {}
+        }
+        // (the browser: adapter and device answer later, and the views draw on the output's device anyway)
+        if cfg!(target_arch = "wasm32") {
+            gview.own = Own::Never(String::from("the browser: views draw on the output's device"));
+            return None;
+        }
+        let t0 = plat::time_us();
+        let r = Instance::new().and_then(|inst| {
+            let a = inst.adapter()?;
+            let dev = a.create_device(&DeviceDesc::DEFAULT)?;
+            Ok((inst, a.info().name.clone(), dev))
+        });
+        match r {
+            Ok((inst, name, dev)) => {
+                s.dev_gen += 1;
+                s.note(&format!("views: a device of their own: {name} ({:?}), {:.2} ms", dev.level(), ms(t0, plat::time_us())));
+                gview.own = Own::Ready { _inst: inst, dev: dev.clone(), devgen: s.dev_gen };
+                Some((dev, s.dev_gen, false))
+            }
+            Err(e) => {
+                s.note(&format!("views: no device of their own: {e}"));
+                gview.own = match e {
+                    GpuError::DeviceLost | GpuError::OutOfMemory | GpuError::Timeout | GpuError::Failed(_) | GpuError::NotReady => Own::Retry(now + RETRY_FIRST_MS * 1000),
+                    _ => Own::Never(format!("{e}")), // no Vulkan, jfgui_GPU=0, no usable adapter: they paint
+                };
+                None
+            }
+        }
+    }
+
+    /// dirty_compute, before hashing: the live window's views of this frame.  The device (a new one takes the
+    /// content along: detach, attach); a frame where the ver, size or device changed, drawn and submitted now,
+    /// before anything reads it; whether the output's render pass draws it (dirty.canv: its hash stands for its
+    /// place then, as a canvas apart's), else its command hashes the frame's number: a new frame, a new picture
+    pub(crate) fn gp_views_begin(&mut self) {
+        if self.wp.canv.views.is_empty() {
+            return;
+        }
+        // (contents the app dropped: their records go, and with them what holds a device; also without an output,
+        // where gp_tick does not look)
+        self.m.gview.views.retain(|e| e.content.strong_count() > 0);
+        let i = self.uiw_cur as usize;
+        let now = plat::time_us();
+        let dev = self.gp_view_device(now);
+        let pw = self.uiw_pw(i as u32);
+        // (nobody sees a minimised or hidden window: no frame for it, the next one when it is back)
+        let unseen = pw >= 0 && plat::win_state(pw) & (plat::WST_MINIMIZED | plat::WST_HIDDEN) != 0;
+        let can = self.wp.dirty.split && !self.rtl && self.dc.opac == 255 && self.m.gout.views_on && self.gp_can_split(i);
+        let mut failed: Option<(GpuError, bool, u32)> = None;
+        let Ui { m, wp, .. } = self;
+        let Mods { gout: s, gview, .. } = m;
+        let bgl = match &s.dev {
+            Dev::Ready(core) if s.want => Some(core.bgl.clone()),
+            _ => None,
+        };
+        let lim = dev.as_ref().map_or(0, |d| d.0.limits().max_texture_2d);
+        for rec in wp.canv.views.iter_mut() {
+            rec.apart = false;
+            let Some(Cmd::Custom { x, y, w, h, ver, .. }) = wp.cmd.layers[rec.layer as usize].get_mut(rec.index as usize) else { continue };
+            let Some(e) = gview.views.iter_mut().find(|e| e.win == i && e.id == rec.id) else { continue };
+            let Some(content) = e.content.upgrade() else { continue };
+            // ---- the device
+            if let Some((d, devgen, out)) = &dev {
+                if e.devgen != *devgen && e.refused != *devgen {
+                    if e.devgen != 0 {
+                        view_detach(e);
+                    }
+                    let r = match content.try_borrow_mut() {
+                        Ok(mut c) => c.attach(d),
+                        Err(_) => Err(GpuError::Invalid("the view's content is borrowed")),
+                    };
+                    match r {
+                        Ok(()) => {
+                            e.devgen = *devgen;
+                            e.output = *out;
+                            e.level = Some(d.level());
+                            e.info.attaches += 1;
+                            e.info.error = None;
+                            s.note(&format!("view {}: attached to device {devgen}", e.id));
+                        }
+                        Err(err) => {
+                            e.refused = *devgen;
+                            e.info.error = Some(format!("{err}"));
+                        }
+                    }
+                }
+            }
+            let attached = e.devgen != 0 && dev.as_ref().is_some_and(|d| d.1 == e.devgen);
+            let size = ((*w).max(0) as u32, (*h).max(0) as u32);
+            e.info.size = size;
+            e.moved = false;
+            // ---- a frame
+            let key = (rec.ver, size, e.devgen);
+            if attached && !unseen && size.0 > 0 && size.1 > 0 && size.0 <= lim && size.1 <= lim && e.tried != Some(key) {
+                e.tried = Some(key);
+                let (d, _, out) = dev.as_ref().unwrap_or_else(|| unreachable!());
+                let t0 = plat::time_us();
+                match view_frame(e, &content, d, if *out { bgl.as_ref() } else { None }, size) {
+                    Ok(()) => {
+                        e.moved = true;
+                        e.rest_at = now + VIEW_REST_US;
+                        e.info.error = None;
+                    }
+                    Err(err) => {
+                        e.info.error = Some(format!("{err}"));
+                        if matches!(err, GpuError::DeviceLost | GpuError::OutOfMemory | GpuError::Failed(_) | GpuError::Timeout | GpuError::SurfaceLost) {
+                            failed = Some((err, *out, e.devgen));
+                        }
+                    }
+                }
+                e.info.draw_us += plat::time_us().saturating_sub(t0);
+            }
+            // ---- the output draws it where it ends up on top (gp_plan_views)
+            let frame = e.sh.c.borrow().frame;
+            let fits = e.tex.as_ref().is_some_and(|t| (t.w, t.h) == size && t.group.is_some());
+            let apart = can && attached && e.output && rec.layer == 0 && fits && frame != 0;
+            rec.apart = apart;
+            e.apart = apart;
+            if apart {
+                wp.dirty.canv.push((rec.index, [*x, *y, *w, *h]));
+            }
+            // ---- the CPU's way: another frame or another painting, its cells drawn again
+            *ver = rec.ver.wrapping_mul(0x9E37_79B9) ^ (frame as u32).wrapping_mul(0x85EB_CA6B) ^ (frame >> 32) as u32;
+        }
+        // (their own device, when no view is on it any more)
+        if let Own::Ready { devgen, .. } = gview.own {
+            if !gview.views.iter().any(|e| e.devgen == devgen) {
+                gview.own = Own::None;
+                s.note("views: their own device goes");
+            }
+        }
+        if let Some((err, out, devgen)) = failed {
+            if out {
+                // (every window back on the CPU path now: this frame is hashed and drawn as on it)
+                self.gp_failed(i, err);
+                self.wp.dirty.split = false;
+                self.wp.dirty.canv.clear();
+                for rec in self.wp.canv.views.iter_mut() {
+                    rec.apart = false;
+                }
+            } else {
+                self.gp_views_gone(Some(devgen));
+                self.m.gview.own = Own::Retry(now + RETRY_FIRST_MS * 1000);
+            }
+        }
+    }
+
+    /// dirty_compute, after hashing: the cells the output's render pass draws each view apart in (where it ended
+    /// up on top, as a canvas's), a new frame as a canvas's move: those cells owed and stale, the cells with
+    /// something over it or under a layer drawn again (their Draw reads the frame back) -> any view drawn so
+    pub(crate) fn gp_plan_views(&mut self) -> bool {
+        let i = self.uiw_cur as usize;
+        if !self.wp.canv.views.iter().any(|v| v.apart) {
+            return false;
+        }
+        let (fw, fh) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        let Ui { m, wp, .. } = self;
+        let Mods { gout: s, gview, .. } = m;
+        let d = &wp.dirty;
+        let (cols, rows) = (d.cols as usize, d.rows as usize);
+        let Some(Some(w)) = s.wins.get_mut(i) else { return false };
+        let sp = &mut w.sp;
+        if sp.hole.len() != cols * rows {
+            return false; // (gp_plan_images sizes them where a window can be drawn apart)
+        }
+        let mut quads = core::mem::take(&mut sp.quads);
+        let span = |a: i32, b: i32, n: usize| ((a.max(0) >> 5) as usize, (((b + CELL - 1).max(0) >> 5) as usize).min(n));
+        let mut any = false;
+        for rec in wp.canv.views.iter().filter(|v| v.apart) {
+            let Some(e) = gview.views.iter().find(|e| e.win == i && e.id == rec.id) else { continue };
+            let Some(tex) = e.tex.clone() else { continue };
+            let moved = e.moved;
+            let Some(Cmd::Custom { x, y, w: cw, h: ch, .. }) = wp.cmd.layers[0].get(rec.index as usize) else { continue };
+            let seen = d.imgs.iter().position(|s| s.index == rec.index);
+            let q = quads.len() as u8 + 1;
+            let Some(tag0) = seen.filter(|_| quads.len() < TOP_BLOCKED as usize - 1) else {
+                // (not on top anywhere, or too many: the CPU draws its cells, from the frame read back)
+                if moved {
+                    let (c0, c1) = span(*x, x + cw, cols);
+                    let (r0, r1) = span(*y, y + ch, rows);
+                    for r in r0..r1 {
+                        sp.redraw[r * cols + c0..r * cols + c1.max(c0)].fill(true);
+                    }
+                    sp.moved = true;
+                }
+                continue;
+            };
+            let (tag, vis) = (tag0 as u8 + 1, d.imgs[tag0].vis);
+            let (c0, c1) = span(vis[0], vis[2], cols);
+            let (r0, r1) = span(vis[1], vis[3], rows);
+            for r in r0..r1 {
+                for c in c0..c1 {
+                    let k = r * cols + c;
+                    if d.top.get(k) == Some(&tag) {
+                        let b = cell_box(k, cols, fw, fh);
+                        sp.hole[k] = q;
+                        sp.part[k] = b[0] < vis[0] || b[1] < vis[1] || b[2] > vis[2] || b[3] > vis[3];
+                        if moved {
+                            sp.owed[k] = true;
+                            sp.stale[k] = true;
+                        }
+                    }
+                    if moved {
+                        sp.redraw[k] = true;
+                    }
+                }
+            }
+            sp.moved |= moved;
+            let mut rects = Vec::new();
+            let hole = &sp.hole;
+            cell_rects(&mut rects, cols, rows, fw, fh, |k| hole[k] == q);
+            for r in rects.iter_mut() {
+                let (x0, y0) = (r[0].max(vis[0]), r[1].max(vis[1]));
+                let (x1, y1) = ((r[0] + r[2]).min(vis[2]), (r[1] + r[3]).min(vis[3]));
+                *r = [x0, y0, x1 - x0, y1 - y0];
+            }
+            rects.retain(|r| r[2] > 0 && r[3] > 0);
+            if !rects.is_empty() {
+                quads.push(Quad { x: *x, y: *y, src: QuadSrc::View { tex, f: e.draw.clone(), w: *cw, h: *ch, vis }, rects });
+                any = true;
+            }
+        }
+        w.sp.quads = quads;
+        any
+    }
+
+    /// the contents of the views on device generation devgen (None: every device) leave it: detach, their targets go
+    /// (the frames read back last stay with their Draw)
+    pub(crate) fn gp_views_gone(&mut self, devgen: Option<u32>) {
+        for e in self.m.gview.views.iter_mut() {
+            if e.devgen != 0 && devgen.is_none_or(|g| g == e.devgen) {
+                view_detach(e);
+            }
+        }
+    }
+
+    /// the window loop: contents the app dropped; views at rest: their window settled once, the framebuffer holds
+    /// their last frame again (a lost device later loses nothing of the picture)
+    fn gp_views_tick(&mut self, now: u64) {
+        let views = &mut self.m.gview.views;
+        if views.is_empty() {
+            return;
+        }
+        views.retain(|e| e.content.strong_count() > 0);
+        let mut rest: Vec<usize> = Vec::new();
+        for e in views.iter_mut().filter(|e| e.rest_at != 0 && now >= e.rest_at) {
+            e.rest_at = 0;
+            if !rest.contains(&e.win) {
+                rest.push(e.win);
+            }
+        }
+        for i in rest {
+            self.gp_settle(i);
+        }
+    }
     pub(crate) fn gp_split_begin(&mut self, n: i32) -> bool {
         if !self.wp.dirty.split {
             return false;
@@ -3269,6 +3691,7 @@ impl Ui {
             self.m.gout.script = true;
             self.m.gout.setup();
             self.m.gout.want = true;
+            self.m.gout.want3d = self.desc.flags & AF_GPU_3D != 0;
             self.m.gout.verify = word_eq(skip_ws(r), "fast").is_none();
             self.m.gout.trace = env_on("jfgui_GPU_TRACE");
             self.m.gout.skip = false;
@@ -3296,6 +3719,10 @@ impl Ui {
         if word_eq(a, "off").is_some() {
             self.m.gout.script = false;
             self.gp_wait_jobs(3000);
+            if matches!(self.m.gout.dev, Dev::Ready(_)) {
+                let devgen = self.m.gout.dev_gen;
+                self.gp_views_gone(Some(devgen)); // (views: their own device with the next frame)
+            }
             let s = &mut self.m.gout;
             s.wins.clear();
             s.images.clear();

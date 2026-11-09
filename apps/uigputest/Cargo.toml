@@ -26,6 +26,12 @@ ui.workspace = true
 shader.workspace = true
 wgsl.workspace = true
 gpu.workspace = true
+# (G5e1) a render3d scene in a view (view.rs); render3dtest's geometry and ray caster (common.rs, cpu.rs, gltfgen.rs
+# included as they are) need gltf and the image crates
+render3d.workspace = true
+gltf.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
 [build-dependencies]

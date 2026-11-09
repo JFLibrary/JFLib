@@ -1,0 +1,2 @@
+#!args --test viewoff
+# (G5e1) jfgui_GPU=0: a view without a device: its content paints, the window's DC shows it, nothing is drawn
