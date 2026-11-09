@@ -5,8 +5,11 @@
 //                        and Tab too (ui.key_take); F5 the page does not use: back to the command
 //                        table (ui.accel_run); the arrow cursor (HB_CURSOR_SET), the hand over a link
 //   the plain canvas     the defaults: crosshair, accelerators and Tab as everywhere
+//   menus at a point     a right click on the page opens its menu one pass later, where the
+//                        click was (ui.menu_popup_at), as when an engine answers; "Menü später"
+//                        opens a flyout of the app's own at a point of the page (ui.popup_open_at)
 //
-// tests/keys.uis drives it; the texts above the page say what it saw.
+// tests/keys.uis and tests/menus.uis drive it; the texts above the page say what it saw.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -22,9 +25,16 @@ use ui::*;
 const ID_SINK: u32 = 100;
 const ID_PAGE: u32 = 101;
 const ID_PLAIN: u32 = 102;
+const ID_LATER: u32 = 103; // "Menü später"
+const ID_FLYOUT: u32 = 104; // the flyout it opens at a point of the page
+const ID_ROW: u32 = 105; // its row
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
+const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
+
+// the page's context menu
+static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
 
 static CMDS: [Command; 2] = [
     Command::new(CMD_NEW_TAB, "Neuer Tab", 0, MOD_CTRL, VK_T, 0),
@@ -55,11 +65,17 @@ struct ViewTest {
     cursor: u32,
     /// the link under the pointer in the last pass (+1, 0 none)
     hover: u32,
+    /// a right click on the page (px of the window): its menu opens in the next pass
+    menu_at: Option<(i32, i32)>,
+    /// "Menü später" was clicked: the flyout opens in the next pass
+    later: bool,
+    copy: u32,
+    rows: u32,
 }
 
 impl Default for ViewTest {
     fn default() -> Self {
-        ViewTest { sink: 1, keys: Vec::new(), new_tab: 0, reload: 0, cursor: u32::MAX, hover: 0 }
+        ViewTest { sink: 1, keys: Vec::new(), new_tab: 0, reload: 0, cursor: u32::MAX, hover: 0, menu_at: None, later: false, copy: 0, rows: 0 }
     }
 }
 
@@ -120,6 +136,16 @@ impl ViewTest {
                 ui.repass();
             }
         }
+        // a right click: the menu comes a pass later, where the click was (an engine answers)
+        if inp.ev & EV_RCLICK != 0 {
+            self.menu_at = Some((r[0] + inp.x, r[1] + inp.y));
+            ui.repass();
+        }
+        // "Menü später": the flyout hangs at a point of the page
+        if self.later {
+            self.later = false;
+            ui.popup_open_at(ID_FLYOUT, r[0] + ui.dp(200), r[1] + ui.dp(60));
+        }
         // the cursor of the hit box under the pointer: the last pass's, once more when it is not
         // yet the one this pass asked for
         if inp.ev & EV_HOVER != 0 {
@@ -155,15 +181,27 @@ impl App for ViewTest {
         ui.text(TS_BODY, &format!("Tasten: {}", self.keys.join(" ")));
         ui.text(TS_BODY, &format!("Befehle: Tab {} Laden {}", self.new_tab, self.reload));
         ui.text(TS_BODY, &format!("Zeiger: {}", cursor_name(self.cursor)));
+        if let Some((x, y)) = self.menu_at.take() {
+            ui.menu_popup_at(&PAGE_MENU, x, y);
+        }
         self.page(ui);
         self.plain(ui);
+        ui.text(TS_BODY, &format!("Menü: Kopieren {} Eintrag {}", self.copy, self.rows));
+        if ui.button(ID_LATER, "Menü später") & EV_ACT != 0 {
+            self.later = true;
+        }
         ui.box_end();
+        if ui.flyout_begin(ID_FLYOUT, 0) && ui.menu_item(ID_ROW, "Eintrag A") & EV_ACT != 0 {
+            self.rows += 1;
+        }
+        ui.flyout_end();
     }
 
     fn command(&mut self, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
         match id {
             CMD_NEW_TAB => self.new_tab += 1,
             CMD_RELOAD => self.reload += 1,
+            CMD_COPY => self.copy += 1,
             _ => return false,
         }
         true

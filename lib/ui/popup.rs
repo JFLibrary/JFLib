@@ -528,11 +528,12 @@ impl Ui {
     }
 
     // focus_has_keys: the focused widget keeps every key (HB_KEYS): as this pass drew it, else
-    // (not drawn yet: ui.undo_keys at the start of a frame) as the last one did
+    // (not drawn yet: ui.undo_keys at the start of a frame) as the last one did; not while a
+    // popup of the window is open (its keys, ui.key_take gives none)
     pub(crate) fn focus_has_keys(&self) -> bool {
         let c = &self.wp.ctx;
         let find = |n: usize| c.hits[n].iter().rev().find(|h| h.id == c.focus);
-        c.focus != 0 && find(c.hit_cur).or_else(|| find(c.hit_cur ^ 1)).is_some_and(|h| h.keys)
+        c.focus != 0 && self.wp.popup.pp_n == 0 && find(c.hit_cur).or_else(|| find(c.hit_cur ^ 1)).is_some_and(|h| h.keys)
     }
 
     // uiw_popup_area (ui_win.s): the area the live window's popups may use when they may
@@ -595,6 +596,20 @@ impl Ui {
         }
         let l = self.wp.popup.fl_level;
         self.pp_push(id, l);
+    }
+
+    /// popup_open_at(id, x, y): open popup `id` as popup_open does, its flyout hanging at the
+    /// point (x, y) (px of the window, as last_rect: a canvas's UiInput::rect plus its x, y)
+    /// instead of at the last widget; an open one moves there.  For a place the app learns later
+    /// than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
+    pub fn popup_open_at(&mut self, id: u32, x: i32, y: i32) {
+        self.popup_open(id);
+        let i = self.pp_find(id);
+        if i >= 0 {
+            let e = &mut self.wp.popup.pp[i as usize];
+            e.flags |= PPF_POINT;
+            e.anchor = [x, y, 0, 0];
+        }
     }
 
     /// ui_popup_close: close every popup (the focus returns to where it was)
@@ -1956,6 +1971,18 @@ impl Ui {
             return;
         }
         let (x, y) = (self.wp.ctx.mx, self.wp.ctx.my);
+        self.ctx_open(menu, x, y, false);
+    }
+
+    /// menu_popup_at(menu, x, y): open a menu at the point (x, y) (px of the window, as
+    /// last_rect; a canvas: UiInput::rect plus its x, y), the runtime draws it as menu_popup's.
+    /// For a context menu whose place the app learns after the right click (a web engine
+    /// answers later): open it in the frame the answer comes; rows that change with the answer:
+    /// a flyout of the app's own through popup_open_at.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn menu_popup_at(&mut self, menu: &'static [Mi], x: i32, y: i32) {
+        let _src = self.src_scope();
+        self.wp.popup.ctx_target = 0;
         self.ctx_open(menu, x, y, false);
     }
 
