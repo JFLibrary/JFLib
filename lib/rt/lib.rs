@@ -152,26 +152,28 @@ macro_rules! __std_main {
 }
 
 pub mod boot;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/cpu.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "portable/cpu.rs")]
 pub mod cpu;
 pub mod crash;
 #[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
 pub mod fx;
 #[cfg(target_os = "linux")]
 pub mod kernel;
-#[cfg(not(target_os = "android"))]
+// Android and Apple: the system's malloc and memory functions (android.rs, apple.rs)
+#[cfg(not(any(target_os = "android", target_vendor = "apple")))]
 #[cfg_attr(target_arch = "wasm32", path = "portable/mem.rs")]
 #[cfg_attr(feature = "std", allow(dead_code))] // std brings the allocator and the memory functions
 mod mem;
 /// rt's allocator, for a program with std that wants it instead of the system's:
 /// `#[global_allocator] static ALLOC: jflib::rt::Alloc = jflib::rt::Alloc::new();`
-#[cfg(all(feature = "std", not(any(target_os = "android", target_arch = "wasm32"))))]
+#[cfg(all(feature = "std", not(any(target_os = "android", target_arch = "wasm32", target_vendor = "apple"))))]
 pub use mem::Alloc;
 #[cfg_attr(target_arch = "wasm32", path = "portable/os.rs")]
 #[cfg_attr(target_os = "android", path = "android.rs")]
+#[cfg_attr(target_vendor = "apple", path = "apple.rs")]
 pub mod os;
 pub mod sync;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/math.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "portable/math.rs")]
 pub mod x87;
 
 /// Portable arithmetic, available on native targets for exact backend comparisons.

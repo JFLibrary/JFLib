@@ -248,6 +248,7 @@ pub mod assoc;
 pub mod recent;
 pub use recent::{recent_add, recent_clear, recent_list, recent_remove};
 /// Sound output: streams, short sounds from memory or files, the system's own sounds.
+#[cfg_attr(target_vendor = "apple", allow(dead_code))] // no sound backend on Apple yet: the mixer waits for it
 pub mod audio;
 /// The monitors, a pixel's colour anywhere on the screen, pictures of the screen.
 pub mod screen;
@@ -314,6 +315,12 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
 
+// macOS and iOS through libSystem (docs/APPLE.md)
+#[cfg(target_vendor = "apple")]
+mod apple;
+#[cfg(target_vendor = "apple")]
+pub use apple::*;
+
 /// Host-driven boundary shared by browser workers and the native Android adapter.
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub mod web;
@@ -322,6 +329,7 @@ pub use web::*;
 
 mod clipdrop;
 // drag and drop between programs (the shared part; win_dnd.rs, linux_x11_dnd.rs, linux_wl_clip.rs)
+#[cfg_attr(target_vendor = "apple", allow(dead_code))] // no windows on Apple yet (docs/APPLE.md AP4)
 mod dnd;
 pub use dnd::*;
 // clipboard_platform: reusable rich clipboard framing.
@@ -331,7 +339,7 @@ mod consts;
 mod evq;
 mod ime;
 pub use ime::*;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "web_icc.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_icc.rs")]
 mod icc;
 mod pwin0;
 pub use clipdrop::*;
@@ -341,13 +349,13 @@ pub use icc::*;
 pub use pwin0::*;
 // plat-shared: printing (print.rs + win_print.rs / linux_print.rs), plugin libraries and the
 // crash guard (plib.rs + win_lib.rs / linux_elfload.rs, linux_guard.rs)
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "web_lib.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_lib.rs")]
 mod plib;
 mod print;
 pub use plib::*;
 pub use print::*;
 // jxl-module: loadable modules, the host side (the JPEG XL writer jxlenc; modhost.rs, modabi.rs)
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "web_modhost.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_modhost.rs")]
 mod modhost;
 pub use modhost::*;
 

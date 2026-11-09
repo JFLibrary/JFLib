@@ -41,3 +41,26 @@ pub fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32> {
         return if count < 0 { Err((-count) as u32) } else { Ok(count as usize) };
     }
 }
+
+/// Read bytes from the process standard input (macOS, iOS), as on Linux: interrupted calls are
+/// retried, a descriptor inherited non-blocking is waited on.
+#[cfg(target_vendor = "apple")]
+pub fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32> {
+    use crate::apple::ffi;
+    loop {
+        // SAFETY: fd 0, a live writable slice, read cannot exceed the passed length.
+        let count = unsafe { ffi::read(0, bytes.as_mut_ptr().cast(), bytes.len()) };
+        if count >= 0 {
+            return Ok(count as usize);
+        }
+        match ffi::errno() {
+            ffi::EINTR => continue,
+            ffi::EAGAIN => {
+                let mut pfd = ffi::Pollfd { fd: 0, events: ffi::POLLIN, revents: 0 };
+                // SAFETY: one pollfd record, no timeout.
+                unsafe { ffi::poll(&mut pfd, 1, -1) };
+            }
+            e => return Err(e as u32),
+        }
+    }
+}

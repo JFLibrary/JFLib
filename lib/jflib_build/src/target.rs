@@ -79,8 +79,10 @@ impl Target {
             "windows" => self.windows(kind, dir, out_dir)?,
             "linux" if self.env == "gnu" => self.linux(out_dir)?,
             "android" => return Ok(Vec::new()), // the APK's library: tools/android.py of JFLib (cargo jflib, later)
+            // Apple's linker as rustc calls it: libSystem, its start calls plat's main (docs/APPLE.md)
+            "macos" | "ios" => return Ok(Vec::new()),
             _ if self.arch == "wasm32" => return Ok(self.wasm()),
-            _ => return Err(format!("{}: JFLib builds for Windows, Linux, Android and the browser", self.triple)),
+            _ => return Err(format!("{}: JFLib builds for Windows, Linux, macOS, iOS, Android and the browser", self.triple)),
         };
         lines.extend(args.into_iter().map(|a| format!("cargo::rustc-link-arg-bins={a}")));
         Ok(lines)

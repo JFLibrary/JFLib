@@ -246,3 +246,26 @@ use crate::linux_screen as native;
 
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 use crate::web_screen as native;
+
+// macOS and iOS before the window backend (docs/APPLE.md, AP4): no monitors known yet, no colour
+// pick, no capture
+#[cfg(target_vendor = "apple")]
+mod native {
+    use super::{Monitor, ScreenError};
+    use alloc::vec::Vec;
+    pub fn monitors() -> Vec<Monitor> {
+        Vec::new()
+    }
+    pub fn pick_available() -> bool {
+        false
+    }
+    pub fn pick_start(_test: Option<(i32, i32)>) -> Result<(), ScreenError> {
+        Err(ScreenError::Unavailable)
+    }
+    pub fn capture_available() -> bool {
+        false
+    }
+    pub fn capture_start(_rect: Option<[i32; 4]>) -> Result<(), ScreenError> {
+        Err(ScreenError::Unavailable)
+    }
+}
