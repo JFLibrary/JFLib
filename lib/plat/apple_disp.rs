@@ -1,9 +1,8 @@
 // apple_disp -- what macOS and iOS share of the window-level API (home, drives, printing, the file
-// dialog, opening URLs and folders, starting this program again), and iOS's windows before AP5
-// (docs/APPLE.md): every window function there answers as linux_disp.rs does without a display (no
-// window opens, sizes are 0, the dpi is 96, the clipboard is empty, wait() sleeps until its deadline
-// or a wake(); the main window ends the process with exit code 1 and a message).  macOS's windows:
-// apple_mac.rs.
+// dialog, opening URLs and folders, starting this program again), and what iOS's host path leaves
+// to the platform (docs/APPLE.md AP5: the windows are web_windows.rs's in the canvas of
+// apple_ios.rs; wait() for programs without the host, the clipboard until AP5b, the theme).
+// macOS's windows: apple_mac.rs.
 
 use alloc::string::String;
 use alloc::vec;
@@ -12,54 +11,15 @@ use alloc::vec::Vec;
 #[cfg(target_os = "ios")]
 pub use nodisp::*;
 
+// iOS (AP5): the windows live in one canvas the UIKit host shows (web_windows.rs, apple_ios.rs);
+// what the host path leaves to the platform stays here
 #[cfg(target_os = "ios")]
 mod nodisp {
-    use alloc::vec::Vec;
-
-    use crate::Frame;
-
-    /// see win_api.rs (Windows) for the semantics of every function
-    pub fn win_create(_title: &str, _w_dip: i32, _h_dip: i32, _flags: u32, owner: i32, _x: i32, _y: i32) -> i32 {
-        if owner != crate::PW_NOOWNER {
-            return -1; // an owned window before any display
-        }
-        crate::write_stderr(b"error: no windows on iOS yet (docs/APPLE.md, AP5; use --shot FILE.png for a headless render)\n");
-        crate::exit(1)
-    }
-
-    pub fn win_destroy(_w: i32) {}
-    pub fn win_show(_w: i32, _mode: u32) {}
-    pub fn win_activate(_w: i32) {}
-    pub fn win_enable(_w: i32, _on: bool) {}
-    pub fn win_set_rect(_w: i32, _x: i32, _y: i32, _cw: i32, _ch: i32) {}
-    pub fn win_get_rect(_w: i32) -> Option<[i32; 4]> {
-        None
-    }
-    pub fn win_work_area(_w: i32) -> Option<[i32; 4]> {
-        None
-    }
-    pub fn win_set_title(_w: i32, _title: &str) {}
-    pub fn win_state(_w: i32) -> u32 {
-        0
-    }
-    pub fn win_cmd(_w: i32, _cmd: u32) {}
-    pub fn win_begin_move(_w: i32) {}
-    pub fn win_begin_resize(_w: i32, _edges: u32) {}
+    /// a context menu of the system at a window position: none on iOS (the app's own menus)
     pub fn win_show_menu(_w: i32, _x: i32, _y: i32) {}
-    pub fn win_size(_w: i32) -> (i32, i32) {
-        (0, 0)
-    }
-    pub fn win_dpi(_w: i32) -> i32 {
-        96
-    }
-    pub fn win_set_min_size(_w: i32, _w_dip: i32, _h_dip: i32) {}
-    pub fn win_present(_w: i32, _f: &Frame, _rects: Option<&[[i32; 4]]>) {}
-    pub fn win_set_cursor(_w: i32, _shape: u32) {}
-    pub fn win_hit_hook(_f: Option<fn(i32, i32, i32) -> u32>) {}
-    pub fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>) {}
-    pub fn set_refresh(_f: Option<fn()>) {}
 
-    /// without a display: sleep until the deadline (0 = poll, u64::MAX = forever) or a wake()
+    /// a program without the host (a headless run, a command-line program): sleep until the
+    /// deadline (0 = poll, u64::MAX = forever) or a wake(); the host's runtime never waits
     pub fn wait(deadline_us: u64) -> u32 {
         if crate::evq_count() == 0 {
             crate::wait_events(deadline_us, &mut |e| {
@@ -69,56 +29,37 @@ mod nodisp {
         crate::evq_count()
     }
 
-    pub fn popup(_slot: u32, _owner: i32, _rect: Option<[i32; 4]>, _f: Option<&Frame>) {}
-    pub fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2]) {}
-    pub fn popup_placed(_slot: u32) -> Option<[i32; 2]> {
-        None
-    }
-    pub fn cursor_create(_px: &[u8], _w: i32, _h: i32, _hot_x: i32, _hot_y: i32, _dpi: i32) -> i32 {
-        -1
-    }
-    pub fn cursor_destroy(_id: i32) {}
-    /// the dpi to draw a cursor for a window of this dpi (no display: the dpi itself)
-    pub fn cursor_dpi(dpi: i32) -> i32 {
-        dpi
-    }
-    pub fn clip_set(_fmt: u32, _data: &[u8]) -> bool {
-        false
-    }
-    pub fn clip_set_many(_entries: &[(u32, &[u8])]) -> bool {
-        false
-    }
-    pub fn clip_get(_fmt: u32) -> Option<Vec<u8>> {
-        None
-    }
-    pub fn clip_has(_fmt: u32) -> bool {
-        false
-    }
-    pub fn ime_pos(_x: i32, _y: i32, _h: i32) {}
+    // the clipboard: UIPasteboard (apple_ios_services.rs)
+    pub use super::super::ios::{clip_get, clip_has, clip_set, clip_set_many};
 
-    /// (dnd.rs) dragging data out of the app: not without windows
+    /// (dnd.rs) dragging data out of the app: not on iOS yet
     pub(crate) fn os_drag_start(_data: crate::DragData) -> bool {
         false
     }
 
-    /// 0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark, else unknown (the system's appearance
-    /// comes with the window backend)
+    /// 0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark, else the scene's appearance as the host
+    /// sent it (UITraitCollection, web_system.rs)
     pub fn theme() -> i32 {
         match crate::env("jfgui_THEME").as_deref() {
             Some("dark") => 1,
             Some("light") => 0,
-            _ => -1,
+            _ => match crate::web::system_host::dark() {
+                Some(true) => 1,
+                Some(false) => 0,
+                None => -1,
+            },
         }
     }
 
-    /// pens / pen tablets (-1 = unknown)
+    /// pens (-1 = unknown; the Apple Pencil shows itself at its first touch)
     pub fn pen_devices() -> i32 {
         -1
     }
 
-
-    /// (apple_thread.rs wake) no application to wake on iOS before AP5
-    pub(crate) fn wake_app() {}
+    /// (apple_thread.rs wake) the host's next tick takes the wake-up (apple_ios.rs)
+    pub(crate) fn wake_app() {
+        super::super::ios::wake();
+    }
 }
 
 /// $HOME (or "/")  [plat_home]
@@ -163,12 +104,9 @@ pub fn print(job: &mut crate::PrintJob<'_>) -> i32 {
     crate::ERR_UNSUPPORTED
 }
 
-/// iOS: no system file dialog before AP5 -> (-1, 0): the library's own dialog, as in a browser without
-/// the File System Access API (macOS: apple_mac.rs)  [plat_file_dialog]
+// iOS's file dialog: the system's picker, answering later (apple_ios_services.rs); macOS: apple_mac.rs
 #[cfg(target_os = "ios")]
-pub fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32) {
-    (-1, 0)
-}
+pub use super::ios::{file_dialog, file_dialog_poll};
 
 /// macOS: /usr/bin/open with the argument (LaunchServices), waited for up to 5 s -> 0 / -1; iOS: -1
 fn open_with_launch_services(arg: &str) -> i32 {
@@ -196,11 +134,14 @@ pub fn open_folder(path: &str) -> i32 {
     open_with_launch_services(path)
 }
 
-/// a web page in the default application -> 0 / -1  [plat_open_url]
+/// a web page in the default application (iOS: UIApplication openURL) -> 0 / -1  [plat_open_url]
 pub fn open_url(url: &str) -> i32 {
     if !crate::policy::url_allowed(url) {
         return -1;
     }
+    #[cfg(target_os = "ios")]
+    return super::ios::open_url(url);
+    #[cfg(not(target_os = "ios"))]
     open_with_launch_services(url)
 }
 

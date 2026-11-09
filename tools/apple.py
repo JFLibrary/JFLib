@@ -87,6 +87,16 @@ def bundle(exe, sim=False):
         "CFBundleVersion": "1", "CFBundleSupportedPlatforms": ["iPhoneSimulator" if sim else "iPhoneOS"],
         "DTPlatformName": "iphonesimulator" if sim else "iphoneos", "MinimumOSVersion": IOS_MIN,
         "LSRequiresIPhoneOS": True, "UIDeviceFamily": [1, 2], "UILaunchScreen": {},
+        # one scene, its delegate the UIKit host's (lib/plat/apple_ios.rs, docs/APPLE.md AP5)
+        "UIApplicationSceneManifest": {
+            "UIApplicationSupportsMultipleScenes": False,
+            "UISceneConfigurations": {"UIWindowSceneSessionRoleApplication": [
+                {"UISceneConfigurationName": "Default", "UISceneDelegateClassName": "JFSceneDelegate"}]},
+        },
+        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationLandscapeLeft",
+                                             "UIInterfaceOrientationLandscapeRight"],
+        "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
+                                                  "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"],
     }
     (app / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
     if sim:
@@ -292,13 +302,15 @@ def gui_run(exe, args, timeout=600, env=None):
 # ---------------------------------------------------------------- the simulator
 
 def sim_device():
-    """(udid, booted) of the simulator to use"""
+    """(udid, booted) of the simulator to use: a booted iPhone first; none with two displays (an
+    "iPhone Duo": simctl io's screenshot wants one of them named)"""
     want = os.environ.get("jfgui_SIM_DEVICE")
     data = json.loads(run(["xcrun", "simctl", "list", "devices", "available", "-j"]).stdout)
     devices = [d for runtime, ds in data["devices"].items() if "iOS" in runtime for d in ds]
     if want:
         devices = [d for d in devices if d["udid"] == want]
     else:
+        devices = [d for d in devices if "Duo" not in d["name"]]
         devices.sort(key=lambda d: (not d["name"].startswith("iPhone"), d["state"] != "Booted"))
     if not devices:
         raise RuntimeError("no iOS simulator available (Xcode: Settings, Components)")
@@ -307,14 +319,20 @@ def sim_device():
 
 def sim_run(exe, args, timeout=600):
     """start the simulator's build of a program (the plain program, not the bundle) in a simulator
-    without a window: simctl spawn -> CompletedProcess"""
+    without a window, in the repository folder (jfgui_CWD: simctl spawn starts it in the device's data
+    folder): simctl spawn -> CompletedProcess"""
     udid, booted = sim_device()
     if not booted:
         run(["xcrun", "simctl", "boot", udid])
         run(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout=300)
+    env = dict(os.environ, SIMCTL_CHILD_jfgui_CWD=str(ROOT))
+    for k, v in os.environ.items():         # the caller's jfgui_* settings reach the program too
+        if k.startswith("jfgui_"):
+            env["SIMCTL_CHILD_" + k] = v
     try:
         return subprocess.run(["xcrun", "simctl", "spawn", udid, str(Path(exe).resolve()), *map(str, args)],
-                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                              env=env)
     finally:
         if not booted and os.environ.get("jfgui_SIM_KEEP") != "1":
             run(["xcrun", "simctl", "shutdown", udid], check=False)

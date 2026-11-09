@@ -24,8 +24,12 @@ mod disp;
 pub use disp::*;
 // the Objective-C runtime (classes, selectors, typed objc_msgSend)
 #[path = "apple_objc.rs"]
-#[cfg_attr(target_os = "ios", allow(dead_code))] // (iOS: from AP5 on)
+#[cfg_attr(target_os = "ios", allow(dead_code))] // (iOS: what UIKit's host needs of it)
 pub(crate) mod objc;
+// iOS's host: UIKit (AP5)
+#[cfg(target_os = "ios")]
+#[path = "apple_ios.rs"]
+pub(crate) mod ios;
 // macOS's windows: AppKit (AP4)
 #[cfg(target_os = "macos")]
 #[path = "apple_mac.rs"]
@@ -178,6 +182,7 @@ pub(crate) mod ffi {
         pub fn dispatch_semaphore_wait(sem: *mut c_void, timeout: u64) -> isize;
         pub fn dispatch_time(when: u64, delta_ns: i64) -> u64;
         pub fn dispatch_release(object: *mut c_void);
+        pub fn chdir(path: *const c_char) -> c_int;
         pub fn _NSGetArgc() -> *mut c_int;
         pub fn _NSGetArgv() -> *mut *mut *mut c_char;
         pub fn _NSGetEnviron() -> *mut *mut *mut c_char;
@@ -206,9 +211,26 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     crash::crash_init();
     thread::wake_init();
     crate::cpu::simd_override();
+    // iOS: nothing starts a program in the simulator in a folder (simctl spawn has no shell): jfgui_CWD
+    // names it (tools/apple.py sim_run: the repository, as for every other target's tests)
+    #[cfg(target_os = "ios")]
+    if let Some(dir) = env("jfgui_CWD").filter(|d| !d.is_empty() && !d.contains('\0')) {
+        let mut z = dir.into_bytes();
+        z.push(0);
+        // SAFETY: a NUL-terminated path.
+        unsafe { ffi::chdir(z.as_ptr().cast()) };
+    }
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
+    // iOS: the canvas the app's windows start in; the host's view sends its real size
+    #[cfg(target_os = "ios")]
+    ios::before_main();
     // SAFETY: the app defines jfgui_main (rt::main! / ui::main!); it takes no arguments.
     let code = unsafe { jfgui_main() };
+    // iOS: an app installed its runtime (ui::launch): UIKit takes the main thread, never returns
+    #[cfg(target_os = "ios")]
+    if code == 0 && crate::web::installed() {
+        ios::run();
+    }
     rt::os::exit(code)
 }
 

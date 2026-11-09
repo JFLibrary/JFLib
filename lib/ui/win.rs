@@ -1939,8 +1939,8 @@ impl Ui {
         if on && self.uiw_os() && self.uiw_plat_state(i as u32) & plat::WST_CHILD != 0 {
             return; // a subsurface of its owner: no full screen of its own
         }
-        if cfg!(target_os = "android") {
-            return;
+        if cfg!(any(target_os = "android", target_os = "ios")) {
+            return; // the app has the whole screen already
         }
         self.m.win.recs[iu].fs = on;
         self.m.win.recs[iu].want |= UWW_FS;

@@ -1574,7 +1574,7 @@ def run_app_suite(builders, name):
         if exe is None:
             print(f"[{b.folder}] {name}: not built for this target (apps/{name}/TARGETS)")
             continue
-        for record in run_app_tests(name, b.target, exe):
+        for record in run_app_tests(name, "ios-sim" if getattr(b, "ios_sim", False) else b.target, exe):
             if record["status"] == "skipped":
                 continue
             total += 1
@@ -2016,15 +2016,15 @@ def main():
     targets = ["win", "linux"] if tgt == "both" else ["win", "linux", "web"] if tgt == "all" else [tgt]
     if a.arch != "x86_64" and not set(targets) <= set(ARM64_TRIPLE):
         raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
-    if a.cmd in ("run", "test") and a.arch != host_arch():
+    if a.cmd in ("run", "test") and a.arch != host_arch() and not set(targets) & set(APPLE):   # (--arch: win, linux)
         foreign_start_check(a.name, targets, a.arch)
     if "android" in targets and a.cmd not in ("app", "lib"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
     if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only
         if sys.platform != "darwin":
             raise BuildError("mac and ios build on a Mac (Apple's SDK; docs/APPLE.md).")
-        if a.cmd not in ("app", "lib", "run") and not (a.cmd == "test" and a.name and targets == ["mac"]):
-            raise BuildError("mac and ios support app, lib and run (mac also test NAME); the iPhone itself: "
+        if a.cmd not in ("app", "lib", "run") and not (a.cmd == "test" and a.name and (targets == ["mac"] or (targets == ["ios"] and a.sim))):
+            raise BuildError("mac and ios support app, lib and run (mac and ios --sim also test NAME); the iPhone itself: "
                              "python tools/apple.py device APP.app")
         if a.cmd == "run" and targets == ["ios"] and not a.sim:
             raise BuildError("run --target ios starts the simulator's build (--sim); the iPhone: python tools/apple.py device APP.app")
