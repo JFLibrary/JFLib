@@ -334,3 +334,83 @@ pub fn gallery_change(s: &mut Scene, ids: &mut Vec<InstanceId>, meshes: u32, mat
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------- the textured gallery (G5b)
+
+/// random texels
+pub fn noise_rgba(w: u32, h: u32, seed: u32) -> Vec<u8> {
+    let mut r = Rng(seed);
+    (0..w * h).flat_map(|_| { let v = r.next(); [v as u8, (v >> 8) as u8, (v >> 16) as u8, 255] }).collect()
+}
+
+/// a scene every path must draw alike with textures: seven textures of four classes (sRGB and linear, a
+/// 4 x 4 one repeated, one of 100 x 60 resampled), every sampling mode and MASK, 600 instances of which a
+/// third are mirrored
+pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
+    use render3d::{Mip, Sampling, TextureData, TextureRef, Wrap};
+    let geos = [cube(), ball(10, 16), prism(5, 0.6), plate()];
+    let mut meshes = Vec::new();
+    for g in &geos {
+        meshes.push(r.add_mesh(&g.data())?);
+    }
+    let pics: [(u32, u32, Vec<u8>, bool, bool); 7] = [
+        (128, 128, crate::gltfgen::picture(128, 128, 1, &|_, _| 255), true, false),
+        (256, 256, crate::gltfgen::picture(256, 256, 2, &|_, _| 255), true, false),
+        (512, 512, noise_rgba(512, 512, 3), false, false),
+        (4, 4, noise_rgba(4, 4, 4), true, true),
+        (100, 60, crate::gltfgen::picture(100, 60, 5, &|_, _| 255), true, false),
+        (128, 128, crate::gltfgen::picture(128, 128, 6, &|x, y| if ((x / 8) + (y / 8)) % 3 == 0 { 30 } else { 230 }), true, true),
+        (1024, 1024, crate::gltfgen::picture(1024, 1024, 7, &|_, _| 255), true, false),
+    ];
+    let mut tex = Vec::new();
+    for p in &pics {
+        tex.push(r.add_texture(&TextureData { width: p.0, height: p.1, rgba: &p.2, srgb: p.3, nearest: p.4 })?);
+    }
+    let s = |mag_nearest, min_nearest, mip, wrap_u, wrap_v| Sampling { mag_nearest, min_nearest, mip, wrap_u, wrap_v };
+    let samplings = [Sampling::LINEAR, Sampling::NEAREST, s(false, false, Mip::Linear, Wrap::Clamp, Wrap::Mirror), s(true, false, Mip::Nearest, Wrap::Mirror, Wrap::Repeat),
+                     s(false, true, Mip::None, Wrap::Repeat, Wrap::Clamp)];
+    let colors = gallery_colors(12);
+    let mut mats = Vec::new();
+    for (i, c) in colors.iter().enumerate() {
+        let mut m = Material::color(c[0] * 0.5 + 0.5, c[1] * 0.5 + 0.5, c[2] * 0.5 + 0.5);
+        if i % 6 != 5 {
+            m.base_color_texture = Some(TextureRef { texture: tex[i % 7], sampling: samplings[i % 5] });
+        }
+        if i % 7 == 5 {
+            m.alpha_cutoff = Some(0.5);
+        }
+        mats.push(r.add_material(&m)?);
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&gallery_camera([0.0; 3]));
+    sc.set_sun(&Sun::DEFAULT);
+    // close to the camera and large enough that the textures show
+    let mut rng = Rng(555);
+    for _ in 0..600 {
+        let axis = cpu::norm([rng.range(-1.0, 1.0), rng.range(-1.0, 1.0), rng.range(-1.0, 1.0) + 0.01]);
+        let s = rng.range(0.8, 2.4) as f32;
+        let q = |r: &mut Rng, a: f64, b: f64| (r.range(a, b) * 1024.0) as i64 as f64 / 1024.0;
+        let pos = [q(&mut rng, -30.0, 30.0), q(&mut rng, -16.0, 20.0), q(&mut rng, -40.0, 25.0)];
+        let mut scale = [s, s * rng.range(0.7, 1.3) as f32, s];
+        if rng.below(3) == 0 {
+            scale[rng.below(3) as usize] *= -1.0;
+        }
+        let (mesh, material) = (meshes[rng.below(geos.len() as u32) as usize], mats[rng.below(mats.len() as u32) as usize]);
+        sc.add(Instance { mesh, material, transform: render3d::Transform { pos, rot: quat(axis, rng.range(0.0, 6.0)), scale } })?;
+    }
+    Ok(sc)
+}
+
+/// the glTF test scene (gltfgen.rs) as a .glb, read and put on the GPU: its scene and the camera that sees it
+pub fn gltf_gallery(r: &mut Renderer) -> Result<Scene> {
+    let (glb, _) = crate::gltfgen::test_scene().write(crate::gltfgen::Form::Glb);
+    let doc = gltf::load(&glb, &mut |_| None, &gltf::Limits::DEFAULT).map_err(|_| GpuError::Invalid("the glTF gallery does not load"))?;
+    let imp = render3d::gltf::upload(r, &doc, None)?;
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&crate::gltfgen::test_camera(GALLERY_W as f64 / GALLERY_H as f64));
+    sc.set_sun(&Sun::DEFAULT);
+    for i in &imp.instances {
+        sc.add(*i)?;
+    }
+    Ok(sc)
+}

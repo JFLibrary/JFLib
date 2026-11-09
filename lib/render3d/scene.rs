@@ -3,8 +3,10 @@
 // On the CPU: one Slot per instance with its f64 position; free places on a list, used again first.
 // On the GPU, per slot: spheres (16 bytes, read by cull), list_of (4 bytes, read by cull only for what
 // is visible), instances (64 bytes, the finished matrix, read by the vertex shader).  Per list (one per
-// mesh in use): a draw record, a first place in the visible list.  Capacities double, a list keeps room
-// for its instances, so frames with instances coming and going rewrite no list layout.
+// mesh and side in use: a mirrored instance, its scales' product negative, turns its faces round and is
+// drawn by the pipeline whose front faces are clockwise): a draw record, a first place in the visible
+// list.  Capacities double, a list keeps room for its instances, so frames with instances coming and
+// going rewrite no list layout.
 //
 // What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the
 // barrier against the frame before): always the view and the lights of this frame's slot; the changed
@@ -23,9 +25,10 @@ use gpu::*;
 use crate::math::{self, V3};
 use crate::{CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer};
 
-/// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis
-/// (not negative: a mirrored instance would turn its faces inside out; 0 on some of the axes leaves
-/// faces without a normal, they come out black)
+/// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
+/// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
+/// list of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
+/// a normal, they come out black
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform {
     pub pos: [f64; 3],
@@ -36,6 +39,11 @@ pub struct Transform {
 impl Transform {
     pub const fn at(pos: [f64; 3]) -> Transform {
         Transform { pos, rot: [0.0, 0.0, 0.0, 1.0], scale: [1.0; 3] }
+    }
+
+    /// the determinant is negative: the faces turn round
+    pub fn mirrored(&self) -> bool {
+        (self.scale[0] as f64) * (self.scale[1] as f64) * (self.scale[2] as f64) < 0.0
     }
 }
 
@@ -149,6 +157,8 @@ pub struct UploadInfo {
 #[derive(Clone, Copy, Debug)]
 pub struct ListInfo {
     pub mesh: MeshId,
+    /// its instances are mirrored (drawn with clockwise front faces)
+    pub mirrored: bool,
     /// the instances of this mesh, and the room for them in the visible list
     pub count: u32,
     pub capacity: u32,
@@ -178,10 +188,12 @@ pub(crate) struct Slot {
     era: u32,
     live: bool,
     dirty: bool,
+    mirrored: bool,
 }
 
 pub(crate) struct List {
     mesh: u32,
+    pub mirrored: bool,
     pub count: u32,
     cap: u32,
     pub first: u32,
@@ -216,9 +228,10 @@ pub struct Scene {
     dirty: Vec<u32>,
     full_dirty: bool,
     pub(crate) lists: Vec<List>,
-    /// runs of lists with the same width of indices: first, count, wide
-    pub(crate) runs: Vec<(u32, u32, bool)>,
-    list_of_mesh: Vec<u32>,
+    /// runs of lists with the same width of indices and side: first, count, wide, mirrored
+    pub(crate) runs: Vec<(u32, u32, bool, bool)>,
+    /// the list of each mesh, as it is and mirrored
+    list_of_mesh: Vec<[u32; 2]>,
     lists_dirty: bool,
     live: u32,
     camera: Camera,
@@ -293,7 +306,8 @@ fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORD
     // rows of rotation * scale, then the place
     let row = |k: usize| [(c[0][k] * sx) as f32, (c[1][k] * sy) as f32, (c[2][k] * sz) as f32, p[k] as f32];
     let (r0, r1, r2) = (row(0), row(1), row(2));
-    let inv = |v: f64| if v > 0.0 { (1.0 / (v * v)) as f32 } else { 0.0 };
+    // (a mirror's sign stays in the matrix: m * (n / s^2) = r * (n / s), the inverse transpose)
+    let inv = |v: f64| if v != 0.0 { (1.0 / (v * v)) as f32 } else { 0.0 };
     let b = |v: f32| v.to_bits();
     let words = [b(r0[0]), b(r0[1]), b(r0[2]), b(r0[3]), b(r1[0]), b(r1[1]), b(r1[2]), b(r1[3]), b(r2[0]), b(r2[1]), b(r2[2]), b(r2[3]),
                  b(inv(sx)), b(inv(sy)), b(inv(sz)), s.material];
@@ -302,7 +316,7 @@ fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORD
                                c[0][1] * sx * mc[0] + c[1][1] * sy * mc[1] + c[2][1] * sz * mc[2],
                                c[0][2] * sx * mc[0] + c[1][2] * sy * mc[1] + c[2][2] * sz * mc[2]]);
     let big = center[0].abs().max(center[1].abs()).max(center[2].abs());
-    let radius = m.radius * sx.max(sy).max(sz) * (1.0 + 2e-6) + big * 5e-7;
+    let radius = m.radius * sx.abs().max(sy.abs()).max(sz.abs()) * (1.0 + 2e-6) + big * 5e-7;
     ([center[0] as f32, center[1] as f32, center[2] as f32, radius as f32], words)
 }
 
@@ -379,9 +393,9 @@ impl Scene {
     // ------------------------------------------------------------ instances
 
     fn check_transform(t: &Transform) -> Result<()> {
-        let fine = t.pos.iter().all(|v| v.is_finite()) && t.rot.iter().all(|v| v.is_finite()) && t.scale.iter().all(|v| v.is_finite() && *v >= 0.0);
+        let fine = t.pos.iter().all(|v| v.is_finite()) && t.rot.iter().all(|v| v.is_finite()) && t.scale.iter().all(|v| v.is_finite());
         if !fine {
-            return Err(GpuError::Invalid("Transform: finite values and no negative scale (mirrored instances are not built)"));
+            return Err(GpuError::Invalid("Transform: finite values"));
         }
         if t.rot == [0.0; 4] {
             return Err(GpuError::Invalid("Transform: a quaternion of length 0"));
@@ -405,21 +419,22 @@ impl Scene {
         }
     }
 
-    fn list_for(&mut self, mesh: u32) -> u32 {
+    fn list_for(&mut self, mesh: u32, mirrored: bool) -> u32 {
         let m = mesh as usize;
         if self.list_of_mesh.len() <= m {
-            self.list_of_mesh.resize(m + 1, u32::MAX);
+            self.list_of_mesh.resize(m + 1, [u32::MAX; 2]);
         }
-        if self.list_of_mesh[m] == u32::MAX {
-            self.list_of_mesh[m] = self.lists.len() as u32;
-            self.lists.push(List { mesh, count: 0, cap: 0, first: 0, wide: false });
+        let side = mirrored as usize;
+        if self.list_of_mesh[m][side] == u32::MAX {
+            self.list_of_mesh[m][side] = self.lists.len() as u32;
+            self.lists.push(List { mesh, mirrored, count: 0, cap: 0, first: 0, wide: false });
             self.lists_dirty = true;
         }
-        self.list_of_mesh[m]
+        self.list_of_mesh[m][side]
     }
 
-    fn enter_list(&mut self, mesh: u32) -> u32 {
-        let l = self.list_for(mesh);
+    fn enter_list(&mut self, mesh: u32, mirrored: bool) -> u32 {
+        let l = self.list_for(mesh, mirrored);
         let list = &mut self.lists[l as usize];
         list.count += 1;
         if list.count > list.cap {
@@ -443,12 +458,13 @@ impl Scene {
         self.check_mesh(i.mesh)?;
         self.check_material(i.material)?;
         self.stale = true;
-        let list = self.enter_list(i.mesh.0);
+        let mirrored = i.transform.mirrored();
+        let list = self.enter_list(i.mesh.0, mirrored);
         let slot = match self.free.pop() {
             Some(f) => f,
             None => {
                 let f = self.slots.len() as u32;
-                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: 0, era: 0, live: false, dirty: false });
+                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: 0, era: 0, live: false, dirty: false, mirrored: false });
                 f
             }
         };
@@ -458,6 +474,7 @@ impl Scene {
         s.material = i.material.0;
         s.list = list;
         s.live = true;
+        s.mirrored = mirrored;
         let era = s.era;
         self.live += 1;
         self.mark(slot);
@@ -485,9 +502,19 @@ impl Scene {
         Ok(())
     }
 
+    /// a new transform; one that mirrors where the old did not (or the other way round) moves the instance
+    /// to its mesh's other list, as set_mesh does
     pub fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()> {
         Scene::check_transform(t)?;
         let i = self.get(id)?;
+        let mirrored = t.mirrored();
+        if mirrored != self.slots[i].mirrored {
+            self.stale = true;
+            let old = self.slots[i].list as usize;
+            self.lists[old].count -= 1;
+            self.slots[i].list = self.enter_list(self.slots[i].mesh, mirrored);
+            self.slots[i].mirrored = mirrored;
+        }
         self.slots[i].t = *t;
         self.mark(id.slot);
         Ok(())
@@ -511,7 +538,7 @@ impl Scene {
         self.stale = true;
         let old = self.slots[i].list as usize;
         self.lists[old].count -= 1;
-        let list = self.enter_list(m.0);
+        let list = self.enter_list(m.0, self.slots[i].mirrored);
         let s = &mut self.slots[i];
         s.mesh = m.0;
         s.list = list;
@@ -570,7 +597,7 @@ impl Scene {
 
     /// the lists in order (list i = the i-th draw record of draws_buffer)
     pub fn lists(&self) -> Vec<ListInfo> {
-        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.mesh), count: l.count, capacity: l.cap, first: l.first }).collect()
+        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.mesh), mirrored: l.mirrored, count: l.count, capacity: l.cap, first: l.first }).collect()
     }
 
     /// (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list, instance_count second
@@ -708,8 +735,8 @@ impl Scene {
         self.runs.clear();
         for (i, l) in self.lists.iter().enumerate() {
             match self.runs.last_mut() {
-                Some(r) if r.2 == l.wide => r.1 += 1,
-                _ => self.runs.push((i as u32, 1, l.wide)),
+                Some(r) if r.2 == l.wide && r.3 == l.mirrored => r.1 += 1,
+                _ => self.runs.push((i as u32, 1, l.wide, l.mirrored)),
             }
         }
         let n = self.lists.len() as u64;

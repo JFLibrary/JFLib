@@ -1,0 +1,3 @@
+#!args --bench 20000 --res 320x180 --frames 20 --warmup 4 --textures 16 --tex-size 128 --verify --validate
+# (G5b) a short run of the measurement loop with 16 textures on the materials, under the validation layer:
+# its lists hold all of gputest's cull_ref

@@ -25,6 +25,10 @@ shader.workspace = true
 wgsl.workspace = true
 gpu.workspace = true
 render3d.workspace = true
+gltf.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "jflib-render3d"
-description = "The core of JFLib's 3D engine on jflib-gpu: meshes, materials, scenes of instances, visibility on the GPU"
+description = "The core of JFLib's 3D engine on jflib-gpu: meshes, textured materials, scenes of instances, visibility on the GPU, glTF scenes"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -19,6 +19,7 @@ workspace = true
 
 [dependencies]
 gpu.workspace = true
+gltf.workspace = true
 
 # docs.rs: JFLib's four targets, not docs.rs's five defaults (macOS and 32-bit Windows are none of JFLib's)
 [package.metadata.docs.rs]
