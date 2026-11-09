@@ -26,6 +26,9 @@ pub use disp::*;
 #[path = "apple_objc.rs"]
 #[cfg_attr(target_os = "ios", allow(dead_code))] // (iOS: what UIKit's host needs of it)
 pub(crate) mod objc;
+// Objective-C blocks: global ones the system calls back, calling the system's (notifications)
+#[path = "apple_block.rs"]
+pub(crate) mod block;
 // iOS's host: UIKit (AP5)
 #[cfg(target_os = "ios")]
 #[path = "apple_ios.rs"]
