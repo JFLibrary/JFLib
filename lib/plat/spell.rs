@@ -62,6 +62,11 @@ pub fn hunspell_dirs() -> Vec<String> {
             v.push(alloc::format!("{}/myspell/dicts", d));
         }
     }
+    if cfg!(target_os = "macos") {
+        // where Hunspell and LibreOffice look on a Mac
+        v.extend(crate::env("HOME").filter(|h| h.starts_with('/')).map(|h| alloc::format!("{}/Library/Spelling", h.trim_end_matches('/'))));
+        v.push(String::from("/Library/Spelling"));
+    }
     v
 }
 

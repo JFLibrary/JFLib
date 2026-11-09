@@ -9,6 +9,9 @@ mod native;
 #[cfg(target_os = "linux")]
 #[path = "process_linux.rs"]
 mod native;
+#[cfg(target_vendor = "apple")]
+#[path = "process_apple.rs"]
+mod native;
 pub use native::Child;
 
 /// Shell-free child invocation. Environment entries override inherited values.
@@ -70,6 +73,13 @@ pub fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
     if !crate::policy::process_allowed(program) {
         return Err(if cfg!(windows) { 5 } else { 13 });
     }
+    native::launch(program, args)
+}
+
+/// launch without the manifest's check: the library starting this program itself again
+/// (spawn_self / restart_self on Apple); the caller passes clean arguments
+#[cfg(target_vendor = "apple")]
+pub(crate) fn launch_own(program: &str, args: &[&str]) -> Result<(), u32> {
     native::launch(program, args)
 }
 

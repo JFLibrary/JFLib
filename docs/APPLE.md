@@ -1,8 +1,7 @@
 # Apple-Plan: macOS und iOS nativ
 
-Stand 2026-11-10, auf Basis von `main` 16ec0ab4. Umgesetzt sind AP0 (Mac und iPhone bereit) und AP2 (Bau, `rt`
-und der Kern von `plat`). Die Aufwände sind geschätzt.
-In der Roadmap stehen die Punkte unter [ROADMAP.md](ROADMAP.md) §9 (macOS P1, iOS P2, Safari P2).
+Stand 2026-11-10, auf Basis von `main` bdda550b. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
+und der Kern von `plat`) und AP3 (`plat` ohne Fenster). Die Aufwände sind geschätzt.
 
 ## Ziel
 
@@ -137,6 +136,31 @@ rückt nach AP3. `cargo-jflib` folgt, sobald Apple-Programme Fenster haben.
 
 **Fertig, wenn:** `coretest` und die Teile von `plattest` und `asynctest` ohne Fenster auf dem Mac grün sind.
 
+**Umgesetzt (2026-11-10):** `coretest` auf dem Mac 4726 von 4726, `plattest --test all` 212 von 212, dazu die einzelnen
+Tests ohne Fenster grün (unter anderem `crash`, `panic`, `spawn`, `launch`, `vfs`, `dirs`, `instance`, `log`, `policy`,
+`print`, `spell`; `secret` in der angemeldeten Sitzung, per SSH ist der Schlüsselbund gesperrt). `asynctest` öffnet ein
+Fenster und wartet auf AP4. Im iOS-Simulator `coretest` 4715 von 4717: iOS hat keine Ordnerüberwachung, und der Pfad
+eines Unix-Sockets im Temp-Ordner des Simulators ist länger als die 104 Bytes von `sun_path`.
+
+- **Module:** `process` ([`process_apple.rs`](../lib/plat/process_apple.rs): `posix_spawn` mit eigener Prozessgruppe,
+  SIGPIPE zurück auf Standard, `POSIX_SPAWN_CLOEXEC_DEFAULT`; `launch` mit eigener Session), `sync` (Tabelle aus
+  pthread-Mutex und -Bedingung statt Futex, denn `os_sync_wait_on_address` gibt es erst ab macOS 14.4), `net` (BSD-Sockets,
+  `sockaddr` mit Längenbyte, `SO_NOSIGPIPE`, Namen über `getaddrinfo`), `fs` (Darwins `struct stat` und `statfs`,
+  `utimensat`), `rand` (`getentropy`), `watch` (FSEvents mit Dateiereignissen; beim Start eine Markierungsdatei pro
+  Wurzel, vorher Gemeldetes stammt von vor dem Start), `certs` (`SecTrustEvaluateWithError`, macOS dazu
+  `/etc/ssl/cert.pem`), `service` (launchd: `/Library/LaunchDaemons`, `plist_text`), `control_ipc`
+  ([`control_ipc_apple.rs`](../lib/plat/control_ipc_apple.rs): Unix-Sockets mit `getpeereid`; die Einzelinstanz als
+  Socket-Datei in einem privaten Ordner statt eines abstrakten Namens), `secret`
+  ([`apple_secret.rs`](../lib/plat/apple_secret.rs): generische Passwörter der Keychain).
+- **Abstürze:** [`apple_crash.rs`](../lib/plat/apple_crash.rs): Signale auf einem eigenen Stack pro Thread, die
+  Register aus dem Maschinenkontext, die Aufrufkette über die Frame-Zeiger, die Apples ARM64-ABI vorschreibt; ein
+  Fehler knapp unter dem Stack ist ein Stack-Überlauf. `crash_test` gibt es für ARM64.
+- **Weiter:** Ordner (`~/Documents` usw., Logs in `~/Library/Logs/<app>`, `HOME` sonst aus `getpwuid_r`), `File::set_len`,
+  `create_new`, `spawn_self` / `restart_self`, `open_url` / `open_folder` über `/usr/bin/open`, `print` mit der
+  Testvariante `jfgui_PRINT_TO`, `cpu_brand`, Hunspell in `~/Library/Spelling` und `/Library/Spelling`.
+- **Noch nicht (AP7):** Papierkorb, Autostart, Dateizuordnungen, zuletzt benutzte Dateien, die Rechtschreibung des
+  Systems, die Locale des Systems; `plattest` meldet diese Tests auf Apple als „not on Apple yet“.
+
 ### AP4: Fenster auf macOS (L)
 
 - `NSApplication`, `NSWindow`, eigene `NSView`; die Ereignisschleife bleibt die eigene (`nextEventMatchingMask`).
@@ -221,6 +245,12 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
 - **`readdir`:** Der Eintrag kann kürzer sein als `struct dirent` mit seinen 1024 Bytes Namen. Keine Referenz auf
   den ganzen Eintrag bilden, nur `d_namlen` Bytes lesen.
 - **`fsync`** lässt die Daten auf Apple im Cache des Laufwerks, erst `F_FULLFSYNC` schreibt sie wirklich.
+- **FSEvents liefert spät:** Änderungen kurz vor dem Start eines Watchers kommen erst danach an, auch nach
+  `FSEventStreamFlushSync`. Erst eine Markierungsdatei grenzt sie sicher ab.
+- **`sockaddr` hat auf Apple ein Längenbyte** vor der Familie (ein Byte), `AF_INET6` ist 30, `SOL_SOCKET` 0xffff, und
+  `sun_path` fasst 104 statt 108 Bytes. Abstrakte Socket-Namen gibt es nicht.
+- **`posix_spawn` statt `fork`:** In einem Prozess mit Threads ist `fork` unsicher, `posix_spawn` erledigt Umleitung,
+  Prozessgruppe, Signale und das Schließen der übrigen Deskriptoren in einem Aufruf.
 
 ## Testen
 

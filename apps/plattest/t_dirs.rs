@@ -34,6 +34,8 @@ pub fn t_dirs(t: &mut T) {
     t.check(schemes == [Some("desktop"), Some("documents"), Some("downloads"), Some("pictures"), Some("music"), Some("videos")], "dirs: the schemes of the user folders");
     if cfg!(windows) {
         windows(t, &base);
+    } else if cfg!(target_vendor = "apple") {
+        apple(t, &base);
     } else {
         linux(t, &base);
     }
@@ -130,6 +132,28 @@ fn linux(t: &mut T, base: &str) {
     t.expect_s(vfs::app_dir(APP_LOG).as_deref(), Some(want.as_str()), "dirs: app_dir(APP_LOG) = XDG_STATE_HOME/<app>");
     logs_scheme(t, &want);
     // HOME and the XDG variables stay redirected: the manifest test needs the scratch home
+}
+
+// macOS and iOS: the folders below $HOME (Movies for the videos), the logs in ~/Library/Logs/<app>
+fn apple(t: &mut T, base: &str) {
+    let home = format!("{base}/home");
+    plat::setenv("HOME", Some(&home));
+    let names = ["Desktop", "Documents", "Downloads", "Pictures", "Music", "Movies"];
+    let all = (0..DIR_COUNT).all(|k| user_dir(k).as_deref() == Some(&*format!("{home}/{}", names[k as usize])));
+    t.check(all, "dirs: the folders below $HOME (Movies for the videos)");
+    plat::setenv("HOME", Some(&format!("{home}/")));
+    t.expect_s(user_dir(DIR_MUSIC).as_deref(), Some(&*format!("{home}/Music")), "dirs: a trailing slash of $HOME is dropped");
+    plat::setenv("HOME", Some(&home));
+    t.expect_s(vfs::os_path("documents://a/b.txt").as_deref(), Some(&*format!("{home}/Documents/a/b.txt")), "dirs: documents:// is the documents folder");
+    t.check(plat::write_file("documents://notes/n.txt", b"doc") && plat::file_exists(&format!("{home}/Documents/notes/n.txt")) == 1,
+        "dirs: a write through documents:// lands in the folder");
+    t.check(plat::write_file("pictures://p.png", b"png") && plat::file_exists(&format!("{home}/Pictures/p.png")) == 1,
+        "dirs: pictures:// is the pictures folder");
+    t.expect_s(plat::log_dir().as_deref(), Some(&*format!("{home}/Library/Logs")), "dirs: log_dir is ~/Library/Logs");
+    let want = format!("{home}/Library/Logs/plattest");
+    t.expect_s(vfs::app_dir(APP_LOG).as_deref(), Some(want.as_str()), "dirs: app_dir(APP_LOG) = ~/Library/Logs/<app>");
+    logs_scheme(t, &want);
+    // HOME stays redirected: the manifest test needs the scratch home
 }
 
 // logs:// is a DirFs on app_dir(APP_LOG) (want); the log file of the runtime lives there

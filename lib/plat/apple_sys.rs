@@ -50,8 +50,28 @@ fn trim_slash(mut s: String) -> String {
     s
 }
 
+/// $HOME (absolute), else the home folder of the user database (getpwuid_r; a relative $HOME
+/// counts as none)
 fn home_dir() -> Option<String> {
-    Some(trim_slash(env("HOME").filter(|v| v.starts_with('/'))?))
+    if let Some(h) = env("HOME") {
+        return h.starts_with('/').then(|| trim_slash(h));
+    }
+    #[link(name = "System")]
+    unsafe extern "C" {
+        fn getuid() -> u32;
+        fn getpwuid_r(uid: u32, pw: *mut [u64; 9], buf: *mut u8, size: usize, out: *mut *mut [u64; 9]) -> i32;
+    }
+    let mut pw = [0u64; 9]; // struct passwd: pw_dir at offset 48
+    let mut buf = alloc::vec![0u8; 4096];
+    let mut out: *mut [u64; 9] = core::ptr::null_mut();
+    // SAFETY: a struct passwd and a buffer of its size for the strings it points into.
+    let r = unsafe { getpwuid_r(getuid(), &mut pw, buf.as_mut_ptr(), buf.len(), &mut out) };
+    if r != 0 || out.is_null() || pw[6] == 0 {
+        return None;
+    }
+    // SAFETY: pw_dir points into buf, NUL-terminated.
+    let dir = unsafe { core::ffi::CStr::from_ptr(pw[6] as *const core::ffi::c_char) }.to_string_lossy().into_owned();
+    dir.starts_with('/').then(|| trim_slash(dir))
 }
 
 // ---------------------------------------------------------------- well-known directories

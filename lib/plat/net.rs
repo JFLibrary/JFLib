@@ -867,6 +867,343 @@ mod sys {
     }
 }
 
+// macOS and iOS: BSD sockets through libSystem.  Their sockaddr starts with a length byte and a family
+// byte (encode_sockaddr / decode_sockaddr / unix_addr); sends never raise SIGPIPE through SO_NOSIGPIPE,
+// set on every socket; names go through the system resolver (getaddrinfo: VPNs, mDNS, the iOS rules).
+#[cfg(target_vendor = "apple")]
+mod sys {
+    use super::{NetError, NetErrorKind, NetResult};
+    use core::ffi::{c_char, c_int, c_uint, c_void};
+
+    pub type Raw = i32;
+    pub const AF_INET: i32 = 2;
+    pub const AF_INET6: i32 = 30;
+    pub const SOL_SOCKET: i32 = 0xffff;
+    pub const SO_REUSEADDR: i32 = 0x0004;
+    pub const SO_ERROR: i32 = 0x1007;
+    pub const SO_KEEPALIVE: i32 = 0x0008;
+    pub const IPPROTO_IPV6: i32 = 41;
+    pub const IPV6_V6ONLY: i32 = 27;
+    pub const POLLIN: i16 = 1;
+    pub const POLLOUT: i16 = 4;
+    pub const SHUT_WR: i32 = 1;
+    const SO_NOSIGPIPE: i32 = 0x1022;
+    const F_GETFL: c_int = 3;
+    const F_SETFL: c_int = 4;
+    const F_SETFD: c_int = 2;
+    const FD_CLOEXEC: c_int = 1;
+    const O_NONBLOCK: c_int = 4;
+    const EINTR: i32 = 4;
+    const EINPROGRESS: i32 = 36;
+
+    #[repr(C)]
+    pub struct PollFd {
+        pub fd: i32,
+        pub events: i16,
+        pub revents: i16,
+    }
+    #[repr(C)]
+    struct AddrInfo {
+        flags: c_int,
+        family: c_int,
+        socktype: c_int,
+        protocol: c_int,
+        addrlen: u32,
+        canonname: *mut c_char,
+        addr: *const u8,
+        next: *mut AddrInfo,
+    }
+    #[repr(C)]
+    struct IfAddrs {
+        next: *mut IfAddrs,
+        name: *const c_char,
+        flags: c_uint,
+        addr: *const u8,
+        netmask: *const u8,
+        dstaddr: *const u8,
+        data: *mut c_void,
+    }
+
+    #[link(name = "System")]
+    unsafe extern "C" {
+        #[link_name = "socket"]
+        fn c_socket(domain: c_int, ty: c_int, proto: c_int) -> c_int;
+        #[link_name = "close"]
+        fn c_close(fd: c_int) -> c_int;
+        fn fcntl(fd: c_int, cmd: c_int, ...) -> c_int;
+        fn bind(fd: c_int, a: *const u8, len: u32) -> c_int;
+        fn listen(fd: c_int, n: c_int) -> c_int;
+        fn accept(fd: c_int, a: *mut u8, len: *mut u32) -> c_int;
+        fn connect(fd: c_int, a: *const u8, len: u32) -> c_int;
+        fn recv(fd: c_int, b: *mut c_void, n: usize, flags: c_int) -> isize;
+        fn send(fd: c_int, b: *const c_void, n: usize, flags: c_int) -> isize;
+        fn recvfrom(fd: c_int, b: *mut c_void, n: usize, flags: c_int, from: *mut u8, len: *mut u32) -> isize;
+        fn sendto(fd: c_int, b: *const c_void, n: usize, flags: c_int, to: *const u8, len: u32) -> isize;
+        fn setsockopt(fd: c_int, level: c_int, name: c_int, v: *const c_void, len: u32) -> c_int;
+        fn getsockopt(fd: c_int, level: c_int, name: c_int, v: *mut c_void, len: *mut u32) -> c_int;
+        fn getsockname(fd: c_int, a: *mut u8, len: *mut u32) -> c_int;
+        fn getpeername(fd: c_int, a: *mut u8, len: *mut u32) -> c_int;
+        fn shutdown(fd: c_int, how: c_int) -> c_int;
+        #[link_name = "poll"]
+        fn c_poll(fds: *mut PollFd, n: c_uint, ms: c_int) -> c_int;
+        fn if_nametoindex(name: *const c_char) -> c_uint;
+        fn getifaddrs(out: *mut *mut IfAddrs) -> c_int;
+        fn freeifaddrs(list: *mut IfAddrs);
+        fn getaddrinfo(host: *const c_char, service: *const c_char, hints: *const AddrInfo, res: *mut *mut AddrInfo) -> c_int;
+        fn freeaddrinfo(res: *mut AddrInfo);
+        fn __error() -> *mut c_int;
+    }
+
+    fn errno() -> i32 {
+        // SAFETY: the calling thread's errno slot, always valid.
+        unsafe { *__error() }
+    }
+
+    /// if_nametoindex ("en0")
+    pub fn if_index(name: &str) -> Option<u32> {
+        let mut z = name.as_bytes().to_vec();
+        z.push(0);
+        // SAFETY: a NUL-terminated name.
+        let i = unsafe { if_nametoindex(z.as_ptr().cast()) };
+        (i != 0).then_some(i)
+    }
+
+    /// getifaddrs: every interface's IPv4 and IPv6 addresses (link-local ones with their scope)
+    pub fn local_addrs() -> alloc::vec::Vec<super::SocketAddr> {
+        let mut out = alloc::vec::Vec::new();
+        let mut list: *mut IfAddrs = core::ptr::null_mut();
+        // SAFETY: getifaddrs fills list, freed below.
+        if unsafe { getifaddrs(&mut list) } != 0 {
+            return out;
+        }
+        let mut p = list;
+        while !p.is_null() {
+            // SAFETY: p walks the list getifaddrs returned; an address is at least its length byte long.
+            let (addr, next) = unsafe { ((*p).addr, (*p).next) };
+            if !addr.is_null() {
+                // SAFETY: a sockaddr whose first byte is its length.
+                let raw = unsafe { core::slice::from_raw_parts(addr, (*addr).max(2) as usize) };
+                if let Some(a) = super::decode_sockaddr(raw) {
+                    out.push(super::SocketAddr::with_scope(a.ip, 0, a.scope));
+                }
+            }
+            p = next;
+        }
+        // SAFETY: the list from getifaddrs, freed once.
+        unsafe { freeifaddrs(list) };
+        out
+    }
+
+    /// (Windows only: Apple resolves names through getaddrinfo, resolve_system)
+    pub fn dns_servers() -> alloc::vec::Vec<super::SocketAddr> {
+        alloc::vec::Vec::new()
+    }
+
+    pub fn kind(c: i32) -> NetErrorKind {
+        match c {
+            60 | 35 => NetErrorKind::TimedOut,
+            61 => NetErrorKind::Refused,
+            54 | 53 | 32 => NetErrorKind::Reset,
+            48 => NetErrorKind::AddrInUse,
+            49 => NetErrorKind::AddrNotAvailable,
+            51 | 65 => NetErrorKind::Unreachable,
+            _ => NetErrorKind::Other,
+        }
+    }
+
+    /// a libSystem result: >= 0 the value, else errno (calls interrupted by a signal repeat)
+    fn call(mut f: impl FnMut() -> isize) -> NetResult<usize> {
+        loop {
+            let v = f();
+            if v >= 0 {
+                return Ok(v as usize);
+            }
+            let c = errno();
+            if c != EINTR {
+                return Err(NetError::new(kind(c), c));
+            }
+        }
+    }
+
+    pub fn would_block(e: &NetError) -> bool {
+        e.code == 35 || e.code == EINPROGRESS
+    }
+
+    /// a new socket or an accepted one: not inherited, no SIGPIPE
+    fn own(fd: c_int) -> Raw {
+        // SAFETY: an owned descriptor; FD_CLOEXEC and SO_NOSIGPIPE take an int.
+        unsafe {
+            fcntl(fd, F_SETFD, FD_CLOEXEC);
+            let one: c_int = 1;
+            setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, (&one as *const c_int).cast(), 4);
+        }
+        fd
+    }
+
+    pub fn socket(af: i32, ty: i32, proto: i32) -> NetResult<Raw> {
+        // SAFETY: plain socket creation.
+        call(|| unsafe { c_socket(af, ty, proto) } as isize).map(|fd| own(fd as c_int))
+    }
+
+    pub fn close(s: Raw) {
+        // SAFETY: the caller owns the descriptor.
+        unsafe { c_close(s) };
+    }
+
+    pub fn set_nonblocking(s: Raw, on: bool) -> NetResult<()> {
+        // SAFETY: F_GETFL / F_SETFL on an owned descriptor.
+        let fl = call(|| unsafe { fcntl(s, F_GETFL) } as isize)? as c_int;
+        let fl = if on { fl | O_NONBLOCK } else { fl & !O_NONBLOCK };
+        call(|| unsafe { fcntl(s, F_SETFL, fl) } as isize).map(|_| ())
+    }
+
+    pub fn bind_to(s: Raw, a: &[u8]) -> NetResult<()> {
+        // SAFETY: a is a complete sockaddr.
+        call(|| unsafe { bind(s, a.as_ptr(), a.len() as u32) } as isize).map(|_| ())
+    }
+    pub fn listen_on(s: Raw, n: i32) -> NetResult<()> {
+        // SAFETY: plain call.
+        call(|| unsafe { listen(s, n) } as isize).map(|_| ())
+    }
+    pub fn accept_one(s: Raw, buf: &mut [u8; 128], len: &mut i32) -> NetResult<Raw> {
+        let lp = len as *mut i32 as *mut u32;
+        // SAFETY: buf has room for any sockaddr; len is its size.
+        call(|| unsafe { accept(s, buf.as_mut_ptr(), lp) } as isize).map(|fd| own(fd as c_int))
+    }
+    pub fn connect_to(s: Raw, a: &[u8]) -> NetResult<()> {
+        // SAFETY: a is a complete sockaddr.  EINTR: the connection goes on (poll for it).
+        if unsafe { connect(s, a.as_ptr(), a.len() as u32) } < 0 {
+            let c = errno();
+            let c = if c == EINTR { EINPROGRESS } else { c };
+            return Err(NetError::new(kind(c), c));
+        }
+        Ok(())
+    }
+    pub fn recv_into(s: Raw, b: &mut [u8]) -> NetResult<usize> {
+        // SAFETY: b is writable for its length.
+        call(|| unsafe { recv(s, b.as_mut_ptr().cast(), b.len(), 0) })
+    }
+    pub fn send_from(s: Raw, b: &[u8]) -> NetResult<usize> {
+        // SAFETY: b is readable for its length.
+        call(|| unsafe { send(s, b.as_ptr().cast(), b.len(), 0) })
+    }
+    pub fn recv_from(s: Raw, b: &mut [u8], from: &mut [u8; 128], len: &mut i32) -> NetResult<usize> {
+        let lp = len as *mut i32 as *mut u32;
+        // SAFETY: valid buffers.
+        call(|| unsafe { recvfrom(s, b.as_mut_ptr().cast(), b.len(), 0, from.as_mut_ptr(), lp) })
+    }
+    pub fn send_to(s: Raw, b: &[u8], to: &[u8]) -> NetResult<usize> {
+        // SAFETY: valid buffers.
+        call(|| unsafe { sendto(s, b.as_ptr().cast(), b.len(), 0, to.as_ptr(), to.len() as u32) })
+    }
+    pub fn set_opt(s: Raw, level: i32, name: i32, v: i32) -> NetResult<()> {
+        // SAFETY: a 4-byte option value.
+        call(|| unsafe { setsockopt(s, level, name, (&v as *const i32).cast(), 4) } as isize).map(|_| ())
+    }
+    pub fn get_opt(s: Raw, level: i32, name: i32) -> i32 {
+        let mut v = 0i32;
+        let mut n = 4u32;
+        // SAFETY: a 4-byte option value.
+        unsafe { getsockopt(s, level, name, (&mut v as *mut i32).cast(), &mut n) };
+        v
+    }
+    pub fn name(s: Raw, peer: bool, buf: &mut [u8; 128], len: &mut i32) -> NetResult<()> {
+        let lp = len as *mut i32 as *mut u32;
+        // SAFETY: buf has room for any sockaddr; len is its size.
+        call(|| unsafe { if peer { getpeername(s, buf.as_mut_ptr(), lp) } else { getsockname(s, buf.as_mut_ptr(), lp) } } as isize)
+            .map(|_| ())
+    }
+    pub fn shut(s: Raw, how: i32) -> NetResult<()> {
+        // SAFETY: plain call.
+        call(|| unsafe { shutdown(s, how) } as isize).map(|_| ())
+    }
+    pub fn poll(fds: &mut [PollFd], ms: i32) -> NetResult<usize> {
+        // SAFETY: fds is a valid array of its length.
+        call(|| unsafe { c_poll(fds.as_mut_ptr(), fds.len() as c_uint, ms) } as isize)
+    }
+
+    /// the system resolver: the addresses of a host name (getaddrinfo)
+    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::IpAddr>> {
+        let mut z = host.as_bytes().to_vec();
+        z.push(0);
+        let hints = AddrInfo { flags: 0, family: 0, socktype: 1, protocol: 6, addrlen: 0, canonname: core::ptr::null_mut(),
+                               addr: core::ptr::null(), next: core::ptr::null_mut() };
+        let mut res: *mut AddrInfo = core::ptr::null_mut();
+        // SAFETY: a NUL-terminated name and valid hints; the result list is freed below.
+        let r = unsafe { getaddrinfo(z.as_ptr().cast(), core::ptr::null(), &hints, &mut res) };
+        if r != 0 {
+            return Err(NetError::new(NetErrorKind::NotFound, r));
+        }
+        let mut out = alloc::vec::Vec::new();
+        let mut p = res;
+        while !p.is_null() {
+            // SAFETY: p walks the list getaddrinfo returned.
+            let ai = unsafe { &*p };
+            if !ai.addr.is_null() && ai.addrlen >= 8 {
+                // SAFETY: ai.addr points to ai.addrlen bytes.
+                let raw = unsafe { core::slice::from_raw_parts(ai.addr, ai.addrlen as usize) };
+                if let Some(a) = super::decode_sockaddr(raw) {
+                    if !out.contains(&a.ip) {
+                        out.push(a.ip);
+                    }
+                }
+            }
+            p = ai.next;
+        }
+        // SAFETY: the list from getaddrinfo, freed once.
+        unsafe { freeaddrinfo(res) };
+        Ok(out)
+    }
+}
+
+// Apple's sockaddr: sa_len, sa_family (one byte each), then the same fields as Linux and Windows
+#[cfg(target_vendor = "apple")]
+fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
+    let mut b = match a.ip {
+        IpAddr::V4(ip) => {
+            let mut b = alloc::vec![0u8; 16];
+            b[4..8].copy_from_slice(&ip);
+            b
+        }
+        IpAddr::V6(ip) => {
+            let mut b = alloc::vec![0u8; 28];
+            b[8..24].copy_from_slice(&ip);
+            b[24..28].copy_from_slice(&a.scope.to_ne_bytes()); // sin6_scope_id
+            b
+        }
+    };
+    b[0] = b.len() as u8;
+    b[1] = family(a) as u8;
+    b[2..4].copy_from_slice(&a.port.to_be_bytes());
+    b
+}
+
+#[cfg(target_vendor = "apple")]
+fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
+    if b.len() < 8 {
+        return None;
+    }
+    let port = u16::from_be_bytes([b[2], b[3]]);
+    match b[1] as i32 {
+        sys::AF_INET => Some(SocketAddr::new(IpAddr::V4([b[4], b[5], b[6], b[7]]), port)),
+        sys::AF_INET6 if b.len() >= 24 => {
+            let mut ip = [0u8; 16];
+            ip.copy_from_slice(&b[8..24]);
+            let mut scope = if b.len() >= 28 { u32::from_ne_bytes([b[24], b[25], b[26], b[27]]) } else { 0 };
+            // the kernel's link-local addresses may carry the interface in their second word (KAME)
+            if ip[0] == 0xfe && ip[1] & 0xc0 == 0x80 && (ip[2] | ip[3]) != 0 {
+                if scope == 0 {
+                    scope = u16::from_be_bytes([ip[2], ip[3]]) as u32;
+                }
+                (ip[2], ip[3]) = (0, 0);
+            }
+            Some(SocketAddr::with_scope(IpAddr::V6(ip), port, scope))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(not(target_vendor = "apple"))]
 fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     match a.ip {
         IpAddr::V4(ip) => {
@@ -887,6 +1224,7 @@ fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     }
 }
 
+#[cfg(not(target_vendor = "apple"))]
 fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     if b.len() < 8 {
         return None;
@@ -1153,13 +1491,28 @@ impl UdpSocket {
 
 // ------------------------------------------------------------------ Unix domain sockets
 
-/// AF_UNIX on Linux and Windows
+/// AF_UNIX (1 on Linux, Windows, macOS and iOS)
 const AF_UNIX: i32 = 1;
 
 /// a connected Unix domain stream socket (the stream calls of TcpStream)
 pub type UnixStream = TcpStream;
 
+/// sockaddr_un of a socket path on Apple: sun_len, sun_family, sun_path of 104 bytes
+#[cfg(target_vendor = "apple")]
+fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
+    let p = path.as_bytes();
+    if p.is_empty() || p.len() >= 104 || p.contains(&0) {
+        return Err(NetError::new(NetErrorKind::Other, 0));
+    }
+    let mut b = alloc::vec![0u8; 2 + 104];
+    b[0] = b.len() as u8;
+    b[1] = AF_UNIX as u8;
+    b[2..2 + p.len()].copy_from_slice(p);
+    Ok(b)
+}
+
 /// sockaddr_un of a socket path (sun_path holds 108 bytes on both systems)
+#[cfg(not(target_vendor = "apple"))]
 fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
     let p = path.as_bytes();
     if p.is_empty() || p.len() >= 108 || p.contains(&0) {
@@ -1248,8 +1601,8 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 // ------------------------------------------------------------------ names
 
-/// the addresses of a host: numeric forms and "localhost" everywhere; on Windows other names
-/// through the system resolver (Linux: netio::dns)
+/// the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
+/// other names through the system resolver (Linux: netio::dns)
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = ip_scope_parse(h) {
@@ -1258,7 +1611,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     if h.eq_ignore_ascii_case("localhost") {
         return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_vendor = "apple"))]
     {
         if !crate::policy::net_name_allowed(h) {
             return Err(denied());
@@ -1289,6 +1642,19 @@ pub fn hostname() -> String {
             .map(|b| String::from(String::from_utf8_lossy(&b).trim()))
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| String::from("localhost"))
+    }
+    #[cfg(target_vendor = "apple")]
+    {
+        #[link(name = "System")]
+        unsafe extern "C" {
+            fn gethostname(name: *mut u8, len: usize) -> i32;
+        }
+        let mut buf = [0u8; 256];
+        // SAFETY: buf holds 256 bytes; the name comes back NUL-terminated (or truncated).
+        let ok = unsafe { gethostname(buf.as_mut_ptr(), buf.len() - 1) } == 0;
+        let n = buf.iter().position(|&c| c == 0).unwrap_or(0);
+        let name = String::from(String::from_utf8_lossy(&buf[..n]).trim());
+        if ok && !name.is_empty() { name } else { String::from("localhost") }
     }
 }
 

@@ -1,6 +1,6 @@
 // rand -- the operating system's cryptographic random number generator
 //
-//   fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2)
+//   fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy (Apple)
 //   random_bytes::<N>() -> [u8; N]          random_u64()
 //
 // There is no fallback: when the system RNG fails the process stops (a key made from weak
@@ -40,6 +40,19 @@ fn os_fill(buf: &mut [u8]) -> bool {
         done += r as usize;
     }
     true
+}
+
+#[cfg(target_vendor = "apple")]
+fn os_fill(buf: &mut [u8]) -> bool {
+    #[link(name = "System")]
+    unsafe extern "C" {
+        fn getentropy(buf: *mut u8, len: usize) -> i32;
+    }
+    // getentropy takes at most 256 bytes per call
+    buf.chunks_mut(256).all(|chunk| {
+        // SAFETY: the chunk is valid for its length (at most 256 bytes).
+        unsafe { getentropy(chunk.as_mut_ptr(), chunk.len()) == 0 }
+    })
 }
 
 /// fill a buffer with cryptographically secure random bytes (stops the process on failure)

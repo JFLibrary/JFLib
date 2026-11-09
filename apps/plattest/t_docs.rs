@@ -16,7 +16,7 @@ use alloc::{format, string::String};
 
 use crate::T;
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_docs_bus(_: &mut T) {
     plat::write_stderr(b"plattest: --test docs-bus is Linux only\n");
     plat::exit(2);

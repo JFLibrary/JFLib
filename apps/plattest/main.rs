@@ -157,6 +157,9 @@
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
+// macOS and iOS: the tests of windows, pens, fingers and screens wait for AP4 (docs/APPLE.md); their helpers
+// stay unused until then
+#![cfg_attr(target_vendor = "apple", allow(dead_code, unused_imports))]
 
 extern crate alloc;
 
@@ -187,13 +190,37 @@ mod t_touch;
 mod t_spawn;
 mod t_window;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
+#[cfg(not(target_vendor = "apple"))]
 mod t_guard;
+// Apple loads no native plugins yet (docs/APPLE.md, decision 6): nothing to guard or load
+#[cfg(target_vendor = "apple")]
+mod t_guard {
+    pub fn t_guard(t: &mut crate::T) {
+        t.info("guard: no native plugins on Apple (docs/APPLE.md, decision 6)\n");
+    }
+    pub fn t_guardlimit(t: &mut crate::T) {
+        t_guard(t);
+    }
+    pub fn t_guardcrash(t: &mut crate::T) {
+        t_guard(t);
+    }
+}
 mod t_ibus;
 mod t_icc;
 mod t_instance;
 mod t_kernel;
 mod t_life;
+#[cfg(not(target_vendor = "apple"))]
 mod t_lib;
+#[cfg(target_vendor = "apple")]
+mod t_lib {
+    pub fn t_lib(t: &mut crate::T) {
+        t.info("lib: no native plugins on Apple (docs/APPLE.md, decision 6)\n");
+    }
+    pub fn t_libfuzz(t: &mut crate::T) {
+        t_lib(t);
+    }
+}
 mod t_log;
 mod t_policy;
 mod t_permask;
@@ -237,7 +264,9 @@ const LONG_LINE: usize = 100000; // 'x' bytes in the long ini line
 const RND_SIZE: usize = 65536;
 const NRANDOM: u32 = 20000; // random doubles for the f64 round trip
 const OS: &str = if cfg!(windows) { "win" } else { "linux" };
-const CFGVAR: &str = if cfg!(windows) { "APPDATA" } else { "XDG_CONFIG_HOME" };
+const CFGVAR: &str = if cfg!(windows) { "APPDATA" } else if cfg!(target_vendor = "apple") { "HOME" } else { "XDG_CONFIG_HOME" };
+// what config_dir adds to CFGVAR (macOS, iOS: the folder below the home)
+const CFGSUB: &str = if cfg!(target_vendor = "apple") { "/Library/Application Support" } else { "" };
 
 ui::main!(plattest());
 
@@ -964,7 +993,7 @@ fn t_env(t: &mut T) {
     let orig = plat::env(CFGVAR);
     // expected = cwd/base/cfg with '/'; the value set in the native form
     let raw = format!("{}/{}/cfg", plat::cwd(), t.base);
-    let expected = raw.replace('\\', "/");
+    let expected = raw.replace('\\', "/") + CFGSUB;
     let native = if cfg!(windows) { raw.replace('/', "\\") } else { raw };
     let s = plat::setenv(CFGVAR, Some(&native));
     let cd = plat::config_dir().unwrap_or_default();
@@ -979,20 +1008,25 @@ fn t_env(t: &mut T) {
     t.check(!v.is_empty() && v.starts_with(&native), "env: plat_env reads what plat_setenv set");
     t.check(env_cap(CFGVAR, 4) == -1, "env: plat_env with a too small buffer = -1");
     t.check(env_cap("jfgui_PLATTEST_UNSET", 64) == -1, "env: plat_env of an unset variable = -1");
-    if cfg!(not(windows)) {
+    if cfg!(target_os = "linux") {
         plat::setenv(CFGVAR, Some("relative/dir"));
         let cd = plat::config_dir().unwrap_or_default();
         t.check(cd.ends_with("/.config"), "env: a relative XDG_CONFIG_HOME is ignored");
     }
+    if cfg!(target_vendor = "apple") {
+        plat::setenv(CFGVAR, Some("relative/dir"));
+        t.check(plat::config_dir().is_none(), "env: a relative HOME is no config folder");
+    }
     // without the variable: the fallback
     plat::setenv(CFGVAR, None);
     let cd = plat::config_dir();
-    let tail = if cfg!(windows) { "/AppData/Roaming" } else { "/.config" };
+    let tail = if cfg!(windows) { "/AppData/Roaming" } else if cfg!(target_vendor = "apple") { "/Library/Application Support" } else { "/.config" };
     t.check(cd.as_deref().is_some_and(|c| c.ends_with(tail)), "env: plat_config_dir fallback without the variable");
     t.info(&format!("  ({})\n", cd.unwrap_or_default()));
     // settings through the redirected config dir
     plat::setenv(CFGVAR, Some(&native));
     let path = plat::config_dir().unwrap_or_default() + "/jfgui-plattest/settings.ini";
+    plat::mkdir(&(plat::config_dir().unwrap_or_default() + "/jfgui-plattest"));
     let mut ini = Ini::new();
     ini.set_int("Window", "width", 1234);
     let ok = ini.save(&path) && Ini::load(&path).get_int("Window", "width", 0) == 1234;
@@ -1483,13 +1517,15 @@ fn ct_hook(ci: &plat::CrashInfo) {
     ck(ci.kind == plat::CK_ACCESS, "crash: kind = access violation");
     ck(ci.access == 1, "crash: a write");
     ck(ci.addr == 16, "crash: at address 0x10");
-    let fault = plat::crash_test as *const () as u64 + 5;
+    // the faulting store: after `mov eax, 16` (5 bytes, x86-64) / `mov x0, #16` (4 bytes, arm64)
+    let step = if cfg!(target_arch = "aarch64") { 4 } else { 5 };
+    let fault = plat::crash_test as *const () as u64 + step;
     ck(ci.ip == fault, "crash: the instruction pointer is the faulting store");
     ck(ci.regs[0] as u32 == 16, "crash: register rax = 16");
     ck(ci.code0 <= fault && fault < ci.code1, "crash: the code range holds the faulting instruction");
     // plat-win: the call chain (plat-x11: Linux fills CrashInfo::frames too)
     {
-        let ret = plat::crash_test_caller as *const () as u64 + 5;
+        let ret = plat::crash_test_caller as *const () as u64 + step; // after the call / bl
         let n = (ci.nframes as usize).min(ci.frames.len());
         ck(ci.frames[..n].contains(&ret), "crash: the return address into ct_outer is among the frames");
     }

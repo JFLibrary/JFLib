@@ -2,7 +2,7 @@
 #![no_std]
 #![forbid(unsafe_code)]
 extern crate alloc;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod ipc;
 
 use alloc::vec::Vec;

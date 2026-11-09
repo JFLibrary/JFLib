@@ -22,6 +22,7 @@ const STACK_ALIGN: usize = 0x4000; // pthread stacks: a multiple of the 16 KiB p
 type Start = Box<dyn FnOnce() + Send + 'static>;
 
 extern "C" fn thread_main(arg: *mut c_void) -> *mut c_void {
+    super::crash::thread_alt_stack(); // the crash handler runs there (a stack overflow of this thread too)
     // SAFETY: thread_spawn handed over a Box<Start> through Box::into_raw, taken back once here.
     let f = unsafe { Box::from_raw(arg as *mut Start) };
     f();
@@ -59,6 +60,13 @@ pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
 }
 
 impl Thread {
+    /// let the thread end on its own: nobody joins it, its stack goes when it ends
+    #[allow(dead_code)]
+    pub(crate) fn detach(self) {
+        // SAFETY: the thread was created joinable and nobody joins it any more.
+        unsafe { ffi::pthread_detach(self.0) };
+    }
+
     /// wait until the thread has ended  [plat_thread_join]
     pub fn join(self) {
         // SAFETY: the thread was created joinable and only this call joins it.

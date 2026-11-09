@@ -184,7 +184,7 @@ fn titlebar(t: &mut T) {
     clear();
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_settings_bus(_: &mut T) {
     plat::write_stderr(b"plattest: --test settings-bus is Linux only\n");
     plat::exit(2);
@@ -232,7 +232,7 @@ pub fn t_settings_bus_files(t: &mut T) {
     files_done(&home);
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_settings_bus_files(_: &mut T) {
     plat::write_stderr(b"plattest: --test settings-bus-files is Linux only\n");
     plat::exit(2);

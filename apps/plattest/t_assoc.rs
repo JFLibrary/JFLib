@@ -102,6 +102,11 @@ fn run(program: &str, args: &[&str]) -> Option<(i32, String)> {
 
 pub fn t_assoc(t: &mut T) {
     parts(t);
+    if cfg!(target_vendor = "apple") {
+        t.info("assoc: not on Apple yet (docs/APPLE.md AP7)\n");
+        return;
+    }
+
     let base = scratch(t, "assoc");
     let cfg_var = crate::CFGVAR;
     let saved_cfg = plat::env(cfg_var);

@@ -118,12 +118,88 @@ pub fn drives() -> Vec<String> {
     vec![String::from("/")]
 }
 
-/// starting this program again: not yet on Apple (posix_spawn comes with the processes, AP3) -> -1
-pub fn spawn_self(_args: &[&str]) -> i32 {
+/// printing as linux_print.rs checks it: the manifest, a job without pixels (ERR_DIMS), the test
+/// variant jfgui_PRINT_TO=FILE (the PDF into a file); the system's print dialog comes with AP7, until
+/// then ERR_UNSUPPORTED
+pub fn print(job: &mut crate::PrintJob<'_>) -> i32 {
+    job.copies = 0;
+    if !crate::policy::print_allowed() {
+        return crate::ERR_UNSUPPORTED;
+    }
+    if job.src.is_none() {
+        return crate::ERR_DIMS;
+    }
+    if let Some(to) = crate::env("jfgui_PRINT_TO").filter(|v| !v.is_empty()) {
+        if crate::env("jfgui_PRINT_SMASK").as_deref() == Some("1") {
+            job.flags |= crate::PJF_SMASK; // test: alpha as /SMask instead of white
+        }
+        let page = crate::page_init(job.paper, job.flags);
+        let pdf = match crate::print_pdf(job, &page) {
+            Ok(p) => p,
+            Err(e) => return e,
+        };
+        if !crate::write_file_raw(&to, &pdf) {
+            return crate::ERR_IO;
+        }
+        job.copies = 1;
+        return 0;
+    }
+    crate::ERR_UNSUPPORTED
+}
+
+/// the system's file dialog: not before the window backend (AP4) -> (-1, 0): the library's own
+/// dialog, as in a browser without the File System Access API  [plat_file_dialog]
+pub fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32) {
+    (-1, 0)
+}
+
+/// macOS: /usr/bin/open with the argument (LaunchServices), waited for up to 5 s -> 0 / -1; iOS: -1
+fn open_with_launch_services(arg: &str) -> i32 {
+    if cfg!(target_os = "ios") || arg.is_empty() || arg.starts_with('-') {
+        return -1;
+    }
+    let c = crate::process::Command { program: "/usr/bin/open", args: &[arg], cwd: None, env: &[] };
+    let Ok(mut child) = c.spawn_own() else { return -1 };
+    child.close_stdin();
+    for _ in 0..500 {
+        match child.try_wait() {
+            Ok(Some(0)) => return 0,
+            Ok(Some(_)) | Err(_) => return -1,
+            Ok(None) => crate::sleep_ms(10),
+        }
+    }
     -1
 }
 
-/// like spawn_self -> -1
-pub fn restart_self(_args: &[&str]) -> i32 {
-    -1
+/// show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
+pub fn open_folder(path: &str) -> i32 {
+    if !crate::policy::fs_allowed(path, crate::policy::FS_READ) {
+        return -1;
+    }
+    open_with_launch_services(path)
+}
+
+/// a web page in the default application -> 0 / -1  [plat_open_url]
+pub fn open_url(url: &str) -> i32 {
+    if !crate::policy::url_allowed(url) {
+        return -1;
+    }
+    open_with_launch_services(url)
+}
+
+/// start this program again, on its own (process.rs launch: a session of its own, standard handles
+/// on /dev/null), with the arguments (at most 31) -> 0 / -1  [plat_spawn_self]; iOS: -1
+pub fn spawn_self(args: &[&str]) -> i32 {
+    if cfg!(target_os = "ios") || args.len() >= 32 || args.iter().any(|a| a.contains('\0')) {
+        return -1;
+    }
+    match crate::current_exe() {
+        Some(exe) if crate::process::launch_own(&exe, args).is_ok() => 0,
+        _ => -1,
+    }
+}
+
+/// like spawn_self: the program file now at this process's path (an update replaced it) -> 0 / -1
+pub fn restart_self(args: &[&str]) -> i32 {
+    spawn_self(args)
 }

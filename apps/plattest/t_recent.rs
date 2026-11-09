@@ -112,6 +112,10 @@ fn count(hay: &str, needle: &str) -> usize {
 }
 
 pub fn t_recent(t: &mut T) {
+    if cfg!(target_vendor = "apple") {
+        t.info("recent: not on Apple yet (docs/APPLE.md AP7)\n");
+        return;
+    }
     let base = scratch(t, "recent");
     let saved = plat::env("jfgui_RECENT");
     let xbel = format!("{base}/recent.xbel");

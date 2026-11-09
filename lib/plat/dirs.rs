@@ -6,10 +6,12 @@
 //       example to OneDrive).  Linux: the XDG user dirs of $XDG_CONFIG_HOME/user-dirs.dirs
 //       (XDG_DOCUMENTS_DIR="$HOME/Dokumente": "$HOME/..." or an absolute path, backslash
 //       escapes, the last line wins), else $HOME/Desktop, Documents, Downloads, Pictures,
-//       Music, Videos.  Browser and Android: "/documents" of the virtual files for
+//       Music, Videos.  macOS and iOS: $HOME/Desktop, Documents, Downloads, Pictures, Music,
+//       Movies (on iOS inside the app's container).  Browser and Android: "/documents" of the virtual files for
 //       DIR_DOCUMENTS, None for the others.
 //   log_dir() -> Option<String>   the base folder of logs: Linux $XDG_STATE_HOME (absolute)
-//       or $HOME/.local/state; Windows %LOCALAPPDATA% (like cache_dir); the browser /data.
+//       or $HOME/.local/state; Windows %LOCALAPPDATA% (like cache_dir); macOS and iOS
+//       ~/Library/Logs; the browser /data.
 //       vfs::app_dir(APP_LOG) adds the app's own folder (logs://).
 //   user_dir_scheme(kind) -> Option<&str>   the vfs scheme of a user folder ("documents" ..)
 //
@@ -52,7 +54,7 @@ pub fn user_dir(kind: u32) -> Option<String> {
 
 // "/x/" -> "/x", Windows "C:\\a\\" -> "C:/a" (on Linux '\' is a character of the name); "/"
 // and "C:/" stay
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 fn tidy(s: &str) -> String {
     let mut s: String = if cfg!(windows) { s.replace('\\', "/") } else { String::from(s) };
     while s.len() > 1 && s.ends_with('/') && !(s.len() == 3 && s.as_bytes()[1] == b':') {
@@ -250,16 +252,32 @@ pub fn log_dir() -> Option<String> {
     home_base().map(|h| alloc::format!("{h}/.local/state"))
 }
 
+// ---------------------------------------------------------------- macOS, iOS
+
+#[cfg(target_vendor = "apple")]
+fn os_user_dir(kind: u32) -> Option<String> {
+    let home = tidy(&crate::env("HOME").filter(|v| v.starts_with('/'))?);
+    let name = ["Desktop", "Documents", "Downloads", "Pictures", "Music", "Movies"][kind as usize];
+    Some(alloc::format!("{home}/{name}"))
+}
+
+/// the base folder of logs: ~/Library/Logs (vfs::app_dir(APP_LOG) = <it>/<app>)
+#[cfg(target_vendor = "apple")]
+pub fn log_dir() -> Option<String> {
+    let home = tidy(&crate::env("HOME").filter(|v| v.starts_with('/'))?);
+    Some(alloc::format!("{home}/Library/Logs"))
+}
+
 // ---------------------------------------------------------------- browser, Android
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn os_user_dir(kind: u32) -> Option<String> {
     // the virtual files have one folder for the user's documents (home())
     if kind == DIR_DOCUMENTS { crate::home() } else { None }
 }
 
 /// the base folder of logs: the virtual /data (vfs::app_dir(APP_LOG) = /data/<app>/Logs)
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 pub fn log_dir() -> Option<String> {
     crate::data_dir()
 }

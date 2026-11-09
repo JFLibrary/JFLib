@@ -13,10 +13,16 @@
 //            in between
 // Every check prints PASS / FAIL (T::check).
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub use lx::t_pen;
 
-#[cfg(not(windows))]
+/// macOS and iOS: no pen path before the window backends (docs/APPLE.md AP4, AP5)
+#[cfg(target_vendor = "apple")]
+pub fn t_pen(t: &mut crate::T) {
+    t.info("pen: not on Apple yet (docs/APPLE.md AP4, AP5)\n");
+}
+
+#[cfg(target_os = "linux")]
 mod lx {
     use alloc::format;
     use alloc::vec::Vec;

@@ -186,8 +186,8 @@ fn scopes(t: &mut T, ll: IpAddr) {
     t.eq("SocketAddr shows its zone", alloc::format!("{}", SocketAddr::with_scope(ll, 53, 3)), String::from("[fe80::1%3]:53"));
     t.eq("numeric host with a zone", dns::resolve_with("fe80::1%3", 80, &Config::default()).map(|v| v[0]), Ok(SocketAddr::with_scope(ll, 80, 3)));
     t.check("if_index: no such interface", if_index("nosuchif9").is_none() && if_index("../x").is_none() && if_index("").is_none());
-    // the loopback interface by its name: lo (Linux), loopback_0 (Windows' NDIS name)
-    let lo = if cfg!(windows) { "loopback_0" } else { "lo" };
+    // the loopback interface by its name: lo (Linux), lo0 (macOS, iOS), loopback_0 (Windows' NDIS name)
+    let lo = if cfg!(windows) { "loopback_0" } else if cfg!(target_vendor = "apple") { "lo0" } else { "lo" };
     t.eq("if_index of the loopback interface", if_index(lo), Some(1));
     t.eq("zone by name", ip_scope_parse(&alloc::format!("fe80::1%{lo}")), Some((ll, 1)));
 }

@@ -36,6 +36,10 @@ fn scratch(t: &mut T, tag: &str) -> String {
 
 pub fn t_autostart(t: &mut T) {
     t.check(autostart_set(true, &["a\0b"]) == Err(AutostartError::Invalid), "autostart: an argument with NUL refused");
+    if cfg!(target_vendor = "apple") {
+        t.info("autostart: not on Apple yet (docs/APPLE.md AP7)\n");
+        return;
+    }
     if cfg!(windows) {
         windows(t);
     } else {

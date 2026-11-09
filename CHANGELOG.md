@@ -22,6 +22,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
 - **plat:** macOS and iOS (aarch64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim): rt and the core of plat through libSystem: the start, arguments and environment, time, files, threads, semaphores, the wake-up; windows answer as without a display until the window backend (docs/APPLE.md, AP2)
 - **build:** build_rs.py app, lib and run with --target mac and --target ios (--sim: the simulator) on a Mac; tools/apple.py packs a program as NAME.app and starts it in the simulator or on an iPhone; jflib-build accepts macOS and iOS
+- **plat:** macOS and iOS: plat without windows (docs/APPLE.md, AP3): processes through posix_spawn, sync, sockets, file system, random numbers, folder watching (FSEvents, macOS), trusted certificates (Security framework), services (launchd), local control sockets and the single instance, the keychain as secret store, crash reports through signals with the call chain; coretest and plattest's windowless tests pass on a Mac
+- **plat:** plat::service::plist_text: the launchd property list a service install writes on macOS
 
 ### Changed
 

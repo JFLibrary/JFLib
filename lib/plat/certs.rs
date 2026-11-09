@@ -3,11 +3,11 @@
 //   verify_tls_server(chain, host) -> Option<Result<(), String>>
 //        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
 //        that name, with the machine's and user's roots, enterprise policy and automatic root
-//        updates; Some(Err(text)) when it refuses.  Linux: None (netio checks against the
-//        bundle).
+//        updates; Some(Err(text)) when it refuses.  macOS and iOS: the Security framework
+//        (SecTrustEvaluateWithError), likewise.  Linux: None (netio checks against the bundle).
 //   root_bundle() -> Option<Vec<u8>>
 //        Linux: the PEM file of the distribution's CA bundle (Debian / Ubuntu, Fedora / RHEL,
-//        openSUSE, Alpine).  Windows: None.
+//        openSUSE, Alpine); macOS: /etc/ssl/cert.pem.  Windows, iOS: None.
 //
 // Revocation is not checked (no network access during the handshake).
 
@@ -151,5 +151,95 @@ pub fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), Strin
         }
         CertFreeCertificateContext(ctx);
         Some(result)
+    }
+}
+
+/// macOS: the system's PEM bundle (/etc/ssl/cert.pem, updated with the system); iOS: None.  Apple's
+/// own trust decision is verify_tls_server.
+#[cfg(target_vendor = "apple")]
+pub fn root_bundle() -> Option<Vec<u8>> {
+    if cfg!(target_os = "macos") { crate::read_file_raw("/etc/ssl/cert.pem") } else { None }
+}
+
+/// macOS and iOS: the Security framework builds and checks the chain (leaf first, DER) for a TLS
+/// server of that name, with the system's and the user's roots and trust settings, without network
+/// access (SecTrustSetNetworkFetchAllowed false); Some(Err(text)) when it refuses.
+#[cfg(target_vendor = "apple")]
+pub fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>> {
+    use core::ffi::c_void;
+    type CfRef = *const c_void;
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        static kCFTypeArrayCallBacks: [usize; 5];
+        fn CFDataCreate(alloc: CfRef, bytes: *const u8, n: isize) -> CfRef;
+        fn CFStringCreateWithBytes(alloc: CfRef, bytes: *const u8, n: isize, encoding: u32, external: u8) -> CfRef;
+        fn CFArrayCreate(alloc: CfRef, values: *const CfRef, n: isize, callbacks: *const [usize; 5]) -> CfRef;
+        fn CFErrorCopyDescription(e: CfRef) -> CfRef;
+        fn CFStringGetCString(s: CfRef, buf: *mut u8, n: isize, encoding: u32) -> u8;
+        fn CFRelease(r: CfRef);
+    }
+    #[link(name = "Security", kind = "framework")]
+    unsafe extern "C" {
+        fn SecCertificateCreateWithData(alloc: CfRef, data: CfRef) -> CfRef;
+        fn SecPolicyCreateSSL(server: u8, host: CfRef) -> CfRef;
+        fn SecTrustCreateWithCertificates(certs: CfRef, policies: CfRef, trust: *mut CfRef) -> i32;
+        fn SecTrustSetNetworkFetchAllowed(trust: CfRef, allowed: u8) -> i32;
+        fn SecTrustEvaluateWithError(trust: CfRef, error: *mut CfRef) -> u8;
+    }
+    const UTF8: u32 = 0x0800_0100;
+    if chain.is_empty() {
+        return Some(Err(String::from("keine Zertifikate")));
+    }
+    // SAFETY: CoreFoundation objects made here and released once each; the byte slices live during
+    // the calls that copy them.
+    unsafe {
+        let mut certs: Vec<CfRef> = Vec::new();
+        for der in chain {
+            let data = CFDataCreate(core::ptr::null(), der.as_ptr(), der.len() as isize);
+            let cert = if data.is_null() { core::ptr::null() } else { SecCertificateCreateWithData(core::ptr::null(), data) };
+            if !data.is_null() {
+                CFRelease(data);
+            }
+            if cert.is_null() {
+                certs.iter().for_each(|c| CFRelease(*c));
+                return Some(Err(String::from("ein Zertifikat ist ungültig kodiert")));
+            }
+            certs.push(cert);
+        }
+        let array = CFArrayCreate(core::ptr::null(), certs.as_ptr(), certs.len() as isize, &kCFTypeArrayCallBacks);
+        certs.iter().for_each(|c| CFRelease(*c)); // the array holds them
+        let name = CFStringCreateWithBytes(core::ptr::null(), host.as_ptr(), host.len() as isize, UTF8, 0);
+        let policy = SecPolicyCreateSSL(1, name);
+        if !name.is_null() {
+            CFRelease(name);
+        }
+        let mut trust: CfRef = core::ptr::null();
+        let status = SecTrustCreateWithCertificates(array, policy, &mut trust);
+        CFRelease(array);
+        CFRelease(policy);
+        if status != 0 || trust.is_null() {
+            return Some(Err(alloc::format!("SecTrustCreateWithCertificates: {}", status)));
+        }
+        SecTrustSetNetworkFetchAllowed(trust, 0);
+        let mut err: CfRef = core::ptr::null();
+        let ok = SecTrustEvaluateWithError(trust, &mut err) != 0;
+        CFRelease(trust);
+        if ok {
+            return Some(Ok(()));
+        }
+        let mut text = String::from("das Zertifikat wird nicht vertraut");
+        if !err.is_null() {
+            let d = CFErrorCopyDescription(err);
+            if !d.is_null() {
+                let mut buf = [0u8; 512];
+                if CFStringGetCString(d, buf.as_mut_ptr(), buf.len() as isize, UTF8) != 0 {
+                    let n = buf.iter().position(|&c| c == 0).unwrap_or(0);
+                    text = String::from_utf8_lossy(&buf[..n]).into_owned();
+                }
+                CFRelease(d);
+            }
+            CFRelease(err);
+        }
+        Some(Err(text))
     }
 }

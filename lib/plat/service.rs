@@ -12,6 +12,8 @@
 //       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
 //       administrator / root rights; the errors say so.
 //   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
+//   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
+//       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
 
 use alloc::format;
 use alloc::string::String;
@@ -88,6 +90,8 @@ pub fn unit_text(s: &ServiceSpec) -> String {
 pub use win::*;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+#[cfg(target_vendor = "apple")]
+pub use apple::*;
 
 #[cfg(windows)]
 mod win {
@@ -513,6 +517,160 @@ mod linux {
             "activating" => ServiceState::Starting,
             "deactivating" => ServiceState::Stopping,
             _ => ServiceState::Other,
+        }
+    }
+}
+
+/// the launchd property list of a service (macOS): started at boot, again after a failure, umask 077
+pub fn plist_text(s: &ServiceSpec) -> String {
+    fn esc(t: &str) -> String {
+        t.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    }
+    let mut args = format!("        <string>{}</string>\n", esc(s.exe));
+    for a in s.args {
+        args.push_str(&format!("        <string>{}</string>\n", esc(a)));
+    }
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+<plist version=\"1.0\">\n<dict>\n    <key>Label</key>\n    <string>{}</string>\n    <key>ProgramArguments</key>\n    <array>\n{}    </array>\n\
+    <key>RunAtLoad</key>\n    <true/>\n    <key>KeepAlive</key>\n    <dict>\n        <key>SuccessfulExit</key>\n        <false/>\n    </dict>\n\
+    <key>ThrottleInterval</key>\n    <integer>5</integer>\n    <key>Umask</key>\n    <integer>63</integer>\n</dict>\n</plist>\n",
+        esc(s.name),
+        args
+    )
+}
+
+// macOS: launchd.  A service is a daemon in /Library/LaunchDaemons (root); stop unloads it (bootout,
+// KeepAlive would start it again after a kill), start loads it again (bootstrap) and starts it.
+// iOS has no services: everything fails there with a text that says so.
+#[cfg(target_vendor = "apple")]
+mod apple {
+    use super::*;
+
+    pub fn run_service(_name: &str, run: fn() -> i32) -> i32 {
+        run()
+    }
+
+    fn is_root() -> bool {
+        crate::process::elevated()
+    }
+
+    /// launchctl ARGS -> exit code, stdout, stderr
+    fn launchctl(args: &[&str]) -> Result<(i32, String, String), String> {
+        let c = crate::process::Command { program: "/bin/launchctl", args, cwd: None, env: &[] };
+        let mut ch = c.spawn().map_err(|e| format!("launchctl kann nicht gestartet werden (Fehler {})", e))?;
+        ch.close_stdin();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut buf = [0u8; 4096];
+        for _ in 0..6000 {
+            let mut busy = false;
+            while let Ok(Some(n)) = ch.read_stdout(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                out.extend_from_slice(&buf[..n]);
+                busy = true;
+            }
+            while let Ok(Some(n)) = ch.read_stderr(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                err.extend_from_slice(&buf[..n]);
+                busy = true;
+            }
+            if let Ok(Some(code)) = ch.try_wait() {
+                return Ok((code, String::from(String::from_utf8_lossy(&out).trim()), String::from(String::from_utf8_lossy(&err).trim())));
+            }
+            if !busy {
+                crate::sleep_ms(10);
+            }
+        }
+        Err(format!("launchctl {}: keine Antwort", args.join(" ")))
+    }
+
+    fn launchctl_ok(args: &[&str]) -> Result<(), String> {
+        match launchctl(args)? {
+            (0, _, _) => Ok(()),
+            (_, out, err) => Err(format!("launchctl {}: {}", args.join(" "), if err.is_empty() { out } else { err })),
+        }
+    }
+
+    fn plist_path(name: &str) -> String {
+        format!("/Library/LaunchDaemons/{}.plist", name)
+    }
+
+    /// a label that is a file name (no '/', no "..") and no launchctl option
+    fn valid_name(name: &str) -> Result<(), String> {
+        let ok = !name.is_empty()
+            && name.len() <= 200
+            && !name.starts_with(['-', '.'])
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'));
+        if ok { Ok(()) } else { Err(format!("{}: kein gültiger Dienstname", name)) }
+    }
+
+    fn need_root() -> Result<(), String> {
+        if cfg!(target_os = "ios") {
+            return Err(String::from("iOS kennt keine Dienste"));
+        }
+        if is_root() { Ok(()) } else { Err(String::from("nur als root (sudo) möglich")) }
+    }
+
+    pub fn install(s: &ServiceSpec) -> Result<(), String> {
+        valid_name(s.name)?;
+        need_root()?;
+        let p = plist_path(s.name);
+        if crate::fs::stat(&p).is_some() {
+            return Err(format!("{}: der Dienst ist bereits eingerichtet", s.name));
+        }
+        if !crate::write_file(&p, plist_text(s).as_bytes()) {
+            return Err(format!("{} kann nicht geschrieben werden", p));
+        }
+        launchctl_ok(&["bootstrap", "system", &p])
+    }
+
+    pub fn start(name: &str) -> Result<(), String> {
+        valid_name(name)?;
+        need_root()?;
+        if state(name) == ServiceState::Stopped {
+            launchctl_ok(&["bootstrap", "system", &plist_path(name)])?;
+        }
+        launchctl_ok(&["kickstart", &format!("system/{name}")])
+    }
+
+    pub fn stop(name: &str) -> Result<(), String> {
+        valid_name(name)?;
+        need_root()?;
+        launchctl_ok(&["bootout", &format!("system/{name}")])
+    }
+
+    pub fn uninstall(name: &str) -> Result<(), String> {
+        valid_name(name)?;
+        need_root()?;
+        let p = plist_path(name);
+        if crate::fs::stat(&p).is_none() {
+            return Err(format!("{}: der Dienst ist nicht eingerichtet", name));
+        }
+        let _ = launchctl(&["bootout", &format!("system/{name}")]);
+        crate::delete(&p);
+        Ok(())
+    }
+
+    pub fn state(name: &str) -> ServiceState {
+        if valid_name(name).is_err() || crate::fs::stat(&plist_path(name)).is_none() {
+            return ServiceState::NotInstalled;
+        }
+        match launchctl(&["print", &format!("system/{name}")]) {
+            Ok((0, out, _)) => {
+                if out.lines().any(|l| l.trim() == "state = running") {
+                    ServiceState::Running
+                } else if out.lines().any(|l| l.trim() == "state = not running") {
+                    ServiceState::Stopped
+                } else {
+                    ServiceState::Other
+                }
+            }
+            Ok(_) => ServiceState::Stopped, // installed, not loaded
+            Err(_) => ServiceState::Other,
         }
     }
 }

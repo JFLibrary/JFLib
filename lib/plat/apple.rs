@@ -3,7 +3,8 @@
 // Apple keeps only libSystem stable, not the system calls under it (decision 2), so everything here
 // is a libSystem call, as on Android through Bionic.  This is the start of the port (AP2): process,
 // environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, system information
-// (apple_thread.rs); windows answer as on a system without a display (apple_disp.rs) until AP4.
+// (apple_thread.rs), crash reports (apple_crash.rs); windows answer as on a system without a display
+// (apple_disp.rs) until AP4.
 //
 // main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
 // the process with its result.  The arguments and the environment come from _NSGetArgv and
@@ -21,6 +22,8 @@ pub use thread::*;
 #[path = "apple_disp.rs"]
 mod disp;
 pub use disp::*;
+#[path = "apple_crash.rs"]
+mod crash;
 
 /// libSystem's functions and records this backend uses (Darwin's values, arm64)
 #[allow(non_camel_case_types, dead_code)]
@@ -157,6 +160,8 @@ pub(crate) mod ffi {
         pub fn pthread_attr_setstacksize(attr: *mut PthreadAttr, size: usize) -> c_int;
         pub fn pthread_create(t: *mut usize, attr: *const PthreadAttr, start: extern "C" fn(*mut c_void) -> *mut c_void, arg: *mut c_void) -> c_int;
         pub fn pthread_join(t: usize, ret: *mut *mut c_void) -> c_int;
+        pub fn pthread_detach(t: usize) -> c_int;
+        pub fn signal(sig: c_int, handler: usize) -> usize;
         pub fn pthread_threadid_np(t: usize, id: *mut u64) -> c_int;
         pub fn dispatch_semaphore_create(value: isize) -> *mut c_void;
         pub fn dispatch_semaphore_signal(sem: *mut c_void) -> isize;
@@ -184,6 +189,11 @@ unsafe extern "Rust" {
 #[cfg(not(feature = "std"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+    // SIGPIPE ignored, as plat's start does it on Linux: a write to a closed pipe is an error, not the
+    // end of the process (sockets have SO_NOSIGPIPE as well); child processes get it back at default
+    // SAFETY: a constant handler (SIG_IGN = 1) for SIGPIPE (13).
+    unsafe { ffi::signal(13, 1) };
+    crash::crash_init();
     thread::wake_init();
     crate::cpu::simd_override();
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest

@@ -353,7 +353,7 @@ pub fn app_id() -> String {
     exe_stem().unwrap_or_else(|| String::from("app"))
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn exe_stem() -> Option<String> {
     let p = crate::current_exe()?;
     let name = &p[p.rfind(['/', '\\']).map_or(0, |k| k + 1)..];
@@ -361,7 +361,7 @@ fn exe_stem() -> Option<String> {
     (!stem.is_empty()).then(|| String::from(stem))
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn exe_stem() -> Option<String> {
     None
 }
@@ -374,8 +374,9 @@ pub fn app_dir(kind: u32) -> Option<String> {
         APP_DATA => crate::data_dir().map(|d| alloc::format!("{d}/{id}")),
         APP_CACHE if cfg!(windows) => crate::data_dir().map(|d| alloc::format!("{d}/{id}/Cache")),
         APP_CACHE => crate::cache_dir().map(|d| alloc::format!("{d}/{id}")),
-        // Linux: a folder of its own below $XDG_STATE_HOME; elsewhere below the data folder
-        APP_LOG if cfg!(target_os = "linux") => crate::log_dir().map(|d| alloc::format!("{d}/{id}")),
+        // Linux: a folder of its own below $XDG_STATE_HOME, macOS / iOS below ~/Library/Logs;
+        // elsewhere below the data folder
+        APP_LOG if cfg!(any(target_os = "linux", target_vendor = "apple")) => crate::log_dir().map(|d| alloc::format!("{d}/{id}")),
         APP_LOG => crate::log_dir().map(|d| alloc::format!("{d}/{id}/Logs")),
         _ => None,
     }
@@ -751,14 +752,14 @@ impl Provider for DirFs {
         Some(self.full(path))
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     fn stat(&self, path: &str) -> Option<Stat> {
         let m = crate::fs::stat(&self.full(path))?;
         let kind = if m.is_dir() { 2 } else if m.is_file() { 1 } else { return None };
         Some(Stat { kind, size: if kind == 1 { m.size } else { 0 }, mtime_ns: m.mtime_ns, atime_ns: m.atime_ns })
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     fn set_times(&self, path: &str, atime_ns: i64, mtime_ns: i64) -> bool {
         crate::fs::set_times(&self.full(path), atime_ns, mtime_ns)
     }

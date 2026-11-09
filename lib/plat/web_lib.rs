@@ -74,6 +74,11 @@ impl Lib {
 }
 /// Reject native DLL/SO input on WebAssembly.
 pub fn lib_open(_path: &str) -> Result<Lib, u32> {
+    // macOS, iOS: the manifest first, as the native loaders ask it (a refusal is recorded); then refused
+    #[cfg(target_vendor = "apple")]
+    if !crate::policy::plugin_allowed(_path) {
+        return Err(LIBE_IO);
+    }
     Err(LIBE_FORMAT)
 }
 /// Native symbols cannot be resolved.

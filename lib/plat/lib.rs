@@ -95,29 +95,29 @@ extern crate std;
 extern crate alloc;
 
 /// Owned native child processes with pipes and process-tree lifetime management.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod process;
 /// Mutex, Condvar, RwLock and bounded channels for worker threads.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod sync;
 /// TCP and UDP sockets (IPv4 / IPv6) with timeouts, numeric names.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod net;
 /// Metadata, directory listings, links, times, free space, owner-only files, the local zone.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod fs;
 /// Running as a system service (Windows service control manager, systemd units).
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod service;
 /// Changes below folders as they happen (continuous data protection).
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod watch;
 /// The operating system's trusted certificate authorities (TLS clients of public servers).
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod certs;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 mod rand;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub use rand::*;
 
 use alloc::string::String;
@@ -287,7 +287,7 @@ mod trash;
 mod control_stream;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use control_stream::*;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod control_ipc;
 #[cfg_attr(all(any(target_arch = "wasm32", target_os = "android"), not(web_threads)), path = "web_pool.rs")]
 mod pool;
@@ -472,6 +472,22 @@ pub extern "C" fn crash_test() -> ! { core::arch::wasm32::unreachable() }
 /// Deliberate trap through the compatibility caller API.
 #[cfg(target_arch = "wasm32")]
 pub extern "C" fn crash_test_caller() -> ! { crash_test() }
+
+/// a deliberate crash for tests on Apple's arm64: x0 = 16, then a 4-byte write to address 0x10 -- the
+/// faulting instruction is at crash_test + 4
+#[unsafe(naked)]
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+pub extern "C" fn crash_test() -> ! {
+    core::arch::naked_asm!("mov x0, #16", "str w0, [x0]", "brk #0")
+}
+
+/// crash_test called from a known place (bl): the return address crash_test_caller + 4 must be
+/// among CrashInfo::frames
+#[unsafe(naked)]
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+pub extern "C" fn crash_test_caller() -> ! {
+    core::arch::naked_asm!("bl {0}", "brk #0", sym crash_test)
+}
 
 /// Deliberate termination on Android, where no hardware exception translator is installed.
 #[cfg(all(target_os = "android", not(target_arch = "x86_64")))]

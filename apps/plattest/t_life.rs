@@ -12,7 +12,7 @@
 
 use crate::T;
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_life_bus(_: &mut T) {
     plat::write_stderr(b"plattest: --test life-bus is Linux only\n");
     plat::exit(2);

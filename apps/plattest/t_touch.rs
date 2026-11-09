@@ -11,8 +11,14 @@
 
 #[cfg(windows)]
 pub use win::t_touch;
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub use lx::t_touch;
+
+/// macOS and iOS: no finger path before the window backends (docs/APPLE.md AP4, AP5)
+#[cfg(target_vendor = "apple")]
+pub fn t_touch(t: &mut crate::T) {
+    t.info("touch: not on Apple yet (docs/APPLE.md AP4, AP5)\n");
+}
 
 /// the event's fields as a finger: phase type, id, x, y, cancelled
 #[allow(dead_code)]
@@ -305,7 +311,7 @@ mod win {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 mod lx {
     use alloc::vec::Vec;
 

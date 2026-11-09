@@ -242,7 +242,7 @@ impl File {
 
     /// Create a named file exclusively; never open an existing path (a mount without OS
     /// files: exclusive inside this process).
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     pub fn create_new(path: &str) -> Option<File> {
         let new_os = |o: &str| if fs_allowed(o, FS_WRITE) { OsFile::create_new_raw(o).map(|f| File(Inner::Os(f))) } else { None };
         match vfs::route(path) {
@@ -307,9 +307,9 @@ impl File {
     /// cut or extend the file to `len` bytes
     pub fn set_len(&self, len: u64) -> bool {
         match &self.0 {
-            #[cfg(any(windows, target_os = "linux", target_os = "android"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple"))]
             Inner::Os(f) => f.set_len(len),
-            #[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
+            #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple")))]
             Inner::Os(_) => false,
             Inner::Vfs(s) => s.set_len(len),
         }
@@ -429,7 +429,7 @@ impl Drop for AtomicFile {
 }
 
 // create_new on mounts without OS files: one check-and-create at a time
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 static NEW_LOCK: SpinLock<()> = SpinLock::new(());
 
 // the FileLocks of mounts without OS files: provider (address) and path

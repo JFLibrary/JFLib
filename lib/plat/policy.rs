@@ -254,7 +254,7 @@ struct Rule {
 
 // an address a permitted name resolved to: the port range and ask tag of the name's rule, the
 // name (plugins check it against their own rules)
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 struct Resolved {
     ip: [u8; 16],
     lo: u16,
@@ -264,7 +264,7 @@ struct Resolved {
 }
 
 #[derive(Default)]
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 struct Policy {
     fs: Vec<Rule>,
     /// the user's files (Key::grant, with fs.user)
@@ -773,12 +773,12 @@ pub(crate) fn trusted_scope<R>(f: impl FnOnce() -> R) -> R {
     Key(()).trusted(f)
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn tid() -> u64 {
     crate::plat_tid()
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn tid() -> u64 {
     0
 }
@@ -817,9 +817,9 @@ enum Req<'a> {
     Capture,
     Location,
     Sensors,
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     Connect([u8; 16], u16),
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     Listen([u8; 16], u16),
     Name(String),
     /// a path normalize refuses
@@ -863,7 +863,7 @@ fn fs_match(r: &Rule, segs: &[String], mode: u32) -> bool {
 impl Policy {
     // granted: the user's files this policy may use; resolved: the app's resolved names
     // (own: their rules' ports; a plugin's: checked against its own name rules)
-    #[cfg_attr(not(any(windows, target_os = "linux")), allow(unused_variables))]
+    #[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(unused_variables))]
     fn grant(&self, req: &Req, granted: &[Rule], resolved: &[Resolved], own: bool) -> Grant {
         match req {
             Req::Fs(segs, mode) => grant(
@@ -883,7 +883,7 @@ impl Policy {
             Req::Capture => flag(self.capture),
             Req::Location => flag(self.location),
             Req::Sensors => flag(self.sensors),
-            #[cfg(any(windows, target_os = "linux"))]
+            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
                 let names = resolved.iter().filter(|a| a.ip == *ip).filter_map(|a| {
@@ -899,7 +899,7 @@ impl Policy {
                         .chain(dns.then_some(0)),
                 )
             }
-            #[cfg(any(windows, target_os = "linux"))]
+            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
             Req::Listen(ip, port) => grant(self.listen.iter().filter(|r| (r.lo..=r.hi).contains(port) && r.host.has_ip(ip)).map(|r| r.ask)),
             Req::Name(h) => grant(self.connect.iter().filter(|r| r.host.has_name(h)).map(|r| r.ask)),
             Req::Never => Grant::No,
@@ -966,7 +966,7 @@ static WAIT: AtomicU32 = AtomicU32::new(u32::MAX);
 
 fn bump() {
     EPOCH.fetch_add(1, Ordering::AcqRel);
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     crate::sync::wake_all(&EPOCH);
 }
 
@@ -981,7 +981,7 @@ fn auto() -> Option<Answer> {
     [Answer::Once, Answer::Always, Answer::Deny, Answer::Never].into_iter().find(|a| *a as u8 == v)
 }
 
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 fn wait_ms() -> u32 {
     let v = WAIT.load(Ordering::Acquire);
     if v != u32::MAX {
@@ -1051,7 +1051,7 @@ fn ask_user(kind: &'static str, target: &str, rule: &str, reason: &str, plugin: 
 
 // another thread: wait until question id is answered (Some(allowed)), withdrawn or the time is
 // up (None)
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn wait_answer(id: u32, rule: &str) -> Option<bool> {
     let deadline = crate::time_us().saturating_add(wait_ms() as u64 * 1000);
     loop {
@@ -1072,7 +1072,7 @@ fn wait_answer(id: u32, rule: &str) -> Option<bool> {
 }
 
 // the browser has one thread: it is the asking one
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn wait_answer(_id: u32, _rule: &str) -> Option<bool> {
     None
 }
@@ -1865,14 +1865,14 @@ fn fontconfig_dirs() -> Vec<String> {
     out
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn exe_dir() -> Option<String> {
     let p = crate::current_exe()?;
     let k = p.rfind(['/', '\\'])?;
     Some(String::from(&p[..k]))
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn exe_dir() -> Option<String> {
     None
 }
@@ -1889,7 +1889,7 @@ fn appimage_dir() -> Option<String> {
 // ---------------------------------------------------------------- the network
 
 /// the host of a net.connect / net.listen rule (the browser keeps the rules unused)
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Host {
     Any,
@@ -1901,7 +1901,7 @@ enum Host {
     Loopback,
 }
 
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NetRule {
     host: Host,
@@ -1910,9 +1910,9 @@ struct NetRule {
     ask: u16,
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const RESOLVED_MAX: usize = 4096;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const V6_LOOPBACK: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 impl Host {
@@ -1927,7 +1927,7 @@ impl Host {
         }
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     fn has_ip(&self, ip: &[u8; 16]) -> bool {
         match self {
             Host::Any => true,
@@ -1942,7 +1942,7 @@ fn mapped(v4: [u8; 4]) -> [u8; 16] {
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, v4[0], v4[1], v4[2], v4[3]]
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn prefix_eq(a: &[u8; 16], b: &[u8; 16], bits: u8) -> bool {
     let (whole, rest) = ((bits / 8) as usize, bits % 8);
     if a[..whole] != b[..whole] {
@@ -2010,7 +2010,7 @@ fn net_rule(a: &str, listen: bool) -> Result<NetRule, String> {
 }
 
 // an IPv4 / IPv6 address -> 16 bytes, is IPv4
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn ip16(s: &str) -> Option<([u8; 16], bool)> {
     match crate::net::IpAddr::parse(s)? {
         crate::net::IpAddr::V4(a) => Some((mapped(a), true)),
@@ -2020,14 +2020,14 @@ fn ip16(s: &str) -> Option<([u8; 16], bool)> {
 
 // the browser has no sockets: a dotted IPv4 address (numeric labels) still parses, the rules
 // are never asked
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn ip16(s: &str) -> Option<([u8; 16], bool)> {
     let p: Vec<&str> = s.split('.').collect();
     let v: Vec<u8> = p.iter().filter_map(|x| x.parse::<u8>().ok()).collect();
     if p.len() == 4 && v.len() == 4 { Some((mapped([v[0], v[1], v[2], v[3]]), true)) } else if s.contains(':') { Some(([0; 16], false)) } else { None }
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn to16(ip: &crate::net::IpAddr) -> [u8; 16] {
     match ip {
         crate::net::IpAddr::V4(a) => mapped(*a),
@@ -2037,13 +2037,13 @@ fn to16(ip: &crate::net::IpAddr) -> [u8; 16] {
 
 /// whether a TCP connection or a UDP datagram to addr is allowed: a net.connect rule with
 /// that address, an address a permitted name resolved to, or port 53 (DNS) with name rules
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.connect", &alloc::format!("{}", addr), &Req::Connect(to16(&addr.ip), addr.port), false) == Verdict::Allow
 }
 
 /// whether a TCP listener (or a UDP socket with a fixed port) may bind addr
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.listen", &alloc::format!("{}", addr), &Req::Listen(to16(&addr.ip), addr.port), false) == Verdict::Allow
 }
@@ -2055,7 +2055,7 @@ pub fn net_name_allowed(host: &str) -> bool {
 }
 
 /// (resolvers) host resolved to addrs: connections to them get the ports of host's rules
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn net_resolved(host: &str, addrs: &[crate::net::SocketAddr]) {
     if !active() && SCOPED.load(Ordering::Acquire) == 0 {
         return;

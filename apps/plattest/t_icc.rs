@@ -38,7 +38,7 @@ pub fn t_icc(t: &mut T) {
 /// active; then the root window's _ICC_PROFILE (tools/platshared/icc_x11.py sets it on
 /// the X server for the run) -- "  icc: window 0: N bytes, fnv X" or "none"; the window is
 /// destroyed right away (never shown)
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_iccx11(_: &mut T) {
     plat::write_stderr(b"plattest: --test iccx11 is Linux only\n");
     plat::exit(2);

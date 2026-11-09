@@ -63,13 +63,13 @@ pub const BLOCKING_MAX: u32 = 8;
 pub const PROGRESS_WAKE_MS: u64 = 30;
 const BLOCKING_STACK: usize = 512 * 1024;
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn tid() -> u64 {
     crate::plat_tid()
 }
 
 // no thread ids: every wake-up counts as local, and the owner is told (the browser's workers)
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn tid() -> u64 {
     0
 }

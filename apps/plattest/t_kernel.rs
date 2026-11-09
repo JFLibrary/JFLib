@@ -6,7 +6,7 @@
 //   dup2, rename.  The numbers themselves are compared with the kernel's headers by
 //   tools/kernel_table_check.py.
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_kernel(t: &mut crate::T) {
     t.info("kernel: Linux only\n");
 }

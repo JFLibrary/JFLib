@@ -25,8 +25,22 @@ pub(crate) fn simd_override() {
     }
 }
 
-/// the processor name from CPUID 0x80000002..4, blanks trimmed  [cpu_brand]
+/// the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
+/// "Apple M2"), blanks trimmed  [cpu_brand]
 pub fn cpu_brand() -> String {
+    #[cfg(target_vendor = "apple")]
+    {
+        let mut b = [0u8; 128];
+        let mut len = b.len();
+        // SAFETY: a NUL-terminated name; b holds len bytes.
+        let r = unsafe { crate::apple::ffi::sysctlbyname(c"machdep.cpu.brand_string".as_ptr(), b.as_mut_ptr().cast(), &mut len, core::ptr::null_mut(), 0) };
+        if r != 0 {
+            return String::new();
+        }
+        let end = b[..len.min(b.len())].iter().position(|&c| c == 0).unwrap_or(len.min(b.len()));
+        return String::from_utf8_lossy(&b[..end]).trim_matches(' ').into();
+    }
+    #[allow(unreachable_code)]
     if cpuid(0x8000_0000).eax < 0x8000_0004 {
         return String::new();
     }
@@ -68,9 +82,9 @@ pub fn stack_aligned() -> bool {
 }
 
 /// The browser does not advertise or execute native AVX2 instructions.
-#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64"))))]
+#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple"))]
 pub fn avx2_probe() -> bool { false }
 
 /// WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
-#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64"))))]
+#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple"))]
 pub fn stack_aligned() -> bool { true }

@@ -27,7 +27,8 @@
 // the app's no_backup folder.  Browser (web_secret.rs, web/secrets.js): a non-extractable
 // WebCrypto AES-GCM key per app in IndexedDB encrypts the values kept there; the host decrypts
 // the app's entries before it starts, plat answers from that copy and the host commits each
-// change asynchronously.
+// change asynchronously.  macOS and iOS (apple_secret.rs): generic passwords of the keychain,
+// service "jflib:<app>/<service>" and the account.
 //
 // The OS does not separate the programs of one user: other native programs of the same user
 // can read these entries (the Credential Manager, an unlocked keyring); in the browser every
@@ -75,7 +76,7 @@ impl core::fmt::Display for SecretError {
 }
 
 /// an entry: the app and the caller's names
-#[cfg_attr(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32", target_vendor = "apple")), allow(dead_code))]
 pub(crate) struct Name<'a> {
     pub(crate) app: String,
     pub(crate) service: &'a str,
@@ -142,7 +143,11 @@ mod native;
 #[cfg(target_arch = "wasm32")]
 pub(crate) use native::committed;
 
-#[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
+#[cfg(target_vendor = "apple")]
+#[path = "apple_secret.rs"]
+mod native;
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32", target_vendor = "apple")))]
 mod native {
     use super::{Name, SecretError};
     use alloc::vec::Vec;

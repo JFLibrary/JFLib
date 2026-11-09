@@ -213,7 +213,7 @@ fn ole(t: &mut T) {
     plat::win_destroy(0);
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_dnd_x11(_: &mut T) {
     plat::write_stderr(b"plattest: --test dnd-x11 is Linux only\n");
     plat::exit(2);

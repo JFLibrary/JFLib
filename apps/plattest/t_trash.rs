@@ -48,6 +48,10 @@ pub fn t_trash(t: &mut T) {
     t.check(!plat::trash(&format!("{base}/work/missing.txt")), "trash: a missing file is no success");
     t.check(plat::write_file("mem://t.txt", b"m") && !plat::trash("mem://t.txt") && plat::file_exists("mem://t.txt") == 1,
         "trash: mem:// has no trash (the file stays)");
+    if cfg!(target_vendor = "apple") {
+        t.info("trash: not on Apple yet (docs/APPLE.md AP7)\n");
+        return;
+    }
     if cfg!(windows) {
         windows(t, &base);
     } else {

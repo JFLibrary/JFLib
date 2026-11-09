@@ -9,6 +9,7 @@
 // Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 // answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
 // are added (and reported whole), a full queue or the watch limit reports an overflow.
+// macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 // Paths are absolute, in the form of the platform; the folder of a change is enough for a
 // caller that walks the tree again.
 
@@ -40,6 +41,7 @@ struct Shared {
     stop: AtomicBool,
 }
 
+#[cfg_attr(target_os = "ios", allow(dead_code))] // no FSEvents on iOS
 impl Shared {
     fn push(&self, p: String) {
         let mut g = self.pending.lock();
@@ -376,5 +378,247 @@ mod imp {
         }
         // SAFETY: our descriptor.
         unsafe { syscall3(SYS_CLOSE, fd.0, 0, 0) };
+    }
+}
+
+// macOS: FSEvents (CoreServices) with file events, recursive, on a serial dispatch queue; one thread
+// of ours owns the stream until the watcher stops, then drains the queue.  FSEvents names real paths
+// (/private/var for /var): a change below a root comes back under the root as the caller gave it.
+// iOS has no FSEvents: Watcher::new fails there.
+#[cfg(target_vendor = "apple")]
+mod imp {
+    use super::*;
+
+    #[cfg(target_os = "ios")]
+    pub fn start(_roots: &[String], _shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
+        Err(String::from("auf iOS gibt es keine Ordnerüberwachung"))
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn start(roots: &[String], shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
+        for r in roots {
+            if !crate::fs::lstat(r).is_some_and(|m| m.is_dir()) {
+                return Err(alloc::format!("{} ist kein Ordner", r));
+            }
+        }
+        let roots: Vec<(String, String)> = roots.iter().map(|r| (real_path(r).unwrap_or_else(|| r.clone()), r.clone())).collect();
+        let sh = shared.clone();
+        // the stream is made on the watching thread, which answers whether that worked
+        let ready = Arc::new(crate::sync::Mutex::new(None::<Result<(), String>>));
+        let r2 = ready.clone();
+        let t = crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || mac::run(roots, sh, r2)))
+            .ok_or_else(|| String::from("kein Thread für die Überwachung"))?;
+        loop {
+            if let Some(r) = ready.lock().take() {
+                return match r {
+                    Ok(()) => Ok(alloc::vec![t]),
+                    Err(e) => {
+                        t.join();
+                        Err(e)
+                    }
+                };
+            }
+            crate::sleep_ms(5);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn real_path(p: &str) -> Option<String> {
+        #[link(name = "System")]
+        unsafe extern "C" {
+            fn realpath(path: *const u8, out: *mut u8) -> *mut u8;
+            fn free(p: *mut u8);
+        }
+        let z: Vec<u8> = p.bytes().chain(core::iter::once(0)).collect();
+        // SAFETY: a NUL-terminated path; realpath mallocs the answer, freed below.
+        unsafe {
+            let r = realpath(z.as_ptr(), core::ptr::null_mut());
+            if r.is_null() {
+                return None;
+            }
+            let mut n = 0;
+            while *r.add(n) != 0 {
+                n += 1;
+            }
+            let s = String::from_utf8_lossy(core::slice::from_raw_parts(r, n)).into_owned();
+            free(r);
+            Some(s)
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    mod mac {
+        use super::super::*;
+        use core::ffi::{c_char, c_void};
+
+        type CfRef = *const c_void;
+        #[repr(C)]
+        struct Context {
+            version: isize,
+            info: *mut c_void,
+            retain: usize,
+            release: usize,
+            copy_description: usize,
+        }
+        type Callback = extern "C" fn(CfRef, *mut c_void, usize, *const *const c_char, *const u32, *const u64);
+
+        #[link(name = "CoreFoundation", kind = "framework")]
+        unsafe extern "C" {
+            static kCFTypeArrayCallBacks: [usize; 5];
+            fn CFStringCreateWithBytes(alloc: CfRef, bytes: *const u8, n: isize, encoding: u32, external: u8) -> CfRef;
+            fn CFArrayCreate(alloc: CfRef, values: *const CfRef, n: isize, callbacks: *const [usize; 5]) -> CfRef;
+            fn CFRelease(r: CfRef);
+        }
+        #[link(name = "CoreServices", kind = "framework")]
+        unsafe extern "C" {
+            fn FSEventStreamCreate(alloc: CfRef, cb: Callback, ctx: *const Context, paths: CfRef, since: u64, latency: f64, flags: u32) -> *mut c_void;
+            fn FSEventStreamSetDispatchQueue(s: *mut c_void, q: *mut c_void);
+            fn FSEventStreamStart(s: *mut c_void) -> u8;
+            fn FSEventStreamStop(s: *mut c_void);
+            fn FSEventStreamFlushSync(s: *mut c_void);
+            fn FSEventStreamInvalidate(s: *mut c_void);
+            fn FSEventStreamRelease(s: *mut c_void);
+        }
+        #[link(name = "System")]
+        unsafe extern "C" {
+            fn dispatch_queue_create(label: *const c_char, attr: *const c_void) -> *mut c_void;
+            fn dispatch_sync_f(q: *mut c_void, ctx: *mut c_void, work: extern "C" fn(*mut c_void));
+            fn dispatch_release(o: *mut c_void);
+        }
+        const UTF8: u32 = 0x0800_0100;
+        const SINCE_NOW: u64 = u64::MAX;
+        const FLAG_NO_DEFER: u32 = 0x02;
+        const FLAG_WATCH_ROOT: u32 = 0x04;
+        const FLAG_FILE_EVENTS: u32 = 0x10;
+        const EV_MUST_SCAN: u32 = 0x01;
+        const EV_USER_DROPPED: u32 = 0x02;
+        const EV_KERNEL_DROPPED: u32 = 0x04;
+
+        /// the name of the start's barrier files (MARK + pid + a counter): never reported
+        const MARK: &str = ".jfgui-watch-";
+
+        /// what the callback reaches through the stream's info pointer
+        struct Info {
+            shared: Arc<Shared>,
+            roots: Vec<(String, String)>, // (real path, as the caller gave it)
+            /// the barrier files of the start (real paths) not seen yet; events before the last of
+            /// them happened before the start (FSEvents delivers in order) and are dropped
+            marks: crate::sync::Mutex<Vec<String>>,
+            started: core::sync::atomic::AtomicBool,
+        }
+
+        extern "C" fn on_events(_s: CfRef, info: *mut c_void, n: usize, paths: *const *const c_char, flags: *const u32, _ids: *const u64) {
+            // SAFETY: info is the Info run() keeps alive until the queue has drained; FSEvents hands
+            // n C strings and n flags.
+            let (info, paths, flags) = unsafe { (&*(info as *const Info), core::slice::from_raw_parts(paths, n), core::slice::from_raw_parts(flags, n)) };
+            for (p, f) in paths.iter().zip(flags) {
+                if f & (EV_MUST_SCAN | EV_USER_DROPPED | EV_KERNEL_DROPPED) != 0 {
+                    info.shared.overflow();
+                    continue;
+                }
+                // SAFETY: a NUL-terminated path of this event.
+                let real = unsafe { core::ffi::CStr::from_ptr(*p) }.to_string_lossy();
+                let mut path = String::from(real.trim_end_matches('/'));
+                if path.rsplit('/').next().is_some_and(|n| n.starts_with(MARK)) {
+                    let mut m = info.marks.lock();
+                    m.retain(|x| *x != path);
+                    if m.is_empty() {
+                        info.started.store(true, Ordering::SeqCst);
+                    }
+                    continue;
+                }
+                if !info.started.load(Ordering::SeqCst) {
+                    continue; // from before the start
+                }
+                for (rp, given) in &info.roots {
+                    if path == *rp || path.starts_with(&alloc::format!("{rp}/")) {
+                        path = alloc::format!("{given}{}", &path[rp.len()..]);
+                        break;
+                    }
+                }
+                info.shared.push(path);
+            }
+        }
+
+        extern "C" fn nothing(_: *mut c_void) {}
+
+        pub fn run(roots: Vec<(String, String)>, shared: Arc<Shared>, ready: Arc<crate::sync::Mutex<Option<Result<(), String>>>>) {
+            // SAFETY: no arguments.
+            let pid = unsafe { crate::apple::ffi::getpid() };
+            static SEQ: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+            let n = SEQ.fetch_add(1, Ordering::Relaxed);
+            let marks: Vec<String> = roots.iter().map(|(rp, _)| alloc::format!("{rp}/{MARK}{pid}-{n}")).collect();
+            let info = alloc::boxed::Box::new(Info { shared: shared.clone(), roots, marks: crate::sync::Mutex::new(marks.clone()),
+                                                     started: core::sync::atomic::AtomicBool::new(false) });
+            // SAFETY: CoreFoundation objects made and released here; the context is copied by FSEvents;
+            // info outlives the stream (dropped after the queue drained).
+            unsafe {
+                let strs: Vec<CfRef> = info.roots.iter()
+                    .map(|(rp, _)| CFStringCreateWithBytes(core::ptr::null(), rp.as_ptr(), rp.len() as isize, UTF8, 0))
+                    .collect();
+                let arr = CFArrayCreate(core::ptr::null(), strs.as_ptr(), strs.len() as isize, &kCFTypeArrayCallBacks);
+                for s in &strs {
+                    CFRelease(*s);
+                }
+                let ctx = Context { version: 0, info: &*info as *const Info as *mut c_void, retain: 0, release: 0, copy_description: 0 };
+                let stream = FSEventStreamCreate(core::ptr::null(), on_events, &ctx, arr, SINCE_NOW, 0.05,
+                                                 FLAG_NO_DEFER | FLAG_WATCH_ROOT | FLAG_FILE_EVENTS);
+                CFRelease(arr);
+                if stream.is_null() {
+                    *ready.lock() = Some(Err(String::from("FSEvents ist nicht verfügbar")));
+                    return;
+                }
+                let q = dispatch_queue_create(c"org.jflib.watch".as_ptr(), core::ptr::null());
+                FSEventStreamSetDispatchQueue(stream, q);
+                if FSEventStreamStart(stream) == 0 {
+                    FSEventStreamInvalidate(stream);
+                    FSEventStreamRelease(stream);
+                    dispatch_release(q);
+                    *ready.lock() = Some(Err(String::from("FSEvents startet nicht")));
+                    return;
+                }
+                // FSEvents delivers what happened before the start (a file written just before
+                // Watcher::new) late: a barrier file in every root, and nothing is reported before all of
+                // them came through (a watcher reports changes from its start on, as inotify does).  A root
+                // that refuses the file (read-only): two flushes and 300 ms must do.
+                let mut placed = 0;
+                for m in &marks {
+                    if crate::write_file_raw(m, b"") {
+                        placed += 1;
+                    } else {
+                        info.marks.lock().retain(|x| x != m);
+                    }
+                }
+                if placed == 0 {
+                    info.started.store(true, Ordering::SeqCst);
+                }
+                for _ in 0..200 {
+                    FSEventStreamFlushSync(stream);
+                    if info.started.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    crate::sleep_ms(10);
+                }
+                if placed < marks.len() {
+                    crate::sleep_ms(300);
+                    FSEventStreamFlushSync(stream);
+                }
+                info.started.store(true, Ordering::SeqCst);
+                for m in &marks {
+                    crate::delete_raw(m);
+                }
+                *shared.pending.lock() = Pending::default();
+                *ready.lock() = Some(Ok(()));
+                while !shared.stop.load(Ordering::SeqCst) {
+                    crate::sleep_ms(100);
+                }
+                FSEventStreamStop(stream);
+                FSEventStreamInvalidate(stream);
+                dispatch_sync_f(q, core::ptr::null_mut(), nothing); // a callback still running ends first
+                FSEventStreamRelease(stream);
+                dispatch_release(q);
+            }
+            drop(info);
+        }
     }
 }

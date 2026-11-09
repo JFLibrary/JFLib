@@ -15,19 +15,19 @@
 
 use crate::T;
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_ibus_bus(_: &mut T) {
     plat::write_stderr(b"plattest: --test ibus-bus is Linux only\n");
     plat::exit(2);
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_ibus_none(_: &mut T) {
     plat::write_stderr(b"plattest: --test ibus-none is Linux only\n");
     plat::exit(2);
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_ibus_x11(_: &mut T) {
     plat::write_stderr(b"plattest: --test ibus-x11 is Linux only\n");
     plat::exit(2);

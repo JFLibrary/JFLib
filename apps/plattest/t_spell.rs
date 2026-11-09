@@ -42,11 +42,13 @@ fn dict_dirs(t: &mut T) {
     plat::setenv("DICPATH", Some(mine));
     let dirs = hunspell_dirs();
     t.check(dirs.first().map(String::as_str) == Some(mine), &format!("spell: DICPATH comes first ({:?})", dirs));
-    t.check(cfg!(windows) || dirs.iter().any(|d| d == "/usr/share/hunspell"), "spell: Linux searches /usr/share/hunspell");
+    // the system's folder: /usr/share/hunspell (Linux), /Library/Spelling (macOS); Windows has none
+    let sys = if cfg!(target_vendor = "apple") { "/Library/Spelling" } else { "/usr/share/hunspell" };
+    t.check(cfg!(windows) || dirs.iter().any(|d| d == sys), &format!("spell: {sys} is searched"));
     if plat::policy::install("# plattest --test spell: only what is always allowed\n").is_ok() {
         let read = |p: &str| plat::policy::fs_allowed(p, plat::policy::FS_READ);
         t.check(read(&format!("{}/de_DE.aff", mine)), "spell: a dictionary of DICPATH is readable under a manifest");
-        t.check(cfg!(windows) || read("/usr/share/hunspell/de_DE.dic"), "spell: /usr/share/hunspell is readable under a manifest");
+        t.check(cfg!(windows) || read(&format!("{sys}/de_DE.dic")), &format!("spell: {sys} is readable under a manifest"));
         t.info("  (one PERMDENY line follows: a folder outside the rules)\n");
         t.check(!read(&format!("{}-other/x.aff", mine)), "spell: other folders stay closed");
     } else {

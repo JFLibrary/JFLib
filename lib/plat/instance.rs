@@ -52,7 +52,7 @@ pub struct Request {
 const MAGIC: &[u8; 4] = b"JFI1";
 const TOKEN_TAG: &[u8; 4] = b"XAT1";
 const MSG_MAX: usize = 1 << 20;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const QUEUE_MAX: usize = 64;
 
 static QUEUE: SpinLock<Vec<Request>> = SpinLock::new(Vec::new());
@@ -137,7 +137,7 @@ fn decode(body: &[u8]) -> Option<(Request, Option<String>)> {
 
 // ---------------------------------------------------------------- native
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 mod native {
     use super::*;
     use crate::control_ipc::{InstConn, inst_connect, inst_listen};
@@ -266,11 +266,11 @@ fn app_ok(app: &str) -> bool {
 
 /// become the app's single instance, or hand this start's arguments to the running one
 pub fn claim(app: &str) -> Claim {
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     {
         native::claim(app)
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
     {
         let _ = (app, app_ok as fn(&str) -> bool);
         Claim::Alone
@@ -279,11 +279,11 @@ pub fn claim(app: &str) -> Claim {
 
 /// hand (cwd, args) to the running instance of app -> it confirmed the request
 pub fn send(app: &str, cwd: &str, args: &[String]) -> bool {
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     {
         native::send(app, cwd, args)
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
     {
         let _ = (
             app,

@@ -186,7 +186,7 @@ fn round_trip(t: &mut T, svc: &str, large: bool) {
     t.expect_i(left, 0, "secret: every test entry removed");
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn t_secret_bus(_: &mut T) {
     plat::write_stderr(b"plattest: --test secret-bus is Linux only\n");
     plat::exit(2);

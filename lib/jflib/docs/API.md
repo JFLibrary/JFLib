@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -23685,6 +23685,14 @@ VALUE_OPTS: &[&str] = &[ "--size", "--scale", "--auto-close", "--anim", "--them 
   Deliberate trap through the compatibility caller API.
 
 - **`extern "C" fn crash_test() -> !`**
+  a deliberate crash for tests on Apple's arm64: x0 = 16, then a 4-byte write to address 0x10 -- the
+  faulting instruction is at crash_test + 4
+
+- **`extern "C" fn crash_test_caller() -> !`**
+  crash_test called from a known place (bl): the return address crash_test_caller + 4 must be
+  among CrashInfo::frames
+
+- **`extern "C" fn crash_test() -> !`**
   Deliberate termination on Android, where no hardware exception translator is installed.
 
 - **`extern "C" fn crash_test_caller() -> !`**
@@ -23773,6 +23781,33 @@ Source: [`lib/plat/process_linux.rs`](../lib/plat/process_linux.rs)
 
 ```text
 Linux child pipes, exec and owned process groups. All allocations precede fork.
+```
+
+**`impl Child`**
+
+- **`fn read_stdout(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
+  Read stdout without waiting; None means no data, Some(0) means EOF.
+- **`fn read_stderr(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
+  Read stderr without waiting; None means no data, Some(0) means EOF.
+- **`fn write_stdin(&mut self, bytes: &[u8]) -> Result<Option<usize>, u32>`**
+  Write available bytes; retry None or the unwritten suffix.
+- **`fn close_stdin(&mut self)`**
+  Close stdin to request orderly helper shutdown.
+- **`fn try_wait(&mut self) -> Result<Option<i32>, u32>`**
+  Poll exit status; signals map to 128 + signal.
+- **`fn terminate(&mut self)`**
+  Terminate the owned process group and reap its leader.
+
+### `plat/process_apple.rs` (Apple)
+
+Source: [`lib/plat/process_apple.rs`](../lib/plat/process_apple.rs)
+
+```text
+macOS and iOS child processes through posix_spawn (docs/APPLE.md): no fork in a process with threads.
+A child gets its pipes on 0, 1 and 2, a process group of its own (killed as one, as on Linux),
+SIGPIPE back at its default and no blocked signals, and none of this process's other descriptors
+(POSIX_SPAWN_CLOEXEC_DEFAULT).  posix_spawn reports a failed exec itself.  iOS allows no child
+processes: there every start fails with the system's error.
 ```
 
 - **`struct Child`**
@@ -24069,8 +24104,8 @@ one thread may read while another writes (Arc<TcpStream>).
   connect to a socket file within `timeout_ms` (0: block)
 
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
-  the addresses of a host: numeric forms and "localhost" everywhere; on Windows other names
-  through the system resolver (Linux: netio::dns)
+  the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
+  other names through the system resolver (Linux: netio::dns)
 
 - **`fn hostname() -> String`**
   the host name of this computer
@@ -24214,6 +24249,8 @@ service -- programs that run as a system service
       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
       administrator / root rights; the errors say so.
   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
+  plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
+      /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
 ```
 
 - **`fn stop_requested() -> bool`**
@@ -24242,6 +24279,9 @@ service -- programs that run as a system service
 - **`fn unit_text(s: &ServiceSpec) -> String`**
   the systemd unit of a service
 
+- **`fn plist_text(s: &ServiceSpec) -> String`**
+  the launchd property list of a service (macOS): started at boot, again after a failure, umask 077
+
 ### `plat/watch.rs`
 
 Source: [`lib/plat/watch.rs`](../lib/plat/watch.rs)
@@ -24258,6 +24298,7 @@ watch -- changes below folders, as they happen (continuous data protection)
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
 are added (and reported whole), a full queue or the watch limit reports an overflow.
+macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
 ```
@@ -24285,11 +24326,11 @@ certs -- the operating system's trusted certificate authorities
   verify_tls_server(chain, host) -> Option<Result<(), String>>
        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
        that name, with the machine's and user's roots, enterprise policy and automatic root
-       updates; Some(Err(text)) when it refuses.  Linux: None (netio checks against the
-       bundle).
+       updates; Some(Err(text)) when it refuses.  macOS and iOS: the Security framework
+       (SecTrustEvaluateWithError), likewise.  Linux: None (netio checks against the bundle).
   root_bundle() -> Option<Vec<u8>>
        Linux: the PEM file of the distribution's CA bundle (Debian / Ubuntu, Fedora / RHEL,
-       openSUSE, Alpine).  Windows: None.
+       openSUSE, Alpine); macOS: /etc/ssl/cert.pem.  Windows, iOS: None.
 
 Revocation is not checked (no network access during the handshake).
 ```
@@ -24302,6 +24343,15 @@ Revocation is not checked (no network access during the handshake).
 
 - **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Windows)*
 
+- **`fn root_bundle() -> Option<Vec<u8>>`** *(Apple)*
+  macOS: the system's PEM bundle (/etc/ssl/cert.pem, updated with the system); iOS: None.  Apple's
+  own trust decision is verify_tls_server.
+
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Apple)*
+  macOS and iOS: the Security framework builds and checks the chain (leaf first, DER) for a TLS
+  server of that name, with the system's and the user's roots and trust settings, without network
+  access (SecTrustSetNetworkFetchAllowed false); Some(Err(text)) when it refuses.
+
 ### `plat/rand.rs`
 
 Source: [`lib/plat/rand.rs`](../lib/plat/rand.rs)
@@ -24309,7 +24359,7 @@ Source: [`lib/plat/rand.rs`](../lib/plat/rand.rs)
 ```text
 rand -- the operating system's cryptographic random number generator
 
-  fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2)
+  fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy (Apple)
   random_bytes::<N>() -> [u8; N]          random_u64()
 
 There is no fallback: when the system RNG fails the process stops (a key made from weak
@@ -24372,7 +24422,8 @@ applies `--simd sse2` before the app starts.
   CPU_\* bits (cached; rt::cpu)  [cpu_features]
 
 - **`fn cpu_brand() -> String`**
-  the processor name from CPUID 0x80000002..4, blanks trimmed  [cpu_brand]
+  the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
+  "Apple M2"), blanks trimmed  [cpu_brand]
 
 - **`fn avx2_probe() -> bool`**
   run two 256-bit AVX2 instructions (they fault without OS support); only call it when
@@ -25337,7 +25388,8 @@ the first set, not exportable, no user authentication) encrypts each value into 
 the app's no_backup folder.  Browser (web_secret.rs, web/secrets.js): a non-extractable
 WebCrypto AES-GCM key per app in IndexedDB encrypts the values kept there; the host decrypts
 the app's entries before it starts, plat answers from that copy and the host commits each
-change asynchronously.
+change asynchronously.  macOS and iOS (apple_secret.rs): generic passwords of the keychain,
+service "jflib:<app>/<service>" and the account.
 
 The OS does not separate the programs of one user: other native programs of the same user
 can read these entries (the Credential Manager, an unlocked keyring); in the browser every
@@ -27487,10 +27539,12 @@ dirs -- the user's own folders (documents, downloads, pictures ...) and the fold
       example to OneDrive).  Linux: the XDG user dirs of $XDG_CONFIG_HOME/user-dirs.dirs
       (XDG_DOCUMENTS_DIR="$HOME/Dokumente": "$HOME/..." or an absolute path, backslash
       escapes, the last line wins), else $HOME/Desktop, Documents, Downloads, Pictures,
-      Music, Videos.  Browser and Android: "/documents" of the virtual files for
+      Music, Videos.  macOS and iOS: $HOME/Desktop, Documents, Downloads, Pictures, Music,
+      Movies (on iOS inside the app's container).  Browser and Android: "/documents" of the virtual files for
       DIR_DOCUMENTS, None for the others.
   log_dir() -> Option<String>   the base folder of logs: Linux $XDG_STATE_HOME (absolute)
-      or $HOME/.local/state; Windows %LOCALAPPDATA% (like cache_dir); the browser /data.
+      or $HOME/.local/state; Windows %LOCALAPPDATA% (like cache_dir); macOS and iOS
+      ~/Library/Logs; the browser /data.
       vfs::app_dir(APP_LOG) adds the app's own folder (logs://).
   user_dir_scheme(kind) -> Option<&str>   the vfs scheme of a user folder ("documents" ..)
 
@@ -27528,6 +27582,9 @@ DIR_COUNT: u32 = 6
 - **`fn log_dir() -> Option<String>`** *(Linux)*
   the base folder of logs: $XDG_STATE_HOME (absolute), else $HOME/.local/state
   (vfs::app_dir(APP_LOG) = &lt;it>/&lt;app>)
+
+- **`fn log_dir() -> Option<String>`** *(Apple)*
+  the base folder of logs: ~/Library/Logs (vfs::app_dir(APP_LOG) = &lt;it>/&lt;app>)
 
 - **`fn log_dir() -> Option<String>`**
   the base folder of logs: the virtual /data (vfs::app_dir(APP_LOG) = /data/&lt;app>/Logs)
@@ -27586,12 +27643,6 @@ Nonblocking Unix sockets restricted to the effective user. Linux raw syscalls.
 New code; socket paths never accept external directory or filename input.
 ```
 
-- **`struct Listener`**
-  Private local listener. Dropping it closes and removes only its own socket path.
-
-- **`struct Stream`**
-  One nonblocking authenticated local connection.
-
 **`impl Listener`**
 
 - **`fn bind(app: &str) -> Result<Self, i32>`**
@@ -27607,6 +27658,39 @@ New code; socket paths never accept external directory or filename input.
   Read available bytes. None means would block; Some(0) means peer EOF.
 - **`fn write(&mut self, bytes: &[u8]) -> Result<Option<usize>, i32>`**
   Write available bytes without SIGPIPE. None means would block.
+
+### `plat/control_ipc_apple.rs` (Apple)
+
+Source: [`lib/plat/control_ipc_apple.rs`](../lib/plat/control_ipc_apple.rs)
+
+```text
+Nonblocking Unix sockets restricted to the effective user on macOS and iOS (libSystem; the same
+promises as control_ipc_linux.rs).  The peer's user comes from getpeereid.  Darwin has no abstract
+socket names: the app's single instance is a socket file in a private folder of the user, a stale
+one (nobody answers) is replaced.  Socket paths never accept external directory or file input.
+```
+
+- **`struct Listener`**
+  Private local listener. Dropping it closes and removes only its own socket path.
+
+- **`struct Stream`**
+  One nonblocking authenticated local connection.
+
+**`impl Listener`**
+
+- **`fn bind(app: &str) -> Result<Self, i32>`**
+  Bind below a verified, non-symlink, mode-0700 directory owned by the effective UID.
+- **`fn endpoint(&self) -> &str`**
+  Address to advertise only while control is active.
+- **`fn accept(&mut self) -> Result<Option<Stream>, i32>`**
+  Accept at most one available connection and validate its effective UID (getpeereid).
+
+**`impl Stream`**
+
+- **`fn read(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, i32>`**
+  Read available bytes. None means would block; Some(0) means peer EOF.
+- **`fn write(&mut self, bytes: &[u8]) -> Result<Option<usize>, i32>`**
+  Write available bytes without SIGPIPE (SO_NOSIGPIPE). None means would block.
 
 ### `plat/pool.rs`
 
@@ -30281,7 +30365,8 @@ apple -- macOS and iOS through libSystem (docs/APPLE.md)
 Apple keeps only libSystem stable, not the system calls under it (decision 2), so everything here
 is a libSystem call, as on Android through Bionic.  This is the start of the port (AP2): process,
 environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, system information
-(apple_thread.rs); windows answer as on a system without a display (apple_disp.rs) until AP4.
+(apple_thread.rs), crash reports (apple_crash.rs); windows answer as on a system without a display
+(apple_disp.rs) until AP4.
 
 main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
 the process with its result.  The arguments and the environment come from _NSGetArgv and
@@ -30500,11 +30585,27 @@ ends the process with exit code 1 and a message, as on Linux without Wayland or 
 - **`fn drives() -> Vec<String>`**
   the root "/"  [plat_drives]
 
-- **`fn spawn_self(_args: &[&str]) -> i32`**
-  starting this program again: not yet on Apple (posix_spawn comes with the processes, AP3) -> -1
+- **`fn print(job: &mut crate::PrintJob<'_>) -> i32`**
+  printing as linux_print.rs checks it: the manifest, a job without pixels (ERR_DIMS), the test
+  variant jfgui_PRINT_TO=FILE (the PDF into a file); the system's print dialog comes with AP7, until
+  then ERR_UNSUPPORTED
 
-- **`fn restart_self(_args: &[&str]) -> i32`**
-  like spawn_self -> -1
+- **`fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32)`**
+  the system's file dialog: not before the window backend (AP4) -> (-1, 0): the library's own
+  dialog, as in a browser without the File System Access API  [plat_file_dialog]
+
+- **`fn open_folder(path: &str) -> i32`**
+  show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
+
+- **`fn open_url(url: &str) -> i32`**
+  a web page in the default application -> 0 / -1  [plat_open_url]
+
+- **`fn spawn_self(args: &[&str]) -> i32`**
+  start this program again, on its own (process.rs launch: a session of its own, standard handles
+  on /dev/null), with the arguments (at most 31) -> 0 / -1  [plat_spawn_self]; iOS: -1
+
+- **`fn restart_self(args: &[&str]) -> i32`**
+  like spawn_self: the program file now at this process's path (an update replaced it) -> 0 / -1
 
 ### `plat/web.rs`
 

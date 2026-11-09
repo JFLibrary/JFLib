@@ -75,6 +75,99 @@ mod os {
     }
 }
 
+// macOS and iOS: no futex among the public calls before macOS 14.4 / iOS 17.4 (os_sync_wait_on_address),
+// so a table of pthread mutex + condition pairs stands in, hashed by the word's address.  Words that
+// share a bucket share its condition: every wake is a broadcast (a spurious wake-up is allowed, a lost
+// one is not), and the waker takes the bucket's mutex, so it cannot slip between a waiter's check of
+// the word and its sleep.
+#[cfg(target_vendor = "apple")]
+mod os {
+    use core::cell::UnsafeCell;
+    use core::ffi::c_int;
+    use core::sync::atomic::{AtomicU32, Ordering};
+
+    #[repr(C)]
+    struct PthreadMutex {
+        sig: i64,
+        opaque: [u8; 56],
+    }
+    #[repr(C)]
+    struct PthreadCond {
+        sig: i64,
+        opaque: [u8; 40],
+    }
+    #[repr(C)]
+    struct Timespec {
+        sec: i64,
+        nsec: i64,
+    }
+    #[link(name = "System")]
+    unsafe extern "C" {
+        fn pthread_mutex_lock(m: *mut PthreadMutex) -> c_int;
+        fn pthread_mutex_unlock(m: *mut PthreadMutex) -> c_int;
+        fn pthread_cond_wait(c: *mut PthreadCond, m: *mut PthreadMutex) -> c_int;
+        fn pthread_cond_timedwait_relative_np(c: *mut PthreadCond, m: *mut PthreadMutex, t: *const Timespec) -> c_int;
+        fn pthread_cond_broadcast(c: *mut PthreadCond) -> c_int;
+    }
+    const ETIMEDOUT: c_int = 60;
+
+    struct Bucket {
+        m: UnsafeCell<PthreadMutex>,
+        c: UnsafeCell<PthreadCond>,
+    }
+    // SAFETY: the pthread objects are only touched through their own (thread-safe) calls.
+    unsafe impl Sync for Bucket {}
+
+    // PTHREAD_MUTEX_INITIALIZER and PTHREAD_COND_INITIALIZER: the signature, the rest zero
+    const BUCKET: Bucket = Bucket {
+        m: UnsafeCell::new(PthreadMutex { sig: 0x32AA_ABA7, opaque: [0; 56] }),
+        c: UnsafeCell::new(PthreadCond { sig: 0x3CB0_B1BB, opaque: [0; 40] }),
+    };
+    static BUCKETS: [Bucket; 64] = [BUCKET; 64];
+
+    fn bucket(a: &AtomicU32) -> &'static Bucket {
+        let p = a.as_ptr() as usize;
+        &BUCKETS[(p >> 2 ^ p >> 8) & 63]
+    }
+
+    /// sleep while *a == expected (None: no timeout) -> false on timeout
+    pub fn wait(a: &AtomicU32, expected: u32, ms: Option<u32>) -> bool {
+        let b = bucket(a);
+        // SAFETY: the bucket's mutex and condition are initialized statics; the mutex is held from the
+        // check of the word until the condition releases it while sleeping.
+        unsafe {
+            pthread_mutex_lock(b.m.get());
+            if a.load(Ordering::SeqCst) != expected {
+                pthread_mutex_unlock(b.m.get());
+                return true;
+            }
+            let r = match ms {
+                None => pthread_cond_wait(b.c.get(), b.m.get()),
+                Some(m) => {
+                    let t = Timespec { sec: (m / 1000) as i64, nsec: (m % 1000) as i64 * 1_000_000 };
+                    pthread_cond_timedwait_relative_np(b.c.get(), b.m.get(), &t)
+                }
+            };
+            pthread_mutex_unlock(b.m.get());
+            r != ETIMEDOUT
+        }
+    }
+
+    pub fn wake_one(a: &AtomicU32) {
+        wake_all(a); // the bucket is shared: waking one could wake the wrong word's waiter
+    }
+
+    pub fn wake_all(a: &AtomicU32) {
+        let b = bucket(a);
+        // SAFETY: initialized statics; see wait.
+        unsafe {
+            pthread_mutex_lock(b.m.get());
+            pthread_cond_broadcast(b.c.get());
+            pthread_mutex_unlock(b.m.get());
+        }
+    }
+}
+
 pub(crate) use os::{wait, wake_all, wake_one};
 
 // ------------------------------------------------------------------ Mutex
