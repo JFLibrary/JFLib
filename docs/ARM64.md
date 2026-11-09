@@ -1,7 +1,8 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-03, auf Basis von `main` 7074d800. Bisher sind nur ARM0, ARM1 und ARM6 umgesetzt, und von ARM1
-lief noch nichts auf ARM. Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände geschätzt. Syscalls,
+Stand 2026-11-09, auf Basis von `main` 16ec0ab4. Umgesetzt sind ARM0, ARM1, ARM2 und ARM6: Statische Programme für
+Linux ARM64 laufen unter `qemu-aarch64`, `coretest` und `portabletest` sind grün. Für den Rest gilt: Die Zahlen sind aus
+dem Code gezählt, die Aufwände geschätzt. Syscalls,
 Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`), die
 Relocations noch nicht. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
@@ -68,7 +69,8 @@ Das sind Vorschläge, die der Plan voraussetzt. Abweichungen ändern vor allem A
 5. **Eine Datei pro Architektur:** getrennte Setup-, MSIX-, deb- und AppImage-Dateien, kein gemeinsames
    Setup.
 6. **Mathematik:** ARM nutzt `rt/portable/math.rs` wie Android. Das ist nicht bitgleich zu x87, die
-   Abweichungen werden gemessen und dokumentiert (ARM2).
+   Abweichungen werden gemessen und dokumentiert (ARM2); `pow`, `sin` und `cos` rechnen dort seit dem Nachtrag zu
+   ARM2 auf ein halbes ulp genau.
 7. **Seitengrößen:** 4 KB und 16 KB werden unterstützt, die Größe kommt zur Laufzeit aus `AT_PAGESZ`.
    64 KB wird abgelehnt oder später nachgezogen.
 
@@ -79,8 +81,9 @@ Größe: S klein, M mittel, L groß, jeweils nur relativ zueinander.
 ### ARM0: Build-Grundlage (S)
 
 - `rustup target add aarch64-pc-windows-msvc aarch64-unknown-linux-gnu`.
-- `--arch` in `build_rs.py`: `TRIPLE`, Ausgabeordner, `GLIBC_INTERP` (`/lib/ld-linux-aarch64.so.1`),
-  `GLIBC_VERSION` (`GLIBC_2.17`), die `rustc`-Aufrufe der Stubs und Plugins, `text_shape` über Cargo.
+- `--arch` in `build_rs.py`: Ziel-Triple, Ausgabeordner, Interpreter `/lib/ld-linux-aarch64.so.1` und Version
+  `GLIBC_2.17` der glibc-Stubs (seit dem Umzug auf Cargo `glibc_abi` in `lib/jflib_build/src/target.rs`), die
+  Plugins und `text_shape` über Cargo.
 - Nebenprobe: die heutige x64-Version unter Emulation auf `windows-11-arm` starten. Läuft sie, gibt es
   für Windows auf ARM sofort eine Zwischenlösung.
 
@@ -88,8 +91,9 @@ Größe: S klein, M mittel, L groß, jeweils nur relativ zueinander.
 Stellen dieses Plans entspricht, und die x86-Programme bytegleich zu vorher sind.
 
 **Umgesetzt:** `--arch` gilt für `lib`, `app`, `all` und `plugin`, die Ausgabe liegt in `win-arm64` und
-`linux-arm64` unter dem jeweiligen Ausgabeordner (`build/`, `build/release/`, `--out`). `run`, `test` und `watch`
-lehnen `--arch aarch64` ab, bis ARM2 den Test-Runner bringt, `--target web` und `android` ebenso.
+`linux-arm64` unter dem jeweiligen Ausgabeordner (`build/`, `build/release/`, `--out`). `watch` und `test` ohne App
+lehnen `--arch aarch64` ab, `--target web` und `android` ebenso; `run` und `test NAME` starten seit ARM2 statische
+Linux-Programme über `qemu-aarch64`.
 
 - **x86-64:** `coretest`, `gallery`, `PaintCraft` mit `jxlenc`, alle elf Plugins und die glibc-Stubs sind im
   Release-Bau für beide Ziele Byte für Byte gleich, beide Stände aus demselben Verzeichnis gebaut. Unter Windows
@@ -182,6 +186,128 @@ dieselben Nummern in derselben Reihenfolge wie vorher und kommt jetzt aus der Ta
 Mathematik zu x86-64 gemessen sind. Zusätzlich ein statisches `coretest` per `adb` auf dem A56 starten:
 Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zeigt der Versuch).
 
+**Umgesetzt** (2026-11-09):
+
+- **`rt`:** `os.rs` ruft den Kernel mit `svc 0` (Nummer in `x8`, Ergebnis in `x0`). `lib.rs` wählt für ARM64
+  `portable/cpu.rs` und `portable/math.rs` über `target_arch = "aarch64"`. In `mem.rs` bleibt der Heap gemeinsam,
+  ebenso `memcmp`, `bcmp` und `strlen`; `memcpy`, `memmove`, `memset` und `load8` gibt es pro Architektur, für ARM64
+  in `aarch64/mem.rs` (32 Bytes pro Schritt mit `ldp`/`stp`, der Rest nach seinen Bits).
+- **`plat`:** `_start` (`linux.rs`), der Thread-Start `jfgui_rs_clone` (`linux_thread.rs`, `clone` in der
+  Reihenfolge von ARM64) und der Rückweg der Signale (`linux_crash.rs`). Der Crash-Handler meldet auf ARM64 bis ARM3
+  nur Signal, `pc` und Adresse: Register und Aufrufkette kennen nur x86-64. Plugin-Loader und Guard
+  (`linux_elfload.rs`, `linux_guard.rs`, `plib.rs`, `modhost.rs` mit `win64`) sind auf Linux ARM64 aus, `lib.rs` nimmt
+  dort wie Android `web_lib.rs` und `web_modhost.rs`; `current_exe` und `plat_tid` stehen bis ARM4 als Kopie in
+  `linux.rs`. Für Windows ARM64 gilt das nicht (ARM4 und ARM5).
+  Die x86-Teile tragen ihr `cfg` in derselben Zeile, so verschiebt sich keine Zeilennummer (Panic-Stellen).
+- **Outline-Atomics:** Die `compiler_builtins` von Rust für `aarch64-unknown-linux-gnu` enthält den C-Teil von
+  compiler-rt. Dessen `__aarch64_cas*`, `__aarch64_ldadd*` usw. nehmen LSE (die Atomics von ARMv8.1) nur, wenn
+  `__aarch64_have_lse_atomics` gesetzt ist, und das setzt ein Konstruktor in `.init_array` mit `getauxval(AT_HWCAP)`.
+  Ohne libc fehlte `getauxval` beim Linken, und der Konstruktor liefe nie, es bliebe bei LL/SC. (Der Konstruktor von
+  `std` hilft nicht: Er entsteht nur ohne diesen C-Teil.) Jetzt liest `rt::os::process_start`, von `_start` gerufen,
+  den Auxiliary Vector und führt `.init_array` aus, `rt::os::getauxval` antwortet daraus. Geprüft mit `qemu-aarch64
+  -d in_asm` auf `portabletest`: Mit `-cpu max` liefen nur LSE-Befehle (14, kein LL/SC), mit `-cpu cortex-a53`
+  (ARMv8.0) nur LL/SC (28). Programme gegen glibc oder mit `std` brauchen das nicht, dort macht es die libc.
+- **Test-Runner:** `tools/host_exec.py` liest die Architektur aus dem ELF- oder PE-Kopf und startet ein Linux-Programm
+  eines anderen Prozessors als `qemu-aarch64 PROGRAMM` in WSL. Damit gilt das für jeden Aufrufer, `build_rs.py run`
+  und `test NAME` mit `--arch aarch64 --target linux` eingeschlossen. Abgelehnt mit Meldung: Windows-ARM64 auf
+  x86-64, Apps gegen glibc (in WSL liegt unter `/usr/aarch64-linux-gnu` nur Binutils, keine glibc; `--static` geht),
+  `test` ohne App (die ganze Suite braucht ARM3 und ARM4).
+- **Ergebnis unter `qemu-aarch64`** (8.2.2, WSL): `coretest` 4728 von 4728 Prüfungen in 72 s, auch mit `-cpu
+  cortex-a53`. `portabletest` ist grün mit dem Digest `edea7e9d9579c77a`, demselben wie unter Windows und Linux auf
+  x86-64 (auch mit `--simd sse2`).
+
+**Mathematik:** ARM64 rechnet `rt::x87` mit `portable/math.rs`. `portabletest --math-dump` gibt beide Fassungen für
+dieselben 360 000 Eingaben aus, `apps/portabletest/tests/math_diff.py` vergleicht den Lauf auf x86-64 mit dem auf ARM64
+und misst beide gegen die C-Bibliothek (Pythons `math`, etwa 1 ulp genau). `portable/math.rs` gibt auf beiden
+Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben, Stand nach den beiden Nachträgen unten (in Klammern die
+Werte von ARM2 davor):
+
+| Gruppe | Eingaben | gleiche Bits | ARM64 zu x86-64, max / 99 % | x86-64 zur libm, max | ARM64 zur libm, max |
+|---|---|---|---|---|---|
+| `scale` (`f64_parse`) | m < 2^63, 10^-340 bis 10^308 | 100 % | – | – | – |
+| `log10_round`, `scale_round` (`f64_format`) | jeder positive Double, 1 bis 17 Stellen | 100 % | – | – | – |
+| `exp2` | -1100 bis 1030, -1 bis 1 | 99,97–99,99 % (40–42 %) | 1 / 1 ulp (4 / 3) | 1 ulp | 1 ulp (4) |
+| `log2` | jeder positive Double; 0,5 bis 2 | 99,96 %; 99,98 % (99,8 %; 57 %) | 1 ulp (2; 5) | 1 ulp | 1 ulp (5) |
+| `pow` | x bis 100, y ±20 | 99,56 % (5,8 %) | 1 / 1 ulp (118 / 59) | 1 ulp | 1 ulp (118) |
+| `pow` (Gamma) | x 0 bis 1, y 0,1 bis 10 | 99,95 % (22 %) | 1 / 1 ulp (58 / 17) | 1 ulp | 1 ulp (58) |
+| `sin`, `cos`, `sincos` | -20 bis 20 | 99,91–99,97 % (23–24 %) | 1 ulp, `cos` 38 (9036 / 141) | 1 ulp, `cos` 38 | 1 ulp (9037) |
+| `sin`, `cos` weit | -10^6 bis 10^6 | 11 % (0 %) | 47 500 / 309 ulp, absolut ≤ 1,3e-15 (3,9e-11) | 47 500 ulp | 1 ulp (1,4e9) |
+| `atan2` | ±100, ±100 | 99,97 % (67 %) | 1 / 1 ulp (5 / 3) | 1 ulp | 1 ulp (5) |
+| `rz_exp2`, `rz_log2` | ±16; 0 bis 256 | über 99,99 %; 99,97 % (41 %; 96 %) | 1 ulp (4; 2) | 1 ulp | 1 ulp (4; 2) |
+
+Der Text einer Zahl und die Zahl eines Textes sind also auf ARM64 dieselben wie auf x86-64 (`f64_format` korrigiert
+`log10_round` ohnehin selbst). `exp2`, `log2`, `pow`, `sin`, `cos` und `atan2` (auch `rz_exp2`, `rz_log2`) geben in
+99,6 bis über 99,99 % der Fälle dieselben Bits wie x87; wo nicht, liegt eine Seite ein ulp daneben, bei `cos` nahe seinen
+Nullstellen x87 selbst (bis 38 ulp). Außerhalb von ±20 ist jetzt x87 der ungenauere Teil: `fsin` und `fcos` reduzieren
+mit einem 66-Bit-π (bis 47 500 ulp), `portable/math.rs` bleibt bei 1 ulp zur libm. Die Effekte, Audio und die
+Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind damit nicht garantiert, wo Ergebnisse in Pixel oder
+Samples gerundet werden, aber selten verschieden.
+
+**Nachtrag: `pow`, `sin` und `cos` genauer** (2026-11-09). `portable/math.rs` rechnet die drei mit Double-Doubles
+(hi + lo, Dekkers Produkte mit Veltkamp-Teilung, also ohne FMA) und rundet erst am Ende:
+
+- `pow` = 2^(y log2 x): `log2` aus einer Tabelle `log2(1 + j/64)` (47 Einträge) und `atanh` mit |z| < 0,0056, das
+  Produkt mit y als Double-Double, `exp2` aus `2^(j/32)` (32 Einträge) und einer Reihe in |g| ≤ ln 2 / 64.
+- `sin`, `cos`: Unter 2^19 reduziert Cody-Waite mit π/2 in vier Teilen (172 Bit, die Produkte exakt), darüber
+  Payne-Hanek mit 1216 Bit von 2/π in Ganzzahlarithmetik, also für jeden endlichen Double. Die Taylor-Reihen in r
+  (|r| ≤ π/4) haben ihre führenden Glieder als Double-Doubles.
+
+Gegen eine exakte Referenz (Pythons `decimal`, π auf 1400 Bit) liegen 18 Gruppen mit je 20 000 Eingaben höchstens
+0,502 ulp daneben: die Gruppen oben, dazu `pow` über den ganzen Exponentenbereich und mit x nahe 1, Winkel bis 10^308, nahe
+Vielfachen von π/2 (auch bei 2^19) und der bekannte schlechteste Fall der Reduktion, 6381956970095103 · 2^797. Das eine ulp zur libm in der Tabelle
+kommt von der libm. Weiterhin nur IEEE-Operationen auf Doubles und Ganzzahlen, kein `f64::sin` aus std, `no_std`.
+`scale`, `scale_round`, `log10_round`, `exp2`, `log2` und `atan2` sind unverändert. Neuer Digest von `portabletest`:
+`44721bded2985ff2` unter Windows und Linux auf x86-64 (auch mit `--simd sse2`), unter `qemu-aarch64` und in Nodes
+WebAssembly (`compare.mjs`, `portabletest.wasm` und `.simd.wasm`). Zeit je Aufruf auf dem Entwicklungsrechner (x86-64,
+unter Last gemessen): `pow` 70 ns (vorher 80), `sin` 54 ns (46), `sincos` 71 ns (47).
+
+**Nachtrag: `exp2`, `log2` und `atan2` genauer** (2026-11-09). Sie bauen auf denselben Double-Doubles auf:
+
+- `exp2` ist das `exp2` aus `pow` (Tabelle `2^(j/32)`) mit exaktem Argument. Subnormale Ergebnisse rundet es jetzt
+  einmal statt zweimal: Zu r in [0,98, 2) kommt C = 2^(-1022 - n), dessen ulp genau dem Raster von 2^-1074 nach dem
+  Skalieren entspricht; danach ist das Abziehen von C und das Skalieren exakt (gilt auch für `pow`).
+- `log2` ist das gerundete `log2` aus `pow` (Tabelle `log2(1 + j/64)`). `log10_round` behält die alte Reihe
+  (`log2_series`): Seine ganzen Zahlen müssen die von `fldlg2`/`fyl2x`/`fistp` bleiben, und nahe halben Zahlen
+  entscheidet die letzte Stelle.
+- `atan2`: t = n/d mit 0 < n ≤ d als Double-Double (der Rest über ein exaktes Produkt), c = j/32 der nächste Wert,
+  atan t = atan c + atan((t - c) / (1 + t c)) mit |s| ≤ 1/64, `atan(j/32)` aus einer Tabelle (33 Einträge), die Reihe
+  in s bis s^11. Dazu 0, π/2 oder π als Double-Double, eine Rundung am Ende. Sehr kleine Quotienten (t < 2^-60) gehen
+  direkt durch, sehr große oder kleine Operanden werden vorher mit 2^±600 skaliert.
+
+Gegen die exakte Referenz (`decimal`, 70 Stellen) liegen 20 Gruppen mit je 20 000 Eingaben höchstens 0,50002 ulp
+daneben: die Bereiche der Tabelle, dazu `exp2` mit subnormalen Ergebnissen, knapp unter 1024 und nahe ganzen Zahlen,
+`log2` nahe 1 und für subnormale x, `atan2` mit beliebigen Doubles, Quotienten von 2^-70 bis 2^70, nahe den
+Stützstellen j/32, an den Grenzen 2^±400 und 2^-60 und mit subnormalen Operanden; Vorzeichen von Nullen und Unendlich
+wie vorher. `pow`, `sin` und `cos` bleiben bei 0,502 ulp. `math_diff.py`: `log10_round` weiter 100 % gleich, die
+Tabelle oben. Neuer Digest von `portabletest`: `af6940ef15c56d1f` unter Windows und Linux auf x86-64 (auch mit `--simd
+sse2`), unter `qemu-aarch64` und in Node (`compare.mjs`, `portabletest.wasm` und `.simd.wasm`). Das Tempo ist nicht
+schlechter (Rechner unter Last, verrauscht): `exp2` 26 ns (vorher 38–45), `log2` 33–60 ns (43–48), `atan2` 54–70 ns
+(55–80). Die Zeilen 1 bis 260 von `math.rs` behalten ihre Nummern; auf x86-64 nutzt `base/num.rs` daraus nur `scale`
+und `scale_round`, beide unverändert.
+
+**A56** (SM-A566B, Android 16, Kernel 6.6 mit 4-KB-Seiten, Cortex-A720 und A520 mit LSE): Das statische `coretest`
+aus `/data/local/tmp`, gestartet über `adb shell` mit eigenem `TMPDIR`, läuft auf echter ARM-Hardware: 4720 von 4724
+Prüfungen grün. Die vier Fehler kommen von Android, nicht von ARM: `hard link` verbietet die Shell dort (ein `ln` in
+`/data/local/tmp` scheitert ebenso), vermutlich aus demselben Grund `unix bind` mit EACCES, und für die beiden Prüfungen
+der lokalen Zeitzone fehlt `/etc/localtime` (Android hat die Zone in `persist.sys.timezone`). Vorher geprüft: Das Telefon war seit zehn Minuten nicht bedient, der Bildschirm
+bleibt dort wegen einer sehr langen Zeitsperre an; das Programm berührt die Oberfläche nicht und wurde danach gelöscht.
+
+**x86-64 unverändert:** Release-Bau von `coretest`, `plattest`, `gallery` und `PaintCraft` mit `jxlenc` für Windows und
+Linux, `16ec0ab4` und dieser Stand nacheinander aus demselben Verzeichnis: Alle Programme sind Byte für Byte gleich,
+unter Windows bis auf den Zeitstempel des Linkers (die `.map` nur in dessen Zeile), unter Linux auch `gallery` und
+`PaintCraft` gegen glibc. Anders ist nur der C#-Host `pdn-host`, den `dotnet` baut, mit unveränderten Quellen.
+`cargo check -p jflib` mit und ohne `std` ist grün für Windows, Linux, wasm32 und Android, für Linux ARM64 ohne `std`;
+mit `std` fehlt dort `SYS_ARCH_PRCTL` (`plat/linux_glibc.rs`, ARM3). `build_rs.py lib --target linux --arch aarch64`
+baut die ganze Bibliothek. Windows ARM64 kommt jetzt durch `rt` und endet an 26-mal `win64` in `plat` (ARM4), dahinter
+wartet `__chkstk` (ARM5).
+
+**Beim Merge mit `apple/ap2`** (AP2 der Apple-Portierung, nicht gemergt) widersprechen sich zwei Stellen, beide mit
+derselben Lösung, nämlich beide Bedingungen in das `any(...)`: in `lib/rt/lib.rs` die Zeilen vor `pub mod cpu;` und
+`pub mod x87;` (`target_arch = "aarch64"` gegen `target_vendor = "apple"`), in `lib/plat/lib.rs` die vor `mod plib;`
+und `mod modhost;` (dort `all(target_os = "linux", target_arch = "aarch64")`), dazu `CHANGELOG.md` (beide Einträge
+behalten). `rt/mem.rs` schließt AP2 auf Apple ganz aus, das passt zur Trennung hier. `tools/host_exec.py` und
+`build_rs.py` mischen sich ohne Konflikt (geprüft mit `git merge-tree`).
+
 ### ARM3: `plat` auf Linux ARM64 (L)
 
 - Signale: `sigreturn` (`mov x8, 139`, `svc 0`), `ucontext`, Guard-Trampolin mit `x19`-`x28`,
@@ -195,6 +321,9 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
   Android schon gibt. `plattest` und `linuxtest` rufen sie auf (und JFPainter, früher PaintCraft, in seinem eigenen Repository).
 - Testprogramme: `jfgui_gt_code` in `plib.rs`, `plugins/crash`, `plugins/crashpf`, `modrt`,
   `tools/memory_safety/native_probe.rs`.
+- Von ARM2 übrig: Der Crash-Handler auf ARM64 (`linux_crash.rs`, am Ende) füllt nur `pc` und Adresse, `access` ist
+  „unbekannt“ (das ESR im `__reserved` des `sigcontext` sagt Lesen, Schreiben oder Ausführen); die Seitengröße steckt
+  noch fest in `GUARD_SIZE` (`linux_thread.rs`) und `PAGE` (`rt/mem.rs`: dort nur verschwendet, nicht falsch).
 
 **Fertig, wenn:** `plattest`, `linuxtest`, `lifetest` und `sandboxtest` in einer ARM-VM grün sind. Die
 Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
@@ -209,6 +338,9 @@ Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
 - `modules/modrt` hat Kopien von `rt/cpu.rs`, `rt/fx.rs`, `rt/x87.rs` und `plugin/mem.rs` (`shared/`, `lint()` hält sie gleich) und bindet sie per `#[path]` ein, die
   Auswahl in `rt/lib.rs` gilt dort nicht. Dazu kommen `ud2` und der Testfehler `JXT_FAULT` in `modrt/lib.rs`.
 - `build_rs.py plugin`, `pe_verify`, `elf_verify`, Meldung für Plugins der falschen Architektur.
+- Zurücknehmen, was ARM2 ausgeschaltet hat: `all(target_os = "linux", target_arch = "aarch64")` vor `mod plib;` und `mod modhost;` in
+  `plat/lib.rs`, die `cfg` vor `linux_elfload.rs` und `linux_guard.rs` in `linux.rs` und dort die Kopien von
+  `current_exe` und `plat_tid`, das `allow(dead_code)` an `open_read_nofollow` (`linux_sys.rs`).
 
 **Fertig, wenn:** das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf ARM64 und unverändert auf x86-64
 laufen (JFPainters Plugins: in dessen Repository).
@@ -288,6 +420,7 @@ NEON, gleiche Messung wie oben (die Zahlen schwanken von Tag zu Tag, deshalb imm
 - Rund 280-mal `Ordering::Relaxed` in `lib/` durchsehen, zuerst `rt/sync.rs`, `plat/pool.rs`,
   `plat/sync.rs`, den Heap in `rt/mem.rs`, dann die Codecs und `gpu`.
 - Stresstests mit `asynctest` und dem Pool auf einem ARM-Runner und dem A56.
+- Beide Wege der Outline-Atomics: LSE, wo die CPU es hat (seit ARM2 auch ohne libc), LL/SC auf ARMv8.0.
 
 **Fertig, wenn:** die Prüfung abgeschlossen ist und die Stresstests auf echter Hardware stabil laufen.
 QEMU reicht dafür nicht, siehe Fallen.
@@ -352,7 +485,7 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 
 | Was | Wo | Grenze |
 |---|---|---|
-| `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL | langsam, kein echtes Speichermodell, nur statische Programme |
+| `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
 | Signale, Sandbox, Crash, `process_vm_readv` | `qemu-system-aarch64` in WSL (Gast noch einzurichten) | sehr langsam, keine KVM-Beschleunigung; seccomp und Landlock nicht über `qemu-aarch64` prüfen |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
 | Windows ARM64 | `windows-11-arm` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal keine Möglichkeit |

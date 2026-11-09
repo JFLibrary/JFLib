@@ -47,7 +47,8 @@ The crates, their dependencies and the library's version come from the Cargo man
            --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md; mac: test NAME
                  too, programs with windows start in the logged-in session from SSH),
            --profile size|o2 (release variants, section "r13-measure"),
-           --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
+           --arch x86_64|aarch64 (default x86_64; docs/ARM64.md; run and test NAME start a static Linux
+           program of the other processor under qemu-aarch64 in WSL, tools/host_exec.py)
 
 Cargo: every target builds in a Cargo folder of its own below <out> (cargo, cargo-glibc,
 cargo-web-<mode>, cargo-android-<abi>, cargo-modules), side by side.  One `cargo
@@ -118,7 +119,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tools.project_sources import SourceError, entrypoint, project_sources, resolve_root
-from tools.host_exec import run_native
+from tools.host_exec import host_arch, run_native
 from tools import manifests
 
 ROOT = Path(__file__).resolve().parent              # RustLib/
@@ -1410,6 +1411,17 @@ def run_exe(target, exe, args, timeout=600):
     return run_native(target, exe, args, timeout, gui=gui)
 
 
+def foreign_start_check(name, targets, arch):
+    """run / test of a program for another processor than this machine's (docs/ARM64.md): only a static
+    Linux program starts, under QEMU's user-mode emulation in WSL (tools/host_exec.py)"""
+    if "win" in targets:
+        raise BuildError(f"Windows programs for {arch} only start on such a machine (docs/ARM64.md, ARM5); "
+                         f"--target linux runs the Linux build under qemu-{arch} in WSL.")
+    if name and app_glibc(name):
+        raise BuildError(f"{name} is linked against glibc on Linux, and WSL has no glibc for {arch} (docs/ARM64.md); "
+                         "--static builds it without.")
+
+
 def script_args(uis):
     first = uis.read_text(encoding="utf-8").splitlines()[:1]
     return shlex.split(first[0][len("#!args"):]) if first and first[0].startswith("#!args") else []
@@ -1464,7 +1476,7 @@ def run_tests(builders, out, quick):
                     skipped += 1
                     continue
                 total += 1
-                tag = f"[{b.target}] {name}/{record['script']}"
+                tag = f"[{b.folder}] {name}/{record['script']}"
                 if record['status'] == 'failed':
                     fails.append(tag)
                     print(f"FAIL {tag} (exit {record['exit_code']})")
@@ -1557,13 +1569,13 @@ def run_app_suite(builders, name):
     fails, total = [], 0
     for b, n, exe in build_apps(builders, [name]):
         if exe is None:
-            print(f"[{b.target}] {name}: not built for this target (apps/{name}/TARGETS)")
+            print(f"[{b.folder}] {name}: not built for this target (apps/{name}/TARGETS)")
             continue
         for record in run_app_tests(name, b.target, exe):
             if record["status"] == "skipped":
                 continue
             total += 1
-            tag = f"[{b.target}] {name}/{record['script']}"
+            tag = f"[{b.folder}] {name}/{record['script']}"
             if record["status"] == "failed":
                 fails.append(tag)
                 print(f"FAIL {tag} (exit {record['exit_code']})")
@@ -1928,7 +1940,8 @@ def main():
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
                     help="Android native ABI (default ARM64; x86_64 for emulator tests)")
     ap.add_argument("--arch", choices=ARCHS, default="x86_64",
-                    help="win and linux: the processor (aarch64 builds into win-arm64 and linux-arm64, docs/ARM64.md)")
+                    help="win and linux: the processor (aarch64 builds into win-arm64 and linux-arm64, docs/ARM64.md; "
+                         "run and test NAME start static Linux programs under qemu-aarch64)")
     ap.add_argument("--style")
     ap.add_argument("--web-mode", choices=["auto", "scalar", "simd", "threads"], default="auto",
                     help="browser bundle: auto builds scalar, SIMD128 and shared-memory worker variants")
@@ -1959,8 +1972,9 @@ def main():
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     set_static_ui(a.static)                         # section "glibc"
-    if a.arch != "x86_64" and a.cmd in ("run", "test", "watch"):
-        print(f"{a.cmd}: nothing starts programs of --arch {a.arch} yet (docs/ARM64.md, ARM2)")
+    if a.arch != "x86_64" and (a.cmd == "watch" or a.cmd == "test" and not a.name):
+        print(f"{a.cmd}: not for --arch {a.arch} yet (docs/ARM64.md: the whole suite needs ARM3 and ARM4); "
+              f"one app: python build_rs.py test coretest --target linux --arch {a.arch}")
         return 1
     if a.cmd == "site":                             # tools/site.py (its own process: `site` is a stdlib name)
         return subprocess.run([sys.executable, str(ROOT / "tools" / "site.py")]
@@ -1999,6 +2013,8 @@ def main():
     targets = ["win", "linux"] if tgt == "both" else ["win", "linux", "web"] if tgt == "all" else [tgt]
     if a.arch != "x86_64" and not set(targets) <= set(ARM64_TRIPLE):
         raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
+    if a.cmd in ("run", "test") and a.arch != host_arch():
+        foreign_start_check(a.name, targets, a.arch)
     if "android" in targets and a.cmd not in ("app", "lib"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
     if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only

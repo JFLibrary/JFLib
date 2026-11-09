@@ -15,13 +15,20 @@ rules as the expected result), decimal scaling, allocator reuse, and supported t
 error bounds. A failure names the operation with its input and both results. The browser
 run and the ARM64 run must produce the exact same final digest.
 
-ARM64 runs from `adb shell` on a device (`lib/rt` has no Linux ARM64 before ARM2 of
-[ARM64.md](../../docs/ARM64.md)); the x86-64 emulator runs SSE2 again, no NEON:
+ARM64 runs as a static Linux program under `qemu-aarch64` in WSL (ARM2 of
+[ARM64.md](../../docs/ARM64.md)), or from `adb shell` on a device; the x86-64 Android emulator runs
+SSE2 again, no NEON:
 
 ```text
+python build_rs.py run portabletest --target linux --arch aarch64
 python build_rs.py app portabletest --target android --android-abi arm64-v8a
 python apps/portabletest/tests/android.py --serial SERIAL --digest DIGEST_OF_THE_NATIVE_RUN
 ```
+
+`portabletest --math-dump` prints `rt::x87` and `rt::portable::math` for a fixed set of inputs;
+`python apps/portabletest/tests/math_diff.py` compares the dump of the x86-64 build (the x87 unit)
+with the one of the ARM64 build (`portable/math.rs`) and both with the C library: the deviations
+ARM64.md lists under ARM2.
 
 Additional browser checks exercise virtual
 files, temporary-versus-durable save status, locks, and disabled-by-default agent access.
@@ -35,9 +42,12 @@ and stopping on drop. Explicit agent activation/revocation reaches the owned app
 The x86 implementations and their instruction order are unchanged. Portable decimal
 scaling uses a software 64-bit significand with nearest-even intermediate rounding, as
 the native x87 path does. Portable elementary transcendentals use explicit binary64
-series: they are compared within the stated numeric tolerances, not claimed bit-identical
-to arbitrary x87 transcendental instructions. Large-angle trigonometric reduction is a
-remaining precision limitation; the UI/effect representative tests cover -20 to +20 radians.
+series; `exp2`, `log2`, `pow`, `sin`, `cos` and `atan2` carry their intermediate results as
+double-doubles, and `sin` / `cos` reduce any finite angle exactly enough (Cody-Waite below
+2^19, Payne-Hanek above), so they stay within about half an ulp. `log10_round` keeps its
+plain series, whose integers match the x87 unit's. They are compared within the stated
+numeric tolerances, not claimed bit-identical to the x87 instructions; `math_diff.py` shows
+how often they agree.
 
 Real canvas/browser acceptance is separate:
 

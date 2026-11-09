@@ -29,6 +29,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** macOS windows through AppKit (docs/APPLE.md, AP4): NSApplication with the library's own event loop, windows with a layer-backed view of our own (the frame as a CGImage, Retina scale, the library's frame or the system's title bar), mouse, keys (Command acts as Ctrl), text and input methods through NSTextInputClient, the trackpad (fine scrolling, the pinch as Ctrl + wheel), cursors (custom ones, CUR_NONE), popup windows, owned windows hanging on their owner, win_enable, the pasteboard (text, HTML, RTF, PNG, images: a TIFF arrives as PNG), the Open and Save panels (FD_FOLDER chooses a folder), drag and drop both ways, monitors, the appearance, accent colour and accessibility settings with E_SETTINGS on a change; plattest --test window and --test dnd test it in real windows without a user
 - **build:** build_rs.py test NAME --target mac; programs with windows started from SSH run in the logged-in session (tools/apple.py gui); gallery, uitest and dndtest build for mac
 - **ui:** the source inspector opens the editor on macOS too (CLion, VS Code: in PATH, the Toolbox's script, /Applications)
+- **build:** Linux on ARM64: static programs start and run (rt: system calls with svc, memcpy and its relatives for ARM64, getauxval and the constructors for the LSE atomics of compiler-builtins; plat: _start, the thread start, the crash handler without registers); build_rs.py run and test NAME with --arch aarch64 --target linux start them under qemu-aarch64 in WSL, tools/host_exec.py picks the emulator from the program's header; portabletest --math-dump and tests/math_diff.py measure what ARM64 computes differently in rt::x87 (docs/ARM64.md, ARM2)
 
 ### Changed
 
@@ -42,6 +43,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
 - **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).
 - **Tests:** `lib/text_shape`'s shaping test reads its font from `JFLIB_SHAPING_FONT` (was `PAINTCRAFT_SHAPING_FONT`); the codec checks' fixtures (`a1_rgba.png`, `a6_photo.png`, `pdn/`) are in `apps/codectest/fixtures/`.
+- **rt:** rt::portable::math (rt::x87 on ARM64, Android and in the browser): pow, sin and cos within about half an ulp (were up to 118 ulp for pow and 1e-15 absolute for sin and cos, far worse beyond +-20): double-double intermediates without FMA, a table-driven log2 and exp2 inside pow, any finite angle reduced exactly (Cody-Waite below 2^19, Payne-Hanek above); still the same bits on every processor (docs/ARM64.md)
+- **rt:** rt::portable::math (rt::x87 on ARM64, Android, Apple and in the browser): exp2, log2 and atan2 (and so rz_exp2, rz_log2) within about half an ulp (were up to 4, 5 and 5 ulp): exp2 and log2 from pow's double-double tables, atan2 from a table of atan(j/32) with a double-double quotient; subnormal results of exp2 and pow are rounded once; log10_round keeps its series and its x87 integers (docs/ARM64.md)
 
 ### Removed
 

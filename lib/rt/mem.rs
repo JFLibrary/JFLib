@@ -311,8 +311,16 @@ unsafe impl GlobalAlloc for Alloc {
     }
 }
 
-// ---- memory intrinsics (no C runtime): rep movsb / stosb, so the compiler cannot turn
-// them back into calls to themselves
+// ---- memory intrinsics (no C runtime), per architecture: memcpy, memmove, memset and load8 here
+// for x86-64 (rep movsb / stosb, so the compiler cannot turn them back into calls to themselves),
+// in aarch64/mem.rs for ARM64; memcmp, bcmp and strlen below are the same for both
+#[cfg(target_arch = "aarch64")]
+#[path = "aarch64/mem.rs"]
+mod arch;
+#[cfg(target_arch = "aarch64")]
+use arch::{load8, memset};
+
+#[cfg(target_arch = "x86_64")]
 #[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     // SAFETY: the caller guarantees valid, non-overlapping ranges.
@@ -323,6 +331,7 @@ pub unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) 
     dst
 }
 
+#[cfg(target_arch = "x86_64")]
 #[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
     let (d, s) = (dst as *mut u8, src as *const u8);
@@ -340,6 +349,7 @@ pub unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, n: usize)
     dst
 }
 
+#[cfg(target_arch = "x86_64")]
 #[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
 pub unsafe extern "C" fn memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_void {
     // SAFETY: the caller guarantees a valid range.
@@ -352,6 +362,7 @@ pub unsafe extern "C" fn memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_vo
 
 // 8 bytes through an asm load: the optimizer cannot turn the compare loop into a call to
 // memcmp / bcmp (itself)
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn load8(p: *const u8) -> u64 {
     let v: u64;

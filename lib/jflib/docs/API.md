@@ -29575,6 +29575,10 @@ information: linux_thread.rs; windows: linux_disp.rs (Wayland / X11 backends).
 
 - **`fn sleep_ms(ms: u32)`**
 
+- **`fn current_exe() -> Option<String>`**
+  Absolute path of the running native executable, independent of argv[0] (here for Linux ARM64 until ARM4 of
+  docs/ARM64.md, otherwise in modhost.rs)
+
 ### `plat/linux_disp.rs` (Linux)
 
 Source: [`lib/plat/linux_disp.rs`](../lib/plat/linux_disp.rs)
@@ -47350,9 +47354,9 @@ rules. Integer square root avoids libm imports and gives correctly rounded resul
 Source: [`lib/rt/portable/math.rs`](../lib/rt/portable/math.rs)
 
 ```text
-Portable replacement for the native x87 entry points. Decimal scaling emulates the
-x87 64-bit significand after each multiply/divide. Transcendentals use explicit scalar
-binary64 series; native x87 remains unchanged and is the comparison reference.
+Portable replacement for the native x87 entry points. Decimal scaling emulates the x87
+64-bit significand after each multiply/divide. The transcendentals carry double-doubles
+(below) and stay within about half an ulp; native x87 is the comparison reference.
 ```
 
 - **`fn scale(m: u64, e: i32) -> f64`**
@@ -47365,10 +47369,11 @@ binary64 series; native x87 remains unchanged and is the comparison reference.
   Nearest integer decimal logarithm; nonpositive inputs produce the SSE indefinite value.
 
 - **`fn log2(x: f64) -> f64`**
-  Binary logarithm using a normalized mantissa and a convergent atanh series.
+  Binary logarithm within about half an ulp (a table and a series in double-doubles).
 
 - **`fn exp2(x: f64) -> f64`**
-  Platform-independent base-two exponent; finite underflow rounds into subnormals.
+  Platform-independent base-two exponent within about half an ulp (double-doubles, rounded
+  once, subnormal results too); finite underflow rounds into subnormals, 1024 on is inf.
 
 - **`fn rz_log2(x: f64) -> f64`**
   Existing rotation/zoom base-two logarithm API.
@@ -47378,18 +47383,22 @@ binary64 series; native x87 remains unchanged and is the comparison reference.
 
 - **`fn pow(x: f64, y: f64) -> f64`**
   Effect power contract: y=0 yields 1, nonpositive bases yield 0, NaNs propagate canonically.
+  Else 2^(y log2 x) with log2 x and its product with y as double-doubles, rounded once:
+  within 0.501 ulp in the tests (|y log2 x| up to 1074); x = +inf gives inf (y > 0) or 0.
 
 - **`fn atan2(y: f64, x: f64) -> f64`**
-  Quadrant-aware arctangent, including signed zeros and infinite operands.
+  Quadrant-aware arctangent, including signed zeros and infinite operands: c + atan(n / d)
+  or c - atan(n / d) with c = 0, pi/2 or pi as double-doubles, rounded once (within about
+  half an ulp).
 
 - **`fn sincos(x: f64) -> (f64, f64)`**
   Cosine and sine with shared quadrant reduction; return order matches the x87 API.
 
 - **`fn cos(x: f64) -> f64`**
-  Scalar cosine using the common angle reduction.
+  Scalar cosine using the common angle reduction (the same bits as sincos).
 
 - **`fn sin(x: f64) -> f64`**
-  Scalar sine using the common angle reduction.
+  Scalar sine using the common angle reduction (the same bits as sincos).
 
 ### `rt/hosted.rs`
 
