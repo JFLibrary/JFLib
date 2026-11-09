@@ -23,6 +23,7 @@ extern crate alloc;
 
 use alloc::format;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
 mod read;
@@ -287,7 +288,8 @@ pub const IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.
 
 impl Document {
     /// the instances of a scene (None: Document::scene), depth first in the order of the file; without
-    /// scenes those of every node without a parent
+    /// scenes those of every node without a parent.  Each node is visited once: a Document built by hand
+    /// with a cycle of children ends too
     pub fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef> {
         let roots: Vec<usize> = match scene.or(self.scene).and_then(|s| self.scenes.get(s)) {
             Some(s) => s.nodes.clone(),
@@ -296,8 +298,12 @@ impl Document {
         };
         let mut out = Vec::new();
         let mut stack: Vec<usize> = roots.into_iter().rev().collect();
+        let mut seen = vec![false; self.nodes.len()];
         while let Some(n) = stack.pop() {
             let Some(node) = self.nodes.get(n) else { continue };
+            if core::mem::replace(&mut seen[n], true) {
+                continue;
+            }
             if let Some(m) = node.mesh.and_then(|m| self.meshes.get(m).map(|x| (m, x))) {
                 for p in 0..m.1.primitives.len() {
                     out.push(InstanceRef { node: n, mesh: m.0, primitive: p, world: node.world });

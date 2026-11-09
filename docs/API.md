@@ -20493,7 +20493,8 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
 
 - **`fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef>`**
   the instances of a scene (None: Document::scene), depth first in the order of the file; without
-  scenes those of every node without a parent
+  scenes those of every node without a parent.  Each node is visited once: a Document built by hand
+  with a cycle of children ends too
 
 - **`fn load(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>, limits: &Limits) -> Result<Document>`**
   read a .glb or a .gltf (by its first bytes); `files` gives the bytes of a relative URI the file names

@@ -654,7 +654,10 @@ fn read_primitive(cx: &mut Ctx, p: &Value, w: &str, materials: usize) -> Result<
         }
         None => (0..n as u32).collect(),
     };
-    // strips and fans as lists (a strip's odd triangles turn round to keep their winding)
+    // strips and fans as lists (a strip's odd triangles turn round to keep their winding); the list's
+    // indices are charged before it is allocated (a strip triples them)
+    let listed = if mode == 4 { raw.len() } else { raw.len().saturating_sub(2) * 3 };
+    cx.charge(0, listed as u64)?;
     let idx: Vec<u32> = match mode {
         4 => {
             if raw.len() % 3 != 0 {
@@ -681,8 +684,7 @@ fn read_primitive(cx: &mut Ctx, p: &Value, w: &str, materials: usize) -> Result<
         cx.note(String::from("primitives without a triangle are left out"));
         return Ok(None);
     }
-    cx.charge(0, idx.len() as u64)?;
-    let v3 = |v: &[f32], i: usize| [v[i * 3], v[i * 3 + 1], v[i * 3 + 2]];
+    let v3 =|v: &[f32], i: usize| [v[i * 3], v[i * 3 + 1], v[i * 3 + 2]];
     let v2 = |v: &[f32], i: usize| [v[i * 2], v[i * 2 + 1]];
     let prim = match nrm {
         Some(nv) => Primitive {
