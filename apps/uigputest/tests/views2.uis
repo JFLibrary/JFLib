@@ -1,0 +1,3 @@
+#!args --test views2
+# (G5e1) two views in a window, a view in a second window on the same device; the second window closes, its view's
+# content leaves the device

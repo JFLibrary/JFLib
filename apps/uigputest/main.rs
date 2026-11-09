@@ -49,6 +49,10 @@
 //     canvasplain  the same without reading back: during a gesture the framebuffer lacks the view,
 //               Ui::gpu_settle gives it; at rest it holds it
 //     canvasoff jfgui_GPU=0: the same canvas on the CPU path: no tiles, the framebuffer in every frame
+//     view, views2, viewsize, viewlose, viewplain, viewcpu, viewoff, viewbasis   (G5e1) a view of GPU content
+//               (lib/ui/gpu_view.rs): a render3d scene between widgets, against render3d offscreen and the ray
+//               caster; view.rs says what each does
+//   uigputest --bench view [..]    (G5e1) what a view costs per frame, composed or read back (view.rs)
 //   uigputest --gen-shaders FILE   lib/ui/gpu_out_spv.rs from lib/ui/gpu_out.wgsl
 //   uigputest --bench latency [--scene small|full] [--n N] [--burst]   event -> present returned and
 //                             event -> the screen changed (a thread posts key presses and reads the
@@ -87,6 +91,18 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use gfx::{Surface, FMT_XRGB};
 use ui::*;
+
+// (G5e1) views of GPU content; render3dtest's geometry and ray caster as they are
+mod view;
+#[allow(dead_code)]
+#[path = "../render3dtest/common.rs"]
+mod common;
+#[allow(dead_code)]
+#[path = "../render3dtest/cpu.rs"]
+mod cpu;
+#[allow(dead_code)]
+#[path = "../render3dtest/gltfgen.rs"]
+mod gltfgen;
 
 const DESC: AppDesc = AppDesc { title: "uigputest", flags: AF_RESIZABLE, w: 640, h: 480, min_w: 200, min_h: 150, ..AppDesc::NONE };
 
@@ -163,6 +179,8 @@ struct Scene {
     tick: u32,
     /// a canvas (lib/ui/canvas.rs), with something over it
     canvas: Option<TestCanvas>,
+    /// (G5e1) views of GPU content (view.rs)
+    views: view::ViewSc,
 }
 
 const CANVAS_ID: u32 = 700;
@@ -2120,6 +2138,11 @@ impl App for Test {
         if ui.window_begin(900, "zweites Fenster", Some(&second), WF_TOOL | WF_RESIZABLE, None) {
             ui.draw_color(0xFF60_4080);
             ui.draw_rect(0, 0, 400, 300);
+            if let Some(c) = &self.sc.views.win2 {
+                let r = view::VIEW3_RECT;
+                ui.next_rect_px(r[0], r[1], r[2], r[3]);
+                let _ = ui.gpu_view(view::VIEW_ID3, c, self.sc.views.ver3);
+            }
             ui.window_end();
         } else {
             ui.window_end();
@@ -2171,6 +2194,14 @@ impl App for Test {
                 }
                 "canvasplain" => self.t_canvas_plain(ui),
                 "canvasoff" => self.t_canvas_off(ui),
+                "view" => self.t_view(ui),
+                "views2" => self.t_views2(ui),
+                "viewsize" => self.t_viewsize(ui),
+                "viewlose" => self.t_viewlose(ui),
+                "viewplain" => self.t_viewplain(ui),
+                "viewcpu" => self.t_viewcpu(ui),
+                "viewoff" => self.t_viewoff(ui),
+                "viewbasis" => self.t_viewbasis(ui),
                 _ => {
                     self.done = true;
                     ui.quit();
@@ -2243,6 +2274,7 @@ fn draw_scene(t: &Test, ui: &mut Ui) {
     for (sf, ver, r) in &sc.imgs {
         ui.draw_image(sf, *ver, r[0], r[1], r[2], r[3]);
     }
+    view::draw_views(&sc.views, ui);
     if sc.over {
         if let Some((_, _, r)) = sc.imgs.first() {
             ui.draw_color(0xFF40_8040);
@@ -3142,6 +3174,9 @@ fn run() -> i32 {
         if b == "layers" {
             return layer_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(200));
         }
+        if b == "view" {
+            return view::view_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(300));
+        }
         #[cfg(not(windows))]
         if b == "stages" {
             return stage_bench(val("--n").and_then(|v| v.parse().ok()).unwrap_or(120));
@@ -3163,7 +3198,7 @@ fn run() -> i32 {
     plat::setenv("jfgui_STATE", Some("0"));
     plat::setenv("jfgui_TEST_NOACTIVATE", Some("1"));
     // `switch` without the variable: the swapchain is the default
-    plat::setenv("jfgui_GPU", if test == "off" || test == "canvasoff" { Some("0") } else if test == "switch" { None } else { Some("1") });
+    plat::setenv("jfgui_GPU", if test == "off" || test == "canvasoff" || test == "viewoff" { Some("0") } else if test == "switch" { None } else { Some("1") });
     if !plain {
         plat::setenv("jfgui_GPU_VERIFY", Some("1"));
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));
@@ -3183,16 +3218,25 @@ fn run() -> i32 {
             // (frames read back on a loaded machine: a move must not count as over between two of them)
             plat::setenv("jfgui_GPU_CANVAS_SETTLE_MS", Some("500"));
         }
-        "lose" | "layers" | "images" | "imgplain" => {
+        "lose" | "layers" | "images" | "imgplain" | "viewlose" => {
             plat::setenv("jfgui_GPU_RETRY_MS", Some("300"));
+        }
+        "viewcpu" => {
+            plat::setenv("jfgui_GPU_OUTPUT", Some("0"));
         }
         _ => {}
     }
-    if test == "imgplain" || test == "canvasplain" {
+    if test == "imgplain" || test == "canvasplain" || test == "viewplain" {
         plat::setenv("jfgui_GPU_VERIFY", None);
     }
     let mut t = new_test(&test);
-    let d = if test == "csd" { AppDesc { flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR, ..DESC } } else { DESC };
+    let d = if test == "csd" {
+        AppDesc { flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR, ..DESC }
+    } else if test.starts_with("view") && test != "viewbasis" {
+        AppDesc { flags: AF_RESIZABLE | AF_GPU_3D, ..DESC } // (G5e1: the app shows 3D views)
+    } else {
+        DESC
+    };
     let code = ui::run_window(&d, &mut t, &style::STYLE);
     if code != 0 {
         return code;

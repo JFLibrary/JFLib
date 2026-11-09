@@ -1,0 +1,4 @@
+#!args --test view
+# (G5e1) a view of GPU content (lib/ui/gpu_view.rs): a render3d scene on the output's device (Voll with AF_GPU_3D),
+# drawn by the output's render pass; the framebuffer = render3d offscreen = the ray caster, the screen; idle without
+# a frame; an animation; something of the base, a popup and a tooltip over the view while it moves

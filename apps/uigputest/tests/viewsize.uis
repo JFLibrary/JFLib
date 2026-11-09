@@ -1,0 +1,3 @@
+#!args --test viewsize
+# (G5e1) a view at a new window size (the CPU path meanwhile: its frames read back), 150 % and back, minimised (no
+# frame while nobody sees it, the frame it missed after the restore)

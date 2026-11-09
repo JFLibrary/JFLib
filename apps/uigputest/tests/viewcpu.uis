@@ -1,0 +1,3 @@
+#!args --test viewcpu
+# (G5e1) jfgui_GPU_OUTPUT=0: the window on the CPU path, a view on a device of its own (Voll), every frame read back
+# into the framebuffer; the window's DC shows it

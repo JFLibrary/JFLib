@@ -1583,8 +1583,12 @@ version = "0.0.0"
 dependencies = [
  "jflib-build",
  "jflib-gfx",
+ "jflib-gltf",
  "jflib-gpu",
+ "jflib-img-core",
+ "jflib-img-jpeg",
  "jflib-plat",
+ "jflib-render3d",
  "jflib-rt",
  "jflib-shader",
  "jflib-style-winui",
