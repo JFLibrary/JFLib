@@ -1,0 +1,6 @@
+#!args --test app
+# updatetest --test app: (macOS) the update of a whole app bundle (lib/update, kind "app") against
+# tools/update_server.py: a copy of a signed bundle replaced in one step, its signature checked, rolled
+# back after a start without healthy(); bundles of another identifier, changed after signing or no
+# bundle at all are refused; a translocated app is ReadOnly.  Elsewhere it says SKIP and passes.
+# The script itself is ignored: the program checks and exits with the number of failures.

@@ -413,6 +413,19 @@ Zugang da sind, entsteht alles, was ohne sie geht. Dabei fiel auf: `update::targ
 - **AP8d, Dokumentation:** README, [PACKAGING.md](PACKAGING.md), GUIDE und die Website (deren Inhalt vorher mit dem
   Nutzer abgestimmt).
 
+**AP8a umgesetzt (2026-11-09):** `tools/package.py --formats dmg` und `cargo jflib package --formats dmg` bauen auf dem
+Mac je Stil ein `.dmg` (BackupCraft, JFPainter mit vier Stilen); `jfgui_MAC_IDENTITY` schaltet die Signatur von ad hoc
+auf ein Zertifikat mit gehärteter Laufzeit und Zeitstempel um. Die Update-Art `app` ([UPDATES.md](UPDATES.md) „macOS
+app bundles“) tauscht das Bündel als Ganzes; `updatetest --test app` prüft Einspielen, Signatur, Rückfall und die
+Ablehnungen, `--test update` und `--test apply` laufen jetzt auch auf dem Mac. Dabei gefunden: Ein `exe`-Update verlor
+auf dem Mac das Ausführrecht, und `cargo jflib keygen` baute sein Signierprogramm dort für Linux.
+
+**AP8b umgesetzt (2026-11-09):** [`.github/workflows/apple.yml`](../.github/workflows/apple.yml), nur per Hand: `coretest`,
+die Skripte von `gallery` und `updatetest`, `plattest` ohne Fenster (`all`, `cliprich`, `spell`), `androidGallery` im
+Simulator und ein `.dmg` von BackupCraft als Artefakt. Auf dem Mac zu Hause liefen alle Schritte grün; der erste Lauf
+auf GitHub folgt nach dem Push. `build_rs.py` startet Programme mit `ui` auf dem Mac über ihr Bündel (`tools/apple.py
+gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge.
+
 ## Reihenfolge
 
 ```text

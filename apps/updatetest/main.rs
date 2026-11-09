@@ -177,6 +177,11 @@ fn config(s: &Server, dir: &str, chan: &str, version: &str, state: &str) -> Conf
     c.dir = format!("{}/{}", dir, state);
     c.restart = false;
     c.timeout_ms = 15_000;
+    // these tests update a program file: when this program runs from an app bundle (macOS, through
+    // tools/apple.py gui), a program file outside it (inside one the updater offers only "app")
+    if plat::current_exe().is_some_and(|e| e.contains(".app/Contents/MacOS/")) {
+        c.exe = format!("{}/updatetest-plain", dir);
+    }
     c
 }
 
@@ -782,6 +787,8 @@ fn t_stand_in(t: &mut T, s: &Server, dir: &str) {
 
     // a program folder this app may not write (no fs.write $EXE/**)
     let exe = plat::current_exe().unwrap_or_default();
+    // (from an app bundle: the folder the bundle lies in, outside it)
+    let exe = exe.split(".app/Contents/MacOS/").next().unwrap_or(&exe);
     let exe_dir = &exe[..exe.rfind(['/', '\\']).unwrap_or(0)];
     let mut c = config(s, dir, "good", "1.0.0", "s-nowrite");
     c.exe = format!("{}/updatetest-standin.bin", exe_dir);
@@ -789,7 +796,9 @@ fn t_stand_in(t: &mut T, s: &Server, dir: &str) {
     t.check(matches!(u.check(), Ok(Check::Available(_))) && u.download().is_ok(), "nowrite: 2.0.0 downloaded");
     t.check(matches!(update::startup(&c), Startup::Failed(Error::Io(ref m)) if m.contains("fs.write $EXE")), "nowrite: startup fails and names the permission");
     t.check(plat::file_exists(&c.exe) == 0 && update::state(&c).stage == Stage::Staged, "nowrite: nothing written, the update stays staged");
-    t.check(plat::policy::denials().iter().any(|d| d.kind == "fs.write" && d.target.contains("updatetest-standin.bin")), "nowrite: the refusal is in plat::policy::denials()");
+    // (the file, or its folder when that lies outside $EXE: from an app bundle)
+    t.check(plat::policy::denials().iter().any(|d| d.kind == "fs.write" && (d.target.contains("updatetest-standin.bin") || c.exe.starts_with(&format!("{}/", d.target)))),
+            "nowrite: the refusal is in plat::policy::denials()");
 }
 
 // ---------------------------------------------------------------- --test apply

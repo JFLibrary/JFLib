@@ -1,0 +1,67 @@
+# JFLib on macOS and iOS (docs/APPLE.md AP8b) on GitHub's arm64 Mac runners, started by hand until it
+# runs stable: the foundation's self-checks, the headless scripts of gallery and updatetest (the
+# updater, also replacing an app bundle) on macOS, plattest's windowless tests, androidGallery's
+# scripts in the iOS simulator, and a .dmg of BackupCraft as an artifact.  Windows of AppKit, the
+# iPhone and signing with a certificate stay with the Mac at home (tools/apple.py; scripts never
+# open a window, plattest --test window does).
+name: Apple
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: 1
+  # one simulator booted for every script (tools/apple.py sim)
+  jfgui_SIM_KEEP: "1"
+
+jobs:
+  mac:
+    name: macOS and the iOS simulator
+    runs-on: macos-15
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Rust and Xcode
+        run: |
+          rustup toolchain install stable --profile minimal --target aarch64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim --no-self-update
+          rustup default stable
+          rustc --version
+          xcodebuild -version
+          xcrun simctl list devices available | grep -m 3 iPhone || true
+      - name: coretest (the foundation's self-checks)
+        run: python build_rs.py test coretest --target mac
+      - name: gallery's scripts
+        run: python build_rs.py test gallery --target mac
+      - name: updatetest (checks, downloads, applying, rollback, app bundles)
+        run: python build_rs.py test updatetest --target mac
+      - name: plattest without windows
+        run: |
+          python build_rs.py app plattest --target mac
+          for t in all cliprich spell; do
+            echo "::group::plattest --test $t"
+            build/mac/plattest --test "$t"
+            echo "::endgroup::"
+          done
+      - name: androidGallery in the iOS simulator
+        run: python build_rs.py test androidGallery --target ios --sim
+      - name: A .dmg of BackupCraft
+        run: python tools/package.py BackupCraft --formats dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BackupCraft-dmg
+          path: build/dist/*.dmg
+          retention-days: 7
