@@ -1735,8 +1735,9 @@ fn pattern(a: &str, plugin: Option<&str>) -> Result<Vec<Vec<String>>, String> {
 }
 
 /// the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
-/// on Linux also ':'), else the Windows / XDG folders; on Linux then fontconfig's own folders
-/// (fontconfig_dirs: NixOS, TeX fonts, a <dir> of the user) and in Flatpak the host's fonts
+/// on Linux also ':'), else the Windows / XDG folders (macOS and iOS: /System/Library/Fonts,
+/// /Library/Fonts, ~/Library/Fonts); on Linux then fontconfig's own folders (fontconfig_dirs:
+/// NixOS, TeX fonts, a <dir> of the user) and in Flatpak the host's fonts
 pub fn font_dirs() -> Vec<String> {
     let mut v = Vec::new();
     if let Some(e) = crate::env("jfgui_FONTDIRS").filter(|e| !e.is_empty()) {
@@ -1747,6 +1748,10 @@ pub fn font_dirs() -> Vec<String> {
     if cfg!(windows) {
         v.extend(env("WINDIR", "/Fonts"));
         v.extend(env("LOCALAPPDATA", "/Microsoft/Windows/Fonts"));
+    } else if cfg!(target_vendor = "apple") {
+        v.push(String::from("/System/Library/Fonts"));
+        v.push(String::from("/Library/Fonts"));
+        v.extend(env("HOME", "/Library/Fonts"));
     } else {
         v.push(String::from("/usr/share/fonts"));
         v.push(String::from("/usr/local/share/fonts"));

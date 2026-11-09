@@ -8,7 +8,8 @@
 //        FDB_RESCAN: ignore the cache).  Folders: jfgui_FONTDIRS (';' separated, on Linux
 //        also ':'), else Windows %WINDIR%/Fonts and %LOCALAPPDATA%/Microsoft/Windows/Fonts;
 //        Linux /usr/share/fonts, /usr/local/share/fonts, $XDG_DATA_HOME/fonts (else
-//        ~/.local/share/fonts), ~/.fonts (directories are visited once: symlink loops)
+//        ~/.local/share/fonts), ~/.fonts; macOS and iOS /System/Library/Fonts, /Library/Fonts,
+//        ~/Library/Fonts (directories are visited once: symlink loops)
 //   scan_dirs(dirs, flags) -> faces found   the same in these folders only (tests, apps with
 //        their own font folders)
 //   resolve(conf, family, lang, weight, italic) -> (face, FS_SYN_*, family)   the first installed

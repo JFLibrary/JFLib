@@ -27,6 +27,8 @@
 //     WT_DOCK [k, a]           the Dock tile: k 0 the badge's number (-1 none), 1 progress shown, 2 the Dock
 //                              menu's rows, 3 choose its row a
 //     WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
+//     WT_NOTE_CLICK [id]       the notification centre's delegate told of a click on notification id
+//     WT_BUNDLE                1 when the program runs inside an app bundle
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
 //                              OK with name (a full path)
 
@@ -55,6 +57,8 @@ pub const WT_SIGTERM: u32 = 38;
 pub const WT_TRAY: u32 = 39;
 pub const WT_DOCK: u32 = 40;
 pub const WT_OPEN_URLS: u32 = 41;
+pub const WT_NOTE_CLICK: u32 = 42;
+pub const WT_BUNDLE: u32 = 43;
 // WT_SEND / WT_POPUP_SEND kinds
 pub const TS_MOVE: i32 = 1;
 pub const TS_DOWN: i32 = 2;
@@ -191,6 +195,8 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
         }
         WT_MENU => menu_shape(),
         WT_TRAY => super::services::test_tray(a[0], a[1]),
+        WT_NOTE_CLICK => super::services::test_note_click(a[0] as u32),
+        WT_BUNDLE => super::services::test_bundled(),
         WT_DOCK => super::services::test_dock(a[0], a[1]),
         WT_OPEN_URLS => super::services::test_open(&alloc::format!("{}/build/plattest_open.txt", crate::cwd())),
         WT_TERMINATE => {

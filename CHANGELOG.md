@@ -36,6 +36,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** macOS: the app in the system (docs/APPLE.md, AP7a): the app and Window menus (Cmd+Q asks the main window through E_CLOSE), the Dock icon brings the main window back, E_POWER and E_SESSION_END (NSWorkspace, SIGTERM), tool windows that take the keyboard only for a text field, inhibit (IOKit power assertions), trash (the Finder's trash), the recent documents (NSDocumentController), the system's spell checker (NSSpellChecker), the print dialog (NSPrintPanel, the job's PDF through PDFKit)
 - **plat:** macOS and iOS: system_languages and system_locale ask CoreFoundation (LANGUAGE and LC_* set by hand still win, LANG alone does not)
 - **plat:** macOS services (docs/APPLE.md, AP7b): the tray as an NSStatusItem with its menu, notifications through UNUserNotificationCenter (in an app bundle), the Dock tile (badge, progress, the tasks as the Dock menu), files and URLs the system opens with the app (application:openURLs:, as UIC_OPEN), global shortcuts (Carbon RegisterEventHotKey), autostart as a LaunchAgent
+- **build:** build_rs.py packs every mac program as NAME.app as well (tools/apple.py mac_bundle): Info.plist from PACKAGE (name, version, app_id, file types, URL schemes), the icon as .icns from res/app_*.png, signed ad hoc; with sandbox in PERMISSIONS the App Sandbox and the entitlements its rules need; tools/apple.py gui runs the bundled copy (notifications)
+- **cargo-jflib:** cargo jflib mac [--run]: the app as target/jflib-mac/NAME.app on a Mac (as build_rs.py's bundle); cargo jflib test skips a script whose #!only line does not name the target's system
 
 ### Changed
 
@@ -66,6 +68,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
+- **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
 
 ## [0.1.0] - 2026-11-08
 
