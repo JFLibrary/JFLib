@@ -1,4 +1,4 @@
-# Packaging -- setup.exe, .deb, AppImage, RPM, Flatpak and MSIX
+# Packaging -- setup.exe, .deb, AppImage, RPM, Flatpak, MSIX and .dmg
 
 An app that only uses library widgets can be shipped in every style ([STYLES.md](STYLES.md)).
 `tools/package.py` builds one variant per style and lets the user pick the look at install
@@ -286,6 +286,20 @@ What each format can and cannot do, compared with the setup and the .deb:
 | `lib/update` ([UPDATES.md](UPDATES.md) "Packages") | exe, bundle, package | the channel's `appimage` entry replaces the `.AppImage` file (trial, rollback; the GPG signature must follow the running file's key); also the update information for AppImageUpdate | the channel lists only the .deb | through the Flatpak portal (check, `Update`, `Spawn` of the new version) from the bundle's repository; without the portal "managed by Flatpak" | `Check::Managed`: App Installer (`.appinstaller`, at the next start) or the Store |
 | further programs (BINS) | next to the program, linked into `/usr/bin` | inside, AppRun starts the main program | `/usr/bin` links | in `/app/lib/<deb>/`, not in PATH | next to the program |
 | signing | Authenticode, apt repository | GPG in `.sha256_sig` / `.sig_key` (appimagetool's layout) | not signed (rpmsign missing) | GPG: repository and bundle | signtool (below) |
+
+### macOS: .dmg
+
+`--formats dmg` (on a Mac only, alone: `tools/package.py APP --formats dmg`, `cargo jflib package
+--formats dmg`) builds the program for `aarch64-apple-darwin` per style and puts `NAME.app`
+(Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
+compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-arm64.dmg` (one style:
+`<App>-<ver>-arm64.dmg`).  `all` leaves it out (it names the formats of Windows and Linux).  The
+signature is ad hoc unless `jfgui_MAC_IDENTITY` names a certificate of the keychain ("Developer ID
+Application: NAME (TEAM)"): then the bundle is signed with it, the hardened runtime and a secure time
+stamp, and the image is signed too.  An ad-hoc signed app downloaded from the internet does not start
+on another Mac without the user's consent (Gatekeeper); that needs Developer ID and notarization
+([APPLE.md](APPLE.md) AP8c).  With `--update` the channel gets the bundle (kind `app`) and the image
+(kind `package`), [UPDATES.md](UPDATES.md) "macOS app bundles".
 
 ### AppImage
 

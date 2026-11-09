@@ -16,6 +16,11 @@
 //                                   (the portal's Spawn, LATEST_VERSION) -> its pid
 //   restart_appimage(args) -> i32   (Linux) the AppImage file started again with args (its
 //                                   runtime unpacks the image that is now there): 0 / -1
+//   app_bundle_follows(old, new)    (macOS) the bundle at new may replace the app bundle at old:
+//                                   its signature checks (strict, the whole bundle) against the
+//                                   old one's designated requirement, or, the old one signed ad
+//                                   hoc, it carries the same identifier (apple_bundle.rs) -> Err(why)
+//   app_bundle_swap(a, b) -> bool   (macOS) two folders exchanged in one step (RENAME_SWAP)
 //
 // Elsewhere (web, Android) packaged() is Plain and the rest answers "not available".
 
@@ -125,6 +130,36 @@ pub fn flatpak_spawn_latest(args: &[&str]) -> Result<u32, String> {
     {
         let _ = args;
         Err(String::from("no Flatpak"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[path = "apple_bundle.rs"]
+mod apple_bundle;
+
+/// (macOS) whether the app bundle at `new` may replace the one at `old` (lib/update, kind "app"):
+/// its signature checks, strict and for the whole bundle, against the old bundle's designated
+/// requirement (a team's signature: the same identifier and team); an old bundle signed ad hoc
+/// asks only for a valid signature and the same identifier.  Elsewhere: Err (no app bundles)
+pub fn app_bundle_follows(old: &str, new: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return apple_bundle::follows(old, new);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (old, new);
+        Err(String::from("app bundles are macOS's"))
+    }
+}
+
+/// (macOS) the folders a and b exchanged in one step (renamex_np, RENAME_SWAP): an app bundle is
+/// never missing while an update replaces it -> it worked (elsewhere: false)
+pub fn app_bundle_swap(a: &str, b: &str) -> bool {
+    #[cfg(target_os = "macos")]
+    return apple_bundle::swap(a, b);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (a, b);
+        false
     }
 }
 

@@ -46,6 +46,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py test NAME --target ios --sim runs an app's scripts in the simulator (tools/apple.py sim starts programs in the repository's folder: jfgui_CWD on iOS); the iOS bundle's Info.plist names its scene and orientations; androidGallery and plattest build for ios; plattest --test clip checks the real clipboard (not in all)
 - **plat:** iOS after the check on the iPhone: a bar with Done above the on-screen keyboard (an iPhone has no key that closes it), notifications through UNUserNotificationCenter (asked the first time; refused: NoteClosed), the motion sensors and the location through Core Motion and Core Location (web_sensors.rs's host interface, as on Android); the block helpers of macOS's notifications are shared with iOS (apple_block.rs)
 - **build:** A .dmg for macOS: tools/package.py --formats dmg and cargo jflib package --formats dmg (on a Mac; per style) put NAME.app on a compressed disk image beside a link to /Applications; tools/apple.py dmg; with jfgui_MAC_IDENTITY the bundle and the image are signed with that certificate, the hardened runtime and a time stamp instead of ad hoc (docs/APPLE.md AP8a)
+- **update:** lib/update: kind app replaces a macOS app bundle as a whole (unpacked beside it, its signature checked against the installed one's designated requirement, the two folders exchanged in one step, a copy of the old bundle as the backup; trial and rollback as for an exe); plat::pkg::app_bundle_follows and app_bundle_swap; tools/package.py and cargo jflib package write the app entry and the .dmg into the channel for macos-aarch64; updatetest --test app (docs/UPDATES.md)
 
 ### Changed
 
@@ -81,6 +82,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
 - **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
+- **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
 
 ## [0.1.0] - 2026-11-08
 

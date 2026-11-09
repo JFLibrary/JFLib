@@ -17,7 +17,13 @@
 //   fetch::{get, download, join, Progress}   its HTTP(S) for other downloads of an app (fetch.rs)
 //   install(&cfg) -> Packaged    how the program is installed (plat::pkg::packaged; cfg.exe
 //                                set: Plain), which decides what an update is:
-//     Plain     exe / bundle / package entries of update.json (below)
+//     Plain     exe / bundle / package entries of update.json (below); a program in a macOS
+//               app bundle (NAME.app/Contents/MacOS/NAME) takes the "app" entry instead: the
+//               bundle is replaced as a whole (unpacked next to it, its signature checked against
+//               the installed one's requirement -- plat::pkg::app_bundle_follows --, exchanged in
+//               one step, the old bundle the backup; trial and rollback as for an exe); a folder
+//               the user cannot write or a bundle macOS moved away (App Translocation):
+//               Error::ReadOnly
 //     AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
 //               (copied next to it, checked, renamed over it; the old file is the backup, the
 //               trial and the rollback as for an exe; restarted through the AppImage); a folder
@@ -464,11 +470,17 @@ impl Updater {
         if !newer(&m.version, &cfg.version) || st.bad.contains(&m.version) {
             return Ok(Check::UpToDate);
         }
-        let Some(pkg) = m.package_for(&cfg.target, matches!(inst, Packaged::AppImage(_))).cloned() else {
+        let Some(pkg) = m.package_for_kind(&cfg.target, apply::whole(cfg, &inst)).cloned() else {
             return Ok(Check::NoPackage(m.version));
         };
         if let Packaged::AppImage(file) = &inst {
             apply::replaceable(cfg, file)?;
+        }
+        if let Some(bundle) = apply::app_bundle(cfg).filter(|_| pkg.kind == Kind::App) {
+            if bundle.contains("/AppTranslocation/") {
+                return Err(Error::ReadOnly(bundle));
+            }
+            apply::replaceable(cfg, &bundle)?;
         }
         if pkg.size > cfg.max_size {
             return Err(Error::Manifest(format!("die Datei ist mit {} Bytes zu groß", pkg.size)));

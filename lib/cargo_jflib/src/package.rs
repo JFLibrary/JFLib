@@ -201,7 +201,8 @@ pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", deps: &["jflib-ap
 /// Ed25519 keys and signatures of an update channel with lib/crypto (cargo-jflib has no curve
 /// arithmetic of its own), for the machine it runs on
 pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "jflib-plat", "jflib-crypto"], source: include_str!("signer.rs.in"),
-                                       console: true, triple: if cfg!(windows) { WIN } else { LINUX }, linux_static: false };
+                                       console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
+                                       linux_static: false };
 
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
 /// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
@@ -232,6 +233,9 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     }
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    if s.triple == crate::mac::TRIPLE {
+        cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
+    }
     if s.linux_static {
         cmd.arg("--target-dir").arg(p.target_dir.join("jflib-package").join("static-target"));
         // these flags instead of every target.*.rustflags of the configuration
@@ -298,6 +302,8 @@ pub(crate) struct App<'a> {
     pub deb_made: RefCell<Option<(PathBuf, String)>>,
     /// the AppImage of each style (the update channel)
     pub appimages: RefCell<BTreeMap<String, PathBuf>>,
+    /// (macOS) per style: the .dmg and the app bundle on it
+    pub dmgs: RefCell<BTreeMap<String, (PathBuf, PathBuf)>>,
 }
 
 impl App<'_> {
@@ -579,6 +585,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         signing: OnceCell::new(),
         deb_made: RefCell::new(None),
         appimages: RefCell::new(BTreeMap::new()),
+        dmgs: RefCell::new(BTreeMap::new()),
     };
     if o.repo.is_some() && !wants("deb") {
         return Err("--repo is an apt repository of the .deb: it needs the format deb".to_string());
@@ -630,6 +637,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
                                else { format!("{}-{}-arm64.dmg", app.name, app.version) };
                     let out = app.dist.join(file);
                     crate::mac::dmg(&bundle, &out, &app.display)?;
+                    app.dmgs.borrow_mut().insert(s.clone(), (out.clone(), bundle));
                     app.made(out)?;
                 }
             }

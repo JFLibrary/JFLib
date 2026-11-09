@@ -4,7 +4,7 @@
                                                          public key for update::Config
     python tools/update_manifest.py pubkey [--key FILE]  the public key of a signing key
     python tools/update_manifest.py sign --app ID --version V --out DIR
-            --file TARGET=PATH[,kind=exe|bundle|package|appimage][,name=NAME] ...
+            --file TARGET=PATH[,kind=exe|bundle|package|appimage|app][,name=NAME] ...
             [--notes TEXT] [--expires-days N] [--base-url URL] [--key FILE]
                                                          copies the files into DIR and writes
                                                          DIR/update.json + update.json.sig
@@ -20,7 +20,8 @@ TARGET is "windows-x86_64", "linux-x86_64", "linux-aarch64", "macos-aarch64", ..
 program's folder (tools/assetpack.py pack_files), "package" an installer the app hands to the
 user, "appimage" a whole AppImage that replaces the running AppImage's file (only a program
 running as an AppImage takes it, and nothing else; a channel may hold a "package" and an
-"appimage" for the same target).  With --base-url the manifest names absolute addresses, otherwise the file names
+"appimage" for the same target), "app" a JFA1 bundle of a macOS NAME.app that replaces the app
+bundle the program runs from (only such a program takes it; tools/assetpack.py pack).  With --base-url the manifest names absolute addresses, otherwise the file names
 (relative to update.json).
 
 Ed25519 (RFC 8032) is implemented here in plain Python: the standard library has none, and
@@ -38,7 +39,7 @@ import time
 from pathlib import Path
 
 KEY_TAG = "JFUPDKEY1"
-KINDS = ("exe", "bundle", "package", "appimage")
+KINDS = ("exe", "bundle", "package", "appimage", "app")
 
 # ---------------------------------------------------------------- Ed25519 (RFC 8032)
 # Written from the algorithm of RFC 8032 section 5.1 (key expansion 5.1.5, signing 5.1.6, the

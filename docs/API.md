@@ -26525,6 +26525,11 @@ updates (lib/update builds on it; docs/UPDATES.md "Packages")
                                   (the portal's Spawn, LATEST_VERSION) -> its pid
   restart_appimage(args) -> i32   (Linux) the AppImage file started again with args (its
                                   runtime unpacks the image that is now there): 0 / -1
+  app_bundle_follows(old, new)    (macOS) the bundle at new may replace the app bundle at old:
+                                  its signature checks (strict, the whole bundle) against the
+                                  old one's designated requirement, or, the old one signed ad
+                                  hoc, it carries the same identifier (apple_bundle.rs) -> Err(why)
+  app_bundle_swap(a, b) -> bool   (macOS) two folders exchanged in one step (RENAME_SWAP)
 
 Elsewhere (web, Android) packaged() is Plain and the rest answers "not available".
 ```
@@ -26570,6 +26575,16 @@ Elsewhere (web, Android) packaged() is Plain and the rest answers "not available
 - **`fn flatpak_spawn_latest(args: &[&str]) -> Result<u32, String>`**
   start this app's newest installed Flatpak version with args (the portal's Spawn with
   LATEST_VERSION; the same program inside it) -> its pid
+
+- **`fn app_bundle_follows(old: &str, new: &str) -> Result<(), String>`**
+  (macOS) whether the app bundle at `new` may replace the one at `old` (lib/update, kind "app"):
+  its signature checks, strict and for the whole bundle, against the old bundle's designated
+  requirement (a team's signature: the same identifier and team); an old bundle signed ad hoc
+  asks only for a valid signature and the same identifier.  Elsewhere: Err (no app bundles)
+
+- **`fn app_bundle_swap(a: &str, b: &str) -> bool`**
+  (macOS) the folders a and b exchanged in one step (renamex_np, RENAME_SWAP): an app bundle is
+  never missing while an update replaces it -> it worked (elsewhere: false)
 
 - **`fn restart_appimage(args: &[&str]) -> i32`**
   start the running AppImage's file ($APPIMAGE) again with args: its runtime unpacks the
@@ -44837,7 +44852,13 @@ back a version that does not start
   fetch::{get, download, join, Progress}   its HTTP(S) for other downloads of an app (fetch.rs)
   install(&cfg) -> Packaged    how the program is installed (plat::pkg::packaged; cfg.exe
                                set: Plain), which decides what an update is:
-    Plain     exe / bundle / package entries of update.json (below)
+    Plain     exe / bundle / package entries of update.json (below); a program in a macOS
+              app bundle (NAME.app/Contents/MacOS/NAME) takes the "app" entry instead: the
+              bundle is replaced as a whole (unpacked next to it, its signature checked against
+              the installed one's requirement -- plat::pkg::app_bundle_follows --, exchanged in
+              one step, the old bundle the backup; trial and rollback as for an exe); a folder
+              the user cannot write or a bundle macOS moved away (App Translocation):
+              Error::ReadOnly
     AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
               (copied next to it, checked, renamed over it; the old file is the backup, the
               trial and the rollback as for an exe; restarted through the AppImage); a folder
@@ -45086,6 +45107,11 @@ An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and h
 way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
 running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
 the backup.  Large files are copied in pieces, never read whole.
+An app bundle (kind "app", macOS) is replaced as a whole: its files unpacked as
+NAME.app.jfupd-new, the bundle's signature checked against the installed one's requirement
+(plat::pkg::app_bundle_follows), a copy of the installed bundle in backup/app/ (backup/list:
+"A NAME.app"), the two folders exchanged in one step (plat::pkg::app_bundle_swap) and the old
+one removed; the rollback exchanges the copy back the same way.
 ```
 
 - **`enum Stage`**
@@ -45162,7 +45188,7 @@ compare versions
                                           kind this version does not know are left out)
   Manifest::package_for(target, appimage) the entry for this system and installation
   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
-  target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
+  target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | "macos-aarch64" | ...
   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
 ```
 
@@ -45182,11 +45208,14 @@ MAX_SIG: usize = 4096
     program that runs as an AppImage, which is offered nothing else
   - `Flatpak` -- an update of a Flatpak from its repository, through the Flatpak portal (never in a
     manifest: Offer::kind of a Flatpak)
+  - `App` -- (macOS) a whole app bundle: a JFA1 bundle of the files of NAME.app relative to it, which
+    replaces the bundle the program runs from (its signature covers the bundle, not only the
+    program); only offered to a program in an app bundle, which is offered nothing else
 
 **`impl Kind`**
 
 - **`fn name(self) -> &'static str`**
-  "exe", "bundle", "package", "appimage" or "flatpak"
+  "exe", "bundle", "package", "appimage", "flatpak" or "app"
 - **`fn parse(s: &str) -> Option<Kind>`**
   the kind of a name (name())
 
@@ -45224,7 +45253,7 @@ MAX_SIG: usize = 4096
 
 - **`fn target() -> &'static str`**
   the system this program runs on, as the manifest names it: "windows-x86_64",
-  "linux-x86_64", "linux-aarch64", "android-aarch64", "web-wasm32"
+  "linux-x86_64", "linux-aarch64", "android-aarch64", "macos-aarch64", "ios-aarch64", "web-wasm32"
 
 - **`fn newer(a: &str, b: &str) -> bool`**
   a is newer than b: the numbers before a '-' compared part by part ("1.10" > "1.9",

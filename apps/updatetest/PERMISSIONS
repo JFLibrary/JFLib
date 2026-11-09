@@ -2,4 +2,5 @@
 net.connect localhost:*                # the test server on 127.0.0.1 (other hosts: refused)
 fs.write $TEMP/updatetest-*/**         # a scratch folder per run: states, stand-in programs, the installed copy
 process python python3 $TEMP/updatetest-*/**   # the test server; the installed copy of this program
+process /usr/bin/ditto                 # --test app (macOS): the installed app bundle copied
 autostart                              # --test msix: the package's StartupTask

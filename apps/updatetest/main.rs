@@ -84,8 +84,9 @@ fn updatetest() -> i32 {
         Some("apply") => t_apply(&mut t),
         Some("flatpak") => return t_flatpak(),
         Some("msix") => t_msix(&mut t),
+        Some("app") => t_app(&mut t),
         _ => {
-            plat::write_stderr(b"updatetest --test update|apply|flatpak|msix\n");
+            plat::write_stderr(b"updatetest --test update|apply|flatpak|msix|app\n");
             return 2;
         }
     }
@@ -411,10 +412,100 @@ fn t_update(t: &mut T) {
 
 // installations a package system updates: Flatpak without a portal (no session bus for the
 // test), Snap; on Windows outside a package: Plain
+// (macOS) kind "app": a copy of the server's running.app is the installed app (cfg.exe inside it);
+// the update replaces the bundle as a whole, the signature decides, the rollback brings the old
+// bundle back
+fn t_app(t: &mut T) {
+    if !cfg!(target_os = "macos") {
+        plat::write_stdout(b"SKIP app: app bundles are macOS's\n");
+        return;
+    }
+    let dir = scratch();
+    let Some(s) = start_server(t, &dir) else { return };
+    let installed = format!("{}/Applications/updatetest.app", dir);
+    let plist = |b: &str| read_text(&format!("{}/Contents/Info.plist", b)).unwrap_or_default();
+    let reset = |t: &mut T| {
+        wipe(&installed);
+        let ok = run_ok("/usr/bin/ditto", &[&format!("{}/srv/app/running.app", dir), &installed]);
+        t.check(ok, "app: the installed bundle (1.0.0) copied");
+    };
+    let cfg = |chan: &str, state: &str| {
+        let mut c = config(&s, &dir, chan, "1.0.0", state);
+        c.exe = format!("{}/Contents/MacOS/updatetest", installed);
+        c
+    };
+    reset(t);
+    t.check(plist(&installed).contains("<string>1.0.0</string>"), "app: 1.0.0 installed");
+    // the bundle takes the "app" entry; a plain program of the channel gets nothing
+    let mut plain = cfg("app", "s-app-plain");
+    plain.exe = format!("{}/updatetest-plain", dir);
+    t.eq(Updater::new(plain).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "app: a program outside a bundle gets no app entry");
+    let mut c = cfg("app", "s-app-good");
+    let u = Updater::new(c.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.kind == Kind::App && o.version == "2.0.0"), "app: the bundle gets the app entry (2.0.0)");
+    t.eq(u.download(), Ok(String::from("2.0.0")), "app: downloaded");
+    t.eq(update::startup(&c), Startup::Applied(String::from("2.0.0")), "app: startup replaces the bundle");
+    t.check(plist(&installed).contains("<string>2.0.0</string>"), "app: the bundle is 2.0.0 now");
+    t.check(plat::pkg::app_bundle_follows(&installed, &installed).is_ok(), "app: its signature checks");
+    t.check(plat::fs::stat(&format!("{}/Contents/MacOS/updatetest", installed)).is_some_and(|m| m.mode & 0o777 == 0o755), "app: the program is executable");
+    t.check(plat::file_exists(&format!("{}.jfupd-new", installed)) == 0, "app: nothing left beside it");
+    t.check(plist(&format!("{}/backup/app/updatetest.app", c.dir)).contains("<string>1.0.0</string>"), "app: the old bundle is the backup");
+    // 2.0.0 runs on trial; without healthy() the next start rolls it back
+    c.version = String::from("2.0.0");
+    t.eq(update::startup(&c), Startup::Trial(String::from("2.0.0")), "app: 2.0.0 on trial (no healthy())");
+    t.eq(update::startup(&c), Startup::RollingBack(String::from("2.0.0")), "app: the next start rolls it back");
+    t.check(plist(&installed).contains("<string>1.0.0</string>"), "app: the bundle is 1.0.0 again");
+    t.check(plat::pkg::app_bundle_follows(&installed, &installed).is_ok(), "app: and its signature checks");
+    // refused: another identifier, a changed file, no bundle; the installed app stays as it was
+    for (chan, why) in [("app-otherid", "another identifier"), ("app-tampered", "Info.plist changed after signing"), ("app-notapp", "no bundle")] {
+        reset(t);
+        let c = cfg(chan, &format!("s-{}", chan));
+        let u = Updater::new(c.clone());
+        let got = u.check().is_ok() && u.download().is_ok();
+        t.check(got, &format!("app: {chan} downloaded"));
+        let r = update::startup(&c);
+        t.check(matches!(r, Startup::Failed(_)), &format!("app: {chan} ({why}) is refused ({:?})", r));
+        t.check(plist(&installed).contains("<string>1.0.0</string>"), &format!("app: after {chan} the installed bundle is unchanged"));
+        t.check(plat::file_exists(&format!("{}.jfupd-new", installed)) == 0, &format!("app: after {chan} nothing is left beside it"));
+    }
+    // macOS moved the app away (App Translocation): read-only
+    let mut moved = cfg("app", "s-app-moved");
+    moved.exe = String::from("/private/var/folders/xx/AppTranslocation/ABC/d/updatetest.app/Contents/MacOS/updatetest");
+    t.check(matches!(Updater::new(moved).check(), Err(Error::ReadOnly(_))), "app: a translocated app is not replaced (ReadOnly)");
+    if t.fails == 0 {
+        remove_tree(t, &dir);
+    }
+}
+
+// a program run to its end (at most 30 s) -> it ended with 0
+fn run_ok(program: &str, args: &[&str]) -> bool {
+    let Ok(mut c) = (plat::process::Command { program, args, cwd: None, env: &[] }).spawn() else { return false };
+    for _ in 0..600 {
+        match c.try_wait() {
+            Ok(Some(code)) => return code == 0,
+            Ok(None) => plat::sleep_ms(50),
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+// a folder and everything in it, always (remove_tree keeps the scratch folder after a failure)
+fn wipe(p: &str) {
+    let mut names = Vec::new();
+    plat::dir_list(p, &mut |n, dir, _| names.push((String::from(n), dir)));
+    for (n, dir) in names {
+        let c = format!("{}/{}", p, n);
+        if dir { wipe(&c) } else { plat::delete(&c); }
+    }
+    plat::delete(p);
+}
+
 fn t_managed(t: &mut T, s: &Server, dir: &str) {
     let c = config(s, dir, "good", "1.0.0", "s-managed");
-    if cfg!(windows) {
-        t.eq(update::install(&c), Packaged::Plain, "managed: outside an MSIX package the program is Plain");
+    if !cfg!(target_os = "linux") {
+        // (Flatpak and Snap are Linux's; MSIX outside a package, macOS: Plain)
+        t.eq(update::install(&c), Packaged::Plain, "managed: outside a package the program is Plain");
         return;
     }
     let bus = plat::env("DBUS_SESSION_BUS_ADDRESS");
@@ -711,7 +802,7 @@ fn t_apply(t: &mut T) {
     let prog = format!("{}/{}", inst, exe_name());
     let me = plat::current_exe().and_then(|p| plat::read_file(&p)).unwrap_or_default();
     t.check(!me.is_empty() && plat::mkdir(&inst) && plat::write_file(&prog, &me), "apply: this program copied to the scratch folder");
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     plat::fs::set_mode(&prog, 0o755);
     let log = format!("{}/log.txt", dir);
     let state = format!("{}/state", dir);

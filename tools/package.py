@@ -465,11 +465,13 @@ def sign_variants(app, styles, work, signing, impl):
     signing.windows([f for f in files if f.exists()])
 
 
-def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None):
+def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None, dmgs=None):
     """--update OUT: a signed channel per style (OUT/<style>/update.json + .sig, lib/update):
     Windows the program (kind exe) or, with modules / further programs, a bundle of the program
     folder (kind bundle); Linux the .deb (kind package: the package manager installs it) and the
-    style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path})"""
+    style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path});
+    macOS the app bundle (kind app, a JFA1 bundle of NAME.app: an installed app replaces its
+    bundle) and the .dmg (kind package; dmgs {style: path})"""
     seed = update_manifest.load_key(key_file)
     if seed is None:
         signing.skip("Update-Kanal: kein Signierschlüssel (--update-key DATEI, jfgui_UPDATE_KEY_FILE oder jfgui_UPDATE_KEY; "
@@ -494,6 +496,12 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
             files.append(("linux-x86_64", "package", deb, Path(deb).name))
         if (appimages or {}).get(s):
             files.append(("linux-x86_64", "appimage", appimages[s], Path(appimages[s]).name))
+        bundle = ROOT / work / s / "mac" / f"{app}.app"
+        if (dmgs or {}).get(s) and bundle.is_dir():
+            tmp = ROOT / work / f"{app}-{version}-{s}-mac.jfa"
+            tmp.write_bytes(assetpack.pack(bundle))
+            files.append(("macos-aarch64", "app", tmp, tmp.name))
+            files.append(("macos-aarch64", "package", dmgs[s], Path(dmgs[s]).name))
         if not files:
             continue
         m = update_manifest.write_channel(ROOT / out / s, app_id, version, files, seed, notes=meta.get("update_notes", ""),
@@ -581,11 +589,13 @@ def main():
         pkg_linux.make_rpm(job)
     if "flatpak" in formats:
         pkg_linux.make_flatpak(job)
+    dmgs = {}
     if "dmg" in formats:
         for s in styles:
-            job.done.append(("dmg", make_dmg(a.app, meta, s, dist, work, multi=len(styles) > 1)))
+            dmgs[s] = make_dmg(a.app, meta, s, dist, work, multi=len(styles) > 1)
+            job.done.append(("dmg", dmgs[s]))
     if a.update:
-        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages)
+        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages, dmgs)
     if set(formats) - {"setup", "deb"}:
         job.report()
     signing.report()

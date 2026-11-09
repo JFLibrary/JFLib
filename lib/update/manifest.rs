@@ -35,10 +35,14 @@ pub enum Kind {
     /// an update of a Flatpak from its repository, through the Flatpak portal (never in a
     /// manifest: Offer::kind of a Flatpak)
     Flatpak,
+    /// (macOS) a whole app bundle: a JFA1 bundle of the files of NAME.app relative to it, which
+    /// replaces the bundle the program runs from (its signature covers the bundle, not only the
+    /// program); only offered to a program in an app bundle, which is offered nothing else
+    App,
 }
 
 impl Kind {
-    /// "exe", "bundle", "package", "appimage" or "flatpak"
+    /// "exe", "bundle", "package", "appimage", "flatpak" or "app"
     pub fn name(self) -> &'static str {
         match self {
             Kind::Exe => "exe",
@@ -46,6 +50,7 @@ impl Kind {
             Kind::Package => "package",
             Kind::AppImage => "appimage",
             Kind::Flatpak => "flatpak",
+            Kind::App => "app",
         }
     }
 
@@ -57,6 +62,7 @@ impl Kind {
             "package" => Some(Kind::Package),
             "appimage" => Some(Kind::AppImage),
             "flatpak" => Some(Kind::Flatpak),
+            "app" => Some(Kind::App),
             _ => None,
         }
     }
@@ -126,7 +132,20 @@ impl Manifest {
     /// the package for a target and the way the program is installed: the first "appimage"
     /// entry for an AppImage (appimage = true), else the first entry of another kind
     pub fn package_for(&self, target: &str, appimage: bool) -> Option<&Package> {
-        self.files.iter().find(|p| p.target == target && (p.kind == Kind::AppImage) == appimage)
+        self.package_for_kind(target, appimage.then_some(Kind::AppImage))
+    }
+
+    /// the package of target for an installation that is replaced as a whole (Some(AppImage):
+    /// an AppImage, Some(App): an app bundle) -- only an entry of that kind --, or, None, the
+    /// first entry of another kind
+    pub(crate) fn package_for_kind(&self, target: &str, whole: Option<Kind>) -> Option<&Package> {
+        self.files.iter().find(|p| {
+            p.target == target
+                && match whole {
+                    Some(k) => p.kind == k,
+                    None => !matches!(p.kind, Kind::AppImage | Kind::App),
+                }
+        })
     }
 }
 
@@ -137,7 +156,7 @@ fn package(f: &Value) -> Result<Option<Package>, String> {
     let target = text("target").filter(|s| !s.is_empty()).ok_or("\"target\" fehlt")?;
     let kind_name = text("kind").unwrap_or("exe");
     if kind_name.is_empty() || !kind_name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
-        return Err(String::from("ungültige Art (\"kind\": exe, bundle, package, appimage)"));
+        return Err(String::from("ungültige Art (\"kind\": exe, bundle, package, appimage, app)"));
     }
     let Some(kind) = Kind::parse(kind_name).filter(|k| *k != Kind::Flatpak) else { return Ok(None) };
     let url = text("url").filter(|s| !s.is_empty() && !s.chars().any(|c| c.is_control() || c == ' ')).ok_or("\"url\" fehlt")?;
