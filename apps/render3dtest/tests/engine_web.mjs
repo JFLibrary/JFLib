@@ -5,9 +5,11 @@
 // it says SKIP.  Playwright: tools/tests/playwright.mjs.
 //   python build_rs.py app render3dtest --target win
 //   python build_rs.py app render3dtest --target web
-//   node apps/render3dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE]
+//   node apps/render3dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--save=DIR]
+// (G5e2) also the gallery in an sRGB target (srgb_NAME, against --dump --format rgba8srgb); --save writes every image the
+// browser sent to DIR/MODE_NAME.rgba (to compare a run before a change of the shaders with one after it)
 import {createServer} from 'node:http';
-import {mkdtemp, readFile, rm} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join, resolve, extname, sep} from 'node:path';
@@ -16,6 +18,8 @@ import {loadPlaywright, chromiumOptions} from '../../../tools/tests/playwright.m
 const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')) || 'build');
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights','env','occl'];
+// the images the browser draws into other targets: [its name, the gallery's image, the extension of the native dump]
+const FORMATS=['mix','tex','gltf','pbr','shadow','lights','env','occl'].map(n=>[`srgb_${n}`,n,'rgba8srgb']);
 // The two paths differ in their shader compilers, so a colour may round the other way; more than this
 // is a real difference (the numbers of a run stand in docs/RENDER3D.md)
 const MAX_DELTA=Number(option('max-delta','2')), MAX_SHARE=Number(option('max-share','0.01'));
@@ -23,15 +27,22 @@ const MAX_DELTA=Number(option('max-delta','2')), MAX_SHARE=Number(option('max-sh
 // the Vulkan path on this machine
 const here=await mkdtemp(join(tmpdir(),'render3d-web-'));
 const native=option('native',resolve('build','win','render3dtest.exe'));
-const run=spawnSync(native,['--dump',here],{encoding:'utf8',env:{...process.env,jfgui_TEST_NOACTIVATE:'1'}});
-if(run.status!==0) {
-  console.log(`FAIL the Vulkan path (${native}): ${run.status}\n${run.stdout}${run.stderr}`);
-  process.exit(1);
+let skipped=false;
+for(const format of [null,...new Set(FORMATS.map(f=>f[2]))]) {
+  const run=spawnSync(native,['--dump',here,...(format?['--format',format]:[])],{encoding:'utf8',env:{...process.env,jfgui_TEST_NOACTIVATE:'1'}});
+  if(run.status!==0) {
+    console.log(`FAIL the Vulkan path (${native}${format?' --format '+format:''}): ${run.status}\n${run.stdout}${run.stderr}`);
+    process.exit(1);
+  }
+  console.log(run.stdout.trim().split('\n').pop());
+  skipped=skipped||/SKIP/.test(run.stdout);
 }
-console.log(run.stdout.trim().split('\n').pop());
-const skipped=/SKIP/.test(run.stdout);
 const reference={};
-if(!skipped) for(const level of ['voll','basis']) for(const name of NAMES) reference[`${level}_${name}`]=await readFile(join(here,`${level}_${name}.rgba`));
+if(!skipped) for(const level of ['voll','basis']) {
+  for(const name of NAMES) reference[`${level}_${name}`]=await readFile(join(here,`${level}_${name}.rgba`));
+  for(const [tag,name,ext] of FORMATS) reference[`${level}_${tag}`]=await readFile(join(here,`${level}_${name}.${ext}`));
+}
+const save=option('save',null);
 
 const pw=loadPlaywright(), dir=resolve(build,'web','render3dtest');
 const server=createServer(async (request,response)=>{
@@ -92,7 +103,8 @@ try {
         ran++;
         let good=end.startsWith('render3dtest: ')&&/ 0 failed/.test(end)&&!fail.length&&count>0&&compute===mode;
         console.log(`${good?'PASS':'FAIL'} chromium ${browser.version()} ${compute}: ${end} (${lines.find(l=>l.startsWith('adapter:'))||'no adapter line'})`);
-        for(const name of NAMES) {
+        if(save) for(const [name,img] of Object.entries(images)) await writeFile(join(save,`${mode}_${name}.rgba`),img);
+        for(const name of [...NAMES,...FORMATS.map(f=>f[0])]) {
           if(!images[name]) {
             console.log(`  FAIL no image ${name}`);
             good=false;

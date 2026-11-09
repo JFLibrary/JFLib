@@ -43,6 +43,10 @@ fn hex_line(name: &str, bytes: &[u8]) -> String {
     s
 }
 
+/// (G5e2) the gallery's images drawn into an sRGB target too (tests/engine_web.mjs: against `--dump --format rgba8srgb`)
+const SRGB_TARGET: [(&str, &str); 8] = [("mix", "srgb_mix"), ("tex", "srgb_tex"), ("gltf", "srgb_gltf"), ("pbr", "srgb_pbr"), ("shadow", "srgb_shadow"),
+                                        ("lights", "srgb_lights"), ("env", "srgb_env"), ("occl", "srgb_occl")];
+
 fn say(s: &str) {
     rt::os::write_stdout(format!("{s}\n").as_bytes());
 }
@@ -137,13 +141,37 @@ impl Probe {
         // G5c
         for name in LATER {
             let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
-            let mut s = later_gallery(name, &mut r)?;
+            let mut s = later_gallery_in(name, &mut r, Format::Rgba8Unorm)?;
             let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
             off.submit(&mut r, &mut s)?;
             self.keep.push((name, off));
             self.scenes.push(s);
             self.more.push(r);
         }
+        // (G5e2) the gallery in an sRGB target, where the hardware encodes: srgb_NAME
+        for (name, tag) in SRGB_TARGET {
+            self.in_format(dev, name, tag, Format::Rgba8Srgb)?;
+        }
+        Ok(())
+    }
+
+    /// one of the gallery's images with a renderer and a target of another colour format, kept as `tag`
+    fn in_format(&mut self, dev: &Device, name: &'static str, tag: &'static str, format: Format) -> Result<()> {
+        let mut r = Renderer::new(dev, &RendererDesc::new(format))?;
+        let mut s = match name {
+            "mix" => {
+                let (meshes, materials) = gallery_fill(&mut r)?;
+                gallery_scene(&r, meshes, materials, [0.0; 3])?.0
+            }
+            "tex" => tex_gallery(&mut r)?,
+            "gltf" => gltf_gallery(&mut r)?,
+            _ => later_gallery_in(name, &mut r, format)?,
+        };
+        let mut off = Off::new(dev, GALLERY_W, GALLERY_H, format)?;
+        off.submit(&mut r, &mut s)?;
+        self.keep.push((tag, off));
+        self.scenes.push(s);
+        self.more.push(r);
         Ok(())
     }
 

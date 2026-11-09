@@ -725,25 +725,31 @@ fn many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 pub const GALLERY_NAMES: [&str; 5] = ["mix", "changed", "far", "tex", "gltf"];
 
 fn gallery_image(t: &mut T, dev: &Device) -> Option<Vec<Vec<u8>>> {
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    gallery_image_in(t, dev, Format::Rgba8Unorm)
+}
+
+/// the gallery's images in targets of this format (and renderers made for it)
+fn gallery_image_in(t: &mut T, dev: &Device, format: Format) -> Option<Vec<Vec<u8>>> {
+    let desc = RendererDesc::new(format);
+    let mut r = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
-    let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm), "target")?;
+    let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, format), "target")?;
     let (mut s, mut ids) = t.res(gallery_scene(&r, meshes, materials, [0.0; 3]), "gallery")?;
     let a = shot(t, dev, &mut off, &mut r, &mut s, "gallery")?;
     t.res(gallery_change(&mut s, &mut ids, meshes, materials), "gallery change")?;
     let b = shot(t, dev, &mut off, &mut r, &mut s, "gallery, changed")?;
     let (mut far, _) = t.res(gallery_scene(&r, meshes, materials, [1e7, -3e6, 2e7]), "gallery far")?;
     let c = shot(t, dev, &mut off, &mut r, &mut far, "gallery, far")?;
-    let mut rt = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut rt = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let mut st = t.res(tex_gallery(&mut rt), "textured gallery")?;
     let d = shot(t, dev, &mut off, &mut rt, &mut st, "gallery, textured")?;
-    let mut rg = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut rg = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let mut sg = t.res(gltf_gallery(&mut rg), "glTF gallery")?;
     let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
     let mut all = vec![a, b, c, d, e];
     for name in LATER {
-        let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
-        let mut s = t.res(later_gallery(name, &mut r), name)?;
+        let mut r = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
+        let mut s = t.res(later_gallery_in(name, &mut r, format), name)?;
         all.push(shot(t, dev, &mut off, &mut r, &mut s, name)?);
     }
     Some(all)
@@ -1216,17 +1222,29 @@ fn window_checks(t: &mut T, g: &Gpu, dev: &Device, w: i32) -> Option<()> {
 
 // ---------------------------------------------------------------- the gallery for the browser's test
 
+/// the formats --dump --format knows (the gallery in other targets: sRGB, float; docs/RENDER3D.md "sRGB")
+const DUMP_FORMATS: [(&str, Format); 5] = [("rgba8", Format::Rgba8Unorm), ("bgra8", Format::Bgra8Unorm), ("rgba8srgb", Format::Rgba8Srgb),
+                                           ("rgba16f", Format::Rgba16Float), ("rgba32f", Format::Rgba32Float)];
+
 fn dump(dir: &str) -> i32 {
     let mut t = T { fails: 0, validate: false };
     let Some(g) = setup(&mut t) else { return 0 };
+    let fmt = plat::arg_value("--format");
+    let Some(&(ext, format)) = (match &fmt {
+        None => Some(&("rgba", Format::Rgba8Unorm)),
+        Some(f) => DUMP_FORMATS.iter().find(|x| x.0 == f.as_str()),
+    }) else {
+        out(&format!("FAIL --format: one of {}", DUMP_FORMATS.map(|x| x.0).join(", ")));
+        return 2;
+    };
     let mut names = Vec::new();
     let voll = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device");
     let basis = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device");
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
-        let Some(imgs) = gallery_image(&mut t, &dev) else { continue };
+        let Some(imgs) = gallery_image_in(&mut t, &dev, format) else { continue };
         for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).enumerate() {
-            let file = format!("{dir}/{level}_{name}.rgba");
+            let file = format!("{dir}/{level}_{name}.{ext}");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
         }
