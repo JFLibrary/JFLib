@@ -30,9 +30,6 @@ use crate::apple::objc::{Id, NIL, NSRect, NSSize, Sel, class, msg, nsstring, rel
 
 #[link(name = "UserNotifications", kind = "framework")]
 unsafe extern "C" {}
-unsafe extern "C" {
-    static _NSConcreteGlobalBlock: c_void;
-}
 
 /// state of the services (main thread only)
 struct S {
@@ -340,61 +337,16 @@ pub(crate) mod tray {
     }
 }
 
-// ---- blocks (the notification centre's completion handlers)
+// ---- blocks (the notification centre's completion handlers; apple_block.rs)
 
-#[repr(C)]
-struct BlockDesc {
-    reserved: usize,
-    size: usize,
-}
-
-#[repr(C)]
-struct Block {
-    isa: *const c_void,
-    flags: i32,
-    reserved: i32,
-    invoke: *const c_void,
-    desc: *const BlockDesc,
-}
-
-static BLOCK_DESC: BlockDesc = BlockDesc { reserved: 0, size: core::mem::size_of::<Block>() };
+use crate::apple::block::call as call_block;
 
 extern "C" fn noop2(_b: *const c_void, _granted: bool, _err: Id) {}
 
 /// a global block void (^)(BOOL, NSError *) that does nothing (made once, kept for the process)
 fn block_noop2() -> *const c_void {
     static B: core::sync::atomic::AtomicPtr<c_void> = core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
-    let b = B.load(core::sync::atomic::Ordering::SeqCst);
-    if !b.is_null() {
-        return b;
-    }
-    // (the address of the runtime's global block class: taking it needs no unsafe)
-    let isa = core::ptr::addr_of!(_NSConcreteGlobalBlock);
-    let blk = alloc::boxed::Box::new(Block { isa, flags: 1 << 28, reserved: 0, invoke: noop2 as *const c_void, desc: &BLOCK_DESC }); // BLOCK_IS_GLOBAL
-    let p = alloc::boxed::Box::into_raw(blk) as *mut c_void;
-    B.store(p, core::sync::atomic::Ordering::SeqCst);
-    p
-}
-
-/// call a block the system handed us: void (^)(void) or, with Some(x), void (^)(NSUInteger)
-unsafe fn call_block(b: *const c_void, arg: Option<usize>) {
-    if b.is_null() {
-        return;
-    }
-    // SAFETY: (the caller's block) its invoke pointer at offset 16 of the block literal.
-    unsafe {
-        let invoke = *(b as *const u8).add(16).cast::<*const c_void>();
-        match arg {
-            None => {
-                let f: extern "C" fn(*const c_void) = core::mem::transmute(invoke);
-                f(b);
-            }
-            Some(x) => {
-                let f: extern "C" fn(*const c_void, usize) = core::mem::transmute(invoke);
-                f(b, x);
-            }
-        }
-    }
+    crate::apple::block::global(&B, noop2 as *const c_void)
 }
 
 extern "C" fn d_note_present(_this: Id, _cmd: Sel, _center: Id, _note: Id, handler: *const c_void) {

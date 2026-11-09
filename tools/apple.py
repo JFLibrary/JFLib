@@ -70,6 +70,15 @@ def app_id(name):
     return f"org.jflib.{name}"
 
 
+def ios_location(name):
+    """the app may ask for the location: its PERMISSIONS name `location`, or it has none (the library's
+    demos and tests show everything)"""
+    f = ROOT / "apps" / name / "PERMISSIONS"
+    if not f.exists():
+        return (ROOT / "apps" / name).is_dir()
+    return any(ln.split("#")[0].split()[:1] == ["location"] for ln in f.read_text(encoding="utf-8").splitlines())
+
+
 def bundle(exe, sim=False):
     """the program exe as exe.app beside it (Info.plist, the program inside); the simulator's build
     signed ad hoc -> the bundle's path"""
@@ -98,6 +107,8 @@ def bundle(exe, sim=False):
         "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
                                                   "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"],
     }
+    if ios_location(exe.name):          # without the text iOS never asks (plat::sensors::location_watch)
+        plist["NSLocationWhenInUseUsageDescription"] = "Die App zeigt den Standort, solange er in ihr eingeschaltet ist."
     (app / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
     if sim:
         run(["codesign", "-f", "-s", "-", "--timestamp=none", app])

@@ -1,11 +1,12 @@
-// web_sensors -- (sensors.rs) the sensors and the location in the browser and on Android
+// web_sensors -- (sensors.rs) the sensors and the location in the browser, on Android and on iOS
 //
 // Browser (web/sensors.js): REQUEST_SENSORS, u32 SENSOR_* union (0: stop) and REQUEST_LOCATION,
 // u32 LOC_STOP / LOC_START / LOC_RESUME; no completion.  The page answers with jfgui_sensor,
 // jfgui_sensor_state and jfgui_location; while it has not, a sensor is Waiting and the location
 // Searching.  Android (android/GallerySensors.java): CALL_SENSORS, u32 union -> u32 the bits this
 // device has; CALL_LOCATION, u32 op -> u32 LocationState; it asks ACCESS_FINE_LOCATION /
-// ACCESS_COARSE_LOCATION on LOC_START and answers later through the same exports:
+// ACCESS_COARSE_LOCATION on LOC_START and answers later through the same exports.  iOS
+// (apple_ios_motion.rs): Core Motion and Core Location in this process, the same answers:
 //
 //   jfgui_sensor(bit, x, y, z, w, flags) -> 1   a reading (flags: accuracy 0..3, 4 absolute)
 //   jfgui_sensor_state(mask, state) -> 1        Waiting 1, Denied 4, Unavailable 6
@@ -42,6 +43,10 @@ pub(crate) fn sensors(mask: u32) -> Option<u32> {
         let have = crate::web::android_host::call(CALL_SENSORS, &mask.to_le_bytes());
         Some(have.and_then(|r| Some(u32::from_le_bytes(r.get(..4)?.try_into().ok()?))).unwrap_or(0))
     }
+    #[cfg(target_os = "ios")]
+    {
+        Some(crate::apple::ios::motion::sensors(mask))
+    }
 }
 
 /// tell the host LOC_* -> Some(LocationState as a number), None: it answers later
@@ -55,6 +60,10 @@ pub(crate) fn location(op: u32) -> Option<u32> {
     {
         let answer = crate::web::android_host::call(CALL_LOCATION, &op.to_le_bytes());
         Some(answer.and_then(|r| Some(u32::from_le_bytes(r.get(..4)?.try_into().ok()?))).unwrap_or(6))
+    }
+    #[cfg(target_os = "ios")]
+    {
+        Some(crate::apple::ios::motion::location(op))
     }
 }
 

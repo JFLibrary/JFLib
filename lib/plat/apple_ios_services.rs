@@ -1,5 +1,5 @@
 // apple_ios_services -- iOS's system services of AP5b (docs/APPLE.md): the clipboard (UIPasteboard),
-// the system's file picker (UIDocumentPickerViewController).
+// the system's file picker (UIDocumentPickerViewController), notifications (UNUserNotificationCenter).
 //
 //   clip_set / clip_set_many / clip_get / clip_has   as on macOS (apple_mac.rs): one pasteboard item
 //                                with a representation per format (text as a string); CLIP_IMAGE gets a
@@ -12,6 +12,11 @@
 //                                one at a time ((0, 0) while one is open), (-1, 0) without a window
 //   file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
 //                                path a security-scoped URL's, its access started for the session
+//   notes::*                     (tray.rs) notifications: no symbol of a notification area on iOS;
+//                                notify asks the user once (alert, sound) and hands the note to the
+//                                centre when allowed -- refused, it goes away at once (NoteClosed); one
+//                                arriving while the app is in front shows all the same; a tap opens the
+//                                app: NoteClicked.  Only in an app (a bundle identifier).
 //
 // Reading what another app copied makes iOS ask the user once ("Allow Paste"); asking which types the
 // pasteboard has does not.
@@ -33,6 +38,9 @@ unsafe extern "C" {
 }
 // UTType's classes
 #[link(name = "UniformTypeIdentifiers", kind = "framework")]
+unsafe extern "C" {}
+// UNUserNotificationCenter
+#[link(name = "UserNotifications", kind = "framework")]
 unsafe extern "C" {}
 
 const UTI_TEXT: &CStr = c"public.utf8-plain-text";
@@ -385,4 +393,158 @@ pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
         Some(path) => (1, 0, path),
         None => (0, 0, String::new()),
     })
+}
+
+// ---------------------------------------------------------------- notifications
+
+pub(crate) mod notes {
+    use super::*;
+    use crate::tray::{Note, Tray, TrayEvent};
+
+    /// requests waiting for the user's answer: (id, the UNNotificationRequest, +1)
+    static WAITING: SpinLock<Vec<(u32, usize)>> = SpinLock::new(Vec::new());
+    static DELEGATE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+    static ASKED: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+
+    pub fn tray_set(_t: &Tray) -> bool {
+        false
+    }
+    pub fn tray_remove() {}
+    pub fn supported() -> bool {
+        false
+    }
+
+    /// the centre (nil outside an app: iOS has none for a program without a bundle identifier)
+    fn center() -> Id {
+        // SAFETY: the main bundle's identifier, then the shared centre.
+        unsafe {
+            let b: Id = msg!(class(c"NSBundle"), c"mainBundle"; Id);
+            let id: Id = if b.is_null() { NIL } else { msg!(b, c"bundleIdentifier"; Id) };
+            if id.is_null() { NIL } else { msg!(class(c"UNUserNotificationCenter"), c"currentNotificationCenter"; Id) }
+        }
+    }
+
+    fn key(id: u32) -> String {
+        alloc::format!("jflib-note-{id}")
+    }
+
+    fn delegate() -> Id {
+        let d = DELEGATE.load(Ordering::Acquire);
+        if !d.is_null() {
+            return d;
+        }
+        type Imp = *const c_void;
+        let (cls, _) = subclass(c"NSObject", c"JFNoteDelegate", &[
+            (c"userNotificationCenter:willPresentNotification:withCompletionHandler:", present as Imp, c"v@:@@@?"),
+            (c"userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:", response as Imp, c"v@:@@@?"),
+        ], &[c"UNUserNotificationCenterDelegate"]);
+        // SAFETY: an instance of our class, kept for the process (the centre holds it weakly).
+        let d: Id = unsafe { msg!(msg!(cls, c"alloc"; Id), c"init"; Id) };
+        DELEGATE.store(d, Ordering::Release);
+        d
+    }
+
+    pub fn notify(id: u32, n: &Note) -> bool {
+        let c = center();
+        if c.is_null() {
+            return false;
+        }
+        pooled(|| {
+            // SAFETY: the centre's calls with objects made here (the request kept +1 until it is handed
+            // over); the answer's block is global.
+            unsafe {
+                msg!(c, c"setDelegate:", delegate() => Id; ());
+                let content: Id = msg!(class(c"UNMutableNotificationContent"), c"new"; Id);
+                let (t, b) = (nsstring(&n.title), nsstring(&n.body));
+                msg!(content, c"setTitle:", t => Id; ());
+                msg!(content, c"setBody:", b => Id; ());
+                release(t);
+                release(b);
+                let sound: Id = msg!(class(c"UNNotificationSound"), c"defaultSound"; Id);
+                msg!(content, c"setSound:", sound => Id; ());
+                let k = nsstring(&key(id));
+                let req: Id = msg!(class(c"UNNotificationRequest"), c"requestWithIdentifier:content:trigger:", k => Id, content => Id, NIL => Id; Id);
+                release(k);
+                release(content);
+                if req.is_null() {
+                    return false;
+                }
+                msg!(req, c"retain"; Id);
+                WAITING.lock().push((id, req as usize));
+                // alert | sound: iOS asks the user the first time only, later it answers at once
+                let asked = crate::apple::block::global(&ASKED, answered as *const c_void);
+                msg!(c, c"requestAuthorizationWithOptions:completionHandler:", 6usize => usize, asked => *const c_void; ());
+                true
+            }
+        })
+    }
+
+    /// the user's answer (any thread): on to the main queue
+    extern "C" fn answered(_block: *const c_void, granted: bool, _error: Id) {
+        // SAFETY: a plain function on the main queue; its context says granted.
+        unsafe { super::super::dispatch_async_f(super::super::main_queue(), granted as usize as *mut c_void, hand_over) };
+    }
+
+    /// the waiting requests to the centre, or (refused) NoteClosed for each
+    extern "C" fn hand_over(granted: *mut c_void) {
+        let waiting = core::mem::take(&mut *WAITING.lock());
+        let c = center();
+        for (id, req) in waiting {
+            if !granted.is_null() && !c.is_null() {
+                // SAFETY: the centre takes the request (no completion handler).
+                unsafe { msg!(c, c"addNotificationRequest:withCompletionHandler:", req as Id => Id, core::ptr::null::<c_void>() => *const c_void; ()) };
+            } else {
+                crate::tray::push(TrayEvent::NoteClosed(id));
+            }
+            release(req as Id);
+        }
+        super::super::wake();
+    }
+
+    pub fn notify_close(id: u32) {
+        WAITING.lock().retain(|(i, req)| {
+            if *i == id {
+                release(*req as Id);
+            }
+            *i != id
+        });
+        let c = center();
+        if c.is_null() {
+            return;
+        }
+        pooled(|| {
+            // SAFETY: the centre's removals with an array of one identifier.
+            unsafe {
+                let k = nsstring(&key(id));
+                let arr: Id = msg!(class(c"NSArray"), c"arrayWithObject:", k => Id; Id);
+                msg!(c, c"removeDeliveredNotificationsWithIdentifiers:", arr => Id; ());
+                msg!(c, c"removePendingNotificationRequestsWithIdentifiers:", arr => Id; ());
+                release(k);
+            }
+        });
+    }
+
+    /// one arriving while the app is in front: banner, list, sound all the same
+    extern "C" fn present(_this: Id, _sel: Sel, _center: Id, _note: Id, handler: *const c_void) {
+        // SAFETY: the centre's completion handler, called once (UNNotificationPresentationOptions).
+        unsafe { crate::apple::block::call(handler, Some(1 << 4 | 1 << 3 | 1 << 1)) };
+    }
+
+    /// a tap on one of ours (the app comes to the front by itself): NoteClicked
+    extern "C" fn response(_this: Id, _sel: Sel, _center: Id, resp: Id, handler: *const c_void) {
+        // SAFETY: the response's notification, its request's identifier, the action's identifier.
+        let (ident, action) = unsafe {
+            let n: Id = msg!(resp, c"notification"; Id);
+            let r: Id = if n.is_null() { NIL } else { msg!(n, c"request"; Id) };
+            let i = if r.is_null() { String::new() } else { string_of(msg!(r, c"identifier"; Id)) };
+            (i, string_of(msg!(resp, c"actionIdentifier"; Id)))
+        };
+        if let Some(id) = ident.strip_prefix("jflib-note-").and_then(|s| s.parse::<u32>().ok()) {
+            let closed = action.ends_with("DismissActionIdentifier");
+            crate::tray::push(if closed { TrayEvent::NoteClosed(id) } else { TrayEvent::NoteClicked(id) });
+            super::super::wake();
+        }
+        // SAFETY: the centre's completion handler, called once.
+        unsafe { crate::apple::block::call(handler, None) };
+    }
 }

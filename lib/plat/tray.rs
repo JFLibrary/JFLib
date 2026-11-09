@@ -219,7 +219,10 @@ mod native;
 #[cfg(target_os = "macos")]
 use crate::apple::mac::services::tray as native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
+#[cfg(target_os = "ios")]
+use crate::apple::ios::notes as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_vendor = "apple")))]
 mod native {
     use super::{Note, Tray};
     pub fn tray_set(_t: &Tray) -> bool {

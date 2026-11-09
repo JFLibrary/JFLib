@@ -267,11 +267,23 @@ führt ihre zehn Skripte im Simulator aus, alle grün; dafür startet `tools/app
 Repositorys (`jfgui_CWD`, nur iOS). Ein Lauf als App im Simulator zeigt die Gallery mit Statusleiste, ohne Titelleiste,
 hell und bei dunklem System. Die Prüfung von Hand auf dem iPhone steht aus.
 
-- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür), die Sensoren
-  (Core Motion, Core Location), markierter Text der Tastatur (`UITextInput` statt `UIKeyInput`: Diktat, Vorschläge,
-  Tastaturen mit Zusammensetzung), Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte
-  Freigaben gewählter Dateien über einen Neustart (Lesezeichen), Mitteilungen, Bildschirm anlassen, Textgröße des
-  Systems, Accessibility. Das Bild geht bei jedem Frame ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
+**Nach der Prüfung am iPhone (2026-11-09):** Alles lief bis auf drei Punkte, die nachgezogen sind. Die
+Bildschirmtastatur ließ sich nur schließen, wenn ein Tipp den Fokus woandershin brachte (das iPhone hat keine Taste
+dafür, ein Tipp auf leere Fläche ist für die UI ein Klick und lässt den Fokus im Textfeld): Über der Tastatur steht
+jetzt eine Leiste mit „Fertig“ (`inputAccessoryView`), das Textfeld behält den Fokus, ein Tipp hinein bringt die
+Tastatur zurück. Mitteilungen gehen über `UNUserNotificationCenter` (iOS fragt beim ersten Mal, abgelehnt
+verschwindet die Mitteilung mit `NoteClosed`, ein Tipp darauf ist `NoteClicked`); die Blöcke dafür teilen sich macOS
+und iOS ([`apple_block.rs`](../lib/plat/apple_block.rs)). Die Sensoren und der Standort kommen über den Host-Weg von
+Android (`web_sensors.rs`) aus Core Motion und Core Location
+([`apple_ios_motion.rs`](../lib/plat/apple_ios_motion.rs)): die Bewegung des Geräts mit 30 Hz, Bezug magnetisch
+Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSLocationWhenInUseUsageDescription` setzt
+`tools/apple.py` für Apps, deren PERMISSIONS `location` nennen oder die keine haben).
+
+- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür), markierter
+  Text der Tastatur (`UITextInput` statt `UIKeyInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung),
+  Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte Freigaben gewählter Dateien über einen
+  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems, Accessibility. Das Bild geht bei jedem Frame
+  ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
 
 ### AP6: Metal (L)
 
@@ -445,6 +457,15 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
   kein `cd`. `tools/apple.py sim` gibt den Ordner als `jfgui_CWD` mit (`SIMCTL_CHILD_`), `main` wechselt dorthin.
 - **Die Zwischenablage liest nur eine App:** Ein mit `simctl spawn` gestarteter Prozess kann `UIPasteboard` setzen,
   liest aber nichts zurück. Als App (`simctl launch`) geht beides; Inhalte anderer Apps fragt iOS beim Lesen nach.
+- **Core Motion zählt anders:** Beschleunigung und Schwerkraft in g und mit umgekehrtem Vorzeichen (Bildschirm nach
+  oben: z = -1), die Bibliothek will m/s² mit +9,81. Ob die Rotationsmatrix der Lage vom Bezug zum Gerät abbildet
+  oder umgekehrt, entscheidet `apple_ios_motion.rs` an Schwerkraft und Magnetfeld derselben Probe.
+- **`wake()` unter dem Host:** Das Wecken ist über ein Flag zusammengefasst, das nur die Warteschleife eines
+  Programms zurücksetzt (`wake_consume`). Unter UIKit wartet niemand darauf: Das Flag blieb nach dem ersten Wecken
+  stehen, jedes weitere ging verloren (die Sensoren-Seiten froren beim ersten Messwert ein). Mit dem Host geht
+  `wake()` deshalb direkt an ihn (`apple_ios.rs`).
+- **Ohne Nutzungstext fragt iOS nie:** `requestWhenInUseAuthorization` tut ohne
+  `NSLocationWhenInUseUsageDescription` im `Info.plist` nichts.
 - **Zwei Bildschirme:** Der Simulator „iPhone Duo“ hat zwei Displays, `simctl io screenshot` will dann `--display`.
   `tools/apple.py` nimmt ihn nicht von selbst.
 
