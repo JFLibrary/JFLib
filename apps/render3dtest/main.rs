@@ -36,6 +36,10 @@
 //                    pyramid against the depth buffer's minima; the renderer's own depth buffer (occl.rs)
 //        lods        (G5d) detail levels: the pick per instance against the CPU, the image against the ray caster with the same
 //                    pick, the shadow cascades take the camera's pick, Shadows::min_size, what set_lods refuses (lodtest.rs)
+//        alpha       lists per alpha class: instances switching between opaque and MASK (also a material's own class),
+//                    mirrored MASK instances, a change after prepare, against scenes built anew and the ray caster; detail
+//                    levels with MASK (pick per mesh, side and class); a MASK plate switched in the shadows; the occlusion
+//                    test behind a MASK wall (alphatest.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
@@ -63,6 +67,8 @@ mod cpu;
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 mod gltfgen;
 
+#[cfg(not(target_arch = "wasm32"))]
+mod alphatest;
 #[cfg(not(target_arch = "wasm32"))]
 mod bench;
 #[cfg(not(target_arch = "wasm32"))]

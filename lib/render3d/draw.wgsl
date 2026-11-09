@@ -4,7 +4,8 @@
 // SUPER (docs/RENDER3D.md).  A list starts at its first instance on Voll and at pc.first on Basis.  The
 // material is read per fragment: small far objects have more vertices than fragments.  Mirrored instances
 // run through the same code with a pipeline whose front faces are clockwise; their normals come out right
-// through the signed scale.
+// through the signed scale.  Lists per alpha class: `fs` draws opaque lists and has no discard (the early depth test
+// stays the pipeline's), `fs_mask` MASK lists; both shade alike (`shade`).
 //
 // Textures (G5b): one texture array per size class (128 << k, k = 0 .. 4) and colour space in group 1, one
 // repeating trilinear sampler.  A material's texture word says layer | class << 16 | mode << 20 | linear
@@ -24,9 +25,9 @@
 // dfg.rs); occlusion acts on it only.
 //
 // Shadows (G5c): the sun's cascades are views of their own (cull.wgsl fills their lists), drawn into the layers
-// of a depth array by vs_depth (no fragment shader) or vs_shadow + fs_shadow (MASK's holes), both with a
-// cascade's orthographic view_proj in `view`; the main pass filters them with a comparison sampler
-// (sun_shadow).
+// of a depth array by vs_depth (no fragment shader: opaque lists, and MASK lists without their holes) or vs_shadow +
+// fs_shadow (MASK lists' holes), both with a cascade's orthographic view_proj in `view`; the main pass filters them
+// with a comparison sampler (sun_shadow).
 
 struct View {
     view_proj: mat4x4f,
@@ -309,7 +310,7 @@ fn shadow_position(vi: u32, ii: u32) -> vec4f {
     return out;
 }
 
-// depth only: MASK casts full shadows
+// depth only: opaque casters (and MASK casters with full shadows)
 @vertex
 fn vs_depth(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> @builtin(position) vec4f {
     return shadow_position(vi, ii);
@@ -326,7 +327,7 @@ fn vs_shadow(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     return out;
 }
 
-// MASK's holes let the sun through; every other material returns at once
+// MASK's holes let the sun through (MASK lists only; an opaque material would return at once)
 @fragment
 fn fs_shadow(f: ShadowOut) {
     let dx = dpdxFine(f.uv);
@@ -488,55 +489,53 @@ fn bumped(ng: vec3f, t: vec3f, px: vec3f, py: vec3f, dx: vec2f, dy: vec2f) -> ve
     return normalize(tn * t.x + b * t.y + ng * t.z);
 }
 
-@fragment
-fn fs(f: VsOut) -> @location(0) vec4f {
-    // (derivatives in uniform control flow, before anything depends on the material)
-    let dx = dpdxFine(f.uv);
-    let dy = dpdyFine(f.uv);
-    let px = dpdxFine(f.world);
-    let py = dpdyFine(f.world);
-    let m = materials[f.material];
+// the base colour times its texture (alpha: what MASK compares with its cutoff)
+fn base_color(m: Material, uv: vec2f, dx: vec2f, dy: vec2f) -> vec4f {
     var c = m.base_color;
     if m.textures.x != NO_TEXTURE {
-        c = c * sample_texture(m.textures.x, f.uv, dx, dy);
+        c = c * sample_texture(m.textures.x, uv, dx, dy);
     }
-    if c.w < m.alpha_cutoff {
-        discard;
-    }
+    return c;
+}
+
+// everything after the base colour: the other textures, glTF's BRDF for the sun (its shadow), the point and spot
+// lights, the ambient light or the environment, emission, exposure, the tone mapper.  dx, dy: the derivatives of uv,
+// px, py: those of the world position (taken in uniform control flow by the caller)
+fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2f, dy: vec2f, px: vec3f, py: vec3f) -> vec4f {
     var metallic = m.metallic;
     var roughness = m.roughness;
     if m.textures.y != NO_TEXTURE {
-        let mr = sample_texture(m.textures.y, f.uv, dx, dy);
+        let mr = sample_texture(m.textures.y, uv, dx, dy);
         roughness = roughness * mr.y;
         metallic = metallic * mr.z;
     }
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = clamp(roughness, 0.0, 1.0);
-    let ng = normalize(f.normal);
+    let ng = normalize(normal);
     var n = ng;
     if m.textures.z != NO_TEXTURE {
-        let t = sample_texture(m.textures.z, f.uv, dx, dy).xyz * 2.0 - 1.0;
+        let t = sample_texture(m.textures.z, uv, dx, dy).xyz * 2.0 - 1.0;
         n = bumped(ng, t * vec3f(m.normal_scale, m.normal_scale, 1.0), px, py, dx, dy);
     }
     var ao = 1.0;
     if m.textures.w != NO_TEXTURE {
-        ao = 1.0 + m.occlusion * (sample_texture(m.textures.w, f.uv, dx, dy).x - 1.0);
+        ao = 1.0 + m.occlusion * (sample_texture(m.textures.w, uv, dx, dy).x - 1.0);
     }
     var emissive = m.emissive;
     if m.emissive_texture != NO_TEXTURE {
-        emissive = emissive * sample_texture(m.emissive_texture, f.uv, dx, dy).xyz;
+        emissive = emissive * sample_texture(m.emissive_texture, uv, dx, dy).xyz;
     }
-    let v = normalize(view.eye.xyz - f.world);
+    let v = normalize(view.eye.xyz - world);
     let c_diff = c.xyz * (1.0 - metallic);
     let f0 = mix(vec3f(0.04), c.xyz, metallic);
     let a = max(roughness * roughness, ALPHA_MIN);
     var light = direct(n, v, lights.sun_dir.xyz, c_diff, f0, a * a) * lights.sun_color.xyz;
     if lights.shadow.x > 0.0 && any(light > vec3f(0.0)) {
-        light = light * sun_shadow(f.world, ng);
+        light = light * sun_shadow(world, ng);
     }
     let count = u32(lights.shadow.z);
     for (var i = 0u; i < count; i++) {
-        light = light + punctual_light(punctual[i], f.world, n, v, c_diff, f0, a * a);
+        light = light + punctual_light(punctual[i], world, n, v, c_diff, f0, a * a);
     }
     // the uniform environment: what the specular lobe does not take goes to the diffuse
     let ab = env_ab(roughness, clamp(dot(n, v), 0.0, 1.0));
@@ -554,4 +553,31 @@ fn fs(f: VsOut) -> @location(0) vec4f {
         out = neutral(out);
     }
     return vec4f(out, 1.0);
+}
+
+// opaque lists: nothing is dropped, no discard anywhere (alpha_cutoff is not read)
+@fragment
+fn fs(f: VsOut) -> @location(0) vec4f {
+    // (derivatives in uniform control flow, before anything depends on the material)
+    let dx = dpdxFine(f.uv);
+    let dy = dpdyFine(f.uv);
+    let px = dpdxFine(f.world);
+    let py = dpdyFine(f.world);
+    let m = materials[f.material];
+    return shade(m, base_color(m, f.uv, dx, dy), f.normal, f.uv, f.world, dx, dy, px, py);
+}
+
+// MASK lists: fragments whose alpha is below the cutoff are dropped
+@fragment
+fn fs_mask(f: VsOut) -> @location(0) vec4f {
+    let dx = dpdxFine(f.uv);
+    let dy = dpdyFine(f.uv);
+    let px = dpdxFine(f.world);
+    let py = dpdyFine(f.world);
+    let m = materials[f.material];
+    let c = base_color(m, f.uv, dx, dy);
+    if c.w < m.alpha_cutoff {
+        discard;
+    }
+    return shade(m, c, f.normal, f.uv, f.world, dx, dy, px, py);
 }

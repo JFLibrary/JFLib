@@ -111,8 +111,11 @@ pub const HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN;
 pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 #[cfg(not(target_arch = "wasm32"))]
 pub const VS_SPV: &[u32] = spv::VS;
+/// the main pass's fragment shader of opaque lists (no discard); FS_MASK_SPV: that of MASK lists
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_SPV: &[u32] = spv::FS;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_MASK_SPV: &[u32] = spv::FS_MASK;
 #[cfg(not(target_arch = "wasm32"))]
 pub const VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH;
 #[cfg(not(target_arch = "wasm32"))]
@@ -382,6 +385,7 @@ struct Modules {
     scatter: ShaderModule,
     vs: ShaderModule,
     fs: ShaderModule,
+    fs_mask: ShaderModule,
     vs_depth: ShaderModule,
     vs_shadow: ShaderModule,
     fs_shadow: ShaderModule,
@@ -391,7 +395,7 @@ struct Modules {
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
     Ok(Modules { cull: m(CULL_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
-                 scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
+                 scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, fs_mask: m(FS_MASK_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
                  fs_shadow: m(FS_SHADOW_SPV)? })
 }
 
@@ -401,7 +405,7 @@ fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
     Ok(Modules { cull: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
-                 fs: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
+                 fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
 }
 
 impl Renderer {
@@ -464,8 +468,7 @@ impl Renderer {
             depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
         });
         // (the order of AlphaClass::ALL)
-        // (one fragment shader for both classes so far: MASK's discard in it)
-        let (opaque, mask) = (|| ShaderStage::new(&md.fs, "fs"), || ShaderStage::new(&md.fs, "fs"));
+        let (opaque, mask) = (|| ShaderStage::new(&md.fs, "fs"), || ShaderStage::new(&md.fs_mask, "fs_mask"));
         let draw = [[pipeline(opaque(), false)?, pipeline(opaque(), true)?], [pipeline(mask(), false)?, pipeline(mask(), true)?]];
         // both sides of every triangle cast (glTF's single-sided plates too)
         let depth_only = |vertex: ShaderStage, fragment: Option<ShaderStage>| dev.create_render_pipeline(&RenderPipelineDesc {
@@ -1003,8 +1006,7 @@ impl Renderer {
         if !s.runs.iter().any(|r| r.room) {
             return;
         }
-        // (every list with fs_shadow so far)
-        let holes = |_: AlphaClass| self.mask_in_shadow;
+        let holes = |c: AlphaClass| c == AlphaClass::Mask && self.mask_in_shadow;
         let mut bound: Option<bool> = None;
         let mut set = |e: &mut CommandEncoder<'a>, h: bool| -> bool {
             if bound == Some(h) {
