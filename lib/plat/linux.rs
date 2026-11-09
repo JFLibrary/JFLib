@@ -55,18 +55,18 @@ pub use sys::*;
 #[path = "linux_thread.rs"]
 mod thread;
 pub use thread::*;
-#[path = "linux_crash.rs"]
+#[cfg_attr(target_arch = "aarch64", allow(dead_code))] #[path = "linux_crash.rs"]
 mod crash;
 // plat-shared: printing, plugin libraries (own ELF loader) + crash guard
 #[path = "linux_print.rs"]
 mod lprint;
 pub use lprint::*;
-#[path = "linux_elfload.rs"]
+#[cfg(target_arch = "x86_64")] #[path = "linux_elfload.rs"]
 mod elfload;
-pub use elfload::*;
-#[path = "linux_guard.rs"]
+#[cfg(target_arch = "x86_64")] pub use elfload::*;
+#[cfg(target_arch = "x86_64")] #[path = "linux_guard.rs"]
 mod guard;
-pub(crate) use guard::*;
+#[cfg(target_arch = "x86_64")] pub(crate) use guard::*;
 
 use rt::os::*;
 
@@ -77,7 +77,7 @@ unsafe extern "Rust" {
     fn jfgui_main() -> i32;
 }
 
-#[cfg(not(any(jfgui_glibc, feature = "std")))] core::arch::global_asm!(
+#[cfg(all(target_arch = "x86_64", not(any(jfgui_glibc, feature = "std"))))] core::arch::global_asm!(
     ".globl _start",
     "_start:",
     "    xor ebp, ebp",
@@ -216,3 +216,48 @@ pub use glibc::{at_exit, dl_close, dl_error, dl_open, dl_sym, glibc_thread_ids, 
 pub use glibc::exit;
 #[cfg(feature = "std")]
 pub use glibc::std_start; #[cfg(jfgui_glibc)] #[path = "linux_gpuout.rs"] pub(crate) mod gpuout; #[cfg(jfgui_glibc)] pub use gpuout::*;
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+// _start as above: the kernel leaves sp 16-byte aligned on argc; frame pointer and link register 0
+// end the call chain.  rt::os::process_start first: getauxval and the constructors (LSE atomics).  Plugin libraries and the crash guard (linux_elfload.rs, linux_guard.rs)
+// wait for ARM4, lib.rs takes the stubs of web_lib.rs and web_modhost.rs: the thread id and the path
+// of the program, which the others need too, are here until then.
+#[cfg(all(target_arch = "aarch64", not(any(jfgui_glibc, feature = "std"))))]
+core::arch::global_asm!(
+    ".globl _start",
+    "_start:",
+    "    mov x29, xzr",
+    "    mov x30, xzr",
+    "    mov x0, sp",
+    "    bl {entry}",
+    "    brk #1",
+    entry = sym linux_entry_arm64,
+);
+
+#[cfg(all(target_arch = "aarch64", not(any(jfgui_glibc, feature = "std"))))]
+extern "C" fn linux_entry_arm64(sp: *const usize) -> ! {
+    // SAFETY: the kernel's initial stack, first thing on the only thread.
+    unsafe { rt::os::process_start(sp) };
+    linux_entry(sp)
+}
+
+/// the id of the calling thread (gettid)
+#[cfg(target_arch = "aarch64")]
+pub(crate) fn plat_tid() -> u64 {
+    // SAFETY: gettid has no arguments.
+    unsafe { syscall3(SYS_GETTID, 0, 0, 0) as u64 }
+}
+
+/// Absolute path of the running native executable, independent of argv[0] (here for Linux ARM64 until ARM4 of
+/// docs/ARM64.md, otherwise in modhost.rs)
+#[cfg(target_arch = "aarch64")]
+pub fn current_exe() -> Option<String> {
+    let mut buf = alloc::vec![0u8; 4096];
+    // SAFETY: a NUL-terminated path and a buffer of buf.len() bytes.
+    let n = unsafe { syscall6(SYS_READLINKAT, AT_FDCWD, c"/proc/self/exe".as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
+    if n <= 0 || n as usize >= buf.len() {
+        return None;
+    }
+    buf.truncate(n as usize);
+    String::from_utf8(buf).ok()
+}

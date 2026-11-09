@@ -33,7 +33,7 @@ struct AltStack([u8; ALTSTACK_SIZE]);
 static mut ALTSTACK: AltStack = AltStack([0; ALTSTACK_SIZE]);
 
 // return path of signal handlers (never used by the crash handler, which exits)
-core::arch::global_asm!(
+#[cfg(target_arch = "x86_64")] core::arch::global_asm!(
     ".globl jfgui_rs_sigret",
     "jfgui_rs_sigret:",
     "    mov eax, {nr}",
@@ -63,7 +63,7 @@ pub(crate) fn crash_init() {
     }
 }
 
-extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
+#[cfg(target_arch = "x86_64")] extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
     if rt::crash::busy() {
         rt::os::exit(3);
     }
@@ -825,4 +825,56 @@ fn scan_filtered(ci: &mut CrashInfo, eh: Option<&Eh>, words: &[u64]) {
             first = false;
         }
     }
+}
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+//
+// The return path and the handler for ARM64.  Until ARM3 the report has the signal, pc and the fault
+// address, but neither the registers nor the call chain: CrashInfo::regs and the CFI steps above know
+// x86-64's registers only (the module allows their dead code on ARM64).  The ucontext: uc_flags,
+// uc_link, uc_stack, uc_sigmask with the kernel's padding to 128 bytes, then at 176 (16-aligned) the
+// sigcontext: fault_address, x0 .. x30, sp, pc, pstate.
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".globl jfgui_rs_sigret",
+    "jfgui_rs_sigret:",
+    "    mov x8, #{nr}",
+    "    svc 0",
+    "    brk #1",
+    nr = const rt::os::SYS_RT_SIGRETURN,
+);
+
+#[cfg(target_arch = "aarch64")]
+const UC_PC: usize = 176 + 8 + 31 * 8 + 8; // fault_address, x0 .. x30, sp
+
+#[cfg(target_arch = "aarch64")]
+extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
+    if rt::crash::busy() {
+        rt::os::exit(3);
+    }
+    let mut ci = CrashInfo::empty();
+    ci.code = sig as u32;
+    ci.kind = match sig {
+        SIGSEGV => CK_ACCESS,
+        SIGBUS => CK_BUS,
+        SIGILL => CK_ILLEGAL,
+        SIGFPE => CK_DIVIDE,
+        _ => CK_OTHER,
+    };
+    // SAFETY: the kernel passes a valid siginfo and ucontext.
+    let si_addr = unsafe {
+        let si_addr = *(si.add(16) as *const u64);
+        if ci.kind == CK_ACCESS || ci.kind == CK_BUS {
+            ci.addr = si_addr;
+            ci.access = 2; // unknown: the syndrome (ESR) is ARM3's
+        }
+        ci.ip = *(uc.add(UC_PC) as *const u64);
+        si_addr
+    };
+    code_range(&mut ci);
+    let mut line = StackText::<160>::new();
+    let _ = writeln!(line, "jfgui: crash signal {sig} at pc 0x{:x}, address 0x{si_addr:x} (look it up in the .map file)",
+                     ci.ip);
+    rt::os::write_stderr(line.bytes());
+    rt::crash::report(&ci)
 }

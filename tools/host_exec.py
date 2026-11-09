@@ -1,10 +1,38 @@
-"""Host-aware native execution; WSL children die when their owner's input pipe closes."""
+"""Host-aware native execution; WSL children die when their owner's input pipe closes.
+
+A Linux program of another processor (docs/ARM64.md: an ARM64 build on an x86-64 PC) starts through
+QEMU's user-mode emulation, qemu-<arch> in WSL: static programs only, WSL has no glibc for ARM64.  The
+processor comes from the program's own header, so every caller gets this without asking for it."""
 import os
+import platform
 import subprocess
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+ELF_MACHINE = {0x3E: 'x86_64', 0xB7: 'aarch64'}
+PE_MACHINE = {0x8664: 'x86_64', 0xAA64: 'aarch64'}
+
+
+def exe_arch(exe):
+    """the processor a program is built for, from its ELF or PE header (None: unknown, not a program)"""
+    try:
+        with open(exe, 'rb') as f:
+            head = f.read(1024)
+    except OSError:
+        return None
+    if head[:4] == b'\x7fELF':
+        return ELF_MACHINE.get(int.from_bytes(head[18:20], 'little'))
+    pe = int.from_bytes(head[0x3C:0x40], 'little') if head[:2] == b'MZ' else len(head)
+    if head[pe:pe + 4] == b'PE\0\0':
+        return PE_MACHINE.get(int.from_bytes(head[pe + 4:pe + 6], 'little'))
+    return None
+
+
+def host_arch():
+    """the processor of this machine (and so of its WSL)"""
+    m = platform.machine().lower()
+    return {'amd64': 'x86_64', 'x64': 'x86_64', 'arm64': 'aarch64'}.get(m, m)
 
 
 def linux_path(path):
@@ -41,6 +69,13 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
 
 
 def run_native(target, exe, args, timeout=600, env=None):
+    arch = exe_arch(exe)
+    if arch not in (None, host_arch()):
+        if target != 'linux':
+            raise RuntimeError(f'{Path(exe).name} is a Windows program for {arch}: it only starts on such a machine '
+                               '(docs/ARM64.md, windows-11-arm).')
+        return run_linux([f'qemu-{arch}', linux_path(exe), *args], timeout=timeout, env=env)
+
     if target == 'linux':
         return run_linux([linux_path(exe), *args], timeout=timeout, env=env)
     if os.name != 'nt':

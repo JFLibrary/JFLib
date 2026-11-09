@@ -423,8 +423,8 @@ impl OsFile {
         if fd < 0 { None } else { Some(OsFile(fd as i32)) }
     }
 
-    /// read only, never through a final symbolic link (the plugin loader checks the policy on the path)
-    pub(crate) fn open_read_nofollow(path: &str) -> Option<OsFile> {
+    /// read only, never through a final symbolic link (the plugin loader checks the policy on the path; ARM4)
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] pub(crate) fn open_read_nofollow(path: &str) -> Option<OsFile> {
         let p = path_z(path);
         // SAFETY: NUL-terminated path.
         let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, O_CLOEXEC | O_NOFOLLOW, 0, 0, 0) };

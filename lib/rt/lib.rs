@@ -152,7 +152,7 @@ macro_rules! __std_main {
 }
 
 pub mod boot;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/cpu.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_arch = "aarch64"), path = "portable/cpu.rs")]
 pub mod cpu;
 pub mod crash;
 #[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
@@ -171,7 +171,7 @@ pub use mem::Alloc;
 #[cfg_attr(target_os = "android", path = "android.rs")]
 pub mod os;
 pub mod sync;
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android"), path = "portable/math.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_arch = "aarch64"), path = "portable/math.rs")]
 pub mod x87;
 
 /// Portable arithmetic, available on native targets for exact backend comparisons.
