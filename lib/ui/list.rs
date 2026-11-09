@@ -6,7 +6,10 @@
 //        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
 //        PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
 //        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
-//        into view.
+//        into view.  A style whose bars stay visible (netlab) keeps their room free right of
+//        the content of a view that scrolls only vertically, always, so nothing moves when
+//        the bar comes (StyleList::scrollbar_room; views that also scroll sideways keep
+//        floating bars).
 //   scroll_end()
 //   scroll_to(id, x, y)                    jump to a position in DIP (-1 keeps that axis)
 //   scroll_pos(id) -> (x, y)               current position in DIP
@@ -287,6 +290,17 @@ impl Ui {
             bf |= BOX_V; // vertical (or both): children top to bottom
         }
         self.box_begin(id, bf, 0);
+        // a style whose bar stays visible keeps the bar's room free right of the content of a
+        // view that scrolls only vertically, whether it overflows or not (as CSS's
+        // scrollbar-gutter: stable): nothing moves when the bar comes, no pass is lost to it
+        let st = self.style;
+        let room = st.scrollbar_room(self);
+        if room > 0 && axes == 1 {
+            if let Some(b) = self.wp.lay.boxes.last_mut().filter(|b| b.id == id) {
+                b.len[0] = b.len[0].wrapping_sub(room).max(0);
+                b.gutter = room;
+            }
+        }
         // stack entry
         let i = (self.wp.list.scr_sp as usize).min(SCROLL_MAX);
         if i == SCROLL_MAX {

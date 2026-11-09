@@ -2426,7 +2426,10 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
        PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
-       into view.
+       into view.  A style whose bars stay visible (netlab) keeps their room free right of
+       the content of a view that scrolls only vertically, always, so nothing moves when
+       the bar comes (StyleList::scrollbar_room; views that also scroll sideways keep
+       floating bars).
   scroll_end()
   scroll_to(id, x, y)                    jump to a position in DIP (-1 keeps that axis)
   scroll_pos(id) -> (x, y)               current position in DIP
@@ -4783,6 +4786,10 @@ the widget families are being ported; a finished style overrides every function.
     hover area, track margin at both ends, shortest thumb (px)
   - `fn scrollbar_margin(&self, _ui: &mut Ui) -> i32`
   - `fn scrollbar_min_thumb(&self, _ui: &mut Ui) -> i32`
+  - `fn scrollbar_room(&self, _ui: &mut Ui) -> i32`
+    room a view that scrolls only vertically keeps free right of its content for the bar,
+    overflowing or not, so the content ends before a bar that stays visible (px; 0 = the
+    bar floats over the content)
   - `fn scrollbar(&self, _ui: &mut Ui, _sp: &Sp)`
     flags 1 = vertical, value expansion 0..256, s[0] track start, s[1] thumb length,
     value2 thumb offset (px)
