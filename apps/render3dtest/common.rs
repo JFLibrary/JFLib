@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, MaterialId, MeshData, MeshId, Renderer, Scene, Sun, Transform};
+use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, MaterialId, MeshData, MeshId, Renderer, RendererDesc, Scene, Sun, Transform};
 
 use crate::cpu;
 
@@ -165,6 +165,21 @@ pub struct Off {
 
 pub const CLEAR: [f32; 4] = [0.2, 0.4, 0.6, 1.0];
 pub const CLEAR8: [u8; 3] = [51, 102, 153];
+
+/// a renderer whose 8-bit targets get the linear light, as the ray caster compares it (G5e2: RendererDesc::new has
+/// the fragment shaders encode sRGB for an 8-bit target without sRGB; the test `srgb` checks that encoding)
+pub fn linear_desc(color: Format) -> RendererDesc {
+    let mut d = RendererDesc::new(color);
+    d.encode_srgb = false;
+    d
+}
+
+/// the same with n frames in flight (Rgba8Unorm)
+pub fn frames_desc(n: usize) -> RendererDesc {
+    let mut d = linear_desc(Format::Rgba8Unorm);
+    d.frames_in_flight = n;
+    d
+}
 
 impl Off {
     pub fn new(dev: &Device, w: u32, h: u32, format: Format) -> Result<Off> {

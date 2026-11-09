@@ -25,10 +25,10 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, InstanceId, Material, MaterialId, MeshData, MeshId, Renderer, RendererDesc, Sampling, Scene, Sun, TextureData, TextureRef, Transform};
+use render3d::{Camera, InstanceId, Material, MaterialId, MeshData, MeshId, Renderer, Sampling, Scene, Sun, TextureData, TextureRef, Transform};
 use shader::bench as sb;
 
-use crate::common::Rng;
+use crate::common::{frames_desc, linear_desc, Rng};
 use crate::tests::{T, out, setup};
 
 #[derive(Clone, Copy, Default)]
@@ -134,7 +134,7 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
     let t0 = plat::time_us();
-    let mut r = t.res(Renderer::new(dev, &RendererDesc { color: Format::Rgba8Unorm, frames_in_flight: k }), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &frames_desc(k)), "Renderer::new")?;
     // the cube of the scene, as vertex streams
     let cube = sb::cube_vertices();
     let pos: Vec<[f32; 3]> = cube.iter().map(|v| [v.pos[0], v.pos[1], v.pos[2]]).collect();
@@ -475,7 +475,7 @@ pub fn bench_upload() -> i32 {
             }
             let levels = (plat::time_us() - t0) as f64 / 1000.0 / reps as f64;
             // a fresh renderer: the first add makes the array (4 layers), the next fit in
-            let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return 1 };
+            let Some(mut r) = t.res(Renderer::new(&dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return 1 };
             let Some(id) = t.res(dev.queue().flush(), "flush") else { return 1 };
             t.res(dev.wait(id, 10_000_000_000), "wait");
             let reps = reps.min(4);
@@ -573,7 +573,7 @@ pub fn bench_gltf() -> i32 {
                  glb.len() as f64 / 1e6 / (load_ms / 1000.0), mem0 as f64 / 1e6, mem1 as f64 / 1e6, (mem1 as f64 - mem0 as f64) / 1e6, model as f64 / 1e6));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return 1 };
-    let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return 1 };
+    let Some(mut r) = t.res(Renderer::new(&dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return 1 };
     let t2 = plat::time_us();
     let Some(imp) = t.res(render3d::gltf::upload(&mut r, &doc, None), "gltf::upload") else { return 1 };
     let upload_ms = (plat::time_us() - t2) as f64 / 1000.0;

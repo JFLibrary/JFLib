@@ -10,7 +10,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Lod, Material, MeshId, Renderer, RendererDesc, Scene};
+use render3d::{Camera, Lod, Material, MeshId, Renderer, Scene};
 
 use crate::common::*;
 use crate::cpu::{self, RefScene};
@@ -96,7 +96,7 @@ pub fn read(t: &mut T, dev: &Device, s: &Scene, draws: &Buffer, visible: &Buffer
 fn lods_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let geos = geos();
     let colors = gallery_colors(12);
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }

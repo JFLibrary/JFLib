@@ -50,7 +50,8 @@ use crate::{Ui, UiInput};
 use gpu::{Access, Buffer, DataLayout, Device, GpuError, Layout, Texture, TextureRegion};
 
 /// the format of a view's target: what the output samples and what is read back byte for byte into the
-/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, no sRGB encoding
+/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, as sRGB codes like the framebuffer's:
+/// no hardware encodes them (G5e2: render3d's fragment shaders do, RendererDesc::encode_srgb)
 pub const GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm;
 
 /// what a view (ui.gpu_view) shows: content drawn on the UI's GPU device.  The app keeps it in an

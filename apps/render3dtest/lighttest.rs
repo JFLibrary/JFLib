@@ -340,7 +340,7 @@ fn gltf_lights(t: &mut T) {
 fn drawn(t: &mut T, dev: &Device, level: &str, doc: &gltf::Document, nodes: &[([f64; 3], [f64; 4], usize, Option<usize>)]) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
     let mut off = t.res(Off::new(dev, w, h, Format::Rgba8Unorm), "target")?;
-    let mut r = t.res(render3d::Renderer::new(dev, &render3d::RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(render3d::Renderer::new(dev, &crate::common::linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     let imp = t.res(render3d::gltf::upload(&mut r, doc, None), "gltf::upload")?;
     t.ok(imp.lights.len() == 5 && imp.suns.len() == 1, &format!("{level}: upload: {} point and spot lights, {} sun(s)", imp.lights.len(), imp.suns.len()));
     let mut s = t.res(Scene::new(&r), "Scene::new")?;

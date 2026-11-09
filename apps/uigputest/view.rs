@@ -291,11 +291,14 @@ impl Test {
             for spec in &w.specs {
                 rs.add(&w.geos[spec.mesh as usize], spec, w.colors[spec.material as usize]);
             }
+            // (G5e2) the view's 8-bit target: render3d encodes sRGB, the clear colour too; the rays give sRGB codes
+            rs.srgb = content.borrow().r.as_ref().is_some_and(|r| r.desc().encodes_srgb());
+            let clear = if rs.srgb { CLEAR.map(|v| cpu::srgb_encode(v as f64)) } else { [CLEAR8[0], CLEAR8[1], CLEAR8[2], 255] };
             let Some(c) = content.borrow().cam else { return same };
             let rc = RefCamera::new(c.eye, c.forward, c.up, c.fov_y, c.aspect, c.near, c.far);
             let rgba: Vec<u8> = got.chunks_exact(4).flat_map(|p| [p[2], p[1], p[0], 255]).collect();
-            let cmp = cpu::compare(&rs, &rc, size.0, size.1, CLEAR8, &rgba, None);
-            self.ok(cmp.fine(), &format!("{what}: against the ray caster: {}", cmp.text()));
+            let cmp = cpu::compare(&rs, &rc, size.0, size.1, [clear[0], clear[1], clear[2]], &rgba, None);
+            self.ok(cmp.fine(), &format!("{what}: against the ray caster{}: {}", if rs.srgb { " (sRGB codes)" } else { "" }, cmp.text()));
         }
         same
     }

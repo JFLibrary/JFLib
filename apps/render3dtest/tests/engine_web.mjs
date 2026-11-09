@@ -6,7 +6,8 @@
 //   python build_rs.py app render3dtest --target win
 //   python build_rs.py app render3dtest --target web
 //   node apps/render3dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--save=DIR]
-// (G5e2) also the gallery in an sRGB target (srgb_NAME, against --dump --format rgba8srgb); --save writes every image the
+// (G5e2) also the gallery in an sRGB target (srgb_NAME, against --dump --format rgba8srgb) and with the shader's sRGB in
+// Rgba8Unorm (enc_NAME, against --dump --format rgba8; the program compares them with float images); --save writes every image the
 // browser sent to DIR/MODE_NAME.rgba (to compare a run before a change of the shaders with one after it)
 import {createServer} from 'node:http';
 import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
@@ -19,7 +20,7 @@ const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights','env','occl'];
 // the images the browser draws into other targets: [its name, the gallery's image, the extension of the native dump]
-const FORMATS=['mix','tex','gltf','pbr','shadow','lights','env','occl'].map(n=>[`srgb_${n}`,n,'rgba8srgb']);
+const FORMATS=['mix','tex','gltf','pbr','shadow','lights','env','occl'].flatMap(n=>[[`srgb_${n}`,n,'rgba8srgb'],[`enc_${n}`,n,'rgba8']]);
 // The two paths differ in their shader compilers, so a colour may round the other way; more than this
 // is a real difference (the numbers of a run stand in docs/RENDER3D.md)
 const MAX_DELTA=Number(option('max-delta','2')), MAX_SHARE=Number(option('max-share','0.01'));
