@@ -14,6 +14,13 @@
 // triangle's plane.  Where the GPU must match (nearest texels, level 0, a nearest level) it is to within 1;
 // trilinear filtering has a stated tolerance.  A mirrored instance's triangles are turned round (its
 // outside stays in front), its normals go through the signed scale.
+//
+// Shading (G5c): glTF 2.0 Appendix B in f64, written here from the specification (Lambert, GGX, the separable
+// Smith visibility, Schlick's Fresnel), the uniform ambient light through the split-sum with Karis' fit,
+// Khronos PBR Neutral; normal maps on the triangle's exact tangent frame (dp/du from its edges and uv, the
+// bitangent towards decreasing v), which is what the GPU's derivatives give.  At an edge, a single-coloured
+// instance may show any colour between those of its triangle's vertex normals and the hit's (the GPU's
+// normal there lies a little beyond the triangle).
 
 use alloc::format;
 use alloc::vec::Vec;
@@ -22,7 +29,7 @@ use crate::common::{Geo, Spec};
 
 pub type V = [f64; 3];
 
-fn sqrt(x: f64) -> f64 {
+pub fn sqrt(x: f64) -> f64 {
     if x <= 0.0 {
         return 0.0;
     }
@@ -65,7 +72,7 @@ fn mul(a: V, k: f64) -> V {
     [a[0] * k, a[1] * k, a[2] * k]
 }
 
-fn dot(a: V, b: V) -> f64 {
+pub fn dot(a: V, b: V) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
@@ -350,6 +357,96 @@ impl RefTexture {
     }
 }
 
+// ---------------------------------------------------------------- shading (G5c)
+
+const PI: f64 = core::f64::consts::PI;
+/// the least alpha the engine's BRDF takes (draw.wgsl ALPHA_MIN)
+const ALPHA_MIN: f64 = 0.001;
+
+/// glTF 2.0 Appendix B for one light from l, times n.l: (1 - F) c_diff / pi + F D V, V the separable Smith
+/// term G / (4 |n.l| |n.v|), a2 = alpha squared
+pub fn brdf(n: V, v: V, l: V, c_diff: [f64; 3], f0: [f64; 3], a2: f64) -> [f64; 3] {
+    let nl = dot(n, l);
+    if !(nl > 0.0) {
+        return [0.0; 3];
+    }
+    let nv = dot(n, v).clamp(0.0, 1.0);
+    let h = norm(add(l, v));
+    let nh = dot(n, h).clamp(0.0, 1.0);
+    let vh = dot(v, h).clamp(0.0, 1.0);
+    let x = 1.0 - vh;
+    let x5 = x * x * x * x * x;
+    let t = nh * nh * (a2 - 1.0) + 1.0;
+    let d = a2 / (PI * t * t);
+    let vis = 1.0 / ((nl + sqrt(a2 + (1.0 - a2) * nl * nl)) * (nv + sqrt(a2 + (1.0 - a2) * nv * nv)));
+    let mut out = [0.0; 3];
+    for k in 0..3 {
+        let f = f0[k] + (1.0 - f0[k]) * x5;
+        out[k] = ((1.0 - f) * c_diff[k] / PI + f * d * vis) * nl;
+    }
+    out
+}
+
+/// 2^x by the reference's own exp
+pub fn exp2(x: f64) -> f64 {
+    exp(x * core::f64::consts::LN_2)
+}
+
+/// Karis' analytic fit of the split-sum's second sum (measured against the integral; the engine has a table)
+pub fn karis_ab(roughness: f64, nv: f64) -> (f64, f64) {
+    let c0 = [-1.0, -0.0275, -0.572, 0.022];
+    let c1 = [1.0, 0.0425, 1.04, -0.04];
+    let r = [roughness * c0[0] + c1[0], roughness * c0[1] + c1[1], roughness * c0[2] + c1[2], roughness * c0[3] + c1[3]];
+    let a004 = (r[0] * r[0]).min(exp2(-9.28 * nv)) * r[0] + r[1];
+    (-1.04 * a004 + r[2], 1.04 * a004 + r[3])
+}
+
+/// the split-sum's second sum (scale, bias of f0): the engine's table (render3d::DFG, data like a texture's
+/// texels; checked against the integral by the pbr test), read bilinearly
+pub fn env_ab(roughness: f64, nv: f64) -> (f64, f64) {
+    let n = render3d::DFG_N;
+    let last = (n - 1) as f64;
+    let (x, y) = (nv.clamp(0.0, 1.0) * last, roughness.clamp(0.0, 1.0) * last);
+    let (i, j) = ((x as usize).min(n - 2), (y as usize).min(n - 2));
+    let (fx, fy) = (x - i as f64, y - j as f64);
+    let at = |i: usize, j: usize, c: usize| render3d::DFG[j * n + i][c] as f64;
+    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+    let get = |c: usize| lerp(lerp(at(i, j, c), at(i + 1, j, c), fx), lerp(at(i, j + 1, c), at(i + 1, j + 1, c), fx), fy);
+    (get(0), get(1))
+}
+
+/// Khronos PBR Neutral, from its specification
+pub fn neutral(c: [f64; 3]) -> [f64; 3] {
+    let start = 0.8 - 0.04;
+    let desaturation = 0.15;
+    let x = c[0].min(c[1]).min(c[2]);
+    let offset = if x < 0.08 { x - 6.25 * x * x } else { 0.04 };
+    let mut col = [c[0] - offset, c[1] - offset, c[2] - offset];
+    let peak = col[0].max(col[1]).max(col[2]);
+    if peak < start {
+        return col;
+    }
+    let d = 1.0 - start;
+    let new_peak = 1.0 - d * d / (peak + d - start);
+    for v in &mut col {
+        *v *= new_peak / peak;
+    }
+    let g = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
+    [col[0] + (new_peak - col[0]) * g, col[1] + (new_peak - col[1]) * g, col[2] + (new_peak - col[2]) * g]
+}
+
+/// what a material's inputs are at a point: linear base colour (alpha), metallic, roughness, the shading
+/// normal, occlusion, emission
+#[derive(Clone, Copy, Debug)]
+pub struct Surface {
+    pub base: [f64; 4],
+    pub metallic: f64,
+    pub roughness: f64,
+    pub n: V,
+    pub ao: f64,
+    pub emissive: [f64; 3],
+}
+
 // ---------------------------------------------------------------- the ray caster
 
 #[derive(Clone, Copy)]
@@ -361,17 +458,36 @@ struct Tri {
     uv: [[f64; 2]; 3],
 }
 
-/// what an instance looks like: a colour, or a factor times a texture; with a cutoff, glTF's MASK
+/// what an instance looks like: glTF's metallic-roughness material, its textures as indices into
+/// RefScene::textures (each as the GPU holds it: sRGB for base colour and emission, linear for the others);
+/// with a cutoff, glTF's MASK
 #[derive(Clone, Copy, Debug)]
 pub struct Look {
     pub factor: [f64; 4],
     pub texture: Option<(usize, RefSampling)>,
     pub cutoff: Option<f64>,
+    pub metallic: f64,
+    pub roughness: f64,
+    pub mr_texture: Option<(usize, RefSampling)>,
+    pub normal_texture: Option<(usize, RefSampling)>,
+    pub normal_scale: f64,
+    pub occlusion_texture: Option<(usize, RefSampling)>,
+    pub occlusion: f64,
+    pub emissive: [f64; 3],
+    pub emissive_texture: Option<(usize, RefSampling)>,
 }
 
 impl Look {
+    /// render3d's Material::color: dull (metallic 0, roughness 1)
+    pub const DULL: Look = Look { factor: [1.0; 4], texture: None, cutoff: None, metallic: 0.0, roughness: 1.0, mr_texture: None, normal_texture: None,
+                                  normal_scale: 1.0, occlusion_texture: None, occlusion: 1.0, emissive: [0.0; 3], emissive_texture: None };
+
     pub fn color(c: [f32; 3]) -> Look {
-        Look { factor: [c[0] as f64, c[1] as f64, c[2] as f64, 1.0], texture: None, cutoff: None }
+        Look { factor: [c[0] as f64, c[1] as f64, c[2] as f64, 1.0], ..Look::DULL }
+    }
+
+    fn textured(&self) -> bool {
+        self.texture.is_some() || self.mr_texture.is_some() || self.normal_texture.is_some() || self.occlusion_texture.is_some() || self.emissive_texture.is_some()
     }
 }
 
@@ -389,8 +505,156 @@ pub struct RefScene {
     inst: Vec<RefInstance>,
     pub textures: Vec<RefTexture>,
     pub sun_dir: V,
+    /// illuminance (lux) and the uniform ambient radiance, as render3d::Sun
     pub sun: [f64; 3],
     pub ambient: [f64; 3],
+    pub exposure: f64,
+    /// Khronos PBR Neutral (else none)
+    pub tonemap: bool,
+    /// (G5c) the sun casts shadows: exact shadow rays (both sides of every triangle block, MASK's holes not)
+    pub shadows: bool,
+    /// (G5c) point and spot lights, no shadows
+    pub lights: Vec<RefLight>,
+    /// (G5c) the environment in place of the uniform ambient light
+    pub env: Option<RefEnv>,
+}
+
+/// (G5c) the environment as the GPU holds it (data like a texture's texels): the irradiance's harmonics over pi,
+/// the cube's levels; sampled as Vulkan defines cube maps (face selection, bilinear across face edges, linear
+/// between levels), written here from the specification
+pub struct RefEnv {
+    pub k: f64,
+    pub sh: [[f64; 3]; 9],
+    pub size: u32,
+    pub levels: Vec<Vec<[f32; 4]>>,
+}
+
+/// Vulkan's cube face selection: (face, s, t)
+pub fn cube_face(d: V) -> (usize, f64, f64) {
+    let (ax, ay, az) = (d[0].abs(), d[1].abs(), d[2].abs());
+    let (f, sc, tc, ma) = if ax >= ay && ax >= az {
+        if d[0] >= 0.0 { (0, -d[2], -d[1], ax) } else { (1, d[2], -d[1], ax) }
+    } else if ay >= az {
+        if d[1] >= 0.0 { (2, d[0], d[2], ay) } else { (3, d[0], -d[2], ay) }
+    } else if d[2] >= 0.0 {
+        (4, d[0], -d[1], az)
+    } else {
+        (5, -d[0], -d[1], az)
+    };
+    (f, 0.5 * (sc / ma + 1.0), 0.5 * (tc / ma + 1.0))
+}
+
+/// the (unnormalized) direction of face coordinates sc, tc in -1 ..= 1 (and beyond, past the face's edge)
+fn face_point(f: usize, sc: f64, tc: f64) -> V {
+    match f {
+        0 => [1.0, -tc, -sc],
+        1 => [-1.0, -tc, sc],
+        2 => [sc, 1.0, tc],
+        3 => [sc, -1.0, -tc],
+        4 => [sc, -tc, 1.0],
+        _ => [-sc, -tc, -1.0],
+    }
+}
+
+impl RefEnv {
+    /// irradiance over pi at a unit normal
+    pub fn irradiance(&self, n: V) -> [f64; 3] {
+        let (x, y, z) = (n[0], n[1], n[2]);
+        let b = [0.282095, 0.488603 * y, 0.488603 * z, 0.488603 * x, 1.092548 * x * y, 1.092548 * y * z, 0.315392 * (3.0 * z * z - 1.0), 1.092548 * x * z,
+                 0.546274 * (x * x - y * y)];
+        let mut out = [0.0; 3];
+        for k in 0..9 {
+            for c in 0..3 {
+                out[c] += self.sh[k][c] * b[k];
+            }
+        }
+        out
+    }
+
+    /// texel (i, j) of face f at a level; beyond the face's edge the texel of the face its centre's direction
+    /// falls on, beyond a corner the mean of the three texels there (Vulkan's cube map edge handling)
+    fn texel(&self, l: usize, f: usize, i: i64, j: i64) -> [f64; 3] {
+        let n = (self.size as i64 >> l).max(1);
+        let (out_i, out_j) = (i < 0 || i >= n, j < 0 || j >= n);
+        if out_i && out_j {
+            let (ci, cj) = (i.clamp(0, n - 1), j.clamp(0, n - 1));
+            let (a, b, c) = (self.texel(l, f, ci, cj), self.texel(l, f, i, cj), self.texel(l, f, ci, j));
+            return [(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0];
+        }
+        let (f, i, j) = if i < 0 || j < 0 || i >= n || j >= n {
+            let d = face_point(f, 2.0 * (i as f64 + 0.5) / n as f64 - 1.0, 2.0 * (j as f64 + 0.5) / n as f64 - 1.0);
+            let (g, s, t) = cube_face(d);
+            (g, (floor(s * n as f64) as i64).clamp(0, n - 1), (floor(t * n as f64) as i64).clamp(0, n - 1))
+        } else {
+            (f, i, j)
+        };
+        let p = self.levels[l][(f as i64 * n * n + j * n + i) as usize];
+        [p[0] as f64, p[1] as f64, p[2] as f64]
+    }
+
+    fn bilinear(&self, l: usize, d: V) -> [f64; 3] {
+        let (f, s, t) = cube_face(d);
+        let n = (self.size >> l).max(1) as f64;
+        let (u, v) = (s * n - 0.5, t * n - 0.5);
+        let (i, j) = (floor(u), floor(v));
+        let (a, b) = (u - i, v - j);
+        let (i, j) = (i as i64, j as i64);
+        let (t00, t10, t01, t11) = (self.texel(l, f, i, j), self.texel(l, f, i + 1, j), self.texel(l, f, i, j + 1), self.texel(l, f, i + 1, j + 1));
+        let mut out = [0.0; 3];
+        for k in 0..3 {
+            out[k] = (t00[k] * (1.0 - a) + t10[k] * a) * (1.0 - b) + (t01[k] * (1.0 - a) + t11[k] * a) * b;
+        }
+        out
+    }
+
+    /// the prefiltered radiance along d at a level (linear between levels)
+    pub fn specular(&self, d: V, lod: f64) -> [f64; 3] {
+        let top = (self.levels.len() - 1) as f64;
+        let l = lod.clamp(0.0, top);
+        let l0 = floor(l);
+        let a = self.bilinear(l0 as usize, d);
+        if l0 >= top {
+            return a;
+        }
+        let b = self.bilinear(l0 as usize + 1, d);
+        let t = l - l0;
+        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    }
+}
+
+/// (G5c) a point or spot light as KHR_lights_punctual defines it
+#[derive(Clone, Copy, Debug)]
+pub struct RefLight {
+    pub pos: V,
+    /// colour times intensity (candela)
+    pub color: [f64; 3],
+    pub range: Option<f64>,
+    /// a spot's axis (unit) and cone angles
+    pub spot: Option<(V, f64, f64)>,
+}
+
+impl RefLight {
+    /// what reaches a point p (light per unit of BRDF times n.l) and from where (unit vector towards it)
+    pub fn at(&self, p: V) -> Option<(f64, V)> {
+        let d = sub(self.pos, p);
+        let dist2 = dot(d, d);
+        if dist2 <= 0.0 {
+            return None;
+        }
+        let mut att = 1.0 / dist2;
+        if let Some(r) = self.range {
+            let q = (dist2 / (r * r)) * (dist2 / (r * r));
+            att *= (1.0 - q).clamp(0.0, 1.0);
+        }
+        let l = mul(d, 1.0 / sqrt(dist2));
+        if let Some((axis, inner, outer)) = self.spot {
+            let (ci, co) = (sincos(inner).1, sincos(outer).1);
+            let scale = 1.0 / (ci - co).max(0.001);
+            let t = (dot(axis, mul(l, -1.0)) * scale - co * scale).clamp(0.0, 1.0);
+            att *= t * t;
+        }
+        Some((att, l))
+    }
 }
 
 /// what a ray found
@@ -399,6 +663,15 @@ pub struct Hit {
     pub z: f64,
     pub rgb: [u8; 3],
     pub inst: usize,
+    /// the triangle and the barycentric coordinates of the hit
+    pub tri: usize,
+    pub u: f64,
+    pub v: f64,
+    /// the light leaving the point towards the eye, times the exposure, before the tone mapper
+    pub linear: [f64; 3],
+    /// (G5c) of it, the sun's part unshadowed, and how much of the sun reaches the point (0 or 1)
+    pub sun: [f64; 3],
+    pub vis: f64,
 }
 
 /// the rays through the centres of the pixel's 2 x 2 quad that the GPU's fine derivatives take: along x
@@ -413,7 +686,8 @@ pub struct Quad {
 
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
-        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient }
+        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new(),
+                   env: None }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -492,7 +766,13 @@ impl RefScene {
     /// the look's colour (linear rgba) at a point of a triangle
     fn base(&self, look: &Look, t: &Tri, u: f64, v: f64, eye: V, quad: Option<&Quad>) -> [f64; 4] {
         let f = look.factor;
-        let Some((tex, s)) = look.texture else { return f };
+        let Some(c) = self.tex_at(look.texture, t, u, v, eye, quad) else { return f };
+        [f[0] * c[0], f[1] * c[1], f[2] * c[2], f[3] * c[3]]
+    }
+
+    /// a texture of a look at a point of a triangle (None: the look has none there)
+    fn tex_at(&self, which: Option<(usize, RefSampling)>, t: &Tri, u: f64, v: f64, eye: V, quad: Option<&Quad>) -> Option<[f64; 4]> {
+        let (tex, s) = which?;
         let w = 1.0 - u - v;
         let uv = [t.uv[0][0] * w + t.uv[1][0] * u + t.uv[2][0] * v, t.uv[0][1] * w + t.uv[1][1] * u + t.uv[2][1] * v];
         let (dx, dy) = match quad {
@@ -502,8 +782,173 @@ impl RefScene {
             }
             None => ([0.0; 2], [0.0; 2]),
         };
-        let c = self.textures[tex].sample(&s, uv, dx, dy);
-        [f[0] * c[0], f[1] * c[1], f[2] * c[2], f[3] * c[3]]
+        Some(self.textures[tex].sample(&s, uv, dx, dy))
+    }
+
+    /// the normal map's normal on the triangle's tangent frame: the tangent dp/du from the edges and their
+    /// uv, made orthogonal to ng, the bitangent cross(ng, tangent) turned towards decreasing v
+    fn bumped(t: &Tri, ng: V, tn: [f64; 3]) -> V {
+        let (du1, dv1) = (t.uv[1][0] - t.uv[0][0], t.uv[1][1] - t.uv[0][1]);
+        let (du2, dv2) = (t.uv[2][0] - t.uv[0][0], t.uv[2][1] - t.uv[0][1]);
+        let det = du1 * dv2 - du2 * dv1;
+        if det == 0.0 {
+            return ng;
+        }
+        let dpdu = mul(sub(mul(t.e1, dv2), mul(t.e2, dv1)), 1.0 / det);
+        let dpdv = mul(sub(mul(t.e2, du1), mul(t.e1, du2)), 1.0 / det);
+        let tt = sub(dpdu, mul(ng, dot(ng, dpdu)));
+        if !(dot(tt, tt) > 0.0) {
+            return ng;
+        }
+        let tg = norm(tt);
+        let mut b = cross(ng, tg);
+        if dot(b, dpdv) > 0.0 {
+            b = mul(b, -1.0);
+        }
+        norm(add(add(mul(tg, tn[0]), mul(b, tn[1])), mul(ng, tn[2])))
+    }
+
+    /// the material's inputs at a point; normal: the interpolated normal (or one given in its place)
+    fn surface(&self, look: &Look, t: &Tri, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> Surface {
+        let base = self.base(look, t, u, v, eye, quad);
+        let (mut metallic, mut roughness) = (look.metallic, look.roughness);
+        if let Some(mr) = self.tex_at(look.mr_texture, t, u, v, eye, quad) {
+            roughness *= mr[1];
+            metallic *= mr[2];
+        }
+        let w = 1.0 - u - v;
+        let ng = norm(normal.unwrap_or_else(|| add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v))));
+        let mut n = ng;
+        if let Some(c) = self.tex_at(look.normal_texture, t, u, v, eye, quad) {
+            let k = look.normal_scale;
+            n = RefScene::bumped(t, ng, [(c[0] * 2.0 - 1.0) * k, (c[1] * 2.0 - 1.0) * k, c[2] * 2.0 - 1.0]);
+        }
+        let ao = self.tex_at(look.occlusion_texture, t, u, v, eye, quad).map_or(1.0, |c| 1.0 + look.occlusion * (c[0] - 1.0));
+        let mut emissive = look.emissive;
+        if let Some(c) = self.tex_at(look.emissive_texture, t, u, v, eye, quad) {
+            emissive = [emissive[0] * c[0], emissive[1] * c[1], emissive[2] * c[2]];
+        }
+        Surface { base, metallic: metallic.clamp(0.0, 1.0), roughness: roughness.clamp(0.0, 1.0), n, ao, emissive }
+    }
+
+    /// the light a surface at p sends towards the eye, times the exposure (before the tone mapper), the sun
+    /// shadowed by vis; and the sun's part unshadowed
+    pub fn light(&self, sf: &Surface, p: V, eye: V, vis: f64) -> ([f64; 3], [f64; 3]) {
+        let v = norm(sub(eye, p));
+        let m = sf.metallic;
+        let c_diff = [sf.base[0] * (1.0 - m), sf.base[1] * (1.0 - m), sf.base[2] * (1.0 - m)];
+        let f0 = [0.04 + (sf.base[0] - 0.04) * m, 0.04 + (sf.base[1] - 0.04) * m, 0.04 + (sf.base[2] - 0.04) * m];
+        let a = (sf.roughness * sf.roughness).max(ALPHA_MIN);
+        let sun = brdf(sf.n, v, self.sun_dir, c_diff, f0, a * a);
+        let (sa, sb) = env_ab(sf.roughness, dot(sf.n, v).clamp(0.0, 1.0));
+        let mut punctual = [0.0; 3];
+        for light in &self.lights {
+            if let Some((att, l)) = light.at(p) {
+                let f = brdf(sf.n, v, l, c_diff, f0, a * a);
+                for k in 0..3 {
+                    punctual[k] += f[k] * light.color[k] * att;
+                }
+            }
+        }
+        let (mut diffuse, mut specular) = (self.ambient, self.ambient);
+        if let Some(env) = &self.env {
+            let e = env.irradiance(sf.n);
+            let nv = dot(sf.n, v);
+            let r = sub(mul(sf.n, 2.0 * nv), v);
+            let s = env.specular(r, sf.roughness * (env.levels.len() - 1) as f64);
+            diffuse = [e[0] * env.k, e[1] * env.k, e[2] * env.k];
+            specular = [s[0] * env.k, s[1] * env.k, s[2] * env.k];
+        }
+        let (mut out, mut sun_part) = ([0.0; 3], [0.0; 3]);
+        for k in 0..3 {
+            let spec = f0[k] * sa + sb;
+            sun_part[k] = sun[k] * self.sun[k] * self.exposure;
+            out[k] = ((specular[k] * spec + diffuse[k] * c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k] + punctual[k]) * self.exposure + sun_part[k] * vis;
+        }
+        (out, sun_part)
+    }
+
+    /// (G5c) something lies between p and the sun: any triangle, either side, beyond a hair of p; MASK's
+    /// holes (base alpha at level 0) let it through
+    pub fn occluded(&self, p: V, dir: V) -> bool {
+        let dd = dot(dir, dir);
+        for inst in &self.inst {
+            let oc = sub(inst.center, p);
+            let along = dot(oc, dir);
+            if along < -sqrt(inst.r2) || dot(oc, oc) - along * along / dd > inst.r2 {
+                continue;
+            }
+            for t in &self.tris[inst.first..inst.last] {
+                let q = cross(dir, t.e2);
+                let det = dot(t.e1, q);
+                if det == 0.0 {
+                    continue;
+                }
+                let o = sub(p, t.v0);
+                let u = dot(o, q) / det;
+                if !(0.0..=1.0).contains(&u) {
+                    continue;
+                }
+                let r = cross(o, t.e1);
+                let v = dot(dir, r) / det;
+                if v < 0.0 || u + v > 1.0 {
+                    continue;
+                }
+                let z = dot(t.e2, r) / det;
+                if z <= 1e-9 {
+                    continue;
+                }
+                if let Some(cut) = inst.look.cutoff {
+                    if self.base(&inst.look, t, u, v, p, None)[3] < cut {
+                        continue;
+                    }
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    /// (G5c) how much of the sun reaches a point of a triangle with geometric normal ng (shadow rays from a
+    /// hair above the surface)
+    fn sun_vis(&self, p: V, ng: V) -> f64 {
+        if !self.shadows || dot(ng, self.sun_dir) <= 0.0 {
+            return 1.0;
+        }
+        let big = p[0].abs().max(p[1].abs()).max(p[2].abs()).max(1.0);
+        let from = add(p, mul(ng, big * 1e-9 + 1e-6));
+        if self.occluded(from, self.sun_dir) { 0.0 } else { 1.0 }
+    }
+
+    /// light (times the exposure) as the target's 8-bit value, through the tone mapper
+    pub fn to_rgb8(&self, c: [f64; 3]) -> [u8; 3] {
+        let c = if self.tonemap { neutral(c) } else { c };
+        let px = |v: f64| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
+        [px(c[0]), px(c[1]), px(c[2])]
+    }
+
+    /// the light of instance k's triangle ti at (u, v), seen from eye; the sun's part unshadowed; the sun's reach
+    fn shade_parts(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> ([f64; 3], [f64; 3], f64) {
+        let t = &self.tris[ti];
+        let sf = self.surface(&self.inst[k].look, t, u, v, eye, quad, normal);
+        let p = add(add(t.v0, mul(t.e1, u)), mul(t.e2, v));
+        let w = 1.0 - u - v;
+        let ng = norm(add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v)));
+        let vis = self.sun_vis(p, ng);
+        let (c, sun) = self.light(&sf, p, eye, vis);
+        (c, sun, vis)
+    }
+
+    /// the light of instance k's triangle ti at (u, v), seen from eye
+    fn shade(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> [f64; 3] {
+        self.shade_parts(k, ti, u, v, eye, quad, normal).0
+    }
+
+    /// (diagnostics) the uv of a hit
+    pub fn uv_of(&self, h: &Hit) -> [f64; 2] {
+        let t = &self.tris[h.tri];
+        let w = 1.0 - h.u - h.v;
+        [t.uv[0][0] * w + t.uv[1][0] * h.u + t.uv[2][0] * h.v, t.uv[0][1] * w + t.uv[1][1] * h.u + t.uv[2][1] * h.v]
     }
 
     /// the nearest front face along eye + z * d with z between near and far
@@ -552,29 +997,27 @@ impl RefScene {
             }
         }
         let (z, k, ti, u, v) = best?;
-        let t = &self.tris[ti];
-        let w = 1.0 - u - v;
-        let n = add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v));
-        let ndl = dot(norm(n), self.sun_dir).max(0.0);
-        let c = self.base(&self.inst[k].look, t, u, v, eye, quad);
-        let px = |i: usize| {
-            let v = c[i] * (self.ambient[i] + self.sun[i] * ndl);
-            (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8
-        };
-        Some(Hit { z, rgb: [px(0), px(1), px(2)], inst: k })
+        let (linear, sun, vis) = self.shade_parts(k, ti, u, v, eye, quad, None);
+        Some(Hit { z, rgb: self.to_rgb8(linear), inst: k, tri: ti, u, v, linear, sun, vis })
     }
 
-    /// this colour is that of the instance under some light between the ambient and the full sun (one
-    /// colour only: a textured instance relies on its neighbours' rays)
-    fn could_show(&self, inst: usize, got: [u8; 3]) -> bool {
-        let look = &self.inst[inst].look;
-        if look.texture.is_some() {
+    /// this colour is one the hit's instance shows near the hit: between the colours of the hit and of its
+    /// triangle's vertex normals there (one colour only: a textured instance relies on its neighbours' rays)
+    fn could_show(&self, hit: &Hit, eye: V, got: [u8; 3]) -> bool {
+        if self.inst[hit.inst].look.textured() {
             return false;
         }
-        let c = look.factor;
-        let k = (0..3).map(|i| got[i] as f64 / 255.0 / c[i].max(1e-6)).fold(0.0, f64::max);
-        let top = (0..3).map(|i| self.ambient[i] + self.sun[i]).fold(0.0, f64::max) + 0.01;
-        k <= top && (0..3).all(|i| ((c[i] * k * 255.0 + 0.5) as i32 - got[i] as i32).abs() <= 2)
+        let t = &self.tris[hit.tri];
+        let mut lo = hit.rgb;
+        let mut hi = hit.rgb;
+        for n in t.n {
+            let c = self.to_rgb8(self.shade(hit.inst, hit.tri, hit.u, hit.v, eye, None, Some(n)));
+            for k in 0..3 {
+                lo[k] = lo[k].min(c[k]);
+                hi[k] = hi[k].max(c[k]);
+            }
+        }
+        (0..3).all(|k| got[k] as i32 >= lo[k] as i32 - 2 && got[k] as i32 <= hi[k] as i32 + 2)
     }
 }
 
@@ -642,7 +1085,7 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                 if !near_rgb(got, want, tol) {
                     let wide = [shoot(cx - 1.0, cy, &q), shoot(cx + 1.0, cy, &q), shoot(cx, cy - 1.0, &q), shoot(cx, cy + 1.0, &q), shoot(cx - 1.0, cy - 1.0, &q),
                                 shoot(cx + 1.0, cy - 1.0, &q), shoot(cx - 1.0, cy + 1.0, &q), shoot(cx + 1.0, cy + 1.0, &q)];
-                    if wide.iter().any(|h| h.is_some_and(|v| sc.could_show(v.inst, got))) {
+                    if wide.iter().any(|h| h.is_some_and(|v| sc.could_show(&v, cam.eye, got))) {
                         out.slivers += 1;
                     } else {
                         out.bad += 1;
@@ -665,8 +1108,8 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                 }
             } else {
                 out.edges += 1;
-                let fine = near_rgb(got, want, tol) || around.iter().any(|h| near_rgb(got, rgb(h), tol) || h.is_some_and(|v| sc.could_show(v.inst, got)))
-                    || c.is_some_and(|v| sc.could_show(v.inst, got));
+                let fine = near_rgb(got, want, tol) || around.iter().any(|h| near_rgb(got, rgb(h), tol) || h.is_some_and(|v| sc.could_show(&v, cam.eye, got)))
+                    || c.is_some_and(|v| sc.could_show(&v, cam.eye, got));
                 if !fine {
                     out.bad += 1;
                     out.first.get_or_insert((x, y, got, want));
@@ -675,6 +1118,134 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
         }
     }
     out.objects_seen = seen.iter().filter(|v| **v).count() as u32;
+    out
+}
+
+/// (G5c) what comparing a shadowed image with exact shadow rays found
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ShadowCompared {
+    /// pixels away from geometric edges, of them on objects, of them in the sun's shadow by the rays
+    pub solid: u32,
+    pub on_objects: u32,
+    pub shadowed: u32,
+    /// solid pixels whose colour lies on no mix of their point's shadowed and lit colour (tolerance): wrong
+    pub bad: u32,
+    /// the mix the GPU shows is nearer the other side than the rays' (more than half): within 3 pixels of a
+    /// pixel whose ray says otherwise (a shadow's edge, the filter's and the bias's doing), or not (acne, leaks)
+    pub at_edges: u32,
+    pub inside: u32,
+    /// pixels at geometric edges, and of them wrong
+    pub edges: u32,
+    pub edges_bad: u32,
+    pub first: Option<(u32, u32, [u8; 3], [u8; 3])>,
+    pub first_inside: Option<(u32, u32, f64, f64)>,
+}
+
+impl ShadowCompared {
+    pub fn text(&self) -> alloc::string::String {
+        let share = |n: u32| n as f64 * 100.0 / self.on_objects.max(1) as f64;
+        format!("{} solid ({} on objects, {} shadowed by the rays): {} other side at a shadow's edge ({:.2} %), {} inside ({:.3} %), {} wrong; {} at geometric edges, {} wrong{}{}",
+                self.solid, self.on_objects, self.shadowed, self.at_edges, share(self.at_edges), self.inside, share(self.inside), self.bad, self.edges, self.edges_bad,
+                self.first.map_or(alloc::string::String::new(), |f| format!(" (first wrong at {}, {}: {:?}, expected {:?})", f.0, f.1, f.2, f.3)),
+                self.first_inside.map_or(alloc::string::String::new(), |f| format!(" (first inside at {}, {}: shows {:.2}, rays {})", f.0, f.1, f.2, f.3)))
+    }
+}
+
+/// (G5c) an image of a scene whose sun casts shadows against exact shadow rays: each solid pixel must show a
+/// mix of its point's shadowed and lit colour (the filter's penumbra), and that mix is judged against the rays
+pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3], image: &[u8], tol: u8) -> ShadowCompared {
+    const NEAR_EDGE: f64 = 1.0 / 64.0;
+    let mut out = ShadowCompared::default();
+    let shoot = |x: f64, y: f64| sc.trace(cam.eye, cam.ray(x, y, w, h), cam.near, cam.far);
+    // the rays' answer per pixel first: -1 for no object
+    let mut vis = alloc::vec![-1.0f64; (w * h) as usize];
+    let mut hits = alloc::vec![None; (w * h) as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let c = shoot(x as f64 + 0.5, y as f64 + 0.5);
+            if let Some(hit) = c {
+                vis[(y * w + x) as usize] = hit.vis;
+            }
+            hits[(y * w + x) as usize] = c;
+        }
+    }
+    let mix = |hit: &Hit, t: f64| -> [u8; 3] {
+        let d = [hit.linear[0] - hit.vis * hit.sun[0], hit.linear[1] - hit.vis * hit.sun[1], hit.linear[2] - hit.vis * hit.sun[2]];
+        sc.to_rgb8([d[0] + t * hit.sun[0], d[1] + t * hit.sun[1], d[2] + t * hit.sun[2]])
+    };
+    // the mix nearest to the colour: (distance, t)
+    let nearest = |hit: &Hit, got: [u8; 3]| -> (u8, f64) {
+        let mut best = (255u8, 0.0);
+        for k in 0..=64 {
+            let t = k as f64 / 64.0;
+            let c = mix(hit, t);
+            let d = (0..3).map(|i| c[i].abs_diff(got[i])).max().unwrap_or(0);
+            if d < best.0 {
+                best = (d, t);
+            }
+        }
+        best
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let at = ((y * w + x) * 4) as usize;
+            let got = [image[at], image[at + 1], image[at + 2]];
+            let (cx, cy) = (x as f64 + 0.5, y as f64 + 0.5);
+            let c = hits[(y * w + x) as usize];
+            let around = [shoot(cx - NEAR_EDGE, cy), shoot(cx + NEAR_EDGE, cy), shoot(cx, cy - NEAR_EDGE), shoot(cx, cy + NEAR_EDGE)];
+            let same = around.iter().all(|h| h.map(|v| v.inst) == c.map(|v| v.inst));
+            if !same {
+                out.edges += 1;
+                let fine = c.iter().chain(around.iter().flatten()).any(|h| nearest(h, got).0 <= tol + 1) || near_rgb(got, clear, tol)
+                    || c.iter().chain(around.iter().flatten()).any(|h| sc.could_show(h, cam.eye, got));
+                if !fine {
+                    out.edges_bad += 1;
+                }
+                continue;
+            }
+            out.solid += 1;
+            let Some(hit) = c else {
+                if !near_rgb(got, clear, tol) {
+                    out.bad += 1;
+                    out.first.get_or_insert((x, y, got, clear));
+                }
+                continue;
+            };
+            out.on_objects += 1;
+            out.shadowed += (hit.vis < 0.5) as u32;
+            let (d, t) = nearest(&hit, got);
+            if d > tol {
+                out.bad += 1;
+                out.first.get_or_insert((x, y, got, hit.rgb));
+                continue;
+            }
+            // a sun too weak here to tell shadow from light
+            let (lit, dark) = (mix(&hit, 1.0), mix(&hit, 0.0));
+            if (0..3).map(|i| lit[i].abs_diff(dark[i])).max().unwrap_or(0) < 4 {
+                continue;
+            }
+            if (t - hit.vis).abs() > 0.5 {
+                let mut edge = false;
+                for dy in -3i32..=3 {
+                    for dx in -3i32..=3 {
+                        let (xx, yy) = (x as i32 + dx, y as i32 + dy);
+                        if xx >= 0 && yy >= 0 && (xx as u32) < w && (yy as u32) < h {
+                            let v = vis[(yy as u32 * w + xx as u32) as usize];
+                            if v >= 0.0 && (v - hit.vis).abs() > 0.5 {
+                                edge = true;
+                            }
+                        }
+                    }
+                }
+                if edge {
+                    out.at_edges += 1;
+                } else {
+                    out.inside += 1;
+                    out.first_inside.get_or_insert((x, y, t, hit.vis));
+                }
+            }
+        }
+    }
     out
 }
 

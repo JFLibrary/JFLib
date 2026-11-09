@@ -1,0 +1,5 @@
+#!args --test shadows
+# (G5c) the sun's cascaded shadow maps against exact shadow rays: a scene across all four cascades, at the origin
+# and at 1e7, MASK with and without the shadow pass's fragment shader, one cascade for comparison, the cascades'
+# radius and snapping on the CPU, the map read back after the camera moved by part of a texel and by whole
+# texels; Voll and Basis

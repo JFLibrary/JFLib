@@ -153,7 +153,8 @@ fn read_depth(t: &mut T, dev: &Device, off: &Off) -> Option<Vec<f32>> {
 }
 
 pub fn sun_of() -> Sun {
-    Sun { direction: [0.3, 0.8, 0.5], color: [0.7, 0.7, 0.7], ambient: [0.3, 0.3, 0.3] }
+    // (0.7 pi lux: a white matte face towards the sun shows 0.7 + 0.3 before the tone mapper)
+    Sun { direction: [0.3, 0.8, 0.5], color: [0.7 * core::f32::consts::PI; 3], ambient: [0.3, 0.3, 0.3] }
 }
 
 /// meshes, materials (one colour per spec), a scene and its reference
@@ -204,6 +205,10 @@ fn check_image(t: &mut T, b: &Built, cam: &Camera, off: &Off, img: &[u8], depth:
     if depth.is_some() {
         t.ok(c.depth_bad == 0, &format!("{what}: depth buffer, largest relative error {:.2e} at {} pixels", c.depth_err, c.solid_hit));
     }
+}
+
+pub fn pixel_of(img: &[u8], w: u32, x: u32, y: u32) -> [u8; 3] {
+    pixel(img, w, x, y)
 }
 
 fn pixel(img: &[u8], w: u32, x: u32, y: u32) -> [u8; 3] {
@@ -509,7 +514,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     // nothing changed: only view and lights go up
     let _ = shot(t, dev, &mut off, &mut r, &mut s, "idle")?;
     let idle = s.upload_info();
-    t.ok(idle.bytes == 176 + 48 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
+    t.ok(idle.bytes == 176 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
     // moving a few: k changes, 96 bytes each
     let mut rng = Rng(5);
     for _ in 0..37 {
@@ -616,7 +621,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     }
     let got = shot(t, dev, &mut off, &mut r, &mut big, "200 moved")?;
     let info = big.upload_info();
-    t.ok(info.changed == 200 && !info.full && info.bytes == 176 + 48 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
+    t.ok(info.changed == 200 && !info.full && info.bytes == 176 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
     let mut f = rebuilt(t, &r, &blist, &cam, false)?;
     let want = shot(t, dev, &mut off, &mut r, &mut f, "200 moved")?;
     let (n, m) = diff(&got, &want);
@@ -695,10 +700,11 @@ fn many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 
 // ---------------------------------------------------------------- levels, coordinates, frames
 
-/// the gallery's images: mixed, changed, far away (G5a), textured with mirrored instances, the glTF scene (G5b)
+/// the gallery's images: mixed, changed, far away (G5a), textured with mirrored instances, the glTF scene (G5b),
+/// then those of common::LATER (G5c)
 pub const GALLERY_NAMES: [&str; 5] = ["mix", "changed", "far", "tex", "gltf"];
 
-fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 5]> {
+fn gallery_image(t: &mut T, dev: &Device) -> Option<Vec<Vec<u8>>> {
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm), "target")?;
@@ -714,7 +720,13 @@ fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 5]> {
     let mut rg = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     let mut sg = t.res(gltf_gallery(&mut rg), "glTF gallery")?;
     let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
-    Some([a, b, c, d, e])
+    let mut all = vec![a, b, c, d, e];
+    for name in LATER {
+        let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+        let mut s = t.res(later_gallery(name, &mut r), name)?;
+        all.push(shot(t, dev, &mut off, &mut r, &mut s, name)?);
+    }
+    Some(all)
 }
 
 fn levels(t: &mut T) {
@@ -727,8 +739,9 @@ fn levels(t: &mut T) {
     let Some(a) = gallery_image(t, &voll) else { return };
     let Some(basis) = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device") else { return };
     let Some(b) = gallery_image(t, &basis) else { return };
-    for (i, name) in ["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK",
-                      "the glTF scene"].iter().enumerate() {
+    let mut names = vec!["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK", "the glTF scene"];
+    names.extend_from_slice(&LATER);
+    for (i, name) in names.iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
         t.ok(n == 0, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m})", GALLERY_W * GALLERY_H));
     }
@@ -1007,7 +1020,8 @@ fn errors(t: &mut T) {
 fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
-    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]), (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs")][..])] {
+    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
+                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -1052,10 +1066,37 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 4] = [("CULL", render3d::CULL_SPV), ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV)];
+    let table: [(&str, &[u32]); 7] = [("CULL", render3d::CULL_SPV), ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV),
+                                      ("VS_DEPTH", render3d::VS_DEPTH_SPV), ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));
+    }
+    // (G5c) the split-sum's table
+    let fresh = render3d::dfg_table();
+    let same = fresh.len() == render3d::DFG.len() && fresh.iter().zip(render3d::DFG.iter()).all(|(a, b)| a[0].to_bits() == b[0].to_bits() && a[1].to_bits() == b[1].to_bits());
+    t.ok(same, &format!("DFG: {} entries embedded, as dfg_table makes them (if not: render3dtest --gen-dfg lib/render3d/dfg_table.rs)", render3d::DFG.len()));
+}
+
+fn gen_dfg(path: &str) -> i32 {
+    let v = render3d::dfg_table();
+    let mut s = String::from("// written by render3dtest --gen-dfg from render3d::dfg_table (dfg.rs): (A, B) as f32 bits, n.v along a row; do not edit\n");
+    s.push_str(&format!("pub const DFG_BITS: [u32; {}] = [\n", v.len() * 2));
+    for row in v.chunks(4) {
+        s.push_str("    ");
+        for e in row {
+            s.push_str(&format!("{:#010x}, {:#010x}, ", e[0].to_bits(), e[1].to_bits()));
+        }
+        s.truncate(s.trim_end().len());
+        s.push('\n');
+    }
+    s.push_str("];\n");
+    if plat::write_file(path, s.as_bytes()) {
+        out(&format!("{path}: {} entries", v.len()));
+        0
+    } else {
+        out(&format!("FAIL cannot write {path}"));
+        1
     }
 }
 
@@ -1159,7 +1200,7 @@ fn dump(dir: &str) -> i32 {
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
         let Some(imgs) = gallery_image(&mut t, &dev) else { continue };
-        for (i, name) in GALLERY_NAMES.iter().enumerate() {
+        for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).enumerate() {
             let file = format!("{dir}/{level}_{name}.rgba");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
@@ -1178,6 +1219,9 @@ pub fn run() -> i32 {
     if let Some(p) = plat::arg_value("--gen-shaders") {
         return gen_shaders(&p);
     }
+    if let Some(p) = plat::arg_value("--gen-dfg") {
+        return gen_dfg(&p);
+    }
     if let Some(d) = plat::arg_value("--dump") {
         return dump(&d);
     }
@@ -1195,9 +1239,10 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 12] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 16] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
-                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf)];
+                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
+                                          ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

@@ -1,6 +1,6 @@
 # GLTF -- glTF-2.0-Import
 
-`lib/gltf` (Crate `jflib-gltf`, in der Fassade `jflib::gltf`) liest glTF 2.0 als `.gltf` (JSON mit Dateien daneben oder Data-URIs) und als `.glb` in ein Datenmodell, das keine GPU braucht: Meshes aus Dreiecken mit Positionen, Normalen und einem UV-Satz, Materialien mit den fünf Texturen von pbrMetallicRoughness, dekodierte Bilder, Sampler, Knoten mit ihren Weltmatrizen in `f64` und die Instanzen einer Szene. [`render3d::gltf`](RENDER3D.md) legt ein solches Dokument auf die GPU; ein CAD- oder Spielwerkzeug liest dasselbe ohne Gerät. Entstanden in G5b ([Roadmap](ROADMAP.md)).
+`lib/gltf` (Crate `jflib-gltf`, in der Fassade `jflib::gltf`) liest glTF 2.0 als `.gltf` (JSON mit Dateien daneben oder Data-URIs) und als `.glb` in ein Datenmodell, das keine GPU braucht: Meshes aus Dreiecken mit Positionen, Normalen und einem UV-Satz, Materialien mit den fünf Texturen von pbrMetallicRoughness, dekodierte Bilder, Sampler, Knoten mit ihren Weltmatrizen in `f64`, die Instanzen einer Szene und (G5c) die Lichter von `KHR_lights_punctual`. [`render3d::gltf`](RENDER3D.md) legt ein solches Dokument auf die GPU; ein CAD- oder Spielwerkzeug liest dasselbe ohne Gerät. Entstanden in G5b ([Roadmap](ROADMAP.md)).
 
 | Teil | Wo |
 | --- | --- |
@@ -38,8 +38,9 @@ let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
 - **Knoten**: TRS oder Matrix (die letzte Zeile muss 0 0 0 1 sein: glTF verlangt Matrizen, die sich in T · R · S zerlegen lassen), Weltmatrizen in `f64` von den Wurzeln her ohne Rekursion; jeder Knoten hat höchstens einen Elternknoten, Zyklen sind ein Fehler.
 - **Materialien**: pbrMetallicRoughness mit Faktoren und Texturen, Normale (mit `scale`), Verdeckung (mit `strength`), Emission, `alphaMode` mit `alphaCutoff`, `doubleSided`.
 - **Bilder**: PNG und JPEG über `lib/img_png` und `lib/img_jpeg`, erkannt an den ersten Bytes (nicht am `mimeType`), als `rgba` mit geradem Alpha. Farbprofile und Gamma der Dateien werden ignoriert (glTF sagt so), ebenso die EXIF-Ausrichtung eines JPEG (UV meinen das gespeicherte Bild). Nur Bilder, die eine Textur nennt, werden dekodiert.
-- **Erweiterungen**: unbekannte werden übergangen. Nennt `extensionsRequired` irgendeine (Draco, meshopt, KTX2/basisu, Quantisierung, Texturtransformation, ...), ist das `Error::Unsupported`: Jede davon ändert, was die Daten bedeuten.
-- **Nicht gelesen**: Animationen, Skins, Morph-Ziele, Kameras, Lichter, Tangenten, Farben je Ecke, weitere UV-Sätze (eine Textur auf `texCoord` 1 behält den Wert, `render3d` nimmt UV 0 und notiert das).
+- **Lichter** (G5c): `KHR_lights_punctual`, gerichtet, Punkt und Spot, mit Name, Farbe (Vorgabe weiß), Intensität (Vorgabe 1; Candela, gerichtet Lux), Reichweite und Kegelwinkeln (Vorgaben 0 und π/4); `Document::lights`, `Node::light`, `doc.lights_of(szene) -> Vec<LightRef { node, light, world }>` (`position()`, `direction()`: das −z des Knotens). Geprüft wie alles andere: eine der drei Arten, Farbe mit drei endlichen Werten ab 0, Intensität endlich ab 0, Reichweite über 0, `0 ≤ innen < außen ≤ π/2`, ein Spot braucht `spot`, ein Knoten nennt nur vorhandene Lichter; `Limits::lights` (65 536) begrenzt die Zahl, bevor etwas zugewiesen wird. Die Reichweite eines gerichteten Lichts wird übergangen (Notiz).
+- **Erweiterungen**: unbekannte werden übergangen. Nennt `extensionsRequired` irgendeine außer `KHR_lights_punctual` (Draco, meshopt, KTX2/basisu, Quantisierung, Texturtransformation, ...), ist das `Error::Unsupported`: Jede davon ändert, was die Daten bedeuten.
+- **Nicht gelesen**: Animationen, Skins, Morph-Ziele, Kameras, Tangenten, Farben je Ecke, weitere UV-Sätze (eine Textur auf `texCoord` 1 behält den Wert, `render3d` nimmt UV 0 und notiert das).
 
 ## Dateien sind nicht vertrauenswürdig
 
@@ -73,10 +74,11 @@ let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
 | acht Grenzen unter die Datei gesenkt (Knoten, Tiefe, Instanzen, Pixel, Puffer, JSON, Ecken, Datei) | jedes Mal `Limit` |
 | `.glb`: ohne Magie, Version 1, Kopf länger als die Datei, Chunk über das Ende, BIN zuerst, ein zweiter JSON-Chunk | `Invalid`/`Unsupported`; ohne Magie hält `load` die Datei für JSON und sagt `Json` |
 | Streifen und Fächer, Punkte, ein Primitiv ohne POSITION | Dreiecke 0 1 2, 2 1 0 und 0 1 2, 0 2 0; ausgelassen mit Notiz |
+| (G5c) `KHR_lights_punctual` (`render3dtest --test lights`): eine Datei mit fünf Lichtern aller Arten, eins von zwei Knoten gesetzt, eins unter einem Elternknoten; dieselbe mit der Erweiterung in `extensionsRequired`; jede Länge abgeschnitten; 600 Dateien mit 1 bis 6 geänderten Bytes; 17 gebrochene Regeln (keine Art, unbekannte Art, Art als Zahl, zwei Farbkanäle, negative Farbe, negative, unendliche und als Text geschriebene Intensität, Reichweite 0 und negativ, innen = außen, außen über π/2, negativer innerer Winkel, Spot ohne `spot`, ein Knoten nennt Licht 9 und −1, `lights` als Objekt); die Grenze unter der Zahl; gezeichnet über `upload` gegen den Strahlenwerfer aus der Beschreibung | wie geschrieben, Weltmatrizen 4,4 · 10⁻¹⁶ neben den im Test zusammengesetzten, der Spot zeigt nach unten; lädt; 2337 abgeschnittene: keine lädt; 12 laden, 588 Fehler, keine Panik; jede `Invalid`; `Limit`; 0 falsche Pixel |
 | die Szene über `render3d::gltf::upload` gezeichnet, gegen den Strahlenwerfer, der aus der Beschreibung des Tests gebaut ist (nicht aus dem Import), Voll und Basis; dasselbe Bild im Browser | 0 falsche Pixel (Toleranz 6 wegen bilinearer und trilinearer Texturen); im Browser 0 Pixel anders als Vulkan |
 
 Messungen (Laden einer großen Datei, Speicher): [RENDER3D.md](RENDER3D.md#g5b-texturen-hochladen-gltf).
 
 ## Was nicht gebaut ist
 
-Schreiben von glTF (außer `write_glb` für Tests), Animationen, Skins, Morph-Ziele, Kameras, Lichter (`KHR_lights_punctual`), Erweiterungen, die Daten umdeuten (Draco, meshopt, KTX2/basisu, `KHR_mesh_quantization`, `KHR_texture_transform`), weitere UV-Sätze, Tangenten, Farben je Ecke, Data-URIs ohne Base64, ein Lesen ohne JSON-Baum für Dateien mit Millionen Knoten.
+Schreiben von glTF (außer `write_glb` für Tests), Animationen, Skins, Morph-Ziele, Kameras, Erweiterungen, die Daten umdeuten (Draco, meshopt, KTX2/basisu, `KHR_mesh_quantization`, `KHR_texture_transform`), weitere UV-Sätze, Tangenten, Farben je Ecke, Data-URIs ohne Base64, ein Lesen ohne JSON-Baum für Dateien mit Millionen Knoten.

@@ -1,0 +1,3 @@
+#!args --bench 20000 --res 320x180 --frames 20 --warmup 4 --lights 64 --verify --validate
+# (G5c) a short run of the measurement loop with 64 point lights under validation: the lists hold all of gputest's
+# cull_ref, the light list goes up and is read without a hazard

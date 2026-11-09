@@ -22,6 +22,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
 - **plat:** macOS and iOS (aarch64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim): rt and the core of plat through libSystem: the start, arguments and environment, time, files, threads, semaphores, the wake-up; windows answer as without a display until the window backend (docs/APPLE.md, AP2)
 - **build:** build_rs.py app, lib and run with --target mac and --target ios (--sim: the simulator) on a Mac; tools/apple.py packs a program as NAME.app and starts it in the simulator or on an iPhone; jflib-build accepts macOS and iOS
+- **render3d:** PBR after glTF 2.0 Appendix B (GGX, separable Smith, Schlick) with all five textures (normal maps on a tangent frame from derivatives), exposure and Khronos PBR Neutral in the fragment shader (Scene::set_exposure, set_tonemap), the split-sum's second sum from an embedded table (DFG); cascaded shadow maps of the sun (Scene::set_shadows, Shadows: up to four cascades culled on the GPU, snapped to the texel grid, PCF, MASK's holes); point and spot lights after KHR_lights_punctual (Scene::set_lights, Light); environment light from 9 spherical harmonics and a prefiltered cube (Renderer::set_environment with a procedural Sky or six faces, Scene::set_environment); render3d::gltf::upload returns lights and suns (docs/RENDER3D.md)
+- **gltf:** KHR_lights_punctual: Document::lights, Node::light, lights_of(scene), Limits::lights; the extension may stand in extensionsRequired (docs/GLTF.md)
 
 ### Changed
 
@@ -29,6 +31,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
 - **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
+- **render3d:** Sun::color is illuminance in lux (KHR_lights_punctual; Sun::DEFAULT 0.75 pi), materials are shaded as PBR instead of Lambert, nearest texture filtering loads the texel (textureLoad) instead of sampling its centre
 - **img_core:** The MIME type of Paint.NET files is `image/x-paint.net` (it was `image/x-PaintCraft`, a leftover of a renaming).
 - **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
 - **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).

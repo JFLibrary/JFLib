@@ -52,8 +52,12 @@ pub fn ref_sampling(s: Sampling) -> RefSampling {
 /// what the reference makes of a material (texture ids are the reference's texture indices)
 pub fn look_of(m: &Material) -> Look {
     let f = m.base_color;
-    Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: m.base_color_texture.map(|t| (t.texture.0 as usize, ref_sampling(t.sampling))),
-           cutoff: m.alpha_cutoff.map(|c| c as f64) }
+    let tex = |t: Option<TextureRef>| t.map(|t| (t.texture.0 as usize, ref_sampling(t.sampling)));
+    let e = m.emissive;
+    Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: tex(m.base_color_texture), cutoff: m.alpha_cutoff.map(|c| c as f64),
+           metallic: m.metallic as f64, roughness: m.roughness as f64, mr_texture: tex(m.metallic_roughness_texture), normal_texture: tex(m.normal_texture),
+           normal_scale: m.normal_scale as f64, occlusion_texture: tex(m.occlusion_texture), occlusion: m.occlusion_strength as f64,
+           emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: tex(m.emissive_texture) }
 }
 
 pub struct Built {

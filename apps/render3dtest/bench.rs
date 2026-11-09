@@ -91,13 +91,24 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let (frames, warmup, k) = (num("--frames", 300), num("--warmup", 60), num("--inflight", 3).clamp(1, 3));
     let (moved, meshes) = (num("--moved", 0), num("--meshes", 1).max(1));
     let (textures, tex_size) = (num("--textures", 0), num("--tex-size", 256).clamp(1, 4096) as u32);
+    // (G5c) the sun's shadows: --shadows C cascades of --shadow-size S up to --shadow-distance D, --shadow-mask 0: no
+    // fragment shader in the shadow passes
+    let shadows = num("--shadows", 0).min(render3d::CASCADES_MAX);
+    let shadow = render3d::Shadows { cascades: shadows.max(1) as u32, size: num("--shadow-size", 2048) as u32, distance: num("--shadow-distance", 100) as f64,
+                                     ..render3d::Shadows::DEFAULT };
+    let shadow_mask = num("--shadow-mask", 1) != 0;
+    // (G5c) --lights N point lights spread over the scene, range an eighth of its extent
+    let lights = num("--lights", 0);
+    // (G5c) --env 1: the procedural sky lights the scene
+    let env = num("--env", 0) != 0;
     let args = plat::args();
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
     let desc = DeviceDesc { max_level: if basis { Level::Basis } else { Level::Voll } };
     let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size).is_none() && t.fails == 0 {
+    let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -108,7 +119,8 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32) -> Option<()> {
+fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
+       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -146,7 +158,27 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let palette = objs.len().min(1024) as u32;
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     let amb = 0.25f32;
-    s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [1.0 - amb; 3], ambient: [amb; 3] });
+    s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [(1.0 - amb) * core::f32::consts::PI; 3], ambient: [amb; 3] });
+    if env {
+        t.res(r.set_environment(&render3d::EnvironmentData::Sky(render3d::Sky::DEFAULT)), "set_environment")?;
+        s.set_environment(Some(1.0));
+        out("  the procedural sky lights the scene");
+    }
+    if lights > 0 {
+        let mut lr = Rng(321);
+        let e = extent as f64 * 0.5;
+        let list: Vec<render3d::Light> = (0..lights).map(|_| render3d::Light::point([lr.range(-e, e), lr.range(-e * 0.2, e * 0.2), lr.range(-e, e)],
+                                                                                      [lr.range(0.3, 1.0) as f32, lr.range(0.3, 1.0) as f32, lr.range(0.3, 1.0) as f32],
+                                                                                      (e * e * 0.01) as f32, Some(extent * 0.125))).collect();
+        t.res(s.set_lights(&list), "set_lights")?;
+        out(&format!("  {lights} point lights over the scene, range {:.0}", extent * 0.125));
+    }
+    if let Some((sh, mask)) = &shadows {
+        t.res(s.set_shadows(Some(sh)), "set_shadows")?;
+        r.set_shadow_mask(*mask);
+        out(&format!("  shadows: {} cascades of {} up to {} (scene extent {extent:.0}), the shadow pass {}", sh.cascades, sh.size, sh.distance,
+                     if *mask { "with fs_shadow (MASK's holes)" } else { "depth only" }));
+    }
     let mut ids: Vec<InstanceId> = Vec::with_capacity(n as usize);
     for (i, o) in objs.iter().enumerate() {
         let transform = Transform { pos: [o.pos[0] as f64, o.pos[1] as f64, o.pos[2] as f64], rot: o.rot, scale: [o.scale; 3] };
@@ -205,7 +237,11 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let vis = pick(&|x| Some(x.visible as f64));
     let up = pick(&|x| x.stamps.map(|a| a[1] - a[0]));
     let cull = pick(&|x| x.stamps.map(|a| a[2] - a[1]));
-    let draw = pick(&|x| x.stamps.map(|a| a[3] - a[2]));
+    let draw = pick(&|x| x.stamps.map(|_| x.draw));
+    // (G5c) the cascades' culling and depth passes, summed and each
+    let shcull = pick(&|x| x.stamps.map(|_| x.cascades.iter().map(|c| c[0]).sum()));
+    let shdraw = pick(&|x| x.stamps.map(|_| x.cascades.iter().map(|c| c[1]).sum()));
+    let per: Vec<(Stat, Stat)> = (0..render3d::CASCADES_MAX).map(|k| (pick(&|x| x.stamps.map(|_| x.cascades[k][0])), pick(&|x| x.stamps.map(|_| x.cascades[k][1])))).collect();
     let all = pick(&|x| x.stamps.map(|a| a[3] - a[0]));
     let mut gaps = Vec::new();
     for p in m.windows(2) {
@@ -225,10 +261,14 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     out(&format!("  CPU: prepare {:.3} ms, record {:.3}, prepare + record + submit {:.3} median, {:.3} p99; waiting for the GPU {:.3}", ps.med, rs.med, cs.med, cs.p99, ws.med));
     out(&format!("  GPU: upload {:.3} / cull {:.3} / draw {:.3} / total {:.3} ms median; p99 {:.3} / {:.3} / {:.3} / {:.3}", up.med, cull.med, draw.med, all.med, up.p99, cull.p99, draw.p99, all.p99));
     out(&format!("  GPU frame interval {:.3} ms median, {:.3} p99; GPU busy {:.1} %", gap.med, gap.p99, busy * 100.0));
+    if shadows.is_some() {
+        out(&format!("  cascades (culling / depth pass, ms median): {}", per.iter().map(|(c, d)| format!("{:.3} / {:.3}", c.med, d.med)).collect::<Vec<_>>().join("; ")));
+    }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} vis={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} draw={:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
-                 dev.level(), m.len(), vis.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99, draw.med, draw.p99, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} vis={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+                 dev.level(), m.len(), vis.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99, shcull.med, shcull.p99,
+                 shdraw.med, shdraw.p99, draw.med, draw.p99, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
         verify_lists(t, dev, &s, &objs, ids.len(), time_of(total - 1), extent, w, h)?;
     }
