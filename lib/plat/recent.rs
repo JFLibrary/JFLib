@@ -8,10 +8,12 @@
 //                                   item is given to that id: SHARD_APPIDINFO).
 //                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
 //                                   freedesktop format GTK and KDE read: href, added / modified /
-//                                   visited, the MIME type, this app's entry with exec and count)
+//                                   visited, the MIME type, this app's entry with exec and count).
+//                                   macOS: the app's recent documents (NSDocumentController, the
+//                                   Dock's menu of the app; apple_recent.rs)
 //   recent_list(max) -> [path]      this app's files, newest first (Windows: the jump list's
 //                                   recent items, IApplicationDocumentLists; Linux: the
-//                                   bookmarks with an entry of this app)
+//                                   bookmarks with an entry of this app; macOS: recentDocumentURLs)
 //   recent_remove(path) -> bool     the file out of the app's list (Windows: the jump list,
 //                                   IApplicationDestinations -- Explorer's recent files keep it;
 //                                   Linux: this app's entry, the bookmark when no other app is
@@ -572,7 +574,11 @@ fn xbel_remove(file: &str, path: Option<&str>) -> bool {
 #[path = "win_recent.rs"]
 mod native;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+#[path = "apple_recent.rs"]
+mod native;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod native {
     use super::Target;
     use alloc::string::String;

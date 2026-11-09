@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -25916,8 +25916,9 @@ Windows (win_spell.rs): ISpellCheckerFactory / ISpellChecker of the Spell Checki
 thread (an apartment of its own on the UI thread): a SysSpeller stays on the thread that
 opened it (it is not Send).  check() reports a word as misspelled when ISpellChecker::Check
 returns any error for it (also "replace" / "delete" actions); the user's Windows word list
-counts as known.  Linux, Web, Android: no system checker (None, empty) -- their Hunspell
-dictionaries are files the spell crate reads itself.
+counts as known.  macOS (apple_spell.rs): NSSpellChecker (its languages; the words the user
+taught it count as known).  Linux, Web, Android, iOS: no system checker (None, empty) -- their
+Hunspell dictionaries are files the spell crate reads itself.
 ```
 
 - **`struct SysSpeller`**
@@ -26082,7 +26083,8 @@ the last guard goes).  A backend may still drop an inhibition later; the guard d
 notice.  logind's Inhibit is not used: it answers with a file descriptor, which plat's
 D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
-partial WakeLock (INHIBIT_SUSPEND).
+partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
+(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
 ```
 
 ```rust
@@ -26753,10 +26755,12 @@ recent -- the system's list of recently used files
                                   item is given to that id: SHARD_APPIDINFO).
                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
                                   freedesktop format GTK and KDE read: href, added / modified /
-                                  visited, the MIME type, this app's entry with exec and count)
+                                  visited, the MIME type, this app's entry with exec and count).
+                                  macOS: the app's recent documents (NSDocumentController, the
+                                  Dock's menu of the app; apple_recent.rs)
   recent_list(max) -> [path]      this app's files, newest first (Windows: the jump list's
                                   recent items, IApplicationDocumentLists; Linux: the
-                                  bookmarks with an entry of this app)
+                                  bookmarks with an entry of this app; macOS: recentDocumentURLs)
   recent_remove(path) -> bool     the file out of the app's list (Windows: the jump list,
                                   IApplicationDestinations -- Explorer's recent files keep it;
                                   Linux: this app's entry, the bookmark when no other app is
@@ -27897,7 +27901,9 @@ locale -- the user's languages and regional format as BCP 47 tags ("de-DE", "en-
 Windows: GetUserPreferredUILanguages and GetUserDefaultLocaleName.  Linux, the browser and
 Android: the environment -- LANGUAGE (a ':' list, GNU), LC_ALL, LC_MESSAGES, LANG for the
 languages; LC_ALL, LC_TIME, LC_NUMERIC, LANG for the format.  The browser host sets LANGUAGE
-from navigator.languages, the Android host from the system's locale list.
+from navigator.languages, the Android host from the system's locale list.  macOS and iOS:
+CoreFoundation's preferred languages and current locale; LANGUAGE / LC_ALL / LC_MESSAGES and
+LC_ALL / LC_TIME / LC_NUMERIC set by hand win (LANG alone does not).
 ```
 
 - **`fn locale_tag(s: &str) -> Option<String>`**
@@ -27909,6 +27915,14 @@ from navigator.languages, the Android host from the system's locale list.
 
 - **`fn system_locale() -> Option<String>`**
   the regional format (numbers, dates, currency) of the user
+
+- **`fn system_languages() -> Vec<String>`** *(Apple)*
+  Apple: the system's preferred languages (CFLocaleCopyPreferredLanguages); LANGUAGE, LC_ALL or
+  LC_MESSAGES set by hand win (LANG alone does not: Terminal sets it from the region)
+
+- **`fn system_locale() -> Option<String>`** *(Apple)*
+  Apple: LC_ALL, LC_TIME or LC_NUMERIC set by hand, else the system's current locale
+  (CFLocaleCopyCurrent: "de_DE", "en_US@rg=dezzzz" -> "en-US"), else LANG, else the first language
 
 - **`fn system_languages() -> Vec<String>`** *(Windows)*
   the UI languages in order of preference (empty when the system names none)
@@ -31018,8 +31032,8 @@ apple_mac.rs.
 
 - **`fn print(job: &mut crate::PrintJob<'_>) -> i32`**
   printing as linux_print.rs checks it: the manifest, a job without pixels (ERR_DIMS), the test
-  variant jfgui_PRINT_TO=FILE (the PDF into a file); the system's print dialog comes with AP7, until
-  then ERR_UNSUPPORTED
+  variant jfgui_PRINT_TO=FILE (the PDF into a file); macOS: the system's print dialog
+  (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 
 - **`fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32)`**
   iOS: no system file dialog before AP5 -> (-1, 0): the library's own dialog, as in a browser without
@@ -31072,6 +31086,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
   system    monitors (NSScreen), the appearance, the accent colour and the accessibility settings
             (sys_settings_os), custom cursors (NSCursor of an NSBitmapImageRep)
   dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
+  the app   apple_mac_app.rs: the main menu (Cmd+Q asks the main window), NSApp's delegate,
+            E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 
 Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -31200,6 +31216,12 @@ reaches the system's event stream.
                              TS_PINCH a magnification of a / 1000 (magnifyWithEvent:, at client px b, c)
     WT_PARENT [popup]        the index of the window w (popup = 1: popup slot w) hangs on, -1 none
     WT_MIN_SIZE              window w's minimum client size (DIP): w | h << 32
+    WT_MENU                  the main menu: its items | the app menu's items << 8 | (1 << 16 when its
+                             Quit is Cmd+Q)
+    WT_TERMINATE             [NSApp terminate:] (Cmd+Q, the Dock's Quit) -> 0 when the app goes on
+    WT_WORKSPACE [k]         NSWorkspace's notification k (0 will sleep, 1 did wake, 2 will power off)
+                             posted in this process
+    WT_SIGTERM               SIGTERM to this process (kill)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -31218,6 +31240,10 @@ WT_POPUP_SEND: u32 = 13
 WT_SEND: u32 = 32
 WT_PARENT: u32 = 33
 WT_MIN_SIZE: u32 = 34
+WT_MENU: u32 = 35
+WT_TERMINATE: u32 = 36
+WT_WORKSPACE: u32 = 37
+WT_SIGTERM: u32 = 38
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
@@ -31275,6 +31301,39 @@ is bounded by dnd.rs / clipdrop.rs (drop_add, drop_set_*).
   (plattest) a drop of data at px x, y of window w, the source offering `mask` (NSDragOperation
   bits): draggingEntered:, draggingUpdated:, then performDragOperation: (or draggingExited: when
   refused) of the view, with a stand-in NSDraggingInfo -> the effect (0 refused); None: no window
+
+### `plat/apple_mac_app.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_app.rs`](../lib/plat/apple_mac_app.rs)
+
+```text
+apple_mac_app -- the app in macOS (docs/APPLE.md AP7a): its menu, its delegate, the system's events,
+tool windows as panels, the print dialog
+
+  gui_once()                (win_create, the first window) the main menu: the app menu (About, Hide,
+                            Hide Others, Show All, Quit: Cmd+Q) and the Window menu (Minimize: Cmd+M,
+                            Zoom, Bring All to Front), in German or English after the system's first
+                            language; SIGTERM becomes E_SESSION_END (a dispatch source on the main
+                            queue: the run loop delivers it)
+  observe(obs)              (init) the observer (a delegate object of ours, index -1) is NSApp's
+                            delegate and hears NSWorkspace: will sleep / did wake -> E_POWER 1 / 0,
+                            will power off -> E_SESSION_END
+  delegate methods          applicationShouldTerminate: (Cmd+Q, the Dock's Quit, logging out): E_CLOSE
+                            of the main window, the app decides (NSTerminateCancel); without a main
+                            window the app ends.  applicationShouldHandleReopen:hasVisibleWindows:
+                            (a click on the Dock icon) brings the main window back
+  panel_class()             PWF_TOOL windows are panels of our class JFPanel: they become the key
+                            window only for a click into a text field (the hit hook's HB_TEXT), as on
+                            Windows (MA_NOACTIVATE); JFPanel's sendEvent: notes the event
+                            needsPanelToBecomeKey looks at
+  print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies;
+                            the job laid out on the chosen paper and its printable area as a one-page
+                            PDF (print.rs), printed through PDFKit without a second panel
+  print_dialog_autoclose(ms) (test aid) the next print panel is cancelled after ms (NSApp abortModal)
+```
+
+- **`fn print_dialog_autoclose(ms: u32)`**
+  (test aid) the next print panel is cancelled after ms
 
 ### `plat/web.rs`
 

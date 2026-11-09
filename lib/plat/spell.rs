@@ -16,8 +16,9 @@
 // thread (an apartment of its own on the UI thread): a SysSpeller stays on the thread that
 // opened it (it is not Send).  check() reports a word as misspelled when ISpellChecker::Check
 // returns any error for it (also "replace" / "delete" actions); the user's Windows word list
-// counts as known.  Linux, Web, Android: no system checker (None, empty) -- their Hunspell
-// dictionaries are files the spell crate reads itself.
+// counts as known.  macOS (apple_spell.rs): NSSpellChecker (its languages; the words the user
+// taught it count as known).  Linux, Web, Android, iOS: no system checker (None, empty) -- their
+// Hunspell dictionaries are files the spell crate reads itself.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -26,10 +27,13 @@ use core::marker::PhantomData;
 #[cfg(windows)]
 #[path = "win_spell.rs"]
 mod imp;
+#[cfg(target_os = "macos")]
+#[path = "apple_spell.rs"]
+mod imp;
 
 /// a checker of the system's spell checking service for one language
 pub struct SysSpeller {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     inner: imp::Checker,
     tag: String,
     _thread: PhantomData<*const ()>, // stays on its thread (COM apartment)
@@ -91,11 +95,11 @@ pub fn hyphen_dirs() -> Vec<String> {
 
 /// the tag of a language the system's checker knows (see the module header)
 pub fn sys_spell_find(lang: &str) -> Option<String> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         imp::find(lang)
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = lang;
         None
@@ -104,11 +108,11 @@ pub fn sys_spell_find(lang: &str) -> Option<String> {
 
 /// every language the system's checker knows
 pub fn sys_spell_languages() -> Vec<String> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         imp::languages()
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         Vec::new()
     }
@@ -117,12 +121,12 @@ pub fn sys_spell_languages() -> Vec<String> {
 impl SysSpeller {
     /// the checker for `tag` (a tag sys_spell_find gave), None when the system has none
     pub fn open(tag: &str) -> Option<SysSpeller> {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             let inner = imp::Checker::open(tag)?;
             Some(SysSpeller { inner, tag: String::from(tag), _thread: PhantomData })
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             let _ = tag;
             None
@@ -136,11 +140,11 @@ impl SysSpeller {
 
     /// the word is correct (an error of the service: true)
     pub fn check(&self, word: &str) -> bool {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             self.inner.check(word)
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             let _ = word;
             true
@@ -149,11 +153,11 @@ impl SysSpeller {
 
     /// corrections for the word (at most max)
     pub fn suggest(&self, word: &str, max: usize) -> Vec<String> {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             self.inner.suggest(word, max)
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             let _ = (word, max);
             Vec::new()

@@ -85,9 +85,9 @@ fn tags(t: &mut T) {
     t.eq("garbage", tag("1x-DE"), None);
 }
 
-// the environment of Linux, the browser and Android (Windows asks the system)
+// the environment of Linux, the browser and Android (Windows and Apple ask the system)
 fn system(t: &mut T) {
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_vendor = "apple")))]
     {
         let set = |n: &str, v: Option<&str>| {
             plat::setenv(n, v);
@@ -111,7 +111,7 @@ fn system(t: &mut T) {
         t.eq("format from the first language", plat::system_locale(), Some(s("pt-BR")));
         set("LANGUAGE", None);
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_vendor = "apple"))]
     {
         let l = plat::system_languages();
         t.check("Windows: valid tags", l.iter().all(|x| plat::locale_tag(x).as_deref() == Some(x.as_str())));

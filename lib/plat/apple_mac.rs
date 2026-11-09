@@ -27,6 +27,8 @@
 //   system    monitors (NSScreen), the appearance, the accent colour and the accessibility settings
 //             (sys_settings_os), custom cursors (NSCursor of an NSBitmapImageRep)
 //   dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
+//   the app   apple_mac_app.rs: the main menu (Cmd+Q asks the main window), NSApp's delegate,
+//             E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
 //   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 //
 // Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -67,6 +69,10 @@ mod test;
 pub use test::*;
 #[path = "apple_mac_dnd.rs"]
 mod dnd;
+#[path = "apple_mac_app.rs"]
+mod sysapp;
+pub(crate) use sysapp::print_dialog;
+pub use sysapp::print_dialog_autoclose;
 pub(crate) use dnd::os_drag_start;
 pub use dnd::{dnd_test_drop, dnd_test_formats};
 #[link(name = "QuartzCore", kind = "framework")]
@@ -290,7 +296,8 @@ fn init() -> bool {
         CFRunLoopAddSource(rl, src, kCFRunLoopCommonModes);
         MAIN_RL.store(rl as *mut c_void, Ordering::SeqCst);
         SOURCE.store(src as *mut c_void, Ordering::SeqCst);
-        observe(del_cls, doff);
+        let obs = observe(del_cls, doff);
+        sysapp::observe(app, obs);
         *ST.0.get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
                                 min0: (0, 0), flags: 0, marked: String::new(), cs, wheel: [0.0; 2], zoom: 0.0, own: false,
                                 cursors: [NIL; CUR_USER_MAX as usize], blank: NIL, autoclose: None });
@@ -298,8 +305,13 @@ fn init() -> bool {
     true
 }
 
-/// the settings' notifications go to a delegate object of ours (index -1): E_SETTINGS
-fn observe(del_cls: Id, doff: isize) {
+/// (apple_recent.rs and others) the application object exists (made here once)
+pub(crate) fn app_init() -> bool {
+    init()
+}
+
+/// the settings' notifications go to a delegate object of ours (index -1): E_SETTINGS -> the object
+fn observe(del_cls: Id, doff: isize) -> Id {
     // SAFETY: an observer object kept for the process; the centres retain nothing of it.
     unsafe {
         let obs: Id = msg!(del_cls, c"new"; Id);
@@ -313,6 +325,7 @@ fn observe(del_cls: Id, doff: isize) {
         let nc: Id = msg!(class(c"NSNotificationCenter"), c"defaultCenter"; Id);
         msg!(nc, c"addObserver:selector:name:object:", obs => Id, super::objc::sel(c"jfScreensChanged:") => Sel,
              NSApplicationDidChangeScreenParametersNotification => Id, NIL => Id; ());
+        obs
     }
 }
 
@@ -385,6 +398,7 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
         crate::write_stderr(b"error: no window server (log in on the Mac first)\n");
         return -1;
     }
+    sysapp::gui_once(); // the main menu, SIGTERM
     let Some(slot) = with(|s| {
         if owner == PW_NOOWNER && s.wins[0].is_none() {
             Some(0)
@@ -412,10 +426,17 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
     let rect = NSRect::new(0.0, 0.0, w_dip.max(1) as f64, h_dip.max(1) as f64);
     // SAFETY: AppKit objects made on the main thread; every message has its exact signature.
     let (win, view, del, scale) = unsafe {
-        let win: Id = msg!(class(c"NSWindow"), c"alloc"; Id);
+        // a tool window is a panel: the key window only for a click into a text field (sysapp)
+        let cls = if flags & PWF_TOOL != 0 { sysapp::panel_class() } else { class(c"NSWindow") };
+        let win: Id = msg!(cls, c"alloc"; Id);
         let win: Id = msg!(win, c"initWithContentRect:styleMask:backing:defer:", rect => NSRect, style => u64, 2u64 => u64, false => bool; Id);
         if win.is_null() {
             return -1;
+        }
+        if flags & PWF_TOOL != 0 {
+            msg!(win, c"setBecomesKeyOnlyIfNeeded:", true => bool; ());
+            msg!(win, c"setFloatingPanel:", false => bool; ());
+            msg!(win, c"setHidesOnDeactivate:", false => bool; ());
         }
         msg!(win, c"setReleasedWhenClosed:", false => bool; ());
         let t = nsstring(title);
@@ -1939,6 +1960,7 @@ fn view_methods() -> Vec<(&'static core::ffi::CStr, *const c_void, &'static core
         (c"isFlipped", v_yes as *const c_void, c"B@:"),
         (c"acceptsFirstResponder", v_yes as *const c_void, c"B@:"),
         (c"acceptsFirstMouse:", v_yes1 as *const c_void, c"B@:@"),
+        (c"needsPanelToBecomeKey", sysapp::v_needs_panel_key as *const c_void, c"B@:"),
         (c"mouseDown:", v_mouse_down as *const c_void, ev),
         (c"mouseUp:", v_mouse_up as *const c_void, ev),
         (c"rightMouseDown:", v_right_down as *const c_void, ev),
@@ -2027,7 +2049,7 @@ extern "C" fn d_backing_changed(this: Id, _cmd: Sel, _n: Id) {
 
 fn delegate_methods() -> Vec<(&'static core::ffi::CStr, *const c_void, &'static core::ffi::CStr)> {
     let n = c"v@:@";
-    alloc::vec![
+    let mut v = alloc::vec![
         (c"windowShouldClose:", d_should_close as *const c_void, c"B@:@"),
         (c"windowDidResize:", d_did_resize as *const c_void, n),
         (c"windowDidMove:", d_did_move as *const c_void, n),
@@ -2037,5 +2059,7 @@ fn delegate_methods() -> Vec<(&'static core::ffi::CStr, *const c_void, &'static 
         (c"windowDidEndLiveResize:", d_did_resize as *const c_void, n),
         (c"jfThemeChanged:", d_theme_changed as *const c_void, n),
         (c"jfScreensChanged:", d_screens_changed as *const c_void, n),
-    ]
+    ];
+    v.extend_from_slice(&sysapp::delegate_methods());
+    v
 }
