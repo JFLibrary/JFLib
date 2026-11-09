@@ -20,7 +20,7 @@ const FUTEX_PRIVATE: usize = 128;
 const EINTR: isize = 4;
 // CLONE_VM | FS | FILES | SIGHAND | THREAD | SYSVSEM | PARENT_SETTID | CHILD_CLEARTID
 const CLONE_THREAD_FLAGS: usize = 0x100 | 0x200 | 0x400 | 0x800 | 0x10000 | 0x40000 | 0x100000 | 0x200000;
-const GUARD_SIZE: usize = 4096;
+#[cfg(target_arch = "x86_64")] const GUARD_SIZE: usize = 4096;
 /// each thread's alternate signal stack (the crash handler runs on it: a stack overflow of the
 /// thread still gets its report), between two guard pages below the thread's stack
 const ALT_SIZE: usize = 65536;
@@ -93,7 +93,7 @@ unsafe impl Send for Thread {}
 
 /// run f on a new thread with stack bytes of stack (0 = 1 MB)  [plat_thread_create]
 pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
-    let size = if stack == 0 { THREAD_STACK_DEF } else { stack.min(THREAD_STACK_MAX) };
+    let size = if stack == 0 { THREAD_STACK_DEF } else { stack.min(THREAD_STACK_MAX) }; #[cfg(all(jfgui_glibc, target_arch = "aarch64"))] let size = size.max(PTHREAD_STACK_MIN);
     let size = ((size + 4095) & !4095) + 2 * GUARD_SIZE + ALT_SIZE; #[cfg(jfgui_glibc)] let size = size + TLS_ROOM;
     // SAFETY: a fresh anonymous mapping (PROT_READ | PROT_WRITE; MAP_PRIVATE | MAP_ANONYMOUS |
     // MAP_NORESERVE | MAP_STACK): from the bottom a guard page, the alternate signal stack,
@@ -381,7 +381,7 @@ extern "C" fn thread_main(rec: *mut u8) -> *mut u8 {
 unsafe fn jfgui_rs_clone(_flags: usize, rec: *mut u8) -> isize {
     use super::glibc::*;
     let r = rec as *mut ThreadRec;
-    let mut attr = PthreadAttr([0; 56]);
+    let mut attr = PthreadAttr([0; PTHREAD_ATTR]);
     // SAFETY: attr is a pthread_attr_t for the time of the call; the stack lies between the upper
     // guard page and the record, thread_spawn wrote the record before this call.
     unsafe {
@@ -435,3 +435,12 @@ core::arch::global_asm!(
     main = sym thread_main,
     nr = const SYS_CLONE,
 );
+
+// The guard pages on ARM64: 64 KB, the largest page size an ARM64 kernel uses (4, 16 or 64 KB), so both
+// guards and the alternate stack between them start on a page boundary whatever the kernel's page size
+// is (mprotect needs that); they are reserved, not committed.  glibc on ARM64 refuses stacks below its
+// PTHREAD_STACK_MIN (128 KB, for 64 KB pages): thread_spawn asks for at least that much there.
+#[cfg(target_arch = "aarch64")]
+const GUARD_SIZE: usize = 65536;
+#[cfg(all(jfgui_glibc, target_arch = "aarch64"))]
+const PTHREAD_STACK_MIN: usize = 131072;

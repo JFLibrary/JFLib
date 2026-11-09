@@ -1,10 +1,10 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-09, auf Basis von `main` 16ec0ab4. Umgesetzt sind ARM0, ARM1, ARM2 und ARM6: Statische Programme für
-Linux ARM64 laufen unter `qemu-aarch64`, `coretest` und `portabletest` sind grün. Für den Rest gilt: Die Zahlen sind aus
-dem Code gezählt, die Aufwände geschätzt. Syscalls,
-Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`), die
-Relocations noch nicht. Der Eintrag in der Roadmap steht in
+Stand 2026-11-09, auf Basis von `main` 39e30a8d. Umgesetzt sind ARM0, ARM1, ARM2, ARM3 und ARM6: `rt` und `plat` laufen
+auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
+grün, Plugins und Module fehlen noch (ARM4). Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände
+geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
+die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
 
 ## Ziel
@@ -71,7 +71,8 @@ Das sind Vorschläge, die der Plan voraussetzt. Abweichungen ändern vor allem A
 6. **Mathematik:** ARM nutzt `rt/portable/math.rs` wie Android. Das ist nicht bitgleich zu x87, die
    Abweichungen werden gemessen und dokumentiert (ARM2); `pow`, `sin` und `cos` rechnen dort seit dem Nachtrag zu
    ARM2 auf ein halbes ulp genau.
-7. **Seitengrößen:** 4 KB und 16 KB werden unterstützt, die Größe kommt zur Laufzeit aus `AT_PAGESZ`.
+7. **Seitengrößen:** 4 KB und 16 KB werden unterstützt, die Größe kommt zur Laufzeit aus `AT_PAGESZ`. (Seit ARM3 laufen die
+   Tests auch mit 64-KB-Seiten, siehe dort.)
    64 KB wird abgelehnt oder später nachgezogen.
 
 ## Meilensteine
@@ -319,14 +320,87 @@ behalten). `rt/mem.rs` schließt AP2 auf Apple ganz aus, das passt zur Trennung 
 - glibc-Variante: `_start`, `TPIDR_EL0` statt `arch_prctl`.
 - `plat/cpu.rs` (Stack-Zeiger, AVX-Probe) und die Crash-Tests in `plat/lib.rs`, für die es den Zweig für
   Android schon gibt. `plattest` und `linuxtest` rufen sie auf (und JFPainter, früher PaintCraft, in seinem eigenen Repository).
-- Testprogramme: `jfgui_gt_code` in `plib.rs`, `plugins/crash`, `plugins/crashpf`, `modrt`,
-  `tools/memory_safety/native_probe.rs`.
+- Testprogramme: `jfgui_gt_code` in `plib.rs`, `plugins/crash`, `plugins/crashpf` (seit dem Umzug in JFPainters
+  Repository), `modrt`, `tools/memory_safety/native_probe.rs`.
 - Von ARM2 übrig: Der Crash-Handler auf ARM64 (`linux_crash.rs`, am Ende) füllt nur `pc` und Adresse, `access` ist
   „unbekannt“ (das ESR im `__reserved` des `sigcontext` sagt Lesen, Schreiben oder Ausführen); die Seitengröße steckt
   noch fest in `GUARD_SIZE` (`linux_thread.rs`) und `PAGE` (`rt/mem.rs`: dort nur verschwendet, nicht falsch).
 
 **Fertig, wenn:** `plattest`, `linuxtest`, `lifetest` und `sandboxtest` in einer ARM-VM grün sind. Die
 Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
+
+**Umgesetzt** (2026-11-09). Die x86-Teile tragen ihr `cfg` in derselben Zeile, die ARM-Teile stehen am Ende der Dateien:
+
+- **Crash-Berichte** (`linux_crash.rs`): `CrashInfo::regs` hat auf ARM64 `x0` bis `x15` und `pc` (wie auf Apple), `access`
+  kommt aus dem ESR-Eintrag im `__reserved` des `sigcontext` (EC 0x20/0x21 Ausführen, 0x24/0x25 Lesen oder Schreiben nach
+  WnR). Die Aufrufkette nutzt das CFI-Lesen von x86-64 mit den DWARF-Registern von ARM64 (`x0`–`x30`, `sp` = 31,
+  Rücksprungspalte `x30`, ein eigener Platz für `pc`). Code ohne CFI wird über das Link-Register an seinen Aufrufer
+  gehängt, wenn er selbst fehlte (ein Blatt wie `crash_test`), sonst über ein Stack-Wort nach `bl`/`blr`, das in ihn ruft
+  (`calls_into`); der Stack-Scan beginnt bei `sp`, das Link-Register zuerst.
+- **glibc-Variante** (`linux_glibc.rs`): `_start` für ARM64 (`ld.so` lässt den Finalisierer in `x0`), `glibc_thread_ids` liest
+  `TPIDR_EL0`. Fallen, die erst beim Linken oder Starten auffallen: `pthread_attr_t` hat dort 64 Bytes statt 56,
+  `PTHREAD_STACK_MIN` ist 128 KB (glibc rechnet mit 64-KB-Seiten), `thread_spawn` fragt dort nie weniger an; TLS ist
+  Variante I, `pthread_self()` liegt knapp unter dem Thread-Zeiger (`gputest --test glibc` prüft das jetzt so).
+- **Seitengröße zur Laufzeit:** `rt::os::page_size()` aus `AT_PAGESZ` (statisch aus dem Auxiliary Vector von ARM2, gegen glibc
+  über `getauxval`, das die glibc-Stubs für ARM64 jetzt mitbringen). Die Page-Runs des Heaps (`rt/mem.rs`) richten sich
+  danach. Die Guard-Seiten der Threads sind auf ARM64 fest 64 KB, die größte Seitengröße: So liegen beide Guards und der
+  Signal-Stack dazwischen bei 4, 16 und 64 KB auf Seitengrenzen, belegt wird nur Adressraum.
+- **Sandbox:** `AUDIT_ARCH_AARCH64`; der Schritt für das x32-Bit von x86-64 bleibt, keine ARM64-Nummer erreicht es.
+  `plat::sandbox::denied_syscalls()` gibt die Sperrliste heraus, `sandboxtest` ruft jeden gesperrten Aufruf einmal auf
+  (dazu `execve` und `execveat`), mit harmlosen Argumenten, die ohne Filter wo möglich eine andere Antwort als EPERM
+  bekommen; auf beiden Architekturen.
+- **`cpu.rs`, `lib.rs`:** `stack_aligned` liest `sp`, `avx2_probe` ist `false`, `cpu_brand` kommt aus `MIDR_EL1`
+  (Hersteller und Kern, etwa „ARM Cortex-A720“, wenn `AT_HWCAP` `HWCAP_CPUID` hat, sonst „ARM64“); `crash_test` und
+  `crash_test_caller` wie auf Apple. `tools/memory_safety/native_probe.rs` hat einen `_start` für ARM64.
+- **Für ARM4 geschrieben, aber noch aus** (`plib` bleibt auf Linux ARM64 bis dahin aus): `guard_sig` setzt `pc`, `sp` und
+  `x29` im `sigcontext` (`linux_guard.rs`); das Trampolin in AAPCS64 sichert `x19`–`x28`, `x29`/`x30` im Frame und
+  `FPCR`, `d8`–`d15` im Record, dessen Felder ihre Offsets behalten (`plib.rs`); der Test-Code `jfgui_gt_code` (ARM64
+  teilt ganzzahlig durch null ohne Trap: Fall 4 schickt sich `SIGFPE` mit `tgkill`, der Fehler liegt bei +40); der
+  ELF-Loader nimmt `EM_AARCH64` mit `RELATIVE`, `ABS64`, `GLOB_DAT` und `JUMP_SLOT` (die beiden letzten mit Addend, anders als
+  auf x86-64), rechnet in der Seitengröße des Kernels (Segmente, die sich eine solche Seite teilen, lehnt er ab) und
+  leert den Befehlscache der ausführbaren Segmente (`dc cvau`, `ic ivau`, Zeilen aus `CTR_EL0`). Geprüft mit einem
+  temporären Schalter, der `plib` einschaltet und `win64` durch `extern "C"` ersetzt (nicht im Repository, Inhalt unter ARM4).
+- **`plattest`:** `t_guard` und `t_lib` sind auf Linux ARM64 bis ARM4 Platzhalter wie auf Apple; die Erwartungen in
+  `t_guard.rs` (Offsets 4 und 40) kennen ARM64 schon. Der Platzhalter-Loader fragt dort wie auf Apple zuerst das Manifest.
+
+Getestet in einer VM: `qemu-system-aarch64` 8.2 mit AAVMF in WSL (TCG, 8 Kerne, 6 GB), Ubuntu 24.04 arm64 (Cloud-Image),
+Kernel 6.8.0-147 mit 4-KB-Seiten, Weston (headless) und Xvfb als Anzeige:
+
+| Programm | Ergebnis |
+|---|---|
+| `plattest` | 41 von 42 Skripten; `screen.uis` scheitert nur an Xvfb (RandR ohne Bildwiederholrate). Mit XWayland in der VM besteht diese Prüfung, dort fehlen dem randlosen XWayland Root-Bild und XTEST; unter `qemu-aarch64` mit WSLg ist `screen.uis` grün |
+| `plattest --test crash` | 7 von 7: `access` = Schreiben aus dem ESR, `x0` = 16, `pc`, Code-Bereich, 2 Frames mit `crash_test_caller` + 4 |
+| `plattest --test kernel` | 50 von 50 (auch `CLONE_PARENT_SETTID`) |
+| `linuxtest` (ohne Skripte, jeder Test einmal) | `files` 15, `synth` 23, `x11synth` 118, `cursors`, `window` 7, `wlwin` 8, `pcheck` 9; `crash` Exit 3, `protoerr` Exit 1 wie erwartet |
+| `lifetest` | 3 von 3 Skripten |
+| `sandboxtest` | 0 Fehler: Landlock ABI 4 (Dateien und Netz), seccomp; alle 23 gesperrten Aufrufe geben EPERM |
+| `coretest`, `portabletest` | 3605 von 3605 Prüfungen (56 s); Digest `af6940ef15c56d1f` wie überall |
+| ARM4-Teile (temporärer Schalter) | `guard` 24 von 24 (`FPCR` und `d8`–`d15` nach 64 Fehlern zurück, 8 Worker, Stack-Überlauf), `guardlimit` 3 von 3, `guardcrash` 8 von 8; ein Test-Plugin mit allen fünf Relocation-Arten, für 4 und 64 KB gelinkt, lädt und rechnet unter dem Guard 55 |
+
+Gegenprobe zu `sandboxtest`: Dieselben Aufrufe ohne Filter (Python mit `ctypes`, gleicher Kernel) antworten in 16 von 23
+Fällen anders (ESRCH, 0, EFAULT, EINVAL, EOPNOTSUPP, EBADF); dort beweist das EPERM den Filter. Sieben geben auch ohne
+Filter EPERM, weil das Recht fehlt (`kexec_load`, `kexec_file_load`, die drei Modul-Aufrufe, `pivot_root`,
+`open_by_handle_at` vor Linux 6.9): Sie scheitern also, nur nicht nachweislich am Filter. In WSL (x86-64, Kernel 6.18)
+antworten 18 anders.
+
+**Mit 64-KB-Seiten** (Ubuntus Kernel `6.8.0-149-generic-64k` in derselben VM, `getconf PAGESIZE` = 65536): dasselbe Bild.
+`plattest` 41 von 42 (wieder nur `screen.uis` an Xvfb), `linuxtest` wie oben, `lifetest` 3 von 3, `sandboxtest` ohne
+Fehler, `coretest` 3605 von 3605, `portabletest` mit demselben Digest; mit dem temporären Schalter `guard` 24 von 24 und
+`guardlimit` (140 Threads mit 64-KB-Guards), und der Loader lehnt das für 4 KB gelinkte Test-Plugin mit `LIBE_FORMAT` ab,
+das für 64 KB gelinkte lädt und rechnet. Ein Kernel mit 16-KB-Seiten war nicht zur Hand.
+
+Unter `qemu-aarch64` (User-Mode) waren vorher `plattest` 40 von 42 Skripten und alle `linuxtest`-Tests grün. Grenzen
+dieses Wegs: QEMU schreibt keinen ESR-Eintrag in den Signal-Frame (`access` bleibt „unbekannt“) und setzt
+`CLONE_PARENT_SETTID` nur im Speicher des Kindes (`kernel.uis`); seccomp und Landlock prüft er nicht.
+
+**x86-64 unverändert:** Release-Bau von `coretest`, `plattest`, `gallery` und `gputest` für Windows und Linux, `39e30a8d` und
+dieser Stand nacheinander aus demselben Verzeichnis: unter Linux Byte für Byte gleich (`gallery` und `gputest` gegen glibc),
+unter Windows bis auf den Zeitstempel des Linkers (die `.map` nur in dessen Zeile). Absichtlich anders ist `sandboxtest`
+(die neuen Proben). `cargo check -q -p jflib` mit und ohne `std` ist grün für Windows, Linux, wasm32, Android und Linux ARM64.
+
+Offen: echte ARM-Hardware (der Befehlscache und das Speichermodell zeigen sich unter TCG nicht, ARM4 und ARM7), ein Kernel
+mit 16-KB-Seiten (Asahi), `screen.uis` mit einer vollständigen Anzeige in der VM. `plugins/crash` und `crashpf` gehören zu
+JFPainter.
 
 ### ARM4: Plugin- und Modul-ABI (M)
 
@@ -341,6 +415,18 @@ Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
 - Zurücknehmen, was ARM2 ausgeschaltet hat: `all(target_os = "linux", target_arch = "aarch64")` vor `mod plib;` und `mod modhost;` in
   `plat/lib.rs`, die `cfg` vor `linux_elfload.rs` und `linux_guard.rs` in `linux.rs` und dort die Kopien von
   `current_exe` und `plat_tid`, das `allow(dead_code)` an `open_read_nofollow` (`linux_sys.rs`).
+- Von ARM3 vorbereitet und mit einem temporären Schalter in der VM geprüft (siehe ARM3 „Umgesetzt“): Guard-Handler,
+  Trampolin, `jfgui_gt_code` und der ELF-Loader für ARM64. Der Schalter tat genau dies, ARM4 macht es dauerhaft: in
+  `plat/lib.rs` nur bei `mod plib;` das `all(target_os = "linux", target_arch = "aarch64")` streichen, in `linux.rs` die vier
+  `#[cfg(target_arch = "x86_64")]` vor `elfload` und `guard` und die Kopie von `plat_tid`, in `plib.rs` `extern "win64" fn
+  thunk` und in `apps/plattest/t_guard.rs` die vier Host-Funktionen auf das Makro, in `apps/plattest/main.rs` die Platzhalter
+  für `t_guard` und `t_lib` wieder auf Apple allein. Dazu die Apple-und-ARM64-Bedingung vor `plugin_allowed` in
+  `web_lib.rs`, die dann nur noch Apple betrifft.
+- Plugins für ARM64 mit `-z max-page-size=65536` linken: Der Loader lehnt Segmente ab, die sich eine Seite des laufenden
+  Kernels teilen, ein für 4 KB gelinktes Plugin lädt also auf Kerneln mit 16 oder 64 KB nicht (in der VM mit 64-KB-Seiten
+  geprüft). Rust ruft innerhalb eines Plugins über die GOT (`GLOB_DAT`); `JUMP_SLOT` entsteht erst mit `-Z plt=yes`.
+- Der Befehlscache: `sync_icache` ist unter TCG nicht prüfbar (QEMU hält Code und Daten von selbst gleich). Ein echtes
+  Gerät (A56 mit einem statischen `plattest`, ein Runner `ubuntu-24.04-arm`) sollte `t_lib` laufen lassen.
 
 **Fertig, wenn:** das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf ARM64 und unverändert auf x86-64
 laufen (JFPainters Plugins: in dessen Repository).
@@ -349,7 +435,10 @@ laufen (JFPainters Plugins: in dessen Repository).
 
 - `__chkstk` (Größe in `x15` mal 16, nur `x16` und `x17` frei), TEB über `x18` statt `gs:`
   (`win_crash.rs`, `win_lib.rs`).
-- `CONTEXT` und `RtlVirtualUnwind` in `win_crash.rs`, Guard-Trampolin mit Unwind-Daten.
+- `CONTEXT` und `RtlVirtualUnwind` in `win_crash.rs`, Guard-Trampolin mit Unwind-Daten. Das Trampolin für ARM64 steht seit
+  ARM3 in `plib.rs` (`target_arch = "aarch64"`, ohne Betriebssystem-Teile); es braucht unter Windows `.pdata`/`.xdata`.
+  `jfgui_gt_code` gibt es nur für Linux: Windows bekommt für die Division durch null `brk #0xF003`
+  (`STATUS_INTEGER_DIVIDE_BY_ZERO`), die Offsets in `t_guard.rs` (`+40`) gelten dann nur für Linux.
 - PE-Loader: Machine `0xAA64`, `FlushInstructionCache`.
 - `native_link_args`: Das Ziel braucht keine eigene Angabe, `lld-link` nimmt die Maschine aus den Objekten
   (ARM0, an einem kleinen Programm geprüft). Ob ein ganzes Programm so startet, zeigt erst dieser Schritt.
@@ -470,14 +559,20 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 - **`dup3`:** Anders als `dup2` lehnt es `old == new` mit `EINVAL` ab. `process::launch` kann dorthin kommen,
   wenn Standardeingabe geschlossen war. `rt::os::dup2` fängt das ab.
 - **Sandbox offen statt zu:** Eine falsche Nummer in der Sperrliste sperrt still den falschen Aufruf.
-- **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Die eigenen Loader leeren ihn heute nicht, auf
-  x86 ist das auch nicht nötig. Geladene Plugins können sonst zufällig abstürzen.
+- **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Der ELF-Loader leert ihn seit ARM3 (`sync_icache`), der
+  PE-Loader noch nicht (ARM5). Geladene Plugins können sonst zufällig abstürzen; QEMU zeigt das nicht.
 - **Speichermodell:** x86 verzeiht falsche `Relaxed`-Zugriffe. QEMU auf einem x86-Rechner verzeiht sie
   meist genauso, solche Fehler zeigen sich erst auf echter Hardware.
 - **Stack:** Auf ARM64 muss `sp` bei Speicherzugriffen 16-Byte-ausgerichtet sein, das betrifft jeden
   handgeschriebenen Einstieg.
-- **Seitengröße:** `4096` steht an 20 Stellen in 11 Linux-Dateien von `plat`, nicht alles davon meint
-  Seiten. Asahi Linux läuft mit 16 KB.
+- **Seitengröße:** `4096` stand an 20 Stellen in 11 Linux-Dateien von `plat`, nicht alles davon meint Seiten. Seiten
+  meinten nur die Guards der Threads, der ELF-Loader und der Heap in `rt` (ARM3). Asahi Linux läuft mit 16 KB.
+- **glibc auf ARM64:** `pthread_attr_t` hat 64 Bytes, `PTHREAD_STACK_MIN` ist 128 KB, die TLS ist Variante I
+  (`TPIDR_EL0` zeigt auf den TCB über `struct pthread`, nicht auf `pthread_self()`). Ein zu kleines `pthread_attr_t`
+  überschreibt still den Stack.
+- **Relocations:** `R_AARCH64_GLOB_DAT` und `JUMP_SLOT` addieren den Addend, `R_X86_64_GLOB_DAT` nicht.
+- **QEMU im User-Mode:** kein ESR-Eintrag im Signal-Frame, `CLONE_PARENT_SETTID` nur beim Kind, seccomp und Landlock
+  gar nicht. Ein grüner Lauf dort sagt über Signale und Sandbox wenig.
 - **`c_char`:** auf Linux ARM64 `u8`, auf Windows ARM64 `i8`, das meldet der Compiler aber. Beim Stand von ARM0
   meldet er dazu nichts.
 
@@ -486,7 +581,7 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 | Was | Wo | Grenze |
 |---|---|---|
 | `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
-| Signale, Sandbox, Crash, `process_vm_readv` | `qemu-system-aarch64` in WSL (Gast noch einzurichten) | sehr langsam, keine KVM-Beschleunigung; seccomp und Landlock nicht über `qemu-aarch64` prüfen |
+| Signale, Sandbox, Crash, glibc, Fenster | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
 | Windows ARM64 | `windows-11-arm` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal keine Möglichkeit |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |
@@ -502,4 +597,5 @@ höchstens drei Runden pro Variante. Die Runner von GitHub sind für öffentlich
    kann bis dahin warten.
 3. **CI:** Sollen die ARM-Läufe später auch automatisch bei jedem Push laufen? Vorschlag: nur bei Releases
    und per Hand.
-4. **64-KB-Seiten:** Nur für manche Server-Kernel relevant, nach Entscheidung 7 zunächst nicht unterstützt.
+4. **64-KB-Seiten:** Nur für manche Server-Kernel relevant, nach Entscheidung 7 zunächst nicht unterstützt. Seit ARM3
+   laufen `rt` und `plat` dort (VM mit Ubuntus Kernel `generic-64k`); offen ist, ob Pakete und Plugins das zusagen sollen.

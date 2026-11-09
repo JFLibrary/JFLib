@@ -97,3 +97,10 @@ pub fn status() -> Status {
 pub fn status() -> Status {
     Status::default()
 }
+
+/// (Linux) the system calls the seccomp filter answers with EPERM; execve and execveat come on top when
+/// the manifest allows no program (sandboxtest calls every one of them)
+#[cfg(target_os = "linux")]
+pub fn denied_syscalls() -> &'static [usize] {
+    crate::linux_sandbox::DENY
+}
