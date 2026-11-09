@@ -55,7 +55,8 @@ struct Cascade {
 
 // sun_dir: towards the sun (a unit vector), w the exposure; sun_color: illuminance per channel (lux), w 1
 // for the neutral tone mapper, 0 for none; ambient: the radiance of a uniform environment; shadow.x the
-// sun's cascades (0: no shadows), shadow.y texels a side of each cascade's map
+// sun's cascades (0: no shadows), shadow.y texels a side of each cascade's map, shadow.z the point and spot
+// lights
 struct Lights {
     sun_dir: vec4f,
     sun_color: vec4f,
@@ -106,6 +107,15 @@ struct VsOut {
 @group(0) @binding(3) var<storage, read> materials: array<Material>;
 @group(0) @binding(4) var<storage, read> visible: array<u32>;
 @group(0) @binding(5) var<storage, read> vertices: array<Vertex>;
+// (G5c) a point or spot light (KHR_lights_punctual): position relative to the origin and range (0: none);
+// colour times intensity (candela) and the kind (1: spot); a spot's axis; its cone as scale and offset of cos
+struct Punctual {
+    pos_range: vec4f,
+    color_kind: vec4f,
+    dir: vec4f,
+    cone: vec4f,
+}
+@group(0) @binding(6) var<storage, read> punctual: array<Punctual>;
 // sRGB (base colour, emissive) and linear (the others) arrays of 128, 256, 512, 1024, 2048 texels
 @group(1) @binding(0) var s0: texture_2d_array<f32>;
 @group(1) @binding(1) var s1: texture_2d_array<f32>;
@@ -385,6 +395,31 @@ fn direct(n: vec3f, v: vec3f, l: vec3f, c_diff: vec3f, f0: vec3f, a2: f32) -> ve
     return ((1.0 - f) * c_diff * (1.0 / PI) + f * (d * vis)) * nl;
 }
 
+// a point or spot light's light at p (KHR_lights_punctual): 1 / d^2, its range's window clamp(1 - (d / range)^4,
+// 0, 1), a spot's smooth cone squared; no shadows
+fn punctual_light(q: Punctual, p: vec3f, n: vec3f, v: vec3f, c_diff: vec3f, f0: vec3f, a2: f32) -> vec3f {
+    let d = q.pos_range.xyz - p;
+    let dist2 = dot(d, d);
+    if !(dist2 > 0.0) {
+        return vec3f(0.0);
+    }
+    var att = 1.0 / dist2;
+    let range = q.pos_range.w;
+    if range > 0.0 {
+        let r2 = dist2 / (range * range);
+        att = att * clamp(1.0 - r2 * r2, 0.0, 1.0);
+    }
+    let l = d * inverseSqrt(dist2);
+    if q.color_kind.w != 0.0 {
+        let t = clamp(dot(q.dir.xyz, -l) * q.cone.x + q.cone.y, 0.0, 1.0);
+        att = att * t * t;
+    }
+    if att == 0.0 {
+        return vec3f(0.0);
+    }
+    return direct(n, v, l, c_diff, f0, a2) * q.color_kind.xyz * att;
+}
+
 // the second sum of the split-sum approximation: scale and bias of f0, bilinear in the table (dfg.rs)
 fn env_ab(roughness: f32, nv: f32) -> vec2f {
     let x = clamp(nv, 0.0, 1.0) * 31.0;
@@ -483,6 +518,10 @@ fn fs(f: VsOut) -> @location(0) vec4f {
     var light = direct(n, v, lights.sun_dir.xyz, c_diff, f0, a * a) * lights.sun_color.xyz;
     if lights.shadow.x > 0.0 && any(light > vec3f(0.0)) {
         light = light * sun_shadow(f.world, ng);
+    }
+    let count = u32(lights.shadow.z);
+    for (var i = 0u; i < count; i++) {
+        light = light + punctual_light(punctual[i], f.world, n, v, c_diff, f0, a * a);
     }
     // the uniform environment: what the specular lobe does not take goes to the diffuse
     let ab = env_ab(roughness, clamp(dot(n, v), 0.0, 1.0));

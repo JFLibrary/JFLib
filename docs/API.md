@@ -20069,6 +20069,8 @@ materials drawn from the front, uv sets other than 0, world matrices with shear 
   - `instances: Vec<Instance>` -- the scene's instances, for Scene::add
   - `sheared: u32` -- instances whose world matrix has shear, which a Transform cannot hold (the largest |cos| between
     two axes above 1e-4); drawn without it
+  - `lights: Vec<Light>` -- (G5c) the scene's point and spot lights (KHR_lights_punctual), for Scene::set_lights
+  - `suns: Vec<Sun>` -- (G5c) its directional lights as suns (ambient 0); a Scene has one sun
   - `notes: Vec<String>` -- what the engine leaves out (once each)
 
 - **`fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Result<Imported>`**
@@ -20198,6 +20200,25 @@ commands without a barrier against the frames still on the GPU.
 - **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75 * core::f3 ...`**
   a white matte face towards the sun shows 0.75 + 0.25 (0.75 pi lux, ambient 0.25)
 
+- **`enum LightKind`**
+  (G5c) a point or spot light (KHR_lights_punctual): no shadows
+  - `Point`
+  - `Spot { inner: f32, outer: f32 }` -- cone angles from the axis in radians, 0 &lt;= inner &lt; outer &lt;= pi / 2: full inside inner, nothing beyond outer
+
+- **`struct Light`**
+  (G5c) a point or spot light of a Scene
+  - `kind: LightKind`
+  - `pos: [f64; 3]`
+  - `direction: [f64; 3]` -- a spot light's axis, the way it shines (any length but 0)
+  - `color: [f32; 3]` -- linear colour, and the intensity in candela: color \* intensity / d^2 reaches a surface d away
+  - `intensity: f32`
+  - `range: Option<f32>` -- where it ends, KHR_lights_punctual's window clamp(1 - (d / range)^4, 0, 1); None: never
+
+**`impl Light`**
+
+- **`const fn point(pos: [f64; 3], color: [f32; 3], intensity: f32, range: Option<f32>) -> Light`**
+  a point light of colour times intensity at pos
+
 - **`enum Tonemap`**
   what the fragment shader does with the light it computed (times the exposure)
   - `Neutral` -- Khronos PBR Neutral: base colours stay up to 0.76, highlights are compressed towards white
@@ -20257,6 +20278,10 @@ commands without a barrier against the frames still on the GPU.
 - **`fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()>`**
   (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
 - **`fn shadows(&self) -> Option<Shadows>`**
+- **`fn set_lights(&mut self, lights: &[Light]) -> Result<()>`**
+  (G5c) the point and spot lights (all of them: they go up with the next frame); Invalid for values out of
+  range, and nothing changes then
+- **`fn lights(&self) -> &[Light]`**
 - **`fn cascades(&self) -> &[Cascade]`**
   (G5c; tests, tools) the cascades the last prepare computed
 - **`fn cascade_buffers(&self, k: usize) -> Option<(&Buffer, &Buffer)>`**
@@ -20445,14 +20470,16 @@ Document on the GPU (render3d::gltf); a CAD or game tool can read the same witho
   gltf::load(bytes, &mut |uri| Option<Vec<u8>>, &Limits) -> Result<Document>   .glb or .gltf by its first
        bytes; the closure reads the files a .gltf names (relative paths, decoded; never called for data URIs)
   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
+  doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
 
 Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
-anything (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is Error::Unsupported; other
-extensions and what this model has no place for (animations, skins, cameras, lights, tangents, colours,
-further uv sets) are ignored.  URIs that leave the file's folder (absolute paths, "..", a scheme) are
-refused before the closure sees them.
+anything but KHR_lights_punctual (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is
+Error::Unsupported; other extensions and what this model has no place for (animations, skins, cameras,
+tangents, colours, further uv sets) are ignored.  KHR_lights_punctual (G5c) is read as untrusted as the rest:
+types, colours, intensities, ranges and cone angles checked, the lights limited.  URIs that leave the file's
+folder (absolute paths, "..", a scheme) are refused before the closure sees them.
 ```
 
 ### `gltf` crate root
@@ -20480,6 +20507,7 @@ refused before the closure sees them.
   - `instances: u64` -- instances of one scene (node x primitive)
   - `image_pixels: u64` -- pixels of one image, bytes of all decoded images (4 per pixel)
   - `image_bytes: u64`
+  - `lights: usize` -- (G5c) lights of KHR_lights_punctual
 
 **`impl Limits`**
 
@@ -20496,6 +20524,7 @@ refused before the closure sees them.
   - `nodes: Vec<Node>`
   - `scenes: Vec<SceneDef>`
   - `scene: Option<usize>` -- the scene to show (the file's `scene`; else the first; None: no scenes, instances() takes every root)
+  - `lights: Vec<Light>` -- (G5c) the lights of KHR_lights_punctual; nodes place them
   - `notes: Vec<String>` -- what was read but left out: points and lines, unused images, unknown attributes, ... (once each)
 
 - **`struct Mesh`**
@@ -20587,6 +20616,34 @@ refused before the closure sees them.
   - `parent: Option<usize>`
   - `local: [f64; 16]`
   - `world: [f64; 16]`
+  - `light: Option<usize>` -- (G5c) the KHR_lights_punctual light this node places
+
+- **`struct Light`**
+  (G5c) a light of KHR_lights_punctual; where it is and which way it shines come from the nodes naming it
+  - `name: String`
+  - `kind: LightKind`
+  - `color: [f32; 3]` -- linear rgb, 0 or more (white if the file says nothing)
+  - `intensity: f32` -- candela for point and spot lights, lux for directional ones (1 if the file says nothing)
+  - `range: Option<f32>` -- point and spot: the distance where it ends (above 0); None: it never does
+
+- **`enum LightKind`**
+  (G5c) KHR_lights_punctual's kinds; spot cone angles in radians from the axis, 0 &lt;= inner &lt; outer &lt;= pi / 2
+  - `Directional`
+  - `Point`
+  - `Spot { inner: f32, outer: f32 }`
+
+- **`struct LightRef`**
+  (G5c) a light placed by a node
+  - `node: usize`
+  - `light: usize`
+  - `world: [f64; 16]`
+
+**`impl LightRef`**
+
+- **`fn position(&self) -> [f64; 3]`**
+  where the light is: the node's origin
+- **`fn direction(&self) -> [f64; 3]`**
+  which way it shines: the node's -z, a unit vector (spot and directional lights)
 
 - **`struct SceneDef`**
   - `name: String`
@@ -20608,8 +20665,9 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
 
 - **`fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef>`**
   the instances of a scene (None: Document::scene), depth first in the order of the file; without
-  scenes those of every node without a parent.  Each node is visited once: a Document built by hand
-  with a cycle of children ends too
+  scenes those of every node without a parent.  Each node is visited once
+- **`fn lights_of(&self, scene: Option<usize>) -> Vec<LightRef>`**
+  (G5c) the lights a scene places (KHR_lights_punctual), in the same order as instances()
 
 - **`fn load(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>, limits: &Limits) -> Result<Document>`**
   read a .glb or a .gltf (by its first bytes); `files` gives the bytes of a relative URI the file names

@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Instance, InstanceId, Material, MaterialId, MeshData, MeshId, Renderer, Scene, Sun, Transform};
+use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, MaterialId, MeshData, MeshId, Renderer, Scene, Sun, Transform};
 
 use crate::cpu;
 
@@ -408,13 +408,14 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
 // ---------------------------------------------------------------- the galleries of G5c
 
 /// the galleries that came with G5c, by name, after the five above: every path must draw them alike
-pub const LATER: [&str; 2] = ["pbr", "shadow"];
+pub const LATER: [&str; 3] = ["pbr", "shadow", "lights"];
 
 /// one of LATER in a fresh renderer of its own
 pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
     match name {
         "pbr" => pbr_gallery(r),
         "shadow" => shadow_gallery(r),
+        "lights" => lights_gallery(r),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -556,6 +557,60 @@ pub fn shadow_gallery(r: &mut Renderer) -> Result<Scene> {
     let mut cam = shadow_camera([0.0; 3]);
     cam.aspect = GALLERY_W as f64 / GALLERY_H as f64;
     sc.set_camera(&cam);
+    for (spec, m) in &items {
+        let id = r.add_material(m)?;
+        sc.add(Instance { material: id, ..spec.instance() })?;
+    }
+    Ok(sc)
+}
+
+/// the scene's lights at world offset `at`: points with and without a range, spots narrow and wide
+pub fn light_set(at: [f64; 3]) -> Vec<Light> {
+    let p = |x: f64, y: f64, z: f64| [at[0] + x, at[1] + y, at[2] + z];
+    vec![
+        Light::point(p(-3.0, 1.5, 1.0), [1.0, 0.3, 0.2], 8.0, None),
+        Light::point(p(2.0, 0.8, -1.0), [0.3, 1.0, 0.4], 6.0, Some(4.0)),
+        Light { kind: LightKind::Spot { inner: 0.3, outer: 0.5 }, pos: p(0.0, 5.0, 2.0), direction: [0.0, -1.0, -0.2], color: [1.0, 1.0, 0.9], intensity: 40.0, range: Some(12.0) },
+        Light { kind: LightKind::Spot { inner: 0.0, outer: 0.35 }, pos: p(4.0, 3.0, -3.0), direction: [-2.0, -3.0, 0.0], color: [0.3, 0.4, 1.0], intensity: 30.0, range: None },
+    ]
+}
+
+/// a ground, balls and cubes under a dim sun
+pub fn light_scene(at: [f64; 3]) -> (Vec<Geo>, Vec<(Spec, Material)>) {
+    let geos = vec![plate(), ball(16, 24), cube()];
+    let flat = quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2);
+    let p = |x: f64, y: f64, z: f64| [at[0] + x, at[1] + y, at[2] + z];
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let m = |r: f32, g: f32, b: f32, metallic: f32, roughness: f32| Material { metallic, roughness, ..Material::color(r, g, b) };
+    let items = vec![
+        (s(0, p(0.0, 0.0, -2.0), flat, [9.0, 7.0, 1.0]), m(0.8, 0.8, 0.8, 0.0, 0.8)),
+        (s(1, p(-2.0, 0.9, 0.0), NO_TURN, [0.9; 3]), m(0.9, 0.9, 0.9, 0.0, 0.4)),
+        (s(1, p(1.5, 0.7, -2.5), NO_TURN, [0.7; 3]), m(0.95, 0.8, 0.5, 1.0, 0.35)),
+        (s(2, p(3.0, 0.6, 0.5), quat([0.0, 1.0, 0.0], 0.5), [0.6; 3]), m(0.4, 0.6, 0.9, 0.0, 0.6)),
+        (s(2, p(-1.0, 0.5, -4.0), quat([0.0, 1.0, 0.0], 1.0), [0.5, 0.5, 0.5]), m(0.9, 0.5, 0.3, 0.2, 0.5)),
+    ];
+    (geos, items)
+}
+
+pub fn light_sun() -> Sun {
+    Sun { direction: [0.2, 0.9, 0.3], color: [0.1 * core::f32::consts::PI; 3], ambient: [0.04; 3] }
+}
+
+pub fn light_camera(at: [f64; 3], aspect: f64) -> Camera {
+    Camera::look_at([at[0], at[1] + 6.0, at[2] + 10.0], [at[0], at[1], at[2] - 2.0], [0.0, 1.0, 0.0], 1.0, aspect, 0.1, f64::INFINITY)
+}
+
+/// (G5c) the light scene: point and spot lights under a dim sun, with the sun's shadows
+pub fn lights_gallery(r: &mut Renderer) -> Result<Scene> {
+    let (geos, items) = light_scene([0.0; 3]);
+    for g in &geos {
+        r.add_mesh(&g.data())?;
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&light_camera([0.0; 3], GALLERY_W as f64 / GALLERY_H as f64));
+    sc.set_sun(&light_sun());
+    sc.set_lights(&light_set([0.0; 3]))?;
+    sc.set_shadows(Some(&render3d::Shadows { cascades: 2, size: 1024, distance: 30.0, ..render3d::Shadows::DEFAULT }))?;
     for (spec, m) in &items {
         let id = r.add_material(m)?;
         sc.add(Instance { material: id, ..spec.instance() })?;

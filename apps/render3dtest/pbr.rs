@@ -138,11 +138,14 @@ pub fn compare_hdr(sc: &RefScene, cam: &cpu::RefCamera, w: u32, h: u32, img: &[[
                     out.max = out.max.max(got[k] as f64);
                 }
             }
+            // (the GPU snaps vertices to 1/256 of a pixel: where the light changes fast across the pixel, near a
+            // ball's silhouette under a highlight, a quarter of what 1/64 of a pixel changes is allowed too)
+            let steep = |k: usize| around.iter().flatten().map(|a| (a.linear[k] - want[k]).abs()).fold(0.0, f64::max) * 0.25;
             let mut wrong = false;
             for k in 0..3 {
                 let d = (got[k] as f64 - want[k]).abs();
                 out.largest = out.largest.max(d / want[k].abs().max(1e-3));
-                if d > abs + rel * want[k].abs() {
+                if d > abs + rel * want[k].abs() + steep(k) {
                     wrong = true;
                 }
             }

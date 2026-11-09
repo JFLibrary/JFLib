@@ -513,6 +513,43 @@ pub struct RefScene {
     pub tonemap: bool,
     /// (G5c) the sun casts shadows: exact shadow rays (both sides of every triangle block, MASK's holes not)
     pub shadows: bool,
+    /// (G5c) point and spot lights, no shadows
+    pub lights: Vec<RefLight>,
+}
+
+/// (G5c) a point or spot light as KHR_lights_punctual defines it
+#[derive(Clone, Copy, Debug)]
+pub struct RefLight {
+    pub pos: V,
+    /// colour times intensity (candela)
+    pub color: [f64; 3],
+    pub range: Option<f64>,
+    /// a spot's axis (unit) and cone angles
+    pub spot: Option<(V, f64, f64)>,
+}
+
+impl RefLight {
+    /// what reaches a point p (light per unit of BRDF times n.l) and from where (unit vector towards it)
+    pub fn at(&self, p: V) -> Option<(f64, V)> {
+        let d = sub(self.pos, p);
+        let dist2 = dot(d, d);
+        if dist2 <= 0.0 {
+            return None;
+        }
+        let mut att = 1.0 / dist2;
+        if let Some(r) = self.range {
+            let q = (dist2 / (r * r)) * (dist2 / (r * r));
+            att *= (1.0 - q).clamp(0.0, 1.0);
+        }
+        let l = mul(d, 1.0 / sqrt(dist2));
+        if let Some((axis, inner, outer)) = self.spot {
+            let (ci, co) = (sincos(inner).1, sincos(outer).1);
+            let scale = 1.0 / (ci - co).max(0.001);
+            let t = (dot(axis, mul(l, -1.0)) * scale - co * scale).clamp(0.0, 1.0);
+            att *= t * t;
+        }
+        Some((att, l))
+    }
 }
 
 /// what a ray found
@@ -544,7 +581,7 @@ pub struct Quad {
 
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
-        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false }
+        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new() }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -698,11 +735,20 @@ impl RefScene {
         let a = (sf.roughness * sf.roughness).max(ALPHA_MIN);
         let sun = brdf(sf.n, v, self.sun_dir, c_diff, f0, a * a);
         let (sa, sb) = env_ab(sf.roughness, dot(sf.n, v).clamp(0.0, 1.0));
+        let mut punctual = [0.0; 3];
+        for light in &self.lights {
+            if let Some((att, l)) = light.at(p) {
+                let f = brdf(sf.n, v, l, c_diff, f0, a * a);
+                for k in 0..3 {
+                    punctual[k] += f[k] * light.color[k] * att;
+                }
+            }
+        }
         let (mut out, mut sun_part) = ([0.0; 3], [0.0; 3]);
         for k in 0..3 {
             let spec = f0[k] * sa + sb;
             sun_part[k] = sun[k] * self.sun[k] * self.exposure;
-            out[k] = (self.ambient[k] * (spec + c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k]) * self.exposure + sun_part[k] * vis;
+            out[k] = (self.ambient[k] * (spec + c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k] + punctual[k]) * self.exposure + sun_part[k] * vis;
         }
         (out, sun_part)
     }

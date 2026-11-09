@@ -97,6 +97,8 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let shadow = render3d::Shadows { cascades: shadows.max(1) as u32, size: num("--shadow-size", 2048) as u32, distance: num("--shadow-distance", 100) as f64,
                                      ..render3d::Shadows::DEFAULT };
     let shadow_mask = num("--shadow-mask", 1) != 0;
+    // (G5c) --lights N point lights spread over the scene, range an eighth of its extent
+    let lights = num("--lights", 0);
     let args = plat::args();
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
@@ -104,7 +106,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh).is_none() && t.fails == 0 {
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -116,7 +118,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
-       shadows: Option<(render3d::Shadows, bool)>) -> Option<()> {
+       shadows: Option<(render3d::Shadows, bool)>, lights: usize) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -155,6 +157,15 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     let amb = 0.25f32;
     s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [(1.0 - amb) * core::f32::consts::PI; 3], ambient: [amb; 3] });
+    if lights > 0 {
+        let mut lr = Rng(321);
+        let e = extent as f64 * 0.5;
+        let list: Vec<render3d::Light> = (0..lights).map(|_| render3d::Light::point([lr.range(-e, e), lr.range(-e * 0.2, e * 0.2), lr.range(-e, e)],
+                                                                                      [lr.range(0.3, 1.0) as f32, lr.range(0.3, 1.0) as f32, lr.range(0.3, 1.0) as f32],
+                                                                                      (e * e * 0.01) as f32, Some(extent * 0.125))).collect();
+        t.res(s.set_lights(&list), "set_lights")?;
+        out(&format!("  {lights} point lights over the scene, range {:.0}", extent * 0.125));
+    }
     if let Some((sh, mask)) = &shadows {
         t.res(s.set_shadows(Some(sh)), "set_shadows")?;
         r.set_shadow_mask(*mask);

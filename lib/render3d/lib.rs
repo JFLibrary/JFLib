@@ -49,7 +49,7 @@ mod texture;
 
 pub use dfg::{DFG, DFG_N, dfg_table};
 pub use shadow::{CASCADES_MAX, Cascade, Shadows};
-pub use scene::{Camera, FrameStats, Instance, InstanceId, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
+pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
@@ -345,6 +345,8 @@ impl Renderer {
             b(3, BindingKind::StorageBufferRead, Stages::FRAGMENT),
             b(4, BindingKind::StorageBufferRead, vf),
             b(5, BindingKind::StorageBufferRead, vf),
+            // (G5c) the point and spot lights
+            b(6, BindingKind::StorageBufferRead, Stages::FRAGMENT),
         ])?;
         let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 8 })?;
         let scatter_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&scatter_layout], push_constants: 4 })?;
@@ -656,6 +658,12 @@ impl Renderer {
         for k in 0..cascades {
             e.copy_buffer(&f.stage, CASCADE_AT + k as u64 * CASCADE_STRIDE, &s.cascades[k].ubo, 0, VIEW_BYTES);
         }
+        // (G5c) the point and spot lights, when they changed (the barrier below makes them visible to the
+        // fragment shader; the one above waited for the frame before's reads)
+        if let (n @ 1.., Some(up)) = (s.punctual_up, &f.punctual) {
+            e.copy_buffer(up, 0, &s.punctual_buf, 0, n as u64 * scene::PUNCTUAL_BYTES);
+        }
+
         if !self.material_up_done.replace(true) {
             if let Some((up, at, size)) = &self.material_up {
                 e.copy_buffer(up, 0, &self.material_buf, *at, *size);
