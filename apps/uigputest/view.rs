@@ -993,10 +993,11 @@ impl App for ViewBench {
         let (w, h) = (ui.fb().w, ui.fb().h);
         ui.draw_color(0xFF20_2428);
         ui.draw_rect(0, 0, w, h);
-        ui.next_rect_px(40, 50, w - 80, h - 100);
+        // (the title in cells of its own: nothing over the view, which starts on the second row of cells)
+        ui.next_rect_px(40, 64, w - 80, h - 100);
         let _ = ui.gpu_view(VIEW_ID, &self.content, self.ver);
         ui.draw_color(0xFFE0_E4E8);
-        ui.draw_text(48, 34, "uigputest --bench view", (14u32 << 16) | FONT_REG);
+        ui.draw_text(48, 22, "uigputest --bench view", (14u32 << 16) | FONT_REG);
         if self.done {
             return;
         }
@@ -1011,7 +1012,7 @@ impl App for ViewBench {
         if !warm || i.frames == 0 {
             self.content.borrow_mut().angle += 0.01;
             self.ver += 1;
-            ui.invalidate();
+            ui.timer(1, 1); // (the next pass: an animation's timer, as fast as the loop takes it)
             return;
         }
         let counters = [o.frames + o.cpu_frames, o.render_us, o.present_us, i.draw_us, i.read_us, i.reads, i.frames];
@@ -1023,8 +1024,10 @@ impl App for ViewBench {
             self.content.borrow_mut().gpu_ms.clear();
             if self.idle {
                 self.started = plat::win_test_usage().0; // (now: the CPU time at the start)
+                ui.timer(1, 5100); // (one look after 5 s, nothing before)
+            } else {
+                ui.timer(1, 1);
             }
-            ui.invalidate();
             return;
         };
         if self.idle {
@@ -1065,7 +1068,15 @@ impl App for ViewBench {
         }
         self.content.borrow_mut().angle += 0.01;
         self.ver += 1;
-        ui.invalidate();
+        ui.timer(1, 1);
+    }
+
+    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        if id == UIC_TIMER {
+            ui.invalidate();
+            return true;
+        }
+        false
     }
 }
 
