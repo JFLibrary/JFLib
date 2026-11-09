@@ -1,5 +1,0 @@
-// recurse.jfs -- a recursion without an end hits --depth
-fn down(n) {
-  return down(n + 1)
-}
-down(0)

@@ -1,8 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/web_site.jfnet --scenario apps/JFNetworker/tests/scen/web_site.scn --golden apps/JFNetworker/tests/scen/web_site.report
-# golden scenario of a small website (B1, B2): WEB1 serves the files of /var/www (http-server with
-# "root") and a shop as a script (http.serve, req.query, req.form), DNS1 knows web.lab; PC1 fetches
-# with curl what the Webbrowser fetches: pages by name, a folder's redirect, types by extension,
-# a missing page, a path that cannot climb out, GET and POST forms, redirects with their methods
-# and their limit, a saved page at once.  The GUI program runs tests/scen/web_site.scn on
-# tests/fixtures/web_site.jfnet without a window and ends with the report, which must equal
-# tests/scen/web_site.report byte for byte on every target (the script itself is not run)

@@ -7,7 +7,9 @@ The library is designed to be used by AI Agents, not by Humans – Thus the enti
 JFLIB brings widgets, layout, text, 2D graphics, image formats, and platform integration
 together in one library. This repository contains both the library and its applications:
 from small GUI examples to Kritzel, jfWord, and the Build Manager. JFPainter, the image editor
-formerly called PaintCraft, has its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter).
+formerly called PaintCraft, has its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter);
+so do the network simulator JFNetworker, [JFLibrary/JFNetworker](https://github.com/JFLibrary/JFNetworker), and its scripting language
+JFScript, [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript).
 The Rust code uses `#![no_std]`, `core`, and `alloc`; an app of its own may use `std` and `std`
 crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps;
 a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
@@ -188,7 +190,7 @@ Pass the app names in the first column exactly as written to `build_rs.py app NA
 | [`jfWord`](apps/jfWord/README.md) | A word processor with a ribbon, page view, text styles, tables, references, and DOCX support | Windows, Linux, Web |
 | [`buildManager`](apps/buildManager/README.md) | A graphical build app for applications, styles, profiles, tests, and release packages | Windows, Linux |
 | [`BackupCraft`](apps/BackupCraft/README.md) | A backup suite: console, server (`bc-server`), agents (`bc-agent`), and `bcctl`; deduplicated, encrypted, signed backups with schedules, roles, and audit; copy jobs, replication with failover, continuous protection, tape, QEMU/KVM VMs with instant start and boot checks, volume images, a central view of several servers | Windows, Linux |
-| [`JFNetworker`](apps/JFNetworker/README.md) | A network simulator and lab for distributed systems, an alternative to Cisco Packet Tracer: a topology editor with cables and port choice, IOS-like and Linux consoles, ARP, IPv4, VLANs, DHCP, DNS, TCP and HTTP byte for byte, a step-by-step simulation mode with event list and packet view, pcapng export; German and English | Windows, Linux |
+| [JFNetworker](https://github.com/JFLibrary/JFNetworker) | A network simulator and lab for distributed systems, an alternative to Cisco Packet Tracer: a topology editor with cables and port choice, IOS-like and Linux consoles, ARP, IPv4, VLANs, DHCP, DNS, TCP and HTTP byte for byte, a step-by-step simulation mode with event list and packet view, pcapng export; German and English; now in its own repository, with JFScript for the scripts in its hosts | Windows, Linux |
 | [`androidGallery`](apps/androidGallery/README.md) | A touch gallery with widgets, text input, and theme switching | Android; also Windows, Linux, and Web |
 
 jfWord is under active development; full Word feature coverage and file compatibility

@@ -218,7 +218,6 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Zurücksetzen", "Reset", "Réinitialiser", "Restablecer", "Reimposta", "Opnieuw instellen", "Resetuj", "إعادة تعيين", "איפוס"],
     ["Dateiname:", "File name:", "Nom du fichier\u{A0}:", "Nombre de archivo:", "Nome file:", "Bestandsnaam:", "Nazwa pliku:", "اسم الملف:", "שם קובץ:"],
     ["Ordner auswählen", "Select folder", "Sélectionner un dossier", "Seleccionar carpeta", "Seleziona cartella", "Map selecteren", "Wybierz folder", "تحديد مجلد", "בחירת תיקייה"],
-    ["Neuer Ordner", "New folder", "Nouveau dossier", "Nueva carpeta", "Nuova cartella", "Nieuwe map", "Nowy folder", "مجلد جديد", "תיקייה חדשה"],
     ["Übergeordneter Ordner", "Parent folder", "Dossier parent", "Carpeta superior", "Cartella superiore", "Bovenliggende map", "Folder nadrzędny", "المجلد الأصل", "תיקיית אב"],
     ["Startordner", "Home folder", "Dossier personnel", "Carpeta personal", "Cartella personale", "Persoonlijke map", "Folder domowy", "المجلد الرئيسي", "תיקיית הבית"],
     [

@@ -21,7 +21,7 @@ workspace = true
 [dependencies]
 plat.workspace = true
 ui.workspace = true
-script = { path = "../jfs/crates/script" }
+script = { package = "jfscript", git = "https://github.com/JFLibrary/JFScript" }
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
 [build-dependencies]

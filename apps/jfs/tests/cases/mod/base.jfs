@@ -1,3 +1,0 @@
-// imported by util.jfs, relative to it
-print("base.jfs läuft einmal")
-let prefix = "Hallo, "

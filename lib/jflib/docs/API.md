@@ -2062,7 +2062,7 @@ Source: [`lib/ui/highlight.rs`](../lib/ui/highlight.rs)
 ```text
 highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-apps/jfs/crates/script) and the colours of the tokens
+JFScript) and the colours of the tokens
 
   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
@@ -2185,7 +2185,7 @@ SY_COUNT: usize = 17
 - **`const fn markdown() -> Highlighter`**
   a Markdown subset
 - **`const fn jfs() -> Highlighter`**
-  the scripting language of apps/jfs/crates/script (.jfs, JFNetworker's scripts)
+  the scripting language of JFScript (.jfs, JFNetworker's scripts)
 - **`fn for_name(s: &str) -> Highlighter`**
   by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
 - **`fn grammar(&self) -> &'static Grammar`**
@@ -2214,7 +2214,7 @@ SY_COUNT: usize = 17
   strong, links, escapes, HTML comments
 
 - **`static JFS: Grammar`**
-  the scripting language of apps/jfs/crates/script (.jfs): calls before '(' are functions, the
+  the scripting language of JFScript (.jfs): calls before '(' are functions, the
   delimiters of ${..} in strings SY_META
 
 - **`static PLAIN: Grammar`**

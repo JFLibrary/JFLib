@@ -1,3 +1,0 @@
-# A lesson
-
-Very short.

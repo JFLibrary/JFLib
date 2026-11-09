@@ -1,6 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/dot1x_imap.jfnet --scenario apps/JFNetworker/tests/scen/dot1x_imap.scn --golden apps/JFNetworker/tests/scen/dot1x_imap.report
-# golden scenario: two PCs on 802.1X ports of a switch, one refused; a laptop on a WPA2-Enterprise
-# network whose PMK comes from EAP-PWD over RADIUS; a mail fetched and marked read over IMAP. The GUI
-# program runs tests/scen/dot1x_imap.scn on tests/fixtures/dot1x_imap.jfnet without a window and ends
-# with the report, which must equal tests/scen/dot1x_imap.report byte for byte on every target (CR
-# LF there counts as LF; the script itself is not run).

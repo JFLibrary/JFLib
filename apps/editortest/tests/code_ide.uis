@@ -1,6 +1,6 @@
 #!args --verify-dirty
 # the code editor's gutter for a debugger and folding (SK6, cmd 906: CE_BREAKPOINTS and the
-# folding ranges of apps/jfs/crates/script on the JFS sample): a click in the breakpoints' column is
+# folding ranges of JFScript on the JFS sample): a click in the breakpoints' column is
 # CodeEv::Breakpoint (the app toggles its set), the disabled and conditional looks (cmd 907 /
 # 908), the execution line (cmd 909); they follow Enter and undo.  Folding: a click on a
 # chevron, the caret steps over folded lines, find steps over their matches, the "..." box

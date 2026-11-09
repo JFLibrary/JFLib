@@ -27,6 +27,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Changed
 
+- **ui:** The built-in catalogue has no row "Neuer Ordner" any more: only JFNetworker used it, which keeps its own (`ui::i18n::t` falls back to the text itself).
 - **gpu:** Validation with jfgui_GPU_VALIDATE now also checks what shaders read and write through their bindings (syncval_shader_accesses_heuristic, off in the layer by default): a missing barrier between two shaders no longer goes unreported
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
@@ -39,6 +40,12 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Removed
 
+- **JFNetworker** and **JFScript** moved to their own repositories, [JFLibrary/JFNetworker](https://github.com/JFLibrary/JFNetworker) and
+  [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript) (docs/CRATES.md, CR7 step 1): `apps/JFNetworker`, `apps/jfs` with the crate `script`
+  (now `jfscript`), coretest's groups script, scriptvm, scriptlib, scriptls and scriptmod (JFScript's `scripttest`),
+  `tools/academy_index.py`, `tools/academy_e2e.py` and `tools/script_math_check.py`. `editortest` takes JFScript from
+  its repository, the workspace takes that repository's `jflib-agent-core` from itself (`[patch.crates-io]`);
+  `symboltest` keeps a copy of JFNetworker's symbol table. The style `netlab` stays here.
 - **PaintCraft** moved to its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter), as JFPainter (docs/CRATES.md, CR7 step 1), with its Rust plugins (`plugins/`, `lib/plugin`), its paint.net host (`tools/paintcraft-pdn-host`) and its check scripts; `build_rs.py plugin`, the plugin lint and the pdn-host section are gone, and so are the platshared comparisons that imported those scripts (`clip_rs_check`, `lib_check`, `print_rs_check`, the print part of `portal_bus`) and `pathdata_check`'s XAML fuzz through PaintCraft. `testenv` no longer sets `PaintCraft_CONFIG_DIR`.
 
 ### Fixed

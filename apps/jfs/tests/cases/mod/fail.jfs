@@ -1,3 +1,0 @@
-fn ratio(a, b) {
-  return a / b
-}

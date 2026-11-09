@@ -1,5 +1,5 @@
 #!args --verify-dirty
-# the code editor's language services (SK6, ui.code_editor_with with apps/jfs/crates/script's services for
+# the code editor's language services (SK6, ui.code_editor_with with JFScript's services for
 # JFS, cmd 906): the completion list (opened while typing a word, after a dot, by Ctrl+Space;
 # filtered as one types; Up / Down / PgUp / PgDn / Enter / Tab / Esc; a click on an item; the
 # insert one undo step), hover tooltips, signature help, Ctrl+click and F12 (CodeEv::Definition),

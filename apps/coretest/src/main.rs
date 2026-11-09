@@ -1,7 +1,6 @@
 // coretest -- self-checks of the foundation crates (datetime, crypto, compress, datastore,
 // cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP, syslog, RIP and OSPF, base::rng,
-// base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
-// its standard library, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
+// base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
 // netpkt::icmpv6, the address selection of netpkt::addrsel, the BGP messages of netpkt::bgp,
 // TFTP and FTP of netpkt::tftp and netpkt::ftp, BER, SNMP and the MIB of netpkt::ber, snmp and
 // mib, RADIUS and Telnet of netpkt::radius and netpkt::telnet): known-answer vectors, round
@@ -12,15 +11,13 @@
 // and the crate eapm (eapt.rs), and netpkt::imap (imapt.rs).
 // The group cookie checks netpkt::cookie (cookiet.rs), the group tlscore netpkt::tls and netpkt::x509
 // against netio::tls (tlscoret.rs).
-// The group scriptls checks script's language services and formatter (scriptlst.rs).
 // The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
-// The group scriptmod checks script's modules, debugger and test functions (scriptmodt.rs).
+// JFScript's checks (script, its VM, standard library, language services, modules) are its program
+// scripttest (https://github.com/JFLibrary/JFScript).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
-//   build/win/coretest.exe --bench vm   the script VM's benchmark alone (scriptmodt.rs)
-//   build/win/coretest.exe --math FILE  (FILE: tools/script_math_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 #![no_std]
 #![no_main]
@@ -45,7 +42,6 @@ mod netpktt;
 mod ntpt;
 mod platx;
 mod rngt;
-mod scriptt;
 mod sshd;
 mod store;
 mod tlst;
@@ -54,9 +50,7 @@ mod cookiet;
 mod tlscoret;
 mod snmpv3t;
 mod cmdtreet;
-mod scriptvmt;
 mod httpmsgt;
-mod scriptlibt;
 mod hashringt;
 mod lrut;
 mod stpt;
@@ -70,9 +64,7 @@ mod ftpt;
 mod mailt;
 mod snmpt;
 mod radiust;
-mod scriptlst;
 mod patternt;
-mod scriptmodt;
 mod eapt;
 mod imapt;
 
@@ -108,16 +100,8 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--vectors") {
         return crypto::vectors(&f);
     }
-    if let Some(f) = plat::arg_value("--math") {
-        return scriptlibt::math_file(&f);
-    }
-    if plat::arg_value("--bench").as_deref() == Some("vm") {
-        scriptmodt::bench();
-        return 0;
-    }
     if args.iter().any(|a| a == "--bench") {
         crypto::bench();
-        scriptmodt::bench();
         return 0;
     }
     if let Some(op) = plat::arg_value("--lz4") {
@@ -165,7 +149,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 42] = [
+    let groups: [(&'static str, fn(&mut T)); 37] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -179,15 +163,12 @@ fn run() -> i32 {
         ("netpkt", netpktt::run),
         ("rng", rngt::run),
         ("jmap", jmapt::run),
-        ("script", scriptt::run),
         ("dhcp", dhcpt::run),
         ("dnsmsg", dnsmsgt::run),
         ("ntp", ntpt::run),
         ("metrics", metricst::run),
         ("cmdtree", cmdtreet::run),
-        ("scriptvm", scriptvmt::run),
         ("httpmsg", httpmsgt::run),
-        ("scriptlib", scriptlibt::run),
         ("hashring", hashringt::run),
         ("lru", lrut::run),
         ("stp", stpt::run),
@@ -201,9 +182,7 @@ fn run() -> i32 {
         ("mail", mailt::run),
         ("snmp", snmpt::run),
         ("radius", radiust::run),
-        ("scriptls", scriptlst::run),
         ("pattern", patternt::run),
-        ("scriptmod", scriptmodt::run),
         ("sshcore", sshcoret::run),
         ("eap", eapt::run),
         ("cookie", cookiet::run),

@@ -1,3 +1,0 @@
-# Eine Lektion
-
-Ganz kurz.
