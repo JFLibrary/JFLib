@@ -706,11 +706,22 @@ pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
         sc.add(sp.instance())?;
     }
     let aspect = GALLERY_W as f64 / GALLERY_H as f64;
+    // the frames before: into a target without a read-back (the browser maps a read-back after the frame that fills it)
     let dev = r.device().clone();
-    let mut off = Off::new(&dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+    let color = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, Format::Rgba8Unorm, TextureUsage::COLOR_TARGET))?;
+    let depth = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?;
     for f in 0..6 {
         sc.set_camera(&occl_camera([0.0; 3], f, aspect));
-        off.submit(r, &mut sc)?;
+        sc.prepare(r)?;
+        let mut e = dev.encoder()?;
+        let first = f == 0;
+        let ca = ColorAttachment { view: color.view(), load: Load::Clear, clear: CLEAR, store: true, before: if first { Layout::Undefined } else { Layout::ColorTarget },
+                                   after: Layout::ColorTarget };
+        let da = DepthAttachment { view: depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: false,
+                                   before: if first { Layout::Undefined } else { Layout::DepthTarget }, after: Layout::DepthTarget };
+        r.record(&mut e, &sc, ca, Some(da))?;
+        let id = dev.queue().submit([e.finish()?])?;
+        sc.submitted(id);
     }
     sc.set_camera(&occl_camera([0.0; 3], 6, aspect));
     Ok(sc)

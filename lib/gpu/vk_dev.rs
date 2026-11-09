@@ -571,6 +571,11 @@ impl Shared {
     /// (G5d) the compute queue's value the GPU has reached (asks the driver; 0 without one)
     fn lane_refresh(&self) -> u64 {
         let Some(l) = &self.lane else { return 0 };
+        // (nothing pending: no call; a device that never uses the queue never asks its timeline)
+        let done = l.completed.load(Ordering::Acquire);
+        if l.submitted.load(Ordering::Acquire) <= done {
+            return done;
+        }
         let mut v = 0u64;
         // SAFETY: the compute queue's timeline semaphore.
         let r = unsafe { (self.f.get_semaphore_counter_value)(self.dev, l.timeline, &mut v) };

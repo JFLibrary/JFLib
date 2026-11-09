@@ -267,6 +267,13 @@ Synchronisation dazwischen meldet sie nicht (geprüft mit einer ersten Übergabe
 der Warteschlange des Geräts, danach die Rechen-Warteschlange auf seinem Puffer. Mit `submit_after`: 0 von 512
 Stichproben falsch; ohne: 260 von 512 falsch.
 
+**Ein Absturz unter Validierung, nicht aufgeklärt.** Zweimal stürzte `gputest --test all --validate` mit Rechen-Warteschlange
+ab (`0xC0000005` in einer DLL, nicht im Programm), beide Male beim Abbau des Tests `bindless`, nachdem `upload` eine
+Swapchain benutzt hatte; ohne Validierung, mit `jfgui_GPU_COMPUTE=0`, ohne den Swapchain-Teil und mit denselben Tests
+in Teilfolgen nicht, auch nicht in der genauen Folge bis `bindless`, die beim ersten Mal abstürzte. Danach fragt
+`lib/gpu` die Zeitleiste der Rechen-Warteschlange nur noch, wenn auf ihr etwas aussteht (vorher bei jedem Aufräumen),
+und die ganze Reihe lief grün; ob das die Ursache war, ist nicht belegt (vermutet: die Schicht).
+
 **Läuft etwas nebeneinander?** Zwei lange Dispatches (1 Mio. × 2000 Schritte, je ein Puffer) nacheinander auf der
 Warteschlange des Geräts: 1,75 ms; je einer auf jeder: 1,46 ms (ein Lauf, `gputest --test queues`). Die
 Messungen in render3d stehen in [RENDER3D.md](RENDER3D.md#zweite-warteschlange-g5d).

@@ -173,7 +173,7 @@ Eine Transformation mit negativer Determinante (eine ungerade Zahl negativer Ska
 
 ## Punkt- und Spotlichter (G5c)
 
-**Eine Liste im Speicherpuffer** (`Scene::set_lights`, 64 Byte je Licht: Position relativ zum Ursprung und Reichweite, Farbe mal Intensität und Art, Achse, Kegel als Skala und Versatz des Kosinus), Gruppe 0, Bindung 6, nur der Fragment-Shader liest sie. Sie geht mit dem nächsten Bild hoch, wenn sie sich änderte, der Ursprung wanderte oder ein `prepare` sein Bild nicht erreichte; sonst kostet sie nichts (ein Bild ohne Änderung schickt weiter 496 Byte). Der Fragment-Shader läuft für jedes Fragment über alle Lichter.
+**Eine Liste im Speicherpuffer** (`Scene::set_lights`, 64 Byte je Licht: Position relativ zum Ursprung und Reichweite, Farbe mal Intensität und Art, Achse, Kegel als Skala und Versatz des Kosinus), Gruppe 0, Bindung 6, nur der Fragment-Shader liest sie. Sie geht mit dem nächsten Bild hoch, wenn sie sich änderte, der Ursprung wanderte oder ein `prepare` sein Bild nicht erreichte; sonst kostet sie nichts (ein Bild ohne Änderung schickt weiter 496 Byte; seit G5d 688, der Uniform-Block der Ansicht wuchs). Der Fragment-Shader läuft für jedes Fragment über alle Lichter.
 
 - **Abfall nach `KHR_lights_punctual`**: Intensität in Candela, `1 / d²`, mit Reichweite das Fenster `clamp(1 − (d / Reichweite)⁴, 0, 1)` (der Test: das Licht der Reichweite 4 ändert 3842 Pixel innerhalb, 0 außerhalb); Spot: `t = clamp(cos · Skala + Versatz, 0, 1)`, `t²`, mit `Skala = 1 / max(0,001, cos innen − cos außen)` und `Versatz = −cos außen · Skala`, beides auf der CPU in `f64` (kein Kosinus im Shader). Dieselbe BRDF wie die Sonne. Keine Schatten (offen).
 - **Kosten je Licht** (unten): etwa 0,11 ms je Licht und Bild in der Messszene, auch wenn fast alle Fragmente außerhalb der Reichweiten liegen: Die Schleife lädt jedes Licht für jedes Fragment. **Gebaut ist keine Aufteilung in Cluster oder Kacheln**: Die Messung verlangt sie ab etwa acht Lichtern (acht kosten 0,75 ms, 64 schon 7,2 ms, 256 30 ms), aber sie ist ein eigener Baustein (ein Rechen-Shader, der die Lichter in Cluster des Sichtvolumens sortiert, Indexlisten je Cluster, der Fragment-Shader schlägt seinen Cluster nach) und blieb nicht im Rahmen dieser Stufe. Offener Punkt.
@@ -205,7 +205,7 @@ Eine Transformation mit negativer Determinante (eine ungerade Zahl negativer Ska
 
 **Die Pyramide.** Stufe k (ab 1) hält das Minimum der Pixel `[x·2^k, (x+1)·2^k) × [y·2^k, (y+1)·2^k)`, am Bildrand abgeschnitten, also `⌈b/2^k⌉ × ⌈h/2^k⌉` Texel, bis 1 × 1. Sie liegt in einer quadratischen `R32Float`-Textur von 2^(Stufen−1) Texeln, Mip k−1 ist Stufe k: Mip-Stufen einer Textur halbieren mit Abrunden, die Stufen hier brauchen Aufrunden (1080 → 540 → 270 → 135 → 68 statt 67); was jenseits des Bildes liegt, liest niemand (1080p: 1024 × 1024, 11 Stufen, 5,6 MiB). Ein Texel nimmt die 2 × 2 darunter, bei ungerader Größe den Rand doppelt. Die halbe Auflösung als erste Stufe spart einen Durchgang über den ganzen Tiefenpuffer; ein Objekt kleiner als ein Pixel wird gegen Stufe 1 geprüft, das ist konservativ.
 
-**Der Test.** Die Kugel einer Instanz (dieselbe wie im Sichtkegel, schon gegen das Runden von `f32` geweitet) wird noch einmal geweitet (×1,0001 plus 4 · 10⁻⁶ der größten Koordinate von Mittelpunkt und Auge) und im Raum der Kamera als Würfel um die Kugel projiziert: Die Grenzen in x/z und y/z sind Minimum und Maximum über die nahe und ferne Seite (`(c ± r) / (z ∓ r)`), ohne Wurzel und ohne Auslöschung, dafür etwas weiter als die genaue Projektion der Kugel. Das Rechteck in Pixeln wird auf jeder Seite um einen Pixel größer; die Stufe ist die erste, in der es höchstens 2 × 2 Texel trifft (`k = firstLeadingBit(Ausdehnung) + 1`, mindestens 1). Verdeckt ist die Instanz, wenn ihre nächste Tiefe (`zz + zw / (z − r)`) kleiner ist als das Minimum dieser Texel. Schneidet die Kugel die nahe Ebene, gilt sie als sichtbar. Die Skalen der Projektion stehen seit G5d im Uniform-Block der Ansicht (`proj`, 192 statt 176 Byte), Größe des Ziels und Zahl der Stufen kommen als Push-Werte.
+**Der Test.** Die Kugel einer Instanz (dieselbe wie im Sichtkegel, schon gegen das Runden von `f32` geweitet) wird noch einmal geweitet (×1,0001 plus 4 · 10⁻⁶ der größten Koordinate von Mittelpunkt und Auge) und im Raum der Kamera als Würfel um die Kugel projiziert: Die Grenzen in x/z und y/z sind Minimum und Maximum über die nahe und ferne Seite (`(c ± r) / (z ∓ r)`), ohne Wurzel und ohne Auslöschung, dafür etwas weiter als die genaue Projektion der Kugel. Das Rechteck in Pixeln wird auf jeder Seite um einen Pixel größer; die Stufe ist die erste, in der es höchstens 2 × 2 Texel trifft (`k = firstLeadingBit(Ausdehnung) + 1`, mindestens 1). Verdeckt ist die Instanz, wenn ihre nächste Tiefe (`zz + zw / (z − r)`) kleiner ist als das Minimum dieser Texel. Schneidet die Kugel die nahe Ebene, gilt sie als sichtbar. Die Skalen der Projektion stehen seit G5d im Uniform-Block der Ansicht (`proj`; mit `lod` für die Detailstufen 208 statt 176 Byte), Größe des Ziels und Zahl der Stufen kommen als Push-Werte.
 
 **Nichts darf fehlen, auch nicht beim Sprung.** Phase 2 prüft immer gegen die Pyramide dieses Bildes, die nur aus Instanzen entsteht, die wirklich gezeichnet wurden; was sie verdeckt, ist im fertigen Bild verdeckt. Vom Bild davor bleibt nur, *welche* Instanzen Phase 1 zeichnet, und das ändert nur die Zeit. Deshalb fällt nichts zurück: Ein Kamerasprung macht Phase 1 nutzlos (sie zeichnet, was vorher sichtbar war und jetzt im Kegel liegt), die Pyramide ist dünn, Phase 2 zeichnet fast alles; ab dem nächsten Bild stimmen die Bits wieder. Eine neue Größe des Ziels ist eine neue Tiefenansicht und damit eine neue Pyramide. Ein neuer Ursprung, neue Kapazitäten und jedes Hochladen aller Plätze löschen alle Bits (alles gilt als gesehen, das erste Bild zeichnet alles im Kegel in Phase 1); eine geänderte Instanz (`scatter`) löscht ihr Bit, sie kommt also in Phase 1. Entschieden habe ich das „alles als sichtbar markieren“, nicht das Zurückfallen ohne Verdeckung: Es kostet ein Bild, in dem Phase 1 mehr zeichnet, und braucht keinen zweiten Weg.
 
@@ -255,8 +255,17 @@ nicht**: Die Messung zeigt keinen klaren Gewinn.
   Sichtbarkeit der Kaskaden des nächsten Bildes.
 - **Gemessen** (`render3dtest --bench 1000000 --async-work N --async-on compute|main`): neben jedem Bild läuft der
   echte `scatter`-Shader mit N Änderungen in eine zweite Kopie der Instanzdaten, auf der Rechen-Warteschlange oder
-  nach dem Bild auf der des Geräts; gemessen wird der Bildabstand auf der GPU (Zahlen unten unter
-  [Messwerte G5d](#g5d-verdeckung-detailstufen-zweite-warteschlange)).
+  nach dem Bild auf der des Geräts; gemessen wird der Bildabstand auf der GPU (Tabelle unter
+  [Messwerte G5d](#g5d-verdeckung-detailstufen-zweite-warteschlange)). Ohne Schatten (Bild 0,57 ms) versteckt die
+  Rechen-Warteschlange nichts: 100 000 Änderungen kosten nach dem Bild 1,57 ms mehr, daneben 1,62 ms (die GPU teilt
+  sich zwischen beiden auf, der Bau der Pyramide dauert dann 1,6 statt 0,045 ms). Mit vier Kaskaden (Bild 3,83 ms)
+  versteckt sie rund die Hälfte (5,43 gegen 4,70 ms, die Läufe streuen von 4,32 bis 5,01), mit 10 000 Änderungen
+  0,04 von 0,13 ms. Das wäre der Gewinn, wenn render3d die Instanzdaten doppelt hielte (bei 1 Mio. Plätzen 84 MB
+  mehr) und jede Änderung in beide Kopien schriebe; bei 10 000 Änderungen je Bild ist aber die CPU der Engpass
+  (rund 5 ms je Bild), und große Änderungsmengen gehören in einen eigenen Rechen-Shader zum Bewegen (nicht gebaut).
+  Kein klarer Gewinn: render3d bleibt bei einer Warteschlange.
+- **Concurrent sharing kostet nichts Messbares**: dieselbe Szene mit Rechen-Warteschlange (Puffer concurrent) und mit
+  `jfgui_GPU_COMPUTE=0` (exklusiv): 0,551 gegen 0,550 ms GPU je Bild.
 
 ## WebGPU
 
@@ -309,6 +318,8 @@ Es läuft dasselbe WGSL, `lib/gpu` macht `var<immediate>` zu einem Uniform-Block
 **Umgebung im Browser**: Das Bild `env` (8 Kugeln und ein Boden im Himmel, mit Sonne) ist in allen drei Bündeln Pixel für Pixel das von Vulkan.
 
 **Lichter im Browser**: Das Bild `lights` (vier Lichter, Schatten der Sonne in zwei Kaskaden) weicht in einem von 57 600 Pixeln um 1 ab, in allen drei Bündeln, gegen Voll wie gegen Basis (die Grenze des Tests: 2 Stufen, 1 % der Pixel). Vermutlich rundet der Übersetzer des Browsers eine Zeile anders (etwa ein zusammengezogenes Multiplizieren und Addieren im Kegel des Spotlichts, dessen Skala 12,9 kleine Unterschiede vergrößert); nicht weiter verfolgt.
+
+**Verdeckung und Detailstufen im Browser** (G5d): Das Bild `occl` (die Szene des Tests `occlusion` mit Detailstufen, nach sechs Bildern einer Fahrt am Sprung, Phase 2 zeichnet viel) weicht in allen drei Bündeln in einem von 57 600 Pixeln um 1 ab, gegen Voll wie gegen Basis (innerhalb der Grenze des Tests); alle anderen Bilder wie vorher (0 Pixel, `lights` 1 Pixel um 1). Voll gegen Basis: 0 Pixel, auch `occl`. Zuerst schlug das Bild im Browser fehl: Die sechs Bilder davor gingen in dasselbe Ziel mit Rücklese-Puffer, den der Browser nach dem ersten Bild abbildet („used in submit while mapped“); die Bilder davor gehen jetzt in ein Ziel ohne Rücklese-Puffer.
 
 **Im Browser** ([`tests/engine_web.mjs`](../apps/render3dtest/tests/engine_web.mjs); Bündel bauen mit `python -u build_rs.py app render3dtest --target web`, dazu das Programm für Windows, das die Vergleichsbilder schreibt): Chrome 156 kopflos, alle drei Bündel, eigenes Profil. Die Galerie (die fünf Bilder oben, eins davon an 1e7; die glTF-Szene als `.glb` im Bündel selbst geschrieben und gelesen; seit G5c dazu `pbr`: Kugeln aller Materialien, Platten mit Normalenkarte, Metallic-Roughness-Textur, Emission und Verdeckung, Belichtung 1,2, Neutral) gegen den Vulkan-Weg auf derselben Maschine: **0 von 57 600 Pixeln anders**, auch mit PBR (Wurzeln, Divisionen, die Tabelle mit eigenen Gewichten; keine Exponentialfunktion), gegen Voll wie gegen Basis, in jedem Bündel und jedem Bild, auch dem texturierten mit trilinearer Filterung über den Sampler; der Browser meldet keinen Validierungsfehler; die Zählung der Listen gleich dem exakten Test (2522). Im Browser gilt die Robustheit von WebGPU, auf Vulkan sind die Shader ohne übersetzt; am Bild ändert das nichts. Welches Backend Chrome unter WebGPU nimmt, ist nicht festgehalten, der Adapter heißt `nvidia turing`.
 
@@ -406,6 +417,48 @@ glTF laden (`render3dtest --bench-gltf`; die Datei im Programm geschrieben, nich
 - **Große Meshes lesen schnell** (330 bis 400 MB/s), der Speicher ist das Modell selbst.
 - **Viele Knoten kosten im JSON**: Der Baum aus `agent_core::json` braucht für 17 MB Text vorübergehend rund das Sechsfache; ein Knoten im Modell hält rund 340 Byte (zwei `f64`-Matrizen, Name, Kinder). Für Szenen mit Millionen Knoten wären ein Leser, der den Baum nicht aufbaut, und schlankere Knoten der Weg (nicht gebaut).
 
+### G5d: Verdeckung, Detailstufen, zweite Warteschlange
+
+Dieselbe Maschine und Messszene (Release, offscreen, 1080p, 300 Bilder nach 60, 3 in Flug), je Variante drei Läufe
+im Wechsel (`render3dtest --bench 1000000`), Median der Mediane, in Klammern die Spanne. GPU-Last anderer Sitzungen
+vor dem ersten Satz 1 %; die 29 bis 48 % nach den Sätzen zeigte `nvidia-smi` direkt nach dem eigenen Lauf. „Zeichnen“
+sind beide Durchgänge der Kamera; Pyramide / Phase 2 sind Bau der Pyramide, Sichtbarkeit und Durchgang der Phase 2
+(in „Zeichnen“ steckt der Durchgang der Phase 2 mit).
+
+| 1 Mio., ms | gezeichnet | Sichtbarkeit (Phase 1) | Pyramide / Sichtbarkeit / Durchgang Phase 2 | Zeichnen | GPU gesamt | Bildabstand |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Würfel ohne Verdeckung | 528 700 | 0,064 | – | 1,566 (1,555–1,576) | 1,637 | 1,653 |
+| Würfel mit Verdeckung | 30 200 (Phase 2: 11 900) | 0,038 | 0,045 / 0,077 / 0,036 | 0,382 (0,382–0,382) | 0,551 (0,550–0,552) | 0,567 |
+| dasselbe, eine Warteschlange (`jfgui_GPU_COMPUTE=0`) | 30 200 | 0,038 | 0,045 / 0,077 / 0,037 | 0,381 | 0,550 (0,549–0,550) | 0,565 |
+| Kugeln 8 × 16 (256 Dreiecke) ohne Verdeckung | 527 200 | 0,064 | – | 16,885 (16,755–16,889) | 16,956 | 16,972 |
+| Kugeln mit Verdeckung | 78 800 | 0,045 | 0,057 / 0,080 / 0,897 | 2,530 (2,515–2,535) | 2,732 | 2,748 |
+| Kugeln mit Verdeckung und Detailstufen (4 × 8 unter 0,02, 2 × 4 unter 0,008 der Bildhöhe) | 88 200 | 0,051 | 0,054 / 0,083 / 0,104 | 0,669 (0,665–0,669) | 0,867 (0,860–0,867) | 0,882 |
+| dasselbe, unter 1 Pixel nichts | 88 200 | 0,052 | 0,053 / 0,083 / 0,103 | 0,665 | 0,863 | 0,879 |
+| 4 Kaskaden ohne Verdeckung | 528 700 | 0,064 | – | 1,802 (1,796–1,803) | 5,036 (5,023–5,038) | 5,053 |
+| 4 Kaskaden mit Verdeckung | 30 200 | 0,039 | 0,046 / 0,077 / 0,037 | 0,516 (0,515–0,518) | 3,806 (3,800–3,817) | 3,829 |
+
+Kaskaden: Sichtbarkeit 0,187 ms, Tiefen-Durchgänge 2,826 (ohne) und 2,772 ms (mit Verdeckung der Kamera).
+
+Arbeit neben dem Bild (`--async-work N`: der `scatter`-Shader mit N Änderungen in eine zweite Kopie der Instanzdaten):
+
+| 1 Mio. Würfel mit Verdeckung, ms | GPU-Bildabstand, Arbeit nach dem Bild auf der Warteschlange des Geräts | auf der Rechen-Warteschlange |
+| --- | ---: | ---: |
+| ohne Arbeit daneben | 0,567 | – |
+| 10 000 Änderungen | 0,698 (0,696–0,698) | 0,662 (0,660–0,665) |
+| 100 000 Änderungen | 2,132 (2,131–2,182) | 2,183 (2,136–2,215) |
+| 4 Kaskaden, ohne Arbeit daneben | 3,829 | – |
+| 4 Kaskaden, 100 000 Änderungen | 5,428 (5,386–5,446) | 4,699 (4,323–5,011) |
+
+- **Verdeckung: GPU je Bild 1,637 → 0,551 ms (−66 %).** Von 528 700 Würfeln im Kegel zeichnen beide Phasen 30 200
+  (5,7 %), Phase 2 davon 11 900. Was die Verdeckung selbst kostet: Pyramide 0,045, Sichtbarkeit der Phase 2 0,077 ms;
+  die Sichtbarkeit der Phase 1 ist billiger als die alte (0,038 statt 0,064 ms: weniger Einträge). Die 0,35 ms des
+  Durchgangs der Phase 1 sind jetzt vor allem Pixel: Der Bildschirm ist voll, 2 Mio. Fragmente mit PBR.
+- **Detailstufen: Kugeln 2,732 → 0,867 ms** mit Verdeckung; ohne beide 16,956 ms.
+- **Kleine Objekte auslassen (unter 1 Pixel): nichts** (gleiche Zahl gezeichnet); was so klein ist, verdeckt schon die
+  Pyramide. Für die fernen Kaskaden siehe [Detailstufen](#detailstufen-g5d): die Werfer sind 10 bis 30 Texel groß.
+- **Kaskaden**: Die Verdeckung der Kamera spart mit Schatten 1,23 ms (ohne 1,09 ms: Der Hauptdurchgang mit Schatten
+  ist je Fragment teurer); die Kaskaden selbst (2,8 ms Tiefe) bleiben, wie sie waren.
+
 ### G5c: PBR
 
 Dieselbe Maschine und Messszene (Release, offscreen, 1080p, 300 Bilder nach 60, 3 in Flug), je drei Läufe im Wechsel mit dem G5b-Stand (e61e1ff7, im selben Wechsel gemessen), Median der Mediane, in Klammern die Spanne. GPU-Last anderer Sitzungen bei Blicken 1, 1 und 27 %.
@@ -452,11 +505,15 @@ Punktlichter (dieselbe Szene ohne Schatten, die Lichter zufällig über die Szen
 
 ## Was nicht getestet ist
 
+Aus G5d: die Verdeckung auf anderen GPUs, in 4K und in einem echten Fenster im Dauerbetrieb (das Fenster-Skript zeichnet sechs Bilder), Tiefenanhänge, die eine Array-Ansicht mit einer Schicht sind (die Pyramide liest `texture_depth_2d`; `lib/gpu` sagt die Dimension einer Ansicht nicht), Szenen, in denen Phase 1 lange nutzlos bleibt (eine Kamera, die in jedem Bild springt), Detailstufen in glTF-Szenen (kein `MSFT_lod`), die Rechen-Warteschlange auf GPUs ohne eigene Familie (der Rückweg ist mit `jfgui_GPU_COMPUTE=0` getestet), auf AMD (dort kostet concurrent sharing vielleicht etwas) und unter Linux.
+
 Aus G5c: Schatten mit Dreiecken, die die nahe Ebene einer Kaskade schneiden (Pancaking), sehr flach stehende Sonne, Kaskaden auf anderen GPUs, Umgebungen aus echten HDR-Dateien (die Tests erzeugen ihre), große Seiten (über 64) und ihre Ladezeit, Normalenkarten, die mit MikkTSpace gebacken wurden (Facetten auf groben Meshes), Spotlichter mit Kegeln nahe π/2, sehr viele Lichter über 256.
 
 
 Andere GPUs (AMD, Intel, Telefone), Vulkan 1.1 und 1.2 auf echter Hardware, Linux und Android (das Programm wird dort nicht gebaut: `apps/render3dtest/TARGETS`), Firefox (kopflos kein WebGPU), Safari, 4K, ein Fenster im Dauerbetrieb, ein verlorenes Gerät mitten in der Arbeit über den Rückgabewert hinaus, Szenen über 1 Mio. Instanzen, sRGB-Ziele (ein Fenster im Browser zeigt die linearen Farben heute ungewandelt), Zeiten im Browser. Aus G5b: Texturen mit mehr Ebenen, als eine Klasse auf diesem Gerät hat (2048), eine Klasse am Limit von 256 Ebenen im Browser, Texturen größer als 2048 außer dem einen Fall 4096 × 64, eine sehr große Zahl von Texturen in einem echten glTF (die Tests schreiben ihre Dateien selbst; Beispielmodelle von Khronos wären ein Download), Dateien mit `KHR_texture_transform` und weiteren UV-Sätzen.
 
 ## Was nicht gebaut ist
+
+Aus G5d: Verdeckung für die Schatten-Kaskaden, ein Reprojizieren der Pyramide des Bildes davor, ein Bau der Pyramide in einem Dispatch (heute einer je Stufe), feinere Stufen mit mehr als 2 × 2 Texeln je Test, `draw_indexed_indirect_count` mit Zusammenschieben leerer Listen (keine Messung trug es), eine Vereinfachung von Meshes in der Bibliothek, `MSFT_lod`, eine eigene Grenze in Texeln für kleine Werfer in den Kaskaden (gebaut, gemessen, wieder entfernt), der Einsatz der Rechen-Warteschlange in render3d (gemessen, kein klarer Gewinn), feinere Wartestufen in `submit_after`, eine Kopierwarteschlange.
 
 Aus G5a heraus bewusst nicht: Meshes entfernen (die Pools wachsen nur), Skalierung 0 auf einzelnen Achsen (erlaubt, aber die Flächen ohne Normale werden schwarz; 0 auf allen Achsen versteckt eine Instanz sauber), Scherung (ein glTF-Knoten mit Scherung in der Weltmatrix wird ohne sie gezeichnet und gezählt), orthografische Kamera, Durchsichtigkeit (glTFs BLEND wird deckend gezeichnet), mehrere Ansichten (die Struktur ist da, `Scene` hält eine), mehr Instanzen, als ein Dispatch erreicht, MSAA (fehlt in `lib/gpu`), Schrumpfen von Kapazitäten, ein Rechen-Shader zum Bewegen. Aus G5b: Texturen entfernen, Bindless auf Voll, Mip-Stufen auf der GPU, anisotrope Filterung, beidseitige Materialien (`double_sided`: von vorn gezeichnet, gezählt), eine Pipeline ohne `discard` für deckende Listen, weitere UV-Sätze, komprimierte Texturen (BC, KTX2). Aus G5c: Cluster- oder Kachel-Shading für viele Lichter (die Messung verlangt es ab etwa acht), Tangenten aus der Datei oder MikkTSpace, Mehrfachstreuung (weißes Metall verliert bei Rauheit 1 bis 70 %), Schatten des Umgebungslichts (Verdeckung nur aus der Textur), Vorfiltern auf der GPU, RGBE-Leser, Listen je Alpha-Modus (sie holten die 0,31 ms von `fs_shadow` und das `discard` im Hauptdurchgang zurück; eine Entscheidung des Nutzers), Überblenden zwischen Kaskaden, Ausblenden am Ende der Schattenweite, Schatten für Punkt- und Spotlichter, Auslassen kleiner Werfer in fernen Kaskaden. Eine Sichtbarkeit je Instanz ist nur Kugel gegen sechs Ebenen: Verdeckung kommt mit G5d, und dort liegt nach G1 der größte Hebel.
