@@ -52,7 +52,6 @@ pub struct Request {
 const MAGIC: &[u8; 4] = b"JFI1";
 const TOKEN_TAG: &[u8; 4] = b"XAT1";
 const MSG_MAX: usize = 1 << 20;
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const QUEUE_MAX: usize = 64;
 
 static QUEUE: SpinLock<Vec<Request>> = SpinLock::new(Vec::new());
@@ -81,6 +80,20 @@ impl Request {
         }
         out
     }
+}
+
+/// (platform) a request the system makes itself (macOS: files and URLs it opens with the app, the
+/// Dock menu's tasks): queued as a later start's request (UIC_OPEN), the UI woken
+#[allow(dead_code)]
+pub(crate) fn queue_push(req: Request) {
+    {
+        let mut q = QUEUE.lock();
+        if q.len() == QUEUE_MAX {
+            q.remove(0);
+        }
+        q.push(req);
+    }
+    crate::wake();
 }
 
 /// the requests that arrived since the last call, oldest first

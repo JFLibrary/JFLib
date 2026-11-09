@@ -23,6 +23,10 @@
 //     WT_WORKSPACE [k]         NSWorkspace's notification k (0 will sleep, 1 did wake, 2 will power off)
 //                              posted in this process
 //     WT_SIGTERM               SIGTERM to this process (kill)
+//     WT_TRAY [k, a]           the status item: k 0 its menu rows (-1 none), 1 choose row a, 2 a click
+//     WT_DOCK [k, a]           the Dock tile: k 0 the badge's number (-1 none), 1 progress shown, 2 the Dock
+//                              menu's rows, 3 choose its row a
+//     WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
 //                              OK with name (a full path)
 
@@ -48,6 +52,9 @@ pub const WT_MENU: u32 = 35;
 pub const WT_TERMINATE: u32 = 36;
 pub const WT_WORKSPACE: u32 = 37;
 pub const WT_SIGTERM: u32 = 38;
+pub const WT_TRAY: u32 = 39;
+pub const WT_DOCK: u32 = 40;
+pub const WT_OPEN_URLS: u32 = 41;
 // WT_SEND / WT_POPUP_SEND kinds
 pub const TS_MOVE: i32 = 1;
 pub const TS_DOWN: i32 = 2;
@@ -183,6 +190,9 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                 .map_or(-1, |k| k as i64)
         }
         WT_MENU => menu_shape(),
+        WT_TRAY => super::services::test_tray(a[0], a[1]),
+        WT_DOCK => super::services::test_dock(a[0], a[1]),
+        WT_OPEN_URLS => super::services::test_open(&alloc::format!("{}/build/plattest_open.txt", crate::cwd())),
         WT_TERMINATE => {
             let Some(app) = super::app() else { return -1 };
             // SAFETY: terminate: of the application (its delegate decides).

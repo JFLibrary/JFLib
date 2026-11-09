@@ -24,8 +24,9 @@
 // the Background portal (RequestBackground with autostart and the command line): the desktop
 // may ask the user, and the call waits for the answer (at most AUTOSTART_WAIT_MS); the sandbox
 // cannot see the host's autostart folder, so the answer is remembered in
-// config://autostart.  jfgui_AUTOSTART=portal / file picks the way (tests).  Web and
-// Android: Unavailable.
+// config://autostart.  jfgui_AUTOSTART=portal / file picks the way (tests).  macOS
+// (apple_autostart.rs): a LaunchAgent ~/Library/LaunchAgents/<app id>.plist (RunAtLoad, the
+// executable and the arguments).  Web, Android and iOS: Unavailable.
 
 use alloc::string::String;
 
@@ -90,7 +91,11 @@ pub(crate) mod native;
 #[path = "linux_autostart.rs"]
 pub(crate) mod native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+#[path = "apple_autostart.rs"]
+pub(crate) mod native;
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod native {
     use super::AutostartError;
     use alloc::string::String;

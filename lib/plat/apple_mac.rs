@@ -29,6 +29,8 @@
 //   dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
 //   the app   apple_mac_app.rs: the main menu (Cmd+Q asks the main window), NSApp's delegate,
 //             E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
+//   services  apple_mac_services.rs: the status item and notifications, the Dock tile, files the
+//             system opens with the app, global shortcuts
 //   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 //
 // Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -71,6 +73,9 @@ pub use test::*;
 mod dnd;
 #[path = "apple_mac_app.rs"]
 mod sysapp;
+#[path = "apple_mac_services.rs"]
+pub(crate) mod services;
+pub use services::hotkey::hotkey_test_post;
 pub(crate) use sysapp::print_dialog;
 pub use sysapp::print_dialog_autoclose;
 pub(crate) use dnd::os_drag_start;
@@ -224,6 +229,7 @@ static VIEW_OFF: AtomicIsize = AtomicIsize::new(0);
 static DEL_OFF: AtomicIsize = AtomicIsize::new(0);
 static SOURCE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 static MAIN_RL: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static OBS: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 
 /// a short borrow of the state (never across a call into AppKit)
 fn with<R>(f: impl FnOnce(&mut St) -> R) -> Option<R> {
@@ -325,8 +331,14 @@ fn observe(del_cls: Id, doff: isize) -> Id {
         let nc: Id = msg!(class(c"NSNotificationCenter"), c"defaultCenter"; Id);
         msg!(nc, c"addObserver:selector:name:object:", obs => Id, super::objc::sel(c"jfScreensChanged:") => Sel,
              NSApplicationDidChangeScreenParametersNotification => Id, NIL => Id; ());
+        OBS.store(obs, Ordering::SeqCst);
         obs
     }
+}
+
+/// the observer object: NSApp's and the notification centre's delegate
+pub(crate) fn observer() -> Id {
+    OBS.load(Ordering::SeqCst)
 }
 
 extern "C" fn d_theme_changed(_this: Id, _cmd: Sel, _n: Id) {
@@ -2061,5 +2073,6 @@ fn delegate_methods() -> Vec<(&'static core::ffi::CStr, *const c_void, &'static 
         (c"jfScreensChanged:", d_screens_changed as *const c_void, n),
     ];
     v.extend_from_slice(&sysapp::delegate_methods());
+    v.extend_from_slice(&services::delegate_methods());
     v
 }
