@@ -32,8 +32,9 @@
 // possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 // the old one and attaches it to the new one; its next frame follows.
 //
-// The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back
-// (G5e2 tests it).
+// The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back.  When
+// the answer comes (gp_views_tick looks), the next render takes it to the framebuffer as it would a new frame, and at
+// rest it is settled again (G5e2: before, a view at rest or under a layer kept an older frame in the framebuffer).
 
 use alloc::rc::{Rc, Weak};
 use alloc::string::String;
@@ -100,6 +101,9 @@ pub struct GpuViewInfo {
     /// frames read back into the CPU's copy, the time that took (us: submit, wait, copy)
     pub reads: u64,
     pub read_us: u64,
+    /// (G5e2) the newest frame read back into the CPU's copy (1, 2, ..; 0: none): the framebuffer can hold the view's
+    /// newest frame once it equals `frames` (in the browser a read-back comes later)
+    pub read_frame: u64,
     /// the size of its target (px)
     pub size: (u32, u32),
     /// what the last failure said
@@ -302,6 +306,9 @@ pub(crate) struct Entry {
     pub(crate) tried: Option<(u32, (u32, u32), u32)>,
     /// a frame was drawn in this render; when its pixels go to the framebuffer at rest (0: done)
     pub(crate) moved: bool,
+    /// (G5e2, the browser) a read-back came after the Draw that asked for it: the next render takes it to the framebuffer
+    /// as a new frame (gpu_out.rs gp_views_tick)
+    pub(crate) arrived: bool,
     pub(crate) rest_at: u64,
     pub(crate) apart: bool,
     pub(crate) info: GpuViewInfo,
@@ -366,6 +373,7 @@ impl Ui {
         i.frames = c.frame;
         i.reads = c.reads;
         i.read_us = c.read_us;
+        i.read_frame = c.image_frame;
         if i.error.is_none() {
             i.error = c.error.clone();
         }
@@ -426,6 +434,7 @@ impl Ui {
             tex: None,
             tried: None,
             moved: false,
+            arrived: false,
             rest_at: 0,
             apart: false,
             info: GpuViewInfo::default(),
