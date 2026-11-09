@@ -152,6 +152,11 @@ pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;
 pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
+// (G5e1) GPU content in a window, a 3D view between widgets (gpu_view.rs): where lib/gpu is there
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+mod gpu_view;
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+pub use gpu_view::{GpuContent, GpuViewInfo, GPU_VIEW_FORMAT};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
 // ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
@@ -514,6 +519,9 @@ pub(crate) struct Mods {
     pub(crate) touch: touch::S,
     /// (G3a) the output through a swapchain (gpu_out.rs)
     pub(crate) gout: gpu_out::S,
+    /// (G5e1) the views of GPU content (gpu_view.rs)
+    #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+    pub(crate) gview: gpu_view::S,
 }
 
 /// what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
@@ -560,6 +568,8 @@ pub struct GpuOutput {
     pub image_uploads: u64,
     pub image_hits: u64,
     pub image_evicted: u64,
+    /// (G5e1) views of GPU content (ui.gpu_view) the output's render pass drew in the window's last frame
+    pub view_quads: u32,
     /// canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
     /// in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
     /// and the time that took (us), tiles evicted, gestures ended by the CPU's picture

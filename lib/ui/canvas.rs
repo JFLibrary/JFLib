@@ -84,11 +84,24 @@ pub(crate) struct Rec {
     pub(crate) d: CanvasDesc,
 }
 
-/// the canvases recorded in the live window's frame
+/// (G5e1) a view of the frame (ui.gpu_view, gpu_view.rs): its command, id and version; whether the output's render
+/// pass draws it in this frame (gpu_out.rs decides)
+#[derive(Clone, Copy)]
+#[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
+pub(crate) struct ViewRec {
+    pub(crate) layer: u8,
+    pub(crate) index: u32,
+    pub(crate) id: u32,
+    pub(crate) ver: u32,
+    pub(crate) apart: bool,
+}
+
+/// the canvases and views recorded in the live window's frame
 #[derive(Default)]
 pub(crate) struct W {
     #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
     pub(crate) recs: Vec<Rec>,
+    pub(crate) views: Vec<ViewRec>,
 }
 
 impl Ui {

@@ -329,6 +329,7 @@ impl Ui {
             d.forced = d.full;
             d.top.clear();
             d.imgs.clear();
+            d.canv.clear();
             for k in d.pre.iter_mut() {
                 k.clear();
             }
@@ -336,6 +337,7 @@ impl Ui {
         if self.gp_canvas_wanted() {
             self.gp_canvas_begin(); // which canvases come from tiles in this frame (gpu_out.rs)
         }
+        self.gp_views_begin(); // (G5e1) the views: their frames now, whether the output draws them (gpu_out.rs)
         let mut sc = self.sc_pass(w, h);
         if self.wp.dirty.cells.is_none() || self.wp.dirty.cells_prev.is_none() {
             self.sc_plan(sc, 0, 0, false);
@@ -449,9 +451,11 @@ impl Ui {
         // keeps no separate layers and may lack an image's pixels
         let split = cfg!(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")) && self.wp.dirty.split;
         let apart = split && {
-            let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy) && {
+            let views = self.wp.canv.views.iter().any(|v| v.apart);
+            let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy || views) && {
                 let images = self.gp_plan_images();
-                self.gp_plan_canvases() | images
+                let canvases = self.gp_plan_canvases();
+                self.gp_plan_views() | canvases | images
             };
             quads || self.wp.dirty.busy || self.wp.cmd.layers[1..].iter().any(|l| !l.is_empty())
         };

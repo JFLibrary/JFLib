@@ -533,6 +533,7 @@ impl Ui {
         self.wp.rtl.reset();
         self.wp.scopy.reset(); // the scroll views recorded (scrollcopy.rs)
         self.wp.canv.recs.clear(); // the canvases recorded (canvas.rs)
+        self.wp.canv.views.clear(); // the views recorded (gpu_view.rs)
     }
 
     /// cmd_layer(l) -> previous layer
