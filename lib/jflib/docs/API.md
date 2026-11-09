@@ -19953,10 +19953,11 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 ```text
 render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
-against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
-indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
-Vulkan, handed to the browser as text on WebGPU.
+instance list per mesh, side (mirrored instances turn their faces round) and alpha class (opaque without a discard
+in its pipelines, MASK with one); (G5d) the camera's occlusion test against a depth pyramid in two phases.  No draw
+per object anywhere: a frame is a few compute dispatches and one indirect draw per list and phase (level Basis) or
+one multi-draw per side, alpha class and phase for all of them (level Voll).  The same WGSL on every path: compiled
+ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
   renderer.add_mesh(&MeshData) -> Result<MeshId>              positions, normals, uv, indices into the pools
@@ -20005,7 +20006,9 @@ HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
 HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
+/// the main pass's fragment shader of opaque lists (no discard); FS_MASK_SPV: that of MASK lists
 FS_SPV: &[u32] = spv::FS
+FS_MASK_SPV: &[u32] = spv::FS_MASK
 VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH
 VS_SHADOW_SPV: &[u32] = spv::VS_SHADOW
 FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
@@ -20041,6 +20044,12 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`struct MaterialId(pub u32)`**
   a material of a Renderer
 
+- **`enum AlphaClass`**
+  how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
+  Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+  - `Opaque` -- nothing is dropped: pipelines without a discard (the early depth test stays theirs)
+  - `Mask` -- glTF's MASK: fragments whose alpha is below the cutoff are dropped
+
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
   - `first_index: u32`
@@ -20067,7 +20076,8 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `occlusion_texture: Option<TextureRef>` -- linear, r: how much of the ambient (indirect) light reaches the surface, 1 + strength (r - 1)
   - `occlusion_strength: f32`
   - `emissive_texture: Option<TextureRef>` -- sRGB, times emissive
-  - `alpha_cutoff: Option<f32>` -- glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
+  - `alpha_cutoff: Option<f32>` -- glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque).  It decides the
+    alpha class: an instance of a MASK material is in a list of MASK instances, drawn by pipelines with a discard
 
 **`impl Material`**
 
@@ -20075,6 +20085,8 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   a dull material of one colour
 - **`const fn textured(t: TextureRef) -> Material`**
   a dull material of a texture (white times the texture)
+- **`const fn alpha_class(&self) -> AlphaClass`**
+  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
 
 - **`struct Renderer`**
   the pipelines of one colour format, the mesh pools and the material table of one device
@@ -20088,8 +20100,9 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn max_instances(&self) -> u32`**
   the most instances a scene can hold on this device
 - **`fn set_shadow_mask(&mut self, on: bool)`**
-  (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
-  (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+  (G5c) false: the shadow passes of MASK lists run without a fragment shader too and MASK materials cast full
+  shadows (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through.  Opaque lists cast
+  without a fragment shader either way
 - **`fn set_environment(&mut self, d: &EnvironmentData) -> Result<()>`**
   (G5c) the environment's light: a procedural sky or six faces, prefiltered on the CPU (the levels of a
   cube texture per roughness, 9 harmonics for the diffuse part); scenes take it with
@@ -20125,7 +20138,10 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
   a row of the table; its textures must be this renderer's
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
-  a row of the table; the next frame shows it
+  a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
+  that class with their scenes' next prepare
+- **`fn alpha_class(&self, id: MaterialId) -> AlphaClass`**
+  the alpha class of a material (Opaque for one the renderer does not have)
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
   a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
   its pyramid from it)
@@ -20320,10 +20336,13 @@ scene -- a scene's instances, camera and sun (lib.rs has the overview, docs/REND
 On the CPU: one Slot per instance with its f64 position; free places on a list, used again first.
 On the GPU, per slot: spheres (16 bytes, read by cull), list_of (4 bytes, read by cull only for what
 is visible), instances (64 bytes, the finished matrix, read by the vertex shader).  Per list (one per
-mesh and side in use: a mirrored instance, its scales' product negative, turns its faces round and is
-drawn by the pipeline whose front faces are clockwise): a draw record, a first place in the visible
-list.  Capacities double, a list keeps room for its instances, so frames with instances coming and
-going rewrite no list layout.
+mesh, side and alpha class in use: a mirrored instance, its scales' product negative, turns its faces round and
+is drawn by the pipelines whose front faces are clockwise; an instance of a MASK material is drawn by the pipelines
+with a discard): a draw record, a first place in the visible list.  Which list an instance is in is settled by
+prepare (the class is its material's, which the renderer holds).  The draw records lie by width of indices, class
+and side, so each combination is one multi-draw; a list's record is the fourth word of its entry in list_first.
+Capacities double, a list keeps room for its instances, so frames with instances coming and going rewrite no list
+layout.
 
 What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the
 barrier against the frame before): always the view and the lights of this frame's slot; the changed
@@ -20336,7 +20355,7 @@ commands without a barrier against the frames still on the GPU.
 - **`struct Transform`**
   where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
   Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
-  list of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
+  lists of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
   a normal, they come out black
   - `pos: [f64; 3]`
   - `rot: [f32; 4]`
@@ -20420,10 +20439,13 @@ commands without a barrier against the frames still on the GPU.
   a list of the scene
   - `mesh: MeshId`
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
-  - `count: u32` -- the instances of this mesh, and the room for them in the visible list
+  - `class: AlphaClass` -- the alpha class of its instances' materials (drawn with or without a discard)
+  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list
   - `capacity: u32`
   - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
+  - `record: u32` -- its draw record (draws_buffer, late_buffers, cascade_buffers: 5 u32 each); the records lie by width of indices,
+    class and side
 
 - **`struct FrameStats`**
   what a finished frame measured (Scene::set_stats)
@@ -20443,15 +20465,18 @@ commands without a barrier against the frames still on the GPU.
 
 - **`fn new(r: &Renderer) -> Result<Scene>`**
 - **`fn add(&mut self, i: Instance) -> Result<InstanceId>`**
-  a new instance, on a place that came free if there is one
+  a new instance, on a place that came free if there is one (its list: with the next prepare)
 - **`fn remove(&mut self, id: InstanceId) -> Result<()>`**
-  the instance goes; its place comes free
+  the instance goes; its place comes free (and its list loses it with the next prepare)
 - **`fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()>`**
   a new transform; one that mirrors where the old did not (or the other way round) moves the instance
-  to its mesh's other list, as set_mesh does
+  to its mesh's list of the other side, as set_mesh does (with the next prepare)
 - **`fn transform(&self, id: InstanceId) -> Result<Transform>`**
 - **`fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()>`**
+  a material of another alpha class moves the instance to the list of that class with the next prepare (until then
+  a frame shows the old material: it goes up with prepare too)
 - **`fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()>`**
+  the instance's list of the new mesh, with the next prepare
 - **`fn len(&self) -> u32`**
   instances alive
 - **`fn is_empty(&self) -> bool`**
@@ -20495,9 +20520,11 @@ commands without a barrier against the frames still on the GPU.
 - **`fn upload_info(&self) -> UploadInfo`**
   what the last prepare sent
 - **`fn lists(&self) -> Vec<ListInfo>`**
-  the lists in order (list i = the i-th draw record of draws_buffer)
+  the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
+  record: ListInfo::record)
 - **`fn draws_buffer(&self) -> &Buffer`**
-  (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list, instance_count second
+  (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
+  instance_count second
 - **`fn visible_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's visible list after a frame's culling: slots, a list's at ListInfo::first
 - **`fn wait_slot(&mut self) -> Result<()>`**
