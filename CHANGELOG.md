@@ -37,6 +37,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
 - **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).
 - **Tests:** `lib/text_shape`'s shaping test reads its font from `JFLIB_SHAPING_FONT` (was `PAINTCRAFT_SHAPING_FONT`); the codec checks' fixtures (`a1_rgba.png`, `a6_photo.png`, `pdn/`) are in `apps/codectest/fixtures/`.
+- **rt:** rt::portable::math (rt::x87 on ARM64, Android and in the browser): pow, sin and cos within about half an ulp (were up to 118 ulp for pow and 1e-15 absolute for sin and cos, far worse beyond +-20): double-double intermediates without FMA, a table-driven log2 and exp2 inside pow, any finite angle reduced exactly (Cody-Waite below 2^19, Payne-Hanek above); still the same bits on every processor (docs/ARM64.md)
 
 ### Removed
 

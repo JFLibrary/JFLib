@@ -69,7 +69,8 @@ Das sind Vorschläge, die der Plan voraussetzt. Abweichungen ändern vor allem A
 5. **Eine Datei pro Architektur:** getrennte Setup-, MSIX-, deb- und AppImage-Dateien, kein gemeinsames
    Setup.
 6. **Mathematik:** ARM nutzt `rt/portable/math.rs` wie Android. Das ist nicht bitgleich zu x87, die
-   Abweichungen werden gemessen und dokumentiert (ARM2).
+   Abweichungen werden gemessen und dokumentiert (ARM2); `pow`, `sin` und `cos` rechnen dort seit dem Nachtrag zu
+   ARM2 auf ein halbes ulp genau.
 7. **Seitengrößen:** 4 KB und 16 KB werden unterstützt, die Größe kommt zur Laufzeit aus `AT_PAGESZ`.
    64 KB wird abgelehnt oder später nachgezogen.
 
@@ -218,7 +219,8 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 **Mathematik:** ARM64 rechnet `rt::x87` mit `portable/math.rs`. `portabletest --math-dump` gibt beide Fassungen für
 dieselben 360 000 Eingaben aus, `apps/portabletest/tests/math_diff.py` vergleicht den Lauf auf x86-64 mit dem auf ARM64
 und misst beide gegen die C-Bibliothek (Pythons `math`, etwa 1 ulp genau). `portable/math.rs` gibt auf beiden
-Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben:
+Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben, Stand nach dem Nachtrag unten (in Klammern die Werte
+von ARM2 davor):
 
 | Gruppe | Eingaben | gleiche Bits | ARM64 zu x86-64, max / 99 % | x86-64 zur libm, max | ARM64 zur libm, max |
 |---|---|---|---|---|---|
@@ -226,19 +228,38 @@ Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben:
 | `log10_round`, `scale_round` (`f64_format`) | jeder positive Double, 1 bis 17 Stellen | 100 % | – | – | – |
 | `exp2` | -1100 bis 1030, -1 bis 1 | 40–42 % | 4 / 3 ulp | 1 ulp | 4 ulp |
 | `log2` | jeder positive Double; 0,5 bis 2 | 99,8 %; 57 % | 2; 5 ulp | 1 ulp | 5 ulp |
-| `pow` | x bis 100, y ±20 | 5,8 % | 118 / 59 ulp | 1 ulp | 118 ulp |
-| `pow` (Gamma) | x 0 bis 1, y 0,1 bis 10 | 22 % | 58 / 17 ulp | 1 ulp | 58 ulp |
-| `sin`, `cos`, `sincos` | -20 bis 20 | 23–24 % | 9036 / 141 ulp, absolut ≤ 1,0e-15 | 1 ulp, `cos` 38 | 9037 ulp |
-| `sin`, `cos` weit | -10^6 bis 10^6 | 0 % | absolut ≤ 3,9e-11 | 47 000 ulp | 1,4e9 ulp |
+| `pow` | x bis 100, y ±20 | 99,56 % (5,8 %) | 1 / 1 ulp (118 / 59) | 1 ulp | 1 ulp (118) |
+| `pow` (Gamma) | x 0 bis 1, y 0,1 bis 10 | 99,95 % (22 %) | 1 / 1 ulp (58 / 17) | 1 ulp | 1 ulp (58) |
+| `sin`, `cos`, `sincos` | -20 bis 20 | 99,91–99,97 % (23–24 %) | 1 ulp, `cos` 38 (9036 / 141) | 1 ulp, `cos` 38 | 1 ulp (9037) |
+| `sin`, `cos` weit | -10^6 bis 10^6 | 11 % (0 %) | 47 500 / 309 ulp, absolut ≤ 1,3e-15 (3,9e-11) | 47 500 ulp | 1 ulp (1,4e9) |
 | `atan2` | ±100, ±100 | 67 % | 5 / 3 ulp | 1 ulp | 5 ulp |
 | `rz_exp2`, `rz_log2` | ±16; 0 bis 256 | 41 %; 96 % | 4; 2 ulp | 1 ulp | 4; 2 ulp |
 
 Der Text einer Zahl und die Zahl eines Textes sind also auf ARM64 dieselben wie auf x86-64 (`f64_format` korrigiert
-`log10_round` ohnehin selbst). Sonst ist x87 fast überall der genauere Teil: `pow` rechnet portabel `exp2(y log2 x)` in
-Double, der Fehler wächst mit `|y log2 x|`; `sin` und `cos` liegen absolut höchstens 1e-15 daneben, die großen ulp-Werte
-entstehen bei Ergebnissen nahe 0. Außerhalb von ±20 reduziert `portable/math.rs` den Winkel ungenau (bekannt, README
-von `portabletest`). Die Effekte, Audio und die Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind
-damit dort nicht zu erwarten, wo Ergebnisse von `pow`, `sin` oder `cos` in Pixel oder Samples gerundet werden.
+`log10_round` ohnehin selbst). `pow`, `sin` und `cos` geben in 99,6 bis 99,97 % der Fälle dieselben Bits wie x87; wo
+nicht, liegt eine Seite ein ulp daneben, bei `cos` nahe seinen Nullstellen x87 selbst (bis 38 ulp). Außerhalb von ±20
+ist jetzt x87 der ungenauere Teil: `fsin` und `fcos` reduzieren mit einem 66-Bit-π (bis 47 500 ulp), `portable/math.rs`
+bleibt bei 1 ulp zur libm. `exp2`, `log2` und `atan2` (auch `rz_exp2`, `rz_log2`) weichen weiter um 2 bis 5 ulp ab.
+Die Effekte, Audio und die Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind damit nicht garantiert,
+wo Ergebnisse in Pixel oder Samples gerundet werden, von `pow`, `sin` und `cos` her aber selten verschieden.
+
+**Nachtrag: `pow`, `sin` und `cos` genauer** (2026-11-09). `portable/math.rs` rechnet die drei mit Double-Doubles
+(hi + lo, Dekkers Produkte mit Veltkamp-Teilung, also ohne FMA) und rundet erst am Ende:
+
+- `pow` = 2^(y log2 x): `log2` aus einer Tabelle `log2(1 + j/64)` (47 Einträge) und `atanh` mit |z| < 0,0056, das
+  Produkt mit y als Double-Double, `exp2` aus `2^(j/32)` (32 Einträge) und einer Reihe in |g| ≤ ln 2 / 64.
+- `sin`, `cos`: Unter 2^19 reduziert Cody-Waite mit π/2 in vier Teilen (172 Bit, die Produkte exakt), darüber
+  Payne-Hanek mit 1216 Bit von 2/π in Ganzzahlarithmetik, also für jeden endlichen Double. Die Taylor-Reihen in r
+  (|r| ≤ π/4) haben ihre führenden Glieder als Double-Doubles.
+
+Gegen eine exakte Referenz (Pythons `decimal`, π auf 1400 Bit) liegen 18 Gruppen mit je 20 000 Eingaben höchstens
+0,502 ulp daneben: die Gruppen oben, dazu `pow` über den ganzen Exponentenbereich und mit x nahe 1, Winkel bis 10^308, nahe
+Vielfachen von π/2 (auch bei 2^19) und der bekannte schlechteste Fall der Reduktion, 6381956970095103 · 2^797. Das eine ulp zur libm in der Tabelle
+kommt von der libm. Weiterhin nur IEEE-Operationen auf Doubles und Ganzzahlen, kein `f64::sin` aus std, `no_std`.
+`scale`, `scale_round`, `log10_round`, `exp2`, `log2` und `atan2` sind unverändert. Neuer Digest von `portabletest`:
+`44721bded2985ff2` unter Windows und Linux auf x86-64 (auch mit `--simd sse2`), unter `qemu-aarch64` und in Nodes
+WebAssembly (`compare.mjs`, `portabletest.wasm` und `.simd.wasm`). Zeit je Aufruf auf dem Entwicklungsrechner (x86-64,
+unter Last gemessen): `pow` 70 ns (vorher 80), `sin` 54 ns (46), `sincos` 71 ns (47).
 
 **A56** (SM-A566B, Android 16, Kernel 6.6 mit 4-KB-Seiten, Cortex-A720 und A520 mit LSE): Das statische `coretest`
 aus `/data/local/tmp`, gestartet über `adb shell` mit eigenem `TMPDIR`, läuft auf echter ARM-Hardware: 4720 von 4724

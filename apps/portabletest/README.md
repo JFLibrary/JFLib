@@ -42,9 +42,10 @@ and stopping on drop. Explicit agent activation/revocation reaches the owned app
 The x86 implementations and their instruction order are unchanged. Portable decimal
 scaling uses a software 64-bit significand with nearest-even intermediate rounding, as
 the native x87 path does. Portable elementary transcendentals use explicit binary64
-series: they are compared within the stated numeric tolerances, not claimed bit-identical
-to arbitrary x87 transcendental instructions. Large-angle trigonometric reduction is a
-remaining precision limitation; the UI/effect representative tests cover -20 to +20 radians.
+series; `pow`, `sin` and `cos` carry their intermediate results as double-doubles and reduce
+any finite angle exactly enough (Cody-Waite below 2^19, Payne-Hanek above), so they stay
+within about half an ulp. They are compared within the stated numeric tolerances, not claimed
+bit-identical to the x87 instructions; `math_diff.py` shows how often they agree.
 
 Real canvas/browser acceptance is separate:
 

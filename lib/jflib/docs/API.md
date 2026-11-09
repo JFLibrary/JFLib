@@ -47092,9 +47092,9 @@ rules. Integer square root avoids libm imports and gives correctly rounded resul
 Source: [`lib/rt/portable/math.rs`](../lib/rt/portable/math.rs)
 
 ```text
-Portable replacement for the native x87 entry points. Decimal scaling emulates the
-x87 64-bit significand after each multiply/divide. Transcendentals use explicit scalar
-binary64 series; native x87 remains unchanged and is the comparison reference.
+Portable replacement for the native x87 entry points. Decimal scaling emulates the x87
+64-bit significand after each multiply/divide. Transcendentals use explicit scalar binary64
+series, pow / sin / cos with double-doubles (below); native x87 is the comparison reference.
 ```
 
 - **`fn scale(m: u64, e: i32) -> f64`**
@@ -47120,6 +47120,8 @@ binary64 series; native x87 remains unchanged and is the comparison reference.
 
 - **`fn pow(x: f64, y: f64) -> f64`**
   Effect power contract: y=0 yields 1, nonpositive bases yield 0, NaNs propagate canonically.
+  Else 2^(y log2 x) with log2 x and its product with y as double-doubles, rounded once:
+  within 0.501 ulp in the tests (|y log2 x| up to 1074); x = +inf gives inf (y > 0) or 0.
 
 - **`fn atan2(y: f64, x: f64) -> f64`**
   Quadrant-aware arctangent, including signed zeros and infinite operands.
@@ -47128,10 +47130,10 @@ binary64 series; native x87 remains unchanged and is the comparison reference.
   Cosine and sine with shared quadrant reduction; return order matches the x87 API.
 
 - **`fn cos(x: f64) -> f64`**
-  Scalar cosine using the common angle reduction.
+  Scalar cosine using the common angle reduction (the same bits as sincos).
 
 - **`fn sin(x: f64) -> f64`**
-  Scalar sine using the common angle reduction.
+  Scalar sine using the common angle reduction (the same bits as sincos).
 
 ### `rt/hosted.rs`
 
