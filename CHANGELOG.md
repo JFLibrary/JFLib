@@ -44,6 +44,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **Tests:** uigputest tests views of a render3d scene in real windows (view, views2, viewsize, viewlose, viewplain, viewcpu, viewoff, viewbasis) against render3d offscreen and render3dtest's ray caster; --bench view measures them; docs/RENDER3D.md shows the connection to render3d
 - **plat:** iOS through UIKit (docs/APPLE.md, AP5): the app's runtime takes Android's host path, a host in Rust drives it (apple_ios.rs): one scene with a view inside the safe area and above the keyboard, the frame as the layer's contents, fingers with their coalesced samples, the Apple Pencil as a pen, an iPad's pointer as a mouse, the on-screen keyboard (UIKeyInput) and a hardware keyboard, rotation, the display link resting while the app is idle, active / background / termination as E_FOCUS_*, E_POWER and E_SESSION_END, the appearance, reduced motion and darker colours as system settings; the clipboard through UIPasteboard, Open / Save as / folders through UIDocumentPickerViewController (answering later, as on Android), URLs through UIApplication, spell checking through UITextChecker
 - **build:** build_rs.py test NAME --target ios --sim runs an app's scripts in the simulator (tools/apple.py sim starts programs in the repository's folder: jfgui_CWD on iOS); the iOS bundle's Info.plist names its scene and orientations; androidGallery and plattest build for ios; plattest --test clip checks the real clipboard (not in all)
+- **ui:** GpuViewInfo::read_frame, the newest frame of a view read back into its CPU copy; jfgui_GPU_VERIFY in the browser leaves out the rectangles the output's pass draws views in
 
 ### Changed
 
@@ -62,6 +63,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** The renderer's own depth buffer (Renderer::set_size) can be sampled (TextureUsage::SAMPLED), FrameStats::visible counts both phases of the occlusion test and FrameStats::draw both passes
 - **render3d:** A view's uniform block is 208 bytes (UploadInfo::bytes of a frame without changes: 688); the bounding sphere of a mesh with detail levels holds every level
 - **render3d:** Scene: which list an instance is in is settled by Scene::prepare (the class is its material's, which the renderer holds): add, remove, set_mesh, set_transform and set_material only mark it, Scene::lists shows what the last prepare settled, a material that changes its class through Renderer::set_material moves its instances with each scene's next prepare; draws_buffer, late_buffers and cascade_buffers hold a list's draw record at ListInfo::record (records lie by index width, class and side), no longer at the list's index; FS_SPV is now the opaque lists' fragment shader without discard
+- **render3d:** render3d encodes sRGB in the fragment shader for 8-bit colour targets without sRGB (Rgba8Unorm, Bgra8Unorm: a window's swapchain, ui::GPU_VIEW_FORMAT), by the definition, the clear colour too; RendererDesc::encode_srgb (default true, false keeps the light linear), RendererDesc::encodes_srgb, Renderer::desc; RendererDesc is #[non_exhaustive] (RendererDesc::new, then set fields)
 
 ### Removed
 
@@ -78,6 +80,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
+- **ui:** Views of GPU content in the browser: a read-back that comes after its Draw now reaches the framebuffer (the cells the output draws are owed again, the next render and the settle at rest take it there); before, the framebuffer kept an older frame or the content's painting
 
 ## [0.1.0] - 2026-11-08
 
