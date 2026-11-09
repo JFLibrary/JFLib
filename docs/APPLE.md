@@ -460,6 +460,10 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
 - **Core Motion zählt anders:** Beschleunigung und Schwerkraft in g und mit umgekehrtem Vorzeichen (Bildschirm nach
   oben: z = -1), die Bibliothek will m/s² mit +9,81. Ob die Rotationsmatrix der Lage vom Bezug zum Gerät abbildet
   oder umgekehrt, entscheidet `apple_ios_motion.rs` an Schwerkraft und Magnetfeld derselben Probe.
+- **`wake()` unter dem Host:** Das Wecken ist über ein Flag zusammengefasst, das nur die Warteschleife eines
+  Programms zurücksetzt (`wake_consume`). Unter UIKit wartet niemand darauf: Das Flag blieb nach dem ersten Wecken
+  stehen, jedes weitere ging verloren (die Sensoren-Seiten froren beim ersten Messwert ein). Mit dem Host geht
+  `wake()` deshalb direkt an ihn (`apple_ios.rs`).
 - **Ohne Nutzungstext fragt iOS nie:** `requestWhenInUseAuthorization` tut ohne
   `NSLocationWhenInUseUsageDescription` im `Info.plist` nichts.
 - **Zwei Bildschirme:** Der Simulator „iPhone Duo“ hat zwei Displays, `simctl io screenshot` will dann `--display`.

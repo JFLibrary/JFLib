@@ -55,11 +55,6 @@ mod nodisp {
     pub fn pen_devices() -> i32 {
         -1
     }
-
-    /// (apple_thread.rs wake) the host's next tick takes the wake-up (apple_ios.rs)
-    pub(crate) fn wake_app() {
-        super::super::ios::wake();
-    }
 }
 
 /// $HOME (or "/")  [plat_home]

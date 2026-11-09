@@ -170,6 +170,13 @@ static HOST: Main = Main(Host {
     accessory: Cell::new(NIL),
 });
 static WAKE_QUEUED: AtomicBool = AtomicBool::new(false);
+/// UIKit runs the app (run): wake() goes to the host, not to the pipe of a waiting loop
+static HOSTED: AtomicBool = AtomicBool::new(false);
+
+/// (apple_thread.rs wake, any thread) the UIKit host runs the app
+pub(crate) fn hosted() -> bool {
+    HOSTED.load(Ordering::Acquire)
+}
 
 fn host() -> &'static Host {
     &HOST.0
@@ -240,6 +247,7 @@ pub(crate) fn before_main() {
 
 /// (apple.rs main, an app installed its runtime) UIKit takes the main thread
 pub(crate) fn run() -> ! {
+    HOSTED.store(true, Ordering::Release);
     register();
     let name = nsstring("JFAppDelegate");
     // SAFETY: the process's own argc / argv (dyld's); UIApplicationMain never returns.
@@ -615,7 +623,7 @@ fn request_frame() {
     }
 }
 
-/// (any thread; apple_thread.rs wake) the next tick takes E_WAKE
+/// (any thread; apple_thread.rs wake under the host) the next tick takes E_WAKE
 pub(crate) fn wake() {
     crate::web::host_wake();
     if !WAKE_QUEUED.swap(true, Ordering::AcqRel) {
