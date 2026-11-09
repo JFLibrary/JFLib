@@ -5,6 +5,7 @@
 //                             language, an unknown tag), then for the first language with sample
 //                             words here: a correct and a misspelled word, the suggestions;
 //                             Windows without spell checking languages: only the empty answers.
+//                             macOS: NSSpellChecker, iOS: UITextChecker, the same checks.
 //                             Linux / Web / Android: no system checker (None, empty).  Then the
 //                             Hunspell folders (DICPATH first) and that a manifest leaves them
 //                             readable.
@@ -42,13 +43,14 @@ fn dict_dirs(t: &mut T) {
     plat::setenv("DICPATH", Some(mine));
     let dirs = hunspell_dirs();
     t.check(dirs.first().map(String::as_str) == Some(mine), &format!("spell: DICPATH comes first ({:?})", dirs));
-    // the system's folder: /usr/share/hunspell (Linux), /Library/Spelling (macOS); Windows has none
+    // the system's folder: /usr/share/hunspell (Linux), /Library/Spelling (macOS); Windows and iOS have none
     let sys = if cfg!(target_vendor = "apple") { "/Library/Spelling" } else { "/usr/share/hunspell" };
-    t.check(cfg!(windows) || dirs.iter().any(|d| d == sys), &format!("spell: {sys} is searched"));
+    let none = cfg!(any(windows, target_os = "ios"));
+    t.check(none || dirs.iter().any(|d| d == sys), &format!("spell: {sys} is searched"));
     if plat::policy::install("# plattest --test spell: only what is always allowed\n").is_ok() {
         let read = |p: &str| plat::policy::fs_allowed(p, plat::policy::FS_READ);
         t.check(read(&format!("{}/de_DE.aff", mine)), "spell: a dictionary of DICPATH is readable under a manifest");
-        t.check(cfg!(windows) || read(&format!("{sys}/de_DE.dic")), &format!("spell: {sys} is readable under a manifest"));
+        t.check(none || read(&format!("{sys}/de_DE.dic")), &format!("spell: {sys} is readable under a manifest"));
         t.info("  (one PERMDENY line follows: a folder outside the rules)\n");
         t.check(!read(&format!("{}-other/x.aff", mine)), "spell: other folders stay closed");
     } else {
@@ -62,7 +64,7 @@ fn checker(t: &mut T) {
     let langs = sys_spell_languages();
     t.info(&format!("  system spell checker: {:?}\n", langs));
     t.check(sys_spell_find("xx-QQ").is_none(), "spell: an unknown language is not found");
-    if !cfg!(any(windows, target_os = "macos")) {
+    if !cfg!(any(windows, target_vendor = "apple")) {
         t.check(langs.is_empty() && sys_spell_find("de-DE").is_none() && SysSpeller::open("de-DE").is_none(), "spell: no system checker here");
         return;
     }

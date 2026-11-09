@@ -1,7 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
-Stand 2026-11-10, auf Basis von `main` bdda550b. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
-und der Kern von `plat`) und AP3 (`plat` ohne Fenster). Die Aufwände sind geschätzt.
+Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
+und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
+auf die Prüfung von Hand auf dem iPhone. Die Aufwände sind geschätzt.
 
 ## Ziel
 
@@ -66,7 +67,7 @@ Größe: S klein, M mittel, L groß, nur relativ zueinander.
 **Fertig, wenn:** ein kleines Rust-Programm per SSH im Terminal des Macs, im Simulator (`xcrun simctl`) und auf
 dem iPhone (`xcrun devicectl`) läuft.
 
-**Umgesetzt (2026-11-10):** Mac mini mit M2 (16 GB, macOS 27.2, Xcode 27.2), iPhone 14 mit iOS 27.2. Auf dem Mac
+**Umgesetzt (2026-11-09):** Mac mini mit M2 (16 GB, macOS 27.2, Xcode 27.2), iPhone 14 mit iOS 27.2. Auf dem Mac
 liegen Rust 1.98.1 über rustup mit `aarch64-apple-ios` und `aarch64-apple-ios-sim` und Python 3.11 über `uv`, beides
 ohne sudo. Ein Rust-Programm, das Betriebssystem und Architektur ausgibt, läuft per SSH auf dem Mac (der Linker
 signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`) und auf dem iPhone
@@ -103,7 +104,7 @@ signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`
 **Fertig, wenn:** `coretest` und `portabletest` auf dem Mac und im Simulator grün sind und die Ergebnisse
 von `portabletest` denselben Digest haben wie auf dem A56.
 
-**Umgesetzt (2026-11-10), mit zwei Änderungen am Plan:** `plat` kannte nur die Backends Windows, Linux und
+**Umgesetzt (2026-11-09), mit zwei Änderungen am Plan:** `plat` kannte nur die Backends Windows, Linux und
 Web/Android, ohne ein Apple-Backend baute also kein Programm. Der Kern von `plat` kam deshalb schon hier dazu.
 `coretest` braucht dagegen Netz, Sperren, `fs` und Prozesse, die es bisher nur für Windows und Linux gibt, und
 rückt nach AP3. `cargo-jflib` folgt, sobald Apple-Programme Fenster haben.
@@ -136,7 +137,7 @@ rückt nach AP3. `cargo-jflib` folgt, sobald Apple-Programme Fenster haben.
 
 **Fertig, wenn:** `coretest` und die Teile von `plattest` und `asynctest` ohne Fenster auf dem Mac grün sind.
 
-**Umgesetzt (2026-11-10):** `coretest` auf dem Mac 4726 von 4726, `plattest --test all` 212 von 212, dazu die einzelnen
+**Umgesetzt (2026-11-09):** `coretest` auf dem Mac 4726 von 4726, `plattest --test all` 212 von 212, dazu die einzelnen
 Tests ohne Fenster grün (unter anderem `crash`, `panic`, `spawn`, `launch`, `vfs`, `dirs`, `instance`, `log`, `policy`,
 `print`, `spell`; `secret` in der angemeldeten Sitzung, per SSH ist der Schlüsselbund gesperrt). `asynctest` öffnet ein
 Fenster und wartet auf AP4. Im iOS-Simulator `coretest` 4715 von 4717: iOS hat keine Ordnerüberwachung, und der Pfad
@@ -170,7 +171,7 @@ eines Unix-Sockets im Temp-Ordner des Simulators ist länger als die 104 Bytes v
 
 **Fertig, wenn:** `gallery`, `uitest` und `dndtest` mit ihren Skripten auf dem Mac grün sind.
 
-**Umgesetzt (2026-11-10), mit einer Änderung am Prüfkriterium:** `build_rs.py test gallery|uitest|dndtest --target mac`
+**Umgesetzt (2026-11-09), mit einer Änderung am Prüfkriterium:** `build_rs.py test gallery|uitest|dndtest --target mac`
 ist grün (42, 1 und 3 Skripte). Skripte laufen aber immer headless (`--script`), sie prüfen das AppKit-Backend gar
 nicht. Das übernehmen deshalb zwei Tests in echten Fenstern ohne Benutzer: `plattest --test window` (50 Prüfungen) und
 `plattest --test dnd` (49), dazu ein Lauf der echten Gallery mit `--auto-close`. Ereignisse gehen dabei nur an die
@@ -220,6 +221,58 @@ eigenen Fenster (`[NSWindow sendEvent:]` oder direkt an die View), nichts erreic
 
 **Fertig, wenn:** die Gallery im Simulator mit Skripten grün ist und auf dem iPhone von Hand geprüft ist.
 
+**Ansatz (2026-11-09), nach Entscheidung 4:** iOS nimmt den Host-Weg von Android. `ui::launch` legt die
+Laufzeit an (`HostRuntime`, `plat::web::install`) und kehrt zurück, `main` übergibt dann den Hauptthread an
+`UIApplicationMain`, und der Host in Rust treibt die Oberfläche über dieselben Einstiege wie `android/bridge.c`
+(`jfgui_tick`, `jfgui_input`, `jfgui_finger`, `jfgui_event`, `jfgui_text`; `jfgui_host_present`, `jfgui_host_request`).
+Von `web.rs` gilt auf iOS nur der Host-Teil (Fenster in einer Fläche, Eingabe, Anfragen, Systemwerte); Zeit,
+Argumente, Umgebung, Threads, Dateien, Zwischenablage und Dialoge sind die nativen von `apple*.rs`. Programme ohne
+Fenster (Tests mit `simctl spawn`, `--script`, `--shot`) starten wie bisher ohne UIKit. Die Schritte:
+
+- **AP5a, Fenster und Eingabe:** ein Vollbild-`UIWindow` mit eigener View (Bild als Inhalt des `CALayer` wie auf dem
+  Mac), Skala und Drehen, sichere Bereiche, Berührung über den Finger-Weg der UI, Apple Pencil, die
+  Bildschirmtastatur (`UIKeyInput`, Texteingabe), Tasten einer Hardware-Tastatur, Hintergrund und Beenden.
+- **AP5b, Systemdienste:** Zwischenablage (`UIPasteboard`), Dateien über `UIDocumentPickerViewController`, URLs
+  öffnen, Teilen, Hell/Dunkel, Rechtschreibung (`UITextChecker`).
+- **AP5c, die Gallery:** `androidGallery` (die mobile Gallery) für `ios`, ihre Skripte im Simulator, ein Lauf im
+  Simulator mit Bildschirmfoto und die Prüfung von Hand auf dem iPhone.
+
+**AP5a umgesetzt (2026-11-09):** [`apple_ios.rs`](../lib/plat/apple_ios.rs) registriert `JFAppDelegate`,
+`JFSceneDelegate`, `JFViewController` und `JFView` über die Laufzeit; `Info.plist` nennt die Szene
+(`UIApplicationSceneManifest`, `tools/apple.py`). Die View liegt im sicheren Bereich über der Tastatur
+(`keyboardLayoutGuide`) und zeigt das ganze Bild als `CGImage` im Layer. Pixel pro Punkt: die Skala des Bildschirms,
+höchstens 2 und höchstens 2048 Pixel an der langen Seite wie bei Android, dpi 96 mal das. Ein `CADisplayLink` tickt,
+solange die App animiert, sonst ruht er bis zur Frist von `jfgui_frame_delay` (ein Timer von libdispatch); Eingaben und
+`wake()` wecken ihn (im Leerlauf 0,1 % CPU im Simulator). Finger gehen mit allen zusammengefassten Proben und ihrem
+Alter an `jfgui_finger`, der Apple Pencil als Stift (Druck, Neigung aus Höhe und Azimut), der Zeiger eines Trackpads
+als Maus. Die Bildschirmtastatur ist `UIKeyInput` der View: sie wird First Responder, wenn eine Geste ein Widget
+erreicht hat und die App Text will (`REQUEST_IME` mit Höhe), und gibt ab, wenn die App keinen mehr will. Tasten einer
+Hardware-Tastatur nimmt der View-Controller (`pressesBegan`); was das Textsystem tippt, bleibt ihm. Aktiv und inaktiv
+werden `E_FOCUS_IN` / `OUT`, Hintergrund und Vordergrund `E_POWER` 2 / 3, Beenden `E_SESSION_END`. Das Hauptfenster
+ist maximiert (keine Titelleiste). Die Leisten um den sicheren Bereich und der Stil der Statusleiste folgen der Farbe
+oben links im Bild, nicht dem System (eine App darf ihr eigenes Design behalten).
+
+**AP5b umgesetzt (2026-11-09):** Zwischenablage über `UIPasteboard` (Text, HTML, RTF, PNG; Bilder anderer Formate
+als PNG über `UIImage`), [`apple_ios_services.rs`](../lib/plat/apple_ios_services.rs). Öffnen, Speichern unter und
+Ordner über `UIDocumentPickerViewController`, wie auf Android später beantwortet (`FD_PENDING`, `file_dialog_poll`):
+Öffnen und Ordner an Ort und Stelle (der Zugriff auf die gewählte URL gilt für die Sitzung), Speichern unter
+exportiert eine leere Datei des vorgeschlagenen Namens dorthin, wo der Nutzer sie ablegt, und die App schreibt sie
+dann. URLs über `UIApplication openURL`. Hell/Dunkel, weniger Bewegung und dunklere Farben gehen über `jfgui_system`
+(`web_system.rs`). Rechtschreibung über `UITextChecker` (`apple_spell.rs`; `plattest --test spell` im Simulator 60 von
+60). Der Schlüsselbund war schon da (`apple_secret.rs`). `plattest --test clip` (neu, nicht in `all`: überschreibt
+die Zwischenablage) als App im Simulator 11 von 11.
+
+**AP5c (2026-11-09):** `androidGallery` hat `ios` in `TARGETS`. `build_rs.py test androidGallery --target ios --sim`
+führt ihre zehn Skripte im Simulator aus, alle grün; dafür startet `tools/apple.py sim` Programme im Ordner des
+Repositorys (`jfgui_CWD`, nur iOS). Ein Lauf als App im Simulator zeigt die Gallery mit Statusleiste, ohne Titelleiste,
+hell und bei dunklem System. Die Prüfung von Hand auf dem iPhone steht aus.
+
+- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür), die Sensoren
+  (Core Motion, Core Location), markierter Text der Tastatur (`UITextInput` statt `UIKeyInput`: Diktat, Vorschläge,
+  Tastaturen mit Zusammensetzung), Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte
+  Freigaben gewählter Dateien über einen Neustart (Lesezeichen), Mitteilungen, Bildschirm anlassen, Textgröße des
+  Systems, Accessibility. Das Bild geht bei jedem Frame ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
+
 ### AP6: Metal (L)
 
 - `lib/gpu` mit einem Metal-Backend neben Vulkan und WebGPU, `CAMetalLayer` zum Anzeigen.
@@ -235,7 +288,7 @@ eigenen Fenster (`[NSWindow sendEvent:]` oder direkt an die View), nichts erreic
 **Fertig, wenn:** die Desktop-Apps (`jfWord`, `BackupCraft`, JFPainter) auf dem Mac ohne fehlende Grundfunktionen
 laufen.
 
-**Aufteilung (2026-11-10).** Die Bestandsaufnahme nach AP4 ergab mehr als die Liste oben: Papierkorb, zuletzt
+**Aufteilung (2026-11-09).** Die Bestandsaufnahme nach AP4 ergab mehr als die Liste oben: Papierkorb, zuletzt
 benutzte Dateien, Locale und Rechtschreibung des Systems (aus AP3), globale Tastenkürzel, `E_POWER` und
 `E_SESSION_END` sowie Cmd+Q fehlen ebenfalls. Eine Menüleiste aus den Menüs der App gibt es auf keiner Plattform,
 die UI zeichnet ihre Menüs selbst; oben steht deshalb zunächst nur das App-Menü des Systems. AP7 läuft in drei
@@ -254,7 +307,7 @@ Schritten, jeder für sich prüfbar und mergebar:
   `cargo-jflib`, Dateizuordnungen im `Info.plist`, App-Sandbox und die Rechte aus PERMISSIONS.md als Entitlements;
   dann `jfWord`, `BackupCraft` und JFPainter auf dem Mac.
 
-**AP7a umgesetzt (2026-11-10):** [`apple_mac_app.rs`](../lib/plat/apple_mac_app.rs) baut beim ersten Fenster das
+**AP7a umgesetzt (2026-11-09):** [`apple_mac_app.rs`](../lib/plat/apple_mac_app.rs) baut beim ersten Fenster das
 App-Menü und das Fenster-Menü (Deutsch oder Englisch nach der ersten Sprache des Systems). Cmd+Q, „Beenden“ im Dock
 und das Abmelden fragen über `applicationShouldTerminate:` das Hauptfenster (`E_CLOSE`), die App entscheidet. Ein
 Klick aufs Dock-Symbol holt das Hauptfenster zurück. `NSWorkspace` meldet Ruhezustand und Aufwachen (`E_POWER`) und das
@@ -272,7 +325,7 @@ Geprüft auf dem Mac: `plattest --test trash` (19), `power` (10), `spell` (57), 
 abgebrochene Druckpanel. Der Panel-Fokus braucht eine aktive App; er lief erst mit AP7b, als der Test-Mac nicht mehr
 auf dem Sperrbildschirm stand.
 
-**AP7b umgesetzt (2026-11-10):** [`apple_mac_services.rs`](../lib/plat/apple_mac_services.rs): das Statusmenü als
+**AP7b umgesetzt (2026-11-09):** [`apple_mac_services.rs`](../lib/plat/apple_mac_services.rs): das Statusmenü als
 `NSStatusItem` (Symbol 18 Punkte hoch, sonst das der App; mit Menü öffnet ein Klick das Menü wie auf dem Mac üblich,
 ohne Menü meldet er `Activate`), Mitteilungen über `UNUserNotificationCenter` mit Delegate für Klicks und für das
 Zeigen im Vordergrund, das Dock (Badge, der Fortschritt in die Kachel gezeichnet, die Aufgaben als Dock-Menü), Dateien
@@ -290,7 +343,7 @@ deshalb 0, die echte Prüfung folgt mit den Bündeln in AP7c (macOS fragt den Nu
 Abschlussblöcke des Systems sind Objective-C-Blöcke: Ihre Funktion liegt im Block-Literal bei Offset 16, eigene
 Blöcke sind globale Blöcke (`_NSConcreteGlobalBlock`).
 
-**AP7c umgesetzt (2026-11-10), damit ist AP7 fertig:** `build_rs.py` packt jedes Programm für `mac` zusätzlich als
+**AP7c umgesetzt (2026-11-09), damit ist AP7 fertig:** `build_rs.py` packt jedes Programm für `mac` zusätzlich als
 `NAME.app` ([`tools/apple.py`](../tools/apple.py) `mac_bundle`). `Info.plist` kommt aus `PACKAGE`: Name, Version,
 `app_id`, `filetypes=` als Dokumenttypen (eigene Typen auch als exportierte UTIs) und `schemes=` als URL-Typen. Das
 Symbol entsteht als `NAME.icns` aus `res/app_*.png`, das Bündel wird ad hoc signiert. Mit `sandbox` in PERMISSIONS
@@ -386,6 +439,14 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
 - **Synthetische Mausbewegungen** schickt `[NSWindow sendEvent:]` an den First Responder, nicht an die View unter dem
   Punkt; echte kommen über die Tracking-Area. Ein Panel hat keine View als First Responder.
 - **`clip_set_many`** nimmt nur Textformate (cliprich.rs), Bilder gehen über `clip_set`.
+- **UIKit ohne Szene geht nicht mehr:** Mit dem SDK von iOS 27 braucht eine App `UIApplicationSceneManifest` im
+  `Info.plist` und einen Szenen-Delegate, der das Fenster mit `initWithWindowScene:` anlegt.
+- **`simctl spawn` startet im Datenordner des Simulators** (`…/Devices/UDID/data`) und hat keine Shell, also auch
+  kein `cd`. `tools/apple.py sim` gibt den Ordner als `jfgui_CWD` mit (`SIMCTL_CHILD_`), `main` wechselt dorthin.
+- **Die Zwischenablage liest nur eine App:** Ein mit `simctl spawn` gestarteter Prozess kann `UIPasteboard` setzen,
+  liest aber nichts zurück. Als App (`simctl launch`) geht beides; Inhalte anderer Apps fragt iOS beim Lesen nach.
+- **Zwei Bildschirme:** Der Simulator „iPhone Duo“ hat zwei Displays, `simctl io screenshot` will dann `--display`.
+  `tools/apple.py` nimmt ihn nicht von selbst.
 
 ## Testen
 

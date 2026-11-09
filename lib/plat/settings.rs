@@ -227,8 +227,9 @@ pub fn sys_settings() -> SysSettings {
     crate::sys_settings_os(&mut s);
     #[cfg(target_os = "macos")]
     crate::apple::mac::sys_settings_os(&mut s);
-    // the browser's media queries / Android's configuration, as the host sent them (web_system.rs)
-    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+    // the browser's media queries / Android's configuration / iOS's traits, as the host sent them
+    // (web_system.rs)
+    #[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
     crate::web::sys_settings_host(&mut s);
     env_overrides(&mut s);
     s

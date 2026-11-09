@@ -217,7 +217,8 @@ impl App for Gallery {
         if let Some(to) = nav::card(ui) {
             self.next = Some(to);
         }
-        let platform = if cfg!(target_arch = "aarch64") { "ARM64 / arm64-v8a" }
+        let platform = if cfg!(target_os = "ios") { "iOS / arm64" }
+            else if cfg!(target_arch = "aarch64") { "ARM64 / arm64-v8a" }
             else if cfg!(target_os = "android") { "x86_64 / Emulator" } else { t("Desktop-Vorschau") };
         ui.text(TS_CAPTION | TX_SECONDARY, platform);
         ui.text(TS_CAPTION | TX_WRAP | TX_SECONDARY, t("Nativer Rust-Code · eigener Renderer · nach oben wischen"));

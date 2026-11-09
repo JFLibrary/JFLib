@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -380,8 +380,10 @@ event carries its window (Event::win).
 ```
 
 - **`fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style) -> i32`**
-  Launch the same owned app on a desktop event loop, browser worker or Android host.
-  Host-driven applications remain alive after their entrypoint returns.
+  Launch the same owned app on a desktop event loop, browser worker, Android or iOS host.
+  Host-driven applications remain alive after their entrypoint returns.  iOS: a headless run
+  (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the UIKit host's
+  (plat apple_ios.rs, which takes the main thread when this returned 0).
 
 - **`struct Runtime`**
   An owned application driven one event/tick at a time. Browser hosts and automation
@@ -24116,10 +24118,11 @@ Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_
 
 - **`fn app_finish()`**
   Android: the runtime ended (ui.quit): the activity goes and its process with it, a new start
-  needs a new runtime.  Elsewhere nothing: there the main loop ends the program
+  needs a new runtime; iOS: the process ends (UIKit's loop never returns).  Elsewhere nothing:
+  there the main loop ends the program
 
 - **`fn touch_primary() -> bool`**
-  (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
+  (ui touch.rs) the host's main pointer is a finger at the start (Android, iOS; a phone's browser:
   `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
   next pointer event decides again
 
@@ -24130,7 +24133,7 @@ Re-exports: `rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_
 
 - **`fn touch_reached(reached: bool)`**
   (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):
-  Android asks after the finger lifted whether the keyboard has to follow
+  Android and iOS ask after the finger lifted whether the keyboard has to follow
 
 - **`fn touch_long_press()`**
   (ui touch.rs) a finger rested long enough: the host's feedback (Android: performLongClick)
@@ -24191,8 +24194,8 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
 
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
-  Android's picker and the browser's; web.rs): None while it is open, then once (1 chosen /
-  0 not, index, path).
+  Android's picker and the browser's, web.rs, and iOS's, apple_ios_services.rs): None while it
+  is open, then once (1 chosen / 0 not, index, path).
 
 - **`fn arg_value(name: &str) -> Option<String>`**
   the argument after `name` on the command line (argument 0, the program, is skipped)  [arg_value]
@@ -26057,8 +26060,9 @@ thread (an apartment of its own on the UI thread): a SysSpeller stays on the thr
 opened it (it is not Send).  check() reports a word as misspelled when ISpellChecker::Check
 returns any error for it (also "replace" / "delete" actions); the user's Windows word list
 counts as known.  macOS (apple_spell.rs): NSSpellChecker (its languages; the words the user
-taught it count as known).  Linux, Web, Android, iOS: no system checker (None, empty) -- their
-Hunspell dictionaries are files the spell crate reads itself.
+taught it count as known); iOS: UITextChecker (its languages, the words the user taught the
+keyboard).  Linux, Web, Android: no system checker (None, empty) -- their Hunspell
+dictionaries are files the spell crate reads itself.
 ```
 
 - **`struct SysSpeller`**
@@ -31169,11 +31173,10 @@ Source: [`lib/plat/apple_disp.rs`](../lib/plat/apple_disp.rs)
 
 ```text
 apple_disp -- what macOS and iOS share of the window-level API (home, drives, printing, the file
-dialog, opening URLs and folders, starting this program again), and iOS's windows before AP5
-(docs/APPLE.md): every window function there answers as linux_disp.rs does without a display (no
-window opens, sizes are 0, the dpi is 96, the clipboard is empty, wait() sleeps until its deadline
-or a wake(); the main window ends the process with exit code 1 and a message).  macOS's windows:
-apple_mac.rs.
+dialog, opening URLs and folders, starting this program again), and what iOS's host path leaves
+to the platform (docs/APPLE.md AP5: the windows are web_windows.rs's in the canvas of
+apple_ios.rs; wait() for programs without the host, the clipboard until AP5b, the theme).
+macOS's windows: apple_mac.rs.
 ```
 
 - **`fn home() -> Option<String>`**
@@ -31187,15 +31190,11 @@ apple_mac.rs.
   variant jfgui_PRINT_TO=FILE (the PDF into a file); macOS: the system's print dialog
   (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 
-- **`fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32)`**
-  iOS: no system file dialog before AP5 -> (-1, 0): the library's own dialog, as in a browser without
-  the File System Access API (macOS: apple_mac.rs)  [plat_file_dialog]
-
 - **`fn open_folder(path: &str) -> i32`**
   show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
 
 - **`fn open_url(url: &str) -> i32`**
-  a web page in the default application -> 0 / -1  [plat_open_url]
+  a web page in the default application (iOS: UIApplication openURL) -> 0 / -1  [plat_open_url]
 
 - **`fn spawn_self(args: &[&str]) -> i32`**
   start this program again, on its own (process.rs launch: a session of its own, standard handles
@@ -31203,6 +31202,50 @@ apple_mac.rs.
 
 - **`fn restart_self(args: &[&str]) -> i32`**
   like spawn_self: the program file now at this process's path (an update replaced it) -> 0 / -1
+
+### `plat/apple_ios_services.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_services.rs`](../lib/plat/apple_ios_services.rs)
+
+```text
+apple_ios_services -- iOS's system services of AP5b (docs/APPLE.md): the clipboard (UIPasteboard),
+the system's file picker (UIDocumentPickerViewController).
+
+  clip_set / clip_set_many / clip_get / clip_has   as on macOS (apple_mac.rs): one pasteboard item
+                               with a representation per format (text as a string); CLIP_IMAGE gets a
+                               PNG, else any image of the pasteboard (JPEG, HEIC, TIFF) made a PNG
+                               through UIImage
+  file_dialog(flags, path, exts) -> (FD_PENDING, 0)   the picker over the scene's window, as
+                               Android's: FD_OPEN opens a document in place (its types from the
+                               extensions), FD_FOLDER a folder, FD_SAVE exports an empty file of the
+                               suggested name to where the user puts it (the app writes it then);
+                               one at a time ((0, 0) while one is open), (-1, 0) without a window
+  file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
+                               path a security-scoped URL's, its access started for the session
+
+Reading what another app copied makes iOS ask the user once ("Allow Paste"); asking which types the
+pasteboard has does not.
+```
+
+- **`fn clip_set(fmt: u32, data: &[u8]) -> bool`**
+  CLIP_TEXT / CLIP_HTML / CLIP_RTF / CLIP_DOCX as clip_set_many; CLIP_PNG: the PNG file;
+  CLIP_IMAGE: a CLIPIMG record (clipimg_pack): its PNG, else a PNG made of its BMP
+
+- **`fn clip_set_many(entries: &[(u32, &[u8])]) -> bool`**
+  several representations of one selection (text formats, cliprich.rs)
+
+- **`fn clip_get(fmt: u32) -> Option<Vec<u8>>`**
+  CLIP_IMAGE: the PNG, else any image of the pasteboard as a PNG
+
+- **`fn clip_has(fmt: u32) -> bool`**
+  the pasteboard offers the format (nothing is read: no question to the user)
+
+- **`fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32)`**
+  the system's picker (see the module header) -> (FD_PENDING, 0), (0, 0) while one is open,
+  (-1, 0) without a window
+
+- **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
+  the picker's answer (see the module header)
 
 ### `plat/apple_mac.rs` (Apple)
 
@@ -31506,8 +31549,12 @@ tool windows as panels, the print dialog
 Source: [`lib/plat/web.rs`](../lib/plat/web.rs)
 
 ```text
-Shared browser/Android host adapter. The host exchanges bounded buffers and queued events;
+Shared browser/Android/iOS host adapter. The host exchanges bounded buffers and queued events;
 app state stays in the same Rust UI/runtime used by native applications.
+iOS (docs/APPLE.md AP5): the host is Rust too (apple_ios.rs: UIKit, which never returns from
+UIApplicationMain); only the host part is used there -- the windows, the input, the requests,
+the system host --, time, arguments, environment, threads, files, clipboard and the pickers are
+the native ones of apple*.rs.
 Android differs where its system offers more: real files on internal storage
 (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 the persisted grants (android_host.rs), the system's file picker behind file_dialog
@@ -32187,7 +32234,7 @@ web_system -- what the browser / Android host says about the system: the user's 
   dark() -> Option<bool>       (web.rs theme())
   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
-  jfgui_touch_reached() -> 0|1  (Android) the last finger's gesture reached a widget (a tap, a
+  jfgui_touch_reached() -> 0|1  (Android, iOS) the last finger's gesture reached a widget (a tap, a
                                drag), not only a scroll: the keyboard may follow it
 
 The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
@@ -32204,7 +32251,7 @@ into UIC_SUSPEND.
   -> 1 taken (0: the app has not started).
 
 - **`extern "C" fn jfgui_touch_reached() -> u32`**
-  (Android) the last finger's gesture reached a widget -> 1
+  (Android, iOS) the last finger's gesture reached a widget -> 1
 
 ### `plat/web_sensors.rs`
 
