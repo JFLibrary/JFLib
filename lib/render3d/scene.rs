@@ -87,9 +87,10 @@ impl Camera {
         Camera { eye, forward: f, up: math::cross(r, f), fov_y, aspect, near, far }
     }
 
-    /// the 44 floats of the view's uniform block, relative to origin: view_proj, the six planes (inside:
-    /// dot(n, p) + d >= 0; left, right, bottom, top, near, far), the eye
-    pub(crate) fn view_block(&self, origin: V3) -> [f32; 44] {
+    /// the 48 floats of the view's uniform block, relative to origin: view_proj, the six planes (inside:
+    /// dot(n, p) + d >= 0; left, right, bottom, top, near, far), the eye, (G5d) the projection's scales for the
+    /// occlusion test (clip x = fx x, clip y = fy y, depth = zz + zw / z in the camera's space)
+    pub(crate) fn view_block(&self, origin: V3) -> [f32; 48] {
         let e = math::sub(self.eye, origin);
         let (f, u) = (self.forward, self.up);
         let r = math::cross(f, u);
@@ -100,7 +101,7 @@ impl Camera {
         let (zz, zw) = if fa.is_finite() { (-n / (fa - n), n * fa / (fa - n)) } else { (0.0, n) };
         // rows of the view matrix: x along r, y along u, z along forward
         let view = [[r[0], r[1], r[2], -math::dot(r, e)], [u[0], u[1], u[2], -math::dot(u, e)], [f[0], f[1], f[2], -math::dot(f, e)]];
-        let mut out = [0.0f32; 44];
+        let mut out = [0.0f32; 48];
         for c in 0..4 {
             let w = if c == 3 { 1.0 } else { 0.0 };
             out[c * 4] = (fx * view[0][c]) as f32;
@@ -124,6 +125,10 @@ impl Camera {
         out[40] = e[0] as f32;
         out[41] = e[1] as f32;
         out[42] = e[2] as f32;
+        out[44] = fx as f32;
+        out[45] = fy as f32;
+        out[46] = zz as f32;
+        out[47] = zw as f32;
         out
     }
 }
@@ -245,15 +250,19 @@ pub struct ListInfo {
 pub struct FrameStats {
     /// counts the scene's frames from 0
     pub frame: u64,
-    /// instances the compute shader found visible
+    /// instances the compute shader found visible (with the occlusion test: drawn in phase 1 or 2)
     pub visible: u64,
-    /// the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
-    /// timestamps here: None)
+    /// (G5d) of them, those phase 2 of the occlusion test drew (0 without it)
+    pub late: u64,
+    /// the GPU's clock (ms) at the start, after the uploads, after the camera's culling (phase 1), after the frame
+    /// (no timestamps here: None)
     pub stamps: Option<[f64; 4]>,
     /// (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
     pub cascades: [[f64; 2]; CASCADES_MAX],
-    /// (G5c) the main render pass, ms
+    /// (G5c) the main render pass, ms (G5d: both phases' passes)
     pub draw: f64,
+    /// (G5d) the occlusion test, ms: building the pyramid, phase 2's culling, phase 2's pass (0 without it)
+    pub occlusion: [f64; 3],
 }
 
 #[derive(Clone, Copy)]
@@ -280,8 +289,8 @@ pub(crate) struct List {
 }
 
 /// one view's data of a frame: its uniform block, its lists, its bind groups for culling and drawing.  The
-/// camera's, one per shadow cascade (G5c); the second round of Hi-Z (G5d) adds more (the layout of the lists
-/// is the scene's)
+/// camera's, one per shadow cascade (G5c), phase 2 of the occlusion test (G5d; the camera's uniform block); the
+/// layout of the lists is the scene's
 pub(crate) struct ViewLists {
     pub ubo: Buffer,
     pub draws: Buffer,
@@ -344,6 +353,14 @@ pub struct Scene {
     pub(crate) template: Buffer,
     pub(crate) list_first: Buffer,
     pub(crate) view: ViewLists,
+    /// (G5d) phase 2 of the camera's occlusion test: its lists (the camera's uniform block)
+    pub(crate) late: ViewLists,
+    /// (G5d) a bit per slot, phase 2 found it hidden; whether this frame clears them all (a new buffer, every slot
+    /// sent anew), whether the buffer is new; the occlusion test on
+    pub(crate) hidden: Buffer,
+    pub(crate) reset_hidden: bool,
+    hidden_fresh: bool,
+    pub(crate) occlusion: bool,
     /// (G5c) one per cascade of the sun, made when shadows want them
     pub(crate) cascades: Vec<ViewLists>,
     pub(crate) frames: Vec<FrameSlot>,
@@ -375,10 +392,11 @@ fn entry(binding: u32, buffer: &Buffer) -> BindEntry<'_> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cull_group(dev: &Device, r: &Renderer, ubo: &Buffer, spheres: &Buffer, list_of: &Buffer, first: &Buffer, draws: &Buffer, visible: &Buffer) -> Result<BindGroup> {
+fn cull_group(dev: &Device, r: &Renderer, ubo: &Buffer, spheres: &Buffer, list_of: &Buffer, first: &Buffer, draws: &Buffer, visible: &Buffer, hidden: &Buffer)
+              -> Result<BindGroup> {
     dev.create_bind_group(&BindGroupDesc {
         layout: &r.cull_layout,
-        entries: &[entry(0, ubo), entry(1, spheres), entry(2, list_of), entry(3, first), entry(4, draws), entry(5, visible)],
+        entries: &[entry(0, ubo), entry(1, spheres), entry(2, list_of), entry(3, first), entry(4, draws), entry(5, visible), entry(6, hidden)],
     })
 }
 
@@ -391,14 +409,17 @@ fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, li
     })
 }
 
-/// the buffers of a view of the scene's sizes, and its groups
+/// the buffers of a view of the scene's sizes, and its groups (ubo: another view's uniform block, else its own)
 #[allow(clippy::too_many_arguments)]
 fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spheres: &Buffer, list_of: &Buffer, list_first: &Buffer, instances: &Buffer,
-              lights: &Buffer, punctual: &Buffer) -> Result<ViewLists> {
-    let ubo = dev.create_buffer(&BufferDesc { size: crate::VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
+              lights: &Buffer, punctual: &Buffer, hidden: &Buffer, ubo: Option<&Buffer>) -> Result<ViewLists> {
+    let ubo = match ubo {
+        Some(u) => u.clone(),
+        None => dev.create_buffer(&BufferDesc { size: crate::VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?,
+    };
     let draws = storage(dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
     let visible = storage(dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
-    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible)?;
+    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible, hidden)?;
     let render = render_group(dev, r, &ubo, instances, lights, &visible, punctual)?;
     Ok(ViewLists { ubo, draws, visible, group, render })
 }
@@ -432,6 +453,11 @@ fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORD
 /// the sphere of a free slot: its first plane test rejects it
 const FREE_SPHERE: [f32; 4] = [0.0, 0.0, 0.0, -f32::MAX];
 
+/// (G5d) the bits of hidden slots: a word per 32
+fn hidden_bytes(cap: u32) -> u64 {
+    cap.div_ceil(32) as u64 * 4
+}
+
 impl Scene {
     pub fn new(r: &Renderer) -> Result<Scene> {
         let dev = r.dev.clone();
@@ -445,7 +471,9 @@ impl Scene {
         let list_first = storage(&dev, list_cap as u64 * 4, none)?;
         let punctual_cap = 16u32;
         let punctual_buf = storage(&dev, punctual_cap as u64 * PUNCTUAL_BYTES, none)?;
-        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf)?;
+        let hidden = storage(&dev, hidden_bytes(cap), none)?;
+        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, None)?;
+        let late = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, Some(&view.ubo))?;
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
             let stage = dev.create_buffer(&BufferDesc { size: CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64, usage: none, memory: MemoryKind::Upload })?;
@@ -487,6 +515,11 @@ impl Scene {
             template,
             list_first,
             view,
+            late,
+            hidden,
+            reset_hidden: false,
+            hidden_fresh: true,
+            occlusion: true,
             cascades: Vec::new(),
             frames,
             ts: None,
@@ -762,6 +795,22 @@ impl Scene {
         self.culling = on;
     }
 
+    /// (G5d) the camera's occlusion test against a depth pyramid in two phases (docs/RENDER3D.md "Verdeckung"): true
+    /// at first.  It runs when the depth attachment can be sampled (the renderer's own can) and culling is on
+    pub fn set_occlusion(&mut self, on: bool) {
+        self.occlusion = on;
+    }
+
+    pub fn occlusion(&self) -> bool {
+        self.occlusion
+    }
+
+    /// (G5d; tests, tools) phase 2's draw records and visible list after a frame (laid out as draws_buffer and
+    /// visible_buffer, which hold phase 1's with the occlusion test)
+    pub fn late_buffers(&self) -> (&Buffer, &Buffer) {
+        (&self.late.draws, &self.late.visible)
+    }
+
     /// FrameStats of each frame: the instances found visible (a small copy per frame), the GPU's times
     pub fn set_stats(&mut self, on: bool) {
         self.stats_on = on;
@@ -820,20 +869,25 @@ impl Scene {
         if rb.read(0, &mut draws).is_err() {
             return;
         }
-        let n = self.lists.len().min(draws.len() / 5);
-        let visible = (0..n).map(|i| draws[i * 5 + 1] as u64).sum();
+        // phase 1's records, phase 2's in the second half
+        let half = draws.len() / 2;
+        let n = self.lists.len().min(half / 5);
+        let early: u64 = (0..n).map(|i| draws[i * 5 + 1] as u64).sum();
+        let late: u64 = (0..n).map(|i| draws[half + i * 5 + 1] as u64).sum();
         let v = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * STAMPS, STAMPS).ok());
         let mut cascades = [[0.0; 2]; CASCADES_MAX];
-        let mut draw = 0.0;
+        let (mut draw, mut occlusion) = (0.0, [0.0; 3]);
         if let Some(v) = &v {
-            // stamps: 0 start, 1 uploads, 2 the camera's culling, 3 + k cascade k's culling, 7 + k its pass, 11 the end
+            // stamps: 0 start, 1 uploads, 2 the camera's culling, 3 + k cascade k's culling, 7 + k its pass, 11 the
+            // (phase 1) main pass, 12 the pyramid, 13 phase 2's culling, 14 its pass
             for (k, c) in cascades.iter_mut().enumerate() {
                 *c = [v[3 + k] - v[2 + k], v[7 + k] - v[6 + k]];
             }
-            draw = v[11] - v[10];
+            occlusion = [v[12] - v[11], v[13] - v[12], v[14] - v[13]];
+            draw = v[11] - v[10] + occlusion[2];
         }
-        let stamps = v.map(|v| [v[0], v[1], v[2], v[11]]);
-        self.finished.push(FrameStats { frame, visible, stamps, cascades, draw });
+        let stamps = v.map(|v| [v[0], v[1], v[2], v[14]]);
+        self.finished.push(FrameStats { frame, visible: early + late, late, stamps, cascades, draw, occlusion });
     }
 
     /// the finished frames' stats since the last call
@@ -865,6 +919,8 @@ impl Scene {
             self.spheres = storage(&dev, self.cap as u64 * 16, none)?;
             self.list_of = storage(&dev, self.cap as u64 * 4, none)?;
             self.instances = storage(&dev, self.cap as u64 * 64, none)?;
+            // (G5d) (cleared with the full upload that follows)
+            self.hidden = storage(&dev, hidden_bytes(self.cap), none)?;
             self.full_dirty = true;
             groups = true;
         }
@@ -899,11 +955,12 @@ impl Scene {
         // (G5c) a view per cascade of the sun's shadows
         let want = self.shadows.map_or(0, |s| s.cascades as usize);
         while self.cascades.len() < want {
-            let v = view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights, &self.punctual_buf)?;
+            let v = view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights, &self.punctual_buf,
+                               &self.hidden, None)?;
             self.cascades.push(v);
         }
         let (list_cap, visible_cap) = (self.list_cap, self.visible_cap);
-        for v in core::iter::once(&mut self.view).chain(self.cascades.iter_mut()) {
+        for v in [&mut self.view, &mut self.late].into_iter().chain(self.cascades.iter_mut()) {
             if draws_new {
                 v.draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
             }
@@ -911,7 +968,7 @@ impl Scene {
                 v.visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
             }
             if groups {
-                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible)?;
+                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible, &self.hidden)?;
             }
             if groups || punctual_new || self.seen_materials != r.bindings_gen {
                 v.render = render_group(&dev, r, &v.ubo, &self.instances, &self.lights, &v.visible, &self.punctual_buf)?;
@@ -999,6 +1056,8 @@ impl Scene {
         }
         self.dirty.clear();
         self.full_dirty = false;
+        // (G5d) every slot counts as seen again
+        self.reset_hidden = true;
         self.upload.full = true;
         self.upload.bytes += size;
         self.full_up = Some(up);
@@ -1047,7 +1106,7 @@ impl Scene {
         if f.scatter_group.is_none() {
             f.scatter_group = Some(self.dev.create_bind_group(&BindGroupDesc {
                 layout: &r.scatter_layout,
-                entries: &[entry(0, buf), entry(1, &self.spheres), entry(2, &self.list_of), entry(3, &self.instances)],
+                entries: &[entry(0, buf), entry(1, &self.spheres), entry(2, &self.list_of), entry(3, &self.instances), entry(4, &self.hidden)],
             })?);
         }
         self.scratch = rows;
@@ -1075,6 +1134,8 @@ impl Scene {
         let slot = (self.frame % self.frames.len() as u64) as usize;
         self.slot = slot;
         self.upload = UploadInfo::default();
+        // (G5d) a new buffer of bits is cleared by the frame that first uses it (and by every full upload)
+        self.reset_hidden = core::mem::take(&mut self.hidden_fresh);
         self.full_up = None;
         self.changed = 0;
         self.upload.bytes += r.prepare_materials()?;
@@ -1085,7 +1146,8 @@ impl Scene {
             if self.ts.is_none() && self.dev.features().timestamps {
                 self.ts = Some(self.dev.create_timestamps(STAMPS * self.frames.len() as u32)?);
             }
-            let size = self.list_cap as u64 * DRAW_BYTES;
+            // (G5d) phase 1's records, then phase 2's
+            let size = 2 * self.list_cap as u64 * DRAW_BYTES;
             let f = &mut self.frames[slot];
             if f.readback.as_ref().is_none_or(|b| b.size() < size) {
                 f.readback = Some(self.dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?);

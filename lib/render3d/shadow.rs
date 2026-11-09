@@ -119,16 +119,16 @@ pub(crate) fn cascades(cam: &crate::Camera, sun: V3, s: &Shadows) -> Vec<Cascade
 }
 
 impl Cascade {
-    /// the 44 floats of a view's uniform block relative to origin (as Camera::view_block): an orthographic
+    /// the 48 floats of a view's uniform block relative to origin (as Camera::view_block): an orthographic
     /// view_proj, the planes (four sides, the far side; no near plane), the centre in place of the eye
-    pub(crate) fn view_block(&self, origin: V3) -> [f32; 44] {
+    pub(crate) fn view_block(&self, origin: V3) -> [f32; 48] {
         let [x, y, l] = self.axes;
         let r = self.radius;
         let (ox, oy, oz) = (math::dot(origin, x) - math::dot(self.center, x), math::dot(origin, y) - math::dot(self.center, y), math::dot(origin, l));
         let depth = self.z_near - self.z_far;
         let rows = [[x[0] / r, x[1] / r, x[2] / r, ox / r], [y[0] / r, y[1] / r, y[2] / r, oy / r],
                     [l[0] / depth, l[1] / depth, l[2] / depth, (oz - self.z_far) / depth], [0.0, 0.0, 0.0, 1.0]];
-        let mut out = [0.0f32; 44];
+        let mut out = [0.0f32; 48];
         for c in 0..4 {
             for (k, row) in rows.iter().enumerate() {
                 out[c * 4 + k] = row[c] as f32;

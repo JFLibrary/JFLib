@@ -212,6 +212,14 @@ impl TextureView {
     pub(crate) fn handle(&self) -> u32 {
         self.0.h.h
     }
+    /// what its texture may be used for (a swapchain frame's: a colour target)
+    pub fn usage(&self) -> TextureUsage {
+        self.0._tex.as_ref().map_or(TextureUsage::COLOR_TARGET, |t| t.desc.usage)
+    }
+    /// the same view (it or a clone of it), not merely one of the same range: a cache's key
+    pub fn same(&self, other: &TextureView) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
     /// (the swapchain's image, web_swap.rs: its object changes with every frame)
     pub(crate) fn for_frame(h: u32, format: Format, w: u32, hh: u32) -> TextureView {
         TextureView(Rc::new(ViewInner { h: Handle { h, destroy: false }, format, w, hh, dim: ViewDim::D2, _tex: None }))

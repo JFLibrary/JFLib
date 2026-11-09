@@ -101,6 +101,8 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let lights = num("--lights", 0);
     // (G5c) --env 1: the procedural sky lights the scene
     let env = num("--env", 0) != 0;
+    // (G5d) --occlusion 0: without the camera's occlusion test
+    let occlusion = num("--occlusion", 1) != 0;
     let args = plat::args();
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
@@ -108,7 +110,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env).is_none() && t.fails == 0 {
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env, occlusion).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -120,7 +122,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
-       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool) -> Option<()> {
+       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool, occlusion: bool) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -186,8 +188,10 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     }
     let t_add = (plat::time_us() - t0) as f64 / 1000.0;
     s.set_stats(true);
+    s.set_occlusion(occlusion);
     let color = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Rgba8Unorm, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC)), "colour target")?;
-    let depth = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET)), "depth target")?;
+    // (G5d: sampled, the occlusion test's pyramid reads it)
+    let depth = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED)), "depth target")?;
     let aspect = w as f64 / h as f64;
     let total = warmup + frames;
     let (mut rec, mut cpu, mut wait, mut prep, mut interval) = (vec![0.0; total], vec![0.0; total], vec![0.0; total], vec![0.0; total], vec![0.0; total]);
@@ -235,6 +239,9 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let m: Vec<_> = st.iter().filter(|x| x.frame as usize >= warmup).collect();
     let pick = |f: &dyn Fn(&render3d::FrameStats) -> Option<f64>| -> Stat { stat(&m.iter().filter_map(|x| f(x)).collect::<Vec<f64>>()) };
     let vis = pick(&|x| Some(x.visible as f64));
+    // (G5d) phase 2's instances, the pyramid, phase 2's culling and pass
+    let late = pick(&|x| Some(x.late as f64));
+    let hiz: Vec<Stat> = (0..3).map(|k| pick(&|x| x.stamps.map(|_| x.occlusion[k]))).collect();
     let up = pick(&|x| x.stamps.map(|a| a[1] - a[0]));
     let cull = pick(&|x| x.stamps.map(|a| a[2] - a[1]));
     let draw = pick(&|x| x.stamps.map(|_| x.draw));
@@ -264,19 +271,40 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     if shadows.is_some() {
         out(&format!("  cascades (culling / depth pass, ms median): {}", per.iter().map(|(c, d)| format!("{:.3} / {:.3}", c.med, d.med)).collect::<Vec<_>>().join("; ")));
     }
+    if occlusion {
+        out(&format!("  occlusion test: {:.0} drawn by phase 2 (median); pyramid {:.3} / phase 2's culling {:.3} / phase 2's pass {:.3} ms median (in draw: both passes)",
+                     late.med, hiz[0].med, hiz[1].med, hiz[2].med));
+    }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} vis={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
-                 dev.level(), m.len(), vis.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99, shcull.med, shcull.p99,
-                 shdraw.med, shdraw.p99, draw.med, draw.p99, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} occl={} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+                 dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
+                 shcull.med, shcull.p99, shdraw.med, shdraw.p99, draw.med, draw.p99, hiz[0].med, hiz[1].med, hiz[2].med, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
-        verify_lists(t, dev, &s, &objs, ids.len(), time_of(total - 1), extent, w, h)?;
+        // (G5d) the lists of a frame without the occlusion test at the last frame's camera: everything in the view
+        if occlusion {
+            s.set_occlusion(false);
+            s.set_camera(&bench_camera(time_of(total - 1), extent, aspect));
+            t.res(s.prepare(&mut r), "prepare")?;
+            let mut e = t.res(dev.encoder(), "encoder")?;
+            let ca = ColorAttachment { view: color.view(), load: Load::Clear, clear: [0.05, 0.06, 0.09, 1.0], store: true, before: Layout::ColorTarget, after: Layout::ColorTarget };
+            let da = DepthAttachment { view: depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: false, before: Layout::DepthTarget, after: Layout::DepthTarget };
+            t.res(r.record(&mut e, &s, ca, Some(da)), "record")?;
+            let cmd = t.res(e.finish(), "finish")?;
+            let id = t.res(dev.queue().submit([cmd]), "submit")?;
+            s.submitted(id);
+            t.res(dev.wait_idle(), "wait_idle")?;
+        }
+        let in_view = verify_lists(t, dev, &s, &objs, ids.len(), time_of(total - 1), extent, w, h)?;
+        if occlusion {
+            out(&format!("  with the occlusion test {:.0} of {in_view} in the view drawn (median, {:.1} %)", vis.med, vis.med / in_view.max(1) as f64 * 100.0));
+        }
     }
     Some(())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usize, time: f32, extent: f32, w: u32, h: u32) -> Option<()> {
+fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usize, time: f32, extent: f32, w: u32, h: u32) -> Option<usize> {
     let cam = g1_camera(time, extent, w as f32 / h as f32);
     let want = sb::cull_ref(objs, &cam);
     let lists = s.lists();
@@ -300,7 +328,7 @@ fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usiz
     let missing = want.iter().filter(|&&i| !in_list[i as usize]).count();
     let extra = got as i64 - want.len() as i64;
     t.ok(missing == 0, &format!("--verify: the last frame's lists hold all {} of gputest's cull_ref (at the camera it had), {} more (spheres grown for f32's rounding), {missing} missing", want.len(), extra));
-    Some(())
+    Some(got)
 }
 
 // ---------------------------------------------------------------- textures and glTF (G5b)

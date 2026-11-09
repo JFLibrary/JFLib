@@ -19073,6 +19073,10 @@ GPU has finished the submissions made before it was dropped (vk_dev.rs).
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19675,6 +19679,10 @@ A browser's errors come later than the call (web_dev.rs); what can be known here
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for (a swapchain frame's: a colour target)
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19867,11 +19875,11 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
-anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
-per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
+against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
+indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
 Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
@@ -19910,7 +19918,13 @@ FRAMES_MAX: usize = 3
 CULL_WGSL: &str = include_str!("cull.wgsl")
 SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
+/// (G5d) the depth pyramid of the occlusion test
+HIZ_WGSL: &str = include_str!("hiz.wgsl")
 CULL_SPV: &[u32] = spv::CULL
+CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+CULL_LATE_SPV: &[u32] = spv::CULL_LATE
+HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
+HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 FS_SPV: &[u32] = spv::FS
@@ -20018,10 +20032,19 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
-  a depth buffer the renderer keeps, for frames recorded with depth None
+  a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
+  its pyramid from it)
+- **`fn depth_texture(&self) -> Option<&Texture>`**
+  (G5d; tests) the renderer's own depth buffer (set_size)
+- **`fn pyramid(&self, depth: &TextureView) -> Option<&Texture>`**
+  (G5d; tests) the occlusion test's pyramid of a depth attachment as the last frame with it built it: mip k - 1
+  holds level k (the smallest depth of 2^k x 2^k pixels), in Layout::Sampled; None when no record used it lately
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
-  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared.
+  (G5d) With the occlusion test (Scene::set_occlusion, and a depth attachment with TextureUsage::SAMPLED) the
+  pass is two: phase 1 with the attachments' load and their `before`, phase 2 that keeps what phase 1 drew and
+  ends in their `store` and `after`
 
 ### `render3d/dfg.rs`
 
@@ -20309,11 +20332,13 @@ commands without a barrier against the frames still on the GPU.
 - **`struct FrameStats`**
   what a finished frame measured (Scene::set_stats)
   - `frame: u64` -- counts the scene's frames from 0
-  - `visible: u64` -- instances the compute shader found visible
-  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
-    timestamps here: None)
+  - `visible: u64` -- instances the compute shader found visible (with the occlusion test: drawn in phase 1 or 2)
+  - `late: u64` -- (G5d) of them, those phase 2 of the occlusion test drew (0 without it)
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling (phase 1), after the frame
+    (no timestamps here: None)
   - `cascades: [[f64; 2]; CASCADES_MAX]` -- (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
-  - `draw: f64` -- (G5c) the main render pass, ms
+  - `draw: f64` -- (G5c) the main render pass, ms (G5d: both phases' passes)
+  - `occlusion: [f64; 3]` -- (G5d) the occlusion test, ms: building the pyramid, phase 2's culling, phase 2's pass (0 without it)
 
 - **`struct Scene`**
   instances, camera and sun of one scene of a Renderer
@@ -20362,6 +20387,13 @@ commands without a barrier against the frames still on the GPU.
 - **`fn origin(&self) -> [f64; 3]`**
 - **`fn set_culling(&mut self, on: bool)`**
   false: every live instance is drawn (a test's comparison, a debugging aid)
+- **`fn set_occlusion(&mut self, on: bool)`**
+  (G5d) the camera's occlusion test against a depth pyramid in two phases (docs/RENDER3D.md "Verdeckung"): true
+  at first.  It runs when the depth attachment can be sampled (the renderer's own can) and culling is on
+- **`fn occlusion(&self) -> bool`**
+- **`fn late_buffers(&self) -> (&Buffer, &Buffer)`**
+  (G5d; tests, tools) phase 2's draw records and visible list after a frame (laid out as draws_buffer and
+  visible_buffer, which hold phase 1's with the occlusion test)
 - **`fn set_stats(&mut self, on: bool)`**
   FrameStats of each frame: the instances found visible (a small copy per frame), the GPU's times
 - **`fn upload_info(&self) -> UploadInfo`**

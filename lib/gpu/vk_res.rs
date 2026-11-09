@@ -306,8 +306,13 @@ impl TextureView {
         let d = &self.0.tex.desc;
         ((d.width >> self.0.base_mip).max(1), (d.height >> self.0.base_mip).max(1))
     }
-    pub(crate) fn usage(&self) -> TextureUsage {
+    /// what its texture may be used for
+    pub fn usage(&self) -> TextureUsage {
         self.0.tex.desc.usage
+    }
+    /// the same view (it or a clone of it), not merely one of the same range: a cache's key
+    pub fn same(&self, other: &TextureView) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 

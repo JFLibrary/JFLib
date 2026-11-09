@@ -407,8 +407,8 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
 
 // ---------------------------------------------------------------- the galleries of G5c
 
-/// the galleries that came with G5c, by name, after the five above: every path must draw them alike
-pub const LATER: [&str; 4] = ["pbr", "shadow", "lights", "env"];
+/// the galleries that came with G5c (and G5d's "occl"), by name, after the five above: every path must draw them alike
+pub const LATER: [&str; 5] = ["pbr", "shadow", "lights", "env", "occl"];
 
 /// one of LATER in a fresh renderer of its own
 pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
@@ -417,6 +417,7 @@ pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
         "shadow" => shadow_gallery(r),
         "lights" => lights_gallery(r),
         "env" => env_gallery(r),
+        "occl" => occl_gallery(r),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -635,6 +636,81 @@ pub fn env_gallery(r: &mut Renderer) -> Result<Scene> {
     }
     let ground = r.add_material(&Material { roughness: 0.7, ..Material::color(0.6, 0.6, 0.6) })?;
     sc.add(Instance { mesh: plate, material: ground, transform: Transform { pos: [0.0, -1.5, 0.0], rot: quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2), scale: [9.0, 5.0, 1.0] } })?;
+    Ok(sc)
+}
+
+/// (G5d) the occlusion scene (occl.rs, the gallery's "occl"): its meshes, cube, ball, prism, plate
+pub fn occl_geos() -> Vec<Geo> {
+    vec![cube(), ball(8, 12), prism(6, 0.6), plate()]
+}
+
+/// a ground, three rows of walls and n small instances (a third mirrored) at world offset `at`
+pub fn occl_world(at: [f64; 3], n: u32, seed: u32) -> Vec<Spec> {
+    let p = |x: f64, y: f64, z: f64| [at[0] + x, at[1] + y, at[2] + z];
+    let none = [0.0f32, 0.0, 0.0, 1.0];
+    let mut v = vec![Spec { mesh: 3, material: 0, pos: p(0.0, 0.0, -25.0), rot: quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2), scale: [45.0, 40.0, 1.0] }];
+    let mut k = 1;
+    for (z, xs) in [(-8.0, &[-14.0, 0.0, 14.0][..]), (-22.0, &[-21.0, -7.0, 7.0, 21.0][..]), (-38.0, &[-14.0, 0.0, 14.0][..])] {
+        for &x in xs {
+            v.push(Spec { mesh: 0, material: 1 + k % 5, pos: p(x, 3.0, z), rot: none, scale: [5.5, 3.0, 0.4] });
+            k += 1;
+        }
+    }
+    v.extend(occl_small(at, n, seed));
+    v
+}
+
+/// n small instances among the walls
+pub fn occl_small(at: [f64; 3], n: u32, seed: u32) -> Vec<Spec> {
+    let mut r = Rng(seed);
+    let q = |r: &mut Rng, a: f64, b: f64| (r.range(a, b) * 1024.0) as i64 as f64 / 1024.0;
+    (0..n).map(|_| {
+        let axis = cpu::norm([r.range(-1.0, 1.0), r.range(-1.0, 1.0), r.range(-1.0, 1.0) + 0.01]);
+        let s = r.range(0.25, 0.7) as f32;
+        let mut scale = [s, s * r.range(0.7, 1.3) as f32, s];
+        if r.below(3) == 0 {
+            scale[r.below(3) as usize] *= -1.0;
+        }
+        Spec { mesh: r.below(3), material: 6 + r.below(18), pos: [at[0] + q(&mut r, -35.0, 35.0), at[1] + q(&mut r, 0.3, 5.0), at[2] + q(&mut r, -55.0, 4.0)],
+               rot: quat(axis, r.range(0.0, 6.0)), scale }
+    }).collect()
+}
+
+/// the camera of frame f (a jump at frame 6), for a target of aspect a
+pub fn occl_camera(at: [f64; 3], f: usize, a: f64) -> Camera {
+    let ff = f as f64;
+    let (eye, dir) = if f < 6 {
+        ([cpu::sincos(ff * 0.3).0 * 6.0, 2.5 + 0.5 * cpu::sincos(ff * 0.2).0, 14.0 - ff * 0.8], [cpu::sincos(ff * 0.1).0 * 0.4, -0.08, -1.0])
+    } else {
+        ([25.0 - ff, 6.0, -48.0 + ff * 0.5], [-0.8, -0.15, 1.0])
+    };
+    let e = [at[0] + eye[0], at[1] + eye[1], at[2] + eye[2]];
+    Camera::look_at(e, [e[0] + dir[0] * 10.0, e[1] + dir[1] * 10.0, e[2] + dir[2] * 10.0], [0.0, 1.0, 0.0], 1.0, a, 0.1, f64::INFINITY)
+}
+
+
+/// (G5d) the occlusion scene after five frames of its flight, at the camera of the sixth (a jump: phase 2 of the
+/// occlusion test draws much of it)
+pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
+    for g in &occl_geos() {
+        r.add_mesh(&g.data())?;
+    }
+    for c in &gallery_colors(24) {
+        r.add_material(&Material::color(c[0], c[1], c[2]))?;
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_sun(&Sun::DEFAULT);
+    for sp in occl_world([0.0; 3], 2400, 77) {
+        sc.add(sp.instance())?;
+    }
+    let aspect = GALLERY_W as f64 / GALLERY_H as f64;
+    let dev = r.device().clone();
+    let mut off = Off::new(&dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+    for f in 0..6 {
+        sc.set_camera(&occl_camera([0.0; 3], f, aspect));
+        off.submit(r, &mut sc)?;
+    }
+    sc.set_camera(&occl_camera([0.0; 3], 6, aspect));
     Ok(sc)
 }
 

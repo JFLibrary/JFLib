@@ -1,6 +1,7 @@
 // scatter: the frame's changed instances, each to its slot in the three arrays.  One buffer, one
 // dispatch, however scattered the slots are: k changes as k copy commands (or k calls of writeBuffer)
-// would cost far more (docs/RENDER3D.md).
+// would cost far more (docs/RENDER3D.md).  (G5d) A changed slot counts as seen for the occlusion test's phase 1: its
+// bit in `hidden` is cleared.
 
 struct Instance {
     m0: vec4f,
@@ -27,6 +28,7 @@ struct Push {
 @group(0) @binding(1) var<storage, read_write> spheres: array<vec4f>;
 @group(0) @binding(2) var<storage, read_write> list_of: array<u32>;
 @group(0) @binding(3) var<storage, read_write> instances: array<Instance>;
+@group(0) @binding(4) var<storage, read_write> hidden: array<atomic<u32>>;
 var<immediate> pc: Push;
 
 @compute @workgroup_size(64)
@@ -39,4 +41,5 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     spheres[c.slot] = c.sphere;
     list_of[c.slot] = c.list;
     instances[c.slot] = c.instance;
+    atomicAnd(&hidden[c.slot >> 5u], ~(1u << (c.slot & 31u)));
 }

@@ -1,8 +1,8 @@
-// render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+// render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 // a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-// instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
-// anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
-// per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+// instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
+// against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
+// indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
 // Vulkan, handed to the browser as text on WebGPU.
 //
 //   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
@@ -43,6 +43,7 @@ use gpu::*;
 mod dfg;
 mod env;
 pub mod gltf;
+mod hiz;
 pub mod math;
 mod scene;
 mod shadow;
@@ -59,7 +60,8 @@ pub const DEPTH_CLEAR: f32 = 0.0;
 /// the most frames the CPU may record ahead of the GPU
 pub const FRAMES_MAX: usize = 3;
 
-pub(crate) const VIEW_BYTES: u64 = 176;
+/// a view's uniform block: cull.wgsl's View (draw.wgsl declares its first 176 bytes)
+pub(crate) const VIEW_BYTES: u64 = 192;
 /// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes, the environment
 /// and its 9 harmonics
 pub(crate) const LIGHTS_BYTES: u64 = 480;
@@ -67,9 +69,10 @@ pub(crate) const LIGHTS_BYTES: u64 = 480;
 pub(crate) const LIGHTS_AT: u64 = 256;
 /// (G5c) where the cascades' views lie in it, and how far apart
 pub(crate) const CASCADE_AT: u64 = 736;
-pub(crate) const CASCADE_STRIDE: u64 = 192;
-/// timestamps per frame: start, uploads, the camera's culling, 4 cascades' culling, 4 depth passes, the end
-pub(crate) const STAMPS: u32 = 12;
+pub(crate) const CASCADE_STRIDE: u64 = 256;
+/// timestamps per frame: start, uploads, the camera's culling (phase 1), 4 cascades' culling, 4 depth passes, the
+/// main pass (phase 1), (G5d) the pyramid, phase 2's culling, phase 2's pass
+pub(crate) const STAMPS: u32 = 15;
 pub(crate) const INSTANCE_WORDS: usize = 16;
 pub(crate) const CHANGE_WORDS: usize = 24;
 const MATERIAL_WORDS: usize = 20;
@@ -89,8 +92,18 @@ mod spv {
 pub const CULL_WGSL: &str = include_str!("cull.wgsl");
 pub const SCATTER_WGSL: &str = include_str!("scatter.wgsl");
 pub const DRAW_WGSL: &str = include_str!("draw.wgsl");
+/// (G5d) the depth pyramid of the occlusion test
+pub const HIZ_WGSL: &str = include_str!("hiz.wgsl");
 #[cfg(not(target_arch = "wasm32"))]
 pub const CULL_SPV: &[u32] = spv::CULL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY;
+#[cfg(not(target_arch = "wasm32"))]
+pub const CULL_LATE_SPV: &[u32] = spv::CULL_LATE;
+#[cfg(not(target_arch = "wasm32"))]
+pub const HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH;
+#[cfg(not(target_arch = "wasm32"))]
+pub const HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN;
 #[cfg(not(target_arch = "wasm32"))]
 pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 #[cfg(not(target_arch = "wasm32"))]
@@ -262,6 +275,13 @@ pub struct Renderer {
     pub(crate) multi: bool,
     pub(crate) max_instances: u32,
     cull: ComputePipeline,
+    /// (G5d) the occlusion test's two phases (cull.wgsl) and the pyramid between them (hiz.rs)
+    cull_early: ComputePipeline,
+    cull_late: ComputePipeline,
+    hiz_maker: hiz::Maker,
+    /// a pyramid per depth attachment seen lately, and the records counted (when each was last used)
+    hiz: core::cell::OnceCell<alloc::boxed::Box<hiz::Node>>,
+    hiz_clock: Cell<u64>,
     scatter: ComputePipeline,
     /// front faces counter-clockwise; clockwise for the lists of mirrored instances
     draw: RenderPipeline,
@@ -299,6 +319,10 @@ pub struct Renderer {
 
 struct Modules {
     cull: ShaderModule,
+    cull_early: ShaderModule,
+    cull_late: ShaderModule,
+    hiz_depth: ShaderModule,
+    hiz_down: ShaderModule,
     scatter: ShaderModule,
     vs: ShaderModule,
     fs: ShaderModule,
@@ -310,15 +334,17 @@ struct Modules {
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
-    Ok(Modules { cull: m(CULL_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
-                 fs_shadow: m(FS_SHADOW_SPV)? })
+    Ok(Modules { cull: m(CULL_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
+                 scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?, fs_shadow: m(FS_SHADOW_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
 fn modules(dev: &Device) -> Result<Modules> {
     let d = ShaderModule::from_wgsl(dev, DRAW_WGSL)?;
-    Ok(Modules { cull: ShaderModule::from_wgsl(dev, CULL_WGSL)?, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(), fs: d.clone(), vs_depth: d.clone(),
-                 vs_shadow: d.clone(), fs_shadow: d })
+    let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
+    let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
+    Ok(Modules { cull: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
+                 fs: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
 }
 
 impl Renderer {
@@ -336,12 +362,15 @@ impl Renderer {
             b(3, BindingKind::StorageBufferRead, cs),
             b(4, BindingKind::StorageBuffer, cs),
             b(5, BindingKind::StorageBuffer, cs),
+            // (G5d) the slots phase 2 found hidden
+            b(6, BindingKind::StorageBuffer, cs),
         ])?;
         let scatter_layout = dev.create_bind_group_layout(&[
             b(0, BindingKind::StorageBufferRead, cs),
             b(1, BindingKind::StorageBuffer, cs),
             b(2, BindingKind::StorageBuffer, cs),
             b(3, BindingKind::StorageBuffer, cs),
+            b(4, BindingKind::StorageBuffer, cs),
         ])?;
         let draw_layout = dev.create_bind_group_layout(&[
             b(0, BindingKind::UniformBuffer, vf | Stages::FRAGMENT),
@@ -353,7 +382,9 @@ impl Renderer {
             // (G5c) the point and spot lights
             b(6, BindingKind::StorageBufferRead, Stages::FRAGMENT),
         ])?;
-        let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 8 })?;
+        let hiz_maker = hiz::Maker::new(dev, &md.hiz_depth, &md.hiz_down)?;
+        let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 20 })?;
+        let late_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout, &hiz_maker.read], push_constants: 20 })?;
         let scatter_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&scatter_layout], push_constants: 4 })?;
         let textures = texture::Textures::new(dev)?;
         let shadow = shadow::ShadowMap::new(dev)?;
@@ -361,6 +392,8 @@ impl Renderer {
         let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout, &shadow.layout], push_constants: 4 })?;
         let shadow_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout], push_constants: 4 })?;
         let cull = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull, "main") })?;
+        let cull_early = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_early, "early") })?;
+        let cull_late = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &late_pl, shader: ShaderStage::new(&md.cull_late, "late") })?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
         let pipeline = |front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &draw_pl,
@@ -415,6 +448,11 @@ impl Renderer {
             multi,
             max_instances,
             cull,
+            cull_early,
+            cull_late,
+            hiz_maker,
+            hiz: core::cell::OnceCell::new(),
+            hiz_clock: Cell::new(0),
             scatter,
             draw,
             draw_mirrored,
@@ -594,18 +632,32 @@ impl Renderer {
         }
     }
 
-    /// a depth buffer the renderer keeps, for frames recorded with depth None
+    /// a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
+    /// its pyramid from it)
     pub fn set_size(&mut self, w: u32, h: u32) -> Result<()> {
         if self.depth.as_ref().is_some_and(|d| (d.width(), d.height()) == (w, h)) {
             return Ok(());
         }
-        self.depth = Some(self.dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET))?);
+        self.depth = Some(self.dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?);
         self.depth_used.set(false);
         Ok(())
     }
 
+    /// (G5d; tests) the renderer's own depth buffer (set_size)
+    pub fn depth_texture(&self) -> Option<&Texture> {
+        self.depth.as_ref()
+    }
+
+    /// (G5d; tests) the occlusion test's pyramid of a depth attachment as the last frame with it built it: mip k - 1
+    /// holds level k (the smallest depth of 2^k x 2^k pixels), in Layout::Sampled; None when no record used it lately
+    pub fn pyramid(&self, depth: &TextureView) -> Option<&Texture> {
+        hiz::of(&self.hiz, depth).map(|p| p.texture())
+    }
+
     /// (Scene::prepare) the table's changes for the next frame's commands
     pub(crate) fn prepare_materials(&mut self) -> Result<u64> {
+        // (G5d) the pyramids of depth attachments no record used lately go
+        hiz::prune(&mut self.hiz, self.hiz_clock.get().saturating_sub(hiz::KEEP));
         // the last ones never reached a frame: all of it again
         if !self.material_up_done.get() {
             self.material_dirty = Some((0, self.materials.len() as u32));
@@ -627,7 +679,10 @@ impl Renderer {
     }
 
     /// one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
-    /// colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+    /// colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared.
+    /// (G5d) With the occlusion test (Scene::set_occlusion, and a depth attachment with TextureUsage::SAMPLED) the
+    /// pass is two: phase 1 with the attachments' load and their `before`, phase 2 that keeps what phase 1 drew and
+    /// ends in their `store` and `after`
     pub fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()> {
         if !Arc::ptr_eq(&s.counts, &self.counts) {
             return Err(GpuError::Invalid("record: a scene of another Renderer"));
@@ -672,10 +727,28 @@ impl Renderer {
             e.timestamp(ts, base);
         }
         let cascades = s.cascades().len();
+        let n = s.slots.len() as u32;
+        let lists = s.lists.len() as u64;
+        // (G5d) the occlusion test needs a depth buffer it can read; its pyramid is the attachment's
+        let now = self.hiz_clock.get() + 1;
+        self.hiz_clock.set(now);
+        let pyramid = if s.occlusion && s.culling && n > 0 && lists > 0 && depth.view.usage().contains(TextureUsage::SAMPLED) {
+            hiz::find(&self.hiz, &self.dev, &self.hiz_maker, depth.view, now)?
+        } else {
+            None
+        };
         // the frame before read and wrote everything this one writes (the shadow map: its passes' own layout
         // transitions, Sampled -> DepthTarget -> Sampled)
         e.barrier(Access::COPY_READ | Access::COPY_WRITE | Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::INDIRECT | Access::INDEX_VERTEX | Access::GRAPHICS_READ,
                   Access::COPY_READ | Access::COPY_WRITE | Access::COMPUTE_READ | Access::COMPUTE_WRITE);
+        // (G5d) every slot counts as seen (a new buffer, every slot sent anew); before scatter clears the bits of changed
+        // slots, after the frame before's phase 2 wrote them (the barrier above)
+        if s.reset_hidden {
+            e.fill_buffer(&s.hidden, 0, s.hidden.size(), 0);
+            if s.changed > 0 {
+                e.barrier(Access::COPY_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE);
+            }
+        }
         e.copy_buffer(&f.stage, 0, &s.view.ubo, 0, VIEW_BYTES);
         e.copy_buffer(&f.stage, LIGHTS_AT, &s.lights, 0, LIGHTS_BYTES);
         for k in 0..cascades {
@@ -713,24 +786,28 @@ impl Renderer {
         }
         if lists > 0 {
             e.copy_buffer(&s.template, 0, &s.view.draws, 0, lists * DRAW_BYTES);
+            e.copy_buffer(&s.template, 0, &s.late.draws, 0, lists * DRAW_BYTES);
             for v in &s.cascades[..cascades] {
                 e.copy_buffer(&s.template, 0, &v.draws, 0, lists * DRAW_BYTES);
             }
         }
         // the copies (views, lights, draw records from the template, changes) and scatter's writes before culling
-        // reads them and before the vertex and fragment shaders read views, lights, instances and materials
-        e.barrier(Access::COPY_WRITE | Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::GRAPHICS_READ);
+        // reads them and before the vertex and fragment shaders read views, lights, instances and materials (and
+        // before the stats copy phase 2's untouched records when it does not run)
+        e.barrier(Access::COPY_WRITE | Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::GRAPHICS_READ | Access::COPY_READ);
         if let Some(ts) = ts {
             e.timestamp(ts, base + 1);
         }
-        self.cull(e, s, &s.view);
+        // (G5d) with the occlusion test phase 1: what phase 2 of the frame before saw
+        let all = !s.culling as u32;
+        self.cull(e, s, &s.view, if pyramid.is_some() { &self.cull_early } else { &self.cull }, &[n, all], None);
         if let Some(ts) = ts {
             e.timestamp(ts, base + 2);
         }
         // (G5c) each cascade's own visibility: its planes, its counts and lists, nothing shared written
         for k in 0..CASCADES_MAX {
             if k < cascades {
-                self.cull(e, s, &s.cascades[k]);
+                self.cull(e, s, &s.cascades[k], &self.cull, &[n, all], None);
             }
             if let Some(ts) = ts {
                 e.timestamp(ts, base + 3 + k as u32);
@@ -740,6 +817,9 @@ impl Renderer {
         e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
         if let (true, Some(rb), true) = (s.stats_on, &f.readback, lists > 0) {
             e.copy_buffer(&s.view.draws, 0, rb, 0, lists * DRAW_BYTES);
+            if pyramid.is_none() {
+                e.copy_buffer(&s.late.draws, 0, rb, rb.size() / 2, lists * DRAW_BYTES);
+            }
         }
         // (G5c) a depth pass per cascade into its layer; the pass's barriers: Sampled -> DepthTarget waits for
         // the shaders that read the map before (the last frame's main pass), DepthTarget -> Sampled makes the
@@ -755,11 +835,46 @@ impl Renderer {
                 e.timestamp(ts, base + 7 + k as u32);
             }
         }
-        e.begin_render(&RenderPassDesc { color: &[color], depth: Some(depth) });
+        // (G5d) phase 1 keeps colour and depth for phase 2 and leaves the depth buffer to the pyramid's compute shader:
+        // its pass ends with DepthTarget -> Sampled (late fragment tests and depth writes before the shaders' reads),
+        // phase 2's begins with Sampled -> DepthTarget (the pyramid's reads before the depth test writes again)
+        let (c1, d1) = match pyramid {
+            Some(_) => (ColorAttachment { store: true, after: Layout::ColorTarget, ..color }, DepthAttachment { store: true, after: Layout::Sampled, ..depth }),
+            None => (color, depth),
+        };
+        e.begin_render(&RenderPassDesc { color: &[c1], depth: Some(d1) });
         self.draw_lists(e, s, &s.view);
         e.end_render();
         if let Some(ts) = ts {
             e.timestamp(ts, base + 11);
+        }
+        if let Some(p) = pyramid {
+            p.record(e, &self.hiz_maker);
+            if let Some(ts) = ts {
+                e.timestamp(ts, base + 12);
+            }
+            // phase 2: every instance in the view against the pyramid (its mips Layout::Sampled since the pyramid's
+            // barriers); it reads and writes the bits phase 1 read (the barriers since have waited for phase 1)
+            self.cull(e, s, &s.late, &self.cull_late, &[n, 0, p.w, p.h, p.levels], Some(&p.read));
+            if let Some(ts) = ts {
+                e.timestamp(ts, base + 13);
+            }
+            // phase 2's counts and lists before its indirect draws and vertex shaders read them
+            e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
+            if let (true, Some(rb)) = (s.stats_on, &f.readback) {
+                e.copy_buffer(&s.late.draws, 0, rb, rb.size() / 2, lists * DRAW_BYTES);
+            }
+            let c2 = ColorAttachment { load: Load::Keep, before: Layout::ColorTarget, ..color };
+            let d2 = DepthAttachment { load: Load::Keep, before: Layout::Sampled, ..depth };
+            e.begin_render(&RenderPassDesc { color: &[c2], depth: Some(d2) });
+            self.draw_lists(e, s, &s.late);
+            e.end_render();
+        } else if let Some(ts) = ts {
+            e.timestamp(ts, base + 12);
+            e.timestamp(ts, base + 13);
+        }
+        if let Some(ts) = ts {
+            e.timestamp(ts, base + 14);
         }
         if s.stats_on {
             e.barrier(Access::COPY_WRITE, Access::HOST_READ);
@@ -796,16 +911,19 @@ impl Renderer {
         }
     }
 
-    /// one view's visibility (outside a pass): the camera's, a shadow cascade's (G5c), later the second round
-    /// of Hi-Z (G5d), each a ViewLists of its own
-    fn cull<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
+    /// one view's visibility (outside a pass): the camera's (G5d: phase 1 or 2 of the occlusion test), a shadow
+    /// cascade's (G5c), each a ViewLists of its own; push: cull.wgsl's Push, hiz: group 1 of phase 2
+    fn cull<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists, pipe: &'a ComputePipeline, push: &[u32], hiz: Option<&'a BindGroup>) {
         let n = s.slots.len() as u32;
         if n == 0 {
             return;
         }
-        e.set_compute_pipeline(&self.cull);
+        e.set_compute_pipeline(pipe);
         e.set_bind_group(0, &v.group);
-        e.push_constants(0, &[n, !s.culling as u32]);
+        if let Some(g) = hiz {
+            e.set_bind_group(1, g);
+        }
+        e.push_constants(0, push);
         e.dispatch(n.div_ceil(WG_CULL), 1, 1);
     }
 
