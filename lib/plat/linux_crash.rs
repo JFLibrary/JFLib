@@ -22,11 +22,11 @@ const SA_ONSTACK: u64 = 0x0800_0000;
 const SA_RESTORER: u64 = 0x0400_0000;
 const SA_RESETHAND: u64 = 0x8000_0000;
 const ALTSTACK_SIZE: usize = 65536;
-const UC_GREGS: usize = 40; // ucontext: uc_flags, uc_link, uc_stack, then the registers
+#[cfg(target_arch = "x86_64")] const UC_GREGS: usize = 40; // ucontext: uc_flags, uc_link, uc_stack, then the registers
 // gregs indexes of rax rbx rcx rdx rsi rdi rbp rsp r8 .. r15 rip (CrashInfo::regs order)
-const UC_REGS: [usize; 17] = [13, 11, 14, 12, 9, 8, 10, 15, 0, 1, 2, 3, 4, 5, 6, 7, 16];
-const REG_RIP: usize = 16;
-const REG_ERR: usize = 19;
+#[cfg(target_arch = "x86_64")] const UC_REGS: [usize; 17] = [13, 11, 14, 12, 9, 8, 10, 15, 0, 1, 2, 3, 4, 5, 6, 7, 16];
+#[cfg(target_arch = "x86_64")] const REG_RIP: usize = 16;
+#[cfg(target_arch = "x86_64")] const REG_ERR: usize = 19;
 
 #[repr(C, align(16))]
 struct AltStack([u8; ALTSTACK_SIZE]);
@@ -149,15 +149,15 @@ const PT_LOAD: u32 = 1;
 const PT_GNU_EH_FRAME: u32 = 0x6474_e550;
 const UNWIND_STEPS: usize = 64; // frames stepped through at most
 const LEAF_WORDS: u64 = 128; // code without CFI: its return address is searched in 1 KB above rsp
-const NREG: usize = 17; // DWARF columns 0..15 (rax rdx rcx rbx rsi rdi rbp rsp r8 .. r15), 16 = pc
-const DW_RSP: usize = 7;
-const DW_RA: usize = 16;
+#[cfg(target_arch = "x86_64")] const NREG: usize = 17; // DWARF columns 0..15 (rax rdx rcx rbx rsi rdi rbp rsp r8 .. r15), 16 = pc
+#[cfg(target_arch = "x86_64")] const DW_RSP: usize = 7;
+#[cfg(target_arch = "x86_64")] const DW_RA: usize = 16;
 const STATE_DEPTH: usize = 8; // DW_CFA_remember_state nesting
 // CrashInfo::regs index of each DWARF register 0..15
-const DW_TO_CI: [usize; 16] = [0, 3, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+#[cfg(target_arch = "x86_64")] const DW_TO_CI: [usize; 16] = [0, 3, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 /// CrashInfo::frames: the CFI chain, else the filtered stack scan
-fn call_chain(ci: &mut CrashInfo) {
+#[cfg(target_arch = "x86_64")] fn call_chain(ci: &mut CrashInfo) {
     ci.nframes = 0;
     let eh = eh_tables();
     if let Some(eh) = &eh
@@ -612,7 +612,7 @@ enum Step {
 
 /// one frame up with the CFI: regs (DWARF order, [16] = pc) become the caller's; `first` =
 /// the faulting frame (pc itself, not pc - 1, selects the row)
-fn cfi_step(eh: &Eh, pid: usize, regs: &mut [Option<u64>; NREG], first: bool) -> Step {
+#[cfg(target_arch = "x86_64")] fn cfi_step(eh: &Eh, pid: usize, regs: &mut [Option<u64>; NREG], first: bool) -> Step {
     let Some(pc) = regs[DW_RA] else { return Step::Fail };
     let at = if first { pc } else { pc.wrapping_sub(1) };
     let Some(fde) = find_fde(eh, at) else { return Step::NoFde };
@@ -650,7 +650,7 @@ fn cfi_step(eh: &Eh, pid: usize, regs: &mut [Option<u64>; NREG], first: bool) ->
 }
 
 /// CrashInfo::frames from the CFI; false when no frame was found
-fn cfi_chain(ci: &mut CrashInfo, eh: &Eh) -> bool {
+#[cfg(target_arch = "x86_64")] fn cfi_chain(ci: &mut CrashInfo, eh: &Eh) -> bool {
     // SAFETY: getpid has no arguments.
     let pid = unsafe { syscall6(SYS_GETPID, 0, 0, 0, 0, 0, 0) } as usize;
     let mut regs = [None; NREG];
@@ -703,7 +703,7 @@ fn cfi_chain(ci: &mut CrashInfo, eh: &Eh) -> bool {
 /// the call instruction right before v (a return address candidate in our code): Some(Some(
 /// target)) for call rel32, Some(None) for an indirect call (FF /2 with a register or a
 /// memory operand: [reg], [reg + disp8 / disp32], [rip + disp32], SIB forms)
-fn call_before(ci: &CrashInfo, v: u64) -> Option<Option<u64>> {
+#[cfg(target_arch = "x86_64")] fn call_before(ci: &CrashInfo, v: u64) -> Option<Option<u64>> {
     if v < ci.code0.wrapping_add(8) || v >= ci.code1 {
         return None;
     }
@@ -779,7 +779,7 @@ fn calls_into(ci: &CrashInfo, eh: Option<&Eh>, v: u64, pc: u64, first: bool) -> 
 
 /// up to 16 KB above the faulting rsp copied with process_vm_readv (stops at an unmapped page
 /// instead of faulting); scan_filtered on it, else every return address found  [stack_scan]
-fn stack_scan(ci: &mut CrashInfo, eh: Option<&Eh>) {
+#[cfg(target_arch = "x86_64")] fn stack_scan(ci: &mut CrashInfo, eh: Option<&Eh>) {
     let mut copy = [0u64; CRASH_STACK / 8];
     let lo = ci.regs[7] & !7; // rsp
     let local = [copy.as_mut_ptr() as usize, CRASH_STACK];
@@ -812,7 +812,7 @@ fn stack_scan(ci: &mut CrashInfo, eh: Option<&Eh>) {
 /// faulting instruction.  Limits: a stale return address from an indirect call (dyn methods,
 /// function pointers) is taken like a live one; a tail call breaks the link (the caller's
 /// call targets another function), so the chain may end early; frames above 16 KB are not seen.
-fn scan_filtered(ci: &mut CrashInfo, eh: Option<&Eh>, words: &[u64]) {
+#[cfg(target_arch = "x86_64")] fn scan_filtered(ci: &mut CrashInfo, eh: Option<&Eh>, words: &[u64]) {
     let mut pc = ci.ip;
     let mut first = true;
     for &v in words {
@@ -829,11 +829,21 @@ fn scan_filtered(ci: &mut CrashInfo, eh: Option<&Eh>, words: &[u64]) {
 
 // ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
 //
-// The return path and the handler for ARM64.  Until ARM3 the report has the signal, pc and the fault
-// address, but neither the registers nor the call chain: CrashInfo::regs and the CFI steps above know
-// x86-64's registers only (the module allows their dead code on ARM64).  The ucontext: uc_flags,
-// uc_link, uc_stack, uc_sigmask with the kernel's padding to 128 bytes, then at 176 (16-aligned) the
-// sigcontext: fault_address, x0 .. x30, sp, pc, pstate.
+// The return path and the handler for ARM64.  The ucontext: uc_flags, uc_link, uc_stack, uc_sigmask with
+// the kernel's padding to 128 bytes, then at 176 (16-aligned) the sigcontext: fault_address, x0 .. x30,
+// sp, pc, pstate, then at 464 (16-aligned) __reserved, 4096 bytes of records {magic, size, data} --
+// FPSIMD (FPSR, FPCR, v0 .. v31), ESR (the fault's syndrome), SVE ... -- ended by magic 0.
+// CrashInfo::regs: x0 .. x15, pc (as on Apple); access from the ESR: an instruction abort (EC 0x20) is
+// execute, a data abort (EC 0x24) a write when WnR (bit 6) is set; unknown without the record.
+//
+// The call chain: the CFI as for x86-64 (the parsing above is shared), with ARM64's DWARF registers:
+// x0 .. x30 = 0 .. 30, sp = 31, the return address column x30 (the link register) and a slot of its
+// own for pc (32), which takes the caller's x30 after each step.  Code without CFI (naked functions
+// such as crash_test, global_asm stubs) is linked to its caller by the link register when it faulted
+// itself (a leaf: x30 still holds the return address, sp and the saved registers are the caller's) or
+// else by the first stack word above sp after a bl / blr into that code (calls_into); after such a
+// word only sp (the word + 8) and pc are known.  sp stays the same over one step only from the
+// faulting frame (a leaf has no frame).  The stack scan from sp as fallback, the link register first.
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!(
     ".globl jfgui_rs_sigret",
@@ -845,7 +855,43 @@ core::arch::global_asm!(
 );
 
 #[cfg(target_arch = "aarch64")]
-const UC_PC: usize = 176 + 8 + 31 * 8 + 8; // fault_address, x0 .. x30, sp
+const UC_X: usize = 176 + 8; // x0 .. x30, then sp and pc: after the sigcontext's fault_address
+#[cfg(target_arch = "aarch64")]
+const UC_RESERVED: usize = 464; // the records after pstate, 16-aligned
+#[cfg(target_arch = "aarch64")]
+const ESR_MAGIC: u32 = 0x4553_5201;
+#[cfg(target_arch = "aarch64")]
+const NREG: usize = 33; // DWARF columns 0 .. 31 (x0 .. x30, sp), 32 = pc
+#[cfg(target_arch = "aarch64")]
+const DW_LR: usize = 30;
+#[cfg(target_arch = "aarch64")]
+const DW_SP: usize = 31;
+#[cfg(target_arch = "aarch64")]
+const DW_PC: usize = 32;
+
+/// the fault's syndrome from the ESR record of the signal frame, None without one
+///
+/// # Safety
+/// uc is the ucontext the kernel passed to the handler.
+#[cfg(target_arch = "aarch64")]
+unsafe fn esr_of(uc: *const u8) -> Option<u64> {
+    let mut off = 0usize;
+    while off + 16 <= 4096 {
+        // SAFETY: off + 16 lies inside __reserved (4096 bytes); the records are 16-aligned.
+        let (magic, size, data) = unsafe {
+            let p = uc.add(UC_RESERVED + off);
+            (*(p as *const u32), *(p.add(4) as *const u32) as usize, *(p.add(8) as *const u64))
+        };
+        if magic == 0 || size < 16 || size % 16 != 0 {
+            return None; // the end, or a broken record
+        }
+        if magic == ESR_MAGIC {
+            return Some(data);
+        }
+        off += size;
+    }
+    None
+}
 
 #[cfg(target_arch = "aarch64")]
 extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
@@ -861,20 +907,201 @@ extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
         SIGFPE => CK_DIVIDE,
         _ => CK_OTHER,
     };
+    let mut x = [0u64; NREG]; // x0 .. x30, sp, pc: in the sigcontext in this order
     // SAFETY: the kernel passes a valid siginfo and ucontext.
     let si_addr = unsafe {
+        for (k, v) in x.iter_mut().enumerate() {
+            *v = *(uc.add(UC_X + k * 8) as *const u64);
+        }
         let si_addr = *(si.add(16) as *const u64);
         if ci.kind == CK_ACCESS || ci.kind == CK_BUS {
             ci.addr = si_addr;
-            ci.access = 2; // unknown: the syndrome (ESR) is ARM3's
         }
-        ci.ip = *(uc.add(UC_PC) as *const u64);
+        if ci.kind == CK_ACCESS
+            && let Some(esr) = esr_of(uc)
+        {
+            ci.access = match esr >> 26 {
+                0x20 | 0x21 => 8,                     // instruction abort: execute
+                0x24 | 0x25 => (esr >> 6 & 1) as u32, // data abort: WnR
+                _ => 2,
+            };
+        }
         si_addr
     };
+    ci.regs[..16].copy_from_slice(&x[..16]);
+    ci.ip = x[DW_PC];
+    ci.regs[16] = ci.ip;
     code_range(&mut ci);
+    call_chain(&mut ci, &x); // crash-check: CFI, else the filtered stack scan
     let mut line = StackText::<160>::new();
     let _ = writeln!(line, "jfgui: crash signal {sig} at pc 0x{:x}, address 0x{si_addr:x} (look it up in the .map file)",
                      ci.ip);
     rt::os::write_stderr(line.bytes());
     rt::crash::report(&ci)
+}
+
+/// CrashInfo::frames: the CFI chain, else the filtered stack scan (x: x0 .. x30, sp, pc)
+#[cfg(target_arch = "aarch64")]
+fn call_chain(ci: &mut CrashInfo, x: &[u64; NREG]) {
+    ci.nframes = 0;
+    let eh = eh_tables();
+    if let Some(eh) = &eh
+        && cfi_chain(ci, eh, x)
+    {
+        return;
+    }
+    stack_scan(ci, eh.as_ref(), x[DW_SP], x[DW_LR]);
+}
+
+/// one frame up with the CFI: regs (DWARF order, [32] = pc) become the caller's; `first` = the
+/// faulting frame (pc itself, not pc - 1, selects the row)
+#[cfg(target_arch = "aarch64")]
+fn cfi_step(eh: &Eh, pid: usize, regs: &mut [Option<u64>; NREG], first: bool) -> Step {
+    let Some(pc) = regs[DW_PC] else { return Step::Fail };
+    let at = if first { pc } else { pc.wrapping_sub(1) };
+    let Some(fde) = find_fde(eh, at) else { return Step::NoFde };
+    let cie = &fde.cie;
+    if cie.ra != DW_LR as u64 {
+        return Step::Fail;
+    }
+    let mut row = Row { cfa_reg: DW_SP as u64, cfa_off: 0, r: [Rule::Same; NREG] };
+    let init = row;
+    if run_cfa(&eh.seg, cie, cie.ins, cie.end, 0, u64::MAX, &mut row, &init).is_none() {
+        return Step::Fail;
+    }
+    let init = row;
+    if run_cfa(&eh.seg, cie, fde.ins, fde.ins_end, fde.begin, at, &mut row, &init).is_none() || at >= fde.end {
+        return Step::Fail;
+    }
+    let Some(Some(base)) = regs.get(row.cfa_reg as usize).copied() else { return Step::Fail };
+    let cfa = base.wrapping_add(row.cfa_off as u64);
+    let mut next = [None; NREG];
+    for (k, n) in next.iter_mut().enumerate() {
+        *n = match row.r[k] {
+            Rule::Same => regs[k],
+            Rule::Undef => None,
+            Rule::At(o) => peek(pid, cfa.wrapping_add(o as u64)),
+            Rule::Val(o) => Some(cfa.wrapping_add(o as u64)),
+            Rule::Reg(r) => regs.get(r as usize).copied().flatten(),
+        };
+    }
+    next[DW_SP] = Some(cfa);
+    next[DW_PC] = next[DW_LR]; // the caller goes on at the return address
+    if next[DW_PC].is_none() {
+        return Step::Fail;
+    }
+    *regs = next;
+    Step::Done
+}
+
+/// CrashInfo::frames from the CFI; false when no frame was found
+#[cfg(target_arch = "aarch64")]
+fn cfi_chain(ci: &mut CrashInfo, eh: &Eh, x: &[u64; NREG]) -> bool {
+    // SAFETY: getpid has no arguments.
+    let pid = unsafe { syscall6(SYS_GETPID, 0, 0, 0, 0, 0, 0) } as usize;
+    let mut regs = x.map(Some);
+    for step in 0..UNWIND_STEPS {
+        let (Some(sp), Some(pc)) = (regs[DW_SP], regs[DW_PC]) else { break };
+        match cfi_step(eh, pid, &mut regs, step == 0) {
+            Step::Done => {}
+            Step::Fail => break,
+            Step::NoFde => {
+                // code without unwind data: a faulting leaf still has its return address in x30;
+                // else the first word from sp up whose bl / blr calls into this code
+                let lr = if step == 0 { regs[DW_LR].filter(|&v| calls_into(ci, Some(eh), v, pc, true)) } else { None };
+                if let Some(ret) = lr {
+                    regs[DW_PC] = Some(ret); // sp and the callee-saved registers stay the caller's
+                } else {
+                    let mut found = None;
+                    for k in 0..LEAF_WORDS {
+                        let a = sp + 8 * k;
+                        let Some(v) = peek(pid, a) else { break };
+                        if calls_into(ci, Some(eh), v, pc, step == 0) {
+                            found = Some((a, v));
+                            break;
+                        }
+                    }
+                    let Some((a, ret)) = found else { break };
+                    regs = [None; NREG];
+                    regs[DW_PC] = Some(ret);
+                    regs[DW_LR] = Some(ret);
+                    regs[DW_SP] = Some(a + 8);
+                }
+            }
+        }
+        let (Some(ret), Some(nsp)) = (regs[DW_PC], regs[DW_SP]) else { break };
+        if nsp < sp || (nsp == sp && step != 0) || ret < ci.code0 || ret >= ci.code1 {
+            break; // no progress, or out of our code (the end of the chain)
+        }
+        add_frame(ci, ret);
+        if ci.nframes as usize == ci.frames.len() {
+            break;
+        }
+    }
+    ci.nframes > 0
+}
+
+/// the call instruction right before v (a return address candidate in our code): Some(Some(target))
+/// for bl, Some(None) for blr (indirect)
+#[cfg(target_arch = "aarch64")]
+fn call_before(ci: &CrashInfo, v: u64) -> Option<Option<u64>> {
+    if v < ci.code0.wrapping_add(4) || v >= ci.code1 || v & 3 != 0 {
+        return None;
+    }
+    // SAFETY: v - 4 .. v lies inside our image's code (checked above), 4-aligned.
+    let w = unsafe { *((v - 4) as *const u32) };
+    if w & 0xFC00_0000 == 0x9400_0000 {
+        // bl: a signed 26-bit word offset from the instruction
+        let off = (((w & 0x03FF_FFFF) << 6) as i32 >> 6) as i64 * 4;
+        return Some(Some((v - 4).wrapping_add(off as u64)));
+    }
+    if w & 0xFFFF_FC1F == 0xD63F_0000 {
+        return Some(None); // blr xN
+    }
+    None
+}
+
+/// up to 16 KB above the faulting sp copied with process_vm_readv; the link register first when it
+/// returns into the caller of the faulting code, then the walk of scan_filtered, else every return
+/// address found
+#[cfg(target_arch = "aarch64")]
+fn stack_scan(ci: &mut CrashInfo, eh: Option<&Eh>, sp: u64, lr: u64) {
+    let mut copy = [0u64; CRASH_STACK / 8];
+    let lo = sp & !7;
+    let local = [copy.as_mut_ptr() as usize, CRASH_STACK];
+    let remote = [lo as usize, CRASH_STACK];
+    // SAFETY: getpid; process_vm_readv of our own stack into the local copy (iovecs live).
+    let got = unsafe {
+        let pid = syscall6(SYS_GETPID, 0, 0, 0, 0, 0, 0);
+        syscall6(SYS_PROCESS_VM_READV, pid as usize, local.as_ptr() as usize, 1, remote.as_ptr() as usize, 1, 0)
+    };
+    let words = if got > 0 { &copy[..(got as usize / 8).min(CRASH_STACK / 8)] } else { &copy[..0] };
+    let mut pc = ci.ip;
+    let mut first = true;
+    if calls_into(ci, eh, lr, pc, true) {
+        add_frame(ci, lr);
+        pc = lr;
+        first = false;
+    }
+    for &v in words {
+        if ci.nframes as usize >= ci.frames.len() {
+            break;
+        }
+        if calls_into(ci, eh, v, pc, first) {
+            add_frame(ci, v);
+            pc = v;
+            first = false;
+        }
+    }
+    if ci.nframes > 0 {
+        return;
+    }
+    for &v in words {
+        if ci.nframes as usize >= ci.frames.len() {
+            break;
+        }
+        if is_return(ci, v) {
+            add_frame(ci, v);
+        }
+    }
 }

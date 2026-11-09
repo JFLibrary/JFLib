@@ -340,4 +340,44 @@ mod imp {
         }
         0
     }
+
+    // ---- ARM64: the page size (docs/ARM64.md, decision 7).  ARM64 kernels run with 4 KB, 16 KB (Asahi
+    // Linux) or 64 KB pages; x86-64 has 4 KB only, its code keeps the constant.
+    #[cfg(target_arch = "aarch64")]
+    pub const AT_HWCAP: usize = 16;
+    #[cfg(target_arch = "aarch64")]
+    pub const AT_PAGESZ: usize = 6;
+    #[cfg(target_arch = "aarch64")]
+    static PAGE_SIZE: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+    /// an entry of the auxiliary vector (AT_HWCAP, AT_PAGESZ), 0 when it has none: a static program
+    /// reads the vector process_start found, one against glibc (or with std) asks glibc
+    #[cfg(target_arch = "aarch64")]
+    pub fn auxv(typ: usize) -> usize {
+        #[cfg(not(any(jfgui_glibc, feature = "std")))]
+        return getauxval(typ);
+        #[cfg(any(jfgui_glibc, feature = "std"))]
+        {
+            unsafe extern "C" {
+                fn getauxval(typ: usize) -> usize;
+            }
+            // SAFETY: glibc's getauxval (since 2.16) has no preconditions.
+            unsafe { getauxval(typ) }
+        }
+    }
+
+    /// the kernel's page size (AT_PAGESZ, cached): a power of two from 4096 on, 4096 when the vector
+    /// has none
+    #[cfg(target_arch = "aarch64")]
+    pub fn page_size() -> usize {
+        use core::sync::atomic::Ordering::Relaxed;
+        let p = PAGE_SIZE.load(Relaxed);
+        if p != 0 {
+            return p;
+        }
+        let v = auxv(AT_PAGESZ);
+        let v = if v.is_power_of_two() && v >= 4096 { v } else { 4096 };
+        PAGE_SIZE.store(v, Relaxed);
+        v
+    }
 }

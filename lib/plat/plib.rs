@@ -179,7 +179,7 @@ static GUARD_ON: AtomicU32 = AtomicU32::new(0);
 // The trampoline (Win64 ABI on both OSes): jfgui_guard_run(rec, f, args) -> 0 returned /
 // 1 faulted.  Frame like the assembly's PROLOG 16: [rsp+0..63] outgoing arguments, [rsp+64]
 // the record pointer (the fault path finds it there: only rsp / rbp are restored).
-core::arch::global_asm!(
+#[cfg(target_arch = "x86_64")] core::arch::global_asm!(
     ".globl jfgui_guard_run",
     ".globl jfgui_guard_fault_ip",
     "jfgui_guard_run:",
@@ -268,7 +268,7 @@ core::arch::global_asm!(
     "    ret",
 );
 
-unsafe extern "win64" {
+#[cfg(target_arch = "x86_64")] unsafe extern "win64" {
     fn jfgui_guard_run(rec: *mut GuardRec, f: usize, args: *const [u64; 4]) -> u64;
     fn jfgui_guard_fault_ip();
 }
@@ -474,7 +474,7 @@ pub fn lib_read(h: &Lib, addr: usize, len: usize) -> Option<alloc::vec::Vec<u8>>
 // a4), 1 write to [a1], 2 ud2, 3 int3, 4 integer division by zero, 5 endless recursion in
 // 4 KB frames (stack overflow), 6 clobber every callee-saved register, xmm6-15, MXCSR (round
 // down), the x87 control word (single precision) and DF, then write to [a1]
-core::arch::global_asm!(
+#[cfg(target_arch = "x86_64")] core::arch::global_asm!(
     ".globl jfgui_gt_code",
     "jfgui_gt_code:",
     "0:",
@@ -578,7 +578,7 @@ core::arch::global_asm!(
     "    ret",
 );
 
-unsafe extern "win64" {
+#[cfg(target_arch = "x86_64")] unsafe extern "win64" {
     fn jfgui_gt_table(t: *mut [usize; 7]);
     fn jfgui_gt_state() -> u64;
 }
@@ -597,4 +597,199 @@ pub fn guard_test_state() -> (u32, u32, bool) {
     let v = unsafe { jfgui_gt_state() };
     let d = (v >> 32) as u32;
     (v as u32, d & 0xFFFF, d >> 16 & 1 != 0)
+}
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+//
+// The trampoline in AAPCS64 (the plugin ABI of ARM64, decision 4 of the plan): jfgui_guard_run(rec = x0,
+// f = x1, args = x2) -> x0: 0 returned / 1 faulted.  Its frame: x29 / x30 at [sp], x19 .. x28 at
+// [sp + 16 .. 96], the record pointer at [sp + 96] (the fault path finds it there: only sp and x29 are
+// restored), 112 bytes, sp 16-aligned.  The record's fields keep their offsets and change their
+// meaning: rsp / rbp = sp / x29 of the body, mxcsr = FPCR, xmm = d8 .. d15 (80 .. 143; AAPCS64 keeps
+// only their low halves), rax / rdx = x0 / x1 of the call.  The fault path (linux_guard.rs: pc, sp,
+// x29 in the signal frame) restores FPCR and d8 .. d15 from the record; the epilogue restores x19 ..
+// x28, x29 and x30 from the frame; sp comes from x29.  Linux on ARM64 compiles this with ARM4 (plib
+// is off there until then); Windows on ARM64 needs unwind data for it (ARM5).
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".globl jfgui_guard_run",
+    ".globl jfgui_guard_fault_ip",
+    ".p2align 2",
+    "jfgui_guard_run:",
+    "    stp x29, x30, [sp, #-112]!",
+    "    mov x29, sp",
+    "    stp x19, x20, [sp, #16]",
+    "    stp x21, x22, [sp, #32]",
+    "    stp x23, x24, [sp, #48]",
+    "    stp x25, x26, [sp, #64]",
+    "    stp x27, x28, [sp, #80]",
+    "    str x0, [sp, #96]",
+    "    mov x19, x0",
+    "    mov x20, x1",
+    "    mov x21, x2",
+    "    mov x9, sp",
+    "    str x9, [x19, #8]",
+    "    str x29, [x19, #16]",
+    "    mrs x9, fpcr",
+    "    str x9, [x19, #64]", // FPCR (32 bits used) over mxcsr and fcw
+    "    stp d8, d9, [x19, #80]",
+    "    stp d10, d11, [x19, #96]",
+    "    stp d12, d13, [x19, #112]",
+    "    stp d14, d15, [x19, #128]",
+    "    ldr x9, [x19, #24]",
+    "    str x19, [x9, #8]", // armed: GT_CUR = the record
+    "    ldp x0, x1, [x21]",
+    "    ldp x2, x3, [x21, #16]",
+    "    blr x20",
+    // normal return: sp is intact; x29 / d8 .. d15 are restored even if f broke the ABI
+    "    ldr x9, [sp, #96]",
+    "    ldr x29, [x9, #16]",
+    "    stp x0, x1, [x9, #240]",
+    "    ldr x10, [x9, #24]",
+    "    ldr x11, [x9]",
+    "    str x11, [x10, #8]", // unlinked: GT_CUR = the enclosing record
+    "    bl 2f",
+    "    mov x0, #0",
+    "    b 3f",
+    // the fault handler resumes a faulting guarded thread here (sp, x29 of the body; the record is
+    // already unlinked)
+    "jfgui_guard_fault_ip:",
+    "    ldr x9, [sp, #96]",
+    "    ldr x10, [x9, #64]",
+    "    msr fpcr, x10",
+    "    bl 2f",
+    "    mov x0, #1",
+    "3:",
+    "    mov sp, x29",
+    "    ldp x19, x20, [sp, #16]",
+    "    ldp x21, x22, [sp, #32]",
+    "    ldp x23, x24, [sp, #48]",
+    "    ldp x25, x26, [sp, #64]",
+    "    ldp x27, x28, [sp, #80]",
+    "    ldp x29, x30, [sp], #112",
+    "    ret",
+    // d8 .. d15 from the record at x9; leaf
+    "2:",
+    "    ldp d8, d9, [x9, #80]",
+    "    ldp d10, d11, [x9, #96]",
+    "    ldp d12, d13, [x9, #112]",
+    "    ldp d14, d15, [x9, #128]",
+    "    ret",
+);
+
+#[cfg(target_arch = "aarch64")]
+unsafe extern "C" {
+    fn jfgui_guard_run(rec: *mut GuardRec, f: usize, args: *const [u64; 4]) -> u64;
+    fn jfgui_guard_fault_ip();
+}
+
+// Test aids for Linux on ARM64, the cases of the x86-64 code above in AAPCS64: 0 sum (x0 = a1 + 2 a2 +
+// 3 a3 + 4 a4, x1 = a1 ^ a4), 1 write to [a1] (the store first: the fault at the function's start),
+// 2 udf (SIGILL), 3 brk (SIGTRAP), 4 SIGFPE: ARM64's integer division does not trap, so the code sends
+// itself SIGFPE with tgkill (the signal arrives at the instruction after the svc, +40), 5 endless
+// recursion in 4 KB frames, 6 clobber x19 .. x29, d8 .. d15 and FPCR (round towards minus infinity),
+// then write to [a1].  jfgui_gt_state -> x0 = FPCR (no x87, no direction flag).
+#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+core::arch::global_asm!(
+    ".globl jfgui_gt_code",
+    ".p2align 4",
+    "jfgui_gt_code:",
+    "0:",
+    "    add x9, x0, x1, lsl #1",
+    "    add x10, x2, x2, lsl #1",
+    "    add x9, x9, x10",
+    "    add x9, x9, x3, lsl #2",
+    "    eor x1, x0, x3",
+    "    mov x0, x9",
+    "    ret",
+    ".p2align 4",
+    "1:",
+    "    str w0, [x0]",
+    "    ret",
+    ".p2align 4",
+    "2:",
+    "    udf #0",
+    "    ret",
+    ".p2align 4",
+    "3:",
+    "    brk #0",
+    "    ret",
+    ".p2align 4",
+    "4:",
+    "    mov x8, #{getpid}",
+    "    svc 0",
+    "    mov x9, x0",
+    "    mov x8, #{gettid}",
+    "    svc 0",
+    "    mov x1, x0",
+    "    mov x0, x9",
+    "    mov x2, #8",
+    "    mov x8, #{tgkill}",
+    "    svc 0",
+    "    ret",
+    ".p2align 4",
+    "5:",
+    "    sub sp, sp, #4096",
+    "    str x0, [sp]",
+    "    bl 5b",
+    "    add sp, sp, #4096",
+    "    ret",
+    ".p2align 4",
+    "6:",
+    "    mov x9, #0x5A5A",
+    "    movk x9, #0x5A5A, lsl #16",
+    "    movk x9, #0x5A5A, lsl #32",
+    "    movk x9, #0x5A5A, lsl #48",
+    "    mov x19, x9",
+    "    mov x20, x9",
+    "    mov x21, x9",
+    "    mov x22, x9",
+    "    mov x23, x9",
+    "    mov x24, x9",
+    "    mov x25, x9",
+    "    mov x26, x9",
+    "    mov x27, x9",
+    "    mov x28, x9",
+    "    mov x29, x9",
+    "    fmov d8, x9",
+    "    fmov d9, x9",
+    "    fmov d10, x9",
+    "    fmov d11, x9",
+    "    fmov d12, x9",
+    "    fmov d13, x9",
+    "    fmov d14, x9",
+    "    fmov d15, x9",
+    "    mov x10, #0x800000",
+    "    msr fpcr, x10",
+    "    str w9, [x0]",
+    "    ret",
+    ".p2align 4",
+    ".globl jfgui_gt_table",
+    "jfgui_gt_table:",
+    "    adr x9, 0b",
+    "    adr x10, 1b",
+    "    stp x9, x10, [x0]",
+    "    adr x9, 2b",
+    "    adr x10, 3b",
+    "    stp x9, x10, [x0, #16]",
+    "    adr x9, 4b",
+    "    adr x10, 5b",
+    "    stp x9, x10, [x0, #32]",
+    "    adr x9, 6b",
+    "    str x9, [x0, #48]",
+    "    ret",
+    ".globl jfgui_gt_state",
+    "jfgui_gt_state:",
+    "    mrs x0, fpcr",
+    "    mov w0, w0",
+    "    ret",
+    getpid = const rt::os::SYS_GETPID,
+    gettid = const rt::os::SYS_GETTID,
+    tgkill = const rt::os::SYS_TGKILL,
+);
+
+#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+unsafe extern "C" {
+    fn jfgui_gt_table(t: *mut [usize; 7]);
+    fn jfgui_gt_state() -> u64;
 }

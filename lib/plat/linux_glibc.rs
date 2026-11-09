@@ -53,17 +53,17 @@ unsafe extern "C" {
     pub(super) fn pthread_join(thread: usize, ret: *mut *mut u8) -> i32;
 }
 
-/// pthread_attr_t of x86-64 (56 bytes)
+/// pthread_attr_t (56 bytes on x86-64, 64 on ARM64)
 #[repr(C, align(8))]
-pub(super) struct PthreadAttr(pub(super) [u8; 56]);
+pub(super) struct PthreadAttr(pub(super) [u8; PTHREAD_ATTR]); #[cfg(target_arch = "x86_64")] pub(super) const PTHREAD_ATTR: usize = 56;
 
-const ARCH_GET_FS: usize = 0x1003;
+#[cfg(target_arch = "x86_64")] const ARCH_GET_FS: usize = 0x1003;
 const RTLD_NOW: i32 = 2;
 
 // the ABI's entry: rsp -> argc, argv[], 0, envp[], 0; rdx = ld.so's finaliser (registered by
 // __libc_start_main).  init and fini 0: this program has neither (glibc takes both as optional).
 // A program with std has the C runtime's _start and std_start.
-#[cfg(not(feature = "std"))]
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
 core::arch::global_asm!(
     ".globl _start",
     "_start:",
@@ -184,12 +184,54 @@ pub fn glibc_version() -> String {
 
 /// the calling thread's FS base, pthread_self() and the address of errno: its thread control block
 /// and thread-local storage (a raw clone would have 0 and the creator's)
-pub fn glibc_thread_ids() -> (usize, usize, usize) {
+#[cfg(target_arch = "x86_64")] pub fn glibc_thread_ids() -> (usize, usize, usize) {
     let mut fs = 0usize;
     // SAFETY: arch_prctl writes the FS base to fs; the two libc calls have no preconditions on a
     // thread started by glibc.
     unsafe {
         rt::os::syscall3(rt::os::SYS_ARCH_PRCTL, ARCH_GET_FS, &mut fs as *mut usize as usize, 0);
         (fs, pthread_self(), __errno_location() as usize)
+    }
+}
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+//
+// _start as above in ARM64's registers: ld.so leaves its finaliser in x0 and sp on argc (16-aligned);
+// __libc_start_main(main = x0, argc = w1, argv = x2, init = x3, fini = x4, rtld_fini = x5, stack_end
+// = x6), frame pointer and link register 0 end the call chain.  glibc_thread_ids reads TPIDR_EL0
+// instead of the FS base: ARM64 has no arch_prctl, and its TLS is variant I, so the thread pointer
+// points at the TCB right above glibc's struct pthread (pthread_self() lies a little below it).
+#[cfg(target_arch = "aarch64")]
+pub(super) const PTHREAD_ATTR: usize = 64;
+
+#[cfg(all(target_arch = "aarch64", not(feature = "std")))]
+core::arch::global_asm!(
+    ".globl _start",
+    "_start:",
+    "    mov x29, xzr",
+    "    mov x30, xzr",
+    "    mov x5, x0",
+    "    ldr x1, [sp]",
+    "    add x2, sp, #8",
+    "    mov x6, sp",
+    "    mov x3, xzr",
+    "    mov x4, xzr",
+    "    adrp x0, {main}",
+    "    add x0, x0, :lo12:{main}",
+    "    bl {start}",
+    "    brk #1",
+    main = sym glibc_main,
+    start = sym __libc_start_main,
+);
+
+/// the calling thread's thread pointer (TPIDR_EL0: its TCB), pthread_self() and the address of errno
+#[cfg(target_arch = "aarch64")]
+pub fn glibc_thread_ids() -> (usize, usize, usize) {
+    let tp: usize;
+    // SAFETY: reads the thread pointer register only; the two libc calls have no preconditions on a
+    // thread started by glibc.
+    unsafe {
+        core::arch::asm!("mrs {}, tpidr_el0", out(reg) tp, options(nomem, nostack, preserves_flags));
+        (tp, pthread_self(), __errno_location() as usize)
     }
 }
