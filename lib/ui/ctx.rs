@@ -110,6 +110,8 @@ pub(crate) struct Hit {
     pub(crate) continuation: bool,
     /// HB_* (cursor in bits 12..15)
     pub(crate) flags: u16,
+    /// HB_KEYS: every key is the widget's while it has the focus
+    pub(crate) keys: bool,
     /// the axes along which a finger belongs to the widget (touch.rs, AX_*)
     pub(crate) grab: u8,
     pub(crate) layer: u8,
@@ -413,6 +415,20 @@ impl Ui {
     /// ui_key_first: the first unconsumed key this frame (VK | mods << 16) or 0
     pub fn key_first(&self) -> u32 {
         self.wp.ctx.keyq.iter().copied().find(|&k| (k as i32) >= 0).unwrap_or(0)
+    }
+
+    /// key_take -> the first unconsumed key this frame (VK | mods << 16), consumed; 0 when none
+    /// is left.  A canvas with HB_KEYS takes every key with it while it has the focus (`ev &
+    /// EV_FOCUS`, call it until 0); the keys a focused text box keeps stay with the box.
+    pub fn key_take(&mut self) -> u32 {
+        for i in 0..self.wp.ctx.keyq.len() {
+            let k = self.wp.ctx.keyq[i];
+            if (k as i32) >= 0 && self.text_key_filter(Some(i)).is_some() {
+                self.wp.ctx.keyq[i] |= 0x8000_0000;
+                return k;
+            }
+        }
+        0
     }
 
     /// ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
@@ -745,6 +761,7 @@ impl Ui {
             id,
             continuation: false,
             flags: (hbflags | notab) as u16,
+            keys: hbflags & HB_KEYS != 0,
             grab: super::touch::hit_grab(hbflags),
             layer: c.cmd_layer_ui as u8,
             kind: 0,
@@ -830,7 +847,7 @@ impl Ui {
         }
         if c.focus == id {
             ev |= EV_FOCUS;
-            if flags & (HB_TEXT | HB_OWNKEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
+            if flags & (HB_TEXT | HB_OWNKEYS | HB_KEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
                 ev |= EV_ACT;
                 self.wp.ctx.focus_visible = true;
             }

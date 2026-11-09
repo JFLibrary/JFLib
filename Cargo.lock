@@ -1670,6 +1670,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "viewtest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "webgputest"
 version = "0.0.0"
 dependencies = [

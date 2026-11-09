@@ -161,10 +161,10 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -670,6 +670,10 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_key_down(vk): held (mods: VK_SHIFT / VK_CONTROL / VK_MENU)
 - **`fn key_first(&self) -> u32`**
   ui_key_first: the first unconsumed key this frame (VK | mods &lt;&lt; 16) or 0
+- **`fn key_take(&mut self) -> u32`**
+  key_take -> the first unconsumed key this frame (VK | mods &lt;&lt; 16), consumed; 0 when none
+  is left.  A canvas with HB_KEYS takes every key with it while it has the focus (\\`ev &
+  EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box.
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
@@ -897,7 +901,9 @@ Label strings are copied, so they may live in scratch buffers.
 - **`fn canvas(&mut self, id: u32, draw: Option<DrawRef>, user: usize, version: u32) -> &UiInput`**
   ui_canvas(id, draw, user, version) -> &UiInput: a custom area.  The hit box wants
   every pointer move; the cursor comes from next_flags bits 12..15 (CUR_\* &lt;&lt;
-  HB_CURSOR_SHIFT), default crosshair.
+  HB_CURSOR_SHIFT), default crosshair (with HB_CURSOR_SET as given: 0 is the arrow).
+  next_flags(HB_KEYS): every key is the canvas's while it has the focus (a press gives it
+  the focus, so does ui.focus(id)); it takes them with ui.key_take.
 
 ### Popups, menus, command table, tooltips
 
@@ -988,6 +994,11 @@ numbers for them.
 
 **`impl Ui`**
 
+- **`fn accel_run(&mut self, key: u32) -> bool`**
+  accel_run(key) -> true when key (VK | mods &lt;&lt; 16, as ui.key_take gives it) is the
+  accelerator of an enabled, visible command of the table: it runs (cmd_run(id, 0), after the
+  frame) as if the key had reached the table, open popups close.  For a widget with HB_KEYS
+  that hands a key back (one a web page did not use, say).
 - **`fn popup_is_open(&self, id: u32) -> bool`**
   ui_popup_is_open(id): popup `id` is open
 - **`fn popup_count(&self) -> u32`**
@@ -4974,6 +4985,15 @@ HB_OWNKEYS: u32 = 0x20000
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 HB_GRAB_H: u32 = 0x40000
 HB_GRAB_V: u32 = 0x80000
+// every key is the widget's while it has the focus, Ctrl + letter, Tab and the arrows too: no
+// accelerator, no keyboard navigation, no Enter / Space action and no ui.undo_keys takes one (a
+// canvas that shows a web page takes them with ui.key_take; ui.accel_run hands one back to the
+// command table).  Unlike HB_TEXT no text box rules: no reserved keys, no input method, no
+// on-screen keyboard.  A canvas takes it from next_flags.
+HB_KEYS: u32 = 0x10_0000
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+HB_CURSOR_SET: u32 = 0x20_0000
 ```
 
 *the finger (touch.rs)*
@@ -8132,7 +8152,8 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 
 - **`fn undo_keys(&mut self) -> Option<bool>`**
   undo_keys() -> Some(true) for Ctrl+Z, Some(false) for Ctrl+Y / Ctrl+Shift+Z, when no
-  text field has the keyboard (they keep their own undo); the key is consumed
+  text field (they keep their own undo) or widget with HB_KEYS has the keyboard; the key is
+  consumed
 
 #### `ui/hyph.rs`
 
