@@ -15,7 +15,9 @@
 //        primitive index (geometryShader), sample-rate shading, dual-source blending in
 //        shaders, the extended storage image formats, storage reads without format.  Not
 //        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
-//   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
+//   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
+//   device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies: a family
+//        without graphics where the device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
 //   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -42,6 +44,13 @@
 // small rectangles costs what they hold, not a full frame or a new allocation.
 // Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 // call returns GpuError::DeviceLost (objects are still destroyed normally).
+// (G5d) The compute queue has a timeline of its own (two queues signalling one timeline semaphore could reach its
+// values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
+// the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
+// command slots come from a pool of each family.  Resources are shared between the families concurrently: every
+// buffer, and every texture that is no render target (render targets stay exclusive to the device's queue: render
+// passes run there only, and some GPUs compress exclusive targets) -- no ownership transfers in the caller's code.
+// Pending uploads run on the device's queue: a compute submission flushes them first and waits for them.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -77,10 +86,25 @@ pub(crate) enum Garbage {
     Memory(vk::Handle),
 }
 
-/// a command pool with its one command buffer
+/// a command pool with its one command buffer (of the compute queue's family, or the device queue's)
 pub(crate) struct Slot {
     pub pool: vk::Handle,
     pub cb: vk::CommandBuffer,
+    pub compute: bool,
+}
+
+/// (G5d) the bit of a SubmitId of the compute queue (its timeline's value below it)
+pub(crate) const COMPUTE_ID: u64 = 1 << 63;
+
+/// (G5d) the compute queue: its family, its timeline, what was submitted and is known done
+pub(crate) struct Lane {
+    pub queue: vk::Queue,
+    pub family: u32,
+    pub timeline: vk::Handle,
+    pub ts_bits: u32,
+    submitted: AtomicU64,
+    completed: AtomicU64,
+    qlock: SpinLock<()>,
 }
 
 /// a buffer of the staging ring
@@ -111,8 +135,12 @@ struct Ring {
 
 pub(crate) struct State {
     pub mem: Allocator,
-    garbage: Vec<(u64, Garbage)>,
+    /// (the device queue's value, the compute queue's)
+    garbage: Vec<(u64, u64, Garbage)>,
     free: Vec<Slot>,
+    /// (G5d) free slots of the compute queue's family
+    cfree: Vec<Slot>,
+    /// (a SubmitId's value: COMPUTE_ID for the compute queue)
     busy: Vec<(u64, Slot)>,
     pools: Vec<vk::Handle>, // descriptor pools of the bind groups (the last one is filled)
     upload: Option<Upload>,
@@ -153,6 +181,8 @@ pub(crate) struct Shared {
     pub host_query_reset: bool,
     /// maintenance4 enabled (Vulkan 1.3): shaders may set their workgroup size with LocalSizeId
     pub maintenance4: bool,
+    /// (G5d) the compute queue
+    pub lane: Option<Lane>,
     lost: AtomicBool,
     submitted: AtomicU64,
     completed: AtomicU64,
@@ -165,6 +195,15 @@ pub(crate) struct Shared {
 pub struct Device {
     pub(crate) sh: Arc<Shared>,
     queue: Queue,
+    compute: Option<ComputeQueue>,
+}
+
+/// (G5d) a queue of its own for compute shaders and copies, beside the device's queue (Device::compute_queue): its
+/// encoders record no render passes, its submissions run in parallel with the device queue's unless one waits for the
+/// other (submit_after)
+#[derive(Clone)]
+pub struct ComputeQueue {
+    pub(crate) sh: Arc<Shared>,
 }
 
 /// the device's queue (graphics, compute, copies, presentation)
@@ -340,11 +379,15 @@ impl Adapter {
             p_queue_priorities: &prio,
             ..vk::Zero::zero()
         };
+        // (G5d) the compute queue: a family of its own, unless jfgui_GPU_COMPUTE=0
+        let off = plat::env("jfgui_GPU_COMPUTE").is_some_and(|v| v == "0" || v.eq_ignore_ascii_case("off"));
+        let cfam = self.compute_family.filter(|_| !off);
+        let qis = [qi, vk::DeviceQueueCreateInfo { queue_family_index: cfam.map_or(0, |c| c.0), ..qi }];
         let info = vk::DeviceCreateInfo {
             s_type: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             p_next: &f2 as *const _ as *const c_void,
-            queue_create_info_count: 1,
-            p_queue_create_infos: &qi,
+            queue_create_info_count: 1 + cfam.is_some() as u32,
+            p_queue_create_infos: qis.as_ptr(),
             enabled_extension_count: names.len() as u32,
             pp_enabled_extension_names: names.as_ptr(),
             ..vk::Zero::zero()
@@ -396,6 +439,25 @@ impl Adapter {
             unsafe { (f.destroy_device)(dev, core::ptr::null()) };
             return Err(err(r));
         }
+        let mut lane = None;
+        if let Some((family, ts_bits)) = cfam {
+            let mut cq: vk::Queue = 0;
+            let mut ct = 0;
+            // SAFETY: the family / index 0 requested above; a valid create info.
+            let r = unsafe {
+                (f.get_device_queue)(dev, family, 0, &mut cq);
+                (f.create_semaphore)(dev, &si, core::ptr::null(), &mut ct)
+            };
+            if r != vk::SUCCESS {
+                // SAFETY: only the timeline was created from the device.
+                unsafe {
+                    (f.destroy_semaphore)(dev, timeline, core::ptr::null());
+                    (f.destroy_device)(dev, core::ptr::null());
+                }
+                return Err(err(r));
+            }
+            lane = Some(Lane { queue: cq, family, timeline: ct, ts_bits, submitted: AtomicU64::new(0), completed: AtomicU64::new(0), qlock: SpinLock::new(()) });
+        }
         let mut features = self.features;
         if !voll {
             features.bindless = false;
@@ -433,6 +495,7 @@ impl Adapter {
             ts_base: AtomicU64::new(0),
             host_query_reset: v12 && e12[vk::F12_HOST_QUERY_RESET] != 0,
             maintenance4: v13 && e13[vk::F13_MAINTENANCE4] != 0,
+            lane,
             lost: AtomicBool::new(false),
             submitted: AtomicU64::new(0),
             completed: AtomicU64::new(0),
@@ -441,13 +504,15 @@ impl Adapter {
                 mem: Allocator::new(self.mem),
                 garbage: Vec::new(),
                 free: Vec::new(),
+                cfree: Vec::new(),
                 busy: Vec::new(),
                 pools: Vec::new(),
                 upload: None,
                 ring: Ring::default(),
             }),
         });
-        Ok(Device { queue: Queue { sh: sh.clone() }, sh })
+        let compute = sh.lane.as_ref().map(|_| ComputeQueue { sh: sh.clone() });
+        Ok(Device { queue: Queue { sh: sh.clone() }, compute, sh })
     }
 }
 
@@ -498,6 +563,32 @@ impl Shared {
         self.submitted.load(Ordering::Acquire)
     }
 
+    /// (G5d) the compute queue's last submitted value (0 without one)
+    fn lane_submitted(&self) -> u64 {
+        self.lane.as_ref().map_or(0, |l| l.submitted.load(Ordering::Acquire))
+    }
+
+    /// (G5d) the compute queue's value the GPU has reached (asks the driver; 0 without one)
+    fn lane_refresh(&self) -> u64 {
+        let Some(l) = &self.lane else { return 0 };
+        // (nothing pending: no call; a device that never uses the queue never asks its timeline)
+        let done = l.completed.load(Ordering::Acquire);
+        if l.submitted.load(Ordering::Acquire) <= done {
+            return done;
+        }
+        let mut v = 0u64;
+        // SAFETY: the compute queue's timeline semaphore.
+        let r = unsafe { (self.f.get_semaphore_counter_value)(self.dev, l.timeline, &mut v) };
+        if r != vk::SUCCESS {
+            if r == vk::ERROR_DEVICE_LOST {
+                self.lost.store(true, Ordering::Relaxed);
+            }
+            return l.completed.load(Ordering::Acquire);
+        }
+        l.completed.fetch_max(v, Ordering::AcqRel);
+        v
+    }
+
     /// the timeline value the GPU has reached (asks the driver)
     pub fn refresh(&self) -> u64 {
         let mut v = 0u64;
@@ -521,10 +612,13 @@ impl Shared {
         let mut st = self.st.lock();
         let named = st.upload.is_some() && matches!(g, Garbage::Buffer(..) | Garbage::Image(..));
         let v = self.submitted() + named as u64;
-        if v <= self.completed.load(Ordering::Acquire) || self.lost.load(Ordering::Relaxed) {
+        // (G5d) and the compute queue's latest submission
+        let vc = self.lane_submitted();
+        let lane_done = self.lane.as_ref().is_none_or(|l| vc <= l.completed.load(Ordering::Acquire));
+        if (v <= self.completed.load(Ordering::Acquire) && lane_done) || self.lost.load(Ordering::Relaxed) {
             self.destroy(&mut st, g);
         } else {
-            st.garbage.push((v, g));
+            st.garbage.push((v, vc, g));
         }
     }
 
@@ -571,7 +665,9 @@ impl Shared {
         if st.garbage.is_empty() && st.busy.is_empty() && st.ring.busy.is_empty() && st.ring.free.is_empty() {
             return;
         }
-        let done = if self.lost.load(Ordering::Relaxed) { u64::MAX } else { self.refresh() };
+        let lost = self.lost.load(Ordering::Relaxed);
+        let done = if lost { u64::MAX } else { self.refresh() };
+        let done_c = if lost { u64::MAX } else { self.lane_refresh() };
         let mut i = 0;
         while i < st.ring.busy.len() {
             if st.ring.busy[i].0 <= done {
@@ -585,19 +681,21 @@ impl Shared {
         self.ring_trim(st);
         let mut i = 0;
         while i < st.busy.len() {
-            if st.busy[i].0 <= done {
+            let v = st.busy[i].0;
+            let finished = if v & COMPUTE_ID != 0 { v & !COMPUTE_ID <= done_c } else { v <= done };
+            if finished {
                 let (_, s) = st.busy.swap_remove(i);
                 // SAFETY: the pool's command buffer finished executing.
                 unsafe { (self.f.reset_command_pool)(self.dev, s.pool, 0) };
-                st.free.push(s);
+                if s.compute { st.cfree.push(s) } else { st.free.push(s) }
             } else {
                 i += 1;
             }
         }
         let mut i = 0;
         while i < st.garbage.len() {
-            if st.garbage[i].0 <= done {
-                let (_, g) = st.garbage.swap_remove(i);
+            if st.garbage[i].0 <= done && st.garbage[i].1 <= done_c {
+                let (_, _, g) = st.garbage.swap_remove(i);
                 self.destroy(st, g);
             } else {
                 i += 1;
@@ -606,18 +704,28 @@ impl Shared {
     }
 
     /// a command buffer slot (reused or new), begun for one submission
+    #[cfg_attr(not(jfgui_glibc), allow(dead_code))] // (vk_dmabuf.rs)
     pub fn take_slot(&self) -> Result<Slot> {
+        self.take_slot_for(false)
+    }
+
+    /// (G5d) a slot of the compute queue's family (compute) or the device queue's
+    pub fn take_slot_for(&self, compute: bool) -> Result<Slot> {
         self.check()?;
+        if compute && self.lane.is_none() {
+            return Err(GpuError::Unsupported("a compute queue"));
+        }
         let slot = {
             let mut st = self.st.lock();
-            if st.free.is_empty() {
+            let empty = if compute { st.cfree.is_empty() } else { st.free.is_empty() };
+            if empty {
                 self.collect(&mut st);
             }
-            st.free.pop()
+            if compute { st.cfree.pop() } else { st.free.pop() }
         };
         let slot = match slot {
             Some(s) => s,
-            None => self.new_slot()?,
+            None => self.new_slot(compute)?,
         };
         let bi = vk::CommandBufferBeginInfo {
             s_type: vk::STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -633,11 +741,15 @@ impl Shared {
         Ok(slot)
     }
 
-    fn new_slot(&self) -> Result<Slot> {
+    fn new_slot(&self, compute: bool) -> Result<Slot> {
+        let family = match (&self.lane, compute) {
+            (Some(l), true) => l.family,
+            _ => self.family,
+        };
         let pi = vk::CommandPoolCreateInfo {
             s_type: vk::STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             flags: vk::COMMAND_POOL_CREATE_TRANSIENT_BIT,
-            queue_family_index: self.family,
+            queue_family_index: family,
             ..vk::Zero::zero()
         };
         let mut pool = 0;
@@ -658,14 +770,20 @@ impl Shared {
             unsafe { (self.f.destroy_command_pool)(self.dev, pool, core::ptr::null()) };
             return Err(e);
         }
-        Ok(Slot { pool, cb })
+        Ok(Slot { pool, cb, compute })
     }
 
     /// a slot that was never submitted: reset, back to the free list
     pub fn give_slot(&self, s: Slot) {
         // SAFETY: the buffer is not pending (never submitted).
         unsafe { (self.f.reset_command_pool)(self.dev, s.pool, 0) };
-        self.st.lock().free.push(s);
+        let mut st = self.st.lock();
+        if s.compute { st.cfree.push(s) } else { st.free.push(s) }
+    }
+
+    /// (G5d) the families a resource is shared by (concurrently), when there is a compute queue
+    pub fn sharing(&self) -> Option<[u32; 2]> {
+        self.lane.as_ref().map(|l| [self.family, l.family])
     }
 
     /// the free chunks beyond what the ring keeps go back: ordinary ones above CHUNKS_FREE,
@@ -720,7 +838,7 @@ impl Shared {
             // the upload buffer's slot: from the free list or new (the lock is held: no collect)
             let slot = match st.free.pop() {
                 Some(s) => s,
-                None => self.new_slot()?,
+                None => self.new_slot(false)?,
             };
             let bi = vk::CommandBufferBeginInfo {
                 s_type: vk::STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -772,11 +890,15 @@ impl Shared {
 
     /// a VkBuffer with memory of kind (bound) -> (buffer, allocation)
     pub fn raw_buffer(&self, st: &mut State, size: u64, usage: u32, kind: MemoryKind) -> Result<(vk::Handle, Alloc)> {
+        // (G5d) every buffer is shared with the compute queue's family, if there is one
+        let fams = self.sharing();
         let bi = vk::BufferCreateInfo {
             s_type: vk::STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             size,
             usage,
-            sharing_mode: vk::SHARING_MODE_EXCLUSIVE,
+            sharing_mode: if fams.is_some() { vk::SHARING_MODE_CONCURRENT } else { vk::SHARING_MODE_EXCLUSIVE },
+            queue_family_index_count: if fams.is_some() { 2 } else { 0 },
+            p_queue_family_indices: fams.as_ref().map_or(core::ptr::null(), |f| f.as_ptr()),
             ..vk::Zero::zero()
         };
         let mut buf = 0;
@@ -808,12 +930,52 @@ impl Shared {
     /// semaphore and its stages, signal: a binary semaphore -> the timeline value
     pub fn submit(&self, cbs: &[vk::CommandBuffer], slots: Vec<Slot>, wait: Option<(vk::Handle, u32)>,
                   signal: Option<vk::Handle>) -> Result<u64> {
+        self.submit_on(false, cbs, slots, wait, &[], signal)
+    }
+
+    /// (G5d) the semaphore and value a SubmitId waits on; Invalid when it was not submitted yet
+    fn wait_of(&self, id: u64) -> Result<(vk::Handle, u64)> {
+        if id & COMPUTE_ID == 0 {
+            return if id <= self.submitted() { Ok((self.timeline, id)) } else { Err(GpuError::Invalid("submit_after: a submission not made yet")) };
+        }
+        match &self.lane {
+            Some(l) if id & !COMPUTE_ID <= l.submitted.load(Ordering::Acquire) => Ok((l.timeline, id & !COMPUTE_ID)),
+            Some(_) => Err(GpuError::Invalid("submit_after: a submission not made yet")),
+            None => Err(GpuError::Invalid("submit_after: an id of a compute queue the device does not have")),
+        }
+    }
+
+    /// submit on the device's queue (compute false: after the pending uploads) or on the compute queue (the pending
+    /// uploads go first on the device's queue, and it waits for them); wait: a binary semaphore and its stages,
+    /// after: SubmitIds of either queue it waits for (at all commands), signal: a binary semaphore -> the SubmitId
+    /// (COMPUTE_ID on the compute queue)
+    pub fn submit_on(&self, compute: bool, cbs: &[vk::CommandBuffer], slots: Vec<Slot>, wait: Option<(vk::Handle, u32)>, after: &[u64],
+                     signal: Option<vk::Handle>) -> Result<u64> {
         let mut slots = slots;
-        if let Err(e) = self.check() {
+        let fine = self.check().and_then(|_| {
+            if slots.iter().any(|s| s.compute != compute) {
+                return Err(GpuError::Invalid("submit: a command buffer of the other queue's family (Device::encoder / ComputeQueue::encoder)"));
+            }
+            if compute && (self.lane.is_none() || wait.is_some() || signal.is_some()) {
+                return Err(GpuError::Invalid("submit: no compute queue, or a semaphore on it"));
+            }
+            Ok(())
+        });
+        let mut waits: Vec<(vk::Handle, u64)> = Vec::with_capacity(after.len() + 1);
+        let fine = fine.and_then(|_| {
+            for &id in after {
+                waits.push(self.wait_of(id)?);
+            }
+            Ok(())
+        });
+        if let Err(e) = fine {
             for s in slots {
                 self.give_slot(s);
             }
             return Err(e);
+        }
+        if compute {
+            return self.submit_lane(cbs, slots, waits);
         }
         let up = self.st.lock().upload.take();
         let mut all: Vec<vk::CommandBuffer> = Vec::with_capacity(cbs.len() + 1);
@@ -842,6 +1004,20 @@ impl Shared {
             }
         }
         all.extend_from_slice(cbs);
+        // the binary semaphore (its value is ignored) and the timelines it waits for
+        let mut ws: Vec<vk::Handle> = Vec::with_capacity(waits.len() + 1);
+        let mut wv: Vec<u64> = Vec::with_capacity(waits.len() + 1);
+        let mut wst: Vec<u32> = Vec::with_capacity(waits.len() + 1);
+        if let Some((s, st)) = wait {
+            ws.push(s);
+            wv.push(0);
+            wst.push(st);
+        }
+        for &(s, v) in &waits {
+            ws.push(s);
+            wv.push(v);
+            wst.push(vk::PIPELINE_STAGE_ALL_COMMANDS_BIT);
+        }
         let q = self.qlock.lock();
         let value = self.submitted.load(Ordering::Relaxed) + 1;
         let sems = [self.timeline, signal.unwrap_or(0)];
@@ -849,15 +1025,16 @@ impl Shared {
         let nsig = 1 + signal.is_some() as u32;
         let tsi = vk::TimelineSemaphoreSubmitInfo {
             s_type: vk::STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+            wait_semaphore_value_count: wv.len() as u32,
+            p_wait_semaphore_values: wv.as_ptr(),
             signal_semaphore_value_count: nsig,
             p_signal_semaphore_values: values.as_ptr(),
             ..vk::Zero::zero()
         };
-        let (ws, wst) = wait.map_or(([0u64], [0u32]), |(s, st)| ([s], [st]));
         let si = vk::SubmitInfo {
             s_type: vk::STRUCTURE_TYPE_SUBMIT_INFO,
             p_next: &tsi as *const _ as *const c_void,
-            wait_semaphore_count: wait.is_some() as u32,
+            wait_semaphore_count: ws.len() as u32,
             p_wait_semaphores: ws.as_ptr(),
             p_wait_dst_stage_mask: wst.as_ptr(),
             command_buffer_count: all.len() as u32,
@@ -888,6 +1065,98 @@ impl Shared {
         }
         self.collect(&mut st);
         Ok(value)
+    }
+
+    /// (G5d) a submission on the compute queue (checked by submit_on): the pending uploads first on the device's
+    /// queue, waited for
+    fn submit_lane(&self, cbs: &[vk::CommandBuffer], slots: Vec<Slot>, mut waits: Vec<(vk::Handle, u64)>) -> Result<u64> {
+        let Some(l) = &self.lane else { return Err(GpuError::Invalid("no compute queue")) };
+        if self.st.lock().upload.is_some() {
+            match self.submit_on(false, &[], Vec::new(), None, &[], None) {
+                Ok(v) => waits.push((self.timeline, v)),
+                Err(e) => {
+                    for s in slots {
+                        self.give_slot(s);
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        let wv: Vec<u64> = waits.iter().map(|w| w.1).collect();
+        let ws: Vec<vk::Handle> = waits.iter().map(|w| w.0).collect();
+        let wst: Vec<u32> = ws.iter().map(|_| vk::PIPELINE_STAGE_ALL_COMMANDS_BIT).collect();
+        let q = l.qlock.lock();
+        let value = l.submitted.load(Ordering::Relaxed) + 1;
+        let tsi = vk::TimelineSemaphoreSubmitInfo {
+            s_type: vk::STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+            wait_semaphore_value_count: wv.len() as u32,
+            p_wait_semaphore_values: wv.as_ptr(),
+            signal_semaphore_value_count: 1,
+            p_signal_semaphore_values: &value,
+            ..vk::Zero::zero()
+        };
+        let si = vk::SubmitInfo {
+            s_type: vk::STRUCTURE_TYPE_SUBMIT_INFO,
+            p_next: &tsi as *const _ as *const c_void,
+            wait_semaphore_count: ws.len() as u32,
+            p_wait_semaphores: ws.as_ptr(),
+            p_wait_dst_stage_mask: wst.as_ptr(),
+            command_buffer_count: cbs.len() as u32,
+            p_command_buffers: cbs.as_ptr(),
+            signal_semaphore_count: 1,
+            p_signal_semaphores: &l.timeline,
+        };
+        // SAFETY: every command buffer is executable and of the compute family; the queue is held.
+        let r = unsafe { (self.f.queue_submit)(l.queue, 1, &si, 0) };
+        if r == vk::SUCCESS {
+            l.submitted.store(value, Ordering::Release);
+        }
+        drop(q);
+        if let Err(e) = self.vk(r) {
+            for s in slots {
+                self.give_slot(s);
+            }
+            return Err(e);
+        }
+        let mut st = self.st.lock();
+        for s in slots {
+            st.busy.push((value | COMPUTE_ID, s));
+        }
+        self.collect(&mut st);
+        Ok(value | COMPUTE_ID)
+    }
+
+    /// (G5d) wait for a SubmitId of either queue -> false on timeout
+    pub fn wait_id(&self, id: u64, timeout_ns: u64) -> Result<bool> {
+        if id & COMPUTE_ID == 0 {
+            return self.wait_value(id, timeout_ns);
+        }
+        self.check()?;
+        let Some(l) = &self.lane else { return Err(GpuError::Invalid("wait: an id of a compute queue the device does not have")) };
+        let v = id & !COMPUTE_ID;
+        if v <= l.completed.load(Ordering::Acquire) {
+            return Ok(true);
+        }
+        if v > l.submitted.load(Ordering::Acquire) {
+            return Err(GpuError::Invalid("wait: not submitted yet"));
+        }
+        let wi = vk::SemaphoreWaitInfo {
+            s_type: vk::STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+            semaphore_count: 1,
+            p_semaphores: &l.timeline,
+            p_values: &v,
+            ..vk::Zero::zero()
+        };
+        // SAFETY: the compute queue's timeline semaphore and a value already submitted.
+        let r = unsafe { (self.f.wait_semaphores)(self.dev, &wi, timeout_ns) };
+        if r == vk::TIMEOUT {
+            return Ok(false);
+        }
+        self.vk(r)?;
+        l.completed.fetch_max(v, Ordering::AcqRel);
+        let mut st = self.st.lock();
+        self.collect(&mut st);
+        Ok(true)
     }
 
     fn fail_submit(&self, slots: Vec<Slot>, chunks: Vec<Chunk>) {
@@ -997,22 +1266,23 @@ impl Drop for Shared {
             let mut st = self.st.lock();
             if let Some(u) = st.upload.take() {
                 for c in u.retired {
-                    st.garbage.push((0, Garbage::Buffer(c.buf, c.a)));
+                    st.garbage.push((0, 0, Garbage::Buffer(c.buf, c.a)));
                 }
                 st.free.push(u.slot);
             }
             let ring = core::mem::take(&mut st.ring);
             for c in ring.cur.into_iter().chain(ring.free).chain(ring.busy.into_iter().map(|(_, c)| c)) {
-                st.garbage.push((0, Garbage::Buffer(c.buf, c.a)));
+                st.garbage.push((0, 0, Garbage::Buffer(c.buf, c.a)));
             }
             let garbage = core::mem::take(&mut st.garbage);
-            for (_, g) in garbage {
+            for (_, _, g) in garbage {
                 self.destroy(&mut st, g);
             }
             for (_, s) in core::mem::take(&mut st.busy) {
                 st.free.push(s);
             }
-            for s in st.free.drain(..) {
+            let cfree = core::mem::take(&mut st.cfree);
+            for s in st.free.drain(..).chain(cfree) {
                 (f.destroy_command_pool)(d, s.pool, n);
             }
             for p in st.pools.drain(..) {
@@ -1020,6 +1290,9 @@ impl Drop for Shared {
             }
             st.mem.destroy_all(f, d);
             (f.destroy_semaphore)(d, self.timeline, n);
+            if let Some(l) = &self.lane {
+                (f.destroy_semaphore)(d, l.timeline, n);
+            }
             drop(st);
             (f.destroy_device)(d, n);
         }
@@ -1029,6 +1302,11 @@ impl Drop for Shared {
 impl Device {
     pub fn queue(&self) -> &Queue {
         &self.queue
+    }
+    /// (G5d) the queue of its own for compute and copies (a family without graphics; jfgui_GPU_COMPUTE=0: none);
+    /// None where the device has none (then everything goes through queue())
+    pub fn compute_queue(&self) -> Option<&ComputeQueue> {
+        self.compute.as_ref()
     }
     pub fn info(&self) -> &AdapterInfo {
         &self.sh.info
@@ -1066,21 +1344,25 @@ impl Device {
         drop(st);
         self.sh.check()
     }
-    /// wait for a submission -> false when timeout_ns passed first
+    /// wait for a submission (of either queue) -> false when timeout_ns passed first
     pub fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool> {
-        self.sh.wait_value(id.0, timeout_ns)
+        self.sh.wait_id(id.0, timeout_ns)
     }
-    /// wait for every submission so far
+    /// wait for every submission so far (of both queues)
     pub fn wait_idle(&self) -> Result<()> {
         let v = self.sh.submitted();
-        if self.sh.wait_value(v, 10_000_000_000)? { Ok(()) } else { Err(GpuError::Timeout) }
+        let vc = self.sh.lane_submitted();
+        if self.sh.wait_value(v, 10_000_000_000)? && (vc == 0 || self.sh.wait_id(vc | COMPUTE_ID, 10_000_000_000)?) { Ok(()) } else { Err(GpuError::Timeout) }
     }
     /// the last submission the GPU has finished
     pub fn completed(&self) -> SubmitId {
         SubmitId(self.sh.refresh())
     }
-    /// the submission id is done on the GPU (asks the driver; never waits)
+    /// the submission id (of either queue) is done on the GPU (asks the driver; never waits)
     pub fn is_done(&self, id: SubmitId) -> bool {
+        if id.0 & COMPUTE_ID != 0 {
+            return self.sh.lane_refresh() >= id.0 & !COMPUTE_ID;
+        }
         self.sh.refresh() >= id.0
     }
     /// bytes of device and host memory the device holds in blocks
@@ -1100,6 +1382,14 @@ impl Queue {
             slots.push(s);
         }
         self.sh.submit(&cbs, slots, None, None).map(SubmitId)
+    }
+
+    /// (G5d) run command buffers in order once the submissions `wait` (of either queue; Device::compute_queue) are
+    /// done: a wait through the timeline, at all commands
+    pub fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId> {
+        let (cbs, slots) = split_cmds(cmds);
+        let after: Vec<u64> = wait.iter().map(|w| w.0).collect();
+        self.sh.submit_on(false, &cbs, slots, None, &after, None).map(SubmitId)
     }
 
     /// submit the pending uploads now
@@ -1262,7 +1552,7 @@ impl Queue {
             self.sh.wait_value(id.0, u64::MAX)?;
             return buf.read(offset, out);
         }
-        let dev = Device { sh: self.sh.clone(), queue: self.clone() };
+        let dev = Device { sh: self.sh.clone(), queue: self.clone(), compute: None };
         let rb = dev.create_buffer(&crate::BufferDesc { size: n.max(4), usage: crate::BufferUsage::NONE, memory: MemoryKind::Readback })?;
         let mut enc = dev.encoder()?;
         enc.copy_buffer(buf, offset, &rb, 0, n);
@@ -1271,5 +1561,39 @@ impl Queue {
             return Err(GpuError::Timeout);
         }
         rb.read(0, out)
+    }
+}
+
+/// (G5d) the command buffers' handles and slots
+fn split_cmds<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(cmds: I) -> (Vec<vk::CommandBuffer>, Vec<Slot>) {
+    let mut cbs = Vec::new();
+    let mut slots = Vec::new();
+    for c in cmds {
+        let s = c.into_slot();
+        cbs.push(s.cb);
+        slots.push(s);
+    }
+    (cbs, slots)
+}
+
+impl ComputeQueue {
+    /// (G5d) an encoder of this queue's family: copies, fills, barriers, compute and timestamps (where the family has
+    /// them); a render pass is Invalid (from finish)
+    pub fn encoder(&self) -> Result<crate::CommandEncoder<'_>> {
+        crate::vk_cmd::CommandEncoder::of(&self.sh, true)
+    }
+
+    /// (G5d) run this queue's command buffers in order -> their SubmitId (Device::wait takes it); the pending uploads go
+    /// first, on the device's queue
+    pub fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId> {
+        self.submit_after(&[], cmds)
+    }
+
+    /// (G5d) the same once the submissions `wait` (of either queue) are done: a wait through the timeline, at all
+    /// commands
+    pub fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId> {
+        let (cbs, slots) = split_cmds(cmds);
+        let after: Vec<u64> = wait.iter().map(|w| w.0).collect();
+        self.sh.submit_on(true, &cbs, slots, None, &after, None).map(SubmitId)
     }
 }

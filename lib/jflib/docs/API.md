@@ -18080,6 +18080,9 @@ Planned: Metal; it provides the same types and methods.
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
          wait(id, timeout_ns), wait_idle(), memory_reserved()
+  device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies
+         (Vulkan: a family without graphics; None in the browser and without one): encoder(),
+         submit, submit_after(&[id], ..); queue.submit_after(&[id], ..) waits for the other
   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
                                                   read(off, &mut [T]) (Upload / Readback)
   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -18138,7 +18141,8 @@ before the drop (the device's timeline).  Nothing waits on the CPU unless asked 
 read_buffer, Timestamps::read_*).
 
 Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
-jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
+queue of its own for compute),
 jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 ```
@@ -18744,6 +18748,9 @@ write), CopySrc / CopyDst (transfer), Sampled (vertex + fragment + compute shade
 (colour output), DepthTarget (early + late fragment tests), DepthRead (fragment tests and
 shaders), Present (as Undefined; bottom of pipe).
 Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
+(G5d) An encoder of the compute queue (ComputeQueue::encoder) records no render pass, and its barriers keep the
+stages and accesses a compute family has (compute, copies, indirect arguments, the host): the graphics stages of a
+layout or of Access flags fall away there.
 ```
 
 - **`struct CommandEncoder<'a>`**
@@ -18755,7 +18762,7 @@ Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
 **`impl Device`**
 
 - **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
-  a command encoder (a recording command buffer)
+  a command encoder (a recording command buffer) of the device's queue
 
 **`impl<'a> CommandEncoder<'a>`**
 
@@ -18829,7 +18836,9 @@ buffer slots, staged uploads, submission
        primitive index (geometryShader), sample-rate shading, dual-source blending in
        shaders, the extended storage image formats, storage reads without format.  Not
        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
-  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
+  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
+  device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies: a family
+       without graphics where the device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -18856,10 +18865,22 @@ by the next one that fits and released when none came for a second (Device::poll
 small rectangles costs what they hold, not a full frame or a new allocation.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
+(G5d) The compute queue has a timeline of its own (two queues signalling one timeline semaphore could reach its
+values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
+the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
+command slots come from a pool of each family.  Resources are shared between the families concurrently: every
+buffer, and every texture that is no render target (render targets stay exclusive to the device's queue: render
+passes run there only, and some GPUs compress exclusive targets) -- no ownership transfers in the caller's code.
+Pending uploads run on the device's queue: a compute submission flushes them first and waits for them.
 ```
 
 - **`struct Device`**
   a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute shaders and copies, beside the device's queue (Device::compute_queue): its
+  encoders record no render passes, its submissions run in parallel with the device queue's unless one waits for the
+  other (submit_after)
 
 - **`struct Queue`**
   the device's queue (graphics, compute, copies, presentation)
@@ -18872,6 +18893,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) the queue of its own for compute and copies (a family without graphics; jfgui_GPU_COMPUTE=0: none);
+  None where the device has none (then everything goes through queue())
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
   what this device has enabled
@@ -18888,13 +18912,13 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn poll(&self) -> Result<()>`**
   free what the GPU has finished with (also done by submit and wait)
 - **`fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool>`**
-  wait for a submission -> false when timeout_ns passed first
+  wait for a submission (of either queue) -> false when timeout_ns passed first
 - **`fn wait_idle(&self) -> Result<()>`**
-  wait for every submission so far
+  wait for every submission so far (of both queues)
 - **`fn completed(&self) -> SubmitId`**
   the last submission the GPU has finished
 - **`fn is_done(&self, id: SubmitId) -> bool`**
-  the submission id is done on the GPU (asks the driver; never waits)
+  the submission id (of either queue) is done on the GPU (asks the driver; never waits)
 - **`fn memory_reserved(&self) -> u64`**
   bytes of device and host memory the device holds in blocks
 
@@ -18902,6 +18926,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order (after the pending uploads) -> their timeline value
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) run command buffers in order once the submissions `wait` (of either queue; Device::compute_queue) are
+  done: a wait through the timeline, at all commands
 - **`fn flush(&self) -> Result<SubmitId>`**
   submit the pending uploads now
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
@@ -18921,6 +18948,18 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
   read a buffer's contents at offset (copies through a readback buffer when needed,
   submits and waits for the GPU: the slow path, for tools and tests)
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+  (G5d) an encoder of this queue's family: copies, fills, barriers, compute and timestamps (where the family has
+  them); a render pass is Invalid (from finish)
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  (G5d) run this queue's command buffers in order -> their SubmitId (Device::wait takes it); the pending uploads go
+  first, on the device's queue
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) the same once the submissions `wait` (of either queue) are done: a wait through the timeline, at all
+  commands
 
 ### `gpu/vk_inst.rs`
 
@@ -19073,6 +19112,10 @@ GPU has finished the submissions made before it was dropped (vk_dev.rs).
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19579,9 +19622,21 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 - **`struct Queue`**
   the device's queue
 
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute: WebGPU has one queue, so Device::compute_queue is None here and there is no
+  value of this type
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _cmds: I) -> Result<SubmitId>`**
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], _cmds: I) -> Result<SubmitId>`**
+
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) WebGPU has one queue: None
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
 - **`fn limits(&self) -> &Limits`**
@@ -19606,6 +19661,8 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order -> their number
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) one queue: its submissions run in order, so this is submit
 - **`fn flush(&self) -> Result<SubmitId>`**
   nothing waits for a submission here
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
@@ -19675,6 +19732,10 @@ A browser's errors come later than the call (web_dev.rs); what can be known here
 - **`fn format(&self) -> Format`**
 - **`fn size(&self) -> (u32, u32)`**
   width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+  what its texture may be used for (a swapchain frame's: a colour target)
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it), not merely one of the same range: a cache's key
 
 - **`struct Texture`**
   an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
@@ -19867,11 +19928,11 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
-anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
-per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
+instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
+against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
+indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
 Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
@@ -19906,11 +19967,19 @@ Errors are gpu's: Invalid for ids and values this crate can judge, the rest from
 DEPTH_CLEAR: f32 = 0.0
 /// the most frames the CPU may record ahead of the GPU
 FRAMES_MAX: usize = 3
+/// (G5d) the most detail levels of a mesh
+LODS_MAX: usize = 8
 /// the WGSL sources and their embedded words (render3dtest: the embedding check)
 CULL_WGSL: &str = include_str!("cull.wgsl")
 SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
+/// (G5d) the depth pyramid of the occlusion test
+HIZ_WGSL: &str = include_str!("hiz.wgsl")
 CULL_SPV: &[u32] = spv::CULL
+CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+CULL_LATE_SPV: &[u32] = spv::CULL_LATE
+HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
+HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 FS_SPV: &[u32] = spv::FS
@@ -19939,6 +20008,12 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 
 - **`struct MeshId(pub u32)`**
   a mesh of a Renderer
+
+- **`struct Lod`**
+  (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
+  than `below` of the view's height is drawn with `mesh` instead; None: not drawn at all (contribution culling)
+  - `mesh: Option<MeshId>`
+  - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
   a material of a Renderer
@@ -20004,6 +20079,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
+- **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
+  (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
+  falling, at most LODS_MAX; empty: none.  The visibility picks per instance from the camera's distance (the shadow
+  cascades take the camera's pick, so a shadow matches its caster); the sphere culling takes for the mesh's instances
+  grows to hold every level (cull_sphere).  Scenes send all their instances again with their next frame.  Invalid
+  for meshes the renderer does not have and thresholds not finite, not above 0 or not falling
+- **`fn lods(&self, mesh: MeshId) -> &[Lod]`**
+  (G5d) a mesh's detail levels (empty: none)
+- **`fn cull_sphere(&self, mesh: MeshId) -> Option<([f64; 3], f64)>`**
+  (G5d) the sphere (centre, radius in the mesh's coordinates) the visibility takes for a mesh's instances: its own,
+  grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
   not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
@@ -20018,10 +20104,19 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
-  a depth buffer the renderer keeps, for frames recorded with depth None
+  a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
+  its pyramid from it)
+- **`fn depth_texture(&self) -> Option<&Texture>`**
+  (G5d; tests) the renderer's own depth buffer (set_size)
+- **`fn pyramid(&self, depth: &TextureView) -> Option<&Texture>`**
+  (G5d; tests) the occlusion test's pyramid of a depth attachment as the last frame with it built it: mip k - 1
+  holds level k (the smallest depth of 2^k x 2^k pixels), in Layout::Sampled; None when no record used it lately
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
-  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+  colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared.
+  (G5d) With the occlusion test (Scene::set_occlusion, and a depth attachment with TextureUsage::SAMPLED) the
+  pass is two: phase 1 with the attachments' load and their `before`, phase 2 that keeps what phase 1 drew and
+  ends in their `store` and `after`
 
 ### `render3d/dfg.rs`
 
@@ -20304,16 +20399,19 @@ commands without a barrier against the frames still on the GPU.
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `count: u32` -- the instances of this mesh, and the room for them in the visible list
   - `capacity: u32`
+  - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
 
 - **`struct FrameStats`**
   what a finished frame measured (Scene::set_stats)
   - `frame: u64` -- counts the scene's frames from 0
-  - `visible: u64` -- instances the compute shader found visible
-  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
-    timestamps here: None)
+  - `visible: u64` -- instances the compute shader found visible (with the occlusion test: drawn in phase 1 or 2)
+  - `late: u64` -- (G5d) of them, those phase 2 of the occlusion test drew (0 without it)
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling (phase 1), after the frame
+    (no timestamps here: None)
   - `cascades: [[f64; 2]; CASCADES_MAX]` -- (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
-  - `draw: f64` -- (G5c) the main render pass, ms
+  - `draw: f64` -- (G5c) the main render pass, ms (G5d: both phases' passes)
+  - `occlusion: [f64; 3]` -- (G5d) the occlusion test, ms: building the pyramid, phase 2's culling, phase 2's pass (0 without it)
 
 - **`struct Scene`**
   instances, camera and sun of one scene of a Renderer
@@ -20362,6 +20460,13 @@ commands without a barrier against the frames still on the GPU.
 - **`fn origin(&self) -> [f64; 3]`**
 - **`fn set_culling(&mut self, on: bool)`**
   false: every live instance is drawn (a test's comparison, a debugging aid)
+- **`fn set_occlusion(&mut self, on: bool)`**
+  (G5d) the camera's occlusion test against a depth pyramid in two phases (docs/RENDER3D.md "Verdeckung"): true
+  at first.  It runs when the depth attachment can be sampled (the renderer's own can) and culling is on
+- **`fn occlusion(&self) -> bool`**
+- **`fn late_buffers(&self) -> (&Buffer, &Buffer)`**
+  (G5d; tests, tools) phase 2's draw records and visible list after a frame (laid out as draws_buffer and
+  visible_buffer, which hold phase 1's with the occlusion test)
 - **`fn set_stats(&mut self, on: bool)`**
   FrameStats of each frame: the instances found visible (a small copy per frame), the GPU's times
 - **`fn upload_info(&self) -> UploadInfo`**

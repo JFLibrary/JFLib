@@ -101,6 +101,8 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let lights = num("--lights", 0);
     // (G5c) --env 1: the procedural sky lights the scene
     let env = num("--env", 0) != 0;
+    // (G5d) --occlusion 0: without the camera's occlusion test
+    let occlusion = num("--occlusion", 1) != 0;
     let args = plat::args();
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
@@ -108,7 +110,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env).is_none() && t.fails == 0 {
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env, occlusion).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -120,7 +122,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
-       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool) -> Option<()> {
+       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool, occlusion: bool) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -133,8 +135,36 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     // (four corners per face: uv 0 ..= 1 over each)
     let uv: Vec<[f32; 2]> = (0..pos.len()).map(|i| [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]][i % 4]).collect();
     let idx: Vec<u32> = sb::cube_indices().iter().map(|&v| v as u32).collect();
+    // (G5d) --ball S: balls of S x 2S segments in place of the cubes; --lods: their detail levels, balls of S/2 and S/4
+    // below 0.02 and 0.008 of the view's height; --min-px P: nothing below P pixels (contribution culling)
+    let ball_n = plat::arg_value("--ball").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let lods = plat::args().iter().any(|a| a == "--lods");
+    let min_px = plat::arg_value("--min-px").and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
+    let geo = |g: &crate::common::Geo| -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<u32>) { (g.pos.clone(), g.nrm.clone(), g.uv.clone(), g.idx.clone()) };
+    let (pos, nrm, uv, idx) = if ball_n > 0 { geo(&crate::common::ball(ball_n, 2 * ball_n)) } else { (pos, nrm, uv, idx) };
+    let mut bases = Vec::new();
     for _ in 0..meshes {
-        t.res(r.add_mesh(&MeshData { positions: &pos, normals: &nrm, uvs: &uv, indices: &idx }), "add_mesh")?;
+        bases.push(t.res(r.add_mesh(&MeshData { positions: &pos, normals: &nrm, uvs: &uv, indices: &idx }), "add_mesh")?);
+    }
+    let mut levels = Vec::new();
+    if lods && ball_n > 0 {
+        for (s, below) in [((ball_n / 2).max(2), 0.02f32), ((ball_n / 4).max(2), 0.008)] {
+            let (p, nn, u, i) = geo(&crate::common::ball(s, 2 * s));
+            let m = t.res(r.add_mesh(&MeshData { positions: &p, normals: &nn, uvs: &u, indices: &i }), "add_mesh")?;
+            levels.push(render3d::Lod { mesh: Some(m), below });
+        }
+    }
+    if min_px > 0.0 {
+        levels.push(render3d::Lod { mesh: None, below: min_px / h as f32 });
+    }
+    if !levels.is_empty() {
+        for &b in &bases {
+            t.res(r.set_lods(b, &levels), "set_lods")?;
+        }
+        out(&format!("  detail levels: {}", levels.iter().map(|l| format!("{} below {}", l.mesh.map_or("nothing".into(), |m| format!("mesh {}", m.0)), l.below)).collect::<Vec<_>>().join(", ")));
+    }
+    if ball_n > 0 {
+        out(&format!("  balls of {} x {} segments ({} triangles) in place of the cubes", ball_n, 2 * ball_n, idx.len() / 3));
     }
     let tt = plat::time_us();
     let mut tex = Vec::new();
@@ -186,14 +216,27 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     }
     let t_add = (plat::time_us() - t0) as f64 / 1000.0;
     s.set_stats(true);
+    s.set_occlusion(occlusion);
     let color = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Rgba8Unorm, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC)), "colour target")?;
-    let depth = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET)), "depth target")?;
+    // (G5d: sampled, the occlusion test's pyramid reads it)
+    let depth = t.res(dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED)), "depth target")?;
     let aspect = w as f64 / h as f64;
     let total = warmup + frames;
     let (mut rec, mut cpu, mut wait, mut prep, mut interval) = (vec![0.0; total], vec![0.0; total], vec![0.0; total], vec![0.0; total], vec![0.0; total]);
     let mut rng = Rng(123);
     let mut last = plat::time_us();
     let mut first_frame = 0.0;
+    // (G5d) --async-work N --async-on compute|main: beside every frame render3d's scatter shader puts N changes into a
+    // second copy of the instance data (what scattering the next frame's changes into double-buffered data would
+    // cost), on the compute queue or after the frame on the device queue: does it run beside the drawing?
+    let async_n = plat::arg_value("--async-work").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let on_compute = plat::arg_value("--async-on").is_none_or(|v| v != "main");
+    let side = if async_n > 0 { Some(t.res(Side::new(dev, n, async_n), "async work")?) } else { None };
+    if side.is_some() {
+        out(&format!("  beside every frame: render3d's scatter shader with {async_n} changes into a second copy of the instance data, on {}",
+                     if on_compute && dev.compute_queue().is_some() { "the compute queue" } else { "the device queue after the frame" }));
+    }
+    let mut side_ids: Vec<SubmitId> = Vec::new();
     for f in 0..total {
         let tw = plat::time_us();
         t.res(s.wait_slot(), "wait")?;
@@ -219,6 +262,14 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         let id = t.res(dev.queue().submit([cmd]), "submit")?;
         let t1 = plat::time_us();
         s.submitted(id);
+        if let Some(sd) = &side {
+            // (at most three in flight, like the frames)
+            if side_ids.len() >= 3 {
+                let old = side_ids.remove(0);
+                t.res(dev.wait(old, 10_000_000_000), "wait")?;
+            }
+            side_ids.push(t.res(sd.run(dev, on_compute), "async work")?);
+        }
         wait[f] = (t0 - tw) as f64 / 1000.0;
         prep[f] = (tp - t0) as f64 / 1000.0;
         rec[f] = (tr - tp) as f64 / 1000.0;
@@ -235,6 +286,9 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let m: Vec<_> = st.iter().filter(|x| x.frame as usize >= warmup).collect();
     let pick = |f: &dyn Fn(&render3d::FrameStats) -> Option<f64>| -> Stat { stat(&m.iter().filter_map(|x| f(x)).collect::<Vec<f64>>()) };
     let vis = pick(&|x| Some(x.visible as f64));
+    // (G5d) phase 2's instances, the pyramid, phase 2's culling and pass
+    let late = pick(&|x| Some(x.late as f64));
+    let hiz: Vec<Stat> = (0..3).map(|k| pick(&|x| x.stamps.map(|_| x.occlusion[k]))).collect();
     let up = pick(&|x| x.stamps.map(|a| a[1] - a[0]));
     let cull = pick(&|x| x.stamps.map(|a| a[2] - a[1]));
     let draw = pick(&|x| x.stamps.map(|_| x.draw));
@@ -264,19 +318,93 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     if shadows.is_some() {
         out(&format!("  cascades (culling / depth pass, ms median): {}", per.iter().map(|(c, d)| format!("{:.3} / {:.3}", c.med, d.med)).collect::<Vec<_>>().join("; ")));
     }
+    if occlusion {
+        out(&format!("  occlusion test: {:.0} drawn by phase 2 (median); pyramid {:.3} / phase 2's culling {:.3} / phase 2's pass {:.3} ms median (in draw: both passes)",
+                     late.med, hiz[0].med, hiz[1].med, hiz[2].med));
+    }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} vis={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
-                 dev.level(), m.len(), vis.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99, shcull.med, shcull.p99,
-                 shdraw.med, shdraw.p99, draw.med, draw.p99, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+                 dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
+                 shcull.med, shcull.p99, shdraw.med, shdraw.p99, draw.med, draw.p99, hiz[0].med, hiz[1].med, hiz[2].med, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
-        verify_lists(t, dev, &s, &objs, ids.len(), time_of(total - 1), extent, w, h)?;
+        // (G5d) the lists of a frame without the occlusion test at the last frame's camera: everything in the view
+        if occlusion {
+            s.set_occlusion(false);
+            s.set_camera(&bench_camera(time_of(total - 1), extent, aspect));
+            t.res(s.prepare(&mut r), "prepare")?;
+            let mut e = t.res(dev.encoder(), "encoder")?;
+            let ca = ColorAttachment { view: color.view(), load: Load::Clear, clear: [0.05, 0.06, 0.09, 1.0], store: true, before: Layout::ColorTarget, after: Layout::ColorTarget };
+            let da = DepthAttachment { view: depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: false, before: Layout::DepthTarget, after: Layout::DepthTarget };
+            t.res(r.record(&mut e, &s, ca, Some(da)), "record")?;
+            let cmd = t.res(e.finish(), "finish")?;
+            let id = t.res(dev.queue().submit([cmd]), "submit")?;
+            s.submitted(id);
+            t.res(dev.wait_idle(), "wait_idle")?;
+        }
+        let in_view = verify_lists(t, dev, &s, &objs, ids.len(), time_of(total - 1), extent, w, h)?;
+        if occlusion {
+            out(&format!("  with the occlusion test {:.0} of {in_view} in the view drawn (median, {:.1} %)", vis.med, vis.med / in_view.max(1) as f64 * 100.0));
+        }
     }
     Some(())
 }
 
+/// (G5d) the work beside the frames: render3d's scatter shader over its own buffers
+struct Side {
+    pipe: ComputePipeline,
+    group: BindGroup,
+    n: u32,
+}
+
+impl Side {
+    fn new(dev: &Device, cap: u32, n: u32) -> gpu::Result<Side> {
+        let m = ShaderModule::from_spirv(dev, render3d::SCATTER_SPV)?;
+        let b = |binding, kind| Binding { binding, kind, stages: Stages::COMPUTE };
+        let bgl = dev.create_bind_group_layout(&[b(0, BindingKind::StorageBufferRead), b(1, BindingKind::StorageBuffer), b(2, BindingKind::StorageBuffer),
+                                                 b(3, BindingKind::StorageBuffer), b(4, BindingKind::StorageBuffer)])?;
+        let pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 4 })?;
+        let pipe = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &pl, shader: ShaderStage::new(&m, "main") })?;
+        let buf = |size: u64, memory| dev.create_buffer(&BufferDesc { size, usage: BufferUsage::STORAGE, memory });
+        // changes of 96 bytes: slot, list, 2 reserved, the sphere, the instance's 16 words
+        let mut rng = Rng(77);
+        let rows: Vec<[u32; 24]> = (0..n).map(|_| {
+            let mut r = [0u32; 24];
+            r[0] = rng.below(cap);
+            r[7] = 1.0f32.to_bits();
+            r
+        }).collect();
+        let changes = buf(n as u64 * 96, MemoryKind::Upload)?;
+        changes.write(0, &rows)?;
+        let (spheres, list_of, inst, hidden) = (buf(cap as u64 * 16, MemoryKind::Device)?, buf(cap as u64 * 4, MemoryKind::Device)?, buf(cap as u64 * 64, MemoryKind::Device)?,
+                                                buf(cap.div_ceil(32) as u64 * 4, MemoryKind::Device)?);
+        let e = |binding, buffer| BindEntry { binding, resource: Resource::Buffer { buffer, offset: 0, size: 0 } };
+        let group = dev.create_bind_group(&BindGroupDesc { layout: &bgl, entries: &[e(0, &changes), e(1, &spheres), e(2, &list_of), e(3, &inst), e(4, &hidden)] })?;
+        Ok(Side { pipe, group, n })
+    }
+
+    fn run(&self, dev: &Device, on_compute: bool) -> gpu::Result<SubmitId> {
+        let cq = dev.compute_queue().filter(|_| on_compute);
+        let mut e = match cq {
+            Some(q) => q.encoder()?,
+            None => dev.encoder()?,
+        };
+        // the run before wrote the same buffers
+        e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
+        e.set_compute_pipeline(&self.pipe);
+        e.set_bind_group(0, &self.group);
+        e.push_constants(0, &[self.n]);
+        e.dispatch(self.n.div_ceil(64), 1, 1);
+        let cmd = e.finish()?;
+        match cq {
+            Some(q) => q.submit([cmd]),
+            None => dev.queue().submit([cmd]),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usize, time: f32, extent: f32, w: u32, h: u32) -> Option<()> {
+fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usize, time: f32, extent: f32, w: u32, h: u32) -> Option<usize> {
     let cam = g1_camera(time, extent, w as f32 / h as f32);
     let want = sb::cull_ref(objs, &cam);
     let lists = s.lists();
@@ -300,7 +428,7 @@ fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usiz
     let missing = want.iter().filter(|&&i| !in_list[i as usize]).count();
     let extra = got as i64 - want.len() as i64;
     t.ok(missing == 0, &format!("--verify: the last frame's lists hold all {} of gputest's cull_ref (at the camera it had), {} more (spheres grown for f32's rounding), {missing} missing", want.len(), extra));
-    Some(())
+    Some(got)
 }
 
 // ---------------------------------------------------------------- textures and glTF (G5b)

@@ -17,6 +17,9 @@
 //   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
 //   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
 //          wait(id, timeout_ns), wait_idle(), memory_reserved()
+//   device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies
+//          (Vulkan: a family without graphics; None in the browser and without one): encoder(),
+//          submit, submit_after(&[id], ..); queue.submit_after(&[id], ..) waits for the other
 //   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
 //                                                   read(off, &mut [T]) (Upload / Readback)
 //   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -75,7 +78,8 @@
 // read_buffer, Timestamps::read_*).
 //
 // Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
-// jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+// jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
+// queue of its own for compute),
 // jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 // installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 #![no_std]
@@ -117,7 +121,7 @@ mod web_swap;
 #[cfg(not(target_arch = "wasm32"))]
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
 #[cfg(not(target_arch = "wasm32"))]
-pub use vk_dev::{Device, Queue};
+pub use vk_dev::{ComputeQueue, Device, Queue};
 #[cfg(not(target_arch = "wasm32"))]
 pub use vk_inst::{Adapter, Instance, low_power_rank, validation_messages};
 #[cfg(not(target_arch = "wasm32"))]
@@ -128,7 +132,7 @@ pub use vk_swap::{Frame, Surface, Swapchain, TryAcquire};
 #[cfg(target_arch = "wasm32")]
 pub use web_cmd::{CommandBuffer, CommandEncoder};
 #[cfg(target_arch = "wasm32")]
-pub use web_dev::{Adapter, Device, Instance, Queue, low_power_rank, validation_messages};
+pub use web_dev::{Adapter, ComputeQueue, Device, Instance, Queue, low_power_rank, validation_messages};
 #[cfg(target_arch = "wasm32")]
 pub use web_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
                   ShaderModule, Texture, TextureView, Timestamps};

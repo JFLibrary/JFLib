@@ -104,7 +104,7 @@ pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Sc
 }
 
 /// the depth buffer through a small compute shader (lib/gpu refuses copies of depth textures)
-fn read_depth(t: &mut T, dev: &Device, off: &Off) -> Option<Vec<f32>> {
+pub fn read_depth(t: &mut T, dev: &Device, off: &Off) -> Option<Vec<f32>> {
     const SRC: &str = "
         @group(0) @binding(0) var tex: texture_depth_2d;
         @group(0) @binding(1) var<storage, read_write> out: array<f32>;
@@ -514,7 +514,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     // nothing changed: only view and lights go up
     let _ = shot(t, dev, &mut off, &mut r, &mut s, "idle")?;
     let idle = s.upload_info();
-    t.ok(idle.bytes == 176 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
+    t.ok(idle.bytes == 208 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
     // moving a few: k changes, 96 bytes each
     let mut rng = Rng(5);
     for _ in 0..37 {
@@ -621,7 +621,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     }
     let got = shot(t, dev, &mut off, &mut r, &mut big, "200 moved")?;
     let info = big.upload_info();
-    t.ok(info.changed == 200 && !info.full && info.bytes == 176 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
+    t.ok(info.changed == 200 && !info.full && info.bytes == 208 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
     let mut f = rebuilt(t, &r, &blist, &cam, false)?;
     let want = shot(t, dev, &mut off, &mut r, &mut f, "200 moved")?;
     let (n, m) = diff(&got, &want);
@@ -1020,8 +1020,9 @@ fn errors(t: &mut T) {
 fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
-    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
-                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..])] {
+    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main"), ("CULL_EARLY", "early"), ("CULL_LATE", "late")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
+                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..]),
+                        (render3d::HIZ_WGSL, &[("HIZ_DEPTH", "from_depth"), ("HIZ_DOWN", "down")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -1039,7 +1040,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl (shader::BASIS, no robustness); do not edit\n");
+    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl, hiz.wgsl (shader::BASIS, no robustness); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -1066,8 +1067,10 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 7] = [("CULL", render3d::CULL_SPV), ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV),
-                                      ("VS_DEPTH", render3d::VS_DEPTH_SPV), ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV)];
+    let table: [(&str, &[u32]); 11] = [("CULL", render3d::CULL_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
+                                       ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV), ("VS_DEPTH", render3d::VS_DEPTH_SPV),
+                                       ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV), ("HIZ_DEPTH", render3d::HIZ_DEPTH_SPV),
+                                       ("HIZ_DOWN", render3d::HIZ_DOWN_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));
@@ -1239,10 +1242,11 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 16] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 18] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
-                                          ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env)];
+                                          ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
+                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

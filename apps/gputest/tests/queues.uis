@@ -1,0 +1,4 @@
+#!args --test queues
+# (G5d) the compute queue: rounds on one buffer alternating between the queues with waits through the timeline (=
+# the CPU), a storage texture written on the compute queue and read on the device queue, waits and ids of both, a
+# buffer dropped while in use, refused uses, the fallback without one (jfgui_GPU_COMPUTE=0)

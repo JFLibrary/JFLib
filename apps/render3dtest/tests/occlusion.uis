@@ -1,0 +1,4 @@
+#!args --test occlusion
+# (G5d) the camera's occlusion test against a depth pyramid in two phases: with it = without it over a flight (a jump,
+# instances coming and going, a new origin, a new size; at 0 and at 1e7, a third mirrored), against the ray caster, what
+# the rays see is drawn and less than the view holds; the pyramid against the depth buffer's minima; Voll and Basis
