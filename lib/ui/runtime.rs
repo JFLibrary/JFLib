@@ -47,12 +47,22 @@ use text::Text;
 
 const MAX_PASSES: u32 = 4;
 
-/// Launch the same owned app on a desktop event loop, browser worker or Android host.
-/// Host-driven applications remain alive after their entrypoint returns.
+/// Launch the same owned app on a desktop event loop, browser worker, Android or iOS host.
+/// Host-driven applications remain alive after their entrypoint returns.  iOS: a headless run
+/// (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the UIKit host's
+/// (plat apple_ios.rs, which takes the main thread when this returned 0).
 pub fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style) -> i32 {
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
     { let mut app = app; run(desc, &mut app, style) }
-    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+    #[cfg(target_os = "ios")]
+    {
+        let a = Args(plat::args());
+        if a.value("--shot").is_some() || a.value("--script").is_some() || a.flag("--agent-json") || a.flag("--agent-mcp") {
+            let mut app = app;
+            return run(desc, &mut app, style);
+        }
+    }
+    #[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
     {
         let (mut ui, w, h) = prepare(desc, style);
         plat::win_hit_hook(Some(super::win::uiw_hit_pw));
@@ -82,13 +92,13 @@ pub fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style
     }
 }
 
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
 struct HostRuntime {
     runtime: Runtime,
     sessions: BTreeMap<String, (u64, agent_core::RpcSession)>,
     session_clock: u64,
 }
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
 impl plat::web::WebApplication for HostRuntime {
     fn frame_delay(&self) -> u32 {
         let ui = &self.runtime.ui;
@@ -118,11 +128,11 @@ impl plat::web::WebApplication for HostRuntime {
         if !enabled { self.sessions.clear(); }
     }
     fn tick(&mut self, time_ms: u32) {
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_os = "ios"))]
         let running = !self.runtime.finished;
         self.runtime.step(time_ms, &[]);
-        // ui.quit: there nobody ends the activity but the app (the browser's page stays)
-        #[cfg(target_os = "android")]
+        // ui.quit: there nobody ends the activity / the process but the app (the browser's page stays)
+        #[cfg(any(target_os = "android", target_os = "ios"))]
         if running && self.runtime.finished {
             plat::app_finish();
         }

@@ -183,6 +183,8 @@ mod t_dirs;
 mod t_trash;
 // clipboard_platform: deterministic rich clipboard framing checks.
 mod t_cliprich;
+// the system's clipboard for real (test devices: the iOS simulator)
+mod t_clip;
 // drag and drop between programs: the shared part, Windows' OLE objects
 mod t_dnd;
 mod t_pen;
@@ -363,6 +365,7 @@ fn plattest() -> i32 {
         Some("touch") => t_touch::t_touch,
         Some("cursor") => t_cursor::t_cursor,    // plat-win
         Some("cliprich") => t_cliprich::t_cliprich,
+        Some("clip") => t_clip::t_clip,                // the system's clipboard, real (not in "all": test devices)
         Some("cliprich-owner") => t_cliprich::t_owner,
         Some("cliprich-reader") => t_cliprich::t_reader,
         Some("dnd") => t_dnd::t_dnd,                   // drag and drop: effects, hook, OLE objects

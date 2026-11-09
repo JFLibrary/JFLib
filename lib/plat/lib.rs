@@ -179,23 +179,26 @@ pub fn back_trap(on: bool) {
 }
 
 /// Android: the runtime ended (ui.quit): the activity goes and its process with it, a new start
-/// needs a new runtime.  Elsewhere nothing: there the main loop ends the program
+/// needs a new runtime; iOS: the process ends (UIKit's loop never returns).  Elsewhere nothing:
+/// there the main loop ends the program
 pub fn app_finish() {
     #[cfg(target_os = "android")]
     web::system_host::app_finish();
+    #[cfg(target_os = "ios")]
+    apple::ios::finish();
 }
 
-/// (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
+/// (ui touch.rs) the host's main pointer is a finger at the start (Android, iOS; a phone's browser:
 /// `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
 /// next pointer event decides again
 pub fn touch_primary() -> bool {
     #[cfg(target_arch = "wasm32")]
     return web::touch_primary();
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     return true;
     #[cfg(windows)]
     return win_touch_primary();
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android", windows)))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios", windows)))]
     false
 }
 
@@ -210,11 +213,11 @@ pub fn touch_keyboard(w: i32, show: bool) {
 }
 
 /// (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):
-/// Android asks after the finger lifted whether the keyboard has to follow
+/// Android and iOS ask after the finger lifted whether the keyboard has to follow
 pub fn touch_reached(reached: bool) {
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     web::system_host::touch_reached(reached);
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let _ = reached;
 }
 
@@ -321,15 +324,17 @@ mod apple;
 #[cfg(target_vendor = "apple")]
 pub use apple::*;
 
-/// Host-driven boundary shared by browser workers and the native Android adapter.
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+/// Host-driven boundary shared by browser workers, the native Android adapter and the iOS host
+/// (apple_ios.rs: only the host part there, docs/APPLE.md AP5).
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
+#[cfg_attr(target_os = "ios", allow(dead_code))] // (iOS: the host part only, the rest is the browser's)
 pub mod web;
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
 pub use web::*;
 
 mod clipdrop;
 // drag and drop between programs (the shared part; win_dnd.rs, linux_x11_dnd.rs, linux_wl_clip.rs)
-#[cfg_attr(target_os = "ios", allow(dead_code))] // no windows on iOS yet (docs/APPLE.md AP5)
+#[cfg_attr(target_os = "ios", allow(dead_code))] // no drags between programs on iOS yet
 mod dnd;
 pub use dnd::*;
 // clipboard_platform: reusable rich clipboard framing.
@@ -420,9 +425,9 @@ pub fn persistent_name(name: &str) -> String {
 }
 
 /// The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
-/// Android's picker and the browser's; web.rs): None while it is open, then once (1 chosen /
-/// 0 not, index, path).
-#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+/// Android's picker and the browser's, web.rs, and iOS's, apple_ios_services.rs): None while it
+/// is open, then once (1 chosen / 0 not, index, path).
+#[cfg(not(any(target_os = "android", target_arch = "wasm32", target_os = "ios")))]
 pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
     None
 }

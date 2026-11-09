@@ -126,6 +126,27 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
 - **Zwischenablage**: Text und HTML über den `ClipboardManager`; Bilder als PNG über den
   Provider `GalleryFiles` (im Manifest, Authority `org.jflib.gallery.jfgui.files`).
 
+## iOS (seit 09.11.2026)
+
+Dieselbe App läuft auf dem iPhone und im Simulator ([APPLE.md, AP5](../../docs/APPLE.md)). Den Host
+schreibt Rust selbst über die Objective-C-Laufzeit ([`lib/plat/apple_ios.rs`](../../lib/plat/apple_ios.rs)):
+eine Szene mit Fenster und View, das Bild als Inhalt ihres Layers, Finger, Apple Pencil, Bildschirm- und
+Hardware-Tastatur, sichere Bereiche, Drehen, Hintergrund. Der Rest ist der Host-Pfad von Android
+(`lib/plat/web*.rs`, `HostRuntime` in `lib/ui/runtime.rs`). Zwischenablage über `UIPasteboard`, Öffnen,
+Speichern unter und Ordner über `UIDocumentPickerViewController`, Rechtschreibung über `UITextChecker`,
+der sichere Speicher im Schlüsselbund. Die Sensoren-Seiten haben auf iOS noch keine Daten.
+
+Auf dem Mac, vom Repository-Verzeichnis:
+
+```bash
+python3.13 build_rs.py test androidGallery --target ios --sim
+python3.13 build_rs.py app androidGallery --target ios
+python3.13 tools/apple.py device build/ios/androidGallery.app
+```
+
+Der erste Befehl baut für den Simulator und führt `tests/*.uis` dort ohne Fenster aus; die beiden anderen bauen
+für das iPhone, signieren, installieren und starten die App (das iPhone entsperrt, siehe APPLE.md, AP0).
+
 ## Die GPU prüfen (seit 02.11.2026)
 
 ```powershell

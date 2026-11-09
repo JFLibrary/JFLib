@@ -1,5 +1,9 @@
-// Shared browser/Android host adapter. The host exchanges bounded buffers and queued events;
+// Shared browser/Android/iOS host adapter. The host exchanges bounded buffers and queued events;
 // app state stays in the same Rust UI/runtime used by native applications.
+// iOS (docs/APPLE.md AP5): the host is Rust too (apple_ios.rs: UIKit, which never returns from
+// UIApplicationMain); only the host part is used there -- the windows, the input, the requests,
+// the system host --, time, arguments, environment, threads, files, clipboard and the pickers are
+// the native ones of apple*.rs.
 // Android differs where its system offers more: real files on internal storage
 // (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 // the persisted grants (android_host.rs), the system's file picker behind file_dialog
@@ -11,7 +15,12 @@
 // after a reload.  Without the API: the library's own dialog over the virtual files, export
 // through download().
 
-use crate::{Capabilities, Date, Event};
+use crate::Event;
+#[cfg(not(target_os = "ios"))]
+use crate::{Capabilities, Date};
+// iOS: the wake-up is apple_thread.rs's (it reaches the host through apple_ios.rs)
+#[cfg(target_os = "ios")]
+use crate::wake;
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
     cell::UnsafeCell,
@@ -23,9 +32,10 @@ use rt::sync::SpinLock;
 #[cfg(target_os = "android")]
 #[path = "android_files.rs"]
 mod files;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[path = "web_files.rs"]
 mod files;
+#[cfg(not(target_os = "ios"))]
 pub use files::*;
 #[cfg(target_os = "android")]
 #[path = "android_host.rs"]
@@ -35,11 +45,13 @@ pub use android_host::{content_fs, content_grants, content_release, jfgui_reply,
 // a host import: the bytes the host already has (never written back)
 #[cfg(target_os = "android")]
 use files::write_file_raw as import_raw;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use files::store as import_raw;
 #[path = "web_windows.rs"]
 mod windows;
 pub use windows::*;
+// (iOS: the platform's accessibility, not a host's mirror)
+#[cfg(not(target_os = "ios"))]
 #[path = "web_a11y.rs"]
 pub(crate) mod a11y_host;
 // screen.rs: the host's monitors (jfgui_screens), the browser's EyeDropper (jfgui_color)
@@ -52,12 +64,15 @@ pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 #[path = "web_system.rs"]
 pub(crate) mod system_host;
 pub use system_host::{jfgui_note, jfgui_system};
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "ios"))]
 pub use system_host::jfgui_touch_reached;
 pub(crate) use system_host::sys_settings_host;
 // sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
+// (iOS: Core Motion and Core Location come with a later step, docs/APPLE.md)
+#[cfg(not(target_os = "ios"))]
 #[path = "web_sensors.rs"]
 pub(crate) mod sensors_host;
+#[cfg(not(target_os = "ios"))]
 pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 #[cfg(target_os = "android")]
 #[path = "android_gpu.rs"]
@@ -84,16 +99,17 @@ pub use threads::{Sem, Thread, spawn as thread_spawn};
 #[cfg_attr(target_arch = "wasm32", link(wasm_import_module = "jfgui"))]
 unsafe extern "C" {
     #[cfg_attr(target_arch = "wasm32", link_name = "time_us")]
-    #[cfg_attr(target_os = "android", link_name = "jfgui_host_time_us")]
+    #[cfg_attr(any(target_os = "android", target_os = "ios"), link_name = "jfgui_host_time_us")]
     fn host_time_us() -> f64;
     #[cfg_attr(target_arch = "wasm32", link_name = "present")]
-    #[cfg_attr(target_os = "android", link_name = "jfgui_host_present")]
+    #[cfg_attr(any(target_os = "android", target_os = "ios"), link_name = "jfgui_host_present")]
     fn host_present(ptr: *const u8, len: usize, width: i32, height: i32, stride: i32, rects: *const [i32; 4], count: usize,
                     order: u32);
     #[cfg_attr(target_arch = "wasm32", link_name = "request")]
-    #[cfg_attr(target_os = "android", link_name = "jfgui_host_request")]
+    #[cfg_attr(any(target_os = "android", target_os = "ios"), link_name = "jfgui_host_request")]
     fn host_request(kind: u32, id: u32, ptr: *const u8, len: usize);
 }
+#[cfg(not(target_os = "ios"))]
 unsafe extern "Rust" {
     fn jfgui_main() -> i32;
 }
@@ -182,11 +198,15 @@ static REQUESTS: SpinLock<Vec<Request>> = SpinLock::new(Vec::new());
 static NEXT_REQUEST: AtomicU32 = AtomicU32::new(1);
 static CAP_EXTRA: AtomicU32 = AtomicU32::new(0);
 static HANDLES: AtomicBool = AtomicBool::new(false);
+#[cfg(not(target_os = "ios"))]
 static ARGS: SpinLock<Vec<String>> = SpinLock::new(Vec::new());
+#[cfg(not(target_os = "ios"))]
 static ENV: SpinLock<Vec<(String, String)>> = SpinLock::new(Vec::new());
 static INBOX: SpinLock<Vec<u8>> = SpinLock::new(Vec::new());
 static OUTBOX: SpinLock<Vec<u8>> = SpinLock::new(Vec::new());
+#[cfg(not(target_os = "ios"))]
 static CLIP: SpinLock<Vec<(u32, Vec<u8>)>> = SpinLock::new(Vec::new());
+#[cfg(not(target_os = "ios"))]
 static CALENDAR: SpinLock<Date> = SpinLock::new(Date {
     year: 1970,
     month: 1,
@@ -304,6 +324,7 @@ pub(crate) fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> O
     }
     Some(id)
 }
+#[cfg(not(target_os = "ios"))]
 fn file_request(kind: u32, path: &str) -> Option<u32> {
     let (path, revision, data) = files::snapshot(path)?;
     let mut bytes = Vec::new();
@@ -317,7 +338,7 @@ fn file_request(kind: u32, path: &str) -> Option<u32> {
 /// own (/handles/.., chosen in the system's picker) is written back to that file instead
 /// (Durable once the browser closed the write); its change already started that request, which
 /// is returned while it is pending or done.
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 pub fn persist(path: &str) -> Option<u32> {
     if let Some(file) = files::revision(path).filter(|(p, _)| files::bound(p)) {
         let requests = REQUESTS.lock();
@@ -329,7 +350,7 @@ pub fn persist(path: &str) -> Option<u32> {
     file_request(REQUEST_PERSIST, path)
 }
 /// (web_files.rs) a file of the user's own changed: written back (once per revision)
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 pub(super) fn write_back(path: &str) {
     let _ = persist(path);
 }
@@ -338,7 +359,7 @@ pub(super) fn write_back(path: &str) {
 /// the user's click or key), imports the file's current bytes and completes (Completed; Denied,
 /// Failed when the file is gone, Unsupported without such a file).  None: refused by the
 /// permissions or no request slot.
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 pub fn reopen(path: &str) -> Option<u32> {
     let p = files::normal(path)?;
     if !files::bound(&p) || !crate::policy::fs_allowed(&p, crate::policy::FS_READ) {
@@ -363,11 +384,13 @@ pub fn persist(path: &str) -> Option<u32> {
 }
 /// Request a browser download; success means export, not durable origin storage.  Android:
 /// "save a copy" through the system's picker (the user chooses where).
+#[cfg(not(target_os = "ios"))]
 pub fn download(path: &str) -> Option<u32> {
     file_request(REQUEST_DOWNLOAD, path)
 }
 /// Request file selection. The host imports selected files before completing the request.
 /// Android: the chosen document arrives as its content:// name in a drop (E_DROP).
+#[cfg(not(target_os = "ios"))]
 pub fn pick_file(extensions: &str) -> Option<u32> {
     request(REQUEST_OPEN, extensions.as_bytes(), None)
 }
@@ -394,6 +417,7 @@ pub fn forget_request(id: u32) -> bool {
 }
 
 /// Services supplied by this browser session, including dynamically granted host services.
+#[cfg(not(target_os = "ios"))]
 pub fn capabilities() -> Capabilities {
     Capabilities {
         available: (crate::CAP_FILE_READ
@@ -413,17 +437,21 @@ pub fn capabilities() -> Capabilities {
     }
 }
 /// App start arguments copied from the host, with a synthetic executable name first.
+#[cfg(not(target_os = "ios"))]
 pub fn args() -> Vec<String> {
     ARGS.lock().clone()
 }
 /// Monotonic microseconds from the host's performance clock.
+#[cfg(not(target_os = "ios"))]
 pub fn time_us() -> u64 {
     // SAFETY: scalar return without memory access.
     unsafe { host_time_us().max(0.0) as u64 }
 }
 /// No blocking sleep occurs in the browser; callers must return to their step loop.
+#[cfg(not(target_os = "ios"))]
 pub fn sleep_ms(_ms: u32) {}
 /// Read a per-instance virtual environment setting.
+#[cfg(not(target_os = "ios"))]
 pub fn env(name: &str) -> Option<String> {
     ENV.lock()
         .iter()
@@ -431,10 +459,12 @@ pub fn env(name: &str) -> Option<String> {
         .map(|(_, v)| v.clone())
 }
 /// Alias for the shared environment API.
+#[cfg(not(target_os = "ios"))]
 pub fn getenv(name: &str) -> Option<String> {
     env(name)
 }
 /// Set a per-instance environment value without changing the browser or OS environment.
+#[cfg(not(target_os = "ios"))]
 pub fn setenv(name: &str, value: Option<&str>) -> bool {
     if name.is_empty() || name.contains('\0') || value.is_some_and(|v| v.contains('\0')) {
         return false;
@@ -447,10 +477,12 @@ pub fn setenv(name: &str, value: Option<&str>) -> bool {
     true
 }
 /// Host-supplied UTC calendar, updated independently from the monotonic clock.
+#[cfg(not(target_os = "ios"))]
 pub fn date() -> (Date, bool) {
     (*CALENDAR.lock(), true)
 }
 /// Wall-clock time from the host calendar: nanoseconds since 1970-01-01 00:00 UTC.
+#[cfg(not(target_os = "ios"))]
 pub fn unix_time_ns() -> i64 {
     let d = *CALENDAR.lock();
     let (y, m) = (d.year as i64, d.month as i64);
@@ -464,6 +496,7 @@ pub fn unix_time_ns() -> i64 {
 }
 /// Theme requested by the host: 0 light, 1 dark, or -1 unspecified (jfgui_THEME, else the
 /// system's scheme the host reported: prefers-color-scheme, Android's night mode).
+#[cfg(not(target_os = "ios"))]
 pub fn theme() -> i32 {
     match env("jfgui_THEME").as_deref() {
         Some("dark") => 1,
@@ -472,6 +505,7 @@ pub fn theme() -> i32 {
     }
 }
 /// Available compute workers in a shared-memory bundle, otherwise one app worker.
+#[cfg(not(target_os = "ios"))]
 pub fn cpu_count() -> u32 {
     #[cfg(web_threads)]
     { threads::cpu_count() }
@@ -479,6 +513,7 @@ pub fn cpu_count() -> u32 {
     { 1 }
 }
 /// Current WASM linear-memory allocation; zero when the embedded host does not report RAM.
+#[cfg(not(target_os = "ios"))]
 pub fn mem_total() -> u64 {
     #[cfg(target_arch = "wasm32")]
     { core::arch::wasm32::memory_size::<0>() as u64 * 65536 }
@@ -486,15 +521,16 @@ pub fn mem_total() -> u64 {
     { 0 }
 }
 /// Cooperative yield is achieved by returning from the current runtime step.
+#[cfg(not(target_os = "ios"))]
 pub fn thread_yield() {}
 /// Browser thread handle placeholder; spawning native threads is unsupported (Android: the GPU
 /// output's jobs have threads of their own, android_gpu.rs).
-#[cfg(not(web_threads))]
+#[cfg(all(not(web_threads), not(target_os = "ios")))]
 pub struct Thread {
     #[cfg(target_os = "android")]
     handle: usize,
 }
-#[cfg(not(web_threads))]
+#[cfg(all(not(web_threads), not(target_os = "ios")))]
 impl Thread {
     /// Wait for it (no thread was started in the browser).
     pub fn join(self) {
@@ -503,14 +539,14 @@ impl Thread {
     }
 }
 /// Reject native thread creation. Use Job for cooperative background work.
-#[cfg(not(web_threads))]
+#[cfg(all(not(web_threads), not(target_os = "ios")))]
 pub fn thread_spawn(_stack: usize, _f: Box<dyn FnOnce() + Send>) -> Option<Thread> {
     None
 }
 /// Nonblocking counting semaphore used only by portable try-wait paths.
-#[cfg(not(web_threads))]
+#[cfg(all(not(web_threads), not(target_os = "ios")))]
 pub struct Sem(AtomicU32);
-#[cfg(not(web_threads))]
+#[cfg(all(not(web_threads), not(target_os = "ios")))]
 impl Sem {
     /// Create a logical semaphore inside this worker.
     pub fn new(initial: u32) -> Option<Self> {
@@ -528,8 +564,25 @@ impl Sem {
     }
 }
 /// Coalesce job/repaint notifications without occupying the bounded input ring.
+#[cfg(not(target_os = "ios"))]
 pub fn wake() {
     WAKE_PENDING.store(true, Ordering::Release);
+}
+/// (iOS: apple_ios.rs, from apple_thread.rs wake) a wake-up for the next tick (E_WAKE)
+#[cfg(target_os = "ios")]
+pub(crate) fn host_wake() {
+    WAKE_PENDING.store(true, Ordering::Release);
+}
+/// (iOS: apple_ios.rs, before the app's jfgui_main) the canvas the windows live in
+#[cfg(target_os = "ios")]
+pub(crate) fn host_viewport(width: i32, height: i32, dpi: i32) {
+    windows::viewport(width, height, dpi);
+}
+/// (iOS) whether jfgui_main installed a runtime: the host then takes over the main thread
+#[cfg(target_os = "ios")]
+pub(crate) fn installed() -> bool {
+    // SAFETY: the main thread only; no borrow survives.
+    unsafe { (*APP.0.get()).is_some() }
 }
 fn drain_wake() {
     if WAKE_PENDING.swap(false, Ordering::AcqRel)
@@ -539,10 +592,12 @@ fn drain_wake() {
     }
 }
 /// Poll available events; the host schedules future ticks.
+#[cfg(not(target_os = "ios"))]
 pub fn wait(_deadline_us: u64) -> u32 {
     crate::evq_count()
 }
 /// Dispatch already queued events without blocking the browser worker.
+#[cfg(not(target_os = "ios"))]
 pub fn wait_events(_deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32 {
     let mut count = 0;
     while let Some(event) = crate::evq_pop() {
@@ -552,6 +607,7 @@ pub fn wait_events(_deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32 {
     count
 }
 /// Browser MessagePort replaces process stdin.
+#[cfg(not(target_os = "ios"))]
 pub fn read_stdin(_bytes: &mut [u8]) -> Result<usize, u32> {
     Err(38)
 }
@@ -562,7 +618,7 @@ pub fn read_stdin(_bytes: &mut [u8]) -> Result<usize, u32> {
 /// /handles/ID/NAME bound to the chosen file (opened: imported already), whose changes are
 /// written back.  One picker at a time ((0, 0) while one is open).  FD_FOLDER and browsers
 /// without the API: (-1, 0), the library's own dialog over the virtual files.
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32) {
     if !HANDLES.load(Ordering::Relaxed) || flags & crate::FD_FOLDER != 0 {
         return (-1, 0);
@@ -599,6 +655,7 @@ pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, 
 // the request of file_dialog: u32 flags, the suggested name, where the picker starts, u32
 // count, the extensions (the selected entry's first) -> FD_PENDING, or (0, 0) while a picker is
 // open, (-1, 0) without one
+#[cfg(not(target_os = "ios"))]
 fn dialog_request(flags: u32, name: &str, start: &str, extensions: &[&str]) -> (i32, u32) {
     let mut slot = DIALOG.lock();
     if let Some(id) = *slot {
@@ -641,6 +698,7 @@ fn dialog_request(flags: u32, name: &str, start: &str, extensions: &[&str]) -> (
 /// The answer of the picker file_dialog opened: None while it is open (or there is none),
 /// then once (1, 0, the content:// name / the /handles/ path) or (0, 0, "") for cancelled /
 /// failed.
+#[cfg(not(target_os = "ios"))]
 pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
     let mut slot = DIALOG.lock();
     let id = (*slot)?;
@@ -659,14 +717,17 @@ pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
 // the request of the open picker
 static DIALOG: SpinLock<Option<u32>> = SpinLock::new(None);
 /// Native printing is disabled until a browser print adapter has been connected.
+#[cfg(not(target_os = "ios"))]
 pub fn print(_job: &mut crate::PrintJob<'_>) -> i32 {
     crate::ERR_UNSUPPORTED
 }
 /// Operating-system folder launch is unavailable.
+#[cfg(not(target_os = "ios"))]
 pub fn open_folder(_path: &str) -> i32 {
     -1
 }
 /// Request an explicitly selected web URL; the host still enforces user-gesture restrictions.
+#[cfg(not(target_os = "ios"))]
 pub fn open_url(url: &str) -> i32 {
     if !["https://", "http://", "mailto:"]
         .iter()
@@ -682,14 +743,17 @@ pub fn open_url(url: &str) -> i32 {
     }
 }
 /// Process spawning is unavailable in the browser.
+#[cfg(not(target_os = "ios"))]
 pub fn spawn_self(_args: &[&str]) -> i32 {
     -1
 }
 /// Process spawning is unavailable in the browser.
+#[cfg(not(target_os = "ios"))]
 pub fn restart_self(_args: &[&str]) -> i32 {
     -1
 }
 /// Number of pen devices is not exposed by browser pointer events.
+#[cfg(not(target_os = "ios"))]
 pub fn pen_devices() -> i32 {
     -1
 }
@@ -705,6 +769,7 @@ pub fn ime_pos(x: i32, y: i32, height: i32) {
 /// Set the local multi-format clipboard; browser system text writes are asynchronous requests.
 /// Android: text and HTML (an image: its PNG) go to the system's clipboard at once; the richer
 /// forms stay in the app and count while the system's clip is still this one.
+#[cfg(not(target_os = "ios"))]
 pub fn clip_set_many(entries: &[(u32, &[u8])]) -> bool {
     if !crate::clip_many_valid(entries) {
         return false;
@@ -715,7 +780,7 @@ pub fn clip_set_many(entries: &[(u32, &[u8])]) -> bool {
         .collect();
     clip_publish(entries)
 }
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 fn clip_publish(entries: &[(u32, &[u8])]) -> bool {
     if capabilities().supports(crate::CAP_CLIPBOARD_TEXT) {
         if let Some((_, bytes)) = entries
@@ -734,6 +799,7 @@ fn clip_publish(entries: &[(u32, &[u8])]) -> bool {
 }
 /// Set one instance-local clipboard representation.  Android: CLIP_IMAGE (the record of
 /// ui::clip_set_image) and CLIP_PNG go to the system's clipboard as a PNG.
+#[cfg(not(target_os = "ios"))]
 pub fn clip_set(format: u32, bytes: &[u8]) -> bool {
     #[cfg(target_os = "android")]
     if matches!(format, crate::CLIP_IMAGE | crate::CLIP_PNG) {
@@ -747,6 +813,7 @@ pub fn clip_set(format: u32, bytes: &[u8]) -> bool {
 /// Read an available clipboard representation; the host refreshes text before paste input.
 /// Android: text, HTML and images from the system's clipboard; the app's own richer forms
 /// while the system's clip is the one it set.
+#[cfg(not(target_os = "ios"))]
 pub fn clip_get(format: u32) -> Option<Vec<u8>> {
     #[cfg(target_os = "android")]
     {
@@ -777,6 +844,7 @@ pub fn clip_get(format: u32) -> Option<Vec<u8>> {
 }
 /// Whether an instance-local clipboard representation is present (Android: on the system's
 /// clipboard, or the app's own form of its clip).
+#[cfg(not(target_os = "ios"))]
 pub fn clip_has(format: u32) -> bool {
     #[cfg(target_os = "android")]
     {
@@ -804,6 +872,7 @@ fn image_png(record: &[u8]) -> Option<&[u8]> {
 }
 
 /// (dnd.rs) the browser and Android hosts do not drag out of the app (yet)
+#[cfg(not(target_os = "ios"))]
 pub(crate) fn os_drag_start(_data: crate::DragData) -> bool {
     false
 }
@@ -832,6 +901,7 @@ pub extern "C" fn jfgui_buffer(len: u32) -> usize {
     input.as_mut_ptr() as usize
 }
 /// Start once. Inbox contains newline-separated arguments, excluding the synthetic program name.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) -> i32 {
     if STARTED.swap(true, Ordering::Relaxed) {
@@ -891,7 +961,7 @@ pub extern "C" fn jfgui_gpu_test(op: u32) -> u32 {
 /// Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_tick(time_ms: u32) {
-    #[cfg(not(web_threads))]
+    #[cfg(all(not(web_threads), not(target_os = "ios")))]
     crate::pump_jobs(16);
     drain_wake();
     let _ = with_app(|app| app.tick(time_ms));
@@ -951,6 +1021,7 @@ pub extern "C" fn jfgui_event(
 }
 /// Set a per-instance environment value from the host before jfgui_start; inbox: UTF-8
 /// "NAME=value" (the host's languages arrive as LANGUAGE=de-DE:en-US).  1 = set.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_env(len: u32) -> u32 {
     let Some(bytes) = input(len) else {
@@ -1028,6 +1099,7 @@ pub extern "C" fn jfgui_capabilities(bits: u32) {
     web_screen::set_eyedropper(bits & web_screen::HOST_EYEDROPPER != 0);
 }
 /// Refresh UTC calendar fields, validated before replacing the last host value.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_date(
     year: u32,
@@ -1063,6 +1135,7 @@ pub extern "C" fn jfgui_date(
     1
 }
 /// Import path + file bytes from the inbox. Selected files can be announced through E_DROP.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_import(path_len: u32, total_len: u32, dropped: u32, durable: u32) -> u32 {
     let Some(bytes) = input(total_len) else {
@@ -1092,6 +1165,7 @@ pub extern "C" fn jfgui_import(path_len: u32, total_len: u32, dropped: u32, dura
     1
 }
 /// Update a browser clipboard representation before delivering the corresponding paste key.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_clipboard(format: u32, len: u32) -> u32 {
     let Some(bytes) = input(len) else {
@@ -1134,6 +1208,7 @@ pub extern "C" fn jfgui_clipboard(format: u32, len: u32) -> u32 {
 /// the /handles/ path bound to the chosen file (browser; an opened file was imported first)
 /// (status 2), a negative status as in jfgui_complete (-4 cancelled).  A file_dialog request
 /// keeps the name for file_dialog_poll; pick_file's becomes a drop (E_DROP).  1 = taken.
+#[cfg(not(target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_file_result(id: u32, status: i32, len: u32) -> u32 {
     let ours = |u: &String| if cfg!(target_os = "android") { u.starts_with("content://") } else { u.starts_with("/handles/") };
@@ -1183,6 +1258,7 @@ pub extern "C" fn jfgui_complete(id: u32, status: i32) -> u32 {
         -4 => RequestStatus::Cancelled,
         _ => RequestStatus::Failed,
     };
+    #[cfg(not(target_os = "ios"))]
     if request.status == RequestStatus::Durable {
         if let Some((path, revision)) = &request.file {
             files::persisted(path, *revision);

@@ -161,9 +161,9 @@ pub fn win_create(
         title: String::from(title),
         shown: false,
         enabled: true,
-        // Android's main surface fills its Activity; desktop caption controls and resize
+        // Android's main surface fills its Activity (iOS's: its scene); desktop caption controls and resize
         // grips belong only to floating library windows, not to the phone viewport.
-        state: if id == 0 && cfg!(target_os = "android") { WST_MAXIMIZED } else { WST_CSD },
+        state: if id == 0 && cfg!(any(target_os = "android", target_os = "ios")) { WST_MAXIMIZED } else { WST_CSD },
         pixels: Vec::new(),
         width: 0,
         height: 0,

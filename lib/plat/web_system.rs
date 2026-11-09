@@ -34,7 +34,7 @@
 //   dark() -> Option<bool>       (web.rs theme())
 //   notify_state() / wakelock()  (web_notify.rs, web_power.rs)
 //   back_trap(on)                (Android) the back key is Esc for the app while on (lib.rs)
-//   jfgui_touch_reached() -> 0|1  (Android) the last finger's gesture reached a widget (a tap, a
+//   jfgui_touch_reached() -> 0|1  (Android, iOS) the last finger's gesture reached a widget (a tap, a
 //                                drag), not only a scroll: the keyboard may follow it
 //
 // The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
@@ -213,17 +213,17 @@ pub(crate) fn app_finish() {
     let _ = crate::web::android_host::call(CALL_FINISH, &[]);
 }
 
-// (Android) the finger's gesture reached a widget: plat::touch_reached, jfgui_touch_reached
-#[cfg(target_os = "android")]
+// (Android, iOS) the finger's gesture reached a widget: plat::touch_reached, jfgui_touch_reached
+#[cfg(any(target_os = "android", target_os = "ios"))]
 static TOUCH_REACHED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "ios"))]
 pub(crate) fn touch_reached(reached: bool) {
     TOUCH_REACHED.store(reached, Ordering::Relaxed);
 }
 
-/// (Android) the last finger's gesture reached a widget -> 1
-#[cfg(target_os = "android")]
+/// (Android, iOS) the last finger's gesture reached a widget -> 1
+#[cfg(any(target_os = "android", target_os = "ios"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_touch_reached() -> u32 {
     TOUCH_REACHED.load(Ordering::Relaxed) as u32
