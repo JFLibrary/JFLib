@@ -142,7 +142,7 @@ mod imp {
     fn threads(t: &mut T) {
         let (fs, me, errno) = plat::glibc_thread_ids();
         out(&format!("  main thread: FS base {fs:x}, errno at {errno:x}"));
-        t.ok(fs != 0 && fs == me, "main thread: FS base = pthread_self");
+        t.ok(fs != 0 && (fs == me || cfg!(target_arch = "aarch64") && me < fs && fs - me < 8192), "main thread: FS base = pthread_self");
         t.ok(errno != 0, "main thread: errno has an address");
         // every thread its own control block and TLS
         const N: usize = 8;
@@ -178,7 +178,7 @@ mod imp {
             th.join();
         }
         let got: Vec<[usize; 3]> = ids.iter().map(|x| [x[0].load(SeqCst), x[1].load(SeqCst), x[2].load(SeqCst)]).collect();
-        t.ok(got.iter().all(|x| x[0] != 0 && x[0] == x[1] && x[2] != 0), "threads: FS base = pthread_self on each");
+        t.ok(got.iter().all(|x| x[0] != 0 && (x[0] == x[1] || cfg!(target_arch = "aarch64") && x[1] < x[0] && x[0] - x[1] < 8192) && x[2] != 0), "threads: FS base = pthread_self on each");
         let distinct = |i: usize, extra: usize| {
             let mut v: Vec<usize> = got.iter().map(|x| x[i]).collect();
             v.push(extra);

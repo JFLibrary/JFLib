@@ -129,8 +129,23 @@ extern "C" fn review_main() -> i32 {
 #[unsafe(no_mangle)]
 extern "C" fn mainCRTStartup() -> ! { rt::os::exit(review_main()) }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 core::arch::global_asm!(
     ".globl _start", "_start:", "and rsp, -16", "call {main}",
     "mov edi, eax", "mov eax, 231", "syscall", "ud2", main = sym review_main,
+);
+
+// Linux on ARM64 (docs/ARM64.md): rt's process start first (the auxiliary vector, .init_array for the
+// outline atomics), as plat's _start does
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+extern "C" fn review_start(sp: *const usize) -> ! {
+    // SAFETY: the kernel's initial stack, first thing on the only thread.
+    unsafe { rt::os::process_start(sp) };
+    rt::os::exit(review_main())
+}
+
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+core::arch::global_asm!(
+    ".globl _start", "_start:", "mov x29, xzr", "mov x30, xzr", "mov x0, sp", "bl {start}", "brk #1",
+    start = sym review_start,
 );

@@ -24232,7 +24232,7 @@ VALUE_OPTS: &[&str] = &[ "--size", "--scale", "--auto-close", "--anim", "--them 
   Deliberate trap through the compatibility caller API.
 
 - **`extern "C" fn crash_test() -> !`**
-  a deliberate crash for tests on Apple's arm64: x0 = 16, then a 4-byte write to address 0x10 -- the
+  a deliberate crash for tests on ARM64 (Apple, Linux): x0 = 16, then a 4-byte write to address 0x10 -- the
   faulting instruction is at crash_test + 4
 
 - **`extern "C" fn crash_test_caller() -> !`**
@@ -24992,6 +24992,14 @@ applies `--simd sse2` before the app starts.
 - **`fn stack_aligned() -> bool`**
   WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
 
+- **`fn stack_aligned() -> bool`**
+  the stack pointer is 16-byte aligned (ARM64 faults on a memory access through a misaligned sp: a
+  thread started with one would show here first)  [plattest th_raw]
+
+- **`fn cpu_brand() -> String`**
+  the processor's name from MIDR_EL1 ("ARM Cortex-A720"; "Qualcomm CPU 0x001" for parts not listed),
+  "ARM64" when the kernel does not let user space read it
+
 ### `plat/capabilities.rs`
 
 Source: [`lib/plat/capabilities.rs`](../lib/plat/capabilities.rs)
@@ -25496,6 +25504,10 @@ creation).  The browser and Android have no such API; apply() does nothing there
 
 - **`fn status() -> Status`**
   the browser and Android install nothing
+
+- **`fn denied_syscalls() -> &'static [usize]`** *(Linux)*
+  (Linux) the system calls the seccomp filter answers with EPERM; execve and execveat come on top when
+  the manifest allows no program (sandboxtest calls every one of them)
 
 ### `plat/boot.rs`
 
@@ -30786,10 +30798,10 @@ linux_elfload -- plugin libraries on Linux: a small ELF loader without libc
                                         DT_GNU_HASH chains)
   (crate) lib_unload(h)                 munmap (lib_close / drop)
 
-Accepted: ELFCLASS64, little endian, ET_DYN, EM_X86_64, program headers of 56 bytes
+Accepted: ELFCLASS64, little endian, ET_DYN, EM_X86_64 (ARM64: EM_AARCH64), program headers of 56 bytes
 (1..64), at most LH_SEGMAX PT_LOAD segments in ascending, page-disjoint order, never
 writable AND executable, one PT_DYNAMIC; relocations R_X86_64_NONE / RELATIVE and
-R_X86_64_64 / GLOB_DAT / JUMP_SLOT against symbols the object defines itself (RELA only).
+R_X86_64_64 / GLOB_DAT / JUMP_SLOT against symbols the object defines itself (RELA only; ARM64 at the end).
 Rejected: DT_NEEDED or undefined symbols (LIBE_DEPS), PT_INTERP / PT_TLS / DT_INIT /
 DT_INIT_ARRAY / DT_PREINIT_ARRAY (LIBE_INIT: nothing of the object runs while loading),
 DT_REL and other relocation types (LIBE_RELOC), everything malformed (LIBE_FORMAT).
@@ -30875,6 +30887,9 @@ a driver's getenv reads the start environment.
 - **`fn glibc_thread_ids() -> (usize, usize, usize)`**
   the calling thread's FS base, pthread_self() and the address of errno: its thread control block
   and thread-local storage (a raw clone would have 0 and the creator's)
+
+- **`fn glibc_thread_ids() -> (usize, usize, usize)`**
+  the calling thread's thread pointer (TPIDR_EL0: its TCB), pthread_self() and the address of errno
 
 ### `plat/linux_gpuout.rs` (Linux)
 

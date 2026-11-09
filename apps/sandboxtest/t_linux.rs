@@ -72,6 +72,7 @@ pub fn checks(t: &mut T, _dir: &str, st: &Status) {
         } else {
             t.skip("sandboxtest: the manifest allows programs, execve not denied");
         }
+        deny_list(t, st);
     } else {
         t.skip("sandboxtest: seccomp not installed");
     }
@@ -179,4 +180,72 @@ pub fn gpu_checks(t: &mut T) {
     };
     let r = run();
     t.check(matches!(r, Ok(0x1234_5678)), &alloc::format!("sandboxtest: {name} works under the sandbox: {r:x?}"));
+}
+
+// --------------------------------------------------------------- every denied call
+//
+// Each system call of the filter's deny list (plat::sandbox::denied_syscalls, the numbers of this
+// processor from rt's kernel table; execve / execveat when no program is allowed) is called once with
+// arguments that do no harm and that, without the filter, get another answer than EPERM wherever the
+// kernel allows that: a bad pointer (EFAULT), a bad descriptor (EBADF), unknown flags (EINVAL), or a
+// call that would succeed and change nothing (0).  With the filter every one must give EPERM.  Some
+// check the capability first and give EPERM without the filter too (kexec, modules, pivot_root; bpf
+// and open_by_handle_at on older kernels): for them EPERM shows that the call fails, not who refused
+// it.  A deny-list entry without a probe here is a failure.
+
+const PEEKDATA: usize = 2;
+const NO_FD: usize = usize::MAX;
+
+/// (name, number, arguments, the answer without the filter)
+fn probes() -> Vec<(&'static str, usize, [usize; 5], &'static str)> {
+    use rt::os::*;
+    // SAFETY: getpid has no arguments.
+    let pid = unsafe { syscall3(SYS_GETPID, 0, 0, 0) } as usize;
+    alloc::vec![
+        ("ptrace", SYS_PTRACE, [PEEKDATA, 0, 0, 0, 0], "ESRCH: pid 0"),
+        ("process_vm_readv", SYS_PROCESS_VM_READV, [pid, 0, 0, 0, 0], "0: nothing to read"),
+        ("process_vm_writev", SYS_PROCESS_VM_WRITEV, [pid, 0, 0, 0, 0], "0: nothing to write"),
+        ("kexec_load", SYS_KEXEC_LOAD, [0; 5], "EPERM too: CAP_SYS_BOOT"),
+        ("kexec_file_load", SYS_KEXEC_FILE_LOAD, [NO_FD, NO_FD, 0, 0, 0], "EPERM too: CAP_SYS_BOOT"),
+        ("init_module", SYS_INIT_MODULE, [0; 5], "EPERM too: CAP_SYS_MODULE"),
+        ("finit_module", SYS_FINIT_MODULE, [NO_FD, 0, 0, 0, 0], "EPERM too: CAP_SYS_MODULE"),
+        ("delete_module", SYS_DELETE_MODULE, [0; 5], "EPERM too: CAP_SYS_MODULE"),
+        ("mount", SYS_MOUNT, [0; 5], "EFAULT: no target"),
+        ("umount2", SYS_UMOUNT2, [0, 0x8000_0000, 0, 0, 0], "EINVAL: unknown flag"),
+        ("pivot_root", SYS_PIVOT_ROOT, [0; 5], "EPERM too: CAP_SYS_ADMIN"),
+        ("chroot", SYS_CHROOT, [0; 5], "EFAULT: no path"),
+        ("bpf", SYS_BPF, [0x7FFF_FFFF, 0, 0, 0, 0], "EINVAL: unknown command (EPERM before Linux 5.19 without CAP_BPF)"),
+        ("perf_event_open", SYS_PERF_EVENT_OPEN, [0, 0, NO_FD, NO_FD, 0x8000_0000], "EINVAL: unknown flag"),
+        ("userfaultfd", SYS_USERFAULTFD, [0xFFFF_FFFF, 0, 0, 0, 0], "EINVAL: unknown flags"),
+        ("keyctl", SYS_KEYCTL, [0x7FFF_FFFF, 0, 0, 0, 0], "EOPNOTSUPP: unknown operation"),
+        ("add_key", SYS_ADD_KEY, [0; 5], "EFAULT: no type"),
+        ("request_key", SYS_REQUEST_KEY, [0; 5], "EFAULT: no type"),
+        ("open_by_handle_at", SYS_OPEN_BY_HANDLE_AT, [NO_FD, 0, 0, 0, 0], "EBADF / EFAULT (EPERM before Linux 6.9)"),
+        ("setns", SYS_SETNS, [NO_FD, 0, 0, 0, 0], "EBADF"),
+        ("unshare", SYS_UNSHARE, [0; 5], "0: nothing to unshare"),
+        ("execve", SYS_EXECVE, [0; 5], "EFAULT: no program"),
+        ("execveat", SYS_EXECVEAT, [NO_FD, 0, 0, 0, 0], "EFAULT / EBADF: no program"),
+    ]
+}
+
+fn deny_list(t: &mut T, st: &Status) {
+    let probes = probes();
+    let mut list: Vec<usize> = plat::sandbox::denied_syscalls().to_vec();
+    if st.exec_denied {
+        list.extend([rt::os::SYS_EXECVE, rt::os::SYS_EXECVEAT]);
+    }
+    let mut refused = 0;
+    for &nr in &list {
+        let Some(&(name, _, a, without)) = probes.iter().find(|p| p.1 == nr) else {
+            t.check(false, &alloc::format!("sandboxtest: a probe for denied system call {nr}"));
+            continue;
+        };
+        // SAFETY: arguments that do no harm without the filter (see above): null pointers, no
+        // descriptor, unknown flags, or nothing to do.
+        let r = unsafe { syscall6(nr, a[0], a[1], a[2], a[3], a[4], 0) };
+        refused += (r == EPERM) as usize;
+        t.check(r == EPERM, &alloc::format!("sandboxtest: seccomp refuses {name} ({nr}): {r}, without the filter {without}"));
+    }
+    t.check(refused == list.len() && list.len() >= 21,
+            &alloc::format!("sandboxtest: all {} denied system calls fail with EPERM", list.len()));
 }

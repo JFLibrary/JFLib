@@ -29,6 +29,9 @@ const GLIBC_STUBS: [(&str, &[&str]); 3] = [
     ("libc.so.6", &["__libc_start_main", "__cxa_atexit", "__errno_location", "exit", "gnu_get_libc_version", "pthread_self"]),
 ];
 
+// ARM64 asks libc.so.6 for one more: getauxval (rt::os::page_size, AT_PAGESZ; glibc has it since 2.16)
+const GLIBC_STUBS_AARCH64: &[&str] = &["getauxval"];
+
 fn glibc_abi(arch: &str) -> Option<(&'static str, &'static str)> {
     match arch {
         "x86_64" => Some(("/lib64/ld-linux-x86-64.so.2", "GLIBC_2.2.5")),
@@ -179,7 +182,8 @@ impl Target {
         let (_, version) = glibc_abi(&self.arch).ok_or_else(|| format!("{}: no glibc build for {}", self.triple, self.arch))?;
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let rustc = env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
-        let mut names: Vec<&str> = GLIBC_STUBS.iter().flat_map(|(_, s)| s.iter().copied()).collect();
+        let extra: &[&str] = if self.arch == "aarch64" { GLIBC_STUBS_AARCH64 } else { &[] };
+        let mut names: Vec<&str> = GLIBC_STUBS.iter().flat_map(|(_, s)| s.iter().copied()).chain(extra.iter().copied()).collect();
         names.sort();
         let mut asm = String::from("#![no_std]\ncore::arch::global_asm!(\n");
         for n in &names {
@@ -200,7 +204,8 @@ impl Target {
         let mut out = Vec::new();
         for (lib, symbols) in GLIBC_STUBS {
             let script = dir.join(format!("{lib}.map"));
-            let text: String = symbols.iter().map(|s| format!("    {s};\n")).collect();
+            let own: &[&str] = if lib == "libc.so.6" { extra } else { &[] };
+            let text: String = symbols.iter().chain(own).map(|s| format!("    {s};\n")).collect();
             fs::write(&script, format!("{version} {{\n  global:\n{text}  local: *;\n}};\n")).map_err(|e| format!("{}: {e}", script.display()))?;
             let so = dir.join(lib);
             run(Command::new(&lld)

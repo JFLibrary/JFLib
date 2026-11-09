@@ -22,7 +22,7 @@ use crate::os;
 
 const CLASSES: usize = 8; // 16, 32, ..., 2048 bytes
 const CHUNK: usize = 64 * 1024;
-const PAGE: usize = 4096;
+#[cfg(not(all(target_os = "linux", target_arch = "aarch64")))] const PAGE: usize = 4096; #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))] #[inline(always)] const fn page() -> usize { PAGE }
 const MID: usize = 9; // cached page runs: PAGE << k bytes, k = 0..8 (4 KB .. 1 MB)
 const CACHE_MAX: usize = 32 << 20; // bytes of page runs the cache keeps at most
 const SHARDS: usize = 64; // heaps of small blocks (a power of two: few threads share one by chance)
@@ -80,7 +80,7 @@ impl Default for Alloc {
 
 /// the cache bucket of a page run of `total` bytes (rounded up to PAGE << k), None = too large
 fn mid_of(total: usize) -> Option<usize> {
-    let pages = total.div_ceil(PAGE);
+    let pages = total.div_ceil(page());
     let k = (usize::BITS - (pages - 1).leading_zeros()) as usize; // ceil(log2(pages))
     if k < MID { Some(k) } else { None }
 }
@@ -193,8 +193,8 @@ impl Alloc {
                 // over-aligned: the pointer is rounded up inside the run; the run's base and
                 // byte count sit right before it
                 let Some(total) = size
-                    .checked_add(layout.align() + 64 + PAGE - 1)
-                    .map(|t| t & !(PAGE - 1))
+                    .checked_add(layout.align() + 64 + page() - 1)
+                    .map(|t| t & !(page() - 1))
                 else {
                     return (core::ptr::null_mut(), false);
                 };
@@ -213,9 +213,9 @@ impl Alloc {
             }
             _ => {
                 // page run with a 64-byte header holding the byte count
-                let mut total = (size + 64 + PAGE - 1) & !(PAGE - 1);
+                let mut total = (size + 64 + page() - 1) & !(page() - 1);
                 if let Some(k) = mid_of(total) {
-                    total = PAGE << k;
+                    total = page() << k;
                     lock(&self.runs_lock);
                     // SAFETY: exclusive access under the lock; a cached run keeps its byte
                     // count in header word 0 and the next cached run in word 1.
@@ -279,7 +279,7 @@ unsafe impl GlobalAlloc for Alloc {
                 // SAFETY: ptr came from the page path of alloc.
                 let base = ptr.sub(64);
                 let total = *(base as *mut usize);
-                if let Some(k) = mid_of(total).filter(|&k| PAGE << k == total) {
+                if let Some(k) = mid_of(total).filter(|&k| page() << k == total) {
                     lock(&self.runs_lock);
                     let h = &mut *self.runs.get();
                     let keep = h.mid_bytes + total <= CACHE_MAX;
@@ -415,4 +415,12 @@ pub unsafe extern "C" fn strlen(s: *const core::ffi::c_char) -> usize {
         n += 1;
     }
     n
+}
+
+// ARM64 on Linux (docs/ARM64.md, decision 7): page runs in the kernel's page size, 4 KB, 16 KB or 64 KB
+// (rt::os::page_size); x86-64 and the others keep the constant above
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[inline]
+fn page() -> usize {
+    os::page_size()
 }
