@@ -45,7 +45,8 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 check (errors only, the gaps are reported)
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
-  options: --target win|linux|both|web|all|android (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
+  options: --target win|linux|both|web|all|android|mac|ios (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
+           --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md),
            --profile size|o2 (release variants, section "r13-measure"),
            --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
 
@@ -125,7 +126,13 @@ from tools import manifests
 ROOT = Path(__file__).resolve().parent              # RustLib/
 RS = ROOT
 LLVM = Path(r"C:\Program Files\LLVM\bin")
-TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", "web": "wasm32-unknown-unknown", "android": "aarch64-linux-android"}
+TRIPLE = {"win": "x86_64-pc-windows-msvc", "linux": "x86_64-unknown-linux-gnu", "web": "wasm32-unknown-unknown", "android": "aarch64-linux-android",
+          "mac": "aarch64-apple-darwin", "ios": "aarch64-apple-ios"}
+# Apple (docs/APPLE.md): built on a Mac only; --sim builds ios for the simulator into ios-sim; the
+# oldest systems the programs start on (decision 7)
+APPLE = ("mac", "ios")
+IOS_SIM_TRIPLE = "aarch64-apple-ios-sim"
+APPLE_MIN = {"mac": ("MACOSX_DEPLOYMENT_TARGET", "13.0"), "ios": ("IPHONEOS_DEPLOYMENT_TARGET", "16.0")}
 # --arch aarch64 (docs/ARM64.md): the same two targets for ARM64, each in a folder of its own
 ARCHS = ("x86_64", "aarch64")
 ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
@@ -860,10 +867,11 @@ class Builder:
     into <out>/<target dir> (cargo_build), the programs copied to <out>/<folder> as before"""
 
     def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None,
-                 arch="x86_64"):
+                 arch="x86_64", ios_sim=False):
         self.target = target
         self.arch = arch
-        self.folder = arch_folder(target, arch)
+        self.ios_sim = ios_sim and target == "ios"    # Apple: the simulator's build (docs/APPLE.md)
+        self.folder = "ios-sim" if self.ios_sim else arch_folder(target, arch)
         self.out = out
         self.profile_name = profile if isinstance(profile, str) else None
         self.dir = out / self.folder
@@ -897,11 +905,14 @@ class Builder:
         self.deps_dir = None                  # cargo_rlibs: the folder of the rlibs (probe_flags)
 
     def triple(self):
+        if self.ios_sim:
+            return IOS_SIM_TRIPLE
         return "x86_64-linux-android" if self.target == "android" and self.android_abi == "x86_64" else arch_triple(self.target, self.arch)
 
     def target_dir(self):
         folder = {"win": "cargo", "linux": "cargo-glibc" if self.glibc else "cargo", "web": f"cargo-web-{self.web_mode}",
-                  "android": f"cargo-android-{self.android_abi}"}[self.target]
+                  "android": f"cargo-android-{self.android_abi}", "mac": "cargo-mac",
+                  "ios": "cargo-ios-sim" if self.ios_sim else "cargo-ios"}[self.target]
         return self.out / (folder if self.arch == "x86_64" else f"{folder}-{self.arch}")
 
     def glibc_twin(self):
@@ -920,6 +931,8 @@ class Builder:
             return flags + ["-C", f"linker={tool('lld-link')}"]
         if self.target == "android":
             return flags                                   # a static library: tools/android.py links it
+        if self.target in APPLE:
+            return flags                                   # Apple's linker as rustc calls it (libSystem)
         if self.target == "web":
             flags += ["-C", f"linker={tool('wasm-ld')}"]
             if self.web_mode != "scalar":
@@ -950,6 +963,8 @@ class Builder:
         """run cargo with this target's rustflags into its folder -> (stdout, stderr); BuildError on failure"""
         full = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
         full.update({"CARGO_TARGET_DIR": str(self.target_dir()), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(self.cargo_flags())})
+        if self.target in APPLE:                         # the oldest macOS / iOS the program starts on
+            full.setdefault(*APPLE_MIN[self.target])
         full.update(env or {})
         if not self.release:             # a rustc killed during ThinLTO poisons Cargo's cache as it did rustc's
             incremental_flags(Path(full["CARGO_TARGET_DIR"]) / self.triple() / "debug" / "incremental")
@@ -1120,6 +1135,9 @@ class Builder:
             web_assets(name, vdir)
             return exe
         exe = own.cargo_copy(pkg, vdir / bin_file(name, self.target))
+        if self.target == "ios":                          # the program in NAME.app (tools/apple.py)
+            from tools.apple import bundle
+            bundle(exe, sim=self.ios_sim)
         if app_bins(name) and any(b not in self.cargo_builder(name, k).cargo_out for b, _, k in app_bins(name)):
             self.base.cargo_build([name])                 # a variant: the BINS stay in the app's own style
         for b, _, kind in app_bins(name):
@@ -1128,9 +1146,10 @@ class Builder:
         return exe
 
 
-def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch="x86_64"):
+def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch="x86_64",
+                  ios_sim=False):
     """The CLI and Build Manager use the same browser variant selection."""
-    return [Builder(target, out, release, jobs, profile, mode, android_abi, arch=arch)
+    return [Builder(target, out, release, jobs, profile, mode, android_abi, arch=arch, ios_sim=ios_sim)
             for target in targets
             for mode in ((["scalar", "simd", "threads"] if web_mode == "auto" else [web_mode])
                          if target == "web" else ["scalar"])]
@@ -1370,7 +1389,7 @@ def build_apps(builders, names, styles=None):
     with ThreadPoolExecutor(max(1, len(runs) + len(builders) * len(names))) as ex:
         futs = [ex.submit(b.cargo_build, ns, s) for b, ns, s in runs if ns]
         futs += [ex.submit(build_app_modules, b, n) for b in builders for n in names
-                 if b.target not in ("web", "android") and b.target in app_targets(n) and APP_MODULES.get(n)]
+                 if b.target not in ("web", "android", *APPLE) and b.target in app_targets(n) and APP_MODULES.get(n)]
         for f in futs:
             try:
                 f.result()
@@ -2022,8 +2041,8 @@ def module_lint():
 def build_app_modules(b, app, vdir=None):
     """the modules of APP_MODULES[app] into the app's folder (Builder b; once per run, also when several
     style variants link at once), copied next to a variant's exe (vdir); the browser and Android load
-    none (lib/plat/web_lib.rs)"""
-    if b.target in ("web", "android"):
+    none (lib/plat/web_lib.rs), Apple none yet (docs/APPLE.md, decision 6)"""
+    if b.target in ("web", "android", *APPLE):
         return
     with b.mod_lock:
         if app not in b.mod_ready:
@@ -2102,7 +2121,8 @@ def main():
     ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "plugin",
                                     "new", "api-diff", "changelog", "release", "site", "i18n", "watch"])
     ap.add_argument("name", nargs="?")
-    ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
+    ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android", "mac", "ios"])
+    ap.add_argument("--sim", action="store_true", help="ios: the simulator's build (ios-sim; docs/APPLE.md)")
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
                     help="Android native ABI (default ARM64; x86_64 for emulator tests)")
     ap.add_argument("--arch", choices=ARCHS, default="x86_64",
@@ -2179,11 +2199,18 @@ def main():
         raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
     if "android" in targets and a.cmd not in ("app", "lib"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
+    if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only
+        if sys.platform != "darwin":
+            raise BuildError("mac and ios build on a Mac (Apple's SDK; docs/APPLE.md).")
+        if a.cmd not in ("app", "lib", "run"):
+            raise BuildError("mac and ios support app, lib and run; the iPhone itself: python tools/apple.py device APP.app")
+        if a.cmd == "run" and targets == ["ios"] and not a.sim:
+            raise BuildError("run --target ios starts the simulator's build (--sim); the iPhone: python tools/apple.py device APP.app")
     if a.cmd in ("run", "test", "plugin") and "web" in targets:
         raise BuildError("Use app/all --target web to build browser bundles; serve their index.html for browser tests. Native run/test/plugin requires win/linux/both.")
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
-    builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch)
+    builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch, a.sim)
     t0 = time.perf_counter()
     try:
         if a.cmd == "lib":
@@ -2206,7 +2233,7 @@ def main():
                     if a.bin not in [n for n, _, _ in app_bins(a.name)]:
                         raise BuildError(f"{a.name} has no executable {a.bin} (apps/{a.name}/BINS)")
                     exe = exe.parent / bin_file(a.bin, targets[0])
-                r = run_exe(targets[0], exe, extra, timeout=None)
+                r = run_exe("ios-sim" if a.sim and targets[0] == "ios" else targets[0], exe, extra, timeout=None)
                 sys.stdout.write(r.stdout)
                 sys.stderr.write(r.stderr)
                 return r.returncode

@@ -1,7 +1,7 @@
 # Apple-Plan: macOS und iOS nativ
 
-Stand 2026-11-10, auf Basis von `main` 2a20b91e. Umgesetzt ist AP0 (Mac und iPhone bereit), noch kein Code der
-Bibliothek. Die Aufwände sind geschätzt.
+Stand 2026-11-10, auf Basis von `main` 16ec0ab4. Umgesetzt sind AP0 (Mac und iPhone bereit) und AP2 (Bau, `rt`
+und der Kern von `plat`). Die Aufwände sind geschätzt.
 In der Roadmap stehen die Punkte unter [ROADMAP.md](ROADMAP.md) §9 (macOS P1, iOS P2, Safari P2).
 
 ## Ziel
@@ -29,8 +29,8 @@ Was hilft:
   später auch nach MSL.
 - **Std-Programme** (CR6, Feature `std`) sind auf Apple ohne Zusatzarbeit möglich, std ist dort vollständig.
 
-Was fehlt: jede Zeile Apple-Code. `target_os = "macos"` kommt im ganzen `lib/` einmal vor. `build_rs.py` kennt kein
-Apple-Ziel, die Update-Manifeste kein `macos-aarch64`.
+Was fehlte (2026-11-08): jede Zeile Apple-Code. `target_os = "macos"` kam im ganzen `lib/` einmal vor. `build_rs.py`
+kannte kein Apple-Ziel, die Update-Manifeste kein `macos-aarch64`.
 
 ## Entscheidungen (Vorschläge)
 
@@ -104,12 +104,38 @@ signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`
 **Fertig, wenn:** `coretest` und `portabletest` auf dem Mac und im Simulator grün sind und die Ergebnisse
 von `portabletest` denselben Digest haben wie auf dem A56.
 
+**Umgesetzt (2026-11-10), mit zwei Änderungen am Plan:** `plat` kannte nur die Backends Windows, Linux und
+Web/Android, ohne ein Apple-Backend baute also kein Programm. Der Kern von `plat` kam deshalb schon hier dazu.
+`coretest` braucht dagegen Netz, Sperren, `fs` und Prozesse, die es bisher nur für Windows und Linux gibt, und
+rückt nach AP3. `cargo-jflib` folgt, sobald Apple-Programme Fenster haben.
+
+- **`rt`:** [`lib/rt/apple.rs`](../lib/rt/apple.rs) nimmt `malloc`, `mmap`, `write` und `_exit` aus libSystem, wie
+  `android.rs` aus Bionic; dazu `portable/cpu.rs`, `portable/math.rs` und `aarch64/fx.rs`.
+- **`plat`:** [`apple.rs`](../lib/plat/apple.rs) mit `main`, Argumenten und Umgebung (`_NSGetArgv`,
+  `_NSGetEnviron`, gilt auch für Programme mit std) und Zeit; [`apple_sys.rs`](../lib/plat/apple_sys.rs) mit
+  Dateien und Ordnern (`config://` und `data://` beide unter `~/Library/Application Support`, `cache://` unter
+  `~/Library/Caches`); [`apple_thread.rs`](../lib/plat/apple_thread.rs) mit pthreads, Semaphoren von libdispatch,
+  einem Weck-Pipe und Systemangaben; [`apple_disp.rs`](../lib/plat/apple_disp.rs) beantwortet die Fenster-API
+  wie Linux ohne Display. Plugin-Bibliotheken, Module und ICC nehmen die Web-Fassungen, `screen.rs` kennt noch
+  keine Monitore, ohne Ton und Drag and Drop gibt es keine Warnungen über ungenutzten Code.
+- **Bau:** `build_rs.py app|lib|run --target mac` und `--target ios` (mit `--sim` nach `build/ios-sim/`), nur auf
+  einem Mac; Mindestversionen über `MACOSX_DEPLOYMENT_TARGET` und `IPHONEOS_DEPLOYMENT_TARGET`. `jflib-build`
+  kennt macOS und iOS. Für `ios` packt [`tools/apple.py`](../tools/apple.py) jedes Programm als `NAME.app`, die
+  Simulator-Fassung ad hoc signiert; `tools/apple.py sim` startet im Simulator ohne Fenster, `tools/apple.py
+  device APP.app` signiert, installiert und startet auf dem iPhone. Über SSH signiert es im Terminal des Macs.
+- **Ergebnis:** `portabletest` gibt auf dem Mac, im Simulator, auf dem iPhone 14 und unter Windows x86-64
+  denselben Digest aus, `edea7e9d9579c77a` (auch der des Browsers). Windows, Linux, wasm32 und Android bauen
+  `rt` und `plat` weiter ohne Warnung.
+- **Python:** `tools/gendoc.py` brauchte Python 3.12, das README verspricht 3.11; jetzt läuft `build_rs.py`
+  wieder mit 3.11. Nur `apps/androidGallery/tests/android_perf.py` braucht noch 3.12.
+
 ### AP3: `plat` ohne Fenster auf macOS (M)
 
-- Dateien, Ordner (`~/Library/Application Support`), Zeit, Zufall, Prozesse (`posix_spawn`), Netz, Locale,
-  Geheimnisse (Keychain), Datei-Beobachtung, Absturzberichte.
+- Schon da (AP2): Dateien, Ordner, Zeit, Threads, Semaphoren, Weck-Pipe.
+- Dazu: `fs`, `sync`, `net`, `process` (`posix_spawn`), `rand`, `watch`, Locale, Geheimnisse (Keychain),
+  Absturzberichte (Signale), `spawn_self`.
 
-**Fertig, wenn:** die Teile von `plattest`, `asynctest` und `coretest` ohne Fenster auf dem Mac grün sind.
+**Fertig, wenn:** `coretest` und die Teile von `plattest` und `asynctest` ohne Fenster auf dem Mac grün sind.
 
 ### AP4: Fenster auf macOS (L)
 
@@ -190,6 +216,11 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
   BackupCraft gibt es dort nicht.
 - **Rosetta** als Übergang für x86-64 lohnt nicht: Apple hat angekündigt, es nach macOS 27 nur noch eingeschränkt
   anzubieten.
+- **Semaphoren von libdispatch** beenden den Prozess, wenn sie mit einem kleineren Stand freigegeben werden, als
+  sie angelegt wurden. `apple_thread.rs` legt sie deshalb bei 0 an und erhöht danach.
+- **`readdir`:** Der Eintrag kann kürzer sein als `struct dirent` mit seinen 1024 Bytes Namen. Keine Referenz auf
+  den ganzen Eintrag bilden, nur `d_namlen` Bytes lesen.
+- **`fsync`** lässt die Daten auf Apple im Cache des Laufwerks, erst `F_FULLFSYNC` schreibt sie wirklich.
 
 ## Testen
 

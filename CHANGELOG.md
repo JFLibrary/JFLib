@@ -20,6 +20,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** Textures: one texture array per size class (128 to 2048) and colour space, chosen per instance through its material in the fragment shader, the same WGSL on Voll, Basis and WebGPU; mip levels by a box filter on the CPU (sRGB in linear light), other sizes resampled, glTF's wrap and filter modes done exactly in the shader with one sampler, alpha mode MASK; Material carries glTF's five textures and their factors for PBR; add_texture, texture_info, mip_chain (docs/RENDER3D.md)
 - **render3d:** Mirrored instances: a transform with a negative determinant goes to its mesh's list of mirrored instances, drawn by a second pipeline with clockwise front faces and correct normals; negative scales are no longer Invalid
 - **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
+- **plat:** macOS and iOS (aarch64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim): rt and the core of plat through libSystem: the start, arguments and environment, time, files, threads, semaphores, the wake-up; windows answer as without a display until the window backend (docs/APPLE.md, AP2)
+- **build:** build_rs.py app, lib and run with --target mac and --target ios (--sim: the simulator) on a Mac; tools/apple.py packs a program as NAME.app and starts it in the simulator or on an iPhone; jflib-build accepts macOS and iOS
 
 ### Changed
 
@@ -27,6 +29,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
 - **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
+
+### Fixed
+
+- **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 
 ## [0.1.0] - 2026-11-08
 

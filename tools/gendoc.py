@@ -922,7 +922,8 @@ class Writer:
             for m in it.members:
                 if m.kind in ("fn", "const", "type"):
                     self.note(f, f"{it.name}::{m.name}", m.doc)
-                    self.p(f"  - {code(re.sub(r'^pub\s+', '', m.sig))}")
+                    sig = re.sub(r'^pub\s+', '', m.sig)     # outside the f-string: Python 3.11 (README)
+                    self.p(f"  - {code(sig)}")
                     self.p(*doc_md(m.doc, "    "))
         elif it.kind in ("struct", "union", "enum"):
             for vis, text, doc, trailing in it.fields:

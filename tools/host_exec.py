@@ -43,6 +43,12 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
 def run_native(target, exe, args, timeout=600, env=None):
     if target == 'linux':
         return run_linux([linux_path(exe), *args], timeout=timeout, env=env)
+    if target == 'mac':                     # docs/APPLE.md: on the Mac itself
+        return subprocess.run([str(exe), *args], cwd=ROOT, timeout=timeout, env=env,
+                              capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if target == 'ios-sim':                 # in a simulator without a window (tools/apple.py)
+        from tools.apple import sim_run
+        return sim_run(exe, args, timeout=timeout)
     if os.name != 'nt':
         raise RuntimeError('Windows-Programme können auf diesem Host nicht ausgeführt werden.')
     return subprocess.run([str(exe), *args], cwd=ROOT, timeout=timeout, env=env,
