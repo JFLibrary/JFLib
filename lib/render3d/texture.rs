@@ -28,6 +28,8 @@ pub const CLASS_MIN: u32 = 128;
 pub const CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1);
 /// the texture word of a material slot without a texture
 pub(crate) const NO_TEXTURE: u32 = u32::MAX;
+/// group 1's binding of the split-sum's table (draw.wgsl dfg)
+const DFG_BINDING: u32 = 11;
 /// bytes of the buffer a growing array's layers pass through, at most (a 2048 layer is about 22 MB)
 const GROW_CHUNK: u64 = 64 << 20;
 
@@ -315,6 +317,8 @@ pub(crate) struct Textures {
     arrays: [[ClassArray; CLASSES]; 2],
     pub layout: BindGroupLayout,
     sampler: Sampler,
+    /// the split-sum's table (G5c)
+    dfg: Buffer,
     pub group: BindGroup,
     pub info: Vec<TextureInfo>,
     pub srgb: Srgb,
@@ -344,17 +348,21 @@ impl Textures {
             bindings.push(Binding { binding: b, kind: BindingKind::Texture, stages: Stages::FRAGMENT });
         }
         bindings.push(Binding { binding: 2 * CLASSES as u32, kind: BindingKind::Sampler, stages: Stages::FRAGMENT });
+        // (G5c) the split-sum's table (dfg.rs), written once (the upload's barrier precedes every frame)
+        bindings.push(Binding { binding: DFG_BINDING, kind: BindingKind::StorageBufferRead, stages: Stages::FRAGMENT });
         let layout = dev.create_bind_group_layout(&bindings)?;
         let sampler = dev.create_sampler(&SamplerDesc { address: [AddressMode::Repeat; 3], ..SamplerDesc::LINEAR })?;
         let mk = |srgb| -> Result<[ClassArray; CLASSES]> {
             Ok([placeholder(dev, srgb)?, placeholder(dev, srgb)?, placeholder(dev, srgb)?, placeholder(dev, srgb)?, placeholder(dev, srgb)?])
         };
         let arrays = [mk(false)?, mk(true)?];
-        let group = Textures::make_group(dev, &layout, &arrays, &sampler)?;
-        Ok(Textures { arrays, layout, sampler, group, info: Vec::new(), srgb: Srgb::new(), max_layers: dev.limits().max_texture_layers.clamp(1, 1 << 16) })
+        let dfg = dev.create_buffer(&BufferDesc { size: (crate::DFG.len() * 8) as u64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?;
+        dev.queue().write_buffer(&dfg, 0, &crate::DFG)?;
+        let group = Textures::make_group(dev, &layout, &arrays, &sampler, &dfg)?;
+        Ok(Textures { arrays, layout, sampler, dfg, group, info: Vec::new(), srgb: Srgb::new(), max_layers: dev.limits().max_texture_layers.clamp(1, 1 << 16) })
     }
 
-    fn make_group(dev: &Device, layout: &BindGroupLayout, arrays: &[[ClassArray; CLASSES]; 2], sampler: &Sampler) -> Result<BindGroup> {
+    fn make_group(dev: &Device, layout: &BindGroupLayout, arrays: &[[ClassArray; CLASSES]; 2], sampler: &Sampler, dfg: &Buffer) -> Result<BindGroup> {
         let mut entries = Vec::new();
         // bindings 0 .. 4 sRGB, 5 .. 9 linear
         for (s, srgb) in [true, false].iter().enumerate() {
@@ -363,6 +371,7 @@ impl Textures {
             }
         }
         entries.push(BindEntry { binding: 2 * CLASSES as u32, resource: Resource::Sampler(sampler) });
+        entries.push(BindEntry { binding: DFG_BINDING, resource: Resource::Buffer { buffer: dfg, offset: 0, size: 0 } });
         dev.create_bind_group(&BindGroupDesc { layout, entries: &entries })
     }
 
@@ -441,7 +450,7 @@ impl Textures {
         e.texture_barrier(&t, Layout::CopyDst, Layout::Sampled);
         dev.queue().submit([e.finish()?])?;
         self.arrays[s][c] = ClassArray { view: array_view(&t)?, tex: Some(t), used, cap };
-        self.group = Textures::make_group(dev, &self.layout, &self.arrays, &self.sampler)?;
+        self.group = Textures::make_group(dev, &self.layout, &self.arrays, &self.sampler, &self.dfg)?;
         Ok(())
     }
 

@@ -48,7 +48,7 @@ let out = wgsl::compile(src, &wgsl::CompileOptions::new(shader::VOLL))?;   // SP
 ```
 
 `Diagnostic { line, col, end_col, error, info, msg, start, end, notes }`: Zeile und Spalte
-1-basiert, Spalten zählen Zeichen (wie `apps/jfs/crates/script`), `end_col` exklusiv auf derselben Zeile,
+1-basiert, Spalten zählen Zeichen (wie `JFScript`), `end_col` exklusiv auf derselben Zeile,
 `start`/`end` der Bytebereich, `notes` zeigen auf zugehörige Stellen („hier deklariert“, „das
 erste“). `error` und `info` beide falsch: eine Warnung. Zeilen trennt WGSL mit LF, VT, FF, CR, CRLF,
 NEL, LS und PS; `LineMap` zählt genauso. Die Texte sind deutsch: „erwartet `;` nach der Anweisung,

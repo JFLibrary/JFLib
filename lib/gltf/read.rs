@@ -18,8 +18,8 @@ const UINT: u64 = 5125;
 const BYTE: u64 = 5120;
 const SHORT: u64 = 5122;
 
-/// the extensions a file may require: none (each one changes what the data means)
-const SUPPORTED_REQUIRED: &[&str] = &[];
+/// the extensions a file may require: KHR_lights_punctual (G5c) only (each other one changes what the data means)
+const SUPPORTED_REQUIRED: &[&str] = &["KHR_lights_punctual"];
 
 struct View {
     buffer: usize,
@@ -348,7 +348,8 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
     let textures = read_textures(&mut cx, images.len())?;
     let materials = read_materials(&mut cx, textures.len())?;
     let meshes = read_meshes(&mut cx, materials.len())?;
-    let nodes = read_nodes(&mut cx, meshes.len())?;
+    let lights = read_lights(&mut cx)?;
+    let nodes = read_nodes(&mut cx, meshes.len(), lights.len())?;
     let (scenes, scene) = read_scenes(&mut cx, &nodes)?;
     let mut doc = Document {
         version,
@@ -360,6 +361,7 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
         nodes,
         scenes,
         scene,
+        lights,
         notes: Vec::new(),
     };
     // a scene's instances are bounded before anyone asks for them
@@ -722,7 +724,69 @@ fn read_primitive(cx: &mut Ctx, p: &Value, w: &str, materials: usize) -> Result<
 
 // ---------------------------------------------------------------- nodes and scenes
 
-fn read_nodes(cx: &mut Ctx, meshes: usize) -> Result<Vec<Node>> {
+// ---------------------------------------------------------------- KHR_lights_punctual (G5c)
+
+/// the file's lights: each checked (a type of the three, colour and intensity finite and not negative, a range
+/// above 0, cone angles 0 <= inner < outer <= pi / 2), their number against Limits::lights
+fn read_lights(cx: &mut Ctx) -> Result<Vec<Light>> {
+    let Some(ext) = cx.root.get("extensions").and_then(|e| e.get("KHR_lights_punctual")) else { return Ok(Vec::new()) };
+    if ext.as_object().is_none() {
+        return invalid(String::from("extensions.KHR_lights_punctual: not an object"));
+    }
+    let list = match ext.get("lights") {
+        None => return Ok(Vec::new()),
+        Some(v) => match v.as_array() {
+            Some(a) => a,
+            None => return invalid(String::from("KHR_lights_punctual.lights: not an array")),
+        },
+    };
+    if list.len() > cx.limits.lights {
+        return Err(Error::Limit(format!("{} lights, the limit is {}", list.len(), cx.limits.lights)));
+    }
+    let mut out = Vec::with_capacity(list.len());
+    for (i, v) in list.iter().enumerate() {
+        let w = format!("light {i}");
+        if v.as_object().is_none() {
+            return invalid(format!("{w}: not an object"));
+        }
+        let color = floats(v, "color", &w, [1.0; 3])?;
+        if color.iter().any(|c| *c < 0.0) {
+            return invalid(format!("{w}.color: negative"));
+        }
+        let intensity = num_or(v, "intensity", &w, 1.0)?;
+        if intensity < 0.0 {
+            return invalid(format!("{w}.intensity: negative"));
+        }
+        let range = num(v, "range", &w)?;
+        if range.is_some_and(|r| r <= 0.0) {
+            return invalid(format!("{w}.range: not above 0"));
+        }
+        let kind = match v.get("type").and_then(|t| t.as_str()) {
+            Some("directional") => {
+                if range.is_some() {
+                    cx.note(String::from("a directional light's range is ignored"));
+                }
+                LightKind::Directional
+            }
+            Some("point") => LightKind::Point,
+            Some("spot") => {
+                let Some(s) = v.get("spot").filter(|s| s.as_object().is_some()) else { return invalid(format!("{w}: a spot light without spot")) };
+                let inner = num_or(s, "innerConeAngle", &w, 0.0)?;
+                let outer = num_or(s, "outerConeAngle", &w, core::f64::consts::FRAC_PI_4)?;
+                if !(inner >= 0.0 && inner < outer && outer <= core::f64::consts::FRAC_PI_2) {
+                    return invalid(format!("{w}.spot: cone angles 0 <= inner < outer <= pi / 2"));
+                }
+                LightKind::Spot { inner: inner as f32, outer: outer as f32 }
+            }
+            Some(t) => return invalid(format!("{w}: the type {:?} (directional, point, spot)", short(t))),
+            None => return invalid(format!("{w}: no type")),
+        };
+        out.push(Light { name: text(v, "name"), kind, color: f32s(color), intensity: intensity as f32, range: range.map(|r| r as f32) });
+    }
+    Ok(out)
+}
+
+fn read_nodes(cx: &mut Ctx, meshes: usize, lights: usize) -> Result<Vec<Node>> {
     let root = cx.root;
     let list = arr(root, "nodes");
     if list.len() > cx.limits.nodes {
@@ -762,7 +826,16 @@ fn read_nodes(cx: &mut Ctx, meshes: usize) -> Result<Vec<Node>> {
             }
             trs_matrix(t, [q[0] / l, q[1] / l, q[2] / l, q[3] / l], s)
         };
-        nodes.push(Node { name: text(v, "name"), mesh, children, parent: None, local, world: IDENTITY });
+        // (G5c) the light it places
+        let light = match v.get("extensions").and_then(|e| e.get("KHR_lights_punctual")) {
+            None => None,
+            Some(x) => match index(x, "light", &w)? {
+                Some(l) if l < lights => Some(l),
+                Some(l) => return invalid(format!("{w}: no light {l}")),
+                None => return invalid(format!("{w}: KHR_lights_punctual without a light")),
+            },
+        };
+        nodes.push(Node { name: text(v, "name"), mesh, children, parent: None, local, world: IDENTITY, light });
     }
     // parents: one at most; then the world matrices from the roots down, without recursion
     for i in 0..nodes.len() {

@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -2062,7 +2062,7 @@ Source: [`lib/ui/highlight.rs`](../lib/ui/highlight.rs)
 ```text
 highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-apps/jfs/crates/script) and the colours of the tokens
+JFScript) and the colours of the tokens
 
   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
@@ -2185,7 +2185,7 @@ SY_COUNT: usize = 17
 - **`const fn markdown() -> Highlighter`**
   a Markdown subset
 - **`const fn jfs() -> Highlighter`**
-  the scripting language of apps/jfs/crates/script (.jfs, JFNetworker's scripts)
+  the scripting language of JFScript (.jfs, JFNetworker's scripts)
 - **`fn for_name(s: &str) -> Highlighter`**
   by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
 - **`fn grammar(&self) -> &'static Grammar`**
@@ -2214,7 +2214,7 @@ SY_COUNT: usize = 17
   strong, links, escapes, HTML comments
 
 - **`static JFS: Grammar`**
-  the scripting language of apps/jfs/crates/script (.jfs): calls before '(' are functions, the
+  the scripting language of JFScript (.jfs): calls before '(' are functions, the
   delimiters of ${..} in strings SY_META
 
 - **`static PLAIN: Grammar`**
@@ -19867,8 +19867,8 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
-a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
 instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
 anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
 per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
@@ -19891,8 +19891,9 @@ Vulkan, handed to the browser as text on WebGPU.
        materials, and its instances for a Scene (gltf.rs)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
-of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
-linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
+units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
+Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
 origin on the GPU.
 
 Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -19913,6 +19914,9 @@ CULL_SPV: &[u32] = spv::CULL
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 FS_SPV: &[u32] = spv::FS
+VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH
+VS_SHADOW_SPV: &[u32] = spv::VS_SHADOW
+FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 ```
 
 - **`struct RendererDesc`**
@@ -19950,20 +19954,21 @@ FS_SPV: &[u32] = spv::FS
   - `radius: f64`
 
 - **`struct Material`**
-  a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
-  texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
-  What reaches the target is opaque (alpha 1)
+  a row of the material table: glTF's metallic-roughness material, shaded as glTF 2.0 Appendix B says (G5c;
+  draw.wgsl).  Fragments whose alpha is below alpha_cutoff are dropped.  What reaches the target is opaque
+  (alpha 1)
   - `base_color: [f32; 4]` -- linear rgb and alpha (the texture's sRGB is decoded first)
-  - `metallic: f32`
+  - `metallic: f32` -- 0 ..= 1 (clamped in the shader, after the texture)
   - `roughness: f32`
-  - `emissive: [f32; 3]`
+  - `emissive: [f32; 3]` -- linear radiance (before the exposure)
   - `base_color_texture: Option<TextureRef>`
-  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b
-  - `normal_texture: Option<TextureRef>`
+  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b (times the factors)
+  - `normal_texture: Option<TextureRef>` -- linear, glTF's tangent space (+y up in the image); the tangent frame comes from the derivatives
+    (docs/RENDER3D.md: how that differs from MikkTSpace); scale multiplies x and y
   - `normal_scale: f32`
-  - `occlusion_texture: Option<TextureRef>`
+  - `occlusion_texture: Option<TextureRef>` -- linear, r: how much of the ambient (indirect) light reaches the surface, 1 + strength (r - 1)
   - `occlusion_strength: f32`
-  - `emissive_texture: Option<TextureRef>`
+  - `emissive_texture: Option<TextureRef>` -- sRGB, times emissive
   - `alpha_cutoff: Option<f32>` -- glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
 
 **`impl Material`**
@@ -19984,6 +19989,17 @@ FS_SPV: &[u32] = spv::FS
   this device draws its lists with one multi-draw (level Voll)
 - **`fn max_instances(&self) -> u32`**
   the most instances a scene can hold on this device
+- **`fn set_shadow_mask(&mut self, on: bool)`**
+  (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
+  (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+- **`fn set_environment(&mut self, d: &EnvironmentData) -> Result<()>`**
+  (G5c) the environment's light: a procedural sky or six faces, prefiltered on the CPU (the levels of a
+  cube texture per roughness, 9 harmonics for the diffuse part); scenes take it with
+  Scene::set_environment.  The upload goes with the next submission
+- **`fn environment(&self) -> Option<&Environment>`**
+  (G5c; tests, tools) the environment as the GPU holds it
+- **`fn shadow_map(&self) -> &Texture`**
+  (G5c; tests) the sun's shadow map: CASCADES_MAX layers of Depth32Float, in Layout::Sampled between frames
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
@@ -20006,6 +20022,94 @@ FS_SPV: &[u32] = spv::FS
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
   colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+
+### `render3d/dfg.rs`
+
+Source: [`lib/render3d/dfg.rs`](../lib/render3d/dfg.rs)
+
+```text
+dfg -- the second sum of the split-sum approximation for draw.wgsl's BRDF (G5c; docs/RENDER3D.md "PBR"): a
+table of (A, B) such that the specular light a white uniform environment reflects is f0 A + B, over n.v (x)
+and roughness (y), 32 x 32 points from 0 to 1, read bilinearly by the fragment shader from a storage buffer
+(no texture slot, the same exact weights on every path).  Made ahead by dfg_table (render3dtest --gen-dfg
+writes dfg_table.rs, --test shaders compares the embedded table with a fresh one): GGX importance sampling
+of the half vector, 4096 points of the Hammersley set per entry, in f64.  Karis' analytic fit was the
+first choice; for this BRDF's separable Smith term it lies up to 0.19 from the integral (measured by
+render3dtest --test pbr), the table within a few thousandths.
+```
+
+```rust
+/// points of the table per axis
+DFG_N: usize = 32
+/// the embedded table: entry j * DFG_N + i holds (A, B) at n.v = i / (DFG_N - 1), roughness j / (DFG_N - 1)
+DFG: [[f32; 2]; DFG_N * DFG_N] = { let mut out = [[0.0f32; 2]; DFG_N * DFG_N]; let mut k = ...
+```
+
+- **`fn dfg_table() -> Vec<[f32; 2]>`**
+  the table computed (what dfg_table.rs holds; slow: some 4 million samples)
+
+### `render3d/env.rs`
+
+Source: [`lib/render3d/env.rs`](../lib/render3d/env.rs)
+
+```text
+env -- the environment's light (G5c; docs/RENDER3D.md "Umgebungslicht"): diffuse through 9 spherical harmonics
+(the irradiance's coefficients, in the lights' uniform block: no texture slot), specular through a cube texture
+prefiltered per roughness (level k holds roughness k / (levels - 1)) read with the split-sum's table (dfg.rs).
+The source is a procedural sky or the caller's six faces of linear radiance (RGBA f32); levels down to 4 x 4.  Everything is made on
+the CPU in f64 when it is set: level 0 is the source, every further level a GGX convolution with N = V = R
+(importance sampling of the half vector, 128 points of the Hammersley set; a face source is read at the level
+of its own box-filtered chain the sample's solid angle asks for), the harmonics from the source's texels
+weighted by their solid angle (a sky through a 32 x 32 grid per face), times the cosine lobe's factors
+(Ramamoorthi and Hanrahan).  Uploaded as Rgba16Float with every level.
+
+Faces in Vulkan's order: +x, -x, +y, -y, +z, -z; texel (i, j) of face f looks along the direction Vulkan's
+face selection maps to it (env_dir).
+```
+
+```rust
+/// texels a side of a sky's level 0
+SKY_SIZE: u32 = 64
+```
+
+- **`struct Sky`**
+  a procedural sky: linear radiance; smooth everywhere (a glow, no sharp sun disc)
+  - `zenith: [f32; 3]`
+  - `horizon: [f32; 3]`
+  - `ground: [f32; 3]`
+  - `sun: [f64; 3]` -- towards the sun's glow (any length), its colour at the centre, falling off as cos^8
+  - `glow: [f32; 3]`
+
+**`impl Sky`**
+
+- **`const DEFAULT: Sky = Sky { zenith: [0.25, 0.45, 0.9], horizon: [0.8, 0.85, 0.9 ...`**
+- **`fn radiance(&self, d: V3) -> [f64; 3]`**
+  the radiance along a unit vector
+
+- **`enum EnvironmentData<'a>`**
+  what Renderer::set_environment takes
+  - `Sky(Sky)`
+  - `Faces { size: u32, rgba: [&'a [f32]; 6] }` -- six faces of size x size texels (a power of two, 4 ..= 1024), rows from the top, RGBA f32 linear radiance
+    (alpha unused; RGBE, half floats and the like converted by the caller)
+
+- **`struct Environment`**
+  the environment as the GPU holds it (tests, tools): each level's six faces, RGBA as f32 of the half floats
+  uploaded, and the irradiance's harmonics (divided by pi: what a white matte surface shows)
+  - `size: u32`
+  - `levels: Vec<Vec<[f32; 4]>>`
+  - `sh: [[f32; 3]; 9]`
+
+- **`fn env_dir(f: usize, s: f64, t: f64) -> V3`**
+  the unit vector of a point (s, t) in 0 ..= 1 of face f (Vulkan's face selection, inverted)
+
+- **`fn env_face(d: V3) -> (usize, f64, f64)`**
+  the face and (s, t) a unit vector falls on (Vulkan's face selection)
+
+- **`fn to_half(v: f32) -> u16`**
+  an f32 as IEEE half (nearest, ties to even; large values to infinity, which radiance never reaches here)
+
+- **`fn from_half(h: u16) -> f32`**
+  a half as f32
 
 ### `render3d/gltf.rs`
 
@@ -20032,6 +20136,8 @@ materials drawn from the front, uv sets other than 0, world matrices with shear 
   - `instances: Vec<Instance>` -- the scene's instances, for Scene::add
   - `sheared: u32` -- instances whose world matrix has shear, which a Transform cannot hold (the largest |cos| between
     two axes above 1e-4); drawn without it
+  - `lights: Vec<Light>` -- (G5c) the scene's point and spot lights (KHR_lights_punctual), for Scene::set_lights
+  - `suns: Vec<Sun>` -- (G5c) its directional lights as suns (ambient 0); a Scene has one sun
   - `notes: Vec<String>` -- what the engine leaves out (once each)
 
 - **`fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Result<Imported>`**
@@ -20053,6 +20159,9 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 - **`fn tan(x: f64) -> f64`**
   the tangent of a small angle (a field of view below pi): sine over cosine by their series
 
+- **`fn floor(x: f64) -> f64`**
+  the largest integer not above x (|x| below 2^63)
+
 - **`fn add(a: V3, b: V3) -> V3`**
 
 - **`fn sub(a: V3, b: V3) -> V3`**
@@ -20070,6 +20179,9 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 
 - **`fn rotation(q: [f32; 4]) -> [V3; 3]`**
   the rotation matrix's columns of a quaternion (x, y, z, w; any length except 0)
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sine and cosine: reduced to -pi ..= pi, then their series
 
 - **`fn ln(x: f64) -> f64`**
   the natural logarithm (x &lt;= 0: -inf): x = m 2^e, ln m by the series of atanh
@@ -20144,14 +20256,40 @@ commands without a barrier against the frames still on the GPU.
   at eye looking at target; `up` says which way is up on the screen
 
 - **`struct Sun`**
-  one sun and an ambient light (linear colours)
+  one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
+  the sun shows color / pi, one under the ambient light alone shows ambient (before the exposure)
   - `direction: [f64; 3]` -- towards the sun, any length
-  - `color: [f32; 3]`
-  - `ambient: [f32; 3]`
+  - `color: [f32; 3]` -- illuminance per channel (lux)
+  - `ambient: [f32; 3]` -- the radiance of a uniform environment around the scene
 
 **`impl Sun`**
 
-- **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75; 3], ambie ...`**
+- **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75 * core::f3 ...`**
+  a white matte face towards the sun shows 0.75 + 0.25 (0.75 pi lux, ambient 0.25)
+
+- **`enum LightKind`**
+  (G5c) a point or spot light (KHR_lights_punctual): no shadows
+  - `Point`
+  - `Spot { inner: f32, outer: f32 }` -- cone angles from the axis in radians, 0 &lt;= inner &lt; outer &lt;= pi / 2: full inside inner, nothing beyond outer
+
+- **`struct Light`**
+  (G5c) a point or spot light of a Scene
+  - `kind: LightKind`
+  - `pos: [f64; 3]`
+  - `direction: [f64; 3]` -- a spot light's axis, the way it shines (any length but 0)
+  - `color: [f32; 3]` -- linear colour, and the intensity in candela: color \* intensity / d^2 reaches a surface d away
+  - `intensity: f32`
+  - `range: Option<f32>` -- where it ends, KHR_lights_punctual's window clamp(1 - (d / range)^4, 0, 1); None: never
+
+**`impl Light`**
+
+- **`const fn point(pos: [f64; 3], color: [f32; 3], intensity: f32, range: Option<f32>) -> Light`**
+  a point light of colour times intensity at pos
+
+- **`enum Tonemap`**
+  what the fragment shader does with the light it computed (times the exposure)
+  - `Neutral` -- Khronos PBR Neutral: base colours stay up to 0.76, highlights are compressed towards white
+  - `None` -- none: linear values, clamped by the target's format (HDR targets such as Rgba16Float keep them)
 
 - **`struct UploadInfo`**
   what prepare sent for this frame
@@ -20172,8 +20310,10 @@ commands without a barrier against the frames still on the GPU.
   what a finished frame measured (Scene::set_stats)
   - `frame: u64` -- counts the scene's frames from 0
   - `visible: u64` -- instances the compute shader found visible
-  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after culling, after the render pass (no
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
     timestamps here: None)
+  - `cascades: [[f64; 2]; CASCADES_MAX]` -- (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
+  - `draw: f64` -- (G5c) the main render pass, ms
 
 - **`struct Scene`**
   instances, camera and sun of one scene of a Renderer
@@ -20197,6 +20337,25 @@ commands without a barrier against the frames still on the GPU.
 - **`fn set_camera(&mut self, c: &Camera)`**
 - **`fn camera(&self) -> &Camera`**
 - **`fn set_sun(&mut self, s: &Sun)`**
+- **`fn set_exposure(&mut self, e: f32)`**
+  what the light is multiplied by before the tone mapper (1 at first; not finite: 1)
+- **`fn exposure(&self) -> f32`**
+- **`fn set_tonemap(&mut self, t: Tonemap)`**
+  Tonemap::Neutral at first
+- **`fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()>`**
+  (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
+- **`fn shadows(&self) -> Option<Shadows>`**
+- **`fn set_environment(&mut self, k: Option<f32>)`**
+  (G5c) Some(k): the renderer's environment (Renderer::set_environment) times k lights the scene in place of
+  Sun::ambient (until it has one, Sun::ambient does); None (at first): Sun::ambient
+- **`fn set_lights(&mut self, lights: &[Light]) -> Result<()>`**
+  (G5c) the point and spot lights (all of them: they go up with the next frame); Invalid for values out of
+  range, and nothing changes then
+- **`fn lights(&self) -> &[Light]`**
+- **`fn cascades(&self) -> &[Cascade]`**
+  (G5c; tests, tools) the cascades the last prepare computed
+- **`fn cascade_buffers(&self, k: usize) -> Option<(&Buffer, &Buffer)>`**
+  (G5c; tests, tools) a cascade's draw records and visible list after a frame's culling
 - **`fn set_origin(&mut self, origin: [f64; 3])`**
   the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
   digits.  Moving it uploads every instance once
@@ -20225,6 +20384,59 @@ commands without a barrier against the frames still on the GPU.
   the frame's data for Renderer::record: waits for this slot's last frame, sends what changed
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render3d/shadow.rs`
+
+Source: [`lib/render3d/shadow.rs`](../lib/render3d/shadow.rs)
+
+```text
+shadow -- the sun's cascaded shadow maps (G5c; docs/RENDER3D.md "Schatten"): one Depth32Float array of
+CASCADES_MAX layers owned by the Renderer, group 2 of the main pass with a linear comparison sampler, and the
+cascades' geometry on the CPU in f64.
+
+A cascade covers a slice of the camera's view (splits between uniform and logarithmic) by the bounding
+sphere of the slice: its radius depends only on the camera's field of view and the splits, so turning the
+camera changes nothing in the map's scale; its centre is snapped to the map's texel grid in the light's
+basis, in world coordinates (f64, not relative to the origin), so moving the camera moves the map by whole
+texels only.  Light space: z towards the sun, x and y from a fixed reference (world y, or x for a sun
+overhead).  Depth is reverse Z (the near plane, towards the sun, at 1), the planes of the visibility
+test are the box's four sides and its far side; there is no near plane: casters between the sun and the
+cascade stay in the list and are flattened onto the near plane by the vertex shader (pancaking).
+
+The map stays in Layout::Sampled between frames: a cascade's pass takes its layer from Sampled to
+DepthTarget and back (the pass's own barriers: the last frame's fragment reads before the depth writes, the
+depth writes before this frame's fragment reads).
+```
+
+```rust
+/// the most cascades of the sun
+CASCADES_MAX: usize = 4
+```
+
+- **`struct Shadows`**
+  the sun's shadows: cascaded shadow maps (Scene::set_shadows)
+  - `cascades: u32` -- 1 ..= CASCADES_MAX
+  - `size: u32` -- texels a side of each cascade's map (16 ..= 8192)
+  - `distance: f64` -- how far along the view shadows reach (the last cascade's far end)
+  - `split: f64` -- how the slices are split: 0 uniform, 1 logarithmic
+  - `reach: f64` -- how far towards the sun beyond a cascade's sphere casters keep their depth; nearer the sun they are
+    flattened onto the near plane and still cast (a triangle crossing that plane gets a wrong depth)
+
+**`impl Shadows`**
+
+- **`const DEFAULT: Shadows = Shadows { cascades: 4, size: 2048, distance: 100.0, split ...`**
+  4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100
+
+- **`struct Cascade`**
+  a cascade as the CPU computed it for a frame (Scene::cascades)
+  - `near: f64` -- the slice of the view it covers (distances along the camera's forward)
+  - `far: f64`
+  - `center: [f64; 3]` -- its sphere's centre after snapping (world coordinates), its radius, one texel in world units
+  - `radius: f64`
+  - `texel: f64`
+  - `axes: [[f64; 3]; 3]` -- the light's basis: x and y of the map, z towards the sun
+  - `z_far: f64` -- the depth range along z (world, absolute): far side, near side
+  - `z_near: f64`
 
 ### `render3d/texture.rs`
 
@@ -20328,14 +20540,16 @@ Document on the GPU (render3d::gltf); a CAD or game tool can read the same witho
   gltf::load(bytes, &mut |uri| Option<Vec<u8>>, &Limits) -> Result<Document>   .glb or .gltf by its first
        bytes; the closure reads the files a .gltf names (relative paths, decoded; never called for data URIs)
   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
+  doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
 
 Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
-anything (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is Error::Unsupported; other
-extensions and what this model has no place for (animations, skins, cameras, lights, tangents, colours,
-further uv sets) are ignored.  URIs that leave the file's folder (absolute paths, "..", a scheme) are
-refused before the closure sees them.
+anything but KHR_lights_punctual (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is
+Error::Unsupported; other extensions and what this model has no place for (animations, skins, cameras,
+tangents, colours, further uv sets) are ignored.  KHR_lights_punctual (G5c) is read as untrusted as the rest:
+types, colours, intensities, ranges and cone angles checked, the lights limited.  URIs that leave the file's
+folder (absolute paths, "..", a scheme) are refused before the closure sees them.
 ```
 
 ### `gltf` crate root
@@ -20363,6 +20577,7 @@ refused before the closure sees them.
   - `instances: u64` -- instances of one scene (node x primitive)
   - `image_pixels: u64` -- pixels of one image, bytes of all decoded images (4 per pixel)
   - `image_bytes: u64`
+  - `lights: usize` -- (G5c) lights of KHR_lights_punctual
 
 **`impl Limits`**
 
@@ -20379,6 +20594,7 @@ refused before the closure sees them.
   - `nodes: Vec<Node>`
   - `scenes: Vec<SceneDef>`
   - `scene: Option<usize>` -- the scene to show (the file's `scene`; else the first; None: no scenes, instances() takes every root)
+  - `lights: Vec<Light>` -- (G5c) the lights of KHR_lights_punctual; nodes place them
   - `notes: Vec<String>` -- what was read but left out: points and lines, unused images, unknown attributes, ... (once each)
 
 - **`struct Mesh`**
@@ -20470,6 +20686,34 @@ refused before the closure sees them.
   - `parent: Option<usize>`
   - `local: [f64; 16]`
   - `world: [f64; 16]`
+  - `light: Option<usize>` -- (G5c) the KHR_lights_punctual light this node places
+
+- **`struct Light`**
+  (G5c) a light of KHR_lights_punctual; where it is and which way it shines come from the nodes naming it
+  - `name: String`
+  - `kind: LightKind`
+  - `color: [f32; 3]` -- linear rgb, 0 or more (white if the file says nothing)
+  - `intensity: f32` -- candela for point and spot lights, lux for directional ones (1 if the file says nothing)
+  - `range: Option<f32>` -- point and spot: the distance where it ends (above 0); None: it never does
+
+- **`enum LightKind`**
+  (G5c) KHR_lights_punctual's kinds; spot cone angles in radians from the axis, 0 &lt;= inner &lt; outer &lt;= pi / 2
+  - `Directional`
+  - `Point`
+  - `Spot { inner: f32, outer: f32 }`
+
+- **`struct LightRef`**
+  (G5c) a light placed by a node
+  - `node: usize`
+  - `light: usize`
+  - `world: [f64; 16]`
+
+**`impl LightRef`**
+
+- **`fn position(&self) -> [f64; 3]`**
+  where the light is: the node's origin
+- **`fn direction(&self) -> [f64; 3]`**
+  which way it shines: the node's -z, a unit vector (spot and directional lights)
 
 - **`struct SceneDef`**
   - `name: String`
@@ -20491,8 +20735,9 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
 
 - **`fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef>`**
   the instances of a scene (None: Document::scene), depth first in the order of the file; without
-  scenes those of every node without a parent.  Each node is visited once: a Document built by hand
-  with a cycle of children ends too
+  scenes those of every node without a parent.  Each node is visited once
+- **`fn lights_of(&self, scene: Option<usize>) -> Vec<LightRef>`**
+  (G5c) the lights a scene places (KHR_lights_punctual), in the same order as instances()
 
 - **`fn load(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>, limits: &Limits) -> Result<Document>`**
   read a .glb or a .gltf (by its first bytes); `files` gives the bytes of a relative URI the file names

@@ -1,7 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/units.jfnet --scenario apps/JFNetworker/tests/scen/deploy.scn --golden apps/JFNetworker/tests/scen/deploy.report
-# golden scenario of services as units and rolling deployments (A2): systemctl and journalctl on
-# DEV1 with exit codes, a unit that fails and restarts in virtual time, a deployment to the group
-# Webserver that fails on WEB2, one that goes through, an enabled unit through a power cycle, and
-# a rollback.  The GUI program runs tests/scen/deploy.scn on tests/fixtures/units.jfnet without a
-# window and ends with the report, which must equal tests/scen/deploy.report byte for byte on every
-# target (the script itself is not run)

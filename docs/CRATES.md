@@ -37,7 +37,7 @@ Runtime, ein Betrieb mit `std`“; das war nie die Entscheidung des Nutzers, sie
 | Ordner | kein `crates/`, `lib/` und `styles/` bleiben |
 | Inhalt | alles aus `lib/` außer `script` und `plugin`; `modrt` und `modplat` als eigene Crates |
 | Stile | `winui`, `classic`, `kde`, `macos`; `jfoffice`, `backupcraft` und `netlab` bleiben draußen |
-| JFScript | `apps/jfs/crates/script` mit `publish = false`, eigenes Repo erst zum Crate-Release |
+| JFScript | seit 2026-11-09 eigene Repo [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript), Crate `jfscript`, nicht auf crates.io (Git-Abhängigkeit) |
 | Apps | bleiben bis zum Crate-Release im Repo, immer mit `publish = false` |
 | Version | eine für alle Crates, sie steht in der `Cargo.toml` im Wurzelordner; untereinander exakt (`=0.1.0`), weil nur der Weg über `jflib` versprochen ist |
 | Offene Worktrees | bleiben lokal und passen sich später an |
@@ -562,6 +562,15 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    (`clip_rs_check`, `lib_check`, `print_rs_check`, der Druckteil von `portal_bus`); `build_rs.py` ohne `plugin`, Plugin-Lint
    und pdn-host. Das Modul `jxlenc` baut jetzt neben `codectest` (`--jxlenc FILE`); die Fixtures der Codec-Prüfungen
    (`a1_rgba.png`, `a6_photo.png`, `pdn/`) liegen in `apps/codectest/fixtures/`.
+   **JFNetworker und JFScript (2026-11-09):** [JFLibrary/JFNetworker](https://github.com/JFLibrary/JFNetworker) und [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript)
+   (Entscheidungen des Nutzers: JFScript als Git-Abhängigkeit, nicht auf crates.io; der Style `netlab` bleibt hier und
+   geht mit dem nächsten Release auf crates.io, bis dahin nimmt JFNetworker per `[patch.crates-io]` alle JFLib-Crates aus
+   einem Checkout daneben; neue erste Commits). JFNetworker: 203 Skripte, Selbsttest, Studien und Golden-Szenarien auf
+   Windows und Linux, die Kurse kommen aus der eigenen Repo; Pakete erst mit einem `cargo-jflib`, das `netlab` kennt und
+   nicht auf der Crate `jflib` besteht. Hier entfernt: `apps/JFNetworker`, `apps/jfs`, die fünf Skript-Gruppen von
+   `coretest` (jetzt JFScripts `scripttest`), `tools/academy_index.py`, `academy_e2e.py`, `script_math_check.py`.
+   `editortest` nimmt JFScript aus seiner Repo (der Workspace lenkt dessen `jflib-agent-core` auf sich selbst um),
+   `symboltest` hat eine Kopie der Symboltabelle von JFNetworker.
 2. `cargo publish --workspace --dry-run`, dann in Abhängigkeitsreihenfolge hochladen. Vorher die aktuellen Limits von
    crates.io für neue Crates prüfen, bei 57 Stück kann das dauern. Stand 2026-11-08: `cargo publish --workspace
    --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem

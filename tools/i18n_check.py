@@ -10,7 +10,7 @@
     python build_rs.py i18n --check         the suite's check: exit code 1 only for errors
     python tools/i18n_check.py [APP | apps/APP [FOLDER ..] | lib] .. [--update] [--check] [--unused]
                                             the same; FOLDER: only these folders of the app
-                                            (apps/JFNetworker crates)
+                                            (apps/APP crates)
 
 Exit code: 1 when anything is reported (--check: only errors, see below).
 
@@ -104,7 +104,7 @@ PLURALS = {
 CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
 # complete today (2026-11-02): in --check a missing or untranslated text is an error there too,
 # so they stay complete; the other apps' gaps are reported only
-COMPLETE = ("BackupCraft", "JFNetworker", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
+COMPLETE = ("BackupCraft", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
             "editortest", "fontpicktest", "gallery", "mdviewtest", "prefstest", "spelltest", "svgtest", "template", "lib")
 
 
@@ -757,7 +757,7 @@ def main(argv=None):
     targets = []                                        # (name, app dir or None, folders)
     for w in words:
         if targets and targets[-1][1] is not None and (targets[-1][1] / w).exists() and "/" not in w.strip("/"):
-            targets[-1][2].append(w)                    # apps/JFNetworker crates
+            targets[-1][2].append(w)                    # apps/APP crates
             continue
         if w == "lib":
             targets.append(("lib", None, []))

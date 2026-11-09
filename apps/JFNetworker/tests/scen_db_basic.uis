@@ -1,6 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/db_basic.jfnet --scenario apps/JFNetworker/tests/scen/db_basic.scn --golden apps/JFNetworker/tests/scen/db_basic.report
-# golden scenario: the database service (jfn_sim's db.rs) on a metered project: statements by curl with their
-# figures and the place of a mistake, dbctl with status, tables, locks and explain, a join, a route with a value
-# from the request and one with a transaction, an index built while it runs, a crash and its recovery.  The GUI
-# program runs tests/scen/db_basic.scn on tests/fixtures/db_basic.jfnet without a window and ends with the report,
-# which must equal tests/scen/db_basic.report byte for byte on every target (the script itself is not run)

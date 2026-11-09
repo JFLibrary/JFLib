@@ -1,6 +1,6 @@
 #!args --verify-dirty
 # diagnostics in the code editor (CodeDoc::set_diagnostics, ui.code_diag): "Prüfen" checks the
-# JFS sample with apps/jfs/crates/script (two errors, a warning) plus an info at the TODO -- wavy
+# JFS sample with JFScript (two errors, a warning) plus an info at the TODO -- wavy
 # underlines and markers in a gutter column of their own; the pointer over an underline or a
 # marker shows the messages, F8 / Shift+F8 go round them (the record at the caret and
 # code_diag tell the one there); edits move them until the next check (typing before one on

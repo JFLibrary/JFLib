@@ -1,0 +1,4 @@
+#!args --test lights
+# (G5c) point and spot lights against the ray caster: falloff, range window and cone of KHR_lights_punctual, 64 lights,
+# the light itself in Rgba16Float, nothing beyond a range, a changed list, what goes up, 1e7, what set_lights refuses;
+# KHR_lights_punctual in lib/gltf: read, placed by nodes, drawn, truncated, corrupted, broken, the limit; Voll and Basis

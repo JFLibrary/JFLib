@@ -1,8 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/shell_tour.jfnet --scenario apps/JFNetworker/tests/scen/shell_tour.scn --golden apps/JFNetworker/tests/scen/shell_tour.report
-# golden scenario: a tour through PC1's shell (V1). A small project tree with folders, a jfs
-# script written with echo and run as a process into a log file, the log with grep, pipes
-# behind ping and curl (with tee and cut), background jobs with jobs, ps and kill, globs, find,
-# redirections of stderr and lists; folders in R1's flash: (mkdir, cd, copy, dir). The GUI
-# program runs tests/scen/shell_tour.scn on tests/fixtures/shell_tour.jfnet without a window
-# and ends with the report, which must equal tests/scen/shell_tour.report byte for byte on every
-# target (the script itself is not run)

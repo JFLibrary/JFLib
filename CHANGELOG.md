@@ -22,15 +22,19 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
 - **plat:** macOS and iOS (aarch64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim): rt and the core of plat through libSystem: the start, arguments and environment, time, files, threads, semaphores, the wake-up; windows answer as without a display until the window backend (docs/APPLE.md, AP2)
 - **build:** build_rs.py app, lib and run with --target mac and --target ios (--sim: the simulator) on a Mac; tools/apple.py packs a program as NAME.app and starts it in the simulator or on an iPhone; jflib-build accepts macOS and iOS
+- **render3d:** PBR after glTF 2.0 Appendix B (GGX, separable Smith, Schlick) with all five textures (normal maps on a tangent frame from derivatives), exposure and Khronos PBR Neutral in the fragment shader (Scene::set_exposure, set_tonemap), the split-sum's second sum from an embedded table (DFG); cascaded shadow maps of the sun (Scene::set_shadows, Shadows: up to four cascades culled on the GPU, snapped to the texel grid, PCF, MASK's holes); point and spot lights after KHR_lights_punctual (Scene::set_lights, Light); environment light from 9 spherical harmonics and a prefiltered cube (Renderer::set_environment with a procedural Sky or six faces, Scene::set_environment); render3d::gltf::upload returns lights and suns (docs/RENDER3D.md)
+- **gltf:** KHR_lights_punctual: Document::lights, Node::light, lights_of(scene), Limits::lights; the extension may stand in extensionsRequired (docs/GLTF.md)
 - **plat:** macOS and iOS: plat without windows (docs/APPLE.md, AP3): processes through posix_spawn, sync, sockets, file system, random numbers, folder watching (FSEvents, macOS), trusted certificates (Security framework), services (launchd), local control sockets and the single instance, the keychain as secret store, crash reports through signals with the call chain; coretest and plattest's windowless tests pass on a Mac
 - **plat:** plat::service::plist_text: the launchd property list a service install writes on macOS
 
 ### Changed
 
+- **ui:** The built-in catalogue has no row "Neuer Ordner" any more: only JFNetworker used it, which keeps its own (`ui::i18n::t` falls back to the text itself).
 - **gpu:** Validation with jfgui_GPU_VALIDATE now also checks what shaders read and write through their bindings (syncval_shader_accesses_heuristic, off in the layer by default): a missing barrier between two shaders no longer goes unreported
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
 - **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
+- **render3d:** Sun::color is illuminance in lux (KHR_lights_punctual; Sun::DEFAULT 0.75 pi), materials are shaded as PBR instead of Lambert, nearest texture filtering loads the texel (textureLoad) instead of sampling its centre
 - **img_core:** The MIME type of Paint.NET files is `image/x-paint.net` (it was `image/x-PaintCraft`, a leftover of a renaming).
 - **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
 - **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).
@@ -38,6 +42,12 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Removed
 
+- **JFNetworker** and **JFScript** moved to their own repositories, [JFLibrary/JFNetworker](https://github.com/JFLibrary/JFNetworker) and
+  [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript) (docs/CRATES.md, CR7 step 1): `apps/JFNetworker`, `apps/jfs` with the crate `script`
+  (now `jfscript`), coretest's groups script, scriptvm, scriptlib, scriptls and scriptmod (JFScript's `scripttest`),
+  `tools/academy_index.py`, `tools/academy_e2e.py` and `tools/script_math_check.py`. `editortest` takes JFScript from
+  its repository, the workspace takes that repository's `jflib-agent-core` from itself (`[patch.crates-io]`);
+  `symboltest` keeps a copy of JFNetworker's symbol table. The style `netlab` stays here.
 - **PaintCraft** moved to its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter), as JFPainter (docs/CRATES.md, CR7 step 1), with its Rust plugins (`plugins/`, `lib/plugin`), its paint.net host (`tools/paintcraft-pdn-host`) and its check scripts; `build_rs.py plugin`, the plugin lint and the pdn-host section are gone, and so are the platshared comparisons that imported those scripts (`clip_rs_check`, `lib_check`, `print_rs_check`, the print part of `portal_bus`) and `pathdata_check`'s XAML fuzz through PaintCraft. `testenv` no longer sets `PaintCraft_CONFIG_DIR`.
 
 ### Fixed

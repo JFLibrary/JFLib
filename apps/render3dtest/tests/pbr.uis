@@ -1,0 +1,4 @@
+#!args --test pbr
+# (G5c) glTF's BRDF against the ray caster: materials dull to metallic, the metallic-roughness texture, normal
+# maps (turned, mirrored, mirrored uv, which way they lean), emission, occlusion, exposure, both tone mappers, the
+# light itself in Rgba16Float, a white furnace; on the CPU the BRDF's albedo and the split-sum table; Voll and Basis

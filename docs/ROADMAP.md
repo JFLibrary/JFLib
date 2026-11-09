@@ -1318,7 +1318,7 @@ Fensterrand hinaus.
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
   Vektor-Icons ([STYLES.md](STYLES.md)).
-- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](../apps/jfs/crates/script/lib.rs), seit
+- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](https://github.com/JFLibrary/JFScript/blob/main/script/lib.rs), seit
   2026-10-19, Meilenstein SK1): `.jfs`-Dateien, klein und dynamisch typisiert (JS/Lua-artig,
   Closures, `try`/`catch`, `??`, Interpolation `"${x}"`). Lexer mit `tokens()` für die
   Syntaxhervorhebung (deckt jedes Byte ab, scheitert nie), Pratt-Parser mit Fehlerkorrektur
@@ -1365,8 +1365,8 @@ Fensterrand hinaus.
   Rückgängig-Schritt, nach dem das laufende Skript Disk und Zahlen behält
   (`Action::ScriptSource`; App-README „Skript-Editor“).
 - **P3** · *erledigt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25,
-  seit 2026-10-26): [`apps/jfs`](../apps/jfs/README.md) führt Skripte der Sprache aus
-  `apps/jfs/crates/script` außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
+  seit 2026-10-26): [`jfs`](https://github.com/JFLibrary/JFScript/blob/main/jfs/README.md) führt Skripte der Sprache aus
+  JFScript außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
   Linux). `jfs DATEI.jfs [ARGS…]` übersetzt und startet ein Skript (die Argumente in
   `config.args`), `jfs -e "CODE"` und `jfs -` (stdin) für Einzeiler, `jfs --check` gibt nur die
   Diagnosen als `DATEI:ZEILE:SPALTE: Fehler: …` und Warnungen auf stdout aus (Exit-Code 1 bei
@@ -1382,11 +1382,11 @@ Fensterrand hinaus.
   `--heap` (auch `64k`, `16M`), `--depth`, `--stack`, sonst `Limits::default()`. Fehler beim
   Übersetzen oder Laufen erscheinen auf stderr mit Datei, Zeile:Spalte, der Quellzeile mit
   Marke und der Aufrufkette (Rekursionen zusammengefasst), Exit-Code 1; ein falscher Aufruf
-  ergibt 2. Sprache und VM sind unverändert; neu in `apps/jfs/crates/script` ist nur
+  ergibt 2. Sprache und VM sind unverändert; neu in JFScript ist nur
   `compile_with(name, src, globals)`: Namen gegen die des Hosts (dazu Built-ins und
   Standardbibliothek), ein unbekannter Name ist dort ein Fehler statt einer Warnung (getestet
   in `coretest --only scriptvm`). Eine REPL gibt es nicht. Tests: `python build_rs.py test jfs`
-  startet `jfs --selftest apps/jfs/tests/cases`, 14 Fälle (`*.test`) mit Läufen von `jfs`
+  startet `jfs --selftest tests/cases`, 14 Fälle (`*.test`) mit Läufen von `jfs`
   samt Argumenten, Umgebung und stdin und der erwarteten Ausgabe auf stdout und stderr, dem
   Exit-Code und Dateiinhalten: Hallo Welt, Argumente und `config`, Timer mit virtueller und
   echter Uhr, Fehler mit Zeile:Spalte und Aufrufkette, `--check`, `-e`, stdin, überschrittene
@@ -1463,7 +1463,7 @@ Fensterrand hinaus.
   zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
   Linux). Seit B3 (2026-11-01) nennt `MdEv::click` das Element unter einem Klick, auch inline
   (`MdDoc::element_at`, `mdviewtest --test unit`, `doc_clicks.uis`), `MdDoc::dom_size` die Größe des
-  Baums, und `Vm::add_script` in `apps/jfs/crates/script` gibt die Skripte einer Seite in eine VM mit gemeinsamen
+  Baums, und `Vm::add_script` in JFScript gibt die Skripte einer Seite in eine VM mit gemeinsamen
   obersten Namen (coretest `scriptmod`). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten
   das ganze Dokument neu ab statt nur den betroffenen Container.
   (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
@@ -1487,7 +1487,7 @@ Fensterrand hinaus.
   Getestet mit `mdviewtest --test unit` (Gruppe `css`: Spezifität, Reihenfolge, `!important`,
   Vererbung, Kästen, Ignoriertes, physische Seiten in rechts-nach-links, Kosten; die 300
   zufälligen Änderungen von (3) mit Stylesheet) und `--page css` (`css_shots.uis` hell, dunkel,
-  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In `apps/jfs/crates/script` nur
+  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In JFScript nur
   `compile_with` (siehe den Runner), damit der Browser-Host seine eigenen Globals (`document`,
   `fetch` …) prüfen lässt. Bewusst nicht: eine vollständige HTML/CSS-Engine (Box-Modell mit
   Breiten und Höhen, Floats, Flexbox, Grid, Positionierung) und JavaScript. Offen: Schriftgrößen
@@ -1506,7 +1506,7 @@ Fensterrand hinaus.
   coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker. Seit R1 findet
   `find_mode` einen Modus über seinen Prompt (die Modi der Zugriffslisten von JFNetworker).
 - **P3** · *erledigt* · Sprachdienste für jfs (SK6, 2026-10-30, für die IDE von JFNetworker):
-  [`script::ls`](../apps/jfs/crates/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
+  [`script::ls`](https://github.com/JFLibrary/JFScript/blob/main/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
   lokale `let`, `fn` samt Parametern, Closures, Schleifen- und catch-Variablen) und jede
   Verwendung nach den Gültigkeitsregeln von `ast.rs`, auch auf Code, der nicht parst
   (`parse_partial`); darauf `definition` (in importierte Module über einen Lade-Callback des
@@ -1516,8 +1516,8 @@ Fensterrand hinaus.
   Kurzbeschreibung, Built-ins und Module der Standardbibliothek, Methoden von str / list / map /
   bytes nach dem Typ eines Literals, Schlüsselwörter am Anweisungsanfang; nach Art und Präfix
   sortiert), `hover` (Art, Signatur, `///`-Doku-Kommentar; deutsche Beschreibungen jeder
-  Funktion der Standardbibliothek in [`lsdoc.rs`](../apps/jfs/crates/script/lsdoc.rs)), `signature`,
-  `folding`, `symbols` (Gliederung). [`script::fmt`](../apps/jfs/crates/script/fmt.rs) formatiert
+  Funktion der Standardbibliothek in [`lsdoc.rs`](https://github.com/JFLibrary/JFScript/blob/main/script/lsdoc.rs)), `signature`,
+  `folding`, `symbols` (Gliederung). [`script::fmt`](https://github.com/JFLibrary/JFScript/blob/main/script/fmt.rs) formatiert
   (Einrückung nach Klammern, Leerzeichen um Operatoren, eine Anweisung je Zeile, Kommentare und
   höchstens eine Leerzeile bleiben, idempotent), verweigert Code mit Syntaxfehlern und prüft,
   dass der Baum des Ergebnisses dem des Originals gleicht – der übersetzte Code bleibt gleich.
@@ -1761,7 +1761,7 @@ Fensterrand hinaus.
   Texturen gegen einen Strahlenwerfer mit eigener Filterung (genau, trilinear auf 6), Stufen Byte für Byte gegen einen eigenen
   Kastenfilter; Voll, Basis und Chrome 156 zeigen dieselben Bilder, 0 Pixel anders; abgeschnittene und verfälschte glTF-Dateien sind
   Fehler, keine Panik. Nicht gebaut: Bindless auf Voll, Mip-Stufen auf der GPU, BLEND, beidseitige Materialien, Scherung.
-- **P2** · *fehlt* · G5c: PBR, Licht, Schatten.
+- **P2** · *erledigt* (2026-11-09) · G5c: PBR, Licht, Schatten ([RENDER3D.md](RENDER3D.md#pbr-g5c)): die BRDF von glTF 2.0 Anhang B mit allen fünf Texturen (Normalenkarten mit dem Tangentenrahmen des Dreiecks aus Ableitungen, Abweichung von MikkTSpace dokumentiert), Belichtung und Khronos PBR Neutral im Fragment-Shader, die zweite Summe der Split-Sum aus einer eingebetteten Tabelle; kaskadierte Schatten der Sonne (bis vier Kaskaden als eigene Sichten mit Sichtbarkeit auf der GPU, stabil auf das Texelraster gerastet, PCF, Bias auf der Seite des Empfängers, MASK mit Löchern); Punkt- und Spotlichter nach `KHR_lights_punctual`, auch aus glTF (`lib/gltf` liest die Erweiterung); Umgebungslicht aus 9 Harmonischen und einer vorgefilterten Würfel-Textur (prozeduraler Himmel oder Seiten des Aufrufers). Alles gegen den Strahlenwerfer in `f64` und exakte Schattenstrahlen getestet, Voll = Basis, im Browser 0 Pixel anders außer einem Pixel um 1 im Lichter-Bild. Gemessen (1 Mio. Würfel, 1080p, RTX 2070 SUPER): Zeichnen 1,578 ms mit PBR (G5b 1,278), 1,653 mit Umgebung, Schatten mit vier Kaskaden 3,4 ms mehr, je Punktlicht 0,11 ms (Cluster-Shading offen).
 - **P2** · *fehlt* · G5d: Verdeckung über eine Hi-Z-Pyramide, Detailstufen, zweite Warteschlange.
 - **P2** · *fehlt* · G5e: 3D-Ansicht in der UI, Linux, Android, Browser in einem echten Fenster, Messungen auf anderen GPUs.
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,

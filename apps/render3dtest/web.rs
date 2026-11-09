@@ -134,6 +134,16 @@ impl Probe {
             self.scenes.push(s);
             self.more.push(r);
         }
+        // G5c
+        for name in LATER {
+            let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+            let mut s = later_gallery(name, &mut r)?;
+            let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
+            off.submit(&mut r, &mut s)?;
+            self.keep.push((name, off));
+            self.scenes.push(s);
+            self.more.push(r);
+        }
         Ok(())
     }
 

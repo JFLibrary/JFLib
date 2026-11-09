@@ -111,7 +111,7 @@ pub use highlight::{
     CodeTheme, Grammar, Highlighter, Rule, Token, INI, JSON, MARKDOWN, PLAIN, RUST, SY_CODE, SY_COMMENT, SY_CONST, SY_COUNT, SY_EMPH, SY_ESCAPE,
     SY_FUNC, SY_HEADING, SY_KEY, SY_KEYWORD, SY_LINK, SY_META, SY_NUMBER, SY_PUNCT, SY_STRING, SY_STRONG, SY_TEXT, SY_TYPE, TOML,
 };
-pub use highlight::JFS; // (L6) the grammar of apps/jfs/crates/script's .jfs
+pub use highlight::JFS; // (L6) the grammar of JFScript's .jfs
 mod code_edit;
 mod code_long;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};

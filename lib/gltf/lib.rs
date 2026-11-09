@@ -7,14 +7,16 @@
 //   gltf::load(bytes, &mut |uri| Option<Vec<u8>>, &Limits) -> Result<Document>   .glb or .gltf by its first
 //        bytes; the closure reads the files a .gltf names (relative paths, decoded; never called for data URIs)
 //   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
+//   doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
 //   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
 //
 // Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 // (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
-// anything (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is Error::Unsupported; other
-// extensions and what this model has no place for (animations, skins, cameras, lights, tangents, colours,
-// further uv sets) are ignored.  URIs that leave the file's folder (absolute paths, "..", a scheme) are
-// refused before the closure sees them.
+// anything but KHR_lights_punctual (Draco, meshopt, KTX2 / basisu, quantization, texture transforms, ...) is
+// Error::Unsupported; other extensions and what this model has no place for (animations, skins, cameras,
+// tangents, colours, further uv sets) are ignored.  KHR_lights_punctual (G5c) is read as untrusted as the rest:
+// types, colours, intensities, ranges and cone angles checked, the lights limited.  URIs that leave the file's
+// folder (absolute paths, "..", a scheme) are refused before the closure sees them.
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -82,6 +84,8 @@ pub struct Limits {
     /// pixels of one image, bytes of all decoded images (4 per pixel)
     pub image_pixels: u64,
     pub image_bytes: u64,
+    /// (G5c) lights of KHR_lights_punctual
+    pub lights: usize,
 }
 
 impl Limits {
@@ -97,6 +101,7 @@ impl Limits {
         instances: 16 << 20,
         image_pixels: 8192 * 8192,
         image_bytes: 2 << 30,
+        lights: 1 << 16,
     };
 }
 
@@ -120,6 +125,8 @@ pub struct Document {
     pub scenes: Vec<SceneDef>,
     /// the scene to show (the file's `scene`; else the first; None: no scenes, instances() takes every root)
     pub scene: Option<usize>,
+    /// (G5c) the lights of KHR_lights_punctual; nodes place them
+    pub lights: Vec<Light>,
     /// what was read but left out: points and lines, unused images, unknown attributes, ... (once each)
     pub notes: Vec<String>,
 }
@@ -265,6 +272,51 @@ pub struct Node {
     pub parent: Option<usize>,
     pub local: [f64; 16],
     pub world: [f64; 16],
+    /// (G5c) the KHR_lights_punctual light this node places
+    pub light: Option<usize>,
+}
+
+/// (G5c) a light of KHR_lights_punctual; where it is and which way it shines come from the nodes naming it
+#[derive(Clone, Debug, PartialEq)]
+pub struct Light {
+    pub name: String,
+    pub kind: LightKind,
+    /// linear rgb, 0 or more (white if the file says nothing)
+    pub color: [f32; 3],
+    /// candela for point and spot lights, lux for directional ones (1 if the file says nothing)
+    pub intensity: f32,
+    /// point and spot: the distance where it ends (above 0); None: it never does
+    pub range: Option<f32>,
+}
+
+/// (G5c) KHR_lights_punctual's kinds; spot cone angles in radians from the axis, 0 <= inner < outer <= pi / 2
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LightKind {
+    Directional,
+    Point,
+    Spot { inner: f32, outer: f32 },
+}
+
+/// (G5c) a light placed by a node
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LightRef {
+    pub node: usize,
+    pub light: usize,
+    pub world: [f64; 16],
+}
+
+impl LightRef {
+    /// where the light is: the node's origin
+    pub fn position(&self) -> [f64; 3] {
+        [self.world[12], self.world[13], self.world[14]]
+    }
+
+    /// which way it shines: the node's -z, a unit vector (spot and directional lights)
+    pub fn direction(&self) -> [f64; 3] {
+        let z = [-self.world[8], -self.world[9], -self.world[10]];
+        let l = sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
+        if l > 0.0 { [z[0] / l, z[1] / l, z[2] / l] } else { [0.0, 0.0, -1.0] }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -287,10 +339,9 @@ pub struct InstanceRef {
 pub const IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
 
 impl Document {
-    /// the instances of a scene (None: Document::scene), depth first in the order of the file; without
-    /// scenes those of every node without a parent.  Each node is visited once: a Document built by hand
-    /// with a cycle of children ends too
-    pub fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef> {
+    /// the nodes of a scene (None: Document::scene), depth first in the order of the file, each once; without
+    /// scenes every node without a parent and below.  A Document built by hand with a cycle of children ends too
+    fn scene_nodes(&self, scene: Option<usize>) -> Vec<usize> {
         let roots: Vec<usize> = match scene.or(self.scene).and_then(|s| self.scenes.get(s)) {
             Some(s) => s.nodes.clone(),
             None if self.scenes.is_empty() => (0..self.nodes.len()).filter(|&n| self.nodes[n].parent.is_none()).collect(),
@@ -304,12 +355,35 @@ impl Document {
             if core::mem::replace(&mut seen[n], true) {
                 continue;
             }
+            out.push(n);
+            stack.extend(node.children.iter().rev());
+        }
+        out
+    }
+
+    /// the instances of a scene (None: Document::scene), depth first in the order of the file; without
+    /// scenes those of every node without a parent.  Each node is visited once
+    pub fn instances(&self, scene: Option<usize>) -> Vec<InstanceRef> {
+        let mut out = Vec::new();
+        for n in self.scene_nodes(scene) {
+            let node = &self.nodes[n];
             if let Some(m) = node.mesh.and_then(|m| self.meshes.get(m).map(|x| (m, x))) {
                 for p in 0..m.1.primitives.len() {
                     out.push(InstanceRef { node: n, mesh: m.0, primitive: p, world: node.world });
                 }
             }
-            stack.extend(node.children.iter().rev());
+        }
+        out
+    }
+
+    /// (G5c) the lights a scene places (KHR_lights_punctual), in the same order as instances()
+    pub fn lights_of(&self, scene: Option<usize>) -> Vec<LightRef> {
+        let mut out = Vec::new();
+        for n in self.scene_nodes(scene) {
+            let node = &self.nodes[n];
+            if let Some(l) = node.light.filter(|&l| l < self.lights.len()) {
+                out.push(LightRef { node: n, light: l, world: node.world });
+            }
         }
         out
     }

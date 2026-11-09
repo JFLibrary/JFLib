@@ -434,21 +434,25 @@ fn drawn(t: &mut T, dev: &Device, level: &str, sc: &GScene, doc: &g::Document) -
     let img = shot(t, dev, &mut off, &mut r, &mut s, "glTF")?;
     // the reference from the description: textures at their class's size as this test makes them
     let mut rs = RefScene::new(sun.direction, sun.color.map(|v| v as f64), sun.ambient.map(|v| v as f64));
+    // (each texture twice: sRGB at k for base colour and emission, linear at n + k for the others, as upload
+    // puts an image used both ways up twice)
     let mut tex_of = Vec::new();
-    for x in &sc.texs {
-        let im = &sc.images[x.image];
-        let srgb = true;
-        let px = if im.jpeg { img_jpeg::decode_fl(&gg::jpeg(im.w, im.h, &im.rgba), img_core::JDF_STRAIGHT).map(|sf| bgra_rows(&sf)).unwrap_or_default() } else { im.rgba.clone() };
-        let size = render3d::CLASS_MIN << render3d::class_of(im.w, im.h);
-        let reference = if im.w == size && im.h == size {
-            px
-        } else if x.sampler[0] == 9728 {
-            crate::tex::nearest_resample(&px, im.w, im.h, size)
-        } else {
-            crate::tex::bilinear_resample(&px, im.w, im.h, size, srgb)
-        };
-        rs.textures.push(RefTexture::new(size, &reference, srgb));
-        tex_of.push(ref_sampler(x.sampler));
+    let n = sc.texs.len();
+    for srgb in [true, false] {
+        for x in &sc.texs {
+            let im = &sc.images[x.image];
+            let px = if im.jpeg { img_jpeg::decode_fl(&gg::jpeg(im.w, im.h, &im.rgba), img_core::JDF_STRAIGHT).map(|sf| bgra_rows(&sf)).unwrap_or_default() } else { im.rgba.clone() };
+            let size = render3d::CLASS_MIN << render3d::class_of(im.w, im.h);
+            let reference = if im.w == size && im.h == size {
+                px
+            } else if x.sampler[0] == 9728 {
+                crate::tex::nearest_resample(&px, im.w, im.h, size)
+            } else {
+                crate::tex::bilinear_resample(&px, im.w, im.h, size, srgb)
+            };
+            rs.textures.push(RefTexture::new(size, &reference, srgb));
+            tex_of.push(ref_sampler(x.sampler));
+        }
     }
     let worlds = sc.worlds();
     for (node, mesh, prim) in sc.instances() {
@@ -457,16 +461,23 @@ fn drawn(t: &mut T, dev: &Device, level: &str, sc: &GScene, doc: &g::Document) -
             Some(m) => {
                 let gm = &sc.mats[m];
                 let f = gm.factor;
-                Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: gm.tex[0].map(|k| (k, tex_of[k])), cutoff: gm.mask.map(|c| c as f64) }
+                let srgb = |i: usize| gm.tex[i].map(|k| (k, tex_of[k]));
+                let lin = |i: usize| gm.tex[i].map(|k| (n + k, tex_of[n + k]));
+                let e = gm.emissive;
+                Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: srgb(0), cutoff: gm.mask.map(|c| c as f64), metallic: gm.metallic as f64,
+                       roughness: gm.roughness as f64, mr_texture: lin(1), normal_texture: lin(2), normal_scale: 1.0, occlusion_texture: lin(3), occlusion: 1.0,
+                       emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: srgb(4) }
             }
-            None => Look::color([1.0, 1.0, 1.0]),
+            // (glTF's default material: white, metallic 1, roughness 1)
+            None => Look { metallic: 1.0, ..Look::color([1.0, 1.0, 1.0]) },
         };
         rs.add_matrix(&expected(p), &worlds[node], look);
     }
     // (bilinear and trilinear textures in the scene: within 6, as in the texture tests)
     let c = cpu::compare_tol(&rs, &ref_camera(&cam), w, h, CLEAR8, &img, None, 6);
     t.ok(c.fine() && c.objects_seen as usize == imp.instances.len(), &format!("{level}: the scene drawn ({} instances, {} textures, a mirrored node, MASK) against the ray caster: {}", imp.instances.len(), imp.textures, c.text()));
-    t.ok(imp.notes.is_empty() && imp.sheared == 0, &format!("{level}: upload's notes: {:?}", imp.notes));
+    let tangents = imp.notes.len() == 1 && imp.notes[0].contains("MikkTSpace");
+    t.ok(tangents && imp.sheared == 0, &format!("{level}: upload's notes (the normal map's tangent frame only): {:?}", imp.notes));
     Some(())
 }
 

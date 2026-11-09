@@ -5,7 +5,8 @@
 //   build/win/symboltest.exe --script apps/symboltest/tests/sheet.uis
 //   build/win/symboltest.exe          (the sheet in a window; the button switches the theme)
 //
-// The art comes from apps/JFNetworker/icons/*.svg through tools/vsym.py; the symbols are
+// The art comes from JFNetworker's icons/*.svg (https://github.com/JFLibrary/JFNetworker) through tools/vsym.py
+// (symbols_data.rs is a copy of its generated table); the symbols are
 // parsed once and drawn from a SymbolCache (rasters), above 256 px as vectors.
 #![no_std]
 #![no_main]
@@ -20,7 +21,7 @@ use core::cell::{Cell, RefCell};
 
 use ui::*;
 
-#[path = "../JFNetworker/src/workspace/icons/symbols_data.rs"]
+#[path = "symbols_data.rs"]
 mod symbols_data;
 use symbols_data::{SYMBOLS, SYMBOL_GRID};
 

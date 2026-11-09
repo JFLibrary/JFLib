@@ -113,7 +113,6 @@ DOCS = [
     ("apps/jfWord/README.md", "jfWord", "Apps", "de", "Document editing and current feature coverage"),
     ("apps/buildManager/README.md", "Build Manager", "Apps", "en", "Profiles, queue, tests, launching, and releases"),
     ("apps/BackupCraft/README.md", "BackupCraft", "Apps", "en", "Server, agents, console and bcctl: setup, architecture, security model, tests"),
-    ("apps/JFNetworker/README.md", "JFNetworker", "Apps", "de", "A network simulator and lab for distributed systems"),
     ("apps/androidGallery/README.md", "Android Gallery", "Apps", "de", "APKs, Android prerequisites, input, and port status"),
     ("styles/jfoffice/README.md", "jfOffice style", "Apps", "de", "The style of the office apps"),
     ("CHANGELOG.md", "Changelog", "Project", "en", "What changed in each release of the library"),

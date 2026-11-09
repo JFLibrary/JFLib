@@ -1,6 +1,6 @@
 """vsym.py -- multi-colour vector symbols for ui::Symbol (lib/ui/symbol.rs) from SVG files.
 
-    python tools/vsym.py apps/JFNetworker
+    python tools/vsym.py APPDIR        (JFNetworker: python ../JFLib/tools/vsym.py . in its repository)
 
 reads DIR/icons/*.svg (viewBox "0 0 64 48") and writes DIR/src/workspace/icons/symbols_data.rs:
 

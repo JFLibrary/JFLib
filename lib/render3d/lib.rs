@@ -1,5 +1,5 @@
-// render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
-// a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+// render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+// a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
 // instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
 // anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
 // per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
@@ -22,8 +22,9 @@
 //        materials, and its instances for a Scene (gltf.rs)
 //
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
-// of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
-// linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+// of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
+// units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
+// Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
 // origin on the GPU.
 //
 // Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -39,12 +40,18 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use gpu::*;
 
+mod dfg;
+mod env;
 pub mod gltf;
 pub mod math;
 mod scene;
+mod shadow;
 mod texture;
 
-pub use scene::{Camera, FrameStats, Instance, InstanceId, ListInfo, Scene, Sun, Transform, UploadInfo};
+pub use dfg::{DFG, DFG_N, dfg_table};
+pub use env::{Environment, EnvironmentData, SKY_SIZE, Sky, env_dir, env_face, from_half, to_half};
+pub use shadow::{CASCADES_MAX, Cascade, Shadows};
+pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
@@ -53,9 +60,16 @@ pub const DEPTH_CLEAR: f32 = 0.0;
 pub const FRAMES_MAX: usize = 3;
 
 pub(crate) const VIEW_BYTES: u64 = 176;
-pub(crate) const LIGHTS_BYTES: u64 = 48;
+/// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes, the environment
+/// and its 9 harmonics
+pub(crate) const LIGHTS_BYTES: u64 = 480;
 /// where the lights lie in a frame's staging buffer (behind the view)
 pub(crate) const LIGHTS_AT: u64 = 256;
+/// (G5c) where the cascades' views lie in it, and how far apart
+pub(crate) const CASCADE_AT: u64 = 736;
+pub(crate) const CASCADE_STRIDE: u64 = 192;
+/// timestamps per frame: start, uploads, the camera's culling, 4 cascades' culling, 4 depth passes, the end
+pub(crate) const STAMPS: u32 = 12;
 pub(crate) const INSTANCE_WORDS: usize = 16;
 pub(crate) const CHANGE_WORDS: usize = 24;
 const MATERIAL_WORDS: usize = 20;
@@ -83,6 +97,12 @@ pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 pub const VS_SPV: &[u32] = spv::VS;
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_SPV: &[u32] = spv::FS;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_SHADOW_SPV: &[u32] = spv::VS_SHADOW;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW;
 
 /// Renderer::new
 #[derive(Clone, Copy, Debug)]
@@ -131,23 +151,29 @@ pub struct MeshInfo {
     pub radius: f64,
 }
 
-/// a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
-/// texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
-/// What reaches the target is opaque (alpha 1)
+/// a row of the material table: glTF's metallic-roughness material, shaded as glTF 2.0 Appendix B says (G5c;
+/// draw.wgsl).  Fragments whose alpha is below alpha_cutoff are dropped.  What reaches the target is opaque
+/// (alpha 1)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Material {
     /// linear rgb and alpha (the texture's sRGB is decoded first)
     pub base_color: [f32; 4],
+    /// 0 ..= 1 (clamped in the shader, after the texture)
     pub metallic: f32,
     pub roughness: f32,
+    /// linear radiance (before the exposure)
     pub emissive: [f32; 3],
     pub base_color_texture: Option<TextureRef>,
-    /// linear: roughness in g, metallic in b
+    /// linear: roughness in g, metallic in b (times the factors)
     pub metallic_roughness_texture: Option<TextureRef>,
+    /// linear, glTF's tangent space (+y up in the image); the tangent frame comes from the derivatives
+    /// (docs/RENDER3D.md: how that differs from MikkTSpace); scale multiplies x and y
     pub normal_texture: Option<TextureRef>,
     pub normal_scale: f32,
+    /// linear, r: how much of the ambient (indirect) light reaches the surface, 1 + strength (r - 1)
     pub occlusion_texture: Option<TextureRef>,
     pub occlusion_strength: f32,
+    /// sRGB, times emissive
     pub emissive_texture: Option<TextureRef>,
     /// glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
     pub alpha_cutoff: Option<f32>,
@@ -240,6 +266,13 @@ pub struct Renderer {
     /// front faces counter-clockwise; clockwise for the lists of mirrored instances
     draw: RenderPipeline,
     draw_mirrored: RenderPipeline,
+    /// (G5c) the shadow passes: depth only (MASK casts full shadows), or with fs_shadow (its holes)
+    shadow_depth: RenderPipeline,
+    shadow_mask: RenderPipeline,
+    mask_in_shadow: bool,
+    pub(crate) shadow: shadow::ShadowMap,
+    /// (G5c) the environment as the GPU holds it, None before set_environment
+    pub(crate) env: Option<Environment>,
     pub(crate) textures: texture::Textures,
     pub(crate) cull_layout: BindGroupLayout,
     pub(crate) scatter_layout: BindGroupLayout,
@@ -264,16 +297,28 @@ pub struct Renderer {
     depth_used: Cell<bool>,
 }
 
+struct Modules {
+    cull: ShaderModule,
+    scatter: ShaderModule,
+    vs: ShaderModule,
+    fs: ShaderModule,
+    vs_depth: ShaderModule,
+    vs_shadow: ShaderModule,
+    fs_shadow: ShaderModule,
+}
+
 #[cfg(not(target_arch = "wasm32"))]
-fn modules(dev: &Device) -> Result<(ShaderModule, ShaderModule, ShaderModule, ShaderModule)> {
-    Ok((ShaderModule::from_spirv(dev, CULL_SPV)?, ShaderModule::from_spirv(dev, SCATTER_SPV)?, ShaderModule::from_spirv(dev, VS_SPV)?,
-        ShaderModule::from_spirv(dev, FS_SPV)?))
+fn modules(dev: &Device) -> Result<Modules> {
+    let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
+    Ok(Modules { cull: m(CULL_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
+                 fs_shadow: m(FS_SHADOW_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
-fn modules(dev: &Device) -> Result<(ShaderModule, ShaderModule, ShaderModule, ShaderModule)> {
+fn modules(dev: &Device) -> Result<Modules> {
     let d = ShaderModule::from_wgsl(dev, DRAW_WGSL)?;
-    Ok((ShaderModule::from_wgsl(dev, CULL_WGSL)?, ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, d.clone(), d))
+    Ok(Modules { cull: ShaderModule::from_wgsl(dev, CULL_WGSL)?, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(), fs: d.clone(), vs_depth: d.clone(),
+                 vs_shadow: d.clone(), fs_shadow: d })
 }
 
 impl Renderer {
@@ -281,7 +326,7 @@ impl Renderer {
         if !(1..=FRAMES_MAX).contains(&desc.frames_in_flight) {
             return Err(GpuError::Invalid("frames_in_flight: 1 ..= 3"));
         }
-        let (cull_m, scatter_m, vs, fs) = modules(dev)?;
+        let md = modules(dev)?;
         let b = |binding, kind, stages| Binding { binding, kind, stages };
         let (cs, vf) = (Stages::COMPUTE, Stages::VERTEX);
         let cull_layout = dev.create_bind_group_layout(&[
@@ -299,23 +344,28 @@ impl Renderer {
             b(3, BindingKind::StorageBuffer, cs),
         ])?;
         let draw_layout = dev.create_bind_group_layout(&[
-            b(0, BindingKind::UniformBuffer, vf),
+            b(0, BindingKind::UniformBuffer, vf | Stages::FRAGMENT),
             b(1, BindingKind::StorageBufferRead, vf),
             b(2, BindingKind::UniformBuffer, Stages::FRAGMENT),
             b(3, BindingKind::StorageBufferRead, Stages::FRAGMENT),
             b(4, BindingKind::StorageBufferRead, vf),
             b(5, BindingKind::StorageBufferRead, vf),
+            // (G5c) the point and spot lights
+            b(6, BindingKind::StorageBufferRead, Stages::FRAGMENT),
         ])?;
         let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 8 })?;
         let scatter_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&scatter_layout], push_constants: 4 })?;
         let textures = texture::Textures::new(dev)?;
-        let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout], push_constants: 4 })?;
-        let cull = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&cull_m, "main") })?;
-        let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&scatter_m, "main") })?;
+        let shadow = shadow::ShadowMap::new(dev)?;
+        // group 2 (the shadow map) is the main pass's alone: the shadow passes write it
+        let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout, &shadow.layout], push_constants: 4 })?;
+        let shadow_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout], push_constants: 4 })?;
+        let cull = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull, "main") })?;
+        let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
         let pipeline = |front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &draw_pl,
-            vertex: ShaderStage::new(&vs, "vs"),
-            fragment: Some(ShaderStage::new(&fs, "fs")),
+            vertex: ShaderStage::new(&md.vs, "vs"),
+            fragment: Some(ShaderStage::new(&md.fs, "fs")),
             buffers: &[],
             topology: Topology::Triangles,
             cull: Cull::Back,
@@ -324,6 +374,20 @@ impl Renderer {
             depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
         });
         let (draw, draw_mirrored) = (pipeline(false)?, pipeline(true)?);
+        // both sides of every triangle cast (glTF's single-sided plates too)
+        let depth_only = |vertex: ShaderStage, fragment: Option<ShaderStage>| dev.create_render_pipeline(&RenderPipelineDesc {
+            layout: &shadow_pl,
+            vertex,
+            fragment,
+            buffers: &[],
+            topology: Topology::Triangles,
+            cull: Cull::None,
+            front_cw: false,
+            targets: &[],
+            depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
+        });
+        let shadow_depth = depth_only(ShaderStage::new(&md.vs_depth, "vs_depth"), None)?;
+        let shadow_mask = depth_only(ShaderStage::new(&md.vs_shadow, "vs_shadow"), Some(ShaderStage::new(&md.fs_shadow, "fs_shadow")))?;
         let (f, l) = (dev.features(), dev.limits());
         let multi = dev.level() == Level::Voll && f.multi_draw_indirect && f.draw_indirect_first_instance;
         // what the bindings and one dispatch can reach
@@ -354,6 +418,11 @@ impl Renderer {
             scatter,
             draw,
             draw_mirrored,
+            shadow_depth,
+            shadow_mask,
+            mask_in_shadow: true,
+            shadow,
+            env: None,
             textures,
             cull_layout,
             scatter_layout,
@@ -373,6 +442,34 @@ impl Renderer {
     /// the most instances a scene can hold on this device
     pub fn max_instances(&self) -> u32 {
         self.max_instances
+    }
+
+    /// (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
+    /// (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+    pub fn set_shadow_mask(&mut self, on: bool) {
+        self.mask_in_shadow = on;
+    }
+
+    /// (G5c) the environment's light: a procedural sky or six faces, prefiltered on the CPU (the levels of a
+    /// cube texture per roughness, 9 harmonics for the diffuse part); scenes take it with
+    /// Scene::set_environment.  The upload goes with the next submission
+    pub fn set_environment(&mut self, d: &EnvironmentData) -> Result<()> {
+        let (size, levels, sh) = env::build(d)?;
+        let (tex, held) = env::upload(&self.dev, size, &levels)?;
+        self.shadow.set_env(&self.dev, tex)?;
+        let sh = sh.map(|c| [c[0] as f32, c[1] as f32, c[2] as f32]);
+        self.env = Some(Environment { size, levels: held, sh });
+        Ok(())
+    }
+
+    /// (G5c; tests, tools) the environment as the GPU holds it
+    pub fn environment(&self) -> Option<&Environment> {
+        self.env.as_ref()
+    }
+
+    /// (G5c; tests) the sun's shadow map: CASCADES_MAX layers of Depth32Float, in Layout::Sampled between frames
+    pub fn shadow_map(&self) -> &Texture {
+        &self.shadow.tex
     }
 
     /// a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
@@ -565,17 +662,31 @@ impl Renderer {
             }
         };
         let f = &s.frames[s.slot];
-        if let Some(ts) = &s.ts {
-            if s.stats_on {
-                e.reset_timestamps(ts, s.slot as u32 * 4, 4);
-                e.timestamp(ts, s.slot as u32 * 4);
-            }
+        let ts = match &s.ts {
+            Some(ts) if s.stats_on => Some(ts),
+            _ => None,
+        };
+        let base = s.slot as u32 * STAMPS;
+        if let Some(ts) = ts {
+            e.reset_timestamps(ts, base, STAMPS);
+            e.timestamp(ts, base);
         }
-        // the frame before read and wrote everything this one writes
+        let cascades = s.cascades().len();
+        // the frame before read and wrote everything this one writes (the shadow map: its passes' own layout
+        // transitions, Sampled -> DepthTarget -> Sampled)
         e.barrier(Access::COPY_READ | Access::COPY_WRITE | Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::INDIRECT | Access::INDEX_VERTEX | Access::GRAPHICS_READ,
                   Access::COPY_READ | Access::COPY_WRITE | Access::COMPUTE_READ | Access::COMPUTE_WRITE);
         e.copy_buffer(&f.stage, 0, &s.view.ubo, 0, VIEW_BYTES);
         e.copy_buffer(&f.stage, LIGHTS_AT, &s.lights, 0, LIGHTS_BYTES);
+        for k in 0..cascades {
+            e.copy_buffer(&f.stage, CASCADE_AT + k as u64 * CASCADE_STRIDE, &s.cascades[k].ubo, 0, VIEW_BYTES);
+        }
+        // (G5c) the point and spot lights, when they changed (the barrier below makes them visible to the
+        // fragment shader; the one above waited for the frame before's reads)
+        if let (n @ 1.., Some(up)) = (s.punctual_up, &f.punctual) {
+            e.copy_buffer(up, 0, &s.punctual_buf, 0, n as u64 * scene::PUNCTUAL_BYTES);
+        }
+
         if !self.material_up_done.replace(true) {
             if let Some((up, at, size)) = &self.material_up {
                 e.copy_buffer(up, 0, &self.material_buf, *at, *size);
@@ -602,24 +713,53 @@ impl Renderer {
         }
         if lists > 0 {
             e.copy_buffer(&s.template, 0, &s.view.draws, 0, lists * DRAW_BYTES);
+            for v in &s.cascades[..cascades] {
+                e.copy_buffer(&s.template, 0, &v.draws, 0, lists * DRAW_BYTES);
+            }
         }
+        // the copies (views, lights, draw records from the template, changes) and scatter's writes before culling
+        // reads them and before the vertex and fragment shaders read views, lights, instances and materials
         e.barrier(Access::COPY_WRITE | Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE | Access::GRAPHICS_READ);
-        if let (Some(ts), true) = (&s.ts, s.stats_on) {
-            e.timestamp(ts, s.slot as u32 * 4 + 1);
+        if let Some(ts) = ts {
+            e.timestamp(ts, base + 1);
         }
         self.cull(e, s, &s.view);
-        if let (Some(ts), true) = (&s.ts, s.stats_on) {
-            e.timestamp(ts, s.slot as u32 * 4 + 2);
+        if let Some(ts) = ts {
+            e.timestamp(ts, base + 2);
         }
+        // (G5c) each cascade's own visibility: its planes, its counts and lists, nothing shared written
+        for k in 0..CASCADES_MAX {
+            if k < cascades {
+                self.cull(e, s, &s.cascades[k]);
+            }
+            if let Some(ts) = ts {
+                e.timestamp(ts, base + 3 + k as u32);
+            }
+        }
+        // every view's counts and lists before the indirect draws and the vertex shaders read them
         e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
         if let (true, Some(rb), true) = (s.stats_on, &f.readback, lists > 0) {
             e.copy_buffer(&s.view.draws, 0, rb, 0, lists * DRAW_BYTES);
         }
+        // (G5c) a depth pass per cascade into its layer; the pass's barriers: Sampled -> DepthTarget waits for
+        // the shaders that read the map before (the last frame's main pass), DepthTarget -> Sampled makes the
+        // depth writes visible to the shaders after (this frame's main pass)
+        for k in 0..CASCADES_MAX {
+            if k < cascades {
+                let layer = DepthAttachment { view: &self.shadow.layers[k], load: Load::Clear, clear: DEPTH_CLEAR, store: true, before: Layout::Sampled, after: Layout::Sampled };
+                e.begin_render(&RenderPassDesc { color: &[], depth: Some(layer) });
+                self.draw_shadow(e, s, &s.cascades[k]);
+                e.end_render();
+            }
+            if let Some(ts) = ts {
+                e.timestamp(ts, base + 7 + k as u32);
+            }
+        }
         e.begin_render(&RenderPassDesc { color: &[color], depth: Some(depth) });
         self.draw_lists(e, s, &s.view);
         e.end_render();
-        if let (Some(ts), true) = (&s.ts, s.stats_on) {
-            e.timestamp(ts, s.slot as u32 * 4 + 3);
+        if let Some(ts) = ts {
+            e.timestamp(ts, base + 11);
         }
         if s.stats_on {
             e.barrier(Access::COPY_WRITE, Access::HOST_READ);
@@ -627,8 +767,37 @@ impl Renderer {
         Ok(())
     }
 
-    /// one view's visibility (outside a pass).  A later view, a shadow cascade (G5c) or the second round
-    /// of Hi-Z (G5d), is a ViewLists of its own through this function
+    /// (G5c) one cascade's lists into its depth pass: one pipeline for both sides (no culling of faces)
+    fn draw_shadow<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
+        if !s.lists.iter().any(|l| l.count > 0) {
+            return;
+        }
+        e.set_render_pipeline(if self.mask_in_shadow { &self.shadow_mask } else { &self.shadow_depth });
+        e.set_bind_group(0, &v.render);
+        e.set_bind_group(1, &self.textures.group);
+        if self.multi {
+            e.push_constants(0, &[0u32]);
+            for &(first, count, wide, _) in &s.runs {
+                self.bind_indices(e, wide);
+                e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
+            }
+        } else {
+            let mut bound = None;
+            for (i, l) in s.lists.iter().enumerate() {
+                if l.count > 0 {
+                    if bound != Some(l.wide) {
+                        self.bind_indices(e, l.wide);
+                        bound = Some(l.wide);
+                    }
+                    e.push_constants(0, &[l.first]);
+                    e.draw_indexed_indirect(&v.draws, i as u64 * DRAW_BYTES);
+                }
+            }
+        }
+    }
+
+    /// one view's visibility (outside a pass): the camera's, a shadow cascade's (G5c), later the second round
+    /// of Hi-Z (G5d), each a ViewLists of its own
     fn cull<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
         let n = s.slots.len() as u32;
         if n == 0 {
@@ -656,8 +825,9 @@ impl Renderer {
                 continue;
             }
             e.set_render_pipeline(if mirrored { &self.draw_mirrored } else { &self.draw });
-            e.set_bind_group(0, &s.render_group);
+            e.set_bind_group(0, &v.render);
             e.set_bind_group(1, &self.textures.group);
+            e.set_bind_group(2, &self.shadow.group);
             if self.multi {
                 // lists side by side with the same width of indices and side are one multi-draw (usually all)
                 e.push_constants(0, &[0u32]);

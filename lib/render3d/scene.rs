@@ -23,7 +23,8 @@ use core::sync::atomic::Ordering;
 use gpu::*;
 
 use crate::math::{self, V3};
-use crate::{CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer};
+use crate::shadow::{self, CASCADES_MAX, Cascade, Shadows};
+use crate::{CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer, STAMPS};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
 /// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
@@ -127,17 +128,90 @@ impl Camera {
     }
 }
 
-/// one sun and an ambient light (linear colours)
+/// one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
+/// the sun shows color / pi, one under the ambient light alone shows ambient (before the exposure)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Sun {
     /// towards the sun, any length
     pub direction: [f64; 3],
+    /// illuminance per channel (lux)
     pub color: [f32; 3],
+    /// the radiance of a uniform environment around the scene
     pub ambient: [f32; 3],
 }
 
 impl Sun {
-    pub const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75; 3], ambient: [0.25; 3] };
+    /// a white matte face towards the sun shows 0.75 + 0.25 (0.75 pi lux, ambient 0.25)
+    pub const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75 * core::f32::consts::PI; 3], ambient: [0.25; 3] };
+}
+
+/// (G5c) a point or spot light (KHR_lights_punctual): no shadows
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LightKind {
+    Point,
+    /// cone angles from the axis in radians, 0 <= inner < outer <= pi / 2: full inside inner, nothing beyond outer
+    Spot { inner: f32, outer: f32 },
+}
+
+/// (G5c) a point or spot light of a Scene
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Light {
+    pub kind: LightKind,
+    pub pos: [f64; 3],
+    /// a spot light's axis, the way it shines (any length but 0)
+    pub direction: [f64; 3],
+    /// linear colour, and the intensity in candela: color * intensity / d^2 reaches a surface d away
+    pub color: [f32; 3],
+    pub intensity: f32,
+    /// where it ends, KHR_lights_punctual's window clamp(1 - (d / range)^4, 0, 1); None: never
+    pub range: Option<f32>,
+}
+
+impl Light {
+    /// a point light of colour times intensity at pos
+    pub const fn point(pos: [f64; 3], color: [f32; 3], intensity: f32, range: Option<f32>) -> Light {
+        Light { kind: LightKind::Point, pos, direction: [0.0, 0.0, -1.0], color, intensity, range }
+    }
+
+    fn check(&self) -> Result<()> {
+        let finite = self.pos.iter().chain(self.direction.iter()).all(|v| v.is_finite()) && self.color.iter().all(|v| v.is_finite() && *v >= 0.0)
+            && self.intensity.is_finite() && self.intensity >= 0.0 && self.range.is_none_or(|r| r.is_finite() && r > 0.0);
+        let cone = match self.kind {
+            LightKind::Point => true,
+            LightKind::Spot { inner, outer } => inner >= 0.0 && inner < outer && outer <= core::f32::consts::FRAC_PI_2 && math::len(self.direction) > 0.0,
+        };
+        if finite && cone { Ok(()) } else { Err(GpuError::Invalid("Light: finite values, colour and intensity not negative, range above 0, 0 <= inner < outer <= pi / 2")) }
+    }
+
+    /// draw.wgsl's Punctual relative to origin: position and range (0: none), colour times intensity and the
+    /// kind (1: spot), the axis, the cone as scale and offset of cos (KHR_lights_punctual)
+    fn words(&self, origin: V3) -> [f32; 16] {
+        let p = math::sub(self.pos, origin);
+        let c = self.color;
+        let k = self.intensity;
+        let (spot, d, scale, offset) = match self.kind {
+            LightKind::Point => (0.0, [0.0; 3], 0.0, 0.0),
+            LightKind::Spot { inner, outer } => {
+                let (ci, co) = (math::sincos(inner as f64).1, math::sincos(outer as f64).1);
+                let scale = 1.0 / (ci - co).max(0.001);
+                (1.0, math::norm(self.direction), scale, -co * scale)
+            }
+        };
+        [p[0] as f32, p[1] as f32, p[2] as f32, self.range.unwrap_or(0.0), c[0] * k, c[1] * k, c[2] * k, spot, d[0] as f32, d[1] as f32, d[2] as f32, 0.0,
+         scale as f32, offset as f32, 0.0, 0.0]
+    }
+}
+
+/// bytes of a light on the GPU
+pub(crate) const PUNCTUAL_BYTES: u64 = 64;
+
+/// what the fragment shader does with the light it computed (times the exposure)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tonemap {
+    /// Khronos PBR Neutral: base colours stay up to 0.76, highlights are compressed towards white
+    Neutral,
+    /// none: linear values, clamped by the target's format (HDR targets such as Rgba16Float keep them)
+    None,
 }
 
 /// what prepare sent for this frame
@@ -173,9 +247,13 @@ pub struct FrameStats {
     pub frame: u64,
     /// instances the compute shader found visible
     pub visible: u64,
-    /// the GPU's clock (ms) at the start, after the uploads, after culling, after the render pass (no
+    /// the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
     /// timestamps here: None)
     pub stamps: Option<[f64; 4]>,
+    /// (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
+    pub cascades: [[f64; 2]; CASCADES_MAX],
+    /// (G5c) the main render pass, ms
+    pub draw: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -201,18 +279,22 @@ pub(crate) struct List {
     pub wide: bool,
 }
 
-/// one view's data of a frame: its uniform block, its lists.  G5a has the camera's; shadow cascades (G5c)
-/// and the second round of Hi-Z (G5d) add more of these (the layout of the lists is the scene's)
+/// one view's data of a frame: its uniform block, its lists, its bind groups for culling and drawing.  The
+/// camera's, one per shadow cascade (G5c); the second round of Hi-Z (G5d) adds more (the layout of the lists
+/// is the scene's)
 pub(crate) struct ViewLists {
     pub ubo: Buffer,
     pub draws: Buffer,
     pub visible: Buffer,
     pub group: BindGroup,
+    pub render: BindGroup,
 }
 
 /// a frame in flight's own data
 pub(crate) struct FrameSlot {
     pub stage: Buffer,
+    /// (G5c) the point and spot lights of a frame that sends them
+    pub punctual: Option<Buffer>,
     changes: Option<Buffer>,
     pub scatter_group: Option<BindGroup>,
     pub readback: Option<Buffer>,
@@ -236,6 +318,19 @@ pub struct Scene {
     live: u32,
     camera: Camera,
     sun: Sun,
+    shadows: Option<Shadows>,
+    cascade_info: Vec<Cascade>,
+    /// (G5c) the renderer's environment times this instead of Sun::ambient
+    environment: Option<f32>,
+    /// (G5c) the point and spot lights; their buffer, its room, whether they go up with the next frame
+    punctual: Vec<Light>,
+    pub(crate) punctual_buf: Buffer,
+    punctual_cap: u32,
+    punctual_dirty: bool,
+    /// lights this frame copies from its slot's buffer
+    pub(crate) punctual_up: u32,
+    exposure: f32,
+    tonemap: Tonemap,
     origin: V3,
     pub(crate) culling: bool,
     pub(crate) stats_on: bool,
@@ -249,7 +344,8 @@ pub struct Scene {
     pub(crate) template: Buffer,
     pub(crate) list_first: Buffer,
     pub(crate) view: ViewLists,
-    pub(crate) render_group: BindGroup,
+    /// (G5c) one per cascade of the sun, made when shadows want them
+    pub(crate) cascades: Vec<ViewLists>,
     pub(crate) frames: Vec<FrameSlot>,
     pub(crate) ts: Option<Timestamps>,
     seen_materials: u32,
@@ -286,12 +382,25 @@ fn cull_group(dev: &Device, r: &Renderer, ubo: &Buffer, spheres: &Buffer, list_o
     })
 }
 
-fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, lights: &Buffer, visible: &Buffer) -> Result<BindGroup> {
+#[allow(clippy::too_many_arguments)]
+fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, lights: &Buffer, visible: &Buffer, punctual: &Buffer) -> Result<BindGroup> {
     dev.create_bind_group(&BindGroupDesc {
         layout: &r.draw_layout,
         entries: &[entry(0, ubo), entry(1, instances), entry(2, lights), entry(3, &r.material_buf), entry(4, visible),
-                   entry(5, &r.vertices.buf)],
+                   entry(5, &r.vertices.buf), entry(6, punctual)],
     })
+}
+
+/// the buffers of a view of the scene's sizes, and its groups
+#[allow(clippy::too_many_arguments)]
+fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spheres: &Buffer, list_of: &Buffer, list_first: &Buffer, instances: &Buffer,
+              lights: &Buffer, punctual: &Buffer) -> Result<ViewLists> {
+    let ubo = dev.create_buffer(&BufferDesc { size: crate::VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
+    let draws = storage(dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+    let visible = storage(dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
+    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible)?;
+    let render = render_group(dev, r, &ubo, instances, lights, &visible, punctual)?;
+    Ok(ViewLists { ubo, draws, visible, group, render })
 }
 
 /// the record of a slot: its bounding sphere relative to origin, safe against what f32 rounds (nothing
@@ -331,18 +440,16 @@ impl Scene {
         let spheres = storage(&dev, cap as u64 * 16, none)?;
         let list_of = storage(&dev, cap as u64 * 4, none)?;
         let instances = storage(&dev, cap as u64 * 64, none)?;
-        let device_uniform = |size: u64| dev.create_buffer(&BufferDesc { size, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device });
-        let (ubo, lights) = (device_uniform(crate::VIEW_BYTES)?, device_uniform(crate::LIGHTS_BYTES)?);
+        let lights = dev.create_buffer(&BufferDesc { size: crate::LIGHTS_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
         let template = dev.create_buffer(&BufferDesc { size: list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
         let list_first = storage(&dev, list_cap as u64 * 4, none)?;
-        let draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
-        let visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
-        let group = cull_group(&dev, r, &ubo, &spheres, &list_of, &list_first, &draws, &visible)?;
-        let rg = render_group(&dev, r, &ubo, &instances, &lights, &visible)?;
+        let punctual_cap = 16u32;
+        let punctual_buf = storage(&dev, punctual_cap as u64 * PUNCTUAL_BYTES, none)?;
+        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf)?;
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            let stage = dev.create_buffer(&BufferDesc { size: LIGHTS_AT + crate::LIGHTS_BYTES, usage: none, memory: MemoryKind::Upload })?;
-            frames.push(FrameSlot { stage, changes: None, scatter_group: None, readback: None, last: None });
+            let stage = dev.create_buffer(&BufferDesc { size: CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64, usage: none, memory: MemoryKind::Upload })?;
+            frames.push(FrameSlot { stage, punctual: None, changes: None, scatter_group: None, readback: None, last: None });
         }
         Ok(Scene {
             counts: r.counts.clone(),
@@ -357,6 +464,16 @@ impl Scene {
             live: 0,
             camera: Camera::look_at([0.0, 0.0, 5.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY),
             sun: Sun::DEFAULT,
+            shadows: None,
+            cascade_info: Vec::new(),
+            environment: None,
+            punctual: Vec::new(),
+            punctual_buf,
+            punctual_cap,
+            punctual_dirty: false,
+            punctual_up: 0,
+            exposure: 1.0,
+            tonemap: Tonemap::Neutral,
             origin: [0.0; 3],
             culling: true,
             stats_on: false,
@@ -369,8 +486,8 @@ impl Scene {
             lights,
             template,
             list_first,
-            view: ViewLists { ubo, draws, visible, group },
-            render_group: rg,
+            view,
+            cascades: Vec::new(),
             frames,
             ts: None,
             seen_materials: r.bindings_gen,
@@ -567,12 +684,72 @@ impl Scene {
         self.sun = *s;
     }
 
+    /// what the light is multiplied by before the tone mapper (1 at first; not finite: 1)
+    pub fn set_exposure(&mut self, e: f32) {
+        self.exposure = if e.is_finite() { e } else { 1.0 };
+    }
+
+    pub fn exposure(&self) -> f32 {
+        self.exposure
+    }
+
+    /// Tonemap::Neutral at first
+    pub fn set_tonemap(&mut self, t: Tonemap) {
+        self.tonemap = t;
+    }
+
+    /// (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
+    pub fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()> {
+        if let Some(s) = s {
+            s.check()?;
+        }
+        self.shadows = s.copied();
+        Ok(())
+    }
+
+    pub fn shadows(&self) -> Option<Shadows> {
+        self.shadows
+    }
+
+    /// (G5c) Some(k): the renderer's environment (Renderer::set_environment) times k lights the scene in place of
+    /// Sun::ambient (until it has one, Sun::ambient does); None (at first): Sun::ambient
+    pub fn set_environment(&mut self, k: Option<f32>) {
+        self.environment = k.filter(|v| v.is_finite() && *v >= 0.0);
+    }
+
+    /// (G5c) the point and spot lights (all of them: they go up with the next frame); Invalid for values out of
+    /// range, and nothing changes then
+    pub fn set_lights(&mut self, lights: &[Light]) -> Result<()> {
+        for l in lights {
+            l.check()?;
+        }
+        self.punctual.clear();
+        self.punctual.extend_from_slice(lights);
+        self.punctual_dirty = true;
+        Ok(())
+    }
+
+    pub fn lights(&self) -> &[Light] {
+        &self.punctual
+    }
+
+    /// (G5c; tests, tools) the cascades the last prepare computed
+    pub fn cascades(&self) -> &[Cascade] {
+        &self.cascade_info
+    }
+
+    /// (G5c; tests, tools) a cascade's draw records and visible list after a frame's culling
+    pub fn cascade_buffers(&self, k: usize) -> Option<(&Buffer, &Buffer)> {
+        self.cascades.get(k).map(|v| (&v.draws, &v.visible))
+    }
+
     /// the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
     /// digits.  Moving it uploads every instance once
     pub fn set_origin(&mut self, origin: [f64; 3]) {
         if origin != self.origin {
             self.origin = origin;
             self.full_dirty = true;
+            self.punctual_dirty = true;
         }
     }
 
@@ -645,8 +822,18 @@ impl Scene {
         }
         let n = self.lists.len().min(draws.len() / 5);
         let visible = (0..n).map(|i| draws[i * 5 + 1] as u64).sum();
-        let stamps = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * 4, 4).ok()).map(|v| [v[0], v[1], v[2], v[3]]);
-        self.finished.push(FrameStats { frame, visible, stamps });
+        let v = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * STAMPS, STAMPS).ok());
+        let mut cascades = [[0.0; 2]; CASCADES_MAX];
+        let mut draw = 0.0;
+        if let Some(v) = &v {
+            // stamps: 0 start, 1 uploads, 2 the camera's culling, 3 + k cascade k's culling, 7 + k its pass, 11 the end
+            for (k, c) in cascades.iter_mut().enumerate() {
+                *c = [v[3 + k] - v[2 + k], v[7 + k] - v[6 + k]];
+            }
+            draw = v[11] - v[10];
+        }
+        let stamps = v.map(|v| [v[0], v[1], v[2], v[11]]);
+        self.finished.push(FrameStats { frame, visible, stamps, cascades, draw });
     }
 
     /// the finished frames' stats since the last call
@@ -682,11 +869,12 @@ impl Scene {
             groups = true;
         }
         let lists = self.lists.len() as u32;
+        let mut draws_new = false;
         if lists > self.list_cap {
             self.list_cap = lists.max(self.list_cap * 2);
             self.template = dev.create_buffer(&BufferDesc { size: self.list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
             self.list_first = storage(&dev, self.list_cap as u64 * 4, none)?;
-            self.view.draws = storage(&dev, self.list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+            draws_new = true;
             self.lists_dirty = true;
             groups = true;
         }
@@ -694,22 +882,47 @@ impl Scene {
         if room > u32::MAX as u64 {
             return Err(GpuError::Unsupported("Scene: the visible lists have grown too large"));
         }
+        let mut visible_new = false;
         if room as u32 > self.visible_cap {
             self.visible_cap = (room as u32).max(self.visible_cap.saturating_mul(2));
-            self.view.visible = storage(&dev, self.visible_cap as u64 * 4, BufferUsage::NONE)?;
+            visible_new = true;
             groups = true;
         }
+        // (G5c) room for the point and spot lights
+        let mut punctual_new = false;
+        if self.punctual.len() as u32 > self.punctual_cap {
+            self.punctual_cap = (self.punctual.len() as u32).max(self.punctual_cap * 2);
+            self.punctual_buf = storage(&dev, self.punctual_cap as u64 * PUNCTUAL_BYTES, none)?;
+            self.punctual_dirty = true;
+            punctual_new = true;
+        }
+        // (G5c) a view per cascade of the sun's shadows
+        let want = self.shadows.map_or(0, |s| s.cascades as usize);
+        while self.cascades.len() < want {
+            let v = view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights, &self.punctual_buf)?;
+            self.cascades.push(v);
+        }
+        let (list_cap, visible_cap) = (self.list_cap, self.visible_cap);
+        for v in core::iter::once(&mut self.view).chain(self.cascades.iter_mut()) {
+            if draws_new {
+                v.draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+            }
+            if visible_new {
+                v.visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
+            }
+            if groups {
+                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible)?;
+            }
+            if groups || punctual_new || self.seen_materials != r.bindings_gen {
+                v.render = render_group(&dev, r, &v.ubo, &self.instances, &self.lights, &v.visible, &self.punctual_buf)?;
+            }
+        }
         if groups {
-            let v = &mut self.view;
-            v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible)?;
             for f in &mut self.frames {
                 f.scatter_group = None;
             }
         }
-        if groups || self.seen_materials != r.bindings_gen {
-            self.render_group = render_group(&dev, r, &self.view.ubo, &self.instances, &self.lights, &self.view.visible)?;
-            self.seen_materials = r.bindings_gen;
-        }
+        self.seen_materials = r.bindings_gen;
         Ok(())
     }
 
@@ -853,6 +1066,7 @@ impl Scene {
         if self.sent {
             self.full_dirty = true;
             self.lists_dirty = true;
+            self.punctual_dirty = true;
             r.resend_materials();
         }
         self.sent = true;
@@ -869,7 +1083,7 @@ impl Scene {
         // this device's stats need a read-back per frame and timestamps
         if self.stats_on {
             if self.ts.is_none() && self.dev.features().timestamps {
-                self.ts = Some(self.dev.create_timestamps(4 * self.frames.len() as u32)?);
+                self.ts = Some(self.dev.create_timestamps(STAMPS * self.frames.len() as u32)?);
             }
             let size = self.list_cap as u64 * DRAW_BYTES;
             let f = &mut self.frames[slot];
@@ -885,11 +1099,53 @@ impl Scene {
         }
         let s = &self.sun;
         let d = math::norm(s.direction);
-        let lights = [d[0] as f32, d[1] as f32, d[2] as f32, 0.0, s.color[0], s.color[1], s.color[2], 0.0, s.ambient[0], s.ambient[1], s.ambient[2], 0.0];
+        let tm = if self.tonemap == Tonemap::Neutral { 1.0 } else { 0.0 };
+        let mut lights = [0.0f32; crate::LIGHTS_BYTES as usize / 4];
+        lights[..12].copy_from_slice(&[d[0] as f32, d[1] as f32, d[2] as f32, self.exposure, s.color[0], s.color[1], s.color[2], tm, s.ambient[0], s.ambient[1], s.ambient[2], 0.0]);
+        // (G5c) the sun's cascades
+        self.cascade_info = match &self.shadows {
+            Some(sh) => {
+                r.shadow.ensure(&self.dev, sh.size)?;
+                shadow::cascades(&self.camera, s.direction, sh)
+            }
+            None => Vec::new(),
+        };
+        lights[12] = self.cascade_info.len() as f32;
+        lights[13] = self.shadows.map_or(1.0, |sh| sh.size as f32);
+        // (G5c) the environment: on (its strength), its cube's top level, the harmonics
+        if let (Some(k), Some(env)) = (self.environment, &r.env) {
+            lights[80] = k.max(1e-30);
+            lights[81] = (env.levels.len() - 1) as f32;
+            for (i, c) in env.sh.iter().enumerate() {
+                lights[84 + i * 4..87 + i * 4].copy_from_slice(c);
+            }
+        }
+        // (G5c) the point and spot lights, when they changed (or the origin did, or what went up was lost)
+        lights[14] = self.punctual.len() as f32;
+        self.punctual_up = 0;
+        if self.punctual_dirty && !self.punctual.is_empty() {
+            let n = self.punctual.len();
+            let bytes = n as u64 * PUNCTUAL_BYTES;
+            let f = &mut self.frames[slot];
+            if f.punctual.as_ref().is_none_or(|b| b.size() < bytes) {
+                f.punctual = Some(self.dev.create_buffer(&BufferDesc { size: bytes.next_power_of_two().max(1024), usage: BufferUsage::NONE, memory: MemoryKind::Upload })?);
+            }
+            let words: Vec<[f32; 16]> = self.punctual.iter().map(|l| l.words(self.origin)).collect();
+            if let Some(b) = &f.punctual {
+                b.write(0, &words)?;
+            }
+            self.punctual_up = n as u32;
+            self.upload.bytes += bytes;
+        }
+        self.punctual_dirty = false;
         let f = &self.frames[slot];
+        for (k, c) in self.cascade_info.iter().enumerate() {
+            lights[16 + k * 16..32 + k * 16].copy_from_slice(&c.receiver(self.origin));
+            f.stage.write(CASCADE_AT + k as u64 * CASCADE_STRIDE, &c.view_block(self.origin))?;
+        }
         f.stage.write(0, &self.camera.view_block(self.origin))?;
         f.stage.write(LIGHTS_AT, &lights)?;
-        self.upload.bytes += crate::VIEW_BYTES + crate::LIGHTS_BYTES;
+        self.upload.bytes += crate::VIEW_BYTES * (1 + self.cascade_info.len() as u64) + crate::LIGHTS_BYTES;
         self.prepared = true;
         Ok(())
     }

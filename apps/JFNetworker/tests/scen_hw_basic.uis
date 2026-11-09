@@ -1,7 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/hw_basic.jfnet --scenario apps/JFNetworker/tests/scen/hw_basic.scn --golden apps/JFNetworker/tests/scen/hw_basic.report
-# golden scenario: the hardware of a device (jfn_sim's res.rs) on a metered project: a server's cores at
-# their closed form, top, free and lscpu with the real figures, a resize with a reboot and one live,
-# a slow CPU, a memory hog with page-ins and an out-of-memory kill.  The GUI program runs
-# tests/scen/hw_basic.scn on tests/fixtures/hw_basic.jfnet without a window and ends with the report,
-# which must equal tests/scen/hw_basic.report byte for byte on every target (the script itself is not
-# run)

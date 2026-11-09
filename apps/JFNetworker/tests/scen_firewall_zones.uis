@@ -1,7 +1,0 @@
-#!args apps/JFNetworker/tests/fixtures/firewall_zones.jfnet --scenario apps/JFNetworker/tests/scen/firewall_zones.scn --golden apps/JFNetworker/tests/scen/firewall_zones.report
-# golden scenario: three zones around a firewall: INNEN goes out with PAT and the answers come back
-# through sessions, from outside only web reaches the DMZ through a port forward, no rule means no way
-# (DMZ to inside, outside to inside), debug policy-firewall, the log, the show commands, the running
-# configuration and the sessions timing out.  The GUI program runs tests/scen/firewall_zones.scn on
-# tests/fixtures/firewall_zones.jfnet without a window and ends with the report, which must equal
-# tests/scen/firewall_zones.report byte for byte on every target (the script itself is not run)

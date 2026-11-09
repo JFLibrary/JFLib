@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use ::gltf as g;
 use gpu::*;
 
-use crate::{Instance, Material, MaterialId, MeshData, MeshId, Mip, Renderer, Sampling, TextureData, TextureId, TextureRef, Transform, Wrap};
+use crate::{Instance, Light, LightKind, Material, MaterialId, MeshData, MeshId, Mip, Renderer, Sampling, Sun, TextureData, TextureId, TextureRef, Transform, Wrap};
 
 /// what upload made of a Document
 #[derive(Clone, Debug, Default)]
@@ -33,6 +33,10 @@ pub struct Imported {
     /// instances whose world matrix has shear, which a Transform cannot hold (the largest |cos| between
     /// two axes above 1e-4); drawn without it
     pub sheared: u32,
+    /// (G5c) the scene's point and spot lights (KHR_lights_punctual), for Scene::set_lights
+    pub lights: Vec<Light>,
+    /// (G5c) its directional lights as suns (ambient 0); a Scene has one sun
+    pub suns: Vec<Sun>,
     /// what the engine leaves out (once each)
     pub notes: Vec<String>,
 }
@@ -116,6 +120,9 @@ pub fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Resu
         if m.double_sided {
             note(&mut out, String::from("double-sided materials are drawn from the front only"));
         }
+        if mat.normal_texture.is_some() {
+            note(&mut out, String::from("normal maps take the triangle's tangent frame from derivatives, not MikkTSpace (docs/RENDER3D.md)"));
+        }
         out.materials.push(r.add_material(&mat)?);
     }
     // (a Document's fields are public: one built by hand is checked here, not trusted)
@@ -152,6 +159,28 @@ pub fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Resu
     }
     if out.sheared > 0 {
         let s = format!("{} instances with shear in their world matrix, drawn without it", out.sheared);
+        note(&mut out, s);
+    }
+    // (G5c) KHR_lights_punctual: where the nodes put them, which way their -z points
+    for lr in doc.lights_of(scene) {
+        let Some(l) = doc.lights.get(lr.light) else { continue };
+        let (pos, dir) = (lr.position(), lr.direction());
+        if !pos.iter().chain(dir.iter()).all(|v| v.is_finite()) {
+            return Err(GpuError::Invalid("gltf::upload: a light's world matrix is not finite"));
+        }
+        let kind = match l.kind {
+            g::LightKind::Directional => {
+                let c = l.color;
+                out.suns.push(Sun { direction: [-dir[0], -dir[1], -dir[2]], color: [c[0] * l.intensity, c[1] * l.intensity, c[2] * l.intensity], ambient: [0.0; 3] });
+                continue;
+            }
+            g::LightKind::Point => LightKind::Point,
+            g::LightKind::Spot { inner, outer } => LightKind::Spot { inner, outer },
+        };
+        out.lights.push(Light { kind, pos, direction: dir, color: l.color, intensity: l.intensity, range: l.range });
+    }
+    if out.suns.len() > 1 {
+        let s = format!("{} directional lights: a scene has one sun (Imported::suns)", out.suns.len());
         note(&mut out, s);
     }
     Ok(out)

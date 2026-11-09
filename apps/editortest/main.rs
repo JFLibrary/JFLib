@@ -11,7 +11,7 @@
 // revision and the last activated link.  Tab "Code": the language (Rust, JSON, INI, TOML,
 // Markdown, Text, JFS), a sample per language, "100 000 Zeilen" (a generated file); the status
 // line shows the caret, the find matches and the lines tokenized in the last frame.
-// Diagnostics: "Prüfen" checks the text (JFS: apps/jfs/crates/script's check(); every language: an info
+// Diagnostics: "Prüfen" checks the text (JFS: JFScript's check(); every language: an info
 // at each "TODO"), "Beim Tippen" checks after every change; a second status line (once the
 // text was checked) shows the counts (`dg: E/W/I`), the diagnostic at the caret (`at: ...`,
 // ui.code_diag) and where the first six are now (`ds: line:col-line:col E|W|I`, they follow
@@ -21,7 +21,7 @@
 // of minified JSON of N bytes (default 100 000), `cmd 905 N` one line of Rust with umlauts, CJK
 // characters, emoji and tabs.
 // Language services (SK6; `cmd 906` on / off, off at the start so the other scripts keep their
-// layout): the editor gets apps/jfs/crates/script's services for JFS through ui.code_editor_with (JfsAssist:
+// layout): the editor gets JFScript's services for JFS through ui.code_editor_with (JfsAssist:
 // completion, hover, signature help), CE_BREAKPOINTS and the folding ranges of
 // script::ls::folding after every change; F12 / Ctrl+click, F2 (renames the name at the caret
 // to `neu` with script::ls::rename) and Shift+Alt+F (script::fmt::format_with) act on the
@@ -120,7 +120,7 @@ struct EdTest {
     folds_rev: Option<(u64, usize)>,
 }
 
-/// apps/jfs/crates/script's language services for JFS in the code editor
+/// JFScript's language services for JFS in the code editor
 struct JfsAssist;
 
 fn item_kind(k: script::ls::ItemKind) -> u8 {
@@ -312,9 +312,9 @@ fn main() { println!("fenced code"); }
 
 const TEXT_SAMPLE: &str = "Plain text without highlighting.\n\tA tab, wide characters 漢字 and an emoji 😀.\n";
 
-/// a script of apps/jfs/crates/script with interpolations, escapes, numbers, comments and (at the end)
+/// a script of JFScript with interpolations, escapes, numbers, comments and (at the end)
 /// an error, a warning and another error for "Prüfen"
-pub const JFS_SAMPLE: &str = r#"// JFS: a request counter for a virtual host (apps/jfs/crates/script)
+pub const JFS_SAMPLE: &str = r#"// JFS: a request counter for a virtual host (JFScript)
 let hits = 0
 let names = ["web", "db"]
 
@@ -342,7 +342,7 @@ break
 "#;
 
 /// the same script with English texts (the English UI)
-const JFS_SAMPLE_EN: &str = r#"// JFS: a request counter for a virtual host (apps/jfs/crates/script)
+const JFS_SAMPLE_EN: &str = r#"// JFS: a request counter for a virtual host (JFScript)
 let hits = 0
 let names = ["web", "db"]
 
@@ -386,7 +386,7 @@ fn highlighter(lang: i32) -> Highlighter {
     }
 }
 
-/// the checks of the code tab: apps/jfs/crates/script's for JFS (errors, warnings), an info at every
+/// the checks of the code tab: JFScript's for JFS (errors, warnings), an info at every
 /// "TODO" in any language
 pub fn check_code(doc: &CodeDoc, jfs: bool) -> Vec<Diag> {
     let mut d = Vec::new();
@@ -563,7 +563,7 @@ impl EdTest {
         }
     }
 
-    // the editor with apps/jfs/crates/script's services (JFS and cmd 906): folding ranges after each
+    // the editor with JFScript's services (JFS and cmd 906): folding ranges after each
     // change, the events of the last pass
     fn code_ls(&mut self, ui: &mut Ui, hl: &Highlighter, flags: u32) -> u32 {
         let key = (self.code.revision(), self.code.line_count());

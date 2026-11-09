@@ -84,11 +84,6 @@ members = [
     "apps/BackupCraft/crates/bc_tape",
     "apps/BackupCraft/crates/bc_vm",
     "apps/BackupCraft/crates/bc_volume",
-    "apps/JFNetworker",
-    "apps/JFNetworker/sim",
-    "apps/JFNetworker/crates/jfn_model",
-    "apps/JFNetworker/crates/jfn_run",
-    "apps/JFNetworker/crates/jfn_sim",
     "apps/Kritzel",
     "apps/agenttest",
     "apps/androidGallery",
@@ -115,8 +110,6 @@ members = [
     "apps/i18ntest",
     "apps/installer",
     "apps/jfWord",
-    "apps/jfs",
-    "apps/jfs/crates/script",
     "apps/lifetest",
     "apps/linuxtest",
     "apps/mdviewtest",
@@ -359,3 +352,9 @@ codegen-units = 1
 lto = "fat"
 debug = 0
 strip = "symbols"
+
+# JFScript lives in its own repository (editortest shows its language services, https://github.com/JFLibrary/JFScript).
+# It names jflib-agent-core from crates.io; this takes that crate from this workspace, so that there
+# is one jflib-rt (links = "jflib_rt").  JFScript has to follow a new JFLib version.
+[patch.crates-io]
+jflib-agent-core = { path = "lib/agent_core" }

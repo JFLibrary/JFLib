@@ -31,7 +31,6 @@ datastore.workspace = true
 netio.workspace = true
 cas.workspace = true
 eapm.workspace = true
-script = { path = "../jfs/crates/script" }
 
 [build-dependencies]
 jflib-build.workspace = true

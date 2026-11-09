@@ -30,6 +30,12 @@ pub fn tan(x: f64) -> f64 {
     s / c
 }
 
+/// the largest integer not above x (|x| below 2^63)
+pub fn floor(x: f64) -> f64 {
+    let t = x as i64 as f64;
+    if t > x { t - 1.0 } else { t }
+}
+
 pub fn add(a: V3, b: V3) -> V3 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
@@ -70,6 +76,22 @@ pub fn rotation(q: [f32; 4]) -> [V3; 3] {
         [s * (x * y - w * z), 1.0 - s * (x * x + z * z), s * (y * z + w * x)],
         [s * (x * z + w * y), s * (y * z - w * x), 1.0 - s * (x * x + y * y)],
     ]
+}
+
+/// sine and cosine: reduced to -pi ..= pi, then their series
+pub fn sincos(x: f64) -> (f64, f64) {
+    let tau = core::f64::consts::TAU;
+    let k = (x / tau + if x < 0.0 { -0.5 } else { 0.5 }) as i64;
+    let r = x - k as f64 * tau;
+    let (r2, mut s, mut c, mut ts, mut tc) = (r * r, 0.0, 0.0, r, 1.0);
+    for n in 0..30 {
+        let n = n as f64;
+        s += ts;
+        c += tc;
+        ts *= -r2 / ((2.0 * n + 2.0) * (2.0 * n + 3.0));
+        tc *= -r2 / ((2.0 * n + 1.0) * (2.0 * n + 2.0));
+    }
+    (s, c)
 }
 
 /// the natural logarithm (x <= 0: -inf): x = m 2^e, ln m by the series of atanh
